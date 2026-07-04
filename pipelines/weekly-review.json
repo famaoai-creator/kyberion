@@ -73,7 +73,7 @@
       "op": "system:shell",
       "produces": { "channel": "task_model_routing_summary", "type": "ShellResult" },
       "params": {
-        "cmd": "node dist/scripts/summarize_task_model_routing.js --json > active/shared/tmp/task-model-routing-summary.json || printf '{\"samples\":[],\"rows\":[]}' > active/shared/tmp/task-model-routing-summary.json"
+        "cmd": "node dist/scripts/summarize_task_model_routing.js --output active/shared/tmp/task-model-routing-summary.json"
       }
     },
     {

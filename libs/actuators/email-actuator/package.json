@@ -1,11 +1,13 @@
 {
-  "name": "@kyberion/email-actuator",
+  "name": "@actuator/email",
   "version": "1.0.0",
   "description": "Email composition and sending actuator (Mail.app JXA + SMTP)",
   "type": "module",
-  "main": "src/index.ts",
+  "main": "../../../dist/libs/actuators/email-actuator/src/index.js",
+  "types": "../../../dist/libs/actuators/email-actuator/src/index.d.ts",
   "scripts": {
-    "build": "tsc"
+    "build": "tsc -p ../../../tsconfig.actuators.json",
+    "test": "vitest run src/"
   },
   "dependencies": {
     "@agent/core": "workspace:*"

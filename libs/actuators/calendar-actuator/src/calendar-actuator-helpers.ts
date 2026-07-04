@@ -5,7 +5,7 @@ import {
   pathResolver,
   TraceContext,
   persistTrace,
-  withRetry,
+  retry,
   classifyError,
   formatClassification,
   compileSchemaFromPath,
@@ -43,7 +43,9 @@ interface CalendarSummary {
 
 const AjvCtor = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
-const CALENDAR_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/calendar-actuator/manifest.json');
+const CALENDAR_MANIFEST_PATH = pathResolver.rootResolve(
+  'libs/actuators/calendar-actuator/manifest.json'
+);
 const DEFAULT_CALENDAR_RETRY = {
   maxRetries: 2,
   initialDelayMs: 500,
@@ -61,7 +63,7 @@ function getValidator(): ValidateFunction {
   addFormats(ajv);
   const schemaPath = path.resolve(
     pathResolver.rootDir(),
-    'libs/actuators/calendar-actuator/schemas/calendar-action.schema.json',
+    'libs/actuators/calendar-actuator/schemas/calendar-action.schema.json'
   );
   cachedValidator = compileSchemaFromPath(ajv, schemaPath);
   return cachedValidator;
@@ -71,7 +73,7 @@ function validateAction(input: unknown): CalendarAction {
   const validate = getValidator();
   if (!validate(input)) {
     const errors = (validate.errors || [])
-      .map(e => `${e.instancePath || '/'} ${e.message ?? 'invalid'}`)
+      .map((e) => `${e.instancePath || '/'} ${e.message ?? 'invalid'}`)
       .join('; ');
     throw new Error(`calendar-actuator: invalid input: ${errors}`);
   }
@@ -94,7 +96,9 @@ function isPlainObject(value: unknown): value is Record<string, any> {
 function loadRecoveryPolicy(): Record<string, any> {
   if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
   try {
-    const manifest = JSON.parse(safeReadFile(CALENDAR_MANIFEST_PATH, { encoding: 'utf8' }) as string);
+    const manifest = JSON.parse(
+      safeReadFile(CALENDAR_MANIFEST_PATH, { encoding: 'utf8' }) as string
+    );
     const policy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
     cachedRecoveryPolicy = policy;
     return policy;
@@ -108,7 +112,9 @@ function buildRetryOptions(override?: Record<string, any>) {
   const recoveryPolicy = loadRecoveryPolicy();
   const manifestRetry = isPlainObject(recoveryPolicy.retry) ? recoveryPolicy.retry : {};
   const retryableCategories = new Set<string>(
-    Array.isArray(recoveryPolicy.retryable_categories) ? recoveryPolicy.retryable_categories.map(String) : [],
+    Array.isArray(recoveryPolicy.retryable_categories)
+      ? recoveryPolicy.retryable_categories.map(String)
+      : []
   );
   const resolved = {
     ...DEFAULT_CALENDAR_RETRY,
@@ -122,10 +128,12 @@ function buildRetryOptions(override?: Record<string, any>) {
       if (retryableCategories.size > 0) {
         return retryableCategories.has(classification.category);
       }
-      return classification.category === 'network'
-        || classification.category === 'rate_limit'
-        || classification.category === 'timeout'
-        || classification.category === 'resource_unavailable';
+      return (
+        classification.category === 'network' ||
+        classification.category === 'rate_limit' ||
+        classification.category === 'timeout' ||
+        classification.category === 'resource_unavailable'
+      );
     },
   };
 }
@@ -138,14 +146,17 @@ async function runJxa<T>(scriptBody: string, params: Record<string, unknown>): P
       ${scriptBody}
     })();
   `;
-  const output = await withRetry(async () => safeExec('osascript', ['-l', 'JavaScript', '-e', script]), buildRetryOptions());
+  const output = await retry(
+    async () => safeExec('osascript', ['-l', 'JavaScript', '-e', script]),
+    buildRetryOptions()
+  );
   const trimmed = String(output).trim();
   if (!trimmed) return undefined as unknown as T;
   try {
     return JSON.parse(trimmed) as T;
   } catch (err: any) {
     throw new Error(
-      `calendar-actuator: failed to parse osascript output: ${err.message}\n${trimmed.slice(0, 300)}`,
+      `calendar-actuator: failed to parse osascript output: ${err.message}\n${trimmed.slice(0, 300)}`
     );
   }
 }
@@ -156,7 +167,7 @@ export async function listCalendars(): Promise<CalendarSummary[]> {
       const app = Application("Calendar");
       return JSON.stringify(app.calendars().map(function (cal) { return { name: cal.name() }; }));
     `,
-    {},
+    {}
   );
 }
 
@@ -171,7 +182,7 @@ export async function listEvents(params: CalendarParams): Promise<CalendarEvent[
 
   if (end.getTime() <= start.getTime()) {
     throw new Error(
-      `calendar-actuator: end_date (${end.toISOString()}) must be after start_date (${start.toISOString()})`,
+      `calendar-actuator: end_date (${end.toISOString()}) must be after start_date (${start.toISOString()})`
     );
   }
 
@@ -211,23 +222,24 @@ export async function listEvents(params: CalendarParams): Promise<CalendarEvent[
       calendar_names: params.calendar_names ?? null,
       start_iso: start.toISOString(),
       end_iso: end.toISOString(),
-    },
+    }
   );
 }
 
-export async function createEvent(params: CalendarParams): Promise<{ status: string; title: string }> {
+export async function createEvent(
+  params: CalendarParams
+): Promise<{ status: string; title: string }> {
   if (!params.title || !params.start_date || !params.calendar_names?.[0]) {
     throw new Error(
-      'calendar-actuator: create_event requires title, start_date, and calendar_names[0]',
+      'calendar-actuator: create_event requires title, start_date, and calendar_names[0]'
     );
   }
   const start = parseISODate(params.start_date, 'start_date')!;
   const end =
-    parseISODate(params.end_date, 'end_date') ??
-    new Date(start.getTime() + 30 * 60 * 1000);
+    parseISODate(params.end_date, 'end_date') ?? new Date(start.getTime() + 30 * 60 * 1000);
   if (end.getTime() <= start.getTime()) {
     throw new Error(
-      `calendar-actuator: end_date (${end.toISOString()}) must be after start_date (${start.toISOString()})`,
+      `calendar-actuator: end_date (${end.toISOString()}) must be after start_date (${start.toISOString()})`
     );
   }
 
@@ -255,7 +267,7 @@ export async function createEvent(params: CalendarParams): Promise<{ status: str
       end_iso: end.toISOString(),
       location: params.location ?? '',
       description: params.description ?? '',
-    },
+    }
   );
 }
 
@@ -302,4 +314,3 @@ export async function handleAction(action: CalendarAction): Promise<unknown> {
     }
   }
 }
-

@@ -13,16 +13,17 @@ const mocks = vi.hoisted(() => ({
   compileVideoGenerationADF: vi.fn(),
   generateImage: vi.fn(),
   secureFetch: vi.fn(),
-  withRetry: vi.fn(async (fn: () => Promise<unknown>, _options?: unknown) => fn()),
+  retry: vi.fn(async (fn: () => Promise<unknown>, _options?: unknown) => fn()),
   safeCopyFileSync: vi.fn(),
   safeExistsSync: vi.fn(),
   safeMkdir: vi.fn(),
 }));
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
+const COMFY_OUTPUT_DIR = pathResolver.sharedTmp('comfy/output');
 
 vi.mock('@agent/core', async () => {
-  const actual = await vi.importActual('@agent/core') as any;
+  const actual = (await vi.importActual('@agent/core')) as any;
   return {
     ...actual,
     safeReadFile: mocks.safeReadFile,
@@ -33,7 +34,7 @@ vi.mock('@agent/core', async () => {
     compileVideoGenerationADF: mocks.compileVideoGenerationADF,
     generateImage: mocks.generateImage,
     secureFetch: mocks.secureFetch,
-    withRetry: mocks.withRetry,
+    retry: mocks.retry,
     safeCopyFileSync: mocks.safeCopyFileSync,
     safeExistsSync: mocks.safeExistsSync,
     safeMkdir: mocks.safeMkdir,
@@ -107,7 +108,7 @@ describe('media-generation-actuator', () => {
       },
     });
 
-    expect(mocks.withRetry).toHaveBeenCalledWith(
+    expect(mocks.retry).toHaveBeenCalledWith(
       expect.any(Function),
       expect.objectContaining({
         maxRetries: 4,
@@ -116,7 +117,7 @@ describe('media-generation-actuator', () => {
         factor: 3,
         jitter: false,
         shouldRetry: expect.any(Function),
-      }),
+      })
     );
   });
 
@@ -132,12 +133,14 @@ describe('media-generation-actuator', () => {
     expect(mocks.executeServicePreset).toHaveBeenCalledWith('media-generation', 'generate_image', {
       workflow_path: 'active/shared/tmp/image-workflow.json',
     });
-    expect(result).toEqual(expect.objectContaining({
-      prompt_id: 'abc123',
-      trace_summary: expect.objectContaining({
-        spans: expect.any(Number),
-      }),
-    }));
+    expect(result).toEqual(
+      expect.objectContaining({
+        prompt_id: 'abc123',
+        trace_summary: expect.objectContaining({
+          spans: expect.any(Number),
+        }),
+      })
+    );
   });
 
   it('uses the direct image bridge path and preserves the artifact format from the output path', async () => {
@@ -157,21 +160,23 @@ describe('media-generation-actuator', () => {
       },
     });
 
-    expect(result).toEqual(expect.objectContaining({
-      prompt_id: 'bridge-prompt-1',
-      artifact: expect.objectContaining({
-        format: 'png',
-        path: 'active/shared/exports/country-cover.png',
-      }),
-      artifacts: expect.arrayContaining([
-        expect.objectContaining({ format: 'png' }),
-      ]),
-      backend_id: 'comfyui',
-    }));
-    expect(mocks.generateImage).toHaveBeenCalledWith(expect.objectContaining({
-      prompt: 'country road',
-      targetPath: 'active/shared/exports/country-cover.png',
-    }));
+    expect(result).toEqual(
+      expect.objectContaining({
+        prompt_id: 'bridge-prompt-1',
+        artifact: expect.objectContaining({
+          format: 'png',
+          path: 'active/shared/exports/country-cover.png',
+        }),
+        artifacts: expect.arrayContaining([expect.objectContaining({ format: 'png' })]),
+        backend_id: 'comfyui',
+      })
+    );
+    expect(mocks.generateImage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prompt: 'country road',
+        targetPath: 'active/shared/exports/country-cover.png',
+      })
+    );
     expect(mocks.executeServicePreset).not.toHaveBeenCalled();
   });
 
@@ -205,21 +210,27 @@ describe('media-generation-actuator', () => {
       },
     });
 
-    expect(mocks.executeServicePreset).toHaveBeenCalledWith('media-generation', 'generate_image', expect.objectContaining({
-      workflow: { '201': { class_type: 'SaveImage' } },
-    }));
-    expect(mocks.safeCopyFileSync).toHaveBeenCalledWith(
-      '/Users/famaoai/Documents/comfy/ComfyUI/output/country-cover_00001_.png',
-      'active/shared/exports/country-cover.png',
+    expect(mocks.executeServicePreset).toHaveBeenCalledWith(
+      'media-generation',
+      'generate_image',
+      expect.objectContaining({
+        workflow: { '201': { class_type: 'SaveImage' } },
+      })
     );
-    expect(result).toEqual(expect.objectContaining({
-      action: 'generate_image',
-      prompt_id: 'img-123',
-      copied_to: 'active/shared/exports/country-cover.png',
-      artifact: expect.objectContaining({
-        filename: 'country-cover_00001_.png',
-      }),
-    }));
+    expect(mocks.safeCopyFileSync).toHaveBeenCalledWith(
+      `${COMFY_OUTPUT_DIR}/country-cover_00001_.png`,
+      'active/shared/exports/country-cover.png'
+    );
+    expect(result).toEqual(
+      expect.objectContaining({
+        action: 'generate_image',
+        prompt_id: 'img-123',
+        copied_to: 'active/shared/exports/country-cover.png',
+        artifact: expect.objectContaining({
+          filename: 'country-cover_00001_.png',
+        }),
+      })
+    );
   });
 
   it('compiles image ADFs before dispatching generation', async () => {
@@ -244,14 +255,16 @@ describe('media-generation-actuator', () => {
     });
 
     expect(mocks.compileImageGenerationADF).toHaveBeenCalled();
-    expect(result).toEqual(expect.objectContaining({
-      prompt_id: 'img-234',
-      status: 'submitted',
-      compiled_generation_request: { filename_prefix: 'cover' },
-      trace_summary: expect.objectContaining({
-        spans: expect.any(Number),
-      }),
-    }));
+    expect(result).toEqual(
+      expect.objectContaining({
+        prompt_id: 'img-234',
+        status: 'submitted',
+        compiled_generation_request: { filename_prefix: 'cover' },
+        trace_summary: expect.objectContaining({
+          spans: expect.any(Number),
+        }),
+      })
+    );
   });
 
   it('compiles music ADFs, waits for completion, and returns the generated artifact', async () => {
@@ -294,20 +307,26 @@ describe('media-generation-actuator', () => {
     });
 
     expect(mocks.compileMusicGenerationADF).toHaveBeenCalled();
-    expect(mocks.executeServicePreset).toHaveBeenCalledWith('media-generation', 'generate_music', expect.objectContaining({
-      workflow: { '111': { class_type: 'SaveAudioMP3' } },
-    }));
-    expect(mocks.safeCopyFileSync).toHaveBeenCalledWith(
-      '/Users/famaoai/Documents/comfy/ComfyUI/output/audio/anniversary-song_00001_.mp3',
-      'active/shared/exports/anniversary-song.mp3',
+    expect(mocks.executeServicePreset).toHaveBeenCalledWith(
+      'media-generation',
+      'generate_music',
+      expect.objectContaining({
+        workflow: { '111': { class_type: 'SaveAudioMP3' } },
+      })
     );
-    expect(result).toEqual(expect.objectContaining({
-      prompt_id: 'music-123',
-      copied_to: 'active/shared/exports/anniversary-song.mp3',
-      artifact: expect.objectContaining({
-        filename: 'anniversary-song_00001_.mp3',
-      }),
-    }));
+    expect(mocks.safeCopyFileSync).toHaveBeenCalledWith(
+      `${COMFY_OUTPUT_DIR}/audio/anniversary-song_00001_.mp3`,
+      'active/shared/exports/anniversary-song.mp3'
+    );
+    expect(result).toEqual(
+      expect.objectContaining({
+        prompt_id: 'music-123',
+        copied_to: 'active/shared/exports/anniversary-song.mp3',
+        artifact: expect.objectContaining({
+          filename: 'anniversary-song_00001_.mp3',
+        }),
+      })
+    );
   });
 
   it('can submit and persist a generation job for later tracking', async () => {
@@ -334,32 +353,36 @@ describe('media-generation-actuator', () => {
       },
     });
 
-    expect(result).toEqual(expect.objectContaining({
-      kind: 'generation-job',
-      action: 'generate_music',
-      status: 'submitted',
-      provider: expect.objectContaining({
-        prompt_id: 'music-123',
-      }),
-    }));
+    expect(result).toEqual(
+      expect.objectContaining({
+        kind: 'generation-job',
+        action: 'generate_music',
+        status: 'submitted',
+        provider: expect.objectContaining({
+          prompt_id: 'music-123',
+        }),
+      })
+    );
     expect(mocks.safeWriteFile).toHaveBeenCalled();
   });
 
   it('can refresh a submitted generation job to succeeded from provider history', async () => {
-    mocks.safeReadFile.mockReturnValue(JSON.stringify({
-      kind: 'generation-job',
-      job_id: 'genjob-generate_music-1',
-      action: 'generate_music',
-      status: 'submitted',
-      provider: { engine: 'comfyui', prompt_id: 'music-123' },
-      request: {
-        target_path: 'active/shared/exports/anniversary-song.mp3',
-      },
-      result: {
-        compiled_music_adf: { filename_prefix: 'anniversary-song' },
-      },
-      created_at: '2026-03-22T00:00:00.000Z',
-    }));
+    mocks.safeReadFile.mockReturnValue(
+      JSON.stringify({
+        kind: 'generation-job',
+        job_id: 'genjob-generate_music-1',
+        action: 'generate_music',
+        status: 'submitted',
+        provider: { engine: 'comfyui', prompt_id: 'music-123' },
+        request: {
+          target_path: 'active/shared/exports/anniversary-song.mp3',
+        },
+        result: {
+          compiled_music_adf: { filename_prefix: 'anniversary-song' },
+        },
+        created_at: '2026-03-22T00:00:00.000Z',
+      })
+    );
     mocks.secureFetch.mockResolvedValue({
       'music-123': {
         status: { completed: true },
@@ -386,30 +409,34 @@ describe('media-generation-actuator', () => {
       },
     });
 
-    expect(result).toEqual(expect.objectContaining({
-      job_id: 'genjob-generate_music-1',
-      status: 'succeeded',
-      result: expect.objectContaining({
-        copied_to: 'active/shared/exports/anniversary-song.mp3',
-      }),
-    }));
+    expect(result).toEqual(
+      expect.objectContaining({
+        job_id: 'genjob-generate_music-1',
+        status: 'succeeded',
+        result: expect.objectContaining({
+          copied_to: 'active/shared/exports/anniversary-song.mp3',
+        }),
+      })
+    );
     expect(mocks.safeWriteFile).toHaveBeenCalled();
   });
 
   it('marks a failed generation job as retrying when retry budget remains', async () => {
-    mocks.safeReadFile.mockReturnValue(JSON.stringify({
-      kind: 'generation-job',
-      job_id: 'genjob-generate_music-2',
-      action: 'generate_music',
-      status: 'submitted',
-      provider: { engine: 'comfyui', prompt_id: 'music-456' },
-      request: {
-        workflow: { '111': { class_type: 'SaveAudioMP3' } },
-      },
-      retry_policy: { max_attempts: 2, backoff_seconds: 0 },
-      attempts: 1,
-      created_at: '2026-03-22T00:00:00.000Z',
-    }));
+    mocks.safeReadFile.mockReturnValue(
+      JSON.stringify({
+        kind: 'generation-job',
+        job_id: 'genjob-generate_music-2',
+        action: 'generate_music',
+        status: 'submitted',
+        provider: { engine: 'comfyui', prompt_id: 'music-456' },
+        request: {
+          workflow: { '111': { class_type: 'SaveAudioMP3' } },
+        },
+        retry_policy: { max_attempts: 2, backoff_seconds: 0 },
+        attempts: 1,
+        created_at: '2026-03-22T00:00:00.000Z',
+      })
+    );
     mocks.secureFetch.mockRejectedValue(new Error('provider unavailable'));
     mocks.executeServicePreset.mockResolvedValue({ prompt_id: 'music-789' });
 
@@ -420,33 +447,37 @@ describe('media-generation-actuator', () => {
     });
 
     expect(mocks.executeServicePreset).not.toHaveBeenCalled();
-    expect(result).toEqual(expect.objectContaining({
-      job_id: 'genjob-generate_music-2',
-      status: 'retrying',
-      next_retry_at: expect.any(String),
-    }));
+    expect(result).toEqual(
+      expect.objectContaining({
+        job_id: 'genjob-generate_music-2',
+        status: 'retrying',
+        next_retry_at: expect.any(String),
+      })
+    );
   });
 
   it('resumes a retrying generation job once its backoff window has elapsed', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-22T00:01:00.000Z'));
-    mocks.safeReadFile.mockReturnValue(JSON.stringify({
-      kind: 'generation-job',
-      job_id: 'genjob-generate_music-3',
-      action: 'generate_music',
-      status: 'retrying',
-      provider: { engine: 'comfyui', prompt_id: 'music-456' },
-      request: {
-        workflow: { '111': { class_type: 'SaveAudioMP3' } },
-      },
-      result: {
-        error: 'provider unavailable',
-      },
-      retry_policy: { max_attempts: 2, backoff_seconds: 30 },
-      attempts: 1,
-      next_retry_at: '2026-03-22T00:00:30.000Z',
-      created_at: '2026-03-22T00:00:00.000Z',
-    }));
+    mocks.safeReadFile.mockReturnValue(
+      JSON.stringify({
+        kind: 'generation-job',
+        job_id: 'genjob-generate_music-3',
+        action: 'generate_music',
+        status: 'retrying',
+        provider: { engine: 'comfyui', prompt_id: 'music-456' },
+        request: {
+          workflow: { '111': { class_type: 'SaveAudioMP3' } },
+        },
+        result: {
+          error: 'provider unavailable',
+        },
+        retry_policy: { max_attempts: 2, backoff_seconds: 30 },
+        attempts: 1,
+        next_retry_at: '2026-03-22T00:00:30.000Z',
+        created_at: '2026-03-22T00:00:00.000Z',
+      })
+    );
     mocks.executeServicePreset.mockResolvedValue({ prompt_id: 'music-789' });
 
     const { handleAction } = await import('./index.js');
@@ -455,22 +486,31 @@ describe('media-generation-actuator', () => {
       params: { job_id: 'genjob-generate_music-3' },
     });
 
-    expect(mocks.executeServicePreset).toHaveBeenCalledWith('media-generation', 'generate_music', expect.objectContaining({
-      workflow: { '111': { class_type: 'SaveAudioMP3' } },
-    }));
-    expect(result).toEqual(expect.objectContaining({
-      job_id: 'genjob-generate_music-3',
-      status: 'submitted',
-      attempts: 2,
-      provider: expect.objectContaining({ prompt_id: 'music-789' }),
-    }));
+    expect(mocks.executeServicePreset).toHaveBeenCalledWith(
+      'media-generation',
+      'generate_music',
+      expect.objectContaining({
+        workflow: { '111': { class_type: 'SaveAudioMP3' } },
+      })
+    );
+    expect(result).toEqual(
+      expect.objectContaining({
+        job_id: 'genjob-generate_music-3',
+        status: 'submitted',
+        attempts: 2,
+        provider: expect.objectContaining({ prompt_id: 'music-789' }),
+      })
+    );
     vi.useRealTimers();
   });
 
   it('emits media generation actions that satisfy the schema', () => {
     const ajv = new Ajv({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.join(pathResolver.rootDir(), 'schemas/media-generation-action.schema.json'));
+    const validate = compileSchemaFromPath(
+      ajv,
+      path.join(pathResolver.rootDir(), 'schemas/media-generation-action.schema.json')
+    );
 
     expect(
       validate({
@@ -479,7 +519,7 @@ describe('media-generation-actuator', () => {
           workflow_path: 'active/shared/tmp/image-workflow.json',
         },
       }),
-      JSON.stringify(validate.errors || []),
+      JSON.stringify(validate.errors || [])
     ).toBe(true);
 
     expect(
@@ -495,51 +535,62 @@ describe('media-generation-actuator', () => {
           },
         },
       }),
-      JSON.stringify(validate.errors || []),
+      JSON.stringify(validate.errors || [])
     ).toBe(true);
   });
 
   it('rejects unsupported media generation actions', () => {
     const ajv = new Ajv({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.join(pathResolver.rootDir(), 'schemas/media-generation-action.schema.json'));
+    const validate = compileSchemaFromPath(
+      ajv,
+      path.join(pathResolver.rootDir(), 'schemas/media-generation-action.schema.json')
+    );
 
     expect(
       validate({
         action: 'unsupported',
         params: {},
-      }),
+      })
     ).toBe(false);
   });
 
   it('emits voice-generation-adf requests that satisfy the schema', () => {
     const ajv = new Ajv({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.join(pathResolver.rootDir(), 'knowledge/product/schemas/voice-generation-adf.schema.json'));
+    const validate = compileSchemaFromPath(
+      ajv,
+      path.join(
+        pathResolver.rootDir(),
+        'knowledge/product/schemas/voice-generation-adf.schema.json'
+      )
+    );
 
-    expect(validate({
-      action: 'generate_voice',
-      request_id: 'req-schema-1',
-      text: 'hello world',
-      profile_ref: {
-        profile_id: 'operator-ja-default',
-      },
-      engine: {
-        engine_id: 'local_say',
-      },
-      rendering: {
-        language: 'ja',
-        chunking: {
-          max_chunk_chars: 200,
-          crossfade_ms: 50,
-          preserve_paralinguistic_tags: true,
+    expect(
+      validate({
+        action: 'generate_voice',
+        request_id: 'req-schema-1',
+        text: 'hello world',
+        profile_ref: {
+          profile_id: 'operator-ja-default',
         },
-      },
-      delivery: {
-        mode: 'artifact',
-        format: 'wav',
-        emit_progress_packets: true,
-      },
-    })).toBe(true);
+        engine: {
+          engine_id: 'local_say',
+        },
+        rendering: {
+          language: 'ja',
+          chunking: {
+            max_chunk_chars: 200,
+            crossfade_ms: 50,
+            preserve_paralinguistic_tags: true,
+          },
+        },
+        delivery: {
+          mode: 'artifact',
+          format: 'wav',
+          emit_progress_packets: true,
+        },
+      })
+    ).toBe(true);
   });
 });

@@ -38,7 +38,9 @@ class AgentRegistryImpl {
       trustScore: input.trustScore ?? this.loadTrustScore(input.agentId),
     };
     this.agents.set(record.agentId, record);
-    logger.info(`[AGENT_REGISTRY] Registered: ${record.agentId} (${record.provider}/${record.modelId})`);
+    logger.info(
+      `[AGENT_REGISTRY] Registered: ${record.agentId} (${record.provider}/${record.modelId})`
+    );
     return record;
   }
 
@@ -72,33 +74,37 @@ class AgentRegistryImpl {
 
   list(filter?: Partial<Pick<AgentRecord, 'status' | 'provider'>>): AgentRecord[] {
     let results = Array.from(this.agents.values());
-    if (filter?.status) results = results.filter(r => r.status === filter.status);
-    if (filter?.provider) results = results.filter(r => r.provider === filter.provider);
+    if (filter?.status) results = results.filter((r) => r.status === filter.status);
+    if (filter?.provider) results = results.filter((r) => r.provider === filter.provider);
     return results;
   }
 
   findByThread(threadId: string): AgentRecord | undefined {
-    return Array.from(this.agents.values()).find(r => r.threadId === threadId);
+    return Array.from(this.agents.values()).find((r) => r.threadId === threadId);
   }
 
   findByCapability(capability: string): AgentRecord[] {
-    return Array.from(this.agents.values()).filter(r => r.capabilities.includes(capability));
+    return Array.from(this.agents.values()).filter((r) => r.capabilities.includes(capability));
   }
 
   getHealthSnapshot(): { total: number; ready: number; busy: number; error: number } {
     const all = Array.from(this.agents.values());
     return {
       total: all.length,
-      ready: all.filter(r => r.status === 'ready').length,
-      busy: all.filter(r => r.status === 'busy').length,
-      error: all.filter(r => r.status === 'error').length,
+      ready: all.filter((r) => r.status === 'ready').length,
+      busy: all.filter((r) => r.status === 'busy').length,
+      error: all.filter((r) => r.status === 'error').length,
     };
   }
 
   private loadTrustScore(agentId: string): number {
-    const record = trustEngine.getScore(agentId);
-    return record?.score ?? 500;
+    return resolveAgentTrustScore(agentId);
   }
+}
+
+export function resolveAgentTrustScore(agentId: string, fallback = 500): number {
+  const record = trustEngine.getScore(agentId);
+  return record?.score ?? fallback;
 }
 
 const GLOBAL_KEY = Symbol.for('@kyberion/agent-registry');

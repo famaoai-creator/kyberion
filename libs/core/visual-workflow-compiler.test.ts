@@ -3,7 +3,10 @@ import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import { describe, expect, it } from 'vitest';
 import { compileSchemaFromPath } from '@agent/core';
-import { compileImageGenerationADF, compileVideoGenerationADF } from './visual-workflow-compiler.js';
+import {
+  compileImageGenerationADF,
+  compileVideoGenerationADF,
+} from './visual-workflow-compiler.js';
 
 const AjvCtor = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
@@ -21,28 +24,48 @@ describe('visual workflow compiler', () => {
     } as any;
     const result = compileImageGenerationADF(adf);
 
-    expect(result.workflow['1']).toEqual(expect.objectContaining({ class_type: 'CheckpointLoaderSimple' }));
+    expect(result.workflow['1']).toEqual(
+      expect.objectContaining({ class_type: 'CheckpointLoaderSimple' })
+    );
     expect(result.workflow['7']).toEqual({
       class_type: 'SaveImage',
       inputs: { images: ['6', 0], filename_prefix: 'country-cover' },
     });
   });
 
+  it('falls back to a slugified image filename prefix when omitted', () => {
+    const result = compileImageGenerationADF({
+      kind: 'image-generation-adf',
+      version: '1.0.0',
+      intent: 'Country Cover',
+      prompt: 'country road at golden hour',
+      canvas: { width: 1024, height: 1024 },
+      output: { format: 'png' },
+    } as any);
+
+    expect(result.resolved.filename_prefix).toBe('country-cover');
+  });
+
   it('emits image-generation-adf that matches the schema', () => {
     const root = process.cwd();
     const ajv = new AjvCtor({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.resolve(root, 'knowledge/product/schemas/image-generation-adf.schema.json'));
+    const validate = compileSchemaFromPath(
+      ajv,
+      path.resolve(root, 'knowledge/product/schemas/image-generation-adf.schema.json')
+    );
 
-    expect(validate({
-      kind: 'image-generation-adf',
-      version: '1.0.0',
-      intent: 'country_cover',
-      prompt: 'country road at golden hour',
-      negative_prompt: 'blurry',
-      canvas: { width: 1024, height: 1024 },
-      output: { format: 'png', filename_prefix: 'country-cover' },
-    })).toBe(true);
+    expect(
+      validate({
+        kind: 'image-generation-adf',
+        version: '1.0.0',
+        intent: 'country_cover',
+        prompt: 'country road at golden hour',
+        negative_prompt: 'blurry',
+        canvas: { width: 1024, height: 1024 },
+        output: { format: 'png', filename_prefix: 'country-cover' },
+      })
+    ).toBe(true);
   });
 
   it('hydrates embedded video workflow templates from video-generation-adf', () => {
@@ -75,25 +98,30 @@ describe('visual workflow compiler', () => {
     const root = process.cwd();
     const ajv = new AjvCtor({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.resolve(root, 'knowledge/product/schemas/video-generation-adf.schema.json'));
+    const validate = compileSchemaFromPath(
+      ajv,
+      path.resolve(root, 'knowledge/product/schemas/video-generation-adf.schema.json')
+    );
 
-    expect(validate({
-      kind: 'video-generation-adf',
-      version: '1.0.0',
-      prompt: 'cinematic driving shot',
-      composition: { duration_sec: 5, fps: 24 },
-      engine: {
-        provider: 'comfyui',
-        workflow_template: 'embedded',
-        base_workflow: {
-          '1': {
-            class_type: 'TextNode',
-            inputs: { text: '{{prompt}}', fps: '{{fps}}', duration: '{{duration_sec}}' },
+    expect(
+      validate({
+        kind: 'video-generation-adf',
+        version: '1.0.0',
+        prompt: 'cinematic driving shot',
+        composition: { duration_sec: 5, fps: 24 },
+        engine: {
+          provider: 'comfyui',
+          workflow_template: 'embedded',
+          base_workflow: {
+            '1': {
+              class_type: 'TextNode',
+              inputs: { text: '{{prompt}}', fps: '{{fps}}', duration: '{{duration_sec}}' },
+            },
           },
         },
-      },
-      output: { format: 'mp4', filename_prefix: 'drive-shot' },
-    })).toBe(true);
+        output: { format: 'mp4', filename_prefix: 'drive-shot' },
+      })
+    ).toBe(true);
   });
 
   it('builds named video workflow templates without embedding raw base_workflow in the ADF', () => {

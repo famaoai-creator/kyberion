@@ -63,3 +63,7 @@
 
 - ブリッジがエラー文を投稿するようになると、リトライ嵐の際にユーザーへ連投される可能性がある。**同一会話への連続エラー投稿は 1 分に 1 回**の簡易レート制限を Task 3 のパターンに含めること。
 - 封筒の文言は LLM 生成にしない(決定論・語彙カタログ準拠)。会話文脈に応じた言い換えが欲しい場合も、まず定型で出してから将来の改善とする。
+
+## 実装メモ
+
+- 2026-07-04: `libs/core/error-classifier.ts` に `buildUserFacingError()` を追加し、`knowledge/product/orchestration/user-facing-vocabulary.json` へエラー語彙を追加した。Chronos の `FocusedOperatorView` / `MissionIntelligence` / `SovereignChat` は、内部例外を直接描画せず、ブラウザ安全な封筒表現に差し替えた。

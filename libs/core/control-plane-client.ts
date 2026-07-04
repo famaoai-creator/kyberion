@@ -195,10 +195,6 @@ export function getControlPlaneRemediationPlan(
   return DEFAULT_REMEDIATION_PLANS[surface];
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 function inferSurfaceMismatchMessage(
   surface: ControlPlaneSurface,
   pathname: string,
@@ -436,3 +432,4 @@ export function createControlPlaneClient(
     },
   };
 }
+import { sleep } from './async-utils.js';

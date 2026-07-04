@@ -20,7 +20,6 @@ import {
   resolveVars,
   handleStepError,
   classifyError,
-  withRetry,
   createActuatorTrace,
   finalizeActuatorTrace,
   resolveMediaToneStyle,
@@ -50,6 +49,7 @@ import {
   resolveDocumentProfileKeywords as resolveDocumentProfileKeywordsPolicy,
   resolveProposalSectionKeywords,
   isLegacyMediaOp,
+  retry,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import {
@@ -73,7 +73,11 @@ import {
   type PdfToPptxHints,
   type PdfToXlsxHints,
 } from './media-pdf-protocol-helpers.js';
-import { handleMediaAction, type MediaAction, type MediaPipelineStep } from './media-pipeline-helpers.js';
+import {
+  handleMediaAction,
+  type MediaAction,
+  type MediaPipelineStep,
+} from './media-pipeline-helpers.js';
 import { createProposalPptxFlow } from './proposal-pptx-helpers.js';
 import { createMediaDocumentPipelineHelpers } from './media-document-pipeline-helpers.js';
 import {
@@ -129,6 +133,7 @@ import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import * as excelUtils from '@agent/shared-media';
 import { PDFParse } from 'pdf-parse';
+import { runActuatorCli } from '@agent/core';
 
 const MEDIA_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/media-actuator/manifest.json');
 const DEFAULT_MEDIA_RETRY = {
@@ -165,7 +170,9 @@ function buildRetryOptions(override?: Record<string, any>) {
   const recoveryPolicy = loadRecoveryPolicy();
   const manifestRetry = isPlainObject(recoveryPolicy.retry) ? recoveryPolicy.retry : {};
   const retryableCategories = new Set<string>(
-    Array.isArray(recoveryPolicy.retryable_categories) ? recoveryPolicy.retryable_categories.map(String) : [],
+    Array.isArray(recoveryPolicy.retryable_categories)
+      ? recoveryPolicy.retryable_categories.map(String)
+      : []
   );
   const resolved = {
     ...DEFAULT_MEDIA_RETRY,
@@ -179,10 +186,12 @@ function buildRetryOptions(override?: Record<string, any>) {
       if (retryableCategories.size > 0) {
         return retryableCategories.has(classification.category);
       }
-      return classification.category === 'network'
-        || classification.category === 'rate_limit'
-        || classification.category === 'timeout'
-        || classification.category === 'resource_unavailable';
+      return (
+        classification.category === 'network' ||
+        classification.category === 'rate_limit' ||
+        classification.category === 'timeout' ||
+        classification.category === 'resource_unavailable'
+      );
     },
   };
 }
@@ -207,7 +216,10 @@ function resolveSlideTemplate(template: any, slideData: any, fallback = ''): str
   return template
     .replace(/{{\s*title\s*}}/g, slideData?.title || '')
     .replace(/{{\s*subtitle\s*}}/g, slideData?.subtitle || '')
-    .replace(/{{\s*body\s*}}/g, Array.isArray(slideData?.body) ? slideData.body.join('\n') : (slideData?.body || ''))
+    .replace(
+      /{{\s*body\s*}}/g,
+      Array.isArray(slideData?.body) ? slideData.body.join('\n') : slideData?.body || ''
+    )
     .replace(/{{\s*visual\s*}}/g, slideData?.visual || '');
 }
 
@@ -225,10 +237,15 @@ function resolveRuntimeSlidePreset(rootDir: string, slideData: any): any {
   const presetKey = layoutKey || mediaKind;
   const catalog = loadSlideLayoutPresetCatalog(rootDir);
   const designSystems = loadMediaDesignSystemsCatalog(rootDir);
-  const system = slideData?.design_system_id ? designSystems.systems?.[slideData.design_system_id] : null;
+  const system = slideData?.design_system_id
+    ? designSystems.systems?.[slideData.design_system_id]
+    : null;
   const defaults = catalog.defaults?.['title-body'] || null;
   const preset = catalog.presets?.[presetKey] || catalog.presets?.[mediaKind] || defaults;
-  const override = system?.slide_layout_overrides?.[presetKey] || system?.slide_layout_overrides?.[mediaKind] || null;
+  const override =
+    system?.slide_layout_overrides?.[presetKey] ||
+    system?.slide_layout_overrides?.[mediaKind] ||
+    null;
   if (!preset && !override) return null;
   return mergePptxShape(preset || {}, override || {});
 }
@@ -236,29 +253,47 @@ function resolveRuntimeSlidePreset(rootDir: string, slideData: any): any {
 let _cachedBzl: any = null;
 function loadBodyZoneLayouts(rootDir: string): any {
   if (_cachedBzl) return _cachedBzl;
-  const p = path.join(rootDir, 'knowledge/public/design-patterns/media-templates/slide-layout-presets/body-zone-layouts.json');
+  const p = path.join(
+    rootDir,
+    'knowledge/public/design-patterns/media-templates/slide-layout-presets/body-zone-layouts.json'
+  );
   _cachedBzl = JSON.parse(safeReadFile(p, { encoding: 'utf8' }) as string);
   return _cachedBzl;
 }
 
 // Reads PNG dimensions from the image file and returns {w, h} in inches, preserving aspect ratio.
 // targetH: desired display height in inches; maxW: optional cap on width.
-function getPngDisplaySize(logoPath: string, targetH: number, maxW?: number): { w: number; h: number } {
+function getPngDisplaySize(
+  logoPath: string,
+  targetH: number,
+  maxW?: number
+): { w: number; h: number } {
   try {
     const buf = safeReadFile(logoPath, { encoding: null }) as Buffer;
-    if (buf && buf.length >= 24 &&
-        buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4E && buf[3] === 0x47) {
+    if (
+      buf &&
+      buf.length >= 24 &&
+      buf[0] === 0x89 &&
+      buf[1] === 0x50 &&
+      buf[2] === 0x4e &&
+      buf[3] === 0x47
+    ) {
       const pxW = buf.readUInt32BE(16);
       const pxH = buf.readUInt32BE(20);
       if (pxW > 0 && pxH > 0) {
         const aspect = pxW / pxH;
         let h = targetH;
         let w = Math.round(aspect * h * 1000) / 1000;
-        if (maxW && w > maxW) { w = maxW; h = Math.round((maxW / aspect) * 1000) / 1000; }
+        if (maxW && w > maxW) {
+          w = maxW;
+          h = Math.round((maxW / aspect) * 1000) / 1000;
+        }
         return { w, h };
       }
     }
-  } catch { /* non-PNG or unreadable — fall through */ }
+  } catch {
+    /* non-PNG or unreadable — fall through */
+  }
   return { w: Math.round(targetH * 3 * 1000) / 1000, h: targetH };
 }
 
@@ -266,15 +301,21 @@ function resolveBodyZoneLayout(semanticType: string): string {
   switch (semanticType) {
     case 'problem':
     case 'evidence':
-    case 'roi':         return 'two-column-callout';
-    case 'control':     return 'two-column-risk';
+    case 'roi':
+      return 'two-column-callout';
+    case 'control':
+      return 'two-column-risk';
     case 'plan':
-    case 'roadmap':     return 'timeline';
+    case 'roadmap':
+      return 'timeline';
     case 'solution':
-    case 'architecture': return 'architecture-panel';
+    case 'architecture':
+      return 'architecture-panel';
     case 'decision':
-    case 'cta':         return 'decision-cta';
-    default:            return 'single-column';
+    case 'cta':
+      return 'decision-cta';
+    default:
+      return 'single-column';
   }
 }
 
@@ -282,7 +323,10 @@ let _cachedLayoutTemplates: any = null;
 function loadLayoutTemplateCatalog(rootDir: string): any {
   if (_cachedLayoutTemplates) return _cachedLayoutTemplates;
   try {
-    const p = path.join(rootDir, 'knowledge/public/design-patterns/media-templates/slide-layout-presets/layout-templates.json');
+    const p = path.join(
+      rootDir,
+      'knowledge/public/design-patterns/media-templates/slide-layout-presets/layout-templates.json'
+    );
     _cachedLayoutTemplates = JSON.parse(safeReadFile(p, { encoding: 'utf8' }) as string);
   } catch {
     _cachedLayoutTemplates = { default: 'corporate-standard', templates: {} };
@@ -301,18 +345,28 @@ function loadTenantEntries(rootDir: string): { override_path: string }[] {
     if (Array.isArray(registry.tenants)) {
       entries.push(...registry.tenants.filter((entry: any) => entry?.override_path));
     }
-  } catch { /* index.json absent or unreadable — fall through to directory scan */ }
+  } catch {
+    /* index.json absent or unreadable — fall through to directory scan */
+  }
   // Fallback: scan knowledge/confidential/*/design/tenant-override.json
   try {
     const confidentialDir = path.join(rootDir, 'knowledge/confidential');
     const names = safeReaddir(confidentialDir);
-    const slugs = names.filter(name => {
-      try { return safeStat(path.join(confidentialDir, name)).isDirectory(); } catch { return false; }
+    const slugs = names.filter((name) => {
+      try {
+        return safeStat(path.join(confidentialDir, name)).isDirectory();
+      } catch {
+        return false;
+      }
     });
-    entries.push(...slugs.map((s: string) => ({
-      override_path: `knowledge/confidential/${s}/design/tenant-override.json`
-    })));
-  } catch { /* confidential directory absent or unreadable */ }
+    entries.push(
+      ...slugs.map((s: string) => ({
+        override_path: `knowledge/confidential/${s}/design/tenant-override.json`,
+      }))
+    );
+  } catch {
+    /* confidential directory absent or unreadable */
+  }
   const seen = new Set<string>();
   return entries.filter((entry) => {
     if (!entry.override_path || seen.has(entry.override_path)) return false;
@@ -321,31 +375,58 @@ function loadTenantEntries(rootDir: string): { override_path: string }[] {
   });
 }
 
-function resolveConfidentialTenantOverride(rootDir: string, brandName: string, designSystemId?: string): any {
+function resolveConfidentialTenantOverride(
+  rootDir: string,
+  brandName: string,
+  designSystemId?: string
+): any {
   if (!brandName) return null;
   try {
     if (!_cachedTenantRegistry) {
       _cachedTenantRegistry = { entries: loadTenantEntries(rootDir) };
     }
     const key = brandName.toLowerCase();
-    for (const entry of (_cachedTenantRegistry.entries || [])) {
+    for (const entry of _cachedTenantRegistry.entries || []) {
       const overridePath = path.resolve(rootDir, entry.override_path);
       try {
         const override = JSON.parse(safeReadFile(overridePath, { encoding: 'utf8' }) as string);
-        if (designSystemId && override.design_system_id && override.design_system_id !== designSystemId) continue;
-        const matched = Array.isArray(override.matchers) && override.matchers.some((m: string) => key.includes(m.toLowerCase()));
+        if (
+          designSystemId &&
+          override.design_system_id &&
+          override.design_system_id !== designSystemId
+        )
+          continue;
+        const matched =
+          Array.isArray(override.matchers) &&
+          override.matchers.some((m: string) => key.includes(m.toLowerCase()));
         if (matched) return override;
-      } catch { /* skip unreadable override */ }
+      } catch {
+        /* skip unreadable override */
+      }
     }
-  } catch { /* unexpected failure */ }
+  } catch {
+    /* unexpected failure */
+  }
   return null;
 }
 
-function resolveLayoutTemplate(rootDir: string, designSystemId: string | undefined, slideData?: any, theme?: any): any {
-  const themeTemplateCatalog = theme?.layout_templates || theme?.pptx?.layout_templates || theme?.web?.layout_templates || null;
+function resolveLayoutTemplate(
+  rootDir: string,
+  designSystemId: string | undefined,
+  slideData?: any,
+  theme?: any
+): any {
+  const themeTemplateCatalog =
+    theme?.layout_templates ||
+    theme?.pptx?.layout_templates ||
+    theme?.web?.layout_templates ||
+    null;
   if (themeTemplateCatalog?.templates) {
-    const templateId = slideData?.layout_template_id || themeTemplateCatalog.default || theme?.layout_template_id;
-    const tpl = themeTemplateCatalog.templates?.[templateId] || themeTemplateCatalog.templates?.[themeTemplateCatalog.default];
+    const templateId =
+      slideData?.layout_template_id || themeTemplateCatalog.default || theme?.layout_template_id;
+    const tpl =
+      themeTemplateCatalog.templates?.[templateId] ||
+      themeTemplateCatalog.templates?.[themeTemplateCatalog.default];
     if (tpl) return tpl;
   }
   const designSystems = loadMediaDesignSystemsCatalog(rootDir);
@@ -360,10 +441,13 @@ function resolveLayoutTemplate(rootDir: string, designSystemId: string | undefin
       const templateId = tenantOverride.layout_template_id || catalog.default;
       const tpl = catalog.templates?.[templateId];
       if (tpl) return tpl;
-    } catch { /* fall through to public catalog */ }
+    } catch {
+      /* fall through to public catalog */
+    }
   }
   // Priority 2: template ID resolved from the public catalog
-  const templateId: string | null = tenantOverride?.layout_template_id || system?.layout_template_id || null;
+  const templateId: string | null =
+    tenantOverride?.layout_template_id || system?.layout_template_id || null;
   if (templateId) {
     const catalog = loadLayoutTemplateCatalog(rootDir);
     const tpl = catalog.templates?.[templateId];
@@ -372,7 +456,11 @@ function resolveLayoutTemplate(rootDir: string, designSystemId: string | undefin
   return loadBodyZoneLayouts(rootDir);
 }
 
-function resolveBodyZoneKey(semanticType: string, designSystemId: string | undefined, rootDir: string): string {
+function resolveBodyZoneKey(
+  semanticType: string,
+  designSystemId: string | undefined,
+  rootDir: string
+): string {
   const designSystems = loadMediaDesignSystemsCatalog(rootDir);
   const system = designSystemId ? designSystems.systems?.[designSystemId] : null;
   const mapped: string | undefined = system?.body_zone_map?.[semanticType];
@@ -380,12 +468,21 @@ function resolveBodyZoneKey(semanticType: string, designSystemId: string | undef
   return resolveBodyZoneLayout(semanticType).replace(/-/g, '_');
 }
 
-function buildPptxSlideFromPattern(rootDir: string, data: any, idx: number, theme: any, pattern: any, activeMaster: any, canvas: any) {
+function buildPptxSlideFromPattern(
+  rootDir: string,
+  data: any,
+  idx: number,
+  theme: any,
+  pattern: any,
+  activeMaster: any,
+  canvas: any
+) {
   const themeColors = resolveThemeColors(theme);
-  const primaryHex  = (themeColors.primary    || '#3867D6').replace('#', '');
-  const accentHex   = (themeColors.accent     || '#0070C0').replace('#', '');
-  const textHex     = (themeColors.text       || '#000000').replace('#', '');
-  const semanticType = data.semantic_type || classifyRenderSemantic(data.layout_key, data.media_kind);
+  const primaryHex = (themeColors.primary || '#3867D6').replace('#', '');
+  const accentHex = (themeColors.accent || '#0070C0').replace('#', '');
+  const textHex = (themeColors.text || '#000000').replace('#', '');
+  const semanticType =
+    data.semantic_type || classifyRenderSemantic(data.layout_key, data.media_kind);
   const semanticTokens = resolveSemanticRenderTokens(rootDir, semanticType, data.design_system_id);
   const pptxTokens = semanticTokens.pptx || {};
   const pageLayouts = pattern?.page_layouts || {};
@@ -396,16 +493,17 @@ function buildPptxSlideFromPattern(rootDir: string, data: any, idx: number, them
     ...(runtimePreset || {}),
     ...(pageLayout?.placeholders || {}),
   };
-  const bodyLines: string[] = Array.isArray(data.body) ? data.body : (data.body ? [data.body] : []);
+  const bodyLines: string[] = Array.isArray(data.body) ? data.body : data.body ? [data.body] : [];
   const bodyText = bodyLines.join('\n');
   const elements: any[] = [];
 
   // Resolve logo from branding > theme assets with fallback to nested structures and defaults
-  let rawLogoPath = data.branding?.logo_url || theme?.assets?.logo_url || theme?.theme?.assets?.logo_url || null;
+  let rawLogoPath =
+    data.branding?.logo_url || theme?.assets?.logo_url || theme?.theme?.assets?.logo_url || null;
   if (!rawLogoPath) {
     const fallbackPaths = [
       'knowledge/confidential/sbijsm/design/assets/logo.png',
-      'knowledge/confidential/sbijsm/assets/logo.png'
+      'knowledge/confidential/sbijsm/assets/logo.png',
     ];
     for (const p of fallbackPaths) {
       if (safeExistsSync(path.resolve(rootDir, p))) {
@@ -421,7 +519,7 @@ function buildPptxSlideFromPattern(rootDir: string, data: any, idx: number, them
   const isHero = semanticType === 'hero';
   const themeFonts = theme?.fonts || theme?.theme?.fonts || {};
   const headingFont = themeFonts.heading?.split(',')[0]?.trim() || 'Inter';
-  const bodyFont    = themeFonts.body?.split(',')[0]?.trim() || 'System-ui';
+  const bodyFont = themeFonts.body?.split(',')[0]?.trim() || 'System-ui';
   const bzl = resolveLayoutTemplate(rootDir, data.design_system_id, data, theme);
   const chr = bzl.chrome;
   const hro = bzl.hero;
@@ -454,39 +552,45 @@ function buildPptxSlideFromPattern(rootDir: string, data: any, idx: number, them
 
     // Main title — centered on blue area
     if (data.title && placeholderConfig.title !== false) {
-      const titleEl = mergePptxShape({
-        type: 'text',
-        placeholderType: 'title',
-        pos: { x: hro.title_x, y: hro.title_y, w: hro.title_w, h: hro.title_h },
-        text: data.title,
-        style: {
-          fontSize: hro.title_font_size,
-          bold: true,
-          color: 'FFFFFF',
-          fontFamily: headingFont,
-          align: 'center',
-          valign: 'middle',
+      const titleEl = mergePptxShape(
+        {
+          type: 'text',
+          placeholderType: 'title',
+          pos: { x: hro.title_x, y: hro.title_y, w: hro.title_w, h: hro.title_h },
+          text: data.title,
+          style: {
+            fontSize: hro.title_font_size,
+            bold: true,
+            color: 'FFFFFF',
+            fontFamily: headingFont,
+            align: 'center',
+            valign: 'middle',
+          },
         },
-      }, placeholderConfig.title);
+        placeholderConfig.title
+      );
       titleEl.text = resolveSlideTemplate(titleEl.text, data, data.title);
       elements.push(titleEl);
     }
 
     // Subtitle — on blue, just above divider
     if (bodyText && placeholderConfig.body !== false) {
-      const subtitleEl = mergePptxShape({
-        type: 'text',
-        placeholderType: 'body',
-        pos: { x: hro.subtitle_x, y: hro.subtitle_y, w: hro.subtitle_w, h: hro.subtitle_h },
-        text: bodyText,
-        style: {
-          fontSize: hro.subtitle_font_size,
-          color: 'D0E4FF',
-          fontFamily: bodyFont,
-          align: 'center',
-          valign: 'middle',
+      const subtitleEl = mergePptxShape(
+        {
+          type: 'text',
+          placeholderType: 'body',
+          pos: { x: hro.subtitle_x, y: hro.subtitle_y, w: hro.subtitle_w, h: hro.subtitle_h },
+          text: bodyText,
+          style: {
+            fontSize: hro.subtitle_font_size,
+            color: 'D0E4FF',
+            fontFamily: bodyFont,
+            align: 'center',
+            valign: 'middle',
+          },
         },
-      }, placeholderConfig.body);
+        placeholderConfig.body
+      );
       subtitleEl.text = resolveSlideTemplate(subtitleEl.text, data, bodyText);
       elements.push(subtitleEl);
     }
@@ -507,7 +611,13 @@ function buildPptxSlideFromPattern(rootDir: string, data: any, idx: number, them
         type: 'shape',
         shapeType: 'rect',
         pos: { x: hro.brand_name_x, y: hro.brand_name_y, w: hro.brand_name_w, h: hro.brand_name_h },
-        style: { fill: 'FFFFFF', color: primaryHex, fontSize: hro.brand_name_font_size, align: 'left', valign: 'middle' },
+        style: {
+          fill: 'FFFFFF',
+          color: primaryHex,
+          fontSize: hro.brand_name_font_size,
+          align: 'left',
+          valign: 'middle',
+        },
         text: brandName,
       });
     }
@@ -524,35 +634,88 @@ function buildPptxSlideFromPattern(rootDir: string, data: any, idx: number, them
     const navyHex = resolveThemeHexColor(themeColors, 'navy', '#003366').replace('#', '');
     const azureHex = resolveThemeHexColor(themeColors, 'cta', '#0070C0').replace('#', '');
     const surfaceBg = resolveThemeHexColor(themeColors, 'surface', '#E9EDF4').replace('#', '');
-    const bodyTextColor = resolveThemeHexColor(themeColors, 'text_primary', '#000000').replace('#', '');
-    const subTextColor = resolveThemeHexColor(themeColors, 'text_secondary', '#595959').replace('#', '');
+    const bodyTextColor = resolveThemeHexColor(themeColors, 'text_primary', '#000000').replace(
+      '#',
+      ''
+    );
+    const subTextColor = resolveThemeHexColor(themeColors, 'text_secondary', '#595959').replace(
+      '#',
+      ''
+    );
 
     // 1. Full-height blue header bar
-    elements.push({ type: 'shape', shapeType: 'rect', pos: { x: 0, y: 0, w: 10, h: chr.header_h }, style: { fill: primaryHex, color: primaryHex }, text: '' });
+    elements.push({
+      type: 'shape',
+      shapeType: 'rect',
+      pos: { x: 0, y: 0, w: 10, h: chr.header_h },
+      style: { fill: primaryHex, color: primaryHex },
+      text: '',
+    });
 
     // 2. White logo zone; logo sized from actual PNG dimensions (tenant-agnostic)
     if (logoExists) {
-      elements.push({ type: 'shape', shapeType: 'rect', pos: { x: chr.logo_zone_x, y: chr.logo_zone_y, w: chr.logo_zone_w, h: chr.logo_zone_h }, style: { fill: 'FFFFFF', color: 'FFFFFF' }, text: '' });
+      elements.push({
+        type: 'shape',
+        shapeType: 'rect',
+        pos: { x: chr.logo_zone_x, y: chr.logo_zone_y, w: chr.logo_zone_w, h: chr.logo_zone_h },
+        style: { fill: 'FFFFFF', color: 'FFFFFF' },
+        text: '',
+      });
       const ls = getPngDisplaySize(logoPath, chr.logo_display_h, chr.logo_display_max_w);
-      elements.push({ type: 'image', imagePath: logoPath, pos: { x: chr.logo_zone_x + (chr.logo_zone_w - ls.w) / 2, y: chr.logo_zone_y + (chr.logo_zone_h - ls.h) / 2, w: ls.w, h: ls.h } });
+      elements.push({
+        type: 'image',
+        imagePath: logoPath,
+        pos: {
+          x: chr.logo_zone_x + (chr.logo_zone_w - ls.w) / 2,
+          y: chr.logo_zone_y + (chr.logo_zone_h - ls.h) / 2,
+          w: ls.w,
+          h: ls.h,
+        },
+      });
     }
 
     // 3. Slide title in blue header — white text, bold
     if (data.title && placeholderConfig.title !== false) {
-      const titleAlign = (bodyZoneKey === 'decision_cta') ? 'center' : 'left';
+      const titleAlign = bodyZoneKey === 'decision_cta' ? 'center' : 'left';
       elements.push({
-        type: 'text', placeholderType: 'title',
-        pos: { x: chr.title_x, y: 0, w: logoExists ? chr.title_w_logo : chr.title_w_no_logo, h: chr.header_h },
+        type: 'text',
+        placeholderType: 'title',
+        pos: {
+          x: chr.title_x,
+          y: 0,
+          w: logoExists ? chr.title_w_logo : chr.title_w_no_logo,
+          h: chr.header_h,
+        },
         text: resolveSlideTemplate(data.title, data, data.title),
-        style: { fontSize: chr.title_font_size, bold: true, color: 'FFFFFF', fontFamily: headingFont, align: titleAlign, valign: 'middle', margin: [0, 0, 0, 0.06] },
+        style: {
+          fontSize: chr.title_font_size,
+          bold: true,
+          color: 'FFFFFF',
+          fontFamily: headingFont,
+          align: titleAlign,
+          valign: 'middle',
+          margin: [0, 0, 0, 0.06],
+        },
       });
     }
 
     // 4. Navy separator line below header
-    elements.push({ type: 'shape', shapeType: 'rect', pos: { x: 0, y: chr.header_h, w: 10, h: chr.separator_h }, style: { fill: navyHex, color: navyHex }, text: '' });
+    elements.push({
+      type: 'shape',
+      shapeType: 'rect',
+      pos: { x: 0, y: chr.header_h, w: 10, h: chr.separator_h },
+      style: { fill: navyHex, color: navyHex },
+      text: '',
+    });
 
     // 5. Left accent strip
-    elements.push({ type: 'shape', shapeType: 'rect', pos: { x: chr.accent_strip_x, y: bodyY, w: chr.accent_strip_w, h: bodyH }, style: { fill: primaryHex, color: primaryHex }, text: '' });
+    elements.push({
+      type: 'shape',
+      shapeType: 'rect',
+      pos: { x: chr.accent_strip_x, y: bodyY, w: chr.accent_strip_w, h: bodyH },
+      style: { fill: primaryHex, color: primaryHex },
+      text: '',
+    });
 
     // 6. Body zone — layout-dispatched
     if (bodyText && placeholderConfig.body !== false) {
@@ -561,76 +724,339 @@ function buildPptxSlideFromPattern(rootDir: string, data: any, idx: number, them
         const splitAt = Math.ceil(bodyLines.length * 0.55);
         const leftLines = bodyLines.slice(0, splitAt);
         const rightLines = bodyLines.slice(splitAt);
-        const rightText = rightLines.join('\n') || (data.objective || leftLines[leftLines.length - 1] || '');
+        const rightText =
+          rightLines.join('\n') || data.objective || leftLines[leftLines.length - 1] || '';
         const calloutLabels = zc.semantic_labels || {};
-        const calloutLabel = calloutLabels[semanticType] ?? calloutLabels['default'] ?? '  根拠データ';
+        const calloutLabel =
+          calloutLabels[semanticType] ?? calloutLabels['default'] ?? '  根拠データ';
         if (leftLines.length > 0) {
-          elements.push({ type: 'text', placeholderType: 'body', pos: { x: bodyX, y: bodyY, w: zc.left_w, h: bodyH }, text: resolveSlideTemplate(leftLines.join('\n'), data, leftLines.join('\n')), style: { ...(placeholderConfig.body?.style || {}), fontSize: zc.left_font_size, color: bodyTextColor, fontFamily: bodyFont, align: 'left', valign: 'top', lineSpacingPct: zc.left_line_spacing_pct, margin: zc.left_margin } });
+          elements.push({
+            type: 'text',
+            placeholderType: 'body',
+            pos: { x: bodyX, y: bodyY, w: zc.left_w, h: bodyH },
+            text: resolveSlideTemplate(leftLines.join('\n'), data, leftLines.join('\n')),
+            style: {
+              ...(placeholderConfig.body?.style || {}),
+              fontSize: zc.left_font_size,
+              color: bodyTextColor,
+              fontFamily: bodyFont,
+              align: 'left',
+              valign: 'top',
+              lineSpacingPct: zc.left_line_spacing_pct,
+              margin: zc.left_margin,
+            },
+          });
         }
-        elements.push({ type: 'shape', shapeType: 'rect', pos: { x: zc.right_x, y: bodyY, w: zc.right_w, h: zc.panel_h }, style: { fill: primaryHex, color: 'FFFFFF', fontSize: zc.panel_header_font_size, bold: true, align: 'left', valign: 'middle', margin: zc.panel_header_margin }, text: calloutLabel });
-        elements.push({ type: 'shape', shapeType: 'rect', pos: { x: zc.right_x, y: bodyY + zc.panel_h, w: zc.right_w, h: bodyH - zc.panel_h }, style: { fill: surfaceBg, color: navyHex, fontSize: zc.panel_body_font_size, align: 'left', valign: 'top', lineSpacingPct: zc.panel_body_line_spacing_pct, margin: zc.panel_body_margin }, text: rightText });
+        elements.push({
+          type: 'shape',
+          shapeType: 'rect',
+          pos: { x: zc.right_x, y: bodyY, w: zc.right_w, h: zc.panel_h },
+          style: {
+            fill: primaryHex,
+            color: 'FFFFFF',
+            fontSize: zc.panel_header_font_size,
+            bold: true,
+            align: 'left',
+            valign: 'middle',
+            margin: zc.panel_header_margin,
+          },
+          text: calloutLabel,
+        });
+        elements.push({
+          type: 'shape',
+          shapeType: 'rect',
+          pos: { x: zc.right_x, y: bodyY + zc.panel_h, w: zc.right_w, h: bodyH - zc.panel_h },
+          style: {
+            fill: surfaceBg,
+            color: navyHex,
+            fontSize: zc.panel_body_font_size,
+            align: 'left',
+            valign: 'top',
+            lineSpacingPct: zc.panel_body_line_spacing_pct,
+            margin: zc.panel_body_margin,
+          },
+          text: rightText,
+        });
         if (data.visual) {
           const vl = zc.visual_label || {};
-          elements.push({ type: 'text', pos: { x: zc.right_x, y: bodyY + bodyH - (vl.y_from_bottom ?? 0.32), w: zc.right_w, h: vl.h ?? 0.28 }, text: data.visual, style: { fill: accentHex, color: 'FFFFFF', fontSize: vl.font_size ?? 9, align: 'left', valign: 'middle', margin: vl.margin ?? [2, 4, 2, 4] } });
+          elements.push({
+            type: 'text',
+            pos: {
+              x: zc.right_x,
+              y: bodyY + bodyH - (vl.y_from_bottom ?? 0.32),
+              w: zc.right_w,
+              h: vl.h ?? 0.28,
+            },
+            text: data.visual,
+            style: {
+              fill: accentHex,
+              color: 'FFFFFF',
+              fontSize: vl.font_size ?? 9,
+              align: 'left',
+              valign: 'middle',
+              margin: vl.margin ?? [2, 4, 2, 4],
+            },
+          });
         }
-      }
-      else if (bodyZoneKey === 'two_column_risk') {
+      } else if (bodyZoneKey === 'two_column_risk') {
         const zc = bzl.body_zones.two_column_risk;
         const splitAt = Math.ceil(bodyLines.length * 0.55);
         const leftLines = bodyLines.slice(0, splitAt);
         const rightLines = bodyLines.slice(splitAt);
-        const rightText = rightLines.join('\n') || (data.objective || '');
+        const rightText = rightLines.join('\n') || data.objective || '';
         if (leftLines.length > 0) {
-          elements.push({ type: 'text', placeholderType: 'body', pos: { x: bodyX, y: bodyY, w: zc.left_w, h: bodyH }, text: resolveSlideTemplate(leftLines.join('\n'), data, leftLines.join('\n')), style: { ...(placeholderConfig.body?.style || {}), fontSize: zc.left_font_size, color: bodyTextColor, fontFamily: bodyFont, align: 'left', valign: 'top', lineSpacingPct: zc.left_line_spacing_pct, margin: zc.left_margin } });
+          elements.push({
+            type: 'text',
+            placeholderType: 'body',
+            pos: { x: bodyX, y: bodyY, w: zc.left_w, h: bodyH },
+            text: resolveSlideTemplate(leftLines.join('\n'), data, leftLines.join('\n')),
+            style: {
+              ...(placeholderConfig.body?.style || {}),
+              fontSize: zc.left_font_size,
+              color: bodyTextColor,
+              fontFamily: bodyFont,
+              align: 'left',
+              valign: 'top',
+              lineSpacingPct: zc.left_line_spacing_pct,
+              margin: zc.left_margin,
+            },
+          });
         }
-        elements.push({ type: 'shape', shapeType: 'rect', pos: { x: zc.right_x, y: bodyY, w: zc.right_w, h: zc.panel_h }, style: { fill: zc.panel_header_fill ?? 'C00000', color: 'FFFFFF', fontSize: zc.panel_header_font_size, bold: true, align: 'left', valign: 'middle', margin: zc.panel_header_margin }, text: zc.panel_label ?? '  リスク対策' });
-        elements.push({ type: 'shape', shapeType: 'rect', pos: { x: zc.right_x, y: bodyY + zc.panel_h, w: zc.right_w, h: bodyH - zc.panel_h }, style: { fill: zc.panel_body_fill ?? 'FFF0F0', color: zc.panel_body_color ?? '7F1D1D', fontSize: zc.panel_body_font_size, align: 'left', valign: 'top', lineSpacingPct: zc.panel_body_line_spacing_pct, margin: zc.panel_body_margin }, text: rightText });
-      }
-      else if (bodyZoneKey === 'timeline') {
+        elements.push({
+          type: 'shape',
+          shapeType: 'rect',
+          pos: { x: zc.right_x, y: bodyY, w: zc.right_w, h: zc.panel_h },
+          style: {
+            fill: zc.panel_header_fill ?? 'C00000',
+            color: 'FFFFFF',
+            fontSize: zc.panel_header_font_size,
+            bold: true,
+            align: 'left',
+            valign: 'middle',
+            margin: zc.panel_header_margin,
+          },
+          text: zc.panel_label ?? '  リスク対策',
+        });
+        elements.push({
+          type: 'shape',
+          shapeType: 'rect',
+          pos: { x: zc.right_x, y: bodyY + zc.panel_h, w: zc.right_w, h: bodyH - zc.panel_h },
+          style: {
+            fill: zc.panel_body_fill ?? 'FFF0F0',
+            color: zc.panel_body_color ?? '7F1D1D',
+            fontSize: zc.panel_body_font_size,
+            align: 'left',
+            valign: 'top',
+            lineSpacingPct: zc.panel_body_line_spacing_pct,
+            margin: zc.panel_body_margin,
+          },
+          text: rightText,
+        });
+      } else if (bodyZoneKey === 'timeline') {
         const zc = bzl.body_zones.timeline;
         const tlLabels = zc.semantic_labels || {};
         const tlLabel = tlLabels[semanticType] ?? tlLabels['default'] ?? '  ロードマップ';
-        elements.push({ type: 'text', placeholderType: 'body', pos: { x: bodyX, y: bodyY, w: zc.left_w, h: bodyH }, text: resolveSlideTemplate(bodyText, data, bodyText), style: { ...(placeholderConfig.body?.style || {}), fontSize: zc.left_font_size, color: bodyTextColor, fontFamily: bodyFont, align: 'left', valign: 'top', lineSpacingPct: zc.left_line_spacing_pct, margin: zc.left_margin } });
-        elements.push({ type: 'shape', shapeType: 'rect', pos: { x: zc.right_x, y: bodyY, w: zc.right_w, h: zc.panel_h }, style: { fill: primaryHex, color: 'FFFFFF', fontSize: zc.panel_header_font_size, bold: true, align: 'left', valign: 'middle', margin: zc.panel_header_margin }, text: tlLabel });
+        elements.push({
+          type: 'text',
+          placeholderType: 'body',
+          pos: { x: bodyX, y: bodyY, w: zc.left_w, h: bodyH },
+          text: resolveSlideTemplate(bodyText, data, bodyText),
+          style: {
+            ...(placeholderConfig.body?.style || {}),
+            fontSize: zc.left_font_size,
+            color: bodyTextColor,
+            fontFamily: bodyFont,
+            align: 'left',
+            valign: 'top',
+            lineSpacingPct: zc.left_line_spacing_pct,
+            margin: zc.left_margin,
+          },
+        });
+        elements.push({
+          type: 'shape',
+          shapeType: 'rect',
+          pos: { x: zc.right_x, y: bodyY, w: zc.right_w, h: zc.panel_h },
+          style: {
+            fill: primaryHex,
+            color: 'FFFFFF',
+            fontSize: zc.panel_header_font_size,
+            bold: true,
+            align: 'left',
+            valign: 'middle',
+            margin: zc.panel_header_margin,
+          },
+          text: tlLabel,
+        });
         const timelineText = bodyLines.map((line: string) => `▶  ${line}`).join('\n\n');
-        elements.push({ type: 'shape', shapeType: 'rect', pos: { x: zc.right_x, y: bodyY + zc.panel_h, w: zc.right_w, h: bodyH - zc.panel_h }, style: { fill: surfaceBg, color: navyHex, fontSize: zc.panel_body_font_size, align: 'left', valign: 'top', lineSpacingPct: zc.panel_body_line_spacing_pct, margin: zc.panel_body_margin }, text: timelineText });
+        elements.push({
+          type: 'shape',
+          shapeType: 'rect',
+          pos: { x: zc.right_x, y: bodyY + zc.panel_h, w: zc.right_w, h: bodyH - zc.panel_h },
+          style: {
+            fill: surfaceBg,
+            color: navyHex,
+            fontSize: zc.panel_body_font_size,
+            align: 'left',
+            valign: 'top',
+            lineSpacingPct: zc.panel_body_line_spacing_pct,
+            margin: zc.panel_body_margin,
+          },
+          text: timelineText,
+        });
         if (data.visual) {
           const vl = zc.visual_label || {};
-          elements.push({ type: 'text', pos: { x: zc.right_x, y: bodyY + bodyH - (vl.y_from_bottom ?? 0.32), w: zc.right_w, h: vl.h ?? 0.28 }, text: data.visual, style: { fill: vl.fill ?? 'DCFCE7', color: vl.color ?? '166534', fontSize: vl.font_size ?? 9, align: 'left', valign: 'middle', margin: vl.margin ?? [2, 4, 2, 4] } });
+          elements.push({
+            type: 'text',
+            pos: {
+              x: zc.right_x,
+              y: bodyY + bodyH - (vl.y_from_bottom ?? 0.32),
+              w: zc.right_w,
+              h: vl.h ?? 0.28,
+            },
+            text: data.visual,
+            style: {
+              fill: vl.fill ?? 'DCFCE7',
+              color: vl.color ?? '166534',
+              fontSize: vl.font_size ?? 9,
+              align: 'left',
+              valign: 'middle',
+              margin: vl.margin ?? [2, 4, 2, 4],
+            },
+          });
         }
-      }
-      else if (bodyZoneKey === 'architecture_panel') {
+      } else if (bodyZoneKey === 'architecture_panel') {
         const zc = bzl.body_zones.architecture_panel;
         const splitAt = Math.min(3, Math.max(1, bodyLines.length - 1));
         const descLines = bodyLines.slice(0, splitAt);
         const archLines = bodyLines.slice(splitAt);
-        elements.push({ type: 'text', placeholderType: 'body', pos: { x: bodyX, y: bodyY, w: bodyW, h: zc.desc_h }, text: resolveSlideTemplate(descLines.join('\n'), data, descLines.join('\n')), style: { ...(placeholderConfig.body?.style || {}), fontSize: zc.desc_font_size, color: bodyTextColor, fontFamily: bodyFont, align: 'left', valign: 'top', lineSpacingPct: zc.desc_line_spacing_pct, margin: zc.desc_margin } });
-        elements.push({ type: 'shape', shapeType: 'rect', pos: { x: bodyX, y: bodyY + zc.panel_header_y_offset, w: bodyW, h: zc.panel_header_h }, style: { fill: primaryHex, color: 'FFFFFF', fontSize: zc.panel_header_font_size, bold: true, align: 'left', valign: 'middle', margin: zc.panel_header_margin }, text: zc.panel_label ?? '  システム構成概要' });
+        elements.push({
+          type: 'text',
+          placeholderType: 'body',
+          pos: { x: bodyX, y: bodyY, w: bodyW, h: zc.desc_h },
+          text: resolveSlideTemplate(descLines.join('\n'), data, descLines.join('\n')),
+          style: {
+            ...(placeholderConfig.body?.style || {}),
+            fontSize: zc.desc_font_size,
+            color: bodyTextColor,
+            fontFamily: bodyFont,
+            align: 'left',
+            valign: 'top',
+            lineSpacingPct: zc.desc_line_spacing_pct,
+            margin: zc.desc_margin,
+          },
+        });
+        elements.push({
+          type: 'shape',
+          shapeType: 'rect',
+          pos: { x: bodyX, y: bodyY + zc.panel_header_y_offset, w: bodyW, h: zc.panel_header_h },
+          style: {
+            fill: primaryHex,
+            color: 'FFFFFF',
+            fontSize: zc.panel_header_font_size,
+            bold: true,
+            align: 'left',
+            valign: 'middle',
+            margin: zc.panel_header_margin,
+          },
+          text: zc.panel_label ?? '  システム構成概要',
+        });
         const archText = (archLines.length > 0 ? archLines : bodyLines).join('\n');
-        elements.push({ type: 'shape', shapeType: 'rect', pos: { x: bodyX, y: bodyY + zc.panel_body_y_offset, w: bodyW, h: bodyH - zc.panel_body_y_offset }, style: { fill: surfaceBg, color: navyHex, fontSize: zc.panel_body_font_size, align: 'left', valign: 'top', lineSpacingPct: zc.panel_body_line_spacing_pct, margin: zc.panel_body_margin }, text: archText });
-      }
-      else if (bodyZoneKey === 'decision_cta') {
+        elements.push({
+          type: 'shape',
+          shapeType: 'rect',
+          pos: {
+            x: bodyX,
+            y: bodyY + zc.panel_body_y_offset,
+            w: bodyW,
+            h: bodyH - zc.panel_body_y_offset,
+          },
+          style: {
+            fill: surfaceBg,
+            color: navyHex,
+            fontSize: zc.panel_body_font_size,
+            align: 'left',
+            valign: 'top',
+            lineSpacingPct: zc.panel_body_line_spacing_pct,
+            margin: zc.panel_body_margin,
+          },
+          text: archText,
+        });
+      } else if (bodyZoneKey === 'decision_cta') {
         const zc = bzl.body_zones.decision_cta;
         const ctaLine = bodyLines.length > 1 ? bodyLines[bodyLines.length - 1] : '';
         const msgLines = ctaLine ? bodyLines.slice(0, -1) : bodyLines;
         const msgText = msgLines.join('\n');
         if (msgText) {
-          elements.push({ type: 'text', placeholderType: 'body', pos: { x: bodyX, y: bodyY + zc.msg_y_offset, w: bodyW, h: zc.msg_h }, text: resolveSlideTemplate(msgText, data, msgText), style: { ...(placeholderConfig.body?.style || {}), fontSize: zc.msg_font_size, color: navyHex, fontFamily: bodyFont, align: 'center', valign: 'middle', lineSpacingPct: zc.msg_line_spacing_pct, margin: zc.msg_margin } });
+          elements.push({
+            type: 'text',
+            placeholderType: 'body',
+            pos: { x: bodyX, y: bodyY + zc.msg_y_offset, w: bodyW, h: zc.msg_h },
+            text: resolveSlideTemplate(msgText, data, msgText),
+            style: {
+              ...(placeholderConfig.body?.style || {}),
+              fontSize: zc.msg_font_size,
+              color: navyHex,
+              fontFamily: bodyFont,
+              align: 'center',
+              valign: 'middle',
+              lineSpacingPct: zc.msg_line_spacing_pct,
+              margin: zc.msg_margin,
+            },
+          });
         }
         if (ctaLine) {
-          elements.push({ type: 'shape', shapeType: 'rect', pos: { x: zc.cta_x, y: bodyY + zc.cta_y_offset, w: zc.cta_w, h: zc.cta_h }, style: { fill: azureHex, color: 'FFFFFF', fontSize: zc.cta_font_size, bold: true, align: 'center', valign: 'middle' }, text: ctaLine });
+          elements.push({
+            type: 'shape',
+            shapeType: 'rect',
+            pos: { x: zc.cta_x, y: bodyY + zc.cta_y_offset, w: zc.cta_w, h: zc.cta_h },
+            style: {
+              fill: azureHex,
+              color: 'FFFFFF',
+              fontSize: zc.cta_font_size,
+              bold: true,
+              align: 'center',
+              valign: 'middle',
+            },
+            text: ctaLine,
+          });
         }
-      }
-      else {
+      } else {
         // single-column (summary / content / execution / signals / appendix)
         const zc = bzl.body_zones.single_column;
         const baseFontSize = zc.font_size + Number(pptxTokens.body_font_size_delta || 0);
-        elements.push({ type: 'text', placeholderType: 'body', pos: { x: bodyX, y: bodyY, w: bodyW, h: bodyH }, text: resolveSlideTemplate(bodyText, data, bodyText), style: { ...(placeholderConfig.body?.style || {}), fontSize: baseFontSize, color: bodyTextColor, fontFamily: bodyFont, align: 'left', valign: 'top', lineSpacingPct: zc.line_spacing_pct, margin: zc.margin } });
+        elements.push({
+          type: 'text',
+          placeholderType: 'body',
+          pos: { x: bodyX, y: bodyY, w: bodyW, h: bodyH },
+          text: resolveSlideTemplate(bodyText, data, bodyText),
+          style: {
+            ...(placeholderConfig.body?.style || {}),
+            fontSize: baseFontSize,
+            color: bodyTextColor,
+            fontFamily: bodyFont,
+            align: 'left',
+            valign: 'top',
+            lineSpacingPct: zc.line_spacing_pct,
+            margin: zc.margin,
+          },
+        });
       }
     }
 
     // 7. Footer bar
-    elements.push({ type: 'shape', shapeType: 'rect', pos: { x: 0, y: chr.footer_y, w: 10, h: chr.footer_h }, style: { fill: 'F0F4FA', color: subTextColor, fontSize: chr.footer_font_size, align: 'right', valign: 'middle' }, text: brandName ? `${brandName}  |  Confidential  ` : '  Confidential  ' });
+    elements.push({
+      type: 'shape',
+      shapeType: 'rect',
+      pos: { x: 0, y: chr.footer_y, w: 10, h: chr.footer_h },
+      style: {
+        fill: 'F0F4FA',
+        color: subTextColor,
+        fontSize: chr.footer_font_size,
+        align: 'right',
+        valign: 'middle',
+      },
+      text: brandName ? `${brandName}  |  Confidential  ` : '  Confidential  ',
+    });
   }
 
   if (Array.isArray(data.elements)) {
@@ -640,10 +1066,8 @@ function buildPptxSlideFromPattern(rootDir: string, data: any, idx: number, them
   return {
     id: data.id || `slide${idx + 1}`,
     elements,
-    backgroundFill: isHero
-      ? primaryHex
-      : (data.backgroundFill || pageLayout?.backgroundFill),
-    bgXml: isHero ? undefined : (data.bgXml || pageLayout?.bgXml),
+    backgroundFill: isHero ? primaryHex : data.backgroundFill || pageLayout?.backgroundFill,
+    bgXml: isHero ? undefined : data.bgXml || pageLayout?.bgXml,
     transitionXml: data.transitionXml || pageLayout?.transitionXml,
     notesXml: data.notesXml,
     extensions: data.extensions || pageLayout?.extensions,
@@ -694,17 +1118,24 @@ function resolvePdfOutDir(params: any, resolve: Function, prefix: string): strin
 }
 
 function sanitizePdfFilenamePrefix(value: string): string {
-  return path.basename(value).replace(/[\\/]+/g, '-').replace(/[^a-zA-Z0-9._-]+/g, '-') || 'page';
+  return (
+    path
+      .basename(value)
+      .replace(/[\\/]+/g, '-')
+      .replace(/[^a-zA-Z0-9._-]+/g, '-') || 'page'
+  );
 }
 
 function runPdfOpsBridge(
   command: string,
   cliArgs: string[],
   passwords: Record<string, string | undefined>,
-  timeoutMs?: number,
+  timeoutMs?: number
 ): any {
   const rootDir = pathResolver.rootDir();
-  const bridge = pathResolver.rootResolve('libs/actuators/media-actuator/scripts/pdf_ops_bridge.py');
+  const bridge = pathResolver.rootResolve(
+    'libs/actuators/media-actuator/scripts/pdf_ops_bridge.py'
+  );
   const pythonBin = resolvePdfBridgePythonBin();
   const cleanedPw: Record<string, string> = {};
   for (const [key, value] of Object.entries(passwords)) {
@@ -717,13 +1148,20 @@ function runPdfOpsBridge(
   });
   if (execResult.error && (execResult.status === null || execResult.status === undefined)) {
     throw new Error(
-      `pdf_${command}: failed to launch "${pythonBin}" (${execResult.error.message}). Ensure Python 3 is installed, or set KYBERION_PYTHON_BIN / KYBERION_PYTHON.`,
+      `pdf_${command}: failed to launch "${pythonBin}" (${execResult.error.message}). Ensure Python 3 is installed, or set KYBERION_PYTHON_BIN / KYBERION_PYTHON.`
     );
   }
   let parsed: any = {};
-  try { parsed = JSON.parse(String(execResult.stdout || '').trim() || '{}'); } catch { parsed = {}; }
+  try {
+    parsed = JSON.parse(String(execResult.stdout || '').trim() || '{}');
+  } catch {
+    parsed = {};
+  }
   if (execResult.status !== 0 || !parsed.ok) {
-    const detail = parsed.error || (execResult.stderr || '').trim() || `python exited with status ${execResult.status}`;
+    const detail =
+      parsed.error ||
+      (execResult.stderr || '').trim() ||
+      `python exited with status ${execResult.status}`;
     throw new Error(`pdf_${command} failed: ${detail}`);
   }
   return parsed;
@@ -762,7 +1200,11 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
       const sourcePath = path.resolve(rootDir, resolve(params.path));
       const assetsDir = pathResolver.sharedTmp(`actuators/media-actuator/assets_${Date.now()}`);
       const design = await pptxUtils.distillPptxDesign(sourcePath, assetsDir);
-      return { ...ctx, [params.export_as || 'last_pptx_design']: design, last_assets_dir: assetsDir };
+      return {
+        ...ctx,
+        [params.export_as || 'last_pptx_design']: design,
+        last_assets_dir: assetsDir,
+      };
     }
     case 'pptx_slide_text': {
       const sourcePath = path.resolve(rootDir, resolve(params.path));
@@ -799,7 +1241,9 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
         const extractedText = await mediaPdfHelpers.extractCleanerPdfText(pdfPath);
         pdfDesign = mediaPdfHelpers.mergeCleanerPdfText(pdfDesign, extractedText);
       } catch (error: any) {
-        logger.warn(`[MEDIA_CAPTURE] pdf_extract cleaner text fallback unavailable: ${error.message}`);
+        logger.warn(
+          `[MEDIA_CAPTURE] pdf_extract cleaner text fallback unavailable: ${error.message}`
+        );
       }
       return { ...ctx, [params.export_as || 'last_pdf_design']: pdfDesign };
     }
@@ -814,38 +1258,60 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
         throw new Error(`pdf_split: input PDF not found: ${resolve(params.path)}`);
       }
       const defaultPrefix = path.basename(inputPath).replace(/\.pdf$/i, '') || 'page';
-      const prefix = sanitizePdfFilenamePrefix(params.prefix ? String(resolve(params.prefix)) : defaultPrefix);
+      const prefix = sanitizePdfFilenamePrefix(
+        params.prefix ? String(resolve(params.prefix)) : defaultPrefix
+      );
       const outDirAbs = resolvePdfOutDir(params, resolve, prefix);
       const pad = Number.isInteger(params.pad) ? params.pad : 3;
-      const password = params.password !== undefined && params.password !== null
-        ? String(resolve(params.password))
-        : '';
-      const bridge = pathResolver.rootResolve('libs/actuators/media-actuator/scripts/pdf_split_bridge.py');
+      const password =
+        params.password !== undefined && params.password !== null
+          ? String(resolve(params.password))
+          : '';
+      const bridge = pathResolver.rootResolve(
+        'libs/actuators/media-actuator/scripts/pdf_split_bridge.py'
+      );
       const pythonBin = resolvePdfBridgePythonBin();
-      const execResult = safeExecResult(pythonBin, [
-        bridge,
-        '--input', inputPath,
-        '--out-dir', outDirAbs,
-        '--prefix', prefix,
-        '--pad', String(pad),
-      ], {
-        cwd: rootDir,
-        input: `${password}\n`, // password via stdin only; never on argv
-        timeoutMs: params.timeout_ms || 120000,
-      });
+      const execResult = safeExecResult(
+        pythonBin,
+        [
+          bridge,
+          '--input',
+          inputPath,
+          '--out-dir',
+          outDirAbs,
+          '--prefix',
+          prefix,
+          '--pad',
+          String(pad),
+        ],
+        {
+          cwd: rootDir,
+          input: `${password}\n`, // password via stdin only; never on argv
+          timeoutMs: params.timeout_ms || 120000,
+        }
+      );
       if (execResult.error && (execResult.status === null || execResult.status === undefined)) {
         throw new Error(
-          `pdf_split: failed to launch "${pythonBin}" (${execResult.error.message}). Ensure Python 3 is installed, or set KYBERION_PYTHON_BIN / KYBERION_PYTHON.`,
+          `pdf_split: failed to launch "${pythonBin}" (${execResult.error.message}). Ensure Python 3 is installed, or set KYBERION_PYTHON_BIN / KYBERION_PYTHON.`
         );
       }
       let parsed: any = {};
-      try { parsed = JSON.parse(String(execResult.stdout || '').trim() || '{}'); } catch { parsed = {}; }
+      try {
+        parsed = JSON.parse(String(execResult.stdout || '').trim() || '{}');
+      } catch {
+        parsed = {};
+      }
       if (execResult.status !== 0 || !parsed.ok) {
-        const detail = parsed.error || (execResult.stderr || '').trim() || `python exited with status ${execResult.status}`;
+        const detail =
+          parsed.error ||
+          (execResult.stderr || '').trim() ||
+          `python exited with status ${execResult.status}`;
         throw new Error(`pdf_split failed: ${detail}`);
       }
       // Return repo-relative paths so the result stays portable if persisted downstream.
-      const pages = (Array.isArray(parsed.pages) ? parsed.pages : []).map((p: string) => pathResolver.toRepoRelative(p));
+      const pages = (Array.isArray(parsed.pages) ? parsed.pages : []).map((p: string) =>
+        pathResolver.toRepoRelative(p)
+      );
       return {
         ...ctx,
         [params.export_as || 'pdf_pages']: {
@@ -856,123 +1322,228 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
       };
     }
     case 'pdf_merge': {
-      const inputs = (Array.isArray(params.inputs) ? params.inputs : [])
-        .map((p: any) => resolvePdfPath(p, resolve, 'pdf_merge input'));
+      const inputs = (Array.isArray(params.inputs) ? params.inputs : []).map((p: any) =>
+        resolvePdfPath(p, resolve, 'pdf_merge input')
+      );
       if (inputs.length < 2) {
         throw new Error('pdf_merge: "inputs" must list at least two PDF paths');
       }
       const outAbs = resolvePdfOutPath(params, resolve, 'merge');
-      const result = runPdfOpsBridge('merge', [
-        '--inputs', inputs.join(path.delimiter),
-        '--out', outAbs,
-      ], { password: params.password ? String(resolve(params.password)) : undefined }, params.timeout_ms);
-      return { ...ctx, [params.export_as || 'pdf_merge']: {
-        count: result.count, out: pathResolver.toRepoRelative(result.out || outAbs),
-      } };
+      const result = runPdfOpsBridge(
+        'merge',
+        ['--inputs', inputs.join(path.delimiter), '--out', outAbs],
+        { password: params.password ? String(resolve(params.password)) : undefined },
+        params.timeout_ms
+      );
+      return {
+        ...ctx,
+        [params.export_as || 'pdf_merge']: {
+          count: result.count,
+          out: pathResolver.toRepoRelative(result.out || outAbs),
+        },
+      };
     }
     case 'pdf_extract_range': {
       const inputAbs = resolvePdfPath(params.path, resolve, 'pdf_extract_range path');
-      if (!safeExistsSync(inputAbs)) throw new Error(`pdf_extract_range: input not found: ${resolve(params.path)}`);
+      if (!safeExistsSync(inputAbs))
+        throw new Error(`pdf_extract_range: input not found: ${resolve(params.path)}`);
       const outAbs = resolvePdfOutPath(params, resolve, 'extract');
-      const result = runPdfOpsBridge('extract_range', [
-        '--input', inputAbs, '--out', outAbs, '--pages', String(resolve(params.pages ?? 'all')),
-      ], { password: params.password ? String(resolve(params.password)) : undefined }, params.timeout_ms);
-      return { ...ctx, [params.export_as || 'pdf_extract']: {
-        count: result.count, out: pathResolver.toRepoRelative(result.out || outAbs), pages: result.pages,
-      } };
+      const result = runPdfOpsBridge(
+        'extract_range',
+        ['--input', inputAbs, '--out', outAbs, '--pages', String(resolve(params.pages ?? 'all'))],
+        { password: params.password ? String(resolve(params.password)) : undefined },
+        params.timeout_ms
+      );
+      return {
+        ...ctx,
+        [params.export_as || 'pdf_extract']: {
+          count: result.count,
+          out: pathResolver.toRepoRelative(result.out || outAbs),
+          pages: result.pages,
+        },
+      };
     }
     case 'pdf_delete_pages': {
       const inputAbs = resolvePdfPath(params.path, resolve, 'pdf_delete_pages path');
-      if (!safeExistsSync(inputAbs)) throw new Error(`pdf_delete_pages: input not found: ${resolve(params.path)}`);
+      if (!safeExistsSync(inputAbs))
+        throw new Error(`pdf_delete_pages: input not found: ${resolve(params.path)}`);
       const outAbs = resolvePdfOutPath(params, resolve, 'delete');
-      const result = runPdfOpsBridge('delete_pages', [
-        '--input', inputAbs, '--out', outAbs, '--delete', String(resolve(params.delete ?? '')),
-      ], { password: params.password ? String(resolve(params.password)) : undefined }, params.timeout_ms);
-      return { ...ctx, [params.export_as || 'pdf_delete_pages']: {
-        count: result.count, out: pathResolver.toRepoRelative(result.out || outAbs), deleted: result.deleted,
-      } };
+      const result = runPdfOpsBridge(
+        'delete_pages',
+        ['--input', inputAbs, '--out', outAbs, '--delete', String(resolve(params.delete ?? ''))],
+        { password: params.password ? String(resolve(params.password)) : undefined },
+        params.timeout_ms
+      );
+      return {
+        ...ctx,
+        [params.export_as || 'pdf_delete_pages']: {
+          count: result.count,
+          out: pathResolver.toRepoRelative(result.out || outAbs),
+          deleted: result.deleted,
+        },
+      };
     }
     case 'pdf_reorder': {
       const inputAbs = resolvePdfPath(params.path, resolve, 'pdf_reorder path');
-      if (!safeExistsSync(inputAbs)) throw new Error(`pdf_reorder: input not found: ${resolve(params.path)}`);
+      if (!safeExistsSync(inputAbs))
+        throw new Error(`pdf_reorder: input not found: ${resolve(params.path)}`);
       const outAbs = resolvePdfOutPath(params, resolve, 'reorder');
-      const result = runPdfOpsBridge('reorder', [
-        '--input', inputAbs, '--out', outAbs, '--order', String(resolve(params.order ?? '')),
-      ], { password: params.password ? String(resolve(params.password)) : undefined }, params.timeout_ms);
-      return { ...ctx, [params.export_as || 'pdf_reorder']: {
-        count: result.count, out: pathResolver.toRepoRelative(result.out || outAbs), order: result.order,
-      } };
+      const result = runPdfOpsBridge(
+        'reorder',
+        ['--input', inputAbs, '--out', outAbs, '--order', String(resolve(params.order ?? ''))],
+        { password: params.password ? String(resolve(params.password)) : undefined },
+        params.timeout_ms
+      );
+      return {
+        ...ctx,
+        [params.export_as || 'pdf_reorder']: {
+          count: result.count,
+          out: pathResolver.toRepoRelative(result.out || outAbs),
+          order: result.order,
+        },
+      };
     }
     case 'pdf_rotate': {
       const inputAbs = resolvePdfPath(params.path, resolve, 'pdf_rotate path');
-      if (!safeExistsSync(inputAbs)) throw new Error(`pdf_rotate: input not found: ${resolve(params.path)}`);
+      if (!safeExistsSync(inputAbs))
+        throw new Error(`pdf_rotate: input not found: ${resolve(params.path)}`);
       const outAbs = resolvePdfOutPath(params, resolve, 'rotate');
       const angle = Number.isInteger(params.angle) ? params.angle : 90;
-      const result = runPdfOpsBridge('rotate', [
-        '--input', inputAbs, '--out', outAbs, '--pages', String(resolve(params.pages ?? 'all')), '--angle', String(angle),
-      ], { password: params.password ? String(resolve(params.password)) : undefined }, params.timeout_ms);
-      return { ...ctx, [params.export_as || 'pdf_rotate']: {
-        count: result.count, out: pathResolver.toRepoRelative(result.out || outAbs), rotated: result.rotated, angle: result.angle,
-      } };
+      const result = runPdfOpsBridge(
+        'rotate',
+        [
+          '--input',
+          inputAbs,
+          '--out',
+          outAbs,
+          '--pages',
+          String(resolve(params.pages ?? 'all')),
+          '--angle',
+          String(angle),
+        ],
+        { password: params.password ? String(resolve(params.password)) : undefined },
+        params.timeout_ms
+      );
+      return {
+        ...ctx,
+        [params.export_as || 'pdf_rotate']: {
+          count: result.count,
+          out: pathResolver.toRepoRelative(result.out || outAbs),
+          rotated: result.rotated,
+          angle: result.angle,
+        },
+      };
     }
     case 'pdf_remove_password': {
       const inputAbs = resolvePdfPath(params.path, resolve, 'pdf_remove_password path');
-      if (!safeExistsSync(inputAbs)) throw new Error(`pdf_remove_password: input not found: ${resolve(params.path)}`);
+      if (!safeExistsSync(inputAbs))
+        throw new Error(`pdf_remove_password: input not found: ${resolve(params.path)}`);
       const outAbs = resolvePdfOutPath(params, resolve, 'unlocked');
-      const result = runPdfOpsBridge('remove_password', [
-        '--input', inputAbs, '--out', outAbs,
-      ], { password: params.password ? String(resolve(params.password)) : undefined }, params.timeout_ms);
-      return { ...ctx, [params.export_as || 'pdf_unlocked']: {
-        count: result.count, out: pathResolver.toRepoRelative(result.out || outAbs),
-      } };
+      const result = runPdfOpsBridge(
+        'remove_password',
+        ['--input', inputAbs, '--out', outAbs],
+        { password: params.password ? String(resolve(params.password)) : undefined },
+        params.timeout_ms
+      );
+      return {
+        ...ctx,
+        [params.export_as || 'pdf_unlocked']: {
+          count: result.count,
+          out: pathResolver.toRepoRelative(result.out || outAbs),
+        },
+      };
     }
     case 'pdf_encrypt': {
       const inputAbs = resolvePdfPath(params.path, resolve, 'pdf_encrypt path');
-      if (!safeExistsSync(inputAbs)) throw new Error(`pdf_encrypt: input not found: ${resolve(params.path)}`);
+      if (!safeExistsSync(inputAbs))
+        throw new Error(`pdf_encrypt: input not found: ${resolve(params.path)}`);
       const outAbs = resolvePdfOutPath(params, resolve, 'encrypted');
-      const result = runPdfOpsBridge('encrypt', [
-        '--input', inputAbs, '--out', outAbs,
-      ], {
-        password: params.password ? String(resolve(params.password)) : undefined,
-        user_password: params.user_password ? String(resolve(params.user_password)) : undefined,
-        owner_password: params.owner_password ? String(resolve(params.owner_password)) : undefined,
-      }, params.timeout_ms);
-      return { ...ctx, [params.export_as || 'pdf_encrypted']: {
-        count: result.count, out: pathResolver.toRepoRelative(result.out || outAbs),
-      } };
+      const result = runPdfOpsBridge(
+        'encrypt',
+        ['--input', inputAbs, '--out', outAbs],
+        {
+          password: params.password ? String(resolve(params.password)) : undefined,
+          user_password: params.user_password ? String(resolve(params.user_password)) : undefined,
+          owner_password: params.owner_password
+            ? String(resolve(params.owner_password))
+            : undefined,
+        },
+        params.timeout_ms
+      );
+      return {
+        ...ctx,
+        [params.export_as || 'pdf_encrypted']: {
+          count: result.count,
+          out: pathResolver.toRepoRelative(result.out || outAbs),
+        },
+      };
     }
     case 'pdf_metadata': {
       const inputAbs = resolvePdfPath(params.path, resolve, 'pdf_metadata path');
-      if (!safeExistsSync(inputAbs)) throw new Error(`pdf_metadata: input not found: ${resolve(params.path)}`);
-      const setObj = params.set && typeof params.set === 'object'
-        ? Object.fromEntries(Object.entries(params.set).map(([k, v]) => [k, typeof v === 'string' ? resolve(v) : v]))
-        : undefined;
+      if (!safeExistsSync(inputAbs))
+        throw new Error(`pdf_metadata: input not found: ${resolve(params.path)}`);
+      const setObj =
+        params.set && typeof params.set === 'object'
+          ? Object.fromEntries(
+              Object.entries(params.set).map(([k, v]) => [
+                k,
+                typeof v === 'string' ? resolve(v) : v,
+              ])
+            )
+          : undefined;
       const cliArgs = ['--input', inputAbs];
       if (setObj) {
         cliArgs.push('--set', JSON.stringify(setObj));
         cliArgs.push('--out', resolvePdfOutPath(params, resolve, 'metadata'));
       }
-      const result = runPdfOpsBridge('metadata', cliArgs, {
-        password: params.password ? String(resolve(params.password)) : undefined,
-      }, params.timeout_ms);
-      return { ...ctx, [params.export_as || 'pdf_metadata']: {
-        metadata: result.metadata,
-        ...(result.out ? { out: pathResolver.toRepoRelative(result.out) } : {}),
-        ...(result.count !== undefined ? { count: result.count } : {}),
-      } };
+      const result = runPdfOpsBridge(
+        'metadata',
+        cliArgs,
+        {
+          password: params.password ? String(resolve(params.password)) : undefined,
+        },
+        params.timeout_ms
+      );
+      return {
+        ...ctx,
+        [params.export_as || 'pdf_metadata']: {
+          metadata: result.metadata,
+          ...(result.out ? { out: pathResolver.toRepoRelative(result.out) } : {}),
+          ...(result.count !== undefined ? { count: result.count } : {}),
+        },
+      };
     }
     case 'pdf_stamp': {
       const inputAbs = resolvePdfPath(params.path, resolve, 'pdf_stamp path');
-      if (!safeExistsSync(inputAbs)) throw new Error(`pdf_stamp: input not found: ${resolve(params.path)}`);
+      if (!safeExistsSync(inputAbs))
+        throw new Error(`pdf_stamp: input not found: ${resolve(params.path)}`);
       const stampAbs = resolvePdfPath(params.stamp, resolve, 'pdf_stamp stamp');
-      if (!safeExistsSync(stampAbs)) throw new Error(`pdf_stamp: stamp PDF not found: ${resolve(params.stamp)}`);
+      if (!safeExistsSync(stampAbs))
+        throw new Error(`pdf_stamp: stamp PDF not found: ${resolve(params.stamp)}`);
       const outAbs = resolvePdfOutPath(params, resolve, 'stamped');
-      const result = runPdfOpsBridge('stamp', [
-        '--input', inputAbs, '--stamp', stampAbs, '--out', outAbs, '--pages', String(resolve(params.pages ?? 'all')),
-      ], { password: params.password ? String(resolve(params.password)) : undefined }, params.timeout_ms);
-      return { ...ctx, [params.export_as || 'pdf_stamp']: {
-        count: result.count, out: pathResolver.toRepoRelative(result.out || outAbs), stamped: result.stamped,
-      } };
+      const result = runPdfOpsBridge(
+        'stamp',
+        [
+          '--input',
+          inputAbs,
+          '--stamp',
+          stampAbs,
+          '--out',
+          outAbs,
+          '--pages',
+          String(resolve(params.pages ?? 'all')),
+        ],
+        { password: params.password ? String(resolve(params.password)) : undefined },
+        params.timeout_ms
+      );
+      return {
+        ...ctx,
+        [params.export_as || 'pdf_stamp']: {
+          count: result.count,
+          out: pathResolver.toRepoRelative(result.out || outAbs),
+          stamped: result.stamped,
+        },
+      };
     }
     case 'document_digest': {
       // Extract a document and return concise LLM-friendly Markdown.
@@ -997,7 +1568,9 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
           try {
             const extractedText = await mediaPdfHelpers.extractCleanerPdfText(filePath);
             protocol = mediaPdfHelpers.mergeCleanerPdfText(protocol, extractedText);
-          } catch { /* fallback to native extraction */ }
+          } catch {
+            /* fallback to native extraction */
+          }
           break;
         }
         case '.pptx': {
@@ -1019,7 +1592,8 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
       const md = protocolToMarkdown(protocol);
       return { ...ctx, [exportKey]: md };
     }
-    default: return ctx;
+    default:
+      return ctx;
   }
 }
 
@@ -1030,23 +1604,36 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
     case 'pdf_to_pptx_design': {
       const pdfDesign = ctx[params.from || 'last_pdf_design'];
       if (!pdfDesign || typeof pdfDesign !== 'object') {
-        throw new Error(`pdf_to_pptx_design could not find context key: ${params.from || 'last_pdf_design'}`);
+        throw new Error(
+          `pdf_to_pptx_design could not find context key: ${params.from || 'last_pdf_design'}`
+        );
       }
-      const augmentedPdfDesign = await maybeAugmentPdfDesignWithImageOcr(pdfDesign as PdfDesignProtocol, params.hints);
+      const augmentedPdfDesign = await maybeAugmentPdfDesignWithImageOcr(
+        pdfDesign as PdfDesignProtocol,
+        params.hints
+      );
       return {
         ...ctx,
-        [params.export_as || 'last_pptx_design']: buildPptxProtocolFromPdfDesignHelper(augmentedPdfDesign, params.hints),
+        [params.export_as || 'last_pptx_design']: buildPptxProtocolFromPdfDesignHelper(
+          augmentedPdfDesign,
+          params.hints
+        ),
         merged_output_format: 'pptx',
       };
     }
     case 'pdf_to_xlsx_design': {
       const pdfDesign = ctx[params.from || 'last_pdf_design'];
       if (!pdfDesign || typeof pdfDesign !== 'object') {
-        throw new Error(`pdf_to_xlsx_design could not find context key: ${params.from || 'last_pdf_design'}`);
+        throw new Error(
+          `pdf_to_xlsx_design could not find context key: ${params.from || 'last_pdf_design'}`
+        );
       }
       return {
         ...ctx,
-        [params.export_as || 'last_xlsx_design']: buildXlsxProtocolFromPdfDesignHelper(pdfDesign as PdfDesignProtocol, params.hints),
+        [params.export_as || 'last_xlsx_design']: buildXlsxProtocolFromPdfDesignHelper(
+          pdfDesign as PdfDesignProtocol,
+          params.hints
+        ),
         merged_output_format: 'xlsx',
       };
     }
@@ -1059,14 +1646,20 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
       const themeName = resolve(params.theme) || themes.default_theme || 'kyberion-standard';
       const theme = themes.themes[themeName];
       const confidentialPack = theme ? null : resolveConfidentialThemePack(rootDir, themeName);
-      const resolvedTheme = theme || (confidentialPack?.theme ? {
-        ...confidentialPack.theme,
-        layout_templates: confidentialPack.layout_templates || null,
-        pptx: confidentialPack.pptx || null,
-        web: confidentialPack.web || null,
-      } : null);
+      const resolvedTheme =
+        theme ||
+        (confidentialPack?.theme
+          ? {
+              ...confidentialPack.theme,
+              layout_templates: confidentialPack.layout_templates || null,
+              pptx: confidentialPack.pptx || null,
+              web: confidentialPack.web || null,
+            }
+          : null);
       if (!resolvedTheme) {
-        logger.warn(`[MEDIA_TRANSFORM] Theme "${themeName}" not found, available: ${Object.keys(themes.themes).join(', ')}`);
+        logger.warn(
+          `[MEDIA_TRANSFORM] Theme "${themeName}" not found, available: ${Object.keys(themes.themes).join(', ')}`
+        );
         return ctx;
       }
       return {
@@ -1076,11 +1669,13 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
         active_theme_pack: confidentialPack || null,
         active_pptx_master: confidentialPack?.pptx?.master || ctx.active_pptx_master,
         active_canvas: confidentialPack?.pptx?.canvas || ctx.active_canvas,
-        active_web_theme: confidentialPack?.web ? {
-          theme: confidentialPack.theme || resolvedTheme,
-          web: confidentialPack.web,
-          layout_templates: confidentialPack.layout_templates || null,
-        } : ctx.active_web_theme,
+        active_web_theme: confidentialPack?.web
+          ? {
+              theme: confidentialPack.theme || resolvedTheme,
+              web: confidentialPack.web,
+              layout_templates: confidentialPack.layout_templates || null,
+            }
+          : ctx.active_web_theme,
       };
     }
     case 'apply_pattern': {
@@ -1095,7 +1690,8 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
       const pattern = ctx.active_pattern;
       const theme = ctx.active_theme;
       const contentData = resolve(params.content_data) || pattern?.content_data || [];
-      const outputFormat = resolve(params.output_format) || pattern?.media_actuator_config?.engine || 'pptx';
+      const outputFormat =
+        resolve(params.output_format) || pattern?.media_actuator_config?.engine || 'pptx';
 
       if (outputFormat === 'pptx') {
         const themeColors = resolveThemeColors(theme);
@@ -1119,7 +1715,9 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
             extensions: activeMaster?.extensions,
             bgXml: activeMaster?.bgXml,
           },
-          slides: contentData.map((data: any, idx: number) => buildPptxSlideFromPattern(rootDir, data, idx, theme, pattern, activeMaster, canvas)),
+          slides: contentData.map((data: any, idx: number) =>
+            buildPptxSlideFromPattern(rootDir, data, idx, theme, pattern, activeMaster, canvas)
+          ),
         };
         return { ...ctx, last_pptx_design: protocol, merged_output_format: 'pptx' };
       }
@@ -1136,7 +1734,8 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
     case 'layout_template_from_pptx_design': {
       const fromKey = resolve(params.from) || 'last_pptx_design';
       const design = ctx[fromKey];
-      if (!design) throw new Error(`layout_template_from_pptx_design: context key not found: ${fromKey}`);
+      if (!design)
+        throw new Error(`layout_template_from_pptx_design: context key not found: ${fromKey}`);
 
       const geometry = extractChromeGeometryFromPptxDesign(design);
       const publicCatalog = loadLayoutTemplateCatalog(rootDir);
@@ -1147,24 +1746,34 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
       if (tenantSlug) {
         const confPath = `knowledge/confidential/${tenantSlug}/design/layout-templates.json`;
         try {
-          const confCatalog = JSON.parse(safeReadFile(path.resolve(rootDir, confPath), { encoding: 'utf8' }) as string);
+          const confCatalog = JSON.parse(
+            safeReadFile(path.resolve(rootDir, confPath), { encoding: 'utf8' }) as string
+          );
           const m = matchLayoutTemplate(geometry, confCatalog);
           if (m) confMatch = { ...m, catalog: confPath };
-        } catch { /* no confidential catalog yet */ }
+        } catch {
+          /* no confidential catalog yet */
+        }
       }
 
       const THRESHOLD = 0.85;
-      const chosen: any = (confMatch?.score ?? 0) >= (publicMatch?.score ?? 0) ? confMatch : publicMatch;
-      const baseTemplate = chosen?.id ? (chosen?.catalog === 'public' || !chosen?.catalog
-        ? publicCatalog.templates?.[chosen.id]
-        : null) : null;
-      const template = deriveLayoutTemplateFromPptxDesign(design, baseTemplate || publicCatalog.templates?.[chosen?.id || 'corporate-standard'] || {});
+      const chosen: any =
+        (confMatch?.score ?? 0) >= (publicMatch?.score ?? 0) ? confMatch : publicMatch;
+      const baseTemplate = chosen?.id
+        ? chosen?.catalog === 'public' || !chosen?.catalog
+          ? publicCatalog.templates?.[chosen.id]
+          : null
+        : null;
+      const template = deriveLayoutTemplateFromPptxDesign(
+        design,
+        baseTemplate || publicCatalog.templates?.[chosen?.id || 'corporate-standard'] || {}
+      );
       const result: any = {
         geometry,
-        matched_template_id:   chosen && chosen.score >= THRESHOLD ? chosen.id : null,
-        match_score:           chosen?.score ?? 0,
-        match_catalog:         (chosen as any)?.catalog || 'public',
-        needs_new_template:    !chosen || chosen.score < THRESHOLD,
+        matched_template_id: chosen && chosen.score >= THRESHOLD ? chosen.id : null,
+        match_score: chosen?.score ?? 0,
+        match_catalog: (chosen as any)?.catalog || 'public',
+        needs_new_template: !chosen || chosen.score < THRESHOLD,
         recommended_template_id: chosen?.id || 'corporate-standard',
         template,
       };
@@ -1257,7 +1866,8 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
     }
     case 'brief_to_design_protocol': {
       const fromKey = resolve(params.from) || 'last_json';
-      const rawBrief = params.brief && typeof params.brief === 'object' ? params.brief : ctx[fromKey];
+      const rawBrief =
+        params.brief && typeof params.brief === 'object' ? params.brief : ctx[fromKey];
       if (!rawBrief || typeof rawBrief !== 'object') {
         throw new Error(`brief_to_design_protocol could not find context key: ${fromKey}`);
       }
@@ -1294,7 +1904,10 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
 
       return {
         ...ctx,
-        active_theme: ctx.active_theme || resolveNamedTheme(rootDir, storyline.recommended_theme) || ctx.active_theme,
+        active_theme:
+          ctx.active_theme ||
+          resolveNamedTheme(rootDir, storyline.recommended_theme) ||
+          ctx.active_theme,
         active_theme_name: ctx.active_theme_name || storyline.recommended_theme,
         [params.export_as || 'proposal_content_data']: contentData,
       };
@@ -1330,7 +1943,9 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
 
       if (brief.render_target === 'drawio') {
         const iconMap = resolveDrawioIconMap(rootDir, params, resolve);
-        const activeTheme = ctx.active_theme || loadFallbackDrawioTheme(rootDir, brief.layout_template_id, loadThemeCatalog);
+        const activeTheme =
+          ctx.active_theme ||
+          loadFallbackDrawioTheme(rootDir, brief.layout_template_id, loadThemeCatalog);
         nextCtx.last_drawio_document = generateDrawioDocument(brief.payload.graph, {
           title: brief.payload.title || brief.title || 'Diagram',
           theme: activeTheme,
@@ -1375,7 +1990,8 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
       const graph = resolveGraphDefinition(rootDir, params, ctx, resolve);
       const iconMap = resolveDrawioIconMap(rootDir, params, resolve);
       const preferredTheme = resolve(params.theme) || graph?.render_hints?.theme;
-      const activeTheme = ctx.active_theme || loadFallbackDrawioTheme(rootDir, preferredTheme, loadThemeCatalog);
+      const activeTheme =
+        ctx.active_theme || loadFallbackDrawioTheme(rootDir, preferredTheme, loadThemeCatalog);
       const document = generateDrawioDocument(graph, {
         title: resolve(params.title) || graph.title || 'Architecture Diagram',
         theme: activeTheme,
@@ -1410,10 +2026,13 @@ function resolveThemeColors(theme: any): Record<string, string> {
     accent: cssVarHex(cssVars['--kb-accent']),
     text: cssVarHex(cssVars['--kb-text-primary']),
   };
-  return Object.entries(mappedFromCssVars).reduce<Record<string, string>>((acc, [key, value]) => {
-    if (value) acc[key] = value;
-    return acc;
-  }, { ...colors });
+  return Object.entries(mappedFromCssVars).reduce<Record<string, string>>(
+    (acc, [key, value]) => {
+      if (value) acc[key] = value;
+      return acc;
+    },
+    { ...colors }
+  );
 }
 
 function cssVarHex(value: unknown): string | undefined {
@@ -1421,7 +2040,9 @@ function cssVarHex(value: unknown): string | undefined {
   const trimmed = value.trim();
   const hex = trimmed.match(/^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/);
   if (hex) return trimmed;
-  const rgba = trimmed.match(/^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})(?:\s*,\s*(?:0|1|0?\.\d+))?\s*\)$/i);
+  const rgba = trimmed.match(
+    /^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})(?:\s*,\s*(?:0|1|0?\.\d+))?\s*\)$/i
+  );
   if (!rgba) return undefined;
   const channels = rgba.slice(1, 4).map((entry) => Math.max(0, Math.min(255, Number(entry))));
   if (channels.some((entry) => !Number.isFinite(entry))) return undefined;
@@ -1445,7 +2066,10 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
 
       const args = ['-i', inputPath, '-o', outPath];
       const activeTheme = resolveDiagramTheme(params, ctx);
-      const mermaidConfig = buildMermaidConfig(activeTheme, params.background_color ? resolve(params.background_color) : undefined);
+      const mermaidConfig = buildMermaidConfig(
+        activeTheme,
+        params.background_color ? resolve(params.background_color) : undefined
+      );
       const configPath = path.join(tempDir, 'mermaid.config.json');
       safeWriteFile(configPath, JSON.stringify(mermaidConfig, null, 2));
       args.push('-c', configPath);
@@ -1454,7 +2078,10 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       if (params.height) args.push('-H', String(resolve(params.height)));
       if (params.background_color) args.push('-b', String(resolve(params.background_color)));
 
-      await withRetry(async () => safeExec('mmdc', args, { cwd: rootDir, timeoutMs: params.timeout_ms || 30000 }), buildRetryOptions());
+      await retry(
+        async () => safeExec('mmdc', args, { cwd: rootDir, timeoutMs: params.timeout_ms || 30000 }),
+        buildRetryOptions()
+      );
 
       const stats = safeStat(outPath);
       logger.info(`✅ [MEDIA] Mermaid rendered at: ${outPath} (${stats.size} bytes).`);
@@ -1477,7 +2104,10 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       if (params.sketch) args.push('--sketch');
       if (params.pad) args.push('--pad', String(resolve(params.pad)));
 
-      await withRetry(async () => safeExec('d2', args, { cwd: rootDir, timeoutMs: params.timeout_ms || 30000 }), buildRetryOptions());
+      await retry(
+        async () => safeExec('d2', args, { cwd: rootDir, timeoutMs: params.timeout_ms || 30000 }),
+        buildRetryOptions()
+      );
 
       const stats = safeStat(outPath);
       logger.info(`✅ [MEDIA] D2 rendered at: ${outPath} (${stats.size} bytes).`);
@@ -1501,9 +2131,10 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       const protocol = ctx[params.design_from || 'last_pptx_design'];
       const outPath = path.resolve(rootDir, resolve(params.path || params.output_path));
 
-      if (!safeExistsSync(path.dirname(outPath))) safeMkdir(path.dirname(outPath), { recursive: true });
+      if (!safeExistsSync(path.dirname(outPath)))
+        safeMkdir(path.dirname(outPath), { recursive: true });
 
-      await withRetry(async () => generateNativePptx(protocol, outPath), buildRetryOptions());
+      await retry(async () => generateNativePptx(protocol, outPath), buildRetryOptions());
 
       const stats = safeStat(outPath);
       logger.info(`✅ [MEDIA] PPTX rendered at: ${outPath} (${stats.size} bytes).`);
@@ -1512,9 +2143,11 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
     case 'pptx_patch': {
       const sourcePath = path.resolve(rootDir, resolve(params.source));
       const outPath = path.resolve(rootDir, resolve(params.path));
-      const replacements = params.replacements || ctx[params.replacements_from || 'last_replacements'] || {};
+      const replacements =
+        params.replacements || ctx[params.replacements_from || 'last_replacements'] || {};
 
-      if (!safeExistsSync(path.dirname(outPath))) safeMkdir(path.dirname(outPath), { recursive: true });
+      if (!safeExistsSync(path.dirname(outPath)))
+        safeMkdir(path.dirname(outPath), { recursive: true });
 
       patchPptxText(sourcePath, outPath, replacements);
 
@@ -1525,34 +2158,47 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
     case 'pptx_filter_slides': {
       const sourcePath = path.resolve(rootDir, resolve(params.source));
       const outPath = path.resolve(rootDir, resolve(params.path));
-      const keepIndices: number[] = params.keep_indices || ctx[params.keep_indices_from || 'last_keep_indices'] || [];
+      const keepIndices: number[] =
+        params.keep_indices || ctx[params.keep_indices_from || 'last_keep_indices'] || [];
 
-      if (!safeExistsSync(path.dirname(outPath))) safeMkdir(path.dirname(outPath), { recursive: true });
+      if (!safeExistsSync(path.dirname(outPath)))
+        safeMkdir(path.dirname(outPath), { recursive: true });
 
       filterPptxSlides(sourcePath, outPath, keepIndices);
 
       const stats = safeStat(outPath);
-      logger.info(`✅ [MEDIA] PPTX filtered to slides [${keepIndices.join(',')}] at: ${outPath} (${stats.size} bytes).`);
+      logger.info(
+        `✅ [MEDIA] PPTX filtered to slides [${keepIndices.join(',')}] at: ${outPath} (${stats.size} bytes).`
+      );
       break;
     }
     case 'pptx_patch_paragraphs': {
       const sourcePath = path.resolve(rootDir, resolve(params.source));
       const outPath = path.resolve(rootDir, resolve(params.path));
-      const replacements = params.paragraph_replacements || ctx[params.replacements_from || 'last_paragraph_replacements'] || [];
+      const replacements =
+        params.paragraph_replacements ||
+        ctx[params.replacements_from || 'last_paragraph_replacements'] ||
+        [];
 
-      if (!safeExistsSync(path.dirname(outPath))) safeMkdir(path.dirname(outPath), { recursive: true });
+      if (!safeExistsSync(path.dirname(outPath)))
+        safeMkdir(path.dirname(outPath), { recursive: true });
 
       const result = patchPptxParagraphs(sourcePath, outPath, replacements);
 
       const stats = safeStat(outPath);
-      logger.info(`✅ [MEDIA] PPTX paragraph-patched (${result.match_count} matches across ${result.modified_slides.length} slide(s)) at: ${outPath} (${stats.size} bytes).`);
+      logger.info(
+        `✅ [MEDIA] PPTX paragraph-patched (${result.match_count} matches across ${result.modified_slides.length} slide(s)) at: ${outPath} (${stats.size} bytes).`
+      );
       break;
     }
     case 'xlsx_render': {
-      const xlsxProtocol = normalizeXlsxDesignProtocol(ctx[params.design_from || 'last_xlsx_design']);
+      const xlsxProtocol = normalizeXlsxDesignProtocol(
+        ctx[params.design_from || 'last_xlsx_design']
+      );
       const xlsxOutPath = path.resolve(rootDir, resolve(params.path || params.output_path));
-      if (!safeExistsSync(path.dirname(xlsxOutPath))) safeMkdir(path.dirname(xlsxOutPath), { recursive: true });
-      await withRetry(async () => generateNativeXlsx(xlsxProtocol, xlsxOutPath), buildRetryOptions());
+      if (!safeExistsSync(path.dirname(xlsxOutPath)))
+        safeMkdir(path.dirname(xlsxOutPath), { recursive: true });
+      await retry(async () => generateNativeXlsx(xlsxProtocol, xlsxOutPath), buildRetryOptions());
       const xlsxStats = safeStat(xlsxOutPath);
       logger.info(`✅ [MEDIA] XLSX rendered at: ${xlsxOutPath} (${xlsxStats.size} bytes).`);
       break;
@@ -1560,8 +2206,9 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
     case 'docx_render': {
       const docxProtocol = ctx[params.design_from || 'last_docx_design'];
       const docxOutPath = path.resolve(rootDir, resolve(params.path || params.output_path));
-      if (!safeExistsSync(path.dirname(docxOutPath))) safeMkdir(path.dirname(docxOutPath), { recursive: true });
-      await withRetry(async () => generateNativeDocx(docxProtocol, docxOutPath), buildRetryOptions());
+      if (!safeExistsSync(path.dirname(docxOutPath)))
+        safeMkdir(path.dirname(docxOutPath), { recursive: true });
+      await retry(async () => generateNativeDocx(docxProtocol, docxOutPath), buildRetryOptions());
       const docxStats = safeStat(docxOutPath);
       logger.info(`✅ [MEDIA] DOCX rendered at: ${docxOutPath} (${docxStats.size} bytes).`);
       break;
@@ -1569,8 +2216,12 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
     case 'pdf_render': {
       const pdfProtocol = ctx[params.design_from || 'last_pdf_design'];
       const pdfOutPath = path.resolve(rootDir, resolve(params.path || params.output_path));
-      if (!safeExistsSync(path.dirname(pdfOutPath))) safeMkdir(path.dirname(pdfOutPath), { recursive: true });
-      await withRetry(async () => generateNativePdf(pdfProtocol, pdfOutPath, params.options), buildRetryOptions());
+      if (!safeExistsSync(path.dirname(pdfOutPath)))
+        safeMkdir(path.dirname(pdfOutPath), { recursive: true });
+      await retry(
+        async () => generateNativePdf(pdfProtocol, pdfOutPath, params.options),
+        buildRetryOptions()
+      );
       const pdfStats = safeStat(pdfOutPath);
       logger.info(`✅ [MEDIA] PDF rendered at: ${pdfOutPath} (${pdfStats.size} bytes).`);
       break;
@@ -1578,15 +2229,28 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
     case 'generate_document': {
       const fromKey = resolve(params.from) || 'last_json';
       const inlineData = params.data && typeof params.data === 'object' ? params.data : {};
-      const source = params.brief && typeof params.brief === 'object' ? params.brief : (ctx[fromKey] && typeof ctx[fromKey] === 'object' ? ctx[fromKey] : {});
-      const renderTarget = String(params.render_target || source.render_target || inlineData.render_target || '').trim();
-      const profileId = String(params.profile_id || source.document_profile || inlineData.document_profile || '').trim();
-      const brief = buildUnifiedDocumentBrief(rootDir, {
-        profileId,
-        renderTarget,
-        source,
-        data: inlineData,
-      }, loadDocumentCompositionCatalog);
+      const source =
+        params.brief && typeof params.brief === 'object'
+          ? params.brief
+          : ctx[fromKey] && typeof ctx[fromKey] === 'object'
+            ? ctx[fromKey]
+            : {};
+      const renderTarget = String(
+        params.render_target || source.render_target || inlineData.render_target || ''
+      ).trim();
+      const profileId = String(
+        params.profile_id || source.document_profile || inlineData.document_profile || ''
+      ).trim();
+      const brief = buildUnifiedDocumentBrief(
+        rootDir,
+        {
+          profileId,
+          renderTarget,
+          source,
+          data: inlineData,
+        },
+        loadDocumentCompositionCatalog
+      );
       const compiled = compileBriefToDesignProtocol(rootDir, brief);
       const outPath = path.resolve(rootDir, resolve(params.path || params.output_path));
       await renderCompiledProtocol(compiled, outPath, params.options);
@@ -1595,7 +2259,10 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       break;
     }
     case 'write_file':
-      safeWriteFile(path.resolve(rootDir, resolve(params.path)), ctx[params.from] || params.content);
+      safeWriteFile(
+        path.resolve(rootDir, resolve(params.path)),
+        ctx[params.from] || params.content
+      );
       break;
     case 'drawio_write': {
       const outPath = path.resolve(rootDir, resolve(params.path));
@@ -1612,19 +2279,33 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
     case 'save_brand_to_confidential': {
       // Writes tenant-override.json + layout-templates.json to confidential tier,
       // then registers the tenant in knowledge/confidential/tenants/index.json.
-      const tenantSlug: string   = resolve(params.tenant_slug) || ctx.tenant_slug;
-      const brandName: string    = resolve(params.brand_name)  || ctx.brand_name  || tenantSlug;
-      const matchers: string[]   = params.matchers ? (Array.isArray(params.matchers) ? params.matchers : [resolve(params.matchers)]) : [brandName.toLowerCase()];
-      const dsId: string         = resolve(params.design_system_id) || ctx.design_system_id || 'executive-standard';
-      const theme: any           = ctx[resolve(params.theme_from) || 'active_theme'] || {};
-      const webTheme: any        = ctx[resolve(params.web_theme_from) || 'active_web_theme'] || ctx.active_web_theme || null;
-      const webSnapshot: any     = ctx[resolve(params.web_from) || 'web_snapshot'] || ctx.active_web_snapshot || null;
-      const layoutGeo: any       = ctx[resolve(params.layout_from) || 'last_layout_geometry'] || {};
-      const pptxDesign: any      = ctx[resolve(params.pptx_from) || 'source_pptx_design'] || ctx.active_pptx_design || null;
+      const tenantSlug: string = resolve(params.tenant_slug) || ctx.tenant_slug;
+      const brandName: string = resolve(params.brand_name) || ctx.brand_name || tenantSlug;
+      const matchers: string[] = params.matchers
+        ? Array.isArray(params.matchers)
+          ? params.matchers
+          : [resolve(params.matchers)]
+        : [brandName.toLowerCase()];
+      const dsId: string =
+        resolve(params.design_system_id) || ctx.design_system_id || 'executive-standard';
+      const theme: any = ctx[resolve(params.theme_from) || 'active_theme'] || {};
+      const webTheme: any =
+        ctx[resolve(params.web_theme_from) || 'active_web_theme'] || ctx.active_web_theme || null;
+      const webSnapshot: any =
+        ctx[resolve(params.web_from) || 'web_snapshot'] || ctx.active_web_snapshot || null;
+      const layoutGeo: any = ctx[resolve(params.layout_from) || 'last_layout_geometry'] || {};
+      const pptxDesign: any =
+        ctx[resolve(params.pptx_from) || 'source_pptx_design'] || ctx.active_pptx_design || null;
       const isWebPack = Boolean(webTheme);
-      const webHeritage = webTheme?.web ? cloneJsonValue(webTheme.web) : (webSnapshot ? cloneJsonValue(webSnapshot) : null);
-      const webLayoutTemplates = webTheme?.layout_templates || webHeritage?.layout_templates || null;
-      const extractedTemplate: any = layoutGeo?.template || (pptxDesign ? deriveLayoutTemplateFromPptxDesign(pptxDesign) : null);
+      const webHeritage = webTheme?.web
+        ? cloneJsonValue(webTheme.web)
+        : webSnapshot
+          ? cloneJsonValue(webSnapshot)
+          : null;
+      const webLayoutTemplates =
+        webTheme?.layout_templates || webHeritage?.layout_templates || null;
+      const extractedTemplate: any =
+        layoutGeo?.template || (pptxDesign ? deriveLayoutTemplateFromPptxDesign(pptxDesign) : null);
 
       if (!tenantSlug) throw new Error('save_brand_to_confidential: tenant_slug is required');
 
@@ -1633,27 +2314,31 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
 
       // 1. Build and write layout-templates.json
       const templateId = `${tenantSlug}-extracted`;
-      const needsNewTemplate = isWebPack
-        ? true
-        : layoutGeo.needs_new_template !== false;
+      const needsNewTemplate = isWebPack ? true : layoutGeo.needs_new_template !== false;
       const webTemplate = webLayoutTemplates?.templates
-        ? webLayoutTemplates.templates?.[webLayoutTemplates.default] || webLayoutTemplates.templates?.[Object.keys(webLayoutTemplates.templates)[0]]
+        ? webLayoutTemplates.templates?.[webLayoutTemplates.default] ||
+          webLayoutTemplates.templates?.[Object.keys(webLayoutTemplates.templates)[0]]
         : null;
       const templatePayload = isWebPack
-        ? (webTemplate || {
-          chrome: {
-            viewport: webHeritage?.viewport || null,
-            background: webHeritage?.background || null,
-            container: webHeritage?.container || null,
-          },
-          hero: webHeritage?.hero || {},
-          body_zones: webHeritage?.body_zones || {},
-          web: webHeritage || {},
-        })
-        : (extractedTemplate || { chrome: layoutGeo.geometry?.chrome || {}, hero: {}, body_zones: {} });
+        ? webTemplate || {
+            chrome: {
+              viewport: webHeritage?.viewport || null,
+              background: webHeritage?.background || null,
+              container: webHeritage?.container || null,
+            },
+            hero: webHeritage?.hero || {},
+            body_zones: webHeritage?.body_zones || {},
+            web: webHeritage || {},
+          }
+        : extractedTemplate || {
+            chrome: layoutGeo.geometry?.chrome || {},
+            hero: {},
+            body_zones: {},
+          };
       if (needsNewTemplate && (layoutGeo.geometry || extractedTemplate || isWebPack)) {
         const pubCatalog = loadLayoutTemplateCatalog(rootDir);
-        const baseTemplate = pubCatalog.templates?.[layoutGeo.recommended_template_id || 'corporate-standard'] || {};
+        const baseTemplate =
+          pubCatalog.templates?.[layoutGeo.recommended_template_id || 'corporate-standard'] || {};
         const newTemplate = {
           chrome: { ...baseTemplate.chrome, ...(templatePayload.chrome || {}) },
           hero: { ...baseTemplate.hero, ...(templatePayload.hero || {}) },
@@ -1663,13 +2348,22 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
             ? `Auto-extracted from Web heritage for ${brandName}. Review layout before production use.`
             : `Auto-extracted from PPTX for ${brandName}. Review geometry before production use.`,
         };
-        const layoutCatalog = { version: '1.0.0', default: templateId, templates: { [templateId]: newTemplate } };
-        safeWriteFile(path.join(confDir, 'layout-templates.json'), JSON.stringify(layoutCatalog, null, 2));
+        const layoutCatalog = {
+          version: '1.0.0',
+          default: templateId,
+          templates: { [templateId]: newTemplate },
+        };
+        safeWriteFile(
+          path.join(confDir, 'layout-templates.json'),
+          JSON.stringify(layoutCatalog, null, 2)
+        );
         logger.info(`[BRAND_IMPORT] Wrote confidential layout-templates.json for ${tenantSlug}`);
       }
 
       // 2. Build and write tenant-override.json
-      const usedTemplateId = needsNewTemplate ? templateId : (layoutGeo.matched_template_id || templateId);
+      const usedTemplateId = needsNewTemplate
+        ? templateId
+        : layoutGeo.matched_template_id || templateId;
       const override: any = {
         _meta: `Auto-imported brand profile for ${brandName}. Review before production use.`,
         design_system_id: dsId,
@@ -1686,7 +2380,12 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       if (extractedTheme?.colors || extractedTheme?.fonts) {
         override.extracted_theme = { colors: extractedTheme.colors, fonts: extractedTheme.fonts };
       }
-      if (resolve(params.logo_url)) override.branding = { brand_name: brandName, logo_url: resolve(params.logo_url), tone: 'professional-enterprise' };
+      if (resolve(params.logo_url))
+        override.branding = {
+          brand_name: brandName,
+          logo_url: resolve(params.logo_url),
+          tone: 'professional-enterprise',
+        };
       else override.branding = { brand_name: brandName };
       if (pptxDesign || theme?.pptx || webTheme) {
         override.theme_pack_path = `knowledge/confidential/${tenantSlug}/design/theme.json`;
@@ -1700,40 +2399,64 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
         colors: webTheme?.theme?.colors || theme?.colors || {},
         fonts: webTheme?.theme?.fonts || theme?.fonts || {},
         assets: {
-          logo_url: resolve(params.logo_url) || webTheme?.theme?.assets?.logo_url || theme?.assets?.logo_url || undefined,
+          logo_url:
+            resolve(params.logo_url) ||
+            webTheme?.theme?.assets?.logo_url ||
+            theme?.assets?.logo_url ||
+            undefined,
         },
       };
-      const packHeritage = pptxDesign ? {
-        canvas: cloneJsonValue(pptxDesign.canvas || null),
-        master: cloneJsonValue(pptxDesign.master || null),
-        rawThemeXml: pptxDesign.rawThemeXml || null,
-        rawMasterXml: pptxDesign.rawMasterXml || null,
-        rawMasterRelsXml: pptxDesign.rawMasterRelsXml || null,
-        rawLayouts: Array.isArray(pptxDesign.rawLayouts) ? cloneJsonValue(pptxDesign.rawLayouts) : [],
-        rawMasters: Array.isArray(pptxDesign.rawMasters) ? cloneJsonValue(pptxDesign.rawMasters) : [],
-        masterMedia: Array.isArray(pptxDesign.masterMedia) ? cloneJsonValue(pptxDesign.masterMedia) : [],
-        rawParts: pptxDesign.rawParts || null,
-      } : theme?.pptx ? cloneJsonValue(theme.pptx) : null;
-      const packLayoutTemplates = isWebPack && webLayoutTemplates
-        ? cloneJsonValue(webLayoutTemplates)
-        : (needsNewTemplate && extractedTemplate ? {
-          version: '1.0.0',
-          default: templateId,
-          templates: {
-            [templateId]: {
-              chrome: { ...(extractedTemplate.chrome || {}) },
-              hero: { ...(extractedTemplate.hero || {}) },
-              body_zones: { ...(extractedTemplate.body_zones || {}) },
-              _meta: `Derived from PPTX heritage for ${brandName}.`,
-            },
-          },
-        } : (extractedTemplate ? {
-          version: '1.0.0',
-          default: layoutGeo.matched_template_id || layoutGeo.recommended_template_id || templateId,
-          templates: {
-            [layoutGeo.matched_template_id || layoutGeo.recommended_template_id || templateId]: cloneJsonValue(extractedTemplate),
-          },
-        } : null));
+      const packHeritage = pptxDesign
+        ? {
+            canvas: cloneJsonValue(pptxDesign.canvas || null),
+            master: cloneJsonValue(pptxDesign.master || null),
+            rawThemeXml: pptxDesign.rawThemeXml || null,
+            rawMasterXml: pptxDesign.rawMasterXml || null,
+            rawMasterRelsXml: pptxDesign.rawMasterRelsXml || null,
+            rawLayouts: Array.isArray(pptxDesign.rawLayouts)
+              ? cloneJsonValue(pptxDesign.rawLayouts)
+              : [],
+            rawMasters: Array.isArray(pptxDesign.rawMasters)
+              ? cloneJsonValue(pptxDesign.rawMasters)
+              : [],
+            masterMedia: Array.isArray(pptxDesign.masterMedia)
+              ? cloneJsonValue(pptxDesign.masterMedia)
+              : [],
+            rawParts: pptxDesign.rawParts || null,
+          }
+        : theme?.pptx
+          ? cloneJsonValue(theme.pptx)
+          : null;
+      const packLayoutTemplates =
+        isWebPack && webLayoutTemplates
+          ? cloneJsonValue(webLayoutTemplates)
+          : needsNewTemplate && extractedTemplate
+            ? {
+                version: '1.0.0',
+                default: templateId,
+                templates: {
+                  [templateId]: {
+                    chrome: { ...(extractedTemplate.chrome || {}) },
+                    hero: { ...(extractedTemplate.hero || {}) },
+                    body_zones: { ...(extractedTemplate.body_zones || {}) },
+                    _meta: `Derived from PPTX heritage for ${brandName}.`,
+                  },
+                },
+              }
+            : extractedTemplate
+              ? {
+                  version: '1.0.0',
+                  default:
+                    layoutGeo.matched_template_id ||
+                    layoutGeo.recommended_template_id ||
+                    templateId,
+                  templates: {
+                    [layoutGeo.matched_template_id ||
+                    layoutGeo.recommended_template_id ||
+                    templateId]: cloneJsonValue(extractedTemplate),
+                  },
+                }
+              : null;
       const themePack = {
         kind: isWebPack ? 'web-theme-pack' : 'pptx-theme-pack',
         version: '1.0.0',
@@ -1755,10 +2478,15 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       // 3. Update knowledge/confidential/tenants/index.json
       const registryPath = path.resolve(rootDir, 'knowledge/confidential/tenants/index.json');
       let registry: any = { tenants: [] };
-      try { registry = JSON.parse(safeReadFile(registryPath, { encoding: 'utf8' }) as string); } catch { /* create new */ }
+      try {
+        registry = JSON.parse(safeReadFile(registryPath, { encoding: 'utf8' }) as string);
+      } catch {
+        /* create new */
+      }
       const overridePath = `knowledge/confidential/${tenantSlug}/design/tenant-override.json`;
       const existing = registry.tenants.findIndex((t: any) => t.id === tenantSlug);
-      if (existing >= 0) registry.tenants[existing] = { id: tenantSlug, override_path: overridePath };
+      if (existing >= 0)
+        registry.tenants[existing] = { id: tenantSlug, override_path: overridePath };
       else registry.tenants.push({ id: tenantSlug, override_path: overridePath });
       safeWriteFile(registryPath, JSON.stringify(registry, null, 2));
       logger.info(`[BRAND_IMPORT] Updated confidential tenant registry for ${tenantSlug}`);
@@ -1766,7 +2494,9 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       logger.info(`✅ [BRAND_IMPORT] Brand saved to confidential tier → ${confDir}`);
       break;
     }
-    case 'log': logger.info(`[MEDIA_LOG] ${resolve(params.message)}`); break;
+    case 'log':
+      logger.info(`[MEDIA_LOG] ${resolve(params.message)}`);
+      break;
   }
   return ctx;
 }
@@ -1786,7 +2516,14 @@ function deepMergeCatalog(base: any, next: any): any {
   if (!next || typeof next !== 'object') return cloneJsonValue(next);
   const merged: Record<string, any> = { ...base };
   for (const [key, value] of Object.entries(next)) {
-    if (value && typeof value === 'object' && !Array.isArray(value) && merged[key] && typeof merged[key] === 'object' && !Array.isArray(merged[key])) {
+    if (
+      value &&
+      typeof value === 'object' &&
+      !Array.isArray(value) &&
+      merged[key] &&
+      typeof merged[key] === 'object' &&
+      !Array.isArray(merged[key])
+    ) {
       merged[key] = deepMergeCatalog(merged[key], value);
     } else {
       merged[key] = cloneJsonValue(value);
@@ -1812,11 +2549,14 @@ function readJsonFilesRecursively(dirPath: string): any[] {
   return docs;
 }
 
-function loadJsonCatalog(rootDir: string, input: {
-  directoryPath: string;
-  filePath: string;
-  fallback: any;
-}): any {
+function loadJsonCatalog(
+  rootDir: string,
+  input: {
+    directoryPath: string;
+    filePath: string;
+    fallback: any;
+  }
+): any {
   const dirPath = path.resolve(rootDir, input.directoryPath);
   const filePath = path.resolve(rootDir, input.filePath);
   const docs = readJsonFilesRecursively(dirPath);
@@ -1830,7 +2570,10 @@ function loadJsonCatalog(rootDir: string, input: {
 }
 
 function loadArtifactLibraryCatalog(rootDir: string): any {
-  const dirPath = path.resolve(rootDir, 'knowledge/public/design-patterns/media-templates/artifact-library');
+  const dirPath = path.resolve(
+    rootDir,
+    'knowledge/public/design-patterns/media-templates/artifact-library'
+  );
   const docs = readJsonFilesRecursively(dirPath);
   const fallback = { profiles: {} };
   if (docs.length === 0) {
@@ -1877,7 +2620,9 @@ function loadThemeCatalog(rootDir: string): any {
   return deepMergeCatalog(deepMergeCatalog(publicCatalog, runtimeCatalog), personalCatalog);
 }
 
-function loadConfidentialThemePackEntries(rootDir: string): { theme_id: string; theme_name?: string; pack_path: string }[] {
+function loadConfidentialThemePackEntries(
+  rootDir: string
+): { theme_id: string; theme_name?: string; pack_path: string }[] {
   try {
     const confidentialDir = path.resolve(rootDir, 'knowledge/confidential');
     let tenantNames: string[] = [];
@@ -1892,30 +2637,42 @@ function loadConfidentialThemePackEntries(rootDir: string): { theme_id: string; 
       if (!safeExistsSync(themePackPath)) continue;
       try {
         const pack = JSON.parse(safeReadFile(themePackPath, { encoding: 'utf8' }) as string);
-        const themeId = String(pack?.theme_id || pack?.theme?.theme_id || pack?.theme?.name || '').trim();
+        const themeId = String(
+          pack?.theme_id || pack?.theme?.theme_id || pack?.theme?.name || ''
+        ).trim();
         if (!themeId) continue;
-        entries.push({ theme_id: themeId, theme_name: pack?.theme?.name, pack_path: `knowledge/confidential/${tenantName}/design/theme.json` });
+        entries.push({
+          theme_id: themeId,
+          theme_name: pack?.theme?.name,
+          pack_path: `knowledge/confidential/${tenantName}/design/theme.json`,
+        });
       } catch (err: any) {
-        logger.warn(`[THEME_RESOLVER] Failed reading theme JSON for tenant ${tenantName}: ${err.message}`);
+        logger.warn(
+          `[THEME_RESOLVER] Failed reading theme JSON for tenant ${tenantName}: ${err.message}`
+        );
         continue;
       }
     }
     return entries;
   } catch (err: any) {
-    logger.warn(`[THEME_RESOLVER] loadConfidentialThemePackEntries general failure: ${err.message}`);
+    logger.warn(
+      `[THEME_RESOLVER] loadConfidentialThemePackEntries general failure: ${err.message}`
+    );
     return [];
   }
 }
 
 function resolveConfidentialThemePack(rootDir: string, themeName: string): any {
-  const normalized = String(themeName || '').trim().toLowerCase();
+  const normalized = String(themeName || '')
+    .trim()
+    .toLowerCase();
   if (!normalized) return null;
 
   // Try direct path first to bypass sandbox/secure-io directory listing limitations
   const potentialSlugs = [
     normalized,
     normalized.split('-')[0],
-    normalized.replace('-imported', '')
+    normalized.replace('-imported', ''),
   ];
   for (const slug of potentialSlugs) {
     if (!slug) continue;
@@ -1923,9 +2680,16 @@ function resolveConfidentialThemePack(rootDir: string, themeName: string): any {
     if (safeExistsSync(directPath)) {
       try {
         const pack = JSON.parse(safeReadFile(directPath, { encoding: 'utf8' }) as string);
-        const themeId = String(pack?.theme_id || pack?.theme?.theme_id || pack?.theme?.name || '').trim();
-        if (themeId.toLowerCase() === normalized || String(pack?.theme?.name || '').toLowerCase() === normalized) {
-          logger.info(`[THEME_RESOLVER] Direct resolved confidential theme pack from: ${directPath}`);
+        const themeId = String(
+          pack?.theme_id || pack?.theme?.theme_id || pack?.theme?.name || ''
+        ).trim();
+        if (
+          themeId.toLowerCase() === normalized ||
+          String(pack?.theme?.name || '').toLowerCase() === normalized
+        ) {
+          logger.info(
+            `[THEME_RESOLVER] Direct resolved confidential theme pack from: ${directPath}`
+          );
           return pack;
         }
       } catch (err: any) {
@@ -1936,7 +2700,10 @@ function resolveConfidentialThemePack(rootDir: string, themeName: string): any {
 
   // Scan fallback
   for (const entry of loadConfidentialThemePackEntries(rootDir)) {
-    if (entry.theme_id.toLowerCase() !== normalized && String(entry.theme_name || '').toLowerCase() !== normalized) {
+    if (
+      entry.theme_id.toLowerCase() !== normalized &&
+      String(entry.theme_name || '').toLowerCase() !== normalized
+    ) {
       continue;
     }
     try {
@@ -1982,33 +2749,79 @@ function resolveDesignBindingHints(brief: any): {
   branding?: Record<string, any>;
 } {
   const direct = {
-    tenant_id: String(brief?.tenant_id || brief?.payload?.tenant_id || brief?.tenant_slug || brief?.payload?.tenant_slug || '').trim() || undefined,
+    tenant_id:
+      String(
+        brief?.tenant_id ||
+          brief?.payload?.tenant_id ||
+          brief?.tenant_slug ||
+          brief?.payload?.tenant_slug ||
+          ''
+      ).trim() || undefined,
     client_key: String(brief?.client_key || brief?.payload?.client_key || '').trim() || undefined,
-    design_system_id: String(brief?.design_system_id || brief?.payload?.design_system_id || '').trim() || undefined,
-    design_reference: String(brief?.design_reference || brief?.payload?.design_reference || '').trim() || undefined,
+    design_system_id:
+      String(brief?.design_system_id || brief?.payload?.design_system_id || '').trim() || undefined,
+    design_reference:
+      String(brief?.design_reference || brief?.payload?.design_reference || '').trim() || undefined,
     theme: String(brief?.theme || brief?.payload?.theme || '').trim() || undefined,
-    branding: (brief?.branding && typeof brief.branding === 'object') ? brief.branding : ((brief?.payload?.branding && typeof brief.payload.branding === 'object') ? brief.payload.branding : {}),
+    branding:
+      brief?.branding && typeof brief.branding === 'object'
+        ? brief.branding
+        : brief?.payload?.branding && typeof brief.payload.branding === 'object'
+          ? brief.payload.branding
+          : {},
   };
   const projectId = String(brief?.project_id || brief?.payload?.project_id || '').trim();
   const project = projectId ? loadProjectRecord(projectId) : null;
-  const projectMeta = (project?.metadata && typeof project.metadata === 'object') ? project.metadata as Record<string, any> : {};
+  const projectMeta =
+    project?.metadata && typeof project.metadata === 'object'
+      ? (project.metadata as Record<string, any>)
+      : {};
   const bindingIds = [
-    ...((Array.isArray(project?.service_bindings) ? project!.service_bindings : []).map((value: any) => String(value))),
-    ...((Array.isArray(brief?.service_binding_ids) ? brief.service_binding_ids : []).map((value: any) => String(value))),
-    ...((Array.isArray(brief?.payload?.service_binding_ids) ? brief.payload.service_binding_ids : []).map((value: any) => String(value))),
+    ...(Array.isArray(project?.service_bindings) ? project!.service_bindings : []).map(
+      (value: any) => String(value)
+    ),
+    ...(Array.isArray(brief?.service_binding_ids) ? brief.service_binding_ids : []).map(
+      (value: any) => String(value)
+    ),
+    ...(Array.isArray(brief?.payload?.service_binding_ids)
+      ? brief.payload.service_binding_ids
+      : []
+    ).map((value: any) => String(value)),
   ].filter(Boolean);
   const bindings = bindingIds
     .map((bindingId) => loadServiceBindingRecord(bindingId))
     .filter((value): value is NonNullable<typeof value> => Boolean(value));
-  const bindingMeta = bindings
-    .map((binding) => (binding.metadata && typeof binding.metadata === 'object') ? binding.metadata as Record<string, any> : {})
-    .find((meta) => Object.keys(meta).length > 0) || {};
+  const bindingMeta =
+    bindings
+      .map((binding) =>
+        binding.metadata && typeof binding.metadata === 'object'
+          ? (binding.metadata as Record<string, any>)
+          : {}
+      )
+      .find((meta) => Object.keys(meta).length > 0) || {};
 
   return {
-    tenant_id: direct.tenant_id || String(projectMeta.tenant_id || bindingMeta.tenant_id || '').trim() || undefined,
-    client_key: direct.client_key || String(projectMeta.client_key || bindingMeta.client_key || '').trim() || undefined,
-    design_system_id: direct.design_system_id || String(projectMeta.design_system_id || bindingMeta.design_system_id || '').trim() || undefined,
-    design_reference: direct.design_reference || String(projectMeta.design_reference || bindingMeta.design_reference || bindingMeta.design_system_slug || '').trim() || undefined,
+    tenant_id:
+      direct.tenant_id ||
+      String(projectMeta.tenant_id || bindingMeta.tenant_id || '').trim() ||
+      undefined,
+    client_key:
+      direct.client_key ||
+      String(projectMeta.client_key || bindingMeta.client_key || '').trim() ||
+      undefined,
+    design_system_id:
+      direct.design_system_id ||
+      String(projectMeta.design_system_id || bindingMeta.design_system_id || '').trim() ||
+      undefined,
+    design_reference:
+      direct.design_reference ||
+      String(
+        projectMeta.design_reference ||
+          bindingMeta.design_reference ||
+          bindingMeta.design_system_slug ||
+          ''
+      ).trim() ||
+      undefined,
     theme: direct.theme || String(projectMeta.theme || bindingMeta.theme || '').trim() || undefined,
     branding: {
       ...(projectMeta.branding || {}),
@@ -2032,75 +2845,88 @@ function resolveImportedDesignReference(rootDir: string, input: any): any | null
     .filter(Boolean);
   if (candidates.length === 0) return null;
   const systems = Array.isArray(catalog.systems) ? catalog.systems : [];
-  return systems.find((entry: any) => {
-    const values = [
-      entry?.design_system_id,
-      entry?.theme_id,
-      entry?.slug,
-      entry?.name,
-      entry?.description,
-      entry?.category,
-      ...(Array.isArray(entry?.keywords) ? entry.keywords : []),
-    ].map(normalizeDesignLookupKey);
-    return candidates.some((candidate) => values.some((value) => {
-      if (!value) return false;
-      if (value === candidate) return true;
-      if (candidate.length >= 4 && value.includes(candidate)) return true;
-      return false;
-    }));
-  }) || null;
+  return (
+    systems.find((entry: any) => {
+      const values = [
+        entry?.design_system_id,
+        entry?.theme_id,
+        entry?.slug,
+        entry?.name,
+        entry?.description,
+        entry?.category,
+        ...(Array.isArray(entry?.keywords) ? entry.keywords : []),
+      ].map(normalizeDesignLookupKey);
+      return candidates.some((candidate) =>
+        values.some((value) => {
+          if (!value) return false;
+          if (value === candidate) return true;
+          if (candidate.length >= 4 && value.includes(candidate)) return true;
+          return false;
+        })
+      );
+    }) || null
+  );
 }
 
 function recommendImportedDesignReferences(rootDir: string, brief: any, limit = 3): any[] {
   const catalog = loadImportedDesignMdIndex(rootDir);
   const systems = Array.isArray(catalog.systems) ? catalog.systems : [];
-  const haystack = normalizeDesignLookupKey([
-    brief?.design_reference,
-    brief?.client,
-    brief?.client_key,
-    brief?.title,
-    brief?.objective,
-    brief?.summary,
-    brief?.project_name,
-    brief?.project_id,
-    brief?.payload?.title,
-    brief?.payload?.summary,
-    brief?.payload?.client,
-    brief?.story?.core_message,
-    brief?.story?.closing_cta,
-    brief?.payload?.story?.core_message,
-    brief?.audience,
-    brief?.payload?.audience,
-  ].filter(Boolean).join(' '));
+  const haystack = normalizeDesignLookupKey(
+    [
+      brief?.design_reference,
+      brief?.client,
+      brief?.client_key,
+      brief?.title,
+      brief?.objective,
+      brief?.summary,
+      brief?.project_name,
+      brief?.project_id,
+      brief?.payload?.title,
+      brief?.payload?.summary,
+      brief?.payload?.client,
+      brief?.story?.core_message,
+      brief?.story?.closing_cta,
+      brief?.payload?.story?.core_message,
+      brief?.audience,
+      brief?.payload?.audience,
+    ]
+      .filter(Boolean)
+      .join(' ')
+  );
 
   if (!haystack) return [];
 
-  const scored = systems.map((entry: any) => {
-    const terms = [
-      entry?.slug,
-      entry?.name,
-      entry?.category,
-      entry?.description,
-      ...(Array.isArray(entry?.keywords) ? entry.keywords : []),
-    ]
-      .map(normalizeDesignLookupKey)
-      .filter(Boolean);
-    let score = 0;
-    for (const term of terms) {
-      if (!term) continue;
-      if (haystack === term) score += 10;
-      else if (haystack.includes(term)) score += Math.min(6, Math.max(2, term.split(' ').length + 1));
-      else if (term.includes(haystack)) score += 1;
-    }
-    return {
-      ...entry,
-      recommendation_score: score,
-    };
-  })
+  const scored = systems
+    .map((entry: any) => {
+      const terms = [
+        entry?.slug,
+        entry?.name,
+        entry?.category,
+        entry?.description,
+        ...(Array.isArray(entry?.keywords) ? entry.keywords : []),
+      ]
+        .map(normalizeDesignLookupKey)
+        .filter(Boolean);
+      let score = 0;
+      for (const term of terms) {
+        if (!term) continue;
+        if (haystack === term) score += 10;
+        else if (haystack.includes(term))
+          score += Math.min(6, Math.max(2, term.split(' ').length + 1));
+        else if (term.includes(haystack)) score += 1;
+      }
+      return {
+        ...entry,
+        recommendation_score: score,
+      };
+    })
     .filter((entry: any) => entry.recommendation_score > 0)
     .sort((left: any, right: any) => {
-      if (right.recommendation_score !== left.recommendation_score) return right.recommendation_score - left.recommendation_score;
-      return String(left.design_system_id || '').localeCompare(String(right.design_system_id || ''));
+      if (right.recommendation_score !== left.recommendation_score)
+        return right.recommendation_score - left.recommendation_score;
+      return String(left.design_system_id || '').localeCompare(
+        String(right.design_system_id || '')
+      );
     });
 
   return scored.slice(0, limit).map((entry: any) => ({
@@ -2115,25 +2941,48 @@ function recommendImportedDesignReferences(rootDir: string, brief: any, limit = 
   }));
 }
 
-function resolveMediaDesignSystem(rootDir: string, brief: any): { designSystemId: string; system: any; tenantOverride: any; resolvedThemeName: string; branding: any; promptGuide: string[]; sourceDesign?: Record<string, any> | null; recommendations: any[] } {
+function resolveMediaDesignSystem(
+  rootDir: string,
+  brief: any
+): {
+  designSystemId: string;
+  system: any;
+  tenantOverride: any;
+  resolvedThemeName: string;
+  branding: any;
+  promptGuide: string[];
+  sourceDesign?: Record<string, any> | null;
+  recommendations: any[];
+} {
   const catalog = loadMediaDesignSystemsCatalog(rootDir);
   const bindingHints = resolveDesignBindingHints(brief);
   const recommendations = recommendImportedDesignReferences(rootDir, brief);
   const explicit = String(bindingHints.design_system_id || '').trim();
   const resolveTenantOverride = (_system: any, designSystemId?: string) => {
-    const clientHint = bindingHints.tenant_id || bindingHints.client_key || brief?.client || brief?.payload?.client || '';
+    const clientHint =
+      bindingHints.tenant_id ||
+      bindingHints.client_key ||
+      brief?.client ||
+      brief?.payload?.client ||
+      '';
     const override = resolveConfidentialTenantOverride(rootDir, String(clientHint));
     if (override) return override;
-    return designSystemId ? resolveConfidentialTenantOverride(rootDir, String(clientHint), designSystemId) : null;
+    return designSystemId
+      ? resolveConfidentialTenantOverride(rootDir, String(clientHint), designSystemId)
+      : null;
   };
   const buildResult = (designSystemId: string, system: any) => {
     const tenantOverride = resolveTenantOverride(system, designSystemId);
-    const promptGuide = Array.isArray(system?.metadata?.prompt_guide) ? system.metadata.prompt_guide : [];
+    const promptGuide = Array.isArray(system?.metadata?.prompt_guide)
+      ? system.metadata.prompt_guide
+      : [];
     return {
       designSystemId,
       system,
       tenantOverride,
-      resolvedThemeName: String(bindingHints.theme || tenantOverride?.theme || system?.theme || 'kyberion-standard'),
+      resolvedThemeName: String(
+        bindingHints.theme || tenantOverride?.theme || system?.theme || 'kyberion-standard'
+      ),
       branding: {
         ...(system?.branding || {}),
         ...(tenantOverride?.branding || {}),
@@ -2141,14 +2990,17 @@ function resolveMediaDesignSystem(rootDir: string, brief: any): { designSystemId
       },
       promptGuide,
       recommendations,
-      sourceDesign: system?.metadata?.source_type === 'design-md' ? {
-        source_type: system.metadata.source_type,
-        source_repo: system.metadata.source_repo,
-        source_path: system.metadata.source_path,
-        slug: system.metadata.slug,
-        category: system.metadata.category,
-        description: system.metadata.description,
-      } : null,
+      sourceDesign:
+        system?.metadata?.source_type === 'design-md'
+          ? {
+              source_type: system.metadata.source_type,
+              source_repo: system.metadata.source_repo,
+              source_path: system.metadata.source_path,
+              slug: system.metadata.slug,
+              category: system.metadata.category,
+              description: system.metadata.description,
+            }
+          : null,
     };
   };
   if (explicit && catalog.systems?.[explicit]) {
@@ -2157,15 +3009,16 @@ function resolveMediaDesignSystem(rootDir: string, brief: any): { designSystemId
   const imported = resolveImportedDesignReference(rootDir, {
     ...bindingHints,
     client: brief?.client || brief?.payload?.client,
-    project_name: brief?.project_name || brief?.payload?.project_name || brief?.name || brief?.payload?.name,
+    project_name:
+      brief?.project_name || brief?.payload?.project_name || brief?.name || brief?.payload?.name,
     project_id: brief?.project_id || brief?.payload?.project_id,
   });
   if (imported?.design_system_id && catalog.systems?.[imported.design_system_id]) {
     return buildResult(imported.design_system_id, catalog.systems[imported.design_system_id]);
   }
   const profileId = String(brief?.document_profile || '').trim();
-  const matched = Object.entries(catalog.systems || {}).find(([, system]: any) =>
-    Array.isArray(system?.profiles) && system.profiles.includes(profileId),
+  const matched = Object.entries(catalog.systems || {}).find(
+    ([, system]: any) => Array.isArray(system?.profiles) && system.profiles.includes(profileId)
   );
   if (matched) {
     return buildResult(matched[0], matched[1]);
@@ -2182,7 +3035,11 @@ function loadSemanticRenderTokenCatalog(rootDir: string): any {
   });
 }
 
-function resolveSemanticRenderTokens(rootDir: string, semanticType?: string, designSystemId?: string): any {
+function resolveSemanticRenderTokens(
+  rootDir: string,
+  semanticType?: string,
+  designSystemId?: string
+): any {
   const catalog = loadSemanticRenderTokenCatalog(rootDir);
   const key = String(semanticType || 'content').trim() || 'content';
   const designSystems = loadMediaDesignSystemsCatalog(rootDir);
@@ -2196,10 +3053,15 @@ function resolveSemanticRenderTokens(rootDir: string, semanticType?: string, des
   };
 }
 
-function resolveSemanticComponentRule(rootDir: string, semanticType: string | undefined, medium: string, component: string): any {
+function resolveSemanticComponentRule(
+  rootDir: string,
+  semanticType: string | undefined,
+  medium: string,
+  component: string
+): any {
   const tokens = resolveSemanticRenderTokens(rootDir, semanticType);
   return {
-    ...((tokens?.[medium] && tokens[medium][component]) ? tokens[medium][component] : {}),
+    ...(tokens?.[medium] && tokens[medium][component] ? tokens[medium][component] : {}),
   };
 }
 
@@ -2227,23 +3089,27 @@ function resolveNamedTheme(rootDir: string, preferredTheme?: string): any {
   return catalog.themes?.[catalog.default_theme] || null;
 }
 
-function resolveDocumentCompositionPresetCore(rootDir: string, brief: any): { profileId: string; preset: any } {
+function resolveDocumentCompositionPresetCore(
+  rootDir: string,
+  brief: any
+): { profileId: string; preset: any } {
   const catalog = loadDocumentCompositionCatalog(rootDir);
   const profiles = catalog.profiles || {};
   const defaults = catalog.defaults || {};
-  const artifactFamily = String(brief?.artifact_family || brief?.payload?.artifact_family || '').trim();
+  const artifactFamily = String(
+    brief?.artifact_family || brief?.payload?.artifact_family || ''
+  ).trim();
   const documentType = String(brief?.document_type || brief?.payload?.document_type || '').trim();
   const explicitProfile = String(
-    brief?.document_profile ||
-    brief?.payload?.document_profile ||
-    brief?.profile_id ||
-    '',
+    brief?.document_profile || brief?.payload?.document_profile || brief?.profile_id || ''
   ).trim();
 
   const candidateProfiles = new Set<string>();
   if (explicitProfile) candidateProfiles.add(explicitProfile);
-  if (artifactFamily && typeof defaults[artifactFamily] === 'string') candidateProfiles.add(defaults[artifactFamily]);
-  if (documentType && typeof defaults[documentType] === 'string') candidateProfiles.add(defaults[documentType]);
+  if (artifactFamily && typeof defaults[artifactFamily] === 'string')
+    candidateProfiles.add(defaults[artifactFamily]);
+  if (documentType && typeof defaults[documentType] === 'string')
+    candidateProfiles.add(defaults[documentType]);
   for (const candidate of resolveDocumentProfileCandidatesPolicy(documentType, artifactFamily)) {
     candidateProfiles.add(String(candidate));
   }
@@ -2280,7 +3146,9 @@ function resolveDocumentCompositionPresetCore(rootDir: string, brief: any): { pr
           ...(preset.branding || {}),
           ...(designSystem.branding || {}),
         },
-        prompt_guide: Array.isArray(preset.prompt_guide) ? preset.prompt_guide : designSystem.promptGuide,
+        prompt_guide: Array.isArray(preset.prompt_guide)
+          ? preset.prompt_guide
+          : designSystem.promptGuide,
         source_design: preset.source_design || designSystem.sourceDesign || null,
         design_recommendations: Array.isArray(preset.design_recommendations)
           ? preset.design_recommendations
@@ -2297,20 +3165,40 @@ function resolveDocumentCompositionPresetCore(rootDir: string, brief: any): { pr
     }
   }
 
-  const inferredProfileId = explicitProfile || defaults[artifactFamily] || defaults[documentType] || defaults.proposal || defaults.report || defaults.spreadsheet || defaults.diagram;
+  const inferredProfileId =
+    explicitProfile ||
+    defaults[artifactFamily] ||
+    defaults[documentType] ||
+    defaults.proposal ||
+    defaults.report ||
+    defaults.spreadsheet ||
+    defaults.diagram;
   if (inferredProfileId && profiles?.[inferredProfileId]) {
     return buildPreset(inferredProfileId, profiles[inferredProfileId]);
   }
 
   for (const [profileId, preset] of Object.entries(profiles)) {
     if (!preset || typeof preset !== 'object') continue;
-    if (artifactFamily && String((preset as any).artifact_family || '') !== artifactFamily) continue;
+    if (artifactFamily && String((preset as any).artifact_family || '') !== artifactFamily)
+      continue;
     if (documentType && String((preset as any).document_type || '') !== documentType) continue;
     return buildPreset(profileId, preset);
   }
 
-  const fallbackId = String(defaults[artifactFamily] || defaults[documentType] || defaults.report || defaults.proposal || defaults.spreadsheet || defaults.diagram || 'summary-report');
-  const profileId = profiles[fallbackId] ? fallbackId : (profiles['summary-report'] ? 'summary-report' : fallbackId);
+  const fallbackId = String(
+    defaults[artifactFamily] ||
+      defaults[documentType] ||
+      defaults.report ||
+      defaults.proposal ||
+      defaults.spreadsheet ||
+      defaults.diagram ||
+      'summary-report'
+  );
+  const profileId = profiles[fallbackId]
+    ? fallbackId
+    : profiles['summary-report']
+      ? 'summary-report'
+      : fallbackId;
   const preset = profiles[profileId] || profiles[fallbackId] || profiles['summary-report'] || {};
   return buildPreset(profileId, preset);
 }
@@ -2353,11 +3241,17 @@ const mediaSpreadsheetPipelineHelpers = createMediaSpreadsheetPipelineHelpers({
   loadSemanticRenderTokenCatalog,
 });
 
-function resolveDocumentCompositionPreset(rootDir: string, brief: any): { profileId: string; preset: any } {
+function resolveDocumentCompositionPreset(
+  rootDir: string,
+  brief: any
+): { profileId: string; preset: any } {
   return resolveDocumentCompositionPresetCore(rootDir, brief);
 }
 
-function buildOutlineDrivenPptxProtocol(rootDir: string, outline: any): { protocol: any; theme: any; themeName: string } {
+function buildOutlineDrivenPptxProtocol(
+  rootDir: string,
+  outline: any
+): { protocol: any; theme: any; themeName: string } {
   return mediaDocumentPipelineHelpers.buildOutlineDrivenPptxProtocol(rootDir, outline);
 }
 
@@ -2366,11 +3260,18 @@ const proposalPptxFlow = createProposalPptxFlow({
   buildMediaGenerationBoundary,
 });
 
-function buildPresentationPptxProtocol(rootDir: string, brief: any): { protocol: any; outline: any; theme: any; themeName: string } {
+function buildPresentationPptxProtocol(
+  rootDir: string,
+  brief: any
+): { protocol: any; outline: any; theme: any; themeName: string } {
   return mediaDocumentPipelineHelpers.buildPresentationPptxProtocol(rootDir, brief);
 }
 
-function buildOutlineFromNormalizedBrief(rootDir: string, category: 'presentation' | 'document' | 'spreadsheet' | 'diagram', brief: any): any {
+function buildOutlineFromNormalizedBrief(
+  rootDir: string,
+  category: 'presentation' | 'document' | 'spreadsheet' | 'diagram',
+  brief: any
+): any {
   return mediaDocumentPipelineHelpers.buildOutlineFromNormalizedBrief(rootDir, category, brief);
 }
 
@@ -2384,26 +3285,52 @@ function buildCompiledBriefContext(input: {
   return mediaDocumentPipelineHelpers.buildCompiledBriefContext(input);
 }
 
-async function renderCompiledProtocol(compiled: {
-  protocol: any;
-  protocolKind: ProtocolKind;
-}, outPath: string, options?: any): Promise<void> {
+async function renderCompiledProtocol(
+  compiled: {
+    protocol: any;
+    protocolKind: ProtocolKind;
+  },
+  outPath: string,
+  options?: any
+): Promise<void> {
   return mediaDocumentPipelineHelpers.renderCompiledProtocol(compiled, outPath, options);
 }
 
-async function renderDiagramDocumentBrief(rootDir: string, brief: any, outPath: string, params: any, ctx: any, resolve: Function): Promise<void> {
-  return mediaDocumentPipelineHelpers.renderDiagramDocumentBrief(rootDir, brief, outPath, params, ctx, resolve);
+async function renderDiagramDocumentBrief(
+  rootDir: string,
+  brief: any,
+  outPath: string,
+  params: any,
+  ctx: any,
+  resolve: Function
+): Promise<void> {
+  return mediaDocumentPipelineHelpers.renderDiagramDocumentBrief(
+    rootDir,
+    brief,
+    outPath,
+    params,
+    ctx,
+    resolve
+  );
 }
 
-function resolveObjectInput(ctx: any, params: any, resolve: Function, defaults: {
-  paramKey?: string;
-  fromKey?: string;
-  opName: string;
-}): any {
+function resolveObjectInput(
+  ctx: any,
+  params: any,
+  resolve: Function,
+  defaults: {
+    paramKey?: string;
+    fromKey?: string;
+    opName: string;
+  }
+): any {
   return mediaDocumentPipelineHelpers.resolveObjectInput(ctx, params, resolve, defaults);
 }
 
-function compileBriefToDesignProtocol(rootDir: string, rawBrief: any): {
+function compileBriefToDesignProtocol(
+  rootDir: string,
+  rawBrief: any
+): {
   protocol: any;
   outline: any;
   theme: any;
@@ -2426,22 +3353,24 @@ function themeToPptxPalette(theme: any): any {
   };
 }
 
-function themeToDocxStyleHints(theme: any, locale?: string): { headingFont: string; bodyFont: string; accent: string } {
+function themeToDocxStyleHints(
+  theme: any,
+  locale?: string
+): { headingFont: string; bodyFont: string; accent: string } {
   const themeFonts = theme?.fonts || theme?.theme?.fonts || {};
   const headingFont = normalizeFontFamily(
-    locale?.startsWith('ja')
-      ? themeFonts.heading || 'Meiryo'
-      : themeFonts.heading || 'Aptos',
+    locale?.startsWith('ja') ? themeFonts.heading || 'Meiryo' : themeFonts.heading || 'Aptos'
   );
   const bodyFont = normalizeFontFamily(
-    locale?.startsWith('ja')
-      ? themeFonts.body || 'Meiryo'
-      : themeFonts.body || 'Aptos',
+    locale?.startsWith('ja') ? themeFonts.body || 'Meiryo' : themeFonts.body || 'Aptos'
   );
   return {
     headingFont,
     bodyFont,
-    accent: String(theme?.colors?.accent || theme?.theme?.colors?.accent || '#2563eb').replace('#', ''),
+    accent: String(theme?.colors?.accent || theme?.theme?.colors?.accent || '#2563eb').replace(
+      '#',
+      ''
+    ),
   };
 }
 
@@ -2489,7 +3418,11 @@ function resolveThemeHexColor(themeColors: any, role?: string, fallback = '#3341
   }
 }
 
-function applyCompositionTemplate(template: any, tokens: Record<string, string>, fallback = ''): string {
+function applyCompositionTemplate(
+  template: any,
+  tokens: Record<string, string>,
+  fallback = ''
+): string {
   return proposalPptxFlow.applyCompositionTemplate(template, tokens, fallback);
 }
 
@@ -2540,7 +3473,10 @@ function buildReportPdfProtocol(rootDir: string, brief: any): any {
 function buildTrackerSpreadsheetProtocol(rootDir: string, brief: any): any {
   return mediaSpreadsheetPipelineHelpers.buildTrackerSpreadsheetProtocol(rootDir, brief);
 }
-function resolveDocumentLayoutTemplate(rootDir: string, brief: any): { templateId: string; template: any } {
+function resolveDocumentLayoutTemplate(
+  rootDir: string,
+  brief: any
+): { templateId: string; template: any } {
   return mediaDocumentPipelineHelpers.resolveDocumentLayoutTemplate(rootDir, brief);
 }
 
@@ -2548,9 +3484,10 @@ function buildDocumentPdfProtocol(rawBrief: any): any {
   return mediaDocumentPipelineHelpers.buildDocumentPdfProtocol(rawBrief);
 }
 
-
-
-async function maybeAugmentPdfDesignWithImageOcr(pdfDesign: PdfDesignProtocol, hints?: PdfToPptxHints): Promise<PdfDesignProtocol> {
+async function maybeAugmentPdfDesignWithImageOcr(
+  pdfDesign: PdfDesignProtocol,
+  hints?: PdfToPptxHints
+): Promise<PdfDesignProtocol> {
   const resolvedHints: PdfToPptxHints = {
     canvas: { ...DEFAULT_PDF_TO_PPTX_HINTS.canvas, ...(hints?.canvas || {}) },
     features: { ...DEFAULT_PDF_TO_PPTX_HINTS.features, ...(hints?.features || {}) },
@@ -2560,7 +3497,8 @@ async function maybeAugmentPdfDesignWithImageOcr(pdfDesign: PdfDesignProtocol, h
     theme: { ...DEFAULT_PDF_TO_PPTX_HINTS.theme, ...(hints?.theme || {}) },
   };
   if (!resolvedHints.features?.fullPageImageOcrOverlay) return pdfDesign;
-  if (!Array.isArray(pdfDesign.content?.pages) || pdfDesign.content.pages.length === 0) return pdfDesign;
+  if (!Array.isArray(pdfDesign.content?.pages) || pdfDesign.content.pages.length === 0)
+    return pdfDesign;
 
   let Tesseract: any;
   try {
@@ -2576,14 +3514,20 @@ async function maybeAugmentPdfDesignWithImageOcr(pdfDesign: PdfDesignProtocol, h
     const pageHeight = page?.height || 540;
     const pageArea = pageWidth * pageHeight;
     const images = Array.isArray(page?.images) ? page.images : [];
-    const dominantImage = images.find((image: any) => (((image.width || 0) * (image.height || 0)) >= pageArea * 0.85));
+    const dominantImage = images.find(
+      (image: any) => (image.width || 0) * (image.height || 0) >= pageArea * 0.85
+    );
     const positionedTextElements = Array.isArray(page?.elements)
       ? page.elements.filter((element: any) => ['text', 'heading'].includes(element?.type))
       : [];
     const existingTextCount = positionedTextElements.length;
-    const reliableTextCount = positionedTextElements.filter((element: any) => mediaPdfHelpers.isLikelyReliablePdfText(String(element?.text || ''))).length;
-    const hasMostlyUnreliableText = existingTextCount > 0 && (reliableTextCount / existingTextCount) < 0.35;
-    const shouldRunOcr = existingTextCount <= 8 || reliableTextCount <= 3 || hasMostlyUnreliableText;
+    const reliableTextCount = positionedTextElements.filter((element: any) =>
+      mediaPdfHelpers.isLikelyReliablePdfText(String(element?.text || ''))
+    ).length;
+    const hasMostlyUnreliableText =
+      existingTextCount > 0 && reliableTextCount / existingTextCount < 0.35;
+    const shouldRunOcr =
+      existingTextCount <= 8 || reliableTextCount <= 3 || hasMostlyUnreliableText;
     if (Array.isArray(page?.ocrLines) && page.ocrLines.length > 0) continue;
     if (!dominantImage || !dominantImage.path || !shouldRunOcr) continue;
     try {
@@ -2593,7 +3537,9 @@ async function maybeAugmentPdfDesignWithImageOcr(pdfDesign: PdfDesignProtocol, h
         ocr = await Tesseract.recognize(dominantImage.path, requestedLanguage);
       } catch (error: any) {
         if (requestedLanguage !== 'eng') {
-          logger.warn(`[MEDIA_TRANSFORM] OCR fallback to eng on page ${page.pageNumber}: ${error.message}`);
+          logger.warn(
+            `[MEDIA_TRANSFORM] OCR fallback to eng on page ${page.pageNumber}: ${error.message}`
+          );
           ocr = await Tesseract.recognize(dominantImage.path, 'eng');
         } else {
           throw error;
@@ -2601,24 +3547,26 @@ async function maybeAugmentPdfDesignWithImageOcr(pdfDesign: PdfDesignProtocol, h
       }
       page.ocrLines = mediaPdfHelpers.buildPdfPageOcrOverlayLines(page, dominantImage, ocr);
     } catch (error: any) {
-      logger.warn(`[MEDIA_TRANSFORM] fullPageImageOcrOverlay failed on page ${page.pageNumber}: ${error.message}`);
+      logger.warn(
+        `[MEDIA_TRANSFORM] fullPageImageOcrOverlay failed on page ${page.pageNumber}: ${error.message}`
+      );
     }
   }
   return cloned;
 }
 
 const main = async () => {
-  const argv = await createStandardYargs().option('input', { alias: 'i', type: 'string', required: true }).parseSync();
-  const inputContent = safeReadFile(path.resolve(pathResolver.rootDir(), argv.input as string), { encoding: 'utf8' }) as string;
-  const result = await handleAction(JSON.parse(inputContent));
-  console.log(JSON.stringify(result, null, 2));
+  await runActuatorCli({
+    name: 'media-actuator',
+    handleAction,
+  });
 };
 
 const entrypoint = process.argv[1] ? path.resolve(process.argv[1]) : '';
 const modulePath = fileURLToPath(import.meta.url);
 
 if (entrypoint && modulePath === entrypoint) {
-  main().catch(err => {
+  main().catch((err) => {
     logger.error(err.message);
     process.exit(1);
   });

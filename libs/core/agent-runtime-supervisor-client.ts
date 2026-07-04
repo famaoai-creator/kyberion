@@ -10,6 +10,7 @@ import {
 } from './secure-io.js';
 import type { AgentHandle, SpawnOptions } from './agent-lifecycle.js';
 import type { AgentRecord } from './agent-registry.js';
+import { resolveAgentTrustScore } from './agent-registry.js';
 import type { TaskModelHint } from './reasoning-model-routing.js';
 
 type SupervisorMethod =
@@ -324,7 +325,7 @@ export function createSupervisorBackedAgentHandle(
         provider: snapshot?.provider || 'unknown',
         modelId: snapshot?.model_id || 'unknown',
         capabilities: [],
-        trustScore: 5,
+        trustScore: resolveAgentTrustScore(agentId),
         sessionId: snapshot?.session_id || null,
         threadId: agentId,
         status: (snapshot?.status as AgentRecord['status']) || 'ready',

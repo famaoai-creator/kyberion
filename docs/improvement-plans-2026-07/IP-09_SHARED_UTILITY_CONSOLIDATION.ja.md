@@ -49,3 +49,45 @@
 
 - `retry` の統合はリトライ回数・backoff の変化がそのまま外部 API 呼び出し回数の変化になる。**各消費箇所の現行パラメータを維持する**(正本 `retry` は回数・遅延を引数必須にし、既定値に頼らせない)。
 - `slugify` の統合で出力が 1 文字でも変わると、既存 mission ディレクトリや knowledge ファイルとの照合が壊れる。一致テストを必須とする。
+
+## 実装メモ
+
+- `libs/core/text-utils.ts` に `slugify()` 正本を追加し、`analysis-findings` / `work-coordination` / `reasoning-backend` の 3 箇所を移行した。`libs/core/text-utils.test.ts` で normalized / whitespace 両方の挙動を固定した。
+- 追加で `question-resolver` と `project-registry` を正本 `slugify()` に寄せ、`question-resolver` の profile question ids と `project-registry` の bootstrap work_id の既存出力をテストで固定した。
+- さらに `music-workflow-compiler` / `visual-workflow-compiler` / `video-composition-compiler` の `slugify` ローカル定義も正本化し、各 compiler の既定 filename / composition id の挙動をテストで固定した。
+- `mission-context-pack` の残っていたローカル `slugifySegment()` も `text-utils.slugify()` に寄せ、context pack id の生成が `CPK-...-IMPLEMENTER-<8hex>` 形式で安定することを回帰テストで固定した。
+- `libs/core/async-utils.ts` を追加し、`retry()` を既存 `withRetry()` の正本ラッパとして公開した。`service-engine-execution.ts` を新しい `retry()` 経由に寄せ、`control-plane-client.ts` のローカル `sleep()` も `async-utils.sleep()` に置換した。
+- `media-generation-helpers.ts` の局所 `sleep()` も `async-utils.sleep()` に寄せた。`android-runtime-helpers.ts` の busy-wait 版 `sleep()` は同期制御の別実装なので今回は保持した。
+- その後 `android-runtime-helpers.ts` の busy-wait 版 `sleep()` も async 化して `async-utils.sleep()` に寄せ、UI 待機ループを非同期待ちへ統一した。
+- `media-document-pipeline-helpers.ts` / `vision-actuator/src/index.ts` / `process-actuator-helpers.ts` の `withRetry()` 呼び出しを `retry()` 経由へ置換し、正本ラッパの消費箇所を追加した。
+- `media-actuator/src/index.ts` からは `withRetry` import の残骸を除去した。
+- `approval-actuator-helpers.ts` も `withRetry()` から `retry()` に寄せた。
+- `secret-actuator-helpers.ts` と `calendar-actuator-helpers.ts` も `withRetry()` から `retry()` に寄せた。
+- `service-actuator-helpers.ts` も `withRetry()` から `retry()` に寄せた。
+- `agent-actuator-helpers.ts` も `withRetry()` から `retry()` に寄せ、agent runtime 操作の再試行を正本化した。
+- `meeting-actuator-helpers.ts` と `media-generation-helpers.ts` も `withRetry()` から `retry()` に寄せた。
+- `network-pipeline-helpers.ts` も `withRetry()` から `retry()` に寄せた。
+- `ios-runtime-helpers.ts` の `withRetry()` 呼び出し群も `retry()` に寄せ、simctl 系の再試行を正本化した。
+- `terminal-actuator-helpers.ts` も `withRetry()` から `retry()` に寄せた。
+- `terminal-actuator-helpers.ts` の取り残し 1 箇所も `retry()` に揃えた。
+- `voice-runtime-helpers.ts` の `withRetry()` 呼び出し群も `retry()` に寄せた。
+- `email-actuator/src/index.ts` の draft/send 経路も `withRetry()` から `retry()` に寄せ、メール送信の再試行を正本ラッパに統一した。
+- `blockchain-actuator/src/index.ts` の simulated anchor 経路も `withRetry()` から `retry()` に寄せた。
+- `presence-actuator-helpers.ts` の Slack 送信と timeline dispatch も `withRetry()` から `retry()` に寄せた。
+- `video-composition-action-helpers.ts` の bundle 構築と backend render も `withRetry()` から `retry()` に寄せた。
+- `scripts/run_pipeline.ts` / `scripts/run_pipeline.js` の reasoning backend 呼び出しも `withRetry()` から `retry()` に寄せた。
+- `artifact-actuator/src/index.ts` と `network-actuator/src/a2a-transport.ts` の `withRetry` import 残骸を除去した。
+- `artifact-actuator-helpers.ts` の governed artifact 書き込み/参照系も `withRetry()` から `retry()` に寄せた。
+- `system-actuator/src/index.ts` / `code-actuator/src/index.ts` / `browser-actuator/src/index.ts` / `meeting-browser-driver-helpers.ts` の `withRetry` import 残骸も除去した。
+- `orchestrator-actuator/src/orchestrator-helpers.ts` の shell / file / git_checkpoint も `withRetry()` から `retry()` に寄せ、テストのモックも更新した。
+- `system-actuator/src/system-pipeline-helpers.ts` の shell / exec / probe / tts / open / kill 系も `withRetry()` から `retry()` に寄せた。
+- `system-actuator/src/index.test.ts` のモックも `withRetry` から `retry` に揃えた。
+- `file-actuator/src/file-pipeline-helpers.ts` の file pipeline 系の再試行も `withRetry()` から `retry()` に寄せ、`index.test.ts` も追従させた。
+- `browser-actuator/src/browser-pipeline-helpers.ts` の browser pipeline 系の再試行も `withRetry()` から `retry()` に寄せ、`index.test.ts` も追従させた。
+- `code-actuator/src/code-pipeline-helpers.ts` の code pipeline 系の再試行も `withRetry()` から `retry()` に寄せ、`index.test.ts` も追従させた。
+- `wisdom-actuator/src/wisdom-pipeline-helpers.ts` の wisdom pipeline 系の再試行も `withRetry()` から `retry()` に寄せ、`index.test.ts` も追従させた。
+- `modeling-actuator/src/modeling-pipeline-helpers.ts` の modeling pipeline 系の再試行も `withRetry()` から `retry()` に寄せ、`index.ts` の残骸 import も除去した。
+- `android-actuator/src/android-runtime-helpers.ts` の adb / file / UIA / CLI 系の再試行も `withRetry()` から `retry()` に寄せ、`index.test.ts` も追従させた。
+- `meeting-browser-driver/src/index.ts` の Playwright 接続/終了/ページ操作も `withRetry()` から `retry()` に寄せた。
+- 残っていたテストモック群(`terminal`, `voice`, `network`, `approval`, `service`, `media-generation`, `secret`, `ios`, `email`, `blockchain`, `video-composition`, `service-engine`) も `retry` 名義に揃え、`calendar-actuator/src/index.js` の実装呼び出しも `retry()` に寄せた。`service-engine.test.ts` は `./async-utils.js` をモックして retry 引数の検証を維持した。
+- `secure-io.ts` に `loadJson()` と `ensureDir()` を追加し、`work-design.ts` / `mission-team-index.ts` / `mission-team-plan-composer.ts` の局所 `loadJson()` を撤去して正本へ寄せた。`secure-io.test.ts` で JSON 解析とディレクトリ作成の契約を固定した。

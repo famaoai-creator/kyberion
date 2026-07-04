@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { buildAttentionItems, type AttentionItem } from '../lib/operator-console';
 import type { RuntimeTopologySnapshot } from '../lib/runtime-topology';
+import { buildUserFacingError } from '../lib/user-facing-error';
 import { resolveChronosLocale, uxText } from '../lib/ux-vocabulary';
 import { SurfaceStatusPanel } from './SurfaceStatusPanel';
 
@@ -33,50 +34,50 @@ interface MissionSummary {
   controlRequestedBy?: string;
 }
 
-const MISSION_INTELLIGENCE_PREFS_KEY = "chronos.mission-intelligence.prefs";
+const MISSION_INTELLIGENCE_PREFS_KEY = 'chronos.mission-intelligence.prefs';
 
 function loadMissionIntelligenceSelectedMissionId(): string | null {
-  if (typeof window === "undefined") return null;
+  if (typeof window === 'undefined') return null;
   try {
     const raw = window.localStorage.getItem(MISSION_INTELLIGENCE_PREFS_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<{ selectedMissionId: string | null }>;
-    return typeof parsed.selectedMissionId === "string" ? parsed.selectedMissionId : null;
+    return typeof parsed.selectedMissionId === 'string' ? parsed.selectedMissionId : null;
   } catch {
     return null;
   }
 }
 
 function saveMissionIntelligenceSelectedMissionId(selectedMissionId: string | null): void {
-  if (typeof window === "undefined") return;
+  if (typeof window === 'undefined') return;
   try {
     window.localStorage.setItem(
       MISSION_INTELLIGENCE_PREFS_KEY,
-      JSON.stringify({ selectedMissionId }),
+      JSON.stringify({ selectedMissionId })
     );
   } catch {
     // localStorage may be denied; ignore.
   }
 }
 
-export function resolveMissionThreadHotkeyAction(key: string): "thread" | "card" | null {
+export function resolveMissionThreadHotkeyAction(key: string): 'thread' | 'card' | null {
   const normalized = key.toLowerCase();
-  if (normalized === "t") return "thread";
-  if (normalized === "c") return "card";
+  if (normalized === 't') return 'thread';
+  if (normalized === 'c') return 'card';
   return null;
 }
 
 export function resolveMissionControlFocusId(
   missions: MissionSummary[],
   selectedMissionId: string | null,
-  focusedMissionId: string | null,
+  focusedMissionId: string | null
 ): string | null {
   return pickDefaultMissionId(missions, focusedMissionId || selectedMissionId);
 }
 
 export function pickDefaultMissionId(
   missions: MissionSummary[],
-  selectedMissionId: string | null,
+  selectedMissionId: string | null
 ): string | null {
   if (selectedMissionId && missions.some((mission) => mission.missionId === selectedMissionId)) {
     return selectedMissionId;
@@ -89,13 +90,16 @@ export function pickDefaultMissionId(
     return 0;
   };
 
-  const prioritized = missions.reduce<{ missionId: string; score: number } | null>((best, mission) => {
-    const score = tonePriority(mission.controlTone) * 1000 + (mission.nextTaskCount || 0);
-    if (!best || score > best.score) {
-      return { missionId: mission.missionId, score };
-    }
-    return best;
-  }, null);
+  const prioritized = missions.reduce<{ missionId: string; score: number } | null>(
+    (best, mission) => {
+      const score = tonePriority(mission.controlTone) * 1000 + (mission.nextTaskCount || 0);
+      if (!best || score > best.score) {
+        return { missionId: mission.missionId, score };
+      }
+      return best;
+    },
+    null
+  );
 
   return prioritized?.missionId || missions[0]?.missionId || null;
 }
@@ -104,10 +108,10 @@ function isEditableHotkeyTarget(target: EventTarget | null): boolean {
   const element = target as HTMLElement | null;
   return Boolean(
     element &&
-      (element.tagName === "INPUT" ||
-        element.tagName === "TEXTAREA" ||
-        element.tagName === "SELECT" ||
-        element.isContentEditable),
+    (element.tagName === 'INPUT' ||
+      element.tagName === 'TEXTAREA' ||
+      element.tagName === 'SELECT' ||
+      element.isContentEditable)
   );
 }
 
@@ -841,6 +845,28 @@ function actionButtonClass(kind: 'safe' | 'risky'): string {
   return 'rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-white/70 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40';
 }
 
+export interface DangerousActionPrompt {
+  title: string;
+  detail: string;
+  confirmLabel: string;
+  cancelLabel: string;
+}
+
+export function buildDangerousActionPrompt(
+  subject: string,
+  operation: string,
+  reversible: boolean
+): DangerousActionPrompt {
+  return {
+    title: `${subject} · ${operation}`,
+    detail: reversible
+      ? 'This action changes state and can be retried or reverted through the governed control plane.'
+      : 'This action changes state and may not be fully reversible.',
+    confirmLabel: operation,
+    cancelLabel: 'cancel',
+  };
+}
+
 function missionSummaryBadgeClass(tone: MissionSummary['controlTone']): string {
   if (tone === 'pending') return 'bg-violet-500/15 text-violet-200';
   if (tone === 'ready') return 'bg-cyan-500/15 text-cyan-200';
@@ -1061,6 +1087,12 @@ export function MissionIntelligence({
   const [browserSessionTarget, setBrowserSessionTarget] = useState<string | null>(null);
   const [actionResult, setActionResult] = useState<string | null>(null);
   const [distillCandidateTarget, setDistillCandidateTarget] = useState<string | null>(null);
+  const [dangerousAction, setDangerousAction] = useState<{
+    title: string;
+    detail: string;
+    confirmLabel: string;
+    onConfirm: () => Promise<void> | void;
+  } | null>(null);
   const [expandedActionId, setExpandedActionId] = useState<string | null>(null);
   const [expandedMissionCardActionId, setExpandedMissionCardActionId] = useState<string | null>(
     null
@@ -1072,8 +1104,8 @@ export function MissionIntelligence({
     null
   );
   const [messageMissionFilter, setMessageMissionFilter] = useState<string>('all');
-  const [selectedMissionId, setSelectedMissionId] = useState<string | null>(
-    () => loadMissionIntelligenceSelectedMissionId(),
+  const [selectedMissionId, setSelectedMissionId] = useState<string | null>(() =>
+    loadMissionIntelligenceSelectedMissionId()
   );
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
@@ -1084,6 +1116,27 @@ export function MissionIntelligence({
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Risky actions are always routed through a confirmation step before state changes.
+  const requestDangerousAction = (
+    title: string,
+    detail: string,
+    confirmLabel: string,
+    onConfirm: () => Promise<void> | void
+  ) => {
+    setDangerousAction({ title, detail, confirmLabel, onConfirm });
+  };
+
+  const clearDangerousAction = () => {
+    setDangerousAction(null);
+  };
+
+  const confirmDangerousAction = async () => {
+    if (!dangerousAction) return;
+    const action = dangerousAction;
+    setDangerousAction(null);
+    await action.onConfirm();
+  };
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -1783,14 +1836,16 @@ export function MissionIntelligence({
   const missionPinStatusLabel = selectedMissionId ? 'mission pinned' : 'pin mission thread';
 
   if (error) {
+    const safeError = buildUserFacingError(error, { locale, surface: 'chronos' });
     return (
       <div className="flex h-full w-full items-center justify-center">
         <div className="w-full max-w-xl">
           <SurfaceStatusPanel
             eyebrow="Mission Intelligence"
-            title="Unable to load mission intelligence"
-            detail={error}
+            title={safeError.title}
+            detail={`${safeError.body} ${safeError.nextAction}`}
             tone="error"
+            meta={safeError.traceLine}
             actionLabel="Retry"
             onAction={() => {
               void refreshData();
@@ -1958,29 +2013,33 @@ export function MissionIntelligence({
 
   useEffect(() => {
     if (focusedView !== 'mission-control-plane') return;
-    const missionId = resolveMissionControlFocusId(filteredMissions, selectedMissionId, focusedMissionId);
+    const missionId = resolveMissionControlFocusId(
+      filteredMissions,
+      selectedMissionId,
+      focusedMissionId
+    );
     if (!missionId || missionId === selectedMissionId) return;
     setSelectedMissionId(missionId);
     setMessageMissionFilter(missionId);
   }, [filteredMissions, focusedMissionId, focusedView, selectedMissionId]);
 
   useEffect(() => {
-    if (focusedView !== "mission-control-plane") return;
+    if (focusedView !== 'mission-control-plane') return;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
       if (isEditableHotkeyTarget(event.target)) return;
       const action = resolveMissionThreadHotkeyAction(event.key);
       if (!action || !effectiveMissionId) return;
       event.preventDefault();
-      if (action === "thread") {
+      if (action === 'thread') {
         focusMissionThread(effectiveMissionId);
         return;
       }
       focusMissionCard(effectiveMissionId);
     };
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, [effectiveMissionId, focusedView]);
 
   const surfaceExceptions = data.surfaces.filter(
@@ -2047,69 +2106,138 @@ export function MissionIntelligence({
   const nextAction = data.nextActions?.[0] || null;
   const nextActions = Array.isArray(data.nextActions) ? data.nextActions : [];
   const memoryCandidateCount = (data.memoryCandidates || []).length;
-  const workCoordination: WorkCoordinationSummary =
-    data.workCoordination || {
-      total: 0,
-      backlog: 0,
-      ready: 0,
-      inProgress: 0,
-      blocked: 0,
-      review: 0,
-      done: 0,
-      archived: 0,
-      runningAttempts: 0,
-      recentItems: [],
-    };
+  const workCoordination: WorkCoordinationSummary = data.workCoordination || {
+    total: 0,
+    backlog: 0,
+    ready: 0,
+    inProgress: 0,
+    blocked: 0,
+    review: 0,
+    done: 0,
+    archived: 0,
+    runningAttempts: 0,
+    recentItems: [],
+  };
 
   return (
     <div className="w-full h-full flex flex-col gap-6 overflow-y-auto pr-1">
+      {dangerousAction ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 px-4 py-6"
+          onClick={clearDangerousAction}
+          role="presentation"
+        >
+          <div
+            className="w-full max-w-lg rounded-2xl border border-white/10 bg-[#0b1020] p-5 shadow-2xl shadow-black/40"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="chronos-dangerous-action-title"
+          >
+            <div className="text-[10px] uppercase tracking-[0.26em] text-red-200/70">
+              risky action confirmation
+            </div>
+            <div
+              id="chronos-dangerous-action-title"
+              className="mt-2 text-lg font-semibold tracking-tight text-white/92"
+            >
+              {dangerousAction.title}
+            </div>
+            <div className="mt-3 text-[12px] leading-6 text-white/68">{dangerousAction.detail}</div>
+            <div className="mt-5 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={clearDangerousAction}
+                className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[10px] uppercase tracking-[0.18em] text-white/72 transition hover:bg-white/10"
+              >
+                {dangerousAction.cancelLabel}
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmDangerousAction()}
+                className={actionButtonClass('risky')}
+              >
+                {dangerousAction.confirmLabel}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       {/* Command Center: High-Visibility Action Dashboard */}
       {!selectedProject && !selectedMissionId && (
         <section className="flex flex-col gap-8 py-4">
           <div className="flex flex-col gap-2">
-            <div className="text-[12px] uppercase tracking-[0.4em] text-cyan-400 font-bold">Sovereign Command</div>
-            <h2 className="text-3xl font-bold tracking-tight text-white/90">Welcome to the Mirror.</h2>
+            <div className="text-[12px] uppercase tracking-[0.4em] text-cyan-400 font-bold">
+              Sovereign Command
+            </div>
+            <h2 className="text-3xl font-bold tracking-tight text-white/90">
+              Welcome to the Mirror.
+            </h2>
             <p className="text-sm text-white/50 max-w-2xl leading-relaxed">
-              Chronos is your operational管制塔. 
-              Use the tiles below to start monitoring or intervene in active agent workflows.
+              Chronos is your operational管制塔. Use the tiles below to start monitoring or
+              intervene in active agent workflows.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <button 
-              onClick={() => document.getElementById('mission-control-plane')?.scrollIntoView({ behavior: 'smooth' })}
+            <button
+              onClick={() =>
+                document
+                  .getElementById('mission-control-plane')
+                  ?.scrollIntoView({ behavior: 'smooth' })
+              }
               className="group kyberion-glass p-8 rounded-[32px] text-left hover:border-cyan-400/50 transition-all hover:translate-y-[-4px]"
             >
               <div className="w-14 h-14 rounded-2xl bg-cyan-400/10 flex items-center justify-center text-cyan-400 mb-6 group-hover:scale-110 transition-transform">
                 <Radar size={28} />
               </div>
               <h3 className="text-xl font-bold text-white mb-2">Monitor Missions</h3>
-              <p className="text-xs text-white/40 leading-relaxed">Observe real-time intent execution and artifact delivery across all active agents.</p>
-              <div className="mt-6 text-[10px] uppercase tracking-widest text-cyan-400 font-bold opacity-0 group-hover:opacity-100 transition-opacity">Open Dashboard →</div>
+              <p className="text-xs text-white/40 leading-relaxed">
+                Observe real-time intent execution and artifact delivery across all active agents.
+              </p>
+              <div className="mt-6 text-[10px] uppercase tracking-widest text-cyan-400 font-bold opacity-0 group-hover:opacity-100 transition-opacity">
+                Open Dashboard →
+              </div>
             </button>
 
-            <button 
-              onClick={() => document.getElementById('runtime-lease-doctor')?.scrollIntoView({ behavior: 'smooth' })}
+            <button
+              onClick={() =>
+                document
+                  .getElementById('runtime-lease-doctor')
+                  ?.scrollIntoView({ behavior: 'smooth' })
+              }
               className="group kyberion-glass p-8 rounded-[32px] text-left hover:border-amber-400/50 transition-all hover:translate-y-[-4px]"
             >
               <div className="w-14 h-14 rounded-2xl bg-amber-400/10 flex items-center justify-center text-amber-400 mb-6 group-hover:scale-110 transition-transform">
                 <Activity size={28} />
               </div>
               <h3 className="text-xl font-bold text-white mb-2">System Health</h3>
-              <p className="text-xs text-white/40 leading-relaxed">Inspect runtime leases, remediation findings, and supervisor-level governance.</p>
-              <div className="mt-6 text-[10px] uppercase tracking-widest text-amber-400 font-bold opacity-0 group-hover:opacity-100 transition-opacity">Check Vitals →</div>
+              <p className="text-xs text-white/40 leading-relaxed">
+                Inspect runtime leases, remediation findings, and supervisor-level governance.
+              </p>
+              <div className="mt-6 text-[10px] uppercase tracking-widest text-amber-400 font-bold opacity-0 group-hover:opacity-100 transition-opacity">
+                Check Vitals →
+              </div>
             </button>
 
-            <button 
-              onClick={() => document.getElementById('recent-surface-outbox')?.scrollIntoView({ behavior: 'smooth' })}
+            <button
+              onClick={() =>
+                document
+                  .getElementById('recent-surface-outbox')
+                  ?.scrollIntoView({ behavior: 'smooth' })
+              }
               className="group kyberion-glass p-8 rounded-[32px] text-left hover:border-rose-400/50 transition-all hover:translate-y-[-4px]"
             >
               <div className="w-14 h-14 rounded-2xl bg-rose-400/10 flex items-center justify-center text-rose-400 mb-6 group-hover:scale-110 transition-transform">
                 <ShieldAlert size={28} />
               </div>
               <h3 className="text-xl font-bold text-white mb-2">Intervention</h3>
-              <p className="text-xs text-white/40 leading-relaxed">Resolve blocked deliveries, approve sensitive requests, and manage exceptions.</p>
-              <div className="mt-6 text-[10px] uppercase tracking-widest text-rose-400 font-bold opacity-0 group-hover:opacity-100 transition-opacity">View Outbox →</div>
+              <p className="text-xs text-white/40 leading-relaxed">
+                Resolve blocked deliveries, approve sensitive requests, and manage exceptions.
+              </p>
+              <div className="mt-6 text-[10px] uppercase tracking-widest text-rose-400 font-bold opacity-0 group-hover:opacity-100 transition-opacity">
+                View Outbox →
+              </div>
             </button>
           </div>
 
@@ -2234,7 +2362,9 @@ export function MissionIntelligence({
             mission focus:{' '}
             <span className="font-semibold text-white/90">{selectedMission.missionId}</span>
             <span className="mx-2 text-white/40">·</span>
-            <span className="text-white/80">{buildMissionIntentSummary(data, selectedMission)}</span>
+            <span className="text-white/80">
+              {buildMissionIntentSummary(data, selectedMission)}
+            </span>
             <button
               type="button"
               onClick={() => setSelectedMissionId(null)}
@@ -2366,7 +2496,8 @@ export function MissionIntelligence({
                       priority: <span className="font-mono text-white/78">{item.priority}</span>
                     </div>
                     <div>
-                      attempts: <span className="font-mono text-white/78">{item.attempt_count}</span>
+                      attempts:{' '}
+                      <span className="font-mono text-white/78">{item.attempt_count}</span>
                     </div>
                     <div className="sm:col-span-2">
                       updated:{' '}
@@ -2826,7 +2957,19 @@ export function MissionIntelligence({
                           <button
                             key={action.operation}
                             type="button"
-                            onClick={() => runMissionControl(mission.missionId, action.operation)}
+                            onClick={() => {
+                              const prompt = buildDangerousActionPrompt(
+                                `mission ${mission.missionId}`,
+                                action.label,
+                                false
+                              );
+                              requestDangerousAction(
+                                prompt.title,
+                                prompt.detail,
+                                prompt.confirmLabel,
+                                () => runMissionControl(mission.missionId, action.operation)
+                              );
+                            }}
                             disabled={
                               !action.enabled ||
                               missionActionTarget === `${mission.missionId}:${action.operation}`
@@ -3056,14 +3199,23 @@ export function MissionIntelligence({
                   <div className="mt-1 text-[10px] text-white/55">{finding.reason}</div>
                   <button
                     type="button"
-                    onClick={() =>
-                      remediateLease(
+                    onClick={() => {
+                      const prompt = buildDangerousActionPrompt(
                         finding.agentId,
                         finding.recommendedAction === 'restart_runtime'
-                          ? 'restart_runtime_lease'
-                          : 'cleanup_runtime_lease'
-                      )
-                    }
+                          ? 'restart runtime'
+                          : 'stop runtime',
+                        false
+                      );
+                      requestDangerousAction(prompt.title, prompt.detail, prompt.confirmLabel, () =>
+                        remediateLease(
+                          finding.agentId,
+                          finding.recommendedAction === 'restart_runtime'
+                            ? 'restart_runtime_lease'
+                            : 'cleanup_runtime_lease'
+                        )
+                      );
+                    }}
                     disabled={remediationTarget === finding.agentId}
                     className="mt-3 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-white/70 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
                   >
@@ -3136,7 +3288,16 @@ export function MissionIntelligence({
                   <div className="mt-2 text-[11px] text-white/80">{message.text}</div>
                   <button
                     type="button"
-                    onClick={() => clearOutboxMessage(message.surface, message.message_id)}
+                    onClick={() => {
+                      const prompt = buildDangerousActionPrompt(
+                        `${message.surface} outbox`,
+                        'clear outbox',
+                        false
+                      );
+                      requestDangerousAction(prompt.title, prompt.detail, prompt.confirmLabel, () =>
+                        clearOutboxMessage(message.surface, message.message_id)
+                      );
+                    }}
                     disabled={outboxTarget === message.message_id}
                     className="mt-3 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-white/70 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
                   >
@@ -3605,7 +3766,19 @@ export function MissionIntelligence({
                         <div className="mt-3 flex flex-wrap gap-2">
                           <button
                             type="button"
-                            onClick={() => promoteMissionSeed(seed.seed_id)}
+                            onClick={() => {
+                              const prompt = buildDangerousActionPrompt(
+                                `seed ${seed.seed_id}`,
+                                'promote to mission',
+                                false
+                              );
+                              requestDangerousAction(
+                                prompt.title,
+                                prompt.detail,
+                                prompt.confirmLabel,
+                                () => promoteMissionSeed(seed.seed_id)
+                              );
+                            }}
                             disabled={
                               seed.status === 'promoted' || missionSeedTarget === seed.seed_id
                             }
@@ -3721,7 +3894,19 @@ export function MissionIntelligence({
                       ) : null}
                       <button
                         type="button"
-                        onClick={() => promoteMissionSeed(selectedReferenceSeed.seed_id)}
+                        onClick={() => {
+                          const prompt = buildDangerousActionPrompt(
+                            `seed ${selectedReferenceSeed.seed_id}`,
+                            'promote to mission',
+                            false
+                          );
+                          requestDangerousAction(
+                            prompt.title,
+                            prompt.detail,
+                            prompt.confirmLabel,
+                            () => promoteMissionSeed(selectedReferenceSeed.seed_id)
+                          );
+                        }}
                         disabled={
                           selectedReferenceSeed.status === 'promoted' ||
                           missionSeedTarget === selectedReferenceSeed.seed_id
@@ -4935,7 +5120,19 @@ export function MissionIntelligence({
                           <button
                             key={action.operation}
                             type="button"
-                            onClick={() => runSurfaceControl(surface.id, action.operation)}
+                            onClick={() => {
+                              const prompt = buildDangerousActionPrompt(
+                                `surface ${surface.id}`,
+                                action.label,
+                                false
+                              );
+                              requestDangerousAction(
+                                prompt.title,
+                                prompt.detail,
+                                prompt.confirmLabel,
+                                () => runSurfaceControl(surface.id, action.operation)
+                              );
+                            }}
                             disabled={
                               !action.enabled ||
                               surfaceActionTarget === `${surface.id}:${action.operation}`

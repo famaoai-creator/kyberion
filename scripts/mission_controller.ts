@@ -46,6 +46,7 @@ import {
   missionEvidenceDir,
   validateWritePermission,
   killSwitch,
+  renderStatus,
 } from '@agent/core';
 
 // --- Sub-module imports ---
@@ -616,7 +617,8 @@ function listMissions(filterStatus?: string) {
   console.log('-'.repeat(header.length + 10));
   for (const m of missions) {
     const missionId = String(m.id ?? '-');
-    const status = String(m.status ?? '-');
+    const statusRaw = String(m.status ?? '-');
+    const status = renderStatus('mission', statusRaw, 'en');
     const tier = String(m.tier ?? '-');
     const lastEvent = String(m.lastEvent ?? '-');
     const statusIcon =
@@ -629,7 +631,7 @@ function listMissions(filterStatus?: string) {
         validating: '🔍',
         distilling: '🧠',
         archived: '📦',
-      }[status] || '  ';
+      }[statusRaw] || '  ';
     console.log(
       `${missionId.padEnd(30)} ${statusIcon} ${status.padEnd(10)} ${tier.padEnd(14)} ${String(m.checkpoints).padStart(3)} ${lastEvent}`
     );
@@ -1117,7 +1119,7 @@ function showMissionStatus(id: string) {
 
   console.log('');
   console.log(`  Mission:     ${state.mission_id}`);
-  console.log(`  Status:      ${state.status}`);
+  console.log(`  Status:      ${renderStatus('mission', state.status, 'en')}`);
   console.log(`  Tier:        ${state.tier}`);
   console.log(`  Persona:     ${state.assigned_persona}`);
   console.log(`  Confidence:  ${state.confidence_score}`);

@@ -9,7 +9,7 @@ import {
   pathResolver,
   resolveVars,
   assertValidMobileAppProfile,
-  withRetry,
+  retry,
   classifyError,
 } from '@agent/core';
 import type { MobileAppProfile } from '@agent/core';
@@ -45,7 +45,7 @@ export function buildRetryOptions() {
   const policy = loadRecoveryPolicy();
   const retry = isPlainObject(policy.retry) ? policy.retry : DEFAULT_IOS_RETRY;
   const retryableCategories = new Set<string>(
-    Array.isArray(policy.retryable_categories) ? policy.retryable_categories.map(String) : [],
+    Array.isArray(policy.retryable_categories) ? policy.retryable_categories.map(String) : []
   );
   return {
     ...DEFAULT_IOS_RETRY,
@@ -86,11 +86,15 @@ interface SimctlDevice {
   runtime: string;
 }
 
-export async function executePipeline(steps: PipelineStep[], options: IOSAction['options'] = {}, initialCtx: Record<string, any> = {}) {
+export async function executePipeline(
+  steps: PipelineStep[],
+  options: IOSAction['options'] = {},
+  initialCtx: Record<string, any> = {}
+) {
   const rootDir = pathResolver.rootDir();
   const artifactsDir = path.resolve(
     rootDir,
-    options?.artifacts_dir || pathResolver.sharedTmp(`actuators/ios-actuator/session_${Date.now()}`),
+    options?.artifacts_dir || pathResolver.sharedTmp(`actuators/ios-actuator/session_${Date.now()}`)
   );
   if (!safeExistsSync(artifactsDir)) safeMkdir(artifactsDir, { recursive: true });
 
@@ -130,13 +134,10 @@ export async function executePipeline(steps: PipelineStep[], options: IOSAction[
   }
 
   if (initialCtx.context_path) {
-    await withRetry(
-      async () => {
-        safeWriteFile(path.resolve(rootDir, initialCtx.context_path), JSON.stringify(ctx, null, 2));
-        return undefined;
-      },
-      buildRetryOptions(),
-    );
+    await retry(async () => {
+      safeWriteFile(path.resolve(rootDir, initialCtx.context_path), JSON.stringify(ctx, null, 2));
+      return undefined;
+    }, buildRetryOptions());
   }
 
   return {
@@ -151,13 +152,13 @@ async function opCapture(
   params: any,
   ctx: Record<string, any>,
   resolve: (val: any) => any,
-  options?: IOSAction['options'],
+  options?: IOSAction['options']
 ) {
   const rootDir = pathResolver.rootDir();
   switch (op) {
     case 'read_json': {
       const sourcePath = path.resolve(rootDir, resolve(params.path));
-      const parsed = await withRetry(async () => {
+      const parsed = await retry(async () => {
         const content = safeReadFile(sourcePath, { encoding: 'utf8' }) as string;
         return JSON.parse(content);
       }, buildRetryOptions());
@@ -168,14 +169,17 @@ async function opCapture(
     }
     case 'read_text_file': {
       const sourcePath = path.resolve(rootDir, resolve(params.path));
-      const content = await withRetry(
+      const content = await retry(
         async () => safeReadFile(sourcePath, { encoding: 'utf8' }) as string,
-        buildRetryOptions(),
+        buildRetryOptions()
       );
       return { ...ctx, [params.export_as || 'last_text']: content };
     }
     case 'simctl_health_check': {
-      const health = await withRetry(async () => collectSimctlHealth(ctx, options), buildRetryOptions());
+      const health = await retry(
+        async () => collectSimctlHealth(ctx, options),
+        buildRetryOptions()
+      );
       return {
         ...ctx,
         [params.export_as || 'simctl_health']: health,
@@ -188,43 +192,49 @@ async function opCapture(
       const device = resolveDeviceUdid(ctx, options, params);
       const bundleId = resolveBundleId(params, ctx, resolve);
       if (!bundleId) {
-        throw new Error('capture_runtime_session_handoff requires params.bundle_id or an app_profile with launch.bundle_id/package_name');
+        throw new Error(
+          'capture_runtime_session_handoff requires params.bundle_id or an app_profile with launch.bundle_id/package_name'
+        );
       }
       const profile = resolveAppProfile(params, ctx);
       const relativePath = String(
-        resolve(params.container_relative_path || profile?.webview?.runtime_export?.ios_container_relative_path || ''),
+        resolve(
+          params.container_relative_path ||
+            profile?.webview?.runtime_export?.ios_container_relative_path ||
+            ''
+        )
       ).trim();
       if (!relativePath) {
         throw new Error(
-          'capture_runtime_session_handoff requires params.container_relative_path or app_profile.webview.runtime_export.ios_container_relative_path',
+          'capture_runtime_session_handoff requires params.container_relative_path or app_profile.webview.runtime_export.ios_container_relative_path'
         );
       }
-      const containerRoot = await withRetry(
+      const containerRoot = await retry(
         async () => runSimctl(['get_app_container', device, bundleId, 'data'], options).trim(),
-        buildRetryOptions(),
+        buildRetryOptions()
       );
       const sourcePath = path.join(containerRoot, relativePath);
       const outPath = path.resolve(
         rootDir,
-        resolve(params.path || path.join(ctx.artifacts_dir, `ios-runtime-session-handoff-${Date.now()}.json`)),
+        resolve(
+          params.path ||
+            path.join(ctx.artifacts_dir, `ios-runtime-session-handoff-${Date.now()}.json`)
+        )
       );
       ensureParentDir(outPath);
-      const content = await withRetry(
+      const content = await retry(
         async () => safeReadFile(sourcePath, { encoding: 'utf8' }) as string,
-        buildRetryOptions(),
+        buildRetryOptions()
       );
-      await withRetry(
-        async () => {
-          safeWriteFile(outPath, content);
-          return undefined;
-        },
-        buildRetryOptions(),
-      );
+      await retry(async () => {
+        safeWriteFile(outPath, content);
+        return undefined;
+      }, buildRetryOptions());
       return {
         ...ctx,
-        [params.export_as || 'runtime_session_handoff']: await withRetry(
+        [params.export_as || 'runtime_session_handoff']: await retry(
           async () => JSON.parse(content),
-          buildRetryOptions(),
+          buildRetryOptions()
         ),
         runtime_session_handoff_path: outPath,
       };
@@ -239,7 +249,7 @@ async function opTransform(
   op: string,
   params: any,
   ctx: Record<string, any>,
-  resolve: (val: any) => any,
+  resolve: (val: any) => any
 ) {
   switch (op) {
     case 'set': {
@@ -258,7 +268,7 @@ async function opApply(
   params: any,
   ctx: Record<string, any>,
   resolve: (val: any) => any,
-  options?: IOSAction['options'],
+  options?: IOSAction['options']
 ) {
   const rootDir = pathResolver.rootDir();
   switch (op) {
@@ -266,24 +276,50 @@ async function opApply(
       ensureSimctlAvailable(ctx, options);
       const device = resolveDeviceUdid(ctx, options, params);
       const bundleId = resolveBundleId(params, ctx, resolve);
-      if (!bundleId) throw new Error('launch_app requires params.bundle_id or an app_profile with launch.bundle_id/package_name');
-      const output = await withRetry(async () => runSimctl(['launch', device, bundleId], options), buildRetryOptions());
-      return { ...ctx, last_launch_output: output, ios_device_udid: device, ios_bundle_id: bundleId };
+      if (!bundleId)
+        throw new Error(
+          'launch_app requires params.bundle_id or an app_profile with launch.bundle_id/package_name'
+        );
+      const output = await retry(
+        async () => runSimctl(['launch', device, bundleId], options),
+        buildRetryOptions()
+      );
+      return {
+        ...ctx,
+        last_launch_output: output,
+        ios_device_udid: device,
+        ios_bundle_id: bundleId,
+      };
     }
     case 'install_app': {
       ensureSimctlAvailable(ctx, options);
       const device = resolveDeviceUdid(ctx, options, params, { allowShutdownMatch: true });
       const appPath = resolveAppPath(params, ctx, resolve, rootDir);
-      if (!appPath) throw new Error('install_app requires params.app_path or an app_profile with launch.app_path');
-      if (!safeExistsSync(appPath)) throw new Error(`install_app app_path does not exist: ${appPath}`);
-      const output = await withRetry(async () => runSimctl(['install', device, appPath], options), buildRetryOptions());
-      return { ...ctx, last_install_output: output, last_installed_app_path: appPath, ios_device_udid: device };
+      if (!appPath)
+        throw new Error(
+          'install_app requires params.app_path or an app_profile with launch.app_path'
+        );
+      if (!safeExistsSync(appPath))
+        throw new Error(`install_app app_path does not exist: ${appPath}`);
+      const output = await retry(
+        async () => runSimctl(['install', device, appPath], options),
+        buildRetryOptions()
+      );
+      return {
+        ...ctx,
+        last_install_output: output,
+        last_installed_app_path: appPath,
+        ios_device_udid: device,
+      };
     }
     case 'boot_simulator': {
       ensureSimctlAvailable(ctx, options);
       const device = resolveDeviceUdid(ctx, options, params, { allowShutdownMatch: true });
       try {
-        const output = await withRetry(async () => runSimctl(['boot', device], options), buildRetryOptions());
+        const output = await retry(
+          async () => runSimctl(['boot', device], options),
+          buildRetryOptions()
+        );
         return { ...ctx, last_boot_output: output, ios_device_udid: device };
       } catch (error: any) {
         const message = String(error?.message || '');
@@ -296,44 +332,69 @@ async function opApply(
     case 'shutdown_simulator': {
       ensureSimctlAvailable(ctx, options);
       const device = resolveDeviceUdid(ctx, options, params, { allowShutdownMatch: true });
-      const output = await withRetry(async () => runSimctl(['shutdown', device], options), buildRetryOptions());
+      const output = await retry(
+        async () => runSimctl(['shutdown', device], options),
+        buildRetryOptions()
+      );
       return { ...ctx, last_shutdown_output: output, ios_device_udid: device };
     }
     case 'uninstall_app': {
       ensureSimctlAvailable(ctx, options);
       const device = resolveDeviceUdid(ctx, options, params, { allowShutdownMatch: true });
       const bundleId = resolveBundleId(params, ctx, resolve);
-      if (!bundleId) throw new Error('uninstall_app requires params.bundle_id or an app_profile with launch.bundle_id/package_name');
-      const output = await withRetry(async () => runSimctl(['uninstall', device, bundleId], options), buildRetryOptions());
-      return { ...ctx, last_uninstall_output: output, ios_device_udid: device, ios_bundle_id: bundleId };
+      if (!bundleId)
+        throw new Error(
+          'uninstall_app requires params.bundle_id or an app_profile with launch.bundle_id/package_name'
+        );
+      const output = await retry(
+        async () => runSimctl(['uninstall', device, bundleId], options),
+        buildRetryOptions()
+      );
+      return {
+        ...ctx,
+        last_uninstall_output: output,
+        ios_device_udid: device,
+        ios_bundle_id: bundleId,
+      };
     }
     case 'open_deep_link': {
       ensureSimctlAvailable(ctx, options);
       const device = resolveDeviceUdid(ctx, options, params);
       const url = String(resolve(params.url || '')).trim();
       if (!url) throw new Error('open_deep_link requires params.url');
-      const output = await withRetry(async () => runSimctl(['openurl', device, url], options), buildRetryOptions());
+      const output = await retry(
+        async () => runSimctl(['openurl', device, url], options),
+        buildRetryOptions()
+      );
       return { ...ctx, last_deep_link_output: output, ios_device_udid: device };
     }
     case 'capture_screen': {
       ensureSimctlAvailable(ctx, options);
       const device = resolveDeviceUdid(ctx, options, params);
-      const outPath = path.resolve(rootDir, resolve(params.path || path.join(ctx.artifacts_dir, `ios-screen-${Date.now()}.png`)));
+      const outPath = path.resolve(
+        rootDir,
+        resolve(params.path || path.join(ctx.artifacts_dir, `ios-screen-${Date.now()}.png`))
+      );
       ensureParentDir(outPath);
-      await withRetry(async () => runSimctl(['io', device, 'screenshot', outPath], options), buildRetryOptions());
+      await retry(
+        async () => runSimctl(['io', device, 'screenshot', outPath], options),
+        buildRetryOptions()
+      );
       return { ...ctx, last_screenshot_path: outPath, ios_device_udid: device };
     }
     case 'emit_session_handoff': {
       const handoff = buildSessionHandoffArtifact(params, ctx, resolve);
-      const outPath = path.resolve(rootDir, resolve(params.path || path.join(ctx.artifacts_dir, `ios-session-handoff-${Date.now()}.json`)));
-      ensureParentDir(outPath);
-      await withRetry(
-        async () => {
-          safeWriteFile(outPath, JSON.stringify(handoff, null, 2));
-          return undefined;
-        },
-        buildRetryOptions(),
+      const outPath = path.resolve(
+        rootDir,
+        resolve(
+          params.path || path.join(ctx.artifacts_dir, `ios-session-handoff-${Date.now()}.json`)
+        )
       );
+      ensureParentDir(outPath);
+      await retry(async () => {
+        safeWriteFile(outPath, JSON.stringify(handoff, null, 2));
+        return undefined;
+      }, buildRetryOptions());
       return {
         ...ctx,
         [params.export_as || 'session_handoff']: handoff,
@@ -354,10 +415,14 @@ function collectSimctlHealth(ctx: Record<string, any>, options?: IOSAction['opti
   try {
     const timeoutMs = options?.timeout_ms || 60000;
     const xcrunVersion = safeExec('xcrun', ['--version'], { timeoutMs }).trim();
-    const devicesOutput = safeExec('xcrun', ['simctl', 'list', 'devices', '--json'], { timeoutMs }).trim();
+    const devicesOutput = safeExec('xcrun', ['simctl', 'list', 'devices', '--json'], {
+      timeoutMs,
+    }).trim();
     const devices = parseSimctlDevices(devicesOutput);
     const preferred = options?.device_udid || ctx.ios_device_udid || '';
-    const booted = devices.find((device) => device.state === 'Booted' && device.isAvailable !== false);
+    const booted = devices.find(
+      (device) => device.state === 'Booted' && device.isAvailable !== false
+    );
     const selected = preferred || booted?.udid || '';
     return {
       available: true,
@@ -385,7 +450,7 @@ function parseSimctlDevices(output: string): SimctlDevice[] {
       state: String(device.state || 'unknown'),
       isAvailable: typeof device.isAvailable === 'boolean' ? device.isAvailable : true,
       runtime,
-    })),
+    }))
   );
 }
 
@@ -404,9 +469,11 @@ function resolveDeviceUdid(
   ctx: Record<string, any>,
   options: IOSAction['options'] | undefined,
   params: any,
-  behavior: { allowShutdownMatch?: boolean } = {},
+  behavior: { allowShutdownMatch?: boolean } = {}
 ): string {
-  const explicit = String(params?.device_udid || options?.device_udid || ctx.ios_device_udid || '').trim();
+  const explicit = String(
+    params?.device_udid || options?.device_udid || ctx.ios_device_udid || ''
+  ).trim();
   if (explicit) return explicit;
   const health = collectSimctlHealth(ctx, options);
   if (!health.available) {
@@ -414,7 +481,9 @@ function resolveDeviceUdid(
   }
   if (health.selected_udid) return health.selected_udid;
 
-  const preferredName = String(params?.device_name || '').trim().toLowerCase();
+  const preferredName = String(params?.device_name || '')
+    .trim()
+    .toLowerCase();
   const availableDevices = health.devices.filter((device) => device.isAvailable !== false);
   const nameMatched = preferredName
     ? availableDevices.find((device) => device.name.toLowerCase() === preferredName) ||
@@ -426,10 +495,16 @@ function resolveDeviceUdid(
     return availableDevices[0].udid;
   }
 
-  throw new Error('No booted iOS simulator found. Provide params.device_udid, params.device_name, or boot a simulator first.');
+  throw new Error(
+    'No booted iOS simulator found. Provide params.device_udid, params.device_name, or boot a simulator first.'
+  );
 }
 
-function resolveBundleId(params: any, ctx: Record<string, any>, resolve: (val: any) => any): string {
+function resolveBundleId(
+  params: any,
+  ctx: Record<string, any>,
+  resolve: (val: any) => any
+): string {
   const explicit = String(resolve(params.bundle_id || '')).trim();
   if (explicit) return explicit;
   const profile = resolveAppProfile(params, ctx);
@@ -437,7 +512,12 @@ function resolveBundleId(params: any, ctx: Record<string, any>, resolve: (val: a
   return String(profile.launch?.bundle_id || profile.package_name || '').trim();
 }
 
-function resolveAppPath(params: any, ctx: Record<string, any>, resolve: (val: any) => any, rootDir: string): string {
+function resolveAppPath(
+  params: any,
+  ctx: Record<string, any>,
+  resolve: (val: any) => any,
+  rootDir: string
+): string {
   const explicit = String(resolve(params.app_path || '')).trim();
   if (explicit) return path.resolve(rootDir, explicit);
   const profile = resolveAppProfile(params, ctx);
@@ -448,24 +528,42 @@ function resolveAppPath(params: any, ctx: Record<string, any>, resolve: (val: an
 function buildSessionHandoffArtifact(
   params: any,
   ctx: Record<string, any>,
-  resolve: (val: any) => any,
+  resolve: (val: any) => any
 ) {
   const profile = resolveAppProfile(params, ctx);
   const targetUrl = String(
-    resolve(params.target_url || profile?.webview?.session_handoff?.target_url || profile?.webview?.entry_url || ''),
+    resolve(
+      params.target_url ||
+        profile?.webview?.session_handoff?.target_url ||
+        profile?.webview?.entry_url ||
+        ''
+    )
   ).trim();
-  if (!targetUrl) throw new Error('emit_session_handoff requires params.target_url or app_profile.webview.session_handoff.target_url');
+  if (!targetUrl)
+    throw new Error(
+      'emit_session_handoff requires params.target_url or app_profile.webview.session_handoff.target_url'
+    );
 
   return {
     kind: 'webview-session-handoff',
     target_url: targetUrl,
     origin: safeOrigin(targetUrl),
-    browser_session_id: String(resolve(params.browser_session_id || profile?.webview?.session_handoff?.browser_session_id || 'ios-webview')),
+    browser_session_id: String(
+      resolve(
+        params.browser_session_id ||
+          profile?.webview?.session_handoff?.browser_session_id ||
+          'ios-webview'
+      )
+    ),
     prefer_persistent_context:
-      params.prefer_persistent_context ?? profile?.webview?.session_handoff?.prefer_persistent_context ?? true,
+      params.prefer_persistent_context ??
+      profile?.webview?.session_handoff?.prefer_persistent_context ??
+      true,
     cookies: resolveObjectRef(params.cookies_from, ctx) || resolve(params.cookies) || [],
-    local_storage: resolveObjectRef(params.local_storage_from, ctx) || resolve(params.local_storage) || {},
-    session_storage: resolveObjectRef(params.session_storage_from, ctx) || resolve(params.session_storage) || {},
+    local_storage:
+      resolveObjectRef(params.local_storage_from, ctx) || resolve(params.local_storage) || {},
+    session_storage:
+      resolveObjectRef(params.session_storage_from, ctx) || resolve(params.session_storage) || {},
     headers: resolveObjectRef(params.headers_from, ctx) || resolve(params.headers) || {},
     source: {
       platform: 'ios',

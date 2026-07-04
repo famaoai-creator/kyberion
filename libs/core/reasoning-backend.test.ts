@@ -101,6 +101,15 @@ describe('reasoning-backend', () => {
       expect(result.every((h) => h.proposed_by && h.content.includes('[STUB]'))).toBe(true);
     });
 
+    it('keeps whitespace-separated persona ids stable', async () => {
+      const result = await stubReasoningBackend.divergePersonas({
+        topic: 'pricing strategy',
+        personas: ['Visionary Persona'],
+        minPerPersona: 1,
+      });
+      expect(result[0]?.id).toBe('H-Visionary_Persona-1');
+    });
+
     it('cross-critiques with deterministic survival pattern', async () => {
       const hypotheses = await stubReasoningBackend.divergePersonas({
         topic: 'x',

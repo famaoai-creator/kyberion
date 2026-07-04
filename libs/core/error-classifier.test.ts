@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  buildUserFacingError,
   classifyError,
   explainPolicyViolation,
   formatClassification,
@@ -205,6 +206,23 @@ describe('error-classifier', () => {
       expect(s).toContain('Rate limit');
       expect(s).toContain('→');
       expect(s).toContain('detail:');
+    });
+  });
+
+  describe('buildUserFacingError', () => {
+    it('hides internal message text and renders locale-aware guidance', () => {
+      const envelope = buildUserFacingError(new Error('database exploded: secret=abc123'), {
+        locale: 'ja',
+        surface: 'chronos',
+        traceId: 'trace-123',
+      });
+
+      expect(envelope.title).toBe('問題が発生しました');
+      expect(envelope.body).toContain('chronos:');
+      expect(envelope.body).not.toContain('abc123');
+      expect(envelope.body).not.toContain('database exploded');
+      expect(envelope.nextAction).toBe('もう一度やり直してください。');
+      expect(envelope.traceLine).toBe('trace trace-123');
     });
   });
 });

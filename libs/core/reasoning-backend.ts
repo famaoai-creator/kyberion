@@ -16,6 +16,7 @@
  */
 
 import { logger } from './core.js';
+import { slugify } from './text-utils.js';
 import { parseStructuredJson } from './structured-reasoning.js';
 import { z } from 'zod';
 
@@ -500,10 +501,6 @@ export function resetReasoningBackend(): void {
   registered = null;
 }
 
-function slugify(value: string): string {
-  return value.replace(/\s+/gu, '_').slice(0, 48);
-}
-
 /** Deterministic, offline backend that emits structured placeholders. */
 export const stubReasoningBackend: ReasoningBackend = {
   name: 'stub',
@@ -517,7 +514,7 @@ export const stubReasoningBackend: ReasoningBackend = {
     for (const persona of input.personas) {
       for (let i = 0; i < min; i++) {
         out.push({
-          id: `H-${slugify(persona)}-${i + 1}`,
+          id: `H-${slugify(persona, { mode: 'whitespace', separator: '_', maxLength: 48 })}-${i + 1}`,
           proposed_by: persona,
           content: `[STUB] Hypothesis ${i + 1} from ${persona} on "${input.topic}"`,
           status: 'pending',

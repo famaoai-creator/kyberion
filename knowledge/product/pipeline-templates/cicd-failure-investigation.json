@@ -1,0 +1,72 @@
+{
+  "action": "pipeline",
+  "name": "CI Failure Investigation",
+  "version": "2.0.0",
+  "description": "Lists recent GitHub Actions workflow runs for a repository, summarizes the likely failure surface, and writes a short investigation note with next actions.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes).",
+  "context": {
+    "owner": "",
+    "repo": "",
+    "branch": "main",
+    "workflow_id": "",
+    "investigation_output_path": "active/shared/tmp/cicd-failure-investigation.md"
+  },
+  "steps": [
+    {
+      "id": "list_runs",
+      "role": "source",
+      "op": "service:preset",
+      "produces": { "channel": "workflow_runs", "type": "ServiceResult" },
+      "params": {
+        "service_id": "github",
+        "action": "actions_list_runs",
+        "params": {
+          "owner": "{{owner}}",
+          "repo": "{{repo}}",
+          "query": {
+            "branch": "{{branch}}",
+            "event": "workflow_dispatch",
+            "per_page": 20
+          }
+        }
+      }
+    },
+    {
+      "id": "summarize_failure_surface",
+      "role": "sink",
+      "op": "reasoning:analyze",
+      "consumes": "workflow_runs",
+      "produces": { "channel": "failure_analysis", "type": "AnalysisResult" },
+      "params": {
+        "instruction": "Inspect the GitHub Actions workflow runs, identify the most likely failed or flaky runs, and propose the next debugging action. Prefer the most recent actionable failure.",
+        "context": ["{{owner}}/{{repo}}", "{{branch}}", "{{workflow_id}}", "{{workflow_runs}}"],
+        "analysisType": "cicd_failure_investigation"
+      }
+    },
+    {
+      "id": "write_investigation_note",
+      "role": "sink",
+      "op": "system:write_file",
+      "consumes": ["workflow_runs", "failure_analysis"],
+      "params": {
+        "path": "{{investigation_output_path}}",
+        "content": {
+          "kind": "cicd-failure-investigation",
+          "generated_at": "{{run_utc_now}}",
+          "repository": "{{owner}}/{{repo}}",
+          "branch": "{{branch}}",
+          "workflow_id": "{{workflow_id}}",
+          "workflow_runs": "{{workflow_runs}}",
+          "failure_analysis": "{{failure_analysis}}"
+        }
+      }
+    },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "CI failure investigation written to {{investigation_output_path}}"
+      }
+    }
+  ]
+}

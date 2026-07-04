@@ -17,7 +17,7 @@ import {
   safeReadFile,
   safeExistsSync,
   pathResolver,
-  withRetry,
+  retry,
   resolveVars,
   sendEmail,
   createDraft,
@@ -41,16 +41,12 @@ interface EmailAction {
 }
 
 function resolveBodyFromFile(filePath: string): string {
-  const absPath = path.isAbsolute(filePath)
-    ? filePath
-    : pathResolver.rootResolve(filePath);
+  const absPath = path.isAbsolute(filePath) ? filePath : pathResolver.rootResolve(filePath);
   if (!safeExistsSync(absPath)) {
     throw new Error(`email-actuator: body_file not found: ${absPath}`);
   }
   return String(safeReadFile(absPath, { encoding: 'utf8' })).trim();
 }
-
-
 
 function resolveEmailParams(raw: EmailParams, ctx: Record<string, unknown>): EmailParams {
   return {
@@ -66,7 +62,7 @@ function resolveEmailParams(raw: EmailParams, ctx: Record<string, unknown>): Ema
 
 async function executePipeline(
   steps: Array<{ type?: string; op: string; params?: EmailParams }>,
-  ctx: Record<string, unknown>,
+  ctx: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
   for (const step of steps) {
     const rawParams: EmailParams = step.params ?? {};
@@ -84,7 +80,7 @@ async function executePipeline(
     switch (step.op) {
       case 'create_draft': {
         logger.info(`[EMAIL] Creating draft → To: ${params.to}, Subject: ${params.subject}`);
-        const result = await withRetry(() => createDraft(params), {
+        const result = await retry(() => createDraft(params), {
           maxRetries: 2,
           initialDelayMs: 1000,
           maxDelayMs: 8000,
@@ -98,7 +94,7 @@ async function executePipeline(
       case 'send':
       case 'send_from_file': {
         logger.info(`[EMAIL] Sending → To: ${params.to ?? ''}, Subject: ${params.subject ?? ''}`);
-        const result = await withRetry(() => sendEmail(params), {
+        const result = await retry(() => sendEmail(params), {
           maxRetries: 2,
           initialDelayMs: 1000,
           maxDelayMs: 8000,
@@ -122,7 +118,8 @@ export async function handleAction(input: {
   context?: Record<string, unknown>;
   params?: EmailParams & { context?: Record<string, unknown> };
 }): Promise<Record<string, unknown>> {
-  const ctx: Record<string, unknown> = input.context ?? (input.params?.context as Record<string, unknown>) ?? {};
+  const ctx: Record<string, unknown> =
+    input.context ?? (input.params?.context as Record<string, unknown>) ?? {};
 
   if (input.action === 'pipeline' && Array.isArray(input.steps)) {
     return executePipeline(input.steps, ctx);

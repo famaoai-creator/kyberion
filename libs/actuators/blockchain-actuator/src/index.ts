@@ -7,11 +7,12 @@ import {
   createStandardYargs,
   pathResolver,
   classifyError,
-  withRetry,
+  retry,
 } from '@agent/core';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { runActuatorCli } from '@agent/core';
 
 /**
  * Blockchain-Actuator v1.0.0 [IMMUTABLE ANCHOR]
@@ -136,7 +137,7 @@ async function anchorMission(params: any) {
     contract_address: '0xKyberionSovereignEvidenceContractV1',
   };
 
-  await withRetry(async () => {
+  await retry(async () => {
     _writeToMockChain(tx);
   }, buildRetryOptions());
   return { status: 'success', simulated: true, tx_id: tx.tx_id, block: tx.block_number };
@@ -158,7 +159,7 @@ async function anchorTrust(params: any) {
     contract_address: '0xKyberionTrustGovernanceContractV1',
   };
 
-  await withRetry(async () => {
+  await retry(async () => {
     _writeToMockChain(tx);
   }, buildRetryOptions());
   return { status: 'success', simulated: true, tx_id: tx.tx_id, block: tx.block_number };
@@ -195,15 +196,10 @@ function _writeToMockChain(tx: any) {
 }
 
 const main = async () => {
-  const argv = await createStandardYargs()
-    .option('input', { alias: 'i', type: 'string', required: true })
-    .parseSync();
-
-  const inputContent = safeReadFile(pathResolver.rootResolve(argv.input as string), {
-    encoding: 'utf8',
-  }) as string;
-  const result = await handleAction(JSON.parse(inputContent));
-  console.log(JSON.stringify(result, null, 2));
+  await runActuatorCli({
+    name: 'blockchain-actuator',
+    handleAction,
+  });
 };
 
 const entrypoint = process.argv[1] ? path.resolve(process.argv[1]) : '';

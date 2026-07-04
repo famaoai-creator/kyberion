@@ -69,12 +69,17 @@ last_session_diff.patch
 
 # Local coverage output
 coverage/
+test-results/
 
 # In-place build output accidentally emitted in actuator source trees
 libs/actuators/presence-actuator/src/*.js
 libs/actuators/presence-actuator/src/*.js.map
 libs/actuators/presence-actuator/src/*.d.ts
 libs/actuators/presence-actuator/src/*.d.ts.map
+libs/actuators/media-generation-actuator/src/*.js
+libs/actuators/media-generation-actuator/src/*.js.map
+libs/actuators/media-generation-actuator/src/*.d.ts
+libs/actuators/media-generation-actuator/src/*.d.ts.map
 
 # Local distillation scratch output
 knowledge/evolution/distill_*.md

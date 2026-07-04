@@ -67,6 +67,57 @@
         "per_page": { "default": 30 }
       }
     },
+    "actions_list_runs": {
+      "type": "api",
+      "path": "repos/{{owner}}/{{repo}}/actions/runs",
+      "method": "GET",
+      "description": "Lists workflow runs for a repository.",
+      "parameters": {
+        "owner": { "required": true, "type": "string" },
+        "repo": { "required": true, "type": "string" },
+        "branch": { "required": false, "type": "string" },
+        "event": { "required": false, "type": "string" },
+        "status": { "required": false, "type": "string" },
+        "per_page": { "required": false, "type": "number" }
+      }
+    },
+    "actions_get_run": {
+      "type": "api",
+      "path": "repos/{{owner}}/{{repo}}/actions/runs/{{run_id}}",
+      "method": "GET",
+      "description": "Gets a single workflow run and its status metadata.",
+      "parameters": {
+        "owner": { "required": true, "type": "string" },
+        "repo": { "required": true, "type": "string" },
+        "run_id": { "required": true, "type": "number" }
+      },
+      "output_mapping": {
+        "run_id": "id",
+        "status": "status",
+        "conclusion": "conclusion",
+        "html_url": "html_url",
+        "name": "name",
+        "head_branch": "head_branch",
+        "head_sha": "head_sha"
+      }
+    },
+    "actions_dispatch_workflow": {
+      "type": "api",
+      "path": "repos/{{owner}}/{{repo}}/actions/workflows/{{workflow_id}}/dispatches",
+      "method": "POST",
+      "description": "Dispatches a GitHub Actions workflow run.",
+      "parameters": {
+        "owner": { "required": true, "type": "string" },
+        "repo": { "required": true, "type": "string" },
+        "workflow_id": { "required": true, "type": "string" },
+        "ref": { "required": true, "type": "string" },
+        "inputs": { "required": false, "type": "object" }
+      },
+      "payload_template": {
+        "ref": "{{ref}}",
+        "inputs": "{{inputs}}"
+      }
+    },
     "create_pull_request": {
       "type": "api",
       "path": "repos/{{owner}}/{{repo}}/pulls",

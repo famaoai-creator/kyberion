@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
   safeWriteFile: vi.fn(),
   safeExistsSync: vi.fn(),
   safeMkdir: vi.fn(),
-  withRetry: vi.fn(async (fn: () => Promise<unknown>) => fn()),
+  retry: vi.fn(async (fn: () => Promise<unknown>) => fn()),
 }));
 
 vi.mock('@agent/core', async (importOriginal) => {
@@ -16,7 +16,7 @@ vi.mock('@agent/core', async (importOriginal) => {
     safeWriteFile: mocks.safeWriteFile,
     safeExistsSync: mocks.safeExistsSync,
     safeMkdir: mocks.safeMkdir,
-    withRetry: mocks.withRetry,
+    retry: mocks.retry,
     logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), success: vi.fn() },
   };
 });
@@ -106,7 +106,9 @@ describe('wisdom-actuator handleAction', () => {
   });
 
   it('registers a presentation preference profile through the personal registry', async () => {
-    mocks.safeExistsSync.mockImplementation((filePath: string) => filePath.includes('presentation-preference-registry.json') ? false : true);
+    mocks.safeExistsSync.mockImplementation((filePath: string) =>
+      filePath.includes('presentation-preference-registry.json') ? false : true
+    );
     mocks.safeReadFile.mockReturnValue('');
 
     const { handleAction } = await import('./index.js');

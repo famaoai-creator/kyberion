@@ -3,7 +3,13 @@ import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
 import { ACPMediator, ACPMediatorOptions } from './acp-mediator.js';
 import { CodexAdapter, CodexAppServerAdapter, ClaudeAdapter } from './agent-adapter.js';
-import { agentRegistry, AgentRecord, AgentProvider, AgentStatus } from './agent-registry.js';
+import {
+  agentRegistry,
+  AgentRecord,
+  AgentProvider,
+  AgentStatus,
+  resolveAgentTrustScore,
+} from './agent-registry.js';
 import { getAgentManifest, validateRequirements } from './agent-manifest.js';
 import * as crypto from 'node:crypto';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
@@ -305,13 +311,16 @@ class AgentLifecycleManagerImpl {
       }
     }
 
+    const existingTrustScore = agentRegistry.get(agentId)?.trustScore;
+    const resolvedTrustScore = resolveAgentTrustScore(agentId, existingTrustScore);
+
     // Trust gate
     const trustRequired = resolvedOptions.trustRequired ?? manifest?.trustRequired ?? 0;
     if (trustRequired > 0) {
-      const existing = agentRegistry.get(agentId);
-      const score = existing?.trustScore ?? 5.0;
-      if (score < trustRequired) {
-        throw new Error(`Trust score ${score} below required ${trustRequired} for ${agentId}`);
+      if (resolvedTrustScore < trustRequired) {
+        throw new Error(
+          `Trust score ${resolvedTrustScore} below required ${trustRequired} for ${agentId}`
+        );
       }
     }
 
@@ -324,7 +333,7 @@ class AgentLifecycleManagerImpl {
       provider: resolvedOptions.provider,
       modelId: resolvedOptions.modelId || config?.default_model || resolvedOptions.provider,
       capabilities: resolvedOptions.capabilities || [],
-      trustScore: 5.0,
+      trustScore: resolvedTrustScore,
       sessionId: null,
       threadId: agentId,
       parentAgentId: resolvedOptions.parentAgentId,

@@ -10,6 +10,7 @@ import {
   grantAccessGuarded,
   createActuatorTrace,
   finalizeActuatorTrace,
+  buildCompletionNextAction,
   ledger,
   logger,
   latestSnapshot,
@@ -520,6 +521,22 @@ export async function finishMission(
   }
 
   const evidenceRefs = collectMissionEvidenceRefs(missionDir);
+  const completionNextAction = buildCompletionNextAction({
+    goal: {
+      summary: state.outcome_contract?.requested_result || `Mission ${upperId}`,
+      success_condition:
+        state.outcome_contract?.success_criteria?.join('; ') ||
+        state.outcome_contract?.requested_result ||
+        `Mission ${upperId}`,
+    },
+    reconciliation: {
+      satisfied: evidenceRefs.length > 0,
+      delivered: evidenceRefs,
+      gaps: evidenceRefs.length > 0 ? [] : ['No mission evidence refs were collected.'],
+      confidence: evidenceRefs.length > 0 ? 0.9 : 0.35,
+      evidence_refs: evidenceRefs,
+    },
+  });
   const traceCtx = createActuatorTrace('mission-controller', 'finish', {
     pipelineId: upperId,
     missionId: upperId,
@@ -649,6 +666,15 @@ export async function finishMission(
   const traceResult = finalizeActuatorTrace(traceCtx);
   state.context = {
     ...(state.context || {}),
+    mission_completion_next_action: completionNextAction,
+    mission_completion_summary: {
+      requested_result: completionNextAction.request,
+      satisfied: completionNextAction.satisfied,
+      delivered: completionNextAction.delivered,
+      gaps: completionNextAction.gaps,
+      next_step: completionNextAction.next_step,
+      confidence: completionNextAction.confidence,
+    },
     mission_finish_trace_summary: traceResult.trace_summary,
     mission_finish_trace_persisted_path: traceResult.trace_persisted_path,
   };

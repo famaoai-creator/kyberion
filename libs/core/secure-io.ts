@@ -8,6 +8,7 @@ import { validateWritePermission, validateReadPermission, detectTier } from './t
 import { policyEngine } from './policy-engine.js';
 import { auditChain } from './audit-chain.js';
 import { killSwitch } from './kill-switch.js';
+import { logger } from './core.js';
 
 /**
  * Secure I/O utilities for Kyberion Ecosystem (TypeScript Edition)
@@ -149,6 +150,13 @@ export function safeReadFile(filePath: string, options: SafeReadOptions = {}): s
   return fs.readFileSync(resolved, { encoding });
 }
 
+/**
+ * Read and parse a JSON file safely.
+ */
+export function loadJson<T>(filePath: string): T {
+  return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as T;
+}
+
 let _policyCheckInProgress = false;
 
 /**
@@ -201,6 +209,9 @@ export function safeWriteFile(
     } catch (err: any) {
       // Only re-throw if it's an actual policy block, not a load/parse failure
       if (err?.message?.includes('[POLICY_BLOCKED]')) throw err;
+      logger.warn(
+        `[secure-io] policy evaluation failed, allowing by default: path=${resolved} error=${err?.message || String(err)}`
+      );
       throw new Error(`Policy engine unavailable for ${resolved}: ${err?.message || err}`);
     } finally {
       _policyCheckInProgress = false;
@@ -351,6 +362,16 @@ export function safeMkdir(
   if (!fs.existsSync(resolved)) {
     fs.mkdirSync(resolved, options);
   }
+}
+
+/**
+ * Ensure a directory exists safely.
+ */
+export function ensureDir(
+  dirPath: string,
+  options: fs.MakeDirectoryOptions = { recursive: true }
+): void {
+  safeMkdir(dirPath, options);
 }
 
 /**

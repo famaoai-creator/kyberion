@@ -7,7 +7,7 @@ import {
   safeExistsSync,
   safeMkdir,
   safeOpenAppendFile,
-  withRetry,
+  retry,
   runtimeSupervisor,
   spawnManagedProcess,
   stopManagedProcess,
@@ -240,7 +240,7 @@ export async function handleAction(input: ServiceAction, onEvent?: (data: any) =
     const steps = input.steps || [];
     for (const step of steps) {
       logger.info(`🔌 [SERVICE] Executing step: ${step.op}`);
-      const stepResult = await withRetry(
+      const stepResult = await retry(
         async () => {
           return await handleSingleAction({
             service_id: step.params.service_id,
@@ -384,7 +384,7 @@ async function executeApiRequest(input: ServiceAction) {
   const token: string | null = binding.accessToken || null;
   const baseUrl = resolveServiceBaseUrl(input.service_id);
   const httpMethod = input.method || (input.params ? 'POST' : 'GET');
-  return await withRetry(
+  return await retry(
     async () => {
       return await secureFetch({
         method: httpMethod,

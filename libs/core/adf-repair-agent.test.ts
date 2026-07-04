@@ -94,6 +94,18 @@ describe('validateAndRepairAdf', () => {
     expect(JSON.parse(readFixture(filePath))).toEqual({ capability: 'demo', action: 'run' });
   });
 
+  it('delegates unrecoverable parse errors and writes the repaired JSON returned by the backend', async () => {
+    const delegateTask = vi.fn(async () => JSON.stringify({ capability: 'demo', action: 'run' }));
+    registerFakeRepairBackend(delegateTask);
+    const filePath = writeFixture('unparseable.json', 'this is not json');
+
+    const result = await validateAndRepairAdf(filePath, 'capability-input');
+
+    expect(result.repaired).toBe(true);
+    expect(delegateTask).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(readFixture(filePath))).toEqual({ capability: 'demo', action: 'run' });
+  });
+
   it('does not overwrite the file when delegated repair output is invalid', async () => {
     const delegateTask = vi.fn(async () => JSON.stringify({ capability: 'demo' }));
     registerFakeRepairBackend(delegateTask);

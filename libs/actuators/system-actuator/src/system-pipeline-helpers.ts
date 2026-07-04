@@ -15,7 +15,7 @@ import {
   nativeTtsSpeak,
   probeNativeTts,
   classifyError,
-  withRetry,
+  retry,
   createVirtualMediaDeviceControlBridge,
   createVirtualDeviceInventoryBridge,
   createVirtualAudioOutputPlaybackBridge,
@@ -68,7 +68,10 @@ import {
 } from '@agent/core/os-automation';
 import type { FocusedInputState } from '@agent/core/os-automation';
 import { osAutomationBridge } from '@agent/core/os-automation-bridge';
-import { systemDisplayHelpers, type ResolvedScreenDisplaySelection } from './system-display-helpers.js';
+import {
+  systemDisplayHelpers,
+  type ResolvedScreenDisplaySelection,
+} from './system-display-helpers.js';
 import { systemFocusHelpers } from './system-focus-helpers.js';
 import * as visionJudge from '@agent/shared-vision';
 import * as path from 'node:path';
@@ -77,7 +80,9 @@ import { randomUUID } from 'node:crypto';
 const ALLOW_UNSAFE_SHELL = process.env.KYBERION_ALLOW_UNSAFE_SHELL === 'true';
 const ALLOW_UNSAFE_JS = process.env.KYBERION_ALLOW_UNSAFE_JS === 'true';
 const COMPUTER_RUNTIME_DIR = pathResolver.shared('runtime/computer');
-const SYSTEM_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/system-actuator/manifest.json');
+const SYSTEM_MANIFEST_PATH = pathResolver.rootResolve(
+  'libs/actuators/system-actuator/manifest.json'
+);
 const DEFAULT_SYSTEM_RETRY = {
   maxRetries: 2,
   initialDelayMs: 250,
@@ -96,13 +101,17 @@ interface PipelineStep {
 
 function assertUnsafeShellAllowed() {
   if (!ALLOW_UNSAFE_SHELL) {
-    throw new Error('[SECURITY] Shell execution disabled. Set KYBERION_ALLOW_UNSAFE_SHELL=true to enable.');
+    throw new Error(
+      '[SECURITY] Shell execution disabled. Set KYBERION_ALLOW_UNSAFE_SHELL=true to enable.'
+    );
   }
 }
 
 function assertUnsafeJsAllowed() {
   if (!ALLOW_UNSAFE_JS) {
-    throw new Error('[SECURITY] JS execution disabled. Set KYBERION_ALLOW_UNSAFE_JS=true to enable.');
+    throw new Error(
+      '[SECURITY] JS execution disabled. Set KYBERION_ALLOW_UNSAFE_JS=true to enable.'
+    );
   }
 }
 
@@ -126,7 +135,9 @@ function buildRetryOptions(override?: Record<string, any>) {
   const recoveryPolicy = loadRecoveryPolicy();
   const manifestRetry = isPlainObject(recoveryPolicy.retry) ? recoveryPolicy.retry : {};
   const retryableCategories = new Set<string>(
-    Array.isArray(recoveryPolicy.retryable_categories) ? recoveryPolicy.retryable_categories.map(String) : [],
+    Array.isArray(recoveryPolicy.retryable_categories)
+      ? recoveryPolicy.retryable_categories.map(String)
+      : []
   );
   const resolved = {
     ...DEFAULT_SYSTEM_RETRY,
@@ -140,10 +151,12 @@ function buildRetryOptions(override?: Record<string, any>) {
       if (retryableCategories.size > 0) {
         return retryableCategories.has(classification.category);
       }
-      return classification.category === 'network'
-        || classification.category === 'rate_limit'
-        || classification.category === 'timeout'
-        || classification.category === 'resource_unavailable';
+      return (
+        classification.category === 'network' ||
+        classification.category === 'rate_limit' ||
+        classification.category === 'timeout' ||
+        classification.category === 'resource_unavailable'
+      );
     },
   };
 }
@@ -163,12 +176,18 @@ function normalizeDisplayIndex(value: unknown): number | undefined {
 function selectDisplayFromInventory(
   inventory: ScreenDisplayInventory,
   requestedIndex?: number,
-  requestedName?: string,
-): { display: ScreenDisplayRecord; selection_source: 'explicit_index' | 'display_name' | 'primary' | 'fallback' } {
+  requestedName?: string
+): {
+  display: ScreenDisplayRecord;
+  selection_source: 'explicit_index' | 'display_name' | 'primary' | 'fallback';
+} {
   return systemDisplayHelpers.selectDisplayFromInventory(inventory, requestedIndex, requestedName);
 }
 
-async function resolveScreenDisplaySelection(params: Record<string, any>, resolve: (value: any) => any): Promise<ResolvedScreenDisplaySelection> {
+async function resolveScreenDisplaySelection(
+  params: Record<string, any>,
+  resolve: (value: any) => any
+): Promise<ResolvedScreenDisplaySelection> {
   return systemDisplayHelpers.resolveScreenDisplaySelection(params, resolve);
 }
 
@@ -233,7 +252,7 @@ function detectFocusedInputWithGuard(
     role?: string;
   } | null,
   targetId?: string,
-  matchPolicy: 'strict' | 'prefix' | 'contains' = 'strict',
+  matchPolicy: 'strict' | 'prefix' | 'contains' = 'strict'
 ) {
   return systemFocusHelpers.detectFocusedInputWithGuard(rememberedTarget, targetId, matchPolicy);
 }
@@ -250,9 +269,14 @@ function assertFocusedTargetMatches(
     role?: string;
   },
   targetId?: string,
-  matchPolicy: 'strict' | 'prefix' | 'contains' = 'strict',
+  matchPolicy: 'strict' | 'prefix' | 'contains' = 'strict'
 ) {
-  return systemFocusHelpers.assertFocusedTargetMatches(rememberedTarget, focusedInput, targetId, matchPolicy);
+  return systemFocusHelpers.assertFocusedTargetMatches(
+    rememberedTarget,
+    focusedInput,
+    targetId,
+    matchPolicy
+  );
 }
 
 function getFocusedTargetMismatches(
@@ -266,16 +290,27 @@ function getFocusedTargetMismatches(
     windowTitle?: string;
     role?: string;
   },
-  matchPolicy: 'strict' | 'prefix' | 'contains' = 'strict',
+  matchPolicy: 'strict' | 'prefix' | 'contains' = 'strict'
 ) {
   return systemFocusHelpers.getFocusedTargetMismatches(rememberedTarget, focusedInput, matchPolicy);
 }
 
-function windowTitleMatches(expected: string, actual: string, matchPolicy: 'strict' | 'prefix' | 'contains') {
+function windowTitleMatches(
+  expected: string,
+  actual: string,
+  matchPolicy: 'strict' | 'prefix' | 'contains'
+) {
   return systemFocusHelpers.windowTitleMatches(expected, actual, matchPolicy);
 }
 
-async function opControl(op: string, params: any, ctx: any, options: any, state: any, resolve: (value: any) => any) {
+async function opControl(
+  op: string,
+  params: any,
+  ctx: any,
+  options: any,
+  state: any,
+  resolve: (value: any) => any
+) {
   switch (op) {
     case 'if':
       if (evaluateCondition(params.condition, ctx)) {
@@ -295,7 +330,8 @@ async function opControl(op: string, params: any, ctx: any, options: any, state:
         const res = await executePipeline(params.pipeline, ctx, options, state);
         ctx = res.context;
       }
-      if (iterations >= maxIter) logger.warn(`[SAFETY_GUARD] Loop reached max_iterations (${maxIter})`);
+      if (iterations >= maxIter)
+        logger.warn(`[SAFETY_GUARD] Loop reached max_iterations (${maxIter})`);
       return ctx;
 
     default:
@@ -307,14 +343,19 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
   const rootDir = pathResolver.rootDir();
   switch (op) {
     case 'screenshot': {
-      const displaySelection = await systemDisplayHelpers.resolveScreenDisplaySelection(params, resolve);
+      const displaySelection = await systemDisplayHelpers.resolveScreenDisplaySelection(
+        params,
+        resolve
+      );
       const application = typeof params.application === 'string' ? params.application.trim() : '';
       const windowTitle = typeof params.window_title === 'string' ? params.window_title.trim() : '';
-      const windowMatchPolicy = typeof params.window_match_policy === 'string' ? params.window_match_policy : 'strict';
+      const windowMatchPolicy =
+        typeof params.window_match_policy === 'string' ? params.window_match_policy : 'strict';
       let captureMode: 'screen' | 'focused_window' = 'screen';
-      let screenshotPath = typeof params.path === 'string' && params.path.trim()
-        ? pathResolver.rootResolve(resolve(params.path))
-        : pathResolver.shared(`runtime/computer/screenshots/screenshot-${Date.now()}.png`);
+      let screenshotPath =
+        typeof params.path === 'string' && params.path.trim()
+          ? pathResolver.rootResolve(resolve(params.path))
+          : pathResolver.shared(`runtime/computer/screenshots/screenshot-${Date.now()}.png`);
       if (!safeExistsSync(path.dirname(screenshotPath))) {
         safeMkdir(path.dirname(screenshotPath), { recursive: true });
       }
@@ -349,19 +390,29 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
         screenshot_display_selection_source: displaySelection.selection_source,
         screenshot_application: application || undefined,
         screenshot_window_title: windowTitle || undefined,
-        screenshot_window_selection_source: windowTitle ? 'window_title' : application ? 'application' : 'display',
+        screenshot_window_selection_source: windowTitle
+          ? 'window_title'
+          : application
+            ? 'application'
+            : 'display',
         screenshot_window_candidates: windowCandidates || [],
       };
     }
     case 'window_list': {
-      const application = typeof params.application === 'string' && params.application.trim() ? params.application.trim() : '';
+      const application =
+        typeof params.application === 'string' && params.application.trim()
+          ? params.application.trim()
+          : '';
       if (!application) {
         throw new Error('window_list requires application param');
       }
       return { ...ctx, [params.export_as || 'window_list']: getWindowList(application) };
     }
     case 'chrome_tab_list': {
-      const browser = typeof params.application === 'string' && params.application.trim() ? params.application.trim() : 'Google Chrome';
+      const browser =
+        typeof params.application === 'string' && params.application.trim()
+          ? params.application.trim()
+          : 'Google Chrome';
       return { ...ctx, [params.export_as || 'chrome_tab_list']: listChromeTabs(browser) };
     }
     case 'clipboard_read':
@@ -371,18 +422,27 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
     case 'get_screen_size':
       return { ...ctx, [params.export_as || 'screen_size']: getScreenSize() };
     case 'window_list': {
-      const application = typeof params.application === 'string' && params.application.trim() ? params.application.trim() : '';
+      const application =
+        typeof params.application === 'string' && params.application.trim()
+          ? params.application.trim()
+          : '';
       if (!application) {
         throw new Error('window_list requires application param');
       }
       return { ...ctx, [params.export_as || 'window_list']: getWindowList(application) };
     }
     case 'chrome_tab_list': {
-      const browser = typeof params.application === 'string' && params.application.trim() ? params.application.trim() : 'Google Chrome';
+      const browser =
+        typeof params.application === 'string' && params.application.trim()
+          ? params.application.trim()
+          : 'Google Chrome';
       return { ...ctx, [params.export_as || 'chrome_tab_list']: listChromeTabs(browser) };
     }
     case 'test_screen_stream': {
-      const displaySelection = await systemDisplayHelpers.resolveScreenDisplaySelection(params, resolve);
+      const displaySelection = await systemDisplayHelpers.resolveScreenDisplaySelection(
+        params,
+        resolve
+      );
       const bridge = createScreenCaptureBridge();
       const bus = new StubVideoFrameBus();
       await bridge.pipeTo(bus, {
@@ -413,7 +473,10 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
       };
     }
     case 'test_screen_mp4_roundtrip': {
-      const displaySelection = await systemDisplayHelpers.resolveScreenDisplaySelection(params, resolve);
+      const displaySelection = await systemDisplayHelpers.resolveScreenDisplaySelection(
+        params,
+        resolve
+      );
       const bridge = createScreenCaptureBridge();
       const captureBus = new StubVideoFrameBus();
       await bridge.pipeTo(captureBus, {
@@ -447,16 +510,22 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
       assertUnsafeShellAllowed();
       return {
         ...ctx,
-        [params.export_as || 'last_capture']: await withRetry(async () => safeExec(
-          process.env.SHELL || '/bin/zsh',
-          ['-lc', resolve(params.cmd)],
-          { cwd: rootDir, env: params.env || {} },
-        ).trim(), buildRetryOptions(params.retry)),
+        [params.export_as || 'last_capture']: await retry(
+          async () =>
+            safeExec(process.env.SHELL || '/bin/zsh', ['-lc', resolve(params.cmd)], {
+              cwd: rootDir,
+              env: params.env || {},
+            }).trim(),
+          buildRetryOptions(params.retry)
+        ),
       };
     case 'cli_health_check': {
       const command = resolve(params.command);
       const args = params.args ? params.args.map((a: any) => resolve(a)) : ['--version'];
-      const result = await withRetry(async () => safeExecResult(command, args, { timeoutMs: params.timeout_ms || 5000 }), buildRetryOptions(params.retry));
+      const result = await retry(
+        async () => safeExecResult(command, args, { timeoutMs: params.timeout_ms || 5000 }),
+        buildRetryOptions(params.retry)
+      );
       return {
         ...ctx,
         [params.export_as || 'cli_health']: {
@@ -472,12 +541,16 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
       const command = resolve(params.command);
       const args = params.args ? params.args.map((a: any) => resolve(a)) : [];
       const env = params.env ? params.env : {};
-      const result = await withRetry(async () => safeExecResult(command, args, {
-        cwd: params.cwd ? path.resolve(rootDir, resolve(params.cwd)) : rootDir,
-        env,
-        timeoutMs: params.timeout_ms || 30000,
-        input: params.input ? resolve(params.input) : undefined,
-      }), buildRetryOptions(params.retry));
+      const result = await retry(
+        async () =>
+          safeExecResult(command, args, {
+            cwd: params.cwd ? path.resolve(rootDir, resolve(params.cwd)) : rootDir,
+            env,
+            timeoutMs: params.timeout_ms || 30000,
+            input: params.input ? resolve(params.input) : undefined,
+          }),
+        buildRetryOptions(params.retry)
+      );
       if (result.status !== 0 && !params.allow_error) {
         throw new Error(`CLI execution failed with status ${result.status}: ${result.stderr}`);
       }
@@ -491,18 +564,37 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
       };
     }
     case 'read_file':
-      return { ...ctx, [params.export_as || 'last_capture']: safeReadFile(path.resolve(rootDir, resolve(params.path)), { encoding: 'utf8' }) };
+      return {
+        ...ctx,
+        [params.export_as || 'last_capture']: safeReadFile(
+          path.resolve(rootDir, resolve(params.path)),
+          { encoding: 'utf8' }
+        ),
+      };
     case 'read_json':
-      return { ...ctx, [params.export_as || 'last_capture_data']: JSON.parse(safeReadFile(pathResolver.rootResolve(resolve(params.path)), { encoding: 'utf8' }) as string) };
+      return {
+        ...ctx,
+        [params.export_as || 'last_capture_data']: JSON.parse(
+          safeReadFile(pathResolver.rootResolve(resolve(params.path)), {
+            encoding: 'utf8',
+          }) as string
+        ),
+      };
     case 'probe': {
       const targetPath = pathResolver.rootResolve(resolve(params.path));
       let exists = false;
       let kind = 'unknown';
       try {
-        exists = await withRetry(async () => safeExistsSync(targetPath), buildRetryOptions(params.retry));
+        exists = await retry(
+          async () => safeExistsSync(targetPath),
+          buildRetryOptions(params.retry)
+        );
         if (exists) {
           const { safeStat } = await import('@agent/core/secure-io');
-          const stats = await withRetry(async () => safeStat(targetPath), buildRetryOptions(params.retry));
+          const stats = await retry(
+            async () => safeStat(targetPath),
+            buildRetryOptions(params.retry)
+          );
           kind = stats.isDirectory() ? 'dir' : 'file';
         }
       } catch {
@@ -518,27 +610,55 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
       };
     }
     case 'glob_files':
-      return { ...ctx, [params.export_as || 'file_list']: getAllFiles(pathResolver.rootResolve(resolve(params.dir))).filter(f => !params.ext || f.endsWith(params.ext)).map(f => path.relative(pathResolver.rootDir(), f)) };
+      return {
+        ...ctx,
+        [params.export_as || 'file_list']: getAllFiles(
+          pathResolver.rootResolve(resolve(params.dir))
+        )
+          .filter((f) => !params.ext || f.endsWith(params.ext))
+          .map((f) => path.relative(pathResolver.rootDir(), f)),
+      };
     case 'scan_directory': {
-      const { safeStat, safeReaddir, safeExistsSync: scanExists } = await import('@agent/core/secure-io');
+      const {
+        safeStat,
+        safeReaddir,
+        safeExistsSync: scanExists,
+      } = await import('@agent/core/secure-io');
       const scanRoot = pathResolver.rootResolve(resolve(params.path || '.'));
       if (!scanExists(scanRoot)) {
-        return { ...ctx, [params.export_as || 'scan_result']: { files: [], count: 0, dir: resolve(params.path || '.') } };
+        return {
+          ...ctx,
+          [params.export_as || 'scan_result']: {
+            files: [],
+            count: 0,
+            dir: resolve(params.path || '.'),
+          },
+        };
       }
       const recursive = params.recursive !== false;
       const includeMetadata = params.include_metadata === true;
-      const excludePatterns: string[] = Array.isArray(params.exclude) ? params.exclude : (params.exclude ? [params.exclude] : []);
+      const excludePatterns: string[] = Array.isArray(params.exclude)
+        ? params.exclude
+        : params.exclude
+          ? [params.exclude]
+          : [];
       const patternStr: string | undefined = params.pattern ? String(params.pattern) : undefined;
       const patternRe = patternStr ? new RegExp(patternStr) : undefined;
       const maxDepth = typeof params.max_depth === 'number' ? params.max_depth : Infinity;
 
       const isExcluded = (rel: string): boolean =>
-        excludePatterns.some(p => rel.includes(p) || rel.split(path.sep).some(seg => seg === p));
+        excludePatterns.some(
+          (p) => rel.includes(p) || rel.split(path.sep).some((seg) => seg === p)
+        );
 
       const scanDir = (dir: string, depth: number): any[] => {
         if (depth > maxDepth) return [];
         let entries: string[];
-        try { entries = safeReaddir(dir); } catch { return []; }
+        try {
+          entries = safeReaddir(dir);
+        } catch {
+          return [];
+        }
         const results: any[] = [];
         for (const entry of entries) {
           if (entry.startsWith('.')) continue;
@@ -546,7 +666,11 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
           const rel = path.relative(pathResolver.rootDir(), abs);
           if (isExcluded(rel)) continue;
           let stats: ReturnType<typeof safeStat> | null = null;
-          try { stats = safeStat(abs); } catch { continue; }
+          try {
+            stats = safeStat(abs);
+          } catch {
+            continue;
+          }
           if (stats.isDirectory()) {
             if (recursive) results.push(...scanDir(abs, depth + 1));
           } else {
@@ -567,7 +691,13 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
       return { ...ctx, [params.export_as || 'scan_result']: data };
     }
     case 'vision_consult':
-      return { ...ctx, [params.export_as || 'vision_decision']: await withRetry(async () => visionJudge.consultVision(resolve(params.context), params.tie_break_options), buildRetryOptions(params.retry)) };
+      return {
+        ...ctx,
+        [params.export_as || 'vision_decision']: await retry(
+          async () => visionJudge.consultVision(resolve(params.context), params.tie_break_options),
+          buildRetryOptions(params.retry)
+        ),
+      };
     case 'pulse_status': {
       const { ledger } = await import('@agent/core');
       return { ...ctx, [params.export_as || 'ledger_valid']: ledger.verifyIntegrity() };
@@ -575,7 +705,10 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
     case 'list_missions': {
       const missionRoot = pathResolver.rootResolve('active/missions');
       const tiers = ['personal', 'confidential', 'public'];
-      const requestedStatus = typeof params.status === 'string' && params.status.trim() ? params.status.trim() : undefined;
+      const requestedStatus =
+        typeof params.status === 'string' && params.status.trim()
+          ? params.status.trim()
+          : undefined;
       const allMissions: any[] = [];
       for (const tier of tiers) {
         const tierPath = path.join(missionRoot, tier);
@@ -589,8 +722,7 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
             if (safeExistsSync(statePath)) {
               try {
                 state = JSON.parse(safeReadFile(statePath, { encoding: 'utf8' }) as string);
-              } catch {
-              }
+              } catch {}
             }
             if (requestedStatus && state?.status !== requestedStatus) continue;
             allMissions.push({
@@ -630,8 +762,7 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
                 description: pkg.description,
                 version: pkg.version,
               });
-            } catch {
-            }
+            } catch {}
           }
         }
       }
@@ -640,9 +771,7 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
     }
     case 'list_tool_runtimes': {
       const inventory = listToolRuntimeInventory(
-        typeof params.requested_mode === 'string'
-          ? params.requested_mode as any
-          : 'trial',
+        typeof params.requested_mode === 'string' ? (params.requested_mode as any) : 'trial'
       );
       return {
         ...ctx,
@@ -669,9 +798,7 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
     }
     case 'list_service_runtimes': {
       const inventory = await listServiceRuntimeInventory(
-        typeof params.requested_mode === 'string'
-          ? params.requested_mode as any
-          : 'trial',
+        typeof params.requested_mode === 'string' ? (params.requested_mode as any) : 'trial'
       );
       return {
         ...ctx,
@@ -706,7 +833,7 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
       const incidents: any[] = [];
       if (safeExistsSync(incidentRoot)) {
         const entries = readIncidentDir(incidentRoot);
-        for (const entry of entries.filter(e => e.endsWith('.md'))) {
+        for (const entry of entries.filter((e) => e.endsWith('.md'))) {
           incidents.push({
             id: entry.replace(/\.md$/, ''),
             path: path.join('knowledge/product/incidents', entry),
@@ -731,13 +858,22 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
         const input = Array.isArray(value) ? value : [value];
         return input.flatMap((item) => {
           if (typeof item !== 'string') {
-            if (item && typeof item === 'object' && ('id' in (item as object) || 'path' in (item as object))) {
+            if (
+              item &&
+              typeof item === 'object' &&
+              ('id' in (item as object) || 'path' in (item as object))
+            ) {
               return [missionObjectToRelPath(item)];
             }
             return [];
           }
           const resolved = resolveVars(item, {});
-          if (resolved && typeof resolved === 'object' && !Array.isArray(resolved) && 'mission_list' in resolved) {
+          if (
+            resolved &&
+            typeof resolved === 'object' &&
+            !Array.isArray(resolved) &&
+            'mission_list' in resolved
+          ) {
             return ((resolved as any).mission_list as any[]).map(missionObjectToRelPath);
           }
           if (Array.isArray(resolved)) {
@@ -774,7 +910,9 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
         if (isPathWithin(missionRoot, mPath) && safeExistsSync(mPath)) {
           results[mId] = {};
           for (const pattern of patterns) {
-            const files = getAllFiles(mPath).filter((f) => matchesPattern(path.relative(mPath, f), pattern));
+            const files = getAllFiles(mPath).filter((f) =>
+              matchesPattern(path.relative(mPath, f), pattern)
+            );
             for (const f of files) {
               const rel = path.relative(mPath, f);
               results[mId][rel] = safeReadFile(f, { encoding: 'utf8' }) as string;
@@ -827,9 +965,13 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
         [params.export_as || 'display_inventory']: {
           inventory: probe.inventory,
           primary_display: Array.isArray(probe.inventory.displays)
-            ? probe.inventory.displays.find((display) => display.primary) || probe.inventory.displays[0] || null
+            ? probe.inventory.displays.find((display) => display.primary) ||
+              probe.inventory.displays[0] ||
+              null
             : null,
-          display_count: Array.isArray(probe.inventory.displays) ? probe.inventory.displays.length : 0,
+          display_count: Array.isArray(probe.inventory.displays)
+            ? probe.inventory.displays.length
+            : 0,
         },
       };
     }
@@ -954,29 +1096,33 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
       const inventoryBridge = createVirtualDeviceInventoryBridge();
       const cameraBridge = createVirtualCameraBridge({
         inventory_bridge: inventoryBridge,
-        device_preference: typeof params.camera_device_preference === 'string'
-          ? params.camera_device_preference
-          : typeof params.device_preference === 'string'
-            ? params.device_preference
+        device_preference:
+          typeof params.camera_device_preference === 'string'
+            ? params.camera_device_preference
+            : typeof params.device_preference === 'string'
+              ? params.device_preference
+              : undefined,
+        preferred_backend:
+          typeof params.preferred_camera_backend === 'string'
+            ? (params.preferred_camera_backend as any)
             : undefined,
-        preferred_backend: typeof params.preferred_camera_backend === 'string'
-          ? params.preferred_camera_backend as any
-          : undefined,
       });
       const injectionBridge = createVirtualCameraInjectionBridge({
         inventory_bridge: inventoryBridge,
-        device_preference: typeof params.camera_device_preference === 'string'
-          ? params.camera_device_preference
-          : typeof params.device_preference === 'string'
-            ? params.device_preference
-            : undefined,
+        device_preference:
+          typeof params.camera_device_preference === 'string'
+            ? params.camera_device_preference
+            : typeof params.device_preference === 'string'
+              ? params.device_preference
+              : undefined,
         device_path: typeof params.device_path === 'string' ? params.device_path : undefined,
       });
       const frameCount = Math.max(1, Number(params.frame_count || 3));
       const frameIntervalMs = Math.max(0, Number(params.frame_interval_ms || 250));
-      const mp4Path = typeof params.input_mp4_path === 'string' && params.input_mp4_path.trim()
-        ? pathResolver.rootResolve(params.input_mp4_path.trim())
-        : pathResolver.shared(`runtime/computer/video/camera-injection-${Date.now()}.mp4`);
+      const mp4Path =
+        typeof params.input_mp4_path === 'string' && params.input_mp4_path.trim()
+          ? pathResolver.rootResolve(params.input_mp4_path.trim())
+          : pathResolver.shared(`runtime/computer/video/camera-injection-${Date.now()}.mp4`);
       let sourcePath = mp4Path;
       if (!(typeof params.input_mp4_path === 'string' && params.input_mp4_path.trim())) {
         const captureBus = new StubVideoFrameBus();
@@ -995,11 +1141,12 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
       }
       const injectionResult = await injectionBridge.injectFromMp4(sourcePath, {
         source_path: sourcePath,
-        device_preference: typeof params.camera_device_preference === 'string'
-          ? params.camera_device_preference
-          : typeof params.device_preference === 'string'
-            ? params.device_preference
-            : undefined,
+        device_preference:
+          typeof params.camera_device_preference === 'string'
+            ? params.camera_device_preference
+            : typeof params.device_preference === 'string'
+              ? params.device_preference
+              : undefined,
         device_path: typeof params.device_path === 'string' ? params.device_path : undefined,
         output_path: typeof params.output_path === 'string' ? params.output_path : undefined,
         fps: Math.max(1, Math.round(1000 / Math.max(1, frameIntervalMs || 250))),
@@ -1044,7 +1191,9 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
           result = pathResolver.vault(input);
           break;
         default:
-          throw new Error(`resolve_path: unsupported mode "${mode}" (expected resolve|to_relative|normalize|shared|knowledge|active|tmp|vault)`);
+          throw new Error(
+            `resolve_path: unsupported mode "${mode}" (expected resolve|to_relative|normalize|shared|knowledge|active|tmp|vault)`
+          );
       }
       return { ...ctx, [params.export_as || 'resolved_path']: result };
     }
@@ -1067,7 +1216,12 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
     }
     case 'sre_analyze': {
       const { sre } = await import('@agent/core');
-      return { ...ctx, [params.export_as || 'root_cause']: sre.analyzeRootCause(ctx[params.from || 'last_capture']) };
+      return {
+        ...ctx,
+        [params.export_as || 'root_cause']: sre.analyzeRootCause(
+          ctx[params.from || 'last_capture']
+        ),
+      };
     }
     case 'run_js': {
       assertUnsafeJsAllowed();
@@ -1078,8 +1232,14 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
         Buffer,
         process: { env: { ...process.env } },
         console: {
-          log: (...args: any[]) => logger.info(`[JS-LOG] ${args.map(a => typeof a === 'object' ? util.inspect(a) : a).join(' ')}`),
-          error: (...args: any[]) => logger.error(`[JS-ERROR] ${args.map(a => typeof a === 'object' ? util.inspect(a) : a).join(' ')}`),
+          log: (...args: any[]) =>
+            logger.info(
+              `[JS-LOG] ${args.map((a) => (typeof a === 'object' ? util.inspect(a) : a)).join(' ')}`
+            ),
+          error: (...args: any[]) =>
+            logger.error(
+              `[JS-ERROR] ${args.map((a) => (typeof a === 'object' ? util.inspect(a) : a)).join(' ')}`
+            ),
         },
         ctx: { ...ctx },
       };
@@ -1107,7 +1267,9 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       break;
     }
     case 'press_key': {
-      const key = String(resolve(params.key || '')).trim().toLowerCase();
+      const key = String(resolve(params.key || ''))
+        .trim()
+        .toLowerCase();
       pressKey(key);
       break;
     }
@@ -1140,7 +1302,9 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       moveMouse(Number(params.x || 0), Number(params.y || 0));
       break;
     case 'wait':
-      await new Promise((resolveDelay) => setTimeout(resolveDelay, Number(params.duration_ms || 1000)));
+      await new Promise((resolveDelay) =>
+        setTimeout(resolveDelay, Number(params.duration_ms || 1000))
+      );
       break;
     case 'voice':
       const { say } = await import('@agent/core');
@@ -1148,12 +1312,16 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       break;
     case 'native_tts_speak': {
       const text = String(resolve(params.text || '{{last_capture}}'));
-      const result = await withRetry(async () => nativeTtsSpeak(text, {
-        voice: params.voice ? String(resolve(params.voice)) : undefined,
-        rate: typeof params.rate === 'number' ? params.rate : undefined,
-        timeoutMs: typeof params.timeout_ms === 'number' ? params.timeout_ms : undefined,
-        silent: true,
-      }), buildRetryOptions(params.retry));
+      const result = await retry(
+        async () =>
+          nativeTtsSpeak(text, {
+            voice: params.voice ? String(resolve(params.voice)) : undefined,
+            rate: typeof params.rate === 'number' ? params.rate : undefined,
+            timeoutMs: typeof params.timeout_ms === 'number' ? params.timeout_ms : undefined,
+            silent: true,
+          }),
+        buildRetryOptions(params.retry)
+      );
       ctx = { ...ctx, [params.export_as || 'last_tts_result']: result };
       if (!result.ok) {
         logger.warn(`[NATIVE_TTS] Speak failed: ${result.error}`);
@@ -1177,11 +1345,20 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       const platform = process.platform;
       try {
         if (platform === 'darwin') {
-          await withRetry(async () => safeExec('open', [url], { cwd: rootDir }), buildRetryOptions(params.retry));
+          await retry(
+            async () => safeExec('open', [url], { cwd: rootDir }),
+            buildRetryOptions(params.retry)
+          );
         } else if (platform === 'win32') {
-          await withRetry(async () => safeExec('cmd', ['/c', 'start', '', url], { cwd: rootDir }), buildRetryOptions(params.retry));
+          await retry(
+            async () => safeExec('cmd', ['/c', 'start', '', url], { cwd: rootDir }),
+            buildRetryOptions(params.retry)
+          );
         } else {
-          await withRetry(async () => safeExec('xdg-open', [url], { cwd: rootDir }), buildRetryOptions(params.retry));
+          await retry(
+            async () => safeExec('xdg-open', [url], { cwd: rootDir }),
+            buildRetryOptions(params.retry)
+          );
         }
         ctx = { ...ctx, [params.export_as || 'opened_url']: url };
       } catch (err: any) {
@@ -1199,7 +1376,14 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       const out = path.resolve(rootDir, spec.path);
       const content = spec.content;
       if (!safeExistsSync(path.dirname(out))) safeMkdir(path.dirname(out), { recursive: true });
-      safeWriteFile(out, typeof content === 'string' ? content : content === undefined ? '' : JSON.stringify(content, null, 2));
+      safeWriteFile(
+        out,
+        typeof content === 'string'
+          ? content
+          : content === undefined
+            ? ''
+            : JSON.stringify(content, null, 2)
+      );
       break;
     }
     case 'mkdir':
@@ -1210,14 +1394,28 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       break;
     case 'write_json': {
       const targetPath = pathResolver.rootResolve(resolve(params.path));
-      const content = params.content ? resolve(params.content) : (params.from ? getPathValue(ctx, params.from) : ctx.last_capture_data);
-      if (!safeExistsSync(path.dirname(targetPath))) safeMkdir(path.dirname(targetPath), { recursive: true });
+      const content = params.content
+        ? resolve(params.content)
+        : params.from
+          ? getPathValue(ctx, params.from)
+          : ctx.last_capture_data;
+      if (!safeExistsSync(path.dirname(targetPath)))
+        safeMkdir(path.dirname(targetPath), { recursive: true });
       safeWriteFile(targetPath, JSON.stringify(content, null, 2));
       break;
     }
     case 'scroll': {
-      const direction = (String(resolve(params.direction || 'down'))) as 'up' | 'down' | 'left' | 'right';
-      scrollAt(Number(resolve(params.x || 0)), Number(resolve(params.y || 0)), direction, Number(resolve(params.amount || 3)));
+      const direction = String(resolve(params.direction || 'down')) as
+        | 'up'
+        | 'down'
+        | 'left'
+        | 'right';
+      scrollAt(
+        Number(resolve(params.x || 0)),
+        Number(resolve(params.y || 0)),
+        direction,
+        Number(resolve(params.amount || 3))
+      );
       break;
     }
     case 'drag':
@@ -1225,14 +1423,17 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
         Number(resolve(params.from_x || 0)),
         Number(resolve(params.from_y || 0)),
         Number(resolve(params.to_x || 0)),
-        Number(resolve(params.to_y || 0)),
+        Number(resolve(params.to_y || 0))
       );
       break;
     case 'run_applescript': {
       assertUnsafeShellAllowed();
       const script = String(resolve(params.script || ''));
       if (!script) throw new Error('run_applescript requires "script" param');
-      const result = await withRetry(async () => osAutomationBridge.runAppleScript(script), buildRetryOptions(params.retry));
+      const result = await retry(
+        async () => osAutomationBridge.runAppleScript(script),
+        buildRetryOptions(params.retry)
+      );
       ctx = { ...ctx, [params.export_as || 'applescript_result']: result };
       break;
     }
@@ -1253,11 +1454,20 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       }
       const platform = process.platform;
       if (platform === 'darwin') {
-        await withRetry(async () => safeExec('open', [absPath], { cwd: rootDir }), buildRetryOptions(params.retry));
+        await retry(
+          async () => safeExec('open', [absPath], { cwd: rootDir }),
+          buildRetryOptions(params.retry)
+        );
       } else if (platform === 'win32') {
-        await withRetry(async () => safeExec('cmd', ['/c', 'start', '', absPath], { cwd: rootDir }), buildRetryOptions(params.retry));
+        await retry(
+          async () => safeExec('cmd', ['/c', 'start', '', absPath], { cwd: rootDir }),
+          buildRetryOptions(params.retry)
+        );
       } else {
-        await withRetry(async () => safeExec('xdg-open', [absPath], { cwd: rootDir }), buildRetryOptions(params.retry));
+        await retry(
+          async () => safeExec('xdg-open', [absPath], { cwd: rootDir }),
+          buildRetryOptions(params.retry)
+        );
       }
       break;
     }
@@ -1265,11 +1475,18 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       assertUnsafeShellAllowed();
       if (params.pid) {
         const pid = Number(resolve(params.pid));
-        if (!Number.isInteger(pid) || pid <= 0) throw new Error(`process_kill: invalid pid "${params.pid}"`);
-        await withRetry(async () => process.kill(pid, params.signal || 'SIGTERM'), buildRetryOptions(params.retry));
+        if (!Number.isInteger(pid) || pid <= 0)
+          throw new Error(`process_kill: invalid pid "${params.pid}"`);
+        await retry(
+          async () => process.kill(pid, params.signal || 'SIGTERM'),
+          buildRetryOptions(params.retry)
+        );
       } else if (params.name) {
         const name = String(resolve(params.name));
-        await withRetry(async () => safeExec('pkill', ['-f', name], { cwd: rootDir }), buildRetryOptions(params.retry));
+        await retry(
+          async () => safeExec('pkill', ['-f', name], { cwd: rootDir }),
+          buildRetryOptions(params.retry)
+        );
       } else {
         throw new Error('process_kill requires "pid" or "name" param');
       }
@@ -1292,7 +1509,12 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
   return ctx;
 }
 
-async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, options: any = {}, state: any = { stepCount: 0, startTime: Date.now() }) {
+async function executePipeline(
+  steps: PipelineStep[],
+  initialCtx: any = {},
+  options: any = {},
+  state: any = { stepCount: 0, startTime: Date.now() }
+) {
   const rootDir = pathResolver.rootDir();
   const MAX_STEPS = options.max_steps || 1000;
   const TIMEOUT = options.timeout_ms || 60000;
@@ -1300,7 +1522,9 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
   let ctx = { ...initialCtx, timestamp: new Date().toISOString() };
 
   if (initialCtx.context_path && safeExistsSync(path.resolve(rootDir, initialCtx.context_path))) {
-    const saved = JSON.parse(safeReadFile(path.resolve(rootDir, initialCtx.context_path), { encoding: 'utf8' }) as string);
+    const saved = JSON.parse(
+      safeReadFile(path.resolve(rootDir, initialCtx.context_path), { encoding: 'utf8' }) as string
+    );
     ctx = { ...ctx, ...saved };
   }
 
@@ -1309,8 +1533,10 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
   const results: Array<{ op: string; status: 'success' | 'failed'; error?: string }> = [];
   for (const step of steps) {
     state.stepCount++;
-    if (state.stepCount > MAX_STEPS) throw new Error(`[SAFETY_LIMIT] Exceeded maximum pipeline steps (${MAX_STEPS})`);
-    if (Date.now() - state.startTime > TIMEOUT) throw new Error(`[SAFETY_LIMIT] Pipeline execution timed out (${TIMEOUT}ms)`);
+    if (state.stepCount > MAX_STEPS)
+      throw new Error(`[SAFETY_LIMIT] Exceeded maximum pipeline steps (${MAX_STEPS})`);
+    if (Date.now() - state.startTime > TIMEOUT)
+      throw new Error(`[SAFETY_LIMIT] Pipeline execution timed out (${TIMEOUT}ms)`);
 
     try {
       logger.info(`  [SYS_PIPELINE] [Step ${state.stepCount}] ${step.type}:${step.op}...`);
@@ -1339,7 +1565,12 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
     safeWriteFile(path.resolve(rootDir, initialCtx.context_path), JSON.stringify(ctx, null, 2));
   }
 
-  return { status: derivePipelineStatus(results), results, context: ctx, total_steps: state.stepCount };
+  return {
+    status: derivePipelineStatus(results),
+    results,
+    context: ctx,
+    total_steps: state.stepCount,
+  };
 }
 
 export {

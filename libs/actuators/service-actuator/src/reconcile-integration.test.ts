@@ -6,10 +6,10 @@ const mocks = vi.hoisted(() => ({
   safeReadFile: vi.fn(),
   safeExistsSync: vi.fn(),
   safeWriteFile: vi.fn(),
-  derivePipelineStatus: vi.fn((results: Array<{ status: string }>) => (
+  derivePipelineStatus: vi.fn((results: Array<{ status: string }>) =>
     results.every((entry) => entry.status === 'success') ? 'succeeded' : 'failed'
-  )),
-  withRetry: vi.fn(async (fn: () => Promise<unknown>) => fn()),
+  ),
+  retry: vi.fn(async (fn: () => Promise<unknown>) => fn()),
   executeServicePreset: vi.fn(),
   spawnManagedProcess: vi.fn(),
   validateServiceAuth: vi.fn(),
@@ -30,7 +30,7 @@ vi.mock('@agent/core', () => ({
   safeExistsSync: mocks.safeExistsSync,
   safeWriteFile: mocks.safeWriteFile,
   derivePipelineStatus: mocks.derivePipelineStatus,
-  withRetry: mocks.withRetry,
+  retry: mocks.retry,
   executeServicePreset: mocks.executeServicePreset,
   safeAppendFile: vi.fn(), // Added
   safeOpenAppendFile: vi.fn(),
@@ -40,22 +40,22 @@ vi.mock('@agent/core', () => ({
   logger: mocks.logger,
   runtimeSupervisor: mocks.runtimeSupervisor,
   pathResolver: mocks.pathResolver,
-  capabilityEntry: (id: string) => `dist/${id}.js`
+  capabilityEntry: (id: string) => `dist/${id}.js`,
 }));
 
 describe('service-actuator: RECONCILE with auth check', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.withRetry.mockImplementation(async (fn: () => Promise<unknown>) => fn());
-    mocks.derivePipelineStatus.mockImplementation((results: Array<{ status: string }>) => (
+    mocks.retry.mockImplementation(async (fn: () => Promise<unknown>) => fn());
+    mocks.derivePipelineStatus.mockImplementation((results: Array<{ status: string }>) =>
       results.every((entry) => entry.status === 'success') ? 'succeeded' : 'failed'
-    ));
+    );
   });
 
   it('should skip starting a service if validation fails', async () => {
     // 1. Mock manifest
     const manifest = {
-      'auth-service': { path: 'src/auth-service.ts', preset_path: 'auth-preset.json' }
+      'auth-service': { path: 'src/auth-service.ts', preset_path: 'auth-preset.json' },
     };
     mocks.safeExistsSync.mockImplementation((p: string) => true);
     mocks.safeReadFile.mockImplementation((p: string) => {
@@ -76,7 +76,7 @@ describe('service-actuator: RECONCILE with auth check', () => {
       service_id: 'manager',
       mode: 'RECONCILE' as const,
       action: 'reconcile',
-      params: { manifest_path: 'services.json' }
+      params: { manifest_path: 'services.json' },
     };
 
     const result = await handleAction(input);
@@ -85,13 +85,15 @@ describe('service-actuator: RECONCILE with auth check', () => {
     expect(mocks.pathResolver.rootResolve).toHaveBeenCalledWith('services.json');
     // Service should NOT be started due to missing auth
     expect(mocks.spawnManagedProcess).not.toHaveBeenCalled();
-    expect(mocks.logger.error).toHaveBeenCalledWith(expect.stringContaining('Auth validation failed for auth-service'));
+    expect(mocks.logger.error).toHaveBeenCalledWith(
+      expect.stringContaining('Auth validation failed for auth-service')
+    );
   });
 
   it('should start a service if validation passes', async () => {
     // 1. Mock manifest
     const manifest = {
-      'good-service': { path: 'src/good-service.ts', preset_path: 'good-preset.json' }
+      'good-service': { path: 'src/good-service.ts', preset_path: 'good-preset.json' },
     };
     mocks.safeExistsSync.mockReturnValue(true);
     mocks.safeReadFile.mockImplementation((p: string) => {
@@ -110,7 +112,7 @@ describe('service-actuator: RECONCILE with auth check', () => {
       service_id: 'manager',
       mode: 'RECONCILE' as const,
       action: 'reconcile',
-      params: { manifest_path: 'services.json' }
+      params: { manifest_path: 'services.json' },
     };
 
     const result = await handleAction(input);
@@ -118,7 +120,9 @@ describe('service-actuator: RECONCILE with auth check', () => {
     expect(result.status).toBe('reconciled');
     // Service SHOULD be started
     expect(mocks.spawnManagedProcess).toHaveBeenCalled();
-    expect(mocks.logger.success).toHaveBeenCalledWith(expect.stringContaining('good-service started'));
+    expect(mocks.logger.success).toHaveBeenCalledWith(
+      expect.stringContaining('good-service started')
+    );
   });
 
   it('writes pipeline context to root-resolved context_path', async () => {
@@ -143,16 +147,18 @@ describe('service-actuator: RECONCILE with auth check', () => {
     } as any);
 
     expect(result.status).toBe('succeeded');
-    expect(mocks.pathResolver.rootResolve).toHaveBeenCalledWith('active/shared/tmp/service-context.json');
+    expect(mocks.pathResolver.rootResolve).toHaveBeenCalledWith(
+      'active/shared/tmp/service-context.json'
+    );
     expect(mocks.safeWriteFile).toHaveBeenCalledWith(
       'active/shared/tmp/service-context.json',
-      expect.stringContaining('"message_result"'),
+      expect.stringContaining('"message_result"')
     );
     expect(mocks.executeServicePreset).toHaveBeenCalledWith(
       'slack',
       'post_message',
       { text: 'hello' },
-      'none',
+      'none'
     );
   });
 });

@@ -5,7 +5,7 @@ const ptyState = {
 };
 
 const mocks = vi.hoisted(() => ({
-  withRetry: vi.fn(async (fn: any) => fn()),
+  retry: vi.fn(async (fn: any) => fn()),
   classifyError: vi.fn(() => ({ category: 'timeout' })),
 }));
 
@@ -20,7 +20,7 @@ vi.mock('@agent/core', () => ({
   encodeTerminalInput: vi.fn((keys: string[]) => keys.join('+')),
   emitComputerSurfacePatch: vi.fn(),
   classifyError: mocks.classifyError,
-  withRetry: mocks.withRetry,
+  retry: mocks.retry,
   ptyEngine: {
     spawn: vi.fn((shell: string, args: string[], cwd?: string) => {
       const id = `pty-${ptyState.sessions.size + 1}`;
@@ -122,7 +122,7 @@ describe('terminal-actuator direct actions', () => {
 
     const result = await handleAction({ action: 'list', params: {} } as any);
     expect(result.sessions).toHaveLength(2);
-    expect(mocks.withRetry).toHaveBeenCalled();
+    expect(mocks.retry).toHaveBeenCalled();
   });
 
   it('poll action requires sessionId', async () => {
@@ -249,7 +249,7 @@ describe('terminal-actuator direct actions', () => {
 
     expect(result.messages).toBeDefined();
     expect(Array.isArray(result.messages)).toBe(true);
-    expect(mocks.withRetry).toHaveBeenCalled();
+    expect(mocks.retry).toHaveBeenCalled();
   });
 });
 
@@ -305,7 +305,7 @@ describe('terminal-actuator computer_interaction edge cases', () => {
 
     expect(result.status).toBe('created');
     expect(result.sessionId).toBeDefined();
-    expect(mocks.withRetry).toHaveBeenCalled();
+    expect(mocks.retry).toHaveBeenCalled();
   });
 
   it('poll_terminal returns session output', async () => {
@@ -324,7 +324,7 @@ describe('terminal-actuator computer_interaction edge cases', () => {
     } as any);
 
     expect(result.output).toBeDefined();
-    expect(mocks.withRetry).toHaveBeenCalled();
+    expect(mocks.retry).toHaveBeenCalled();
   });
 
   it('write_terminal sends data to session', async () => {

@@ -52,3 +52,7 @@
 
 - `any` の除去は「型が合わないことが露見して実バグが見つかる」ことがある。**型の都合でランタイム挙動を変えない**こと。挙動修正が必要に見えたら分けて報告する。
 - ラチェットの集計は test ファイルを分けてカウントする(テストの any は許容度が高い)。ベースライン JSON にカテゴリ別集計(src / test)を持たせる。
+
+## 実装メモ
+
+- `scripts/check_type_ratchet.ts` を追加し、baseline を `scripts/check_type_ratchet.baseline.json` に置いた。fixture ベースの unit test も追加し、`check:type-ratchet` を `validate` チェーンへ接続した。

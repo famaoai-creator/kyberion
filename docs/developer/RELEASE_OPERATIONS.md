@@ -112,8 +112,11 @@ docker buildx build --platform linux/amd64,linux/arm64 \
 ```
 
 For project-specific deploy triggers, add `knowledge/personal/deployments/default.json`
-or `knowledge/personal/deployments/<project>.json` with a `command` field. The release
-bootstrap prefers `KYBERION_DEPLOY_COMMAND`, then falls back to that personal config.
+or `knowledge/personal/deployments/<project>.json` with a `command` field. You can also
+point `KYBERION_DEPLOY_CONFIG_PATH` at an explicit JSON config file when you want to keep
+the deployment recipe outside the default lookup path. The release bootstrap prefers
+`KYBERION_DEPLOY_COMMAND`, then falls back to the explicit config path, then personal config.
+Config JSON may also set `shell`, `timeout_ms`, `cwd`, and `env` for the shell adapter.
 
 ## Migration scripts
 

@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { buildTaskRoutingSamples, summarizeTaskRouting } from './summarize_task_model_routing.js';
+import { safeReadFile, safeRmSync } from '@agent/core';
+import {
+  buildTaskRoutingSamples,
+  summarizeTaskRouting,
+  writeTaskRoutingSummary,
+} from './summarize_task_model_routing.js';
 describe('summarize_task_model_routing', () => {
   it('correlates task issues with runtime completions and aggregates by role and tier', () => {
     const samples = buildTaskRoutingSamples(
@@ -85,5 +90,21 @@ describe('summarize_task_model_routing', () => {
         actual_models: ['openai:gpt-5.5'],
       }),
     ]);
+  });
+
+  it('writes the summary payload to disk when requested', () => {
+    const outputPath = 'active/shared/tmp/task-model-routing-summary-test.json';
+    writeTaskRoutingSummary({
+      samples: [],
+      rows: [],
+      outputPath,
+    });
+
+    const parsed = JSON.parse(safeReadFile(outputPath, { encoding: 'utf8' }) as string) as {
+      samples: unknown[];
+      rows: unknown[];
+    };
+    expect(parsed).toEqual({ samples: [], rows: [] });
+    safeRmSync(outputPath);
   });
 });

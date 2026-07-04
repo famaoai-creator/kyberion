@@ -28,7 +28,7 @@ import {
   pathResolver,
   auditChain,
   classifyError,
-  withRetry,
+  retry,
   createActuatorTrace,
   finalizeActuatorTrace,
   resolveIdentityContext,
@@ -72,7 +72,9 @@ export interface MeetingActionResult {
   transcript_path?: string;
 }
 
-const MEETING_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/meeting-actuator/manifest.json');
+const MEETING_MANIFEST_PATH = pathResolver.rootResolve(
+  'libs/actuators/meeting-actuator/manifest.json'
+);
 const DEFAULT_MEETING_RETRY = {
   maxRetries: 2,
   initialDelayMs: 500,
@@ -103,7 +105,7 @@ function normalizeOptionalString(value: unknown): string | undefined {
 
 function validateGrantedConsent(
   consent: VoiceConsentRecord,
-  missionId: string,
+  missionId: string
 ): { allowed: boolean; reason?: string } {
   if (consent.consent !== 'granted') {
     return {
@@ -200,7 +202,9 @@ function redactedTarget(input: MeetingAction): string {
 function loadRecoveryPolicy(): Record<string, any> {
   if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
   try {
-    const manifest = JSON.parse(safeReadFile(MEETING_MANIFEST_PATH, { encoding: 'utf8' }) as string);
+    const manifest = JSON.parse(
+      safeReadFile(MEETING_MANIFEST_PATH, { encoding: 'utf8' }) as string
+    );
     cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
     return cachedRecoveryPolicy;
   } catch (_) {
@@ -213,7 +217,9 @@ function buildRetryOptions(override?: Record<string, any>) {
   const recoveryPolicy = loadRecoveryPolicy();
   const manifestRetry = isPlainObject(recoveryPolicy.retry) ? recoveryPolicy.retry : {};
   const retryableCategories = new Set<string>(
-    Array.isArray(recoveryPolicy.retryable_categories) ? recoveryPolicy.retryable_categories.map(String) : [],
+    Array.isArray(recoveryPolicy.retryable_categories)
+      ? recoveryPolicy.retryable_categories.map(String)
+      : []
   );
   const resolved = {
     ...DEFAULT_MEETING_RETRY,
@@ -227,18 +233,17 @@ function buildRetryOptions(override?: Record<string, any>) {
       if (retryableCategories.size > 0) {
         return retryableCategories.has(classification.category);
       }
-      return classification.category === 'network'
-        || classification.category === 'rate_limit'
-        || classification.category === 'timeout'
-        || classification.category === 'resource_unavailable';
+      return (
+        classification.category === 'network' ||
+        classification.category === 'rate_limit' ||
+        classification.category === 'timeout' ||
+        classification.category === 'resource_unavailable'
+      );
     },
   };
 }
 
-function recordMeetingEvent(
-  input: MeetingAction,
-  result: MeetingActionResult,
-): string {
+function recordMeetingEvent(input: MeetingAction, result: MeetingActionResult): string {
   const isDenied = result.status === 'denied';
   const isError = result.status === 'error';
   const isPartial = result.partial_state === true;
@@ -316,15 +321,19 @@ export async function handleAction(input: MeetingAction): Promise<MeetingActionR
   }
 
   const bridgePath = path.resolve(
-    pathResolver.rootResolve('libs/actuators/meeting-actuator/meeting-bridge.py'),
+    pathResolver.rootResolve('libs/actuators/meeting-actuator/meeting-bridge.py')
   );
   logger.info(`[MEETING] Executing action: ${input.action} on ${input.params.platform}`);
 
   let parsed: MeetingActionResult;
   try {
-    const raw = await withRetry(async () => safeExec('python3', [bridgePath], {
-      input: JSON.stringify(input),
-    }), buildRetryOptions());
+    const raw = await retry(
+      async () =>
+        safeExec('python3', [bridgePath], {
+          input: JSON.stringify(input),
+        }),
+      buildRetryOptions()
+    );
     const normalized = String(raw).trim();
     if (!normalized) {
       parsed = { status: 'error', message: 'meeting-bridge produced no output' };
@@ -364,4 +373,3 @@ if (entrypoint && (modulePath === entrypoint || entrypoint.endsWith('index.js'))
     process.exit(1);
   });
 }
-

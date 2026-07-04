@@ -64,3 +64,8 @@
 
 - 文言変更はスナップショットテスト・文字列マッチの既存テストを壊しやすい。**キー化 → 既定ロケールでは従来文言と同一** を原則にし、テスト修正は文言変更を伴うものだけに限定する。
 - LLM が生成する自由応答の言語は「ユーザーの言語で返す」プロンプト指示(slack-bridge `:267-268` の方式)に統一し、chronos の日本語固定指示(`api/agent/route.ts:1135`)も同方式へ合わせる。
+
+## 実装メモ
+
+- `libs/core/question-resolver.ts` の固定英語文を `knowledge/product/orchestration/user-facing-vocabulary.json` の `question_*` キー経由に置換した。
+- `question-resolver.test.ts` に ja/en の期待値を追加し、明確化質問のロケール差分を固定した。

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { safeExistsSync, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 import {
   appendArtifactOwnershipRecord,
@@ -57,6 +57,52 @@ function seedContextPackArtifacts(projectId: string): void {
       evidence_refs: ['mission:MSN-CONTEXT-PACK-REVISION'],
       metadata: { quality_score: 95, quality_verdict: 'ready' },
     })
+  );
+}
+
+function seedPriorWorkItemDispatchManifest(): void {
+  const evidenceDir = `${missionPath}/evidence`;
+  if (!safeExistsSync(evidenceDir)) safeMkdir(evidenceDir, { recursive: true });
+  safeWriteFile(
+    `${evidenceDir}/workitem-dispatch-WIT-CONTEXT-PACK-PRIOR-001.json`,
+    JSON.stringify(
+      {
+        task_result: {
+          summary: 'Prior slice completed and published a reusable artifact.',
+          artifacts: [
+            {
+              path: 'knowledge/product/architecture/prior-slice.md',
+              kind: 'markdown',
+            },
+          ],
+        },
+      },
+      null,
+      2
+    )
+  );
+  safeWriteFile(
+    `${evidenceDir}/workitem-dispatch-manifest.json`,
+    JSON.stringify(
+      {
+        mission_id: missionId,
+        records: [
+          {
+            item_id: 'WIT-CONTEXT-PACK-PRIOR-001',
+            title: 'Prior implementation slice',
+            team_role: 'implementer',
+            status: 'updated',
+            response_path: `${evidenceDir}/workitem-dispatch-WIT-CONTEXT-PACK-PRIOR-001.json`,
+            reflection_path: `${evidenceDir}/workitem-reply-WIT-CONTEXT-PACK-PRIOR-001.json`,
+            response_excerpt: 'Prior slice completed with a concrete artifact path.',
+            reflected_at: '2026-06-05T01:00:00.000Z',
+            written_at: '2026-06-05T01:00:00.000Z',
+          },
+        ],
+      },
+      null,
+      2
+    )
   );
 }
 
@@ -522,6 +568,42 @@ describe('mission-context-pack', () => {
     expect(rendered).toContain('Implement context pack injection');
   });
 
+  it('derives a stable uppercase context pack id when one is not supplied', () => {
+    const pack = buildMissionContextPack({
+      missionPath,
+      missionState: {
+        mission_id: missionId,
+        mission_type: 'product_development',
+        tier: 'public',
+        status: 'active',
+        assigned_persona: 'worker',
+        tenant_slug: 'acme',
+        execution_mode: 'delegated',
+        priority: 3,
+        confidence_score: 1,
+        git: {
+          branch: 'mission/context-pack-test',
+          start_commit: 'start-commit',
+          latest_commit: 'latest-commit',
+          checkpoints: [],
+        },
+        history: [],
+        relationships: {},
+        outcome_contract: {
+          outcome_id: 'outcome-context-pack-generated',
+          requested_result: 'mission context pack',
+          deliverable_kind: 'artifact',
+          success_criteria: ['context pack is scoped'],
+          evidence_required: true,
+        },
+      },
+      teamRole: 'implementer',
+      recipientKind: 'agent',
+    });
+
+    expect(pack.context_pack_id).toMatch(/^CPK-MSN-CONTEXT-PACK-TEST-001-IMPLEMENTER-[A-Z0-9]{8}$/);
+  });
+
   it('saves the pack in mission-local coordination storage', () => {
     const pack = makePack();
     const filePath = saveMissionContextPack(missionPath, pack);
@@ -546,6 +628,21 @@ describe('mission-context-pack', () => {
     expect(pack.artifact_hints?.[0]?.reuse_reason).toContain('Reusable project artifact');
     expect(pack.artifact_hints?.every((hint) => hint.project_id === 'PRJ-CONTEXT-PACK-001')).toBe(
       true
+    );
+  });
+
+  it('seeds fast-lane context with prior work item outputs from the same mission', () => {
+    seedPriorWorkItemDispatchManifest();
+
+    const pack = makePack();
+
+    expect(pack.task_guidance?.seed).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('Prior work item response:'),
+        expect.stringContaining('Prior reflection:'),
+        expect.stringContaining('Prior work item: Prior implementation slice'),
+        expect.stringContaining('Prior artifact: knowledge/product/architecture/prior-slice.md'),
+      ])
     );
   });
 

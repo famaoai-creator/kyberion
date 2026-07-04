@@ -63,6 +63,16 @@
         "message": { "type": "string", "minLength": 1 }
       }
     },
+    "design_profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "root_dir": { "type": "string", "minLength": 1 },
+        "customer_id": { "type": "string", "minLength": 1 },
+        "brand_name": { "type": "string", "minLength": 1 },
+        "design_system_id": { "type": "string", "minLength": 1 }
+      }
+    },
     "tone": { "type": "string", "minLength": 1 },
     "language": { "type": "string", "minLength": 2 },
     "duration_sec": { "type": "number", "minimum": 3, "maximum": 300 },

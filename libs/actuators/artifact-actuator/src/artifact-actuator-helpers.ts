@@ -6,14 +6,20 @@ import {
   resolveGovernedArtifactPath,
   writeGovernedArtifactJson,
   classifyError,
-  withRetry,
+  retry,
   type GovernedArtifactRole,
 } from '@agent/core';
 import { pathResolver } from '@agent/core';
 import { safeReadFile } from '@agent/core';
 
 export interface ArtifactAction {
-  action: 'write_json' | 'append_event' | 'read_json' | 'list' | 'ensure_dir' | 'write_delivery_pack';
+  action:
+    | 'write_json'
+    | 'append_event'
+    | 'read_json'
+    | 'list'
+    | 'ensure_dir'
+    | 'write_delivery_pack';
   params: {
     role?: GovernedArtifactRole;
     logicalPath?: string;
@@ -39,7 +45,9 @@ export interface ArtifactAction {
   };
 }
 
-const ARTIFACT_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/artifact-actuator/manifest.json');
+const ARTIFACT_MANIFEST_PATH = pathResolver.rootResolve(
+  'libs/actuators/artifact-actuator/manifest.json'
+);
 const DEFAULT_ARTIFACT_RETRY = {
   maxRetries: 2,
   initialDelayMs: 250,
@@ -57,7 +65,9 @@ function isPlainObject(value: unknown): value is Record<string, any> {
 function loadRecoveryPolicy(): Record<string, any> {
   if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
   try {
-    const manifest = JSON.parse(safeReadFile(ARTIFACT_MANIFEST_PATH, { encoding: 'utf8' }) as string);
+    const manifest = JSON.parse(
+      safeReadFile(ARTIFACT_MANIFEST_PATH, { encoding: 'utf8' }) as string
+    );
     cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
     return cachedRecoveryPolicy;
   } catch (_) {
@@ -70,7 +80,9 @@ function buildRetryOptions(override?: Record<string, any>) {
   const recoveryPolicy = loadRecoveryPolicy();
   const manifestRetry = isPlainObject(recoveryPolicy.retry) ? recoveryPolicy.retry : {};
   const retryableCategories = new Set<string>(
-    Array.isArray(recoveryPolicy.retryable_categories) ? recoveryPolicy.retryable_categories.map(String) : [],
+    Array.isArray(recoveryPolicy.retryable_categories)
+      ? recoveryPolicy.retryable_categories.map(String)
+      : []
   );
   const resolved = {
     ...DEFAULT_ARTIFACT_RETRY,
@@ -84,10 +96,12 @@ function buildRetryOptions(override?: Record<string, any>) {
       if (retryableCategories.size > 0) {
         return retryableCategories.has(classification.category);
       }
-      return classification.category === 'network'
-        || classification.category === 'rate_limit'
-        || classification.category === 'timeout'
-        || classification.category === 'resource_unavailable';
+      return (
+        classification.category === 'network' ||
+        classification.category === 'rate_limit' ||
+        classification.category === 'timeout' ||
+        classification.category === 'resource_unavailable'
+      );
     },
   };
 }
@@ -98,38 +112,53 @@ export async function handleArtifactAction(input: ArtifactAction) {
   switch (input.action) {
     case 'write_json':
       if (!params.logicalPath) throw new Error('logicalPath is required');
-      return await withRetry(async () => ({
-        status: 'written',
-        path: writeGovernedArtifactJson(role, params.logicalPath, params.value ?? {}),
-      }), buildRetryOptions());
+      return await retry(
+        async () => ({
+          status: 'written',
+          path: writeGovernedArtifactJson(role, params.logicalPath, params.value ?? {}),
+        }),
+        buildRetryOptions()
+      );
     case 'append_event':
       if (!params.logicalPath) throw new Error('logicalPath is required');
-      return await withRetry(async () => ({
-        status: 'appended',
-        path: appendGovernedArtifactJsonl(role, params.logicalPath, params.value ?? {}),
-      }), buildRetryOptions());
+      return await retry(
+        async () => ({
+          status: 'appended',
+          path: appendGovernedArtifactJsonl(role, params.logicalPath, params.value ?? {}),
+        }),
+        buildRetryOptions()
+      );
     case 'read_json':
       if (!params.logicalPath) throw new Error('logicalPath is required');
-      return await withRetry(async () => ({
-        status: 'ok',
-        path: resolveGovernedArtifactPath(params.logicalPath),
-        value: readGovernedArtifactJson(params.logicalPath),
-      }), buildRetryOptions());
+      return await retry(
+        async () => ({
+          status: 'ok',
+          path: resolveGovernedArtifactPath(params.logicalPath),
+          value: readGovernedArtifactJson(params.logicalPath),
+        }),
+        buildRetryOptions()
+      );
     case 'list':
       if (!params.logicalDir) throw new Error('logicalDir is required');
-      return await withRetry(async () => ({
-        status: 'ok',
-        entries: listGovernedArtifacts(params.logicalDir),
-      }), buildRetryOptions());
+      return await retry(
+        async () => ({
+          status: 'ok',
+          entries: listGovernedArtifacts(params.logicalDir),
+        }),
+        buildRetryOptions()
+      );
     case 'ensure_dir':
       if (!params.logicalDir) throw new Error('logicalDir is required');
-      return await withRetry(async () => ({
-        status: 'ensured',
-        path: ensureGovernedArtifactDir(role, params.logicalDir),
-      }), buildRetryOptions());
+      return await retry(
+        async () => ({
+          status: 'ensured',
+          path: ensureGovernedArtifactDir(role, params.logicalDir),
+        }),
+        buildRetryOptions()
+      );
     case 'write_delivery_pack': {
       if (!params.logicalDir) throw new Error('logicalDir is required');
-      return await withRetry(async () => {
+      return await retry(async () => {
         const dir = ensureGovernedArtifactDir(role, params.logicalDir);
         const packId = params.packId || `delivery-pack-${Date.now()}`;
         const logicalPath = pathResolver.rootResolve(`${params.logicalDir}/${packId}.json`);

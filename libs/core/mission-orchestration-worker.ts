@@ -19,6 +19,7 @@ import {
   shutdownAllAgentRuntimes,
 } from './agent-runtime-supervisor.js';
 import { ledger } from './ledger.js';
+import { claimWorkItem, importExternalWorkItem, updateWorkItem } from './work-coordination.js';
 import { logger } from './core.js';
 import { buildExecutionEnv } from './authority.js';
 import { missionDir, missionEvidenceDir } from './path-resolver.js';
@@ -153,6 +154,41 @@ interface PlannedNextTask {
   description?: string;
   deliverable?: string;
   target_path?: string;
+  dependencies?: string[];
+  acceptance_criteria?: string[];
+  risk?: string;
+  expected_output_format?: 'text' | 'files' | 'structured';
+  estimated_scope?: 'S' | 'M' | 'L';
+}
+
+interface DispatchMissionTaskOutcome {
+  task_id: string;
+  team_role: string;
+  agent_id: string;
+  dispatched: boolean;
+  context_chars?: number;
+  pruned_chars?: number;
+  rollup_used: boolean;
+  result_schema_ok: boolean;
+  needs_count: number;
+}
+
+function areTaskDependenciesSatisfied(task: PlannedNextTask, tasks: PlannedNextTask[]): boolean {
+  const dependencies = Array.isArray(task.dependencies)
+    ? task.dependencies
+        .map((dependency: unknown) => String(dependency || '').trim())
+        .filter(Boolean)
+    : [];
+  if (dependencies.length === 0) return true;
+  const statusByTaskId = new Map(
+    tasks.map((entry) => [entry.task_id, String(entry.status || 'planned')])
+  );
+  return dependencies.every((dependency) => statusByTaskId.get(dependency) === 'completed');
+}
+
+function buildUnassignedRoleSummary(task: PlannedNextTask, teamRole?: string): string {
+  const roleLabel = teamRole || 'unassigned';
+  return `Task ${task.task_id} is blocked because role ${roleLabel} is not assigned.`;
 }
 
 type TaskResultBlock = NonNullable<ReturnType<typeof extractSurfaceBlocks>['taskResults']>[number];
@@ -429,6 +465,276 @@ async function buildTaskDispatchContext(input: {
     missionContextPackPruningSummary: missionContextPack?.pruning as
       | MissionContextPackPruningSummary
       | undefined,
+  };
+}
+
+async function dispatchPlannedMissionTask(input: {
+  missionId: string;
+  task: PlannedNextTask;
+  teamRole: string;
+  assignment: {
+    agent_id: string;
+    model_hint?: { model_id?: string; tier?: string; effort?: string; route_reason?: string };
+  };
+}): Promise<DispatchMissionTaskOutcome | null> {
+  const workItemSourceRef = `mission:${input.missionId}:${input.task.task_id}`;
+  const workItem = importExternalWorkItem({
+    source: 'local',
+    sourceRef: workItemSourceRef,
+    title: input.task.description || input.task.task_id,
+    description: input.task.description || input.task.task_id,
+    status: 'ready',
+    priority: 'normal',
+    projectId: input.missionId,
+    assigneePeerId: input.assignment.agent_id,
+    labels: [`mission:${input.missionId}`, `team_role:${input.teamRole}`],
+    dependencies: Array.isArray(input.task.dependencies) ? input.task.dependencies : [],
+    metadata: {
+      deliverable: input.task.deliverable,
+      target_path: input.task.target_path,
+      acceptance_criteria: input.task.acceptance_criteria,
+      risk: input.task.risk,
+      estimated_scope: input.task.estimated_scope,
+      task_id: input.task.task_id,
+      mission_id: input.missionId,
+    },
+  });
+  const claimed = claimWorkItem({
+    itemId: workItem.item_id,
+    actorPeerId: 'mission-orchestration-worker',
+    purpose: `dispatch mission task ${input.missionId}/${input.task.task_id}`,
+    expectedVersion: workItem.version,
+    idempotencyKey: workItemSourceRef,
+    metadata: {
+      mission_id: input.missionId,
+      task_id: input.task.task_id,
+      team_role: input.teamRole,
+      deliverable: input.task.deliverable,
+      target_path: input.task.target_path,
+      acceptance_criteria: input.task.acceptance_criteria,
+      risk: input.task.risk,
+      estimated_scope: input.task.estimated_scope,
+    },
+  });
+  const dispatchContext = await buildTaskDispatchContext({
+    missionId: input.missionId,
+    task: input.task,
+    teamRole: input.teamRole,
+    agentId: input.assignment.agent_id,
+    taskModelHint: input.assignment.model_hint,
+  });
+  const response = await obtainTaskResultResponse({
+    missionId: input.missionId,
+    task: input.task,
+    teamRole: input.teamRole,
+    agentId: input.assignment.agent_id,
+    taskModelHint: input.assignment.model_hint,
+    prompt: dispatchContext.prompt,
+  });
+  const taskResultNeeds = response.taskResult?.needs || [];
+  const taskResultObservability = summarizeTaskResultObservability({
+    pruning: dispatchContext.missionContextPackPruningSummary,
+    taskResult: response.taskResult,
+    parseErrors: response.parseErrors,
+  });
+  const taskResultBlocked =
+    !response.taskResult || response.parseErrors.length > 0 || taskResultNeeds.length > 0;
+  const clarificationPacket =
+    taskResultNeeds.length > 0 && response.taskResult
+      ? buildTaskClarificationPacket({
+          missionId: input.missionId,
+          task: input.task,
+          taskResult: response.taskResult,
+        })
+      : undefined;
+  const clarificationPacketPath = clarificationPacket
+    ? taskClarificationFilePath(input.missionId, input.task.task_id)
+    : undefined;
+
+  if (taskResultBlocked && clarificationPacket && clarificationPacketPath) {
+    updateWorkItem({
+      itemId: claimed.item.item_id,
+      expectedVersion: claimed.item.version,
+      status: 'blocked',
+      metadata: {
+        summary: 'Task result needs clarification before completion',
+        blocked_reason: 'task_result_needs_input',
+        mission_id: input.missionId,
+        task_id: input.task.task_id,
+        team_role: input.teamRole,
+      },
+    });
+    safeWriteFile(
+      clarificationPacketPath,
+      JSON.stringify(
+        {
+          mission_id: input.missionId,
+          task_id: input.task.task_id,
+          task_result: response.taskResult,
+          clarification_packet: clarificationPacket,
+          clarification_packet_path: clarificationPacketPath,
+          needs: taskResultNeeds,
+          status: 'needs_input',
+          written_at: new Date().toISOString(),
+        },
+        null,
+        2
+      )
+    );
+    input.task.status = 'blocked';
+    emitMissionTaskEvent({
+      event_type: 'task_reviewed',
+      mission_id: input.missionId,
+      task_id: input.task.task_id,
+      agent_id: input.assignment.agent_id,
+      team_role: input.teamRole,
+      decision: 'task_reviewed',
+      why: 'Task result still needs clarification before the work can continue.',
+      policy_used: 'mission_orchestration_control_plane_v1',
+      evidence: input.task.deliverable ? [String(input.task.deliverable)] : [],
+      payload: {
+        description: input.task.description,
+        deliverable: input.task.deliverable,
+        clarification_packet_path: clarificationPacketPath,
+        needs: taskResultNeeds,
+        task_result: response.taskResult,
+        task_result_errors: response.parseErrors,
+        ...taskResultObservability,
+      },
+    });
+    recordMissionContextTask(input.missionId, `Blocked work item ${input.task.task_id}`, {
+      next_step: 'resolve the missing inputs before retrying the work item',
+      work_item_id: input.task.task_id,
+      team_role: input.teamRole,
+      assignee_peer_id: input.assignment.agent_id,
+      execution_mode: response.executionMode,
+      context_pack_id: dispatchContext.missionContextPackId,
+      context_pack_path: dispatchContext.missionContextPackPath,
+      context_pack_summary: dispatchContext.missionContextPackSummary,
+      context_pack_pruning_summary: dispatchContext.missionContextPackPruningSummary,
+      ...taskResultObservability,
+    });
+    return {
+      task_id: input.task.task_id,
+      team_role: input.teamRole,
+      agent_id: input.assignment.agent_id,
+      dispatched: false,
+      ...taskResultObservability,
+    };
+  }
+
+  if (taskResultBlocked) {
+    updateWorkItem({
+      itemId: claimed.item.item_id,
+      expectedVersion: claimed.item.version,
+      status: 'blocked',
+      metadata: {
+        summary: 'Task result did not satisfy the structured response contract',
+        blocked_reason: 'task_result_unstructured',
+        mission_id: input.missionId,
+        task_id: input.task.task_id,
+        team_role: input.teamRole,
+      },
+    });
+    input.task.status = 'blocked';
+    emitMissionTaskEvent({
+      event_type: 'task_reviewed',
+      mission_id: input.missionId,
+      task_id: input.task.task_id,
+      agent_id: input.assignment.agent_id,
+      team_role: input.teamRole,
+      decision: 'task_reviewed',
+      why: 'Task result did not satisfy the structured response contract.',
+      policy_used: 'mission_orchestration_control_plane_v1',
+      evidence: input.task.deliverable ? [String(input.task.deliverable)] : [],
+      payload: {
+        description: input.task.description,
+        deliverable: input.task.deliverable,
+        task_result: response.taskResult,
+        task_result_errors: response.parseErrors,
+        notes: response.notes,
+        ...taskResultObservability,
+      },
+    });
+    recordMissionContextTask(input.missionId, `Blocked work item ${input.task.task_id}`, {
+      next_step: 'repair the structured task result response before retrying',
+      work_item_id: input.task.task_id,
+      team_role: input.teamRole,
+      assignee_peer_id: input.assignment.agent_id,
+      execution_mode: response.executionMode,
+      context_pack_id: dispatchContext.missionContextPackId,
+      context_pack_path: dispatchContext.missionContextPackPath,
+      context_pack_summary: dispatchContext.missionContextPackSummary,
+      context_pack_pruning_summary: dispatchContext.missionContextPackPruningSummary,
+      ...taskResultObservability,
+    });
+    return {
+      task_id: input.task.task_id,
+      team_role: input.teamRole,
+      agent_id: input.assignment.agent_id,
+      dispatched: false,
+      ...taskResultObservability,
+    };
+  }
+
+  updateWorkItem({
+    itemId: claimed.item.item_id,
+    expectedVersion: claimed.item.version,
+    status: 'done',
+    metadata: {
+      summary: response.taskResult?.summary || input.task.description || input.task.task_id,
+      mission_id: input.missionId,
+      task_id: input.task.task_id,
+      team_role: input.teamRole,
+      task_result_retried: response.retried,
+    },
+  });
+  input.task.status = 'requested';
+  emitMissionTaskEvent({
+    event_type: 'task_issued',
+    mission_id: input.missionId,
+    task_id: input.task.task_id,
+    agent_id: input.assignment.agent_id,
+    team_role: input.teamRole,
+    decision: 'task_issued',
+    why: 'Planner-produced follow-up task was delegated to the assigned mission team role.',
+    policy_used: 'mission_orchestration_control_plane_v1',
+    evidence: input.task.deliverable ? [String(input.task.deliverable)] : [],
+    payload: {
+      description: input.task.description,
+      deliverable: input.task.deliverable,
+      task_model_hint: input.assignment.model_hint,
+      mission_context_pack_path: dispatchContext.missionContextPackPath,
+      mission_context_pack_summary: dispatchContext.missionContextPackSummary,
+      work_item_id: claimed.item.item_id,
+      work_item_lease_id: claimed.lease.lease_id,
+      work_item_status: claimed.item.status,
+      task_result: response.taskResult,
+      task_result_retried: response.retried,
+      ...taskResultObservability,
+    },
+  });
+  recordMissionContextTask(input.missionId, `Dispatched work item ${input.task.task_id}`, {
+    next_step: 'await the dispatched response and continue reconciliation',
+    task_id: input.task.task_id,
+    team_role: input.teamRole,
+    assignee_peer_id: input.assignment.agent_id,
+    execution_mode: response.executionMode,
+    context_pack_id: dispatchContext.missionContextPackId,
+    context_pack_path: dispatchContext.missionContextPackPath,
+    context_pack_summary: dispatchContext.missionContextPackSummary,
+    context_pack_pruning_summary: dispatchContext.missionContextPackPruningSummary,
+    work_item_id: claimed.item.item_id,
+    work_item_lease_id: claimed.lease.lease_id,
+    work_item_status: claimed.item.status,
+    ...taskResultObservability,
+  });
+  return {
+    task_id: input.task.task_id,
+    team_role: input.teamRole,
+    agent_id: input.assignment.agent_id,
+    dispatched: true,
+    ...taskResultObservability,
   };
 }
 
@@ -961,217 +1267,188 @@ export async function dispatchMissionNextTasks(
   }
 
   const dispatched: Array<{ task_id: string; team_role: string; agent_id: string }> = [];
+  const dispatchObservability: Array<{
+    dispatched: boolean;
+    context_chars?: number;
+    pruned_chars?: number;
+    rollup_used: boolean;
+    result_schema_ok: boolean;
+    needs_count: number;
+  }> = [];
   const plan = resolveMissionTeamPlan({ missionId });
-  const teamView = buildMissionTeamView(plan);
+  const maxParallelMembers = Math.max(1, plan.team_governance?.lifecycle.max_parallel_members || 3);
 
-  for (const task of plannedTasks) {
-    const teamRole = task.assigned_to?.role;
-    if (!teamRole) continue;
-    const assignment = resolveMissionTeamReceiver({ missionId, teamRole });
-    if (!assignment?.agent_id) continue;
-    const preflight = validateDelegatedTaskPreflight({
-      task: {
-        task_id: task.task_id,
-        team_role: teamRole,
-        deliverable: task.deliverable,
-        target_path: task.target_path,
-      },
-      assignment,
-    });
-    emitMissionOrchestrationObservation({
-      decision: preflight.allowed ? 'delegation_preflight_passed' : 'delegation_preflight_blocked',
-      event_type: 'delegation_preflight_checked',
-      requested_by: 'mission_orchestration_worker',
-      mission_id: missionId,
-      resource_id: task.task_id,
-      operation: preflight.allowed ? 'allow' : 'block',
-      why: preflight.reason,
-      evidence: preflight.target_path ? [preflight.target_path] : [],
-      payload: {
-        team_role: teamRole,
-        target_path: preflight.target_path,
-        target_scope_class: preflight.target_scope_class,
-        warnings: preflight.warnings,
-      },
-    });
-    if (!preflight.allowed) {
-      task.status = 'blocked';
-      continue;
-    }
+  while (true) {
+    const remainingPlannedTasks = plannedTasks.filter(
+      (task) => (task.status || 'planned') === 'planned'
+    );
+    if (remainingPlannedTasks.length === 0) break;
 
-    const dispatchContext = await buildTaskDispatchContext({
-      missionId,
-      task,
-      teamRole,
-      agentId: assignment.agent_id,
-      taskModelHint: assignment.model_hint,
-    });
-    const response = await obtainTaskResultResponse({
-      missionId,
-      task,
-      teamRole,
-      agentId: assignment.agent_id,
-      taskModelHint: assignment.model_hint,
-      prompt: dispatchContext.prompt,
-    });
-    const taskResultNeeds = response.taskResult?.needs || [];
-    const taskResultObservability = summarizeTaskResultObservability({
-      pruning: dispatchContext.missionContextPackPruningSummary,
-      taskResult: response.taskResult,
-      parseErrors: response.parseErrors,
-    });
-    const taskResultBlocked =
-      !response.taskResult || response.parseErrors.length > 0 || taskResultNeeds.length > 0;
-    const clarificationPacket =
-      taskResultNeeds.length > 0 && response.taskResult
-        ? buildTaskClarificationPacket({
-            missionId,
-            task,
-            taskResult: response.taskResult,
-          })
-        : undefined;
-    const clarificationPacketPath = clarificationPacket
-      ? taskClarificationFilePath(missionId, task.task_id)
-      : undefined;
+    const readyTasks = remainingPlannedTasks
+      .filter((task) => areTaskDependenciesSatisfied(task, allTasks))
+      .sort((left, right) => left.task_id.localeCompare(right.task_id));
+    if (readyTasks.length === 0) break;
 
-    if (taskResultBlocked && clarificationPacket && clarificationPacketPath) {
-      safeWriteFile(
-        clarificationPacketPath,
-        JSON.stringify(
-          {
-            mission_id: missionId,
-            task_id: task.task_id,
-            task_result: response.taskResult,
-            clarification_packet: clarificationPacket,
-            clarification_packet_path: clarificationPacketPath,
-            needs: taskResultNeeds,
-            status: 'needs_input',
-            written_at: new Date().toISOString(),
+    const batch: Promise<DispatchMissionTaskOutcome | null>[] = [];
+    for (const task of readyTasks) {
+      if (batch.length >= maxParallelMembers) break;
+      const teamRole = task.assigned_to?.role;
+      if (!teamRole) {
+        task.status = 'blocked';
+        const summary = buildUnassignedRoleSummary(task);
+        emitMissionTaskEvent({
+          event_type: 'task_reviewed',
+          mission_id: missionId,
+          task_id: task.task_id,
+          agent_id: task.assigned_to?.agent_id || 'mission-orchestration-worker',
+          team_role: 'unassigned',
+          decision: 'task_reviewed',
+          why: summary,
+          policy_used: 'mission_orchestration_control_plane_v1',
+          evidence: task.deliverable ? [String(task.deliverable)] : [],
+          payload: {
+            description: task.description,
+            deliverable: task.deliverable,
+            reason: 'blocked(unassigned_role)',
+            summary,
           },
-          null,
-          2
-        )
+        });
+        recordMissionContextTask(missionId, `Blocked work item ${task.task_id}`, {
+          summary,
+          next_step: 'assign a team role before retrying the work item',
+          work_item_id: task.task_id,
+          team_role: 'unassigned',
+          assignee_peer_id: task.assigned_to?.agent_id,
+          reason: 'blocked(unassigned_role)',
+        });
+        continue;
+      }
+      const assignment = resolveMissionTeamReceiver({ missionId, teamRole });
+      if (!assignment?.agent_id) {
+        task.status = 'blocked';
+        const summary = buildUnassignedRoleSummary(task, teamRole);
+        emitMissionTaskEvent({
+          event_type: 'task_reviewed',
+          mission_id: missionId,
+          task_id: task.task_id,
+          agent_id: 'mission-orchestration-worker',
+          team_role: teamRole,
+          decision: 'task_reviewed',
+          why: summary,
+          policy_used: 'mission_orchestration_control_plane_v1',
+          evidence: task.deliverable ? [String(task.deliverable)] : [],
+          payload: {
+            description: task.description,
+            deliverable: task.deliverable,
+            reason: 'blocked(unassigned_role)',
+            team_role: teamRole,
+            summary,
+          },
+        });
+        recordMissionContextTask(missionId, `Blocked work item ${task.task_id}`, {
+          summary,
+          next_step: `assign an agent for role ${teamRole} before retrying the work item`,
+          work_item_id: task.task_id,
+          team_role: teamRole,
+          reason: 'blocked(unassigned_role)',
+        });
+        continue;
+      }
+      const preflight = validateDelegatedTaskPreflight({
+        task: {
+          task_id: task.task_id,
+          team_role: teamRole,
+          deliverable: task.deliverable,
+          target_path: task.target_path,
+        },
+        assignment,
+      });
+      emitMissionOrchestrationObservation({
+        decision: preflight.allowed
+          ? 'delegation_preflight_passed'
+          : 'delegation_preflight_blocked',
+        event_type: 'delegation_preflight_checked',
+        requested_by: 'mission_orchestration_worker',
+        mission_id: missionId,
+        resource_id: task.task_id,
+        operation: preflight.allowed ? 'allow' : 'block',
+        why: preflight.reason,
+        evidence: preflight.target_path ? [preflight.target_path] : [],
+        payload: {
+          team_role: teamRole,
+          target_path: preflight.target_path,
+          target_scope_class: preflight.target_scope_class,
+          warnings: preflight.warnings,
+        },
+      });
+      if (!preflight.allowed) {
+        task.status = 'blocked';
+        continue;
+      }
+
+      batch.push(
+        dispatchPlannedMissionTask({
+          missionId,
+          task,
+          teamRole,
+          assignment,
+        })
       );
-      task.status = 'blocked';
-      emitMissionTaskEvent({
-        event_type: 'task_reviewed',
-        mission_id: missionId,
-        task_id: task.task_id,
-        agent_id: assignment.agent_id,
-        team_role: teamRole,
-        decision: 'task_reviewed',
-        why: 'Task result still needs clarification before the work can continue.',
-        policy_used: 'mission_orchestration_control_plane_v1',
-        evidence: task.deliverable ? [String(task.deliverable)] : [],
-        payload: {
-          description: task.description,
-          deliverable: task.deliverable,
-          clarification_packet_path: clarificationPacketPath,
-          needs: taskResultNeeds,
-          task_result: response.taskResult,
-          task_result_errors: response.parseErrors,
-          ...taskResultObservability,
-        },
-      });
-      recordMissionContextTask(missionId, `Blocked work item ${task.task_id}`, {
-        next_step: 'resolve the missing inputs before retrying the work item',
-        work_item_id: task.task_id,
-        team_role: teamRole,
-        assignee_peer_id: assignment.agent_id,
-        execution_mode: response.executionMode,
-        context_pack_id: dispatchContext.missionContextPackId,
-        context_pack_path: dispatchContext.missionContextPackPath,
-        context_pack_summary: dispatchContext.missionContextPackSummary,
-        context_pack_pruning_summary: dispatchContext.missionContextPackPruningSummary,
-        ...taskResultObservability,
-      });
+    }
+
+    if (batch.length === 0) {
       continue;
     }
 
-    if (taskResultBlocked) {
-      task.status = 'blocked';
-      emitMissionTaskEvent({
-        event_type: 'task_reviewed',
-        mission_id: missionId,
-        task_id: task.task_id,
-        agent_id: assignment.agent_id,
-        team_role: teamRole,
-        decision: 'task_reviewed',
-        why: 'Task result did not satisfy the structured response contract.',
-        policy_used: 'mission_orchestration_control_plane_v1',
-        evidence: task.deliverable ? [String(task.deliverable)] : [],
-        payload: {
-          description: task.description,
-          deliverable: task.deliverable,
-          task_result: response.taskResult,
-          task_result_errors: response.parseErrors,
-          notes: response.notes,
-          ...taskResultObservability,
-        },
-      });
-      recordMissionContextTask(missionId, `Blocked work item ${task.task_id}`, {
-        next_step: 'repair the structured task result response before retrying',
-        work_item_id: task.task_id,
-        team_role: teamRole,
-        assignee_peer_id: assignment.agent_id,
-        execution_mode: response.executionMode,
-        context_pack_id: dispatchContext.missionContextPackId,
-        context_pack_path: dispatchContext.missionContextPackPath,
-        context_pack_summary: dispatchContext.missionContextPackSummary,
-        context_pack_pruning_summary: dispatchContext.missionContextPackPruningSummary,
-        ...taskResultObservability,
-      });
-      continue;
+    const results = await Promise.all(batch);
+    for (const result of results) {
+      if (result) {
+        dispatchObservability.push(result);
+        if (result.dispatched) {
+          dispatched.push({
+            task_id: result.task_id,
+            team_role: result.team_role,
+            agent_id: result.agent_id,
+          });
+        }
+      }
     }
-
-    task.status = 'requested';
-    emitMissionTaskEvent({
-      event_type: 'task_issued',
-      mission_id: missionId,
-      task_id: task.task_id,
-      agent_id: assignment.agent_id,
-      team_role: teamRole,
-      decision: 'task_issued',
-      why: 'Planner-produced follow-up task was delegated to the assigned mission team role.',
-      policy_used: 'mission_orchestration_control_plane_v1',
-      evidence: task.deliverable ? [String(task.deliverable)] : [],
-      payload: {
-        description: task.description,
-        deliverable: task.deliverable,
-        task_model_hint: assignment.model_hint,
-        mission_context_pack_path: dispatchContext.missionContextPackPath,
-        mission_context_pack_summary: dispatchContext.missionContextPackSummary,
-        task_result: response.taskResult,
-        task_result_retried: response.retried,
-        ...taskResultObservability,
-      },
-    });
-    recordMissionContextTask(missionId, `Dispatched work item ${task.task_id}`, {
-      next_step: 'await the dispatched response and continue reconciliation',
-      work_item_id: task.task_id,
-      team_role: teamRole,
-      assignee_peer_id: assignment.agent_id,
-      execution_mode: response.executionMode,
-      context_pack_id: dispatchContext.missionContextPackId,
-      context_pack_path: dispatchContext.missionContextPackPath,
-      context_pack_summary: dispatchContext.missionContextPackSummary,
-      context_pack_pruning_summary: dispatchContext.missionContextPackPruningSummary,
-      ...taskResultObservability,
-    });
-    dispatched.push({
-      task_id: task.task_id,
-      team_role: teamRole,
-      agent_id: assignment.agent_id,
-    });
   }
 
   writeNextTasks(missionId, allTasks);
   markTaskBoardInProgress(missionId);
   reconcileMissionProgress(missionId);
+  const contextChars = dispatchObservability
+    .map((entry) => entry.context_chars)
+    .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+  const prunedChars = dispatchObservability
+    .map((entry) => entry.pruned_chars)
+    .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+  const needsCountTotal = dispatchObservability.reduce(
+    (count, entry) => count + entry.needs_count,
+    0
+  );
+  const resultSchemaOkCount = dispatchObservability.filter(
+    (entry) => entry.result_schema_ok
+  ).length;
+  const rollupCount = dispatchObservability.filter((entry) => entry.rollup_used).length;
   ledger.record('MISSION_FOLLOWUP_DISPATCHED', {
     mission_id: missionId,
     dispatched_task_count: dispatched.length,
     task_ids: dispatched.map((task) => task.task_id),
+    average_context_chars:
+      contextChars.length > 0
+        ? Math.round(contextChars.reduce((sum, value) => sum + value, 0) / contextChars.length)
+        : undefined,
+    average_pruned_chars:
+      prunedChars.length > 0
+        ? Math.round(prunedChars.reduce((sum, value) => sum + value, 0) / prunedChars.length)
+        : undefined,
+    needs_rate:
+      dispatchObservability.length > 0 ? needsCountTotal / dispatchObservability.length : 0,
+    result_schema_ok_rate:
+      dispatchObservability.length > 0 ? resultSchemaOkCount / dispatchObservability.length : 0,
+    rollup_used_count: rollupCount,
   });
   return dispatched;
 }

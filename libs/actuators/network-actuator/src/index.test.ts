@@ -17,7 +17,6 @@ vi.mock('@agent/core', async (importOriginal) => {
     safeExistsSync: vi.fn().mockReturnValue(false),
     safeExec: vi.fn().mockReturnValue(''),
     secureFetch: vi.fn().mockResolvedValue({ status: 200, data: {} }),
-    withRetry: vi.fn(async (fn: () => Promise<unknown>, _options?: unknown) => fn()),
     logger: {
       info: vi.fn(),
       warn: vi.fn(),
@@ -29,7 +28,7 @@ vi.mock('@agent/core', async (importOriginal) => {
     evaluateCondition: actual.evaluateCondition,
     getPathValue: actual.getPathValue,
     resolveWriteArtifactSpec: actual.resolveWriteArtifactSpec,
-    withRetry: vi.fn(async (fn: () => Promise<unknown>) => fn()),
+    retry: vi.fn(async (fn: () => Promise<unknown>, _options?: unknown) => fn()),
     pathResolver: {
       rootDir: vi.fn().mockReturnValue('/mock/root'),
       resolve: vi.fn((p: string) => `/mock/root/${p}`),
@@ -112,7 +111,7 @@ describe('network-actuator', () => {
       });
 
       it('fetch は manifest の recovery policy と step override をマージして retry する', async () => {
-        const { secureFetch, withRetry } = await import('@agent/core');
+        const { secureFetch, retry } = await import('@agent/core');
         vi.mocked(secureFetch).mockResolvedValueOnce({ status: 200, data: { result: 'ok' } });
 
         const result = await handleAction({
@@ -132,7 +131,7 @@ describe('network-actuator', () => {
         });
 
         expect(result.status).toBe('succeeded');
-        expect(withRetry).toHaveBeenCalledWith(
+        expect(retry).toHaveBeenCalledWith(
           expect.any(Function),
           expect.objectContaining({
             maxRetries: 5,
@@ -141,7 +140,7 @@ describe('network-actuator', () => {
             factor: 2,
             jitter: true,
             shouldRetry: expect.any(Function),
-          }),
+          })
         );
       });
 

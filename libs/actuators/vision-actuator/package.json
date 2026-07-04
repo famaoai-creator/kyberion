@@ -1,0 +1,15 @@
+{
+  "name": "@actuator/vision",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Perception-oriented compatibility facade for legacy visual workflows",
+  "main": "../../../dist/libs/actuators/vision-actuator/src/index.js",
+  "types": "../../../dist/libs/actuators/vision-actuator/src/index.d.ts",
+  "scripts": {
+    "build": "tsc -p ../../../tsconfig.actuators.json",
+    "test": "vitest run src/"
+  },
+  "dependencies": {
+    "@agent/core": "workspace:*"
+  }
+}

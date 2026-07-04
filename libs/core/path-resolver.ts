@@ -14,9 +14,14 @@ function findProjectRoot(startDir: string): string {
   }
   let current = startDir;
   while (current !== path.parse(current).root) {
+    const hasRootMarker =
+      rawExistsSync(path.join(current, 'AGENTS.md')) ||
+      rawExistsSync(path.join(current, 'pnpm-workspace.yaml'));
     if (
       rawExistsSync(path.join(current, 'package.json')) &&
-      (rawExistsSync(path.join(current, 'libs/actuators')) || rawExistsSync(path.join(current, 'knowledge')))
+      hasRootMarker &&
+      (rawExistsSync(path.join(current, 'libs/actuators')) ||
+        rawExistsSync(path.join(current, 'knowledge')))
     ) {
       return current;
     }
@@ -32,18 +37,32 @@ const KNOWLEDGE_ROOT = path.join(PROJECT_ROOT_DIR, 'knowledge');
 const SCRIPTS_ROOT = path.join(PROJECT_ROOT_DIR, 'scripts');
 const VAULT_ROOT = path.join(PROJECT_ROOT_DIR, 'vault');
 const VISION_ROOT = path.join(PROJECT_ROOT_DIR, 'vision');
-const INDEX_PATHS = [
-  path.join(KNOWLEDGE_ROOT, 'product/orchestration/global_actuator_index.json'),
-];
+const INDEX_PATHS = [path.join(KNOWLEDGE_ROOT, 'product/orchestration/global_actuator_index.json')];
 
-export function rootDir() { return PROJECT_ROOT_DIR; }
-export function knowledge(subPath = '') { return path.join(KNOWLEDGE_ROOT, subPath); }
-export function active(subPath = '') { return path.join(ACTIVE_ROOT, subPath); }
-export function scripts(subPath = '') { return path.join(SCRIPTS_ROOT, subPath); }
-export function vault(subPath = '') { return path.join(VAULT_ROOT, subPath); }
-export function vision(subPath = '') { return path.join(VISION_ROOT, subPath); }
-export function capabilityAssets(subPath = '') { return path.join(KNOWLEDGE_ROOT, 'product/capability-assets', subPath); }
-export function shared(subPath = '') { return path.join(ACTIVE_SHARED_ROOT, subPath); }
+export function rootDir() {
+  return PROJECT_ROOT_DIR;
+}
+export function knowledge(subPath = '') {
+  return path.join(KNOWLEDGE_ROOT, subPath);
+}
+export function active(subPath = '') {
+  return path.join(ACTIVE_ROOT, subPath);
+}
+export function scripts(subPath = '') {
+  return path.join(SCRIPTS_ROOT, subPath);
+}
+export function vault(subPath = '') {
+  return path.join(VAULT_ROOT, subPath);
+}
+export function vision(subPath = '') {
+  return path.join(VISION_ROOT, subPath);
+}
+export function capabilityAssets(subPath = '') {
+  return path.join(KNOWLEDGE_ROOT, 'product/capability-assets', subPath);
+}
+export function shared(subPath = '') {
+  return path.join(ACTIVE_SHARED_ROOT, subPath);
+}
 export function sharedTmp(subPath = '') {
   const base = path.join(ACTIVE_SHARED_ROOT, 'tmp');
   if (!rawExistsSync(base)) rawMkdirp(base);
@@ -67,7 +86,11 @@ export type VolatileCadence = 'resident' | 'daily' | 'weekly' | 'adhoc-ttl';
 export function volatile(
   scope: VolatileScope,
   ref: string | null = null,
-  opts: { cadence?: VolatileCadence; periodKey?: string; tier?: 'personal' | 'confidential' | 'public' } = {},
+  opts: {
+    cadence?: VolatileCadence;
+    periodKey?: string;
+    tier?: 'personal' | 'confidential' | 'public';
+  } = {}
 ): string {
   const cadence = opts.cadence ?? 'resident';
   const tier = opts.tier ?? 'confidential';
@@ -80,7 +103,8 @@ export function volatile(
     }
     case 'mission': {
       if (!normalRef) throw new Error('volatile(mission) requires a mission ref');
-      const missionPath = findMissionPath(normalRef) ?? path.join(ACTIVE_ROOT, 'missions', tier, normalRef);
+      const missionPath =
+        findMissionPath(normalRef) ?? path.join(ACTIVE_ROOT, 'missions', tier, normalRef);
       return missionPath;
     }
     case 'project': {
@@ -152,36 +176,49 @@ export function isProtected(filePath: string) {
 }
 
 export function capabilityDir(capabilityName: string) {
-  const indexPath = INDEX_PATHS.find(candidate => rawExistsSync(candidate));
+  const indexPath = INDEX_PATHS.find((candidate) => rawExistsSync(candidate));
   if (!indexPath) return path.join(PROJECT_ROOT_DIR, 'libs/actuators', capabilityName);
   const index = JSON.parse(rawReadTextFile(indexPath));
   const capabilityList = index.actuators || index.s || index.skills || [];
   const capability = capabilityList.find((s: any) => (s.n || s.name) === capabilityName);
-  
+
   if (capability && capability.path) return path.join(PROJECT_ROOT_DIR, capability.path);
-  
+
   // Actuator fallback
   const actuatorPath = path.join(PROJECT_ROOT_DIR, 'libs/actuators', capabilityName);
   if (rawExistsSync(actuatorPath)) return actuatorPath;
-  
+
   return path.join(PROJECT_ROOT_DIR, capabilityName);
 }
 
 export const skillDir = capabilityDir;
 
 export function capabilityEntry(capabilityName: string) {
-  return path.join(PROJECT_ROOT_DIR, 'dist', 'libs', 'actuators', capabilityName, 'src', 'index.js');
+  return path.join(
+    PROJECT_ROOT_DIR,
+    'dist',
+    'libs',
+    'actuators',
+    capabilityName,
+    'src',
+    'index.js'
+  );
 }
 
-export function missionDir(missionId: string, tier: 'personal' | 'confidential' | 'public' = 'confidential') {
+export function missionDir(
+  missionId: string,
+  tier: 'personal' | 'confidential' | 'public' = 'confidential'
+) {
   const configPath = path.join(KNOWLEDGE_ROOT, 'product/governance/mission-management-config.json');
   let subPath = 'active/missions';
-  
+
   if (rawExistsSync(configPath)) {
     try {
       const config = JSON.parse(rawReadTextFile(configPath));
       subPath = config.directories?.[tier] || subPath;
-    } catch (_) { /* Fallback to default */ }
+    } catch (_) {
+      /* Fallback to default */
+    }
   }
 
   const dir = path.join(PROJECT_ROOT_DIR, subPath, missionId);
@@ -190,11 +227,13 @@ export function missionDir(missionId: string, tier: 'personal' | 'confidential' 
 }
 
 function normalizePathSegment(value: string, fallback = 'shared') {
-  return String(value || '')
-    .trim()
-    .replace(/[\\/]+/g, '-')
-    .replace(/[^a-zA-Z0-9._-]+/g, '-')
-    .replace(/^-+|-+$/g, '') || fallback;
+  return (
+    String(value || '')
+      .trim()
+      .replace(/[\\/]+/g, '-')
+      .replace(/[^a-zA-Z0-9._-]+/g, '-')
+      .replace(/^-+|-+$/g, '') || fallback
+  );
 }
 
 /**
@@ -204,9 +243,15 @@ function normalizePathSegment(value: string, fallback = 'shared') {
 export function projectWorkspaceDir(
   projectId: string,
   tier: 'personal' | 'confidential' | 'public' = 'public',
-  tenantSlug = 'shared',
+  tenantSlug = 'shared'
 ): string {
-  const dir = path.join(ACTIVE_ROOT, 'projects', tier, normalizePathSegment(tenantSlug, 'shared'), normalizePathSegment(projectId, 'project'));
+  const dir = path.join(
+    ACTIVE_ROOT,
+    'projects',
+    tier,
+    normalizePathSegment(tenantSlug, 'shared'),
+    normalizePathSegment(projectId, 'project')
+  );
   if (!rawExistsSync(dir)) rawMkdirp(dir);
   return dir;
 }
@@ -218,7 +263,7 @@ export function projectWorkspaceDir(
 export function projectOsDir(
   projectId: string,
   tier: 'personal' | 'confidential' | 'public' = 'public',
-  tenantSlug = 'shared',
+  tenantSlug = 'shared'
 ): string {
   const dir = path.join(projectWorkspaceDir(projectId, tier, tenantSlug), 'project-os');
   if (!rawExistsSync(dir)) rawMkdirp(dir);
@@ -232,7 +277,7 @@ export function projectOsDir(
 export function projectStateDir(
   projectId: string,
   tier: 'personal' | 'confidential' | 'public' = 'public',
-  tenantSlug = 'shared',
+  tenantSlug = 'shared'
 ): string {
   const dir = path.join(projectWorkspaceDir(projectId, tier, tenantSlug), 'state');
   if (!rawExistsSync(dir)) rawMkdirp(dir);
@@ -242,8 +287,12 @@ export function projectStateDir(
 /**
  * Returns the path to the audit directory for a given mission (tier-aware).
  */
-export function missionAuditDir(missionId: string, tier: 'personal' | 'confidential' | 'public' = 'confidential') {
-  const missionPath = findMissionPath(missionId) ?? path.join(ACTIVE_ROOT, 'missions', tier, missionId);
+export function missionAuditDir(
+  missionId: string,
+  tier: 'personal' | 'confidential' | 'public' = 'confidential'
+) {
+  const missionPath =
+    findMissionPath(missionId) ?? path.join(ACTIVE_ROOT, 'missions', tier, missionId);
   const dir = path.join(missionPath, 'audit');
   if (!rawExistsSync(dir)) rawMkdirp(dir);
   return dir;
@@ -277,7 +326,9 @@ export function tenantMissionDir(
     try {
       const config = JSON.parse(rawReadTextFile(configPath));
       subPath = config.directories?.[tier] || subPath;
-    } catch (_) { /* fallback */ }
+    } catch (_) {
+      /* fallback */
+    }
   }
   const dir = path.join(PROJECT_ROOT_DIR, subPath, tenantSlug, missionId);
   if (!rawExistsSync(dir)) rawMkdirp(dir);
@@ -291,7 +342,7 @@ export function tenantMissionDir(
 export function findMissionPath(missionId: string): string | null {
   const configPath = path.join(KNOWLEDGE_ROOT, 'product/governance/mission-management-config.json');
   const tiers: ('personal' | 'confidential' | 'public')[] = ['personal', 'confidential', 'public'];
-  
+
   if (rawExistsSync(configPath)) {
     try {
       const config = JSON.parse(rawReadTextFile(configPath));
@@ -302,7 +353,9 @@ export function findMissionPath(missionId: string): string | null {
           if (rawExistsSync(fullPath)) return fullPath;
         }
       }
-    } catch (_) { /* Fallback to legacy search */ }
+    } catch (_) {
+      /* Fallback to legacy search */
+    }
   }
 
   // Legacy fallback

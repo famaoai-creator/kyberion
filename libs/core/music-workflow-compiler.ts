@@ -1,4 +1,5 @@
 import type { KyberionMusicGenerationADF } from './src/types/music-generation-adf.js';
+import { slugify } from './text-utils.js';
 
 export interface CompiledMusicWorkflow {
   workflow: Record<string, any>;
@@ -16,14 +17,6 @@ export interface CompiledMusicWorkflow {
     language: string;
     filename_prefix: string;
   };
-}
-
-function slugify(input: string): string {
-  return input
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 48) || 'kyberion-music';
 }
 
 function deriveTags(adf: KyberionMusicGenerationADF): string {
@@ -49,7 +42,9 @@ function resolveProfile(adf: KyberionMusicGenerationADF): string {
   return adf.engine?.profile || 'turbo';
 }
 
-function resolveModels(adf: KyberionMusicGenerationADF): NonNullable<Required<NonNullable<KyberionMusicGenerationADF['engine']>['models']>> {
+function resolveModels(
+  adf: KyberionMusicGenerationADF
+): NonNullable<Required<NonNullable<KyberionMusicGenerationADF['engine']>['models']>> {
   const profile = resolveProfile(adf);
   const defaults = {
     unet_name: profile === 'base' ? 'acestep_v1.5.safetensors' : 'acestep_v1.5_turbo.safetensors',
@@ -77,7 +72,9 @@ function normalizeKeyscale(input?: string): string {
 }
 
 function resolveSeed(adf: KyberionMusicGenerationADF): number {
-  return Number.isInteger(adf.engine?.seed) ? Number(adf.engine?.seed) : Math.floor(Date.now() % 2147483647);
+  return Number.isInteger(adf.engine?.seed)
+    ? Number(adf.engine?.seed)
+    : Math.floor(Date.now() % 2147483647);
 }
 
 export function compileMusicGenerationADF(adf: KyberionMusicGenerationADF): CompiledMusicWorkflow {
@@ -93,9 +90,14 @@ export function compileMusicGenerationADF(adf: KyberionMusicGenerationADF): Comp
   const bpm = adf.composition.bpm || 100;
   const keyscale = normalizeKeyscale(adf.composition.key);
   const language = normalizeLanguage(
-    adf.style.vocal?.language || (adf.lyrics?.text?.trim() ? 'ja' : undefined),
+    adf.style.vocal?.language || (adf.lyrics?.text?.trim() ? 'ja' : undefined)
   );
-  const filename_prefix = adf.output.filename_prefix || slugify(adf.intent || `${adf.style.genre}-song`);
+  const filename_prefix =
+    adf.output.filename_prefix ||
+    slugify(adf.intent || `${adf.style.genre}-song`, {
+      maxLength: 48,
+      fallback: 'kyberion-music',
+    });
   const seed = resolveSeed(adf);
 
   const workflow = {

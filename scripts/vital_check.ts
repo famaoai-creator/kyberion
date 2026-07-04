@@ -2,7 +2,14 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
-import { customerResolver, pathResolver, safeExistsSync, safeReadFile, safeReaddir, safeStat } from '@agent/core';
+import {
+  pathResolver,
+  resolveActiveProfileRoot,
+  safeExistsSync,
+  safeReadFile,
+  safeReaddir,
+  safeStat,
+} from '@agent/core';
 
 interface CheckResult {
   id: string;
@@ -11,12 +18,19 @@ interface CheckResult {
   detail?: string;
 }
 
-export function fileCheck(id: string, label: string, relPath: string, kind: 'file' | 'dir'): CheckResult {
+export function fileCheck(
+  id: string,
+  label: string,
+  relPath: string,
+  kind: 'file' | 'dir'
+): CheckResult {
   const full = pathResolver.resolve(relPath);
   try {
     const stat = safeStat(relPath);
     const expected = kind === 'dir' ? stat.isDirectory() : stat.isFile();
-    return expected ? { id, label, status: 'ok', detail: full } : { id, label, status: 'error', detail: `expected ${kind} at ${full}` };
+    return expected
+      ? { id, label, status: 'ok', detail: full }
+      : { id, label, status: 'error', detail: `expected ${kind} at ${full}` };
   } catch {
     return { id, label, status: 'missing', detail: full };
   }
@@ -59,7 +73,7 @@ export function activeMissionCount(): number {
 }
 
 function profileRoot(): string {
-  return customerResolver.customerRoot('') ?? pathResolver.knowledge('personal');
+  return resolveActiveProfileRoot();
 }
 
 function profilePath(subPath: string): string {
@@ -70,14 +84,39 @@ export function buildVitalReport() {
   const checks: CheckResult[] = [
     fileCheck('physical_foundation', 'Physical Foundation', 'node_modules', 'dir'),
     fileCheck('system_build', 'System Build', 'dist', 'dir'),
-    fileCheck('chronos_build', 'Chronos UI Build', 'presence/displays/chronos-mirror-v2/.next', 'dir'),
-    fileCheck('surface_manifest_snapshot', 'Surface Manifest Snapshot', 'knowledge/product/governance/active-surfaces.json', 'file'),
-    fileCheck('surface_manifests_dir', 'Surface Manifests Directory', 'knowledge/product/governance/surfaces', 'dir'),
-    fileCheck('surface_state', 'Surface Runtime State', 'active/shared/runtime/surfaces/state.json', 'file'),
+    fileCheck(
+      'chronos_build',
+      'Chronos UI Build',
+      'presence/displays/chronos-mirror-v2/.next',
+      'dir'
+    ),
+    fileCheck(
+      'surface_manifest_snapshot',
+      'Surface Manifest Snapshot',
+      'knowledge/product/governance/active-surfaces.json',
+      'file'
+    ),
+    fileCheck(
+      'surface_manifests_dir',
+      'Surface Manifests Directory',
+      'knowledge/product/governance/surfaces',
+      'dir'
+    ),
+    fileCheck(
+      'surface_state',
+      'Surface Runtime State',
+      'active/shared/runtime/surfaces/state.json',
+      'file'
+    ),
     fileCheck('sovereign_identity', 'Sovereign Identity', profilePath('my-identity.json'), 'file'),
     fileCheck('agent_identity', 'Agent Identity', profilePath('agent-identity.json'), 'file'),
     fileCheck('sovereign_vision', 'Sovereign Vision', profilePath('my-vision.md'), 'file'),
-    fileCheck('onboarding_summary', 'Onboarding Summary', profilePath('onboarding/onboarding-summary.md'), 'file'),
+    fileCheck(
+      'onboarding_summary',
+      'Onboarding Summary',
+      profilePath('onboarding/onboarding-summary.md'),
+      'file'
+    ),
   ];
 
   const summary = {
@@ -110,7 +149,9 @@ async function main() {
   } else {
     for (const c of result.checks) {
       const icon = c.status === 'ok' ? '✅' : c.status === 'missing' ? '⚠️ ' : '❌';
-      console.log(`${icon} ${c.label}: ${c.status.toUpperCase()}${c.detail ? ` (${c.detail})` : ''}`);
+      console.log(
+        `${icon} ${c.label}: ${c.status.toUpperCase()}${c.detail ? ` (${c.detail})` : ''}`
+      );
     }
     console.log(`🚀 Active Missions: ${result.active_mission_count}`);
     console.log(`Overall: ${result.overall}`);

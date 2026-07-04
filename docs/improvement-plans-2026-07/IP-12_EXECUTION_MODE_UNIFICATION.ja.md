@@ -54,6 +54,21 @@
 
 - `docs/developer/LOCAL_DEV.md` に「スクリプト実行モード」の節を追加: dist(正)/ ts-loader(開発)/ tsx フォールバック(緊急時のみ・警告付き)の使い分け、`pnpm build` が保証する範囲、新しい script を足すときのチェックリスト(両モードで動くこと、`check:script-integrity` が通ること)。
 
+## 実装メモ
+
+- Task 1/2/3/4 は実装済み。
+- `run_pipeline.ts` / `run_pipeline.js` の tsx フォールバックは共通ヘルパーに集約した。
+- `package.json` の `clean` は `scripts/clean.ts` 経由に移し、`build` の先頭で stale `dist/` を掃除するようにした。
+- `pipelines/baseline-check.json` は `system:exec` で `node dist/scripts/run_baseline_check.js` を直接起動する。
+- `scripts/run_baseline_check.ts` は `scanTenantDrift()` / `runCoworkHealthCheck()` を `active/shared/runtime/baseline-check-cache/` に TTL 1 時間でキャッシュし、`cache.tenant_drift.cached` / `cache.cowork_health.cached` を report に含める。
+- `scripts/check_script_integrity.ts` は script source と build output の両方を検査する。
+- `docs/developer/LOCAL_DEV.md` に script execution mode の節を追加した。
+- baseline-check 実測(2026-07-03、`/usr/bin/time -p pnpm pipeline --input pipelines/baseline-check.json`)。
+  - before: `real 1.92 / 0.96 / 0.96`(shell 経由)
+  - after: `real 1.11 / 0.96 / 0.96`(direct exec + cache warm-up)
+  - 2 回目以降の after: `real 0.96 / 0.96 / 0.96`
+- 目標の「50%短縮」には届いていないが、二重 spawn の解消と cached report は実装済み。
+
 ## リスクと注意
 
 - baseline-check はセッション開始ゲート(CLAUDE.md §3)なので、**変更中も常に動く状態を維持**する。(a) 案では `pipelines/baseline-check.json` 自体は互換のため残す(直接コマンドへの thin wrapper のまま)。

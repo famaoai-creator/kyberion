@@ -34,6 +34,7 @@ import {
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   performPlayback,
   renderNativeArtifact,
@@ -41,65 +42,69 @@ import {
   waitForVoiceJob,
   type VoiceArtifactFormat,
 } from './voice-runtime-helpers.js';
+import { runActuatorCli } from '@agent/core';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
-const voiceActionValidate = compileSchemaFromPath(ajv, pathResolver.rootResolve('schemas/voice-action.schema.json'));
+const voiceActionValidate = compileSchemaFromPath(
+  ajv,
+  pathResolver.rootResolve('schemas/voice-action.schema.json')
+);
 
 type VoiceAction =
   | { action: 'health'; params?: Record<string, unknown> }
   | { action: 'speak_local'; params: Record<string, unknown> }
   | { action: 'list_voices'; params: Record<string, unknown> }
   | {
-    action: 'record_voice_sample';
-    request_id: string;
-    sample_id: string;
-    duration_sec: number;
-    language?: string;
-    prompt_text?: string;
-    output_path?: string;
-  }
+      action: 'record_voice_sample';
+      request_id: string;
+      sample_id: string;
+      duration_sec: number;
+      language?: string;
+      prompt_text?: string;
+      output_path?: string;
+    }
   | {
-    action: 'collect_voice_samples';
-    request_id: string;
-    profile_draft?: {
-      profile_id: string;
-      display_name: string;
-      tier: 'personal' | 'confidential' | 'public';
-      languages: string[];
-      default_engine_id: string;
-      notes?: string;
-    };
-    samples: Array<{ sample_id: string; path: string; language?: string; note?: string }>;
-  }
+      action: 'collect_voice_samples';
+      request_id: string;
+      profile_draft?: {
+        profile_id: string;
+        display_name: string;
+        tier: 'personal' | 'confidential' | 'public';
+        languages: string[];
+        default_engine_id: string;
+        notes?: string;
+      };
+      samples: Array<{ sample_id: string; path: string; language?: string; note?: string }>;
+    }
   | {
-    action: 'collect_and_register_voice_profile';
-    request_id: string;
-    profile: {
-      profile_id: string;
-      display_name: string;
-      tier: 'personal' | 'confidential' | 'public';
-      languages: string[];
-      default_engine_id: string;
-      notes?: string;
-    };
-    samples: Array<{ sample_id: string; path: string; language?: string; note?: string }>;
-    policy?: { strict_personal_voice?: boolean };
-  }
+      action: 'collect_and_register_voice_profile';
+      request_id: string;
+      profile: {
+        profile_id: string;
+        display_name: string;
+        tier: 'personal' | 'confidential' | 'public';
+        languages: string[];
+        default_engine_id: string;
+        notes?: string;
+      };
+      samples: Array<{ sample_id: string; path: string; language?: string; note?: string }>;
+      policy?: { strict_personal_voice?: boolean };
+    }
   | {
-    action: 'register_voice_profile';
-    request_id: string;
-    profile: {
-      profile_id: string;
-      display_name: string;
-      tier: 'personal' | 'confidential' | 'public';
-      languages: string[];
-      default_engine_id: string;
-      notes?: string;
-    };
-    samples: Array<{ sample_id: string; path: string; language?: string }>;
-    policy?: { strict_personal_voice?: boolean };
-  }
+      action: 'register_voice_profile';
+      request_id: string;
+      profile: {
+        profile_id: string;
+        display_name: string;
+        tier: 'personal' | 'confidential' | 'public';
+        languages: string[];
+        default_engine_id: string;
+        notes?: string;
+      };
+      samples: Array<{ sample_id: string; path: string; language?: string }>;
+      policy?: { strict_personal_voice?: boolean };
+    }
   | Record<string, any>;
 
 export async function handleSingleAction(input: VoiceAction) {
@@ -107,7 +112,7 @@ export async function handleSingleAction(input: VoiceAction) {
     return voiceHealth(input as any);
   }
   if (input.action === 'speak_local') {
-    return speakLocal(((input as any).params || {}));
+    return speakLocal((input as any).params || {});
   }
   if (input.action === 'list_voices') {
     return listVoices();
@@ -161,21 +166,36 @@ export async function handleSingleAction(input: VoiceAction) {
         ...(p.tone_shifts ? { tone_shifts: p.tone_shifts } : {}),
       },
     });
-    logger.info(`[VOICE] recorded interaction with ${p.org}/${p.person_slug} (${node.history.length} entries)`);
-    return { status: 'interaction_recorded', person_slug: p.person_slug, org: p.org, history_length: node.history.length };
+    logger.info(
+      `[VOICE] recorded interaction with ${p.org}/${p.person_slug} (${node.history.length} entries)`
+    );
+    return {
+      status: 'interaction_recorded',
+      person_slug: p.person_slug,
+      org: p.org,
+      history_length: node.history.length,
+    };
   }
   throw new Error(`Unsupported voice action: ${String((input as any)?.action)}`);
 }
 
-async function voiceHealth(input: { action: 'health'; params?: Record<string, unknown> }): Promise<any> {
+async function voiceHealth(input: {
+  action: 'health';
+  params?: Record<string, unknown>;
+}): Promise<any> {
   const requestedMode = String(input.params?.requested_mode || 'trial').trim() || 'trial';
   const toolRuntimes = listToolRuntimeInventory(requestedMode as any);
   const voiceEngineRegistry = getVoiceEngineRegistry();
   const activeEngines = voiceEngineRegistry.engines.filter((engine) => engine.status === 'active');
-  const qwen3Engine = voiceEngineRegistry.engines.find((engine) => engine.engine_id === 'mlx_audio_qwen3') || null;
-  const resolvedQwen3Engine = qwen3Engine ? resolveVoiceEngineForPlatform(qwen3Engine.engine_id) : null;
-  const mlxAudioRuntime = toolRuntimes.items.find((item) => item.tool.tool_id === 'mlx_audio') || null;
-  const mlxWhisperRuntime = toolRuntimes.items.find((item) => item.tool.tool_id === 'mlx_whisper') || null;
+  const qwen3Engine =
+    voiceEngineRegistry.engines.find((engine) => engine.engine_id === 'mlx_audio_qwen3') || null;
+  const resolvedQwen3Engine = qwen3Engine
+    ? resolveVoiceEngineForPlatform(qwen3Engine.engine_id)
+    : null;
+  const mlxAudioRuntime =
+    toolRuntimes.items.find((item) => item.tool.tool_id === 'mlx_audio') || null;
+  const mlxWhisperRuntime =
+    toolRuntimes.items.find((item) => item.tool.tool_id === 'mlx_whisper') || null;
 
   return {
     status: 'succeeded',
@@ -185,38 +205,44 @@ async function voiceHealth(input: { action: 'health'; params?: Record<string, un
       version: voiceEngineRegistry.version,
       default_engine_id: voiceEngineRegistry.default_engine_id,
       active_engine_count: activeEngines.length,
-      qwen3_engine: qwen3Engine ? {
-        engine_id: qwen3Engine.engine_id,
-        status: qwen3Engine.status,
-        kind: qwen3Engine.kind,
-        provider: qwen3Engine.provider,
-        supported_artifact_formats: qwen3Engine.supports.artifact_formats,
-        fallback_engine_id: qwen3Engine.fallback_engine_id || null,
-        resolved_engine_id: resolvedQwen3Engine?.engine_id || null,
-      } : null,
+      qwen3_engine: qwen3Engine
+        ? {
+            engine_id: qwen3Engine.engine_id,
+            status: qwen3Engine.status,
+            kind: qwen3Engine.kind,
+            provider: qwen3Engine.provider,
+            supported_artifact_formats: qwen3Engine.supports.artifact_formats,
+            fallback_engine_id: qwen3Engine.fallback_engine_id || null,
+            resolved_engine_id: resolvedQwen3Engine?.engine_id || null,
+          }
+        : null,
     },
     tool_runtimes: {
       version: toolRuntimes.version,
       default_tool_id: toolRuntimes.default_tool_id,
       items: {
-        mlx_audio: mlxAudioRuntime ? {
-          lifecycle_stage: mlxAudioRuntime.lifecycle_stage,
-          selected_action: mlxAudioRuntime.selected_action,
-          selected_backend: mlxAudioRuntime.selected_backend,
-          installed: mlxAudioRuntime.installed,
-          requires_install: mlxAudioRuntime.requires_install,
-          managed_env_path: mlxAudioRuntime.managed_env_path,
-          reason: mlxAudioRuntime.reason,
-        } : null,
-        mlx_whisper: mlxWhisperRuntime ? {
-          lifecycle_stage: mlxWhisperRuntime.lifecycle_stage,
-          selected_action: mlxWhisperRuntime.selected_action,
-          selected_backend: mlxWhisperRuntime.selected_backend,
-          installed: mlxWhisperRuntime.installed,
-          requires_install: mlxWhisperRuntime.requires_install,
-          managed_env_path: mlxWhisperRuntime.managed_env_path,
-          reason: mlxWhisperRuntime.reason,
-        } : null,
+        mlx_audio: mlxAudioRuntime
+          ? {
+              lifecycle_stage: mlxAudioRuntime.lifecycle_stage,
+              selected_action: mlxAudioRuntime.selected_action,
+              selected_backend: mlxAudioRuntime.selected_backend,
+              installed: mlxAudioRuntime.installed,
+              requires_install: mlxAudioRuntime.requires_install,
+              managed_env_path: mlxAudioRuntime.managed_env_path,
+              reason: mlxAudioRuntime.reason,
+            }
+          : null,
+        mlx_whisper: mlxWhisperRuntime
+          ? {
+              lifecycle_stage: mlxWhisperRuntime.lifecycle_stage,
+              selected_action: mlxWhisperRuntime.selected_action,
+              selected_backend: mlxWhisperRuntime.selected_backend,
+              installed: mlxWhisperRuntime.installed,
+              requires_install: mlxWhisperRuntime.requires_install,
+              managed_env_path: mlxWhisperRuntime.managed_env_path,
+              reason: mlxWhisperRuntime.reason,
+            }
+          : null,
       },
     },
   };
@@ -292,7 +318,10 @@ export async function handleAction(input: VoiceAction) {
       };
     }
   }
-  const traceCtx = createActuatorTrace('voice-actuator', String((input as any).action || 'unknown'));
+  const traceCtx = createActuatorTrace(
+    'voice-actuator',
+    String((input as any).action || 'unknown')
+  );
   traceCtx.startSpan(`voice:${String((input as any).action || 'unknown')}`);
   try {
     const result = await handleSingleAction(input);
@@ -347,7 +376,9 @@ async function listVoices(): Promise<any> {
   if (process.platform === 'win32') {
     return {
       status: 'succeeded',
-      voices: [{ id: 'windows-default', display_name: 'Windows Speech Synthesizer', provider: 'sapi' }],
+      voices: [
+        { id: 'windows-default', display_name: 'Windows Speech Synthesizer', provider: 'sapi' },
+      ],
       engine_id: engine.engine_id,
     };
   }
@@ -359,15 +390,24 @@ async function speakLocal(params: Record<string, unknown>): Promise<any> {
   const text = String(params.text || '').trim();
   if (!text) throw new Error('speak_local requires params.text');
 
-  const language = String(params.language || '').trim().toLowerCase() || 'en';
+  const language =
+    String(params.language || '')
+      .trim()
+      .toLowerCase() || 'en';
   const defaults = getVoiceTtsLanguageConfig(language);
-  const voice = typeof params.voice === 'string' && params.voice.trim() ? params.voice.trim() : defaults.voice;
+  const voice =
+    typeof params.voice === 'string' && params.voice.trim() ? params.voice.trim() : defaults.voice;
   const rate = Number.isFinite(params.rate) ? Number(params.rate) : defaults.rate;
   const requestedEngineId = String(params.engine_id || 'local_say').trim() || 'local_say';
   const engine = resolveVoiceEngineForPlatform(requestedEngineId);
   const backend = resolveVoiceBackend(requestedEngineId);
 
-  const playback = await performPlayback(text, { language, voice, rate, engineId: engine.engine_id });
+  const playback = await performPlayback(text, {
+    language,
+    voice,
+    rate,
+    engineId: engine.engine_id,
+  });
   return {
     status: 'succeeded',
     mode: 'speaker_verification',
@@ -390,33 +430,44 @@ async function generateVoice(input: Record<string, any>): Promise<any> {
   const jobId = String(input.request_id || randomUUID());
   const language = String(input.rendering?.language || profile.languages[0] || 'en').toLowerCase();
   const defaults = getVoiceTtsLanguageConfig(language);
-  const maxChunkChars = Number(input.rendering?.chunking?.max_chunk_chars || policy.chunking.default_max_chunk_chars);
-  const crossfadeMs = Number(input.rendering?.chunking?.crossfade_ms || policy.chunking.default_crossfade_ms);
+  const maxChunkChars = Number(
+    input.rendering?.chunking?.max_chunk_chars || policy.chunking.default_max_chunk_chars
+  );
+  const crossfadeMs = Number(
+    input.rendering?.chunking?.crossfade_ms || policy.chunking.default_crossfade_ms
+  );
   const chunks = splitVoiceTextIntoChunks(String(input.text || ''), maxChunkChars);
   const deliveryMode = String(input.delivery?.mode || 'playback');
-  const requestedFormat = String(input.delivery?.format || policy.delivery.default_format) as VoiceArtifactFormat;
-  const requestedEngineId = String(input.engine?.engine_id || profile.default_engine_id || '').trim() || profile.default_engine_id;
+  const requestedFormat = String(
+    input.delivery?.format || policy.delivery.default_format
+  ) as VoiceArtifactFormat;
+  const requestedEngineId =
+    String(input.engine?.engine_id || profile.default_engine_id || '').trim() ||
+    profile.default_engine_id;
   const defaultEngine = getVoiceEngineRecord(profile.default_engine_id);
   const engine = resolveVoiceEngineForPlatform(requestedEngineId);
   const backend = resolveVoiceBackend(requestedEngineId);
-  const personalVoiceMode = String(input.routing?.personal_voice_mode || policy.routing.default_personal_voice_mode);
+  const personalVoiceMode = String(
+    input.routing?.personal_voice_mode || policy.routing.default_personal_voice_mode
+  );
   const fallbackDetected = engine.engine_id !== requestedEngineId;
-  const requiresPersonalVoice = personalVoiceMode === 'require_personal_voice'
-    || (policy.routing.enforce_clone_engine_for_personal_tier && profile.tier === 'personal');
+  const requiresPersonalVoice =
+    personalVoiceMode === 'require_personal_voice' ||
+    (policy.routing.enforce_clone_engine_for_personal_tier && profile.tier === 'personal');
   if (requiresPersonalVoice && (engine.kind !== 'voice_clone_service' || fallbackDetected)) {
-      return {
-        status: 'blocked',
-        request_id: jobId,
-        profile_id: profile.profile_id,
-        profile_tier: profile.tier,
-        engine_id: requestedEngineId,
-        resolved_engine_id: engine.engine_id,
-        backend_id: backend.backend_id,
-        backend_kind: backend.kind,
-        backend_provider: backend.provider,
-        fallback_detected: fallbackDetected,
-        personal_voice_mode: personalVoiceMode,
-        reason: fallbackDetected
+    return {
+      status: 'blocked',
+      request_id: jobId,
+      profile_id: profile.profile_id,
+      profile_tier: profile.tier,
+      engine_id: requestedEngineId,
+      resolved_engine_id: engine.engine_id,
+      backend_id: backend.backend_id,
+      backend_kind: backend.kind,
+      backend_provider: backend.provider,
+      fallback_detected: fallbackDetected,
+      personal_voice_mode: personalVoiceMode,
+      reason: fallbackDetected
         ? `personal voice required but engine resolved to fallback (${engine.engine_id})`
         : `personal voice required but resolved engine is not clone-capable (${engine.engine_id})`,
     };
@@ -467,46 +518,50 @@ async function generateVoice(input: Record<string, any>): Promise<any> {
 
       if (deliveryMode === 'playback' || deliveryMode === 'artifact_and_playback') {
         if (deliveryMode === 'artifact_and_playback' && artifactRefs.length > 0) {
-          const verification = await performPlayback(String(input.text || ''), {
-            language,
-            voice: defaults.voice,
-            rate: defaults.rate,
-            engineId: engine.engine_id,
-            profile,
-            requireVoiceClone: requiresPersonalVoice,
-          }, artifactRefs[0]);
+          const verification = await performPlayback(
+            String(input.text || ''),
+            {
+              language,
+              voice: defaults.voice,
+              rate: defaults.rate,
+              engineId: engine.engine_id,
+              profile,
+              requireVoiceClone: requiresPersonalVoice,
+            },
+            artifactRefs[0]
+          );
           speaker_verification.push({
             playback_source_path: artifactRefs[0],
             verification,
           });
         } else {
-        for (let index = 0; index < chunks.length; index += 1) {
-          if (api.isCancelled()) return { artifactRefs };
-          api.report({
-            status: 'generating',
-            progress: {
-              current: index + 1,
-              total: Math.max(1, chunks.length),
-              percent: ((index + 1) / Math.max(1, chunks.length)) * 100,
-              unit: 'chunks',
-            },
-            message: `rendering chunk ${index + 1}/${chunks.length}`,
-            artifact_refs: artifactRefs,
-          });
-          const verification = await performPlayback(chunks[index], {
-            language,
-            voice: defaults.voice,
-            rate: defaults.rate,
-            engineId: engine.engine_id,
-            profile,
-            requireVoiceClone: requiresPersonalVoice,
-          });
-          speaker_verification.push({
-            chunk_index: index,
-            playback_source_path: verification?.playback_source_path,
-            verification,
-          });
-        }
+          for (let index = 0; index < chunks.length; index += 1) {
+            if (api.isCancelled()) return { artifactRefs };
+            api.report({
+              status: 'generating',
+              progress: {
+                current: index + 1,
+                total: Math.max(1, chunks.length),
+                percent: ((index + 1) / Math.max(1, chunks.length)) * 100,
+                unit: 'chunks',
+              },
+              message: `rendering chunk ${index + 1}/${chunks.length}`,
+              artifact_refs: artifactRefs,
+            });
+            const verification = await performPlayback(chunks[index], {
+              language,
+              voice: defaults.voice,
+              rate: defaults.rate,
+              engineId: engine.engine_id,
+              profile,
+              requireVoiceClone: requiresPersonalVoice,
+            });
+            speaker_verification.push({
+              chunk_index: index,
+              playback_source_path: verification?.playback_source_path,
+              verification,
+            });
+          }
         }
       }
 
@@ -523,7 +578,7 @@ async function generateVoice(input: Record<string, any>): Promise<any> {
   const finalPacket = await waitForVoiceJob(runtime, jobId);
   if (requiresPersonalVoice && finalPacket.status !== 'completed') {
     throw new Error(
-      `[VOICE] personal voice generation failed with required learned-voice engine ${engine.engine_id}: ${finalPacket.message || finalPacket.status}`,
+      `[VOICE] personal voice generation failed with required learned-voice engine ${engine.engine_id}: ${finalPacket.message || finalPacket.status}`
     );
   }
   return {
@@ -564,8 +619,11 @@ async function registerVoiceProfile(input: {
   }
   const ingestionPolicy = getVoiceSampleIngestionPolicy();
   const validation = validateVoiceProfileRegistration(
-    { ...input, policy: { ...input.policy, strict_personal_voice: input.policy?.strict_personal_voice } },
-    ingestionPolicy,
+    {
+      ...input,
+      policy: { ...input.policy, strict_personal_voice: input.policy?.strict_personal_voice },
+    },
+    ingestionPolicy
   );
   if (!validation.ok) {
     return {
@@ -589,14 +647,18 @@ async function registerVoiceProfile(input: {
     const nextProfiles = existing
       ? registry.profiles.map((p) => (p.profile_id === input.profile.profile_id ? updated : p))
       : [...registry.profiles, updated];
-    const nextDefaultProfileId = nextProfiles.some((profile) => profile.profile_id === registry.default_profile_id)
+    const nextDefaultProfileId = nextProfiles.some(
+      (profile) => profile.profile_id === registry.default_profile_id
+    )
       ? registry.default_profile_id
       : updated.profile_id;
     writeVoiceProfileRegistry(
       { ...registry, default_profile_id: nextDefaultProfileId, profiles: nextProfiles },
-      registryPath,
+      registryPath
     );
-    logger.info(`[VOICE] ${existing ? 'updated' : 'created'} profile ${input.profile.profile_id} with ${sampleRefs.length} sample(s)`);
+    logger.info(
+      `[VOICE] ${existing ? 'updated' : 'created'} profile ${input.profile.profile_id} with ${sampleRefs.length} sample(s)`
+    );
     return {
       status: 'succeeded',
       action: 'register_voice_profile',
@@ -625,8 +687,8 @@ async function registerVoiceProfile(input: {
         policy_version: ingestionPolicy.version,
       },
       null,
-      2,
-    ),
+      2
+    )
   );
 
   return {
@@ -650,7 +712,7 @@ async function transcribeVoiceSample(input: {
   if (!audioPath) throw new Error('transcribe_voice_sample requires audio_path');
 
   const bridgeScript = pathResolver.rootResolve(
-    'libs/actuators/voice-actuator/scripts/mlx_audio_stt_bridge.py',
+    'libs/actuators/voice-actuator/scripts/mlx_audio_stt_bridge.py'
   );
   const payload = JSON.stringify({
     action: 'transcribe',
@@ -709,7 +771,7 @@ function deepResolve(val: any, ctx: any): any {
 export async function dispatchDecisionOp(
   op: string,
   params: Record<string, any>,
-  ctx: Record<string, any>,
+  ctx: Record<string, any>
 ): Promise<{ handled: boolean; ctx: any }> {
   const resolvedParams = deepResolve(params, ctx);
   const payload = { action: op, ...resolvedParams };
@@ -726,22 +788,16 @@ export async function dispatchDecisionOp(
 }
 
 const main = async () => {
-  const argv = await createStandardYargs()
-    .option('input', { alias: 'i', type: 'string', required: true })
-    .parseSync();
-
-  const inputData = JSON.parse(safeReadFile(pathResolver.rootResolve(argv.input as string), { encoding: 'utf8' }) as string);
-  const result = await handleAction(inputData);
-  console.log(JSON.stringify(result, null, 2));
+  await runActuatorCli({
+    name: 'voice-actuator',
+    handleAction,
+  });
 };
 
-const isMain = process.argv[1] && (
-  process.argv[1].endsWith('voice-actuator/src/index.ts')
-  || process.argv[1].endsWith('voice-actuator/dist/index.js')
-  || process.argv[1].endsWith('voice-actuator/src/index.js')
-);
+const entrypoint = process.argv[1] ? path.resolve(process.argv[1]) : '';
+const modulePath = fileURLToPath(import.meta.url);
 
-if (isMain) {
+if (entrypoint && modulePath === entrypoint) {
   main().catch((err) => {
     logger.error(err.message);
     process.exit(1);
