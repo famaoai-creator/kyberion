@@ -54,6 +54,27 @@ describe('run_pipeline compatibility', () => {
     expect(result.results).toEqual([{ op: 'system:shell', status: 'success' }]);
   });
 
+  it('executes direct commands without shell expansion', async () => {
+    const result = await runSteps([
+      {
+        op: 'system:exec',
+        params: {
+          command: 'node',
+          args: ['-e', 'process.stdout.write("exec-output")'],
+          export_as: 'exec_result',
+        },
+      },
+    ]);
+
+    expect(result.status).toBe('succeeded');
+    expect(result.context.exec_result).toMatchObject({
+      stdout: 'exec-output',
+      stderr: '',
+      status: 0,
+    });
+    expect(result.results).toEqual([{ op: 'system:exec', status: 'success' }]);
+  });
+
   it('parses JSON shell output into structured context when possible', async () => {
     const result = await runSteps([
       {

@@ -9,6 +9,7 @@ import {
   safeStat,
   loadActuatorManifestCatalog,
   installReasoningBackends,
+  renderStatus,
 } from '@agent/core';
 import { installPythonVoiceBridgeIfAvailable } from '@agent/core/python-voice-bridge';
 import {
@@ -344,6 +345,10 @@ function printHelp(actuators: ActuatorRecord[]) {
   console.log('── Artifacts ───────────────────────────────────────────────────────');
   console.log('  artifact <path>      Inspect a generated artifact (text preview for text types)');
   console.log('  open-artifact <path> Open a generated artifact with the OS default viewer');
+  console.log('');
+  console.log(
+    '  intent [--clarify] "<utterance>"   Resolve free text into an intent or clarification packet'
+  );
   console.log('');
   console.log('── Operator Packets ────────────────────────────────────────────────');
   console.log(
@@ -906,45 +911,50 @@ function openArtifact(targetPath: string) {
 }
 
 export function formatOperatorPacketLines(packet: OperatorInteractionPacket): string[] {
+  const locale = resolveLocale();
   const lines = [chalk.bold(packet.headline), packet.summary];
   if (packet.readiness) {
-    lines.push(`${t('cli_readiness')}: ${packet.readiness}`);
+    lines.push(
+      `${t('cli_readiness', locale)}: ${renderStatus('readiness', packet.readiness, locale)}`
+    );
   }
   if (typeof packet.confidence === 'number') {
-    lines.push(`${t('cli_confidence')}: ${packet.confidence}`);
+    lines.push(`${t('cli_confidence', locale)}: ${packet.confidence}`);
   }
   if (packet.missing_inputs?.length) {
-    lines.push(`${t('cli_missing_inputs')}: ${packet.missing_inputs.join(', ')}`);
+    lines.push(`${t('cli_missing_inputs', locale)}: ${packet.missing_inputs.join(', ')}`);
   }
   if (typeof packet.omitted_question_count === 'number' && packet.omitted_question_count > 0) {
-    lines.push(t('cli_more_questions').replace('{count}', String(packet.omitted_question_count)));
+    lines.push(
+      t('cli_more_questions', locale).replace('{count}', String(packet.omitted_question_count))
+    );
   }
   if (packet.suggested_response_style) {
-    lines.push(`${t('cli_response_style')}: ${packet.suggested_response_style}`);
+    lines.push(`${t('cli_response_style', locale)}: ${packet.suggested_response_style}`);
   }
   if (packet.questions?.length) {
-    lines.push('', `${t('cli_questions')}:`);
+    lines.push('', `${t('cli_questions', locale)}:`);
     packet.questions.forEach((question) => {
       lines.push(`- ${chalk.bold(question.id)}: ${question.question}`);
-      lines.push(`  ${t('cli_reason')}: ${question.reason}`);
+      lines.push(`  ${t('cli_reason', locale)}: ${question.reason}`);
       if (question.default_assumption)
-        lines.push(`  ${t('cli_default')}: ${question.default_assumption}`);
-      if (question.impact) lines.push(`  ${t('cli_impact')}: ${question.impact}`);
+        lines.push(`  ${t('cli_default', locale)}: ${question.default_assumption}`);
+      if (question.impact) lines.push(`  ${t('cli_impact', locale)}: ${question.impact}`);
     });
   }
   if (packet.next_actions?.length) {
-    lines.push('', `${t('cli_next_actions')}:`);
+    lines.push('', `${t('cli_next_actions', locale)}:`);
     packet.next_actions.forEach((action) => {
       lines.push(
         `- ${chalk.bold(action.id)}${action.priority ? ` [${action.priority}]` : ''}${action.next_action_type ? ` <${action.next_action_type}>` : ''}: ${action.action}`
       );
-      if (action.reason) lines.push(`  ${t('cli_reason')}: ${action.reason}`);
+      if (action.reason) lines.push(`  ${t('cli_reason', locale)}: ${action.reason}`);
       if (action.suggested_command)
-        lines.push(`  ${t('cli_command')}: ${action.suggested_command}`);
+        lines.push(`  ${t('cli_command', locale)}: ${action.suggested_command}`);
       if (action.suggested_pipeline_path)
-        lines.push(`  ${t('cli_pipeline')}: ${action.suggested_pipeline_path}`);
+        lines.push(`  ${t('cli_pipeline', locale)}: ${action.suggested_pipeline_path}`);
       if (action.suggested_followup_request)
-        lines.push(`  ${t('cli_follow_up')}: ${action.suggested_followup_request}`);
+        lines.push(`  ${t('cli_follow_up', locale)}: ${action.suggested_followup_request}`);
     });
   }
   return lines;
@@ -1626,19 +1636,22 @@ export async function main(args = process.argv.slice(2)) {
 
   if (command === 'intent') {
     // Free-text → intent resolution → optional pipeline execution
-    // Usage: pnpm cli intent "仮説を発散させて" [--run]
+    // Usage: pnpm cli intent "仮説を発散させて" [--run|--clarify]
     const flags = normalizedArgs.filter((a) => a.startsWith('--'));
     const words = normalizedArgs.slice(1).filter((a) => !a.startsWith('--'));
     const utterance = words.join(' ').trim();
     if (!utterance) {
-      console.error('Usage: pnpm cli intent "<utterance>" [--run]');
+      console.error('Usage: pnpm cli intent "<utterance>" [--run|--clarify]');
       console.error('  --run  Execute the resolved pipeline immediately');
+      console.error('  --clarify  Print a clarification packet for the utterance');
       process.exit(1);
     }
     const doRun = flags.includes('--run');
+    const doClarify = flags.includes('--clarify');
 
     const { resolveIntentResolutionPacket, loadStandardIntentCatalog } =
       await import('@agent/core/intent-resolution');
+    const { resolveQuestionInteractionPacket } = await import('@agent/core/question-resolver');
     const packet = resolveIntentResolutionPacket(utterance);
 
     console.log(`\n=== Intent Resolution ===`);
@@ -1653,6 +1666,22 @@ export async function main(args = process.argv.slice(2)) {
             `  ${c.confidence.toFixed(2)}  ${c.intent_id}  — ${c.reasons[0] ?? 'heuristic'}`
           );
         }
+      }
+      const clarificationPacket = resolveQuestionInteractionPacket(
+        {
+          text: utterance,
+          confidence: packet.selected_confidence,
+        },
+        undefined,
+        undefined
+      );
+      if (clarificationPacket) {
+        console.log('\nClarification packet:');
+        printOperatorPacket(clarificationPacket);
+      } else {
+        console.log(
+          '\nNext step: rephrase the utterance, or run `pnpm cli -- intent --clarify "<utterance>"` to inspect missing inputs.'
+        );
       }
       process.exit(0);
     }
@@ -1680,6 +1709,27 @@ export async function main(args = process.argv.slice(2)) {
       }
     }
 
+    if (doClarify) {
+      const clarificationPacket = resolveQuestionInteractionPacket(
+        {
+          text: utterance,
+          intentId: packet.selected_intent_id,
+          confidence: packet.selected_confidence,
+          executionShape: undefined,
+        },
+        undefined,
+        undefined
+      );
+      if (clarificationPacket) {
+        console.log('\nClarification packet:');
+        printOperatorPacket(clarificationPacket);
+      } else {
+        console.log(
+          '\nClarification packet: none — the request is already clear enough to execute.'
+        );
+      }
+    }
+
     if (doRun && intent?.pipeline?.length) {
       const { execFileSync } = await import('node:child_process');
       const tempPipeline = {
@@ -1703,7 +1753,7 @@ export async function main(args = process.argv.slice(2)) {
       }
     } else if (doRun) {
       console.log(
-        `\nNote: intent "${packet.selected_intent_id}" has no inline pipeline (execution_shape: ${intent?.execution_shape ?? 'unknown'}). Use a task session instead.`
+        `\nNote: intent "${packet.selected_intent_id}" has no inline pipeline (execution_shape: ${intent?.execution_shape ?? 'unknown'}). Use a task session instead: pnpm mission create --intent-id ${packet.selected_intent_id}`
       );
     }
 

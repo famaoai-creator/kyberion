@@ -9,7 +9,9 @@ import {
 describe('service-preset-registry', () => {
   it('loads the canonical service presets directory', () => {
     const catalog = loadServicePresetsCatalog();
-    expect(Object.keys(catalog.services)).toEqual(expect.arrayContaining(['slack', 'comfyui', 'voice']));
+    expect(Object.keys(catalog.services)).toEqual(
+      expect.arrayContaining(['slack', 'comfyui', 'voice'])
+    );
   });
 
   it('resolves a service preset by service id', () => {
@@ -18,12 +20,25 @@ describe('service-preset-registry', () => {
     expect(preset?.operations).toHaveProperty('post_message');
   });
 
+  it('includes GitHub Actions operations in the canonical preset', () => {
+    const preset = getServicePresetRecord('github');
+    expect(preset?.service_id).toBe('github');
+    expect(preset?.operations).toHaveProperty('actions_list_runs');
+    expect(preset?.operations).toHaveProperty('actions_get_run');
+    expect(preset?.operations).toHaveProperty('actions_dispatch_workflow');
+  });
+
   it('resolves a service preset path for a canonical service id', () => {
-    expect(resolveServicePresetPath('comfyui')).toContain('knowledge/product/orchestration/service-presets/comfyui.json');
+    expect(resolveServicePresetPath('comfyui')).toContain(
+      'knowledge/product/orchestration/service-presets/comfyui.json'
+    );
   });
 
   it('resolves a service preset from an explicit hint path', () => {
-    const preset = getServicePresetRecord('voice', 'knowledge/product/orchestration/service-presets/voice.json');
+    const preset = getServicePresetRecord(
+      'voice',
+      'knowledge/product/orchestration/service-presets/voice.json'
+    );
     expect(preset?.service_id).toBe('voice');
     expect(preset?.operations).toHaveProperty('speak_local');
   });

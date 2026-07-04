@@ -12,7 +12,7 @@ import {
   resolveVars,
   evaluateCondition,
   getPathValue,
-  withRetry,
+  retry,
   classifyError,
 } from '@agent/core';
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
@@ -58,13 +58,24 @@ interface BrowserRuntime {
   cdpSessions: WeakMap<Page, CDPSession>;
   activeTabId: string;
   consoleEvents: Array<{ tab_id: string; type: string; text: string; ts: string }>;
-  networkEvents: Array<{ tab_id: string; method: string; url: string; resourceType: string; ts: string }>;
+  networkEvents: Array<{
+    tab_id: string;
+    method: string;
+    url: string;
+    resourceType: string;
+    ts: string;
+  }>;
   webAuthn?: {
     authenticatorId?: string;
     enabled: boolean;
     options?: Record<string, any>;
     credentials: Array<Record<string, any>>;
-    events: Array<{ type: string; credential?: Record<string, any>; credentialId?: string; ts: string }>;
+    events: Array<{
+      type: string;
+      credential?: Record<string, any>;
+      credentialId?: string;
+      ts: string;
+    }>;
   };
 }
 
@@ -104,7 +115,9 @@ interface BrowserRuntimeLeaseLike {
 const BROWSER_RUNTIME_DIR = pathResolver.shared('runtime/browser');
 const BROWSER_SESSION_DIR = path.join(BROWSER_RUNTIME_DIR, 'sessions');
 const EVIDENCE_DIR = pathResolver.rootResolve('evidence/browser');
-const BROWSER_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/browser-actuator/manifest.json');
+const BROWSER_MANIFEST_PATH = pathResolver.rootResolve(
+  'libs/actuators/browser-actuator/manifest.json'
+);
 const DEFAULT_BROWSER_RETRY = {
   maxRetries: 2,
   initialDelayMs: 500,
@@ -121,7 +134,9 @@ function isPlainObject(value: unknown): value is Record<string, any> {
 function loadRecoveryPolicy(): Record<string, any> {
   if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
   try {
-    const manifest = JSON.parse(safeReadFile(BROWSER_MANIFEST_PATH, { encoding: 'utf8' }) as string);
+    const manifest = JSON.parse(
+      safeReadFile(BROWSER_MANIFEST_PATH, { encoding: 'utf8' }) as string
+    );
     cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
     return cachedRecoveryPolicy;
   } catch (_) {
@@ -134,15 +149,27 @@ function buildRetryOptions(stepParams: Record<string, any>) {
   const recoveryPolicy = loadRecoveryPolicy();
   const manifestRetry = isPlainObject(recoveryPolicy.retry) ? recoveryPolicy.retry : {};
   const retryableCategories = new Set<string>(
-    Array.isArray(recoveryPolicy.retryable_categories) ? recoveryPolicy.retryable_categories.map(String) : [],
+    Array.isArray(recoveryPolicy.retryable_categories)
+      ? recoveryPolicy.retryable_categories.map(String)
+      : []
   );
   const explicitRetry = isPlainObject(stepParams.retry) ? stepParams.retry : {};
   const resolved = {
     ...DEFAULT_BROWSER_RETRY,
     ...manifestRetry,
     ...explicitRetry,
-    maxRetries: Number(stepParams.max_retries ?? explicitRetry.maxRetries ?? manifestRetry.maxRetries ?? DEFAULT_BROWSER_RETRY.maxRetries),
-    initialDelayMs: Number(stepParams.retry_delay_ms ?? explicitRetry.initialDelayMs ?? manifestRetry.initialDelayMs ?? DEFAULT_BROWSER_RETRY.initialDelayMs),
+    maxRetries: Number(
+      stepParams.max_retries ??
+        explicitRetry.maxRetries ??
+        manifestRetry.maxRetries ??
+        DEFAULT_BROWSER_RETRY.maxRetries
+    ),
+    initialDelayMs: Number(
+      stepParams.retry_delay_ms ??
+        explicitRetry.initialDelayMs ??
+        manifestRetry.initialDelayMs ??
+        DEFAULT_BROWSER_RETRY.initialDelayMs
+    ),
   };
 
   return {
@@ -153,22 +180,32 @@ function buildRetryOptions(stepParams: Record<string, any>) {
         return retryableCategories.has(classification.category);
       }
       const message = error.message?.toLowerCase?.() || '';
-      return classification.category === 'timeout'
-        || classification.category === 'network'
-        || classification.category === 'resource_unavailable'
-        || message.includes('selector')
-        || message.includes('not visible')
-        || message.includes('strict mode violation')
-        || message.includes('detached');
+      return (
+        classification.category === 'timeout' ||
+        classification.category === 'network' ||
+        classification.category === 'resource_unavailable' ||
+        message.includes('selector') ||
+        message.includes('not visible') ||
+        message.includes('strict mode violation') ||
+        message.includes('detached')
+      );
     },
   };
 }
 
-export async function executePipeline(steps: PipelineStep[], sessionId: string, options: any, initialCtx: any = {}, state: any = { stepCount: 0, startTime: Date.now() }) {
+export async function executePipeline(
+  steps: PipelineStep[],
+  sessionId: string,
+  options: any,
+  initialCtx: any = {},
+  state: any = { stepCount: 0, startTime: Date.now() }
+) {
   const MAX_STEPS = options.max_steps || 1000;
   const TIMEOUT = options.timeout_ms || 300000;
 
-  const userDataDir = pathResolver.rootResolve(options.user_data_dir || path.join(BROWSER_RUNTIME_DIR, sessionId));
+  const userDataDir = pathResolver.rootResolve(
+    options.user_data_dir || path.join(BROWSER_RUNTIME_DIR, sessionId)
+  );
   if (!safeExistsSync(userDataDir)) safeMkdir(userDataDir, { recursive: true });
   if (!safeExistsSync(BROWSER_SESSION_DIR)) safeMkdir(BROWSER_SESSION_DIR, { recursive: true });
   const sessionMetadataPath = path.join(BROWSER_SESSION_DIR, `${sessionId}.json`);
@@ -176,17 +213,31 @@ export async function executePipeline(steps: PipelineStep[], sessionId: string, 
   const tracePath = path.join(EVIDENCE_DIR, `trace_${sessionId}_${Date.now()}.zip`);
   const videoDir = path.join(EVIDENCE_DIR, 'videos', sessionId);
   const resolvedVideoDir = pathResolver.rootResolve(options.video_artifact_dir || videoDir);
-  if (options.record_video && !safeExistsSync(resolvedVideoDir)) safeMkdir(resolvedVideoDir, { recursive: true });
+  if (options.record_video && !safeExistsSync(resolvedVideoDir))
+    safeMkdir(resolvedVideoDir, { recursive: true });
 
-  const browserContext = await browserRuntimeHelpers.getOrCreateBrowserContext(sessionId, userDataDir, sessionMetadataPath, options, resolvedVideoDir);
+  const browserContext = await browserRuntimeHelpers.getOrCreateBrowserContext(
+    sessionId,
+    userDataDir,
+    sessionMetadataPath,
+    options,
+    resolvedVideoDir
+  );
 
   // Start Tracing if requested
   if (options.record_trace) {
     await browserContext.tracing.start({ screenshots: true, snapshots: true, sources: true });
   }
 
-  const runtime = browserRuntimeHelpers.getOrCreateBrowserRuntime(sessionId, browserContext, userDataDir, sessionMetadataPath);
-  const activeLease = browserRuntimeHelpers.findBrowserRuntimeLease(runtime) as BrowserRuntimeLeaseLike | undefined;
+  const runtime = browserRuntimeHelpers.getOrCreateBrowserRuntime(
+    sessionId,
+    browserContext,
+    userDataDir,
+    sessionMetadataPath
+  );
+  const activeLease = browserRuntimeHelpers.findBrowserRuntimeLease(runtime) as
+    | BrowserRuntimeLeaseLike
+    | undefined;
   if (runtime.tabs.size === 0) {
     const page = await browserContext.newPage();
     browserRuntimeHelpers.registerBrowserPage(runtime, page, 'tab-1');
@@ -214,8 +265,10 @@ export async function executePipeline(steps: PipelineStep[], sessionId: string, 
     for (const step of steps) {
       state.stepCount++;
       stepIndex++;
-      if (state.stepCount > MAX_STEPS) throw new Error(`[SAFETY_LIMIT] Exceeded maximum pipeline steps (${MAX_STEPS})`);
-      if (Date.now() - state.startTime > TIMEOUT) throw new Error(`[SAFETY_LIMIT] Pipeline execution timed out (${TIMEOUT}ms)`);
+      if (state.stepCount > MAX_STEPS)
+        throw new Error(`[SAFETY_LIMIT] Exceeded maximum pipeline steps (${MAX_STEPS})`);
+      if (Date.now() - state.startTime > TIMEOUT)
+        throw new Error(`[SAFETY_LIMIT] Pipeline execution timed out (${TIMEOUT}ms)`);
 
       const spanId = traceCtx.startSpan(`${step.type}:${step.op}`, {
         stepId: (step as any).id || `step-${stepIndex}`,
@@ -238,7 +291,8 @@ export async function executePipeline(steps: PipelineStep[], sessionId: string, 
         }
 
         if (step.op === 'screenshot') {
-          const screenshotPath = ctx.last_screenshot || ctx[step.params?.export_as || 'last_screenshot'];
+          const screenshotPath =
+            ctx.last_screenshot || ctx[step.params?.export_as || 'last_screenshot'];
           if (screenshotPath) {
             traceCtx.addArtifact('screenshot', screenshotPath, (step as any).id || 'screenshot');
           }
@@ -268,17 +322,32 @@ export async function executePipeline(steps: PipelineStep[], sessionId: string, 
         if (stepOnError) {
           try {
             const { handleStepError } = await import('@agent/core');
-            const recovery = await handleStepError(err, step, stepOnError, ctx,
+            const recovery = await handleStepError(
+              err,
+              step,
+              stepOnError,
+              ctx,
               async (fallbackSteps: any[], errCtx: any) => {
-                const res = await executePipelineInternal(fallbackSteps, runtime, errCtx, options, state, resolve);
+                const res = await executePipelineInternal(
+                  fallbackSteps,
+                  runtime,
+                  errCtx,
+                  options,
+                  state,
+                  resolve
+                );
                 return res.context;
-              }, resolve as (val: any) => any);
+              },
+              resolve as (val: any) => any
+            );
             if (recovery.recovered) {
               ctx = recovery.ctx;
               results.push({ op: step.op, status: 'recovered' as any });
               continue;
             }
-          } catch (_) { /* fallthrough */ }
+          } catch (_) {
+            /* fallthrough */
+          }
         }
         logger.error(`  [BROWSER_PIPELINE] Step failed (${step.op}): ${err.message}`);
         results.push({ op: step.op, status: 'failed', error: err.message });
@@ -299,7 +368,9 @@ export async function executePipeline(steps: PipelineStep[], sessionId: string, 
     ctx.active_tab_id = runtime.activeTabId;
     const keepAlive = options.keep_alive === true || Number(options.lease_ms || 0) > 0;
     const shouldClose = ctx.__close_browser_session === true || !keepAlive;
-    const leaseExpiresAt = shouldClose ? undefined : Date.now() + Number(options.lease_ms || 5 * 60 * 1000);
+    const leaseExpiresAt = shouldClose
+      ? undefined
+      : Date.now() + Number(options.lease_ms || 5 * 60 * 1000);
     browserRuntimeHelpers.saveBrowserSessionMetadata(sessionMetadataPath, {
       session_id: sessionId,
       user_data_dir: userDataDir,
@@ -320,7 +391,9 @@ export async function executePipeline(steps: PipelineStep[], sessionId: string, 
       recent_actions: browserRuntimeHelpers.summarizeRecentActions(ctx.action_trail),
     } as any);
     if (shouldClose) {
-      finalizedVideoPaths = videoRecordingEnabled ? await browserRuntimeHelpers.collectRecordedVideoPaths(runtime) : undefined;
+      finalizedVideoPaths = videoRecordingEnabled
+        ? await browserRuntimeHelpers.collectRecordedVideoPaths(runtime)
+        : undefined;
       ctx.recorded_videos = finalizedVideoPaths || [];
       for (const vp of finalizedVideoPaths ?? []) {
         traceCtx.addArtifact('file', vp, 'browser-video');
@@ -363,10 +436,22 @@ export async function executePipeline(steps: PipelineStep[], sessionId: string, 
     logger.warn(`[BROWSER_PIPELINE] Failed to persist trace: ${err?.message || err}`);
   }
 
-  return { status: derivePipelineStatus(results), results, context: ctx, total_steps: state.stepCount };
+  return {
+    status: derivePipelineStatus(results),
+    results,
+    context: ctx,
+    total_steps: state.stepCount,
+  };
 }
 
-async function executePipelineInternal(steps: PipelineStep[], runtime: BrowserRuntime, ctx: any, options: any, state: any, resolve: Function) {
+async function executePipelineInternal(
+  steps: PipelineStep[],
+  runtime: BrowserRuntime,
+  ctx: any,
+  options: any,
+  state: any,
+  resolve: Function
+) {
   const results = [];
   for (const step of steps) {
     state.stepCount++;
@@ -388,11 +473,24 @@ async function executePipelineInternal(steps: PipelineStep[], runtime: BrowserRu
       if (stepOnError) {
         try {
           const { handleStepError } = await import('@agent/core');
-          const recovery = await handleStepError(err, step, stepOnError, ctx,
+          const recovery = await handleStepError(
+            err,
+            step,
+            stepOnError,
+            ctx,
             async (fallbackSteps: any[], errCtx: any) => {
-              const res = await executePipelineInternal(fallbackSteps, runtime, errCtx, options, state, resolve);
+              const res = await executePipelineInternal(
+                fallbackSteps,
+                runtime,
+                errCtx,
+                options,
+                state,
+                resolve
+              );
               return res.context;
-            }, resolve as (val: any) => any);
+            },
+            resolve as (val: any) => any
+          );
           if (recovery.recovered) {
             ctx = recovery.ctx;
             results.push({ op: step.op, status: 'recovered' as any });
@@ -407,7 +505,15 @@ async function executePipelineInternal(steps: PipelineStep[], runtime: BrowserRu
   return { context: ctx };
 }
 
-async function opControl(op: string, params: any, runtime: BrowserRuntime, ctx: any, options: any, state: any, resolve: Function) {
+async function opControl(
+  op: string,
+  params: any,
+  runtime: BrowserRuntime,
+  ctx: any,
+  options: any,
+  state: any,
+  resolve: Function
+) {
   switch (op) {
     case 'open_tab': {
       const page = await runtime.context.newPage();
@@ -417,34 +523,42 @@ async function opControl(op: string, params: any, runtime: BrowserRuntime, ctx: 
         await page.goto(resolve(params.url), { waitUntil: params.waitUntil || 'networkidle' });
       }
       if (params.select !== false) runtime.activeTabId = tabId;
-      return browserRuntimeHelpers.recordBrowserAction({
-        ...ctx,
-        active_tab_id: runtime.activeTabId,
-        browser_tabs: await browserRuntimeHelpers.summarizeTabs(runtime),
-      }, {
-        kind: 'control',
-        op: 'open_tab',
-        tab_id: tabId,
-        url: params.url ? resolve(params.url) : undefined,
-      });
+      return browserRuntimeHelpers.recordBrowserAction(
+        {
+          ...ctx,
+          active_tab_id: runtime.activeTabId,
+          browser_tabs: await browserRuntimeHelpers.summarizeTabs(runtime),
+        },
+        {
+          kind: 'control',
+          op: 'open_tab',
+          tab_id: tabId,
+          url: params.url ? resolve(params.url) : undefined,
+        }
+      );
     }
     case 'select_tab': {
       const tabId = resolve(params.tab_id);
       if (!runtime.tabs.has(tabId)) throw new Error(`Unknown browser tab: ${tabId}`);
       runtime.activeTabId = tabId;
-      return browserRuntimeHelpers.recordBrowserAction({
-        ...ctx,
-        active_tab_id: runtime.activeTabId,
-        browser_tabs: await browserRuntimeHelpers.summarizeTabs(runtime),
-      }, {
-        kind: 'control',
-        op: 'select_tab',
-        tab_id: tabId,
-      });
+      return browserRuntimeHelpers.recordBrowserAction(
+        {
+          ...ctx,
+          active_tab_id: runtime.activeTabId,
+          browser_tabs: await browserRuntimeHelpers.summarizeTabs(runtime),
+        },
+        {
+          kind: 'control',
+          op: 'select_tab',
+          tab_id: tabId,
+        }
+      );
     }
     case 'select_tab_matching': {
       const urlIncludes = params.url_includes ? String(resolve(params.url_includes)) : undefined;
-      const titleIncludes = params.title_includes ? String(resolve(params.title_includes)) : undefined;
+      const titleIncludes = params.title_includes
+        ? String(resolve(params.title_includes))
+        : undefined;
       if (!urlIncludes && !titleIncludes) {
         throw new Error('select_tab_matching requires url_includes or title_includes');
       }
@@ -461,39 +575,51 @@ async function opControl(op: string, params: any, runtime: BrowserRuntime, ctx: 
       }
 
       if (!selected) {
-        throw new Error(`No browser tab matched url_includes=${urlIncludes || '*'} title_includes=${titleIncludes || '*'}`);
+        throw new Error(
+          `No browser tab matched url_includes=${urlIncludes || '*'} title_includes=${titleIncludes || '*'}`
+        );
       }
 
       runtime.activeTabId = selected.tabId;
       if (typeof (selected.page as any).bringToFront === 'function') {
         await (selected.page as any).bringToFront();
       }
-      return browserRuntimeHelpers.recordBrowserAction({
-        ...ctx,
-        active_tab_id: runtime.activeTabId,
-        browser_tabs: await browserRuntimeHelpers.summarizeTabs(runtime),
-      }, {
-        kind: 'control',
-        op: 'select_tab_matching',
-        tab_id: selected.tabId,
-        url: selected.url,
-      });
+      return browserRuntimeHelpers.recordBrowserAction(
+        {
+          ...ctx,
+          active_tab_id: runtime.activeTabId,
+          browser_tabs: await browserRuntimeHelpers.summarizeTabs(runtime),
+        },
+        {
+          kind: 'control',
+          op: 'select_tab_matching',
+          tab_id: selected.tabId,
+          url: selected.url,
+        }
+      );
     }
     case 'close_session':
-      return browserRuntimeHelpers.recordBrowserAction({
-        ...ctx,
-        __close_browser_session: true,
-      }, {
-        kind: 'control',
-        op: 'close_session',
-        tab_id: runtime.activeTabId,
-      });
+      return browserRuntimeHelpers.recordBrowserAction(
+        {
+          ...ctx,
+          __close_browser_session: true,
+        },
+        {
+          kind: 'control',
+          op: 'close_session',
+          tab_id: runtime.activeTabId,
+        }
+      );
     case 'pause_for_operator': {
-      const message = resolve(params.message || 'Operator input required. Press Enter to continue.');
+      const message = resolve(
+        params.message || 'Operator input required. Press Enter to continue.'
+      );
       await browserRuntimeHelpers.waitForOperatorContinue({
         sessionId: ctx.session_id || 'default',
         message,
-        continueFile: params.continue_file ? pathResolver.rootResolve(resolve(params.continue_file)) : undefined,
+        continueFile: params.continue_file
+          ? pathResolver.rootResolve(resolve(params.continue_file))
+          : undefined,
         pollMs: Number(params.poll_ms || 250),
         timeoutMs: params.timeout_ms ? Number(params.timeout_ms) : undefined,
       });
@@ -505,10 +631,24 @@ async function opControl(op: string, params: any, runtime: BrowserRuntime, ctx: 
     }
     case 'if':
       if (evaluateCondition(params.condition, ctx)) {
-        const res = await executePipelineInternal(params.then, runtime, ctx, options, state, resolve);
+        const res = await executePipelineInternal(
+          params.then,
+          runtime,
+          ctx,
+          options,
+          state,
+          resolve
+        );
         return res.context;
       } else if (params.else) {
-        const res = await executePipelineInternal(params.else, runtime, ctx, options, state, resolve);
+        const res = await executePipelineInternal(
+          params.else,
+          runtime,
+          ctx,
+          options,
+          state,
+          resolve
+        );
         return res.context;
       }
       return ctx;
@@ -516,7 +656,14 @@ async function opControl(op: string, params: any, runtime: BrowserRuntime, ctx: 
       let iterations = 0;
       const maxIter = params.max_iterations || 100;
       while (evaluateCondition(params.condition, ctx) && iterations < maxIter) {
-        const res = await executePipelineInternal(params.pipeline, runtime, ctx, options, state, resolve);
+        const res = await executePipelineInternal(
+          params.pipeline,
+          runtime,
+          ctx,
+          options,
+          state,
+          resolve
+        );
         ctx = res.context;
         iterations++;
       }
@@ -534,14 +681,17 @@ async function opControl(op: string, params: any, runtime: BrowserRuntime, ctx: 
         automaticPresenceSimulation: params.automatic_presence !== false,
         isUserVerified: params.user_verified !== false,
       });
-      return browserRuntimeHelpers.recordBrowserAction({
-        ...ctx,
-        [params.export_as || 'passkey_authenticator']: setup,
-      }, {
-        kind: 'control',
-        op: 'setup_passkey_authenticator',
-        tab_id: runtime.activeTabId,
-      });
+      return browserRuntimeHelpers.recordBrowserAction(
+        {
+          ...ctx,
+          [params.export_as || 'passkey_authenticator']: setup,
+        },
+        {
+          kind: 'control',
+          op: 'setup_passkey_authenticator',
+          tab_id: runtime.activeTabId,
+        }
+      );
     }
     case 'remove_passkey_authenticator': {
       const page = browserRuntimeHelpers.getActivePage(runtime);
@@ -562,7 +712,14 @@ async function opControl(op: string, params: any, runtime: BrowserRuntime, ctx: 
         }
       }
       const refResult = await resolveRef(refPath, bindResolved, ctx, resolve as (val: any) => any);
-      const subResult = await executePipelineInternal(refResult.steps, runtime, { ...ctx, ...refResult.mergedCtx }, options, state, resolve);
+      const subResult = await executePipelineInternal(
+        refResult.steps,
+        runtime,
+        { ...ctx, ...refResult.mergedCtx },
+        options,
+        state,
+        resolve
+      );
       if (params.export_as) {
         ctx = { ...ctx, [params.export_as]: subResult.context };
       } else {
@@ -580,29 +737,41 @@ async function opControl(op: string, params: any, runtime: BrowserRuntime, ctx: 
   }
 }
 
-async function opCapture(op: string, params: any, runtime: BrowserRuntime, ctx: any, resolve: Function) {
+async function opCapture(
+  op: string,
+  params: any,
+  runtime: BrowserRuntime,
+  ctx: any,
+  resolve: Function
+) {
   const page = browserRuntimeHelpers.getActivePage(runtime);
   switch (op) {
     case 'goto': {
       const url = resolve(params.url);
       await page.goto(url, { waitUntil: params.waitUntil || 'networkidle' });
-      return browserRuntimeHelpers.recordBrowserAction({ ...ctx, last_url: page.url() }, {
-        kind: 'capture',
-        op: 'goto',
-        tab_id: runtime.activeTabId,
-        url,
-      });
+      return browserRuntimeHelpers.recordBrowserAction(
+        { ...ctx, last_url: page.url() },
+        {
+          kind: 'capture',
+          op: 'goto',
+          tab_id: runtime.activeTabId,
+          url,
+        }
+      );
     }
     case 'tabs':
-      return browserRuntimeHelpers.recordBrowserAction({
-        ...ctx,
-        browser_tabs: await browserRuntimeHelpers.summarizeTabs(runtime),
-        [params.export_as || 'browser_tabs']: await browserRuntimeHelpers.summarizeTabs(runtime),
-      }, {
-        kind: 'capture',
-        op: 'tabs',
-        tab_id: runtime.activeTabId,
-      });
+      return browserRuntimeHelpers.recordBrowserAction(
+        {
+          ...ctx,
+          browser_tabs: await browserRuntimeHelpers.summarizeTabs(runtime),
+          [params.export_as || 'browser_tabs']: await browserRuntimeHelpers.summarizeTabs(runtime),
+        },
+        {
+          kind: 'capture',
+          op: 'tabs',
+          tab_id: runtime.activeTabId,
+        }
+      );
     case 'snapshot': {
       const snapshot = await browserRuntimeHelpers.buildSnapshot(page, {
         sessionId: ctx.session_id || 'default',
@@ -610,76 +779,105 @@ async function opCapture(op: string, params: any, runtime: BrowserRuntime, ctx: 
         maxElements: Number(params.max_elements || 200),
       });
       browserRuntimeHelpers.saveBrowserSessionSnapshot(ctx.session_id || 'default', snapshot);
-      return browserRuntimeHelpers.recordBrowserAction({
-        ...ctx,
-        last_snapshot: snapshot,
-        last_capture: snapshot,
-        ref_map: Object.fromEntries(snapshot.elements.map((element) => [element.ref, element.selector])),
-        [params.export_as || 'last_snapshot']: snapshot,
-      }, {
-        kind: 'capture',
-        op: 'snapshot',
-        tab_id: runtime.activeTabId,
-        url: snapshot.url,
-        title: snapshot.title,
-      });
+      return browserRuntimeHelpers.recordBrowserAction(
+        {
+          ...ctx,
+          last_snapshot: snapshot,
+          last_capture: snapshot,
+          ref_map: Object.fromEntries(
+            snapshot.elements.map((element) => [element.ref, element.selector])
+          ),
+          [params.export_as || 'last_snapshot']: snapshot,
+        },
+        {
+          kind: 'capture',
+          op: 'snapshot',
+          tab_id: runtime.activeTabId,
+          url: snapshot.url,
+          title: snapshot.title,
+        }
+      );
     }
     case 'console':
-      return browserRuntimeHelpers.recordBrowserAction({
-        ...ctx,
-        [params.export_as || 'console_events']: runtime.consoleEvents.slice(-(params.limit || 50)),
-      }, {
-        kind: 'capture',
-        op: 'console',
-        tab_id: runtime.activeTabId,
-      });
+      return browserRuntimeHelpers.recordBrowserAction(
+        {
+          ...ctx,
+          [params.export_as || 'console_events']: runtime.consoleEvents.slice(
+            -(params.limit || 50)
+          ),
+        },
+        {
+          kind: 'capture',
+          op: 'console',
+          tab_id: runtime.activeTabId,
+        }
+      );
     case 'network':
-      return browserRuntimeHelpers.recordBrowserAction({
-        ...ctx,
-        [params.export_as || 'network_events']: runtime.networkEvents.slice(-(params.limit || 50)),
-      }, {
-        kind: 'capture',
-        op: 'network',
-        tab_id: runtime.activeTabId,
-      });
+      return browserRuntimeHelpers.recordBrowserAction(
+        {
+          ...ctx,
+          [params.export_as || 'network_events']: runtime.networkEvents.slice(
+            -(params.limit || 50)
+          ),
+        },
+        {
+          kind: 'capture',
+          op: 'network',
+          tab_id: runtime.activeTabId,
+        }
+      );
     case 'screenshot': {
-      const outPath = pathResolver.rootResolve(resolve(params.path || `evidence/browser/screenshot_${Date.now()}.png`));
+      const outPath = pathResolver.rootResolve(
+        resolve(params.path || `evidence/browser/screenshot_${Date.now()}.png`)
+      );
       logger.info(`📸 [BROWSER] Taking screenshot to: ${outPath}`);
-      if (!safeExistsSync(path.dirname(outPath))) safeMkdir(path.dirname(outPath), { recursive: true });
+      if (!safeExistsSync(path.dirname(outPath)))
+        safeMkdir(path.dirname(outPath), { recursive: true });
       await page.screenshot({ path: outPath, fullPage: params.fullPage });
-      return browserRuntimeHelpers.recordBrowserAction({ ...ctx, [params.export_as || 'last_screenshot']: outPath }, {
-        kind: 'capture',
-        op: 'screenshot',
-        tab_id: runtime.activeTabId,
-        url: page.url(),
-      });
+      return browserRuntimeHelpers.recordBrowserAction(
+        { ...ctx, [params.export_as || 'last_screenshot']: outPath },
+        {
+          kind: 'capture',
+          op: 'screenshot',
+          tab_id: runtime.activeTabId,
+          url: page.url(),
+        }
+      );
     }
     case 'content': {
       const selector = params.selector ? resolve(params.selector) : undefined;
       const content = selector ? await page.innerText(selector) : await page.content();
-      return browserRuntimeHelpers.recordBrowserAction({ ...ctx, [params.export_as || 'last_capture']: content }, {
-        kind: 'capture',
-        op: 'content',
-        tab_id: runtime.activeTabId,
-        selector,
-        content_excerpt: typeof content === 'string' ? content.trim().slice(0, 120) : undefined,
-      });
+      return browserRuntimeHelpers.recordBrowserAction(
+        { ...ctx, [params.export_as || 'last_capture']: content },
+        {
+          kind: 'capture',
+          op: 'content',
+          tab_id: runtime.activeTabId,
+          selector,
+          content_excerpt: typeof content === 'string' ? content.trim().slice(0, 120) : undefined,
+        }
+      );
     }
     case 'evaluate':
-      return browserRuntimeHelpers.recordBrowserAction({ ...ctx, [params.export_as || 'last_capture']: await page.evaluate(params.script) }, {
-        kind: 'capture',
-        op: 'evaluate',
-        tab_id: runtime.activeTabId,
-      });
+      return browserRuntimeHelpers.recordBrowserAction(
+        { ...ctx, [params.export_as || 'last_capture']: await page.evaluate(params.script) },
+        {
+          kind: 'capture',
+          op: 'evaluate',
+          tab_id: runtime.activeTabId,
+        }
+      );
     case 'query_elements': {
       // Count visible elements matching a selector (and optional text). Result is
       // stored to `export_as` so a `while`/`if` condition can read it — the
       // declarative equivalent of "is there still a button to process?".
       const selector = resolve(params.selector || '*');
       const textMatch =
-        params.text != null ? String(resolve(params.text))
-        : params.text_match != null ? String(resolve(params.text_match))
-        : null;
+        params.text != null
+          ? String(resolve(params.text))
+          : params.text_match != null
+            ? String(resolve(params.text_match))
+            : null;
       const exact = params.exact === true;
       const count = await page.evaluate(
         (args: { selector: string; textMatch: string | null; exact: boolean }) => {
@@ -691,33 +889,39 @@ async function opCapture(op: string, params: any, runtime: BrowserRuntime, ctx: 
             return args.exact ? label === args.textMatch : label.includes(args.textMatch);
           }).length;
         },
-        { selector, textMatch, exact },
+        { selector, textMatch, exact }
       );
       return browserRuntimeHelpers.recordBrowserAction(
         { ...ctx, [params.export_as || 'element_count']: count },
-        { kind: 'capture', op: 'query_elements', tab_id: runtime.activeTabId, selector },
+        { kind: 'capture', op: 'query_elements', tab_id: runtime.activeTabId, selector }
       );
     }
     case 'passkey_credentials': {
       const credentials = await getVirtualPasskeyCredentials(runtime, page);
-      return browserRuntimeHelpers.recordBrowserAction({
-        ...ctx,
-        [params.export_as || 'passkey_credentials']: credentials,
-      }, {
-        kind: 'capture',
-        op: 'passkey_credentials',
-        tab_id: runtime.activeTabId,
-      });
+      return browserRuntimeHelpers.recordBrowserAction(
+        {
+          ...ctx,
+          [params.export_as || 'passkey_credentials']: credentials,
+        },
+        {
+          kind: 'capture',
+          op: 'passkey_credentials',
+          tab_id: runtime.activeTabId,
+        }
+      );
     }
     case 'passkey_events':
-      return browserRuntimeHelpers.recordBrowserAction({
-        ...ctx,
-        [params.export_as || 'passkey_events']: runtime.webAuthn?.events || [],
-      }, {
-        kind: 'capture',
-        op: 'passkey_events',
-        tab_id: runtime.activeTabId,
-      });
+      return browserRuntimeHelpers.recordBrowserAction(
+        {
+          ...ctx,
+          [params.export_as || 'passkey_events']: runtime.webAuthn?.events || [],
+        },
+        {
+          kind: 'capture',
+          op: 'passkey_events',
+          tab_id: runtime.activeTabId,
+        }
+      );
     case 'export_session_handoff': {
       const targetUrl = String(resolve(params.target_url || page.url())).trim();
       const origin = browserRuntimeHelpers.deriveOrigin(targetUrl || page.url());
@@ -729,32 +933,42 @@ async function opCapture(op: string, params: any, runtime: BrowserRuntime, ctx: 
       });
       const outPath = params.path ? pathResolver.rootResolve(resolve(params.path)) : undefined;
       if (outPath) {
-        if (!safeExistsSync(path.dirname(outPath))) safeMkdir(path.dirname(outPath), { recursive: true });
+        if (!safeExistsSync(path.dirname(outPath)))
+          safeMkdir(path.dirname(outPath), { recursive: true });
         safeWriteFile(outPath, JSON.stringify(handoff, null, 2));
       }
-      return browserRuntimeHelpers.recordBrowserAction({
-        ...ctx,
-        [params.export_as || 'session_handoff']: handoff,
-        ...(outPath ? { session_handoff_path: outPath } : {}),
-      }, {
-        kind: 'capture',
-        op: 'export_session_handoff',
-        tab_id: runtime.activeTabId,
-        url: targetUrl,
-      });
+      return browserRuntimeHelpers.recordBrowserAction(
+        {
+          ...ctx,
+          [params.export_as || 'session_handoff']: handoff,
+          ...(outPath ? { session_handoff_path: outPath } : {}),
+        },
+        {
+          kind: 'capture',
+          op: 'export_session_handoff',
+          tab_id: runtime.activeTabId,
+          url: targetUrl,
+        }
+      );
     }
     case 'title':
-      return browserRuntimeHelpers.recordBrowserAction({ ...ctx, [params.export_as || 'page_title']: await page.title() }, {
-        kind: 'capture',
-        op: 'title',
-        tab_id: runtime.activeTabId,
-      });
+      return browserRuntimeHelpers.recordBrowserAction(
+        { ...ctx, [params.export_as || 'page_title']: await page.title() },
+        {
+          kind: 'capture',
+          op: 'title',
+          tab_id: runtime.activeTabId,
+        }
+      );
     case 'url':
-      return browserRuntimeHelpers.recordBrowserAction({ ...ctx, [params.export_as || 'current_url']: page.url() }, {
-        kind: 'capture',
-        op: 'url',
-        tab_id: runtime.activeTabId,
-      });
+      return browserRuntimeHelpers.recordBrowserAction(
+        { ...ctx, [params.export_as || 'current_url']: page.url() },
+        {
+          kind: 'capture',
+          op: 'url',
+          tab_id: runtime.activeTabId,
+        }
+      );
     default:
       throw new Error(`Unsupported capture operator in Browser-Actuator: ${op}`);
   }
@@ -774,8 +988,14 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
     }
     case 'export_playwright': {
       const trail = browserRuntimeHelpers.readRecordedActions(ctx, params.from);
-      const outPath = pathResolver.rootResolve(resolve(params.path || `active/shared/tmp/browser/${ctx.session_id || 'default'}-playwright.spec.ts`));
-      if (!safeExistsSync(path.dirname(outPath))) safeMkdir(path.dirname(outPath), { recursive: true });
+      const outPath = pathResolver.rootResolve(
+        resolve(
+          params.path ||
+            `active/shared/tmp/browser/${ctx.session_id || 'default'}-playwright.spec.ts`
+        )
+      );
+      if (!safeExistsSync(path.dirname(outPath)))
+        safeMkdir(path.dirname(outPath), { recursive: true });
       const content = browserRuntimeHelpers.renderPlaywrightSkeleton(trail, {
         assertions: params.assertions === 'hint' ? 'hint' : 'strict',
       });
@@ -784,8 +1004,13 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
     }
     case 'export_adf': {
       const trail = browserRuntimeHelpers.readRecordedActions(ctx, params.from);
-      const outPath = pathResolver.rootResolve(resolve(params.path || `active/shared/tmp/browser/${ctx.session_id || 'default'}-pipeline.json`));
-      if (!safeExistsSync(path.dirname(outPath))) safeMkdir(path.dirname(outPath), { recursive: true });
+      const outPath = pathResolver.rootResolve(
+        resolve(
+          params.path || `active/shared/tmp/browser/${ctx.session_id || 'default'}-pipeline.json`
+        )
+      );
+      if (!safeExistsSync(path.dirname(outPath)))
+        safeMkdir(path.dirname(outPath), { recursive: true });
       const adf = browserRuntimeHelpers.renderBrowserAdf(trail, ctx.session_id || 'default');
       safeWriteFile(outPath, JSON.stringify(adf, null, 2));
       return { ...ctx, [params.export_as || 'adf_path']: outPath };
@@ -795,26 +1020,40 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
   }
 }
 
-async function opApply(op: string, params: any, runtime: BrowserRuntime, ctx: any, resolve: Function) {
+async function opApply(
+  op: string,
+  params: any,
+  runtime: BrowserRuntime,
+  ctx: any,
+  resolve: Function
+) {
   const page = browserRuntimeHelpers.getActivePage(runtime);
   switch (op) {
     case 'goto': {
       const url = resolve(params.url);
-      await withRetry(async () => {
+      await retry(async () => {
         await page.goto(url, { waitUntil: params.waitUntil || 'networkidle' });
       }, buildRetryOptions(params));
-      return browserRuntimeHelpers.recordBrowserAction({ ...ctx, last_url: page.url() }, {
-        kind: 'apply',
-        op: 'goto',
-        tab_id: runtime.activeTabId,
-        url,
-      });
+      return browserRuntimeHelpers.recordBrowserAction(
+        { ...ctx, last_url: page.url() },
+        {
+          kind: 'apply',
+          op: 'goto',
+          tab_id: runtime.activeTabId,
+          url,
+        }
+      );
     }
     case 'click':
-      await withRetry(async () => {
+      await retry(async () => {
         await page.click(resolve(params.selector), { timeout: params.timeout || 5000 });
       }, buildRetryOptions(params));
-      return browserRuntimeHelpers.recordBrowserAction(ctx, { kind: 'apply', op: 'click', tab_id: runtime.activeTabId, selector: resolve(params.selector) });
+      return browserRuntimeHelpers.recordBrowserAction(ctx, {
+        kind: 'apply',
+        op: 'click',
+        tab_id: runtime.activeTabId,
+        selector: resolve(params.selector),
+      });
     case 'click_first_match': {
       // Click the first VISIBLE element matching any of the fallback selectors
       // (optionally constrained by text). Declarative resilience against UIs that
@@ -831,35 +1070,60 @@ async function opApply(op: string, params: any, runtime: BrowserRuntime, ctx: an
             for (const el of els) {
               if (el.offsetParent === null) continue; // visible only
               const label = (el.textContent || (el as HTMLInputElement).value || '').trim();
-              if (args.text != null && !(args.exact ? label === args.text : label.includes(args.text))) continue;
+              if (
+                args.text != null &&
+                !(args.exact ? label === args.text : label.includes(args.text))
+              )
+                continue;
               el.click();
               return label || selector;
             }
           }
           return null;
         },
-        { selectors, text, exact },
+        { selectors, text, exact }
       );
       return browserRuntimeHelpers.recordBrowserAction(
         { ...ctx, [params.export_as || 'clicked_match']: clicked },
-        { kind: 'apply', op: 'click_first_match', tab_id: runtime.activeTabId, text: clicked ?? '(none)' },
+        {
+          kind: 'apply',
+          op: 'click_first_match',
+          tab_id: runtime.activeTabId,
+          text: clicked ?? '(none)',
+        }
       );
     }
     case 'fill':
-      await withRetry(async () => {
-        await page.fill(resolve(params.selector), resolve(params.text), { timeout: params.timeout || 5000 });
+      await retry(async () => {
+        await page.fill(resolve(params.selector), resolve(params.text), {
+          timeout: params.timeout || 5000,
+        });
       }, buildRetryOptions(params));
-      return browserRuntimeHelpers.recordBrowserAction(ctx, { kind: 'apply', op: 'fill', tab_id: runtime.activeTabId, selector: resolve(params.selector), text: resolve(params.text) });
+      return browserRuntimeHelpers.recordBrowserAction(ctx, {
+        kind: 'apply',
+        op: 'fill',
+        tab_id: runtime.activeTabId,
+        selector: resolve(params.selector),
+        text: resolve(params.text),
+      });
     case 'press':
-      await withRetry(async () => {
-        await page.press(resolve(params.selector), resolve(params.key), { timeout: params.timeout || 5000 });
+      await retry(async () => {
+        await page.press(resolve(params.selector), resolve(params.key), {
+          timeout: params.timeout || 5000,
+        });
       }, buildRetryOptions(params));
-      return browserRuntimeHelpers.recordBrowserAction(ctx, { kind: 'apply', op: 'press', tab_id: runtime.activeTabId, selector: resolve(params.selector), key: resolve(params.key) });
+      return browserRuntimeHelpers.recordBrowserAction(ctx, {
+        kind: 'apply',
+        op: 'press',
+        tab_id: runtime.activeTabId,
+        selector: resolve(params.selector),
+        key: resolve(params.key),
+      });
     case 'click_ref': {
       const ref = resolve(params.ref);
       const selector = browserRuntimeHelpers.resolveRefSelector(ctx, ref);
       const element = browserRuntimeHelpers.findSnapshotElement(ctx, ref);
-      await withRetry(async () => {
+      await retry(async () => {
         await page.click(selector, { timeout: params.timeout || 5000 });
       }, buildRetryOptions(params));
       return browserRuntimeHelpers.recordBrowserAction(ctx, {
@@ -877,7 +1141,7 @@ async function opApply(op: string, params: any, runtime: BrowserRuntime, ctx: an
       const text = resolve(params.text);
       const selector = browserRuntimeHelpers.resolveRefSelector(ctx, ref);
       const element = browserRuntimeHelpers.findSnapshotElement(ctx, ref);
-      await withRetry(async () => {
+      await retry(async () => {
         await page.fill(selector, text, { timeout: params.timeout || 5000 });
       }, buildRetryOptions(params));
       return browserRuntimeHelpers.recordBrowserAction(ctx, {
@@ -896,7 +1160,7 @@ async function opApply(op: string, params: any, runtime: BrowserRuntime, ctx: an
       const key = resolve(params.key);
       const selector = browserRuntimeHelpers.resolveRefSelector(ctx, ref);
       const element = browserRuntimeHelpers.findSnapshotElement(ctx, ref);
-      await withRetry(async () => {
+      await retry(async () => {
         await page.press(selector, key, { timeout: params.timeout || 5000 });
       }, buildRetryOptions(params));
       return browserRuntimeHelpers.recordBrowserAction(ctx, {
@@ -912,41 +1176,73 @@ async function opApply(op: string, params: any, runtime: BrowserRuntime, ctx: an
     }
     case 'wait':
       if (params.selector) {
-        await withRetry(async () => {
-          await page.waitForSelector(resolve(params.selector), { state: params.state || 'visible', timeout: params.timeout || 10000 });
+        await retry(async () => {
+          await page.waitForSelector(resolve(params.selector), {
+            state: params.state || 'visible',
+            timeout: params.timeout || 10000,
+          });
         }, buildRetryOptions(params));
       } else {
         await page.waitForTimeout(params.duration || 1000);
       }
-      return browserRuntimeHelpers.recordBrowserAction(ctx, { kind: 'apply', op: 'wait', tab_id: runtime.activeTabId, selector: params.selector ? resolve(params.selector) : undefined });
+      return browserRuntimeHelpers.recordBrowserAction(ctx, {
+        kind: 'apply',
+        op: 'wait',
+        tab_id: runtime.activeTabId,
+        selector: params.selector ? resolve(params.selector) : undefined,
+      });
     case 'wait_ref': {
       const ref = resolve(params.ref);
       const selector = browserRuntimeHelpers.resolveRefSelector(ctx, ref);
-      await withRetry(async () => {
-        await page.waitForSelector(selector, { state: params.state || 'visible', timeout: params.timeout || 10000 });
+      await retry(async () => {
+        await page.waitForSelector(selector, {
+          state: params.state || 'visible',
+          timeout: params.timeout || 10000,
+        });
       }, buildRetryOptions(params));
-      return browserRuntimeHelpers.recordBrowserAction(ctx, { kind: 'apply', op: 'wait_ref', tab_id: runtime.activeTabId, ref, selector });
+      return browserRuntimeHelpers.recordBrowserAction(ctx, {
+        kind: 'apply',
+        op: 'wait_ref',
+        tab_id: runtime.activeTabId,
+        ref,
+        selector,
+      });
     }
     case 'log':
       logger.info(`[BROWSER_LOG] ${resolve(params.message || 'Action completed')}`);
-      return browserRuntimeHelpers.recordBrowserAction(ctx, { kind: 'apply', op: 'log', tab_id: runtime.activeTabId });
+      return browserRuntimeHelpers.recordBrowserAction(ctx, {
+        kind: 'apply',
+        op: 'log',
+        tab_id: runtime.activeTabId,
+      });
     case 'list_profiles': {
       let managedProfiles: string[] = [];
       let nativeProfiles: string[] = [];
-      const lease = browserRuntimeHelpers.findBrowserRuntimeLease(runtime) as BrowserRuntimeLeaseLike | undefined;
+      const lease = browserRuntimeHelpers.findBrowserRuntimeLease(runtime) as
+        | BrowserRuntimeLeaseLike
+        | undefined;
       try {
         const managedDir = pathResolver.rootResolve('active/shared/runtime/browser/profiles');
         if (safeExistsSync(managedDir)) {
-          managedProfiles = (await safeReaddir(managedDir))
-            .filter(name => !name.startsWith('.') && (safeExistsSync(path.join(managedDir, name, 'Preferences')) || safeExistsSync(path.join(managedDir, name, 'Default', 'Preferences'))));
+          managedProfiles = (await safeReaddir(managedDir)).filter(
+            (name) =>
+              !name.startsWith('.') &&
+              (safeExistsSync(path.join(managedDir, name, 'Preferences')) ||
+                safeExistsSync(path.join(managedDir, name, 'Default', 'Preferences')))
+          );
         }
-      } catch (e) { /* ignore */ }
+      } catch (e) {
+        /* ignore */
+      }
       try {
         if (lease && safeExistsSync(lease.userDataDir)) {
-          nativeProfiles = (await safeReaddir(lease.userDataDir))
-            .filter(name => name === 'Default' || name.startsWith('Profile '));
+          nativeProfiles = (await safeReaddir(lease.userDataDir)).filter(
+            (name) => name === 'Default' || name.startsWith('Profile ')
+          );
         }
-      } catch (e) { /* ignore */ }
+      } catch (e) {
+        /* ignore */
+      }
 
       const profilesList = {
         managed: managedProfiles,
@@ -956,7 +1252,11 @@ async function opApply(op: string, params: any, runtime: BrowserRuntime, ctx: an
       if (params.export_as) {
         ctx[params.export_as] = profilesList;
       }
-      return browserRuntimeHelpers.recordBrowserAction(ctx, { kind: 'apply', op: 'list_profiles', tab_id: runtime.activeTabId });
+      return browserRuntimeHelpers.recordBrowserAction(ctx, {
+        kind: 'apply',
+        op: 'list_profiles',
+        tab_id: runtime.activeTabId,
+      });
     }
     case 'set_passkey_user_verified': {
       const authenticatorId = getPasskeyAuthenticatorId(runtime);
@@ -965,7 +1265,11 @@ async function opApply(op: string, params: any, runtime: BrowserRuntime, ctx: an
         authenticatorId,
         isUserVerified: params.is_user_verified !== false,
       });
-      return browserRuntimeHelpers.recordBrowserAction(ctx, { kind: 'apply', op: 'set_passkey_user_verified', tab_id: runtime.activeTabId });
+      return browserRuntimeHelpers.recordBrowserAction(ctx, {
+        kind: 'apply',
+        op: 'set_passkey_user_verified',
+        tab_id: runtime.activeTabId,
+      });
     }
     case 'set_passkey_presence': {
       const authenticatorId = getPasskeyAuthenticatorId(runtime);
@@ -974,53 +1278,74 @@ async function opApply(op: string, params: any, runtime: BrowserRuntime, ctx: an
         authenticatorId,
         enabled: params.enabled !== false,
       });
-      return browserRuntimeHelpers.recordBrowserAction(ctx, { kind: 'apply', op: 'set_passkey_presence', tab_id: runtime.activeTabId });
+      return browserRuntimeHelpers.recordBrowserAction(ctx, {
+        kind: 'apply',
+        op: 'set_passkey_presence',
+        tab_id: runtime.activeTabId,
+      });
     }
     case 'clear_passkey_credentials': {
       const authenticatorId = getPasskeyAuthenticatorId(runtime);
       const cdp = await getOrCreatePageCdpSession(runtime, page);
       await cdp.send('WebAuthn.clearCredentials', { authenticatorId });
       if (runtime.webAuthn) runtime.webAuthn.credentials = [];
-      return browserRuntimeHelpers.recordBrowserAction(ctx, { kind: 'apply', op: 'clear_passkey_credentials', tab_id: runtime.activeTabId });
+      return browserRuntimeHelpers.recordBrowserAction(ctx, {
+        kind: 'apply',
+        op: 'clear_passkey_credentials',
+        tab_id: runtime.activeTabId,
+      });
     }
     case 'register_passkey': {
       const registration = await registerPasskey(page, runtime, ctx, params, resolve);
-      return browserRuntimeHelpers.recordBrowserAction({
-        ...ctx,
-        [params.export_as || 'passkey_registration']: registration,
-        passkey_credentials: registration.credentials,
-      }, {
-        kind: 'apply',
-        op: 'register_passkey',
-        tab_id: runtime.activeTabId,
-      });
+      return browserRuntimeHelpers.recordBrowserAction(
+        {
+          ...ctx,
+          [params.export_as || 'passkey_registration']: registration,
+          passkey_credentials: registration.credentials,
+        },
+        {
+          kind: 'apply',
+          op: 'register_passkey',
+          tab_id: runtime.activeTabId,
+        }
+      );
     }
     case 'authenticate_passkey': {
       const authentication = await authenticatePasskey(page, runtime, ctx, params, resolve);
-      return browserRuntimeHelpers.recordBrowserAction({
-        ...ctx,
-        [params.export_as || 'passkey_authentication']: authentication,
-        passkey_credentials: authentication.credentials,
-      }, {
-        kind: 'apply',
-        op: 'authenticate_passkey',
-        tab_id: runtime.activeTabId,
-      });
+      return browserRuntimeHelpers.recordBrowserAction(
+        {
+          ...ctx,
+          [params.export_as || 'passkey_authentication']: authentication,
+          passkey_credentials: authentication.credentials,
+        },
+        {
+          kind: 'apply',
+          op: 'authenticate_passkey',
+          tab_id: runtime.activeTabId,
+        }
+      );
     }
     case 'delete_passkey': {
       const deletion = await deletePasskey(page, runtime, ctx, params, resolve);
-      return browserRuntimeHelpers.recordBrowserAction({
-        ...ctx,
-        [params.export_as || 'passkey_deletion']: deletion,
-        passkey_credentials: deletion.credentials,
-      }, {
-        kind: 'apply',
-        op: 'delete_passkey',
-        tab_id: runtime.activeTabId,
-      });
+      return browserRuntimeHelpers.recordBrowserAction(
+        {
+          ...ctx,
+          [params.export_as || 'passkey_deletion']: deletion,
+          passkey_credentials: deletion.credentials,
+        },
+        {
+          kind: 'apply',
+          op: 'delete_passkey',
+          tab_id: runtime.activeTabId,
+        }
+      );
     }
     case 'import_session_handoff': {
-      const handoff = await browserRuntimeHelpers.resolveSessionHandoff(params, ctx, resolve as (value: any) => any);
+      const handoff = await browserRuntimeHelpers.resolveSessionHandoff(
+        params,
+        ctx,
+        resolve as (value: any) => any
+      );
       if (Array.isArray(handoff.cookies) && handoff.cookies.length > 0) {
         await runtime.context.addCookies(handoff.cookies as any);
       }
@@ -1030,32 +1355,41 @@ async function opApply(op: string, params: any, runtime: BrowserRuntime, ctx: an
       const targetUrl = String(handoff.target_url || resolve(params.target_url || '')).trim();
       if (!targetUrl) throw new Error('import_session_handoff requires a target_url');
       await page.goto(targetUrl, { waitUntil: params.waitUntil || 'domcontentloaded' });
-      if ((handoff.local_storage && Object.keys(handoff.local_storage).length > 0) || (handoff.session_storage && Object.keys(handoff.session_storage).length > 0)) {
-        await page.evaluate(({ localStorageEntries, sessionStorageEntries }) => {
-          for (const [key, value] of Object.entries(localStorageEntries || {})) {
-            window.localStorage.setItem(key, String(value));
+      if (
+        (handoff.local_storage && Object.keys(handoff.local_storage).length > 0) ||
+        (handoff.session_storage && Object.keys(handoff.session_storage).length > 0)
+      ) {
+        await page.evaluate(
+          ({ localStorageEntries, sessionStorageEntries }) => {
+            for (const [key, value] of Object.entries(localStorageEntries || {})) {
+              window.localStorage.setItem(key, String(value));
+            }
+            for (const [key, value] of Object.entries(sessionStorageEntries || {})) {
+              window.sessionStorage.setItem(key, String(value));
+            }
+          },
+          {
+            localStorageEntries: handoff.local_storage || {},
+            sessionStorageEntries: handoff.session_storage || {},
           }
-          for (const [key, value] of Object.entries(sessionStorageEntries || {})) {
-            window.sessionStorage.setItem(key, String(value));
-          }
-        }, {
-          localStorageEntries: handoff.local_storage || {},
-          sessionStorageEntries: handoff.session_storage || {},
-        });
+        );
         if (params.reload_after_import !== false) {
           await page.reload({ waitUntil: params.waitUntil || 'domcontentloaded' });
         }
       }
-      return browserRuntimeHelpers.recordBrowserAction({
-        ...ctx,
-        [params.export_as || 'imported_session_handoff']: handoff,
-        last_url: page.url(),
-      }, {
-        kind: 'apply',
-        op: 'import_session_handoff',
-        tab_id: runtime.activeTabId,
-        url: targetUrl,
-      });
+      return browserRuntimeHelpers.recordBrowserAction(
+        {
+          ...ctx,
+          [params.export_as || 'imported_session_handoff']: handoff,
+          last_url: page.url(),
+        },
+        {
+          kind: 'apply',
+          op: 'import_session_handoff',
+          tab_id: runtime.activeTabId,
+          url: targetUrl,
+        }
+      );
     }
     default:
       throw new Error(`Unsupported apply operator in Browser-Actuator: ${op}`);
@@ -1072,11 +1406,18 @@ function getPasskeyPreset(provider?: string) {
   return preset;
 }
 
-function loadPasskeyProviderCatalog(): { default_provider?: string; providers: Record<string, any> } {
-  const passkeyProviderCatalogPath = pathResolver.knowledge('product/orchestration/browser-passkey-providers.json');
+function loadPasskeyProviderCatalog(): {
+  default_provider?: string;
+  providers: Record<string, any>;
+} {
+  const passkeyProviderCatalogPath = pathResolver.knowledge(
+    'product/orchestration/browser-passkey-providers.json'
+  );
   if (safeExistsSync(passkeyProviderCatalogPath)) {
     try {
-      const parsed = JSON.parse(safeReadFile(passkeyProviderCatalogPath, { encoding: 'utf8' }) as string);
+      const parsed = JSON.parse(
+        safeReadFile(passkeyProviderCatalogPath, { encoding: 'utf8' }) as string
+      );
       if (parsed && typeof parsed === 'object' && parsed.providers) return parsed;
     } catch (_) {}
   }
@@ -1115,7 +1456,10 @@ function attachWebAuthnObservers(runtime: BrowserRuntime, session: CDPSession): 
       credential: event.credential,
       ts: new Date().toISOString(),
     });
-    runtime.webAuthn!.credentials = upsertPasskeyCredential(runtime.webAuthn!.credentials, event.credential);
+    runtime.webAuthn!.credentials = upsertPasskeyCredential(
+      runtime.webAuthn!.credentials,
+      event.credential
+    );
   });
   session.on('WebAuthn.credentialAsserted', (event: any) => {
     runtime.webAuthn!.events.push({
@@ -1123,7 +1467,10 @@ function attachWebAuthnObservers(runtime: BrowserRuntime, session: CDPSession): 
       credential: event.credential,
       ts: new Date().toISOString(),
     });
-    runtime.webAuthn!.credentials = upsertPasskeyCredential(runtime.webAuthn!.credentials, event.credential);
+    runtime.webAuthn!.credentials = upsertPasskeyCredential(
+      runtime.webAuthn!.credentials,
+      event.credential
+    );
   });
   session.on('WebAuthn.credentialDeleted', (event: any) => {
     runtime.webAuthn!.events.push({
@@ -1132,7 +1479,7 @@ function attachWebAuthnObservers(runtime: BrowserRuntime, session: CDPSession): 
       ts: new Date().toISOString(),
     });
     runtime.webAuthn!.credentials = runtime.webAuthn!.credentials.filter(
-      (credential) => credential.credentialId !== event.credentialId,
+      (credential) => credential.credentialId !== event.credentialId
     );
   });
   session.on('WebAuthn.credentialUpdated', (event: any) => {
@@ -1141,7 +1488,10 @@ function attachWebAuthnObservers(runtime: BrowserRuntime, session: CDPSession): 
       credential: event.credential,
       ts: new Date().toISOString(),
     });
-    runtime.webAuthn!.credentials = upsertPasskeyCredential(runtime.webAuthn!.credentials, event.credential);
+    runtime.webAuthn!.credentials = upsertPasskeyCredential(
+      runtime.webAuthn!.credentials,
+      event.credential
+    );
   });
 }
 
@@ -1158,7 +1508,7 @@ async function setupVirtualPasskeyAuthenticator(
     hasLargeBlob: boolean;
     automaticPresenceSimulation: boolean;
     isUserVerified: boolean;
-  },
+  }
 ): Promise<Record<string, any>> {
   const cdp = await getOrCreatePageCdpSession(runtime, page);
   await cdp.send('WebAuthn.enable', { enableUI: options.enableUI });
@@ -1213,7 +1563,10 @@ async function setupVirtualPasskeyAuthenticator(
   };
 }
 
-async function removeVirtualPasskeyAuthenticator(runtime: BrowserRuntime, page: Page): Promise<void> {
+async function removeVirtualPasskeyAuthenticator(
+  runtime: BrowserRuntime,
+  page: Page
+): Promise<void> {
   const authenticatorId = getPasskeyAuthenticatorId(runtime);
   const cdp = await getOrCreatePageCdpSession(runtime, page);
   await cdp.send('WebAuthn.removeVirtualAuthenticator', { authenticatorId });
@@ -1224,7 +1577,10 @@ async function removeVirtualPasskeyAuthenticator(runtime: BrowserRuntime, page: 
   };
 }
 
-async function getVirtualPasskeyCredentials(runtime: BrowserRuntime, page: Page): Promise<Array<Record<string, any>>> {
+async function getVirtualPasskeyCredentials(
+  runtime: BrowserRuntime,
+  page: Page
+): Promise<Array<Record<string, any>>> {
   const authenticatorId = getPasskeyAuthenticatorId(runtime);
   const cdp = await getOrCreatePageCdpSession(runtime, page);
   const result = await cdp.send('WebAuthn.getCredentials', { authenticatorId });
@@ -1239,34 +1595,46 @@ async function getVirtualPasskeyCredentials(runtime: BrowserRuntime, page: Page)
 function getPasskeyAuthenticatorId(runtime: BrowserRuntime): string {
   const authenticatorId = runtime.webAuthn?.authenticatorId;
   if (!authenticatorId) {
-    throw new Error('No virtual passkey authenticator is active. Run setup_passkey_authenticator first.');
+    throw new Error(
+      'No virtual passkey authenticator is active. Run setup_passkey_authenticator first.'
+    );
   }
   return authenticatorId;
 }
 
 function upsertPasskeyCredential(
   credentials: Array<Record<string, any>>,
-  nextCredential: Record<string, any> | undefined,
+  nextCredential: Record<string, any> | undefined
 ): Array<Record<string, any>> {
   if (!nextCredential?.credentialId) return credentials;
-  const next = credentials.filter((credential) => credential.credentialId !== nextCredential.credentialId);
+  const next = credentials.filter(
+    (credential) => credential.credentialId !== nextCredential.credentialId
+  );
   next.push(nextCredential);
   return next;
 }
 
-async function registerPasskey(page: Page, runtime: BrowserRuntime, ctx: any, params: any, resolve: Function) {
+async function registerPasskey(
+  page: Page,
+  runtime: BrowserRuntime,
+  ctx: any,
+  params: any,
+  resolve: Function
+) {
   const preset = getPasskeyPreset(resolve(params.provider));
   const username = String(resolve(params.username ?? ctx.username ?? 'kyberion_passkey_user'));
   const waitMs = Number(params.wait_ms || 1500);
   if (params.navigate !== false) {
-    await page.goto(String(resolve(params.url || preset.baseUrl)), { waitUntil: params.waitUntil || 'networkidle' });
+    await page.goto(String(resolve(params.url || preset.baseUrl)), {
+      waitUntil: params.waitUntil || 'networkidle',
+    });
   }
   if (!runtime.webAuthn?.authenticatorId || params.setup_authenticator !== false) {
     await setupVirtualPasskeyAuthenticator(runtime, page, {
       enableUI: params.enable_ui === true,
       replaceExisting: params.replace_existing !== false,
-      protocol: (resolve(params.protocol || 'ctap2') as 'ctap2' | 'u2f'),
-      transport: (resolve(params.transport || 'internal') as 'usb' | 'nfc' | 'ble' | 'internal'),
+      protocol: resolve(params.protocol || 'ctap2') as 'ctap2' | 'u2f',
+      transport: resolve(params.transport || 'internal') as 'usb' | 'nfc' | 'ble' | 'internal',
       hasResidentKey: params.has_resident_key !== false,
       hasUserVerification: params.has_user_verification !== false,
       hasLargeBlob: params.has_large_blob === true,
@@ -1274,8 +1642,12 @@ async function registerPasskey(page: Page, runtime: BrowserRuntime, ctx: any, pa
       isUserVerified: params.user_verified !== false,
     });
   }
-  await page.fill(resolve(params.username_selector || preset.usernameSelector), username, { timeout: params.timeout || 5000 });
-  await page.click(resolve(params.register_selector || preset.registerSelector), { timeout: params.timeout || 5000 });
+  await page.fill(resolve(params.username_selector || preset.usernameSelector), username, {
+    timeout: params.timeout || 5000,
+  });
+  await page.click(resolve(params.register_selector || preset.registerSelector), {
+    timeout: params.timeout || 5000,
+  });
   await page.waitForTimeout(waitMs);
   const credentials = await getVirtualPasskeyCredentials(runtime, page);
   return {
@@ -1286,7 +1658,13 @@ async function registerPasskey(page: Page, runtime: BrowserRuntime, ctx: any, pa
   };
 }
 
-async function authenticatePasskey(page: Page, runtime: BrowserRuntime, ctx: any, params: any, resolve: Function) {
+async function authenticatePasskey(
+  page: Page,
+  runtime: BrowserRuntime,
+  ctx: any,
+  params: any,
+  resolve: Function
+) {
   const preset = getPasskeyPreset(resolve(params.provider));
   const waitMs = Number(params.wait_ms || 1500);
   const username = params.username !== undefined ? String(resolve(params.username)) : undefined;
@@ -1298,7 +1676,9 @@ async function authenticatePasskey(page: Page, runtime: BrowserRuntime, ctx: any
     authPage = await openFreshPasskeyPage(runtime);
   }
   if (params.navigate !== false) {
-    await authPage.goto(String(resolve(params.url || preset.baseUrl)), { waitUntil: params.waitUntil || 'networkidle' });
+    await authPage.goto(String(resolve(params.url || preset.baseUrl)), {
+      waitUntil: params.waitUntil || 'networkidle',
+    });
   }
   if (preset.postAuthUrlIncludes && authPage.url().includes(preset.postAuthUrlIncludes)) {
     const credentials = await getVirtualPasskeyCredentials(runtime, authPage);
@@ -1313,9 +1693,13 @@ async function authenticatePasskey(page: Page, runtime: BrowserRuntime, ctx: any
   }
   try {
     if (username) {
-      await authPage.fill(resolve(params.username_selector || preset.usernameSelector), username, { timeout: params.timeout || 5000 });
+      await authPage.fill(resolve(params.username_selector || preset.usernameSelector), username, {
+        timeout: params.timeout || 5000,
+      });
     }
-    await authPage.click(resolve(params.authenticate_selector || preset.authenticateSelector), { timeout: params.timeout || 5000 });
+    await authPage.click(resolve(params.authenticate_selector || preset.authenticateSelector), {
+      timeout: params.timeout || 5000,
+    });
   } catch (err) {
     if (preset.postAuthUrlIncludes && authPage.url().includes(preset.postAuthUrlIncludes)) {
       const credentials = await getVirtualPasskeyCredentials(runtime, authPage);
@@ -1337,11 +1721,19 @@ async function authenticatePasskey(page: Page, runtime: BrowserRuntime, ctx: any
     username,
     credentials,
     url: authPage.url(),
-    authenticated: preset.postAuthUrlIncludes ? authPage.url().includes(preset.postAuthUrlIncludes) : true,
+    authenticated: preset.postAuthUrlIncludes
+      ? authPage.url().includes(preset.postAuthUrlIncludes)
+      : true,
   };
 }
 
-async function deletePasskey(page: Page, runtime: BrowserRuntime, ctx: any, params: any, resolve: Function) {
+async function deletePasskey(
+  page: Page,
+  runtime: BrowserRuntime,
+  ctx: any,
+  params: any,
+  resolve: Function
+) {
   const authenticatorId = getPasskeyAuthenticatorId(runtime);
   const cdp = await getOrCreatePageCdpSession(runtime, page);
   const credentials = await getVirtualPasskeyCredentials(runtime, page);
@@ -1352,13 +1744,17 @@ async function deletePasskey(page: Page, runtime: BrowserRuntime, ctx: any, para
     credentialToDelete = credentials.find((credential) => credential.credentialId === credentialId);
   } else if (params.username) {
     const username = String(resolve(params.username));
-    credentialToDelete = credentials.find((credential) => credential.userName === username || credential.userDisplayName === username);
+    credentialToDelete = credentials.find(
+      (credential) => credential.userName === username || credential.userDisplayName === username
+    );
   } else if (credentials.length === 1) {
     credentialToDelete = credentials[0];
   }
 
   if (!credentialToDelete?.credentialId) {
-    throw new Error('Unable to determine passkey credential to delete. Provide credential_id or username.');
+    throw new Error(
+      'Unable to determine passkey credential to delete. Provide credential_id or username.'
+    );
   }
 
   await cdp.send('WebAuthn.removeCredential', {

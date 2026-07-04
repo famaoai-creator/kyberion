@@ -1,7 +1,14 @@
 import AjvModule, { type ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeReaddir, safeWriteFile } from './secure-io.js';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeReaddir,
+  safeWriteFile,
+} from './secure-io.js';
 import { SPECIALIST_IDS } from './specialist-ids.js';
+import { slugify } from './text-utils.js';
 
 export interface ProjectRecord {
   project_id: string;
@@ -62,7 +69,9 @@ export function validateProjectRecord(value: unknown): value is ProjectRecord {
 
 export function saveProjectRecord(record: ProjectRecord): string {
   if (!validateProjectRecord(record)) {
-    const errors = (ensureValidator().errors || []).map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`);
+    const errors = (ensureValidator().errors || []).map(
+      (error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`
+    );
     throw new Error(`Invalid project record: ${errors.join('; ')}`);
   }
   if (!safeExistsSync(PROJECT_DIR)) safeMkdir(PROJECT_DIR, { recursive: true });
@@ -92,38 +101,43 @@ export function resolveProjectRecordForText(input: {
   utterance?: string;
   projectName?: string;
 }): ProjectRecord | null {
-  const requestedName = String(input.projectName || '').trim().toLowerCase();
-  const utterance = String(input.utterance || '').trim().toLowerCase();
+  const requestedName = String(input.projectName || '')
+    .trim()
+    .toLowerCase();
+  const utterance = String(input.utterance || '')
+    .trim()
+    .toLowerCase();
   const candidates = listProjectRecords();
 
   if (requestedName) {
-    const exact = candidates.find((record) => record.name.toLowerCase() === requestedName || record.project_id.toLowerCase() === requestedName);
+    const exact = candidates.find(
+      (record) =>
+        record.name.toLowerCase() === requestedName ||
+        record.project_id.toLowerCase() === requestedName
+    );
     if (exact) return exact;
-    const fuzzy = candidates.find((record) =>
-      record.name.toLowerCase().includes(requestedName) ||
-      requestedName.includes(record.name.toLowerCase()) ||
-      record.project_id.toLowerCase().includes(requestedName),
+    const fuzzy = candidates.find(
+      (record) =>
+        record.name.toLowerCase().includes(requestedName) ||
+        requestedName.includes(record.name.toLowerCase()) ||
+        record.project_id.toLowerCase().includes(requestedName)
     );
     if (fuzzy) return fuzzy;
   }
 
   if (!utterance) return null;
-  return candidates.find((record) =>
-    utterance.includes(record.name.toLowerCase()) ||
-    utterance.includes(record.project_id.toLowerCase()),
-  ) || null;
+  return (
+    candidates.find(
+      (record) =>
+        utterance.includes(record.name.toLowerCase()) ||
+        utterance.includes(record.project_id.toLowerCase())
+    ) || null
+  );
 }
 
-function slugifyBootstrapToken(value: string): string {
-  return value
-    .trim()
-    .toUpperCase()
-    .replace(/[^A-Z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 18) || 'WORK';
-}
-
-function inferBootstrapKind(utterance?: string): 'web_service' | 'document_program' | 'general_project' {
+function inferBootstrapKind(
+  utterance?: string
+): 'web_service' | 'document_program' | 'general_project' {
   const text = String(utterance || '').toLowerCase();
   if (/(web.?service|webサービス|アプリ|application|saas|サイト)/i.test(text)) return 'web_service';
   if (/(試験計画|報告書|proposal|document|資料|deck|report)/i.test(text)) return 'document_program';
@@ -135,7 +149,10 @@ export function buildProjectBootstrapWorkItems(input: {
   projectName: string;
   utterance?: string;
 }): ProjectBootstrapWorkItem[] {
-  const prefix = slugifyBootstrapToken(input.projectId.replace(/^PRJ-/, ''));
+  const prefix = slugify(input.projectId.replace(/^PRJ-/, ''), {
+    maxLength: 18,
+    fallback: 'work',
+  }).toUpperCase();
   const kind = inferBootstrapKind(input.utterance);
 
   if (kind === 'web_service') {

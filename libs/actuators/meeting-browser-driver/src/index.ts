@@ -26,7 +26,7 @@
 import {
   registerMeetingJoinDriver,
   logger,
-  withRetry,
+  retry,
   type AudioBus,
   type AudioChunk,
   validateMeetingTarget,
@@ -43,7 +43,12 @@ import {
   type MeetingPreJoinSelectors,
 } from './selectors.js';
 import { readCookies, writeCookies } from './cookie-store.js';
-import { buildRetryOptions, loadPlaywright, trySelectors, waitForAnyVisibleSelector } from './meeting-browser-driver-helpers.js';
+import {
+  buildRetryOptions,
+  loadPlaywright,
+  trySelectors,
+  waitForAnyVisibleSelector,
+} from './meeting-browser-driver-helpers.js';
 import { safeReadFile, pathResolver } from '@agent/core';
 import * as path from 'node:path';
 
@@ -109,7 +114,11 @@ interface PlaywrightJoinRuntime {
   cleanup_mode: 'browser' | 'context' | 'none';
 }
 
-async function clickFirstVisible(page: PlaywrightPage, selectors: string[], timeoutMs: number): Promise<boolean> {
+async function clickFirstVisible(
+  page: PlaywrightPage,
+  selectors: string[],
+  timeoutMs: number
+): Promise<boolean> {
   return trySelectors(page, selectors, async (sel) => {
     await page.click(sel, { timeout: timeoutMs });
   });
@@ -119,7 +128,7 @@ async function fillFirstVisible(
   page: PlaywrightPage,
   selectors: string[],
   value: string | undefined,
-  timeoutMs: number,
+  timeoutMs: number
 ): Promise<boolean> {
   const desired = typeof value === 'string' ? value.trim() : '';
   if (!desired) return false;
@@ -137,12 +146,14 @@ async function selectDeviceChoice(
   selectors: MeetingPreJoinSelectors,
   controlSelectors: string[],
   preference: string | undefined,
-  timeoutMs: number,
+  timeoutMs: number
 ): Promise<boolean> {
   const desired = typeof preference === 'string' ? preference.trim() : '';
   if (!desired) return false;
 
-  const opened = controlSelectors.length ? await clickFirstVisible(page, controlSelectors, timeoutMs) : true;
+  const opened = controlSelectors.length
+    ? await clickFirstVisible(page, controlSelectors, timeoutMs)
+    : true;
   if (!opened) return false;
   await new Promise((resolve) => setTimeout(resolve, 250));
 
@@ -165,13 +176,18 @@ async function fillMeetingEntryFields(
   page: PlaywrightPage,
   selectors: MeetingPreJoinSelectors,
   target: { meeting_id?: string; passcode?: string; display_name?: string },
-  timeoutMs: number,
+  timeoutMs: number
 ): Promise<void> {
   await fillFirstVisible(page, selectors.meeting_id_input, target.meeting_id, timeoutMs);
   await fillFirstVisible(page, selectors.meeting_passcode_input, target.passcode, timeoutMs);
   // Some vendors expose a name field on a later step or only for guests.
   if (target.display_name) {
-    await fillFirstVisible(page, selectors.name_input, target.display_name, Math.max(timeoutMs, 20_000));
+    await fillFirstVisible(
+      page,
+      selectors.name_input,
+      target.display_name,
+      Math.max(timeoutMs, 20_000)
+    );
   }
 }
 
@@ -179,22 +195,38 @@ async function configureMeetingDevices(
   page: PlaywrightPage,
   selectors: MeetingPreJoinSelectors,
   preferences: { microphone?: string; speaker?: string; camera?: string },
-  timeoutMs: number,
+  timeoutMs: number
 ): Promise<void> {
-  const desired = [
-    preferences.microphone,
-    preferences.speaker,
-    preferences.camera,
-  ].some((value) => typeof value === 'string' && value.trim().length > 0);
+  const desired = [preferences.microphone, preferences.speaker, preferences.camera].some(
+    (value) => typeof value === 'string' && value.trim().length > 0
+  );
   if (!desired) return;
 
   const opened = await clickFirstVisible(page, selectors.settings_button, timeoutMs);
   if (!opened) return;
   await new Promise((resolve) => setTimeout(resolve, 250));
 
-  await selectDeviceChoice(page, selectors, selectors.microphone_device_button, preferences.microphone, timeoutMs);
-  await selectDeviceChoice(page, selectors, selectors.speaker_device_button, preferences.speaker, timeoutMs);
-  await selectDeviceChoice(page, selectors, selectors.camera_device_button, preferences.camera, timeoutMs);
+  await selectDeviceChoice(
+    page,
+    selectors,
+    selectors.microphone_device_button,
+    preferences.microphone,
+    timeoutMs
+  );
+  await selectDeviceChoice(
+    page,
+    selectors,
+    selectors.speaker_device_button,
+    preferences.speaker,
+    timeoutMs
+  );
+  await selectDeviceChoice(
+    page,
+    selectors,
+    selectors.camera_device_button,
+    preferences.camera,
+    timeoutMs
+  );
 }
 
 function resolveChromeUserDataDir(userDataDir?: string): string | undefined {
@@ -205,7 +237,7 @@ function resolveChromeUserDataDir(userDataDir?: string): string | undefined {
 
 async function createPlaywrightJoinRuntime(
   chromium: any,
-  opts: BrowserDriverOptions,
+  opts: BrowserDriverOptions
 ): Promise<PlaywrightJoinRuntime> {
   const headed = opts.headed ?? false;
   const launchArgs = [
@@ -214,15 +246,19 @@ async function createPlaywrightJoinRuntime(
   ];
 
   if (opts.connect_over_cdp) {
-    const cdpUrl = typeof opts.cdp_url === 'string' && opts.cdp_url.trim().length > 0
-      ? opts.cdp_url.trim()
-      : typeof opts.cdp_port === 'number' && Number.isFinite(opts.cdp_port)
-        ? `http://127.0.0.1:${opts.cdp_port}`
-        : '';
+    const cdpUrl =
+      typeof opts.cdp_url === 'string' && opts.cdp_url.trim().length > 0
+        ? opts.cdp_url.trim()
+        : typeof opts.cdp_port === 'number' && Number.isFinite(opts.cdp_port)
+          ? `http://127.0.0.1:${opts.cdp_port}`
+          : '';
     if (!cdpUrl) {
       throw new Error('connect_over_cdp=true requires cdp_url or cdp_port');
     }
-    const browser = (await withRetry(async () => chromium.connectOverCDP(cdpUrl), buildRetryOptions())) as PlaywrightBrowser & { contexts: () => PlaywrightContext[] };
+    const browser = (await retry(
+      async () => chromium.connectOverCDP(cdpUrl),
+      buildRetryOptions()
+    )) as PlaywrightBrowser & { contexts: () => PlaywrightContext[] };
     const context = browser.contexts()[0];
     if (!context) {
       await browser.close().catch(() => undefined);
@@ -240,29 +276,41 @@ async function createPlaywrightJoinRuntime(
 
   const userDataDir = resolveChromeUserDataDir(opts.user_data_dir);
   if (userDataDir) {
-    const context = (await withRetry(async () => chromium.launchPersistentContext(userDataDir, {
-      channel: opts.browser_channel === 'chrome' ? 'chrome' : undefined,
-      headless: !headed,
-      viewport: { width: 1280, height: 800 },
-      args: [
-        ...launchArgs,
-        ...(opts.profile_directory ? [`--profile-directory=${opts.profile_directory}`] : []),
-      ],
-    }), buildRetryOptions())) as PlaywrightContext;
+    const context = (await retry(
+      async () =>
+        chromium.launchPersistentContext(userDataDir, {
+          channel: opts.browser_channel === 'chrome' ? 'chrome' : undefined,
+          headless: !headed,
+          viewport: { width: 1280, height: 800 },
+          args: [
+            ...launchArgs,
+            ...(opts.profile_directory ? [`--profile-directory=${opts.profile_directory}`] : []),
+          ],
+        }),
+      buildRetryOptions()
+    )) as PlaywrightContext;
     if (typeof (context as any).grantPermissions === 'function') {
       await (context as any).grantPermissions(['microphone', 'camera']);
     }
     return { context, cleanup_mode: 'context' };
   }
 
-  const browser = (await withRetry(async () => chromium.launch({
-    headless: !headed,
-    args: launchArgs,
-  }), buildRetryOptions())) as PlaywrightBrowser & { newContext: (opts?: any) => Promise<PlaywrightContext> };
-  const context = (await withRetry(async () => browser.newContext({
-    permissions: ['microphone', 'camera'],
-    viewport: { width: 1280, height: 800 },
-  }), buildRetryOptions())) as PlaywrightContext;
+  const browser = (await retry(
+    async () =>
+      chromium.launch({
+        headless: !headed,
+        args: launchArgs,
+      }),
+    buildRetryOptions()
+  )) as PlaywrightBrowser & { newContext: (opts?: any) => Promise<PlaywrightContext> };
+  const context = (await retry(
+    async () =>
+      browser.newContext({
+        permissions: ['microphone', 'camera'],
+        viewport: { width: 1280, height: 800 },
+      }),
+    buildRetryOptions()
+  )) as PlaywrightContext;
   return { browser, context, cleanup_mode: 'browser' };
 }
 
@@ -276,7 +324,7 @@ class BrowserMeetingJoinDriver implements MeetingJoinDriver {
     try {
       // Optional dependency — we don't `require`/`import` it
       // statically so non-bot deployments aren't forced to install.
-      await withRetry(async () => loadPlaywright(), buildRetryOptions());
+      await retry(async () => loadPlaywright(), buildRetryOptions());
       return { available: true };
     } catch (err: any) {
       return {
@@ -292,8 +340,9 @@ class BrowserMeetingJoinDriver implements MeetingJoinDriver {
     const { chromium } = await loadPlaywright();
     const validatedTarget = validateMeetingTarget(target);
     const platform = validatedTarget.platform;
-    const selectors = this.opts.selectors_override?.[platform as 'meet' | 'zoom' | 'teams']
-      ?? selectorsForPlatform(platform);
+    const selectors =
+      this.opts.selectors_override?.[platform as 'meet' | 'zoom' | 'teams'] ??
+      selectorsForPlatform(platform);
     const accountSlug = this.opts.account_slug ?? 'default';
     const microphoneDevice = this.opts.microphone_device;
     const speakerDevice = this.opts.speaker_device;
@@ -308,7 +357,7 @@ class BrowserMeetingJoinDriver implements MeetingJoinDriver {
     const persisted = readCookies(accountSlug);
     if (persisted.length) await context.addCookies(persisted as any[]);
 
-    const page = await withRetry(async () => context.newPage(), buildRetryOptions());
+    const page = await retry(async () => context.newPage(), buildRetryOptions());
     const state: MeetingSessionState = {
       session_id: `browser-${Date.now()}`,
       platform,
@@ -316,20 +365,34 @@ class BrowserMeetingJoinDriver implements MeetingJoinDriver {
     };
 
     try {
-      await withRetry(async () => page.goto(validatedTarget.url, { waitUntil: 'domcontentloaded', timeout: stepTimeout }), buildRetryOptions());
+      await retry(
+        async () =>
+          page.goto(validatedTarget.url, { waitUntil: 'domcontentloaded', timeout: stepTimeout }),
+        buildRetryOptions()
+      );
       await trySelectors(page, selectors.continue_without_audio_video_button, async (sel) => {
         await page.click(sel, { timeout: stepTimeout });
       });
-      await fillMeetingEntryFields(page, selectors, {
-        meeting_id: validatedTarget.meeting_id,
-        passcode: validatedTarget.passcode,
-        display_name: validatedTarget.display_name,
-      }, stepTimeout);
-      await configureMeetingDevices(page, selectors, {
-        microphone: microphoneDevice,
-        speaker: speakerDevice,
-        camera: cameraDevice,
-      }, stepTimeout);
+      await fillMeetingEntryFields(
+        page,
+        selectors,
+        {
+          meeting_id: validatedTarget.meeting_id,
+          passcode: validatedTarget.passcode,
+          display_name: validatedTarget.display_name,
+        },
+        stepTimeout
+      );
+      await configureMeetingDevices(
+        page,
+        selectors,
+        {
+          microphone: microphoneDevice,
+          speaker: speakerDevice,
+          camera: cameraDevice,
+        },
+        stepTimeout
+      );
       // Mute mic + camera before joining (the AI controls speech via
       // TTS into the bus, not browser-mic).
       await trySelectors(page, selectors.mute_mic_button, async (sel) => {
@@ -346,14 +409,17 @@ class BrowserMeetingJoinDriver implements MeetingJoinDriver {
       });
       const joined = joinSelector
         ? await trySelectors(page, [joinSelector], async (sel) => {
-          await page.click(sel, { timeout: stepTimeout });
-        })
+            await page.click(sel, { timeout: stepTimeout });
+          })
         : false;
       if (!joined) {
-        const bodyText = await page.locator('body').innerText().catch(() => '');
+        const bodyText = await page
+          .locator('body')
+          .innerText()
+          .catch(() => '');
         if (/You can't join this video call/i.test(bodyText) || /Sign in/i.test(bodyText)) {
           throw new Error(
-            `[browser-driver] Meet rejected this browser session before join. Use a signed-in Chrome profile or seed account_slug='${accountSlug}' with valid Google cookies.`,
+            `[browser-driver] Meet rejected this browser session before join. Use a signed-in Chrome profile or seed account_slug='${accountSlug}' with valid Google cookies.`
           );
         }
         throw new Error(`[browser-driver] no join button matched (${platform})`);
@@ -371,15 +437,18 @@ class BrowserMeetingJoinDriver implements MeetingJoinDriver {
     } catch (err: any) {
       state.status = 'error';
       state.error = err?.message ?? String(err);
-        if (runtime.cleanup_mode === 'browser' && runtime.browser) {
-          await withRetry(async () => runtime.browser?.close().catch(() => undefined), buildRetryOptions());
-        } else if (runtime.cleanup_mode === 'context') {
-          await withRetry(async () => context.close().catch(() => undefined), buildRetryOptions());
-        } else {
-          await page.close().catch(() => undefined);
-        }
-        throw err;
+      if (runtime.cleanup_mode === 'browser' && runtime.browser) {
+        await retry(
+          async () => runtime.browser?.close().catch(() => undefined),
+          buildRetryOptions()
+        );
+      } else if (runtime.cleanup_mode === 'context') {
+        await retry(async () => context.close().catch(() => undefined), buildRetryOptions());
+      } else {
+        await page.close().catch(() => undefined);
       }
+      throw err;
+    }
 
     let leaveSignaled = false;
     return {
@@ -398,19 +467,26 @@ class BrowserMeetingJoinDriver implements MeetingJoinDriver {
       },
       async leave(): Promise<void> {
         leaveSignaled = true;
-        await withRetry(async () => trySelectors(page, selectors.leave_button, async (sel) => {
-          await page.click(sel, { timeout: 5_000 });
-        }), buildRetryOptions());
+        await retry(
+          async () =>
+            trySelectors(page, selectors.leave_button, async (sel) => {
+              await page.click(sel, { timeout: 5_000 });
+            }),
+          buildRetryOptions()
+        );
         state.status = 'ended';
         state.left_at = new Date().toISOString();
         if (runtime.cleanup_mode === 'browser' && runtime.browser) {
-          await withRetry(async () => runtime.browser?.close().catch(() => undefined), buildRetryOptions());
+          await retry(
+            async () => runtime.browser?.close().catch(() => undefined),
+            buildRetryOptions()
+          );
         } else if (runtime.cleanup_mode === 'context') {
-          await withRetry(async () => context.close().catch(() => undefined), buildRetryOptions());
+          await retry(async () => context.close().catch(() => undefined), buildRetryOptions());
         } else {
           await page.close().catch(() => undefined);
         }
-        await withRetry(async () => bus.close(), buildRetryOptions());
+        await retry(async () => bus.close(), buildRetryOptions());
       },
     };
   }
@@ -433,6 +509,8 @@ export function installBrowserMeetingJoinDriver(opts: BrowserDriverOptions = {})
  * This keeps the browser join driver usable as an explicit backend in
  * coordinators that want to own the registry step themselves.
  */
-export function createBrowserMeetingJoinDriver(opts: BrowserDriverOptions = {}): BrowserMeetingJoinDriver {
+export function createBrowserMeetingJoinDriver(
+  opts: BrowserDriverOptions = {}
+): BrowserMeetingJoinDriver {
   return new BrowserMeetingJoinDriver(opts);
 }

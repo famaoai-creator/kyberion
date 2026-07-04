@@ -9,7 +9,7 @@ import {
   safeSymlinkSync,
   resolveVars,
   evaluateCondition,
-  withRetry,
+  retry,
   derivePipelineStatus,
   pathResolver,
   validatePipelineAdf,
@@ -251,10 +251,7 @@ async function opCapture(op: string, params: any, ctx: any) {
       };
     case 'shell':
       const cmd = resolveVars(params.cmd, ctx);
-      const shellResult = await withRetry(
-        async () => safeExec(cmd),
-        buildRetryOptions(params.retry)
-      );
+      const shellResult = await retry(async () => safeExec(cmd), buildRetryOptions(params.retry));
       return { ...ctx, [params.export_as || 'last_capture']: shellResult.trim() };
     case 'intent_detect':
       const mapping = yaml.load(
@@ -894,7 +891,7 @@ async function opApply(op: string, params: any, ctx: any) {
       const out = path.resolve(rootDir, resolveVars(params.path, ctx));
       const content = params.from ? ctx[params.from] : (ctx.last_transform ?? ctx.last_capture);
       if (!safeExistsSync(path.dirname(out))) safeMkdir(path.dirname(out), { recursive: true });
-      await withRetry(async () => {
+      await retry(async () => {
         safeWriteFile(
           out,
           typeof content === 'string' ? content : JSON.stringify(content, null, 2)
@@ -913,7 +910,7 @@ async function opApply(op: string, params: any, ctx: any) {
       safeSymlinkSync(source, target, params.type || 'dir');
       break;
     case 'git_checkpoint':
-      await withRetry(
+      await retry(
         async () => {
           safeExec('git', ['add', '.'], { cwd: rootDir });
           safeExec('git', ['commit', '-m', resolveVars(params.message || 'checkpoint', ctx)], {

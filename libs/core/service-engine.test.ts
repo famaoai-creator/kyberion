@@ -8,14 +8,16 @@ const mocks = vi.hoisted(() => ({
   secureFetch: vi.fn(),
   resolveOverlay: vi.fn(() => null),
   loadServiceEndpointsCatalog: vi.fn(),
-  withRetry: vi.fn(async (fn: () => Promise<unknown>, _options?: unknown) => fn()),
+  retry: vi.fn(async (fn: () => Promise<unknown>, _options?: unknown) => fn()),
   safeExistsSync: vi.fn(() => true),
   safeReaddir: vi.fn(() => []),
   safeStat: vi.fn(() => ({ isFile: () => true })),
   mcpConnect: vi.fn().mockResolvedValue(undefined),
   mcpCallTool: vi.fn().mockResolvedValue({ content: [{ type: 'text', text: 'ok' }] }),
   mcpListTools: vi.fn().mockResolvedValue({ tools: [{ name: 'search_posts' }] }),
-  mcpListResources: vi.fn().mockResolvedValue({ resources: [{ uri: 'https://docs.x.com/docs/intro' }] }),
+  mcpListResources: vi
+    .fn()
+    .mockResolvedValue({ resources: [{ uri: 'https://docs.x.com/docs/intro' }] }),
   mcpClose: vi.fn().mockResolvedValue(undefined),
   mcpTransportCtor: vi.fn(),
   mcpHttpClose: vi.fn().mockResolvedValue(undefined),
@@ -31,7 +33,7 @@ vi.mock('./index.js', async () => {
     resolveServiceBinding: mocks.resolveServiceBinding,
     secureFetch: mocks.secureFetch,
     loadServiceEndpointsCatalog: mocks.loadServiceEndpointsCatalog,
-    withRetry: mocks.withRetry,
+    retry: mocks.retry,
     platform: {
       ...actual.platform,
       checkBinary: mocks.checkBinary,
@@ -39,12 +41,16 @@ vi.mock('./index.js', async () => {
   };
 });
 
+vi.mock('./async-utils.js', () => ({
+  retry: mocks.retry,
+}));
+
 vi.mock('./customer-resolver.js', () => ({
   resolveOverlay: mocks.resolveOverlay,
 }));
 
 vi.mock('./service-binding.js', async () => {
-  const actual = await vi.importActual('./service-binding.js') as any;
+  const actual = (await vi.importActual('./service-binding.js')) as any;
   return {
     ...actual,
     resolveServiceBinding: mocks.resolveServiceBinding,
@@ -52,7 +58,7 @@ vi.mock('./service-binding.js', async () => {
 });
 
 vi.mock('./secure-io.js', async () => {
-  const actual = await vi.importActual('./secure-io.js') as any;
+  const actual = (await vi.importActual('./secure-io.js')) as any;
   return {
     ...actual,
     safeReadFile: mocks.safeReadFile,
@@ -190,7 +196,7 @@ describe('executeServicePreset', () => {
         url: 'https://api.example.com/customer-route',
         data: { text: 'hello' },
         params: undefined,
-      }),
+      })
     );
   });
 
@@ -229,7 +235,7 @@ describe('executeServicePreset', () => {
     expect(mocks.secureFetch).toHaveBeenCalledWith(
       expect.objectContaining({
         url: 'https://api.example.com/personal-route',
-      }),
+      })
     );
   });
 
@@ -333,7 +339,7 @@ describe('executeServicePreset', () => {
       'xapi',
       'call_tool',
       { tool_name: 'search_posts', arguments: { query: 'kyberion' } },
-      'secret-guard',
+      'secret-guard'
     );
 
     expect(mocks.mcpTransportCtor).toHaveBeenCalledWith(
@@ -345,7 +351,7 @@ describe('executeServicePreset', () => {
           CLIENT_SECRET: 'x-client-secret',
           REDIRECT_URI: 'http://localhost:8080/callback',
         },
-      }),
+      })
     );
     expect(mocks.mcpCallTool).toHaveBeenCalledWith({
       name: 'search_posts',
@@ -375,13 +381,13 @@ describe('executeServicePreset', () => {
       'x-docs',
       'call_tool',
       { tool_name: 'search_docs', arguments: { query: 'bookmarks timeline' } },
-      'none',
+      'none'
     );
 
     expect(mocks.mcpHttpTransportCtor).toHaveBeenCalledWith(
       expect.objectContaining({
         url: 'https://docs.x.com/mcp',
-      }),
+      })
     );
     expect(mocks.mcpCallTool).toHaveBeenCalledWith({
       name: 'search_docs',
@@ -406,9 +412,9 @@ describe('executeServicePreset', () => {
       return '';
     });
 
-    await expect(
-      executeServicePreset('x-docs', 'list_resources', {}, 'none'),
-    ).resolves.toEqual({ resources: [{ uri: 'https://docs.x.com/docs/intro' }] });
+    await expect(executeServicePreset('x-docs', 'list_resources', {}, 'none')).resolves.toEqual({
+      resources: [{ uri: 'https://docs.x.com/docs/intro' }],
+    });
 
     expect(mocks.mcpListResources).toHaveBeenCalledOnce();
   });
@@ -522,7 +528,7 @@ describe('executeServicePreset', () => {
           count: 50,
         },
       },
-      'secret-guard',
+      'secret-guard'
     );
 
     expect(mocks.secureFetch).toHaveBeenCalledWith(
@@ -535,7 +541,113 @@ describe('executeServicePreset', () => {
         }),
         data: undefined,
         authenticateRequest: true,
-      }),
+      })
+    );
+  });
+
+  it('supports GitHub Actions workflow inspection and dispatch operations', async () => {
+    const { executeServicePreset } = await import('./service-engine.js');
+    mocks.resolveServiceBinding.mockReturnValue({
+      serviceId: 'github',
+      accessToken: 'github-token',
+    });
+    mocks.loadServiceEndpointsCatalog.mockReturnValue({
+      default_pattern: 'https://api.{service_id}.com/v1',
+      services: {
+        github: {
+          preset_path: 'knowledge/product/orchestration/service-presets/github.json',
+          base_url: 'https://api.github.com',
+        },
+      },
+    });
+    mocks.safeReadFile.mockImplementation((filePath: string) => {
+      if (filePath.includes('github.json')) {
+        return JSON.stringify({
+          service_id: 'github',
+          auth_strategy: 'Bearer',
+          operations: {
+            actions_list_runs: {
+              type: 'api',
+              path: 'repos/{{owner}}/{{repo}}/actions/runs',
+              method: 'GET',
+            },
+            actions_get_run: {
+              type: 'api',
+              path: 'repos/{{owner}}/{{repo}}/actions/runs/{{run_id}}',
+              method: 'GET',
+              output_mapping: {
+                run_id: 'id',
+                status: 'status',
+                conclusion: 'conclusion',
+                html_url: 'html_url',
+              },
+            },
+            actions_dispatch_workflow: {
+              type: 'api',
+              path: 'repos/{{owner}}/{{repo}}/actions/workflows/{{workflow_id}}/dispatches',
+              method: 'POST',
+              payload_template: {
+                ref: '{{ref}}',
+                inputs: '{{inputs}}',
+              },
+            },
+          },
+        });
+      }
+      return '';
+    });
+    mocks.secureFetch.mockResolvedValue({ workflow_runs: [{ id: 42, status: 'completed' }] });
+
+    await expect(
+      executeServicePreset(
+        'github',
+        'actions_list_runs',
+        {
+          owner: 'acme',
+          repo: 'repo',
+          query: { branch: 'main', event: 'workflow_dispatch', per_page: 1 },
+        },
+        'secret-guard'
+      )
+    ).resolves.toEqual({ workflow_runs: [{ id: 42, status: 'completed' }] });
+
+    expect(mocks.secureFetch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: 'https://api.github.com/repos/acme/repo/actions/runs',
+        params: expect.objectContaining({
+          branch: 'main',
+          event: 'workflow_dispatch',
+          per_page: 1,
+        }),
+        headers: expect.objectContaining({
+          Authorization: 'Bearer github-token',
+        }),
+      })
+    );
+
+    mocks.secureFetch.mockResolvedValue({ ok: true });
+
+    await executeServicePreset(
+      'github',
+      'actions_dispatch_workflow',
+      {
+        owner: 'acme',
+        repo: 'repo',
+        workflow_id: 'release.yml',
+        ref: 'main',
+        inputs: { dry_run: true },
+      },
+      'secret-guard'
+    );
+
+    expect(mocks.secureFetch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: 'https://api.github.com/repos/acme/repo/actions/workflows/release.yml/dispatches',
+        data: {
+          ref: 'main',
+          inputs: { dry_run: true },
+        },
+      })
     );
   });
 
@@ -582,10 +694,10 @@ describe('executeServicePreset', () => {
           count: 10,
         },
       },
-      'secret-guard',
+      'secret-guard'
     );
 
-    expect(mocks.withRetry).toHaveBeenCalledWith(
+    expect(mocks.retry).toHaveBeenCalledWith(
       expect.any(Function),
       expect.objectContaining({
         maxRetries: 5,
@@ -594,7 +706,7 @@ describe('executeServicePreset', () => {
         factor: 2,
         jitter: false,
         shouldRetry: expect.any(Function),
-      }),
+      })
     );
   });
 
@@ -715,7 +827,16 @@ describe('executeServicePreset', () => {
             gmail_send: {
               type: 'cli',
               command: 'gws',
-              args: ['gmail', '+send', '--to', '{{to}}', '--subject', '{{subject}}', '--body', '{{body}}'],
+              args: [
+                'gmail',
+                '+send',
+                '--to',
+                '{{to}}',
+                '--subject',
+                '{{subject}}',
+                '--body',
+                '{{body}}',
+              ],
             },
             meet_spaces_create: {
               type: 'cli',
@@ -757,12 +878,31 @@ describe('executeServicePreset', () => {
             gmail_send: {
               type: 'cli',
               command: 'gws',
-              args: ['gmail', '+send', '--to', '{{to}}', '--subject', '{{subject}}', '--body', '{{body}}'],
+              args: [
+                'gmail',
+                '+send',
+                '--to',
+                '{{to}}',
+                '--subject',
+                '{{subject}}',
+                '--body',
+                '{{body}}',
+              ],
             },
             gmail_send_draft: {
               type: 'cli',
               command: 'gws',
-              args: ['gmail', '+send', '--to', '{{to}}', '--subject', '{{subject}}', '--body', '{{body}}', '--draft'],
+              args: [
+                'gmail',
+                '+send',
+                '--to',
+                '{{to}}',
+                '--subject',
+                '{{subject}}',
+                '--body',
+                '{{body}}',
+                '--draft',
+              ],
             },
           },
         });
@@ -811,7 +951,9 @@ describe('executeServicePreset', () => {
       return '';
     });
     mocks.checkBinary.mockResolvedValue(true);
-    mocks.safeExec.mockReturnValue(JSON.stringify({ name: 'spaces/abc123', meetingUri: 'https://meet.google.com/abc-defg-hij' }));
+    mocks.safeExec.mockReturnValue(
+      JSON.stringify({ name: 'spaces/abc123', meetingUri: 'https://meet.google.com/abc-defg-hij' })
+    );
 
     await expect(
       executeServicePreset('google-workspace', 'meet_spaces_create', {

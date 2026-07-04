@@ -232,8 +232,70 @@ describe('mission work item dispatch', () => {
     expect(response.prompt).toContain('Model hint: openai:gpt-5.4-mini (small/low)');
     expect(response.context_pack_path).toContain('/coordination/context-packs/');
     expect(response.prompt).toContain('Mission context pack (scoped, minimal, role-specific).');
+    expect(response.prompt).toContain('Fast-tier enforcement:');
     expect(response.response_text).toContain('agent completed the outline');
     expect(safeExistsSync(`${missionPath}/coordination/events/workitem-dispatch.jsonl`)).toBe(true);
+  });
+
+  it('treats fast-tier work as incomplete when verification evidence is missing', async () => {
+    createWorkItem({
+      title: `${missionId}: Draft the fast-tier outline`,
+      description:
+        'Draft the compact outline and keep the result schema-driven for the fast-tier dispatch.',
+      status: 'ready',
+      source: 'local',
+      sourceRef: `mission:${missionId}:task-fast-tier`,
+      projectId: missionId,
+      assigneePeerId: 'sovereign-brain',
+      labels: [`mission:${missionId}`, 'team_role:product_strategist', 'ticket:workitem'],
+      metadata: {
+        mission_id: missionId,
+        team_role: 'product_strategist',
+        deliverable: 'deliverables/fast-tier-outline.md',
+        target_path: 'deliverables/fast-tier-outline.md',
+        risk: 'low',
+        estimated_scope: 'S',
+      },
+    });
+
+    const routeA2A = vi.fn(async () => ({
+      a2a_version: '1.0',
+      header: {
+        msg_id: 'RES-FAST-1',
+        sender: 'sovereign-brain',
+        receiver: 'kyberion:workitem-dispatcher',
+        performative: 'result' as const,
+        timestamp: new Date().toISOString(),
+      },
+      payload: {
+        text: makeTaskResultText({
+          summary: 'Completed the outline but left out verification details.',
+          artifacts: [{ path: 'deliverables/fast-tier-outline.md', kind: 'markdown' }],
+          verification_done: [],
+          gaps: [],
+          needs: [],
+          extraText: 'fast-tier outline complete',
+        }),
+      },
+    }));
+
+    const manifest = await dispatchMissionWorkItems(
+      makeMissionState(),
+      {
+        mode: 'agent',
+        finalStatus: 'done',
+      },
+      {
+        routeA2A,
+      }
+    );
+
+    expect(manifest.records[0]).toMatchObject({
+      work_item_status_after: 'review',
+    });
+    expect(manifest.records[0].notes).toContain('fast-tier verification incomplete');
+    const routeCall = routeA2A.mock.calls[0] as unknown as [any];
+    expect(routeCall[0].payload.text).toContain('Fast-tier enforcement:');
   });
 
   it('downgrades completion when acceptance criteria are missing from the response', async () => {

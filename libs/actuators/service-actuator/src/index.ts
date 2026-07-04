@@ -3,29 +3,21 @@ import { createStandardYargs } from '@agent/core/cli-utils';
 import { fileURLToPath } from 'node:url';
 import * as path from 'node:path';
 import { handleAction } from './service-actuator-helpers.js';
+import { runActuatorCli } from '@agent/core';
 
 // Slack streaming ingress belongs to the Slack gateway.
 
 const main = async () => {
-  const argv = await createStandardYargs()
-    .option('input', { alias: 'i', type: 'string', required: true })
-    .parseSync();
-
-  const inputData = JSON.parse(
-    safeReadFile(pathResolver.rootResolve(argv.input as string), { encoding: 'utf8' }) as string
-  );
-  const result = await handleAction(inputData);
-  console.log(JSON.stringify(result, null, 2));
+  await runActuatorCli({
+    name: 'service-actuator',
+    handleAction,
+  });
 };
 
-const isMain =
-  process.argv[1] &&
-  (process.argv[1].endsWith('service-actuator/src/index.ts') ||
-    process.argv[1].endsWith('service-actuator/dist/index.js') ||
-    process.argv[1].endsWith('service-actuator/src/index.js'));
+const entrypoint = process.argv[1] ? path.resolve(process.argv[1]) : '';
+const modulePath = fileURLToPath(import.meta.url);
 
-if (isMain) {
-  logger.info('🚀 [SERVICE] CLI Entry triggered');
+if (entrypoint && modulePath === entrypoint) {
   main().catch((err) => {
     logger.error(err.message);
     process.exit(1);

@@ -68,3 +68,12 @@
 
 - Task 1 の順序入れ替えは、書き込み失敗時に「フェーズ未完了のまま途中成果物が残る」ケースを生む。成果物書き込みは既存の secure-io 経由なので atomic write が効いているはずだが、複数ファイルの途中失敗時は「再実行で上書きされる」ことをテストで確認する。
 - Task 4-1 のランチャは全 dist 実行 script への一般化(IP-12 と重複)をしない。onboard 系の入口 1〜2 個に限定する。
+
+## 実装メモ
+
+- `resolveActiveProfileRoot()` を `@agent/core` に追加し、`onboarding_wizard.ts` / `sovereign_dashboard.ts` / `mission-state.ts` の profile root 解決を共通化した。
+- `runIdentityPhase` は identity 成果物の書き込み後に state を `complete` 側へ進めるよう変更した。
+- `runOnboarding()` は完了済み identity フェーズで成果物欠損を見つけた場合、再実行するようにした。
+- dashboard は customer overlay の `connections` / `tenants` / `onboarding` を読むように寄せた。ヘッダの user も identity から取るようにした。
+- `pnpm onboard` / `pnpm onboard:apply` は dist 欠落時に build を促す薄いガードを挟み、`onboarding_apply` は既定で human-readable summary を出し `--json` で機械出力に戻せるようにした。
+- `onboarding_wizard` は開始時に所要時間と Ctrl-C 再開可否を案内するようにした。

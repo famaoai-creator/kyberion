@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { getVideoCompositionTemplateRecord } from './video-composition-template-registry.js';
 import { getVideoRenderRuntimePolicy } from './video-render-runtime-policy.js';
 import * as pathResolver from './path-resolver.js';
+import { slugify } from './text-utils.js';
 import { safeCopyFileSync, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import type {
   CompiledVideoCompositionScene,
@@ -11,9 +12,16 @@ import type {
   VideoCompositionScene,
 } from './video-composition-contract.js';
 
-export function compileVideoCompositionADF(adf: VideoCompositionADF, options?: { bundleDir?: string }): VideoCompositionRenderPlan {
+export function compileVideoCompositionADF(
+  adf: VideoCompositionADF,
+  options?: { bundleDir?: string }
+): VideoCompositionRenderPlan {
   const policy = getVideoRenderRuntimePolicy();
-  const bundleDir = pathResolver.rootResolve(options?.bundleDir || adf.output.bundle_dir || buildDefaultBundleDir(adf, policy.bundle.default_bundle_root));
+  const bundleDir = pathResolver.rootResolve(
+    options?.bundleDir ||
+      adf.output.bundle_dir ||
+      buildDefaultBundleDir(adf, policy.bundle.default_bundle_root)
+  );
   const compositionId = slugify(adf.intent || adf.title || 'video-composition');
   const backgroundColor = adf.composition.background_color || '#0B1020';
 
@@ -26,9 +34,14 @@ export function compileVideoCompositionADF(adf: VideoCompositionADF, options?: {
     .sort((a, b) => a.start_sec - b.start_sec)
     .map((scene) => compileScene(scene, adf));
 
-  const endTime = compiledScenes.reduce((max, scene) => Math.max(max, scene.start_sec + scene.duration_sec), 0);
+  const endTime = compiledScenes.reduce(
+    (max, scene) => Math.max(max, scene.start_sec + scene.duration_sec),
+    0
+  );
   if (endTime > adf.composition.duration_sec + 0.0001) {
-    throw new Error(`Scene timings exceed composition duration (${endTime}s > ${adf.composition.duration_sec}s)`);
+    throw new Error(
+      `Scene timings exceed composition duration (${endTime}s > ${adf.composition.duration_sec}s)`
+    );
   }
 
   const indexHtml = path.join(bundleDir, 'index.html');
@@ -51,7 +64,9 @@ export function compileVideoCompositionADF(adf: VideoCompositionADF, options?: {
     composition_id: compositionId,
     source_kind: 'video-composition-adf',
     title: adf.title || adf.intent || 'Kyberion Video Composition',
-    narration_ref: adf.audio?.narration_ref ? pathResolver.rootResolve(adf.audio.narration_ref) : undefined,
+    narration_ref: adf.audio?.narration_ref
+      ? pathResolver.rootResolve(adf.audio.narration_ref)
+      : undefined,
     music_ref: adf.audio?.music_ref ? pathResolver.rootResolve(adf.audio.music_ref) : undefined,
     duration_sec: adf.composition.duration_sec,
     fps: adf.composition.fps,
@@ -69,7 +84,7 @@ export function compileVideoCompositionADF(adf: VideoCompositionADF, options?: {
 
 export function writeVideoCompositionBundle(
   adf: VideoCompositionADF,
-  options?: { bundleDir?: string },
+  options?: { bundleDir?: string }
 ): VideoCompositionRenderPlan {
   const policy = getVideoRenderRuntimePolicy();
   const plan = compileVideoCompositionADF(adf, options);
@@ -92,7 +107,10 @@ export function writeVideoCompositionBundle(
   return plan;
 }
 
-function compileScene(scene: VideoCompositionScene, adf: VideoCompositionADF): CompiledVideoCompositionScene {
+function compileScene(
+  scene: VideoCompositionScene,
+  adf: VideoCompositionADF
+): CompiledVideoCompositionScene {
   const template = getVideoCompositionTemplateRecord(scene.template_ref?.template_id);
   const role = scene.role || 'generic';
   const sceneKey = safeSceneKey(scene.scene_id);
@@ -103,12 +121,16 @@ function compileScene(scene: VideoCompositionScene, adf: VideoCompositionADF): C
     throw new Error(`Template ${template.template_id} does not support scene role ${role}`);
   }
   if (!template.supported_output_formats.includes(adf.output.format)) {
-    throw new Error(`Template ${template.template_id} does not support output format ${adf.output.format}`);
+    throw new Error(
+      `Template ${template.template_id} does not support output format ${adf.output.format}`
+    );
   }
   for (const field of template.required_content_fields) {
     const value = scene.content?.[field];
     if (typeof value !== 'string' || !value.trim()) {
-      throw new Error(`Scene ${scene.scene_id} is missing required content field "${field}" for template ${template.template_id}`);
+      throw new Error(
+        `Scene ${scene.scene_id} is missing required content field "${field}" for template ${template.template_id}`
+      );
     }
   }
 
@@ -153,14 +175,18 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
     : `<div class="process-visual">
         ${
           visualSteps.length > 0
-            ? visualSteps.map((step: any, index: number) => `
+            ? visualSteps
+                .map(
+                  (step: any, index: number) => `
               <div class="process-step">
                 <span>${escapeHtml(step.step)}</span>
                 <strong>${escapeHtml(step.detail)}</strong>
                 <small>${escapeHtml(sceneText(scene, 'caption') || sceneText(scene, 'body') || `Beat ${index + 1}`)}</small>
               </div>
               ${index < visualSteps.length - 1 ? '<div class="process-arrow"></div>' : ''}
-            `).join('')
+            `
+                )
+                .join('')
             : `
               <div class="process-step">
                 <span>01</span>
@@ -358,16 +384,26 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
           <h1>${escapeHtml(title || 'How-to')}</h1>
           <div class="body">${escapeHtml(body)}</div>
           <div class="summary">
-            ${(Array.isArray(scene.content.visual_steps) ? scene.content.visual_steps : []).slice(0, 4).map((step: any) => `<div class="pill">${escapeHtml(String(step.step ?? ''))} ${escapeHtml(String(step.detail ?? ''))}</div>`).join('')}
+            ${(Array.isArray(scene.content.visual_steps) ? scene.content.visual_steps : [])
+              .slice(0, 4)
+              .map(
+                (step: any) =>
+                  `<div class="pill">${escapeHtml(String(step.step ?? ''))} ${escapeHtml(String(step.detail ?? ''))}</div>`
+              )
+              .join('')}
           </div>
         </div>
         <div class="visual">
-          ${supporting ? `<img src="${escapeHtml(supporting.path)}" alt="visual">` : `
+          ${
+            supporting
+              ? `<img src="${escapeHtml(supporting.path)}" alt="visual">`
+              : `
             <div class="fallback">
               <h2>Ordered steps</h2>
               <p>${escapeHtml(sceneText(scene, 'caption') || 'Audience, use case, constraints, and render output are sequenced as a governed flow.')}</p>
             </div>
-          `}
+          `
+          }
         </div>
       </div>
     </div>
@@ -377,8 +413,12 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
   }
 
   if (scene.template_id === 'promo-spot') {
-    const valuePoints = Array.isArray(scene.content.value_points) ? scene.content.value_points.map((value: any) => String(value)).filter(Boolean) : [];
-    const proofPoints = Array.isArray(scene.content.social_proof) ? scene.content.social_proof.map((value: any) => String(value)).filter(Boolean) : [];
+    const valuePoints = Array.isArray(scene.content.value_points)
+      ? scene.content.value_points.map((value: any) => String(value)).filter(Boolean)
+      : [];
+    const proofPoints = Array.isArray(scene.content.social_proof)
+      ? scene.content.social_proof.map((value: any) => String(value)).filter(Boolean)
+      : [];
     return `<!doctype html>
 <html lang="ja">
   <head>
@@ -512,7 +552,9 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
   }
 
   if (scene.template_id === 'vtuber-stage') {
-    const chatMessages = Array.isArray(scene.content.chat_messages) ? scene.content.chat_messages : [];
+    const chatMessages = Array.isArray(scene.content.chat_messages)
+      ? scene.content.chat_messages
+      : [];
     const stageNotes = Array.isArray(scene.content.stage_notes) ? scene.content.stage_notes : [];
 
     const pageScript = `<script>
@@ -1254,10 +1296,15 @@ function sceneText(scene: CompiledVideoCompositionScene, key: string): string {
 }
 
 function sceneLayoutVariant(scene: CompiledVideoCompositionScene): string {
-  return sanitizeCssClass(String(scene.content?.layout_variant || scene.content?.layout_family || 'default'));
+  return sanitizeCssClass(
+    String(scene.content?.layout_variant || scene.content?.layout_family || 'default')
+  );
 }
 
-function renderSceneCssVars(scene: CompiledVideoCompositionScene, adf: VideoCompositionADF): string {
+function renderSceneCssVars(
+  scene: CompiledVideoCompositionScene,
+  adf: VideoCompositionADF
+): string {
   const vars = extractSceneCssVars(scene, adf);
   const lines = Object.entries(vars)
     .map(([key, value]) => `      ${key}: ${value};`)
@@ -1265,7 +1312,10 @@ function renderSceneCssVars(scene: CompiledVideoCompositionScene, adf: VideoComp
   return `:root {\n${lines}\n    }`;
 }
 
-function extractSceneCssVars(scene: CompiledVideoCompositionScene, adf: VideoCompositionADF): Record<string, string> {
+function extractSceneCssVars(
+  scene: CompiledVideoCompositionScene,
+  adf: VideoCompositionADF
+): Record<string, string> {
   const contentVars = scene.content?.design_system_vars;
   const background = adf.composition.background_color || '#07111f';
   const defaultVars: Record<string, string> = {
@@ -1281,7 +1331,9 @@ function extractSceneCssVars(scene: CompiledVideoCompositionScene, adf: VideoCom
   if (!contentVars || typeof contentVars !== 'object') {
     return defaultVars;
   }
-  const normalized = Object.entries(contentVars as Record<string, unknown>).reduce<Record<string, string>>((acc, [key, value]) => {
+  const normalized = Object.entries(contentVars as Record<string, unknown>).reduce<
+    Record<string, string>
+  >((acc, [key, value]) => {
     if (typeof value === 'string' && value.trim()) {
       acc[key] = value;
     }
@@ -1293,20 +1345,31 @@ function extractSceneCssVars(scene: CompiledVideoCompositionScene, adf: VideoCom
     '--panel': normalized['--kb-panel-bg'] || normalized['--panel'] || defaultVars['--panel'],
     '--accent': normalized['--kb-accent'] || normalized['--accent'] || defaultVars['--accent'],
     '--text': normalized['--kb-text-primary'] || normalized['--text'] || defaultVars['--text'],
-    '--subtext': normalized['--kb-text-secondary'] || normalized['--subtext'] || defaultVars['--subtext'],
-    '--font-sans': normalized['--kb-font-sans'] || normalized['--font-sans'] || defaultVars['--font-sans'],
-    '--radius-panel': normalized['--kb-panel-radius'] || normalized['--radius-panel'] || defaultVars['--radius-panel'],
-    '--radius-surface': normalized['--kb-surface-radius'] || normalized['--radius-surface'] || defaultVars['--radius-surface'],
+    '--subtext':
+      normalized['--kb-text-secondary'] || normalized['--subtext'] || defaultVars['--subtext'],
+    '--font-sans':
+      normalized['--kb-font-sans'] || normalized['--font-sans'] || defaultVars['--font-sans'],
+    '--radius-panel':
+      normalized['--kb-panel-radius'] ||
+      normalized['--radius-panel'] ||
+      defaultVars['--radius-panel'],
+    '--radius-surface':
+      normalized['--kb-surface-radius'] ||
+      normalized['--radius-surface'] ||
+      defaultVars['--radius-surface'],
   };
 }
 
-function resolveAsset(assetRefs: VideoCompositionAssetRef[], role: VideoCompositionAssetRef['role']): VideoCompositionAssetRef | undefined {
+function resolveAsset(
+  assetRefs: VideoCompositionAssetRef[],
+  role: VideoCompositionAssetRef['role']
+): VideoCompositionAssetRef | undefined {
   return assetRefs.find((asset) => asset.role === role) || assetRefs[0];
 }
 
 function mergeSceneAssetRefs(
   declaredAssetRefs: VideoCompositionAssetRef[],
-  inferredAssetRefs: VideoCompositionAssetRef[],
+  inferredAssetRefs: VideoCompositionAssetRef[]
 ): VideoCompositionAssetRef[] {
   const seen = new Set<string>();
   const merged: VideoCompositionAssetRef[] = [];
@@ -1335,15 +1398,19 @@ function extractAvatarAssetRefs(scene: VideoCompositionScene): VideoCompositionA
 
 function resolveAvatarAsset(
   scene: CompiledVideoCompositionScene,
-  supporting?: VideoCompositionAssetRef,
+  supporting?: VideoCompositionAssetRef
 ): VideoCompositionAssetRef | undefined {
   const avatarAssets = scene.content?.avatar_assets;
   if (avatarAssets && typeof avatarAssets === 'object') {
-    const variantKey = String(scene.content?.layout_variant || scene.content?.semantic || scene.role || '').toLowerCase();
+    const variantKey = String(
+      scene.content?.layout_variant || scene.content?.semantic || scene.role || ''
+    ).toLowerCase();
     const candidate = [
       (avatarAssets as Record<string, unknown>)[variantKey],
       (avatarAssets as Record<string, unknown>)[scene.role as string],
-      (avatarAssets as Record<string, unknown>)[String(scene.content?.semantic || '').toLowerCase()],
+      (avatarAssets as Record<string, unknown>)[
+        String(scene.content?.semantic || '').toLowerCase()
+      ],
       (avatarAssets as Record<string, unknown>)['default'],
     ].find((value) => typeof value === 'string' && value.trim());
     if (typeof candidate === 'string') {
@@ -1366,15 +1433,11 @@ function safeAssetName(assetPath: string): string {
 }
 
 function safeSceneKey(value: string): string {
-  return slugify(String(value || 'scene'));
+  return slugify(String(value || 'scene'), { maxLength: 64, fallback: 'video-composition' });
 }
 
 function sanitizeCssClass(value: string): string {
   return safeSceneKey(value);
-}
-
-function slugify(input: string): string {
-  return input.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 64) || 'video-composition';
 }
 
 function escapeHtml(input: string): string {

@@ -24,7 +24,7 @@ import {
   restartAgentRuntimeViaDaemon,
   pathResolver,
   classifyError,
-  withRetry,
+  retry,
 } from '@agent/core';
 import type { AgentProvider } from '@agent/core/agent-registry';
 import type { A2AMessage } from '@agent/core/a2a-bridge';
@@ -43,7 +43,23 @@ const DEFAULT_AGENT_RETRY = {
 let cachedRecoveryPolicy: Record<string, any> | null = null;
 
 export interface AgentAction {
-  action: 'spawn' | 'ask' | 'shutdown' | 'shutdown_all' | 'list' | 'health' | 'a2a' | 'snapshot' | 'refresh' | 'restart' | 'team_plan' | 'team_role' | 'staff_mission' | 'prewarm_mission' | 'list_manifests' | 'list_runtimes';
+  action:
+    | 'spawn'
+    | 'ask'
+    | 'shutdown'
+    | 'shutdown_all'
+    | 'list'
+    | 'health'
+    | 'a2a'
+    | 'snapshot'
+    | 'refresh'
+    | 'restart'
+    | 'team_plan'
+    | 'team_role'
+    | 'staff_mission'
+    | 'prewarm_mission'
+    | 'list_manifests'
+    | 'list_runtimes';
   params: {
     agentId?: string;
     provider?: AgentProvider;
@@ -88,7 +104,9 @@ function buildRetryOptions(override?: Record<string, any>) {
   const recoveryPolicy = loadRecoveryPolicy();
   const manifestRetry = isPlainObject(recoveryPolicy.retry) ? recoveryPolicy.retry : {};
   const retryableCategories = new Set<string>(
-    Array.isArray(recoveryPolicy.retryable_categories) ? recoveryPolicy.retryable_categories.map(String) : [],
+    Array.isArray(recoveryPolicy.retryable_categories)
+      ? recoveryPolicy.retryable_categories.map(String)
+      : []
   );
   const resolved = {
     ...DEFAULT_AGENT_RETRY,
@@ -102,10 +120,12 @@ function buildRetryOptions(override?: Record<string, any>) {
       if (retryableCategories.size > 0) {
         return retryableCategories.has(classification.category);
       }
-      return classification.category === 'network'
-        || classification.category === 'rate_limit'
-        || classification.category === 'timeout'
-        || classification.category === 'resource_unavailable';
+      return (
+        classification.category === 'network' ||
+        classification.category === 'rate_limit' ||
+        classification.category === 'timeout' ||
+        classification.category === 'resource_unavailable'
+      );
     },
   };
 }
@@ -120,7 +140,11 @@ export async function handleAction(input: AgentAction | AgentPipelineDispatch) {
       return { status: 'error', message: 'Empty pipeline steps' };
     }
     const step = dispatch.steps[0];
-    return handleAction({ action: step.op as AgentAction['action'], params: step.params, ...({ context: ctx } as any) });
+    return handleAction({
+      action: step.op as AgentAction['action'],
+      params: step.params,
+      ...({ context: ctx } as any),
+    });
   }
 
   const { params } = input as AgentAction;
@@ -141,13 +165,23 @@ export async function handleAction(input: AgentAction | AgentPipelineDispatch) {
         requestedBy: 'agent_actuator',
       };
       try {
-        const snapshot = await withRetry(async () => ensureAgentRuntimeViaDaemon(spawnPayload), buildRetryOptions());
-        logger.info(`[AGENT_ACTUATOR] Spawned via daemon: ${snapshot.agent_id} (${snapshot.provider}/${snapshot.model_id})`);
+        const snapshot = await retry(
+          async () => ensureAgentRuntimeViaDaemon(spawnPayload),
+          buildRetryOptions()
+        );
+        logger.info(
+          `[AGENT_ACTUATOR] Spawned via daemon: ${snapshot.agent_id} (${snapshot.provider}/${snapshot.model_id})`
+        );
         return { status: 'spawned', agent: snapshot };
       } catch (_) {
-        const handle = await withRetry(async () => ensureAgentRuntime(spawnPayload), buildRetryOptions());
+        const handle = await retry(
+          async () => ensureAgentRuntime(spawnPayload),
+          buildRetryOptions()
+        );
         const record = handle.getRecord();
-        logger.info(`[AGENT_ACTUATOR] Spawned: ${record?.agentId} (${record?.provider}/${record?.modelId})`);
+        logger.info(
+          `[AGENT_ACTUATOR] Spawned: ${record?.agentId} (${record?.provider}/${record?.modelId})`
+        );
         return { status: 'spawned', agent: record };
       }
     }
@@ -168,14 +202,21 @@ export async function handleAction(input: AgentAction | AgentPipelineDispatch) {
       try {
         let response: string;
         try {
-          const result = await withRetry(async () => askAgentRuntimeViaDaemon({
-            agentId: params.agentId,
-            prompt: params.query,
-            requestedBy: 'agent_actuator',
-          }), buildRetryOptions());
+          const result = await retry(
+            async () =>
+              askAgentRuntimeViaDaemon({
+                agentId: params.agentId,
+                prompt: params.query,
+                requestedBy: 'agent_actuator',
+              }),
+            buildRetryOptions()
+          );
           response = result.text;
         } catch (_) {
-          response = await withRetry(async () => askAgentRuntime(params.agentId, params.query, 'agent_actuator'), buildRetryOptions());
+          response = await retry(
+            async () => askAgentRuntime(params.agentId, params.query, 'agent_actuator'),
+            buildRetryOptions()
+          );
         }
         agentRegistry.updateStatus(params.agentId, 'ready');
         return { status: 'ok', agentId: params.agentId, response };
@@ -188,9 +229,15 @@ export async function handleAction(input: AgentAction | AgentPipelineDispatch) {
     case 'shutdown': {
       if (!params.agentId) throw new Error('agentId is required for shutdown');
       try {
-        await withRetry(async () => shutdownAgentRuntimeViaDaemon(params.agentId, 'agent_actuator'), buildRetryOptions());
+        await retry(
+          async () => shutdownAgentRuntimeViaDaemon(params.agentId, 'agent_actuator'),
+          buildRetryOptions()
+        );
       } catch (_) {
-        await withRetry(async () => stopAgentRuntime(params.agentId, 'agent_actuator'), buildRetryOptions());
+        await retry(
+          async () => stopAgentRuntime(params.agentId, 'agent_actuator'),
+          buildRetryOptions()
+        );
       }
       return { status: 'shutdown', agentId: params.agentId };
     }
@@ -215,7 +262,7 @@ export async function handleAction(input: AgentAction | AgentPipelineDispatch) {
     case 'list_runtimes': {
       let runtimes;
       try {
-        runtimes = await withRetry(async () => listAgentRuntimesViaDaemon(), buildRetryOptions());
+        runtimes = await retry(async () => listAgentRuntimesViaDaemon(), buildRetryOptions());
       } catch (_) {
         runtimes = listAgentRuntimeSnapshots();
       }
@@ -228,7 +275,7 @@ export async function handleAction(input: AgentAction | AgentPipelineDispatch) {
       let agents;
       try {
         const daemonAgents = await listAgentRuntimesViaDaemon();
-        agents = daemonAgents.map(entry => ({
+        agents = daemonAgents.map((entry) => ({
           agentId: entry.agent_id,
           provider: entry.provider,
           modelId: entry.model_id,
@@ -237,19 +284,21 @@ export async function handleAction(input: AgentAction | AgentPipelineDispatch) {
           trustScore: null,
           uptimeMs: null,
           idleMs: null,
-          runtime: entry.pid ? {
-            kind: 'agent',
-            state: 'running',
-            pid: entry.pid,
-            idleForMs: null,
-            shutdownPolicy: 'manual',
-          } : null,
+          runtime: entry.pid
+            ? {
+                kind: 'agent',
+                state: 'running',
+                pid: entry.pid,
+                idleForMs: null,
+                shutdownPolicy: 'manual',
+              }
+            : null,
           metrics: null,
           process: null,
           supportsSoftRefresh: true,
         }));
       } catch (_) {
-        agents = listAgentRuntimeSnapshots().map(entry => ({
+        agents = listAgentRuntimeSnapshots().map((entry) => ({
           agentId: entry.agent.agentId,
           provider: entry.agent.provider,
           modelId: entry.agent.modelId,
@@ -270,7 +319,10 @@ export async function handleAction(input: AgentAction | AgentPipelineDispatch) {
     case 'snapshot': {
       if (!params.agentId) throw new Error('agentId is required for snapshot');
       try {
-        const snapshot = await withRetry(async () => getAgentRuntimeStatusViaDaemon(params.agentId), buildRetryOptions());
+        const snapshot = await retry(
+          async () => getAgentRuntimeStatusViaDaemon(params.agentId),
+          buildRetryOptions()
+        );
         if (!snapshot) throw new Error(`Agent ${params.agentId} not found`);
         return { status: 'ok', snapshot };
       } catch (_) {
@@ -283,10 +335,16 @@ export async function handleAction(input: AgentAction | AgentPipelineDispatch) {
     case 'refresh': {
       if (!params.agentId) throw new Error('agentId is required for refresh');
       try {
-        const result = await withRetry(async () => refreshAgentRuntimeViaDaemon(params.agentId, 'agent_actuator'), buildRetryOptions());
+        const result = await retry(
+          async () => refreshAgentRuntimeViaDaemon(params.agentId, 'agent_actuator'),
+          buildRetryOptions()
+        );
         return { status: 'ok', agentId: params.agentId, ...result };
       } catch (_) {
-        const result = await withRetry(async () => refreshAgentRuntime(params.agentId, 'agent_actuator'), buildRetryOptions());
+        const result = await retry(
+          async () => refreshAgentRuntime(params.agentId, 'agent_actuator'),
+          buildRetryOptions()
+        );
         return { status: 'ok', agentId: params.agentId, ...result };
       }
     }
@@ -294,24 +352,39 @@ export async function handleAction(input: AgentAction | AgentPipelineDispatch) {
     case 'restart': {
       if (!params.agentId) throw new Error('agentId is required for restart');
       try {
-        const snapshot = await withRetry(async () => restartAgentRuntimeViaDaemon({
-          agentId: params.agentId,
-          provider: params.provider || 'gemini',
-          modelId: params.modelId,
-          systemPrompt: params.systemPrompt,
-          capabilities: params.capabilities,
-          requestedBy: 'agent_actuator',
-        }), buildRetryOptions());
+        const snapshot = await retry(
+          async () =>
+            restartAgentRuntimeViaDaemon({
+              agentId: params.agentId,
+              provider: params.provider || 'gemini',
+              modelId: params.modelId,
+              systemPrompt: params.systemPrompt,
+              capabilities: params.capabilities,
+              requestedBy: 'agent_actuator',
+            }),
+          buildRetryOptions()
+        );
         return { status: 'ok', agentId: params.agentId, snapshot };
       } catch (_) {
-        const handle = await withRetry(async () => restartAgentRuntime(params.agentId, 'agent_actuator'), buildRetryOptions());
-        return { status: 'ok', agentId: params.agentId, agent: handle.getRecord(), snapshot: getAgentRuntimeSnapshot(params.agentId) };
+        const handle = await retry(
+          async () => restartAgentRuntime(params.agentId, 'agent_actuator'),
+          buildRetryOptions()
+        );
+        return {
+          status: 'ok',
+          agentId: params.agentId,
+          agent: handle.getRecord(),
+          snapshot: getAgentRuntimeSnapshot(params.agentId),
+        };
       }
     }
 
     case 'a2a': {
       if (!params.envelope) throw new Error('envelope is required for a2a');
-      const response = await withRetry(async () => a2aBridge.route(params.envelope), buildRetryOptions());
+      const response = await retry(
+        async () => a2aBridge.route(params.envelope),
+        buildRetryOptions()
+      );
       return { status: 'ok', response };
     }
 
@@ -367,4 +440,3 @@ export async function handleAction(input: AgentAction | AgentPipelineDispatch) {
       throw new Error(`Unsupported agent action: ${action}`);
   }
 }
-

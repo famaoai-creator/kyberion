@@ -26,7 +26,7 @@ const mocks = vi.hoisted(() => ({
     parseSync: vi.fn(() => ({ input: 'input.json' })),
   })),
   classifyError: vi.fn(() => ({ category: 'resource_unavailable' })),
-  withRetry: vi.fn(async (fn: () => Promise<void> | void) => await fn()),
+  retry: vi.fn(async (fn: () => Promise<void> | void) => await fn()),
 }));
 
 vi.mock('@agent/core', async () => {
@@ -41,7 +41,7 @@ vi.mock('@agent/core', async () => {
     logger: mocks.logger,
     createStandardYargs: mocks.createStandardYargs,
     classifyError: mocks.classifyError,
-    withRetry: mocks.withRetry,
+    retry: mocks.retry,
   };
 });
 

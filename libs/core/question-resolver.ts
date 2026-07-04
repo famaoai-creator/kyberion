@@ -3,6 +3,7 @@ import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { safeReadFile } from './secure-io.js';
 import { loadStandardIntentCatalog } from './intent-resolution.js';
+import { renderVocabularyText } from './ux-vocabulary.js';
 import {
   assessContextualClarification,
   type ContextualClarificationExecutionShape,
@@ -11,6 +12,7 @@ import { getMeetingBriefQuestions } from './meeting-operations-profile.js';
 import { getNarratedVideoBriefQuestions } from './narrated-video-preference-profile.js';
 import { getPresentationPreferenceProfile } from './presentation-preference-registry.js';
 import { getPresentationBriefQuestions } from './presentation-preference-profile.js';
+import { slugify } from './text-utils.js';
 import type { ActuatorExecutionBrief } from './src/types/actuator-execution-brief.js';
 import type { OperatorInteractionPacket } from './src/types/operator-interaction-packet.js';
 
@@ -40,17 +42,6 @@ interface QuestionLike {
   required_input?: string;
   default_assumption?: string;
   impact?: string;
-}
-
-function slugifyQuestion(value: string): string {
-  return (
-    value
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 48) || 'question'
-  );
 }
 
 export interface QuestionResolutionRule {
@@ -114,35 +105,29 @@ function resolveQuestionLocale(inputLocale?: string): QuestionLocale {
 
 function localizedQuestionText(
   locale: QuestionLocale,
-  key: 'provide' | 'reason' | 'confirm' | 'headline' | 'summary' | 'unresolved' | 'clear',
+  key:
+    | 'provide'
+    | 'reason'
+    | 'confirm'
+    | 'headline'
+    | 'summary'
+    | 'unresolved'
+    | 'clear'
+    | 'goal_prompt',
   input?: string
 ): string {
-  switch (key) {
-    case 'provide':
-      return locale === 'ja' ? `${input} を指定してください。` : `Please provide ${input}.`;
-    case 'reason':
-      return locale === 'ja'
-        ? 'この入力がないと安全に実行できません。'
-        : 'The request cannot be executed safely without this input.';
-    case 'confirm':
-      return locale === 'ja' ? `${input} を確認してください。` : `Please confirm ${input}.`;
-    case 'headline':
-      return locale === 'ja'
-        ? '実行前に追加の確認が必要です'
-        : 'More context is required before execution';
-    case 'summary':
-      return locale === 'ja'
-        ? '実行を続ける前に入力内容の確認が必要です。'
-        : 'The request needs clarification before Kyberion can proceed safely.';
-    case 'unresolved':
-      return locale === 'ja'
-        ? '未解決の入力があります。'
-        : 'The request still has unresolved inputs.';
-    case 'clear':
-      return locale === 'ja'
-        ? 'この依頼は追加確認なしで進められます。'
-        : 'The request can proceed without clarification.';
-  }
+  const keyMap = {
+    provide: 'question_provide',
+    reason: 'question_reason',
+    confirm: 'question_confirm',
+    headline: 'question_headline',
+    summary: 'question_summary',
+    unresolved: 'question_unresolved',
+    clear: 'question_clear',
+    goal_prompt: 'question_goal_prompt',
+  } as const;
+  const rendered = renderVocabularyText(keyMap[key], locale);
+  return input ? rendered.replace('{input}', input) : rendered;
 }
 
 function localizeContextualReason(
@@ -322,7 +307,7 @@ function buildProfileQuestions(intentId: string | undefined): QuestionResolution
     case 'meeting-operations':
       return getMeetingBriefQuestions(getMeetingProfileFallback(), undefined, 3).questions.map(
         (question, index) => ({
-          id: `meeting_profile_${index + 1}_${slugifyQuestion(question)}`,
+          id: `meeting_profile_${index + 1}_${slugify(question, { maxLength: 48, fallback: 'question' })}`,
           question,
           reason:
             'The meeting profile provides reusable preflight questions for this coordination flow.',
@@ -336,7 +321,7 @@ function buildProfileQuestions(intentId: string | undefined): QuestionResolution
         undefined,
         3
       ).questions.map((question, index) => ({
-        id: `presentation_profile_${index + 1}_${slugifyQuestion(question)}`,
+        id: `presentation_profile_${index + 1}_${slugify(question, { maxLength: 48, fallback: 'question' })}`,
         question,
         reason: 'The presentation profile provides reusable brief questions for this deck flow.',
         source: 'profile' as const,
@@ -348,7 +333,7 @@ function buildProfileQuestions(intentId: string | undefined): QuestionResolution
         undefined,
         3
       ).questions.map((question, index) => ({
-        id: `video_profile_${index + 1}_${slugifyQuestion(question)}`,
+        id: `video_profile_${index + 1}_${slugify(question, { maxLength: 48, fallback: 'question' })}`,
         question,
         reason:
           'The narrated video profile provides reusable preflight questions for this media flow.',
@@ -503,9 +488,7 @@ export function resolveQuestionResolution(input: ResolveQuestionInput): Question
               'confirm',
               String(missingInputs.values().next().value).replace(/_/g, ' ')
             )
-          : locale === 'ja'
-            ? 'Kyberion は何を実行し、何を成功とみなせばよいですか?'
-            : 'What should Kyberion do, and what outcome should count as success?',
+          : localizedQuestionText(locale, 'goal_prompt'),
       reason: localizeContextualReason(
         locale,
         contextualDecision.reason,

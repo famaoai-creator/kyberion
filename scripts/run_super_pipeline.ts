@@ -38,14 +38,19 @@ async function main() {
     }
     logger.success('✅ [SUPER_NERVE] Pipeline completed successfully.');
   } catch (err: any) {
-    trace.addEvent('super_pipeline.failed', { error: err.message });
+    const message = err?.message ?? String(err);
+    trace.addEvent('super_pipeline.failed', { error: message });
     const persisted = finalizeAndPersist(trace);
     logger.info(
       `   [SUPER_NERVE] Trace: ${path.relative(pathResolver.rootDir(), persisted.path) || persisted.path}`
     );
-    logger.error(`❌ [SUPER_NERVE] Pipeline failed: ${err.message}`);
+    logger.error(`❌ [SUPER_NERVE] Pipeline failed: ${message}`);
     process.exit(1);
   }
 }
 
-main();
+main().catch((err) => {
+  const message = err?.message ?? String(err);
+  logger.error(`❌ [SUPER_NERVE] Pipeline failed: ${message}`);
+  process.exit(1);
+});

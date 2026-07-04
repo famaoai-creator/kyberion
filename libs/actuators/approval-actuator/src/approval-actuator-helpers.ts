@@ -1,4 +1,4 @@
-import { classifyError, safeReadFile, withRetry } from '@agent/core';
+import { classifyError, safeReadFile, retry } from '@agent/core';
 import {
   createApprovalRequest,
   decideApprovalRequest,
@@ -14,7 +14,9 @@ import {
 import type { GovernedArtifactRole } from '@agent/core/artifacts';
 import { pathResolver } from '@agent/core';
 
-const APPROVAL_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/approval-actuator/manifest.json');
+const APPROVAL_MANIFEST_PATH = pathResolver.rootResolve(
+  'libs/actuators/approval-actuator/manifest.json'
+);
 const DEFAULT_APPROVAL_RETRY = {
   maxRetries: 2,
   initialDelayMs: 200,
@@ -32,7 +34,9 @@ function isPlainObject(value: unknown): value is Record<string, any> {
 function loadRecoveryPolicy(): Record<string, any> {
   if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
   try {
-    const manifest = JSON.parse(safeReadFile(APPROVAL_MANIFEST_PATH, { encoding: 'utf8' }) as string);
+    const manifest = JSON.parse(
+      safeReadFile(APPROVAL_MANIFEST_PATH, { encoding: 'utf8' }) as string
+    );
     cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
   } catch {
     cachedRecoveryPolicy = {};
@@ -44,7 +48,7 @@ function buildRetryOptions() {
   const policy = loadRecoveryPolicy();
   const retry = isPlainObject(policy.retry) ? policy.retry : DEFAULT_APPROVAL_RETRY;
   const retryableCategories = new Set<string>(
-    Array.isArray(policy.retryable_categories) ? policy.retryable_categories.map(String) : [],
+    Array.isArray(policy.retryable_categories) ? policy.retryable_categories.map(String) : []
   );
   return {
     ...DEFAULT_APPROVAL_RETRY,
@@ -53,7 +57,8 @@ function buildRetryOptions() {
       const classification = classifyError(error);
       return retryableCategories.size > 0
         ? retryableCategories.has(classification.category)
-        : classification.category === 'resource_unavailable' || classification.category === 'timeout';
+        : classification.category === 'resource_unavailable' ||
+            classification.category === 'timeout';
     },
   };
 }
@@ -116,9 +121,9 @@ export async function handleApprovalAction(input: ApprovalAction) {
       if (!params.requestId) throw new Error('requestId is required');
       return {
         status: 'ok',
-        request: await withRetry(
+        request: await retry(
           async () => loadApprovalRequest(params.channel, params.requestId),
-          buildRetryOptions(),
+          buildRetryOptions()
         ),
       };
     case 'decide':
@@ -140,9 +145,9 @@ export async function handleApprovalAction(input: ApprovalAction) {
       };
     case 'list_pending': {
       const storageChannel = params.storageChannel || params.channel;
-      const requests = await withRetry(
+      const requests = await retry(
         async () => listApprovalRequests({ storageChannels: [storageChannel], status: 'pending' }),
-        buildRetryOptions(),
+        buildRetryOptions()
       );
       return { status: 'ok', requests };
     }

@@ -147,6 +147,7 @@ describe('reasoning-model-routing', () => {
     ).toEqual(
       expect.objectContaining({
         tier: 'standard',
+        execution_tier: 'standard',
         effort: 'medium',
         model_id: 'openai:gpt-5.5',
       })
@@ -164,6 +165,7 @@ describe('reasoning-model-routing', () => {
     ).toEqual(
       expect.objectContaining({
         tier: 'small',
+        execution_tier: 'fast',
         effort: 'low',
         model_id: 'openai:gpt-5.4-mini',
       })
@@ -180,6 +182,7 @@ describe('reasoning-model-routing', () => {
     ).toEqual(
       expect.objectContaining({
         tier: 'standard',
+        execution_tier: 'standard',
         effort: 'medium',
         model_id: 'openai:gpt-5.5',
       })
@@ -197,6 +200,7 @@ describe('reasoning-model-routing', () => {
     ).toEqual(
       expect.objectContaining({
         tier: 'large',
+        execution_tier: 'deep',
         effort: 'high',
         model_id: 'openai:gpt-5.5',
       })
@@ -243,6 +247,7 @@ describe('reasoning-model-routing', () => {
     ).toEqual(
       expect.objectContaining({
         tier: 'small',
+        execution_tier: 'fast',
         effort: 'low',
         model_id: 'openai:gpt-5.5',
       })

@@ -37,10 +37,10 @@ const ajv = new Ajv({ allErrors: true });
 const FALLBACK: ProviderConfigFile = {
   default_priority: ['gemini', 'claude', 'codex', 'copilot'],
   default_models: {
-    gemini: 'gemini-2.5-flash',
-    claude: 'sonnet',
-    codex: 'codex',
-    copilot: 'gpt-5.4',
+    gemini: 'gemini-3.5-flash',
+    claude: 'claude-opus-4-8',
+    codex: 'gpt-5.5',
+    copilot: 'claude-sonnet-4-6',
   },
   runtime_defaults: {
     'anthropic-default': 'claude-opus-4-8',
@@ -55,12 +55,12 @@ const FALLBACK: ProviderConfigFile = {
     gemini: {
       boot_command: 'gemini',
       boot_args: ['--acp', '-y'],
-      default_model: 'gemini-2.5-flash',
+      default_model: 'gemini-3.5-flash',
     },
     copilot: {
       boot_command: 'gh',
       boot_args: ['copilot', '--', '--acp', '--allow-all'],
-      default_model: 'claude-sonnet-4',
+      default_model: 'claude-sonnet-4-6',
     },
   },
 };

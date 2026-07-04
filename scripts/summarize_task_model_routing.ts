@@ -1,4 +1,4 @@
-import { pathResolver, safeExistsSync, safeReadFile } from '@agent/core';
+import { pathResolver, safeExistsSync, safeReadFile, safeWriteFile } from '@agent/core';
 import type { TaskModelEffort, TaskModelHint, TaskModelTier } from '@agent/core';
 
 interface TaskIssueEvent {
@@ -169,6 +169,25 @@ export function summarizeTaskRouting(samples: TaskRoutingSample[]): TaskRoutingS
     );
 }
 
+export function writeTaskRoutingSummary(input: {
+  samples: TaskRoutingSample[];
+  rows: TaskRoutingSummaryRow[];
+  outputPath: string;
+}): void {
+  safeWriteFile(
+    input.outputPath,
+    JSON.stringify(
+      {
+        samples: input.samples,
+        rows: input.rows,
+      },
+      null,
+      2
+    ),
+    { mkdir: true, encoding: 'utf8' }
+  );
+}
+
 function formatRow(row: TaskRoutingSummaryRow): string {
   const models = row.actual_models.length > 0 ? row.actual_models.join(', ') : '-';
   return [
@@ -191,6 +210,9 @@ function readEvents(filePath: string): unknown[] {
 
 function main() {
   const jsonOnly = process.argv.includes('--json');
+  const outputPathArg = process.argv.includes('--output')
+    ? process.argv[process.argv.indexOf('--output') + 1]
+    : undefined;
   const taskEventsPath = process.argv.includes('--task-events')
     ? process.argv[process.argv.indexOf('--task-events') + 1]
     : pathResolver.shared('observability/mission-control/task-events.jsonl');
@@ -203,23 +225,36 @@ function main() {
     readEvents(supervisorEventsPath) as SupervisorAskCompletedEvent[]
   );
   const rows = summarizeTaskRouting(samples);
+  const outputPath = outputPathArg || pathResolver.sharedTmp('task-model-routing-summary.json');
+
+  if (outputPathArg) {
+    writeTaskRoutingSummary({ samples, rows, outputPath });
+  }
 
   if (jsonOnly) {
-    console.log(JSON.stringify({ samples, rows }, null, 2));
+    if (!outputPathArg) {
+      console.log(JSON.stringify({ samples, rows }, null, 2));
+    } else {
+      console.log(outputPath);
+    }
     return;
   }
 
-  console.log(
-    'team_role           tier       samp  dur(ms)  in_tok  out_tok  tot_tok  rework  actual_models'
-  );
-  console.log(
-    '----------------------------------------------------------------------------------------------'
-  );
-  for (const row of rows) {
-    console.log(formatRow(row));
+  if (outputPathArg) {
+    console.log(`Task model routing summary written to ${outputPath}`);
+  } else {
+    console.log(
+      'team_role           tier       samp  dur(ms)  in_tok  out_tok  tot_tok  rework  actual_models'
+    );
+    console.log(
+      '----------------------------------------------------------------------------------------------'
+    );
+    for (const row of rows) {
+      console.log(formatRow(row));
+    }
+    console.log('');
+    console.log(`samples=${samples.length} groups=${rows.length}`);
   }
-  console.log('');
-  console.log(`samples=${samples.length} groups=${rows.length}`);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

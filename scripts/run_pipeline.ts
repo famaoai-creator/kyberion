@@ -9,7 +9,7 @@ import {
   safeExistsSync,
   safeWriteFile,
   safeMkdir,
-  withRetry,
+  retry,
   resolveVars,
   evaluateCondition,
   capabilityEntry,
@@ -56,6 +56,31 @@ function resolveExportKey(step: PipelineAdfStep, defaultKey: string): string {
     return typeof step.produces === 'string' ? step.produces : step.produces.channel;
   }
   return String(step.params?.export_as ?? defaultKey);
+}
+
+function runTsFallbackPipeline(fallbackPath: string): ReturnType<typeof safeExecResult> {
+  const fallbackEntry = pathResolver.rootResolve('scripts/run_pipeline.ts');
+  const tsxAvailable = safeExecResult('node', ['--import', 'tsx', '--eval', 'process.exit(0)'], {
+    cwd: pathResolver.rootDir(),
+    env: {
+      KYBERION_PIPELINE_FALLBACK_ACTIVE: '1',
+    },
+  });
+  if (tsxAvailable.status !== 0) {
+    const message =
+      'tsx fallback is unavailable. Run `pnpm build` so dist/scripts/run_pipeline.js is available.';
+    logger.error(`❌ [PIPELINE] ${message}`);
+    throw new Error(message);
+  }
+  logger.warn(
+    `⚠️ [PIPELINE] Running fallback pipeline from source because dist/scripts/run_pipeline.js was not used: ${fallbackPath}`
+  );
+  return safeExecResult('node', ['--import', 'tsx', fallbackEntry, '--input', fallbackPath], {
+    cwd: pathResolver.rootDir(),
+    env: {
+      KYBERION_PIPELINE_FALLBACK_ACTIVE: '1',
+    },
+  });
 }
 
 export interface NormalizedStepBudget {
@@ -276,7 +301,7 @@ async function loadActuatorDispatch(domain: string): Promise<DispatchFunc> {
               JSON.stringify(resolvedContext),
               reasoningCallOptions as any
             )
-          : await withRetry(() => backend.prompt(prompt, reasoningCallOptions as any), {
+          : await retry(() => backend.prompt(prompt, reasoningCallOptions as any), {
               maxRetries: 2,
               initialDelayMs: 3000,
               maxDelayMs: 15000,
@@ -634,6 +659,52 @@ export async function runSteps(
       try {
         if (domain === 'system' && action === 'log') {
           logger.info(resolveLogMessage(params, ctx));
+        } else if (domain === 'system' && action === 'exec') {
+          const resolvedParams = resolveParamsRecursive(params, ctx) as Record<string, unknown>;
+          const command = String(resolvedParams.command ?? resolvedParams.cmd ?? '');
+          if (!command) {
+            throw new Error('system:exec requires "command" param');
+          }
+          const args = Array.isArray(resolvedParams.args)
+            ? resolvedParams.args.map((value) => String(value))
+            : [];
+          const env = Object.fromEntries(
+            Object.entries((resolvedParams.env || {}) as Record<string, unknown>).map(
+              ([key, value]) => [key, typeof value === 'string' ? String(value) : String(value)]
+            )
+          ) as Record<string, string>;
+          const cwdValue =
+            typeof resolvedParams.cwd === 'string' && resolvedParams.cwd.trim().length > 0
+              ? String(resolvedParams.cwd)
+              : rootDir;
+          const timeoutMs =
+            typeof resolvedParams.timeout_ms === 'number' ? resolvedParams.timeout_ms : undefined;
+          const execResult = safeExecResult(command, args, {
+            cwd: nodePath.isAbsolute(cwdValue) ? cwdValue : nodePath.resolve(rootDir, cwdValue),
+            env,
+            ...(timeoutMs ? { timeoutMs } : {}),
+            input:
+              typeof resolvedParams.input === 'string'
+                ? String(resolveVars(resolvedParams.input, ctx))
+                : undefined,
+          });
+          const exportValue = {
+            stdout: execResult.stdout,
+            stderr: execResult.stderr,
+            status: execResult.status,
+          };
+          if (resolvedParams.export_as && typeof resolvedParams.export_as === 'string') {
+            ctx = { ...ctx, [resolvedParams.export_as]: exportValue };
+          }
+          const allowError =
+            resolvedParams.allow_error === true || resolvedParams.allowError === true;
+          if (!allowError && execResult.status !== 0) {
+            throw new Error(
+              execResult.stderr.trim() ||
+                execResult.stdout.trim() ||
+                `system:exec exited with status ${execResult.status}`
+            );
+          }
         } else if (domain === 'system' && action === 'write_file') {
           const enrichedCtx = { ...ctx, $now: new Date().toISOString() };
           const resolvedParams = resolveParamsRecursive(params, enrichedCtx);
@@ -936,7 +1007,7 @@ export async function runSteps(
                 JSON.stringify(resolvedContext),
                 reasoningCallOptions as any
               )
-            : await withRetry(() => backend.prompt(prompt, reasoningCallOptions as any), {
+            : await retry(() => backend.prompt(prompt, reasoningCallOptions as any), {
                 maxRetries: 2,
                 initialDelayMs: 3000,
                 maxDelayMs: 15000,
@@ -1315,16 +1386,7 @@ export async function main() {
           logger.warn(
             `⚠️ [PIPELINE] Primary first-win failed with permission denial. Running fallback pipeline: ${fallbackPath}`
           );
-          const fallbackResult = safeExecResult(
-            'node',
-            ['--import', 'tsx', 'scripts/run_pipeline.ts', '--input', fallbackPath],
-            {
-              cwd: pathResolver.rootDir(),
-              env: {
-                KYBERION_PIPELINE_FALLBACK_ACTIVE: '1',
-              },
-            }
-          );
+          const fallbackResult = runTsFallbackPipeline(fallbackPath);
           if (fallbackResult.status === 0) {
             logger.success(`✅ [PIPELINE] Fallback succeeded: ${fallbackPath}`);
             process.exit(0);
@@ -1350,16 +1412,7 @@ export async function main() {
       logger.warn(
         `⚠️ [PIPELINE] Primary first-win failed with permission denial. Running fallback pipeline: ${fallbackPath}`
       );
-      const fallbackResult = safeExecResult(
-        'node',
-        ['--import', 'tsx', 'scripts/run_pipeline.ts', '--input', fallbackPath],
-        {
-          cwd: pathResolver.rootDir(),
-          env: {
-            KYBERION_PIPELINE_FALLBACK_ACTIVE: '1',
-          },
-        }
-      );
+      const fallbackResult = runTsFallbackPipeline(fallbackPath);
       if (fallbackResult.status === 0) {
         logger.success(`✅ [PIPELINE] Fallback succeeded: ${fallbackPath}`);
         process.exit(0);

@@ -143,6 +143,24 @@ export interface MissionState {
       errors: number;
     };
     mission_finish_trace_persisted_path?: string;
+    mission_completion_next_action?: {
+      title: string;
+      request: string;
+      delivered: string[];
+      gaps: string[];
+      next_step: string;
+      satisfied: boolean;
+      confidence: number;
+      evidence_refs: string[];
+    };
+    mission_completion_summary?: {
+      requested_result: string;
+      satisfied: boolean;
+      delivered: string[];
+      gaps: string[];
+      next_step: string;
+      confidence: number;
+    };
     intent_delta_summary?: {
       checked_at: string;
       passed: boolean;

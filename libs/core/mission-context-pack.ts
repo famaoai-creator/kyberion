@@ -27,6 +27,7 @@ import {
 } from './mission-team-plan-composer.js';
 import { getWorkItem, type WorkItem } from './work-coordination.js';
 import { loadTaskSession, validateTaskSession, type TaskSession } from './task-session.js';
+import { slugify } from './text-utils.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
@@ -390,6 +391,7 @@ function mapTaskModelTier(
 
 function buildTaskGuidance(input: {
   missionState: MissionStateSummary;
+  missionPath?: string;
   taskSession?: TaskSession | null;
   workItem?: WorkItem | null;
   missionTeamAssignment?: MissionTeamAssignment | null;
@@ -443,6 +445,94 @@ function buildTaskGuidance(input: {
     if (artifactHint.path) seed.push(`Artifact path: ${artifactHint.path}`);
     if (artifactHint.evidence_refs?.length) {
       seed.push(`Evidence refs: ${artifactHint.evidence_refs.join(', ')}`);
+    }
+  }
+
+  if (input.missionPath) {
+    const dispatchManifestPath = path.join(
+      input.missionPath,
+      'evidence',
+      'workitem-dispatch-manifest.json'
+    );
+    if (safeExistsSync(dispatchManifestPath)) {
+      try {
+        const parsed = JSON.parse(
+          safeReadFile(dispatchManifestPath, { encoding: 'utf8' }) as string
+        ) as { records?: Array<Record<string, unknown>> };
+        const currentItemId = input.workItem?.item_id;
+        const currentTeamRole = String(
+          input.workItem?.metadata && typeof input.workItem.metadata === 'object'
+            ? (input.workItem.metadata as Record<string, unknown>).team_role || ''
+            : ''
+        ).trim();
+        const priorResponses = (parsed.records || [])
+          .filter((record) => {
+            const itemId = String(record.item_id || '').trim();
+            if (!itemId || itemId === currentItemId) return false;
+            if (!String(record.response_path || '').trim()) return false;
+            const status = String(record.status || '')
+              .trim()
+              .toLowerCase();
+            if (status && !['updated', 'done'].includes(status)) return false;
+            const recordTeamRole = String(record.team_role || '').trim();
+            if (currentTeamRole && recordTeamRole && recordTeamRole !== currentTeamRole)
+              return false;
+            return true;
+          })
+          .sort((left, right) =>
+            String(
+              right.reflected_at || right.written_at || right.response_path || ''
+            ).localeCompare(
+              String(left.reflected_at || left.written_at || left.response_path || '')
+            )
+          )
+          .slice(0, 2);
+
+        for (const record of priorResponses) {
+          const responsePath = String(record.response_path || '').trim();
+          const reflectionPath = String(record.reflection_path || '').trim();
+          const responseExcerpt = String(record.response_excerpt || '').trim();
+          const recordTitle = String(record.title || '').trim();
+          seed.push(`Prior work item response: ${responsePath}`);
+          if (reflectionPath) seed.push(`Prior reflection: ${reflectionPath}`);
+          if (recordTitle) seed.push(`Prior work item: ${recordTitle}`);
+          if (responseExcerpt)
+            seed.push(
+              `Prior response excerpt: ${summarizeText(responseExcerpt, 160) || responseExcerpt}`
+            );
+          if (responsePath && safeExistsSync(responsePath)) {
+            try {
+              const responsePayload = JSON.parse(
+                safeReadFile(responsePath, { encoding: 'utf8' }) as string
+              ) as {
+                task_result?: {
+                  artifacts?: Array<{ path?: string; kind?: string }>;
+                  summary?: string;
+                };
+              };
+              const artifacts = Array.isArray(responsePayload.task_result?.artifacts)
+                ? responsePayload.task_result.artifacts
+                : [];
+              for (const artifact of artifacts.slice(0, 3)) {
+                const artifactPath = String(artifact.path || '').trim();
+                if (artifactPath) {
+                  seed.push(
+                    `Prior artifact: ${artifactPath}${artifact.kind ? ` (${artifact.kind})` : ''}`
+                  );
+                }
+              }
+              const summary = String(responsePayload.task_result?.summary || '').trim();
+              if (summary) {
+                seed.push(`Prior task summary: ${summarizeText(summary, 180) || summary}`);
+              }
+            } catch {
+              // Best-effort seed enrichment only.
+            }
+          }
+        }
+      } catch {
+        // Best-effort seed enrichment only.
+      }
     }
   }
 
@@ -611,26 +701,26 @@ function normalizeTier(tier: unknown, fallback: MissionTier = 'public'): Mission
   return tier === 'personal' || tier === 'confidential' || tier === 'public' ? tier : fallback;
 }
 
-function slugifySegment(value: string, fallback = 'shared'): string {
-  return (
-    String(value || '')
-      .trim()
-      .replace(/[\\/]+/g, '-')
-      .replace(/[^A-Za-z0-9._-]+/g, '-')
-      .replace(/^-+|-+$/g, '') || fallback
-  );
-}
-
 function buildContextPackId(input: {
   missionId: string;
   teamRole?: string;
   recipientKind?: MissionContextRecipientKind;
   workItemId?: string;
 }): string {
-  const parts = ['CPK', slugifySegment(input.missionId.toUpperCase(), 'MISSION')];
-  if (input.teamRole) parts.push(slugifySegment(input.teamRole, 'role'));
-  else if (input.recipientKind) parts.push(slugifySegment(input.recipientKind, 'recipient'));
-  if (input.workItemId) parts.push(slugifySegment(input.workItemId, 'item'));
+  const parts = [
+    'CPK',
+    slugify(input.missionId.toUpperCase(), { separator: '-', fallback: 'MISSION' }).toUpperCase(),
+  ];
+  if (input.teamRole) {
+    parts.push(slugify(input.teamRole, { separator: '-', fallback: 'role' }).toUpperCase());
+  } else if (input.recipientKind) {
+    parts.push(
+      slugify(input.recipientKind, { separator: '-', fallback: 'recipient' }).toUpperCase()
+    );
+  }
+  if (input.workItemId) {
+    parts.push(slugify(input.workItemId, { separator: '-', fallback: 'item' }).toUpperCase());
+  }
   parts.push(randomUUID().slice(0, 8).toUpperCase());
   return parts.join('-');
 }
@@ -1048,6 +1138,7 @@ export function buildMissionContextPack(input: BuildMissionContextPackInput): Mi
   });
   const taskGuidance = buildTaskGuidance({
     missionState: input.missionState,
+    missionPath,
     taskSession: input.taskSession,
     workItem: input.workItem,
     missionTeamAssignment: assignment,

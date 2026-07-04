@@ -1,11 +1,13 @@
-import { NextRequest, NextResponse } from "next/server";
-import { randomUUID } from "node:crypto";
-import path from "node:path";
-import { safeExistsSync } from "@agent/core/secure-io";
-import { pathResolver as projectPathResolver } from "@agent/core/path-resolver";
-import type { AgentRoutingDecision } from "@agent/core/intent-contract";
-import { guardRequest } from "../../../lib/api-guard";
-import { normalizeChronosLocale, selectChronosLocaleText } from "../../../lib/ux-vocabulary";
+import { NextRequest, NextResponse } from 'next/server';
+import { randomUUID } from 'node:crypto';
+import path from 'node:path';
+import { resolveRuntimeModelId } from '@agent/core';
+import { safeExistsSync } from '@agent/core/secure-io';
+import { pathResolver as projectPathResolver } from '@agent/core/path-resolver';
+import type { AgentRoutingDecision } from '@agent/core/intent-contract';
+import { guardRequest } from '../../../lib/api-guard';
+import { buildUserFacingError } from '../../../lib/user-facing-error';
+import { normalizeChronosLocale, selectChronosLocaleText } from '../../../lib/ux-vocabulary';
 
 async function loadChronosCore() {
   const [
@@ -21,17 +23,17 @@ async function loadChronosCore() {
     orchestrationEvents,
     toolRuntimeRegistry,
   ] = await Promise.all([
-    import("@agent/core/core"),
-    import("@agent/core/path-resolver"),
-    import("@agent/core/secure-io"),
-    import("@agent/core/channel-surface"),
-    import("@agent/core/surface-interaction-model"),
-    import("@agent/core/agent-runtime-supervisor"),
-    import("@agent/core/agent-runtime-supervisor-client"),
-    import("@agent/core/pipeline-contract"),
-    import("@agent/core/agent-manifest"),
-    import("@agent/core/mission-orchestration-events"),
-    import("@agent/core/tool-runtime-registry"),
+    import('@agent/core/core'),
+    import('@agent/core/path-resolver'),
+    import('@agent/core/secure-io'),
+    import('@agent/core/channel-surface'),
+    import('@agent/core/surface-interaction-model'),
+    import('@agent/core/agent-runtime-supervisor'),
+    import('@agent/core/agent-runtime-supervisor-client'),
+    import('@agent/core/pipeline-contract'),
+    import('@agent/core/agent-manifest'),
+    import('@agent/core/mission-orchestration-events'),
+    import('@agent/core/tool-runtime-registry'),
   ]);
 
   return {
@@ -72,8 +74,10 @@ async function loadChronosCore() {
 
 const PROJECT_ROOT = projectPathResolver.rootDir();
 
-const CHRONOS_AGENT_ID = "chronos-mirror";
-const CHRONOS_IDLE_TIMEOUT_MS = Number(process.env.KYBERION_CHRONOS_IDLE_TIMEOUT_MS || 10 * 60 * 1000);
+const CHRONOS_AGENT_ID = 'chronos-mirror';
+const CHRONOS_IDLE_TIMEOUT_MS = Number(
+  process.env.KYBERION_CHRONOS_IDLE_TIMEOUT_MS || 10 * 60 * 1000
+);
 const RUN_PIPELINE_PATTERN = /^node\s+dist\/scripts\/run_pipeline\.js\s+--input\s+(\S+)/;
 const QUICK_ACTION_PATTERN = /^chronos:\/\/quick-action\/([a-z-]+)$/;
 
@@ -95,14 +99,18 @@ function scheduleChronosShutdown() {
   g.__kyberionChronosIdleTimer = setTimeout(async () => {
     try {
       const { stopAgentRuntime } = await loadChronosCore();
-      await stopAgentRuntime(CHRONOS_AGENT_ID, "chronos_api");
+      await stopAgentRuntime(CHRONOS_AGENT_ID, 'chronos_api');
     } catch (_) {}
     clearChronosCache();
   }, CHRONOS_IDLE_TIMEOUT_MS);
   g.__kyberionChronosIdleTimer.unref?.();
 }
 
-async function ensureChronosAgent(context?: { missionId?: string; teamRole?: string; requesterId?: string }) {
+async function ensureChronosAgent(context?: {
+  missionId?: string;
+  teamRole?: string;
+  requesterId?: string;
+}) {
   const {
     ensureAgentRuntime,
     ensureAgentRuntimeViaDaemon,
@@ -113,12 +121,12 @@ async function ensureChronosAgent(context?: { missionId?: string; teamRole?: str
   } = await loadChronosCore();
   const cachedHandle = g.__kyberionChronosHandle;
   const cachedStatus = cachedHandle?.getRecord?.()?.status;
-  if (cachedHandle && cachedStatus !== "shutdown" && cachedStatus !== "error") {
+  if (cachedHandle && cachedStatus !== 'shutdown' && cachedStatus !== 'error') {
     scheduleChronosShutdown();
     return cachedHandle;
   }
   const runtimeHandle = getAgentRuntimeHandle(CHRONOS_AGENT_ID);
-  if (!runtimeHandle || cachedStatus === "shutdown" || cachedStatus === "error") {
+  if (!runtimeHandle || cachedStatus === 'shutdown' || cachedStatus === 'error') {
     clearChronosCache();
   }
 
@@ -128,25 +136,25 @@ async function ensureChronosAgent(context?: { missionId?: string; teamRole?: str
       const manifest = getAgentManifest(CHRONOS_AGENT_ID, PROJECT_ROOT);
       const spawnOptions = {
         agentId: CHRONOS_AGENT_ID,
-        provider: manifest?.provider || "gemini",
-        modelId: manifest?.modelId || "gemini-2.5-flash",
+        provider: manifest?.provider || 'gemini',
+        modelId: manifest?.modelId || resolveRuntimeModelId('gemini-default'),
         systemPrompt: manifest?.systemPrompt,
-        capabilities: manifest?.capabilities || ["a2ui", "dashboard", "commands", "gateway"],
+        capabilities: manifest?.capabilities || ['a2ui', 'dashboard', 'commands', 'gateway'],
         cwd: PROJECT_ROOT,
-        requestedBy: "chronos_api",
+        requestedBy: 'chronos_api',
         runtimeOwnerId: context?.missionId || CHRONOS_AGENT_ID,
-        runtimeOwnerType: context?.missionId ? "mission" : "surface",
+        runtimeOwnerType: context?.missionId ? 'mission' : 'surface',
         runtimeMetadata: {
-          lease_kind: "chronos_surface",
+          lease_kind: 'chronos_surface',
           mission_id: context?.missionId,
           team_role: context?.teamRole,
-          requester_id: context?.requesterId || "chronos-ui",
+          requester_id: context?.requesterId || 'chronos-ui',
         },
       } as const;
       let handle;
       try {
         const snapshot = await ensureAgentRuntimeViaDaemon(toSupervisorEnsurePayload(spawnOptions));
-        handle = createSupervisorBackedAgentHandle(CHRONOS_AGENT_ID, "chronos_api", snapshot);
+        handle = createSupervisorBackedAgentHandle(CHRONOS_AGENT_ID, 'chronos_api', snapshot);
       } catch (_) {
         handle = await ensureAgentRuntime(spawnOptions);
       }
@@ -154,7 +162,7 @@ async function ensureChronosAgent(context?: { missionId?: string; teamRole?: str
       scheduleChronosShutdown();
       return handle;
     })().catch((err: any) => {
-      console.error("[API_AGENT] Boot failed:", err.message);
+      console.error('[API_AGENT] Boot failed:', err.message);
       clearChronosCache();
       throw err;
     });
@@ -165,18 +173,18 @@ async function ensureChronosAgent(context?: { missionId?: string; teamRole?: str
 }
 
 type MissionProposal = {
-  intent: "create_mission";
+  intent: 'create_mission';
   mission_type?: string;
   summary?: string;
   assigned_persona?: string;
-  tier?: "personal" | "confidential" | "public";
+  tier?: 'personal' | 'confidential' | 'public';
   vision_ref?: string;
   why?: string;
 };
 
 type ChronosMissionProposalState = {
-  surface: "chronos";
-  channel: "chronos";
+  surface: 'chronos';
+  channel: 'chronos';
   threadTs: string;
   proposal: MissionProposal;
   sourceText?: string;
@@ -198,50 +206,69 @@ function withMissionRole<T>(role: string, fn: () => T): T {
   }
 }
 
-function chronosMissionProposalStatePath(sessionId: string, pathResolver: Awaited<ReturnType<typeof loadChronosCore>>["pathResolver"]): string {
-  const safeSession = sessionId.replace(/[^a-zA-Z0-9._-]/g, "_");
-  return pathResolver.resolve(`active/shared/coordination/channels/chronos/mission-proposals/chronos-${safeSession}.json`);
+function chronosMissionProposalStatePath(
+  sessionId: string,
+  pathResolver: Awaited<ReturnType<typeof loadChronosCore>>['pathResolver']
+): string {
+  const safeSession = sessionId.replace(/[^a-zA-Z0-9._-]/g, '_');
+  return pathResolver.resolve(
+    `active/shared/coordination/channels/chronos/mission-proposals/chronos-${safeSession}.json`
+  );
 }
 
 function sanitizeMissionSlug(value: string): string {
-  return value
-    .toUpperCase()
-    .replace(/[^A-Z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 24) || "REQUEST";
+  return (
+    value
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 24) || 'REQUEST'
+  );
 }
 
-function buildSurfaceMissionId(prefix: string, threadTs: string, proposal: MissionProposal, sourceText?: string): string {
-  const base = proposal.summary || sourceText || proposal.why || proposal.mission_type || "request";
+function buildSurfaceMissionId(
+  prefix: string,
+  threadTs: string,
+  proposal: MissionProposal,
+  sourceText?: string
+): string {
+  const base = proposal.summary || sourceText || proposal.why || proposal.mission_type || 'request';
   const slug = sanitizeMissionSlug(base);
-  const numericThread = threadTs.replace(/\D+/g, "").slice(-8) || Date.now().toString().slice(-8);
+  const numericThread = threadTs.replace(/\D+/g, '').slice(-8) || Date.now().toString().slice(-8);
   return `MSN-${prefix}-${slug}-${numericThread}`;
 }
 
 function getChronosMissionProposalState(
   sessionId: string,
-  core: Awaited<ReturnType<typeof loadChronosCore>>,
+  core: Awaited<ReturnType<typeof loadChronosCore>>
 ): ChronosMissionProposalState | null {
   const statePath = chronosMissionProposalStatePath(sessionId, core.pathResolver);
-  return withMissionRole("chronos_gateway", () => {
+  return withMissionRole('chronos_gateway', () => {
     if (!core.safeExistsSync(statePath)) return null;
-    return JSON.parse(core.safeReadFile(statePath, { encoding: "utf8" }) as string) as ChronosMissionProposalState;
+    return JSON.parse(
+      core.safeReadFile(statePath, { encoding: 'utf8' }) as string
+    ) as ChronosMissionProposalState;
   });
 }
 
 function saveChronosMissionProposalState(
-  params: { sessionId: string; proposal: MissionProposal; sourceText?: string; routingDecision?: AgentRoutingDecision },
-  core: Awaited<ReturnType<typeof loadChronosCore>>,
+  params: {
+    sessionId: string;
+    proposal: MissionProposal;
+    sourceText?: string;
+    routingDecision?: AgentRoutingDecision;
+  },
+  core: Awaited<ReturnType<typeof loadChronosCore>>
 ): string {
   const statePath = chronosMissionProposalStatePath(params.sessionId, core.pathResolver);
-  return withMissionRole("chronos_gateway", () => {
+  return withMissionRole('chronos_gateway', () => {
     core.safeMkdir(path.dirname(statePath));
     core.safeWriteFile(
       statePath,
       JSON.stringify(
         {
-          surface: "chronos",
-          channel: "chronos",
+          surface: 'chronos',
+          channel: 'chronos',
           threadTs: params.sessionId,
           proposal: params.proposal,
           sourceText: params.sourceText,
@@ -249,8 +276,8 @@ function saveChronosMissionProposalState(
           createdAt: new Date().toISOString(),
         } satisfies ChronosMissionProposalState,
         null,
-        2,
-      ),
+        2
+      )
     );
     return statePath;
   });
@@ -258,49 +285,61 @@ function saveChronosMissionProposalState(
 
 function clearChronosMissionProposalState(
   sessionId: string,
-  core: Awaited<ReturnType<typeof loadChronosCore>>,
+  core: Awaited<ReturnType<typeof loadChronosCore>>
 ): void {
   const statePath = chronosMissionProposalStatePath(sessionId, core.pathResolver);
-  withMissionRole("chronos_gateway", () => {
+  withMissionRole('chronos_gateway', () => {
     if (!core.safeExistsSync(statePath)) return;
     core.safeRmSync(statePath, { force: true });
   });
 }
 
 async function issueChronosMissionFromProposal(
-  params: { sessionId: string; proposal: MissionProposal; sourceText?: string; routingDecision?: AgentRoutingDecision },
-  core: Awaited<ReturnType<typeof loadChronosCore>>,
+  params: {
+    sessionId: string;
+    proposal: MissionProposal;
+    sourceText?: string;
+    routingDecision?: AgentRoutingDecision;
+  },
+  core: Awaited<ReturnType<typeof loadChronosCore>>
 ) {
-  const missionId = buildSurfaceMissionId("CHRONOS", params.sessionId, params.proposal, params.sourceText);
-  const tier = params.proposal.tier || "public";
-  const missionType = params.proposal.mission_type || "development";
-  const persona = params.proposal.assigned_persona || "Ecosystem Architect";
-  const env = { ...process.env, MISSION_ROLE: "mission_controller" };
+  const missionId = buildSurfaceMissionId(
+    'CHRONOS',
+    params.sessionId,
+    params.proposal,
+    params.sourceText
+  );
+  const tier = params.proposal.tier || 'public';
+  const missionType = params.proposal.mission_type || 'development';
+  const persona = params.proposal.assigned_persona || 'Ecosystem Architect';
+  const env = { ...process.env, MISSION_ROLE: 'mission_controller' };
 
   const startOutput = core.safeExec(
-    "node",
+    'node',
     [
-      "dist/scripts/mission_controller.js",
-      "start",
+      'dist/scripts/mission_controller.js',
+      'start',
       missionId,
       tier,
       persona,
-      "default",
+      'default',
       missionType,
-      ...(params.routingDecision ? ["--routing-decision", JSON.stringify(params.routingDecision)] : []),
+      ...(params.routingDecision
+        ? ['--routing-decision', JSON.stringify(params.routingDecision)]
+        : []),
     ],
-    { env, cwd: PROJECT_ROOT },
+    { env, cwd: PROJECT_ROOT }
   );
 
-  let orchestrationStatus: "queued" | "failed" = "queued";
+  let orchestrationStatus: 'queued' | 'failed' = 'queued';
   let orchestrationJobPath: string | undefined;
   let orchestrationError: string | undefined;
   try {
-    const event = withMissionRole("chronos_gateway", () =>
+    const event = withMissionRole('chronos_gateway', () =>
       core.enqueueMissionOrchestrationEvent({
-        eventType: "mission_issue_requested",
+        eventType: 'mission_issue_requested',
         missionId,
-        requestedBy: "chronos_gateway",
+        requestedBy: 'chronos_gateway',
         correlationId: randomUUID(),
         payload: {
           sessionId: params.sessionId,
@@ -309,26 +348,28 @@ async function issueChronosMissionFromProposal(
           tier,
           persona,
           missionType,
-          channel: "chronos",
+          channel: 'chronos',
           threadTs: params.sessionId,
         },
-      }),
+      })
     );
-    orchestrationJobPath = withMissionRole("chronos_gateway", () => core.startMissionOrchestrationWorker(event));
+    orchestrationJobPath = withMissionRole('chronos_gateway', () =>
+      core.startMissionOrchestrationWorker(event)
+    );
   } catch (error) {
-    orchestrationStatus = "failed";
+    orchestrationStatus = 'failed';
     orchestrationError = error instanceof Error ? error.message : String(error);
   }
 
-  withMissionRole("chronos_gateway", () => {
+  withMissionRole('chronos_gateway', () => {
     core.emitMissionOrchestrationObservation({
-      decision: "mission_issued",
-      source: "chronos",
+      decision: 'mission_issued',
+      source: 'chronos',
       mission_id: missionId,
       session_id: params.sessionId,
       mission_type: missionType,
       tier,
-      requested_by: "chronos_gateway",
+      requested_by: 'chronos_gateway',
       orchestration_status: orchestrationStatus,
       orchestration_job_path: orchestrationJobPath,
     });
@@ -346,35 +387,41 @@ async function issueChronosMissionFromProposal(
   };
 }
 
-function l(locale: "en" | "ja", en: string, ja: string): string {
+function l(locale: 'en' | 'ja', en: string, ja: string): string {
   return selectChronosLocaleText(locale, { en, ja });
 }
 
-async function tryHandleDeterministicPipelineQuery(query: string, locale: "en" | "ja") {
+async function tryHandleDeterministicPipelineQuery(query: string, locale: 'en' | 'ja') {
   const match = query.match(RUN_PIPELINE_PATTERN);
   if (!match) return null;
 
   const { pathResolver, safeExec, logger } = await loadChronosCore();
   const inputPath = pathResolver.rootResolve(match[1]);
-  const output = safeExec("node", ["dist/scripts/run_pipeline.js", "--input", inputPath], { cwd: PROJECT_ROOT });
+  const output = safeExec('node', ['dist/scripts/run_pipeline.js', '--input', inputPath], {
+    cwd: PROJECT_ROOT,
+  });
 
   logger.info(`[CHRONOS] Deterministic pipeline query executed via built script: ${match[1]}`);
 
   return {
-    status: "ok",
-    response: l(locale, `Pipeline ${match[1]} completed.`, `Pipeline ${match[1]} の実行が完了しました。`),
+    status: 'ok',
+    response: l(
+      locale,
+      `Pipeline ${match[1]} completed.`,
+      `Pipeline ${match[1]} の実行が完了しました。`
+    ),
     a2ui: [
       {
-        type: "display:section",
+        type: 'display:section',
         props: {
-          title: "Pipeline Execution",
+          title: 'Pipeline Execution',
           description: `Deterministic execution of ${match[1]} through the built pipeline runner.`,
           items: [
             {
-              type: "display:log",
+              type: 'display:log',
               props: {
-                title: "Execution Output",
-                lines: output.split("\n").filter(Boolean).slice(-40),
+                title: 'Execution Output',
+                lines: output.split('\n').filter(Boolean).slice(-40),
               },
             },
           ],
@@ -383,14 +430,14 @@ async function tryHandleDeterministicPipelineQuery(query: string, locale: "en" |
     ],
     pipeline: {
       input: match[1],
-      status: "completed",
+      status: 'completed',
     },
     delegations: undefined,
     timestamp: new Date().toISOString(),
   };
 }
 
-async function tryHandleChronosQuickAction(query: string, locale: "en" | "ja") {
+async function tryHandleChronosQuickAction(query: string, locale: 'en' | 'ja') {
   const match = query.match(QUICK_ACTION_PATTERN);
   if (!match) return null;
 
@@ -399,8 +446,8 @@ async function tryHandleChronosQuickAction(query: string, locale: "en" | "ja") {
 
   const collectActiveMissions = () => {
     const roots = [
-      { dir: core.pathResolver.active("missions/public"), tier: "public" },
-      { dir: core.pathResolver.active("missions/confidential"), tier: "confidential" },
+      { dir: core.pathResolver.active('missions/public'), tier: 'public' },
+      { dir: core.pathResolver.active('missions/confidential'), tier: 'confidential' },
     ];
 
     const missions: Array<{
@@ -417,19 +464,25 @@ async function tryHandleChronosQuickAction(query: string, locale: "en" | "ja") {
       if (!core.safeExistsSync(root.dir)) continue;
       for (const item of core.safeReaddir(root.dir)) {
         const missionDir = path.join(root.dir, item);
-        const statePath = path.join(missionDir, "mission-state.json");
+        const statePath = path.join(missionDir, 'mission-state.json');
         if (!core.safeExistsSync(statePath)) continue;
-        const state = JSON.parse(core.safeReadFile(statePath, { encoding: "utf8" }) as string);
+        const state = JSON.parse(core.safeReadFile(statePath, { encoding: 'utf8' }) as string);
         missions.push({
           missionId: state.mission_id || item,
           status: state.status,
           tier: state.tier || root.tier,
           missionType: state.mission_type,
           checkpoints: state.git?.checkpoints?.length || 0,
-          nextTaskCount: core.safeExistsSync(path.join(missionDir, "NEXT_TASKS.json"))
-            ? ((JSON.parse(core.safeReadFile(path.join(missionDir, "NEXT_TASKS.json"), { encoding: "utf8" }) as string) as any[])?.length || 0)
+          nextTaskCount: core.safeExistsSync(path.join(missionDir, 'NEXT_TASKS.json'))
+            ? (
+                JSON.parse(
+                  core.safeReadFile(path.join(missionDir, 'NEXT_TASKS.json'), {
+                    encoding: 'utf8',
+                  }) as string
+                ) as any[]
+              )?.length || 0
             : 0,
-          planReady: core.safeExistsSync(path.join(missionDir, "PLAN.md")),
+          planReady: core.safeExistsSync(path.join(missionDir, 'PLAN.md')),
         });
       }
     }
@@ -437,44 +490,48 @@ async function tryHandleChronosQuickAction(query: string, locale: "en" | "ja") {
     return missions.sort((a, b) => a.missionId.localeCompare(b.missionId));
   };
 
-  const readJson = (filePath: string) => JSON.parse(core.safeReadFile(filePath, { encoding: "utf8" }) as string);
+  const readJson = (filePath: string) =>
+    JSON.parse(core.safeReadFile(filePath, { encoding: 'utf8' }) as string);
 
   const runCommandQuickAction = (title: string, command: string[], description: string) => {
-    const result = core.safeExecResult("pnpm", command, { cwd: PROJECT_ROOT, maxOutputMB: 4 });
-    const output = [result.stdout, result.stderr].map((part) => String(part || "").trim()).filter(Boolean).join("\n");
+    const result = core.safeExecResult('pnpm', command, { cwd: PROJECT_ROOT, maxOutputMB: 4 });
+    const output = [result.stdout, result.stderr]
+      .map((part) => String(part || '').trim())
+      .filter(Boolean)
+      .join('\n');
     const ok = result.status === 0;
     return {
-      status: ok ? "ok" : "warning",
+      status: ok ? 'ok' : 'warning',
       response: l(
         locale,
-        `${title} completed${ok ? "" : " with warnings"}.`,
-        `${title} が完了しました${ok ? "" : "（警告あり）"}。`,
+        `${title} completed${ok ? '' : ' with warnings'}.`,
+        `${title} が完了しました${ok ? '' : '（警告あり）'}。`
       ),
       a2ui: [
         {
-          type: "display:hero",
+          type: 'display:hero',
           props: {
-            eyebrow: "Readiness",
+            eyebrow: 'Readiness',
             title,
             description,
-            status: ok ? "ready" : "attention",
+            status: ok ? 'ready' : 'attention',
           },
         },
         {
-          type: "display:metrics-row",
+          type: 'display:metrics-row',
           props: {
             metrics: [
-              { label: "exit", value: result.status ?? -1, trend: ok ? "flat" : "down" },
-              { label: "stdout", value: output ? output.split("\n").length : 0, trend: "flat" },
-              { label: "status", value: ok ? "ok" : "warning", trend: ok ? "flat" : "down" },
+              { label: 'exit', value: result.status ?? -1, trend: ok ? 'flat' : 'down' },
+              { label: 'stdout', value: output ? output.split('\n').length : 0, trend: 'flat' },
+              { label: 'status', value: ok ? 'ok' : 'warning', trend: ok ? 'flat' : 'down' },
             ],
           },
         },
         {
-          type: "display:log",
+          type: 'display:log',
           props: {
             title: `${title} Output`,
-            lines: output ? output.split("\n").slice(-30) : ["(no output)"],
+            lines: output ? output.split('\n').slice(-30) : ['(no output)'],
           },
         },
       ],
@@ -482,64 +539,57 @@ async function tryHandleChronosQuickAction(query: string, locale: "en" | "ja") {
     };
   };
 
-  const runScheduleQuickAction = async (action: "list" | "tick") => {
+  const runScheduleQuickAction = async (action: 'list' | 'tick') => {
     try {
-      const { runGenerationScheduleAction } = await import("@agent/core/generation-scheduler");
+      const { runGenerationScheduleAction } = await import('@agent/core/generation-scheduler');
       const result = await runGenerationScheduleAction({ action });
       const serialized = JSON.stringify(result, null, 2);
       return {
-        status: "ok",
-        response: l(
-          locale,
-          `Schedule ${action} completed.`,
-          `schedule ${action} が完了しました。`,
-        ),
+        status: 'ok',
+        response: l(locale, `Schedule ${action} completed.`, `schedule ${action} が完了しました。`),
         a2ui: [
           {
-            type: "display:hero",
+            type: 'display:hero',
             props: {
-              eyebrow: "Schedule",
-              title: action === "tick" ? "Schedule Tick" : "Schedule List",
-              description: action === "tick"
-                ? "Tick due generation schedules and submit any ready jobs."
-                : "Inspect the current generation schedule registry.",
-              status: action === "tick" ? "ticked" : "listed",
+              eyebrow: 'Schedule',
+              title: action === 'tick' ? 'Schedule Tick' : 'Schedule List',
+              description:
+                action === 'tick'
+                  ? 'Tick due generation schedules and submit any ready jobs.'
+                  : 'Inspect the current generation schedule registry.',
+              status: action === 'tick' ? 'ticked' : 'listed',
             },
           },
           {
-            type: "display:log",
+            type: 'display:log',
             props: {
-              title: action === "tick" ? "Tick Result" : "Schedule Registry",
-              lines: serialized.split("\n"),
+              title: action === 'tick' ? 'Tick Result' : 'Schedule Registry',
+              lines: serialized.split('\n'),
             },
           },
         ],
         timestamp: new Date().toISOString(),
       };
     } catch (err: any) {
-      const message = String(err?.message || err || "schedule action failed");
+      const message = String(err?.message || err || 'schedule action failed');
       return {
-        status: "warning",
-        response: l(
-          locale,
-          `Schedule ${action} failed.`,
-          `schedule ${action} に失敗しました。`,
-        ),
+        status: 'warning',
+        response: l(locale, `Schedule ${action} failed.`, `schedule ${action} に失敗しました。`),
         a2ui: [
           {
-            type: "display:hero",
+            type: 'display:hero',
             props: {
-              eyebrow: "Schedule",
-              title: action === "tick" ? "Schedule Tick" : "Schedule List",
-              description: "The schedule registry is reachable, but the action returned an error.",
-              status: "attention",
+              eyebrow: 'Schedule',
+              title: action === 'tick' ? 'Schedule Tick' : 'Schedule List',
+              description: 'The schedule registry is reachable, but the action returned an error.',
+              status: 'attention',
             },
           },
           {
-            type: "display:log",
+            type: 'display:log',
             props: {
-              title: "Schedule Error",
-              lines: message.split("\n").slice(-20),
+              title: 'Schedule Error',
+              lines: message.split('\n').slice(-20),
             },
           },
         ],
@@ -549,134 +599,146 @@ async function tryHandleChronosQuickAction(query: string, locale: "en" | "ja") {
   };
 
   switch (action) {
-    case "prereq-check": {
+    case 'prereq-check': {
       return runCommandQuickAction(
-        "Kyberion Toolchain Preflight",
-        ["prereq:check"],
-        "Confirm the local Node, pnpm, git, and source-workflow tooling before you build from source.",
+        'Kyberion Toolchain Preflight',
+        ['prereq:check'],
+        'Confirm the local Node, pnpm, git, and source-workflow tooling before you build from source.'
       );
     }
-    case "setup-report": {
+    case 'setup-report': {
       return runCommandQuickAction(
-        "Kyberion Setup Report",
-        ["setup:report"],
-        "Inspect surfaces, services, reasoning, and doctor readiness together before you start work.",
+        'Kyberion Setup Report',
+        ['setup:report'],
+        'Inspect surfaces, services, reasoning, and doctor readiness together before you start work.'
       );
     }
-    case "doctor": {
+    case 'doctor': {
       return runCommandQuickAction(
-        "Kyberion Doctor",
-        ["run", "doctor"],
-        "Run the consolidated readiness check for must / should / nice signals.",
+        'Kyberion Doctor',
+        ['run', 'doctor'],
+        'Run the consolidated readiness check for must / should / nice signals.'
       );
     }
-    case "surfaces-setup": {
+    case 'surfaces-setup': {
       return runCommandQuickAction(
-        "Surface Setup",
-        ["surfaces:setup"],
-        "Inspect surface auth readiness and host-managed bridge prerequisites.",
+        'Surface Setup',
+        ['surfaces:setup'],
+        'Inspect surface auth readiness and host-managed bridge prerequisites.'
       );
     }
-    case "services-setup": {
+    case 'services-setup': {
       return runCommandQuickAction(
-        "Service Setup",
-        ["services:setup"],
-        "Inspect external service presets, auth strategies, and connection files.",
+        'Service Setup',
+        ['services:setup'],
+        'Inspect external service presets, auth strategies, and connection files.'
       );
     }
-    case "reasoning-setup": {
+    case 'reasoning-setup': {
       return runCommandQuickAction(
-        "Reasoning Setup",
-        ["reasoning:setup"],
-        "Inspect reasoning backend readiness before routing missions through a provider.",
+        'Reasoning Setup',
+        ['reasoning:setup'],
+        'Inspect reasoning backend readiness before routing missions through a provider.'
       );
     }
-    case "schedule-tick":
-      return runScheduleQuickAction("tick");
-    case "schedule-list":
-      return runScheduleQuickAction("list");
-    case "dashboard": {
+    case 'schedule-tick':
+      return runScheduleQuickAction('tick');
+    case 'schedule-list':
+      return runScheduleQuickAction('list');
+    case 'dashboard': {
       const missions = collectActiveMissions();
       const runtime = core.listAgentRuntimeSnapshots();
       const pendingOutbox = [
-        ...core.listSurfaceOutboxMessages("slack"),
-        ...core.listSurfaceOutboxMessages("chronos"),
+        ...core.listSurfaceOutboxMessages('slack'),
+        ...core.listSurfaceOutboxMessages('chronos'),
       ].length;
 
       return {
-        status: "ok",
+        status: 'ok',
         response: l(
           locale,
           `Dashboard ready. ${missions.length} missions, ${runtime.length} agent runtimes, ${pendingOutbox} pending outbox messages.`,
-          `Dashboard を更新しました。missions=${missions.length}、agent runtimes=${runtime.length}、pending outbox=${pendingOutbox} です。`,
+          `Dashboard を更新しました。missions=${missions.length}、agent runtimes=${runtime.length}、pending outbox=${pendingOutbox} です。`
         ),
         a2ui: [
           {
-            type: "display:hero",
+            type: 'display:hero',
             props: {
-              eyebrow: "Operator Snapshot",
-              title: "Chronos Dashboard",
-              description: "Mission state, runtime health, and pending delivery are aligned into a single control surface snapshot.",
+              eyebrow: 'Operator Snapshot',
+              title: 'Chronos Dashboard',
+              description:
+                'Mission state, runtime health, and pending delivery are aligned into a single control surface snapshot.',
               status: `${missions.length} missions`,
             },
           },
           {
-            type: "display:metrics-row",
+            type: 'display:metrics-row',
             props: {
               metrics: [
-                { label: "missions", value: missions.length, trend: "flat" },
-                { label: "runtime", value: runtime.length, trend: "flat" },
-                { label: "ready", value: runtime.filter((entry: any) => entry.agent.status === "ready").length, trend: "flat" },
-                { label: "outbox", value: pendingOutbox, trend: pendingOutbox > 0 ? "up" : "flat" },
+                { label: 'missions', value: missions.length, trend: 'flat' },
+                { label: 'runtime', value: runtime.length, trend: 'flat' },
+                {
+                  label: 'ready',
+                  value: runtime.filter((entry: any) => entry.agent.status === 'ready').length,
+                  trend: 'flat',
+                },
+                { label: 'outbox', value: pendingOutbox, trend: pendingOutbox > 0 ? 'up' : 'flat' },
               ],
             },
           },
           {
-            type: "display:table",
+            type: 'display:table',
             props: {
-              title: "Active Missions",
-              headers: ["Mission", "Status", "Tier", "Type", "Next", "Plan"],
-              rows: missions.slice(0, 12).map((mission) => [
-                mission.missionId,
-                mission.status,
-                mission.tier,
-                mission.missionType || "development",
-                String(mission.nextTaskCount),
-                mission.planReady ? "ready" : "pending",
-              ]),
+              title: 'Active Missions',
+              headers: ['Mission', 'Status', 'Tier', 'Type', 'Next', 'Plan'],
+              rows: missions
+                .slice(0, 12)
+                .map((mission) => [
+                  mission.missionId,
+                  mission.status,
+                  mission.tier,
+                  mission.missionType || 'development',
+                  String(mission.nextTaskCount),
+                  mission.planReady ? 'ready' : 'pending',
+                ]),
             },
           },
         ],
         timestamp: new Date().toISOString(),
       };
     }
-    case "missions": {
+    case 'missions': {
       const missions = collectActiveMissions();
       return {
-        status: "ok",
-        response: l(locale, `Mission list refreshed from active mission state. ${missions.length} missions are visible to Chronos.`, `active mission state から mission list を更新しました。Chronos から ${missions.length} 件の mission が見えています。`),
+        status: 'ok',
+        response: l(
+          locale,
+          `Mission list refreshed from active mission state. ${missions.length} missions are visible to Chronos.`,
+          `active mission state から mission list を更新しました。Chronos から ${missions.length} 件の mission が見えています。`
+        ),
         a2ui: [
           {
-            type: "display:hero",
+            type: 'display:hero',
             props: {
-              eyebrow: "Mission Control",
-              title: "Visible Missions",
-              description: "Chronos lists missions from active mission state under public and confidential tiers.",
+              eyebrow: 'Mission Control',
+              title: 'Visible Missions',
+              description:
+                'Chronos lists missions from active mission state under public and confidential tiers.',
               status: `${missions.length} visible`,
             },
           },
           {
-            type: "display:table",
+            type: 'display:table',
             props: {
-              title: "Mission Registry View",
-              headers: ["Mission", "Status", "Tier", "Checkpoints", "Next Tasks", "Plan"],
+              title: 'Mission Registry View',
+              headers: ['Mission', 'Status', 'Tier', 'Checkpoints', 'Next Tasks', 'Plan'],
               rows: missions.map((mission) => [
                 mission.missionId,
                 mission.status,
                 mission.tier,
                 String(mission.checkpoints),
                 String(mission.nextTaskCount),
-                mission.planReady ? "ready" : "pending",
+                mission.planReady ? 'ready' : 'pending',
               ]),
             },
           },
@@ -684,36 +746,41 @@ async function tryHandleChronosQuickAction(query: string, locale: "en" | "ja") {
         timestamp: new Date().toISOString(),
       };
     }
-    case "agents": {
+    case 'agents': {
       const manifests = core.loadAgentManifests();
       const runtimes = core.listAgentRuntimeSnapshots();
       const runtimeById = new Map(runtimes.map((entry: any) => [entry.agent.agentId, entry]));
       return {
-        status: "ok",
-        response: l(locale, `Agent catalog refreshed. ${manifests.length} manifests, ${runtimes.length} active runtimes.`, `agent catalog を更新しました。manifests=${manifests.length}、active runtimes=${runtimes.length} です。`),
+        status: 'ok',
+        response: l(
+          locale,
+          `Agent catalog refreshed. ${manifests.length} manifests, ${runtimes.length} active runtimes.`,
+          `agent catalog を更新しました。manifests=${manifests.length}、active runtimes=${runtimes.length} です。`
+        ),
         a2ui: [
           {
-            type: "display:hero",
+            type: 'display:hero',
             props: {
-              eyebrow: "Agent Catalog",
-              title: "Available Agents",
-              description: "Manifest definitions are merged with current runtime status so operator decisions match actual runtime state.",
+              eyebrow: 'Agent Catalog',
+              title: 'Available Agents',
+              description:
+                'Manifest definitions are merged with current runtime status so operator decisions match actual runtime state.',
               status: `${runtimes.length} active runtimes`,
             },
           },
           {
-            type: "display:table",
+            type: 'display:table',
             props: {
-              title: "Agents",
-              headers: ["Agent", "Provider", "Model", "Status", "Capabilities"],
+              title: 'Agents',
+              headers: ['Agent', 'Provider', 'Model', 'Status', 'Capabilities'],
               rows: manifests.map((manifest: any) => {
                 const runtime = runtimeById.get(manifest.agentId);
                 return [
                   manifest.agentId,
                   manifest.provider,
-                  manifest.modelId || "-",
-                  runtime?.agent.status || "offline",
-                  (manifest.capabilities || []).join(", "),
+                  manifest.modelId || '-',
+                  runtime?.agent.status || 'offline',
+                  (manifest.capabilities || []).join(', '),
                 ];
               }),
             },
@@ -722,32 +789,42 @@ async function tryHandleChronosQuickAction(query: string, locale: "en" | "ja") {
         timestamp: new Date().toISOString(),
       };
     }
-    case "vital-check": {
+    case 'vital-check': {
       const missions = collectActiveMissions();
       const runtimes = core.listAgentRuntimeSnapshots();
-      const readyCount = runtimes.filter((entry: any) => entry.agent.status === "ready").length;
-      const pendingOutbox = core.listSurfaceOutboxMessages("slack").length + core.listSurfaceOutboxMessages("chronos").length;
+      const readyCount = runtimes.filter((entry: any) => entry.agent.status === 'ready').length;
+      const pendingOutbox =
+        core.listSurfaceOutboxMessages('slack').length +
+        core.listSurfaceOutboxMessages('chronos').length;
       return {
-        status: "ok",
-        response: l(locale, `Vital check complete. ${missions.length} missions, ${readyCount}/${runtimes.length} runtimes ready, ${pendingOutbox} pending outbox messages.`, `vital check が完了しました。missions=${missions.length}、ready runtimes=${readyCount}/${runtimes.length}、pending outbox=${pendingOutbox} です。`),
+        status: 'ok',
+        response: l(
+          locale,
+          `Vital check complete. ${missions.length} missions, ${readyCount}/${runtimes.length} runtimes ready, ${pendingOutbox} pending outbox messages.`,
+          `vital check が完了しました。missions=${missions.length}、ready runtimes=${readyCount}/${runtimes.length}、pending outbox=${pendingOutbox} です。`
+        ),
         a2ui: [
           {
-            type: "display:hero",
+            type: 'display:hero',
             props: {
-              eyebrow: "Vital Check",
-              title: "System Vital Signs",
-              description: "Mission load, runtime readiness, and surface delivery pressure.",
-              status: readyCount === runtimes.length ? "healthy" : "degraded",
+              eyebrow: 'Vital Check',
+              title: 'System Vital Signs',
+              description: 'Mission load, runtime readiness, and surface delivery pressure.',
+              status: readyCount === runtimes.length ? 'healthy' : 'degraded',
             },
           },
           {
-            type: "display:metrics-row",
+            type: 'display:metrics-row',
             props: {
               metrics: [
-                { label: "missions", value: missions.length, trend: "flat" },
-                { label: "runtimes", value: runtimes.length, trend: "flat" },
-                { label: "ready", value: readyCount, trend: readyCount === runtimes.length ? "flat" : "down" },
-                { label: "outbox", value: pendingOutbox, trend: pendingOutbox > 0 ? "up" : "flat" },
+                { label: 'missions', value: missions.length, trend: 'flat' },
+                { label: 'runtimes', value: runtimes.length, trend: 'flat' },
+                {
+                  label: 'ready',
+                  value: readyCount,
+                  trend: readyCount === runtimes.length ? 'flat' : 'down',
+                },
+                { label: 'outbox', value: pendingOutbox, trend: pendingOutbox > 0 ? 'up' : 'flat' },
               ],
             },
           },
@@ -755,64 +832,79 @@ async function tryHandleChronosQuickAction(query: string, locale: "en" | "ja") {
         timestamp: new Date().toISOString(),
       };
     }
-    case "diagnostics": {
+    case 'diagnostics': {
       const runtimes = core.listAgentRuntimeSnapshots();
-      const problematic = runtimes.filter((entry: any) => entry.agent.status !== "ready");
+      const problematic = runtimes.filter((entry: any) => entry.agent.status !== 'ready');
       const toolRuntimes = core.listToolRuntimeInventory();
-      const readyToolRuntimes = toolRuntimes.items.filter((item: any) => item.lifecycle_stage === "installed" || item.lifecycle_stage === "pinned");
+      const readyToolRuntimes = toolRuntimes.items.filter(
+        (item: any) => item.lifecycle_stage === 'installed' || item.lifecycle_stage === 'pinned'
+      );
       const recentFiles = [
-        core.pathResolver.shared("observability/mission-control/orchestration-events.jsonl"),
-        core.pathResolver.shared("observability/channels/slack/missions.jsonl"),
+        core.pathResolver.shared('observability/mission-control/orchestration-events.jsonl'),
+        core.pathResolver.shared('observability/channels/slack/missions.jsonl'),
       ];
-      const recentLines = recentFiles.flatMap((file) => {
-        if (!core.safeExistsSync(file)) return [];
-        return (core.safeReadFile(file, { encoding: "utf8" }) as string).trim().split("\n").filter(Boolean).slice(-5);
-      }).slice(-10);
+      const recentLines = recentFiles
+        .flatMap((file) => {
+          if (!core.safeExistsSync(file)) return [];
+          return (core.safeReadFile(file, { encoding: 'utf8' }) as string)
+            .trim()
+            .split('\n')
+            .filter(Boolean)
+            .slice(-5);
+        })
+        .slice(-10);
       return {
-        status: "ok",
-        response: l(locale, `Diagnostics loaded. ${problematic.length} non-ready agent runtimes and ${readyToolRuntimes.length}/${toolRuntimes.items.length} governed tool runtimes ready.`, `diagnostics を読み込みました。non-ready agent runtime は ${problematic.length} 件、tool runtime は ${readyToolRuntimes.length}/${toolRuntimes.items.length} ready です。`),
+        status: 'ok',
+        response: l(
+          locale,
+          `Diagnostics loaded. ${problematic.length} non-ready agent runtimes and ${readyToolRuntimes.length}/${toolRuntimes.items.length} governed tool runtimes ready.`,
+          `diagnostics を読み込みました。non-ready agent runtime は ${problematic.length} 件、tool runtime は ${readyToolRuntimes.length}/${toolRuntimes.items.length} ready です。`
+        ),
         a2ui: [
           {
-            type: "display:section",
+            type: 'display:section',
             props: {
-              title: "Runtime Diagnostics",
-              description: "Non-ready runtime entries, governed tool runtime inventory, and recent control-plane events.",
+              title: 'Runtime Diagnostics',
+              description:
+                'Non-ready runtime entries, governed tool runtime inventory, and recent control-plane events.',
               items: [
                 {
-                  type: "display:table",
+                  type: 'display:table',
                   props: {
-                    title: "Non-ready Runtimes",
-                    headers: ["Agent", "Status", "Owner", "Kind"],
-                    rows: problematic.length > 0
-                      ? problematic.map((entry: any) => [
-                          entry.agent.agentId,
-                          entry.agent.status,
-                          entry.agent.ownerId || "-",
-                          entry.agent.ownerType || "-",
-                        ])
-                      : [["none", "ready", "-", "-"]],
+                    title: 'Non-ready Runtimes',
+                    headers: ['Agent', 'Status', 'Owner', 'Kind'],
+                    rows:
+                      problematic.length > 0
+                        ? problematic.map((entry: any) => [
+                            entry.agent.agentId,
+                            entry.agent.status,
+                            entry.agent.ownerId || '-',
+                            entry.agent.ownerType || '-',
+                          ])
+                        : [['none', 'ready', '-', '-']],
                   },
                 },
                 {
-                  type: "display:table",
+                  type: 'display:table',
                   props: {
-                    title: "Governed Tool Runtimes",
-                    headers: ["Tool", "Lifecycle", "Action", "Backend", "Managed Path"],
-                    rows: toolRuntimes.items.length > 0
-                      ? toolRuntimes.items.map((item: any) => [
-                          item.tool.display_name || item.tool.tool_id,
-                          item.lifecycle_stage,
-                          item.selected_action,
-                          item.selected_backend?.kind || item.selected_backend?.command || "-",
-                          item.managed_env_path,
-                        ])
-                      : [["none", "trial", "-", "-", "-"]],
+                    title: 'Governed Tool Runtimes',
+                    headers: ['Tool', 'Lifecycle', 'Action', 'Backend', 'Managed Path'],
+                    rows:
+                      toolRuntimes.items.length > 0
+                        ? toolRuntimes.items.map((item: any) => [
+                            item.tool.display_name || item.tool.tool_id,
+                            item.lifecycle_stage,
+                            item.selected_action,
+                            item.selected_backend?.kind || item.selected_backend?.command || '-',
+                            item.managed_env_path,
+                          ])
+                        : [['none', 'trial', '-', '-', '-']],
                   },
                 },
                 {
-                  type: "display:log",
+                  type: 'display:log',
                   props: {
-                    title: "Recent Events",
+                    title: 'Recent Events',
                     lines: recentLines,
                   },
                 },
@@ -823,7 +915,7 @@ async function tryHandleChronosQuickAction(query: string, locale: "en" | "ja") {
         timestamp: new Date().toISOString(),
       };
     }
-    case "capability-audit": {
+    case 'capability-audit': {
       const manifests = core.loadAgentManifests();
       const capabilityCounts = manifests
         .flatMap((manifest: any) => manifest.capabilities || [])
@@ -836,23 +928,27 @@ async function tryHandleChronosQuickAction(query: string, locale: "en" | "ja") {
         .slice(0, 16)
         .map(([capability, count]) => [capability, String(count)]);
       return {
-        status: "ok",
-        response: l(locale, `Capability audit complete. ${manifests.length} agent manifests were scanned.`, `capability audit が完了しました。${manifests.length} 件の agent manifest を確認しました。`),
+        status: 'ok',
+        response: l(
+          locale,
+          `Capability audit complete. ${manifests.length} agent manifests were scanned.`,
+          `capability audit が完了しました。${manifests.length} 件の agent manifest を確認しました。`
+        ),
         a2ui: [
           {
-            type: "display:hero",
+            type: 'display:hero',
             props: {
-              eyebrow: "Capability Audit",
-              title: "Manifest Capability Coverage",
-              description: "Capability density derived from current agent manifests.",
+              eyebrow: 'Capability Audit',
+              title: 'Manifest Capability Coverage',
+              description: 'Capability density derived from current agent manifests.',
               status: `${manifests.length} manifests`,
             },
           },
           {
-            type: "display:table",
+            type: 'display:table',
             props: {
-              title: "Capabilities",
-              headers: ["Capability", "Agents"],
+              title: 'Capabilities',
+              headers: ['Capability', 'Agents'],
               rows,
             },
           },
@@ -860,24 +956,30 @@ async function tryHandleChronosQuickAction(query: string, locale: "en" | "ja") {
         timestamp: new Date().toISOString(),
       };
     }
-    case "provider-check": {
+    case 'provider-check': {
       const manifests = core.loadAgentManifests();
       const runtimes = core.listAgentRuntimeSnapshots();
-      const runtimeById = new Map(runtimes.map((entry: any) => [entry.agent.agentId, entry.agent.status]));
+      const runtimeById = new Map(
+        runtimes.map((entry: any) => [entry.agent.agentId, entry.agent.status])
+      );
       return {
-        status: "ok",
-        response: l(locale, `Provider inventory loaded for ${manifests.length} manifests.`, `${manifests.length} 件の manifest について provider inventory を読み込みました。`),
+        status: 'ok',
+        response: l(
+          locale,
+          `Provider inventory loaded for ${manifests.length} manifests.`,
+          `${manifests.length} 件の manifest について provider inventory を読み込みました。`
+        ),
         a2ui: [
           {
-            type: "display:table",
+            type: 'display:table',
             props: {
-              title: "Provider Status",
-              headers: ["Agent", "Provider", "Model", "Runtime"],
+              title: 'Provider Status',
+              headers: ['Agent', 'Provider', 'Model', 'Runtime'],
               rows: manifests.map((manifest: any) => [
                 manifest.agentId,
                 manifest.provider,
-                manifest.modelId || "-",
-                runtimeById.get(manifest.agentId) || "offline",
+                manifest.modelId || '-',
+                runtimeById.get(manifest.agentId) || 'offline',
               ]),
             },
           },
@@ -885,49 +987,64 @@ async function tryHandleChronosQuickAction(query: string, locale: "en" | "ja") {
         timestamp: new Date().toISOString(),
       };
     }
-    case "audit-log": {
+    case 'audit-log': {
       const auditChainPath = core.pathResolver.rootResolve(
-        `active/audit/audit-${new Date().toISOString().slice(0, 10)}.jsonl`,
+        `active/audit/audit-${new Date().toISOString().slice(0, 10)}.jsonl`
       );
       const eventFiles = [
         auditChainPath,
-        core.pathResolver.shared("observability/mission-control/orchestration-events.jsonl"),
-        core.pathResolver.shared("observability/channels/slack/missions.jsonl"),
+        core.pathResolver.shared('observability/mission-control/orchestration-events.jsonl'),
+        core.pathResolver.shared('observability/channels/slack/missions.jsonl'),
       ];
       const events: Array<{ time: string; label: string; detail?: string; status?: string }> = [];
       for (const file of eventFiles) {
         if (!core.safeExistsSync(file)) continue;
-        const lines = (core.safeReadFile(file, { encoding: "utf8" }) as string).trim().split("\n").filter(Boolean);
+        const lines = (core.safeReadFile(file, { encoding: 'utf8' }) as string)
+          .trim()
+          .split('\n')
+          .filter(Boolean);
         for (const line of lines.slice(-12)) {
           const event = JSON.parse(line);
-          const routingDecision = event.metadata?.routing_decision as { mode?: string; owner?: string; fanout?: string } | undefined;
+          const routingDecision = event.metadata?.routing_decision as
+            | { mode?: string; owner?: string; fanout?: string }
+            | undefined;
           const routingSummary = routingDecision
-            ? [routingDecision.mode, routingDecision.owner ? `owner=${routingDecision.owner}` : undefined, routingDecision.fanout && routingDecision.fanout !== "none" ? `fanout=${routingDecision.fanout}` : undefined]
+            ? [
+                routingDecision.mode,
+                routingDecision.owner ? `owner=${routingDecision.owner}` : undefined,
+                routingDecision.fanout && routingDecision.fanout !== 'none'
+                  ? `fanout=${routingDecision.fanout}`
+                  : undefined,
+              ]
                 .filter(Boolean)
-                .join(", ")
+                .join(', ')
             : undefined;
           events.push({
             time: String(event.ts || new Date().toISOString()).slice(11, 19),
-            label: String(event.decision || event.action || event.event_type || "event"),
+            label: String(event.decision || event.action || event.event_type || 'event'),
             detail: routingSummary
-              ? `${String(event.mission_id || event.resource_id || event.agentId || "system")} · ${routingSummary}`
-              : String(event.mission_id || event.resource_id || event.agentId || "system"),
-            status: String(event.result || event.decision || "").includes("failed")
-              ? "error"
-              : String(event.result || event.decision || "").includes("completed")
-                ? "ok"
-                : "warning",
+              ? `${String(event.mission_id || event.resource_id || event.agentId || 'system')} · ${routingSummary}`
+              : String(event.mission_id || event.resource_id || event.agentId || 'system'),
+            status: String(event.result || event.decision || '').includes('failed')
+              ? 'error'
+              : String(event.result || event.decision || '').includes('completed')
+                ? 'ok'
+                : 'warning',
           });
         }
       }
       return {
-        status: "ok",
-        response: l(locale, `Recent orchestration and mission audit events loaded.`, `最近の orchestration と mission audit event を読み込みました。`),
+        status: 'ok',
+        response: l(
+          locale,
+          `Recent orchestration and mission audit events loaded.`,
+          `最近の orchestration と mission audit event を読み込みました。`
+        ),
         a2ui: [
           {
-            type: "display:timeline",
+            type: 'display:timeline',
             props: {
-              title: "Recent Audit Events",
+              title: 'Recent Audit Events',
               events: events.slice(-12).reverse(),
             },
           },
@@ -935,49 +1052,68 @@ async function tryHandleChronosQuickAction(query: string, locale: "en" | "ja") {
         timestamp: new Date().toISOString(),
       };
     }
-    case "policies": {
-      const securityPolicyPath = core.pathResolver.knowledge("public/governance/security-policy.json");
+    case 'policies': {
+      const securityPolicyPath = core.pathResolver.knowledge(
+        'public/governance/security-policy.json'
+      );
       const securityPolicy = readJson(securityPolicyPath);
       const chronosPolicy = securityPolicy.authority_role_permissions?.chronos_operator || {};
       return {
-        status: "ok",
-        response: l(locale, "Chronos operator policy loaded.", "Chronos operator policy を読み込みました。"),
+        status: 'ok',
+        response: l(
+          locale,
+          'Chronos operator policy loaded.',
+          'Chronos operator policy を読み込みました。'
+        ),
         a2ui: [
           {
-            type: "display:hero",
+            type: 'display:hero',
             props: {
-              eyebrow: "Governance",
-              title: "Chronos Operator Policy",
-              description: "Read scopes and runtime boundaries applied to the Chronos surface.",
-              status: "policy loaded",
+              eyebrow: 'Governance',
+              title: 'Chronos Operator Policy',
+              description: 'Read scopes and runtime boundaries applied to the Chronos surface.',
+              status: 'policy loaded',
             },
           },
           {
-            type: "display:badges",
+            type: 'display:badges',
             props: {
-              title: "Read Scopes",
-              items: (chronosPolicy.allow_read || []).map((scope: string) => ({ label: scope, tone: "info" })),
+              title: 'Read Scopes',
+              items: (chronosPolicy.allow_read || []).map((scope: string) => ({
+                label: scope,
+                tone: 'info',
+              })),
             },
           },
         ],
         timestamp: new Date().toISOString(),
       };
     }
-    case "knowledge": {
-      const roots = ["knowledge/public", "knowledge/product/architecture", "knowledge/product/governance"];
-      const files = roots.flatMap((root) => {
-        const dir = core.pathResolver.rootResolve(root);
-        if (!core.safeExistsSync(dir)) return [];
-        return core.safeReaddir(dir).map((name) => `${root}/${name}`);
-      }).slice(0, 24);
+    case 'knowledge': {
+      const roots = [
+        'knowledge/public',
+        'knowledge/product/architecture',
+        'knowledge/product/governance',
+      ];
+      const files = roots
+        .flatMap((root) => {
+          const dir = core.pathResolver.rootResolve(root);
+          if (!core.safeExistsSync(dir)) return [];
+          return core.safeReaddir(dir).map((name) => `${root}/${name}`);
+        })
+        .slice(0, 24);
       return {
-        status: "ok",
-        response: l(locale, "Public knowledge surface refreshed.", "public knowledge surface を更新しました。"),
+        status: 'ok',
+        response: l(
+          locale,
+          'Public knowledge surface refreshed.',
+          'public knowledge surface を更新しました。'
+        ),
         a2ui: [
           {
-            type: "display:list",
+            type: 'display:list',
             props: {
-              title: "Public Knowledge Files",
+              title: 'Public Knowledge Files',
               items: files.map((file) => ({ label: file })),
             },
           },
@@ -985,21 +1121,27 @@ async function tryHandleChronosQuickAction(query: string, locale: "en" | "ja") {
         timestamp: new Date().toISOString(),
       };
     }
-    case "build-test": {
-      const buildOutput = core.safeExec("pnpm", ["run", "build"], { cwd: PROJECT_ROOT });
-      const testOutput = core.safeExec("pnpm", ["test"], { cwd: PROJECT_ROOT });
+    case 'build-test': {
+      const buildOutput = core.safeExec('pnpm', ['run', 'build'], { cwd: PROJECT_ROOT });
+      const testOutput = core.safeExec('pnpm', ['test'], { cwd: PROJECT_ROOT });
       return {
-        status: "ok",
-        response: l(locale, "Build and test completed.", "build と test が完了しました。"),
+        status: 'ok',
+        response: l(locale, 'Build and test completed.', 'build と test が完了しました。'),
         a2ui: [
           {
-            type: "display:section",
+            type: 'display:section',
             props: {
-              title: "Build & Test",
-              description: "Deterministic local verification from Chronos.",
+              title: 'Build & Test',
+              description: 'Deterministic local verification from Chronos.',
               items: [
-                { type: "display:log", props: { title: "Build Output", lines: buildOutput.split("\n").slice(-20) } },
-                { type: "display:log", props: { title: "Test Output", lines: testOutput.split("\n").slice(-20) } },
+                {
+                  type: 'display:log',
+                  props: { title: 'Build Output', lines: buildOutput.split('\n').slice(-20) },
+                },
+                {
+                  type: 'display:log',
+                  props: { title: 'Test Output', lines: testOutput.split('\n').slice(-20) },
+                },
               ],
             },
           },
@@ -1016,7 +1158,7 @@ export async function POST(req: NextRequest) {
   const denied = guardRequest(req);
   if (denied) return denied;
   try {
-    process.env.MISSION_ROLE ||= "chronos_operator";
+    process.env.MISSION_ROLE ||= 'chronos_operator';
     const core = await loadChronosCore();
     const {
       isSlackMissionConfirmation,
@@ -1029,58 +1171,69 @@ export async function POST(req: NextRequest) {
     } = core;
     const body = await req.json();
     const locale = normalizeChronosLocale(body.locale);
-    const query = (body.query || body.intent || "").trim();
-    const sessionId = typeof body.sessionId === "string" && body.sessionId.trim() ? body.sessionId : "chronos-default";
+    const query = (body.query || body.intent || '').trim();
+    const sessionId =
+      typeof body.sessionId === 'string' && body.sessionId.trim()
+        ? body.sessionId
+        : 'chronos-default';
     const pendingMissionProposal = getChronosMissionProposalState(sessionId, core);
-    const missionId = typeof body.missionId === "string" ? body.missionId : undefined;
-    const teamRole = typeof body.teamRole === "string" ? body.teamRole : undefined;
+    const missionId = typeof body.missionId === 'string' ? body.missionId : undefined;
+    const teamRole = typeof body.teamRole === 'string' ? body.teamRole : undefined;
 
     if (!query) {
-      return NextResponse.json({ error: l(locale, "Missing query", "query がありません") }, { status: 400 });
+      return NextResponse.json(
+        { error: l(locale, 'Missing query', 'query がありません') },
+        { status: 400 }
+      );
     }
 
     if (pendingMissionProposal && isSlackMissionConfirmation(query)) {
-      const issued = await issueChronosMissionFromProposal({
-        sessionId,
-        proposal: pendingMissionProposal.proposal,
-        sourceText: pendingMissionProposal.sourceText,
-        routingDecision: pendingMissionProposal.routingDecision,
-      }, core);
+      const issued = await issueChronosMissionFromProposal(
+        {
+          sessionId,
+          proposal: pendingMissionProposal.proposal,
+          sourceText: pendingMissionProposal.sourceText,
+          routingDecision: pendingMissionProposal.routingDecision,
+        },
+        core
+      );
       clearChronosMissionProposalState(sessionId, core);
       return NextResponse.json({
-        status: "ok",
+        status: 'ok',
         response: [
           `Mission ${issued.missionId} started.`,
           `Type: ${issued.missionType}`,
           `Tier: ${issued.tier}`,
           `Persona: ${issued.persona}`,
           issued.routingDecision
-            ? `Routing: ${issued.routingDecision.mode}${issued.routingDecision.owner ? ` (${issued.routingDecision.owner})` : ""}`
+            ? `Routing: ${issued.routingDecision.mode}${issued.routingDecision.owner ? ` (${issued.routingDecision.owner})` : ''}`
             : undefined,
-          issued.orchestrationStatus === "queued"
-            ? "Background orchestration has been queued."
-            : "Background orchestration could not be queued.",
-        ].filter(Boolean).join("\n"),
+          issued.orchestrationStatus === 'queued'
+            ? 'Background orchestration has been queued.'
+            : 'Background orchestration could not be queued.',
+        ]
+          .filter(Boolean)
+          .join('\n'),
         a2ui: [
           {
-            type: "display:hero",
+            type: 'display:hero',
             props: {
-              eyebrow: "Mission Started",
+              eyebrow: 'Mission Started',
               title: issued.missionId,
               description: issued.routingDecision
-                ? `Type ${issued.missionType}. Tier ${issued.tier}. Persona ${issued.persona}. Routing ${issued.routingDecision.mode}${issued.routingDecision.owner ? ` (${issued.routingDecision.owner})` : ""}.`
+                ? `Type ${issued.missionType}. Tier ${issued.tier}. Persona ${issued.persona}. Routing ${issued.routingDecision.mode}${issued.routingDecision.owner ? ` (${issued.routingDecision.owner})` : ''}.`
                 : `Type ${issued.missionType}. Tier ${issued.tier}. Persona ${issued.persona}.`,
               status: issued.orchestrationStatus,
             },
           },
           {
-            type: "display:badges",
+            type: 'display:badges',
             props: {
-              title: "Mission Context",
+              title: 'Mission Context',
               items: [
-                { label: issued.missionType, tone: "info" },
-                { label: issued.tier, tone: "warning" },
-                { label: issued.persona, tone: "success" },
+                { label: issued.missionType, tone: 'info' },
+                { label: issued.tier, tone: 'warning' },
+                { label: issued.persona, tone: 'success' },
               ],
             },
           },
@@ -1098,9 +1251,11 @@ export async function POST(req: NextRequest) {
     const requestArtifactPath = recordChronosSurfaceRequest({
       query,
       sessionId,
-      requesterId: body.requesterId || "chronos-ui",
+      requesterId: body.requesterId || 'chronos-ui',
     });
-    const requestArtifact = JSON.parse(safeReadFile(requestArtifactPath, { encoding: "utf8" }) as string);
+    const requestArtifact = JSON.parse(
+      safeReadFile(requestArtifactPath, { encoding: 'utf8' }) as string
+    );
 
     const deterministicPipelineResponse = await tryHandleDeterministicPipelineQuery(query, locale);
     if (deterministicPipelineResponse) {
@@ -1110,29 +1265,29 @@ export async function POST(req: NextRequest) {
     await ensureChronosAgent({
       missionId,
       teamRole,
-      requesterId: body.requesterId || "chronos-ui",
+      requesterId: body.requesterId || 'chronos-ui',
     });
     await dispatchPresenceFrame({
       agentId: CHRONOS_AGENT_ID,
-      title: "Presence Studio",
-      status: "thinking",
-      expression: "thinking",
-      subtitle: "Chronos is preparing a response.",
-      transcript: [{ speaker: "User", text: query }],
+      title: 'Presence Studio',
+      status: 'thinking',
+      expression: 'thinking',
+      subtitle: 'Chronos is preparing a response.',
+      transcript: [{ speaker: 'User', text: query }],
     });
     const conversation = await runSurfaceMessageConversation({
-      surface: "chronos",
+      surface: 'chronos',
       text: query,
       threadTs: sessionId,
       correlationId: requestArtifact.correlation_id,
-      actorId: body.requesterId || "chronos-ui",
+      actorId: body.requesterId || 'chronos-ui',
       senderAgentId: CHRONOS_AGENT_ID,
       agentId: CHRONOS_AGENT_ID,
       cwd: PROJECT_ROOT,
       missionId,
       teamRole,
       delegationSummaryInstruction:
-        "以下は委任先エージェントからの回答です。ユーザーに分かりやすくまとめて表示してください。必要なら A2UI を使ってください。追加の A2A は出力しないでください。",
+        '以下は委任先エージェントからの回答です。ユーザーに分かりやすくまとめて表示してください。必要なら A2UI を使ってください。追加の A2A は出力しないでください。',
     });
     scheduleChronosShutdown();
 
@@ -1149,60 +1304,70 @@ export async function POST(req: NextRequest) {
       const proposal = conversation.missionProposals[0];
       await dispatchPresenceFrame({
         agentId: CHRONOS_AGENT_ID,
-        title: "Presence Studio",
-        status: "speaking",
-        expression: "thinking",
-        subtitle: conversation.text || "Chronos prepared a mission proposal.",
-        transcript: [{ speaker: "Chronos", text: conversation.text || "I can turn this into a mission." }],
+        title: 'Presence Studio',
+        status: 'speaking',
+        expression: 'thinking',
+        subtitle: conversation.text || 'Chronos prepared a mission proposal.',
+        transcript: [
+          { speaker: 'Chronos', text: conversation.text || 'I can turn this into a mission.' },
+        ],
       });
-      saveChronosMissionProposalState({
-        sessionId,
-        proposal,
-        sourceText: query,
-        routingDecision: conversation.routingDecision,
-      }, core);
+      saveChronosMissionProposalState(
+        {
+          sessionId,
+          proposal,
+          sourceText: query,
+          routingDecision: conversation.routingDecision,
+        },
+        core
+      );
       const confirmationText = [
-        conversation.text || "I can turn this into a mission.",
-        "",
-        "If you want me to proceed, reply with `はい` or `お願いします` in this session.",
-      ].join("\n").trim();
+        conversation.text || 'I can turn this into a mission.',
+        '',
+        'If you want me to proceed, reply with `はい` or `お願いします` in this session.',
+      ]
+        .join('\n')
+        .trim();
 
       return NextResponse.json({
-        status: "ok",
+        status: 'ok',
         response: confirmationText,
         a2ui: [
           {
-            type: "display:hero",
+            type: 'display:hero',
             props: {
-              eyebrow: "Mission Proposal",
-              title: proposal.summary || proposal.why || proposal.mission_type || "New mission",
-              description: conversation.text || "Chronos has prepared a mission proposal and is waiting for confirmation.",
-              status: "awaiting confirmation",
+              eyebrow: 'Mission Proposal',
+              title: proposal.summary || proposal.why || proposal.mission_type || 'New mission',
+              description:
+                conversation.text ||
+                'Chronos has prepared a mission proposal and is waiting for confirmation.',
+              status: 'awaiting confirmation',
             },
           },
           {
-            type: "display:badges",
+            type: 'display:badges',
             props: {
-              title: "Proposed Configuration",
+              title: 'Proposed Configuration',
               items: [
-                { label: proposal.mission_type || "development", tone: "info" },
-                { label: proposal.tier || "public", tone: "warning" },
-                { label: proposal.assigned_persona || "Ecosystem Architect", tone: "success" },
+                { label: proposal.mission_type || 'development', tone: 'info' },
+                { label: proposal.tier || 'public', tone: 'warning' },
+                { label: proposal.assigned_persona || 'Ecosystem Architect', tone: 'success' },
               ],
             },
           },
           {
-            type: "display:section",
+            type: 'display:section',
             props: {
-              title: "Next Step",
-              description: "Confirm from Chronos to issue the mission through mission_controller and queue orchestration.",
+              title: 'Next Step',
+              description:
+                'Confirm from Chronos to issue the mission through mission_controller and queue orchestration.',
               items: [
                 {
-                  type: "display:alert",
+                  type: 'display:alert',
                   props: {
-                    severity: "info",
-                    title: "Reply with confirmation",
-                    message: "Send `はい` or `お願いします` in this session to start the mission.",
+                    severity: 'info',
+                    title: 'Reply with confirmation',
+                    message: 'Send `はい` or `お願いします` in this session to start the mission.',
                   },
                 },
               ],
@@ -1217,21 +1382,22 @@ export async function POST(req: NextRequest) {
     if (conversation.text) {
       await reflectPresenceAgentReply({
         agentId: CHRONOS_AGENT_ID,
-        speaker: "Chronos",
+        speaker: 'Chronos',
         text: conversation.text,
       });
     }
 
     return NextResponse.json({
-      status: "ok",
+      status: 'ok',
       response: conversation.text,
       a2ui: conversation.a2uiMessages,
       delegations: delegationResults.length > 0 ? delegationResults : undefined,
       timestamp: new Date().toISOString(),
     });
   } catch (err: any) {
+    const safeError = buildUserFacingError(err, { surface: 'chronos' });
     return NextResponse.json(
-      { error: err.message },
+      { error: safeError.body, nextAction: safeError.nextAction, title: safeError.title },
       { status: 500 }
     );
   }
