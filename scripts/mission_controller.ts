@@ -47,6 +47,7 @@ import {
   validateWritePermission,
   killSwitch,
   renderStatus,
+  buildHandoffPacket,
 } from '@agent/core';
 
 // --- Sub-module imports ---
@@ -1125,6 +1126,16 @@ function showMissionStatus(id: string, follow: boolean = false) {
   console.log(`  Confidence:  ${state.confidence_score}`);
   console.log(`  Priority:    ${state.priority}`);
   console.log(`  Mode:        ${state.execution_mode}`);
+  if (state.classification) {
+    console.log(
+      `  Class:       ${state.classification.mission_class} (risk: ${state.classification.risk_profile}, shape: ${state.classification.delivery_shape})`
+    );
+  }
+  if (state.process_template) {
+    console.log(
+      `  Process:     ${state.process_template.workflow_id} — ${state.process_template.phases.join(' → ')}`
+    );
+  }
   console.log(`  Branch:      ${state.git.branch}`);
   console.log(`  Commit:      ${state.git.latest_commit.slice(0, 8)}`);
   console.log(`  Checkpoints: ${state.git.checkpoints.length}`);
@@ -1166,9 +1177,11 @@ function showMissionStatus(id: string, follow: boolean = false) {
     console.log(`    ${h.ts.slice(0, 16)}  [${h.event}]  ${h.note}`);
   }
   console.log('');
-  
+
   if (follow) {
-    console.log(`  [SYS] Following mission ledger for ${id.toUpperCase()}... (Press Ctrl-C to exit)\n`);
+    console.log(
+      `  [SYS] Following mission ledger for ${id.toUpperCase()}... (Press Ctrl-C to exit)\n`
+    );
     let lastHistoryLength = view.state.history.length;
     setInterval(() => {
       const current = buildMissionStatusView(id);
@@ -1474,11 +1487,47 @@ async function handoffMission(id: string, nextPersona: string, note?: string): P
     return;
   }
   const previousPersona = state.assigned_persona;
+  const handoffPacket = buildHandoffPacket({
+    kind: 'mission',
+    correlationId: `${upperId}:${previousPersona}->${nextPersona}:${Date.now().toString(36)}`,
+    outgoingSummary:
+      note ||
+      state.context?.context_pack_summary ||
+      state.context?.last_action ||
+      `Mission ${upperId} handed off from ${previousPersona} to ${nextPersona}.`,
+    rationale:
+      note ||
+      state.context?.intent_delta_summary?.message ||
+      `Continue mission ${upperId} under ${nextPersona}.`,
+    openDecisions: [
+      ...(state.context?.blockers || []),
+      ...(state.context?.mission_completion_summary?.gaps || []),
+      ...(state.context?.mission_completion_next_action?.gaps || []),
+    ],
+    partialArtifacts: [
+      ...(state.context?.mission_completion_summary?.delivered || []),
+      ...(state.context?.mission_completion_next_action?.delivered || []),
+      ...(state.context?.associated_projects || []),
+    ],
+    remainingAcceptanceCriteria: [
+      ...(state.context?.mission_completion_summary?.gaps || []),
+      ...(state.context?.mission_completion_next_action?.gaps || []),
+      ...(state.context?.next_step ? [state.context.next_step] : []),
+      ...(state.context?.mission_completion_next_action?.next_step
+        ? [state.context.mission_completion_next_action.next_step]
+        : []),
+    ],
+    sourceRef: `persona:${previousPersona}`,
+    targetRef: `persona:${nextPersona}`,
+  });
   state.assigned_persona = nextPersona;
   state.history.push({
     ts: new Date().toISOString(),
     event: 'HANDOFF',
+    from: previousPersona,
+    to: nextPersona,
     note: note || `Handoff from ${previousPersona} to ${nextPersona}.`,
+    handoff_packet: handoffPacket,
   });
   await saveState(upperId, state);
   await syncProjectLedgerIfLinked(upperId);

@@ -33,6 +33,7 @@ export interface CoworkPendingApproval {
   request_id: string;
   title: string;
   summary: string;
+  details?: string;
   severity: string;
   requested_by: string;
   requested_at: string;
@@ -72,6 +73,7 @@ export function listPendingApprovalsForCowork(): CoworkPendingApproval[] {
     request_id: r.id,
     title: r.title,
     summary: r.summary,
+    details: r.details,
     severity: r.severity ?? 'medium',
     requested_by: r.requestedBy,
     requested_at: r.requestedAt,
@@ -112,7 +114,7 @@ export function decideApprovalFromCowork(params: {
     });
     throw new Error(
       `[APPROVAL_ERROR] Request '${params.requestId}' not found among pending approvals. ` +
-      'Call kyberion.approval.list_pending first to obtain a valid request_id.',
+        'Call kyberion.approval.list_pending first to obtain a valid request_id.'
     );
   }
 
