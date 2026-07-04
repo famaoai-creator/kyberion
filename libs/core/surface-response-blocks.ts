@@ -7,8 +7,16 @@ import type {
   SlackApprovalRequestDraft,
   SurfaceConversationResult,
 } from './channel-surface-types.js';
+import { extractPlanningPacketBlocks } from './planning-packet-contract.js';
+import { extractTaskResultBlocks } from './task-result-contract.js';
 
-const REASONING_TAG_NAMES = ['think', 'thinking', 'reasoning', 'thought', 'REASONING_SCRATCHPAD'] as const;
+const REASONING_TAG_NAMES = [
+  'think',
+  'thinking',
+  'reasoning',
+  'thought',
+  'REASONING_SCRATCHPAD',
+] as const;
 const REASONING_FENCE_LANGS = new Set(['thought', 'reasoning', 'internal']);
 
 function stripReasoningPairsFromLine(line: string): string {
@@ -46,7 +54,9 @@ function stripReasoningTags(input: string): string {
     }
 
     if (inReasoningBlock) {
-      const closeTagMatch = line.match(/<\/\s*(think|thinking|reasoning|thought|REASONING_SCRATCHPAD)\s*>/i);
+      const closeTagMatch = line.match(
+        /<\/\s*(think|thinking|reasoning|thought|REASONING_SCRATCHPAD)\s*>/i
+      );
       if (!closeTagMatch || closeTagMatch.index === undefined) {
         continue;
       }
@@ -60,7 +70,9 @@ function stripReasoningTags(input: string): string {
     line = stripReasoningPairsFromLine(line);
     if (!line.trim()) continue;
 
-    const openBoundary = line.match(/^\s*<\s*(think|thinking|reasoning|thought|REASONING_SCRATCHPAD)\s*>/i);
+    const openBoundary = line.match(
+      /^\s*<\s*(think|thinking|reasoning|thought|REASONING_SCRATCHPAD)\s*>/i
+    );
     if (openBoundary) {
       const afterOpen = line.slice(openBoundary[0].length);
       const closeRegex = new RegExp(`</\\s*${openBoundary[1]}\\s*>`, 'i');
@@ -134,47 +146,74 @@ export function extractSurfaceBlocks(raw: string): SurfaceConversationResult {
   const approvalRequests: SlackApprovalRequestDraft[] = [];
   const routingProposals: NerveRoutingProposal[] = [];
   const missionProposals: MissionProposal[] = [];
-  const planningPackets: PlanningPacket[] = [];
+  const surfaceParseErrors: string[] = [];
 
   let text = raw;
+  const planningPacketBlocks = extractPlanningPacketBlocks(text);
+  text = planningPacketBlocks.text;
+  const taskResultBlocks = extractTaskResultBlocks(text);
+  text = taskResultBlocks.text;
 
   text = text.replace(/```a2ui\s*\n([\s\S]*?)```/g, (_match, json) => {
-    try { a2uiMessages.push(JSON.parse(json.trim()) as A2UIMessage); } catch (_) {}
+    try {
+      a2uiMessages.push(JSON.parse(json.trim()) as A2UIMessage);
+    } catch (error: any) {
+      surfaceParseErrors.push(`a2ui block parse failed: ${error?.message ?? String(error)}`);
+    }
     return '';
   });
 
   text = text.replace(/```\s*a2ui\s*\n([\s\S]*?)```/g, (_match, json) => {
-    try { a2uiMessages.push(JSON.parse(json.trim()) as A2UIMessage); } catch (_) {}
+    try {
+      a2uiMessages.push(JSON.parse(json.trim()) as A2UIMessage);
+    } catch (error: any) {
+      surfaceParseErrors.push(`a2ui block parse failed: ${error?.message ?? String(error)}`);
+    }
     return '';
   });
 
   text = text.replace(/```a2a\s*\n([\s\S]*?)```/g, (_match, json) => {
-    try { a2aMessages.push(JSON.parse(json.trim()) as A2AMessage); } catch (_) {}
+    try {
+      a2aMessages.push(JSON.parse(json.trim()) as A2AMessage);
+    } catch (error: any) {
+      surfaceParseErrors.push(`a2a block parse failed: ${error?.message ?? String(error)}`);
+    }
     return '';
   });
 
   text = text.replace(/```approval\s*\n([\s\S]*?)```/g, (_match, json) => {
-    try { approvalRequests.push(JSON.parse(json.trim())); } catch (_) {}
+    try {
+      approvalRequests.push(JSON.parse(json.trim()));
+    } catch (error: any) {
+      surfaceParseErrors.push(`approval block parse failed: ${error?.message ?? String(error)}`);
+    }
     return '';
   });
 
   text = text.replace(/```(?:nerve_route|route)\s*\n([\s\S]*?)```/g, (_match, json) => {
-    try { routingProposals.push(JSON.parse(json.trim()) as NerveRoutingProposal); } catch (_) {}
+    try {
+      routingProposals.push(JSON.parse(json.trim()) as NerveRoutingProposal);
+    } catch (error: any) {
+      surfaceParseErrors.push(`routing proposal parse failed: ${error?.message ?? String(error)}`);
+    }
     return '';
   });
 
   text = text.replace(/```mission_proposal\s*\n([\s\S]*?)```/g, (_match, json) => {
-    try { missionProposals.push(JSON.parse(json.trim()) as MissionProposal); } catch (_) {}
-    return '';
-  });
-
-  text = text.replace(/```planning_packet\s*\n([\s\S]*?)```/g, (_match, json) => {
-    try { planningPackets.push(JSON.parse(json.trim()) as PlanningPacket); } catch (_) {}
+    try {
+      missionProposals.push(JSON.parse(json.trim()) as MissionProposal);
+    } catch (error: any) {
+      surfaceParseErrors.push(`mission proposal parse failed: ${error?.message ?? String(error)}`);
+    }
     return '';
   });
 
   text = text.replace(/>>A2A(\{[\s\S]*?\})<</g, (_match, json) => {
-    try { a2aMessages.push(JSON.parse(json.trim()) as A2AMessage); } catch (_) {}
+    try {
+      a2aMessages.push(JSON.parse(json.trim()) as A2AMessage);
+    } catch (error: any) {
+      surfaceParseErrors.push(`a2a legacy block parse failed: ${error?.message ?? String(error)}`);
+    }
     return '';
   });
 
@@ -188,7 +227,10 @@ export function extractSurfaceBlocks(raw: string): SurfaceConversationResult {
     approvalRequests,
     routingProposals,
     missionProposals,
-    planningPackets,
+    planningPackets: planningPacketBlocks.planningPackets,
+    taskResults: taskResultBlocks.taskResults,
+    taskResultErrors: taskResultBlocks.taskResultErrors,
+    surfaceParseErrors,
   };
 }
 

@@ -50,3 +50,11 @@
 - 並列化は**書き込み競合**を顕在化させる(同一ファイルを触る 2 タスク)。planner プロンプトに「同一 target_path を持つタスクには依存を張る」規則を明記し、dispatcher でも同一 `target_path` の同時発行を禁止する(安全側の直列化)。
 - runtime daemon / provider のレート制限に当たりやすくなる。`max_parallel_members` の既定は 3 に抑え、provider エラー時は並列度を一時的に 1 へ落とすバックオフを入れる。
 - 並列化で Slack 通知が混線しないよう、進捗通知は reconciliation 単位に集約する(タスクごとの逐次通知をやめる)。
+
+## 実装メモ
+
+### Task 2 slice — 2026-07-04
+
+- `dispatchMissionNextTasks` は ready 集合を `max_parallel_members` で打ち切り、task_id 昇順で同時発行するように切り替えた。
+- `libs/core/mission-orchestration-worker.test.ts` に依存チェーンのディスパッチ/保留を固定するテストを追加した。
+- `libs/core/mission-orchestration-worker.test.ts` に、並列 cap 内での task_id 順序と同時 route 発行を固定するテストを追加した。

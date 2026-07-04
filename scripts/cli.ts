@@ -9,6 +9,7 @@ import {
   safeStat,
   loadActuatorManifestCatalog,
   installReasoningBackends,
+  renderStatus,
 } from '@agent/core';
 import { installPythonVoiceBridgeIfAvailable } from '@agent/core/python-voice-bridge';
 import {
@@ -26,7 +27,10 @@ import {
   queryCalendarFreeBusy,
   readM365AuthStatus,
 } from '@agent/core/calendar-workflow';
-import { assertValidMobileAppProfileIndex, assertValidWebAppProfileIndex } from '@agent/core/app-profiles';
+import {
+  assertValidMobileAppProfileIndex,
+  assertValidWebAppProfileIndex,
+} from '@agent/core/app-profiles';
 import { decideApprovalRequest, listApprovalRequests } from '@agent/core/governance';
 import type { MobileAppProfileIndex } from '@agent/core/app-profiles';
 import * as path from 'node:path';
@@ -77,6 +81,8 @@ interface OperatorInteractionPacket {
   summary: string;
   readiness?: string;
   confidence?: number;
+  missing_inputs?: string[];
+  omitted_question_count?: number;
   questions?: Array<{
     id: string;
     question: string;
@@ -107,7 +113,12 @@ interface NextActionExecutionOutcome {
   executed_target: string;
   execution_failed: boolean;
   failure_summary?: string;
-  recommended_next_action_type: 'execute_now' | 'inspect' | 'clarify' | 'start_mission' | 'resume_mission';
+  recommended_next_action_type:
+    | 'execute_now'
+    | 'inspect'
+    | 'clarify'
+    | 'start_mission'
+    | 'resume_mission';
   deterministic_reason: string;
   llm_consult_recommended: boolean;
   llm_consult_prompt?: string;
@@ -176,13 +187,16 @@ function stripLocaleArg(args: string[]): string[] {
   return nextArgs;
 }
 
-function getCalendarProvider(options: Record<string, string | boolean>): 'google-workspace' | 'm365' {
-  const provider = typeof options['--provider'] === 'string' ? options['--provider'] : 'google-workspace';
+function getCalendarProvider(
+  options: Record<string, string | boolean>
+): 'google-workspace' | 'm365' {
+  const provider =
+    typeof options['--provider'] === 'string' ? options['--provider'] : 'google-workspace';
   return provider === 'm365' ? 'm365' : 'google-workspace';
 }
 
 export function stripNpmSeparatorArg(args: string[]): string[] {
-  return args.filter(arg => arg !== '--');
+  return args.filter((arg) => arg !== '--');
 }
 
 function loadVocabularyCatalog(): VocabularyCatalog | null {
@@ -203,11 +217,15 @@ function t(key: string, locale = resolveLocale()): string {
   return entry[locale] || entry[catalog?.default_locale || 'en'] || key;
 }
 
-export function normalizeActuators(index: { s?: RawActuatorEntry[]; actuators?: RawActuatorEntry[]; skills?: RawActuatorEntry[] }): ActuatorRecord[] {
+export function normalizeActuators(index: {
+  s?: RawActuatorEntry[];
+  actuators?: RawActuatorEntry[];
+  skills?: RawActuatorEntry[];
+}): ActuatorRecord[] {
   const rawActuators = index.actuators || index.s || index.skills || [];
 
   return rawActuators
-    .map(actuator => ({
+    .map((actuator) => ({
       name: actuator.n || actuator.name || path.basename(actuator.path),
       path: actuator.path,
       description: actuator.d || actuator.description || 'No description available.',
@@ -233,10 +251,11 @@ export function searchActuators(actuators: ActuatorRecord[], query: string): Act
     return actuators;
   }
 
-  return actuators.filter(actuator =>
-    actuator.name.toLowerCase().includes(normalizedQuery) ||
-    actuator.description.toLowerCase().includes(normalizedQuery) ||
-    actuator.path.toLowerCase().includes(normalizedQuery),
+  return actuators.filter(
+    (actuator) =>
+      actuator.name.toLowerCase().includes(normalizedQuery) ||
+      actuator.description.toLowerCase().includes(normalizedQuery) ||
+      actuator.path.toLowerCase().includes(normalizedQuery)
   );
 }
 
@@ -266,7 +285,11 @@ function printMissionContextBanner(missionId?: string) {
 
   try {
     const state = readJsonFile<{ status?: string }>(statePath);
-    process.stderr.write(chalk.cyan(`\n🧠 BRAIN: Context hydrated from mission "${missionId}" (Status: ${state.status || 'unknown'})\n`));
+    process.stderr.write(
+      chalk.cyan(
+        `\n🧠 BRAIN: Context hydrated from mission "${missionId}" (Status: ${state.status || 'unknown'})\n`
+      )
+    );
   } catch {
     // Keep the console usable even if mission metadata is malformed.
   }
@@ -279,11 +302,15 @@ function printBranchBanner(branchId?: string) {
 
   const patchPath = path.join(rootDir, 'knowledge/evolution/latent-wisdom', `${branchId}.json`);
   if (!safeExistsSync(patchPath)) {
-    process.stderr.write(chalk.red(`\n❌ Error: Branch "${branchId}" not found in Wisdom Vault.\n`));
+    process.stderr.write(
+      chalk.red(`\n❌ Error: Branch "${branchId}" not found in Wisdom Vault.\n`)
+    );
     return;
   }
 
-  process.stderr.write(chalk.magenta(`\n🎭 PERSONA SWAP: Loading latent wisdom from branch "${branchId}"\n`));
+  process.stderr.write(
+    chalk.magenta(`\n🎭 PERSONA SWAP: Loading latent wisdom from branch "${branchId}"\n`)
+  );
 }
 
 function printHeader() {
@@ -296,13 +323,17 @@ function printHelp(actuators: ActuatorRecord[]) {
   console.log('Usage: npm run cli -- <command> [arguments]');
   console.log('');
   console.log('── Actuator Management ─────────────────────────────────────────────');
-  console.log('  list [--check]       List actuators in the manifest catalog (--check: runtime detection)');
+  console.log(
+    '  list [--check]       List actuators in the manifest catalog (--check: runtime detection)'
+  );
   console.log('  search <query>       Search actuators by name, description, or path');
   console.log('  info <name>          Show details for a specific actuator');
   console.log('  examples [name]      List actuator-owned examples (all, or one actuator)');
   console.log('  mobile-profiles [id] List shared mobile app profiles or inspect one');
   console.log('  web-profiles [id]    List shared web app profiles or inspect one');
-  console.log('  run <name> [args]    Execute an actuator (30-min timeout; use --help for actuator flags)');
+  console.log(
+    '  run <name> [args]    Execute an actuator (30-min timeout; use --help for actuator flags)'
+  );
   console.log('');
   console.log('── Pipelines ───────────────────────────────────────────────────────');
   console.log('  preview <file>       Validate a pipeline JSON and show its step tree');
@@ -315,8 +346,14 @@ function printHelp(actuators: ActuatorRecord[]) {
   console.log('  artifact <path>      Inspect a generated artifact (text preview for text types)');
   console.log('  open-artifact <path> Open a generated artifact with the OS default viewer');
   console.log('');
+  console.log(
+    '  intent [--clarify] "<utterance>"   Resolve free text into an intent or clarification packet'
+  );
+  console.log('');
   console.log('── Operator Packets ────────────────────────────────────────────────');
-  console.log('  packet <path>        Render an operator packet, status report, or response preview');
+  console.log(
+    '  packet <path>        Render an operator packet, status report, or response preview'
+  );
   console.log('  accept-next-action <packet> <id>  Execute a suggested next action from a packet');
   console.log('');
   console.log('── Approvals & Governance ──────────────────────────────────────────');
@@ -325,13 +362,17 @@ function printHelp(actuators: ActuatorRecord[]) {
   console.log('  reject  <id> [ch]    Reject a pending request as the current sovereign');
   console.log('');
   console.log('── Email Workflow ───────────────────────────────────────────────────');
-  console.log('  email <status|draft|latest-draft|deliver|archive-inbox>  Email workflow (run `npm run cli -- email --help` for details)');
+  console.log(
+    '  email <status|draft|latest-draft|deliver|archive-inbox>  Email workflow (run `npm run cli -- email --help` for details)'
+  );
   console.log('  email status         Check Gmail auth readiness');
   console.log('  email draft          Generate a reply draft from inbox triage');
   console.log('  email latest-draft   Show the latest stored draft artifact');
   console.log('  email deliver        Create a Gmail draft or send an approved reply');
   console.log('  email archive-inbox  Create archive filters for repeated inbox senders');
-  console.log('  calendar <status|list-calendars|agenda|freebusy|create-event>  Calendar workflow (run `npm run cli -- calendar --help` for details)');
+  console.log(
+    '  calendar <status|list-calendars|agenda|freebusy|create-event>  Calendar workflow (run `npm run cli -- calendar --help` for details)'
+  );
   console.log('  calendar status      Check calendar auth readiness');
   console.log('  calendar list-calendars  List calendars on the authenticated account');
   console.log('  calendar agenda      Show upcoming events from a calendar');
@@ -362,7 +403,9 @@ function printHelp(actuators: ActuatorRecord[]) {
 
 function printEmailHelp(): void {
   printHeader();
-  console.log('Usage: npm run cli -- email <status|draft|latest-draft|deliver|archive-inbox> [options]');
+  console.log(
+    'Usage: npm run cli -- email <status|draft|latest-draft|deliver|archive-inbox> [options]'
+  );
   console.log('');
   console.log('Commands:');
   console.log('  status        Check Gmail auth readiness');
@@ -375,14 +418,20 @@ function printEmailHelp(): void {
   console.log('  npm run cli -- email status');
   console.log('  npm run cli -- email draft --triage-file active/shared/tmp/email-inbox-triage.md');
   console.log('  npm run cli -- email latest-draft');
-  console.log('  npm run cli -- email deliver --draft-mode --body-file active/shared/runtime/presence-studio/email-drafts/latest.md');
-  console.log('  npm run cli -- email deliver --approved --body-file active/shared/runtime/presence-studio/email-drafts/latest.md');
+  console.log(
+    '  npm run cli -- email deliver --draft-mode --body-file active/shared/runtime/presence-studio/email-drafts/latest.md'
+  );
+  console.log(
+    '  npm run cli -- email deliver --approved --body-file active/shared/runtime/presence-studio/email-drafts/latest.md'
+  );
   console.log('  npm run cli -- email archive-inbox --apply');
 }
 
 function printCalendarHelp(): void {
   printHeader();
-  console.log('Usage: npm run cli -- calendar <status|list-calendars|agenda|freebusy|create-event> [options]');
+  console.log(
+    'Usage: npm run cli -- calendar <status|list-calendars|agenda|freebusy|create-event> [options]'
+  );
   console.log('');
   console.log('Commands:');
   console.log('  status        Check calendar auth readiness');
@@ -398,8 +447,12 @@ function printCalendarHelp(): void {
   console.log('  npm run cli -- calendar list-calendars --provider m365');
   console.log('  npm run cli -- calendar agenda --calendar-id primary --days 7');
   console.log('  npm run cli -- calendar agenda --provider m365 --calendar-id primary --days 7');
-  console.log('  npm run cli -- calendar freebusy --calendar-ids primary,team@example.com --time-min 2026-06-21T09:00:00+09:00 --time-max 2026-06-21T18:00:00+09:00');
-  console.log('  npm run cli -- calendar create-event --summary "Planning" --start 2026-06-22T13:00:00+09:00 --end 2026-06-22T14:00:00+09:00 --with-meet');
+  console.log(
+    '  npm run cli -- calendar freebusy --calendar-ids primary,team@example.com --time-min 2026-06-21T09:00:00+09:00 --time-max 2026-06-21T18:00:00+09:00'
+  );
+  console.log(
+    '  npm run cli -- calendar create-event --summary "Planning" --start 2026-06-22T13:00:00+09:00 --end 2026-06-22T14:00:00+09:00 --with-meet'
+  );
 }
 
 function parseEmailWorkflowOptions(args: string[]): Record<string, string | boolean> {
@@ -418,7 +471,10 @@ function parseEmailWorkflowOptions(args: string[]): Record<string, string | bool
   return parsed;
 }
 
-async function handleEmailWorkflowCommand(subcommand: string | undefined, args: string[]): Promise<void> {
+async function handleEmailWorkflowCommand(
+  subcommand: string | undefined,
+  args: string[]
+): Promise<void> {
   if (!subcommand || subcommand === 'help' || subcommand === '--help' || subcommand === '-h') {
     printEmailHelp();
     return;
@@ -438,8 +494,13 @@ async function handleEmailWorkflowCommand(subcommand: string | undefined, args: 
   }
 
   if (subcommand === 'draft') {
-    const triageFile = typeof options['--triage-file'] === 'string' ? options['--triage-file'] : resolveEmailTriagePath();
-    const triageText = String(safeReadFile(pathResolver.rootResolve(triageFile), { encoding: 'utf8' }) || '').trim();
+    const triageFile =
+      typeof options['--triage-file'] === 'string'
+        ? options['--triage-file']
+        : resolveEmailTriagePath();
+    const triageText = String(
+      safeReadFile(pathResolver.rootResolve(triageFile), { encoding: 'utf8' }) || ''
+    ).trim();
     if (!triageText) {
       throw new Error(`triage text not found at ${triageFile}`);
     }
@@ -460,24 +521,29 @@ async function handleEmailWorkflowCommand(subcommand: string | undefined, args: 
 
   if (subcommand === 'deliver') {
     const bodyFile = typeof options['--body-file'] === 'string' ? options['--body-file'] : '';
-    const bodyMarkdown = typeof options['--body-markdown'] === 'string'
-      ? options['--body-markdown']
-      : bodyFile
-        ? String(safeReadFile(pathResolver.rootResolve(bodyFile), { encoding: 'utf8' }) || '')
-        : '';
+    const bodyMarkdown =
+      typeof options['--body-markdown'] === 'string'
+        ? options['--body-markdown']
+        : bodyFile
+          ? String(safeReadFile(pathResolver.rootResolve(bodyFile), { encoding: 'utf8' }) || '')
+          : '';
     if (!bodyMarkdown.trim()) {
       throw new Error('body_markdown is required; provide --body-markdown or --body-file');
     }
     const draftMode = options['--draft-mode'] === true || options['--draft-mode'] === 'true';
     const approved = options['--approved'] === true || options['--approved'] === 'true';
     if (!draftMode && !approved) {
-      throw new Error('approval is required before sending an email; add --approved or use --draft-mode');
+      throw new Error(
+        'approval is required before sending an email; add --approved or use --draft-mode'
+      );
     }
-    const replyModeValue = typeof options['--reply-mode'] === 'string' ? options['--reply-mode'] : 'new';
+    const replyModeValue =
+      typeof options['--reply-mode'] === 'string' ? options['--reply-mode'] : 'new';
     const result = await executeGmailDelivery({
       approved,
       draft_mode: draftMode,
-      reply_mode: replyModeValue === 'reply' || replyModeValue === 'reply-all' ? replyModeValue : 'new',
+      reply_mode:
+        replyModeValue === 'reply' || replyModeValue === 'reply-all' ? replyModeValue : 'new',
       body_markdown: bodyMarkdown,
       subject: typeof options['--subject'] === 'string' ? options['--subject'] : undefined,
       to: typeof options['--to'] === 'string' ? options['--to'] : undefined,
@@ -490,8 +556,11 @@ async function handleEmailWorkflowCommand(subcommand: string | undefined, args: 
 
   if (subcommand === 'archive-inbox') {
     const result = await organizeGmailInboxWithFilters({
-      max_messages: Number(typeof options['--max-messages'] === 'string' ? options['--max-messages'] : '50') || 50,
-      min_count: Number(typeof options['--min-count'] === 'string' ? options['--min-count'] : '2') || 2,
+      max_messages:
+        Number(typeof options['--max-messages'] === 'string' ? options['--max-messages'] : '50') ||
+        50,
+      min_count:
+        Number(typeof options['--min-count'] === 'string' ? options['--min-count'] : '2') || 2,
       apply: options['--apply'] === true || options['--apply'] === 'true',
     });
     printHeader();
@@ -502,7 +571,10 @@ async function handleEmailWorkflowCommand(subcommand: string | undefined, args: 
   throw new Error(`Unknown email subcommand: ${subcommand}`);
 }
 
-async function handleCalendarWorkflowCommand(subcommand: string | undefined, args: string[]): Promise<void> {
+async function handleCalendarWorkflowCommand(
+  subcommand: string | undefined,
+  args: string[]
+): Promise<void> {
   if (!subcommand || subcommand === 'help' || subcommand === '--help' || subcommand === '-h') {
     printCalendarHelp();
     return;
@@ -529,9 +601,12 @@ async function handleCalendarWorkflowCommand(subcommand: string | undefined, arg
     const provider = getCalendarProvider(options);
     const result = await listCalendarAgenda({
       provider,
-      calendar_id: typeof options['--calendar-id'] === 'string' ? options['--calendar-id'] : 'primary',
+      calendar_id:
+        typeof options['--calendar-id'] === 'string' ? options['--calendar-id'] : 'primary',
       days: Number(typeof options['--days'] === 'string' ? options['--days'] : '7') || 7,
-      max_results: Number(typeof options['--max-results'] === 'string' ? options['--max-results'] : '20') || 20,
+      max_results:
+        Number(typeof options['--max-results'] === 'string' ? options['--max-results'] : '20') ||
+        20,
       query: typeof options['--query'] === 'string' ? options['--query'] : undefined,
       time_min: typeof options['--time-min'] === 'string' ? options['--time-min'] : undefined,
       time_max: typeof options['--time-max'] === 'string' ? options['--time-max'] : undefined,
@@ -549,12 +624,17 @@ async function handleCalendarWorkflowCommand(subcommand: string | undefined, arg
     if (!timeMin || !timeMax) {
       throw new Error('time_min and time_max are required for freebusy');
     }
-    const calendarIds = typeof options['--calendar-ids'] === 'string'
-      ? options['--calendar-ids'].split(',').map((item) => item.trim()).filter(Boolean)
-      : [];
+    const calendarIds =
+      typeof options['--calendar-ids'] === 'string'
+        ? options['--calendar-ids']
+            .split(',')
+            .map((item) => item.trim())
+            .filter(Boolean)
+        : [];
     const result = await queryCalendarFreeBusy({
       provider,
-      calendar_id: typeof options['--calendar-id'] === 'string' ? options['--calendar-id'] : 'primary',
+      calendar_id:
+        typeof options['--calendar-id'] === 'string' ? options['--calendar-id'] : 'primary',
       calendar_ids: calendarIds,
       time_min: timeMin,
       time_max: timeMax,
@@ -573,25 +653,38 @@ async function handleCalendarWorkflowCommand(subcommand: string | undefined, arg
     if (!summary || !start || !end) {
       throw new Error('summary, start, and end are required for create-event');
     }
-    const attendees = typeof options['--attendees'] === 'string'
-      ? options['--attendees'].split(',').map((item) => item.trim()).filter(Boolean)
-      : [];
-    const sendUpdatesValue = typeof options['--send-updates'] === 'string' ? options['--send-updates'] : '';
+    const attendees =
+      typeof options['--attendees'] === 'string'
+        ? options['--attendees']
+            .split(',')
+            .map((item) => item.trim())
+            .filter(Boolean)
+        : [];
+    const sendUpdatesValue =
+      typeof options['--send-updates'] === 'string' ? options['--send-updates'] : '';
     const result = await createCalendarEvent({
       provider,
-      calendar_id: typeof options['--calendar-id'] === 'string' ? options['--calendar-id'] : 'primary',
+      calendar_id:
+        typeof options['--calendar-id'] === 'string' ? options['--calendar-id'] : 'primary',
       summary,
       start,
       end,
-      description: typeof options['--description'] === 'string' ? options['--description'] : undefined,
+      description:
+        typeof options['--description'] === 'string' ? options['--description'] : undefined,
       location: typeof options['--location'] === 'string' ? options['--location'] : undefined,
       attendees,
       time_zone: typeof options['--time-zone'] === 'string' ? options['--time-zone'] : undefined,
-      send_updates: sendUpdatesValue === 'all' || sendUpdatesValue === 'externalOnly' || sendUpdatesValue === 'none'
-        ? sendUpdatesValue
-        : undefined,
+      send_updates:
+        sendUpdatesValue === 'all' ||
+        sendUpdatesValue === 'externalOnly' ||
+        sendUpdatesValue === 'none'
+          ? sendUpdatesValue
+          : undefined,
       with_meet: options['--with-meet'] === true || options['--with-meet'] === 'true',
-      conference_request_id: typeof options['--conference-request-id'] === 'string' ? options['--conference-request-id'] : undefined,
+      conference_request_id:
+        typeof options['--conference-request-id'] === 'string'
+          ? options['--conference-request-id']
+          : undefined,
     });
     printHeader();
     console.log(JSON.stringify(result, null, 2));
@@ -610,7 +703,7 @@ function printActuatorList(actuators: ActuatorRecord[]) {
   }
 
   console.log(`Indexed actuators: ${actuators.length}\n`);
-  actuators.forEach(actuator => {
+  actuators.forEach((actuator) => {
     console.log(`- ${chalk.bold(actuator.name)} (${actuator.status})`);
     console.log(`  ${actuator.description}`);
     console.log(`  ${chalk.gray(actuator.path)}`);
@@ -627,7 +720,7 @@ function printActuatorExampleSummary(actuators: ActuatorRecord[]) {
     if (examples.length === 0) continue;
     totalExamples += examples.length;
     console.log(`- ${chalk.bold(actuator.name)} (${examples.length})`);
-    console.log(`  ${examples.map(example => example.id).join(', ')}`);
+    console.log(`  ${examples.map((example) => example.id).join(', ')}`);
   }
 
   if (totalExamples === 0) {
@@ -677,7 +770,7 @@ function printActuatorExamples(actuator: ActuatorRecord) {
     return;
   }
 
-  examples.forEach(example => {
+  examples.forEach((example) => {
     console.log(`- ${chalk.bold(example.id)}: ${example.title}`);
     console.log(`  ${example.description}`);
     console.log(`  ${chalk.gray(example.path)}`);
@@ -698,7 +791,9 @@ function loadMobileAppProfiles(): MobileAppProfileRecord[] {
     return [];
   }
   const parsed = readJsonFile<MobileAppProfileIndex>(indexPath);
-  assertValidMobileAppProfileIndex(parsed, indexPath, (relativePath) => safeExistsSync(path.join(rootDir, relativePath)));
+  assertValidMobileAppProfileIndex(parsed, indexPath, (relativePath) =>
+    safeExistsSync(path.join(rootDir, relativePath))
+  );
   return parsed.profiles;
 }
 
@@ -710,12 +805,21 @@ function loadWebAppProfiles(): WebAppProfileIndexRecord[] {
   const indexPath = resolveWebAppProfileIndexPath();
   if (!safeExistsSync(indexPath)) return [];
   const parsed = readJsonFile<{ profiles: WebAppProfileIndexRecord[] }>(indexPath);
-  assertValidWebAppProfileIndex(parsed, indexPath, (relativePath) => safeExistsSync(path.join(rootDir, relativePath)));
+  assertValidWebAppProfileIndex(parsed, indexPath, (relativePath) =>
+    safeExistsSync(path.join(rootDir, relativePath))
+  );
   return parsed.profiles;
 }
 
 // ─── Generic profile printer (shared by mobile + web) ──────────────────────────
-type AppProfileRecord = { id: string; platform: string; title: string; description: string; path: string; tags?: string[] };
+type AppProfileRecord = {
+  id: string;
+  platform: string;
+  title: string;
+  description: string;
+  path: string;
+  tags?: string[];
+};
 
 function printAppProfilesSummary(profiles: AppProfileRecord[], kind: string): void {
   printHeader();
@@ -724,7 +828,7 @@ function printAppProfilesSummary(profiles: AppProfileRecord[], kind: string): vo
     console.log(`No shared ${kind.toLowerCase()} profiles found.`);
     return;
   }
-  profiles.forEach(profile => {
+  profiles.forEach((profile) => {
     console.log(`- ${chalk.bold(profile.id)} (${profile.platform})`);
     console.log(`  ${profile.title}`);
     console.log(`  ${profile.description}`);
@@ -734,7 +838,7 @@ function printAppProfilesSummary(profiles: AppProfileRecord[], kind: string): vo
 }
 
 function printAppProfile(profiles: AppProfileRecord[], profileId: string, kind: string): void {
-  const profile = profiles.find(entry => entry.id === profileId);
+  const profile = profiles.find((entry) => entry.id === profileId);
   if (!profile) throw new Error(`${kind} profile "${profileId}" not found.`);
   printHeader();
   console.log(`${chalk.bold(profile.id)} (${profile.platform})`);
@@ -744,12 +848,18 @@ function printAppProfile(profiles: AppProfileRecord[], profileId: string, kind: 
   if (profile.tags?.length) console.log(`Tags: ${profile.tags.join(', ')}`);
 }
 
-function printMobileAppProfilesSummary() { printAppProfilesSummary(loadMobileAppProfiles(), 'Mobile app'); }
-function printMobileAppProfile(profileId: string) { printAppProfile(loadMobileAppProfiles(), profileId, 'Mobile app'); }
-function printWebAppProfilesSummary() { printAppProfilesSummary(loadWebAppProfiles(), 'Web app'); }
-function printWebAppProfile(profileId: string) { printAppProfile(loadWebAppProfiles(), profileId, 'Web app'); }
-
-
+function printMobileAppProfilesSummary() {
+  printAppProfilesSummary(loadMobileAppProfiles(), 'Mobile app');
+}
+function printMobileAppProfile(profileId: string) {
+  printAppProfile(loadMobileAppProfiles(), profileId, 'Mobile app');
+}
+function printWebAppProfilesSummary() {
+  printAppProfilesSummary(loadWebAppProfiles(), 'Web app');
+}
+function printWebAppProfile(profileId: string) {
+  printAppProfile(loadWebAppProfiles(), profileId, 'Web app');
+}
 
 function printArtifactInfo(targetPath: string) {
   const resolvedPath = path.resolve(rootDir, targetPath);
@@ -800,37 +910,60 @@ function openArtifact(targetPath: string) {
   safeExec(opener.command, opener.args, { cwd: rootDir, timeoutMs: 120000 });
 }
 
-function printOperatorPacket(packet: OperatorInteractionPacket) {
-  printHeader();
-  console.log(chalk.bold(packet.headline));
-  console.log(packet.summary);
+export function formatOperatorPacketLines(packet: OperatorInteractionPacket): string[] {
+  const locale = resolveLocale();
+  const lines = [chalk.bold(packet.headline), packet.summary];
   if (packet.readiness) {
-    console.log(`${t('cli_readiness')}: ${packet.readiness}`);
+    lines.push(
+      `${t('cli_readiness', locale)}: ${renderStatus('readiness', packet.readiness, locale)}`
+    );
   }
   if (typeof packet.confidence === 'number') {
-    console.log(`${t('cli_confidence')}: ${packet.confidence}`);
+    lines.push(`${t('cli_confidence', locale)}: ${packet.confidence}`);
+  }
+  if (packet.missing_inputs?.length) {
+    lines.push(`${t('cli_missing_inputs', locale)}: ${packet.missing_inputs.join(', ')}`);
+  }
+  if (typeof packet.omitted_question_count === 'number' && packet.omitted_question_count > 0) {
+    lines.push(
+      t('cli_more_questions', locale).replace('{count}', String(packet.omitted_question_count))
+    );
   }
   if (packet.suggested_response_style) {
-    console.log(`${t('cli_response_style')}: ${packet.suggested_response_style}`);
+    lines.push(`${t('cli_response_style', locale)}: ${packet.suggested_response_style}`);
   }
   if (packet.questions?.length) {
-    console.log(`\n${t('cli_questions')}:`);
-    packet.questions.forEach(question => {
-      console.log(`- ${chalk.bold(question.id)}: ${question.question}`);
-      console.log(`  ${t('cli_reason')}: ${question.reason}`);
-      if (question.default_assumption) console.log(`  ${t('cli_default')}: ${question.default_assumption}`);
-      if (question.impact) console.log(`  ${t('cli_impact')}: ${question.impact}`);
+    lines.push('', `${t('cli_questions', locale)}:`);
+    packet.questions.forEach((question) => {
+      lines.push(`- ${chalk.bold(question.id)}: ${question.question}`);
+      lines.push(`  ${t('cli_reason', locale)}: ${question.reason}`);
+      if (question.default_assumption)
+        lines.push(`  ${t('cli_default', locale)}: ${question.default_assumption}`);
+      if (question.impact) lines.push(`  ${t('cli_impact', locale)}: ${question.impact}`);
     });
   }
   if (packet.next_actions?.length) {
-    console.log(`\n${t('cli_next_actions')}:`);
-    packet.next_actions.forEach(action => {
-      console.log(`- ${chalk.bold(action.id)}${action.priority ? ` [${action.priority}]` : ''}${action.next_action_type ? ` <${action.next_action_type}>` : ''}: ${action.action}`);
-      if (action.reason) console.log(`  ${t('cli_reason')}: ${action.reason}`);
-      if (action.suggested_command) console.log(`  ${t('cli_command')}: ${action.suggested_command}`);
-      if (action.suggested_pipeline_path) console.log(`  ${t('cli_pipeline')}: ${action.suggested_pipeline_path}`);
-      if (action.suggested_followup_request) console.log(`  ${t('cli_follow_up')}: ${action.suggested_followup_request}`);
+    lines.push('', `${t('cli_next_actions', locale)}:`);
+    packet.next_actions.forEach((action) => {
+      lines.push(
+        `- ${chalk.bold(action.id)}${action.priority ? ` [${action.priority}]` : ''}${action.next_action_type ? ` <${action.next_action_type}>` : ''}: ${action.action}`
+      );
+      if (action.reason) lines.push(`  ${t('cli_reason', locale)}: ${action.reason}`);
+      if (action.suggested_command)
+        lines.push(`  ${t('cli_command', locale)}: ${action.suggested_command}`);
+      if (action.suggested_pipeline_path)
+        lines.push(`  ${t('cli_pipeline', locale)}: ${action.suggested_pipeline_path}`);
+      if (action.suggested_followup_request)
+        lines.push(`  ${t('cli_follow_up', locale)}: ${action.suggested_followup_request}`);
     });
+  }
+  return lines;
+}
+
+function printOperatorPacket(packet: OperatorInteractionPacket) {
+  printHeader();
+  for (const line of formatOperatorPacketLines(packet)) {
+    console.log(line);
   }
 }
 
@@ -840,19 +973,24 @@ function printSystemStatusReport(report: SystemStatusReportLike) {
   console.log(report.summary);
   if (report.findings?.length) {
     console.log(`\n${t('cli_findings')}:`);
-    report.findings.forEach(finding => {
+    report.findings.forEach((finding) => {
       console.log(`- ${chalk.bold(finding.id)} [${finding.severity}]: ${finding.message}`);
       if (finding.detail) console.log(`  ${t('cli_detail')}: ${finding.detail}`);
     });
   }
   if (report.next_actions?.length) {
     console.log(`\n${t('cli_next_actions')}:`);
-    report.next_actions.forEach(action => {
-      console.log(`- ${chalk.bold(action.id)}${action.priority ? ` [${action.priority}]` : ''}${action.next_action_type ? ` <${action.next_action_type}>` : ''}: ${action.action}`);
+    report.next_actions.forEach((action) => {
+      console.log(
+        `- ${chalk.bold(action.id)}${action.priority ? ` [${action.priority}]` : ''}${action.next_action_type ? ` <${action.next_action_type}>` : ''}: ${action.action}`
+      );
       if (action.reason) console.log(`  ${t('cli_reason')}: ${action.reason}`);
-      if (action.suggested_command) console.log(`  ${t('cli_command')}: ${action.suggested_command}`);
-      if (action.suggested_pipeline_path) console.log(`  ${t('cli_pipeline')}: ${action.suggested_pipeline_path}`);
-      if (action.suggested_followup_request) console.log(`  ${t('cli_follow_up')}: ${action.suggested_followup_request}`);
+      if (action.suggested_command)
+        console.log(`  ${t('cli_command')}: ${action.suggested_command}`);
+      if (action.suggested_pipeline_path)
+        console.log(`  ${t('cli_pipeline')}: ${action.suggested_pipeline_path}`);
+      if (action.suggested_followup_request)
+        console.log(`  ${t('cli_follow_up')}: ${action.suggested_followup_request}`);
     });
   }
 }
@@ -878,10 +1016,15 @@ function isPathWithin(basePath: string, targetPath: string): boolean {
 }
 
 export function assertPacketPathAllowed(resolvedPath: string): void {
-  if (resolvedPath === ORCHESTRATOR_PACKET_DIR || isPathWithin(ORCHESTRATOR_PACKET_DIR, resolvedPath)) {
+  if (
+    resolvedPath === ORCHESTRATOR_PACKET_DIR ||
+    isPathWithin(ORCHESTRATOR_PACKET_DIR, resolvedPath)
+  ) {
     return;
   }
-  throw new Error(`Packet path must stay within ${path.relative(rootDir, ORCHESTRATOR_PACKET_DIR)}.`);
+  throw new Error(
+    `Packet path must stay within ${path.relative(rootDir, ORCHESTRATOR_PACKET_DIR)}.`
+  );
 }
 
 export function assertApprovedNextActionCommand(command: string): void {
@@ -900,10 +1043,9 @@ export function assertApprovedNextActionCommand(command: string): void {
 
 export function assertApprovedPipelinePath(pipelinePath: string): void {
   const resolvedPath = path.resolve(rootDir, pipelinePath);
-  const allowed = (
+  const allowed =
     isPathWithin(path.join(rootDir, 'pipelines'), resolvedPath) ||
-    isPathWithin(ORCHESTRATOR_PACKET_DIR, resolvedPath)
-  );
+    isPathWithin(ORCHESTRATOR_PACKET_DIR, resolvedPath);
   if (!allowed || path.extname(resolvedPath) !== '.json') {
     throw new Error(`Pipeline path is not approved: ${pipelinePath}`);
   }
@@ -936,7 +1078,7 @@ function loadPacketLike(targetPath: string): OperatorInteractionPacket | SystemS
 
 function tokenizeSuggestedCommand(command: string): string[] {
   const tokens = command.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) || [];
-  return tokens.map(token => token.replace(/^['"]|['"]$/g, ''));
+  return tokens.map((token) => token.replace(/^['"]|['"]$/g, ''));
 }
 
 export function classifyNextActionExecutionOutcome(
@@ -946,12 +1088,13 @@ export function classifyNextActionExecutionOutcome(
   executedTarget: string,
   executionFailed: boolean,
   failureSummary: string | undefined,
-  output: string,
+  output: string
 ): NextActionExecutionOutcome {
   const normalizedOutput = String(output || '').toLowerCase();
   const explicitType = action.next_action_type;
 
-  let recommended: NextActionExecutionOutcome['recommended_next_action_type'] = explicitType || 'inspect';
+  let recommended: NextActionExecutionOutcome['recommended_next_action_type'] =
+    explicitType || 'inspect';
   let deterministicReason = explicitType
     ? `The action declared next_action_type=${explicitType}.`
     : 'No explicit next_action_type was provided, so inspection is the safe default.';
@@ -959,28 +1102,37 @@ export function classifyNextActionExecutionOutcome(
   if (!explicitType) {
     if (normalizedOutput.includes('missing input') || normalizedOutput.includes('clarification')) {
       recommended = 'clarify';
-      deterministicReason = 'The execution output suggests that additional clarification is still required.';
-    } else if (normalizedOutput.includes('mission_controller.js resume') || normalizedOutput.includes('resum')) {
+      deterministicReason =
+        'The execution output suggests that additional clarification is still required.';
+    } else if (
+      normalizedOutput.includes('mission_controller.js resume') ||
+      normalizedOutput.includes('resum')
+    ) {
       recommended = 'resume_mission';
       deterministicReason = 'The execution path or output indicates a mission resume action.';
-    } else if (normalizedOutput.includes('mission_controller.js start') || normalizedOutput.includes('activate')) {
+    } else if (
+      normalizedOutput.includes('mission_controller.js start') ||
+      normalizedOutput.includes('activate')
+    ) {
       recommended = 'start_mission';
-      deterministicReason = 'The execution path or output indicates mission creation or activation.';
+      deterministicReason =
+        'The execution path or output indicates mission creation or activation.';
     } else if (executedVia === 'pipeline') {
       recommended = 'inspect';
-      deterministicReason = 'Pipeline execution completed; the next safe step is to inspect outputs and evidence.';
+      deterministicReason =
+        'Pipeline execution completed; the next safe step is to inspect outputs and evidence.';
     } else if (action.suggested_command) {
       recommended = 'inspect';
-      deterministicReason = 'Command execution completed; the next safe step is to inspect resulting state or artifacts.';
+      deterministicReason =
+        'Command execution completed; the next safe step is to inspect resulting state or artifacts.';
     }
   }
 
-  const llmConsultRecommended = (
+  const llmConsultRecommended =
     recommended === 'clarify' ||
     normalizedOutput.includes('error') ||
     normalizedOutput.includes('failed') ||
-    normalizedOutput.includes('warning')
-  );
+    normalizedOutput.includes('warning');
 
   return {
     kind: 'next-action-execution-outcome',
@@ -994,9 +1146,11 @@ export function classifyNextActionExecutionOutcome(
     recommended_next_action_type: recommended,
     deterministic_reason: deterministicReason,
     llm_consult_recommended: llmConsultRecommended,
-    ...(llmConsultRecommended ? {
-      llm_consult_prompt: `Classify the outcome of next action "${action.id}" and propose the safest follow-up. Deterministic classification suggested "${recommended}". Output observed: ${output.slice(0, 1200)}`,
-    } : {}),
+    ...(llmConsultRecommended
+      ? {
+          llm_consult_prompt: `Classify the outcome of next action "${action.id}" and propose the safest follow-up. Deterministic classification suggested "${recommended}". Output observed: ${output.slice(0, 1200)}`,
+        }
+      : {}),
     timestamp: new Date().toISOString(),
   };
 }
@@ -1004,7 +1158,7 @@ export function classifyNextActionExecutionOutcome(
 function acceptNextAction(packetPath: string, actionId: string) {
   const packet = loadPacketLike(packetPath);
   const nextActions = Array.isArray(packet.next_actions) ? packet.next_actions : [];
-  const action = nextActions.find(item => item.id === actionId);
+  const action = nextActions.find((item) => item.id === actionId);
   if (!action) {
     throw new Error(`Next action "${actionId}" not found in packet.`);
   }
@@ -1030,14 +1184,20 @@ function acceptNextAction(packetPath: string, actionId: string) {
     } else if (action.suggested_pipeline_path) {
       assertApprovedPipelinePath(action.suggested_pipeline_path);
       console.log(`Pipeline: ${action.suggested_pipeline_path}\n`);
-      output = safeExec('node', ['dist/scripts/run_pipeline.js', '--input', action.suggested_pipeline_path], {
-        cwd: rootDir,
-        timeoutMs: 120000,
-      });
+      output = safeExec(
+        'node',
+        ['dist/scripts/run_pipeline.js', '--input', action.suggested_pipeline_path],
+        {
+          cwd: rootDir,
+          timeoutMs: 120000,
+        }
+      );
       executedVia = 'pipeline';
       executedTarget = action.suggested_pipeline_path;
     } else {
-      throw new Error(`Next action "${actionId}" has neither suggested_command nor suggested_pipeline_path. The packet may be malformed or was generated by an outdated pipeline. Re-run the originating pipeline or ask the orchestrator to regenerate the packet.`);
+      throw new Error(
+        `Next action "${actionId}" has neither suggested_command nor suggested_pipeline_path. The packet may be malformed or was generated by an outdated pipeline. Re-run the originating pipeline or ask the orchestrator to regenerate the packet.`
+      );
     }
   } catch (error: unknown) {
     executionFailed = true;
@@ -1064,21 +1224,40 @@ function acceptNextAction(packetPath: string, actionId: string) {
       process.stdout.write('\n');
     }
   }
-  const outcome = classifyNextActionExecutionOutcome(packetPath, action, executedVia, executedTarget, executionFailed, failureSummary, output);
-  const outcomePath = path.join(rootDir, 'active/shared/tmp/orchestrator', `next-action-outcome-${action.id}.json`);
+  const outcome = classifyNextActionExecutionOutcome(
+    packetPath,
+    action,
+    executedVia,
+    executedTarget,
+    executionFailed,
+    failureSummary,
+    output
+  );
+  const outcomePath = path.join(
+    rootDir,
+    'active/shared/tmp/orchestrator',
+    `next-action-outcome-${action.id}.json`
+  );
   safeWriteFile(outcomePath, JSON.stringify(outcome, null, 2));
   console.log(`\nOutcome classification: ${outcome.recommended_next_action_type}`);
   console.log(`Reason: ${outcome.deterministic_reason}`);
   console.log(`LLM consult recommended: ${outcome.llm_consult_recommended ? 'yes' : 'no'}`);
   console.log(`Outcome artifact: ${outcomePath}`);
-  if (packet.kind === 'operator-interaction-packet' && packet.refresh_command && packet.refresh_packet_path) {
+  if (
+    packet.kind === 'operator-interaction-packet' &&
+    packet.refresh_command &&
+    packet.refresh_packet_path
+  ) {
     console.log('\nRefreshing status packet...\n');
     assertApprovedNextActionCommand(packet.refresh_command);
     const [refreshCommand, ...refreshArgs] = tokenizeSuggestedCommand(packet.refresh_command);
     if (!refreshCommand) {
       throw new Error('refresh_command is empty.');
     }
-    const refreshOutput = safeExec(refreshCommand, refreshArgs, { cwd: rootDir, timeoutMs: 120000 });
+    const refreshOutput = safeExec(refreshCommand, refreshArgs, {
+      cwd: rootDir,
+      timeoutMs: 120000,
+    });
     if (refreshOutput) {
       process.stdout.write(refreshOutput);
       if (!refreshOutput.endsWith('\n')) {
@@ -1106,12 +1285,18 @@ function printApprovalRequests(channelArg?: string) {
   for (const request of requests) {
     console.log(`- ${chalk.bold(request.id)} [${request.kind}]`);
     console.log(`  ${request.title}`);
-    console.log(`  status: ${request.status} · channel: ${request.storageChannel} · requested by: ${request.requestedBy}`);
+    console.log(
+      `  status: ${request.status} · channel: ${request.storageChannel} · requested by: ${request.requestedBy}`
+    );
     if (request.target) {
-      console.log(`  target: ${request.target.serviceId}/${request.target.secretKey} (${request.target.mutation})`);
+      console.log(
+        `  target: ${request.target.serviceId}/${request.target.secretKey} (${request.target.mutation})`
+      );
     }
     if (request.risk) {
-      console.log(`  risk: ${request.risk.level} · restart: ${request.risk.restartScope} · strong auth: ${request.risk.requiresStrongAuth ? 'yes' : 'no'}`);
+      console.log(
+        `  risk: ${request.risk.level} · restart: ${request.risk.restartScope} · strong auth: ${request.risk.requiresStrongAuth ? 'yes' : 'no'}`
+      );
     }
     if (request.justification?.reason) {
       console.log(`  reason: ${request.justification.reason}`);
@@ -1120,14 +1305,22 @@ function printApprovalRequests(channelArg?: string) {
       const pendingRoles = request.workflow.approvals
         .filter((approval) => approval.status === 'pending')
         .map((approval) => approval.role);
-      console.log(`  workflow: ${request.workflow.workflowId} · pending roles: ${pendingRoles.join(', ') || 'none'}`);
+      console.log(
+        `  workflow: ${request.workflow.workflowId} · pending roles: ${pendingRoles.join(', ') || 'none'}`
+      );
     }
   }
 }
 
-function applyApprovalDecision(command: 'approve' | 'reject', requestId: string | undefined, channelArg?: string) {
+function applyApprovalDecision(
+  command: 'approve' | 'reject',
+  requestId: string | undefined,
+  channelArg?: string
+) {
   if (!requestId) {
-    throw new Error(`Usage: npm run cli -- ${command} <request-id> [storage-channel]\nRun \`npm run cli -- approvals\` first to list pending request IDs.`);
+    throw new Error(
+      `Usage: npm run cli -- ${command} <request-id> [storage-channel]\nRun \`npm run cli -- approvals\` first to list pending request IDs.`
+    );
   }
 
   const requests = listApprovalRequests({
@@ -1156,7 +1349,9 @@ function applyApprovalDecision(command: 'approve' | 'reject', requestId: string 
   console.log(`${decided.title}`);
   console.log(`storage channel: ${decided.storageChannel}`);
   if (decided.target) {
-    console.log(`target: ${decided.target.serviceId}/${decided.target.secretKey} (${decided.target.mutation})`);
+    console.log(
+      `target: ${decided.target.serviceId}/${decided.target.secretKey} (${decided.target.mutation})`
+    );
   }
   if (decided.workflow) {
     const completedRoles = decided.workflow.approvals
@@ -1166,11 +1361,8 @@ function applyApprovalDecision(command: 'approve' | 'reject', requestId: string 
   }
 }
 
-
 export function resolveActuatorPath(actuatorPath: string): string | null {
-  const candidates = [
-    path.join(rootDir, 'dist', actuatorPath, 'src'),
-  ];
+  const candidates = [path.join(rootDir, 'dist', actuatorPath, 'src')];
 
   for (const candidate of candidates) {
     if (!safeExistsSync(candidate)) {
@@ -1178,7 +1370,7 @@ export function resolveActuatorPath(actuatorPath: string): string | null {
     }
 
     const files = safeReaddir(candidate);
-    const main = files.find(file => file === 'index.js' || file === 'main.js');
+    const main = files.find((file) => file === 'index.js' || file === 'main.js');
     if (main) {
       return path.join(candidate, main);
     }
@@ -1189,17 +1381,24 @@ export function resolveActuatorPath(actuatorPath: string): string | null {
 
 function findActuator(actuators: ActuatorRecord[], name: string): ActuatorRecord | undefined {
   const normalizedName = name.trim().toLowerCase();
-  return actuators.find(actuator => actuator.name.toLowerCase() === normalizedName);
+  return actuators.find((actuator) => actuator.name.toLowerCase() === normalizedName);
 }
 
-function runActuator(actuators: ActuatorRecord[], actuatorName: string | undefined, rawArgs: string[], missionId?: string) {
+function runActuator(
+  actuators: ActuatorRecord[],
+  actuatorName: string | undefined,
+  rawArgs: string[],
+  missionId?: string
+) {
   if (!actuatorName) {
     throw new Error('Missing actuator name. Try `npm run cli -- list`.');
   }
 
   const actuator = findActuator(actuators, actuatorName);
   if (!actuator) {
-    const suggestions = searchActuators(actuators, actuatorName).slice(0, 5).map(match => match.name);
+    const suggestions = searchActuators(actuators, actuatorName)
+      .slice(0, 5)
+      .map((match) => match.name);
     const suffix = suggestions.length > 0 ? ` Did you mean: ${suggestions.join(', ')}?` : '';
     throw new Error(`Actuator "${actuatorName}" not found.${suffix}`);
   }
@@ -1209,10 +1408,12 @@ function runActuator(actuators: ActuatorRecord[], actuatorName: string | undefin
 
   const script = resolveActuatorPath(actuator.path);
   if (!script) {
-    throw new Error(`Actuator "${actuator.name}" is indexed but has no runnable build output. Run \`pnpm build\` first.`);
+    throw new Error(
+      `Actuator "${actuator.name}" is indexed but has no runnable build output. Run \`pnpm build\` first.`
+    );
   }
 
-  const forwardedArgs = args.filter(arg => arg !== '--');
+  const forwardedArgs = args.filter((arg) => arg !== '--');
   process.stderr.write(chalk.blue(`🚀 ACTUATING: ${actuator.name}...\n`));
 
   try {
@@ -1261,10 +1462,12 @@ export async function main(args = process.argv.slice(2)) {
       const statuses = await checkAllActuatorCapabilities();
       console.log('\n=== Runtime Capability Check ===');
       for (const status of statuses) {
-        const available = status.capabilities.filter(c => c.available).length;
+        const available = status.capabilities.filter((c) => c.available).length;
         const total = status.capabilities.length;
         const icon = available === total ? '\u2705' : available > 0 ? '\u26A0\uFE0F' : '\u274C';
-        console.log(`${icon} ${status.actuatorId} (v${status.version}): ${available}/${total} ops available`);
+        console.log(
+          `${icon} ${status.actuatorId} (v${status.version}): ${available}/${total} ops available`
+        );
         for (const cap of status.capabilities) {
           if (!cap.available) {
             console.log(`   \u274C ${cap.op}: ${cap.reason}`);
@@ -1333,7 +1536,9 @@ export async function main(args = process.argv.slice(2)) {
 
   if (command === 'artifact') {
     if (!firstArg) {
-      throw new Error('Missing artifact path. Try `npm run cli -- artifact active/shared/tmp/media/proposal-delivery-run-demo.pptx`.');
+      throw new Error(
+        'Missing artifact path. Try `npm run cli -- artifact active/shared/tmp/media/proposal-delivery-run-demo.pptx`.'
+      );
     }
 
     printArtifactInfo(firstArg);
@@ -1342,7 +1547,9 @@ export async function main(args = process.argv.slice(2)) {
 
   if (command === 'open-artifact') {
     if (!firstArg) {
-      throw new Error('Missing artifact path. Try `npm run cli -- open-artifact active/shared/tmp/media/proposal-delivery-run-demo.pptx`.');
+      throw new Error(
+        'Missing artifact path. Try `npm run cli -- open-artifact active/shared/tmp/media/proposal-delivery-run-demo.pptx`.'
+      );
     }
 
     openArtifact(firstArg);
@@ -1351,7 +1558,9 @@ export async function main(args = process.argv.slice(2)) {
 
   if (command === 'packet') {
     if (!firstArg) {
-      throw new Error('Missing packet path. Try `npm run cli -- packet active/shared/tmp/orchestrator/operator-interaction-packet.json`.');
+      throw new Error(
+        'Missing packet path. Try `npm run cli -- packet active/shared/tmp/orchestrator/operator-interaction-packet.json`.'
+      );
     }
 
     printInteractionPacketFile(firstArg);
@@ -1395,7 +1604,10 @@ export async function main(args = process.argv.slice(2)) {
   if (command === 'preview') {
     const { previewPipeline } = await import('@agent/core');
     const filePath = firstArg;
-    if (!filePath) { console.error('Usage: pnpm cli preview <pipeline.json>'); process.exit(1); }
+    if (!filePath) {
+      console.error('Usage: pnpm cli preview <pipeline.json>');
+      process.exit(1);
+    }
     const content = readTextFile(pathResolver.rootResolve(filePath));
     const pipeline = JSON.parse(content);
     const preview = previewPipeline(pipeline);
@@ -1424,18 +1636,22 @@ export async function main(args = process.argv.slice(2)) {
 
   if (command === 'intent') {
     // Free-text → intent resolution → optional pipeline execution
-    // Usage: pnpm cli intent "仮説を発散させて" [--run]
-    const flags = normalizedArgs.filter(a => a.startsWith('--'));
-    const words = normalizedArgs.slice(1).filter(a => !a.startsWith('--'));
+    // Usage: pnpm cli intent "仮説を発散させて" [--run|--clarify]
+    const flags = normalizedArgs.filter((a) => a.startsWith('--'));
+    const words = normalizedArgs.slice(1).filter((a) => !a.startsWith('--'));
     const utterance = words.join(' ').trim();
     if (!utterance) {
-      console.error('Usage: pnpm cli intent "<utterance>" [--run]');
+      console.error('Usage: pnpm cli intent "<utterance>" [--run|--clarify]');
       console.error('  --run  Execute the resolved pipeline immediately');
+      console.error('  --clarify  Print a clarification packet for the utterance');
       process.exit(1);
     }
     const doRun = flags.includes('--run');
+    const doClarify = flags.includes('--clarify');
 
-    const { resolveIntentResolutionPacket, loadStandardIntentCatalog } = await import('@agent/core/intent-resolution');
+    const { resolveIntentResolutionPacket, loadStandardIntentCatalog } =
+      await import('@agent/core/intent-resolution');
+    const { resolveQuestionInteractionPacket } = await import('@agent/core/question-resolver');
     const packet = resolveIntentResolutionPacket(utterance);
 
     console.log(`\n=== Intent Resolution ===`);
@@ -1446,16 +1662,36 @@ export async function main(args = process.argv.slice(2)) {
       if (packet.candidates.length > 0) {
         console.log(`\nTop candidates:`);
         for (const c of packet.candidates.slice(0, 5)) {
-          console.log(`  ${c.confidence.toFixed(2)}  ${c.intent_id}  — ${c.reasons[0] ?? 'heuristic'}`);
+          console.log(
+            `  ${c.confidence.toFixed(2)}  ${c.intent_id}  — ${c.reasons[0] ?? 'heuristic'}`
+          );
         }
+      }
+      const clarificationPacket = resolveQuestionInteractionPacket(
+        {
+          text: utterance,
+          confidence: packet.selected_confidence,
+        },
+        undefined,
+        undefined
+      );
+      if (clarificationPacket) {
+        console.log('\nClarification packet:');
+        printOperatorPacket(clarificationPacket);
+      } else {
+        console.log(
+          '\nNext step: rephrase the utterance, or run `pnpm cli -- intent --clarify "<utterance>"` to inspect missing inputs.'
+        );
       }
       process.exit(0);
     }
 
     const catalog = loadStandardIntentCatalog();
-    const intent = catalog.find(i => i.id === packet.selected_intent_id);
+    const intent = catalog.find((i) => i.id === packet.selected_intent_id);
 
-    console.log(`Selected   : ${packet.selected_intent_id} (confidence: ${packet.selected_confidence})`);
+    console.log(
+      `Selected   : ${packet.selected_intent_id} (confidence: ${packet.selected_confidence})`
+    );
     if (intent?.description) console.log(`Description: ${intent.description}`);
     if (intent?.risk_profile) console.log(`Risk       : ${intent.risk_profile}`);
     if (intent?.plan_outline?.length) {
@@ -1470,6 +1706,27 @@ export async function main(args = process.argv.slice(2)) {
       console.log(`\nCapability bundles:`);
       for (const b of packet.bundle_candidates) {
         console.log(`  [${b.status}] ${b.bundle_id} — ${b.summary}`);
+      }
+    }
+
+    if (doClarify) {
+      const clarificationPacket = resolveQuestionInteractionPacket(
+        {
+          text: utterance,
+          intentId: packet.selected_intent_id,
+          confidence: packet.selected_confidence,
+          executionShape: undefined,
+        },
+        undefined,
+        undefined
+      );
+      if (clarificationPacket) {
+        console.log('\nClarification packet:');
+        printOperatorPacket(clarificationPacket);
+      } else {
+        console.log(
+          '\nClarification packet: none — the request is already clear enough to execute.'
+        );
       }
     }
 
@@ -1495,7 +1752,9 @@ export async function main(args = process.argv.slice(2)) {
         process.exit(1);
       }
     } else if (doRun) {
-      console.log(`\nNote: intent "${packet.selected_intent_id}" has no inline pipeline (execution_shape: ${intent?.execution_shape ?? 'unknown'}). Use a task session instead.`);
+      console.log(
+        `\nNote: intent "${packet.selected_intent_id}" has no inline pipeline (execution_shape: ${intent?.execution_shape ?? 'unknown'}). Use a task session instead: pnpm mission create --intent-id ${packet.selected_intent_id}`
+      );
     }
 
     process.exit(0);
@@ -1503,16 +1762,21 @@ export async function main(args = process.argv.slice(2)) {
 
   if (command === 'schedule') {
     const subAction = firstArg; // register, list, remove
-    const { registerScheduledPipeline, unregisterScheduledPipeline, listScheduledPipelines } = await import('@agent/core');
+    const { registerScheduledPipeline, unregisterScheduledPipeline, listScheduledPipelines } =
+      await import('@agent/core');
 
     if (subAction === 'list') {
       const schedules = listScheduledPipelines();
-      if (schedules.length === 0) { console.log('No scheduled pipelines.'); }
-      else {
+      if (schedules.length === 0) {
+        console.log('No scheduled pipelines.');
+      } else {
         console.log(`\n=== Scheduled Pipelines (${schedules.length}) ===`);
         for (const s of schedules) {
           const status = s.enabled ? '\u2705' : '\u23F8\uFE0F';
-          const trigger = s.trigger.type === 'cron' ? `cron: ${s.trigger.cron}` : `interval: ${s.trigger.intervalMs}ms`;
+          const trigger =
+            s.trigger.type === 'cron'
+              ? `cron: ${s.trigger.cron}`
+              : `interval: ${s.trigger.intervalMs}ms`;
           const last = s.lastRun ? ` | last: ${s.lastRun} (${s.lastStatus})` : '';
           console.log(`${status} ${s.id} \u2014 ${s.name} [${s.actuator}] ${trigger}${last}`);
           console.log(`   pipeline: ${s.pipelinePath}`);
@@ -1526,14 +1790,20 @@ export async function main(args = process.argv.slice(2)) {
         process.exit(1);
       }
       registerScheduledPipeline({
-        id, name: id, pipelinePath, actuator,
+        id,
+        name: id,
+        pipelinePath,
+        actuator,
         trigger: { type: 'cron', cron },
         enabled: true,
       });
       console.log(`Registered: ${id} \u2192 ${pipelinePath} [${actuator}] cron: ${cron}`);
     } else if (subAction === 'remove') {
       const id = restArgs[0];
-      if (!id) { console.error('Usage: pnpm cli schedule remove <id>'); process.exit(1); }
+      if (!id) {
+        console.error('Usage: pnpm cli schedule remove <id>');
+        process.exit(1);
+      }
       unregisterScheduledPipeline(id);
       console.log(`Removed: ${id}`);
     } else {
@@ -1545,10 +1815,11 @@ export async function main(args = process.argv.slice(2)) {
   throw new Error(`Unknown command "${command}". Try \`npm run cli -- help\`.`);
 }
 
-const isDirectRun = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+const isDirectRun =
+  process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 
 if (isDirectRun) {
-  main().catch(err => {
+  main().catch((err) => {
     logger.error(err.message);
     process.exit(1);
   });

@@ -16,6 +16,11 @@
     "summary": { "type": "string" },
     "readiness": { "type": "string" },
     "confidence": { "type": "number" },
+    "missing_inputs": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "omitted_question_count": { "type": "integer", "minimum": 0 },
     "questions": {
       "type": "array",
       "items": {

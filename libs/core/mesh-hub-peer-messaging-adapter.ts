@@ -11,15 +11,14 @@ import {
   type PeerNetworkPeerRecord,
   verifyPeerMessage,
 } from './peer-messaging.js';
-import { buildWorkCoordinationPeerCommandEnvelope, type WorkCoordinationPeerCommandEnvelope } from './work-coordination-peer.js';
+import {
+  buildWorkCoordinationPeerCommandEnvelope,
+  type WorkCoordinationPeerCommandEnvelope,
+} from './work-coordination-peer.js';
 import { safeExistsSync, safeRmSync } from './secure-io.js';
 import type { A2AMessage } from './a2a-bridge.js';
 import { signA2AMessage } from './a2a-bridge.js';
-import type {
-  MeshRequest,
-  MeshRequestKind,
-  MeshTargetSelector,
-} from './mesh-hub-contract.js';
+import type { MeshRequest, MeshRequestKind, MeshTargetSelector } from './mesh-hub-contract.js';
 
 const DEFAULT_RUNTIME_ROOT = 'active/shared/runtime/mesh-hub';
 const DEFAULT_OBSERVABILITY_ROOT = 'active/shared/observability/mesh-hub';
@@ -94,7 +93,11 @@ function appendRecord(role: GovernedArtifactRole, logicalPath: string, record: u
   return appendGovernedArtifactJsonl(role, logicalPath, record);
 }
 
-function recordEvent(namespace: string | undefined, peerId: string, event: Record<string, unknown>): string {
+function recordEvent(
+  namespace: string | undefined,
+  peerId: string,
+  event: Record<string, unknown>
+): string {
   return appendRecord(DEFAULT_WRITER_ROLE, eventsPath(namespace, peerId), {
     ts: nowIso(),
     peer_id: peerId,
@@ -102,7 +105,11 @@ function recordEvent(namespace: string | undefined, peerId: string, event: Recor
   });
 }
 
-function buildWorkitemCommand(request: MeshRequest, peerId: string, sharedSecret: string): WorkCoordinationPeerCommandEnvelope {
+function buildWorkitemCommand(
+  request: MeshRequest,
+  peerId: string,
+  sharedSecret: string
+): WorkCoordinationPeerCommandEnvelope {
   const commandType =
     request.request_kind === 'workitem.handoff'
       ? 'handoff_request'
@@ -118,11 +125,15 @@ function buildWorkitemCommand(request: MeshRequest, peerId: string, sharedSecret
       command_id: request.request_id,
       item_id: request.request_id,
       actor_peer_id: request.sender_peer_id,
-      purpose: request.target.selector.kind === 'topic' ? request.target.selector.topic : request.request_kind,
+      purpose:
+        request.target.selector.kind === 'topic'
+          ? request.target.selector.topic
+          : request.request_kind,
       payload: {
         reference: request.payload.reference,
       },
     },
+    correlationId: request.correlation_id,
   });
 }
 
@@ -134,6 +145,7 @@ function buildA2AProposal(peerId: string, request: MeshRequest): A2AMessage {
       sender: peerId,
       receiver: peerId,
       conversation_id: request.correlation_id,
+      correlation_id: request.correlation_id,
       performative: 'propose',
       timestamp: nowIso(),
     },
@@ -153,7 +165,7 @@ function buildProposalRecord(
   peerId: string,
   messageId: string,
   request: MeshRequest,
-  sharedSecret: string,
+  sharedSecret: string
 ): MeshHubRecipientProposalRecord {
   const proposalKind = request.request_kind.startsWith('workitem.') ? 'workitem' : 'a2a';
   const proposalRef =
@@ -181,7 +193,11 @@ function buildProposalRecord(
   };
 }
 
-function validateRequestEnvelope(envelope: PeerMessageEnvelope, peerId: string, sharedSecret: string): MeshRequest {
+function validateRequestEnvelope(
+  envelope: PeerMessageEnvelope,
+  peerId: string,
+  sharedSecret: string
+): MeshRequest {
   if (envelope.type !== 'request') {
     throw new Error(`mesh_hub_request_type_denied:${envelope.message_id}`);
   }
@@ -195,7 +211,10 @@ function validateRequestEnvelope(envelope: PeerMessageEnvelope, peerId: string, 
   if (!request || request.kind !== 'mesh-request') {
     throw new Error(`mesh_hub_invalid_payload:${envelope.message_id}`);
   }
-  if (request.target.selector.kind === 'topic' && request.request_kind === 'workitem.status_update') {
+  if (
+    request.target.selector.kind === 'topic' &&
+    request.request_kind === 'workitem.status_update'
+  ) {
     throw new Error(`mesh_hub_topic_status_update_denied:${request.request_id}`);
   }
   return request;
@@ -207,7 +226,12 @@ export class MeshHubPeerMessagingAdapter {
   public createResponder(): PeerMessageResponder {
     return async ({ peerId, envelope }) => {
       const request = validateRequestEnvelope(envelope, peerId, this.options.sharedSecret);
-      const proposal = buildProposalRecord(peerId, envelope.message_id, request, this.options.sharedSecret);
+      const proposal = buildProposalRecord(
+        peerId,
+        envelope.message_id,
+        request,
+        this.options.sharedSecret
+      );
       appendRecord(DEFAULT_WRITER_ROLE, proposalsPath(this.options.namespace, peerId), proposal);
       recordEvent(this.options.namespace, peerId, {
         type: 'mesh_hub_request_proposed',
@@ -251,14 +275,18 @@ export class MeshHubPeerMessagingAdapter {
   }
 }
 
-export function createMeshHubPeerMessagingAdapter(options: MeshHubPeerMessagingAdapterOptions): MeshHubPeerMessagingAdapter {
+export function createMeshHubPeerMessagingAdapter(
+  options: MeshHubPeerMessagingAdapterOptions
+): MeshHubPeerMessagingAdapter {
   return new MeshHubPeerMessagingAdapter(options);
 }
 
 export function clearMeshHubPeerMessagingAdapterNamespace(namespace?: string): void {
   const normalized = normalizeNamespace(namespace);
   const root = normalized ? `${meshHubRuntimeRoot(normalized)}` : meshHubRuntimeRoot();
-  const obsRoot = normalized ? `${meshHubObservabilityRoot(normalized)}` : meshHubObservabilityRoot();
+  const obsRoot = normalized
+    ? `${meshHubObservabilityRoot(normalized)}`
+    : meshHubObservabilityRoot();
   withExecutionContext(DEFAULT_WRITER_ROLE, () => {
     if (safeExistsSync(root)) safeRmSync(root, { recursive: true, force: true });
     if (safeExistsSync(obsRoot)) safeRmSync(obsRoot, { recursive: true, force: true });

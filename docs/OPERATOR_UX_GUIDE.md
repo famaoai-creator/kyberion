@@ -58,6 +58,16 @@ For mission-backed work, the team composition artifact also carries a small gove
 
 This is what makes mission staffing explainable before delegation begins.
 
+When resuming a mission, the operator should expect the controller to rebuild state from the journal first:
+
+- `mission_controller resume <MISSION_ID>`
+  - replays the orchestration journal to find the next event
+  - logs `journal から再開: 次イベント=... / 回収タスク=... 件`
+  - logs `lease 回収: requested=... / waiting=... / reissued=...`
+  - keeps `LATEST_TASK.json` as a human-facing warning about the last intended physical action
+
+The resume path is now mechanically driven. The warning remains as context, not as the primary recovery mechanism.
+
 When Kyberion explains a complex capability, it should surface the
 governed capability bundle summary before expanding into the underlying
 actuator or pipeline details.
@@ -125,13 +135,13 @@ Use `pnpm setup:report` when you want a consolidated readiness view across surfa
 
 `pnpm doctor` also reports the pipeline schedule registry maintained by Chronos. For the volatile memory layer, expect these scheduled entries after `node dist/scripts/chronos_daemon.js` has started at least once:
 
-| Schedule                |          Cadence | Purpose                                                                                |
-| ----------------------- | ---------------: | -------------------------------------------------------------------------------------- |
-| `volatile-gc-daily`     |  Daily 04:00 JST | Expire and roll over volatile working-memory faces.                                    |
-| `storage-janitor-daily` |  Daily 04:30 JST | Run governed TTL cleanup for tmp, logs, data-vault, and runtime retention directories. |
-| `volatile-index-daily`  |  Daily 05:00 JST | Rebuild the volatile knowledge index.                                                  |
-| `daily-routine`         |  Daily 06:00 JST | Open daily journal/TODO and roll over pending items.                                   |
-| `weekly-review`         | Monday 07:00 JST | Open weekly review and nominate promotion candidates.                                  |
+| Schedule                |          Cadence | Purpose                                                                                                                    |
+| ----------------------- | ---------------: | -------------------------------------------------------------------------------------------------------------------------- |
+| `volatile-gc-daily`     |  Daily 04:00 JST | Expire and roll over volatile working-memory faces.                                                                        |
+| `storage-janitor-daily` |  Daily 04:30 JST | Run governed TTL cleanup for tmp, logs, data-vault, and runtime retention directories.                                     |
+| `volatile-index-daily`  |  Daily 05:00 JST | Rebuild the volatile knowledge index.                                                                                      |
+| `daily-routine`         |  Daily 06:00 JST | Open daily journal/TODO and roll over pending items.                                                                       |
+| `weekly-review`         | Monday 07:00 JST | Open weekly review, nominate promotion candidates, write task-model routing stats, and summarize queued memory candidates. |
 
 Typical managed entries include:
 

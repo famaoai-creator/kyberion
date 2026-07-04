@@ -41,29 +41,106 @@ export interface ErrorNextActionContext {
   runtime?: string;
 }
 
+export interface CompletionGoal {
+  summary: string;
+  success_condition: string;
+}
+
+export interface CompletionReconciliation {
+  satisfied: boolean;
+  delivered: string[];
+  gaps: string[];
+  confidence: number;
+  evidence_refs?: string[];
+}
+
+export interface CompletionNextAction {
+  title: string;
+  request: string;
+  delivered: string[];
+  gaps: string[];
+  next_step: string;
+  satisfied: boolean;
+  confidence: number;
+  evidence_refs: string[];
+}
+
 export function buildNextAction(input: BuildNextActionInput): NextAction {
   return {
     title: input.title,
     reason: input.reason,
     next_action_type: input.next_action_type,
     ...(input.suggested_command ? { suggested_command: input.suggested_command } : {}),
-    ...(input.suggested_pipeline_path ? { suggested_pipeline_path: input.suggested_pipeline_path } : {}),
-    ...(input.suggested_followup_request ? { suggested_followup_request: input.suggested_followup_request } : {}),
+    ...(input.suggested_pipeline_path
+      ? { suggested_pipeline_path: input.suggested_pipeline_path }
+      : {}),
+    ...(input.suggested_followup_request
+      ? { suggested_followup_request: input.suggested_followup_request }
+      : {}),
   };
 }
 
 export function formatNextAction(action: NextAction): string[] {
-  const lines = [
-    `Next Action: ${action.title}`,
-    `Reason: ${action.reason}`,
-  ];
+  const lines = [`Next Action: ${action.title}`, `Reason: ${action.reason}`];
   if (action.suggested_command) lines.push(`Command: ${action.suggested_command}`);
   if (action.suggested_pipeline_path) lines.push(`Pipeline: ${action.suggested_pipeline_path}`);
-  if (action.suggested_followup_request) lines.push(`Follow-up: ${action.suggested_followup_request}`);
+  if (action.suggested_followup_request)
+    lines.push(`Follow-up: ${action.suggested_followup_request}`);
   return lines;
 }
 
-function buildPipelineFailureNextAction(classification: ErrorClassification, context: ErrorNextActionContext): NextAction {
+export function buildCompletionNextAction(input: {
+  goal: CompletionGoal;
+  reconciliation: CompletionReconciliation;
+}): CompletionNextAction {
+  const satisfied = input.reconciliation.satisfied;
+  const delivered = Array.from(
+    new Set(input.reconciliation.delivered.map((entry) => String(entry).trim()).filter(Boolean))
+  );
+  const gaps = Array.from(
+    new Set(input.reconciliation.gaps.map((entry) => String(entry).trim()).filter(Boolean))
+  );
+  const evidenceRefs = Array.from(
+    new Set(
+      (input.reconciliation.evidence_refs || [])
+        .map((entry) => String(entry).trim())
+        .filter(Boolean)
+    )
+  );
+  return {
+    title: satisfied ? 'Completion confirmed' : 'Completion requires follow-up',
+    request: input.goal.success_condition,
+    delivered,
+    gaps,
+    next_step: satisfied
+      ? 'Proceed with archival, promotion, or the next mission step.'
+      : gaps.length > 0
+        ? 'Resolve the gaps and rerun completion reconciliation.'
+        : 'Review the delivered evidence and confirm whether the goal is satisfied.',
+    satisfied,
+    confidence: input.reconciliation.confidence,
+    evidence_refs: evidenceRefs,
+  };
+}
+
+export function formatCompletionNextAction(action: CompletionNextAction): string[] {
+  const lines = [
+    `Completion: ${action.title}`,
+    `Goal: ${action.request}`,
+    `Satisfied: ${action.satisfied ? 'yes' : 'no'}`,
+    `Confidence: ${action.confidence.toFixed(2)}`,
+  ];
+  if (action.delivered.length > 0) lines.push(`Delivered: ${action.delivered.join('; ')}`);
+  if (action.gaps.length > 0) lines.push(`Gaps: ${action.gaps.join('; ')}`);
+  if (action.evidence_refs.length > 0) lines.push(`Evidence: ${action.evidence_refs.join('; ')}`);
+  lines.push(`Next step: ${action.next_step}`);
+  return lines;
+}
+
+function buildPipelineFailureNextAction(
+  classification: ErrorClassification,
+  context: ErrorNextActionContext
+): NextAction {
   const pipelinePath = context.pipelinePath;
 
   switch (classification.ruleId) {
@@ -141,10 +218,14 @@ function buildPipelineFailureNextAction(classification: ErrorClassification, con
 
   if (classification.category === 'resource_unavailable') {
     return buildNextAction({
-      title: context.surfaceId ? `Repair surface ${context.surfaceId}` : 'Inspect the unavailable resource',
+      title: context.surfaceId
+        ? `Repair surface ${context.surfaceId}`
+        : 'Inspect the unavailable resource',
       reason: classification.remediation,
       next_action_type: context.surfaceId ? 'repair_surface' : 'inspect_artifact',
-      suggested_command: context.surfaceId ? `pnpm surfaces:repair -- --surface ${context.surfaceId}` : 'pnpm surfaces:status',
+      suggested_command: context.surfaceId
+        ? `pnpm surfaces:repair -- --surface ${context.surfaceId}`
+        : 'pnpm surfaces:status',
     });
   }
 
@@ -175,7 +256,11 @@ function buildPipelineFailureNextAction(classification: ErrorClassification, con
     });
   }
 
-  if (classification.category === 'permission_denied' || classification.category === 'governance_block' || classification.category === 'tier_violation') {
+  if (
+    classification.category === 'permission_denied' ||
+    classification.category === 'governance_block' ||
+    classification.category === 'tier_violation'
+  ) {
     return buildNextAction({
       title: 'Resolve the policy block',
       reason: classification.remediation,
@@ -219,7 +304,7 @@ function buildPipelineFailureNextAction(classification: ErrorClassification, con
 
 export function buildNextActionFromError(
   classification: ErrorClassification,
-  context: ErrorNextActionContext = {},
+  context: ErrorNextActionContext = {}
 ): NextAction {
   if (context.source === 'surface' && context.surfaceId) {
     return buildNextAction({
@@ -248,7 +333,8 @@ export function buildNextActionFromError(
       : '';
     return buildNextAction({
       title: `Fix service setup for ${context.serviceId}`,
-      reason: context.serviceSetupHint || `${classification.remediation}${missingSecrets}${fallbackNote}`,
+      reason:
+        context.serviceSetupHint || `${classification.remediation}${missingSecrets}${fallbackNote}`,
       next_action_type: 'bootstrap_environment',
       suggested_command: 'pnpm services:setup',
     });

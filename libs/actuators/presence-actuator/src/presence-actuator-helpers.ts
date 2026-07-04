@@ -1,7 +1,18 @@
-import { logger, recordInteraction, resolveServiceBinding, safeReadFile, validatePresenceTimeline, pathResolver, classifyError, withRetry } from '@agent/core';
+import {
+  logger,
+  recordInteraction,
+  resolveServiceBinding,
+  safeReadFile,
+  validatePresenceTimeline,
+  pathResolver,
+  classifyError,
+  retry,
+} from '@agent/core';
 import { WebClient } from '@slack/web-api';
 
-const PRESENCE_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/presence-actuator/manifest.json');
+const PRESENCE_MANIFEST_PATH = pathResolver.rootResolve(
+  'libs/actuators/presence-actuator/manifest.json'
+);
 const DEFAULT_PRESENCE_RETRY = {
   maxRetries: 2,
   initialDelayMs: 500,
@@ -19,7 +30,9 @@ const getPtyEngine = () => {
   const key = Symbol.for('@kyberion/pty-engine');
   const engine = (globalThis as any)[key];
   if (!engine) {
-    throw new Error('PTY Engine singleton not found in globalThis. Ensure libs/core/pty-engine is loaded.');
+    throw new Error(
+      'PTY Engine singleton not found in globalThis. Ensure libs/core/pty-engine is loaded.'
+    );
   }
   return engine;
 };
@@ -55,7 +68,9 @@ function isPlainObject(value: unknown): value is Record<string, any> {
 function loadRecoveryPolicy(): Record<string, any> {
   if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
   try {
-    const manifest = JSON.parse(safeReadFile(PRESENCE_MANIFEST_PATH, { encoding: 'utf8' }) as string);
+    const manifest = JSON.parse(
+      safeReadFile(PRESENCE_MANIFEST_PATH, { encoding: 'utf8' }) as string
+    );
     cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
     return cachedRecoveryPolicy;
   } catch (_) {
@@ -68,7 +83,9 @@ function buildRetryOptions(override?: Record<string, any>) {
   const recoveryPolicy = loadRecoveryPolicy();
   const manifestRetry = isPlainObject(recoveryPolicy.retry) ? recoveryPolicy.retry : {};
   const retryableCategories = new Set<string>(
-    Array.isArray(recoveryPolicy.retryable_categories) ? recoveryPolicy.retryable_categories.map(String) : [],
+    Array.isArray(recoveryPolicy.retryable_categories)
+      ? recoveryPolicy.retryable_categories.map(String)
+      : []
   );
   const resolved = {
     ...DEFAULT_PRESENCE_RETRY,
@@ -82,10 +99,12 @@ function buildRetryOptions(override?: Record<string, any>) {
       if (retryableCategories.size > 0) {
         return retryableCategories.has(classification.category);
       }
-      return classification.category === 'network'
-        || classification.category === 'rate_limit'
-        || classification.category === 'timeout'
-        || classification.category === 'resource_unavailable';
+      return (
+        classification.category === 'network' ||
+        classification.category === 'rate_limit' ||
+        classification.category === 'timeout' ||
+        classification.category === 'resource_unavailable'
+      );
     },
   };
 }
@@ -105,17 +124,19 @@ export async function handleAction(input: PresenceAction) {
 
   switch (action) {
     case 'receive_event': {
-      logger.info(`[PRESENCE] Received UI Event: ${params.payload.event_type} from ${params.channel}`);
-      
+      logger.info(
+        `[PRESENCE] Received UI Event: ${params.payload.event_type} from ${params.channel}`
+      );
+
       if (params.payload.threadId) {
         getPtyEngine().pushMessage(
           params.payload.threadId,
           `ui:${params.channel}`,
           params.payload.targetPersona || 'KYBERION-PRIME',
-          { 
-            type: 'a2ui_action', 
-            event: params.payload.event_type, 
-            data: params.payload.event_data 
+          {
+            type: 'a2ui_action',
+            event: params.payload.event_type,
+            data: params.payload.event_data,
           }
         );
         return { status: 'routed_to_ism', threadId: params.payload.threadId };
@@ -128,9 +149,9 @@ export async function handleAction(input: PresenceAction) {
 
       if (params.payload.threadId) {
         getPtyEngine().pushMessage(
-          params.payload.threadId, 
-          params.payload.from || 'system', 
-          params.payload.targetPersona || '*', 
+          params.payload.threadId,
+          params.payload.from || 'system',
+          params.payload.targetPersona || '*',
           params.payload.text
         );
       }
@@ -142,20 +163,24 @@ export async function handleAction(input: PresenceAction) {
       }
 
       try {
-        const result = await withRetry(async () => slack.chat.postMessage({
-          channel: params.channel,
-          text: params.payload.text || '',
-          thread_ts: params.payload.threadId
-        }), buildRetryOptions());
+        const result = await retry(
+          async () =>
+            slack.chat.postMessage({
+              channel: params.channel,
+              text: params.payload.text || '',
+              thread_ts: params.payload.threadId,
+            }),
+          buildRetryOptions()
+        );
 
         logger.info(`✅ [PRESENCE_SLACK] Message sent to ${params.channel}. TS: ${result.ts}`);
-        
+
         if (params.mode === 'conversational') {
-          return { 
-            status: 'waiting', 
+          return {
+            status: 'waiting',
             conversationId: result.ts,
             channel: params.channel,
-            originalText: params.payload.text
+            originalText: params.payload.text,
           };
         }
 
@@ -169,11 +194,15 @@ export async function handleAction(input: PresenceAction) {
     case 'dispatch_timeline': {
       const timeline = validatePresenceTimeline(params.payload.timeline);
       const bridgeUrl = process.env.KYBERION_A2UI_BRIDGE_URL || 'http://127.0.0.1:3031';
-      const response = await withRetry(async () => fetch(`${bridgeUrl}/api/timeline/dispatch`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(timeline),
-      }), buildRetryOptions());
+      const response = await retry(
+        async () =>
+          fetch(`${bridgeUrl}/api/timeline/dispatch`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(timeline),
+          }),
+        buildRetryOptions()
+      );
       if (!response.ok) {
         throw new Error(`Presence timeline dispatch failed: HTTP ${response.status}`);
       }
@@ -197,12 +226,18 @@ export async function handleAction(input: PresenceAction) {
           ...(tone_shifts ? { tone_shifts } : {}),
         },
       });
-      logger.info(`[PRESENCE] recorded interaction with ${org}/${person_slug} (${node.history.length} entries)`);
-      return { status: 'interaction_recorded', person_slug, org, history_length: node.history.length };
+      logger.info(
+        `[PRESENCE] recorded interaction with ${org}/${person_slug} (${node.history.length} entries)`
+      );
+      return {
+        status: 'interaction_recorded',
+        person_slug,
+        org,
+        history_length: node.history.length,
+      };
     }
 
     default:
       throw new Error(`Unsupported presence action: ${action}`);
   }
 }
-

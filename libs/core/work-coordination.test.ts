@@ -82,6 +82,16 @@ describe('work coordination', () => {
     expect(listBoardItems('personal-todo')).toHaveLength(1);
   });
 
+  it('slugifies board ids from names when boardId is omitted', () => {
+    const board = createBoard({
+      name: 'Roadmap Review Board',
+      type: 'project',
+      filters: {},
+    });
+
+    expect(board.board_id).toBe('roadmap-review-board');
+  });
+
   it('claims, releases, and hands off leases with version checks', () => {
     const item = createWorkItem({
       title: 'Implement claim logic',
@@ -114,7 +124,7 @@ describe('work coordination', () => {
         actorPeerId: 'peer-b',
         purpose: 'implementation',
         expectedVersion: 2,
-      }),
+      })
     ).toThrowError(/lease/i);
 
     const handed = handoffWorkItem({
@@ -131,7 +141,9 @@ describe('work coordination', () => {
 
     expect(handed.item.status).toBe('in_progress');
     expect(handed.item.lease_id).toBe(handed.toLease.lease_id);
-    expect(listCoordinationEvents().some((event) => event.event_type === 'item_handed_off')).toBe(true);
+    expect(listCoordinationEvents().some((event) => event.event_type === 'item_handed_off')).toBe(
+      true
+    );
     expect(listWorkItemAttempts(item.item_id)).toHaveLength(2);
     expect(listWorkItemAttempts(item.item_id)[0]).toMatchObject({
       status: 'released',
@@ -181,7 +193,11 @@ describe('work coordination', () => {
     expect(updated.status).toBe('done');
     expect(updated.lease_id).toBeUndefined();
     expect(listWorkItems()[0].status).toBe('done');
-    expect(listCoordinationEvents().some((event) => event.event_type === 'item_released' && event.item_id === item.item_id)).toBe(true);
+    expect(
+      listCoordinationEvents().some(
+        (event) => event.event_type === 'item_released' && event.item_id === item.item_id
+      )
+    ).toBe(true);
     expect(listWorkItemAttempts(item.item_id)[0]).toMatchObject({
       status: 'completed',
     });
@@ -192,7 +208,7 @@ describe('work coordination', () => {
         actorPeerId: 'peer-a',
         expectedVersion: 3,
         nextStatus: 'ready',
-      }),
+      })
     ).toThrowError(/lease/i);
   });
 });

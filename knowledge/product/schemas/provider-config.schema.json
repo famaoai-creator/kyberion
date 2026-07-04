@@ -1,0 +1,89 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/provider-config.schema.json",
+  "title": "Provider Config",
+  "type": "object",
+  "required": [
+    "version",
+    "description",
+    "default_priority",
+    "default_models",
+    "runtime_defaults",
+    "lifecycle"
+  ],
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "description": { "type": "string", "minLength": 1 },
+    "default_priority": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "minItems": 1
+    },
+    "default_models": {
+      "type": "object",
+      "required": ["gemini", "claude", "codex", "copilot"],
+      "properties": {
+        "gemini": { "type": "string", "minLength": 1 },
+        "claude": { "type": "string", "minLength": 1 },
+        "codex": { "type": "string", "minLength": 1 },
+        "copilot": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "runtime_defaults": {
+      "type": "object",
+      "required": [
+        "anthropic-default",
+        "anthropic-fast",
+        "gemini-default",
+        "gemini-fast",
+        "openai-vision",
+        "codex-default",
+        "copilot-default"
+      ],
+      "properties": {
+        "anthropic-default": { "type": "string", "minLength": 1 },
+        "anthropic-fast": { "type": "string", "minLength": 1 },
+        "gemini-default": { "type": "string", "minLength": 1 },
+        "gemini-fast": { "type": "string", "minLength": 1 },
+        "openai-vision": { "type": "string", "minLength": 1 },
+        "codex-default": { "type": "string", "minLength": 1 },
+        "copilot-default": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "lifecycle": {
+      "type": "object",
+      "properties": {
+        "gemini": {
+          "type": "object",
+          "required": ["boot_command", "boot_args", "default_model"],
+          "properties": {
+            "boot_command": { "type": "string", "minLength": 1 },
+            "boot_args": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "default_model": { "type": "string", "minLength": 1 }
+          },
+          "additionalProperties": false
+        },
+        "copilot": {
+          "type": "object",
+          "required": ["boot_command", "boot_args", "default_model"],
+          "properties": {
+            "boot_command": { "type": "string", "minLength": 1 },
+            "boot_args": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "default_model": { "type": "string", "minLength": 1 }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

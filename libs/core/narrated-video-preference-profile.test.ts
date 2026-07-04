@@ -47,14 +47,20 @@ const profile: NarratedVideoPreferenceProfile = {
 
 describe('narrated video preference profile', () => {
   it('selects brief questions and theme hints by purpose', () => {
-    expect(getNarratedVideoBriefQuestions(profile, 'tutorial')).toEqual([
-      'Who is it for?',
-      'What should they learn?',
-    ]);
+    const questions = getNarratedVideoBriefQuestions(profile, 'tutorial');
+    expect(questions.questions).toEqual(['Who is it for?', 'What should they learn?']);
+    expect(questions.omitted_count).toBe(0);
     expect(getNarratedVideoThemeHint(profile, 'marketing')).toBe('marketing_launch');
   });
 
   it('returns the publish policy', () => {
     expect(getNarratedVideoPublishPolicy(profile)).toEqual(profile.publish_policy);
+  });
+
+  it('reports omitted brief questions when capped', () => {
+    expect(getNarratedVideoBriefQuestions(profile, 'marketing', 1)).toEqual({
+      questions: ['What is the promise?'],
+      omitted_count: 1,
+    });
   });
 });

@@ -1,7 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { pathResolver } from '@agent/core';
 import { safeMkdir, safeReadFile, safeWriteFile } from '@agent/core';
-import { recordTask, shouldSkipResumeEntry, RESUME_IDEMPOTENCY_WINDOW_MS } from './mission-maintenance.js';
+import {
+  recordTask,
+  shouldSkipResumeEntry,
+  RESUME_IDEMPOTENCY_WINDOW_MS,
+} from './mission-maintenance.js';
 
 describe('shouldSkipResumeEntry (Phase B-3 idempotency)', () => {
   const now = new Date('2026-05-07T12:00:00.000Z');
@@ -12,10 +16,7 @@ describe('shouldSkipResumeEntry (Phase B-3 idempotency)', () => {
 
   it('returns false when last event is not RESUME', () => {
     expect(
-      shouldSkipResumeEntry(
-        [{ ts: '2026-05-07T11:59:50.000Z', event: 'CHECKPOINT' }],
-        now,
-      ),
+      shouldSkipResumeEntry([{ ts: '2026-05-07T11:59:50.000Z', event: 'CHECKPOINT' }], now)
     ).toBe(false);
   });
 
@@ -23,8 +24,8 @@ describe('shouldSkipResumeEntry (Phase B-3 idempotency)', () => {
     expect(
       shouldSkipResumeEntry(
         [{ ts: '2026-05-07T11:59:30.000Z', event: 'RESUME' }], // 30s ago
-        now,
-      ),
+        now
+      )
     ).toBe(true);
   });
 
@@ -32,22 +33,18 @@ describe('shouldSkipResumeEntry (Phase B-3 idempotency)', () => {
     expect(
       shouldSkipResumeEntry(
         [{ ts: '2026-05-07T11:58:00.000Z', event: 'RESUME' }], // 2 min ago
-        now,
-      ),
+        now
+      )
     ).toBe(false);
   });
 
   it('returns false at exact window boundary (strictly less than)', () => {
     const exactlyOnBoundary = new Date(now.getTime() - RESUME_IDEMPOTENCY_WINDOW_MS).toISOString();
-    expect(
-      shouldSkipResumeEntry([{ ts: exactlyOnBoundary, event: 'RESUME' }], now),
-    ).toBe(false);
+    expect(shouldSkipResumeEntry([{ ts: exactlyOnBoundary, event: 'RESUME' }], now)).toBe(false);
   });
 
   it('returns false on malformed timestamp', () => {
-    expect(
-      shouldSkipResumeEntry([{ ts: 'not-a-date', event: 'RESUME' }], now),
-    ).toBe(false);
+    expect(shouldSkipResumeEntry([{ ts: 'not-a-date', event: 'RESUME' }], now)).toBe(false);
   });
 
   it('only inspects the LAST entry, not earlier RESUMEs', () => {
@@ -57,8 +54,8 @@ describe('shouldSkipResumeEntry (Phase B-3 idempotency)', () => {
           { ts: '2026-05-07T11:59:30.000Z', event: 'RESUME' },
           { ts: '2026-05-07T11:59:31.000Z', event: 'CHECKPOINT' },
         ],
-        now,
-      ),
+        now
+      )
     ).toBe(false);
   });
 
@@ -81,8 +78,8 @@ describe('shouldSkipResumeEntry (Phase B-3 idempotency)', () => {
       shouldSkipResumeEntry(
         [{ ts: '2026-05-07T11:59:55.000Z', event: 'RESUME' }], // 5s ago
         now,
-        2_000, // 2s window
-      ),
+        2_000 // 2s window
+      )
     ).toBe(false);
   });
 
@@ -94,22 +91,26 @@ describe('shouldSkipResumeEntry (Phase B-3 idempotency)', () => {
     safeMkdir(missionPath, { recursive: true });
     safeWriteFile(
       `${missionPath}/mission-state.json`,
-      JSON.stringify({
-        mission_id: missionId,
-        tier: 'public',
-        status: 'active',
-        execution_mode: 'delegated',
-        priority: 1,
-        assigned_persona: 'worker',
-        confidence_score: 1,
-        git: {
-          branch: 'main',
-          start_commit: 'start',
-          latest_commit: 'latest',
-          checkpoints: [],
+      JSON.stringify(
+        {
+          mission_id: missionId,
+          tier: 'public',
+          status: 'active',
+          execution_mode: 'delegated',
+          priority: 1,
+          assigned_persona: 'worker',
+          confidence_score: 1,
+          git: {
+            branch: 'main',
+            start_commit: 'start',
+            latest_commit: 'latest',
+            checkpoints: [],
+          },
+          history: [],
         },
-        history: [],
-      }, null, 2),
+        null,
+        2
+      )
     );
 
     await recordTask(missionId, 'Dispatched work item WIT-1', {
@@ -124,6 +125,11 @@ describe('shouldSkipResumeEntry (Phase B-3 idempotency)', () => {
         pruned_sections: ['knowledge_hints'],
         rollup_summary: 'pruned knowledge hints',
       },
+      context_chars: 4800,
+      pruned_chars: 3900,
+      rollup_used: true,
+      result_schema_ok: true,
+      needs_count: 0,
       cognitive_route_summary: 'fast_llm, owner=agent',
       drift_watchdog_summary: 'attempts=1; repeat=0; stop=no; attention=no',
       work_item_dispatch_summary: {
@@ -134,13 +140,22 @@ describe('shouldSkipResumeEntry (Phase B-3 idempotency)', () => {
       },
     });
 
-    const state = JSON.parse(safeReadFile(`${missionPath}/mission-state.json`, { encoding: 'utf8' }) as string);
+    const state = JSON.parse(
+      safeReadFile(`${missionPath}/mission-state.json`, { encoding: 'utf8' }) as string
+    );
     expect(state.context.last_action).toBe('Dispatched work item WIT-1');
     expect(state.context.next_step).toBe('await response');
     expect(state.context.context_pack_id).toBe('CPK-TEST-1');
     expect(state.context.context_pack_summary).toBe('Scoped context pack summary');
     expect(state.context.context_pack_pruning_summary.pruned_sections).toEqual(['knowledge_hints']);
-    expect(state.context.work_item_dispatch_summary.drift_watchdog_summary).toBe('attempts=1; repeat=0; stop=no; attention=no');
+    expect(state.context.context_chars).toBe(4800);
+    expect(state.context.pruned_chars).toBe(3900);
+    expect(state.context.rollup_used).toBe(true);
+    expect(state.context.result_schema_ok).toBe(true);
+    expect(state.context.needs_count).toBe(0);
+    expect(state.context.work_item_dispatch_summary.drift_watchdog_summary).toBe(
+      'attempts=1; repeat=0; stop=no; attention=no'
+    );
     expect(state.history.at(-1)?.event).toBe('RECORD_TASK');
   });
 });

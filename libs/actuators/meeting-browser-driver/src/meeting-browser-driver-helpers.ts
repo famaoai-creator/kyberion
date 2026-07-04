@@ -1,6 +1,8 @@
-import { classifyError, safeReadFile, pathResolver, withRetry } from '@agent/core';
+import { classifyError, safeReadFile, pathResolver } from '@agent/core';
 
-const MEETING_BROWSER_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/meeting-browser-driver/manifest.json');
+const MEETING_BROWSER_MANIFEST_PATH = pathResolver.rootResolve(
+  'libs/actuators/meeting-browser-driver/manifest.json'
+);
 const DEFAULT_MEETING_BROWSER_RETRY = {
   maxRetries: 2,
   initialDelayMs: 500,
@@ -18,7 +20,9 @@ function isPlainObject(value: unknown): value is Record<string, any> {
 function loadRecoveryPolicy(): Record<string, any> {
   if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
   try {
-    const manifest = JSON.parse(safeReadFile(MEETING_BROWSER_MANIFEST_PATH, { encoding: 'utf8' }) as string);
+    const manifest = JSON.parse(
+      safeReadFile(MEETING_BROWSER_MANIFEST_PATH, { encoding: 'utf8' }) as string
+    );
     cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
     return cachedRecoveryPolicy ?? {};
   } catch (_) {
@@ -31,7 +35,9 @@ function buildRetryOptions(override?: Record<string, any>) {
   const recoveryPolicy = loadRecoveryPolicy();
   const manifestRetry = isPlainObject(recoveryPolicy.retry) ? recoveryPolicy.retry : {};
   const retryableCategories = new Set<string>(
-    Array.isArray(recoveryPolicy.retryable_categories) ? recoveryPolicy.retryable_categories.map(String) : [],
+    Array.isArray(recoveryPolicy.retryable_categories)
+      ? recoveryPolicy.retryable_categories.map(String)
+      : []
   );
   const resolved = {
     ...DEFAULT_MEETING_BROWSER_RETRY,
@@ -45,10 +51,12 @@ function buildRetryOptions(override?: Record<string, any>) {
       if (retryableCategories.size > 0) {
         return retryableCategories.has(classification.category);
       }
-      return classification.category === 'network'
-        || classification.category === 'rate_limit'
-        || classification.category === 'timeout'
-        || classification.category === 'resource_unavailable';
+      return (
+        classification.category === 'network' ||
+        classification.category === 'rate_limit' ||
+        classification.category === 'timeout' ||
+        classification.category === 'resource_unavailable'
+      );
     },
   };
 }
@@ -60,7 +68,7 @@ async function loadPlaywright(): Promise<any> {
 async function trySelectors(
   page: { isVisible: (selector: string) => Promise<boolean> },
   selectors: string[],
-  action: (selector: string) => Promise<void>,
+  action: (selector: string) => Promise<void>
 ): Promise<boolean> {
   for (const sel of selectors) {
     try {
@@ -78,7 +86,7 @@ async function trySelectors(
 async function waitForAnyVisibleSelector(
   page: { isVisible: (selector: string) => Promise<boolean> },
   selectors: string[],
-  opts: { timeoutMs: number; pollMs?: number },
+  opts: { timeoutMs: number; pollMs?: number }
 ): Promise<string | null> {
   const pollMs = opts.pollMs ?? 500;
   const deadline = Date.now() + opts.timeoutMs;

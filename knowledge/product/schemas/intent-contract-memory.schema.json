@@ -55,7 +55,27 @@
         "success_rate": { "type": "number", "minimum": 0, "maximum": 1 },
         "sample_count": { "type": "integer", "minimum": 0 },
         "last_seen": { "type": "string", "minLength": 1 },
-        "last_error": { "type": "string" }
+        "last_error": { "type": "string" },
+        "completion_summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "satisfied",
+            "delivered",
+            "gaps",
+            "next_step",
+            "confidence",
+            "evidence_refs"
+          ],
+          "properties": {
+            "satisfied": { "type": "boolean" },
+            "delivered": { "type": "array", "items": { "type": "string" } },
+            "gaps": { "type": "array", "items": { "type": "string" } },
+            "next_step": { "type": "string" },
+            "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+            "evidence_refs": { "type": "array", "items": { "type": "string" } }
+          }
+        }
       }
     }
   }

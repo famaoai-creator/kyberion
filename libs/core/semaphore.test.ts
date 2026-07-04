@@ -6,17 +6,35 @@ describe('Semaphore', () => {
     const semaphore = new Semaphore(2);
     let active = 0;
     let peak = 0;
+    let started = 0;
+    let releaseAll!: () => void;
+    const releasePromise = new Promise<void>((resolve) => {
+      releaseAll = resolve;
+    });
+    let startedTwo!: () => void;
+    const startedTwoPromise = new Promise<void>((resolve) => {
+      startedTwo = resolve;
+    });
 
-    await Promise.all(
+    const runPromise = Promise.all(
       Array.from({ length: 5 }, () =>
         semaphore.run(async () => {
           active += 1;
           peak = Math.max(peak, active);
-          await new Promise((resolve) => setTimeout(resolve, 5));
+          started += 1;
+          if (started === 2) {
+            startedTwo();
+          }
+          await releasePromise;
           active -= 1;
-        }),
-      ),
+        })
+      )
     );
+
+    await startedTwoPromise;
+    releaseAll();
+
+    await runPromise;
 
     expect(peak).toBe(2);
   });
@@ -24,9 +42,11 @@ describe('Semaphore', () => {
   it('releases the slot when a task throws', async () => {
     const semaphore = new Semaphore(1);
 
-    await expect(semaphore.run(async () => {
-      throw new Error('boom');
-    })).rejects.toThrow('boom');
+    await expect(
+      semaphore.run(async () => {
+        throw new Error('boom');
+      })
+    ).rejects.toThrow('boom');
 
     await expect(semaphore.run(async () => 'ok')).resolves.toBe('ok');
   });

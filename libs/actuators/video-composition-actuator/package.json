@@ -1,0 +1,16 @@
+{
+  "name": "@actuator/video-composition",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Governed deterministic composed-video bundle preparation actuator",
+  "main": "../../../dist/libs/actuators/video-composition-actuator/src/index.js",
+  "types": "../../../dist/libs/actuators/video-composition-actuator/src/index.d.ts",
+  "scripts": {
+    "build": "tsc -p ../../../tsconfig.actuators.json",
+    "test": "vitest run src/"
+  },
+  "dependencies": {
+    "@agent/core": "workspace:*",
+    "ajv": "^8.18.0"
+  }
+}

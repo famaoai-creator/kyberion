@@ -9,20 +9,20 @@ const mocks = vi.hoisted(() => ({
   safeReadFile: vi.fn(),
   executeServicePreset: vi.fn(),
   executeMcp: vi.fn(),
-  withRetry: vi.fn(async (fn: () => Promise<unknown>, _options?: unknown) => fn()),
+  retry: vi.fn(async (fn: () => Promise<unknown>, _options?: unknown) => fn()),
 }));
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 
 vi.mock('@agent/core', async () => {
-  const actual = await vi.importActual('@agent/core') as any;
+  const actual = (await vi.importActual('@agent/core')) as any;
   return {
     ...actual,
     safeExec: mocks.safeExec,
     safeReadFile: mocks.safeReadFile,
     executeServicePreset: mocks.executeServicePreset,
     executeMcp: mocks.executeMcp,
-    withRetry: mocks.withRetry,
+    retry: mocks.retry,
   };
 });
 
@@ -67,7 +67,7 @@ describe('service-actuator handleAction', () => {
       ],
     } as any);
 
-    expect(mocks.withRetry).toHaveBeenCalledWith(
+    expect(mocks.retry).toHaveBeenCalledWith(
       expect.any(Function),
       expect.objectContaining({
         maxRetries: 4,
@@ -75,7 +75,7 @@ describe('service-actuator handleAction', () => {
         maxDelayMs: 2000,
         factor: 3,
         jitter: false,
-      }),
+      })
     );
   });
 
@@ -95,7 +95,7 @@ describe('service-actuator handleAction', () => {
       'github',
       'create_issue',
       { owner: 'famaoai', repo: 'kyberion' },
-      'secret-guard',
+      'secret-guard'
     );
     expect(result).toEqual({ ok: true });
   });
@@ -109,7 +109,7 @@ describe('service-actuator handleAction', () => {
         mode: 'CLI',
         action: 'post-message',
         params: { text: 'hello' },
-      }),
+      })
     ).rejects.toThrow('CLI execution disabled');
   });
 
@@ -145,7 +145,7 @@ describe('service-actuator handleAction', () => {
       'voice',
       'speak_local',
       { text: 'hello' },
-      'none',
+      'none'
     );
     expect(mocks.safeExec).not.toHaveBeenCalled();
     expect(result).toEqual({ ok: true, delegated: true });
@@ -166,7 +166,7 @@ describe('service-actuator handleAction', () => {
     expect(mocks.executeMcp).toHaveBeenCalledWith(
       'npx',
       ['-y', '@modelcontextprotocol/server-github'],
-      expect.objectContaining({ action: 'call_tool', name: 'search_repositories' }),
+      expect.objectContaining({ action: 'call_tool', name: 'search_repositories' })
     );
     expect(result).toEqual({ tools: [] });
   });
@@ -174,7 +174,10 @@ describe('service-actuator handleAction', () => {
   it('emits service actions that satisfy the schema', () => {
     const ajv = new Ajv({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.join(pathResolver.rootDir(), 'schemas/service-action.schema.json'));
+    const validate = compileSchemaFromPath(
+      ajv,
+      path.join(pathResolver.rootDir(), 'schemas/service-action.schema.json')
+    );
 
     const directRequest = {
       service_id: 'github',

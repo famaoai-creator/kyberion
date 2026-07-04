@@ -153,6 +153,11 @@ export interface PlanningPacketTask {
   description: string;
   deliverable?: string;
   target_path?: string;
+  dependencies?: string[];
+  acceptance_criteria?: string[];
+  risk?: 'low' | 'medium' | 'high' | 'approval_required' | 'high_stakes';
+  expected_output_format?: 'text' | 'files' | 'structured';
+  estimated_scope?: 'S' | 'M' | 'L';
 }
 
 export interface PlanningPacket {
@@ -160,6 +165,42 @@ export interface PlanningPacket {
   summary?: string;
   plan_markdown: string;
   next_tasks: PlanningPacketTask[];
+}
+
+export interface TaskResultArtifact {
+  path: string;
+  kind: string;
+}
+
+export interface TaskResultBlock {
+  summary: string;
+  artifacts: TaskResultArtifact[];
+  verification_done: string[];
+  gaps: string[];
+  needs: string[];
+}
+
+export interface A2ATaskContext {
+  mission_id: string;
+  team_role: string;
+  execution_mode?: string;
+  channel?: string;
+  thread?: string;
+  slack_channel?: string;
+  correlation_id?: string;
+  task_model_hint?: Record<string, unknown>;
+  model_hint?: Record<string, unknown>;
+}
+
+export interface A2ATaskContract {
+  intent: string;
+  text: string;
+  context: A2ATaskContext;
+  objective?: string;
+  acceptance_criteria?: string[];
+  expected_outputs?: string[];
+  rationale?: string;
+  prior_decisions?: string[];
 }
 
 // ─── A2A / Conversation ───────────────────────────────────────────────────────
@@ -207,8 +248,8 @@ export interface DiscordSurfaceMetadata extends BaseSurfaceMetadata {
   surface: 'discord';
 }
 
-export type SurfaceConversationMetadata = 
-  | SlackSurfaceMetadata 
+export type SurfaceConversationMetadata =
+  | SlackSurfaceMetadata
   | ChronosSurfaceMetadata
   | PresenceSurfaceMetadata
   | IMessageSurfaceMetadata
@@ -266,6 +307,9 @@ export interface SurfaceConversationResult {
   routingProposals?: NerveRoutingProposal[];
   missionProposals?: MissionProposal[];
   planningPackets?: PlanningPacket[];
+  taskResults?: TaskResultBlock[];
+  taskResultErrors?: string[];
+  surfaceParseErrors?: string[];
   routingDecision?: AgentRoutingDecision;
 }
 

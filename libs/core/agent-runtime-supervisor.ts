@@ -11,6 +11,7 @@ import {
   type AgentHandle,
   type AgentRuntimeSnapshot,
 } from './agent-lifecycle.js';
+import type { TaskModelHint } from './reasoning-model-routing.js';
 import {
   safeAppendFileSync,
   safeExistsSync,
@@ -244,15 +245,20 @@ export async function ensureMissionTeamRuntimeViaSupervisor(
 }
 
 export async function ensureAgentRuntime(options: EnsureAgentRuntimeOptions): Promise<AgentHandle> {
+  const taskModelHint = options.runtimeMetadata?.task_model_hint;
   appendSupervisorEvent({
     decision: 'agent_runtime_ensure_requested',
     agent_id: options.agentId,
     mission_id: options.missionId,
     requested_by: options.requestedBy,
     provider: options.provider,
+    model_id: options.modelId,
+    task_model_hint: taskModelHint,
   });
   const handle = await agentLifecycle.spawn(options);
   const runtimeRecord = runtimeSupervisor.get(options.agentId || handle.agentId);
+  const snapshot = getAgentRuntimeSnapshot(options.agentId || handle.agentId, 20);
+  const actualModelId = snapshot?.agent.modelId || handle.getRecord()?.modelId || options.modelId;
   if (runtimeRecord) {
     runtimeSupervisor.update(runtimeRecord.resourceId, {
       ownerId: options.runtimeOwnerId || runtimeRecord.ownerId,
@@ -270,6 +276,8 @@ export async function ensureAgentRuntime(options: EnsureAgentRuntimeOptions): Pr
     mission_id: options.missionId,
     requested_by: options.requestedBy,
     provider: options.provider,
+    model_id: actualModelId,
+    task_model_hint: taskModelHint,
   });
   return handle;
 }
@@ -340,22 +348,33 @@ export async function askAgentRuntime(
   agentId: string,
   prompt: string,
   requestedBy: string,
-  options: { timeoutMs?: number } = {}
+  options: { timeoutMs?: number; taskModelHint?: TaskModelHint; correlationId?: string } = {}
 ): Promise<string> {
+  const startedAt = Date.now();
   appendSupervisorEvent({
     decision: 'agent_runtime_ask_requested',
     agent_id: agentId,
     requested_by: requestedBy,
+    correlation_id: options.correlationId,
+    task_model_hint: options.taskModelHint,
   });
   const handle = getAgentRuntimeHandle(agentId);
   if (!handle) {
     throw new Error(`Agent ${agentId} not found or not ready`);
   }
   const response = await handle.ask(prompt, { timeoutMs: options.timeoutMs });
+  const snapshot = getAgentRuntimeSnapshot(agentId, 20);
   appendSupervisorEvent({
     decision: 'agent_runtime_ask_completed',
     agent_id: agentId,
     requested_by: requestedBy,
+    model_id: snapshot?.agent.modelId || handle.getRecord()?.modelId,
+    duration_ms: Date.now() - startedAt,
+    input_tokens: snapshot?.metrics.usage?.inputTokens,
+    output_tokens: snapshot?.metrics.usage?.outputTokens,
+    total_tokens: snapshot?.metrics.usage?.totalTokens,
+    correlation_id: options.correlationId,
+    task_model_hint: options.taskModelHint,
   });
   return response;
 }

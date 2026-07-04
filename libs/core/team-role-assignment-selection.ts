@@ -1,4 +1,7 @@
-import { resolveAgentProviderTarget, type ResolvedAgentProviderTarget } from './agent-provider-resolution.js';
+import {
+  resolveAgentProviderTarget,
+  type ResolvedAgentProviderTarget,
+} from './agent-provider-resolution.js';
 import { resolveSelectionHints } from './agent-manifest.js';
 import { resolveTeamRoleSelectionHints } from './team-role-selection.js';
 
@@ -55,6 +58,12 @@ export interface MissionTeamAssignment {
   modelId: string | null;
   required_capabilities: string[];
   notes: string;
+  model_hint?: {
+    tier: 'small' | 'standard' | 'large';
+    effort: 'low' | 'medium' | 'high';
+    model_id: string;
+    route_reason: string;
+  };
 }
 
 interface SelectionCandidate {
@@ -66,16 +75,24 @@ interface SelectionCandidate {
 }
 
 function selectedModelHasHint(modelId: string, preferredModels: Set<string>): boolean {
-  return preferredModels.has(String(modelId || '').trim().toLowerCase());
+  return preferredModels.has(
+    String(modelId || '')
+      .trim()
+      .toLowerCase()
+  );
 }
 
 export function selectAgentForTeamRole(
   teamRole: string,
   teamRoleRecord: TeamRoleRecord,
   authorityRoles: Record<string, AuthorityRoleRecord>,
-  agents: Record<string, AgentProfileRecord>,
+  agents: Record<string, AgentProfileRecord>
 ): MissionTeamAssignment {
-  const requiredCapabilities = new Set((teamRoleRecord.required_capabilities || []).map((entry) => entry.trim().toLowerCase()).filter(Boolean));
+  const requiredCapabilities = new Set(
+    (teamRoleRecord.required_capabilities || [])
+      .map((entry) => entry.trim().toLowerCase())
+      .filter(Boolean)
+  );
   const selectionHints = resolveTeamRoleSelectionHints(teamRoleRecord);
   const preferredAgents = new Set(selectionHints.preferred_agents);
   const preferredModels = new Set(selectionHints.preferred_models);
@@ -83,12 +100,14 @@ export function selectAgentForTeamRole(
     .flatMap(([agentId, profile]) => {
       if (!profile.team_roles.includes(teamRole)) return [];
 
-      const profileCapabilities = new Set((profile.capabilities || []).map((entry) => entry.trim().toLowerCase()).filter(Boolean));
+      const profileCapabilities = new Set(
+        (profile.capabilities || []).map((entry) => entry.trim().toLowerCase()).filter(Boolean)
+      );
       const { provider: selectionProvider, modelId: selectionModel } = resolveSelectionHints(
         profile.selection_hints,
         undefined,
         selectionHints.preferred_models[0],
-        agentId,
+        agentId
       );
       const resolvedTarget = resolveAgentProviderTarget({
         preferredProvider: selectionProvider,
@@ -97,30 +116,43 @@ export function selectAgentForTeamRole(
         fallbackProviders: profile.fallback_providers || [],
         requiredCapabilities: profile.capabilities,
       });
-      const capabilityHits = Array.from(requiredCapabilities).filter((capability) => profileCapabilities.has(capability)).length;
+      const capabilityHits = Array.from(requiredCapabilities).filter((capability) =>
+        profileCapabilities.has(capability)
+      ).length;
       const capabilityPenalty = Math.max(0, requiredCapabilities.size - capabilityHits) * 2;
       const preferredAgentBonus = preferredAgents.has(agentId.toLowerCase()) ? 20 : 0;
-      const preferredModelBonus = selectedModelHasHint(resolvedTarget.modelId, preferredModels) ? 5 : 0;
+      const preferredModelBonus = selectedModelHasHint(resolvedTarget.modelId, preferredModels)
+        ? 5
+        : 0;
       const providerBonus = selectionProvider === resolvedTarget.provider ? 2 : 0;
-      const score = capabilityHits * 10 - capabilityPenalty + preferredAgentBonus + preferredModelBonus + providerBonus;
+      const score =
+        capabilityHits * 10 -
+        capabilityPenalty +
+        preferredAgentBonus +
+        preferredModelBonus +
+        providerBonus;
 
       const requiredScopes = new Set(teamRoleRecord.required_scope_classes || []);
       const compatibleAuthorityRoles = profile.authority_roles.filter((role) =>
-        teamRoleRecord.compatible_authority_roles.includes(role),
+        teamRoleRecord.compatible_authority_roles.includes(role)
       );
       return compatibleAuthorityRoles.flatMap((authorityRole) => {
         const authorityRecord = authorityRoles[authorityRole];
         if (!authorityRecord) return [];
         const resolvedScopes = new Set(authorityRecord.scope_classes || []);
-        const missingScope = Array.from(requiredScopes).find((scopeClass) => !resolvedScopes.has(scopeClass));
+        const missingScope = Array.from(requiredScopes).find(
+          (scopeClass) => !resolvedScopes.has(scopeClass)
+        );
         if (missingScope) return [];
-        return [{
-          agentId,
-          authorityRole,
-          authorityRecord,
-          resolvedTarget,
-          score,
-        } satisfies SelectionCandidate];
+        return [
+          {
+            agentId,
+            authorityRole,
+            authorityRecord,
+            resolvedTarget,
+            score,
+          } satisfies SelectionCandidate,
+        ];
       });
     })
     .filter((entry): entry is SelectionCandidate => Boolean(entry))

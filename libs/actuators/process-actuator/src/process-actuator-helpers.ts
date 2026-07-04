@@ -9,13 +9,15 @@ import {
   loadSurfaceManifest,
   loadSurfaceState,
   classifyError,
-  withRetry,
+  retry,
 } from '@agent/core';
 import type { RuntimeResourceKind, RuntimeShutdownPolicy } from '@agent/core';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const PROCESS_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/process-actuator/manifest.json');
+const PROCESS_MANIFEST_PATH = pathResolver.rootResolve(
+  'libs/actuators/process-actuator/manifest.json'
+);
 const DEFAULT_PROCESS_RETRY = {
   maxRetries: 2,
   initialDelayMs: 250,
@@ -51,7 +53,9 @@ function isPlainObject(value: unknown): value is Record<string, any> {
 function loadRecoveryPolicy(): Record<string, any> {
   if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
   try {
-    const manifest = JSON.parse(safeReadFile(PROCESS_MANIFEST_PATH, { encoding: 'utf8' }) as string);
+    const manifest = JSON.parse(
+      safeReadFile(PROCESS_MANIFEST_PATH, { encoding: 'utf8' }) as string
+    );
     cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
     return cachedRecoveryPolicy;
   } catch (_) {
@@ -64,7 +68,9 @@ function buildRetryOptions(override?: Record<string, any>) {
   const recoveryPolicy = loadRecoveryPolicy();
   const manifestRetry = isPlainObject(recoveryPolicy.retry) ? recoveryPolicy.retry : {};
   const retryableCategories = new Set<string>(
-    Array.isArray(recoveryPolicy.retryable_categories) ? recoveryPolicy.retryable_categories.map(String) : [],
+    Array.isArray(recoveryPolicy.retryable_categories)
+      ? recoveryPolicy.retryable_categories.map(String)
+      : []
   );
   const resolved = {
     ...DEFAULT_PROCESS_RETRY,
@@ -78,10 +84,12 @@ function buildRetryOptions(override?: Record<string, any>) {
       if (retryableCategories.size > 0) {
         return retryableCategories.has(classification.category);
       }
-      return classification.category === 'network'
-        || classification.category === 'rate_limit'
-        || classification.category === 'timeout'
-        || classification.category === 'resource_unavailable';
+      return (
+        classification.category === 'network' ||
+        classification.category === 'rate_limit' ||
+        classification.category === 'timeout' ||
+        classification.category === 'resource_unavailable'
+      );
     },
   };
 }
@@ -91,7 +99,10 @@ export async function handleAction(input: ProcessAction) {
 
   if (action === 'pipeline') {
     if (!steps || steps.length === 0) return { status: 'error', message: 'Empty pipeline steps' };
-    if (steps.length > 1) throw new Error('process-actuator pipeline dispatch supports only a single step; use the main pipeline runner for multi-step sequences');
+    if (steps.length > 1)
+      throw new Error(
+        'process-actuator pipeline dispatch supports only a single step; use the main pipeline runner for multi-step sequences'
+      );
     const step = steps[0];
     const result = await handleAction({ action: step.op as any, params: step.params, context });
     return { ...result, context: (result as any).context || context };
@@ -99,10 +110,16 @@ export async function handleAction(input: ProcessAction) {
 
   switch (action) {
     case 'spawn': {
-      if (!params.resourceId || !params.command || !params.kind || !params.ownerId || !params.ownerType) {
+      if (
+        !params.resourceId ||
+        !params.command ||
+        !params.kind ||
+        !params.ownerId ||
+        !params.ownerType
+      ) {
         throw new Error('resourceId, command, kind, ownerId, and ownerType are required for spawn');
       }
-      return await withRetry(async () => {
+      return await retry(async () => {
         const managed = spawnManagedProcess({
           resourceId: params.resourceId,
           kind: params.kind,
@@ -127,7 +144,7 @@ export async function handleAction(input: ProcessAction) {
 
     case 'stop': {
       if (!params.resourceId) throw new Error('resourceId is required for stop');
-      return await withRetry(async () => {
+      return await retry(async () => {
         const record = runtimeSupervisor.get(params.resourceId);
         stopManagedProcess(params.resourceId, null);
         return { status: 'stopped', resourceId: params.resourceId, pid: record?.pid };
@@ -136,14 +153,20 @@ export async function handleAction(input: ProcessAction) {
 
     case 'status': {
       if (!params.resourceId) throw new Error('resourceId is required for status');
-      return await withRetry(async () => ({ status: 'ok', resource: runtimeSupervisor.get(params.resourceId) || null }), buildRetryOptions());
+      return await retry(
+        async () => ({ status: 'ok', resource: runtimeSupervisor.get(params.resourceId) || null }),
+        buildRetryOptions()
+      );
     }
 
     case 'list':
-      return await withRetry(async () => ({ status: 'ok', resources: runtimeSupervisor.snapshot() }), buildRetryOptions());
+      return await retry(
+        async () => ({ status: 'ok', resources: runtimeSupervisor.snapshot() }),
+        buildRetryOptions()
+      );
 
     case 'list-surfaces': {
-      return await withRetry(async () => {
+      return await retry(async () => {
         const manifest = loadSurfaceManifest();
         const state = loadSurfaceState();
 
@@ -161,7 +184,9 @@ export async function handleAction(input: ProcessAction) {
           };
         });
         const data = { status: 'ok', surfaces: results };
-        return params.export_as ? { ...data, context: { ...context, [params.export_as]: results } } : data;
+        return params.export_as
+          ? { ...data, context: { ...context, [params.export_as]: results } }
+          : data;
       }, buildRetryOptions());
     }
 
@@ -195,9 +220,8 @@ const entrypoint = process.argv[1] ? path.resolve(process.argv[1]) : '';
 const modulePath = fileURLToPath(import.meta.url);
 
 if (entrypoint && modulePath === entrypoint) {
-  main().catch(err => {
+  main().catch((err) => {
     logger.error(err.message);
     process.exit(1);
   });
 }
-

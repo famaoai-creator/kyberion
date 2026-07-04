@@ -16,7 +16,6 @@ import {
   nativeTtsSpeak,
   probeNativeTts,
   classifyError,
-  withRetry,
   createVirtualMediaDeviceControlBridge,
   createVirtualDeviceInventoryBridge,
   createVirtualAudioOutputPlaybackBridge,
@@ -38,10 +37,18 @@ import {
 import { randomUUID } from 'node:crypto';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { systemDisplayHelpers, type ResolvedScreenDisplaySelection } from './system-display-helpers.js';
+import {
+  systemDisplayHelpers,
+  type ResolvedScreenDisplaySelection,
+} from './system-display-helpers.js';
 import { systemFocusHelpers } from './system-focus-helpers.js';
 import { executePipeline } from './system-pipeline-helpers.js';
-import { handleSystemAction, type SystemAction, type ComputerInteractionAction, type SystemPipelineStep } from './system-action-helpers.js';
+import {
+  handleSystemAction,
+  type SystemAction,
+  type ComputerInteractionAction,
+  type SystemPipelineStep,
+} from './system-action-helpers.js';
 import {
   activateApplication,
   detectFocusedInput,
@@ -77,6 +84,7 @@ import { createApprovalRequest, loadApprovalRequest } from '@agent/core/governan
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as visionJudge from '@agent/shared-vision';
+import { runActuatorCli } from '@agent/core';
 
 /**
  * System-Actuator v2.1.0 [AUTONOMOUS CONTROL ENABLED]
@@ -87,7 +95,9 @@ const ALLOW_UNSAFE_SHELL = process.env.KYBERION_ALLOW_UNSAFE_SHELL === 'true';
 const ALLOW_UNSAFE_JS = process.env.KYBERION_ALLOW_UNSAFE_JS === 'true';
 const COMPUTER_RUNTIME_DIR = pathResolver.shared('runtime/computer');
 const FOCUS_TARGET_STORE_PATH = path.join(COMPUTER_RUNTIME_DIR, 'focused-targets.json');
-const SYSTEM_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/system-actuator/manifest.json');
+const SYSTEM_MANIFEST_PATH = pathResolver.rootResolve(
+  'libs/actuators/system-actuator/manifest.json'
+);
 const DEFAULT_SYSTEM_RETRY = {
   maxRetries: 2,
   initialDelayMs: 250,
@@ -100,13 +110,17 @@ let cachedRecoveryPolicy: Record<string, any> | undefined;
 
 function assertUnsafeShellAllowed() {
   if (!ALLOW_UNSAFE_SHELL) {
-    throw new Error('[SECURITY] Shell execution disabled. Set KYBERION_ALLOW_UNSAFE_SHELL=true to enable.');
+    throw new Error(
+      '[SECURITY] Shell execution disabled. Set KYBERION_ALLOW_UNSAFE_SHELL=true to enable.'
+    );
   }
 }
 
 function assertUnsafeJsAllowed() {
   if (!ALLOW_UNSAFE_JS) {
-    throw new Error('[SECURITY] JS execution disabled. Set KYBERION_ALLOW_UNSAFE_JS=true to enable.');
+    throw new Error(
+      '[SECURITY] JS execution disabled. Set KYBERION_ALLOW_UNSAFE_JS=true to enable.'
+    );
   }
 }
 
@@ -130,7 +144,9 @@ function buildRetryOptions(override?: Record<string, any>) {
   const recoveryPolicy = loadRecoveryPolicy();
   const manifestRetry = isPlainObject(recoveryPolicy.retry) ? recoveryPolicy.retry : {};
   const retryableCategories = new Set<string>(
-    Array.isArray(recoveryPolicy.retryable_categories) ? recoveryPolicy.retryable_categories.map(String) : [],
+    Array.isArray(recoveryPolicy.retryable_categories)
+      ? recoveryPolicy.retryable_categories.map(String)
+      : []
   );
   const resolved = {
     ...DEFAULT_SYSTEM_RETRY,
@@ -144,10 +160,12 @@ function buildRetryOptions(override?: Record<string, any>) {
       if (retryableCategories.size > 0) {
         return retryableCategories.has(classification.category);
       }
-      return classification.category === 'network'
-        || classification.category === 'rate_limit'
-        || classification.category === 'timeout'
-        || classification.category === 'resource_unavailable';
+      return (
+        classification.category === 'network' ||
+        classification.category === 'rate_limit' ||
+        classification.category === 'timeout' ||
+        classification.category === 'resource_unavailable'
+      );
     },
   };
 }
@@ -167,12 +185,18 @@ function normalizeDisplayIndex(value: unknown): number | undefined {
 function selectDisplayFromInventory(
   inventory: ScreenDisplayInventory,
   requestedIndex?: number,
-  requestedName?: string,
-): { display: ScreenDisplayRecord; selection_source: 'explicit_index' | 'display_name' | 'primary' | 'fallback' } {
+  requestedName?: string
+): {
+  display: ScreenDisplayRecord;
+  selection_source: 'explicit_index' | 'display_name' | 'primary' | 'fallback';
+} {
   return systemDisplayHelpers.selectDisplayFromInventory(inventory, requestedIndex, requestedName);
 }
 
-async function resolveScreenDisplaySelection(params: Record<string, any>, resolve: (value: any) => any): Promise<ResolvedScreenDisplaySelection> {
+async function resolveScreenDisplaySelection(
+  params: Record<string, any>,
+  resolve: (value: any) => any
+): Promise<ResolvedScreenDisplaySelection> {
   return systemDisplayHelpers.resolveScreenDisplaySelection(params, resolve);
 }
 
@@ -248,15 +272,9 @@ export const SYSTEM_ACTUATOR_TRANSFORM_OPS = [
   'run_js',
 ] as const;
 
-export const SYSTEM_ACTUATOR_CONTROL_OPS = [
-  'if',
-  'while',
-] as const;
+export const SYSTEM_ACTUATOR_CONTROL_OPS = ['if', 'while'] as const;
 
-const SYSTEM_ACTUATOR_CAPTURE_ALIAS_OPS = new Set<string>([
-  ...SYSTEM_ACTUATOR_CAPTURE_OPS,
-  'list',
-]);
+const SYSTEM_ACTUATOR_CAPTURE_ALIAS_OPS = new Set<string>([...SYSTEM_ACTUATOR_CAPTURE_OPS, 'list']);
 
 /**
  * Main Entry Point
@@ -270,19 +288,17 @@ const SYSTEM_ACTUATOR_CAPTURE_ALIAS_OPS = new Set<string>([
  * CLI Runner
  */
 const main = async () => {
-  const argv = await createStandardYargs()
-    .option('input', { alias: 'i', type: 'string', required: true })
-    .parseSync();
-  const inputContent = safeReadFile(pathResolver.rootResolve(argv.input as string), { encoding: 'utf8' }) as string;
-  const result = await handleSystemAction(JSON.parse(inputContent));
-  console.log(JSON.stringify(result, null, 2));
+  await runActuatorCli({
+    name: 'system-actuator',
+    handleAction: handleSystemAction,
+  });
 };
 
 const entrypoint = process.argv[1] ? path.resolve(process.argv[1]) : '';
 const modulePath = fileURLToPath(import.meta.url);
 
 if (entrypoint && modulePath === entrypoint) {
-  main().catch(err => {
+  main().catch((err) => {
     logger.error(err.message);
     process.exit(1);
   });

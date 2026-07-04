@@ -7,6 +7,7 @@
 システムをゼロから立ち上げるための標準的なコマンド列です。
 
 前提:
+
 - Node.js `22+`
 - `pnpm`
 
@@ -37,6 +38,8 @@ pnpm surfaces:reconcile
 
 # 9. 魂の注入 (オンボーディング)
 pnpm onboard
+
+`pnpm onboard` は `dist/` が必要です。`pnpm build` を先に実行してから起動してください。
 ```
 
 ---
@@ -44,6 +47,7 @@ pnpm onboard
 ## 🔍 詳細プロセスと物理的効果 (Detailed Process)
 
 ### Stage 1: 物理的基盤の確立 (Physical Foundation)
+
 - **実行コマンド**: `pnpm install`
 - **目的**: 必要なライブラリを全てロードし、内部モジュール間の接続を確立します。
 - **物理的変化**:
@@ -51,12 +55,14 @@ pnpm onboard
   - ワークスペース間のシンボリックリンク（`@agent/core` など）が構築されます。
 
 ### Stage 2: 事前ツール確認 (Prerequisite Toolchain Check)
+
 - **実行コマンド**: `pnpm prereq:check`
 - **目的**: Node / pnpm / git / TypeScript / tsx / vitest など、Kyberion をソースから動かすための基本ツールが揃っているかを確認します。
 - **物理的変化**:
   - まだ実体の変更は行いません。足りないツールやローカル依存が要約されます。
 
 ### Stage 3: システムの具現化 (System Manifestation)
+
 - **実行コマンド**: `pnpm build`
 - **目的**: 依存関係をコンパイルし、実行可能なバイナリ（JavaScript）を生成します。
 - **物理的変化**:
@@ -67,11 +73,13 @@ pnpm onboard
   個別実行する場合は `pnpm build:ui` のみで Chronos UI を再ビルドできます。
 
 ### Python Runtime Resolution
+
 - Python 系の bridge は、原則として `KYBERION_PYTHON_BIN` → `KYBERION_PYTHON` → managed runtime (`active/shared/runtime/tool-runtimes/*/bin/python`) → `.venv/bin/python3` → `python3` の順で解決されます。
 - `.venv/bin/python3` は legacy compatibility 用の repo-local 実行環境候補であり、新規標準ではありません。
 - 音声サンプルやプロモート後の voice profile データは `active/shared/tmp/` または `active/shared/runtime/voice-profiles/<profile_id>/` に置きます。
 
 ### Stage 4: Runtime Surface Setup
+
 - **実行コマンド**: `pnpm surfaces:setup`
 - **目的**: `slack-bridge`、`imessage-bridge`、`discord-bridge`、`telegram-bridge`、`chronos-mirror-v2`、`nexus-daemon`、`terminal-bridge` などの background surface について、認証の不足項目、CLI 代替、ホスト管理 surface を確認します。
 - **物理的変化**:
@@ -84,12 +92,14 @@ pnpm onboard
   - `pnpm surfaces:stop -- --surface <surface-id>` で個別 surface を停止できます。
 
 ### Stage 5: External Service Setup
+
 - **実行コマンド**: `pnpm services:setup`
 - **目的**: GitHub、Google Workspace、Slack、Notion、Jira などの service preset について、必要な secret、CLI 代替、customer/personal connection の置き場を先に確認します。
 - **物理的変化**:
   - まだ実体の変更は行いません。設定不足の候補だけが要約されます。
 
 ### Service Preflight
+
 - **実行コマンド**: `pnpm service:preflight -- --service <service-id>`
 - **目的**: 実行直前に、特定の service が今使えるかを確認します。`services:setup` が「準備」、`service:preflight` が「実行可否」です。
 - **使いどころ**:
@@ -100,18 +110,21 @@ pnpm onboard
   - `pnpm services:setup` が未完でも `service:preflight` は実行できますが、auth が不足していれば失敗します。
 
 ### Stage 6: Reasoning Backend Setup
+
 - **実行コマンド**: `pnpm reasoning:setup`
 - **目的**: `claude-cli` / `gemini-cli` / `codex-cli` / `anthropic` / `nemotron-api` / `local` / `stub` のどれが現在の host で使えるかを確認し、`env:bootstrap` に進む前の判断材料を出します。
 - **物理的変化**:
   - まだ実体の変更は行いません。利用可能な backend と不足条件が見えるだけです。
 
 ### Stage 7: Consolidated Readiness Report
+
 - **実行コマンド**: `pnpm setup:report`
 - **目的**: `surface` / `service` / `reasoning` / `doctor` の readiness を一度に確認し、初期セットアップの抜けをまとめて潰します。
 - **物理的変化**:
   - まだ実体の変更は行いません。まとめた readiness summary が表示されます。
 
 ### Media Runtime Preflight
+
 - **実行コマンド**: `pnpm service:preflight -- --service media-generation`
 - **補助コマンド**: `pnpm media:preflight`
 - **目的**: `media-generation` 系の実装や MV パイプラインを開始する前に、ローカルの ComfyUI サービス runtime が試行可能かを確認します。
@@ -121,6 +134,7 @@ pnpm onboard
   - 失敗した場合は `pnpm services:setup` とあわせて、ComfyUI の起動・プロビジョニング・接続先の確認を進めます。
 
 ### Stage 8: Runtime Surface Reconciliation
+
 - **実行コマンド**: `pnpm surfaces:reconcile`
 - **目的**: setup で確認した状態をもとに、background surface を manifest から標準起動します。
 - **物理的変化**:
@@ -129,6 +143,7 @@ pnpm onboard
   - `runtime-supervisor` に surface runtime が登録されます。
 
 ### Stage 9: 魂の注入 (Soul Infusion)
+
 - **実行コマンド**: `pnpm onboard` (または `node dist/scripts/onboarding_wizard.js`)
 - **目的**: 主権者の名前、言語、対話スタイル、専門分野、vision をシステムに記憶させます。
 - **非対話環境の場合**: TTY が無い環境では `pnpm onboard` は exit 2 で停止します。代わりに以下のいずれかを使用:
@@ -142,12 +157,14 @@ pnpm onboard
   - `customer/{slug}/onboarding/onboarding-summary.md` が生成されます。`KYBERION_CUSTOMER` 未設定時は `knowledge/personal/onboarding/onboarding-summary.md` になります。
 
 ### Stage 10: 邂逅と命名の儀式 (Greeting & Naming)
+
 - **内容**: アイデンティティ設定の最後に、エージェントが自ら自己紹介を行い、主権者との間で「Agent ID」を合意します。
 - **目的**: A2A 通信やブロックチェーン記録に使用する、エージェントの公的な名前（Agent ID）を決定します。
 - **物理的変化**:
   - `customer/{slug}/agent-identity.json` が生成されます。`KYBERION_CUSTOMER` 未設定時は `knowledge/personal/agent-identity.json` になります。
 
 ### Stage 11: 接続・領域・チュートリアルの下準備
+
 - **内容**: サービス接続の候補、テナント 1 件分の登録、最初の tutorial plan を個別に整えます。
 - **目的**: 初回実行で副作用を強制せず、提案・承認・適用を分離します。
 - **物理的変化**:
@@ -166,6 +183,7 @@ pnpm vital
 ```
 
 **期待される出力例**:
+
 - ✅ [OK] Physical Foundation (node_modules)
 - ✅ [OK] System Build (dist)
 - ✅ [OK] Sovereign Identity
@@ -173,5 +191,6 @@ pnpm vital
 - ✅ [OK] Onboarding Summary
 
 ---
-*Status: Mandated by AGENTS.md*
-*Last Updated: 2026-05-06 by Ecosystem Architect*
+
+_Status: Mandated by AGENTS.md_
+_Last Updated: 2026-05-06 by Ecosystem Architect_

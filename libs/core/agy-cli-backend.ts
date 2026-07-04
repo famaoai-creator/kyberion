@@ -224,7 +224,10 @@ export class AgyCliBackend implements ReasoningBackend {
     });
     return (await this.runStructured({
       systemPrompt: 'Simulate branch execution. Return JSON only.',
-      userPrompt: JSON.stringify(input.branches),
+      userPrompt: [
+        `Max steps per branch: ${input.maxStepsPerBranch ?? 10}`,
+        JSON.stringify(input.branches),
+      ].join('\n'),
       schema,
     })) as SimulationResult;
   }

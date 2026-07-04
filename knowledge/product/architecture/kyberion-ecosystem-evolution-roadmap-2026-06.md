@@ -28,23 +28,23 @@ The proposed three pillars are directionally correct:
 
 ### 2.2 Required corrections
 
-| Proposal | Review | Correct implementation rule |
-| --- | --- | --- |
-| Every action converges to `Project -> Track -> Outcome -> Artifact`. | Too absolute. Direct answers and bounded task sessions must not create a project merely to preserve a hierarchy. `Outcome` is a success condition, not always an artifact. | Use `Project` only for durable business context. A `Mission` or `Task Session` links to a project/track when one exists. Every governed execution records outcome criteria, artifacts, and evidence separately. |
-| The data tiers and ADF validation structurally eliminate risk. | Correct direction, but neither is sufficient alone. Inputs from a browser page, extension, peer, or model remain untrusted after schema validation. | Enforce capability, authority, origin, tenant, approval, and recipient-side policy at the action boundary. A delivered request never grants execution authority. |
-| Traces can autonomously rewrite `HINTS.md` or durable rules. | Unsafe as stated. Raw logs are not reusable knowledge, and automatic structural edits can encode one-off failures or attacker-controlled content. | Trace processing can automatically create a redacted, deduplicated `Memory Candidate`; promotion to governed guidance follows evidence, scope/tier validation, and human ratification where a structural rule changes. |
-| Mesh Hub has moved Kyberion from an individual agent to a distributed mesh. | Premature. Mesh Hub v1 establishes a local, same-tenant, single-writer control plane with deterministic eligibility and operator selection. | Treat v1 as the foundation for a pilot. Network federation, public-key identity, automatic scheduling, and cross-tenant sharing remain future work. |
-| Resource-aware routing and hierarchical model allocation are the next immediate step. | Their order is reversed. Optimizing an unproven trust boundary would make failures harder to explain and audit. | First prove operator-visible approval, evidence, and same-tenant peer delivery. Then add signed identity. Add routing only in advisory mode before constrained automation. |
+| Proposal                                                                              | Review                                                                                                                                                                     | Correct implementation rule                                                                                                                                                                                            |
+| ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Every action converges to `Project -> Track -> Outcome -> Artifact`.                  | Too absolute. Direct answers and bounded task sessions must not create a project merely to preserve a hierarchy. `Outcome` is a success condition, not always an artifact. | Use `Project` only for durable business context. A `Mission` or `Task Session` links to a project/track when one exists. Every governed execution records outcome criteria, artifacts, and evidence separately.        |
+| The data tiers and ADF validation structurally eliminate risk.                        | Correct direction, but neither is sufficient alone. Inputs from a browser page, extension, peer, or model remain untrusted after schema validation.                        | Enforce capability, authority, origin, tenant, approval, and recipient-side policy at the action boundary. A delivered request never grants execution authority.                                                       |
+| Traces can autonomously rewrite `HINTS.md` or durable rules.                          | Unsafe as stated. Raw logs are not reusable knowledge, and automatic structural edits can encode one-off failures or attacker-controlled content.                          | Trace processing can automatically create a redacted, deduplicated `Memory Candidate`; promotion to governed guidance follows evidence, scope/tier validation, and human ratification where a structural rule changes. |
+| Mesh Hub has moved Kyberion from an individual agent to a distributed mesh.           | Premature. Mesh Hub v1 establishes a local, same-tenant, single-writer control plane with deterministic eligibility and operator selection.                                | Treat v1 as the foundation for a pilot. Network federation, public-key identity, automatic scheduling, and cross-tenant sharing remain future work.                                                                    |
+| Resource-aware routing and hierarchical model allocation are the next immediate step. | Their order is reversed. Optimizing an unproven trust boundary would make failures harder to explain and audit.                                                            | First prove operator-visible approval, evidence, and same-tenant peer delivery. Then add signed identity. Add routing only in advisory mode before constrained automation.                                             |
 
 ### 2.3 Current implementation baseline
 
-| Area | Current capability | Boundary that remains |
-| --- | --- | --- |
-| Work lifecycle | Project, mission, task-session, artifact, evidence, and memory-candidate concepts already exist. | The canonical relationship must remain visible in one operator state model. |
-| Approval and browser bridge | `approval-*` core modules and `tools/adf-replay-extension/` provide a Side Panel prototype, recording contracts, review state, and a preflight that blocks extension execution without a Native Messaging bridge. | There is no production Native Messaging host, issued lease store, or end-to-end approval-to-execution path. |
-| Learning | `memory-promotion-queue`, promotion workflow, distill candidate registry, and the corporate memory loop are implemented. | `pipelines/fragments/memory-distillation.json` still writes a generated `HINTS.md` directly. It must be replaced by a candidate-and-ratification flow before scheduled automation is enabled. |
-| Mesh Hub | Registration, presence, capability advertisements, durable delivery, topic rules, inspection, and a `peer-messaging` adapter are present. Same-tenant eligibility is deterministic and automatic peer selection is denied. | It is not a network service or a distributed scheduler. Peer transport currently uses an HMAC shared secret, which verifies integrity but does not provide independently verifiable peer identity, rotation, or revocation. |
-| Model routing | The model registry and `reasoning-model-routing` produce shadow recommendations for intent compilation. | It does not yet make live dispatch decisions, enforce budget policy, or record counterfactual quality evidence. |
+| Area                        | Current capability                                                                                                                                                                                                         | Boundary that remains                                                                                                                                                                                                       |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Work lifecycle              | Project, mission, task-session, artifact, evidence, and memory-candidate concepts already exist.                                                                                                                           | The canonical relationship must remain visible in one operator state model.                                                                                                                                                 |
+| Approval and browser bridge | `approval-*` core modules and `tools/adf-replay-extension/` provide a Side Panel prototype, recording contracts, review state, and a preflight that blocks extension execution without a Native Messaging bridge.          | There is no production Native Messaging host, issued lease store, or end-to-end approval-to-execution path.                                                                                                                 |
+| Learning                    | `memory-promotion-queue`, promotion workflow, distill candidate registry, and the corporate memory loop are implemented.                                                                                                   | `pipelines/fragments/memory-distillation.json` now nominates a promotion candidate; approved knowledge hints append into `knowledge/product/governance/HINTS.md` through the promotion workflow.                            |
+| Mesh Hub                    | Registration, presence, capability advertisements, durable delivery, topic rules, inspection, and a `peer-messaging` adapter are present. Same-tenant eligibility is deterministic and automatic peer selection is denied. | It is not a network service or a distributed scheduler. Peer transport currently uses an HMAC shared secret, which verifies integrity but does not provide independently verifiable peer identity, rotation, or revocation. |
+| Model routing               | The model registry and `reasoning-model-routing` produce shadow recommendations for intent compilation.                                                                                                                    | It does not yet make live dispatch decisions, enforce budget policy, or record counterfactual quality evidence.                                                                                                             |
 
 ## 3. Canonical Product Model
 
@@ -222,15 +222,15 @@ The following invariants apply in every roadmap milestone:
 
 ## 5. Delivery Order and PR Boundaries
 
-| PR | Depends on | Scope | Required validation |
-| --- | --- | --- | --- |
-| 1 | None | E0 operator-state schema, adapters, dashboard contracts, ADR | schema checks, focused core tests, dashboard contract tests |
-| 2 | PR 1 | Browser review persistence and approval-state UX | approval/core tests, extension unit tests, manual Side Panel review journey |
-| 3 | PR 2 | Native Messaging host and lease contracts | host contract tests, expired/mismatched lease tests, local Chrome smoke |
-| 4 | None | E2 candidate-only trace distillation | memory workflow tests, redaction/tier/prompt-injection regression tests |
-| 5 | PR 1 | E3 two-peer Mesh pilot and operator inspection | mesh focused suite, restart/retry/dead-letter integration scenario |
-| 6 | PR 5 | E4 peer identity and rotation | signature, enrollment, rotation, revocation, compatibility tests |
-| 7 | PR 5 and PR 6 | E5 advisory resource/model routing | deterministic routing tests, policy/kill-switch tests, counterfactual evidence test |
+| PR  | Depends on    | Scope                                                        | Required validation                                                                 |
+| --- | ------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------- |
+| 1   | None          | E0 operator-state schema, adapters, dashboard contracts, ADR | schema checks, focused core tests, dashboard contract tests                         |
+| 2   | PR 1          | Browser review persistence and approval-state UX             | approval/core tests, extension unit tests, manual Side Panel review journey         |
+| 3   | PR 2          | Native Messaging host and lease contracts                    | host contract tests, expired/mismatched lease tests, local Chrome smoke             |
+| 4   | None          | E2 candidate-only trace distillation                         | memory workflow tests, redaction/tier/prompt-injection regression tests             |
+| 5   | PR 1          | E3 two-peer Mesh pilot and operator inspection               | mesh focused suite, restart/retry/dead-letter integration scenario                  |
+| 6   | PR 5          | E4 peer identity and rotation                                | signature, enrollment, rotation, revocation, compatibility tests                    |
+| 7   | PR 5 and PR 6 | E5 advisory resource/model routing                           | deterministic routing tests, policy/kill-switch tests, counterfactual evidence test |
 
 PRs 2 and 4 may proceed in parallel after PR 1's state vocabulary is accepted. PR 5 may proceed in parallel with PR 2, but PR 6 and PR 7 must not start from an assumption that Mesh Hub v1 is a federated scheduler.
 
@@ -238,14 +238,14 @@ PRs 2 and 4 may proceed in parallel after PR 1's state vocabulary is accepted. P
 
 Every implementation PR receives these reviews before merge:
 
-| Gate | Required question |
-| --- | --- |
-| Architecture | Does the change preserve the ownership model: mission owner, recipient acceptance, and actuator boundary? |
-| Security and privacy | Are data tier, tenant, origin, capability, approval, secret, and payload-redaction boundaries enforced and tested? |
-| Operator UX | Can a person tell what will happen, why it is blocked, who must act, and what happens after approval or rejection? |
-| Reliability | Are retry, restart, cancellation, expiry, ambiguity, and idempotency represented as explicit states with receipts? |
-| Learning quality | Does promotion remain evidence-backed, reversible, and scoped? Does a failure actually become a useful candidate rather than raw log accumulation? |
-| Productization | Does the change improve a master-roadmap objective, especially first win, failure explanation, 30-day operation, or contributor clarity? |
+| Gate                 | Required question                                                                                                                                  |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Architecture         | Does the change preserve the ownership model: mission owner, recipient acceptance, and actuator boundary?                                          |
+| Security and privacy | Are data tier, tenant, origin, capability, approval, secret, and payload-redaction boundaries enforced and tested?                                 |
+| Operator UX          | Can a person tell what will happen, why it is blocked, who must act, and what happens after approval or rejection?                                 |
+| Reliability          | Are retry, restart, cancellation, expiry, ambiguity, and idempotency represented as explicit states with receipts?                                 |
+| Learning quality     | Does promotion remain evidence-backed, reversible, and scoped? Does a failure actually become a useful candidate rather than raw log accumulation? |
+| Productization       | Does the change improve a master-roadmap objective, especially first win, failure explanation, 30-day operation, or contributor clarity?           |
 
 ## 7. Decisions Required Before Implementation
 

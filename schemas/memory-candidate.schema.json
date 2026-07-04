@@ -42,6 +42,9 @@
       "enum": ["queued", "approved", "rejected", "promoted"]
     },
     "queued_at": { "type": "string", "minLength": 1 },
+    "content_hash": { "type": "string", "minLength": 1 },
+    "occurrences": { "type": "integer", "minimum": 1 },
+    "last_seen": { "type": "string", "minLength": 1 },
     "ratified_at": { "type": "string", "minLength": 1 },
     "ratification_note": { "type": "string", "minLength": 1 },
     "promoted_ref": { "type": "string", "minLength": 1 }

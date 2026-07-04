@@ -5,10 +5,7 @@ export {
   materializeTrackArtifactSkeleton,
 } from '@agent/core/sdlc-gate-readiness';
 export { createNextActionContract } from '@agent/core/next-action-contract';
-export {
-  decideApprovalRequest,
-  listApprovalRequests,
-} from '@agent/core/approval-store';
+export { decideApprovalRequest, listApprovalRequests } from '@agent/core/approval-store';
 export {
   clearSurfaceOutboxMessage,
   enqueueSurfaceNotification,
@@ -41,7 +38,10 @@ export {
   saveMissionSeedRecord,
 } from '@agent/core/mission-seed-registry';
 export { listMemoryPromotionCandidates } from '@agent/core/memory-promotion-queue';
-export { promoteMemoryCandidateToKnowledge } from '@agent/core/memory-promotion-workflow';
+export {
+  promoteMemoryCandidateToKnowledge,
+  promotePersonalMemoryCandidates,
+} from '@agent/core/memory-promotion-workflow';
 export {
   listProjectRecords,
   loadProjectRecord,
