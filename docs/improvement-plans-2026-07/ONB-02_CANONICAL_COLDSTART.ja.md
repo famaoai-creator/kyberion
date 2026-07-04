@@ -46,6 +46,23 @@
 2. `pnpm-workspace.yaml` の `allowBuilds` プレースホルダ 2 件を、実際の必要性を確認して true/false に確定。
 3. `pnpm install` → first-win スモークがブラウザ経路で通ることを確認。
 
+## 実装状況 (2026-07-05)
+
+**判定: DONE**(受入条件 1〜5 を充足。残課題は下記「未了」参照)
+
+- **受入 1(単一正本)**: `docs/INITIALIZATION.md` を正本と明記(冒頭に正本宣言を追加)。README の Quick Start と QUICKSTART §1 を「要約 + 正本リンク」に統一し、QUICKSTART の `onboard → reconcile` の順序矛盾を正本の `reconcile → onboard` に修正。AGENTS.md §3 の `install → build → surfaces:reconcile → onboard` は正本と整合済み。
+- **受入 2(Node 統一 + floor 検証)**: engines `>=24.0.0` を正とし、`.nvmrc` を `24` に、`docs/INITIALIZATION.md`・`docs/QUICKSTART.md`・`README.md`・`kyberion-toolchain.json`・`kyberion-runtime-baseline.json`・`error-classifier-rules.json`・`scripts/dependency_resolver.ts`(floor 22→24。依存 id `node22` は bundles/個人 overlay から参照される安定キーのため据え置き)・`Dockerfile`(`node:20-slim`→`node:24-slim`)を 24 に統一。CI workflows は既に 24。
+- **受入 3(preflight での floor 検出)**: `libs/core/environment-capability-probes.ts` に `node-version.floor` probe を新設。root `package.json` の `engines.node` を読み、`process.versions.node` を実バージョン比較(`>=` floor)。不足時は `nvm install 24 && nvm use 24` を日英併記で案内して失敗する。`kyberion-toolchain` / `kyberion-runtime-baseline` の `node-runtime` capability をこの probe に切替(従来はバイナリ存在確認のみで素通り)。Node 22 をシミュレートして exit 1 + 案内文言を確認済み。
+- **受入 4(Playwright)**: `playwright.chromium-browser` probe を新設(`PLAYWRIGHT_BROWSERS_PATH` / OS 別 `ms-playwright` キャッシュディレクトリの存在確認)。`kyberion-toolchain` に `playwright-chromium` capability を **optional** で追加し、未導入時は `pnpm prereq:check` が**非致命の警告**で `pnpm exec playwright install chromium` を案内(exit 0 のまま。実測確認済み)。`scripts/bootstrap_environment.ts` は optional capability を exit code に数えないよう修正。postinstall での自動ダウンロードは行わない(計画どおり既定は案内)。INITIALIZATION/QUICKSTART/README の手順に導入コマンドを明記。
+- **受入 5(allowBuilds)**: 先行コミット(`a6ae51a6`)で解決済み(ts-loader CJS 修正も同コミット)。
+- **テスト**: `libs/core/environment-capability-probes.test.ts` を新設(floor パース/比較、probe の充足・不足、Playwright ディレクトリ解決、案内文言)。既存 `environment-capability.test.ts`・`environment-doctor.test.ts` と合わせて 35 件パス。
+
+**未了(スコープ外として明示)**:
+
+- 統合 preflight の完全版(Task 3 の reasoning backend probe・native toolchain・Python を `prereq:check` の単一 manifest に統合する件)は、reasoning は ONB-01 の `reasoning:setup`、音声/native は各 service preflight に既に分担されており、今回は Node floor + Playwright の追加に留めた。
+- `check_first_win_smoke` の前段への preflight 自動接続(Task 3-2)は未実装(手順書上の案内で代替)。
+- クリーンクローンからの first-win 実走検証(Task 1-3 / Task 4-3)はネットワーク・ブラウザダウンロードを要するため本環境では未実施。
+
 ## リスクと注意
 
 - Node バージョンの一本化は既存環境に影響する。市村さんの現環境の Node を確認し、24 統一で問題が出るなら 22 を正にする判断を先に固める(engines を実態に合わせる)。

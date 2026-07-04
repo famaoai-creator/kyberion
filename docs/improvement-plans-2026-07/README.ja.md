@@ -4,6 +4,7 @@
 > **根拠**: リポジトリ全体調査(libs/core・libs/actuators・satellites/presence・scripts/pipelines・テスト/CI・docs の6領域を並列調査)
 > **位置づけ**: [PRODUCTIZATION_ROADMAP](../../PRODUCTIZATION_ROADMAP.md) Phase B(30日連続運用に耐える)/ Phase C'(貢献容易性)に寄与する下位計画。
 > **登録**: [docs/ROADMAP.md](../../ROADMAP.md) §1 に登録済み。
+> **実装状況の正本**: [STATUS.ja.md](./STATUS.ja.md)(2026-07-05 全計画をコード実態と突合して監査)。各計画文書内の記述と矛盾する場合は STATUS を正とする。
 
 ## 1. 目的
 
@@ -109,7 +110,7 @@ UI・CLI・会話ブリッジ・音声のユーザー接点調査(2026-07-02 追
 
 | ID                                                  | タイトル                                                                   | 優先度 | 規模 | 依存  |
 | --------------------------------------------------- | -------------------------------------------------------------------------- | ------ | ---- | ----- |
-| [DS-01](./DS-01_CANONICAL_DESIGN_TOKENS.ja.md)      | 正準デザイントークンと Web 4 面の統一(KDS 三重管理解消) **(完了)**        | P1     | M    | なし  |
+| [DS-01](./DS-01_CANONICAL_DESIGN_TOKENS.ja.md)      | 正準デザイントークンと Web 4 面の統一(KDS 三重管理解消) **(完了)**         | P1     | M    | なし  |
 | [DS-02](./DS-02_TENANT_BRANDING_EVERYWHERE.ja.md)   | テナントブランディングの全面適用(PPTX 限定→Web/動画、VDS-07 実装)          | P1     | M    | DS-01 |
 | [DS-03](./DS-03_DOCUMENT_THEME_JP_TYPOGRAPHY.ja.md) | 文書エンジンのテーマ駆動化と日本語タイポグラフィ(PDF フォント埋め込み)     | P1     | M    | DS-01 |
 | [DS-04](./DS-04_VIDEO_SCENE_TOKENIZATION.ja.md)     | 動画シーンテンプレートのトークン化                                         | P2     | S〜M | DS-01 |

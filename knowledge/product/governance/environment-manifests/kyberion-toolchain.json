@@ -1,18 +1,18 @@
 {
   "$schema": "https://kyberion.local/schemas/environment-capability-manifest.schema.json",
   "manifest_id": "kyberion-toolchain",
-  "version": "2026-05-10",
+  "version": "2026-07-05",
   "description": "The local toolchain needed to build and test Kyberion from source: Node, pnpm, git, and the core TypeScript runner/test CLI helpers.",
   "capabilities": [
     {
       "capability_id": "node-runtime",
       "kind": "binary",
-      "description": "Node.js v22+ on PATH (the runtime Kyberion targets).",
+      "description": "Node.js v24+ on PATH (the runtime Kyberion targets; must satisfy package.json engines).",
       "required_for": ["all-of-kyberion"],
-      "probe": { "kind": "command", "command": "node", "args": ["--version"] },
+      "probe": { "kind": "probe", "probe_id": "node-version.floor" },
       "install": {
         "operator_confirmed": true,
-        "instruction": "Install Node.js 22+ via your version manager: `nvm install 22 && nvm use 22` or `mise install node@22`.",
+        "instruction": "Install Node.js 24+ via your version manager: `nvm install 24 && nvm use 24` or `mise install node@24` (matches `.nvmrc` and package.json engines).",
         "docs_url": "https://nodejs.org/en/download"
       }
     },
@@ -82,6 +82,22 @@
         "command": "pnpm",
         "args": ["install"],
         "instruction": "Install workspace dependencies so `pnpm exec vitest` resolves.",
+        "retry_after_install": true
+      }
+    },
+    {
+      "capability_id": "playwright-chromium",
+      "kind": "binary",
+      "description": "Playwright browser cache present (chromium). Browser first-win (screenshot smoke, browser:goto) silently falls back to text without it.",
+      "required_for": ["browser-first-win"],
+      "optional": true,
+      "probe": { "kind": "probe", "probe_id": "playwright.chromium-browser" },
+      "install": {
+        "operator_confirmed": true,
+        "command": "pnpm",
+        "args": ["exec", "playwright", "install", "chromium"],
+        "instruction": "Run `pnpm exec playwright install chromium` (network download, ~150MB). Not run automatically by postinstall.",
+        "docs_url": "https://playwright.dev/docs/browsers",
         "retry_after_install": true
       }
     }

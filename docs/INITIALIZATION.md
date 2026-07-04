@@ -2,21 +2,28 @@
 
 この文書は、Kyberion エコシステムの物理的起動と、主権者（Sovereign）としてのアイデンティティ確立（オンボーディング）の完全なプロセスを定義します。
 
+> **この文書がコールドスタート手順の唯一の正本です。** README / QUICKSTART / AGENTS.md は要約とここへのリンクのみを持ち、手順が食い違う場合は本書を正とします。
+
 ## 📋 クイック・スタート (Quick Commands)
 
 システムをゼロから立ち上げるための標準的なコマンド列です。
 
 前提:
 
-- Node.js `22+`
+- Node.js `24+`（`package.json` の `engines` が正。`.nvmrc` も `24`。`nvm use` で揃えられます）
 - `pnpm`
 
 ```bash
 # 1. 物理的基盤の確立 (依存関係のインストール)
 pnpm install
 
-# 2. 事前ツール確認
+# 2. 事前ツール確認 (Node 24+ floor / pnpm / git / Playwright ブラウザ有無 などを一括チェック)
 pnpm prereq:check
+
+# 2b. (推奨) ブラウザ first-win 用の Playwright ブラウザ導入
+#     未導入でも起動はできますが、ブラウザ経路(スクリーンショット first-win 等)は
+#     テキストへフォールバックします。postinstall では自動ダウンロードしません。
+pnpm exec playwright install chromium
 
 # 3. システムの具現化 (ビルド)
 pnpm build
@@ -58,6 +65,9 @@ pnpm onboard
 
 - **実行コマンド**: `pnpm prereq:check`
 - **目的**: Node / pnpm / git / TypeScript / tsx / vitest など、Kyberion をソースから動かすための基本ツールが揃っているかを確認します。
+- **チェック内容の補足**:
+  - **Node floor 検証**: 実行中の Node が `package.json` の `engines`（`>=24.0.0`）を満たすかを実バージョン比較で検証し、不足なら `nvm install 24 && nvm use 24` を案内して失敗します（バイナリ存在確認だけの素通りはしません）。
+  - **Playwright ブラウザ有無**: ブラウザキャッシュ（`ms-playwright`）が見つからない場合、**非致命の警告**として `pnpm exec playwright install chromium` を案内します。ブラウザ first-win を使うなら導入してください。
 - **物理的変化**:
   - まだ実体の変更は行いません。足りないツールやローカル依存が要約されます。
 
@@ -192,5 +202,5 @@ pnpm vital
 
 ---
 
-_Status: Mandated by AGENTS.md_
-_Last Updated: 2026-05-06 by Ecosystem Architect_
+_Status: Mandated by AGENTS.md — canonical cold-start source (ONB-02)_
+_Last Updated: 2026-07-05_
