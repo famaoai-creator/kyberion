@@ -43,16 +43,21 @@ export function createOutcomeContract(input: {
 
 export function validateOutcomeContractAtCompletion(
   contract: OutcomeContract,
-  input: OutcomeCompletionInput = {},
+  input: OutcomeCompletionInput = {}
 ): { ok: boolean; reason?: string } {
   if (!Array.isArray(contract.success_criteria) || contract.success_criteria.length === 0) {
     return { ok: false, reason: 'Outcome contract must include at least one success criterion.' };
   }
 
   if (contract.evidence_required) {
-    const hasEvidence = (input.artifactRefs || []).some((value) => String(value || '').trim().length > 0);
+    const hasEvidence = (input.artifactRefs || []).some(
+      (value) => String(value || '').trim().length > 0
+    );
     if (!hasEvidence) {
-      return { ok: false, reason: 'Outcome contract requires evidence, but no artifact reference was provided.' };
+      return {
+        ok: false,
+        reason: 'Outcome contract requires evidence, but no artifact reference was provided.',
+      };
     }
   }
 
@@ -89,15 +94,38 @@ export function inferMissionOutcomeContract(input: {
   missionId: string;
   missionType?: string;
   visionRef?: string;
+  /**
+   * IL-01: interpreted intent goal from the surface. When present, the
+   * contract reflects the actual user request instead of the generic
+   * per-type placeholder.
+   */
+  intentGoal?: {
+    source_text?: string;
+    summary?: string;
+    success_condition?: string;
+  };
 }): OutcomeContract {
   const missionType = String(input.missionType || 'development');
+  const goalSummary = input.intentGoal?.summary?.trim();
+  const goalSource = input.intentGoal?.source_text?.trim();
+  const successCondition = input.intentGoal?.success_condition?.trim();
+
+  const requestedResult =
+    goalSummary ||
+    goalSource ||
+    (input.visionRef
+      ? `Deliver mission outcome aligned to ${input.visionRef}`
+      : `Complete mission scope for type ${missionType}`);
+  const successCriteria =
+    (goalSummary || goalSource) && successCondition
+      ? [successCondition]
+      : ['Mission lifecycle reaches completed with verification and distillation.'];
+
   return createOutcomeContract({
     outcomeId: `msn_${input.missionId}`,
-    requestedResult: input.visionRef
-      ? `Deliver mission outcome aligned to ${input.visionRef}`
-      : `Complete mission scope for type ${missionType}`,
+    requestedResult,
     deliverableKind: missionType,
-    successCriteria: ['Mission lifecycle reaches completed with verification and distillation.'],
+    successCriteria,
     evidenceRequired: false,
     expectedArtifacts: [],
     verificationMethod: 'review_gate',

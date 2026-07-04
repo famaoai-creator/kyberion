@@ -1,0 +1,175 @@
+import {
+  acknowledgeMeshDelivery,
+  claimDueMeshDeliveries,
+  expireMeshDeliveries,
+  retryMeshDelivery,
+} from './mesh-message-broker.js';
+import {
+  createMeshHubPeerMessagingAdapter,
+  type MeshHubDispatchInput,
+} from './mesh-hub-peer-messaging-adapter.js';
+import { resolvePeerRecord, type PeerNetworkPeerRecord } from './peer-messaging.js';
+import type { MeshDeliveryRecord, MeshRequest } from './mesh-hub-contract.js';
+import type { MeshRetryPolicy } from './mesh-message-broker.js';
+import { logger } from './core.js';
+
+/**
+ * AA-02: delivery driver for the Mesh Hub at-least-once state machine.
+ *
+ * The broker (mesh-message-broker.ts) owns the ledger, dedup, backoff and
+ * dead-lettering; this driver is the previously-missing propulsion: it claims
+ * due deliveries, dispatches them to the selected peer over HTTP+HMAC, acks
+ * successes and feeds failures back into the broker's retry state machine.
+ *
+ * Single-pass by design so it can run under the chronos cron (KM-01) without
+ * adding a resident process; `--loop` in the CLI wraps this for daemon use.
+ */
+
+export interface MeshDeliveryDispatcher {
+  dispatchToPeer(input: MeshHubDispatchInput): Promise<unknown>;
+}
+
+export interface MeshDeliveryPassOptions {
+  /** This host's peer id (sender_peer_id on reconstructed requests). */
+  senderPeerId: string;
+  /** Fallback shared secret when the peer record does not carry one. */
+  sharedSecret?: string;
+  batchLimit?: number;
+  now?: string;
+  dispatcher?: MeshDeliveryDispatcher;
+  resolvePeer?: (peerId: string) => PeerNetworkPeerRecord | null;
+  retryPolicy?: Partial<MeshRetryPolicy>;
+  dispatchTimeoutMs?: number;
+}
+
+export interface MeshDeliveryPassReport {
+  expired: number;
+  claimed: number;
+  delivered: number;
+  retried: number;
+  dead_lettered: number;
+  unroutable: number;
+  failures: Array<{ delivery_id: string; reason: string }>;
+}
+
+const DEFAULT_BATCH_LIMIT = 10;
+const DEFAULT_REQUEST_TTL_MS = 60_000;
+
+/**
+ * The broker persists idempotency_key / expires_at on every delivery row but
+ * types the public record without them; recover them here so the receiver's
+ * dedup keeps working across redeliveries.
+ */
+function reconstructMeshRequest(delivery: MeshDeliveryRecord, senderPeerId: string): MeshRequest {
+  const stored = delivery as MeshDeliveryRecord & {
+    idempotency_key?: string;
+    expires_at?: string;
+  };
+  const ttlMs = stored.expires_at
+    ? Math.max(1, Date.parse(stored.expires_at) - Date.parse(delivery.created_at))
+    : DEFAULT_REQUEST_TTL_MS;
+  return {
+    kind: 'mesh-request',
+    request_id: delivery.request_id,
+    tenant_scope: delivery.tenant_scope,
+    sender_peer_id: senderPeerId,
+    created_at: delivery.created_at,
+    ttl_ms: ttlMs,
+    idempotency_key: stored.idempotency_key || delivery.delivery_id,
+    correlation_id: delivery.request_id,
+    request_kind: delivery.request_kind,
+    target: delivery.target,
+    payload: delivery.payload,
+  };
+}
+
+export async function runMeshDeliveryPass(
+  options: MeshDeliveryPassOptions
+): Promise<MeshDeliveryPassReport> {
+  const now = options.now || new Date().toISOString();
+  const dispatcher =
+    options.dispatcher ||
+    createMeshHubPeerMessagingAdapter({
+      peerId: options.senderPeerId,
+      sharedSecret: options.sharedSecret || '',
+    });
+  const resolvePeer = options.resolvePeer || ((peerId: string) => resolvePeerRecord(peerId));
+
+  const report: MeshDeliveryPassReport = {
+    expired: 0,
+    claimed: 0,
+    delivered: 0,
+    retried: 0,
+    dead_lettered: 0,
+    unroutable: 0,
+    failures: [],
+  };
+
+  report.expired = (await expireMeshDeliveries(now)).length;
+
+  const claimed = await claimDueMeshDeliveries(now, options.batchLimit ?? DEFAULT_BATCH_LIMIT);
+  report.claimed = claimed.length;
+
+  for (const delivery of claimed) {
+    const peerId = delivery.route.selected_peer_id;
+    const routable = delivery.route.decision === 'direct' && peerId;
+    const peer = routable ? resolvePeer(peerId as string) : null;
+
+    if (!peer || !peer.base_url) {
+      // Unroutable deliveries go back through the broker's retry state machine
+      // (and eventually dead-letter) instead of being dropped silently. Peer
+      // selection stays a governance decision — never auto-selected here.
+      report.unroutable += 1;
+      await recordFailure(delivery, `peer_unroutable:${peerId || 'unselected'}`, report);
+      continue;
+    }
+
+    try {
+      await dispatcher.dispatchToPeer({
+        recipient: peer,
+        request: reconstructMeshRequest(delivery, options.senderPeerId),
+        timeoutMs: options.dispatchTimeoutMs,
+      });
+      await acknowledgeMeshDelivery(delivery.delivery_id, {});
+      report.delivered += 1;
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      await recordFailure(delivery, reason, report);
+    }
+  }
+
+  async function recordFailure(
+    delivery: MeshDeliveryRecord,
+    reason: string,
+    target: MeshDeliveryPassReport
+  ): Promise<void> {
+    target.failures.push({ delivery_id: delivery.delivery_id, reason });
+    try {
+      const next = await retryMeshDelivery(delivery.delivery_id, now, options.retryPolicy);
+      if (next.status === 'dead_lettered' || next.status === 'expired') {
+        target.dead_lettered += 1;
+      } else {
+        target.retried += 1;
+      }
+    } catch (retryErr) {
+      const detail = retryErr instanceof Error ? retryErr.message : String(retryErr);
+      logger.warn(
+        `[mesh-delivery-driver] retry bookkeeping failed for ${delivery.delivery_id}: ${detail}`
+      );
+    }
+  }
+
+  return report;
+}
+
+export function formatMeshDeliveryPassReport(report: MeshDeliveryPassReport): string {
+  const parts = [
+    `claimed=${report.claimed}`,
+    `delivered=${report.delivered}`,
+    `retried=${report.retried}`,
+    `dead_lettered=${report.dead_lettered}`,
+    `unroutable=${report.unroutable}`,
+    `expired=${report.expired}`,
+  ];
+  return `[mesh-delivery] ${parts.join(' ')}`;
+}

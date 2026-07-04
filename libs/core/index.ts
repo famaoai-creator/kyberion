@@ -118,6 +118,7 @@ export * from './question-resolver.js';
 export * from './guided-coordination-brief.js';
 export * from './email-workflow.js';
 export * from './calendar-workflow.js';
+export * from './mission-gate-engine.js';
 export * from './handoff-packet.js';
 export * from './presentation-slide-pattern.js';
 export * from './web-design-system.js';
@@ -493,6 +494,9 @@ export {
 } from './secret-guard.js';
 export * from './shell-command-policy.js';
 export * from './adf-guardrails.js';
+export * from './execution-bounds.js';
+export * from './intent-handoff.js';
+export * from './mesh-delivery-driver.js';
 export * from './egress-policy.js';
 export * from './governance-status.js';
 

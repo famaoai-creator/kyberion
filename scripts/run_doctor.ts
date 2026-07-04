@@ -9,6 +9,7 @@ import {
   readJanitorLastRunMs,
   safeExistsSync,
   safeReadFile,
+  inspectMeshHub,
 } from '@agent/core';
 import { buildNextAction, formatNextAction } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
@@ -41,6 +42,7 @@ export interface DoctorRunReport {
   maintenanceLines: string[];
   governanceLines: string[];
   backupLines: string[];
+  meshDeliveryLines: string[];
 }
 
 export function collectPipelineScheduleDoctorLines(): string[] {
@@ -63,6 +65,36 @@ export function collectPipelineScheduleDoctorLines(): string[] {
   }
   if (schedules.length > 8) lines.push(`  - ... ${schedules.length - 8} more`);
   return lines;
+}
+
+export async function collectMeshDeliveryDoctorLines(): Promise<string[]> {
+  try {
+    const report = await inspectMeshHub();
+    if (report.delivery_count === 0 && report.dead_letter_count === 0) {
+      return ['Mesh delivery: idle; no deliveries recorded'];
+    }
+    const stuck = report.routes.filter(
+      (route) => route.state === 'queued' || route.state === 'dispatched'
+    );
+    const oldest = stuck
+      .slice()
+      .sort((left, right) => String(left.expires_at).localeCompare(String(right.expires_at)))[0];
+    const lines = [
+      `Mesh delivery: total=${report.delivery_count}; in_flight=${stuck.length}; dead_letter=${report.dead_letter_count}`,
+    ];
+    if (oldest) {
+      lines.push(
+        `  - oldest in-flight: ${oldest.delivery_id} (${oldest.state}, retries=${oldest.retry_count}, expires=${oldest.expires_at})`
+      );
+    }
+    if (report.dead_letter_count > 0) {
+      lines.push('  - inspect dead letters via `pnpm mesh:deliver --json` and mesh-hub-inspection');
+    }
+    return lines;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return [`Mesh delivery: inspection unavailable (${message})`];
+  }
 }
 
 export function collectBackupDoctorLines(): string[] {
@@ -101,7 +133,9 @@ export function collectMaintenanceDoctorLines(): string[] {
   const ageHours =
     lastRunMs !== null ? ((Date.now() - lastRunMs) / (60 * 60 * 1000)).toFixed(1) : 'unknown';
   const pendingState =
-    submitPending && lastSubmittedAt !== null && Date.now() - lastSubmittedAt < JANITOR_MAINTENANCE_TTL_MS
+    submitPending &&
+    lastSubmittedAt !== null &&
+    Date.now() - lastSubmittedAt < JANITOR_MAINTENANCE_TTL_MS
       ? 'pending'
       : submitPending
         ? 'submitted'
@@ -184,6 +218,7 @@ export async function collectDoctorReport(argv: {
     maintenanceLines: collectMaintenanceDoctorLines(),
     governanceLines,
     backupLines: collectBackupDoctorLines(),
+    meshDeliveryLines: await collectMeshDeliveryDoctorLines(),
   };
 }
 
@@ -216,6 +251,9 @@ async function main(): Promise<void> {
     console.log(line);
   }
   for (const line of report.backupLines) {
+    console.log(line);
+  }
+  for (const line of report.meshDeliveryLines) {
     console.log(line);
   }
   console.log('');
