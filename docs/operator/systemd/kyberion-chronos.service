@@ -1,0 +1,17 @@
+[Unit]
+Description=Kyberion Chronos Scheduled Pipeline Daemon
+After=network.target
+
+[Service]
+Type=simple
+User=kyberion
+WorkingDirectory=/home/kyberion/kyberion
+Environment=NODE_ENV=production
+Environment=KYBERION_CUSTOMER=customer-slug
+EnvironmentFile=-/etc/kyberion/env
+ExecStart=/usr/bin/pnpm chronos
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

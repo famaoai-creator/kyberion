@@ -21,6 +21,12 @@ import {
 } from '@agent/core';
 import { createCustomer } from './customer_create.js';
 import { switchCustomer } from './customer_switch.js';
+import {
+  evaluateReasoningBackend,
+  formatReasoningSummary,
+  markReasoningStubAcknowledged,
+  type OnboardingReasoningState,
+} from './onboarding_reasoning.js';
 
 const AjvCtor: any = (AjvModule as any).default || (AjvModule as any);
 const addFormats: any = (AjvFormats as any).default || AjvFormats;
@@ -36,7 +42,7 @@ const rl = readline.createInterface({
   output: process.stdout,
 });
 
-type OnboardingPhase = 'identity' | 'services' | 'tenants' | 'tutorial' | 'summary';
+type OnboardingPhase = 'identity' | 'reasoning' | 'services' | 'tenants' | 'tutorial' | 'summary';
 type OnboardingStatus = 'draft' | 'complete';
 type ServiceStatus = 'pending' | 'saved' | 'skipped';
 
@@ -84,12 +90,20 @@ interface OnboardingState {
   created_at: string;
   updated_at: string;
   identity?: IdentityDraft;
+  reasoning?: OnboardingReasoningState;
   services?: { candidates: ServiceCandidateDraft[] };
   tenants?: { entries: TenantDraft[] };
   tutorial?: TutorialDraft;
 }
 
-const PHASES: OnboardingPhase[] = ['identity', 'services', 'tenants', 'tutorial', 'summary'];
+const PHASES: OnboardingPhase[] = [
+  'identity',
+  'reasoning',
+  'services',
+  'tenants',
+  'tutorial',
+  'summary',
+];
 function profileRoot(): string {
   return resolveActiveProfileRoot();
 }
@@ -260,6 +274,9 @@ function buildSummaryMarkdown(state: OnboardingState): string {
     `- Vision: ${identity?.vision || 'n/a'}`,
     `- Agent ID: ${identity?.agent_id || 'n/a'}`,
     '',
+    '## Reasoning Backend',
+    ...formatReasoningSummary(state.reasoning),
+    '',
     `## ${summaryPolicy.sections.services}`,
     ...(services.length > 0
       ? services.map(
@@ -347,6 +364,47 @@ async function runIdentityPhase(state: OnboardingState): Promise<void> {
 
   state.identity = identity;
   state.completed_phases = Array.from(new Set([...state.completed_phases, 'identity']));
+  state.current_phase = 'services';
+  state.updated_at = new Date().toISOString();
+  await saveState(state);
+}
+
+async function runReasoningPhase(state: OnboardingState): Promise<void> {
+  console.log('\nReasoning Backend\n');
+  let reasoning = await evaluateReasoningBackend();
+  if (reasoning.available) {
+    console.log(chalk.green('Real reasoning backend detected.'));
+  } else if (reasoning.mode === 'stub_explicit') {
+    console.log(chalk.yellow('KYBERION_REASONING_BACKEND=stub is explicitly selected.'));
+    console.log(
+      chalk.yellow('Real work will use deterministic placeholder responses until reconfigured.')
+    );
+  } else {
+    console.log(chalk.red('No real reasoning backend was detected.'));
+    console.log(reasoning.reason ?? 'Run `pnpm reasoning:setup` to configure one.');
+    console.log(
+      '\nRun `pnpm reasoning:setup` to configure Codex/Gemini/AGY CLI, Anthropic API, or a local backend.'
+    );
+    if (interactive) {
+      const continueWithStub = isAffirmative(
+        await ask(
+          'Continue onboarding in stub-only mode? Real work will not be usable. (y/N): ',
+          'n'
+        )
+      );
+      if (!continueWithStub) {
+        console.log(
+          'Onboarding paused. Configure a reasoning backend, then re-run `pnpm onboard`.'
+        );
+        rl.close();
+        process.exit(2);
+      }
+    }
+    reasoning = markReasoningStubAcknowledged(reasoning);
+  }
+
+  state.reasoning = reasoning;
+  state.completed_phases = Array.from(new Set([...state.completed_phases, 'reasoning']));
   state.current_phase = 'services';
   state.updated_at = new Date().toISOString();
   await saveState(state);
@@ -612,6 +670,11 @@ async function runSummaryPhase(state: OnboardingState): Promise<void> {
   console.log(`Summary written to: ${summaryPath()}`);
   console.log(`State written to: ${statePath()}`);
   console.log('\nNext steps:');
+  if (state.reasoning && !state.reasoning.available) {
+    console.log(
+      '0. Configure a real reasoning backend with `pnpm reasoning:setup` before real work.'
+    );
+  }
   console.log(
     `1. Review the service connection drafts in \`${path.join(profileRoot(), 'connections')}/\`.`
   );
@@ -730,6 +793,8 @@ async function runOnboarding() {
     }
     if (phase === 'identity') {
       await runIdentityPhase(state);
+    } else if (phase === 'reasoning') {
+      await runReasoningPhase(state);
     } else if (phase === 'services') {
       await runServicesPhase(state);
     } else if (phase === 'tenants') {

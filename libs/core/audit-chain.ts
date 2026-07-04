@@ -7,10 +7,17 @@ import {
   safeMkdir,
   safeReaddir,
 } from './secure-io.js';
-import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { rootDir } from './path-resolver.js';
+import {
+  computeAuditEntryHash,
+  GENESIS_HASH,
+  getAuditChainKeyId,
+  resolveAuditChainKey,
+  type ChainAlg,
+  verifyAuditEntryHash,
+} from './chain-integrity.js';
 
 /**
  * Hash-Chained Audit Trail v1.0
@@ -40,12 +47,26 @@ export interface AuditEntry {
    * Schema-additive: legacy entries without this field remain valid.
    */
   tenantSlug?: string;
+  chain_alg?: ChainAlg;
+  chain_key_id?: string;
   previousHash: string;
   currentHash: string;
 }
 
+export interface AuditVerifyOptions {
+  since?: string;
+}
+
+export interface AuditVerifyResult {
+  valid: number;
+  corrupted: string[];
+  total: number;
+  checkedFiles?: string[];
+  boundaryLimited?: boolean;
+}
+
 class AuditChainImpl {
-  private lastHash: string = '0000000000000000000000000000000000000000000000000000000000000000';
+  private lastHash: string = GENESIS_HASH;
   private entryCount: number = 0;
   private auditDir: string;
   private static readonly AUDIT_FILE_RE = /^audit-(\d{4}-\d{2}-\d{2})\.jsonl$/;
@@ -66,19 +87,28 @@ class AuditChainImpl {
     const timestamp = new Date().toISOString();
 
     const tenantSlug = entry.tenantSlug ?? resolveCurrentTenantSlug();
+    const chainKey = resolveAuditChainKey({ createIfMissing: true });
+    if (!chainKey) throw new Error('missing_audit_chain_key');
 
     const fullEntry: AuditEntry = {
       id,
       timestamp,
       ...entry,
       ...(tenantSlug ? { tenantSlug } : {}),
+      chain_alg: 'hmac-sha256',
+      chain_key_id: getAuditChainKeyId(chainKey),
       previousHash: this.lastHash,
       currentHash: '', // computed below
     };
 
-    // Compute hash: SHA-256(previousHash + serialized entry)
-    const hashInput = this.lastHash + JSON.stringify({ ...fullEntry, currentHash: undefined });
-    fullEntry.currentHash = createHash('sha256').update(hashInput).digest('hex');
+    fullEntry.currentHash = computeAuditEntryHash(
+      fullEntry as unknown as Record<string, unknown>,
+      this.lastHash,
+      {
+        alg: 'hmac-sha256',
+        key: chainKey,
+      }
+    );
     this.lastHash = fullEntry.currentHash;
 
     // Persist
@@ -168,13 +198,20 @@ class AuditChainImpl {
    * Verify the integrity of the audit chain.
    * Returns the number of valid entries and any corrupted entry IDs.
    */
-  verify(): { valid: number; corrupted: string[]; total: number } {
-    const files = this.listAuditFiles();
-    const entries = this.loadAll();
+  verify(options: AuditVerifyOptions = {}): AuditVerifyResult {
+    const allFiles = this.listAuditFiles();
+    const files = options.since
+      ? allFiles.filter((fileName) => {
+          const fileDate = this.extractAuditDate(fileName);
+          return !fileDate || fileDate >= String(options.since);
+        })
+      : allFiles;
+    const entries = this.loadEntriesFromFiles(files);
     const corrupted: string[] = [];
-    let prevHash = '0000000000000000000000000000000000000000000000000000000000000000';
+    let prevHash = GENESIS_HASH;
     let previousFileDate: string | null = null;
     let invalidEntryCount = 0;
+    const boundaryLimited = Boolean(options.since);
 
     for (const fileName of files) {
       const fileDate = this.extractAuditDate(fileName);
@@ -185,17 +222,17 @@ class AuditChainImpl {
       previousFileDate = fileDate ?? previousFileDate;
 
       for (const entry of this.readAuditFileEntries(path.join(this.auditDir, fileName))) {
-        if (entry.previousHash !== prevHash) {
-          corrupted.push(entry.id);
-          invalidEntryCount++;
-          prevHash = entry.currentHash;
-          continue;
+        if (boundaryLimited && prevHash === GENESIS_HASH && entry.previousHash !== GENESIS_HASH) {
+          prevHash = entry.previousHash;
         }
-
-        const hashInput = prevHash + JSON.stringify({ ...entry, currentHash: undefined });
-        const expectedHash = createHash('sha256').update(hashInput).digest('hex');
-
-        if (entry.currentHash !== expectedHash) {
+        const chainAlg = entry.chain_alg ?? 'sha256';
+        const chainKey =
+          chainAlg === 'hmac-sha256' ? resolveAuditChainKey({ createIfMissing: false }) : null;
+        const check = verifyAuditEntryHash(entry as unknown as Record<string, unknown>, prevHash, {
+          alg: chainAlg,
+          ...(chainKey ? { key: chainKey } : {}),
+        });
+        if (!check.ok) {
           corrupted.push(entry.id);
           invalidEntryCount++;
         }
@@ -208,6 +245,8 @@ class AuditChainImpl {
       valid: entries.length - invalidEntryCount,
       corrupted,
       total: entries.length,
+      checkedFiles: files,
+      boundaryLimited,
     };
 
     if (corrupted.length > 0) {
@@ -225,8 +264,12 @@ class AuditChainImpl {
    * Load all audit entries from every audit file in chronological order.
    */
   loadAll(): AuditEntry[] {
+    return this.loadEntriesFromFiles(this.listAuditFiles());
+  }
+
+  private loadEntriesFromFiles(files: string[]): AuditEntry[] {
     const entries: AuditEntry[] = [];
-    for (const fileName of this.listAuditFiles()) {
+    for (const fileName of files) {
       entries.push(...this.readAuditFileEntries(path.join(this.auditDir, fileName)));
     }
     return entries;
