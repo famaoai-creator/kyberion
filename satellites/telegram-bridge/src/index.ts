@@ -154,21 +154,19 @@ function appendTelegramThreadHistory(entry: TelegramThreadHistoryEntry): void {
 }
 
 export function buildTelegramThreadContextFromEntries(
-  entries: TelegramThreadHistoryEntry[],
+  entries: TelegramThreadHistoryEntry[]
 ): string | undefined {
-  const recent = entries
-    .filter((entry) => entry.text.trim().length > 0)
-    .slice(-6);
+  const recent = entries.filter((entry) => entry.text.trim().length > 0).slice(-6);
 
   if (!recent.length) return undefined;
 
   return [
     'Recent Telegram thread context:',
-    ...recent.map((entry) => (
+    ...recent.map((entry) =>
       entry.role === 'assistant'
         ? `Assistant: ${entry.text}`
         : `User (${entry.authorLabel}): ${entry.text}`
-    )),
+    ),
   ].join('\n');
 }
 
@@ -198,12 +196,13 @@ function resolveToken(input?: string): string | undefined {
 
 export async function sendTelegramMessage(
   input: { chatId: string | number; text: string; parseMode?: string },
-  options: TelegramBridgeOptions = {},
+  options: TelegramBridgeOptions = {}
 ): Promise<TelegramSendReceipt> {
   const token = resolveToken(options.token);
-  const dryRun = typeof options.dryRun === 'boolean'
-    ? options.dryRun || !token || process.env.TELEGRAM_DRY_RUN === '1'
-    : !token || process.env.TELEGRAM_DRY_RUN === '1';
+  const dryRun =
+    typeof options.dryRun === 'boolean'
+      ? options.dryRun || !token || process.env.TELEGRAM_DRY_RUN === '1'
+      : !token || process.env.TELEGRAM_DRY_RUN === '1';
   const chatId = String(input.chatId);
 
   if (dryRun) {
@@ -226,12 +225,14 @@ export async function sendTelegramMessage(
       parse_mode: input.parseMode || options.parseMode || 'Markdown',
     }),
   });
-  let body = await response.json().catch(() => null) as any;
+  let body = (await response.json().catch(() => null)) as any;
 
   if (!response.ok || body?.ok === false) {
     const description = body?.description || response.statusText || '';
     if (description.includes("can't parse entities") || response.status === 400) {
-      logger.warn(`⚠️ [TelegramBridge] Markdown parsing failed, retrying as plain text: ${description}`);
+      logger.warn(
+        `⚠️ [TelegramBridge] Markdown parsing failed, retrying as plain text: ${description}`
+      );
       response = await fetch(`${apiBaseUrl}/bot${token}/sendMessage`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -240,12 +241,14 @@ export async function sendTelegramMessage(
           text: input.text,
         }),
       });
-      body = await response.json().catch(() => null) as any;
+      body = (await response.json().catch(() => null)) as any;
     }
   }
 
   if (!response.ok || body?.ok === false) {
-    throw new Error(`Telegram send failed: ${response.status} ${body?.description || response.statusText}`);
+    throw new Error(
+      `Telegram send failed: ${response.status} ${body?.description || response.statusText}`
+    );
   }
   return {
     ok: true,
@@ -258,7 +261,7 @@ export async function sendTelegramMessage(
 
 export async function handleTelegramUpdate(
   update: TelegramUpdate,
-  options: TelegramBridgeOptions = {},
+  options: TelegramBridgeOptions = {}
 ): Promise<TelegramWebhookReceipt> {
   const message = pickMessage(update);
   if (!message) {
@@ -277,7 +280,9 @@ export async function handleTelegramUpdate(
     .filter(Boolean);
   const senderId = String(message.from?.id || '');
   if (allowedUserIds.length === 0) {
-    logger.warn('⚠️ [TelegramBridge] TELEGRAM_ALLOWED_USER_IDS is not set — denying all senders. Set it to a comma-separated list of authorized Telegram user ids.');
+    logger.warn(
+      '⚠️ [TelegramBridge] TELEGRAM_ALLOWED_USER_IDS is not set — denying all senders. Set it to a comma-separated list of authorized Telegram user ids.'
+    );
     return { ok: true, ignored: true, reason: 'allowlist_unconfigured' };
   }
   if (!allowedUserIds.includes(senderId)) {
@@ -292,12 +297,15 @@ export async function handleTelegramUpdate(
 
   const chatId = String(message.chat.id);
   const threadTs = resolveTelegramThreadTs(message);
-  const receivedAt = typeof message.date === 'number'
-    ? new Date(message.date * 1000).toISOString()
-    : new Date().toISOString();
+  const receivedAt =
+    typeof message.date === 'number'
+      ? new Date(message.date * 1000).toISOString()
+      : new Date().toISOString();
   const authorLabel = String(message.from?.username || message.from?.id || chatId);
 
-  logger.info(`📥 [TelegramBridge] Message from ${message.from?.username || message.from?.id || chatId}: ${text}`);
+  logger.info(
+    `📥 [TelegramBridge] Message from ${message.from?.username || message.from?.id || chatId}: ${text}`
+  );
   const threadContext = buildTelegramThreadContext(threadTs);
   appendTelegramThreadHistory({
     role: 'user',
@@ -322,10 +330,12 @@ export async function handleTelegramUpdate(
       senderAgentId: 'kyberion:telegram-bridge',
       agentId: TELEGRAM_SURFACE_AGENT_ID,
       threadContext: threadContext || undefined,
-      delegationSummaryInstruction: 'Produce a concise Telegram reply. Use markdown if useful. Do not use A2A blocks.',
+      delegationSummaryInstruction:
+        'Produce a concise Telegram reply. Use markdown if useful. Do not use A2A blocks.',
     } as any);
-  } catch (err: any) {
-    logger.error(`❌ [TelegramBridge] Conversation failed for ${chatId}: ${err?.message || err}`);
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    logger.error(`❌ [TelegramBridge] Conversation failed for ${chatId}: ${detail}`);
     // UX-01: the user must not be left in silence (rate-limited per thread).
     await postBridgeError({
       conversationKey: `telegram:${chatId}:${threadTs}`,
@@ -348,7 +358,7 @@ export async function handleTelegramUpdate(
     logger.info(`📤 [TelegramBridge] Replying to ${chatId}: ${conversation.text}`);
     reply = await sendTelegramMessage(
       { chatId, text: conversation.text, parseMode: options.parseMode },
-      options,
+      options
     );
     appendTelegramThreadHistory({
       role: 'assistant',
@@ -363,7 +373,7 @@ export async function handleTelegramUpdate(
     // UX-01: an empty agent reply must not read as silence.
     reply = await sendTelegramMessage(
       { chatId, text: buildBridgeEmptyReplyText({ locale: 'ja' }) },
-      options,
+      options
     );
   }
 
@@ -379,7 +389,9 @@ export async function handleTelegramUpdate(
 
 async function handleInputFile(inputPath: string, options: TelegramBridgeOptions): Promise<void> {
   const resolved = pathResolver.rootResolve(inputPath);
-  const parsed = JSON.parse(safeReadFile(resolved, { encoding: 'utf8' }) as string) as TelegramBridgeInput | TelegramUpdate;
+  const parsed = JSON.parse(safeReadFile(resolved, { encoding: 'utf8' }) as string) as
+    | TelegramBridgeInput
+    | TelegramUpdate;
 
   if ('action' in parsed && parsed.action === 'send') {
     const payload = await sendTelegramMessage(
@@ -388,7 +400,7 @@ async function handleInputFile(inputPath: string, options: TelegramBridgeOptions
         text: parsed.text || '',
         parseMode: parsed.parseMode,
       },
-      options,
+      options
     );
     console.log(JSON.stringify(payload, null, 2));
     return;
@@ -400,13 +412,29 @@ async function handleInputFile(inputPath: string, options: TelegramBridgeOptions
 
 async function main(): Promise<void> {
   const argv = await createStandardYargs()
-    .option('input', { alias: 'i', type: 'string', description: 'Read a Telegram bridge payload from a JSON file' })
+    .option('input', {
+      alias: 'i',
+      type: 'string',
+      description: 'Read a Telegram bridge payload from a JSON file',
+    })
     .option('port', { type: 'number', default: Number(process.env.TELEGRAM_BRIDGE_PORT || '3035') })
     .option('token', { type: 'string', description: 'Telegram Bot API token' })
-    .option('api-base-url', { type: 'string', default: process.env.TELEGRAM_API_BASE_URL || 'https://api.telegram.org' })
-    .option('parse-mode', { type: 'string', default: process.env.TELEGRAM_PARSE_MODE || 'Markdown' })
-    .option('dry-run', { type: 'boolean', default: process.env.TELEGRAM_DRY_RUN === '1' || !process.env.TELEGRAM_BOT_TOKEN })
-    .option('webhook-path', { type: 'string', default: process.env.TELEGRAM_WEBHOOK_PATH || '/webhook' })
+    .option('api-base-url', {
+      type: 'string',
+      default: process.env.TELEGRAM_API_BASE_URL || 'https://api.telegram.org',
+    })
+    .option('parse-mode', {
+      type: 'string',
+      default: process.env.TELEGRAM_PARSE_MODE || 'Markdown',
+    })
+    .option('dry-run', {
+      type: 'boolean',
+      default: process.env.TELEGRAM_DRY_RUN === '1' || !process.env.TELEGRAM_BOT_TOKEN,
+    })
+    .option('webhook-path', {
+      type: 'string',
+      default: process.env.TELEGRAM_WEBHOOK_PATH || '/webhook',
+    })
     .parseSync();
 
   const options: TelegramBridgeOptions = {
@@ -422,7 +450,9 @@ async function main(): Promise<void> {
   }
 
   if (options.dryRun || !resolveToken(options.token)) {
-    logger.warn('⚠️ [TelegramBridge] Running in dry-run mode because TELEGRAM_BOT_TOKEN is not configured.');
+    logger.warn(
+      '⚠️ [TelegramBridge] Running in dry-run mode because TELEGRAM_BOT_TOKEN is not configured.'
+    );
   }
 
   const webhookPath = String(argv['webhook-path'] || '/webhook');
@@ -448,7 +478,7 @@ async function main(): Promise<void> {
         const body = (await readJsonBody(req)) as TelegramBridgeInput;
         const payload = await sendTelegramMessage(
           { chatId: body.chatId || '', text: body.text || '', parseMode: body.parseMode },
-          options,
+          options
         );
         sendJson(res, 200, payload);
         return;
@@ -469,7 +499,9 @@ async function main(): Promise<void> {
   });
 }
 
-const directEntry = process.argv[1] ? pathToFileURL(process.argv[1]).href === import.meta.url : false;
+const directEntry = process.argv[1]
+  ? pathToFileURL(process.argv[1]).href === import.meta.url
+  : false;
 if (directEntry && !process.env.VITEST) {
   main().catch((error) => {
     logger.error(error instanceof Error ? error.message : String(error));
