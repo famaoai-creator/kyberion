@@ -5,6 +5,7 @@
  */
 
 import { resolveApprovalPolicy } from './approval-policy.js';
+import { summarizeApprovalGate } from './approval-gate-summary.js';
 import {
   createApprovalRequest,
   listApprovalRequests,
@@ -31,6 +32,7 @@ export interface ApprovalGateParams {
   draft?: {
     title: string;
     summary: string;
+    details?: string;
     severity?: 'low' | 'medium' | 'high';
   };
 }
@@ -40,6 +42,107 @@ export interface ApprovalGateResult {
   status: 'approved' | 'pending' | 'not_required';
   requestId?: string;
   message?: string;
+}
+
+function toStringList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((entry) => String(entry).trim()).filter(Boolean);
+}
+
+function firstString(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return undefined;
+}
+
+function buildApprovalDraft(params: {
+  operationId: string;
+  agentId: string;
+  correlationId: string;
+  payload?: Record<string, unknown>;
+  intentId?: string;
+}): { title: string; summary: string; details: string; severity: 'low' | 'medium' | 'high' } {
+  const payload = params.payload || {};
+  const artifactRefs = toStringList(
+    payload.artifacts ??
+      payload.artifactRefs ??
+      payload.artifact_refs ??
+      payload.outputs ??
+      payload.output_refs
+  );
+  const approvalBoundaryRaw =
+    payload.approvalBoundary ?? payload.approval_boundary ?? payload.approval_boundary_summary;
+  const approvalBoundary =
+    approvalBoundaryRaw && typeof approvalBoundaryRaw === 'object'
+      ? (approvalBoundaryRaw as { requiredFor?: string[]; defaultAction?: string })
+      : undefined;
+  const rationale = firstString(
+    payload.rationale,
+    payload.reason,
+    payload.justification,
+    payload.context_rationale
+  );
+  const acceptanceCriteria = toStringList(
+    payload.acceptance_criteria ??
+      payload.acceptanceCriteria ??
+      payload.remaining_acceptance_criteria
+  );
+  const expectedOutputs = toStringList(
+    payload.expected_outputs ?? payload.expectedOutputs ?? payload.artifacts
+  );
+  const consequences = toStringList(
+    payload.consequences ?? payload.impacts ?? payload.resulting_effects
+  );
+  const severity = (() => {
+    const value = firstString(payload.severity, payload.risk_level, payload.riskLevel);
+    if (value === 'high' || value === 'critical') return 'high';
+    if (value === 'low' || value === 'medium') return value;
+    return 'medium';
+  })();
+  const summary = summarizeApprovalGate({
+    taskId: params.operationId,
+    artifacts: artifactRefs,
+    approvalBoundary:
+      approvalBoundary && Array.isArray(approvalBoundary.requiredFor)
+        ? {
+            requiredFor: approvalBoundary.requiredFor,
+            defaultAction: (approvalBoundary.defaultAction as any) || 'requires-human-approval',
+          }
+        : undefined,
+  });
+  const details = [
+    `Operation: ${params.operationId}`,
+    `Agent: ${params.agentId}`,
+    `Correlation: ${params.correlationId}`,
+    '',
+    'Rationale:',
+    `- ${rationale || 'not provided'}`,
+    '',
+    'Acceptance criteria:',
+    acceptanceCriteria.length > 0
+      ? acceptanceCriteria.map((entry) => `- ${entry}`).join('\n')
+      : '- none provided',
+    '',
+    'Expected outputs:',
+    expectedOutputs.length > 0
+      ? expectedOutputs.map((entry) => `- ${entry}`).join('\n')
+      : '- none provided',
+    '',
+    'Consequences:',
+    consequences.length > 0
+      ? consequences.map((entry) => `- ${entry}`).join('\n')
+      : '- not provided',
+    '',
+    summary,
+  ].join('\n');
+
+  return {
+    title: `Approval required: ${params.operationId}`,
+    summary,
+    details,
+    severity,
+  };
 }
 
 /**
@@ -125,11 +228,8 @@ export function enforceApprovalGate(
   }
 
   // --- Step 3: Create a new approval request ---
-  const draft = params.draft ?? {
-    title: `Approval required: ${operationId}`,
-    summary: `Agent ${agentId} requests approval for operation "${operationId}" (correlation: ${correlationId}).`,
-    severity: 'medium' as const,
-  };
+  const draft =
+    params.draft ?? buildApprovalDraft({ operationId, agentId, correlationId, payload, intentId });
 
   const record = createApprovalRequest(role, {
     channel,

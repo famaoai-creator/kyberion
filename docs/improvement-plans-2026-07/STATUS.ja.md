@@ -8,9 +8,9 @@
 
 | 判定    | 件数 |
 | ------- | ---- |
-| DONE    | 20   |
+| DONE    | 21   |
 | PARTIAL | 25   |
-| TODO    | 48   |
+| TODO    | 47   |
 
 ## P0 残作業(プロダクション化のクリティカルパス)
 
@@ -171,10 +171,10 @@
 
 ### HO(ハンドオフ)
 
-| ID    | 状態 | 残作業                                                            |
-| ----- | ---- | ----------------------------------------------------------------- |
-| HO-01 | TODO | handoff-packet schema、契約 rationale/受入条件、承認 framing 配線 |
-| HO-02 | TODO | AiDlcPhaseState、work history 統合ビュー                          |
+| ID    | 状態 | 残作業                                                                    |
+| ----- | ---- | ------------------------------------------------------------------------- |
+| HO-01 | DONE | self-contained handoff packet、approval framing、hand-off summary capture |
+| HO-02 | TODO | AiDlcPhaseState、work history 統合ビュー                                  |
 
 ### HN(ハーネス)
 

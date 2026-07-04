@@ -5,11 +5,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── vi.hoisted ────────────────────────────────────────────────────────────────
-const {
-  mockListApprovalRequests,
-  mockDecideApprovalRequest,
-  mockAuditRecord,
-} = vi.hoisted(() => ({
+const { mockListApprovalRequests, mockDecideApprovalRequest, mockAuditRecord } = vi.hoisted(() => ({
   mockListApprovalRequests: vi.fn(),
   mockDecideApprovalRequest: vi.fn(),
   mockAuditRecord: vi.fn().mockReturnValue({ id: 'AUD-TEST' }),
@@ -58,7 +54,7 @@ describe('listPendingApprovalsForCowork()', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('pending リクエストを CoworkPendingApproval 形式で返す', () => {
-    const record = makePendingRecord();
+    const record = makePendingRecord({ details: 'Rich approval framing' });
     mockListApprovalRequests.mockReturnValue([record]);
 
     const result = listPendingApprovalsForCowork();
@@ -67,6 +63,7 @@ describe('listPendingApprovalsForCowork()', () => {
     expect(result[0]).toMatchObject({
       request_id: 'req-uuid-001',
       title: 'Deploy to production',
+      details: 'Rich approval framing',
       severity: 'high',
       requested_by: 'agent-x',
       channel: 'cowork',
@@ -85,7 +82,7 @@ describe('listPendingApprovalsForCowork()', () => {
 
     expect(mockAuditRecord).toHaveBeenCalledOnce();
     expect(mockAuditRecord).toHaveBeenCalledWith(
-      expect.objectContaining({ action: 'cowork.approval.list_pending', result: 'completed' }),
+      expect.objectContaining({ action: 'cowork.approval.list_pending', result: 'completed' })
     );
   });
 
@@ -130,7 +127,7 @@ describe('decideApprovalFromCowork()', () => {
         requestId: 'nonexistent-id',
         decision: 'approved',
         decidedBy: 'operator-1',
-      }),
+      })
     ).toThrow('[APPROVAL_ERROR]');
   });
 
@@ -141,30 +138,38 @@ describe('decideApprovalFromCowork()', () => {
     } catch {}
 
     expect(mockAuditRecord).toHaveBeenCalledWith(
-      expect.objectContaining({ result: 'denied', action: 'cowork.approval.decide' }),
+      expect.objectContaining({ result: 'denied', action: 'cowork.approval.decide' })
     );
   });
 
   it('成功時に completed 監査エントリを記録する', () => {
     const record = makePendingRecord();
     mockListApprovalRequests.mockReturnValue([record]);
-    mockDecideApprovalRequest.mockReturnValue({ ...record, status: 'rejected', decidedAt: '2026-06-22T11:00:00Z' });
+    mockDecideApprovalRequest.mockReturnValue({
+      ...record,
+      status: 'rejected',
+      decidedAt: '2026-06-22T11:00:00Z',
+    });
 
     decideApprovalFromCowork({ requestId: 'req-uuid-001', decision: 'rejected', decidedBy: 'op' });
 
     expect(mockAuditRecord).toHaveBeenLastCalledWith(
-      expect.objectContaining({ result: 'completed', action: 'cowork.approval.decide' }),
+      expect.objectContaining({ result: 'completed', action: 'cowork.approval.decide' })
     );
   });
 
   it('decision が approved/rejected 以外はアダプタ自体では弾かない（zod バリデーションは MCP 層）', () => {
     const record = makePendingRecord();
     mockListApprovalRequests.mockReturnValue([record]);
-    mockDecideApprovalRequest.mockReturnValue({ ...record, status: 'approved', decidedAt: '2026-06-22T11:00:00Z' });
+    mockDecideApprovalRequest.mockReturnValue({
+      ...record,
+      status: 'approved',
+      decidedAt: '2026-06-22T11:00:00Z',
+    });
 
     // Calling with a valid decision still works
     expect(() =>
-      decideApprovalFromCowork({ requestId: 'req-uuid-001', decision: 'approved', decidedBy: 'op' }),
+      decideApprovalFromCowork({ requestId: 'req-uuid-001', decision: 'approved', decidedBy: 'op' })
     ).not.toThrow();
   });
 });
@@ -175,16 +180,29 @@ describe('recordAuditExportRequest()', () => {
   it('verify_only=true のとき監査エントリを記録する', () => {
     recordAuditExportRequest({ requestedBy: 'op', verifyOnly: true });
     expect(mockAuditRecord).toHaveBeenCalledWith(
-      expect.objectContaining({ action: 'cowork.audit.export', metadata: expect.objectContaining({ verify_only: true }) }),
+      expect.objectContaining({
+        action: 'cowork.audit.export',
+        metadata: expect.objectContaining({ verify_only: true }),
+      })
     );
   });
 
   it('from/to/missionId がメタデータに含まれる', () => {
-    recordAuditExportRequest({ requestedBy: 'op', from: '2026-06-01', to: '2026-06-22', missionId: 'M1', verifyOnly: false });
+    recordAuditExportRequest({
+      requestedBy: 'op',
+      from: '2026-06-01',
+      to: '2026-06-22',
+      missionId: 'M1',
+      verifyOnly: false,
+    });
     expect(mockAuditRecord).toHaveBeenCalledWith(
       expect.objectContaining({
-        metadata: expect.objectContaining({ from: '2026-06-01', to: '2026-06-22', mission_id: 'M1' }),
-      }),
+        metadata: expect.objectContaining({
+          from: '2026-06-01',
+          to: '2026-06-22',
+          mission_id: 'M1',
+        }),
+      })
     );
   });
 });
