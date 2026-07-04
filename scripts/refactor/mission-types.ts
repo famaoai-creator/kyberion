@@ -3,9 +3,24 @@
  * Core type definitions for the Mission Controller.
  */
 
+import type { HandoffPacket, MissionClassification } from '@agent/core';
+
 export interface MissionState {
   mission_id: string;
+  /**
+   * Free-string mission type. Kept for backward compatibility as a
+   * classification hint and team-template key; `classification` below is the
+   * authoritative record (MO-01).
+   */
   mission_type?: string;
+  /** Persisted policy-driven classification, resolved at creation (MO-01). */
+  classification?: MissionClassification;
+  /** Workflow/process template selected from the classification (MO-01). */
+  process_template?: {
+    workflow_id: string;
+    pattern: string;
+    phases: string[];
+  };
   tenant_id?: string;
   /**
    * Tenant slug for multi-tenant isolation (lowercase, ^[a-z][a-z0-9-]{1,30}$).
@@ -169,7 +184,14 @@ export interface MissionState {
       message: string;
     };
   };
-  history: Array<{ ts: string; event: string; from?: string; to?: string; note: string }>;
+  history: Array<{
+    ts: string;
+    event: string;
+    from?: string;
+    to?: string;
+    note: string;
+    handoff_packet?: HandoffPacket;
+  }>;
 }
 
 export type MissionRelationships = NonNullable<MissionState['relationships']>;
