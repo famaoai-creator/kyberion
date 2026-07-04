@@ -48,6 +48,7 @@ import {
   killSwitch,
   renderStatus,
   buildHandoffPacket,
+  recordMissionGateOverride,
 } from '@agent/core';
 
 // --- Sub-module imports ---
@@ -1563,24 +1564,30 @@ async function gatePass(missionId: string, gateFile?: string, note?: string): Pr
     return;
   }
   const gatePath = await resolveGate(missionId, gateFile);
-  const raw = safeReadFile(gatePath, { encoding: 'utf8' }) as string;
-  const gate = JSON.parse(raw);
-  gate.status = 'passed';
-  gate.confirmed_at = new Date().toISOString();
-  gate.confirmed_by = process.env.KYBERION_PERSONA || 'operator';
-  if (note) gate.note = note;
-  safeWriteFile(gatePath, JSON.stringify(gate, null, 2));
+  const overridePath = recordMissionGateOverride({
+    missionId: missionId.toUpperCase(),
+    gateId: path.basename(gatePath).replace(/-\w+\.json$/u, ''),
+    outcome: 'passed',
+    note,
+    actorId: process.env.KYBERION_PERSONA || 'operator',
+    evidenceDir: path.dirname(gatePath),
+  });
   auditChain.record({
     agentId: process.env.KYBERION_PERSONA || 'operator',
     action: 'gate.passed',
     operation: `gate-pass:${path.basename(gatePath)}`,
     result: 'completed',
-    metadata: { mission_id: missionId.toUpperCase(), gate_file: gatePath, note },
+    metadata: {
+      mission_id: missionId.toUpperCase(),
+      gate_file: gatePath,
+      override_path: overridePath,
+      note,
+    },
   });
   logger.success(
     `✅ [GATE] ${path.basename(gatePath)} → passed (mission: ${missionId.toUpperCase()})`
   );
-  logger.info(`   Confirmed by: ${gate.confirmed_by} at ${gate.confirmed_at}`);
+  logger.info(`   Override record: ${overridePath}`);
 }
 
 async function gateFail(missionId: string, gateFile?: string, note?: string): Promise<void> {
@@ -1591,23 +1598,30 @@ async function gateFail(missionId: string, gateFile?: string, note?: string): Pr
     return;
   }
   const gatePath = await resolveGate(missionId, gateFile);
-  const raw = safeReadFile(gatePath, { encoding: 'utf8' }) as string;
-  const gate = JSON.parse(raw);
-  gate.status = 'rejected';
-  gate.rejected_at = new Date().toISOString();
-  gate.rejected_by = process.env.KYBERION_PERSONA || 'operator';
-  if (note) gate.rejection_reason = note;
-  safeWriteFile(gatePath, JSON.stringify(gate, null, 2));
+  const overridePath = recordMissionGateOverride({
+    missionId: missionId.toUpperCase(),
+    gateId: path.basename(gatePath).replace(/-\w+\.json$/u, ''),
+    outcome: 'rejected',
+    note,
+    actorId: process.env.KYBERION_PERSONA || 'operator',
+    evidenceDir: path.dirname(gatePath),
+  });
   auditChain.record({
     agentId: process.env.KYBERION_PERSONA || 'operator',
     action: 'gate.rejected',
     operation: `gate-fail:${path.basename(gatePath)}`,
     result: 'completed',
-    metadata: { mission_id: missionId.toUpperCase(), gate_file: gatePath, note },
+    metadata: {
+      mission_id: missionId.toUpperCase(),
+      gate_file: gatePath,
+      override_path: overridePath,
+      note,
+    },
   });
   logger.warn(
     `❌ [GATE] ${path.basename(gatePath)} → rejected (mission: ${missionId.toUpperCase()})`
   );
+  logger.info(`   Override record: ${overridePath}`);
   if (note) logger.info(`   Reason: ${note}`);
 }
 
