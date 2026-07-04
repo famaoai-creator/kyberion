@@ -24,13 +24,11 @@ export default {
         max_prompt_chars: 4000,
         max_response_chars: 2000,
       },
-      op: 'system:set',
+      op: 'core:transform',
       params: {
+        input: '{{message}}',
+        script: 'return { status: "ok", note: input };',
         export_as: 'workflow_state',
-        value: {
-          status: 'ok',
-          note: '{{message}}',
-        },
       },
     },
     {
