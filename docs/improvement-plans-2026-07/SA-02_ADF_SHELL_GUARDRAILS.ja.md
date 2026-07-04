@@ -20,6 +20,15 @@
 4. 実行時ステップ/ループ上限が system-actuator 外の実行系でも共有される(共通ガード関数化)。
 5. `acp-mediator` の fail-open な default 承認が fail-closed(未分類は承認要求へ)に変わる。
 
+## 実装状況 (2026-07-05)
+
+- **完了(Task 1)**: `libs/core/shell-command-policy.ts` + `knowledge/product/governance/shell-command-policy.json`。コマンド解析(env プレフィクス除去 + 実行ファイル名 + 引数、クォート対応トークナイザ)ベースで denylist → allowlist → **未該当は require_approval(fail-closed)**。ポリシーファイル欠落時も fail-closed。unit test あり。
+- **完了(Task 2)**: `claude-agent-governance.ts` の Bash 無条件 allow を撤廃し、非 allow verdict は理由付き deny。`acp-mediator.ts` も同ポリシー評価 + 未該当 default deny(fail-closed)。※ require_approval → approval-gate 経由の対話的承認ルーティングは SA-05/UX-04 の承認経路統合時に接続(現状は安全側の deny)。
+- **完了(Task 3)**: `libs/core/adf-guardrails.ts`(`validatePipelineGuardrails`)が cmd hook のポリシー走査・http 先の egress 走査・step/loop 上限を検査。`readValidatedPipelineAdf`(run_pipeline の唯一のロード経路)と `adf-repair-agent`(validateAndRepairAdf)に配線済みで、error findings はロード時に throw。unit test あり。
+- **完了(Task 4, 2026-07-05)**: `libs/core/execution-bounds.ts` を新設し、system-actuator の MAX_STEPS / TIMEOUT / max_iterations バックストップを `assertExecutionBounds` / `withinLoopBounds` として抽出(`[SAFETY_LIMIT]` メッセージ互換)。system-actuator を移行し既存テスト 96 件緑。他の実行系からは `@agent/core` 経由で利用可能。
+- **完了(Task 5, 2026-07-05)**: `SECURITY.md` に「Shell & ADF Execution Guardrails」節を追加。危険シナリオの再現は shell-command-policy / adf-guardrails の unit test が担保。
+- **備考**: 現状は全経路 enforce(warn 観測モードは経ずに deny/require_approval が既定)。サンドボックス化(コンテナ/eBPF)は将来計画。
+
 ## 実装タスク
 
 ### Task 1: シェルコマンドポリシーエンジン — `claude-sonnet-4`

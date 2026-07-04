@@ -17,6 +17,14 @@
 3. writer fencing がプロセス間でも有効になる(ファイルロック)。
 4. dead-letter とリトライ滞留がオペレータから見える(`mesh-hub-inspection` の既存レポートを doctor / 週次サマリに接続)。
 
+## 実装状況 (2026-07-05)
+
+- **完了(Task 1 / 受入1)**: `libs/core/mesh-delivery-driver.ts`(`runMeshDeliveryPass`)+ `scripts/mesh_delivery_driver.ts`(`pnpm mesh:deliver`)。ループ: `expireMeshDeliveries`(TTL 掃除)→ `claimDueMeshDeliveries(batch)` → 配送先 peer を catalog から解決 → `MeshHubPeerMessagingAdapter.dispatchToPeer`(HTTP+HMAC)→ 成功 `acknowledgeMeshDelivery` / 失敗 `retryMeshDelivery`(バックオフ・dead-letter は broker に委譲)。delivery 行に永続化済みの `idempotency_key` / `expires_at` を復元して再配送でも受信側 dedup が効く。既定はシングルパス(cron 向け)、`--loop` で常駐。`pipelines/mesh-delivery.json`(5分毎 cron)で chronos に登録。route が `requires_operator_selection` / peer 未解決のものは**自動選択せず** retry 経路へ(`automatic_peer_selection: deny` 維持)。
+- **Task 2(設計変更あり)**: `claimWriter` のファイルロック化は、並列 vitest ワーカーが同一 runtime root で broker を構築する既存テスト群を壊すリスクが高いため見送り。多重起動防止(at-N-times 化の防止)は**ドライバ側**の `acquireLock('mesh-delivery-driver')`(`lock-utils`、プロセス間ファイルロック)で実現 — 二重起動時は後発が即終了。broker 内 fencing のプロセス間化は soak(AO-04)で必要性を再評価。
+- **一部(Task 3 / 受入2)**: 状態遷移((a) 正常配送 → ack、(b) 失敗 → retry、(c) broker による dead-letter 遷移の計上、(d) idempotency_key 保全、unroutable、TTL expiry)は `mesh-delivery-driver.test.ts` 6 件で担保。**2 プロセス実 HTTP の E2E は未実施(残余)** — roadmap E3 パイロット時に実施。
+- **完了(Task 4 / 受入4)**: `pnpm doctor` に「Mesh delivery」セクションを追加(総数 / in-flight / dead-letter 件数、最古の滞留 delivery、dead-letter 時の点検導線)。
+- 検証: typecheck / lint / driver unit 6 件 + broker・doctor 既存テスト緑。空キューでのシングルパス実走(`--json`)確認済み。
+
 ## 実装タスク
 
 ### Task 1: 配送ドライバ本体 — `claude-sonnet-4`
