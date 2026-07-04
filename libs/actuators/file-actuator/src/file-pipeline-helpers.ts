@@ -151,6 +151,8 @@ async function executePipeline(
           case 'apply':
             await opApply(step.op, step.params, ctx, resolve);
             break;
+          default:
+            throw new Error(`[UNKNOWN_TYPE] Unknown step type: ${step.type}`);
         }
       }
       results.push({ op: step.op, status: 'success' });
@@ -206,7 +208,7 @@ async function opControl(
       return ctx;
 
     default:
-      return ctx;
+      throw new Error(`[UNKNOWN_OP] Unknown control op: ${op}`);
   }
 }
 
@@ -275,7 +277,7 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
       return { ...ctx, [params.export_as || 'last_capture']: newText, [posKey]: stats.size };
     }
     default:
-      return ctx;
+      throw new Error(`[UNKNOWN_OP] Unknown capture op: ${op}`);
   }
 }
 
@@ -299,7 +301,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
         [params.export_as]: path.join(...params.parts.map((p: string) => resolve(p))),
       };
     default:
-      return ctx;
+      throw new Error(`[UNKNOWN_OP] Unknown transform op: ${op}`);
   }
 }
 
@@ -382,6 +384,8 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       }, buildRetryOptions());
       break;
     }
+    default:
+      throw new Error(`[UNKNOWN_OP] Unknown apply op: ${op}`);
   }
 }
 

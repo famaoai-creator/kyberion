@@ -8,7 +8,7 @@ import {
 } from './agent-manifest.js';
 import { auditChain } from './audit-chain.js';
 import { isA2ATaskContractLike, validateA2ATaskContract } from './a2a-task-contract.js';
-import { killSwitch } from './kill-switch.js';
+import { recordGovernanceAction } from './kill-switch.js';
 import { emitMissionOrchestrationObservation } from './mission-orchestration-events.js';
 import * as crypto from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
@@ -104,7 +104,7 @@ class A2ABridgeImpl {
             result: 'denied',
             reason: `Invalid signature on message ${envelope.header.msg_id}`,
           });
-          killSwitch.logAction(envelope.header.sender, 'a2a_signature_invalid', true);
+          recordGovernanceAction(envelope.header.sender, 'a2a_signature_invalid', 'system', true);
           throw new Error('A2A message signature verification failed');
         }
       } catch (e: any) {
@@ -127,7 +127,7 @@ class A2ABridgeImpl {
         result: 'denied',
         reason: `Invalid A2A task contract on message ${envelope.header.msg_id}: ${taskContractValidation.errors.join('; ')}`,
       });
-      killSwitch.logAction(envelope.header.sender, 'a2a_task_contract_invalid', true);
+      recordGovernanceAction(envelope.header.sender, 'a2a_task_contract_invalid', 'system', true);
       throw new Error(
         `A2A task contract validation failed: ${taskContractValidation.errors.join('; ')}`
       );
@@ -192,7 +192,7 @@ class A2ABridgeImpl {
         correlation_id: correlationId,
       },
     });
-    killSwitch.logAction(envelope.header.sender, `a2a_route:${agentId}`, false);
+    recordGovernanceAction(envelope.header.sender, 'a2a_route', agentId, false);
 
     // Ask the agent
     let responseText: string;
@@ -281,7 +281,7 @@ class A2ABridgeImpl {
     // Security: Only spawn agents with a known manifest
     const manifest = getAgentManifest(agentId);
     if (!manifest) {
-      killSwitch.logAction(agentId, 'a2a_spawn_denied', true);
+      recordGovernanceAction(agentId, 'a2a_spawn_denied', 'no_manifest', true);
       throw new Error(
         `Cannot auto-spawn "${agentId}": no agent manifest found. Add knowledge/product/agents/${agentId}.agent.md to allow.`
       );

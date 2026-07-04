@@ -17,6 +17,7 @@ vi.mock('@agent/core', async () => {
       ...actual.customerResolver,
       customerRoot: (subPath = '') => (subPath ? path.join(CUSTOMER_OVERLAY_ROOT, subPath) : CUSTOMER_OVERLAY_ROOT),
     },
+    resolveActiveProfileRoot: () => CUSTOMER_OVERLAY_ROOT,
   };
 });
 

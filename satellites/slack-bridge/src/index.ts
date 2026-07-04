@@ -27,6 +27,8 @@ import {
   parseSlackApprovalAction,
   applySlackApprovalDecision,
   dispatchPresenceFrame,
+  buildBridgeEmptyReplyText,
+  postBridgeError,
 } from '@agent/core';
 
 /**
@@ -390,8 +392,23 @@ async function start() {
         approvalCount: conversation.approvalRequests.length,
         missionProposalCount: conversation.missionProposals?.length || 0,
       });
+      // UX-01: an empty agent reply must not read as silence.
+      await client.chat.postMessage({
+        channel: message.channel,
+        thread_ts: threadTs,
+        text: buildBridgeEmptyReplyText({ locale: 'ja' }),
+      });
     } catch (err: any) {
       logger.error(`❌ [SlackBridge] Ingestion failed: ${err.message}`);
+      // UX-01: surface a vocabulary-based error to the user (rate-limited per thread).
+      await postBridgeError({
+        conversationKey: `slack:${message.channel}:${threadTs}`,
+        err,
+        surface: 'slack',
+        locale: 'ja',
+        post: (text) =>
+          client.chat.postMessage({ channel: message.channel, thread_ts: threadTs, text }),
+      });
     }
   });
 

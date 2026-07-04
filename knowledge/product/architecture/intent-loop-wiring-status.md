@@ -71,6 +71,15 @@ Kyberion runs _via_ an LLM CLI, so it should be able to **reason as its own sub-
 
 Tests: `reasoning-backend-policy.test.ts` "prefers the in-session claude-agent … (CLAUDECODE)" (4 assertions incl. API-key-wins + requestedMode-wins + no-CLAUDECODE-default). Known unrelated failure: `reasoning-bootstrap.test.ts` "auto-selects codex-cli" — `codex` CLI not installed on this machine (env-gated), independent of this change.
 
+### Reasoning failover chain (2026-07-04)
+
+The reasoning layer now installs a policy-ordered failover chain instead of a single backend, and the same chain is reused for the intent extractor and voice bridge when those surfaces exist for the selected mode.
+
+- `reasoning-backend.ts` now retries the next healthy candidate on structured/prompts/delegate calls and temporarily demotes the failed provider through `provider-health-registry.ts`.
+- `intent-extractor.ts` and `voice-bridge.ts` now have matching failover wrappers so extractor/voice calls do not pin the session to a single provider when a fallback is already available.
+- `provider-health-registry.ts` now exposes a configurable demotion TTL via `KYBERION_PROVIDER_DEMOTION_TTL_MS` so the temporary exclusion window is policy-driven instead of hard-coded.
+- `reasoning-bootstrap.ts` now registers the failover chain from the active mode plus `reasoning-backend-policy.json` fallback order, so the runtime uses the same provider preference graph for backend, extractor, and voice surfaces.
+
 ### Backend structured-reasoning parity (2026-06-25)
 
 Audit of `not implemented` in code found two selectable reasoning backends — `openai-compatible-backend.ts` (`local` mode) and `openrouter-backend.ts` (`openrouter` mode) — that implemented `prompt`/`delegateTask`/`generateWithTools` but threw on all 9 structured ops (`divergePersonas`/`crossCritique`/`synthesizePersona`/`forkBranches`/`simulateBranches`/`extractRequirements`/`extractDesignSpec`/`extractTestPlan`/`decomposeIntoTasks`). Selecting either mode and running the requirements-to-design-to-tasks pipeline or `wisdom:*` divergence ops would crash.

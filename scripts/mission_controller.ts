@@ -1105,7 +1105,7 @@ function showOrganizationDiscovery(jsonOutput = false, summaryOnly = false) {
   console.log('');
 }
 
-function showMissionStatus(id: string) {
+function showMissionStatus(id: string, follow: boolean = false) {
   if (!id) {
     logger.error('Usage: mission_controller status <MISSION_ID>');
     return;
@@ -1166,6 +1166,21 @@ function showMissionStatus(id: string) {
     console.log(`    ${h.ts.slice(0, 16)}  [${h.event}]  ${h.note}`);
   }
   console.log('');
+  
+  if (follow) {
+    console.log(`  [SYS] Following mission ledger for ${id.toUpperCase()}... (Press Ctrl-C to exit)\n`);
+    let lastHistoryLength = view.state.history.length;
+    setInterval(() => {
+      const current = buildMissionStatusView(id);
+      if (current && current.state.history.length > lastHistoryLength) {
+        const newEvents = current.state.history.slice(lastHistoryLength);
+        for (const h of newEvents) {
+          console.log(`    ${h.ts.slice(0, 16)}  [${h.event}]  ${h.note}`);
+        }
+        lastHistoryLength = current.state.history.length;
+      }
+    }, 2000);
+  }
 }
 
 function showReasoningBackendStatus() {

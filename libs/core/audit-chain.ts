@@ -22,8 +22,8 @@ import {
 /**
  * Hash-Chained Audit Trail v1.0
  *
- * Append-only, tamper-evident audit log with SHA-256 hash chain.
- * Each entry includes the hash of the previous entry for integrity verification.
+ * Keyed hash-chain (HMAC-SHA256) for tamper detection and continuous verification.
+ * Note: Off-box notarization and WORM storage are not yet supported.
  */
 
 export interface AuditEntry {
@@ -258,6 +258,61 @@ class AuditChainImpl {
     }
 
     return result;
+  }
+
+  /**
+   * Verify that tenant mirrors match the master chain exactly (SA-01 Task 4).
+   * Checks counts and hashes of mirrored entries against the master record.
+   */
+  verifyTenantMirrors(): { ok: boolean; findings: string[] } {
+    const findings: string[] = [];
+    const masterEntries = this.loadAll();
+    const masterByTenant = new Map<string, AuditEntry[]>();
+
+    for (const entry of masterEntries) {
+      if (entry.tenantSlug) {
+        if (!masterByTenant.has(entry.tenantSlug)) {
+          masterByTenant.set(entry.tenantSlug, []);
+        }
+        masterByTenant.get(entry.tenantSlug)!.push(entry);
+      }
+    }
+
+    const customersDir = path.join(pathResolver.rootDir(), 'customer');
+    if (!safeExistsSync(customersDir)) return { ok: true, findings };
+
+    for (const slug of safeReaddir(customersDir)) {
+      const mirrorDir = path.join(customersDir, slug, 'logs', 'audit');
+      if (!safeExistsSync(mirrorDir)) continue;
+
+      const mirrorFiles = safeReaddir(mirrorDir)
+        .filter((fileName) => AuditChainImpl.AUDIT_FILE_RE.test(fileName))
+        .sort((left, right) => left.localeCompare(right));
+
+      const mirrorEntries: AuditEntry[] = [];
+      for (const fileName of mirrorFiles) {
+        mirrorEntries.push(...this.readAuditFileEntries(path.join(mirrorDir, fileName)));
+      }
+
+      const masterSet = masterByTenant.get(slug) || [];
+      if (mirrorEntries.length !== masterSet.length) {
+        findings.push(
+          `tenant_mirror_count_mismatch:${slug} (master=${masterSet.length}, mirror=${mirrorEntries.length})`
+        );
+      } else {
+        for (let i = 0; i < masterSet.length; i++) {
+          if (masterSet[i].id !== mirrorEntries[i].id || masterSet[i].currentHash !== mirrorEntries[i].currentHash) {
+            findings.push(`tenant_mirror_hash_mismatch:${slug}:${masterSet[i].id}`);
+            break;
+          }
+        }
+      }
+    }
+
+    return {
+      ok: findings.length === 0,
+      findings,
+    };
   }
 
   /**

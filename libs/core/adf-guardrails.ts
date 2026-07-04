@@ -198,7 +198,11 @@ export function validatePipelineGuardrails(
       if (elseBranch) visitSteps(elseBranch, `${stepPath}.params.else`, depth + 1);
     }
 
-    if (step.op === 'core:foreach' || step.op === 'core:parallel_foreach') {
+    if (
+      step.op === 'core:foreach' ||
+      step.op === 'core:parallel_foreach' ||
+      step.op === 'core:accumulate'
+    ) {
       const params = step.params as Record<string, unknown> | undefined;
       const items = params?.items;
       if (Array.isArray(items) && items.length > policy.limits.max_foreach_items) {

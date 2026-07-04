@@ -1,15 +1,17 @@
+@import url('./design-tokens.css');
+
 :root {
   color-scheme: light;
-  --bg: #f3f6fb;
-  --bg-soft: #eaf1f9;
-  --panel: #ffffff;
-  --panel-border: #d8e2ee;
-  --accent: #0b5fff;
-  --accent-strong: #003ea8;
-  --accent-soft: rgba(11, 95, 255, 0.12);
-  --text: #102033;
-  --muted: #55657a;
-  --warm: #8a5d00;
+  --bg: var(--kb-bg-main);
+  --bg-soft: var(--kb-panel-bg);
+  --panel: var(--kb-bg-main);
+  --panel-border: var(--kb-border, #d8e2ee);
+  --accent: var(--kb-accent);
+  --accent-strong: var(--kb-primary);
+  --accent-soft: var(--kb-panel-bg);
+  --text: var(--kb-text-primary);
+  --muted: var(--kb-text-secondary);
+  --warm: var(--kb-warning);
   --shadow: 0 20px 45px rgba(15, 23, 42, 0.08);
   --shadow-soft: 0 6px 18px rgba(15, 23, 42, 0.05);
 }
@@ -20,7 +22,7 @@ body {
     radial-gradient(circle at 85% 12%, rgba(56, 189, 248, 0.12), transparent 20%),
     linear-gradient(180deg, #f8fbff 0%, var(--bg) 100%);
   color: var(--text);
-  font-family: "Noto Sans JP", "Hiragino Sans", "Yu Gothic UI", "Yu Gothic", "Segoe UI", system-ui, sans-serif;
+  font-family: var(--kb-font-sans);
 }
 
 ::selection {

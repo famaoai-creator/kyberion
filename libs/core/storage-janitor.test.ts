@@ -14,6 +14,10 @@ vi.mock('./secure-io.js', async () => {
     safeExistsSync: (p: string) => actual.existsSync(p),
     safeReadFile: (p: string, opts: any) => actual.readFileSync(p, opts),
     safeMkdir: (p: string, opts: any) => actual.mkdirSync(p, opts),
+    safeWriteFile: (p: string, data: string) => {
+      actual.mkdirSync(path.dirname(p), { recursive: true });
+      actual.writeFileSync(p, data);
+    },
   };
 });
 
@@ -35,7 +39,15 @@ vi.mock('./core.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn() },
 }));
 
-import { scanTmp, rotateLogs, scanRuntime, runJanitor, DEFAULT_TMP_TTL_MS } from './storage-janitor.js';
+import {
+  scanTmp,
+  rotateLogs,
+  scanRuntime,
+  runJanitor,
+  runJanitorIfStale,
+  readJanitorLastRunMs,
+  DEFAULT_TMP_TTL_MS,
+} from './storage-janitor.js';
 
 function writeFile(filePath: string, content = 'x'): void {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
@@ -219,6 +231,40 @@ describe('storage-janitor', () => {
       const report = runJanitor({ dryRun: false });
       expect(report.deletedTmp).toBeGreaterThanOrEqual(1);
       expect(fs.existsSync(oldFile)).toBe(false);
+    });
+  });
+
+  describe('runJanitorIfStale', () => {
+    it('runs when no last-run marker exists, then records the marker', () => {
+      expect(readJanitorLastRunMs()).toBeNull();
+
+      const report = runJanitorIfStale();
+      expect(report).not.toBeNull();
+      expect(readJanitorLastRunMs()).not.toBeNull();
+    });
+
+    it('skips when the last run is within maxAgeMs', () => {
+      const first = runJanitorIfStale();
+      expect(first).not.toBeNull();
+
+      const second = runJanitorIfStale();
+      expect(second).toBeNull();
+    });
+
+    it('runs again once the marker is older than maxAgeMs', () => {
+      runJanitorIfStale();
+      const markerPath = path.join(path.dirname(tmpDir), 'runtime', 'state', 'janitor-last-run.json');
+      const stale = new Date(Date.now() - DEFAULT_TMP_TTL_MS - 60_000).toISOString();
+      fs.writeFileSync(markerPath, JSON.stringify({ completed_at: stale, errors: 0 }));
+
+      const report = runJanitorIfStale();
+      expect(report).not.toBeNull();
+    });
+
+    it('dry-run does not record a marker', () => {
+      const report = runJanitorIfStale({ dryRun: true });
+      expect(report).not.toBeNull();
+      expect(readJanitorLastRunMs()).toBeNull();
     });
   });
 });

@@ -8,6 +8,8 @@ last_updated: 2026-05-07
 
 # Documentation Inventory & Audit
 
+> **注記:** 本文書は 2026-05-07 時点のスナップショット（歴史的記録）であり、最新の状態を反映していません。現在の実際のリポジトリ構造とは異なる場合があります。
+
 A scrutiny pass over `docs/` and high-level `knowledge/public/` to:
 
 1. Identify duplicates / obsolete / sample stubs.
