@@ -4,6 +4,7 @@ import { queryKnowledge, queryKnowledgeHybrid } from './src/knowledge-index.js';
 import { pathResolver } from './path-resolver.js';
 import { secureFetch } from './network.js';
 import { safeExec, safeWriteFile } from './secure-io.js';
+import { writeIntentGoalHandoff } from './intent-handoff.js';
 import { a2aBridge } from './a2a-bridge.js';
 import type { A2AMessage } from './a2a-bridge.js';
 import { getAgentManifest, resolveAgentSelectionHints } from './agent-manifest.js';
@@ -1130,6 +1131,41 @@ function directIntentCommand(intentId?: string): { command: string; args: string
   return resolveDirectIntentCommand(intentId);
 }
 
+/**
+ * IL-01: thread the interpreted intent (utterance + agreed goal + outcome ids)
+ * across the mission-promotion seam via a governed tmp handoff file, so the
+ * mission's outcome contract reflects the real request. Failure-tolerant:
+ * goal threading must never block mission creation.
+ */
+function buildIntentGoalHandoffArgs(
+  context: SurfaceRuntimeRouteContext,
+  missionId: string
+): string[] {
+  const contract = context.compiledFlow?.intentContract;
+  const sourceText = String(
+    contract?.source_text || context.input.surfaceText || context.structuredQuery || ''
+  ).trim();
+  const summary = contract?.goal?.summary?.trim();
+  if (!summary && !sourceText) return [];
+  try {
+    const handoffPath = writeIntentGoalHandoff(missionId, {
+      source_text: sourceText || undefined,
+      goal: contract?.goal
+        ? {
+            summary: contract.goal.summary,
+            success_condition: contract.goal.success_condition,
+          }
+        : undefined,
+      outcome_ids: contract?.outcome_ids,
+    });
+    return ['--intent-goal', handoffPath];
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    logger.warn(`[SURFACE_RUNTIME] intent goal handoff failed for ${missionId}: ${message}`);
+    return [];
+  }
+}
+
 async function handleGovernedExecutionHint(
   context: SurfaceRuntimeRouteContext
 ): Promise<SurfaceConversationResult> {
@@ -1260,6 +1296,7 @@ async function handleGovernedExecutionHint(
           'create',
           missionId,
           'public',
+          ...buildIntentGoalHandoffArgs(context, missionId),
           ...(governancePayload ? ['--routing-decision', JSON.stringify(governancePayload)] : []),
         ],
         {
@@ -1328,6 +1365,7 @@ async function handleGovernedExecutionHint(
           'create',
           missionId,
           'public',
+          ...buildIntentGoalHandoffArgs(context, missionId),
           ...routingDecisionArgs,
         ],
         {

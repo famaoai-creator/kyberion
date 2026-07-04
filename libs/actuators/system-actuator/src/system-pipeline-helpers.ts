@@ -33,6 +33,11 @@ import {
   StubVideoFrameBus,
   writeVideoFrameBusToMp4,
   pipeMp4ToVideoFrameBus,
+  assertExecutionBounds,
+  withinLoopBounds,
+  DEFAULT_MAX_PIPELINE_STEPS,
+  DEFAULT_PIPELINE_TIMEOUT_MS,
+  DEFAULT_MAX_LOOP_ITERATIONS,
 } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { createApprovalRequest, loadApprovalRequest } from '@agent/core/governance';
@@ -322,17 +327,20 @@ async function opControl(
       }
       return ctx;
 
-    case 'while':
+    case 'while': {
       let iterations = 0;
-      const maxIter = params.max_iterations || 100;
-      while (evaluateCondition(params.condition, ctx) && iterations < maxIter) {
+      const maxIter = params.max_iterations || undefined;
+      while (evaluateCondition(params.condition, ctx) && withinLoopBounds(iterations, maxIter)) {
         logger.info(`    [LOOP] Iteration ${++iterations}...`);
         const res = await executePipeline(params.pipeline, ctx, options, state);
         ctx = res.context;
       }
-      if (iterations >= maxIter)
-        logger.warn(`[SAFETY_GUARD] Loop reached max_iterations (${maxIter})`);
+      if (!withinLoopBounds(iterations, maxIter))
+        logger.warn(
+          `[SAFETY_GUARD] Loop reached max_iterations (${maxIter ?? DEFAULT_MAX_LOOP_ITERATIONS})`
+        );
       return ctx;
+    }
 
     default:
       throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
@@ -1516,8 +1524,8 @@ async function executePipeline(
   state: any = { stepCount: 0, startTime: Date.now() }
 ) {
   const rootDir = pathResolver.rootDir();
-  const MAX_STEPS = options.max_steps || 1000;
-  const TIMEOUT = options.timeout_ms || 60000;
+  const MAX_STEPS = options.max_steps || DEFAULT_MAX_PIPELINE_STEPS;
+  const TIMEOUT = options.timeout_ms || DEFAULT_PIPELINE_TIMEOUT_MS;
 
   let ctx = { ...initialCtx, timestamp: new Date().toISOString() };
 
@@ -1533,10 +1541,7 @@ async function executePipeline(
   const results: Array<{ op: string; status: 'success' | 'failed'; error?: string }> = [];
   for (const step of steps) {
     state.stepCount++;
-    if (state.stepCount > MAX_STEPS)
-      throw new Error(`[SAFETY_LIMIT] Exceeded maximum pipeline steps (${MAX_STEPS})`);
-    if (Date.now() - state.startTime > TIMEOUT)
-      throw new Error(`[SAFETY_LIMIT] Pipeline execution timed out (${TIMEOUT}ms)`);
+    assertExecutionBounds(state, { maxSteps: MAX_STEPS, timeoutMs: TIMEOUT });
 
     try {
       logger.info(`  [SYS_PIPELINE] [Step ${state.stepCount}] ${step.type}:${step.op}...`);

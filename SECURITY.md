@@ -6,11 +6,11 @@ How to report a security vulnerability in Kyberion.
 
 Until v1.0.0, only the **latest released version** receives security fixes. After v1.0.0, the policy is:
 
-| Version | Supported |
-|---|---|
-| latest minor of latest major | ✅ security + bug fixes |
+| Version                        | Supported                                                   |
+| ------------------------------ | ----------------------------------------------------------- |
+| latest minor of latest major   | ✅ security + bug fixes                                     |
 | latest minor of previous major | ✅ security only, for 90 days after the new major's release |
-| anything older | ❌ |
+| anything older                 | ❌                                                          |
 
 ## Reporting a Vulnerability
 
@@ -38,12 +38,12 @@ Please include:
 
 ## What to Expect
 
-| When | What |
-|---|---|
-| Within 48 hours | Acknowledgement that we received your report. |
-| Within 7 days | Initial triage assessment: severity, affected components. |
-| Within 30 days | Fix in `main`, plus a draft GitHub Security Advisory ready for publication. |
-| Coordinated release | Public advisory + patched release. We coordinate timing with the reporter. |
+| When                | What                                                                        |
+| ------------------- | --------------------------------------------------------------------------- |
+| Within 48 hours     | Acknowledgement that we received your report.                               |
+| Within 7 days       | Initial triage assessment: severity, affected components.                   |
+| Within 30 days      | Fix in `main`, plus a draft GitHub Security Advisory ready for publication. |
+| Coordinated release | Public advisory + patched release. We coordinate timing with the reporter.  |
 
 If we cannot reproduce or do not consider the report a vulnerability, we will explain our reasoning. You can request reconsideration.
 
@@ -74,13 +74,24 @@ Out of scope:
 - DoS attacks against demos / playgrounds running this code (these are not our infrastructure).
 - Bugs that are not security-related (use regular GitHub issues).
 
+## Shell & ADF Execution Guardrails (SA-02)
+
+Kyberion enforces layered guardrails around agent-initiated execution:
+
+- **Shell command policy** (`libs/core/shell-command-policy.ts` + `knowledge/product/governance/shell-command-policy.json`): commands are parsed (executable + arguments, not substring matching) and evaluated against a denylist and an allowlist. Anything unmatched defaults to `require_approval` (**fail-closed**), including when the policy file is missing.
+- **Sub-agent Bash gating** (`libs/core/claude-agent-governance.ts`): sub-agents get no unconditional Bash; every command runs through the shell policy, and non-`allow` verdicts are denied with the reason surfaced. The ACP mediator applies the same policy and denies unmatched tool calls by default.
+- **ADF static guardrails** (`libs/core/adf-guardrails.ts`): validated pipelines are additionally scanned before execution — command hooks against the shell policy, HTTP targets against the egress policy, and step/loop limits against governance caps. `readValidatedPipelineAdf` rejects pipelines with error-severity findings.
+- **Runtime bounds** (`libs/core/execution-bounds.ts`): shared step-count / wall-clock / loop-iteration backstops (`[SAFETY_LIMIT]`) used by pipeline engines as the last line of defense.
+
+These guardrails are one layer of defense in depth against naive-to-moderate dangerous commands — they are **not** a sandbox. Full isolation (containers/eBPF) is tracked as future work in `docs/improvement-plans-2026-07/SA-02_ADF_SHELL_GUARDRAILS.ja.md`.
+
 ## Hall of Fame
 
 We credit reporters here unless they request anonymity.
 
-| Reporter | Vulnerability | Disclosed |
-|---|---|---|
-| _none yet_ | — | — |
+| Reporter   | Vulnerability | Disclosed |
+| ---------- | ------------- | --------- |
+| _none yet_ | —             | —         |
 
 ## Why This Matters
 

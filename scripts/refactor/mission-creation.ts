@@ -16,6 +16,8 @@ import {
   inferMissionOutcomeContract,
   ensureDefaultTenantProfile,
   loadOrganizationProfile,
+  resolveMissionWorkflowDesign,
+  consumeIntentGoalHandoff,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
@@ -26,7 +28,13 @@ import {
 } from '@agent/core';
 import { readJsonFile } from './cli-input.js';
 import { getCurrentBranch, getGitHash, initMissionRepo } from './mission-git.js';
-import { calculateRequiredTier, checkPrerequisites, loadState, normalizeRelationships, saveState } from './mission-state.js';
+import {
+  calculateRequiredTier,
+  checkPrerequisites,
+  loadState,
+  normalizeRelationships,
+  saveState,
+} from './mission-state.js';
 import { syncRoleProcedure } from './mission-governance.js';
 import { emitMissionLifecycleIntentSnapshot } from './mission-intent-delta.js';
 import type { MissionState } from './mission-types.js';
@@ -41,28 +49,28 @@ function normalizeTenantSlug(value: string | undefined | null): string | undefin
 }
 
 function profileVisionRef(): string {
-  return customerResolver.customerRoot('my-vision.md') ?? pathResolver.knowledge('personal/my-vision.md');
+  return (
+    customerResolver.customerRoot('my-vision.md') ?? pathResolver.knowledge('personal/my-vision.md')
+  );
 }
 
-export async function createMission(
-  args: {
-    id: string;
-    tier?: 'personal' | 'confidential' | 'public';
-    tenantId?: string;
-    /**
-     * Tenant slug for multi-tenant deployments. When set (and matches the
-     * `^[a-z][a-z0-9-]{1,30}$` pattern), the resulting mission-state.json
-     * will carry `tenant_slug` so tier-guard and audit-chain enforce
-     * cross-tenant isolation.
-     */
-    tenantSlug?: string;
-    missionType?: string;
-    visionRef?: string;
-    persona?: string;
-    relationships?: any;
-    rootDir: string;
-  },
-): Promise<void> {
+export async function createMission(args: {
+  id: string;
+  tier?: 'personal' | 'confidential' | 'public';
+  tenantId?: string;
+  /**
+   * Tenant slug for multi-tenant deployments. When set (and matches the
+   * `^[a-z][a-z0-9-]{1,30}$` pattern), the resulting mission-state.json
+   * will carry `tenant_slug` so tier-guard and audit-chain enforce
+   * cross-tenant isolation.
+   */
+  tenantSlug?: string;
+  missionType?: string;
+  visionRef?: string;
+  persona?: string;
+  relationships?: any;
+  rootDir: string;
+}): Promise<void> {
   const {
     id,
     tier = 'confidential',
@@ -77,13 +85,25 @@ export async function createMission(
   const tenantSlug = normalizeTenantSlug(rawTenantSlug);
   if (rawTenantSlug && !tenantSlug) {
     throw new Error(
-      `[mission-creation] invalid tenant slug '${rawTenantSlug}'; must match ^[a-z][a-z0-9-]{1,30}$`,
+      `[mission-creation] invalid tenant slug '${rawTenantSlug}'; must match ^[a-z][a-z0-9-]{1,30}$`
     );
   }
-  withExecutionContext('knowledge_steward', () => ensureDefaultTenantProfile(), 'ecosystem_architect');
+  withExecutionContext(
+    'knowledge_steward',
+    () => ensureDefaultTenantProfile(),
+    'ecosystem_architect'
+  );
 
   const upperId = id.toUpperCase();
   const isEphemeral = process.argv.includes('--ephemeral');
+  // IL-01: the surface passes the interpreted intent (utterance + agreed goal)
+  // via a governed tmp handoff file; consume (read + delete) it here so the
+  // outcome contract reflects the real request. Same process.argv pattern as
+  // --ephemeral above — the flag is process-scoped CLI input.
+  const intentGoalFlagIndex = process.argv.indexOf('--intent-goal');
+  const intentGoalPath =
+    intentGoalFlagIndex >= 0 ? process.argv[intentGoalFlagIndex + 1] : undefined;
+  const intentHandoff = intentGoalPath ? consumeIntentGoalHandoff(intentGoalPath) : null;
   const normalizedRelationships = normalizeRelationships(relationships);
   const organizationProfile = loadOrganizationProfile(rootDir);
   const templatePath = pathResolver.knowledge('product/governance/mission-templates.json');
@@ -97,7 +117,9 @@ export async function createMission(
   const template = templates.find((entry: any) => entry.name === missionType) || templates[0];
 
   const finalTier = calculateRequiredTier(template.knowledge_injections || [], tier);
-  const missionBaseDir = isEphemeral ? pathResolver.active('missions/ephemeral') : resolveMissionDir(upperId, finalTier);
+  const missionBaseDir = isEphemeral
+    ? pathResolver.active('missions/ephemeral')
+    : resolveMissionDir(upperId, finalTier);
   const missionDir = isEphemeral ? path.join(missionBaseDir, upperId) : missionBaseDir;
 
   if (!safeExistsSync(missionDir)) safeMkdir(missionDir, { recursive: true });
@@ -136,6 +158,32 @@ export async function createMission(
   writeMissionTeamPlan(missionDir, teamPlan);
   initializeMissionTeamBindings(missionDir, teamPlan);
 
+  // MO-01: the policy-driven classification (not the free-string mission_type)
+  // is the authoritative record; the selected workflow template drives the
+  // process phases. Both are persisted into mission-state.json below.
+  const classification = teamPlan.mission_classification;
+  const workflowDesign = classification
+    ? resolveMissionWorkflowDesign({
+        missionClass: classification.mission_class,
+        deliveryShape: classification.delivery_shape,
+        riskProfile: classification.risk_profile,
+        stage: classification.stage,
+        executionShape: 'mission',
+      })
+    : undefined;
+  if (classification && workflowDesign) {
+    const taskBoardPath = path.join(missionDir, 'TASK_BOARD.md');
+    if (safeExistsSync(taskBoardPath)) {
+      const board = safeReadFile(taskBoardPath, { encoding: 'utf8' }) as string;
+      const headerLine =
+        `> Class: \`${classification.mission_class}\` (risk: ${classification.risk_profile}) · ` +
+        `Process: \`${workflowDesign.workflow_id}\` — ${workflowDesign.phases.join(' → ')}`;
+      const lines = board.split('\n');
+      lines.splice(1, 0, '', headerLine);
+      safeWriteFile(taskBoardPath, lines.join('\n'));
+    }
+  }
+
   const evidenceDir = path.join(missionDir, 'evidence');
   if (!safeExistsSync(evidenceDir)) {
     safeMkdir(evidenceDir, { recursive: true });
@@ -163,6 +211,16 @@ export async function createMission(
   const initialState: MissionState & { is_ephemeral?: boolean } = {
     mission_id: upperId,
     mission_type: missionType,
+    ...(classification ? { classification } : {}),
+    ...(workflowDesign
+      ? {
+          process_template: {
+            workflow_id: workflowDesign.workflow_id,
+            pattern: workflowDesign.pattern,
+            phases: workflowDesign.phases,
+          },
+        }
+      : {}),
     tier: finalTier,
     status: 'planned',
     execution_mode: 'local',
@@ -182,8 +240,33 @@ export async function createMission(
       missionId: upperId,
       missionType,
       visionRef: resolvedVision,
+      ...(intentHandoff
+        ? {
+            intentGoal: {
+              source_text: intentHandoff.source_text,
+              summary: intentHandoff.goal?.summary,
+              success_condition: intentHandoff.goal?.success_condition,
+            },
+          }
+        : {}),
     }),
-    history: [{ ts: now, event: 'CREATE', note: `Mission created in ${finalTier} tier ${isEphemeral ? '(Ephemeral Mode)' : '(Independent Micro-Repo)'}.` }],
+    ...(intentHandoff
+      ? {
+          intent: {
+            source_text: intentHandoff.source_text,
+            goal_summary: intentHandoff.goal?.summary,
+            success_condition: intentHandoff.goal?.success_condition,
+            outcome_ids: intentHandoff.outcome_ids,
+          },
+        }
+      : {}),
+    history: [
+      {
+        ts: now,
+        event: 'CREATE',
+        note: `Mission created in ${finalTier} tier ${isEphemeral ? '(Ephemeral Mode)' : '(Independent Micro-Repo)'}.`,
+      },
+    ],
   };
   await saveState(upperId, initialState);
 
@@ -196,22 +279,22 @@ export async function createMission(
     is_ephemeral: isEphemeral,
   });
 
-  logger.success(`🚀 Mission ${upperId} initialized in ${finalTier} tier from template "${template.name}" (ADF-driven${isEphemeral ? ', Ephemeral' : ''}).`);
+  logger.success(
+    `🚀 Mission ${upperId} initialized in ${finalTier} tier from template "${template.name}" (ADF-driven${isEphemeral ? ', Ephemeral' : ''}).`
+  );
 }
 
-export async function startMission(
-  args: {
-    id: string;
-    tier?: 'personal' | 'confidential' | 'public';
-    persona?: string;
-    tenantId?: string;
-    tenantSlug?: string;
-    missionType?: string;
-    visionRef?: string;
-    relationships?: any;
-    rootDir: string;
-  },
-): Promise<void> {
+export async function startMission(args: {
+  id: string;
+  tier?: 'personal' | 'confidential' | 'public';
+  persona?: string;
+  tenantId?: string;
+  tenantSlug?: string;
+  missionType?: string;
+  visionRef?: string;
+  relationships?: any;
+  rootDir: string;
+}): Promise<void> {
   const {
     id,
     tier = 'confidential',
@@ -225,8 +308,12 @@ export async function startMission(
   } = args;
 
   if (!id) {
-    logger.error('Usage: mission_controller start <MISSION_ID> [--tier <personal|confidential|public>]');
-    logger.info('  Preferred: use named options for tier, persona, type, vision, relationships, and --dry-run.');
+    logger.error(
+      'Usage: mission_controller start <MISSION_ID> [--tier <personal|confidential|public>]'
+    );
+    logger.info(
+      '  Preferred: use named options for tier, persona, type, vision, relationships, and --dry-run.'
+    );
     return;
   }
 
@@ -246,7 +333,9 @@ export async function startMission(
         return !preState || preState.status !== 'completed';
       });
       if (missing.length > 0) {
-        logger.error(`🚨 Cannot start mission ${upperId}. Prerequisites not met: ${missing.join(', ')}`);
+        logger.error(
+          `🚨 Cannot start mission ${upperId}. Prerequisites not met: ${missing.join(', ')}`
+        );
         logger.info('Use --force to bypass this check.');
         return;
       }
@@ -271,7 +360,11 @@ export async function startMission(
       state = loadState(upperId);
       if (state) {
         state.status = transitionStatus(state.status, 'active');
-        state.history.push({ ts: new Date().toISOString(), event: 'ACTIVATE', note: 'Mission activated.' });
+        state.history.push({
+          ts: new Date().toISOString(),
+          event: 'ACTIVATE',
+          note: 'Mission activated.',
+        });
         await saveState(upperId, state);
       }
     } else {
@@ -281,6 +374,36 @@ export async function startMission(
           missionType: state.mission_type,
           visionRef: state.vision_ref,
         });
+      }
+      // MO-01 backward compatibility: missions created before classification
+      // persistence get lazily classified on activation.
+      if (!state.classification) {
+        try {
+          const { resolveMissionClassification } = await import('@agent/core');
+          const classification = resolveMissionClassification({
+            missionTypeHint: state.mission_type,
+            shape: 'mission',
+            utterance: `${state.mission_type || ''} ${state.vision_ref || ''}`.trim(),
+          });
+          state.classification = classification;
+          state.process_template = (() => {
+            const workflow = resolveMissionWorkflowDesign({
+              missionClass: classification.mission_class,
+              deliveryShape: classification.delivery_shape,
+              riskProfile: classification.risk_profile,
+              stage: classification.stage,
+              executionShape: 'mission',
+            });
+            return {
+              workflow_id: workflow.workflow_id,
+              pattern: workflow.pattern,
+              phases: workflow.phases,
+            };
+          })();
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          logger.warn(`[mission-creation] lazy classification failed for ${upperId}: ${message}`);
+        }
       }
       if (normalizedRelationships.project) {
         state.relationships = {
@@ -301,7 +424,11 @@ export async function startMission(
         };
       }
       state.status = transitionStatus(state.status, 'active');
-      state.history.push({ ts: new Date().toISOString(), event: 'RESUME', note: 'Mission resumed.' });
+      state.history.push({
+        ts: new Date().toISOString(),
+        event: 'RESUME',
+        note: 'Mission resumed.',
+      });
       await saveState(upperId, state);
     }
 

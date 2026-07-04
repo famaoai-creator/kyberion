@@ -21,6 +21,17 @@ export interface MissionState {
     pattern: string;
     phases: string[];
   };
+  /**
+   * IL-01: the original utterance and agreed goal from the surface intent,
+   * threaded through mission promotion so verification/completion can be
+   * reconciled against the real request (IL-04).
+   */
+  intent?: {
+    source_text?: string;
+    goal_summary?: string;
+    success_condition?: string;
+    outcome_ids?: string[];
+  };
   tenant_id?: string;
   /**
    * Tenant slug for multi-tenant isolation (lowercase, ^[a-z][a-z0-9-]{1,30}$).
@@ -253,6 +264,7 @@ export const VALUE_FLAGS = new Set([
   '--execution-role',
   '--routing-decision',
   '--intent-id',
+  '--intent-goal',
   '--intent-confidence',
   '--confirm-intent-track',
   '--execution-shape',
