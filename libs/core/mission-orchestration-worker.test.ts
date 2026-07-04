@@ -89,6 +89,14 @@ describe('mission-orchestration-worker', () => {
     clearWorkCoordinationStore();
     const missionPath = missionDir('MSN-FOLLOWUP', 'public');
     safeMkdir(missionPath, { recursive: true });
+    safeMkdir(`${missionPath}/deliverables`, { recursive: true });
+    safeWriteFile(`${missionPath}/deliverables/presentation.html`, '<html>presentation</html>');
+    safeWriteFile(`${missionPath}/deliverables/work-item.md`, '# work item');
+    safeWriteFile(`${missionPath}/deliverables/bootstrap.md`, '# bootstrap');
+    safeWriteFile(`${missionPath}/deliverables/task-result.md`, '# task result');
+    safeWriteFile(`${missionPath}/deliverables/task-a.md`, '# task a');
+    safeWriteFile(`${missionPath}/deliverables/task-b.md`, '# task b');
+    safeWriteFile(`${missionPath}/deliverables/followup.md`, '# followup');
     safeWriteFile(
       `${missionPath}/mission-state.json`,
       JSON.stringify(
@@ -166,7 +174,7 @@ describe('mission-orchestration-worker', () => {
     }
   });
 
-  it('dispatches planned next tasks and marks them requested', async () => {
+  it('dispatches planned next tasks and marks them completed after acceptance', async () => {
     const { missionDir } = await import('./path-resolver.js');
     const { safeWriteFile, safeReadFile } = await import('./secure-io.js');
     const { dispatchMissionNextTasks } = await import('./mission-orchestration-worker.js');
@@ -286,11 +294,11 @@ describe('mission-orchestration-worker', () => {
     const stored = JSON.parse(
       safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }) as string
     );
-    expect(stored.map((task: any) => task.status)).toEqual(['requested', 'requested']);
+    expect(stored.map((task: any) => task.status)).toEqual(['completed', 'completed']);
 
     const taskBoard = safeReadFile(`${missionPath}/TASK_BOARD.md`, { encoding: 'utf8' }) as string;
-    expect(taskBoard).toContain('## Status: Execution Ready');
-    expect(taskBoard).toContain('- [~] Step 2: Implementation');
+    expect(taskBoard).toContain('## Status: Validation Ready');
+    expect(taskBoard).toContain('- [x] Step 2: Implementation');
     expect(mocks.record).toHaveBeenCalledWith(
       'MISSION_FOLLOWUP_DISPATCHED',
       expect.objectContaining({
@@ -421,7 +429,7 @@ describe('mission-orchestration-worker', () => {
       { task_id: 'task-a', team_role: 'reviewer', agent_id: 'implementation-architect' },
       { task_id: 'task-b', team_role: 'implementer', agent_id: 'implementation-architect' },
     ]);
-    expect(stored.map((task: any) => task.status)).toEqual(['requested', 'requested']);
+    expect(stored.map((task: any) => task.status)).toEqual(['completed', 'completed']);
   });
 
   it('creates and claims a work item for each dispatched mission task', async () => {
@@ -590,7 +598,7 @@ describe('mission-orchestration-worker', () => {
     const stored = JSON.parse(
       safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }) as string
     );
-    expect(stored[0].status).toBe('requested');
+    expect(stored[0].status).toBe('completed');
   });
 
   it('blocks and writes a clarification packet when task_result needs remain', async () => {
@@ -675,6 +683,108 @@ describe('mission-orchestration-worker', () => {
     );
     expect(clarification.status).toBe('needs_input');
     expect(clarification.clarification_packet.kind).toBe('operator-interaction-packet');
+  });
+
+  it('retries once on acceptance-gate failure before blocking and notifying the owner', async () => {
+    const { missionDir, pathResolver } = await import('./path-resolver.js');
+    const { safeWriteFile, safeReadFile, safeExistsSync } = await import('./secure-io.js');
+    const { dispatchMissionNextTasks } = await import('./mission-orchestration-worker.js');
+
+    const missionPath = missionDir('MSN-FOLLOWUP', 'public');
+    safeWriteFile(
+      `${missionPath}/deliverables/rework.md`,
+      '# Rework target\nThe acceptance criteria are not yet satisfied.'
+    );
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify(
+        [
+          {
+            task_id: 'task-rework',
+            status: 'planned',
+            assigned_to: { role: 'implementer', agent_id: 'implementation-architect' },
+            description: 'Meet the acceptance criteria',
+            deliverable: 'deliverables/rework.md',
+            acceptance_criteria: ['Publish the rework summary'],
+          },
+        ],
+        null,
+        2
+      )
+    );
+    safeWriteFile(
+      `${missionPath}/TASK_BOARD.md`,
+      [
+        '# TASK_BOARD: MSN-FOLLOWUP',
+        '',
+        '## Status: Planning Ready',
+        '',
+        '### 🛠️ Execution Phase',
+        '- [x] Step 1: Research and Strategy',
+        '- [ ] Step 2: Implementation',
+        '- [ ] Step 3: Validation',
+        '',
+      ].join('\n')
+    );
+
+    mocks.ensureMissionTeamRuntimeViaSupervisor.mockResolvedValue({
+      runtime_plan: { mission_id: 'MSN-FOLLOWUP', assignments: [] },
+    });
+    mocks.resolveMissionTeamPlan.mockReturnValue({
+      mission_id: 'MSN-FOLLOWUP',
+      mission_type: 'product_development',
+      assignments: [],
+    });
+    mocks.buildMissionTeamView.mockReturnValue({ planner: 'nerve-agent' });
+    mocks.resolveMissionTeamReceiver.mockReturnValue({
+      agent_id: 'implementation-architect',
+      model_hint: {
+        tier: 'small',
+        effort: 'low',
+        model_id: 'openai:gpt-5.4-mini',
+        route_reason: 'phase_kind=mechanical -> small/low',
+      },
+    });
+    mocks.route.mockResolvedValue({
+      payload: {
+        text: makeTaskResultText({
+          summary:
+            'The work item is complete but does not mention the requested acceptance phrase.',
+          artifacts: [{ path: 'deliverables/rework.md', kind: 'markdown' }],
+          verification_done: ['Wrote the deliverable.'],
+          gaps: [],
+          needs: [],
+        }),
+      },
+    });
+
+    const firstPass = await dispatchMissionNextTasks('MSN-FOLLOWUP');
+    expect(firstPass).toEqual([
+      { task_id: 'task-rework', team_role: 'implementer', agent_id: 'implementation-architect' },
+    ]);
+
+    let stored = JSON.parse(
+      safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }) as string
+    );
+    expect(stored[0].status).toBe('planned');
+    expect(stored[0].rework_count).toBe(1);
+    expect(safeExistsSync(`${missionPath}/gates`)).toBe(true);
+
+    const secondPass = await dispatchMissionNextTasks('MSN-FOLLOWUP');
+    expect(secondPass).toEqual([
+      { task_id: 'task-rework', team_role: 'implementer', agent_id: 'implementation-architect' },
+    ]);
+
+    stored = JSON.parse(
+      safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }) as string
+    );
+    expect(stored[0].status).toBe('blocked');
+    expect(stored[0].rework_count).toBe(2);
+
+    const obsPath = pathResolver.shared('observability/mission-control/orchestration-events.jsonl');
+    const obsText = safeReadFile(obsPath, { encoding: 'utf8' }) as string;
+    expect(obsText).toContain('mission_owner_notified');
+    expect(obsText).toContain('task-rework');
   });
 
   it('reconciles accepted task outcomes into the task board and ledger', async () => {
@@ -773,6 +883,8 @@ describe('mission-orchestration-worker', () => {
 
   it('re-prompts the planner once when the initial planning packet fails validation', async () => {
     const { resolveMissionPlanningPacket } = await import('./mission-orchestration-worker.js');
+    const { safeExistsSync, safeReaddir, safeReadFile } = await import('./secure-io.js');
+    const { missionDir } = await import('./path-resolver.js');
 
     mocks.resolveMissionTeamPlan.mockReturnValue({
       mission_id: 'MSN-FOLLOWUP',
@@ -826,10 +938,26 @@ describe('mission-orchestration-worker', () => {
     expect(mocks.route).toHaveBeenCalledTimes(2);
     expect(packet.plan_markdown).toContain('# PLAN');
     expect(packet.next_tasks).toHaveLength(1);
+    const gateDir = `${missionDir('MSN-FOLLOWUP', 'public')}/gates`;
+    expect(safeExistsSync(gateDir)).toBe(true);
+    expect(safeReaddir(gateDir).some((entry: string) => entry.startsWith('planning-packet-'))).toBe(
+      true
+    );
+    const gatePath = `${gateDir}/${safeReaddir(gateDir).find((entry: string) =>
+      entry.startsWith('planning-packet-')
+    )}`;
+    const gateRecord = JSON.parse(safeReadFile(gatePath, { encoding: 'utf8' }) as string);
+    expect(gateRecord).toMatchObject({
+      planner_agent_id: 'planner-agent',
+      review_round: 1,
+      requires_independent_review: false,
+    });
   });
 
   it('routes high-risk planning packets through an independent reviewer and re-plans once on rejection', async () => {
     const { resolveMissionPlanningPacket } = await import('./mission-orchestration-worker.js');
+    const { safeExistsSync, safeReaddir, safeReadFile } = await import('./secure-io.js');
+    const { missionDir } = await import('./path-resolver.js');
 
     mocks.resolveMissionTeamPlan.mockReturnValue({
       mission_id: 'MSN-FOLLOWUP',
@@ -938,6 +1066,24 @@ describe('mission-orchestration-worker', () => {
     expect(reviewPrompts[1]).toContain(
       'Add an independent reviewer step for the high-stakes task.'
     );
+    const gateDir = `${missionDir('MSN-FOLLOWUP', 'public')}/gates`;
+    expect(safeExistsSync(gateDir)).toBe(true);
+    expect(safeReaddir(gateDir).some((entry: string) => entry.startsWith('planning-packet-'))).toBe(
+      true
+    );
+    const gatePath = `${gateDir}/${safeReaddir(gateDir).find((entry: string) =>
+      entry.startsWith('planning-packet-')
+    )}`;
+    const gateRecord = JSON.parse(safeReadFile(gatePath, { encoding: 'utf8' }) as string);
+    expect(gateRecord).toMatchObject({
+      planner_agent_id: 'planner-agent',
+      reviewer_agent_id: 'review-agent',
+      review_round: 2,
+      requires_independent_review: true,
+    });
+    expect(gateRecord.review_verdict).toMatchObject({
+      approve: true,
+    });
   });
 
   it('blocks delegated tasks when preflight path policy fails', async () => {
@@ -1154,7 +1300,7 @@ describe('mission-orchestration-worker', () => {
       { task_id: 'task-bootstrap', team_role: 'implementer', agent_id: 'implementation-architect' },
     ]);
     expect(mocks.route).toHaveBeenCalledTimes(1);
-    expect(stored.map((task: any) => task.status)).toEqual(['requested', 'planned']);
+    expect(stored.map((task: any) => task.status)).toEqual(['completed', 'planned']);
   });
 
   it('renders gate status and rework count into the task board', async () => {

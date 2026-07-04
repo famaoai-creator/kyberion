@@ -23,6 +23,8 @@ import {
   safeReadFile,
   safeRmSync,
   safeWriteFile,
+  recordMissionGateOverride,
+  writeMissionGateRecord,
 } from '@agent/core';
 import { loadState, saveState } from './mission-state.js';
 import {
@@ -111,16 +113,42 @@ function readMissionNextTasks(missionDir: string): Array<Record<string, unknown>
   }
 }
 
-function writeMissionGateRecord(
-  missionDir: string,
-  gateId: string,
-  payload: Record<string, unknown>
-): string {
-  const gateDir = path.join(missionDir, 'gates');
-  if (!safeExistsSync(gateDir)) safeMkdir(gateDir, { recursive: true });
-  const gatePath = path.join(gateDir, `${gateId}-${Date.now().toString(36)}.json`);
-  safeWriteFile(gatePath, JSON.stringify(payload, null, 2));
-  return gatePath;
+function writeMissionNextTasks(missionDir: string, tasks: Array<Record<string, unknown>>): void {
+  const nextTasksPath = path.join(missionDir, 'NEXT_TASKS.json');
+  safeWriteFile(nextTasksPath, JSON.stringify(tasks, null, 2));
+}
+
+function upsertMissionFinishRepairTask(input: {
+  missionDir: string;
+  gateId: string;
+  reason: string;
+  pendingTasks: string[];
+}): string[] {
+  const tasks = readMissionNextTasks(input.missionDir);
+  const repairTaskId = `repair-${input.gateId}`;
+  const repairTask = {
+    task_id: repairTaskId,
+    status: 'planned',
+    assigned_to: {
+      role: 'operator',
+      agent_id: 'mission_controller',
+    },
+    description: `Repair mission finish gate failure: ${input.reason}`,
+    deliverable: `evidence/${repairTaskId}.md`,
+    target_path: `evidence/${repairTaskId}.md`,
+    dependencies: input.pendingTasks,
+    acceptance_criteria: [
+      `Resolve finish gate issue: ${input.reason}`,
+      'Update mission evidence and task board to reflect the repaired finish state.',
+    ],
+    risk: 'medium',
+    expected_output_format: 'files',
+    estimated_scope: 'M',
+  };
+  const filtered = tasks.filter((task) => String(task.task_id || '') !== repairTaskId);
+  filtered.unshift(repairTask as Record<string, unknown>);
+  writeMissionNextTasks(input.missionDir, filtered);
+  return [repairTaskId];
 }
 
 function evaluateMissionFinishExitGate(missionDir: string): {
@@ -154,6 +182,7 @@ function recordMissionFinishGateFailure(input: {
   gateId: string;
   reason: string;
   agentRuntimeEventPath: string;
+  pendingTasks: string[];
 }): string {
   const now = new Date().toISOString();
   const context = input.state.context || {};
@@ -167,6 +196,12 @@ function recordMissionFinishGateFailure(input: {
     mission_finish_gate_last_reason: input.reason,
     mission_finish_gate_last_checked_at: now,
   };
+  const repairTaskIds = upsertMissionFinishRepairTask({
+    missionDir: input.missionDir,
+    gateId: input.gateId,
+    reason: input.reason,
+    pendingTasks: input.pendingTasks,
+  });
   input.state.status = nextStatus;
   input.state.history.push({
     ts: now,
@@ -182,16 +217,15 @@ function recordMissionFinishGateFailure(input: {
     failure_count: failureCount,
     reason: input.reason,
     next_status: input.state.status,
+    repair_task_ids: repairTaskIds,
   });
-  const gatePath = writeMissionGateRecord(input.missionDir, input.gateId, {
-    mission_id: input.missionId,
-    gate_id: input.gateId,
-    verdict: 'fail',
-    reason: input.reason,
-    failure_count: failureCount,
-    next_status: input.state.status,
-    should_realign: shouldRealign,
-    checked_at: now,
+  const gatePath = recordMissionGateOverride({
+    missionId: input.missionId,
+    gateId: input.gateId,
+    outcome: 'rejected',
+    note: input.reason,
+    actorId: 'mission_controller',
+    evidenceDir: path.join(input.missionDir, 'gates'),
   });
   input.state.context = {
     ...(input.state.context || {}),
@@ -446,17 +480,21 @@ export async function finishMission(
         gateId: 'intent-drift',
         reason: driftSummary.message,
         agentRuntimeEventPath: args.agentRuntimeEventPath,
+        pendingTasks: [],
       });
       await saveState(upperId, state);
     }
     return;
   }
-  writeMissionGateRecord(missionDir, 'intent-drift', {
-    mission_id: upperId,
-    gate_id: 'intent-drift',
-    verdict: 'pass',
-    checked_at: new Date().toISOString(),
-    reason: driftSummary?.message || 'intent drift gate passed',
+  writeMissionGateRecord({
+    missionId: upperId,
+    gateId: 'intent-drift',
+    evidenceDir: path.join(missionDir, 'gates'),
+    payload: {
+      verdict: 'pass',
+      checked_at: new Date().toISOString(),
+      reason: driftSummary?.message || 'intent drift gate passed',
+    },
   });
 
   const exitGate = evaluateMissionFinishExitGate(missionDir);
@@ -471,17 +509,21 @@ export async function finishMission(
         gateId: 'finish-exit',
         reason: exitGate.reason || 'exit gate blocked',
         agentRuntimeEventPath: args.agentRuntimeEventPath,
+        pendingTasks: exitGate.pendingTasks,
       });
       await saveState(upperId, state);
     }
     return;
   }
-  writeMissionGateRecord(missionDir, 'finish-exit', {
-    mission_id: upperId,
-    gate_id: 'finish-exit',
-    verdict: 'pass',
-    checked_at: new Date().toISOString(),
-    reason: 'No pending tasks remain',
+  writeMissionGateRecord({
+    missionId: upperId,
+    gateId: 'finish-exit',
+    evidenceDir: path.join(missionDir, 'gates'),
+    payload: {
+      verdict: 'pass',
+      checked_at: new Date().toISOString(),
+      reason: 'No pending tasks remain',
+    },
   });
 
   const quality = await validateMissionQuality(upperId);
@@ -498,17 +540,21 @@ export async function finishMission(
         gateId: 'finish-quality',
         reason: quality.reason || 'quality gate blocked',
         agentRuntimeEventPath: args.agentRuntimeEventPath,
+        pendingTasks: [],
       });
       await saveState(upperId, state);
     }
     return;
   }
-  writeMissionGateRecord(missionDir, 'finish-quality', {
-    mission_id: upperId,
-    gate_id: 'finish-quality',
-    verdict: 'pass',
-    checked_at: new Date().toISOString(),
-    reason: 'Mission quality validation passed',
+  writeMissionGateRecord({
+    missionId: upperId,
+    gateId: 'finish-quality',
+    evidenceDir: path.join(missionDir, 'gates'),
+    payload: {
+      verdict: 'pass',
+      checked_at: new Date().toISOString(),
+      reason: 'Mission quality validation passed',
+    },
   });
 
   const state = loadState(upperId);
