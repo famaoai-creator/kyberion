@@ -11,7 +11,7 @@ function read(relPath: string): string {
 describe('Docker runtime contract', () => {
   it('keeps Dockerfile aligned with current built-artifact execution', () => {
     const dockerfile = read('Dockerfile');
-    expect(dockerfile).toContain('FROM node:20-slim AS base');
+    expect(dockerfile).toContain('FROM node:24-slim AS base');
     expect(dockerfile).toContain('pnpm install --frozen-lockfile');
     expect(dockerfile).toContain('ENTRYPOINT ["node", "dist/scripts/cli.js"]');
     expect(dockerfile).not.toContain('dist/scripts/bootstrap.js');
@@ -19,7 +19,9 @@ describe('Docker runtime contract', () => {
 
   it('copies workspace metadata required by runtime surfaces', () => {
     const dockerfile = read('Dockerfile');
-    expect(dockerfile).toContain('COPY --from=builder /app/pnpm-workspace.yaml ./pnpm-workspace.yaml');
+    expect(dockerfile).toContain(
+      'COPY --from=builder /app/pnpm-workspace.yaml ./pnpm-workspace.yaml'
+    );
     expect(dockerfile).toContain('COPY --from=builder /app/presence ./presence');
     expect(dockerfile).toContain('COPY --from=builder /app/satellites ./satellites');
   });
