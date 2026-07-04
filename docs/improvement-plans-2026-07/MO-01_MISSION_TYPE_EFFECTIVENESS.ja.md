@@ -19,6 +19,15 @@
 3. `code_change` テンプレートは AI-DLC playbook の相構造(Alignment → Execution → Test → Self-Review → Circuit-Breaker)をコード化したものになる。
 4. 分類結果と適用テンプレートがミッション状態(`state.json`)と operator packet に表示される。
 
+## 実装状況 (2026-07-05)
+
+- **完了(受入1)**: `createMission` が team plan composer の分類結果(`mission_classification`)を `mission-state.json` の `classification` として必ず永続化。`startMission` は分類なしの既存ミッションを activation 時に lazy 分類して backfill(失敗許容)。`mission_type` 自由文字列は型上「後方互換ヒント」として明記格下げ(`scripts/refactor/mission-types.ts`)。
+- **完了(受入2 相当)**: プロセステンプレートは既存の **mission-workflow-catalog**(`knowledge/product/governance/mission-workflow-catalog.json` + `resolveMissionWorkflowDesign`)が担うことを確認。クラス別テンプレートは research(explore-then-govern / crystallize-then-freeze)、content(governed-content-narration ほか)、operations(多数)が既存。**欠けていた `code_change` 専用テンプレート `code-change-aidlc` を追加**(`applies_to: code_change × mission`)。
+- **完了(受入3)**: `code-change-aidlc` は AI-DLC の相構造をフェーズ列で表現: `intake → classification → alignment → planning → contract_authoring → execution → test → self_review → verification → delivery → retrospective`(circuit-breaker/ゲート実効化は MO-02)。
+- **完了(受入4)**: 選択結果は `state.json`(`classification` / `process_template`)、TASK_BOARD.md ヘッダ(Class/Process 行)、`mission_controller status`(Class/Process 表示)に出る。
+- **テスト**: `mission-workflow-catalog.test.ts` に「code_change → code-change-aidlc(AI-DLC フェーズ含有)」「クラス3種で異なるテンプレートが選ばれる」を固定。
+- **残余(後続 IP へ)**: worker のイベント連鎖を `process_template.phases` で駆動する差し替え(Task 4-1)は MO-02 のゲート評価と一体で実施するのが安全なため MO-02 に委譲。低確信度分類の operator 確認導線(Task 3-2)は分類器に confidence シグナルが未実装のため未対応(matched_rules 不在=既定フォールバックの検出は可能、MO-02 で扱う)。
+
 ## 実装タスク
 
 ### Task 1: プロセステンプレートのスキーマ設計 — `claude-opus`(設計)
