@@ -41,9 +41,26 @@ async function processManifest(
     force_yes: boolean;
     verify: boolean;
     max_age_minutes: number;
-  },
+  }
 ): Promise<{ ok: boolean; unsatisfied: number }> {
   const manifest = loadEnvironmentManifest(manifestId);
+  const optionalIds = new Set(
+    manifest.capabilities.filter((cap) => cap.optional).map((cap) => cap.capability_id)
+  );
+  const countRequiredMissing = (
+    statuses: readonly { capability_id: string; satisfied: boolean }[]
+  ) => statuses.filter((s) => !s.satisfied && !optionalIds.has(s.capability_id)).length;
+  const warnOptionalMissing = (
+    statuses: readonly { capability_id: string; satisfied: boolean }[]
+  ) => {
+    for (const s of statuses) {
+      if (!s.satisfied && optionalIds.has(s.capability_id)) {
+        logger.warn(
+          `   ⚠️ optional capability '${s.capability_id}' unsatisfied — non-fatal, see the NICE section above for the fix.`
+        );
+      }
+    }
+  };
 
   if (opts.verify) {
     const report = verifyReady(manifest, {
@@ -62,7 +79,8 @@ async function processManifest(
     for (const line of formatDoctorSummary(summary)) {
       logger.info(line);
     }
-    const missing = probes.filter((p) => !p.satisfied).length;
+    warnOptionalMissing(probes);
+    const missing = countRequiredMissing(probes);
     return { ok: missing === 0, unsatisfied: missing };
   }
 
@@ -78,14 +96,16 @@ async function processManifest(
   logger.info(`   expires_at:   ${receipt.expires_at}`);
   logger.info(`   manifest_fp:  ${receipt.manifest_fingerprint.slice(0, 12)}...`);
   logger.info(`   host_fp:      ${receipt.host_fingerprint.slice(0, 12)}...`);
-  const receiptSummary = summarizeManifestDoctor(
-    manifest,
-    [...receipt.satisfied, ...receipt.unsatisfied],
-  );
+  const receiptSummary = summarizeManifestDoctor(manifest, [
+    ...receipt.satisfied,
+    ...receipt.unsatisfied,
+  ]);
   for (const line of formatDoctorSummary(receiptSummary)) {
     logger.info(line);
   }
-  return { ok: receipt.unsatisfied.length === 0, unsatisfied: receipt.unsatisfied.length };
+  warnOptionalMissing(receipt.unsatisfied);
+  const missingRequired = countRequiredMissing(receipt.unsatisfied);
+  return { ok: missingRequired === 0, unsatisfied: missingRequired };
 }
 
 async function main(): Promise<void> {

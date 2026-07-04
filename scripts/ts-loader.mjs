@@ -28,7 +28,8 @@ function resolveTsLike(specifier, context, nextResolve) {
     return nextResolve(specifier, context);
   }
 
-  const parentPath = context.parentURL && isFileUrl(context.parentURL) ? fileURLToPath(context.parentURL) : ROOT_DIR;
+  const parentPath =
+    context.parentURL && isFileUrl(context.parentURL) ? fileURLToPath(context.parentURL) : ROOT_DIR;
   if (!parentPath.startsWith(ROOT_DIR) || parentPath.includes('/node_modules/')) {
     return nextResolve(specifier, context);
   }
@@ -48,13 +49,18 @@ function resolveTsLike(specifier, context, nextResolve) {
       resolvePath(sourcePath, 'index.ts'),
       resolvePath(sourcePath, 'index.tsx'),
       resolvePath(sourcePath, 'index.mts'),
-      resolvePath(sourcePath, 'index.cts'),
+      resolvePath(sourcePath, 'index.cts')
     );
   }
 
   for (const candidate of candidates) {
     const resolved = resolveCandidatePath(candidate);
     if (resolved) {
+      // The CJS default resolver cannot handle file:// URL specifiers; when the
+      // specifier already resolves as-is (no .js→.ts rewrite), pass it through.
+      if (candidate === sourcePath) {
+        return nextResolve(specifier, context);
+      }
       return nextResolve(resolved, context);
     }
   }
