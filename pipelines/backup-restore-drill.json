@@ -1,0 +1,54 @@
+{
+  "action": "pipeline",
+  "name": "backup-restore-drill",
+  "version": "1.0.0",
+  "description": "Monthly restore drill for OP-02. Restores the latest backup archive into a disposable target and reports whether the archive can be decrypted and extracted.",
+  "_refs": {
+    "plan": "docs/improvement-plans-2026-07/OP-02_BACKUP_RECOVERY.ja.md",
+    "implementation": "scripts/backup.ts"
+  },
+  "context": {
+    "backup_dir": "active/shared/exports/backups",
+    "restore_target": "active/shared/tmp/backup-restore-drill"
+  },
+  "schedule": {
+    "id": "backup-restore-drill-monthly",
+    "cron": "45 3 1 * *",
+    "timezone": "Asia/Tokyo",
+    "enabled": true
+  },
+  "steps": [
+    {
+      "id": "restore_latest_backup",
+      "role": "source",
+      "op": "system:exec",
+      "produces": {
+        "channel": "restore_drill_result",
+        "type": "CommandResult"
+      },
+      "params": {
+        "command": "node",
+        "args": [
+          "--import",
+          "./scripts/ts-loader.mjs",
+          "scripts/backup.ts",
+          "drill",
+          "--dir",
+          "{{backup_dir}}",
+          "--target",
+          "{{restore_target}}",
+          "--prepare-checkout",
+          "--force"
+        ],
+        "timeout_ms": 120000
+      }
+    },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "Monthly backup restore drill completed. For clean-checkout DR acceptance, rerun with --verify-baseline on a prepared checkout target."
+      }
+    }
+  ]
+}

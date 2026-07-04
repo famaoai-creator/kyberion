@@ -22,6 +22,17 @@
 
 ## 実装タスク
 
+### 実装メモ(2026-07-04)
+
+- **着手済み(Task 1/2/3 の基礎スライス)**: `scripts/backup.ts` を追加し、`pnpm backup create|restore|list|prune` を実体化。`--scope all|mission|tenant`、暗号化必須判定、`KYBERION_BACKUP_PASSPHRASE` による `openssl` 暗号化、同一ディスク警告、`scripts/tenant_export.ts` 互換入口を実装。
+- **着手済み(Task 1)**: per-mission git は `.git` を生 tar せず、`git bundle create --all` をアーカイブへ同梱し、restore 時に `git init` + bundle fetch で branch を再構成する。
+- **着手済み(Task 2)**: `pipelines/backup-daily.json` を追加し、KM-01 の cron 型スケジュールに載る日次バックアップ定義を作成。既定出力は timestamp 付きで、create 後に日次7+週次4の世代保持を適用する。
+- **着手済み(Task 2/4)**: `pnpm backup drill` と `pipelines/backup-restore-drill.json` を追加し、最新バックアップの復号・clean checkout への展開・manifest 検出を月次で検証できるようにした。`--prepare-checkout --verify-baseline` で依存 install/build 後の baseline まで実行可能。
+- **着手済み(Task 3)**: `docs/operator/DEPLOYMENT.md` の存在しない `tenant_export` TODO と破壊的な `mv active/ ...tar.gz` を、実コマンドと正しい `tar czf` 手順に置換。
+- **着手済み(Task 2)**: `pnpm doctor` と `pnpm dashboard --once` に最終バックアップ時刻/世代数/鮮度を表示する。
+- **検証済み(2026-07-04)**: `IMPROVEMENT-PLANS-2026-07` mission archive を `pnpm backup drill --prepare-checkout --verify-baseline --force` でローカル clean checkout へ復元し、baseline-check 成功(`checkoutPrepared=true`, `baselineVerified=true`, `restoredManifestCount=1`)。
+- **未了**: 外部ボリューム/別ホストでの full-state(`--scope all`) 定期運用実績は未取得。
+
 ### Task 1: バックアップ/復元ツール — `claude-sonnet-4`
 
 1. `scripts/backup.ts` を新設(`pnpm backup create|restore|list`)。create: 対象(`active/`・`vault/`・`knowledge/personal`・`knowledge/confidential`・per-mission git は `git bundle` で整合取得)を tar.gz にまとめる。全 I/O は secure-io 経由。`--encrypt`(AC-05 の暗号化基盤 or age)でアーカイブ暗号化、confidential スコープを含む場合は暗号化必須。
