@@ -57,7 +57,7 @@ describe('enforceApprovalGate', () => {
       expect.objectContaining({
         action: 'approval_gate',
         result: 'allowed',
-      }),
+      })
     );
   });
 
@@ -117,7 +117,7 @@ describe('enforceApprovalGate', () => {
     const result = enforceApprovalGate(baseParams);
     expect(result.allowed).toBe(false);
     expect(mockAuditRecord).toHaveBeenCalledWith(
-      expect.objectContaining({ result: 'denied', reason: 'Existing request is expired' }),
+      expect.objectContaining({ result: 'denied', reason: 'Existing request is expired' })
     );
   });
 
@@ -143,7 +143,7 @@ describe('enforceApprovalGate', () => {
       expect.objectContaining({
         action: 'approval_gate',
         result: 'denied',
-      }),
+      })
     );
   });
 
@@ -167,7 +167,7 @@ describe('enforceApprovalGate', () => {
     expect(mockAuditRecord).toHaveBeenCalledWith(
       expect.objectContaining({
         reason: 'New approval request created; awaiting decision',
-      }),
+      })
     );
   });
 
@@ -188,7 +188,38 @@ describe('enforceApprovalGate', () => {
       'mission_controller',
       expect.objectContaining({
         draft: { title: 'Custom', summary: 'Custom summary', severity: 'high' },
-      }),
+      })
+    );
+  });
+
+  it('builds a rich default draft from payload context', () => {
+    mockResolvePolicy.mockReturnValue({
+      requiresApproval: true,
+      missingRequirements: [],
+    });
+    mockListRequests.mockReturnValue([]);
+    mockCreateRequest.mockReturnValue({ id: 'req-rich' } as any);
+
+    enforceApprovalGate({
+      ...baseParams,
+      payload: {
+        artifacts: ['libs/core/work-coordination.ts'],
+        rationale: 'Need approval before handoff.',
+        acceptance_criteria: ['retain context'],
+        expected_outputs: ['handoff packet'],
+        consequences: ['review only'],
+      },
+    });
+
+    expect(mockCreateRequest).toHaveBeenCalledWith(
+      'mission_controller',
+      expect.objectContaining({
+        draft: expect.objectContaining({
+          title: 'Approval required: secret:set',
+          summary: expect.stringContaining('Task: secret:set'),
+          details: expect.stringContaining('Need approval before handoff.'),
+        }),
+      })
     );
   });
 
@@ -205,14 +236,17 @@ describe('enforceApprovalGate', () => {
       expect.objectContaining({
         agentId: 'agent-1',
         operation: 'secret:set',
-      }),
+      })
     );
   });
 
   it('emits secret mutation approval requests that satisfy the schema', () => {
     const ajv = new Ajv({ allErrors: true });
     addFormats(ajv);
-    const schemaPath = path.join(pathResolver.rootDir(), 'schemas/secret-mutation-approval.schema.json');
+    const schemaPath = path.join(
+      pathResolver.rootDir(),
+      'schemas/secret-mutation-approval.schema.json'
+    );
     const validate = compileSchemaFromPath(ajv, schemaPath);
     const request = {
       request_id: 'req-schema-1',

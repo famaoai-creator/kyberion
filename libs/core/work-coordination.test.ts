@@ -147,10 +147,19 @@ describe('work coordination', () => {
     expect(listWorkItemAttempts(item.item_id)).toHaveLength(2);
     expect(listWorkItemAttempts(item.item_id)[0]).toMatchObject({
       status: 'released',
+      summary: expect.any(String),
     });
     expect(listWorkItemAttempts(item.item_id)[1]).toMatchObject({
       status: 'running',
       lease_id: handed.toLease.lease_id,
+      metadata: expect.objectContaining({
+        handoff_packet: expect.objectContaining({
+          kind: 'work_item',
+          correlation_id: 'handoff-1',
+          source_ref: 'peer:peer-a',
+          target_ref: 'peer:peer-b',
+        }),
+      }),
     });
 
     const released = releaseWorkItem({

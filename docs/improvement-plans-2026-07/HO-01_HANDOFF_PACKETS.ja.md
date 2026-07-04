@@ -48,3 +48,11 @@
 - パケット・契約の拡張は多くの読み手に触れる。**フィールド追加のみ**で既存を壊さない。wire 契約の拡張は A2A のペイロードを増やすので、MO-04 のコンテキスト予算と整合(パケットは要約 refs 中心、全文は貼らない)。
 - rationale/prior_decisions に confidential が入り得る。ハンドオフパケットの tier を継承し、tier をまたぐハンドオフでは機密根拠を要約/参照に留める。
 - 承認 framing のリッチ化で機密(diff 内容等)が承認者に出る。承認者の権限・tier を確認し、必要なら参照リンクに留める。
+
+## 実装結果
+
+- `libs/core/handoff-packet.ts` / `dist/libs/core/handoff-packet.js` に自己完結パケット生成を追加した。
+- `handoffWorkItem` は release/claim の両方に `handoff_packet` を添付し、release 側の summary に退出サマリを残すようにした。
+- `mission:handoff` は persona 交換に加えて `handoff_packet` を history に記録するようにした。
+- `enforceApprovalGate` は `summarizeApprovalGate` ベースの rich draft を使い、Cowork 承認一覧にも `details` を流すようにした。
+- `pnpm pipeline --input pipelines/baseline-check.json` は healthy で完走した。
