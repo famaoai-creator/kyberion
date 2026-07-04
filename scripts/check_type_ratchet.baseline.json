@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": "2026-07-04T15:48:00.000Z",
+  "generated_at": "2026-07-05T04:00:00.000Z",
   "counts": {
     "src": {
       "any_keywords": 2953,
@@ -9,10 +9,10 @@
       "files": 992
     },
     "test": {
-      "any_keywords": 1021,
-      "as_any": 723,
+      "any_keywords": 1026,
+      "as_any": 727,
       "ts_ignore": 2,
-      "files": 638
+      "files": 646
     }
   }
 }

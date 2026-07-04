@@ -44,7 +44,6 @@ const allowedRuntimeChildProcessConsumers = [
   'libs/core/shell-streaming-stt-bridge.ts',
   'libs/core/shell-streaming-tts-bridge.ts',
   'libs/core/speech-to-text-bridge.ts',
-  'libs/core/src/pfc/PhysicalLayer.js',
   'libs/core/src/pfc/PhysicalLayer.ts',
   'libs/core/video-render-backend.ts',
   'libs/core/virtual-audio-input-recording-bridge.ts',
