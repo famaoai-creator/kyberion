@@ -9,6 +9,12 @@
 
 import { logger } from './core.js';
 import type { IntentBody } from './intent-delta.js';
+import {
+  listDemotedProviders,
+  reportProviderHealthy,
+  getProviderHealthDemotionTtlMs,
+  reportProviderTemporarilyUnhealthy,
+} from './provider-health-registry.js';
 
 export interface ExtractIntentInput {
   text: string;
@@ -19,6 +25,65 @@ export interface ExtractIntentInput {
 export interface IntentExtractor {
   name: string;
   extract(input: ExtractIntentInput): Promise<IntentBody>;
+}
+
+export interface IntentExtractorCandidate {
+  extractor: IntentExtractor;
+  provider?: string;
+  label?: string;
+}
+
+function normalizeProviderName(value?: string): string | null {
+  const provider = String(value || '').trim().toLowerCase();
+  return provider || null;
+}
+
+function candidateLabel(candidate: IntentExtractorCandidate): string {
+  return candidate.label || candidate.extractor.name || candidate.provider || 'unknown';
+}
+
+export class FailoverIntentExtractor implements IntentExtractor {
+  readonly name: string;
+  private readonly candidates: IntentExtractorCandidate[];
+
+  constructor(candidates: IntentExtractorCandidate[]) {
+    this.candidates = candidates.filter((candidate) => Boolean(candidate.extractor));
+    this.name = this.candidates[0]?.extractor.name || 'failover';
+  }
+
+  async extract(input: ExtractIntentInput): Promise<IntentBody> {
+    const skippedProviders = new Set(listDemotedProviders());
+    const errors: string[] = [];
+    for (const candidate of this.candidates) {
+      const provider = normalizeProviderName(candidate.provider);
+      if (provider && skippedProviders.has(provider)) continue;
+      try {
+        const result = await candidate.extractor.extract(input);
+        if (provider) reportProviderHealthy(provider);
+        return result;
+      } catch (error) {
+        const message = error instanceof Error ? error.message || error.name : String(error);
+        errors.push(`${candidateLabel(candidate)}: ${message}`);
+        logger.warn(
+          `[intent-extractor:failover] extract failed on ${candidateLabel(candidate)}${provider ? ` (${provider})` : ''}; demoting for ${getProviderHealthDemotionTtlMs()}ms: ${message}`
+        );
+        if (provider) {
+          reportProviderTemporarilyUnhealthy(provider, {
+            reason: `intent-extract:${message}`,
+          });
+        }
+      }
+    }
+    throw new Error(
+      `[intent-extractor:failover] extract failed across ${errors.length} candidate(s): ${errors.join(' | ')}`
+    );
+  }
+}
+
+export function buildFailoverIntentExtractor(
+  candidates: IntentExtractorCandidate[]
+): IntentExtractor {
+  return new FailoverIntentExtractor(candidates);
 }
 
 let registered: IntentExtractor | null = null;

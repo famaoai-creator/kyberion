@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  buildFailoverIntentExtractor,
   getIntentExtractor,
   registerIntentExtractor,
   resetIntentExtractor,
@@ -20,6 +21,37 @@ describe('intent-extractor', () => {
     const fake: IntentExtractor = { name: 'fake', extract: stubIntentExtractor.extract };
     registerIntentExtractor(fake);
     expect(getIntentExtractor().name).toBe('fake');
+  });
+
+  it('fails over to the next extractor when the first one throws', async () => {
+    const calls: string[] = [];
+    const extractor = buildFailoverIntentExtractor([
+      {
+        label: 'primary',
+        provider: 'codex',
+        extractor: {
+          name: 'primary',
+          extract: async () => {
+            calls.push('primary');
+            throw new Error('primary failed');
+          },
+        },
+      },
+      {
+        label: 'fallback',
+        provider: 'gemini',
+        extractor: {
+          name: 'fallback',
+          extract: async () => {
+            calls.push('fallback');
+            return { goal: 'ok' };
+          },
+        },
+      },
+    ]);
+
+    await expect(extractor.extract({ text: 'hello' })).resolves.toEqual({ goal: 'ok' });
+    expect(calls).toEqual(['primary', 'fallback']);
   });
 
   describe('stubIntentExtractor', () => {

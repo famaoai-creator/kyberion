@@ -36,6 +36,7 @@ export interface ModelRegistryEntry {
   cost_band?: 'low' | 'medium' | 'high' | 'very_high';
   latency_band?: 'low' | 'medium' | 'high';
   reasoning_confidence?: 'low' | 'medium' | 'high';
+  capability_tags?: string[];
   role_fit: {
     intent_compiler: ModelRoleFit;
     surface_agent: ModelRoleFit;

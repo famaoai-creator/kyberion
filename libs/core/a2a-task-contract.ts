@@ -1,16 +1,5 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
-
-import { pathResolver } from './path-resolver.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { A2ATaskContractSchema, formatZodIssues } from './structured-output-contracts.js';
 import type { A2ATaskContract } from './channel-surface-types.js';
-
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
-const A2A_TASK_CONTRACT_SCHEMA_PATH = pathResolver.knowledge(
-  'product/schemas/a2a-task-contract.schema.json'
-);
-
-let a2aTaskContractValidateFn: ValidateFunction | null = null;
 
 export interface A2ATaskContractValidationResult {
   valid: boolean;
@@ -18,25 +7,12 @@ export interface A2ATaskContractValidationResult {
   value?: A2ATaskContract;
 }
 
-function ensureA2ATaskContractValidator(): ValidateFunction {
-  if (a2aTaskContractValidateFn) return a2aTaskContractValidateFn;
-  a2aTaskContractValidateFn = compileSchemaFromPath(ajv, A2A_TASK_CONTRACT_SCHEMA_PATH);
-  return a2aTaskContractValidateFn;
-}
-
-function errorsFrom(validate: ValidateFunction): string[] {
-  return (validate.errors || []).map((error) =>
-    `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim()
-  );
-}
-
 export function validateA2ATaskContract(value: unknown): A2ATaskContractValidationResult {
-  const validate = ensureA2ATaskContractValidator();
-  const valid = validate(value);
+  const parsed = A2ATaskContractSchema.safeParse(value);
   return {
-    valid: Boolean(valid),
-    errors: valid ? [] : errorsFrom(validate),
-    value: valid ? (value as A2ATaskContract) : undefined,
+    valid: parsed.success,
+    errors: parsed.success ? [] : formatZodIssues(parsed.error),
+    value: parsed.success ? parsed.data : undefined,
   };
 }
 

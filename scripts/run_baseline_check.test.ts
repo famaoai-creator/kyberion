@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-const { parseConnectionReadinessConfig } = await import(
+const { parseConnectionReadinessConfig, deriveBaselineStatus } = await import(
   new URL('./run_baseline_check.js', import.meta.url).href
 );
 
@@ -35,5 +35,23 @@ describe('run_baseline_check', () => {
       tenantGuard: { requireZeroDrift: false },
       configDegraded: false,
     });
+  });
+
+  it('returns needs_attention when janitor maintenance is pending', () => {
+    const status = deriveBaselineStatus(
+      { success: true, failedLayer: null },
+      { submitted: false, pending: true, reason: 'storage janitor job is already pending' }
+    );
+
+    expect(status).toBe('needs_attention');
+  });
+
+  it('keeps all_clear when baseline is healthy and no janitor maintenance is pending', () => {
+    const status = deriveBaselineStatus(
+      { success: true, failedLayer: null },
+      { submitted: false, pending: false, reason: null }
+    );
+
+    expect(status).toBe('all_clear');
   });
 });

@@ -1,7 +1,11 @@
-import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
 import { safeExec, safeExistsSync, pathResolver } from '@agent/core';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+
+// Change knowledge root to a temporary test directory
+const TEST_KNOWLEDGE_ROOT = path.join(process.cwd(), 'active', 'shared', 'tmp', 'test-knowledge');
+process.env.KYBERION_KNOWLEDGE_ROOT = TEST_KNOWLEDGE_ROOT;
 
 const AGENT_ID = 'Test-Agent-X';
 const LEDGER_PATH = pathResolver.knowledge('personal/governance/agent-trust-scores.json');
@@ -31,6 +35,10 @@ describe.sequential('A2A Mission Lifecycle & Trust Engine Integration', () => {
   beforeAll(() => {
     process.env.MISSION_ROLE = 'mission_controller';
     ensurePersonalFixtures();
+  });
+
+  afterAll(() => {
+    fs.rmSync(TEST_KNOWLEDGE_ROOT, { recursive: true, force: true });
   });
 
   beforeEach(() => {

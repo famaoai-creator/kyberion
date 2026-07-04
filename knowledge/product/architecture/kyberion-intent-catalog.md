@@ -312,7 +312,7 @@ adapter wiring for the current environment.
 - `inspect-mission-inventory` / `mission_controller list [status]` — mission inventory
 - `inspect-generation-schedules` / `schedule:list` — scheduled generation job inventory
 - `inspect-mission-state` / `mission_controller status <ID>` — checkpoint history, git refs
-- `audit-chain` ledger (hash-chained, tamper-evident) → forwarded to SIEM
+- `audit-chain` ledger (keyed HMAC hash-chained, tamper-detectable) → forwarded to SIEM
 - `intent-snapshot-store` → temporal record of every intent decision
 - `policy-engine` policies in `knowledge/product/governance/*.json`
 
@@ -447,7 +447,7 @@ Otherwise a one-shot pipeline is fine.
 | Pipeline runner (wisdom dispatch + tier-aware paths) | End-to-end |
 | Persona divergence + cross-critique | Verified with stub and `claude-cli` |
 | Markdown report rendering | `wisdom:render_hypothesis_report` |
-| Audit chain (tamper-evident) | Local + SIEM forwarder |
+| Audit chain (keyed HMAC tamper-detectable) | Local + SIEM forwarder |
 | Knowledge distill / memory promotion | + human approval queue |
 | Voice profile registry | Active |
 | Contract schema validator | Active, CI-required |

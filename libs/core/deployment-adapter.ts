@@ -75,7 +75,7 @@ export const stubDeploymentAdapter: DeploymentAdapter = {
     return {
       adapter: 'stub',
       status: 'dry_run',
-      message: `[DRY RUN] ${input.projectName}@${input.version} → ${input.environment}`,
+      message: `[DRY RUN] ${input.projectName}@${input.version} → ${input.environment}. To enable real deployment, create knowledge/personal/deployments/${input.projectName}.json matching deployment-adapter-config.schema.json.`,
       started_at: new Date().toISOString(),
     };
   },

@@ -1,0 +1,62 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Kyberion Brand Tokens",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "string"
+    },
+    "brand_name": {
+      "type": "string"
+    },
+    "tokens": {
+      "type": "object",
+      "properties": {
+        "colors": {
+          "type": "object",
+          "properties": {
+            "light": {
+              "type": "object",
+              "properties": {
+                "bg_main": { "type": "string" },
+                "panel_bg": { "type": "string" },
+                "primary": { "type": "string" },
+                "secondary": { "type": "string" },
+                "accent": { "type": "string" },
+                "warning": { "type": "string" },
+                "text_primary": { "type": "string" },
+                "text_secondary": { "type": "string" }
+              },
+              "required": ["bg_main", "panel_bg", "primary", "secondary", "accent", "warning", "text_primary", "text_secondary"]
+            },
+            "dark": {
+              "type": "object",
+              "properties": {
+                "bg_main": { "type": "string" },
+                "panel_bg": { "type": "string" },
+                "primary": { "type": "string" },
+                "secondary": { "type": "string" },
+                "accent": { "type": "string" },
+                "warning": { "type": "string" },
+                "text_primary": { "type": "string" },
+                "text_secondary": { "type": "string" }
+              },
+              "required": ["bg_main", "panel_bg", "primary", "secondary", "accent", "warning", "text_primary", "text_secondary"]
+            }
+          },
+          "required": ["light", "dark"]
+        },
+        "fonts": {
+          "type": "object",
+          "properties": {
+            "sans": { "type": "string" },
+            "mono": { "type": "string" }
+          },
+          "required": ["sans", "mono"]
+        }
+      },
+      "required": ["colors", "fonts"]
+    }
+  },
+  "required": ["version", "brand_name", "tokens"]
+}

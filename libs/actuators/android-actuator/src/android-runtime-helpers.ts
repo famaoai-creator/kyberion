@@ -388,8 +388,7 @@ async function opCapture(
       };
     }
     default:
-      logger.warn(`[ANDROID_CAPTURE] Unknown capture op: ${op}`);
-      return ctx;
+      throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
   }
 }
 
@@ -431,8 +430,7 @@ async function opTransform(
       return { ...ctx, [params.export_as || 'ui_node_matches']: matches };
     }
     default:
-      logger.warn(`[ANDROID_TRANSFORM] Unknown transform op: ${op}`);
-      return ctx;
+      throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
   }
 }
 
@@ -758,8 +756,7 @@ async function opApply(
       logger.info(`[ANDROID_LOG] ${resolve(params.message)}`);
       return ctx;
     default:
-      logger.warn(`[ANDROID_APPLY] Unknown apply op: ${op}`);
-      return ctx;
+      throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
   }
 }
 

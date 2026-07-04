@@ -4,6 +4,8 @@ import {
   resolveMissionTeamPlan,
   resolveMissionTeamReceiver,
 } from './mission-team-plan-composer.js';
+import { resolveTaskModelHint } from './reasoning-model-routing.js';
+import { type TaskModelPhaseKind } from './reasoning-level-policy.js';
 import { resolveQuestionInteractionPacket } from './question-resolver.js';
 import { validateDelegatedTaskPreflight } from './delegation-preflight.js';
 import {
@@ -14,6 +16,10 @@ import {
 } from './channel-surface.js';
 import { extractPlanningPacketBlocks, validatePlanningPacket } from './planning-packet-contract.js';
 import { extractSurfaceBlocks } from './surface-response-blocks.js';
+import {
+  PlanningReviewVerdictSchema,
+  renderStructuredOutputSchemaPrompt,
+} from './structured-output-contracts.js';
 import {
   ensureMissionTeamRuntimeViaSupervisor,
   shutdownAllAgentRuntimes,
@@ -297,7 +303,7 @@ function buildTaskExecutionPrompt(input: {
     input.missionContextPack,
     '',
     'Return exactly one ```task_result``` block and nothing else structured.',
-    'Schema: {"summary":"3 sentences max","artifacts":[{"path":"...","kind":"..."}],"verification_done":["..."],"gaps":["..."],"needs":["..."]}',
+    `Schema: ${renderStructuredOutputSchemaPrompt('task_result')}`,
     'Do not paste file contents. Include only conclusions, artifact paths, verification steps, gaps, and needs.',
   ].filter(Boolean);
   return lines.join('\n');
@@ -312,7 +318,7 @@ function buildTaskResultRetryPrompt(input: {
   return [
     `The previous response for mission ${input.missionId} task ${input.taskId} was rejected.`,
     'Resend the answer as exactly one ```task_result``` block.',
-    'Required fields: summary, artifacts, verification_done, gaps, needs.',
+    `Schema: ${renderStructuredOutputSchemaPrompt('task_result')}`,
     'Do not include any other structured block.',
     'Errors:',
     ...input.parseErrors.map((error) => `- ${error}`),
@@ -1324,6 +1330,23 @@ export async function dispatchMissionNextTasks(
         continue;
       }
       const assignment = resolveMissionTeamReceiver({ missionId, teamRole });
+      // Fill in a routed model hint only when the team plan did not already
+      // pin one — plan-level hints stay authoritative (MO-05 shadow routing).
+      if (assignment && !assignment.model_hint) {
+        const phaseKind: TaskModelPhaseKind =
+          teamRole === 'planner'
+            ? 'plan'
+            : teamRole === 'reviewer' || teamRole === 'qa'
+              ? 'review'
+              : teamRole === 'formatter' || teamRole === 'linter'
+                ? 'mechanical'
+                : 'implement';
+        assignment.model_hint = resolveTaskModelHint({
+          phase_kind: phaseKind,
+          risk: task.risk,
+          estimated_scope: task.estimated_scope,
+        });
+      }
       if (!assignment?.agent_id) {
         task.status = 'blocked';
         const summary = buildUnassignedRoleSummary(task, teamRole);
@@ -1487,29 +1510,7 @@ function buildPlannerKickoffPrompt(
     'Create the initial plan, define deliverables, and prepare the next delegated tasks.',
     'Return exactly one ```planning_packet``` block and no other structured block for the plan.',
     'The planning packet must match this contract:',
-    JSON.stringify(
-      {
-        mission_id: missionId,
-        summary: 'optional string',
-        plan_markdown: 'non-empty markdown string',
-        next_tasks: [
-          {
-            task_id: 'string',
-            team_role: 'string',
-            description: 'string',
-            deliverable: 'optional string',
-            target_path: 'optional string',
-            dependencies: ['optional task_id strings'],
-            acceptance_criteria: ['optional verification statements'],
-            risk: 'low|medium|high|approval_required|high_stakes',
-            expected_output_format: 'text|files|structured',
-            estimated_scope: 'S|M|L',
-          },
-        ],
-      },
-      null,
-      2
-    ),
+    renderStructuredOutputSchemaPrompt('planning_packet'),
     validationFeedback && validationFeedback.length > 0
       ? `Previous response failed validation:\n- ${validationFeedback.join('\n- ')}`
       : '',
@@ -1538,6 +1539,7 @@ function buildPlannerRetryPrompt(
     `The previous planning response for mission ${missionId} was rejected.`,
     'Return the same mission planning answer again, but fix the contract violations below.',
     'Return exactly one ```planning_packet``` block and nothing else that is structured.',
+    `Schema: ${renderStructuredOutputSchemaPrompt('planning_packet')}`,
     'Contract violations:',
     ...validationErrors.map((error) => `- ${error}`),
     '',
@@ -1547,11 +1549,12 @@ function buildPlannerRetryPrompt(
 }
 
 type PlanningReviewVerdict = {
+  raw_text: string;
+  parsed?: Record<string, unknown>;
+} & {
   approve: boolean;
   gaps: string[];
   rationale?: string;
-  raw_text: string;
-  parsed?: Record<string, unknown>;
 };
 
 function extractJsonObject(text: string): string | null {
@@ -1567,37 +1570,33 @@ function extractJsonObject(text: string): string | null {
 function parsePlanningReviewVerdict(text: string): PlanningReviewVerdict {
   const rawText = String(text || '');
   const json = extractJsonObject(rawText);
-  const gaps: string[] = [];
-  let approve = false;
-  let rationale: string | undefined;
   let parsed: Record<string, unknown> | undefined;
+  let approve = false;
+  let gaps: string[] = [];
+  let rationale: string | undefined;
 
   if (json) {
     try {
-      const candidate = JSON.parse(json) as Record<string, unknown>;
-      parsed = candidate;
-      approve =
-        candidate.approve === true || candidate.approve === 'true' || candidate.approved === true;
-      rationale = typeof candidate.rationale === 'string' ? candidate.rationale.trim() : undefined;
-      if (Array.isArray(candidate.gaps)) {
-        gaps.push(...candidate.gaps.map((entry) => String(entry || '').trim()).filter(Boolean));
-      }
-      if (Array.isArray(candidate.findings)) {
-        gaps.push(...candidate.findings.map((entry) => String(entry || '').trim()).filter(Boolean));
+      const candidate = JSON.parse(json) as unknown;
+      const result = PlanningReviewVerdictSchema.safeParse(candidate);
+      if (result.success) {
+        parsed = candidate as Record<string, unknown>;
+        approve = result.data.approve;
+        gaps = result.data.gaps;
+        rationale = result.data.rationale;
+      } else {
+        gaps = result.error.issues.map((issue) => {
+          const path = issue.path.length > 0 ? `/${issue.path.map(String).join('/')}` : '/';
+          return `${path} ${issue.message || 'schema violation'}`.trim();
+        });
       }
     } catch {
-      // fall through to text heuristics
+      gaps = ['planning review verdict was not valid JSON'];
     }
   }
 
-  if (!approve && gaps.length === 0) {
-    const lowered = rawText.toLowerCase();
-    approve =
-      /\bapprove(?:d|s|al)?\b/.test(lowered) &&
-      !/\b(reject|block|gap|missing|refut)\b/.test(lowered);
-    if (/gaps?|missing|block|reject|refut/.test(lowered)) {
-      gaps.push(rawText.trim().slice(0, 500));
-    }
+  if (!json) {
+    gaps = ['planning review verdict block missing'];
   }
 
   return {
@@ -1629,7 +1628,7 @@ function buildPlanningReviewPrompt(input: {
   const sections = [
     `Review the planning packet for mission ${input.missionId}.`,
     'You are an independent reviewer in a separate context from the planner.',
-    'Return JSON only: {"approve": boolean, "gaps": string[], "rationale": string}.',
+    `Return JSON only. Schema: ${renderStructuredOutputSchemaPrompt('planning_review_verdict')}`,
     'Approve only if the plan can reach the deliverable with no missing dependencies, verification, or high-risk gaps.',
     '',
     'Mission request:',

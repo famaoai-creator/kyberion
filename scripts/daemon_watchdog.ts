@@ -3,9 +3,9 @@ import {
   listDaemonHeartbeatStatuses,
   readDaemonHeartbeat,
   type DaemonHeartbeatStatus,
-} from '../libs/core/daemon-heartbeat.js';
-import { sendOpsAlert, type OpsAlertReceipt } from '../libs/core/ops-alert.js';
-import { createStandardYargs } from '../libs/core/cli-utils.js';
+} from '@agent/core';
+import { sendOpsAlert, type OpsAlertReceipt } from '@agent/core';
+import { createStandardYargs } from '@agent/core';
 
 const DEFAULT_DAEMONS = ['chronos-daemon', 'agent-runtime-supervisor-daemon'];
 const DEFAULT_STALE_AFTER_MS = 3 * 60 * 1000;

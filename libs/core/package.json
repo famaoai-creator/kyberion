@@ -415,6 +415,22 @@
       "types": "./dist/path-resolver.d.ts",
       "default": "./dist/path-resolver.js"
     },
+    "./kill-switch": {
+      "types": "./dist/kill-switch.d.ts",
+      "default": "./dist/kill-switch.js"
+    },
+    "./question-resolver": {
+      "types": "./dist/question-resolver.d.ts",
+      "default": "./dist/question-resolver.js"
+    },
+    "./reasoning-model-routing": {
+      "types": "./dist/reasoning-model-routing.d.ts",
+      "default": "./dist/reasoning-model-routing.js"
+    },
+    "./tenant-design-resolver": {
+      "types": "./dist/tenant-design-resolver.d.ts",
+      "default": "./dist/tenant-design-resolver.js"
+    },
     "./project-operational-state-registry": {
       "types": "./dist/project-operational-state-registry.d.ts",
       "default": "./dist/project-operational-state-registry.js"

@@ -2,7 +2,6 @@ import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import * as v8 from 'node:v8';
 import * as readline from 'node:readline';
-import chalk from 'chalk';
 import { pathResolver } from './path-resolver.js';
 import {
   rawExistsSync,
@@ -18,26 +17,47 @@ import {
  * Shared Utility Core for Kyberion (TypeScript Edition)
  */
 
+const ANSI = {
+  reset: '\u001b[0m',
+  dim: '\u001b[2m',
+  magenta: '\u001b[35m',
+  red: '\u001b[31m',
+  yellow: '\u001b[33m',
+  blue: '\u001b[34m',
+  green: '\u001b[32m',
+  cyan: '\u001b[36m',
+  bold: '\u001b[1m',
+};
+
+function supportsAnsi(): boolean {
+  return Boolean(process.stdout.isTTY || process.stderr.isTTY);
+}
+
+function color(code: keyof typeof ANSI, text: string): string {
+  if (!supportsAnsi()) return text;
+  return `${ANSI[code]}${text}${ANSI.reset}`;
+}
+
 export const logger = {
   _log: (level: string, msg: string) => {
     if (process.env.NODE_ENV === 'test' && level !== 'error') return;
-    const ts = chalk.dim(new Date().toISOString());
-    const mid = process.env.MISSION_ID ? chalk.magenta(' [' + process.env.MISSION_ID + ']') : '';
+    const ts = color('dim', new Date().toISOString());
+    const mid = process.env.MISSION_ID ? color('magenta', ' [' + process.env.MISSION_ID + ']') : '';
     const prefix =
       level === 'error'
-        ? chalk.red(' [ERROR] ')
+        ? color('red', ' [ERROR] ')
         : level === 'warn'
-          ? chalk.yellow(' [WARN]  ')
-          : chalk.blue(' [INFO]  ');
+          ? color('yellow', ' [WARN]  ')
+          : color('blue', ' [INFO]  ');
     console.error(ts + mid + prefix + msg);
   },
   info: (msg: string) => logger._log('info', msg),
   warn: (msg: string) => logger._log('warn', msg),
   error: (msg: string) => logger._log('error', msg),
   success: (msg: string) => {
-    const ts = chalk.dim(new Date().toISOString());
-    const mid = process.env.MISSION_ID ? chalk.magenta(' [' + process.env.MISSION_ID + ']') : '';
-    console.log(ts + mid + chalk.green(' [SUCCESS] ') + msg);
+    const ts = color('dim', new Date().toISOString());
+    const mid = process.env.MISSION_ID ? color('magenta', ' [' + process.env.MISSION_ID + ']') : '';
+    console.log(ts + mid + color('green', ' [SUCCESS] ') + msg);
   },
 };
 
@@ -47,14 +67,14 @@ export const ui = {
     const chars = ['\u25dc', '\u25dd', '\u25de', '\u25df'];
     let i = 0;
     const interval = setInterval(() => {
-      process.stdout.write('\r' + chalk.cyan(chars[i++ % chars.length]) + ' ' + msg + '...');
+      process.stdout.write('\r' + color('cyan', chars[i++ % chars.length]) + ' ' + msg + '...');
     }, 100);
     interval.unref?.();
     return {
       stop: (success = true) => {
         clearInterval(interval);
         process.stdout.write(
-          '\r' + (success ? chalk.green('\u2714') : chalk.red('\u2718')) + ' ' + msg + '\n'
+          '\r' + (success ? color('green', '\u2714') : color('red', '\u2718')) + ' ' + msg + '\n'
         );
       },
     };
@@ -76,7 +96,7 @@ export const ui = {
     const filled = Math.round(width * progress);
     const bar = '\u2588'.repeat(filled) + '\u2591'.repeat(width - filled);
     const percent = Math.round(progress * 100);
-    return '[' + chalk.cyan(bar) + '] ' + percent + '%';
+    return '[' + color('cyan', bar) + '] ' + percent + '%';
   },
   confirm: (question: string, options?: { destructive?: boolean }): Promise<boolean> => {
     const autoYes = process.argv.includes('-y') || process.argv.includes('--yes');
@@ -86,7 +106,7 @@ export const ui = {
       output: process.stdout,
     });
     return new Promise((resolve) => {
-      rl.question(chalk.yellow.bold('\uff1f') + ' ' + question + ' [y/N]: ', (answer) => {
+      rl.question(color('yellow', '\uff1f') + ' ' + question + ' [y/N]: ', (answer) => {
         rl.close();
         resolve(answer.toLowerCase() === 'y');
       });
@@ -98,7 +118,7 @@ export const ui = {
       output: process.stdout,
     });
     return new Promise((resolve) => {
-      rl.question(chalk.cyan.bold('\u276f') + ' ' + question, (answer) => {
+      rl.question(color('cyan', '\u276f') + ' ' + question, (answer) => {
         rl.close();
         resolve(answer.trim());
       });
@@ -109,11 +129,11 @@ export const ui = {
       if (data.length <= maxItems) return data;
       const head = data.slice(0, Math.ceil(maxItems / 2));
       const tail = data.slice(-Math.floor(maxItems / 2));
-      return [...head, chalk.dim('... (' + (data.length - maxItems) + ' more items) ...'), ...tail];
+      return [...head, color('dim', '... (' + (data.length - maxItems) + ' more items) ...'), ...tail];
     }
     if (typeof data === 'string' && data.length > 500) {
       return (
-        data.substring(0, 250) + chalk.dim('\n\n... (content truncated) ...\n\n') + data.slice(-250)
+        data.substring(0, 250) + color('dim', '\n\n... (content truncated) ...\n\n') + data.slice(-250)
       );
     }
     return data;

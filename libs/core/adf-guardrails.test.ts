@@ -88,6 +88,14 @@ describe('validatePipelineGuardrails', () => {
             pipeline: [{ op: 'step:three', params: {} }],
           },
         },
+        {
+          op: 'core:accumulate',
+          params: {
+            items: [1, 2],
+            target_count: 1,
+            do: [{ op: 'step:four', params: {} }],
+          },
+        },
       ],
     });
 

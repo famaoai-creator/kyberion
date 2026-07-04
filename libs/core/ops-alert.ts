@@ -109,7 +109,7 @@ export function sendOpsAlert(input: OpsAlertInput, options: OpsAlertOptions = {}
         renderWebhookPayload(input, id, timestamp),
         webhookUrl,
       ],
-      { timeoutMs: 10_000, maxOutputMB: 1 }
+      { timeoutMs: 2_000, maxOutputMB: 1 }
     );
     return {
       id,

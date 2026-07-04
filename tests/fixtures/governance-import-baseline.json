@@ -2,6 +2,7 @@
   "fs_imports": [
     "libs/actuators/media-actuator/src/security-boundary.test.ts",
     "libs/actuators/meeting-actuator/src/index.test.ts",
+    "libs/actuators/meeting-browser-driver/scripts/playwright-meet-join.mjs",
     "libs/core/action-item-store.test.ts",
     "libs/core/audit-chain-tenant.test.ts",
     "libs/core/browser-extension-bridge.test.ts",
@@ -108,6 +109,7 @@
     "libs/core/video-render-backend.ts",
     "libs/core/virtual-audio-input-recording-bridge.ts",
     "satellites/voice-hub/server.ts",
+    "scripts/check_contract_schemas.test.ts",
     "scripts/check_doc_examples.ts",
     "scripts/dependency_resolver.ts",
     "scripts/generate_changelog.ts",

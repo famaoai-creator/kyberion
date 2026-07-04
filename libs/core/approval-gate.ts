@@ -12,7 +12,7 @@ import {
 } from './approval-store.js';
 import type { GovernedArtifactRole } from './artifact-store.js';
 import { auditChain } from './audit-chain.js';
-import { killSwitch } from './kill-switch.js';
+import { recordGovernanceAction } from './kill-switch.js';
 
 export interface ApprovalGateParams {
   /** Intent being executed. */
@@ -55,7 +55,7 @@ export function enforceApprovalGate(
   role: GovernedArtifactRole = 'mission_controller'
 ): ApprovalGateResult {
   const { intentId, operationId, agentId, correlationId, channel, payload } = params;
-  killSwitch.logAction(agentId, `approval_gate:${operationId}`, false);
+  recordGovernanceAction(agentId, 'approval_gate', operationId, false);
 
   // --- Step 1: Resolve policy ---
   const policy = resolveApprovalPolicy({ intentId, payload });
@@ -69,7 +69,7 @@ export function enforceApprovalGate(
       reason: 'No approval required by policy',
       metadata: { correlationId, intentId, matchedRuleId: policy.matchedRuleId },
     });
-    killSwitch.logAction(agentId, `approval_gate:${operationId}:allowed`, false);
+    recordGovernanceAction(agentId, 'approval_gate', `${operationId}:allowed`, false);
     return { allowed: true, status: 'not_required', message: 'No approval required' };
   }
 
@@ -96,7 +96,7 @@ export function enforceApprovalGate(
         reason: 'Existing approval found',
         metadata: { correlationId, intentId, approvalId: matched.id },
       });
-      killSwitch.logAction(agentId, `approval_gate:${operationId}:allowed`, false);
+      recordGovernanceAction(agentId, 'approval_gate', `${operationId}:allowed`, false);
       return {
         allowed: true,
         status: 'approved',
@@ -115,7 +115,7 @@ export function enforceApprovalGate(
       reason: `Existing request is ${effectiveStatus}`,
       metadata: { correlationId, intentId, requestId: matched.id, requestStatus: effectiveStatus },
     });
-    killSwitch.logAction(agentId, `approval_gate:${operationId}:denied`, true);
+    recordGovernanceAction(agentId, 'approval_gate', `${operationId}:denied`, true);
     return {
       allowed: false,
       status: 'pending',
@@ -147,7 +147,7 @@ export function enforceApprovalGate(
     reason: 'New approval request created; awaiting decision',
     metadata: { correlationId, intentId, requestId: record.id },
   });
-  killSwitch.logAction(agentId, `approval_gate:${operationId}:pending`, true);
+  recordGovernanceAction(agentId, 'approval_gate', `${operationId}:pending`, true);
 
   return {
     allowed: false,

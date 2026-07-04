@@ -50,6 +50,72 @@ async function main(): Promise<void> {
   const counts = await runReasoningSetup();
   if (argv.json) {
     logger.info(JSON.stringify({ status: 'ok', counts }, null, 2));
+    process.exit(counts.must === 0 && counts.should === 0 ? 0 : 1);
+  }
+
+  // Interactive backend selection needs a real terminal on both ends —
+  // in unattended runs (CI, cron) readline would block forever on stdin.
+  const interactiveCapable = process.stdin.isTTY && process.stdout.isTTY;
+  if (interactiveCapable && (counts.must > 0 || process.argv.includes('--interactive'))) {
+    const rl = (await import('node:readline')).createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+
+    logger.info('');
+    logger.info('Interactive Setup:');
+    logger.info('1. claude-cli (Recommended)');
+    logger.info('2. anthropic');
+    logger.info('3. gemini-cli');
+    logger.info('4. agy-cli');
+    logger.info('5. stub (Offline mock)');
+
+    const answer = await new Promise<string>((resolve) => {
+      rl.question('Select reasoning backend [1-5, or enter to skip]: ', resolve);
+    });
+
+    rl.close();
+
+    const choices: Record<string, string> = {
+      '1': 'claude-cli',
+      '2': 'anthropic',
+      '3': 'gemini-cli',
+      '4': 'agy-cli',
+      '5': 'stub',
+    };
+
+    if (answer && choices[answer]) {
+      const backend = choices[answer];
+      logger.info(`Selected: ${backend}`);
+
+      const { safeExistsSync, safeReadFile, safeWriteFile } = await import('@agent/core');
+      const path = await import('node:path');
+      const envLocal = path.join(process.cwd(), '.env.local');
+
+      let content = '';
+      if (safeExistsSync(envLocal)) {
+        content = safeReadFile(envLocal, { encoding: 'utf8' }) as string;
+      }
+
+      if (content.includes('KYBERION_REASONING_BACKEND=')) {
+        content = content.replace(
+          /KYBERION_REASONING_BACKEND=.*/g,
+          `KYBERION_REASONING_BACKEND=${backend}`
+        );
+      } else {
+        if (content.length > 0 && !content.endsWith('\n')) content += '\n';
+        content += `KYBERION_REASONING_BACKEND=${backend}\n`;
+      }
+
+      safeWriteFile(envLocal, content);
+      logger.info(`Updated .env.local with KYBERION_REASONING_BACKEND=${backend}`);
+
+      if (backend === 'stub') {
+        logger.warn(
+          'Warning: You have selected the stub backend. It will return deterministic placeholders.'
+        );
+      }
+    }
   }
 
   process.exit(counts.must === 0 && counts.should === 0 ? 0 : 1);

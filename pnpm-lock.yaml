@@ -40,9 +40,6 @@ importers:
       '@agent/core':
         specifier: workspace:*
         version: link:libs/core
-      '@agent/shared-business':
-        specifier: workspace:*
-        version: link:libs/shared-business
       '@agent/shared-media':
         specifier: workspace:*
         version: link:libs/shared-media
@@ -98,7 +95,7 @@ importers:
         specifier: ^0.5.16
         version: 0.5.16
       ajv:
-        specifier: ^8.18.0
+        specifier: 8.18.0
         version: 8.18.0
       ajv-formats:
         specifier: ^3.0.1
@@ -107,7 +104,7 @@ importers:
         specifier: ^1.18.0
         version: 1.18.0
       chalk:
-        specifier: ^4.1.2
+        specifier: 4.1.2
         version: 4.1.2
       chokidar:
         specifier: ^5.0.0
@@ -499,9 +496,6 @@ importers:
       '@agent/core':
         specifier: workspace:*
         version: link:../../core
-      '@agent/shared-business':
-        specifier: workspace:*
-        version: link:../../shared-business
       '@agent/shared-vision':
         specifier: workspace:*
         version: link:../../shared-vision
@@ -547,9 +541,6 @@ importers:
       '@agent/core':
         specifier: workspace:*
         version: link:../../core
-      '@agent/shared-business':
-        specifier: workspace:*
-        version: link:../../shared-business
       '@agent/shared-vision':
         specifier: workspace:*
         version: link:../../shared-vision
@@ -565,9 +556,6 @@ importers:
       '@agent/core':
         specifier: workspace:*
         version: link:../../core
-      '@agent/shared-business':
-        specifier: workspace:*
-        version: link:../../shared-business
       '@agent/shared-vision':
         specifier: workspace:*
         version: link:../../shared-vision
@@ -643,16 +631,6 @@ importers:
       yargs:
         specifier: ^18.0.0
         version: 18.0.0
-
-  libs/shared-business:
-    dependencies:
-      '@agent/core':
-        specifier: workspace:*
-        version: link:../core
-    devDependencies:
-      fast-check:
-        specifier: 4.6.0
-        version: 4.6.0
 
   libs/shared-media:
     dependencies:

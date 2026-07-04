@@ -1,10 +1,13 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import axios from 'axios';
 import { secureFetch } from '@agent/core';
+import { resetEgressPolicyCache } from '@agent/core/egress-policy';
 
 vi.mock('axios', () => ({
   default: vi.fn(),
 }));
+
+const originalEgressMode = process.env.KYBERION_EGRESS_POLICY;
 
 describe('Network Governance Policy Enforcement', () => {
   beforeEach(() => {
@@ -12,7 +15,19 @@ describe('Network Governance Policy Enforcement', () => {
     vi.mocked(axios).mockResolvedValue({ data: { success: true } } as any);
   });
 
-  it('Scenario: Authenticated request to whitelisted domain (Allowed)', async () => {
+  afterAll(() => {
+    if (originalEgressMode === undefined) delete process.env.KYBERION_EGRESS_POLICY;
+    else process.env.KYBERION_EGRESS_POLICY = originalEgressMode;
+    resetEgressPolicyCache();
+  });
+
+  function setEgressMode(mode: 'enforce' | 'warn'): void {
+    process.env.KYBERION_EGRESS_POLICY = mode;
+    resetEgressPolicyCache();
+  }
+
+  it('Scenario: Request to allowlisted domain (Allowed under enforce)', async () => {
+    setEgressMode('enforce');
     const result = await secureFetch({
       url: 'https://api.github.com/user',
       headers: { 'Authorization': 'Bearer test-token' }
@@ -20,7 +35,8 @@ describe('Network Governance Policy Enforcement', () => {
     expect(result.success).toBe(true);
   });
 
-  it('Scenario: Authenticated request to non-whitelisted domain (Blocked)', async () => {
+  it('Scenario: Request to non-allowlisted domain (Blocked under enforce)', async () => {
+    setEgressMode('enforce');
     try {
       await secureFetch({
         url: 'https://malicious-site.com/steal',
@@ -32,7 +48,8 @@ describe('Network Governance Policy Enforcement', () => {
     }
   });
 
-  it('Scenario: Unauthenticated request to any domain (Allowed by default)', async () => {
+  it('Scenario: Request to non-allowlisted domain (Allowed in warn observation mode, SA-04)', async () => {
+    setEgressMode('warn');
     const result = await secureFetch({
       url: 'https://any-public-site.com/data'
     });

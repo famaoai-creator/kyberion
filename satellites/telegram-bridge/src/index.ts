@@ -11,6 +11,8 @@ import {
   safeMkdir,
   runSurfaceMessageConversation,
   safeReadFile,
+  buildBridgeEmptyReplyText,
+  postBridgeError,
 } from '@agent/core';
 
 export interface TelegramUser {
@@ -307,19 +309,39 @@ export async function handleTelegramUpdate(
     receivedAt,
   });
 
-  const conversation = await runSurfaceMessageConversation({
-    surface: 'telegram',
-    text,
-    channel: chatId,
-    threadTs,
-    correlationId: `telegram-${message.message_id}`,
-    receivedAt,
-    actorId: String(message.from?.id || chatId),
-    senderAgentId: 'kyberion:telegram-bridge',
-    agentId: TELEGRAM_SURFACE_AGENT_ID,
-    threadContext: threadContext || undefined,
-    delegationSummaryInstruction: 'Produce a concise Telegram reply. Use markdown if useful. Do not use A2A blocks.',
-  } as any);
+  let conversation: Awaited<ReturnType<typeof runSurfaceMessageConversation>>;
+  try {
+    conversation = await runSurfaceMessageConversation({
+      surface: 'telegram',
+      text,
+      channel: chatId,
+      threadTs,
+      correlationId: `telegram-${message.message_id}`,
+      receivedAt,
+      actorId: String(message.from?.id || chatId),
+      senderAgentId: 'kyberion:telegram-bridge',
+      agentId: TELEGRAM_SURFACE_AGENT_ID,
+      threadContext: threadContext || undefined,
+      delegationSummaryInstruction: 'Produce a concise Telegram reply. Use markdown if useful. Do not use A2A blocks.',
+    } as any);
+  } catch (err: any) {
+    logger.error(`❌ [TelegramBridge] Conversation failed for ${chatId}: ${err?.message || err}`);
+    // UX-01: the user must not be left in silence (rate-limited per thread).
+    await postBridgeError({
+      conversationKey: `telegram:${chatId}:${threadTs}`,
+      err,
+      surface: 'telegram',
+      locale: 'ja',
+      post: (errorText) => sendTelegramMessage({ chatId, text: errorText }, options),
+    });
+    return {
+      ok: false,
+      chatId,
+      messageId: String(message.message_id),
+      threadTs,
+      reason: 'conversation_failed',
+    };
+  }
 
   let reply: TelegramSendReceipt | undefined;
   if (conversation.text) {
@@ -337,6 +359,12 @@ export async function handleTelegramUpdate(
       chatId,
       receivedAt: new Date().toISOString(),
     });
+  } else {
+    // UX-01: an empty agent reply must not read as silence.
+    reply = await sendTelegramMessage(
+      { chatId, text: buildBridgeEmptyReplyText({ locale: 'ja' }) },
+      options,
+    );
   }
 
   return {

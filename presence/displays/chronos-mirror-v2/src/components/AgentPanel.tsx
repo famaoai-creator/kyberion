@@ -281,12 +281,12 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-[600px] max-h-[80vh] kyberion-glass rounded-2xl border border-kyberion-gold/20 flex flex-col overflow-hidden">
+      <div className="relative w-[600px] max-h-[80vh] kyberion-glass rounded-2xl border border-kyberion-warning/20 flex flex-col overflow-hidden">
 
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/5">
           <div className="flex items-center gap-3">
-            <Cpu className="text-kyberion-gold w-5 h-5" />
+            <Cpu className="text-kyberion-warning w-5 h-5" />
             <span className="text-sm font-bold uppercase tracking-widest">{at("chronos_agent_registry", "Agent Registry")}</span>
           </div>
           <div className="flex items-center gap-4">
@@ -436,13 +436,13 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
 
           {/* Spawn Form */}
           {showSpawn && (
-            <div className="p-4 bg-black/40 rounded-xl border border-kyberion-gold/20 space-y-3">
+            <div className="p-4 bg-black/40 rounded-xl border border-kyberion-warning/20 space-y-3">
               {/* Mode Toggle */}
               <div className="flex gap-2 mb-2">
                 <button
                   onClick={() => setSpawnMode("manifest")}
                   className={`flex-1 py-1.5 rounded-lg text-[9px] uppercase tracking-widest transition border ${
-                    spawnMode === "manifest" ? "bg-kyberion-gold/20 border-kyberion-gold/30" : "border-white/5 opacity-40"
+                    spawnMode === "manifest" ? "bg-kyberion-warning/20 border-kyberion-warning/30" : "border-white/5 opacity-40"
                   }`}
                 >
                   <FileText size={10} className="inline mr-1" /> {at("chronos_from_manifest", "From Manifest")}
@@ -450,7 +450,7 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
                 <button
                   onClick={() => setSpawnMode("custom")}
                   className={`flex-1 py-1.5 rounded-lg text-[9px] uppercase tracking-widest transition border ${
-                    spawnMode === "custom" ? "bg-kyberion-gold/20 border-kyberion-gold/30" : "border-white/5 opacity-40"
+                    spawnMode === "custom" ? "bg-kyberion-warning/20 border-kyberion-warning/30" : "border-white/5 opacity-40"
                   }`}
                 >
                   <Plus size={10} className="inline mr-1" /> {at("chronos_custom", "Custom")}
@@ -470,7 +470,7 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
                           onClick={() => setSelectedManifest(m.agentId)}
                           className={`w-full text-left p-3 rounded-lg border transition ${
                             selectedManifest === m.agentId
-                              ? "border-kyberion-gold/30 bg-kyberion-gold/10"
+                              ? "border-kyberion-warning/30 bg-kyberion-warning/10"
                               : "border-white/5 hover:border-white/10"
                           }`}
                         >
@@ -570,7 +570,7 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
                 <button
                   onClick={handleSpawn}
                   disabled={spawning || (spawnMode === "manifest" && !selectedManifest)}
-                  className="px-4 py-1.5 bg-kyberion-gold/20 border border-kyberion-gold/20 rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-kyberion-gold/30 transition disabled:opacity-20"
+                  className="px-4 py-1.5 bg-kyberion-warning/20 border border-kyberion-warning/20 rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-kyberion-warning/30 transition disabled:opacity-20"
                 >
                   {spawning ? "Booting..." : "Spawn"}
                 </button>
@@ -589,7 +589,7 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
           {!showSpawn && accessRole === "localadmin" && (
             <button
               onClick={() => { setShowSpawn(true); setSpawnMode("manifest"); setSelectedManifest(""); }}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-kyberion-gold/20 border border-kyberion-gold/20 rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-kyberion-gold/30 transition"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-kyberion-warning/20 border border-kyberion-warning/20 rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-kyberion-warning/30 transition"
             >
               <Plus size={12} /> Spawn Agent
             </button>

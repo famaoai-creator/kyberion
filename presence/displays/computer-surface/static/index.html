@@ -4,15 +4,16 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Computer Surface</title>
+    <link rel="stylesheet" href="design-tokens.css" />
     <style>
       :root {
         color-scheme: dark;
-        --bg: #07111a;
-        --panel: rgba(255,255,255,0.04);
-        --border: rgba(255,255,255,0.1);
-        --text: rgba(255,255,255,0.92);
-        --muted: rgba(255,255,255,0.55);
-        --accent: #7dd3fc;
+        --bg: var(--kb-bg-main);
+        --panel: var(--kb-panel-bg);
+        --border: var(--kb-border, rgba(255,255,255,0.1));
+        --text: var(--kb-text-primary);
+        --muted: var(--kb-text-secondary);
+        --accent: var(--kb-accent);
       }
       * { box-sizing: border-box; }
       body {
@@ -20,7 +21,7 @@
         min-height: 100vh;
         background: radial-gradient(circle at top, #12324a 0%, var(--bg) 42%, #02060a 100%);
         color: var(--text);
-        font-family: "IBM Plex Sans", "Inter", system-ui, sans-serif;
+        font-family: var(--kb-font-sans);
       }
       .shell {
         width: min(980px, calc(100vw - 32px));

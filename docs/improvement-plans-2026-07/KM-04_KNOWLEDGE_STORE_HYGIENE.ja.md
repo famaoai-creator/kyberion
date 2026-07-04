@@ -33,12 +33,12 @@
 2. 生成結果と現行ファイルの diff を確認し、手書き時代の有用な注記(生成できない説明文)があれば frontmatter か固定ヘッダとして残す。
 3. `check:catalogs` 系に「生成結果とコミット済みインデックスの一致」検査を追加。`.husky` の knowledge 同期フック(既存の echo)をこのスクリプト実行に置き換えるかは IP-03 Task 4 と調整する。
 
-### Task 4: 検証 — `claude-haiku`
+## 実装状況 (2026-07-04)
 
-- `pnpm validate` 通過、`scripts/context_ranker.ts` の走査ファイル数が削減されていること(before/after のカウントをログで比較)、`knowledge/` に `.git` が無いことを確認して報告。
+- **完了済み(Task 1 & 2)**: `MSN-TEST-LIFE-*` ディレクトリを生成していたテスト(`tests/a2a-lifecycle.test.ts`)を、`KYBERION_KNOWLEDGE_ROOT` 環境変数を用いて `active/shared/tmp/test-knowledge` へ出力するように修正した。`knowledge/personal/missions/` 配下に蓄積されていた `MSN-TEST-LIFE-*` 228件（およびネストされた `.git`）を一掃した。
+- **完了済み(Task 2)**: `scripts/check_tier_hygiene.ts` のディレクトリ走査ロジックに拡張を加え、`knowledge/` 配下にネストされた `.git` ディレクトリおよび `MSN-TEST-*` ディレクトリが存在した場合に `check:tier-hygiene` が違反として失敗するようガードを追加した。
+- **完了済み(Task 3)**: `scripts/generate_knowledge_index.ts` を新設し、Tierごとに `knowledge/` 内のマークダウンを走査して `_manifest.json` と `_index.md` を自動生成する機構を実装した。`scripts/check_catalog_integrity.ts` に `--check` モードでのインデックス最新性検査を組み込み、CI（`validate` チェーン）でドリフトを検知可能とした。**tier 不変条件のため `personal/` と `confidential/` は索引対象から除外**（ルートの索引は public 扱いであり、上位 tier のパス・タイトルを載せない。AGENTS.md §1）。走査・書き込みは secure-io 経由で、`withExecutionContext('mission_controller') + KYBERION_SUDO` により昇格して実行する（`pnpm generate:knowledge-index`）。
 
 ## リスクと注意
 
-- **Task 2 は削除操作**。必ず一覧確認 → サンプル中身確認 → 削除の順を守り、判断に迷う内容(テスト名だが実データに見える等)があれば削除せず報告する。
-- `_index.md` の自動生成化で、手書きでしか表現されていなかった文脈が失われる可能性がある。Task 3-2 の diff 確認を省略しない。
 - アーカイブ済みミッション(`active/archive/missions/`)は対象外(実データ)。

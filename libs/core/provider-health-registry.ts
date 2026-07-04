@@ -40,6 +40,14 @@ const DEFAULT_INSTANCE = 'default';
 
 const demotions = new Map<string, Demotion>();
 
+export function getProviderHealthDemotionTtlMs(): number {
+  const configured = Number(process.env.KYBERION_PROVIDER_DEMOTION_TTL_MS || '');
+  if (Number.isFinite(configured) && configured > 0) {
+    return Math.round(configured);
+  }
+  return DEFAULT_DEMOTION_MS;
+}
+
 function keyFor(provider: string, instance: string): string {
   return `${provider}#${instance}`;
 }
@@ -64,14 +72,32 @@ export function reportProviderRateLimited(
   provider: string,
   opts: { instance?: string; retryAfterMs?: number; reason?: string; now?: number } = {},
 ): void {
+  reportProviderTemporarilyUnhealthy(provider, {
+    instance: opts.instance,
+    retryAfterMs: opts.retryAfterMs,
+    reason: opts.reason || 'rate_limited',
+    now: opts.now,
+  });
+}
+
+/**
+ * Temporarily demote a provider instance for a TTL.
+ *
+ * Use this for any short-lived failure mode that should trigger a retry on the
+ * next healthy candidate. `reportProviderRateLimited()` is a semantic wrapper.
+ */
+export function reportProviderTemporarilyUnhealthy(
+  provider: string,
+  opts: { instance?: string; retryAfterMs?: number; reason?: string; now?: number } = {},
+): void {
   const instance = opts.instance || DEFAULT_INSTANCE;
   const now = opts.now ?? Date.now();
-  const ttl = opts.retryAfterMs && opts.retryAfterMs > 0 ? opts.retryAfterMs : DEFAULT_DEMOTION_MS;
+  const ttl = opts.retryAfterMs && opts.retryAfterMs > 0 ? opts.retryAfterMs : getProviderHealthDemotionTtlMs();
   demotions.set(keyFor(provider, instance), {
     provider,
     instance,
     until: now + ttl,
-    reason: opts.reason || 'rate_limited',
+    reason: opts.reason || 'temporarily_unhealthy',
   });
 }
 

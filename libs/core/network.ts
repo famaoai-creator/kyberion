@@ -5,7 +5,7 @@ import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile, validateUrl } from './secure-io.js';
 import { evaluateEgressPolicy } from './egress-policy.js';
 import { auditChain } from './audit-chain.js';
-import { killSwitch } from './kill-switch.js';
+import { recordGovernanceAction } from './kill-switch.js';
 
 /**
  * Standardized network utilities for Kyberion Components.
@@ -111,9 +111,10 @@ export async function secureFetch<T = any>(options: SecureFetchOptions): Promise
   // 1. Verify Endpoint Integrity for all requests.
   const egressDecision = evaluateEgressPolicy(url);
   if (egressDecision.verdict === 'deny') {
-    killSwitch.logAction(
+    recordGovernanceAction(
       process.env.KYBERION_PERSONA || 'unknown',
-      `egress:${hostname}:denied`,
+      'egress',
+      `${hostname}:denied`,
       true
     );
     auditChain.record({
@@ -132,9 +133,10 @@ export async function secureFetch<T = any>(options: SecureFetchOptions): Promise
   }
   if (egressDecision.verdict === 'warn') {
     logger.warn(`[NETWORK_POLICY] ${egressDecision.reason}`);
-    killSwitch.logAction(
+    recordGovernanceAction(
       process.env.KYBERION_PERSONA || 'unknown',
-      `egress:${hostname}:warn`,
+      'egress',
+      `${hostname}:warn`,
       false
     );
   }

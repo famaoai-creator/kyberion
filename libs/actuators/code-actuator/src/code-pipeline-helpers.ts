@@ -264,7 +264,7 @@ async function opControl(
       return ctx;
 
     default:
-      return ctx;
+      throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
   }
 }
 
@@ -367,7 +367,7 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
     case 'discover_skills':
       return { ...ctx, [params.export_as || 'skills_list']: discoverGovernedSkills() };
     default:
-      return ctx;
+      throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
   }
 }
 
@@ -439,7 +439,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
       await new vm.Script(resolve(params.code)).runInContext(sandbox);
       return { ...sandbox.ctx };
     default:
-      return ctx;
+      throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
   }
 }
 

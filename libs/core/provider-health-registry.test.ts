@@ -7,6 +7,7 @@ import {
   listDemotedProviders,
   reportProviderHealthy,
   reportProviderRateLimited,
+  reportProviderTemporarilyUnhealthy,
   resolveCapabilityTargetWithHealth,
   selectHealthyInstance,
 } from './provider-health-registry.js';
@@ -34,16 +35,25 @@ describe('provider-health-registry', () => {
   beforeEach(() => {
     clearProviderHealth();
     delete process.env.KYBERION_CODEX_INSTANCES;
+    delete process.env.KYBERION_PROVIDER_DEMOTION_TTL_MS;
   });
   afterEach(() => {
     clearProviderHealth();
     delete process.env.KYBERION_CODEX_INSTANCES;
+    delete process.env.KYBERION_PROVIDER_DEMOTION_TTL_MS;
   });
 
   it('demotes an instance for a TTL and recovers after it expires', () => {
     reportProviderRateLimited('codex', { retryAfterMs: 5000, now: T0 });
     expect(isInstanceDemoted('codex', 'default', T0 + 1000)).toBe(true);
     expect(isInstanceDemoted('codex', 'default', T0 + 6000)).toBe(false);
+  });
+
+  it('uses the configured demotion ttl when retryAfterMs is omitted', () => {
+    process.env.KYBERION_PROVIDER_DEMOTION_TTL_MS = '2500';
+    reportProviderTemporarilyUnhealthy('codex', { now: T0 });
+    expect(isInstanceDemoted('codex', 'default', T0 + 2400)).toBe(true);
+    expect(isInstanceDemoted('codex', 'default', T0 + 2600)).toBe(false);
   });
 
   it('reads the instance pool from env', () => {

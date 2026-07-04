@@ -1,14 +1,5 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
-
-import { pathResolver } from './path-resolver.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { TaskResultSchema, formatZodIssues } from './structured-output-contracts.js';
 import type { TaskResultBlock } from './channel-surface-types.js';
-
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
-const TASK_RESULT_SCHEMA_PATH = pathResolver.knowledge('product/schemas/task-result.schema.json');
-
-let taskResultValidateFn: ValidateFunction | null = null;
 
 export interface TaskResultValidationResult {
   valid: boolean;
@@ -16,36 +7,13 @@ export interface TaskResultValidationResult {
   value?: TaskResultBlock;
 }
 
-function ensureTaskResultValidator(): ValidateFunction {
-  if (taskResultValidateFn) return taskResultValidateFn;
-  taskResultValidateFn = compileSchemaFromPath(ajv, TASK_RESULT_SCHEMA_PATH);
-  return taskResultValidateFn;
-}
-
-function errorsFrom(validate: ValidateFunction): string[] {
-  return (validate.errors || []).map((error) =>
-    `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim()
-  );
-}
-
 export function validateTaskResult(value: unknown): TaskResultValidationResult {
-  const validate = ensureTaskResultValidator();
-  const valid = validate(value);
+  const result = TaskResultSchema.safeParse(value);
   return {
-    valid: Boolean(valid),
-    errors: valid ? [] : errorsFrom(validate),
-    value: valid ? (value as TaskResultBlock) : undefined,
+    valid: result.success,
+    errors: result.success ? [] : formatZodIssues(result.error),
+    value: result.success ? result.data : undefined,
   };
-}
-
-function extractJsonObject(text: string): string | null {
-  const trimmed = text.trim();
-  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/iu);
-  const content = fenced ? fenced[1].trim() : trimmed;
-  const start = content.indexOf('{');
-  const end = content.lastIndexOf('}');
-  if (start === -1 || end === -1 || end <= start) return null;
-  return content.slice(start, end + 1);
 }
 
 export function extractTaskResultBlocks(raw: string): {
@@ -77,19 +45,6 @@ export function extractTaskResultBlocks(raw: string): {
     }
     return '';
   });
-
-  const json = extractJsonObject(text);
-  if (json) {
-    try {
-      const parsed = JSON.parse(json);
-      const validation = validateTaskResult(parsed);
-      if (validation.valid && validation.value) {
-        taskResults.push(validation.value);
-      }
-    } catch {
-      // ignore plain text fallback
-    }
-  }
 
   return { text, taskResults, taskResultErrors };
 }

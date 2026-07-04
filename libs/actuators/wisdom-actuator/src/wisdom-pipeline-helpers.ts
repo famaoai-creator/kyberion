@@ -253,7 +253,7 @@ async function opControl(op: string, params: any, ctx: any, options: any, state:
       return ctx;
 
     default:
-      return ctx;
+      throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
   }
 }
 
@@ -325,7 +325,7 @@ async function opCapture(op: string, params: any, ctx: any) {
       return ctx;
     }
     default:
-      return ctx;
+      throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
   }
 }
 

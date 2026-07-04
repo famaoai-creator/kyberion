@@ -8,10 +8,11 @@ function read(relPath: string): string {
 describe('Service and channel boundary', () => {
   it('uses shared service bindings for Slack gateway ingress and channel delivery', () => {
     const slackBridge = read('satellites/slack-bridge/src/index.ts');
-    const presenceActuator = read('libs/actuators/presence-actuator/src/index.ts');
+    // presence-actuator delegates to helpers; check the helpers file where Slack binding is used
+    const presenceActuatorHelpers = read('libs/actuators/presence-actuator/src/presence-actuator-helpers.ts');
 
-    expect(slackBridge).toContain('resolveServiceBinding(\'slack\', \'secret-guard\')');
-    expect(presenceActuator).toContain('resolveServiceBinding(\'slack\', \'secret-guard\')');
+    expect(slackBridge).toContain("resolveServiceBinding('slack', 'secret-guard')");
+    expect(presenceActuatorHelpers).toContain("resolveServiceBinding('slack', 'secret-guard')");
   });
 
   it('keeps Slack streaming ingress out of the service actuator', () => {

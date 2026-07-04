@@ -1,15 +1,18 @@
 import * as path from 'node:path';
 
 import { Client, GatewayIntentBits, Events, Message } from 'discord.js';
-import { 
-  createStandardYargs, 
-  logger, 
+import {
+  createStandardYargs,
+  logger,
   pathResolver,
   safeAppendFileSync,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
-  runSurfaceMessageConversation 
+  runSurfaceMessageConversation,
+  buildBridgeEmptyReplyText,
+  chunkBridgeMessage,
+  postBridgeError,
 } from '@agent/core';
 
 const DISCORD_SURFACE_AGENT_ID = 'discord-surface-agent';
@@ -147,7 +150,12 @@ async function handleDiscordMessage(message: Message) {
 
     if (result.text) {
       logger.info(`📤 [DiscordBridge] Replying to ${message.author.tag}`);
-      await message.reply(result.text);
+      // Discord rejects messages over 2,000 chars — long replies used to
+      // throw here and vanish into the catch below (UX-01).
+      const chunks = chunkBridgeMessage(result.text, 1900);
+      for (const chunk of chunks) {
+        await message.reply(chunk);
+      }
       appendDiscordThreadHistory({
         role: 'assistant',
         authorLabel: DISCORD_SURFACE_AGENT_ID,
@@ -157,9 +165,20 @@ async function handleDiscordMessage(message: Message) {
         channelId: message.channelId,
         receivedAt: new Date().toISOString(),
       });
+    } else {
+      // UX-01: an empty agent reply must not read as silence.
+      await message.reply(buildBridgeEmptyReplyText({ locale: 'ja' }));
     }
   } catch (err: any) {
     logger.error(`❌ [DiscordBridge] Conversation failed: ${err.message}`);
+    // UX-01: surface a vocabulary-based error to the user (rate-limited per channel).
+    await postBridgeError({
+      conversationKey: `discord:${message.channelId}`,
+      err,
+      surface: 'discord',
+      locale: 'ja',
+      post: (errorText) => message.reply(errorText),
+    });
   }
 }
 

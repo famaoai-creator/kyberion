@@ -1,5 +1,7 @@
 # Kyberion Design System (KDS): Sovereign Command
 
+> **Note:** For the canonical design tokens and how they are generated across all surfaces, see [DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md).
+
 This document defines the visual theme and UX principles for Kyberion, specifically for the **Chronos Mirror** control surface.
 
 ## 1. Core Philosophy: "Deep Space Intelligence"

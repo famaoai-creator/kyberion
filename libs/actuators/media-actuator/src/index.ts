@@ -1593,7 +1593,7 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
       return { ...ctx, [exportKey]: md };
     }
     default:
-      return ctx;
+      throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
   }
 }
 
@@ -2005,8 +2005,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
       };
     }
     default:
-      logger.warn(`[MEDIA_TRANSFORM] Unknown transform op: ${op}`);
-      return ctx;
+      throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
   }
 }
 

@@ -6,6 +6,7 @@ import {
   safeStat,
   safeUnlinkSync,
   safeExistsSync,
+  safeWriteFile,
 } from './secure-io.js';
 import { logger } from './core.js';
 
@@ -248,7 +249,7 @@ export function runJanitor(opts: { dryRun: boolean }): JanitorReport {
     errors.push(`runtime: ${err?.message ?? String(err)}`);
   }
 
-  return {
+  const report: JanitorReport = {
     expiredTmp: tmpResult.expired.length,
     deletedTmp: tmpResult.deleted.length,
     expiredLogs: logResult.expired.length,
@@ -261,4 +262,46 @@ export function runJanitor(opts: { dryRun: boolean }): JanitorReport {
     timestamp: new Date().toISOString(),
     dryRun: opts.dryRun,
   };
+
+  if (!opts.dryRun) {
+    try {
+      safeWriteFile(
+        shared(JANITOR_MARKER_SUBPATH),
+        JSON.stringify({ completed_at: report.timestamp, errors: errors.length }, null, 2)
+      );
+    } catch (err: any) {
+      // The marker only powers the staleness gate; a real run without a marker
+      // just means the next session re-runs the janitor.
+      logger.warn(`[JANITOR] failed to persist last-run marker: ${err?.message ?? String(err)}`);
+    }
+  }
+
+  return report;
+}
+
+const JANITOR_MARKER_SUBPATH = 'runtime/state/janitor-last-run.json';
+
+export function readJanitorLastRunMs(): number | null {
+  const markerPath = shared(JANITOR_MARKER_SUBPATH);
+  if (!safeExistsSync(markerPath)) return null;
+  try {
+    const parsed = JSON.parse(String(safeReadFile(markerPath, { encoding: 'utf8' })));
+    const ts = Date.parse(parsed?.completed_at);
+    return Number.isFinite(ts) ? ts : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * KM-01 fallback: sessions without a resident chronos daemon still get TTL GC.
+ * Runs the janitor only when the last completed run is older than maxAgeMs.
+ */
+export function runJanitorIfStale(
+  opts: { maxAgeMs?: number; dryRun?: boolean } = {}
+): JanitorReport | null {
+  const maxAgeMs = opts.maxAgeMs ?? DEFAULT_TMP_TTL_MS;
+  const last = readJanitorLastRunMs();
+  if (last !== null && Date.now() - last < maxAgeMs) return null;
+  return runJanitor({ dryRun: opts.dryRun ?? false });
 }

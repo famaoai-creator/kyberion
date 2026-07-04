@@ -3,6 +3,12 @@
 > 優先度: P1(小・高価値の即効) / 規模: S / 依存: AR-02(op 分類の正確化)推奨 / 関連: IP-08(エラー規律)、HN-03(無音打ち切り)
 > **検証(2026-07-03, Fable)**: `file-pipeline-helpers.ts` に `default: return ctx;`(:178/:237/:249)を確認 — 未知/誤分類 op が **status=success のまま何もしない**。verb 経路は `:95` で throw(整合が取れていない)。
 
+## 進捗(2026-07-04)
+
+- **完了済み(Task 1 の大半)**: file / android / ios / code / media / modeling / network / orchestrator / system / wisdom の各 pipeline-helpers で silent `default: return ctx;`(および warn+素通し)を `throw new Error('[UNKNOWN_OP] Unknown op: ...')` に置換。file-actuator は未知 step type も `[UNKNOWN_TYPE]` エラー化。
+- **完了済み(Task 3 の一部)**: android / ios の代表テストを「未知 op → status=failed + `[UNKNOWN_OP]` エラー」を固定する形に更新。
+- **未完了**: 「近い op を suggest」する teach メッセージ(Task 1-1 後半 / Task 2-2)、正当な no-op の `skipped` 明示化(受入条件3)、silent default を検出する lint / 専用チェック(Task 3 前半)、AR-01 正準エンジンへの集約(Task 2-1)。
+
 ## 背景と課題
 
 「動くはず」を裏切る最悪の体験: **op を打ち間違える/type を誤分類すると、エラーでなく `status:success` で無反応**になる。

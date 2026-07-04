@@ -680,6 +680,72 @@ describe('intent-contract compiler', () => {
     });
   });
 
+  it('selects the policy-routed compiler model for the intent when no override is provided', () => {
+    const target = resolveIntentCompilerTarget({
+      selectedIntent: {
+        id: 'review-analysis-report',
+        category: 'analysis',
+        description: 'Review and compare the analysis report for correctness',
+        execution_shape: 'task_session',
+        risk_profile: 'high_stakes',
+        resolution: { shape: 'task_session', task_kind: 'analysis' },
+      } as any,
+      discoveredProviders: [
+        { provider: 'codex', installed: true, healthy: true },
+        { provider: 'claude', installed: true, healthy: true },
+        { provider: 'gemini', installed: false, healthy: false },
+      ] as any,
+      modelRegistry: {
+        version: '1.0.0',
+        default_model_id: 'openai:gpt-5.5',
+        models: [
+          {
+            model_id: 'openai:gpt-5.5',
+            provider: 'openai',
+            family: 'gpt-5',
+            status: 'approved',
+            tier: 'large',
+            execution_tier: 'deep',
+            reasoning_confidence: 'high',
+            role_fit: {
+              intent_compiler: 'primary',
+              surface_agent: 'primary',
+              analysis: 'primary',
+              coding: 'primary',
+            },
+            capability_tags: ['multi_step_reasoning'],
+            cost_band: 'high',
+            latency_band: 'medium',
+          },
+          {
+            model_id: 'anthropic:claude-sonnet-4.5',
+            provider: 'anthropic',
+            family: 'claude-sonnet',
+            status: 'candidate',
+            tier: 'large',
+            execution_tier: 'deep',
+            reasoning_confidence: 'high',
+            role_fit: {
+              intent_compiler: 'secondary',
+              surface_agent: 'secondary',
+              analysis: 'primary',
+              coding: 'secondary',
+            },
+            capability_tags: ['strategy_review', 'long_context_analysis'],
+            cost_band: 'high',
+            latency_band: 'medium',
+          },
+        ],
+      } as any,
+    });
+
+    expect(target).toEqual({
+      provider: 'codex',
+      model: 'gpt-5.5',
+      modelProvider: 'openai',
+    });
+  });
+
   it('infers delivery mode from governed rules', () => {
     expect(
       inferGovernedDeliveryMode('この要件定義を長期的に継続改善したい', 'task_session', [])

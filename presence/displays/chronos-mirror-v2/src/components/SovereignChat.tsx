@@ -201,16 +201,16 @@ export function SovereignChat({
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 w-14 h-14 bg-kyberion-gold/20 border border-kyberion-gold/30 rounded-full flex items-center justify-center hover:bg-kyberion-gold/30 transition z-50"
+        className="fixed bottom-6 right-6 w-14 h-14 bg-kyberion-warning/20 border border-kyberion-warning/30 rounded-full flex items-center justify-center hover:bg-kyberion-warning/30 transition z-50"
       >
-        <MessageSquare className="text-kyberion-gold w-6 h-6" />
+        <MessageSquare className="text-kyberion-warning w-6 h-6" />
       </button>
     );
   }
 
   return (
     <div
-      className="fixed w-[420px] h-[520px] kyberion-glass rounded-2xl border border-kyberion-gold/20 flex flex-col overflow-hidden z-50"
+      className="fixed w-[420px] h-[520px] kyberion-glass rounded-2xl border border-kyberion-warning/20 flex flex-col overflow-hidden z-50"
       style={{ bottom: `${24 - pos.y}px`, right: `${24 - pos.x}px` }}
     >
       {/* Header — drag handle */}
@@ -277,7 +277,7 @@ export function SovereignChat({
             <div
               className={`max-w-[85%] px-3 py-2 rounded-xl text-[11px] leading-relaxed ${
                 msg.role === 'user'
-                  ? 'bg-kyberion-gold/20 border border-kyberion-gold/20'
+                  ? 'bg-kyberion-warning/20 border border-kyberion-warning/20'
                   : msg.status === 'error'
                     ? 'bg-red-900/20 border border-red-500/20'
                     : 'bg-white/5 border border-white/5'
@@ -323,7 +323,7 @@ export function SovereignChat({
             className={`flex-1 bg-white/5 border rounded-lg px-3 py-2 text-[11px] outline-none transition ${
               isListening
                 ? 'border-red-500/50 bg-red-900/10'
-                : 'border-white/10 focus:border-kyberion-gold/30'
+                : 'border-white/10 focus:border-kyberion-warning/30'
             }`}
             disabled={isLoading}
           />
@@ -340,9 +340,9 @@ export function SovereignChat({
           <button
             onClick={sendMessage}
             disabled={isLoading || !input.trim()}
-            className="p-2 bg-kyberion-gold/20 border border-kyberion-gold/20 rounded-lg hover:bg-kyberion-gold/30 transition disabled:opacity-20"
+            className="p-2 bg-kyberion-warning/20 border border-kyberion-warning/20 rounded-lg hover:bg-kyberion-warning/30 transition disabled:opacity-20"
           >
-            <Send className="w-4 h-4 text-kyberion-gold" />
+            <Send className="w-4 h-4 text-kyberion-warning" />
           </button>
         </div>
       </div>

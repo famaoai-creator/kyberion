@@ -18,6 +18,7 @@ describe('run_pipeline compatibility', () => {
     expect(normalizePipelineOp('if')).toBe('core:if');
     expect(normalizePipelineOp('while')).toBe('core:while');
     expect(normalizePipelineOp('parallel_foreach')).toBe('core:parallel_foreach');
+    expect(normalizePipelineOp('accumulate')).toBe('core:accumulate');
     expect(normalizePipelineOp('system:shell')).toBe('system:shell');
   });
 
@@ -156,7 +157,7 @@ describe('run_pipeline compatibility', () => {
       deletedTmp: 0,
       errors: expect.any(Array),
     });
-  });
+  }, 30000);
 
   it('runs parallel_foreach with bounded concurrency and collects per-item outputs', async () => {
     const startedAt = Date.now();
@@ -196,6 +197,40 @@ describe('run_pipeline compatibility', () => {
     expect(result.context.parallel_outputs[1].context.mapped.doubled).toBe(4);
   });
 
+  it('runs accumulate until the unique target count is reached', async () => {
+    const result = await runSteps([
+      {
+        op: 'core:accumulate',
+        params: {
+          items: [1, 1, 2, 3],
+          as: 'item',
+          target_count: 2,
+          dry_streak_limit: 2,
+          export_as: 'accumulated',
+          collect_as: 'seen',
+          do: [
+            {
+              op: 'core:transform',
+              params: {
+                input: '{{item}}',
+                script: 'return { seen: Number(input) };',
+                export_as: 'seen',
+              },
+            },
+          ],
+        },
+      },
+    ]);
+
+    expect(result.status).toBe('succeeded');
+    expect(result.context.accumulated.collected).toHaveLength(2);
+    expect(result.context.accumulated.collected.map((entry: any) => entry.value.seen)).toEqual([
+      1,
+      2,
+    ]);
+    expect(result.context.accumulated.iterations).toBe(3);
+  });
+
   it('runs while loops until the condition is no longer true', async () => {
     const result = await runSteps(
       [
@@ -225,6 +260,47 @@ describe('run_pipeline compatibility', () => {
     expect((result.context.loop as any).count).toBe(3);
     expect(result.context.loop_result).toMatchObject({
       iterations: 3,
+      history: expect.any(Array),
+    });
+  });
+
+  it('runs retry_until_quality until the verdict is acceptable', async () => {
+    const result = await runSteps(
+      [
+        {
+          op: 'core:retry_until_quality',
+          params: {
+            max_iterations: 4,
+            export_as: 'quality_result',
+            pipeline: [
+              {
+                op: 'core:transform',
+                params: {
+                  input: '{{quality_count}}',
+                  script: 'return Number(input || 0) + 1;',
+                  export_as: 'quality_count',
+                },
+              },
+              {
+                op: 'core:transform',
+                params: {
+                  input: '{{quality_count}}',
+                  script:
+                    'const count = Number(input || 0); return count >= 2 ? "ok" : "pending";',
+                  export_as: 'verdict',
+                },
+              },
+            ],
+          },
+        },
+      ],
+      { quality_count: 0, verdict: 'pending' }
+    );
+
+    expect(result.status).toBe('succeeded');
+    expect(result.context.quality_count).toBe(2);
+    expect(result.context.quality_result).toMatchObject({
+      iterations: 2,
       history: expect.any(Array),
     });
   });

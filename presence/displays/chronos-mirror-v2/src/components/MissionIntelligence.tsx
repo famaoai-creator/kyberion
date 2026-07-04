@@ -2281,10 +2281,10 @@ export function MissionIntelligence({
           </div>
         </section>
       )}
-      <section className="rounded-[26px] border border-kyberion-gold/15 bg-gradient-to-br from-kyberion-gold/10 via-black/10 to-cyan-950/20 px-5 py-5">
+      <section className="rounded-[26px] border border-kyberion-warning/15 bg-gradient-to-br from-kyberion-warning/10 via-black/10 to-cyan-950/20 px-5 py-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <div className="text-[10px] uppercase tracking-[0.3em] text-kyberion-gold/45">
+            <div className="text-[10px] uppercase tracking-[0.3em] text-kyberion-warning/45">
               {mt('chronos_operator_console', 'Operator Console')}
             </div>
             <h2 className="mt-2 text-xl font-semibold tracking-tight text-white/90">
@@ -2542,7 +2542,7 @@ export function MissionIntelligence({
           </div>
           <div className="space-y-3">
             {nextActions.length === 0 ? (
-              <div className="text-[11px] italic text-kyberion-gold/30">
+              <div className="text-[11px] italic text-kyberion-warning/30">
                 No immediate next actions recommended.
               </div>
             ) : (
@@ -2725,7 +2725,7 @@ export function MissionIntelligence({
           ) : null}
           <div className="space-y-3">
             {filteredMissions.length === 0 ? (
-              <div className="text-[11px] italic text-kyberion-gold/30">No active missions.</div>
+              <div className="text-[11px] italic text-kyberion-warning/30">No active missions.</div>
             ) : (
               filteredMissions.map((mission) => {
                 const progress = data.missionProgress.find(
@@ -3262,7 +3262,7 @@ export function MissionIntelligence({
           </div>
           <div className="space-y-3">
             {data.recentSurfaceOutbox.length === 0 ? (
-              <div className="text-[11px] italic text-kyberion-gold/30">
+              <div className="text-[11px] italic text-kyberion-warning/30">
                 {mt(
                   'chronos_no_recent_surface_outbox',
                   'No pending or recent surface outbox messages.'
@@ -3464,7 +3464,7 @@ export function MissionIntelligence({
           </div>
           <div className="space-y-3">
             {hydratedTracks.length === 0 ? (
-              <div className="text-[11px] italic text-kyberion-gold/30">
+              <div className="text-[11px] italic text-kyberion-warning/30">
                 {mt('chronos_no_tracks', 'No tracks registered yet.')}
               </div>
             ) : (
@@ -3578,7 +3578,7 @@ export function MissionIntelligence({
           </div>
           <div className="space-y-3">
             {filteredServiceBindings.length === 0 ? (
-              <div className="text-[11px] italic text-kyberion-gold/30">
+              <div className="text-[11px] italic text-kyberion-warning/30">
                 No service bindings registered yet.
               </div>
             ) : (
@@ -3641,7 +3641,7 @@ export function MissionIntelligence({
           </div>
           <div className="space-y-3">
             {filteredMissionSeedsByTrack.length === 0 ? (
-              <div className="text-[11px] italic text-kyberion-gold/30">
+              <div className="text-[11px] italic text-kyberion-warning/30">
                 No mission seeds recorded yet.
               </div>
             ) : (
@@ -4001,7 +4001,7 @@ export function MissionIntelligence({
           </div>
           <div className="space-y-3">
             {filteredPendingApprovalsByTrack.length === 0 ? (
-              <div className="text-[11px] italic text-kyberion-gold/30">
+              <div className="text-[11px] italic text-kyberion-warning/30">
                 {mt('chronos_no_pending_approvals', 'No pending approvals.')}
               </div>
             ) : (
@@ -4120,7 +4120,7 @@ export function MissionIntelligence({
           </div>
           <div className="space-y-3">
             {filteredRecentArtifactsByTrack.length === 0 ? (
-              <div className="text-[11px] italic text-kyberion-gold/30">
+              <div className="text-[11px] italic text-kyberion-warning/30">
                 No governed artifacts recorded yet.
               </div>
             ) : (
@@ -4221,7 +4221,7 @@ export function MissionIntelligence({
           </div>
           <div className="space-y-3">
             {filteredDistillCandidatesByTrack.length === 0 ? (
-              <div className="text-[11px] italic text-kyberion-gold/30">
+              <div className="text-[11px] italic text-kyberion-warning/30">
                 {mt('chronos_no_distill_candidates', 'No distill candidates recorded yet.')}
               </div>
             ) : (
@@ -4402,7 +4402,7 @@ export function MissionIntelligence({
           </div>
           <div className="space-y-3">
             {filteredMemoryCandidatesByTrack.length === 0 ? (
-              <div className="text-[11px] italic text-kyberion-gold/30">
+              <div className="text-[11px] italic text-kyberion-warning/30">
                 No memory candidates queued.
               </div>
             ) : (
@@ -4458,7 +4458,7 @@ export function MissionIntelligence({
         <Panel title="Recent Control Actions">
           <div className="space-y-3">
             {data.controlActions.length === 0 ? (
-              <div className="text-[11px] italic text-kyberion-gold/30">
+              <div className="text-[11px] italic text-kyberion-warning/30">
                 No recent mission or surface control actions.
               </div>
             ) : (
@@ -4524,12 +4524,12 @@ export function MissionIntelligence({
         <Panel title="Orchestration Audit">
           <div className="space-y-3">
             {data.recentEvents.length === 0 ? (
-              <div className="text-[11px] italic text-kyberion-gold/30">
+              <div className="text-[11px] italic text-kyberion-warning/30">
                 No orchestration events yet.
               </div>
             ) : (
               data.recentEvents.map((event, index) => (
-                <div key={`${event.ts}-${index}`} className="border-l border-kyberion-gold/20 pl-3">
+                <div key={`${event.ts}-${index}`} className="border-l border-kyberion-warning/20 pl-3">
                   <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] text-white/45">
                     <Activity size={10} />
                     <span>{event.decision}</span>
@@ -4549,7 +4549,7 @@ export function MissionIntelligence({
         <Panel id="owner-summaries" title="Owner Summaries">
           <div className="space-y-3">
             {data.ownerSummaries.length === 0 ? (
-              <div className="text-[11px] italic text-kyberion-gold/30">
+              <div className="text-[11px] italic text-kyberion-warning/30">
                 No owner summaries yet.
               </div>
             ) : (
@@ -4951,7 +4951,7 @@ export function MissionIntelligence({
           })()}
           <div className="space-y-3">
             {data.surfaces.length === 0 ? (
-              <div className="text-[11px] italic text-kyberion-gold/30">
+              <div className="text-[11px] italic text-kyberion-warning/30">
                 {mt('chronos_no_managed_surfaces', 'No managed surfaces.')}
               </div>
             ) : (
@@ -5225,7 +5225,7 @@ export function MissionIntelligence({
           </div>
           <div className="space-y-3">
             {filteredAgentMessages.length === 0 ? (
-              <div className="text-[11px] italic text-kyberion-gold/30">
+              <div className="text-[11px] italic text-kyberion-warning/30">
                 {mt(
                   'chronos_no_mission_scoped_messages',
                   'No mission-scoped agent messages observed yet.'
@@ -5476,7 +5476,7 @@ function Panel({ id, title, children }: { id?: string; title: string; children: 
   return (
     <div id={id} className="rounded-2xl border border-white/5 bg-black/25 p-4 scroll-mt-6">
       <div className="mb-4 flex items-center justify-between gap-3">
-        <div className="text-[10px] uppercase tracking-[0.3em] text-kyberion-gold/45">{title}</div>
+        <div className="text-[10px] uppercase tracking-[0.3em] text-kyberion-warning/45">{title}</div>
       </div>
       {children}
     </div>
@@ -5494,7 +5494,7 @@ function RuntimeCell({
 }) {
   const accentClass = {
     emerald: 'text-emerald-300/80',
-    gold: 'text-kyberion-gold/80',
+    gold: 'text-kyberion-warning/80',
     red: 'text-red-300/80',
     cyan: 'text-cyan-300/80',
   }[accent];

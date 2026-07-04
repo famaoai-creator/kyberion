@@ -10,10 +10,12 @@ vi.mock('./path-resolver.js', () => ({
   pathResolver: {
     rootResolve: (p: string) => `/repo/${p}`,
     rootDir: () => '/repo',
+    knowledge: (p = '') => `/repo/knowledge/${p}`,
     shared: (p = '') => `/repo/active/shared/${p}`,
     resolve: (p: string) => p,
   },
   rootDir: () => '/repo',
+  knowledge: (p = '') => `/repo/knowledge/${p}`,
 }));
 
 vi.mock('./secure-io.js', () => ({

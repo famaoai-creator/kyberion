@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   auditVerify: vi.fn(),
+  auditVerifyTenantMirrors: vi.fn(),
   ledgerVerify: vi.fn(),
   safeExistsSync: vi.fn(),
 }));
@@ -11,19 +12,14 @@ vi.mock('@agent/core', async (importOriginal) => {
   return {
     ...(actual as any),
     safeExistsSync: mocks.safeExistsSync,
+    auditChain: {
+      verify: mocks.auditVerify,
+      verifyTenantMirrors: mocks.auditVerifyTenantMirrors,
+    },
+    GLOBAL_LEDGER_PATH: 'active/audit/system-ledger.jsonl',
+    verifyLedgerIntegrityDetailed: mocks.ledgerVerify,
   };
 });
-
-vi.mock('../libs/core/audit-chain.js', () => ({
-  auditChain: {
-    verify: mocks.auditVerify,
-  },
-}));
-
-vi.mock('../libs/core/ledger.js', () => ({
-  GLOBAL_LEDGER_PATH: 'active/audit/system-ledger.jsonl',
-  verifyLedgerIntegrityDetailed: mocks.ledgerVerify,
-}));
 
 describe('audit_verify', () => {
   beforeEach(() => {
@@ -41,6 +37,7 @@ describe('audit_verify', () => {
       corrupted: [],
       missingKey: false,
     });
+    mocks.auditVerifyTenantMirrors.mockReturnValue({ ok: true, findings: [] });
     mocks.safeExistsSync.mockReturnValue(true);
   });
 
@@ -68,6 +65,19 @@ describe('audit_verify', () => {
 
     expect(report.ok).toBe(false);
     expect(report.audit.corrupted).toContain('AUD-1');
+  });
+
+  it('returns failed when tenant mirrors diverge from the master chain', async () => {
+    mocks.auditVerifyTenantMirrors.mockReturnValue({
+      ok: false,
+      findings: ['tenant acme: mirror count 2 != master count 3'],
+    });
+    const { collectAuditVerifyReport } = await import('./audit_verify.js');
+
+    const report = collectAuditVerifyReport();
+
+    expect(report.ok).toBe(false);
+    expect(report.tenantMirrors.findings).toHaveLength(1);
   });
 
   it('passes since and extra ledger paths through to the verifiers', async () => {

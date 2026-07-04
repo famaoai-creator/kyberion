@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  buildFailoverReasoningBackend,
   delegateBestOf,
   delegateStructured,
   getReasoningBackend,
@@ -8,11 +9,13 @@ import {
   stubReasoningBackend,
   type ReasoningBackend,
 } from './reasoning-backend.js';
+import { clearProviderHealth } from './provider-health-registry.js';
 import { z } from 'zod';
 
 describe('reasoning-backend', () => {
   afterEach(() => {
     resetReasoningBackend();
+    clearProviderHealth();
   });
 
   it('defaults to the stub backend when none is registered', () => {
@@ -38,6 +41,37 @@ describe('reasoning-backend', () => {
     expect(getReasoningBackend().name).toBe('fake');
   });
 
+  it('fails over to the next backend when the first backend throws', async () => {
+    const calls: string[] = [];
+    const backend = buildFailoverReasoningBackend([
+      {
+        label: 'primary',
+        provider: 'codex',
+        backend: {
+          ...stubReasoningBackend,
+          prompt: async () => {
+            calls.push('primary');
+            throw new Error('primary failed');
+          },
+        },
+      },
+      {
+        label: 'fallback',
+        provider: 'gemini',
+        backend: {
+          ...stubReasoningBackend,
+          prompt: async () => {
+            calls.push('fallback');
+            return 'ok';
+          },
+        },
+      },
+    ]);
+
+    await expect(backend.prompt('hello')).resolves.toBe('ok');
+    expect(calls).toEqual(['primary', 'fallback']);
+  });
+
   it('delegates structured output with retry-on-mismatch', async () => {
     const calls: string[] = [];
     const backend = {
@@ -57,6 +91,90 @@ describe('reasoning-backend', () => {
     expect(result).toEqual({ answer: 'ok' });
     expect(calls).toHaveLength(2);
     expect(calls[1]).toContain('Retry attempt 1');
+  });
+
+  it('resolves structured schemas by registry name', async () => {
+    const calls: string[] = [];
+    const backend = {
+      delegateTask: async (instruction: string) => {
+        calls.push(instruction);
+        return calls.length === 1
+          ? JSON.stringify({
+              summary: 'done',
+              artifacts: [],
+              verification_done: ['validated'],
+              gaps: [],
+              needs: [],
+            })
+          : JSON.stringify({ summary: 'unexpected' });
+      },
+    };
+
+    const result = await delegateStructured(backend, 'Return task result', 'task_result', {
+      maxRetries: 0,
+    });
+
+    expect(result).toEqual({
+      summary: 'done',
+      artifacts: [],
+      verification_done: ['validated'],
+      gaps: [],
+      needs: [],
+    });
+    expect(calls[0]).toContain('Schema:');
+    expect(calls[0]).toContain('"summary"');
+  });
+
+  it('resolves A2A task contracts by registry name', async () => {
+    const calls: string[] = [];
+    const backend = {
+      delegateTask: async (instruction: string) => {
+        calls.push(instruction);
+        return JSON.stringify({
+          intent: 'request_mission_work',
+          text: '進捗をまとめて',
+          context: {
+            mission_id: 'MSN-schema-1',
+            team_role: 'mission-controller',
+          },
+        });
+      },
+    };
+
+    const result = await delegateStructured(
+      backend,
+      'Return task contract',
+      'a2a_task_contract',
+      {
+        maxRetries: 0,
+      }
+    );
+
+    expect(result.intent).toBe('request_mission_work');
+    expect(result.context.team_role).toBe('mission-controller');
+    expect(calls[0]).toContain('context');
+  });
+
+  it('resolves procedure ranking by registry name', async () => {
+    const calls: string[] = [];
+    const backend = {
+      delegateTask: async (instruction: string) => {
+        calls.push(instruction);
+        return JSON.stringify({
+          candidates: [
+            { procedure_id: 'demo', confidence: 0.9, reason: 'best' },
+          ],
+        });
+      },
+    };
+
+    const result = await delegateStructured(backend, 'Rank candidates', 'procedure_ranking', {
+      maxRetries: 0,
+    });
+
+    expect(result.candidates).toHaveLength(1);
+    expect(result.candidates[0]?.procedure_id).toBe('demo');
+    expect(calls[0]).toContain('procedure_id');
   });
 
   it('selects a judge winner from best-of candidates', async () => {

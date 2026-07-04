@@ -16,7 +16,7 @@ function useA2UIText() {
 export const KyberionGauge = ({ label, labelKey, value, unit }: { label: string; labelKey?: string; value: number; unit: string }) => {
   const tx = useA2UIText();
   const percentage = Math.min(100, Math.max(0, value));
-  const color = percentage >= 80 ? 'bg-green-500' : percentage >= 50 ? 'bg-kyberion-gold' : 'bg-red-500';
+  const color = percentage >= 80 ? 'bg-green-500' : percentage >= 50 ? 'bg-kyberion-warning' : 'bg-red-500';
   return (
     <div className="flex flex-col gap-2 w-full">
       <div className="flex justify-between text-[10px] uppercase tracking-widest opacity-60">
@@ -151,9 +151,9 @@ export const KyberionTimeline = ({ title, events }: {
   <div className="flex flex-col gap-3 w-full">
     {title && <div className="text-[10px] uppercase tracking-widest opacity-60 flex items-center gap-2"><Clock size={12} /> {title}</div>}
     <div className="relative pl-6 space-y-4">
-      <div className="absolute left-2 top-1 bottom-1 w-px bg-kyberion-gold/20" />
+      <div className="absolute left-2 top-1 bottom-1 w-px bg-kyberion-warning/20" />
       {events.map((event, i) => {
-        const dotColor = event.status === 'error' ? 'bg-red-500' : event.status === 'warning' ? 'bg-yellow-500' : event.status === 'ok' ? 'bg-green-500' : 'bg-kyberion-gold/40';
+        const dotColor = event.status === 'error' ? 'bg-red-500' : event.status === 'warning' ? 'bg-yellow-500' : event.status === 'ok' ? 'bg-green-500' : 'bg-kyberion-warning/40';
         return (
           <div key={i} className="relative">
             <div className={`absolute -left-[18px] top-1 w-2.5 h-2.5 rounded-full ${dotColor} border-2 border-black`} />
@@ -176,7 +176,7 @@ export const KyberionProgress = ({ title, steps }: {
     {title && <div className="text-[10px] uppercase tracking-widest opacity-60">{title}</div>}
     <div className="flex items-center gap-1">
       {steps.map((step, i) => {
-        const bg = step.status === 'done' ? 'bg-green-500/80' : step.status === 'active' ? 'bg-kyberion-gold/80 animate-pulse' : 'bg-white/10';
+        const bg = step.status === 'done' ? 'bg-green-500/80' : step.status === 'active' ? 'bg-kyberion-warning/80 animate-pulse' : 'bg-white/10';
         const textColor = step.status === 'pending' ? 'opacity-30' : 'opacity-80';
         return (
           <React.Fragment key={i}>
