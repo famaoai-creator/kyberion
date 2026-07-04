@@ -1,8 +1,17 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   resolveQuestionInteractionPacket,
   resolveQuestionResolution,
 } from './question-resolver.js';
+
+vi.mock('./core.js', () => ({
+  logger: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    success: vi.fn(),
+  },
+}));
 
 describe('question-resolver', () => {
   it('resolves meeting operations questions from policy and intent requirements', () => {
@@ -106,6 +115,21 @@ describe('question-resolver', () => {
 
     expect(packet?.missing_inputs).toEqual(result.missing_inputs);
     expect(packet?.omitted_question_count).toBe(result.omitted_question_count);
+  });
+
+  it('logs omitted clarification questions when truncation happens', async () => {
+    const { logger } = await import('./core.js');
+    resolveQuestionResolution({
+      text: '会議の準備をして',
+      intentId: 'meeting-operations',
+      executionShape: 'task_session',
+      confidence: 0.4,
+      maxQuestions: 1,
+    });
+
+    expect(logger.info).toHaveBeenCalledWith(
+      expect.stringContaining('[question-resolver] omitted 2 clarification question(s)')
+    );
   });
 
   it('does not require clarification when the intent is already clear', () => {

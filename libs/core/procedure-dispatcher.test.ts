@@ -121,7 +121,11 @@ describe('dispatchProcedure', () => {
     const result = await dispatchProcedure(input);
     expect(result.status).toBe('blocked');
     expect(result.errors[0]).toContain('serviceRecording');
-    expect(logSpy).toHaveBeenCalledWith('test-agent', 'procedure_service_missing_recording', true);
+    expect(logSpy).toHaveBeenCalledWith(
+      'test-agent',
+      'procedure_dispatcher:service_missing_recording',
+      true
+    );
   });
 
   it('returns not_implemented for system (desktop) executor', async () => {
@@ -152,7 +156,7 @@ describe('dispatchProcedure', () => {
     const result = await dispatchProcedure({ ...BASE_INPUT, recording: undefined });
     expect(result.status).toBe('blocked');
     expect(result.errors[0]).toContain('recording');
-    expect(logSpy).toHaveBeenCalledWith('test-agent', 'procedure_dispatch_missing_recording', true);
+    expect(logSpy).toHaveBeenCalledWith('test-agent', 'procedure_dispatcher:missing_recording', true);
   });
 
   it('returns blocked when session is missing', async () => {
@@ -160,7 +164,7 @@ describe('dispatchProcedure', () => {
     const result = await dispatchProcedure({ ...BASE_INPUT, session: undefined });
     expect(result.status).toBe('blocked');
     expect(result.errors[0]).toContain('session');
-    expect(logSpy).toHaveBeenCalledWith('test-agent', 'procedure_dispatch_missing_session', true);
+    expect(logSpy).toHaveBeenCalledWith('test-agent', 'procedure_dispatcher:missing_session', true);
   });
 
   it('returns blocked when recording origin is not in procedure allowed origins', async () => {
@@ -175,7 +179,7 @@ describe('dispatchProcedure', () => {
     expect(result.errors[0]).toContain('not in allowed origins');
     expect(logSpy).toHaveBeenCalledWith(
       'test-agent',
-      'procedure_origin_blocked:attendance.approve.kingoftime',
+      'procedure_dispatcher:origin_blocked:attendance.approve.kingoftime',
       true
     );
   });
@@ -265,7 +269,7 @@ describe('dispatchProcedure', () => {
     expect(result.errors).toHaveLength(0);
     expect(logSpy).toHaveBeenCalledWith(
       'test-agent',
-      'procedure_approval_required:attendance.approve.kingoftime',
+      'procedure_dispatcher:approval_required:attendance.approve.kingoftime',
       true
     );
   });

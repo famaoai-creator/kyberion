@@ -143,6 +143,14 @@
         "en": "Update the required secret or credential and retry.",
         "ja": "必要な secret / credential を更新して再実行してください。"
       },
+      "empty_reply_body": {
+        "en": "I could not produce a result for that request.",
+        "ja": "今回の依頼に対する結果を生成できませんでした。"
+      },
+      "empty_reply_next_step": {
+        "en": "Try rephrasing the request or adding more detail.",
+        "ja": "言い換えるか、もう少し詳しく書いて再度お試しください。"
+      },
       "pipeline_crystallization_loop": {
         "en": "Pipeline Crystallization Loop",
         "ja": "パイプライン結晶化ループ"

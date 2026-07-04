@@ -79,4 +79,18 @@ describe('a2a-task-contract schema', () => {
     expect(result.valid).toBe(true);
     expect(result.value?.context.correlation_id).toBe('corr-1');
   });
+
+  it('rejects malformed task contract payloads through the helper', () => {
+    const result = validateA2ATaskContract({
+      intent: 'request_mission_work',
+      text: '進捗をまとめて',
+      context: {
+        mission_id: 'MSN-schema-1',
+      },
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.value).toBeUndefined();
+    expect(result.errors.some((error) => error.includes('/context/team_role'))).toBe(true);
+  });
 });

@@ -23,6 +23,15 @@
 4. `format:check` が CI に入り、pre-commit で lint-staged が staged ファイルへ eslint + prettier を実行する。
 5. 上記を通すために既存テストの失敗が見つかった場合、**黙って除外せず**、修正 or 明示的 skip(理由コメント + 課題化)で処理し一覧を報告する。
 
+## 実装状況 (2026-07-04)
+
+- **完了(Task 2)**: `ci.yml` の test マトリクスは `smoke / core / actuators / scripts / integration` の5シャード。`test:integration` は `vitest run tests/` を実行。`pr-validation.yml` は `test:core` + `test:actuators` + 境界テスト4本 + `format:check:ci` を必須実行。`release.yml` は `validate` 後に `test:all` + `check:golden` を実行。
+- **完了(Task 2 必須化)**: 下記「integration 既知失敗」17件が全て解消され `tests/` 184 files / 729 tests が緑になったため、integration シャードの `continue-on-error`(観測モード)を撤廃し必須化した。
+- **完了(Task 3)**: `vitest.config.mts` にカバレッジ閾値(lines 67 / branches 52、「下げる変更は禁止」コメント付き)を設定し、core シャードは `--coverage` 付きで実行。
+- **完了(Task 4)**: pre-commit は `npx lint-staged`(`*.{ts,tsx,js,mjs}` → eslint --fix + prettier、`*.{json,md,yml,yaml}` → prettier)。CI lint ジョブに `format:check:ci` あり。
+- **完了(Task 5)**: 主要な実 sleep テスト(data-vault / core)は `vi.useFakeTimers()` 化済み。semaphore / tier-guard-tenant に実 sleep は残っていない。
+- **備考**: 60秒タイムアウト組(サブプロセス起動が本質)は timeout 維持。`format:check:ci` は歴史的未フォーマットファイルが残るため対象を package.json + workflows に限定している(全量化は Task 4-1 のフォーマット一括コミット実施後)。
+
 ## 実装タスク
 
 ### Task 1: 現状の全テスト実行と失敗棚卸し — `claude-sonnet-4`
@@ -79,7 +88,7 @@
 | actuators     | `pnpm run test:actuators`                                                                                                                                                                   | 43 files / 522 tests passed / 11 skipped | `media-actuator` raw PPTX preservation の即修正を実施                |
 | scripts       | `pnpm run test:scripts`                                                                                                                                                                     |              48 files / 263 tests passed | `check_tier_hygiene` の probe 汚染を避けるため sequential 化         |
 | PR boundary   | `pnpm exec vitest run tests/foundation-io-boundary.test.ts tests/core-fs-exception-boundary.test.ts tests/process-boundary-governance.test.ts tests/runtime-child-process-boundary.test.ts` |                 4 files / 5 tests passed | helper 分割後の allowlist と `vault/` 除外を同期                     |
-| integration   | `pnpm run test:integration`                                                                                                                                                                 |                        17 known failures | CI では観測モード(`continue-on-error`)で導入し、下記を後続修正対象化 |
+| integration   | `pnpm run test:integration`                                                                                                                                                                 |                        17 known failures | **解消済み(2026-07-04)**: 全件修正し必須化。下表は履歴として保持     |
 
 ### integration 既知失敗の分類
 

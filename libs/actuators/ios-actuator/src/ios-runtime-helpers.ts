@@ -240,8 +240,7 @@ async function opCapture(
       };
     }
     default:
-      logger.warn(`[IOS_CAPTURE] Unknown capture op: ${op}`);
-      return ctx;
+      throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
   }
 }
 
@@ -258,8 +257,7 @@ async function opTransform(
       return { ...ctx, [key]: resolve(params.value) };
     }
     default:
-      logger.warn(`[IOS_TRANSFORM] Unknown transform op: ${op}`);
-      return ctx;
+      throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
   }
 }
 
@@ -406,8 +404,7 @@ async function opApply(
       return ctx;
     }
     default:
-      logger.warn(`[IOS_APPLY] Unknown apply op: ${op}`);
-      return ctx;
+      throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
   }
 }
 

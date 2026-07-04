@@ -1363,6 +1363,25 @@ async function processIngest(input: {
         replyError = error?.message || String(error);
         logger.warn(`[voice-hub] Failed to emit assistant reply timeline: ${replyError}`);
         speechError = replyError;
+        // UX-01 Task 4: a voice-only user must hear the failure, not silence.
+        // Single attempt with .catch — a failing error announcement must not
+        // recurse into another announcement.
+        const language = detectReplyLanguage(text);
+        const spokenFallback =
+          language === 'ja'
+            ? 'うまく処理できませんでした。もう一度お願いします。'
+            : 'I could not process that. Please try again.';
+        rememberConversationTurn(sessionKey, 'assistant', spokenFallback);
+        replyText = spokenFallback;
+        speakReplyManaged(spokenFallback)
+          .then(() => {
+            logger.info('[voice-hub] spoke error fallback');
+          })
+          .catch((fallbackError: any) => {
+            logger.warn(
+              `[voice-hub] error fallback speech failed: ${fallbackError?.message || fallbackError}`
+            );
+          });
       }
     }
 

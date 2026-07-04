@@ -87,6 +87,8 @@ vi.mock('./kill-switch.js', () => ({
   killSwitch: {
     logAction: mocks.logAction,
   },
+  recordGovernanceAction: (agentId: string, operation: string, reason: string, violation = false) =>
+    mocks.logAction(agentId, `${operation}:${reason}`, violation),
 }));
 
 describe('a2a-bridge', () => {
@@ -337,7 +339,11 @@ describe('a2a-bridge', () => {
         result: 'denied',
       })
     );
-    expect(mocks.logAction).toHaveBeenCalledWith('sender-x', 'a2a_task_contract_invalid', true);
+    expect(mocks.logAction).toHaveBeenCalledWith(
+      'sender-x',
+      'a2a_task_contract_invalid:system',
+      true
+    );
   });
 
   it('spawns conversation-mode agents inside a conversation sandbox cwd', async () => {

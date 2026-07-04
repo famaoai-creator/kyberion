@@ -638,7 +638,10 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
     };
   }
 
-  async decomposeIntoTasks(input: DecomposeIntoTasksInput): Promise<DecomposedTaskPlan> {
+  async decomposeIntoTasks(
+    input: DecomposeIntoTasksInput,
+    options?: { effort?: AnthropicReasoningBackendOptions['effort'] }
+  ): Promise<DecomposedTaskPlan> {
     const userPrompt = [
       `TASK: Decompose the requirements (and design if provided) into an implementation task plan.`,
       ``,
@@ -665,7 +668,7 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
       model: this.model,
       max_tokens: this.maxTokens,
       system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
-      thinking: this.thinkingConfig(),
+      thinking: this.thinkingConfig(options?.effort),
       messages: [{ role: 'user', content: userPrompt }],
       output_config: { format: zodOutputFormat(DecomposedTaskPlanSchema) },
     });

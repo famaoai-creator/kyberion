@@ -63,9 +63,21 @@ import {
 } from './openai-compatible-backend.js';
 import { OpenRouterBackend, buildOpenRouterBackendFromEnv } from './openrouter-backend.js';
 import { maybeWrapWithDispatcher } from './agent-dispatch.js';
-import { registerReasoningBackend } from './reasoning-backend.js';
-import { registerIntentExtractor } from './intent-extractor.js';
-import { registerVoiceBridge } from './voice-bridge.js';
+import {
+  buildFailoverReasoningBackend,
+  type ReasoningBackendCandidate,
+  registerReasoningBackend,
+} from './reasoning-backend.js';
+import {
+  buildFailoverIntentExtractor,
+  type IntentExtractorCandidate,
+  registerIntentExtractor,
+} from './intent-extractor.js';
+import {
+  buildFailoverVoiceBridge,
+  type VoiceBridgeCandidate,
+  registerVoiceBridge,
+} from './voice-bridge.js';
 import { installShellSpeechToTextBridgeIfAvailable } from './speech-to-text-bridge.js';
 import {
   installShellDeploymentAdapterFromConfigIfAvailable,
@@ -83,7 +95,6 @@ import {
   resolveReasoningBackendModeFromContext,
   type ReasoningBackendMode,
 } from './reasoning-backend-policy.js';
-import { resolveRuntimeModelId } from './runtime-model-defaults.js';
 
 export type { ReasoningBackendMode } from './reasoning-backend-policy.js';
 
@@ -122,6 +133,271 @@ function resolveMode(options: InstallReasoningOptions): ReasoningBackendMode {
     providers: discoverProviders(shouldRefreshProviders(options)),
     policy: loadReasoningBackendPolicy(),
   }) as ReasoningBackendMode;
+}
+
+function providerForReasoningMode(mode: ReasoningBackendMode): string | undefined {
+  switch (mode) {
+    case 'claude-cli':
+    case 'claude-agent':
+      return 'claude';
+    case 'codex-cli':
+      return 'codex';
+    case 'gemini-cli':
+      return 'gemini';
+    case 'agy-cli':
+      return 'agy';
+    case 'anthropic':
+      return 'anthropic';
+    case 'openrouter':
+      return 'openrouter';
+    case 'local':
+      return 'local';
+    case 'nemotron':
+    case 'nemotron-api':
+      return 'nemotron';
+    case 'stub':
+      return undefined;
+  }
+}
+
+interface ReasoningRuntimeBundle {
+  mode: ReasoningBackendMode;
+  backend: ReasoningBackendCandidate;
+  intentExtractor?: IntentExtractorCandidate;
+  voiceBridge?: VoiceBridgeCandidate;
+}
+
+function buildReasoningRuntimeBundle(
+  mode: ReasoningBackendMode,
+  options: InstallReasoningOptions
+): ReasoningRuntimeBundle | null {
+  const provider = providerForReasoningMode(mode);
+  switch (mode) {
+    case 'anthropic': {
+      if (!options.anthropicClient && !process.env.ANTHROPIC_API_KEY && !options.force) {
+        return null;
+      }
+      const client = options.anthropicClient ?? new Anthropic();
+      return {
+        mode,
+        backend: {
+          backend: new AnthropicReasoningBackend({ client, model: options.model }),
+          provider,
+          label: mode,
+        },
+        intentExtractor: {
+          extractor: new AnthropicIntentExtractor({ client, model: options.model }),
+          provider,
+          label: mode,
+        },
+        voiceBridge: {
+          bridge: new AnthropicVoiceBridge({ client, model: options.model }),
+          provider,
+          label: mode,
+        },
+      };
+    }
+    case 'claude-cli': {
+      const cliBackend = buildShellClaudeCliBackendFromEnv();
+      if (!cliBackend) return null;
+      const claudeOptions = buildClaudeCliOptionsFromEnv();
+      return {
+        mode,
+        backend: { backend: cliBackend, provider, label: mode },
+        intentExtractor: {
+          extractor: new ClaudeCliIntentExtractor(claudeOptions),
+          provider,
+          label: mode,
+        },
+        voiceBridge: {
+          bridge: new ClaudeCliVoiceBridge(claudeOptions),
+          provider,
+          label: mode,
+        },
+      };
+    }
+    case 'codex-cli': {
+      const codexOptions = buildCodexCliQueryOptionsFromEnv();
+      const mergedCodexOptions = {
+        ...codexOptions,
+        ...(options.model ? { model: options.model } : {}),
+      };
+      return {
+        mode,
+        backend: {
+          backend: new CodexCliReasoningBackend(mergedCodexOptions),
+          provider,
+          label: mode,
+        },
+        intentExtractor: {
+          extractor: new CodexCliIntentExtractor(mergedCodexOptions),
+          provider,
+          label: mode,
+        },
+        voiceBridge: {
+          bridge: new CodexCliVoiceBridge(mergedCodexOptions),
+          provider,
+          label: mode,
+        },
+      };
+    }
+    case 'claude-agent': {
+      if (!process.env.CLAUDECODE && !process.env.ANTHROPIC_API_KEY && !options.force) return null;
+      return {
+        mode,
+        backend: {
+          backend: new ClaudeAgentReasoningBackend({ model: options.model }),
+          provider,
+          label: mode,
+        },
+        intentExtractor: {
+          extractor: new ClaudeAgentIntentExtractor({ model: options.model }),
+          provider,
+          label: mode,
+        },
+        voiceBridge: {
+          bridge: new ClaudeAgentVoiceBridge({ model: options.model }),
+          provider,
+          label: mode,
+        },
+      };
+    }
+    case 'gemini-cli': {
+      const geminiBackend = buildGeminiCliBackendFromEnv(process.env, options.model);
+      if (!geminiBackend && !options.force) return null;
+      if (!geminiBackend) return null;
+      const geminiOptions = {
+        bin: process.env.KYBERION_GEMINI_CLI_BIN?.trim() || undefined,
+        model: options.model ?? (process.env.KYBERION_GEMINI_CLI_MODEL?.trim() || undefined),
+      };
+      return {
+        mode,
+        backend: {
+          backend: maybeWrapWithDispatcher(geminiBackend),
+          provider,
+          label: mode,
+        },
+        intentExtractor: {
+          extractor: new GeminiCliIntentExtractor(geminiOptions),
+          provider,
+          label: mode,
+        },
+        voiceBridge: {
+          bridge: new GeminiCliVoiceBridge(geminiOptions),
+          provider,
+          label: mode,
+        },
+      };
+    }
+    case 'agy-cli': {
+      const agyBackend = buildAgyCliBackendFromEnv(process.env);
+      if (!agyBackend && !options.force) return null;
+      if (!agyBackend) return null;
+      const agyOptions = {
+        bin:
+          (process.env.KYBERION_ANTIGRAVITY_CLI_BIN || process.env.KYBERION_AGY_CLI_BIN)?.trim() ||
+          undefined,
+      };
+      return {
+        mode,
+        backend: { backend: agyBackend, provider, label: mode },
+        intentExtractor: {
+          extractor: new AgyCliIntentExtractor(agyOptions),
+          provider,
+          label: mode,
+        },
+        voiceBridge: {
+          bridge: new AgyCliVoiceBridge(agyOptions),
+          provider,
+          label: mode,
+        },
+      };
+    }
+    case 'local': {
+      const localBackend = buildOpenAiCompatibleBackendFromEnv(process.env);
+      if (!localBackend && !options.force) return null;
+      if (!localBackend) return null;
+      const baseURL = process.env.KYBERION_LOCAL_LLM_URL || 'http://localhost:11434/v1';
+      const apiKey = process.env.KYBERION_LOCAL_LLM_KEY || 'not-needed';
+      const model = options.model || process.env.KYBERION_LOCAL_LLM_MODEL || 'llama3';
+      return {
+        mode,
+        backend: {
+          backend: new OpenAiCompatibleBackend({ baseURL, apiKey, model }),
+          provider,
+          label: mode,
+        },
+      };
+    }
+    case 'nemotron-api': {
+      const nemotronBackend = buildNemotronBackendFromEnv(process.env);
+      if (!nemotronBackend && !options.force) return null;
+      if (!nemotronBackend) return null;
+      const baseURL =
+        process.env.KYBERION_NEMOTRON_URL ||
+        process.env.KYBERION_LOCAL_LLM_URL ||
+        'http://localhost:11434/v1';
+      const apiKey =
+        process.env.KYBERION_NEMOTRON_KEY || process.env.KYBERION_LOCAL_LLM_KEY || 'not-needed';
+      const model =
+        options.model ||
+        process.env.KYBERION_NEMOTRON_MODEL ||
+        process.env.KYBERION_LOCAL_LLM_MODEL ||
+        'nemotron';
+      return {
+        mode,
+        backend: {
+          backend: new OpenAiCompatibleBackend({ baseURL, apiKey, model }),
+          provider,
+          label: mode,
+        },
+      };
+    }
+    case 'openrouter': {
+      const openrouterBackend = buildOpenRouterBackendFromEnv(process.env, options.model);
+      if (!openrouterBackend && !options.force) return null;
+      if (!openrouterBackend) return null;
+      const apiKey =
+        process.env.KYBERION_OPENROUTER_KEY?.trim() ||
+        process.env.OPENROUTER_API_KEY?.trim() ||
+        'not-needed';
+      const baseURL = process.env.KYBERION_OPENROUTER_URL?.trim();
+      const model =
+        options.model ||
+        process.env.KYBERION_OPENROUTER_MODEL?.trim() ||
+        'meta-llama/llama-3-70b-instruct';
+      return {
+        mode,
+        backend: {
+          backend: openrouterBackend ?? new OpenRouterBackend({ baseURL, apiKey, model }),
+          provider,
+          label: mode,
+        },
+      };
+    }
+    case 'stub':
+      return null;
+  }
+}
+
+function buildReasoningRuntimeChain(
+  selectedMode: ReasoningBackendMode,
+  options: InstallReasoningOptions
+): ReasoningRuntimeBundle[] {
+  const policy = loadReasoningBackendPolicy();
+  const orderedModes = [selectedMode, ...policy.provider_fallback_order.map((entry) => entry.mode)];
+  const seen = new Set<string>();
+  const candidates: ReasoningRuntimeBundle[] = [];
+
+  for (const mode of orderedModes) {
+    const normalized = normalizeReasoningBackendModeFromPolicy(mode, policy);
+    if (seen.has(normalized)) continue;
+    seen.add(normalized);
+    const candidate = buildReasoningRuntimeBundle(normalized, options);
+    if (candidate) candidates.push(candidate);
+  }
+
+  return candidates;
 }
 
 const REASONING_BACKEND_MODES: ReadonlySet<ReasoningBackendMode> = new Set<ReasoningBackendMode>([
@@ -206,259 +482,45 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
     return false;
   }
 
-  if (mode === 'anthropic') {
-    const key = process.env.ANTHROPIC_API_KEY;
-    if (!options.anthropicClient && !key && !options.force) {
-      logger.info(
-        '[reasoning-bootstrap] mode=anthropic selected but ANTHROPIC_API_KEY unset — keeping stubs.'
-      );
-      installed = true;
-      installedMode = 'stub';
-      return false;
-    }
-    const client = options.anthropicClient ?? new Anthropic();
-    registerReasoningBackend(new AnthropicReasoningBackend({ client, model: options.model }));
-    registerIntentExtractor(new AnthropicIntentExtractor({ client, model: options.model }));
-    registerVoiceBridge(new AnthropicVoiceBridge({ client, model: options.model }));
+  const chain = buildReasoningRuntimeChain(mode, options);
+  if (chain.length === 0 && !options.force) {
     installed = true;
-    installedMode = 'anthropic';
-    logger.success(
-      `[reasoning-bootstrap] mode=anthropic — direct @anthropic-ai/sdk (model=${options.model ?? resolveRuntimeModelId('anthropic-default')})`
+    installedMode = 'stub';
+    logger.warn(
+      `[reasoning-bootstrap] mode=${mode} selected but no usable reasoning backend could be built — keeping stubs.`
     );
-    return true;
+    return false;
   }
 
-  if (mode === 'claude-cli') {
-    const cliBackend = buildShellClaudeCliBackendFromEnv();
-    if (!cliBackend) {
-      logger.warn(
-        '[reasoning-bootstrap] mode=claude-cli selected but the Claude CLI is not usable — keeping stubs.'
-      );
-      installed = true;
-      installedMode = 'stub';
-      return false;
-    }
-    registerReasoningBackend(cliBackend);
-    const claudeOptions = buildClaudeCliOptionsFromEnv();
-    registerIntentExtractor(new ClaudeCliIntentExtractor(claudeOptions));
-    registerVoiceBridge(new ClaudeCliVoiceBridge(claudeOptions));
+  if (chain.length === 0) {
     installed = true;
-    installedMode = 'claude-cli';
-    logger.success(
-      `[reasoning-bootstrap] mode=claude-cli — shell claude CLI (model=${options.model ?? 'opus'})`
+    installedMode = 'stub';
+    logger.warn(
+      `[reasoning-bootstrap] mode=${mode} selected but no failover candidates were available — keeping stubs.`
     );
-    return true;
+    return false;
   }
 
-  if (mode === 'codex-cli') {
-    const providers = discoverProviders(shouldRefreshProviders(options));
-    const codexHealthy = providers.some(
-      (provider) => provider.provider === 'codex' && provider.installed && provider.healthy
-    );
-    if (!codexHealthy && !options.force) {
-      logger.warn(
-        '[reasoning-bootstrap] mode=codex-cli selected but Codex CLI is not usable — keeping stubs.'
-      );
-      installed = true;
-      installedMode = 'stub';
-      return false;
-    }
-    const codexOptions = buildCodexCliQueryOptionsFromEnv();
-    const mergedCodexOptions = {
-      ...codexOptions,
-      ...(options.model ? { model: options.model } : {}),
-    };
-    registerReasoningBackend(new CodexCliReasoningBackend(mergedCodexOptions));
-    registerIntentExtractor(new CodexCliIntentExtractor(mergedCodexOptions));
-    registerVoiceBridge(new CodexCliVoiceBridge(mergedCodexOptions));
-    installed = true;
-    installedMode = 'codex-cli';
-    logger.success(
-      `[reasoning-bootstrap] mode=codex-cli — shell codex CLI (model=${mergedCodexOptions.model ?? resolveRuntimeModelId('codex-default')})`
-    );
-    return true;
+  const primaryMode = chain[0]!.mode;
+  registerReasoningBackend(
+    buildFailoverReasoningBackend(chain.map((candidate) => candidate.backend))
+  );
+  const intentCandidates = chain.flatMap((candidate) => (candidate.intentExtractor ? [candidate.intentExtractor] : []));
+  if (intentCandidates.length > 0) {
+    registerIntentExtractor(buildFailoverIntentExtractor(intentCandidates));
   }
-
-  if (mode === 'claude-agent') {
-    // The Agent SDK authenticates via the parent Claude Code harness (CLAUDECODE)
-    // or ANTHROPIC_API_KEY. Without either it cannot run, so fall back to stubs
-    // rather than registering a backend that would fail at delegate time.
-    if (!process.env.CLAUDECODE && !process.env.ANTHROPIC_API_KEY && !options.force) {
-      logger.warn(
-        '[reasoning-bootstrap] mode=claude-agent selected but no Claude Code harness (CLAUDECODE) or ANTHROPIC_API_KEY — keeping stubs.'
-      );
-      installed = true;
-      installedMode = 'stub';
-      return false;
-    }
-    registerReasoningBackend(new ClaudeAgentReasoningBackend({ model: options.model }));
-    registerIntentExtractor(new ClaudeAgentIntentExtractor({ model: options.model }));
-    registerVoiceBridge(new ClaudeAgentVoiceBridge({ model: options.model }));
-    installed = true;
-    installedMode = 'claude-agent';
-    logger.success(
-      `[reasoning-bootstrap] mode=claude-agent — @anthropic-ai/claude-agent-sdk sub-agent delegation (model=${options.model ?? 'opus'})`
-    );
-    return true;
+  const voiceCandidates = chain.flatMap((candidate) => (candidate.voiceBridge ? [candidate.voiceBridge] : []));
+  if (voiceCandidates.length > 0) {
+    registerVoiceBridge(buildFailoverVoiceBridge(voiceCandidates));
   }
-
-  if (mode === 'gemini-cli') {
-    const providers = discoverProviders(shouldRefreshProviders(options));
-    const geminiHealthy = providers.some(
-      (provider) => provider.provider === 'gemini' && provider.installed && provider.healthy
-    );
-    if (!geminiHealthy && !options.force) {
-      logger.warn(
-        '[reasoning-bootstrap] mode=gemini-cli selected but Gemini CLI is not usable — keeping stubs.'
-      );
-      installed = true;
-      installedMode = 'stub';
-      return false;
-    }
-    const geminiBackend = buildGeminiCliBackendFromEnv(process.env, options.model);
-    if (!geminiBackend) {
-      installed = true;
-      installedMode = 'stub';
-      return false;
-    }
-
-    registerReasoningBackend(maybeWrapWithDispatcher(geminiBackend));
-    const geminiOptions = {
-      bin: process.env.KYBERION_GEMINI_CLI_BIN?.trim() || undefined,
-      model: options.model ?? (process.env.KYBERION_GEMINI_CLI_MODEL?.trim() || undefined),
-    };
-    registerIntentExtractor(new GeminiCliIntentExtractor(geminiOptions));
-    registerVoiceBridge(new GeminiCliVoiceBridge(geminiOptions));
-
-    installed = true;
-    installedMode = 'gemini-cli';
-    logger.success(
-      `[reasoning-bootstrap] mode=gemini-cli — shell gemini CLI (model=${options.model ?? resolveRuntimeModelId('gemini-default')})`
-    );
-    return true;
-  }
-
-  if (mode === 'agy-cli') {
-    const providers = discoverProviders(shouldRefreshProviders(options));
-    const agyHealthy = providers.some(
-      (provider) => provider.provider === 'agy' && provider.installed && provider.healthy
-    );
-    if (!agyHealthy && !options.force) {
-      logger.warn(
-        '[reasoning-bootstrap] mode=agy-cli selected but Agy CLI is not usable — keeping stubs.'
-      );
-      installed = true;
-      installedMode = 'stub';
-      return false;
-    }
-    const agyBackend = buildAgyCliBackendFromEnv(process.env);
-    if (!agyBackend) {
-      installed = true;
-      installedMode = 'stub';
-      return false;
-    }
-
-    registerReasoningBackend(agyBackend);
-    const agyOptions = {
-      bin:
-        (process.env.KYBERION_ANTIGRAVITY_CLI_BIN || process.env.KYBERION_AGY_CLI_BIN)?.trim() ||
-        undefined,
-    };
-    registerIntentExtractor(new AgyCliIntentExtractor(agyOptions));
-    registerVoiceBridge(new AgyCliVoiceBridge(agyOptions));
-
-    installed = true;
-    installedMode = 'agy-cli';
-    logger.success(`[reasoning-bootstrap] mode=agy-cli — shell agy CLI`);
-    return true;
-  }
-
-  if (mode === 'local') {
-    const localBackend = buildOpenAiCompatibleBackendFromEnv(process.env);
-    if (!localBackend && !options.force) {
-      logger.warn(
-        '[reasoning-bootstrap] mode=local selected but KYBERION_LOCAL_LLM_URL is unset — keeping stubs.'
-      );
-      installed = true;
-      installedMode = 'stub';
-      return false;
-    }
-    const baseURL = process.env.KYBERION_LOCAL_LLM_URL || 'http://localhost:11434/v1';
-    const apiKey = process.env.KYBERION_LOCAL_LLM_KEY || 'not-needed';
-    const model = options.model || process.env.KYBERION_LOCAL_LLM_MODEL || 'llama3';
-    registerReasoningBackend(new OpenAiCompatibleBackend({ baseURL, apiKey, model }));
-    installed = true;
-    installedMode = 'local';
-    logger.success(
-      `[reasoning-bootstrap] mode=local — OpenAI-compatible local server (${baseURL}, model=${model})`
-    );
-    return true;
-  }
-
-  if (mode === 'nemotron-api') {
-    const nemotronBackend = buildNemotronBackendFromEnv(process.env);
-    if (!nemotronBackend && !options.force) {
-      logger.warn(
-        '[reasoning-bootstrap] mode=nemotron-api selected but KYBERION_NEMOTRON_URL is unset — keeping stubs.'
-      );
-      installed = true;
-      installedMode = 'stub';
-      return false;
-    }
-    const baseURL =
-      process.env.KYBERION_NEMOTRON_URL ||
-      process.env.KYBERION_LOCAL_LLM_URL ||
-      'http://localhost:11434/v1';
-    const apiKey =
-      process.env.KYBERION_NEMOTRON_KEY || process.env.KYBERION_LOCAL_LLM_KEY || 'not-needed';
-    const model =
-      options.model ||
-      process.env.KYBERION_NEMOTRON_MODEL ||
-      process.env.KYBERION_LOCAL_LLM_MODEL ||
-      'nemotron';
-    registerReasoningBackend(new OpenAiCompatibleBackend({ baseURL, apiKey, model }));
-    installed = true;
-    installedMode = 'nemotron-api';
-    logger.success(
-      `[reasoning-bootstrap] mode=nemotron-api — OpenAI-compatible Nemotron endpoint (${baseURL}, model=${model})`
-    );
-    return true;
-  }
-
-  if (mode === 'openrouter') {
-    const openrouterBackend = buildOpenRouterBackendFromEnv(process.env, options.model);
-    if (!openrouterBackend && !options.force) {
-      logger.warn(
-        '[reasoning-bootstrap] mode=openrouter selected but OPENROUTER_API_KEY is unset — keeping stubs.'
-      );
-      installed = true;
-      installedMode = 'stub';
-      return false;
-    }
-    const apiKey =
-      process.env.KYBERION_OPENROUTER_KEY?.trim() ||
-      process.env.OPENROUTER_API_KEY?.trim() ||
-      'not-needed';
-    const baseURL = process.env.KYBERION_OPENROUTER_URL?.trim();
-    const model =
-      options.model ||
-      process.env.KYBERION_OPENROUTER_MODEL?.trim() ||
-      'meta-llama/llama-3-70b-instruct';
-    registerReasoningBackend(
-      openrouterBackend ?? new OpenRouterBackend({ baseURL, apiKey, model })
-    );
-    installed = true;
-    installedMode = 'openrouter';
-    logger.success(
-      `[reasoning-bootstrap] mode=openrouter — OpenRouter API backend (model=${model})`
-    );
-    return true;
-  }
-
-  // Fallback / default
   installed = true;
-  installedMode = 'stub';
-  return false;
+  installedMode = primaryMode;
+  logger.success(
+    `[reasoning-bootstrap] mode=${mode} — reasoning failover chain installed (primary=${primaryMode}, candidates=${chain
+      .map((candidate) => candidate.mode)
+      .join(' -> ')})`
+  );
+  return true;
 }
 
 function shouldRefreshProviders(options: InstallReasoningOptions): boolean {
