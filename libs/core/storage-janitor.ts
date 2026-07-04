@@ -3,6 +3,7 @@ import { sharedTmp, shared } from './path-resolver.js';
 import {
   safeReaddir,
   safeReadFile,
+  safeLstat,
   safeStat,
   safeUnlinkSync,
   safeExistsSync,
@@ -95,7 +96,10 @@ function collectFiles(dir: string): string[] {
     for (const name of entries) {
       const fullPath = nodePath.join(current, name);
       try {
-        const stat = safeStat(fullPath);
+        const stat = safeLstat(fullPath);
+        if (stat.isSymbolicLink()) {
+          continue;
+        }
         if (stat.isDirectory()) {
           walk(fullPath);
         } else {
