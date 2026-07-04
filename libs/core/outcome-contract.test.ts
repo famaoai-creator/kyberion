@@ -40,13 +40,46 @@ describe('outcome-contract', () => {
       evidenceRequired: true,
     });
     expect(validateOutcomeContractAtCompletion(requiredEvidence).ok).toBe(false);
-    expect(validateOutcomeContractAtCompletion(requiredEvidence, { artifactRefs: ['artifact://deck'] }).ok).toBe(true);
+    expect(
+      validateOutcomeContractAtCompletion(requiredEvidence, { artifactRefs: ['artifact://deck'] })
+        .ok
+    ).toBe(true);
+  });
+
+  it('prefers the interpreted intent goal over the generic placeholder (IL-01)', () => {
+    const mission = inferMissionOutcomeContract({
+      missionId: 'MSN-GOAL',
+      missionType: 'development',
+      intentGoal: {
+        source_text: '来週のSBI向け提案資料を作って',
+        summary: 'SBI向け提案資料の作成',
+        success_condition: '提案PPTXが成果物として存在しレビュー済みである',
+      },
+    });
+
+    expect(mission.requested_result).toBe('SBI向け提案資料の作成');
+    expect(mission.success_criteria).toEqual(['提案PPTXが成果物として存在しレビュー済みである']);
+    expect(mission.requested_result).not.toContain('Complete mission scope');
+  });
+
+  it('falls back to the source utterance when the goal summary is empty (IL-01)', () => {
+    const mission = inferMissionOutcomeContract({
+      missionId: 'MSN-GOAL-2',
+      missionType: 'development',
+      intentGoal: { source_text: 'レポートまとめて', summary: '  ' },
+    });
+
+    expect(mission.requested_result).toBe('レポートまとめて');
   });
 
   it('infers mission and task-session defaults', () => {
-    const mission = inferMissionOutcomeContract({ missionId: 'MSN-TEST', missionType: 'development' });
+    const mission = inferMissionOutcomeContract({
+      missionId: 'MSN-TEST',
+      missionType: 'development',
+    });
     expect(mission.verification_method).toBe('review_gate');
     expect(mission.success_criteria.length).toBeGreaterThan(0);
+    expect(mission.requested_result).toContain('Complete mission scope');
 
     const session = inferTaskSessionOutcomeContract({
       sessionId: 'TSK-TEST',
