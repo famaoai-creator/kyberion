@@ -1,5 +1,5 @@
 {
-  "generated": "2026-07-04T13:08:05.199Z",
+  "generated": "2026-07-04T18:47:20.488Z",
   "files": [
     {
       "path": "Ecosystem_Map.md",
@@ -268,7 +268,7 @@
     {
       "path": "product/architecture/component-lifecycle-inventory.md",
       "tier": "public",
-      "size": 6153,
+      "size": 6155,
       "type": "md"
     },
     {
@@ -406,7 +406,7 @@
     {
       "path": "product/architecture/intent-loop-wiring-status.md",
       "tier": "public",
-      "size": 20400,
+      "size": 21451,
       "type": "md"
     },
     {
@@ -1384,13 +1384,13 @@
     {
       "path": "product/governance/environment-manifests/kyberion-runtime-baseline.json",
       "tier": "public",
-      "size": 2955,
+      "size": 3024,
       "type": "json"
     },
     {
       "path": "product/governance/environment-manifests/kyberion-toolchain.json",
       "tier": "public",
-      "size": 3443,
+      "size": 4288,
       "type": "json"
     },
     {
@@ -1420,7 +1420,7 @@
     {
       "path": "product/governance/error-classifier-rules.json",
       "tier": "public",
-      "size": 17073,
+      "size": 17113,
       "type": "json"
     },
     {
@@ -1474,7 +1474,7 @@
     {
       "path": "product/governance/HINTS.md",
       "tier": "public",
-      "size": 1131,
+      "size": 1774,
       "type": "md"
     },
     {
@@ -1750,7 +1750,7 @@
     {
       "path": "product/governance/mission-workflow-catalog.json",
       "tier": "public",
-      "size": 11006,
+      "size": 14011,
       "type": "json"
     },
     {
@@ -5825,6 +5825,12 @@
       "path": "product/schemas/guided-coordination-brief.schema.json",
       "tier": "public",
       "size": 2791,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/handoff-packet.schema.json",
+      "tier": "public",
+      "size": 1162,
       "type": "json"
     },
     {
