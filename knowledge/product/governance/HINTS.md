@@ -33,3 +33,30 @@ source_ref: DSC-MR575TJG-DBBEC2D5
 evidence_refs:
 
 - active/shared/tmp/hints-source.md
+
+## MEM-MR6M9VCE-0657F6DE (2026-07-04)
+
+Reusable weekly review note for the mission closure checklist.
+
+source_ref: MEM-MR6M9VCE-0657F6DE
+evidence_refs:
+
+- active/missions/MSN-TEST-AUTOPROMOTE/evidence/ledger.jsonl
+
+## MEM-MR6N4RVP-944F2192 (2026-07-04)
+
+Reusable weekly review note for the mission closure checklist.
+
+source_ref: MEM-MR6N4RVP-944F2192
+evidence_refs:
+
+- active/missions/MSN-TEST-AUTOPROMOTE/evidence/ledger.jsonl
+
+## MEM-MR6POIEV-F7CA0750 (2026-07-04)
+
+Reusable weekly review note for the mission closure checklist.
+
+source_ref: MEM-MR6POIEV-F7CA0750
+evidence_refs:
+
+- active/missions/MSN-TEST-AUTOPROMOTE/evidence/ledger.jsonl
