@@ -14,20 +14,20 @@
 
 ## P0 残作業(プロダクション化のクリティカルパス)
 
-| ID    | 状態    | 残作業の要点                                                                     |
-| ----- | ------- | -------------------------------------------------------------------------------- |
-| IP-07 | PARTIAL | claude-agent-reasoning-backend テスト、surface-runtime-orchestrator 特性化テスト |
-| MO-01 | PARTIAL | プロセステンプレート機構(schema・4テンプレート・worker のテンプレート駆動化)     |
-| MO-02 | PARTIAL | mission-gate-engine 新設、タスク受入ゲート、exit gate + circuit breaker          |
-| AA-02 | TODO    | mesh_delivery_driver 新設、broker⇔dispatchToPeer 配線、writer fencing、E2E       |
-| SA-02 | PARTIAL | execution-bounds.ts 抽出、SECURITY.md、warn→enforce 到達                         |
-| SA-05 | PARTIAL | policyEngine の操作種別拡張、secure-io parse失敗 fail-open 解消、-y 破壊操作除外 |
-| OP-01 | TODO    | 全推論経路の usage 計測、cost report、spend-guard、KPI 接続                      |
-| AR-01 | TODO    | adf-engine.ts 抽出、3エンジン統合、golden 回帰                                   |
-| AR-02 | TODO    | describeOps、generate_op_registry、CI ゲート                                     |
-| AO-02 | TODO    | CVE スキャン/台帳、パッチ判断ルーブリック、適用フロー                            |
-| IL-01 | TODO    | goal/source_text/outcome_ids の昇格 seam 貫通、outcome-contract の goal 優先化   |
-| IL-04 | PARTIAL | intent-reconciliation エンジン、完了ゲート、学習記録                             |
+| ID    | 状態    | 残作業の要点                                                                                                      |
+| ----- | ------- | ----------------------------------------------------------------------------------------------------------------- |
+| IP-07 | PARTIAL | claude-agent-reasoning-backend テスト、surface-runtime-orchestrator 特性化テスト                                  |
+| MO-01 | PARTIAL | プロセステンプレート機構(schema・4テンプレート・worker のテンプレート駆動化)                                      |
+| MO-02 | PARTIAL | mission-gate-engine、新設ゲート共通化、planning/受入ゲート記録、受入 rework/owner 通知、exit/quality の修復ループ |
+| AA-02 | TODO    | mesh_delivery_driver 新設、broker⇔dispatchToPeer 配線、writer fencing、E2E                                        |
+| SA-02 | PARTIAL | execution-bounds.ts 抽出、SECURITY.md、warn→enforce 到達                                                          |
+| SA-05 | PARTIAL | policyEngine の操作種別拡張、secure-io parse失敗 fail-open 解消、-y 破壊操作除外                                  |
+| OP-01 | TODO    | 全推論経路の usage 計測、cost report、spend-guard、KPI 接続                                                       |
+| AR-01 | TODO    | adf-engine.ts 抽出、3エンジン統合、golden 回帰                                                                    |
+| AR-02 | TODO    | describeOps、generate_op_registry、CI ゲート                                                                      |
+| AO-02 | TODO    | CVE スキャン/台帳、パッチ判断ルーブリック、適用フロー                                                             |
+| IL-01 | TODO    | goal/source_text/outcome_ids の昇格 seam 貫通、outcome-contract の goal 優先化                                    |
+| IL-04 | PARTIAL | intent-reconciliation エンジン、完了ゲート、学習記録                                                              |
 
 ## 全計画一覧
 
@@ -83,15 +83,15 @@
 
 ### MO(ミッション・オーケストレーション)
 
-| ID    | 状態    | 残作業                                                             |
-| ----- | ------- | ------------------------------------------------------------------ |
-| MO-01 | PARTIAL | プロセステンプレート機構一式(schema/テンプレ/worker 駆動化)        |
-| MO-02 | PARTIAL | mission-gate-engine、タスク受入ゲート、exit gate + circuit breaker |
-| MO-03 | PARTIAL | mission-task-contract.schema.json + planner 出力検証+循環検出      |
-| MO-04 | DONE    |                                                                    |
-| MO-05 | DONE    | (軽微: 集計スクリプト)                                             |
-| MO-06 | DONE    |                                                                    |
-| MO-07 | PARTIAL | tier 昇格連動の再実行、media draft→refine                          |
+| ID    | 状態    | 残作業                                                                                                            |
+| ----- | ------- | ----------------------------------------------------------------------------------------------------------------- |
+| MO-01 | PARTIAL | プロセステンプレート機構一式(schema/テンプレ/worker 駆動化)                                                       |
+| MO-02 | PARTIAL | mission-gate-engine、新設ゲート共通化、planning/受入ゲート記録、受入 rework/owner 通知、exit/quality の修復ループ |
+| MO-03 | PARTIAL | mission-task-contract.schema.json + planner 出力検証+循環検出                                                     |
+| MO-04 | DONE    |                                                                                                                   |
+| MO-05 | DONE    | (軽微: 集計スクリプト)                                                                                            |
+| MO-06 | DONE    |                                                                                                                   |
+| MO-07 | PARTIAL | tier 昇格連動の再実行、media draft→refine                                                                         |
 
 ### DS(デザインシステム)
 
@@ -178,11 +178,11 @@
 
 ### HN(ハーネス)
 
-| ID    | 状態    | 残作業                                  |
-| ----- | ------- | --------------------------------------- |
-| HN-01 | DONE    |                                         |
-| HN-02 | DONE    |                                         |
-| HN-03 | PARTIAL | workflow-as-code 第一級経路(SA-02 整合) |
+| ID    | 状態    | 残作業                                                                          |
+| ----- | ------- | ------------------------------------------------------------------------------- |
+| HN-01 | DONE    |                                                                                 |
+| HN-02 | DONE    |                                                                                 |
+| HN-03 | PARTIAL | workflow-as-code 第一級経路(run_pipeline の workflow module 入力化、SA-02 整合) |
 
 ### CO(Company OS)
 

@@ -34,6 +34,7 @@ import {
 } from '@agent/core/blackhole-routing-guard';
 import * as nodePath from 'node:path';
 import { derivePipelineStatus } from '@agent/core/pipeline-contract';
+import { readValidatedWorkflowAdf } from './refactor/adf-input.js';
 function resolveStepType(step) {
   if (step.role) {
     if (step.role === 'source') return 'capture';
@@ -181,7 +182,6 @@ function validateFlow(steps, initialCtx = {}) {
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { readValidatedPipelineAdf } from './refactor/adf-input.js';
 import { runStepHooks } from './refactor/step-hooks.js';
 const dispatchCache = {};
 const moduleCache = {};
@@ -758,7 +758,10 @@ async function runSteps(steps, initialCtx = {}, opts = {}) {
           const exportKey = resolveExportKey(step, 'last_accumulate');
           const originalItemValue = ctx[itemName];
           const originalSharedCtx = { ...ctx };
-          const targetCount = coercePositiveInt(params.target_count ?? params.targetCount, items.length);
+          const targetCount = coercePositiveInt(
+            params.target_count ?? params.targetCount,
+            items.length
+          );
           const maxIterations = coercePositiveInt(
             params.max_iterations ?? params.maxIterations,
             items.length
@@ -781,8 +784,7 @@ async function runSteps(steps, initialCtx = {}, opts = {}) {
                 `accumulate item ${index + 1} failed: ${nested.results.find((r) => r.status === 'failed')?.error || 'nested failure'}`
               );
             }
-            const candidateValue =
-              nested.context[collectKey] ?? nested.context ?? item;
+            const candidateValue = nested.context[collectKey] ?? nested.context ?? item;
             const fingerprint = (() => {
               try {
                 return JSON.stringify(candidateValue);
@@ -1034,7 +1036,7 @@ Context: ${JSON.stringify(resolvedContext)}${buildReasoningPolicyNote(stepPolicy
               `  [SYS_PIPELINE] Repair successful. Refreshing ADF and retrying step ${step.op}...`
             );
             try {
-              const refreshedPipeline = readValidatedPipelineAdf(opts.pipelinePath);
+              const refreshedPipeline = await readValidatedWorkflowAdf(opts.pipelinePath);
               const refreshedStep = refreshedPipeline.steps?.find(
                 (s) => s.id === step.id || s.op === step.op
               );
@@ -1127,7 +1129,7 @@ Once finished, provide a brief summary of the changes you applied to fix the pip
     );
     logger.info(`  [SYS_PIPELINE:REPAIR] Sub-agent report: ${report}`);
     try {
-      readValidatedPipelineAdf(pipelinePath);
+      await readValidatedWorkflowAdf(pipelinePath);
     } catch (validationErr) {
       logger.warn(
         `  [SYS_PIPELINE:REPAIR] Sub-agent finished but ADF is still invalid: ${validationErr.message}`
@@ -1158,7 +1160,7 @@ async function main() {
       describe: 'JSON string merged into pipeline.context (overrides)',
     })
     .parseSync();
-  const pipeline = readValidatedPipelineAdf(argv.input);
+  const pipeline = await readValidatedWorkflowAdf(argv.input);
   const baseContext = pipeline.context || {};
   let overrideContext = {};
   if (argv.context) {
@@ -1210,7 +1212,9 @@ async function main() {
     autoContext._knowledge_scope = inferredScope;
   }
   const mergedContext = { ...baseContext, ...autoContext, ...overrideContext };
-  logger.info(`\u{1F680} [PIPELINE] Running ADF pipeline: ${pipeline.name || argv.input}`);
+  logger.info(
+    `\u{1F680} [PIPELINE] Running ${argv.input.match(/\.(ts|js|mjs|cjs)$/u) ? 'workflow module' : 'ADF pipeline'}: ${pipeline.name || argv.input}`
+  );
   logger.info(`   [PIPELINE] Mission ID: ${missionId || 'NONE'}`);
   logger.info(`   [PIPELINE] Evidence Dir: ${autoContext.mission_evidence_dir || 'UNDEFINED'}`);
   const pipelineId = String(

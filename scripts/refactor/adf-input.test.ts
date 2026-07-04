@@ -129,7 +129,7 @@ describe('readValidatedPipelineAdf', () => {
         action: 'pipeline',
         steps: expect.arrayContaining([
           expect.objectContaining({ op: 'system:log' }),
-          expect.objectContaining({ op: 'system:set' }),
+          expect.objectContaining({ op: 'core:transform' }),
           expect.objectContaining({ op: 'core:parallel_foreach', effort: 'medium' }),
           expect.objectContaining({ op: 'core:accumulate', effort: 'medium' }),
         ]),
