@@ -55,6 +55,14 @@
 
 ## 実装メモ
 
+### 完了スライス — 2026-07-05
+
+- **Task 1 補完**: manifest スキーマに `implemented: false` マーカーを追加(宣言のみで dispatch 未実装の op 用)。`blockchain-actuator` の `verify_anchor` に適用し、汎用プローブが `available:false, reason:'not_implemented'` を返す(受入条件4)。calendar / email(create_draft)の darwin 制約は既存の `platforms` 宣言を汎用プローブが評価することを確認済み(追加宣言不要)。
+- **Task 3-2 補完**: 実行前ゲートの e2e 再現テストを `run_pipeline.test.ts` に追加(`blockchain:verify_anchor` step が dispatch 前に `capability ... unavailable: not_implemented` の分類済みエラーで停止)。`actuator-capability.test.ts` に `implemented:false` の unit テストを追加。
+- **Task 3-3**: `pnpm doctor` は required capabilities の充足状況と欠落時の next step を表示済み(確認)。
+- **副産物(重要)**: `libs/core/src/` に gitignore された古いコンパイル済み `.js` が 82 個残っており、vitest の ESM 解決が `.ts` ではなく stray `.js` を拾ってテストが古いコードを検証していた。全て削除(`.ts` 対応物の存在を確認済み)。scripts/ の追跡済みミラー `.js`(`run_pipeline.js` 等4本)は main 由来の既存パターンのため温存 — 生成同期の統一は IP-12 のスコープ。
+- **残余(意図的)**: `services` prerequisite(ComfyUI 等の到達性)は専用プローブ未実装のため未宣言のまま(宣言すると常時 unavailable になる)。meeting-browser-driver の playwright は npm モジュール解決依存で binary プローブでは表現不能のため未宣言(fail-open 原則)。両者は AC-04 / AC-06 で引き取る。
+
 ### Task 1-2 representative slice — 2026-07-03
 
 - `schemas/actuator-manifest.schema.json` に `capabilities[].prerequisites` を追加した。`binaries` / `platforms` / `env` / `services` / `install` を宣言できる。
