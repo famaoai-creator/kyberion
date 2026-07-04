@@ -16,7 +16,10 @@ export interface BridgeErrorReplyOptions {
   traceId?: string;
 }
 
-export function buildBridgeErrorReplyText(err: unknown, opts: BridgeErrorReplyOptions = {}): string {
+export function buildBridgeErrorReplyText(
+  err: unknown,
+  opts: BridgeErrorReplyOptions = {}
+): string {
   const envelope = buildUserFacingError(err, opts);
   return [envelope.title, envelope.body, envelope.nextAction].filter(Boolean).join('\n');
 }
@@ -79,9 +82,10 @@ export async function postBridgeError(params: {
   try {
     await params.post(text);
     return true;
-  } catch (postErr: any) {
+  } catch (postErr) {
+    const message = postErr instanceof Error ? postErr.message : String(postErr);
     logger.warn(
-      `[bridge-error-reply] failed to deliver error reply for ${params.conversationKey}: ${postErr?.message ?? String(postErr)}`
+      `[bridge-error-reply] failed to deliver error reply for ${params.conversationKey}: ${message}`
     );
     return false;
   }

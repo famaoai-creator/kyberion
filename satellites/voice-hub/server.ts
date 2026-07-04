@@ -147,7 +147,10 @@ function renderVoiceTemplate(template: string, values: Record<string, string | u
   return template.replace(/\{([a-zA-Z0-9_]+)\}/g, (_, key: string) => values[key] ?? '');
 }
 
-function renderVoiceList(values: string[] | undefined, replacements: Record<string, string | undefined>): string[] {
+function renderVoiceList(
+  values: string[] | undefined,
+  replacements: Record<string, string | undefined>
+): string[] {
   if (!Array.isArray(values)) return [];
   return values.map((value) => renderVoiceTemplate(value, replacements));
 }
@@ -278,15 +281,22 @@ function buildDistillCandidateMetadata(
       task_type: session.task_type,
       project_name: projectName,
     };
-    if (profile.applicability) result.applicability = renderVoiceList(profile.applicability, replacements);
-    if (profile.reusable_steps) result.reusable_steps = renderVoiceList(profile.reusable_steps, replacements);
-    if (profile.template_sections) result.template_sections = renderVoiceList(profile.template_sections, replacements);
-    if (profile.procedure_steps) result.procedure_steps = renderVoiceList(profile.procedure_steps, replacements);
-    if (profile.safety_notes) result.safety_notes = renderVoiceList(profile.safety_notes, replacements);
-    if (profile.escalation_conditions) result.escalation_conditions = renderVoiceList(profile.escalation_conditions, replacements);
+    if (profile.applicability)
+      result.applicability = renderVoiceList(profile.applicability, replacements);
+    if (profile.reusable_steps)
+      result.reusable_steps = renderVoiceList(profile.reusable_steps, replacements);
+    if (profile.template_sections)
+      result.template_sections = renderVoiceList(profile.template_sections, replacements);
+    if (profile.procedure_steps)
+      result.procedure_steps = renderVoiceList(profile.procedure_steps, replacements);
+    if (profile.safety_notes)
+      result.safety_notes = renderVoiceList(profile.safety_notes, replacements);
+    if (profile.escalation_conditions)
+      result.escalation_conditions = renderVoiceList(profile.escalation_conditions, replacements);
     if (profile.audience) result.audience = profile.audience;
     if (profile.output_format) result.output_format = profile.output_format;
-    if (profile.expected_outcome) result.expected_outcome = renderVoiceTemplate(profile.expected_outcome, replacements);
+    if (profile.expected_outcome)
+      result.expected_outcome = renderVoiceTemplate(profile.expected_outcome, replacements);
     return result;
   }
   return {
@@ -1105,13 +1115,15 @@ async function speakReplyManaged(text: string): Promise<void> {
   }
 
   if (voiceProfile && voiceProfile.default_engine_id === 'mlx_audio_qwen3') {
-    logger.info(`[voice-hub] Using Qwen3-TTS mlx_audio_qwen3 cloned voice for active profile: ${voiceProfile.profile_id}`);
-    
+    logger.info(
+      `[voice-hub] Using Qwen3-TTS mlx_audio_qwen3 cloned voice for active profile: ${voiceProfile.profile_id}`
+    );
+
     const bridgeScript = pathResolver.rootResolve(
       'libs/actuators/voice-actuator/scripts/mlx_audio_tts_bridge.py'
     );
     const pythonBin = resolveVoiceHubPythonBin();
-    
+
     const samples = voiceProfile.sample_refs || [];
     const refAudio = samples.length > 0 ? pathResolver.rootResolve(samples[0]) : undefined;
     const refTextFile = refAudio ? `${refAudio}.transcript.txt` : undefined;
@@ -1140,24 +1152,30 @@ async function speakReplyManaged(text: string): Promise<void> {
           env: process.env,
           stdio: ['pipe', 'pipe', 'pipe'],
         });
-        
+
         let stdout = '';
         let stderr = '';
-        pyProcess.stdout.on('data', (chunk) => { stdout += String(chunk); });
-        pyProcess.stderr.on('data', (chunk) => { stderr += String(chunk); });
-        
+        pyProcess.stdout.on('data', (chunk) => {
+          stdout += String(chunk);
+        });
+        pyProcess.stderr.on('data', (chunk) => {
+          stderr += String(chunk);
+        });
+
         pyProcess.on('close', (code) => {
           if (code !== 0) {
-            reject(new Error(`MLX Qwen3-TTS generation failed with code ${code}. Stderr: ${stderr}`));
+            reject(
+              new Error(`MLX Qwen3-TTS generation failed with code ${code}. Stderr: ${stderr}`)
+            );
           } else {
             resolve();
           }
         });
-        
+
         pyProcess.stdin.write(payload);
         pyProcess.stdin.end();
       });
-      
+
       // MLX voice synthesized successfully! Let's play it using afplay.
       if (safeExistsSync(tmpPath)) {
         await new Promise<void>((resolve, reject) => {
@@ -1173,7 +1191,7 @@ async function speakReplyManaged(text: string): Promise<void> {
             startedAt: Date.now(),
             pid: afplay.pid,
           };
-          
+
           afplay.on('close', (code) => {
             if (activeSpeechProcess === afplay) {
               activeSpeechProcess = null;
@@ -1196,7 +1214,9 @@ async function speakReplyManaged(text: string): Promise<void> {
         return;
       }
     } catch (err: any) {
-      logger.warn(`[voice-hub] MLX Qwen3-TTS synthesis failed, falling back to OS say: ${err.message}`);
+      logger.warn(
+        `[voice-hub] MLX Qwen3-TTS synthesis failed, falling back to OS say: ${err.message}`
+      );
     }
   }
 
@@ -1377,10 +1397,10 @@ async function processIngest(input: {
           .then(() => {
             logger.info('[voice-hub] spoke error fallback');
           })
-          .catch((fallbackError: any) => {
-            logger.warn(
-              `[voice-hub] error fallback speech failed: ${fallbackError?.message || fallbackError}`
-            );
+          .catch((fallbackError: unknown) => {
+            const detail =
+              fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
+            logger.warn(`[voice-hub] error fallback speech failed: ${detail}`);
           });
       }
     }
@@ -1641,16 +1661,22 @@ async function tryBuildLocationReply(userText: string): Promise<string | null> {
   const fallback = await resolveFallbackLocationSummary();
   if (fallback === 'unknown location') {
     return isJapanese
-      ? formatSurfaceRecoveryAction({
-          reason: 'この surface では現在地の共有がまだありません。',
-          next_step: 'Presence Studio を開いてブラウザの位置情報許可を与えてください。',
-          fallback: '位置情報が不要なら、このまま一般的な案内に切り替えます。',
-        }, 'ja')
-      : formatSurfaceRecoveryAction({
-          reason: 'This surface does not have a current location yet.',
-          next_step: 'Open Presence Studio and allow browser location access.',
-          fallback: 'If location is not required, I can continue with general guidance.',
-        }, 'en');
+      ? formatSurfaceRecoveryAction(
+          {
+            reason: 'この surface では現在地の共有がまだありません。',
+            next_step: 'Presence Studio を開いてブラウザの位置情報許可を与えてください。',
+            fallback: '位置情報が不要なら、このまま一般的な案内に切り替えます。',
+          },
+          'ja'
+        )
+      : formatSurfaceRecoveryAction(
+          {
+            reason: 'This surface does not have a current location yet.',
+            next_step: 'Open Presence Studio and allow browser location access.',
+            fallback: 'If location is not required, I can continue with general guidance.',
+          },
+          'en'
+        );
   }
 
   return isJapanese
@@ -2409,11 +2435,17 @@ function buildTaskSessionAcceptedReply(session: TaskSessionShape, language: 'ja'
     missing: language === 'ja' ? missing.join('、') : missing.join(', '),
   };
   const template = profile
-    ? (missing.includes('approval_confirmation')
-        ? (language === 'ja' ? profile.approval_reply_ja : profile.approval_reply_en)
-        : missing.length > 0
-          ? (language === 'ja' ? profile.missing_reply_ja : profile.missing_reply_en)
-          : (language === 'ja' ? profile.accepted_reply_ja : profile.accepted_reply_en))
+    ? missing.includes('approval_confirmation')
+      ? language === 'ja'
+        ? profile.approval_reply_ja
+        : profile.approval_reply_en
+      : missing.length > 0
+        ? language === 'ja'
+          ? profile.missing_reply_ja
+          : profile.missing_reply_en
+        : language === 'ja'
+          ? profile.accepted_reply_ja
+          : profile.accepted_reply_en
     : null;
   if (template) return renderVoiceTemplate(template, values);
 
@@ -2474,17 +2506,17 @@ function buildTaskSessionProgressReply(session: TaskSessionShape, language: 'ja'
     missing: language === 'ja' ? missing.join('、') : missing.join(', '),
   };
   const template = profile
-    ? (missing.includes('approval_confirmation')
-        ? (language === 'ja'
-            ? profile.approval_reply_ja
-            : profile.approval_reply_en)
-        : missing.length > 0
-          ? (language === 'ja'
-              ? profile.progress_reply_ja || profile.missing_reply_ja
-              : profile.progress_reply_en || profile.missing_reply_en)
-          : (language === 'ja'
-              ? profile.progress_reply_ja || profile.accepted_reply_ja
-              : profile.progress_reply_en || profile.accepted_reply_en))
+    ? missing.includes('approval_confirmation')
+      ? language === 'ja'
+        ? profile.approval_reply_ja
+        : profile.approval_reply_en
+      : missing.length > 0
+        ? language === 'ja'
+          ? profile.progress_reply_ja || profile.missing_reply_ja
+          : profile.progress_reply_en || profile.missing_reply_en
+        : language === 'ja'
+          ? profile.progress_reply_ja || profile.accepted_reply_ja
+          : profile.progress_reply_en || profile.accepted_reply_en
     : null;
   if (template) return renderVoiceTemplate(template, values);
   if (language === 'ja') {
@@ -2568,7 +2600,8 @@ function buildPresentationDeckBrief(session: TaskSessionShape): any {
   const slidePatternId = String(payload.slide_pattern_id || '').trim();
   const slidePatternPackId = String(payload.slide_pattern_pack_id || '').trim();
   const slidePatternPolicy =
-    payload.slide_pattern_selection_policy && typeof payload.slide_pattern_selection_policy === 'object'
+    payload.slide_pattern_selection_policy &&
+    typeof payload.slide_pattern_selection_policy === 'object'
       ? payload.slide_pattern_selection_policy
       : slidePatternId || slidePatternPackId
         ? {
@@ -4168,7 +4201,9 @@ async function generateReply(userText: string, context: { sessionKey: string }):
 
     // インテントにマッチした場合、またはパラメータ不足の聞き返し(clarificationPacket)がある場合
     if (compiledFlow && (compiledFlow.clarificationPacket || compiledFlow.intentContract)) {
-      logger.info(`[voice-hub] Common intent match found. Routing via runSurfaceMessageConversation.`);
+      logger.info(
+        `[voice-hub] Common intent match found. Routing via runSurfaceMessageConversation.`
+      );
       const result = await runSurfaceMessageConversation(
         buildPresenceSurfaceConversationMessageInput(
           buildPresenceConversationPrompt(userText, context.sessionKey),
@@ -4183,7 +4218,9 @@ async function generateReply(userText: string, context: { sessionKey: string }):
       if (text) return text;
     }
   } catch (error) {
-    logger.warn(`[voice-hub] Common intent routing failed, falling back to local handlers: ${error}`);
+    logger.warn(
+      `[voice-hub] Common intent routing failed, falling back to local handlers: ${error}`
+    );
   }
 
   try {
