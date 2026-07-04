@@ -1,0 +1,41 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/handoff-packet.schema.json",
+  "title": "Handoff Packet",
+  "type": "object",
+  "required": [
+    "kind",
+    "correlation_id",
+    "outgoing_summary",
+    "open_decisions",
+    "partial_artifacts",
+    "remaining_acceptance_criteria",
+    "rationale",
+    "created_at"
+  ],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "enum": ["work_item", "mission"]
+    },
+    "correlation_id": { "type": "string", "minLength": 1 },
+    "outgoing_summary": { "type": "string", "minLength": 1 },
+    "open_decisions": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "partial_artifacts": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "remaining_acceptance_criteria": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "rationale": { "type": "string", "minLength": 1 },
+    "source_ref": { "type": "string" },
+    "target_ref": { "type": "string" },
+    "created_at": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": true
+}
