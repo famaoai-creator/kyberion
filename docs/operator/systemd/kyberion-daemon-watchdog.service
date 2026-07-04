@@ -1,0 +1,12 @@
+[Unit]
+Description=Kyberion Daemon Heartbeat Watchdog
+After=network.target
+
+[Service]
+Type=oneshot
+User=kyberion
+WorkingDirectory=/home/kyberion/kyberion
+Environment=NODE_ENV=production
+Environment=KYBERION_CUSTOMER=customer-slug
+EnvironmentFile=-/etc/kyberion/env
+ExecStart=/usr/bin/pnpm daemon:watchdog -- --daemon chronos-daemon --daemon agent-runtime-supervisor-daemon

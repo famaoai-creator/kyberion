@@ -8,6 +8,7 @@ import {
 } from '@agent/core';
 import { buildNextAction, formatNextAction } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
+import { summarizeBackupStatus } from './backup.js';
 import { formatDoctorSummary, summarizeManifestDoctor } from './environment-doctor.js';
 
 const DEFAULT_MANIFESTS = ['kyberion-runtime-baseline', 'reasoning-backend'];
@@ -32,6 +33,7 @@ export interface DoctorRunReport {
   }>;
   scheduleLines: string[];
   governanceLines: string[];
+  backupLines: string[];
 }
 
 export function collectPipelineScheduleDoctorLines(): string[] {
@@ -54,6 +56,46 @@ export function collectPipelineScheduleDoctorLines(): string[] {
   }
   if (schedules.length > 8) lines.push(`  - ... ${schedules.length - 8} more`);
   return lines;
+}
+
+export function collectBackupDoctorLines(): string[] {
+  const status = summarizeBackupStatus();
+  if (status.status === 'missing') {
+    return [
+      'Backup status: missing; run `KYBERION_BACKUP_PASSPHRASE=... pnpm backup create --scope all --encrypt`',
+    ];
+  }
+  const age = status.latestAgeHours?.toFixed(1) ?? 'unknown';
+  return [
+    `Backup status: ${status.status}; latest=${status.latestName}; age=${age}h; archives=${status.count}; dir=${status.backupDir}`,
+  ];
+}
+
+function isReasoningBackendSummary(summary: DoctorRunReport['summaries'][number]): boolean {
+  return (
+    summary.manifestId === 'reasoning-backend' ||
+    summary.lines.some((line) => line.includes('reasoning-backend.any-real'))
+  );
+}
+
+function formatMissingCapabilityNextStep(
+  firstMissingSummary: DoctorRunReport['summaries'][number]
+): { message: string; title: string; reason: string; command: string } {
+  if (isReasoningBackendSummary(firstMissingSummary)) {
+    return {
+      message:
+        'Next step: run `pnpm reasoning:setup`. Configure one real backend: Codex/Gemini/AGY CLI auth, `ANTHROPIC_API_KEY`, `KYBERION_NEMOTRON_URL`, or `KYBERION_LOCAL_LLM_URL`. Use `KYBERION_REASONING_BACKEND=stub` only for explicit offline test mode.',
+      title: 'Configure reasoning backend',
+      reason: `Doctor reports ${firstMissingSummary.counts.must} must and ${firstMissingSummary.counts.should} should reasoning backend gaps.`,
+      command: 'pnpm reasoning:setup',
+    };
+  }
+  return {
+    message: `Next step: run \`pnpm env:bootstrap --manifest ${firstMissingSummary.manifestId} --apply\` for missing must/should items.`,
+    title: `Bootstrap ${firstMissingSummary.manifestId}`,
+    reason: `Doctor reports ${firstMissingSummary.counts.must} must and ${firstMissingSummary.counts.should} should gaps.`,
+    command: `pnpm env:bootstrap --manifest ${firstMissingSummary.manifestId} --apply`,
+  };
 }
 
 export async function collectDoctorReport(argv: {
@@ -99,6 +141,7 @@ export async function collectDoctorReport(argv: {
     summaries,
     scheduleLines: collectPipelineScheduleDoctorLines(),
     governanceLines,
+    backupLines: collectBackupDoctorLines(),
   };
 }
 
@@ -127,6 +170,9 @@ async function main(): Promise<void> {
   for (const line of report.governanceLines) {
     console.log(line);
   }
+  for (const line of report.backupLines) {
+    console.log(line);
+  }
   console.log('');
 
   if (report.totalMissing === 0) {
@@ -148,28 +194,35 @@ async function main(): Promise<void> {
   const needsMeetingHint =
     argv.mission ||
     (argv.runtime && ['meeting', 'voice', 'browser'].includes(String(argv.runtime)));
-  const meetingHint = needsMeetingHint
-    ? ' or `pnpm env:bootstrap --manifest meeting-participation-runtime --apply` for meeting runtime gaps'
-    : '';
-  console.log(
-    `Next step: run \`pnpm env:bootstrap --manifest <id> --apply\` for missing must/should items${meetingHint}.`
-  );
-  console.log(
-    'Need to decide which surface to use after bootstrap? Run `pnpm setup:report --persona first-time-user`.'
-  );
   const firstMissingSummary = report.summaries.find(
     (summary) => summary.counts.must + summary.counts.should > 0
   );
   if (firstMissingSummary) {
+    const nextStep = formatMissingCapabilityNextStep(firstMissingSummary);
+    console.log(
+      needsMeetingHint && !isReasoningBackendSummary(firstMissingSummary)
+        ? `${nextStep.message} For meeting runtime gaps, use \`pnpm env:bootstrap --manifest meeting-participation-runtime --apply\`.`
+        : nextStep.message
+    );
+    console.log(
+      'Need to decide which surface to use after bootstrap? Run `pnpm setup:report --persona first-time-user`.'
+    );
     const nextAction = buildNextAction({
-      title: `Bootstrap ${firstMissingSummary.manifestId}`,
-      reason: `Doctor reports ${firstMissingSummary.counts.must} must and ${firstMissingSummary.counts.should} should gaps.`,
-      next_action_type: 'bootstrap_environment',
-      suggested_command: `pnpm env:bootstrap --manifest ${firstMissingSummary.manifestId} --apply`,
+      title: nextStep.title,
+      reason: nextStep.reason,
+      next_action_type: isReasoningBackendSummary(firstMissingSummary)
+        ? 'run_command'
+        : 'bootstrap_environment',
+      suggested_command: nextStep.command,
     });
     for (const line of formatNextAction(nextAction)) {
       console.log(line);
     }
+  } else {
+    console.log('Next step: inspect doctor findings above and rerun the relevant setup command.');
+    console.log(
+      'Need to decide which surface to use after bootstrap? Run `pnpm setup:report --persona first-time-user`.'
+    );
   }
   process.exit(1);
 }

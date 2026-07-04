@@ -402,6 +402,12 @@ importers:
         specifier: ^17.7.2
         version: 17.7.2
 
+  libs/actuators/media-generation-actuator:
+    dependencies:
+      '@agent/core':
+        specifier: workspace:*
+        version: link:../../core
+
   libs/actuators/meeting-actuator:
     dependencies:
       '@agent/core':
@@ -571,6 +577,33 @@ importers:
       yargs:
         specifier: ^17.7.2
         version: 17.7.2
+
+  libs/actuators/video-composition-actuator:
+    dependencies:
+      '@agent/core':
+        specifier: workspace:*
+        version: link:../../core
+      ajv:
+        specifier: ^8.18.0
+        version: 8.18.0
+
+  libs/actuators/vision-actuator:
+    dependencies:
+      '@agent/core':
+        specifier: workspace:*
+        version: link:../../core
+
+  libs/actuators/voice-actuator:
+    dependencies:
+      '@agent/core':
+        specifier: workspace:*
+        version: link:../../core
+      ajv:
+        specifier: ^8.18.0
+        version: 8.18.0
+      ajv-formats:
+        specifier: ^3.0.1
+        version: 3.0.1(ajv@8.18.0)
 
   libs/actuators/wisdom-actuator:
     dependencies:
@@ -776,6 +809,9 @@ importers:
 
   satellites/discord-bridge:
     dependencies:
+      '@agent/core':
+        specifier: workspace:*
+        version: link:../../libs/core
       discord.js:
         specifier: ^14.26.4
         version: 14.26.4
