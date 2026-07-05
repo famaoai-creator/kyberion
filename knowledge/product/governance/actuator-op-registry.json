@@ -2,86 +2,211 @@
   "version": "1.0.0",
   "description": "Actuator operation registry. Defines which ops belong to each domain and shared op pools. Read by actuator-op-registry.ts to classify pipeline step types (capture/transform/apply). Add new ops here rather than editing source code.",
   "shared_capture_ops": [
-    "read", "read_file", "read_json", "fetch", "shell", "list", "glob_files",
-    "search", "goto", "content", "evaluate", "vision_consult", "pulse_status",
-    "discover_capabilities", "discover_skills", "screenshot", "pptx_extract"
+    "content",
+    "discover_capabilities",
+    "discover_skills",
+    "evaluate",
+    "fetch",
+    "glob_files",
+    "goto",
+    "list",
+    "pptx_extract",
+    "pulse_status",
+    "read",
+    "read_file",
+    "read_json",
+    "screenshot",
+    "search",
+    "shell",
+    "vision_consult"
   ],
   "shared_transform_ops": [
-    "regex_extract", "regex_replace", "json_query", "run_js", "yaml_update",
-    "json_parse", "path_join", "array_count", "array_filter", "variable_hydrate",
-    "json_update", "markdown_to_pdf", "apply_theme", "apply_pattern", "merge_content",
-    "set", "document_diagram_asset_from_brief", "document_diagram_render_from_brief",
-    "document_spreadsheet_design_from_brief", "document_report_design_from_brief",
-    "theme_from_pptx_design"
+    "apply_pattern",
+    "apply_theme",
+    "array_count",
+    "array_filter",
+    "document_diagram_asset_from_brief",
+    "document_diagram_render_from_brief",
+    "document_report_design_from_brief",
+    "document_spreadsheet_design_from_brief",
+    "json_parse",
+    "json_query",
+    "json_update",
+    "markdown_to_pdf",
+    "merge_content",
+    "path_join",
+    "regex_extract",
+    "regex_replace",
+    "run_js",
+    "set",
+    "theme_from_pptx_design",
+    "variable_hydrate",
+    "yaml_update"
   ],
   "shared_apply_ops": [
-    "write", "write_file", "log", "click", "fill", "press", "wait", "delete",
-    "mkdir", "symlink", "git_checkpoint", "voice", "notify", "keyboard",
-    "mouse_click", "deploy", "append", "copy", "move", "pptx_render",
-    "xlsx_render", "docx_render", "pdf_render", "drawio_write", "mermaid_render",
-    "d2_render"
+    "append",
+    "click",
+    "copy",
+    "d2_render",
+    "delete",
+    "deploy",
+    "docx_render",
+    "drawio_write",
+    "fill",
+    "git_checkpoint",
+    "keyboard",
+    "log",
+    "mermaid_render",
+    "mkdir",
+    "mouse_click",
+    "move",
+    "notify",
+    "pdf_render",
+    "pptx_render",
+    "press",
+    "symlink",
+    "voice",
+    "wait",
+    "write",
+    "write_file",
+    "xlsx_render"
   ],
   "domains": {
-    "media": {
-      "capture": ["pptx_extract"],
-      "transform": ["regex_extract", "regex_replace", "json_query", "run_js", "yaml_update",
-        "json_parse", "path_join", "array_count", "array_filter", "variable_hydrate",
-        "json_update", "markdown_to_pdf", "apply_theme", "apply_pattern", "merge_content",
-        "set", "document_diagram_asset_from_brief", "document_diagram_render_from_brief",
-        "document_spreadsheet_design_from_brief", "document_report_design_from_brief",
-        "theme_from_pptx_design"],
-      "apply": ["write", "write_file", "log", "click", "fill", "press", "wait", "delete",
-        "mkdir", "symlink", "git_checkpoint", "voice", "notify", "keyboard",
-        "mouse_click", "deploy", "append", "copy", "move", "pptx_render",
-        "xlsx_render", "docx_render", "pdf_render", "drawio_write", "mermaid_render",
-        "d2_render"]
-    },
     "browser": {
-      "capture": ["goto", "content", "evaluate", "screenshot"],
-      "apply": ["click", "fill", "press", "wait", "log", "extension_session"]
-    },
-    "system": {
-      "capture": ["shell", "list", "pulse_status"],
-      "apply": ["log", "notify", "voice", "voice_input_toggle"]
-    },
-    "service": {
-      "capture": ["read", "list"],
-      "apply": ["deploy", "log", "notify"]
-    },
-    "file": {
-      "capture": ["read", "read_file", "read_json", "list", "glob_files"],
-      "transform": ["json_parse", "json_query", "path_join"],
-      "apply": ["write", "write_file", "append", "copy", "move", "delete", "mkdir", "symlink"]
+      "capture": ["content", "evaluate", "goto", "screenshot"],
+      "transform": [],
+      "apply": ["click", "extension_session", "fill", "log", "press", "wait"]
     },
     "code": {
-      "capture": ["read", "read_file", "list", "glob_files"],
+      "capture": ["glob_files", "list", "read", "read_file"],
       "transform": ["apply_pattern", "merge_content", "set"],
-      "apply": ["write", "write_file", "append", "copy", "move", "log"]
+      "apply": ["append", "copy", "log", "move", "write", "write_file"]
     },
-    "wisdom": {
-      "capture": ["search", "read", "read_file"],
-      "transform": ["regex_extract", "regex_replace", "json_query", "yaml_update", "json_parse"],
-      "apply": ["log", "register_presentation_preference_profile"]
+    "codex": {
+      "capture": ["app-server", "cloud", "features", "mcp", "review"],
+      "transform": [],
+      "apply": ["exec", "plugin"]
+    },
+    "file": {
+      "capture": ["glob_files", "list", "read", "read_file", "read_json"],
+      "transform": ["json_parse", "json_query", "path_join"],
+      "apply": ["append", "copy", "delete", "mkdir", "move", "symlink", "write", "write_file"]
+    },
+    "gemini": {
+      "capture": ["extensions", "hooks", "mcp", "skills"],
+      "transform": [],
+      "apply": ["log", "prompt"]
+    },
+    "gh": {
+      "capture": [],
+      "transform": [],
+      "apply": ["agent-task", "api", "issue", "pr", "repo", "run-workflow", "skill"]
+    },
+    "media": {
+      "capture": ["json_read", "pptx_extract", "pptx_slide_text", "xlsx_extract"],
+      "transform": [
+        "apply_pattern",
+        "apply_theme",
+        "merge_content",
+        "proposal_content_from_storyline",
+        "proposal_storyline_from_brief",
+        "set",
+        "theme_from_pptx_design"
+      ],
+      "apply": [
+        "docx_render",
+        "pptx_filter_slides",
+        "pptx_patch",
+        "pptx_render",
+        "write_file",
+        "xlsx_render"
+      ]
     },
     "network": {
       "capture": ["fetch", "read"],
+      "transform": [],
       "apply": ["log"]
     },
     "orchestrator": {
       "capture": ["discover_capabilities", "discover_skills"],
+      "transform": [],
       "apply": ["deploy", "log"]
     },
-    "gemini": {
-      "capture": ["extensions", "skills", "hooks", "mcp"],
-      "apply": ["prompt", "log"]
+    "service": {
+      "capture": ["list", "read"],
+      "transform": [],
+      "apply": ["deploy", "log", "notify"]
     },
-    "gh": {
-      "capture": [],
-      "apply": ["pr", "issue", "repo", "api", "run-workflow", "skill", "agent-task"]
+    "system": {
+      "capture": [
+        "chrome_tab_list",
+        "cli_health_check",
+        "clipboard_read",
+        "collect_artifacts",
+        "control_media_devices",
+        "exec",
+        "get_focused_input",
+        "get_screen_size",
+        "glob_files",
+        "list_capabilities",
+        "list_displays",
+        "list_incidents",
+        "list_input_devices",
+        "list_knowledge",
+        "list_media_devices",
+        "list_missions",
+        "list_projects",
+        "list_running_apps",
+        "list_service_runtimes",
+        "list_tool_runtimes",
+        "probe",
+        "pulse_status",
+        "read_file",
+        "read_json",
+        "sample_traces",
+        "scan_directory",
+        "screenshot",
+        "shell",
+        "test_camera_injection",
+        "test_screen_mp4_roundtrip",
+        "test_screen_stream",
+        "vision_consult",
+        "window_list"
+      ],
+      "transform": ["json_query", "regex_extract", "run_js", "sre_analyze"],
+      "apply": [
+        "activate_application",
+        "app_quit",
+        "check_native_tts",
+        "clipboard_write",
+        "drag",
+        "keyboard",
+        "log",
+        "mkdir",
+        "mouse_click",
+        "mouse_move",
+        "native_tts_speak",
+        "notify",
+        "open_file",
+        "open_url",
+        "paste_text",
+        "press_key",
+        "process_kill",
+        "run_applescript",
+        "scroll",
+        "system_notify",
+        "voice",
+        "voice_input_toggle",
+        "wait",
+        "write_artifact",
+        "write_file",
+        "write_json"
+      ]
     },
-    "codex": {
-      "capture": ["review", "app-server", "cloud", "mcp", "features"],
-      "apply": ["exec", "plugin"]
+    "wisdom": {
+      "capture": ["read", "read_file", "search"],
+      "transform": ["json_parse", "json_query", "regex_extract", "regex_replace", "yaml_update"],
+      "apply": ["log", "register_presentation_preference_profile"]
     }
   }
 }
