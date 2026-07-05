@@ -53,4 +53,26 @@ describe('a2a conversation store', () => {
       result: 'world',
     });
   });
+
+  it('preserves concurrent appends to the same conversation', async () => {
+    const conversationId = `${CONVERSATION_ID}-CONCURRENT`;
+    const messages = Array.from({ length: 20 }, (_, index) => `message-${index}`);
+
+    await Promise.all(
+      messages.map((prompt, index) =>
+        appendConversationTurn(conversationId, {
+          sender: `sender-${index}`,
+          receiver: 'agent-y',
+          performative: 'request',
+          prompt,
+          result: `result-${index}`,
+          missionId: 'MSN-1',
+        })
+      )
+    );
+
+    const history = readConversationHistory(conversationId);
+    expect(history).toHaveLength(messages.length);
+    expect(new Set(history.map((turn) => turn.prompt))).toEqual(new Set(messages));
+  });
 });
