@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from 'next/server';
 
 /**
  * API Guard: Authentication + Rate Limiting for Chronos Mirror API routes.
@@ -9,32 +9,29 @@ import { NextRequest, NextResponse } from "next/server";
 
 const API_TOKEN = process.env.KYBERION_API_TOKEN;
 const LOCALADMIN_TOKEN = process.env.KYBERION_LOCALADMIN_TOKEN;
-const ALLOW_UNAUTH_REMOTE = process.env.KYBERION_ALLOW_UNAUTH_REMOTE === "true";
-const ALLOW_LOCALHOST_AUTOADMIN = process.env.KYBERION_LOCALHOST_AUTOADMIN === "true";
+const ALLOW_UNAUTH_REMOTE = process.env.KYBERION_ALLOW_UNAUTH_REMOTE === 'true';
+const ALLOW_LOCALHOST_AUTOADMIN = process.env.KYBERION_LOCALHOST_AUTOADMIN === 'true';
 
-export type ChronosAccessRole = "readonly" | "localadmin";
+export type ChronosAccessRole = 'readonly' | 'localadmin';
 
 // In-memory rate limit store
 const rateLimitStore = new Map<string, { count: number; windowStart: number }>();
-const RATE_LIMIT_MAX = 30;        // requests
-const RATE_LIMIT_WINDOW = 60000;  // 1 minute
+const RATE_LIMIT_MAX = 30; // requests
+const RATE_LIMIT_WINDOW = 60000; // 1 minute
 
 function getClientIP(req: NextRequest): string {
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
-    || req.headers.get("x-real-ip")
-    || req.ip
-    || "127.0.0.1";
+  const ip = req.ip || 'unknown';
   return ip;
 }
 
 function isLoopback(ip: string): boolean {
-  return ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1" || ip === "unknown";
+  return ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1' || ip === 'unknown';
 }
 
 function checkRateLimit(ip: string): boolean {
   const now = Date.now();
   let entry = rateLimitStore.get(ip);
-  if (!entry || (now - entry.windowStart) > RATE_LIMIT_WINDOW) {
+  if (!entry || now - entry.windowStart > RATE_LIMIT_WINDOW) {
     entry = { count: 0, windowStart: now };
   }
   entry.count++;
@@ -47,47 +44,54 @@ function checkRateLimit(ip: string): boolean {
  * Returns null if OK, or a NextResponse error if rejected.
  */
 function resolveToken(req: NextRequest): string | null {
-  const authHeader = req.headers.get("authorization");
-  const bearer = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
-  return bearer || req.cookies.get("kyberion_token")?.value || null;
+  const authHeader = req.headers.get('authorization');
+  const bearer = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  return bearer || req.cookies.get('kyberion_token')?.value || null;
+}
+
+function getRateLimitKey(req: NextRequest): string {
+  const token = resolveToken(req);
+  if (token) {
+    return `token:${token}`;
+  }
+  return `ip:${getClientIP(req)}`;
 }
 
 export function resolveChronosAccessRole(req: NextRequest): ChronosAccessRole | null {
-  const ip = getClientIP(req);
-  const isLocal = isLoopback(ip);
   const token = resolveToken(req);
+  const ip = getClientIP(req);
+  const isLocal = ip !== 'unknown' && isLoopback(ip);
 
   if (LOCALADMIN_TOKEN && token === LOCALADMIN_TOKEN) {
-    return "localadmin";
+    return 'localadmin';
   }
   if (API_TOKEN && token === API_TOKEN) {
-    return "readonly";
+    return 'readonly';
   }
   if (isLocal && ALLOW_LOCALHOST_AUTOADMIN) {
-    return "localadmin";
+    return 'localadmin';
   }
   if (isLocal) {
-    return "readonly";
+    return 'readonly';
   }
   if (!API_TOKEN && !LOCALADMIN_TOKEN && ALLOW_UNAUTH_REMOTE) {
-    return "readonly";
+    return 'readonly';
   }
   return null;
 }
 
 export function guardRequest(req: NextRequest): NextResponse | null {
   // Rate limiting (always applied)
-  const ip = getClientIP(req);
-  if (!checkRateLimit(ip)) {
-    return NextResponse.json(
-      { error: "Rate limit exceeded. Try again later." },
-      { status: 429 }
-    );
+  if (!checkRateLimit(getRateLimitKey(req))) {
+    return NextResponse.json({ error: 'Rate limit exceeded. Try again later.' }, { status: 429 });
   }
 
   if (!resolveChronosAccessRole(req)) {
     return NextResponse.json(
-      { error: "Unauthorized. Use a local session, KYBERION_API_TOKEN, or KYBERION_LOCALADMIN_TOKEN." },
+      {
+        error:
+          'Unauthorized. Use a local session, KYBERION_API_TOKEN, or KYBERION_LOCALADMIN_TOKEN.',
+      },
       { status: 401 }
     );
   }
@@ -95,17 +99,23 @@ export function guardRequest(req: NextRequest): NextResponse | null {
   return null; // OK
 }
 
-export function requireChronosAccess(req: NextRequest, requiredRole: ChronosAccessRole): NextResponse | null {
+export function requireChronosAccess(
+  req: NextRequest,
+  requiredRole: ChronosAccessRole
+): NextResponse | null {
   const resolved = resolveChronosAccessRole(req);
   if (!resolved) {
     return NextResponse.json(
-      { error: "Unauthorized. Use a local session, KYBERION_API_TOKEN, or KYBERION_LOCALADMIN_TOKEN." },
+      {
+        error:
+          'Unauthorized. Use a local session, KYBERION_API_TOKEN, or KYBERION_LOCALADMIN_TOKEN.',
+      },
       { status: 401 }
     );
   }
-  if (requiredRole === "localadmin" && resolved !== "localadmin") {
+  if (requiredRole === 'localadmin' && resolved !== 'localadmin') {
     return NextResponse.json(
-      { error: "Forbidden. This action requires Chronos localadmin access." },
+      { error: 'Forbidden. This action requires Chronos localadmin access.' },
       { status: 403 }
     );
   }
@@ -113,16 +123,16 @@ export function requireChronosAccess(req: NextRequest, requiredRole: ChronosAcce
 }
 
 export function roleToMissionRole(accessRole: ChronosAccessRole): string {
-  if (accessRole === "localadmin") {
-    return "chronos_localadmin";
+  if (accessRole === 'localadmin') {
+    return 'chronos_localadmin';
   }
-  return "chronos_operator";
+  return 'chronos_operator';
 }
 
 export function getChronosAccessRoleOrThrow(req: NextRequest): ChronosAccessRole {
   const resolved = resolveChronosAccessRole(req);
   if (!resolved) {
-    throw new Error("Chronos access role was requested before authentication succeeded.");
+    throw new Error('Chronos access role was requested before authentication succeeded.');
   }
   return resolved;
 }
