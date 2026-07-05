@@ -1067,6 +1067,7 @@ export {
   getReasoningBackend,
   delegateBestOf,
   delegateStructured,
+  delegateTaskWithUntrustedData,
   registerReasoningBackend,
   resetReasoningBackend,
   stubReasoningBackend,
@@ -1372,6 +1373,7 @@ export type {
   SimulationInput,
   SimulationResult,
   SynthesizedPersona,
+  UntrustedDataParams,
 } from './reasoning-backend.js';
 export {
   A2ATaskContractSchema,
@@ -1688,3 +1690,16 @@ export type {
   ExecuteServiceProcedureResult,
 } from './service-procedure-executor.js';
 export { SERVICE_EXTERNAL_EFFECT_OP } from './procedure-dispatcher.js';
+
+// SA-03 Prompt Injection & Untrusted Content Defense
+export type { ScanOptions } from './untrusted-content.js';
+export {
+  wrapUntrusted,
+  scanForInjection,
+  scanForInjectionAsync,
+  isInjectionSuspected,
+  setInjectionSuspected,
+  processUntrustedContent,
+  processUntrustedContentAsync,
+  sanitizeUntrustedContentAsync,
+} from './untrusted-content.js';
