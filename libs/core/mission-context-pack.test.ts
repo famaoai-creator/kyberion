@@ -172,6 +172,15 @@ function makePack(): MissionContextPack {
         deliverable_kind: 'architecture-doc',
         success_criteria: ['pack is role-scoped', 'pack is traceable'],
         evidence_required: true,
+        expected_artifacts: [{ kind: 'markdown', storage_class: 'mission' }],
+        verification_method: 'self_check',
+        vision_ref: {
+          raw: 'company://acme/vision',
+          kind: 'company',
+          tenant_slug: 'acme',
+          path: 'vision',
+          query: null,
+        },
       },
     },
     teamRole: 'implementer',
@@ -247,6 +256,13 @@ function makePack(): MissionContextPack {
         evidence_required: true,
         expected_artifacts: [{ kind: 'markdown', storage_class: 'mission' }],
         verification_method: 'self_check',
+        vision_ref: {
+          raw: 'company://acme/vision',
+          kind: 'company',
+          tenant_slug: 'acme',
+          path: 'vision',
+          query: null,
+        },
       },
       updated_at: '2026-06-05T00:00:00.000Z',
     },
@@ -375,6 +391,15 @@ function makePrunablePack(): MissionContextPack {
         deliverable_kind: 'architecture-doc',
         success_criteria: ['pack is role-scoped', 'pack is traceable'],
         evidence_required: true,
+        expected_artifacts: [{ kind: 'markdown', storage_class: 'mission' }],
+        verification_method: 'self_check',
+        vision_ref: {
+          raw: 'company://acme/vision',
+          kind: 'company',
+          tenant_slug: 'acme',
+          path: 'vision',
+          query: null,
+        },
       },
     },
     teamRole: 'implementer',
@@ -548,6 +573,13 @@ describe('mission-context-pack', () => {
         'dispatch prompt should stay scoped',
       ])
     );
+    expect(pack.mission.outcome_contract?.vision_ref).toMatchObject({
+      raw: 'company://acme/vision',
+      kind: 'company',
+      tenant_slug: 'acme',
+      path: 'vision',
+      query: null,
+    });
     expect(pack.sources.map((entry) => entry.kind)).toEqual(
       expect.arrayContaining([
         'mission_state',
@@ -595,6 +627,8 @@ describe('mission-context-pack', () => {
           deliverable_kind: 'artifact',
           success_criteria: ['context pack is scoped'],
           evidence_required: true,
+          expected_artifacts: [{ kind: 'markdown', storage_class: 'mission' }],
+          verification_method: 'self_check',
         },
       },
       teamRole: 'implementer',

@@ -1,0 +1,54 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "OkrTracker",
+  "type": "object",
+  "required": ["company_id", "tenant_slug", "source_kind", "source_path", "period", "objectives"],
+  "properties": {
+    "company_id": { "type": "string" },
+    "tenant_slug": { "type": ["string", "null"] },
+    "source_kind": {
+      "type": "string",
+      "enum": ["customer", "confidential", "public", "derived"]
+    },
+    "source_path": { "type": "string" },
+    "period": {
+      "type": "object",
+      "required": ["period_id", "label"],
+      "properties": {
+        "period_id": { "type": "string" },
+        "label": { "type": "string" },
+        "start_at": { "type": ["string", "null"] },
+        "end_at": { "type": ["string", "null"] }
+      }
+    },
+    "objectives": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["objective", "key_results"],
+        "properties": {
+          "objective": { "type": "string" },
+          "key_results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["metric", "target", "current"],
+              "properties": {
+                "metric": { "type": "string" },
+                "target": {},
+                "current": {},
+                "due": { "type": ["string", "null"] },
+                "owner_role": { "type": ["string", "null"] },
+                "source": {
+                  "type": "string",
+                  "enum": ["manual", "financial", "mission", "operational"]
+                },
+                "source_ref": { "type": ["string", "null"] }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

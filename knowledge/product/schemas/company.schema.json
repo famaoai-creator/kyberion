@@ -1,0 +1,124 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/company.schema.json",
+  "title": "Company Aggregate",
+  "type": "object",
+  "required": [
+    "company_id",
+    "tenant_slug",
+    "name",
+    "sovereign",
+    "customer_ref",
+    "identity_ref",
+    "organization_profile_ref",
+    "vision_ref",
+    "org_chart_ref",
+    "financial_ref",
+    "decision_rights_ref"
+  ],
+  "properties": {
+    "company_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tenant_slug": {
+      "type": "string",
+      "minLength": 1
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sovereign": {
+      "type": ["string", "null"]
+    },
+    "customer_ref": {
+      "$ref": "#/$defs/componentRef"
+    },
+    "identity_ref": {
+      "$ref": "#/$defs/componentRef"
+    },
+    "organization_profile_ref": {
+      "$ref": "#/$defs/componentRef"
+    },
+    "vision_ref": {
+      "$ref": "#/$defs/visionRef"
+    },
+    "org_chart_ref": {
+      "$ref": "#/$defs/componentRef"
+    },
+    "financial_ref": {
+      "$ref": "#/$defs/componentRef"
+    },
+    "decision_rights_ref": {
+      "$ref": "#/$defs/componentRef"
+    }
+  },
+  "$defs": {
+    "componentRef": {
+      "type": "object",
+      "required": ["path", "exists", "data"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "exists": {
+          "type": "boolean"
+        },
+        "data": {}
+      },
+      "additionalProperties": false
+    },
+    "visionRef": {
+      "type": "object",
+      "required": ["tenant_slug", "source_path", "source_kind", "title", "raw", "sections"],
+      "properties": {
+        "tenant_slug": {
+          "type": ["string", "null"]
+        },
+        "source_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_kind": {
+          "type": "string",
+          "enum": ["customer", "tenant", "global"]
+        },
+        "title": {
+          "type": ["string", "null"]
+        },
+        "raw": {
+          "type": "string"
+        },
+        "sections": {
+          "type": "object",
+          "required": ["soul", "steering", "destination"],
+          "properties": {
+            "soul": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "steering": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "destination": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

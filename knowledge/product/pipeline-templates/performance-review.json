@@ -1,0 +1,89 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "performance-review",
+  "version": "2.0.0",
+  "name": "Performance Review",
+  "description": "Performance review workflow that compiles achievement notes and drafts a review memo for line_manager and talent_culture.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes).",
+  "context": {
+    "mission_id": "",
+    "tenant_slug": "",
+    "reviewee_name": "",
+    "review_period": "",
+    "review_input_path": "active/shared/tmp/performance-review-input-{{mission_id}}.json",
+    "review_memo_path": "active/shared/tmp/performance-review-{{mission_id}}.md",
+    "review_summary_path": "active/shared/tmp/performance-review-{{mission_id}}.json"
+  },
+  "steps": [
+    {
+      "id": "preflight",
+      "role": "gate",
+      "op": "core:include",
+      "params": { "fragment": "fragments/runtime-preflight.json" }
+    },
+    {
+      "id": "log_start",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "🧭 Performance review start for mission {{mission_id}} reviewee={{reviewee_name}} period={{review_period}}"
+      }
+    },
+    {
+      "id": "read_review_input",
+      "role": "source",
+      "op": "system:read_file",
+      "produces": { "channel": "review_input", "type": "PerformanceReviewInput" },
+      "params": {
+        "path": "{{review_input_path}}"
+      }
+    },
+    {
+      "id": "draft_review_memo",
+      "role": "transform",
+      "op": "reasoning:analyze",
+      "consumes": "review_input",
+      "produces": { "channel": "review_memo", "type": "PerformanceReviewMemo" },
+      "params": {
+        "instruction": "以下の review input をもとに、人事評価メモを Markdown で作成してください。line_manager と talent_culture がレビューしやすいように、観点を具体化してください。\n\n必須セクション:\n# Performance Review\n## 対象者\n## 期間\n## 主な成果\n## 期待値に対する評価\n## 強み\n## 改善点\n## 次期目標\n## talent_culture / line_manager への確認事項\n\n要件:\n- 事実と推測を分ける\n- 評価理由を明確にする\n- 昇給/昇格などの判断は人間承認前提であることを明記する",
+        "context": ["{{mission_id}}", "{{reviewee_name}}", "{{review_period}}", "{{review_input}}"]
+      }
+    },
+    {
+      "id": "write_review_memo",
+      "role": "sink",
+      "op": "system:write_artifact",
+      "consumes": "review_memo",
+      "params": {
+        "path": "{{review_memo_path}}",
+        "content": "{{review_memo}}"
+      }
+    },
+    {
+      "id": "write_review_summary",
+      "role": "sink",
+      "op": "system:write_file",
+      "params": {
+        "path": "{{review_summary_path}}",
+        "content": {
+          "kind": "performance-review",
+          "mission_id": "{{mission_id}}",
+          "tenant_slug": "{{tenant_slug}}",
+          "reviewee_name": "{{reviewee_name}}",
+          "review_period": "{{review_period}}",
+          "review_memo_path": "{{review_memo_path}}",
+          "reviewers": ["line_manager", "talent_culture"]
+        },
+        "format": "json"
+      }
+    },
+    {
+      "id": "log_done",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "✅ Performance review complete: {{review_memo_path}}"
+      }
+    }
+  ]
+}
