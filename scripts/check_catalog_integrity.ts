@@ -9,6 +9,13 @@ import {
 } from '@agent/core';
 import { readJsonFile } from './refactor/cli-input.js';
 import { generateIndex } from './generate_knowledge_index.js';
+import {
+  expectedKyberionThemeEntries,
+  extractKyberionTokenBlock,
+  readKyberionDesignTokens,
+  renderKyberionDesignTokenBlock,
+  renderKyberionTailwindColorsBlock,
+} from './design-token-utils.js';
 
 const AjvCtor = (AjvModule as any).default ?? AjvModule;
 const ajv = new AjvCtor({ allErrors: true });
@@ -266,6 +273,96 @@ function validateCatalog(check: CatalogCheck, violations: string[]) {
   }
 }
 
+function validateDesignTokenCatalog(violations: string[]) {
+  const tokens = readKyberionDesignTokens();
+  const expectedTokenBlock = renderKyberionDesignTokenBlock(tokens);
+  const expectedTailwindBlock = renderKyberionTailwindColorsBlock();
+  const expectedThemes = expectedKyberionThemeEntries(tokens);
+
+  const tokenFiles = [
+    'presence/displays/chronos-mirror-v2/src/app/globals.css',
+    'presence/displays/operator-surface/src/app/globals.css',
+    'presence/displays/presence-studio/static/design-tokens.css',
+    'presence/displays/computer-surface/static/design-tokens.css',
+  ].map((relativePath) => pathResolver.rootResolve(relativePath));
+
+  for (const filePath of tokenFiles) {
+    if (!safeExistsSync(filePath)) {
+      violations.push(`design-tokens: missing file ${path.relative(pathResolver.rootDir(), filePath)}`);
+      continue;
+    }
+    const actual = String(safeReadFile(filePath, { encoding: 'utf8' }) || '').trim();
+    if (filePath.endsWith('globals.css')) {
+      const tokenBlock = extractKyberionTokenBlock(actual);
+      if (tokenBlock !== expectedTokenBlock) {
+        violations.push(
+          `design-tokens: token block drift in ${path.relative(pathResolver.rootDir(), filePath)}`
+        );
+      }
+      continue;
+    }
+    if (actual !== expectedTokenBlock) {
+      violations.push(
+        `design-tokens: token block drift in ${path.relative(pathResolver.rootDir(), filePath)}`
+      );
+    }
+  }
+
+  const tailwindPath = pathResolver.rootResolve(
+    'presence/displays/chronos-mirror-v2/tailwind.config.cjs'
+  );
+  if (!safeExistsSync(tailwindPath)) {
+    violations.push('design-tokens: missing tailwind.config.cjs');
+  } else {
+    const tailwindText = String(safeReadFile(tailwindPath, { encoding: 'utf8' }) || '');
+    if (!tailwindText.includes(expectedTailwindBlock)) {
+      violations.push('design-tokens: kyberion tailwind color block drift');
+    }
+  }
+
+  const themeFiles = [
+    'knowledge/public/design-patterns/media-templates/themes.json',
+    'knowledge/public/design-patterns/media-templates/themes/themes.json',
+  ].map((relativePath) => pathResolver.rootResolve(relativePath));
+
+  for (const filePath of themeFiles) {
+    if (!safeExistsSync(filePath)) {
+      violations.push(`design-tokens: missing file ${path.relative(pathResolver.rootDir(), filePath)}`);
+      continue;
+    }
+    const raw = JSON.parse(String(safeReadFile(filePath, { encoding: 'utf8' }) || '')) as {
+      default_theme?: string;
+      themes?: Record<string, { colors?: Record<string, string>; fonts?: Record<string, string> }>;
+    };
+    const kyberionStandard = raw.themes?.['kyberion-standard'];
+    const kyberionSovereign = raw.themes?.['kyberion-sovereign'];
+    const expectedStandard = expectedThemes['kyberion-standard'];
+    const expectedSovereign = expectedThemes['kyberion-sovereign'];
+    const isRootThemesCatalog = path.basename(path.dirname(filePath)) !== 'themes';
+    if (isRootThemesCatalog && raw.default_theme !== 'kyberion-standard') {
+      violations.push(
+        `design-tokens: ${path.relative(pathResolver.rootDir(), filePath)} default_theme must be kyberion-standard`
+      );
+    }
+    if (
+      JSON.stringify(kyberionStandard?.colors) !== JSON.stringify(expectedStandard.colors) ||
+      JSON.stringify(kyberionStandard?.fonts) !== JSON.stringify(expectedStandard.fonts)
+    ) {
+      violations.push(
+        `design-tokens: ${path.relative(pathResolver.rootDir(), filePath)} kyberion-standard drift`
+      );
+    }
+    if (
+      JSON.stringify(kyberionSovereign?.colors) !== JSON.stringify(expectedSovereign.colors) ||
+      JSON.stringify(kyberionSovereign?.fonts) !== JSON.stringify(expectedSovereign.fonts)
+    ) {
+      violations.push(
+        `design-tokens: ${path.relative(pathResolver.rootDir(), filePath)} kyberion-sovereign drift`
+      );
+    }
+  }
+}
+
 function validateCapabilitiesGuideDrift(violations: string[]) {
   const guidePath = pathResolver.rootResolve('CAPABILITIES_GUIDE.md');
   if (!safeExistsSync(guidePath)) {
@@ -300,6 +397,7 @@ function main() {
   for (const check of CHECKS) {
     validateCatalog(check, violations);
   }
+  validateDesignTokenCatalog(violations);
   validateCapabilitiesGuideDrift(violations);
 
   const indexUpToDate = generateIndex(true);

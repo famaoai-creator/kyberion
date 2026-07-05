@@ -2,6 +2,12 @@
 
 > 優先度: P1 / 規模: M / 依存: なし / 後続: DS-02(テナント適用)、DS-04(動画)、DS-05(a11y)
 
+## 0.1 実装ステータス(2026-07-05 時点)
+
+- 実装済み: `knowledge/public/design-patterns/brand-tokens/kyberion.json` を正本とするトークン生成、4 面の token CSS 生成、`themes.json` への Kyberion テーマ反映、`docs/developer/design/DESIGN_SYSTEM.md` の統括文書化
+- 追加実装: `check:catalogs` に Kyberion token drift 検査を接続し、generated output とコミット済みファイルの一致を強制
+- 残作業: operator-surface の残 hex 置換と、DS-02/DS-04/DS-05 に向けた面別配線の最終整理
+
 ## 背景と課題
 
 視覚デザインの「正」が存在せず、面ごとに独立進化している。
