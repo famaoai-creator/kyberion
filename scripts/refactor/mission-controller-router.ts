@@ -68,6 +68,8 @@ export interface MissionControllerRoutingContext {
     tenantSlug?: string,
     organizationId?: string
   ) => Awaitable<void>;
+  pauseMission: (id: string, note?: string) => Awaitable<void>;
+  cancelMission: (id: string, note?: string) => Awaitable<void>;
   recordRoutingDecisionInMissionState: (
     missionId: string,
     routingDecision: Record<string, unknown> | null,
@@ -481,6 +483,12 @@ export async function runMissionControllerAction(
       break;
     case 'resume':
       await context.resumeMission(arg1);
+      break;
+    case 'pause':
+      await context.pauseMission(arg1!, getValue('--note', context.argv));
+      break;
+    case 'cancel':
+      await context.cancelMission(arg1!, getValue('--note', context.argv));
       break;
     case 'record-task':
       await context.recordTask(arg1!, arg2!, JSON.parse(context.arg3 || '{}'));
