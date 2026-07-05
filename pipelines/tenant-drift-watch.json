@@ -1,0 +1,38 @@
+{
+  "action": "pipeline",
+  "name": "tenant-drift-watch",
+  "version": "1.0.0",
+  "description": "Daily confidential tenant drift scan using scripts/watch_tenant_drift.ts with alerting enabled.",
+  "_refs": {
+    "plan": "docs/improvement-plans-2026-07/AO-01_AUTONOMOUS_MAINTENANCE_LOOP.ja.md",
+    "implementation": "scripts/watch_tenant_drift.ts"
+  },
+  "schedule": {
+    "id": "tenant-drift-watch-daily",
+    "cron": "15 5 * * *",
+    "timezone": "Asia/Tokyo",
+    "enabled": true
+  },
+  "steps": [
+    {
+      "id": "watch_tenant_drift",
+      "role": "source",
+      "op": "system:exec",
+      "produces": {
+        "channel": "tenant_drift_result",
+        "type": "CommandResult"
+      },
+      "params": {
+        "command": "node",
+        "args": [
+          "--import",
+          "./scripts/ts-loader.mjs",
+          "scripts/watch_tenant_drift.ts",
+          "--quiet",
+          "--alert"
+        ],
+        "timeout_ms": 120000
+      }
+    }
+  ]
+}

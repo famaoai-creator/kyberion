@@ -1,0 +1,32 @@
+{
+  "action": "pipeline",
+  "name": "auto-checkpoint",
+  "version": "1.0.0",
+  "description": "Daily automatic checkpoint pass for active missions.",
+  "_refs": {
+    "plan": "docs/improvement-plans-2026-07/AO-01_AUTONOMOUS_MAINTENANCE_LOOP.ja.md",
+    "implementation": "scripts/auto_checkpoint.ts"
+  },
+  "schedule": {
+    "id": "auto-checkpoint-daily",
+    "cron": "45 5 * * *",
+    "timezone": "Asia/Tokyo",
+    "enabled": true
+  },
+  "steps": [
+    {
+      "id": "run_auto_checkpoint",
+      "role": "source",
+      "op": "system:exec",
+      "produces": {
+        "channel": "auto_checkpoint_result",
+        "type": "CommandResult"
+      },
+      "params": {
+        "command": "node",
+        "args": ["--import", "./scripts/ts-loader.mjs", "scripts/auto_checkpoint.ts"],
+        "timeout_ms": 120000
+      }
+    }
+  ]
+}
