@@ -58,7 +58,7 @@ function firstString(...values: unknown[]): string | undefined {
   return undefined;
 }
 
-function extractDecisionRightsContext(payload?: Record<string, unknown>): {
+function extractDecisionRightsContext(agentId: string, payload?: Record<string, unknown>): {
   tenantSlug?: string;
   decisionType?: string;
   actorRole?: string;
@@ -68,7 +68,7 @@ function extractDecisionRightsContext(payload?: Record<string, unknown>): {
   if (!payload) return {};
   const tenantSlug = firstString(payload.tenant_slug, payload.tenantSlug, payload.company_id);
   const decisionType = firstString(payload.decision_type, payload.decisionType, payload.operation_type);
-  const actorRole = firstString(payload.actor_role, payload.actorRole, payload.requested_role, payload.requestedRole);
+  const actorRole = process.env.MISSION_ROLE || agentId;
   const amountValue = payload.amount_jpy ?? payload.amount ?? payload.value;
   const amount =
     typeof amountValue === 'number'
@@ -190,7 +190,7 @@ export function enforceApprovalGate(
   const { intentId, operationId, agentId, correlationId, channel, payload } = params;
   recordGovernanceAction(agentId, 'approval_gate', operationId, false);
 
-  const decisionRightsContext = extractDecisionRightsContext(payload);
+  const decisionRightsContext = extractDecisionRightsContext(agentId, payload);
   const decisionRightsMatrix =
     decisionRightsContext.decisionType || decisionRightsContext.tenantSlug
       ? resolveDecisionRightsMatrix(decisionRightsContext.tenantSlug ?? null)
