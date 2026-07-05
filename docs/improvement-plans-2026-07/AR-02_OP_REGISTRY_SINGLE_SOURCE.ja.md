@@ -46,6 +46,8 @@ op-registry ↔ code のドリフトで、`determineActuatorStepType('file','sta
 
 **進捗メモ(2026-07-06)**: 既定 `apply` フォールバックは除去済み。未知 op は `actuator-op-registry.ts` で `[UNKNOWN_OP]` として失敗し、`super-nerve` からもそのまま failed に伝播する。
 
+**進捗メモ(2026-07-06 追記)**: `system-actuator` で `describeOps()` を切り出し、`scripts/generate_op_registry.ts` で `actuator-op-registry.json` と `actuator-op-discovery.json` を再生成できるようにした。まだ全アクチュエータ self-describe 化は未完了だが、生成パイプラインの実行路は確立した。
+
 ### Task 4: 発見可能性ドキュメント — `claude-haiku`
 
 - `global_actuator_index` と CAPABILITIES を生成物に切替。`docs/GLOSSARY`/`CAPABILITIES_GUIDE` から「op の探し方(生成 index → per-op schema)」を1段落で案内。

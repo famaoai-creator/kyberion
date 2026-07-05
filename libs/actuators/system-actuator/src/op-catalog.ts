@@ -1,0 +1,82 @@
+export const SYSTEM_ACTUATOR_CAPTURE_OPS = [
+  'screenshot',
+  'clipboard_read',
+  'get_focused_input',
+  'get_screen_size',
+  'window_list',
+  'chrome_tab_list',
+  'read_file',
+  'read_json',
+  'probe',
+  'glob_files',
+  'scan_directory',
+  'pulse_status',
+  'exec',
+  'shell',
+  'cli_health_check',
+  'list_missions',
+  'list_projects',
+  'list_capabilities',
+  'list_incidents',
+  'list_knowledge',
+  'list_running_apps',
+  'list_input_devices',
+  'list_displays',
+  'list_media_devices',
+  'list_tool_runtimes',
+  'list_service_runtimes',
+  'control_media_devices',
+  'collect_artifacts',
+  'sample_traces',
+  'vision_consult',
+  'test_screen_stream',
+  'test_screen_mp4_roundtrip',
+  'test_camera_injection',
+] as const;
+
+export const SYSTEM_ACTUATOR_APPLY_OPS = [
+  'scroll',
+  'drag',
+  'clipboard_write',
+  'system_notify',
+  'open_file',
+  'app_quit',
+  'process_kill',
+  'run_applescript',
+  'keyboard',
+  'paste_text',
+  'press_key',
+  'voice_input_toggle',
+  'mouse_click',
+  'mouse_move',
+  'activate_application',
+  'open_url',
+  'write_file',
+  'write_artifact',
+  'write_json',
+  'mkdir',
+  'log',
+  'voice',
+  'native_tts_speak',
+  'check_native_tts',
+  'notify',
+  'wait',
+] as const;
+
+export const SYSTEM_ACTUATOR_TRANSFORM_OPS = [
+  'regex_extract',
+  'json_query',
+  'sre_analyze',
+  'run_js',
+] as const;
+
+export const SYSTEM_ACTUATOR_CONTROL_OPS = ['if', 'while'] as const;
+
+export function describeOps() {
+  return [
+    ...SYSTEM_ACTUATOR_CAPTURE_OPS.map((op) => ({ op, kind: 'capture' as const })),
+    ...SYSTEM_ACTUATOR_TRANSFORM_OPS.map((op) => ({ op, kind: 'transform' as const })),
+    ...SYSTEM_ACTUATOR_APPLY_OPS.map((op) => ({ op, kind: 'apply' as const })),
+    ...SYSTEM_ACTUATOR_CONTROL_OPS.map((op) => ({ op, kind: 'control' as const })),
+  ];
+}

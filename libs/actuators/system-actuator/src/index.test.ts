@@ -2368,5 +2368,18 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
       expect(result.status).toBe('failed');
       expect(result.results[0].error).toMatch(/path/);
     });
+
+    it('describeOps: exposes the registered system ops by kind', async () => {
+      const { describeOps } = await import('./index');
+      const ops = describeOps();
+
+      expect(ops).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ op: 'shell', kind: 'capture' }),
+          expect.objectContaining({ op: 'voice_input_toggle', kind: 'apply' }),
+          expect.objectContaining({ op: 'if', kind: 'control' }),
+        ])
+      );
+    });
   });
 });
