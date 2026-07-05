@@ -141,6 +141,7 @@ export {
   formatCompletionNextAction,
   formatNextAction,
 } from './next-action.js';
+export { buildCompletionSummary, reconcileCompletion } from './intent-reconciliation.js';
 export type {
   BuildNextActionInput,
   ErrorNextActionContext,
