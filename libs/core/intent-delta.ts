@@ -24,6 +24,7 @@ export interface IntentSnapshot {
   snapshot_id: string;
   mission_id: string;
   stage: string;
+  kind?: 'origin' | 'current';
   created_at: string;
   source: 'user_prompt' | 'mission_state' | 'gate_evaluation' | 'worker_transition' | 'manual';
   intent: IntentBody;
@@ -77,7 +78,7 @@ function tokenize(text: string): Set<string> {
       .toLowerCase()
       .split(TOKEN_SPLIT)
       .map((token) => token.trim())
-      .filter((token) => token.length > 0),
+      .filter((token) => token.length > 0)
   );
 }
 
@@ -104,11 +105,11 @@ function arrayDiff(from: string[] = [], to: string[] = []): { added: string[]; r
 export function computeIntentDelta(
   from: IntentSnapshot,
   to: IntentSnapshot,
-  thresholds: DriftThresholds = DEFAULT_THRESHOLDS,
+  thresholds: DriftThresholds = DEFAULT_THRESHOLDS
 ): IntentDelta {
   if (from.mission_id !== to.mission_id) {
     throw new Error(
-      `[intent-delta] cross-mission comparison refused: ${from.mission_id} vs ${to.mission_id}`,
+      `[intent-delta] cross-mission comparison refused: ${from.mission_id} vs ${to.mission_id}`
     );
   }
 
@@ -176,7 +177,10 @@ function estimateFieldChurn(changes: IntentDeltaChanges): number {
   return Math.min(1, touched * 0.5);
 }
 
-export function classifyDrift(score: number, thresholds: DriftThresholds = DEFAULT_THRESHOLDS): DriftVerdict {
+export function classifyDrift(
+  score: number,
+  thresholds: DriftThresholds = DEFAULT_THRESHOLDS
+): DriftVerdict {
   if (score >= thresholds.blocking) return 'blocking';
   if (score >= thresholds.significant) return 'significant';
   if (score >= thresholds.minor) return 'minor';

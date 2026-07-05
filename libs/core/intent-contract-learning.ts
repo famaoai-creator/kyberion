@@ -28,6 +28,8 @@ type ContractKind =
 
 export interface IntentContractMemoryEntry {
   intent_id: string;
+  correlation_id?: string;
+  mission_id?: string;
   context_fingerprint: {
     domain?: string;
     merchant?: string;
@@ -279,6 +281,8 @@ export function recordIntentContractOutcome(input: {
   contract_ref: { kind: ContractKind; ref: string };
   success: boolean;
   error?: string;
+  correlation_id?: string;
+  mission_id?: string;
   context_fingerprint?: IntentContractMemoryEntry['context_fingerprint'];
   completion_summary?: IntentContractMemoryEntry['completion_summary'];
 }): IntentContractMemoryEntry {
@@ -293,6 +297,8 @@ export function recordIntentContractOutcome(input: {
   if (idx < 0) {
     const created: IntentContractMemoryEntry = {
       intent_id: input.intent_id,
+      ...(input.correlation_id ? { correlation_id: input.correlation_id } : {}),
+      ...(input.mission_id ? { mission_id: input.mission_id } : {}),
       context_fingerprint: input.context_fingerprint || {},
       contract_ref: input.contract_ref,
       execution_shape: input.execution_shape,
@@ -312,6 +318,8 @@ export function recordIntentContractOutcome(input: {
   const nextRate = (prev.success_rate * prev.sample_count + (input.success ? 1 : 0)) / nextCount;
   const updated: IntentContractMemoryEntry = {
     ...prev,
+    ...(input.correlation_id ? { correlation_id: input.correlation_id } : {}),
+    ...(input.mission_id ? { mission_id: input.mission_id } : {}),
     execution_shape: input.execution_shape,
     context_fingerprint: input.context_fingerprint || prev.context_fingerprint,
     sample_count: nextCount,

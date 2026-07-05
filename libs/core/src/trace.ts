@@ -31,7 +31,7 @@ export interface TraceSpan {
   attributes?: Record<string, string | number | boolean>;
   events: TraceEvent[];
   artifacts: TraceArtifact[];
-  knowledgeRefs: string[];     // paths to related knowledge files
+  knowledgeRefs: string[]; // paths to related knowledge files
   children: TraceSpan[];
   error?: string;
 }
@@ -41,6 +41,7 @@ export interface Trace {
   rootSpan: TraceSpan;
   metadata: {
     missionId?: string;
+    correlationId?: string;
     actuator?: string;
     pipelineId?: string;
     startedAt: string;
@@ -58,6 +59,10 @@ export class TraceContext {
   private spanStack: TraceSpan[];
 
   constructor(name: string, metadata?: Partial<Trace['metadata']>) {
+    const correlationId =
+      typeof metadata?.correlationId === 'string' && metadata.correlationId.trim().length > 0
+        ? metadata.correlationId.trim()
+        : undefined;
     const rootSpan: TraceSpan = {
       spanId: randomUUID(),
       name,
@@ -78,13 +83,16 @@ export class TraceContext {
         ...(customer ? { customerId: customer } : {}),
         ...(tenant ? { tenantSlug: tenant } : {}),
         ...metadata,
+        ...(correlationId ? { correlationId } : {}),
       },
     };
     this.spanStack = [rootSpan];
   }
 
   /** Get the trace ID for correlation */
-  get traceId(): string { return this.trace.traceId; }
+  get traceId(): string {
+    return this.trace.traceId;
+  }
 
   /** Get the current active span */
   private get currentSpan(): TraceSpan {
@@ -93,12 +101,16 @@ export class TraceContext {
 
   /** Start a new child span */
   startSpan(name: string, attributes?: Record<string, string | number | boolean>): string {
+    const correlationId = this.trace.metadata.correlationId;
     const span: TraceSpan = {
       spanId: randomUUID(),
       name,
       startTime: new Date().toISOString(),
       status: 'in_progress',
-      attributes,
+      attributes: {
+        ...(attributes || {}),
+        ...(correlationId ? { correlationId } : {}),
+      },
       events: [],
       artifacts: [],
       knowledgeRefs: [],
@@ -120,10 +132,14 @@ export class TraceContext {
 
   /** Add an event to the current span */
   addEvent(name: string, attributes?: Record<string, string | number | boolean>): void {
+    const correlationId = this.trace.metadata.correlationId;
     this.currentSpan.events.push({
       name,
       timestamp: new Date().toISOString(),
-      attributes,
+      attributes: {
+        ...(attributes || {}),
+        ...(correlationId ? { correlationId } : {}),
+      },
     });
   }
 
@@ -149,18 +165,23 @@ export class TraceContext {
       this.endSpan('error', 'span not explicitly closed');
     }
     this.trace.rootSpan.endTime = new Date().toISOString();
-    this.trace.rootSpan.status =
-      this.trace.rootSpan.children.some(c => c.status === 'error') ? 'error' : 'ok';
+    this.trace.rootSpan.status = this.trace.rootSpan.children.some((c) => c.status === 'error')
+      ? 'error'
+      : 'ok';
     this.trace.metadata.completedAt = this.trace.rootSpan.endTime;
     return this.trace;
   }
 
   /** Get a summary for logging */
   summary(): { traceId: string; spans: number; events: number; artifacts: number; errors: number } {
-    const countSpans = (s: TraceSpan): number => 1 + s.children.reduce((sum, c) => sum + countSpans(c), 0);
-    const countEvents = (s: TraceSpan): number => s.events.length + s.children.reduce((sum, c) => sum + countEvents(c), 0);
-    const countArtifacts = (s: TraceSpan): number => s.artifacts.length + s.children.reduce((sum, c) => sum + countArtifacts(c), 0);
-    const countErrors = (s: TraceSpan): number => (s.status === 'error' ? 1 : 0) + s.children.reduce((sum, c) => sum + countErrors(c), 0);
+    const countSpans = (s: TraceSpan): number =>
+      1 + s.children.reduce((sum, c) => sum + countSpans(c), 0);
+    const countEvents = (s: TraceSpan): number =>
+      s.events.length + s.children.reduce((sum, c) => sum + countEvents(c), 0);
+    const countArtifacts = (s: TraceSpan): number =>
+      s.artifacts.length + s.children.reduce((sum, c) => sum + countArtifacts(c), 0);
+    const countErrors = (s: TraceSpan): number =>
+      (s.status === 'error' ? 1 : 0) + s.children.reduce((sum, c) => sum + countErrors(c), 0);
     return {
       traceId: this.trace.traceId,
       spans: countSpans(this.trace.rootSpan),
@@ -213,7 +234,7 @@ export function persistTrace(trace: Trace, opts?: { dir?: string }): string {
  */
 export function finalizeAndPersist(
   ctx: TraceContext,
-  opts?: { dir?: string },
+  opts?: { dir?: string }
 ): { trace: Trace; path: string } {
   const trace = ctx.finalize();
   const p = persistTrace(trace, opts);

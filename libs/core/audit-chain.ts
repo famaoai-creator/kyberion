@@ -34,6 +34,7 @@ export interface AuditEntry {
   operation: string;
   result: 'allowed' | 'denied' | 'error' | 'completed' | 'failed';
   reason?: string;
+  correlationId?: string;
   metadata?: Record<string, any>;
   compliance?: {
     framework: string;
@@ -94,6 +95,11 @@ class AuditChainImpl {
       id,
       timestamp,
       ...entry,
+      correlationId:
+        entry.correlationId ??
+        (typeof entry.metadata?.correlationId === 'string'
+          ? entry.metadata.correlationId
+          : undefined),
       ...(tenantSlug ? { tenantSlug } : {}),
       chain_alg: 'hmac-sha256',
       chain_key_id: getAuditChainKeyId(chainKey),
@@ -301,7 +307,10 @@ class AuditChainImpl {
         );
       } else {
         for (let i = 0; i < masterSet.length; i++) {
-          if (masterSet[i].id !== mirrorEntries[i].id || masterSet[i].currentHash !== mirrorEntries[i].currentHash) {
+          if (
+            masterSet[i].id !== mirrorEntries[i].id ||
+            masterSet[i].currentHash !== mirrorEntries[i].currentHash
+          ) {
             findings.push(`tenant_mirror_hash_mismatch:${slug}:${masterSet[i].id}`);
             break;
           }

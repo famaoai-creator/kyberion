@@ -9,6 +9,7 @@ import {
   latestSnapshot,
   listSnapshots,
   mapStageToLoopPhase,
+  recordApprovedIntentScopeChange,
 } from './intent-snapshot-store.js';
 
 vi.mock('./path-resolver.js', async () => {
@@ -52,6 +53,7 @@ describe('intent-snapshot-store', () => {
       intent: { goal: 'prepare quarterly report' },
     });
     expect(result.snapshot.mission_id).toBe('MSN-1');
+    expect(result.snapshot.kind).toBe('origin');
     expect(result.delta).toBeNull();
     expect(listSnapshots('MSN-1')).toHaveLength(1);
   });
@@ -72,6 +74,30 @@ describe('intent-snapshot-store', () => {
     expect(delta).not.toBeNull();
     expect(delta?.changes.goal_changed).toBe(true);
     expect(delta?.drift_score).toBeGreaterThan(0);
+  });
+
+  it('compares the origin snapshot to the latest snapshot when evaluating drift', () => {
+    emitIntentSnapshot({
+      missionId: 'MSN-2A',
+      stage: 'intake',
+      source: 'user_prompt',
+      intent: { goal: 'prepare quarterly report' },
+    });
+    emitIntentSnapshot({
+      missionId: 'MSN-2A',
+      stage: 'planning',
+      source: 'worker_transition',
+      intent: { goal: 'prepare quarterly report', constraints: ['by Friday'] },
+    });
+    emitIntentSnapshot({
+      missionId: 'MSN-2A',
+      stage: 'execution',
+      source: 'worker_transition',
+      intent: { goal: 'rewrite marketing website', constraints: ['by Friday'] },
+    });
+    const gate = evaluateIntentDriftGate('MSN-2A');
+    expect(gate.passed).toBe(false);
+    expect(gate.verdict).toBe('blocking');
   });
 
   it('returns the most recent snapshot from latestSnapshot', () => {
@@ -131,6 +157,55 @@ describe('intent-snapshot-store', () => {
       const gate = evaluateIntentDriftGate('MSN-5');
       expect(gate.passed).toBe(false);
       expect(gate.verdict).toBe('blocking');
+    });
+
+    it('rebaselines from the latest approved origin scope change', () => {
+      emitIntentSnapshot({
+        missionId: 'MSN-6',
+        stage: 'intake',
+        source: 'user_prompt',
+        intent: { goal: 'prepare quarterly report' },
+      });
+      emitIntentSnapshot({
+        missionId: 'MSN-6',
+        stage: 'execution',
+        source: 'worker_transition',
+        intent: { goal: 'rewrite marketing website' },
+      });
+
+      const before = evaluateIntentDriftGate('MSN-6');
+      expect(before.passed).toBe(false);
+      expect(before.verdict).toBe('blocking');
+
+      const change = recordApprovedIntentScopeChange({
+        missionId: 'MSN-6',
+        approvedBy: 'owner-1',
+        reason: 'Approved scope expansion to reflect the revised website deliverable.',
+        intent: {
+          goal: 'rewrite marketing website',
+          deliverables: ['website copy', 'launch checklist'],
+        },
+      });
+      expect(change.change.previous_origin_snapshot_id).not.toBeNull();
+
+      emitIntentSnapshot({
+        missionId: 'MSN-6',
+        stage: 'execution',
+        source: 'worker_transition',
+        intent: {
+          goal: 'rewrite marketing website',
+          deliverables: ['website copy', 'launch checklist', 'handoff note'],
+        },
+      });
+
+      const after = evaluateIntentDriftGate('MSN-6');
+      expect(after.passed).toBe(true);
+      expect(after.verdict).not.toBe('blocking');
+
+      const originCount = listSnapshots('MSN-6').filter(
+        (snapshot) => snapshot.kind === 'origin'
+      ).length;
+      expect(originCount).toBe(2);
     });
   });
 
