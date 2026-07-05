@@ -81,6 +81,7 @@ Kyberion からの用事(質問・承認・完了・アラート): 設定した1
 ### Task 2: 通知ルーティング(復路の配達)— `gpt-5.4-mini`
 
 1. `libs/core/operator-notifications.ts` を新設:
+
    ```ts
    type OperatorEvent =
      | 'question'
@@ -101,6 +102,7 @@ Kyberion からの用事(質問・承認・完了・アラート): 設定した1
 
    - 設定は `knowledge/personal/notification-preferences.json`(スキーマ `schemas/notification-preferences.schema.json` 新設、`check:contract-schemas` 対象に)。未設定イベントは default_channel、default も無ければ **ops-alert JSONL に記録して false**(無言で捨てない)。
    - 送信実装は既存部品へ委譲: slack= slack outbox 書込(`listSlackOutboxMessages` の書込側 API を grep)、imessage= `sendIMessage`、telegram= `sendTelegramMessage`、discord= bridge が poll する outbox JSONL(無ければ slack と同型で新設 ±30行)。UX-01 の**会話単位レート制限**(`shouldPostBridgeError` と同型・イベント種別単位)を内蔵。
+
 2. 発火点の配線(各1〜3行の挿入。失敗許容 warn):
    - 承認要求作成時(`approval-gate.ts` の「New approval request created」経路)→ `approval_required`
    - clarification packet 生成時(`question-resolver` の packet 生成箇所)→ `question`
