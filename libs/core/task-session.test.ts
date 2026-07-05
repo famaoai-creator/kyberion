@@ -3,14 +3,7 @@ import AjvModule from 'ajv';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
-import {
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  safeReaddir,
-  safeRmSync,
-  safeWriteFile,
-} from './secure-io.js';
+import { safeExistsSync, safeReadFile, safeReaddir, safeRmSync } from './secure-io.js';
 import {
   classifyTaskSessionIntent,
   createTaskSession,
@@ -180,8 +173,6 @@ describe('task-session', () => {
     const artifactPath = pathResolver.shared(
       'runtime/task-sessions/TSK-TEST-COMPLETION-SUMMARY.docx'
     );
-    safeMkdir(path.dirname(artifactPath), { recursive: true });
-    safeWriteFile(artifactPath, 'The report file is saved.');
     const session = createTaskSession({
       sessionId: 'TSK-TEST-COMPLETION-SUMMARY',
       surface: 'presence',
@@ -195,7 +186,7 @@ describe('task-session', () => {
     session.artifact = {
       kind: 'docx',
       output_path: artifactPath,
-      preview_text: 'Weekly report is complete.',
+      preview_text: 'The report file is saved.',
     };
 
     expect(() => saveTaskSession(session)).not.toThrow();
