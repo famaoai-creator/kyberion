@@ -14,6 +14,7 @@ import {
   getPathValue,
   retry,
   classifyError,
+  processUntrustedContent,
 } from '@agent/core';
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
 import { chromium, type CDPSession, type Page } from '@playwright/test';
@@ -846,7 +847,11 @@ async function opCapture(
     }
     case 'content': {
       const selector = params.selector ? resolve(params.selector) : undefined;
-      const content = selector ? await page.innerText(selector) : await page.content();
+      const rawContent = selector ? await page.innerText(selector) : await page.content();
+      const content =
+        typeof rawContent === 'string'
+          ? processUntrustedContent(rawContent, `web:${page.url()}`).wrapped
+          : rawContent;
       return browserRuntimeHelpers.recordBrowserAction(
         { ...ctx, [params.export_as || 'last_capture']: content },
         {
@@ -854,7 +859,8 @@ async function opCapture(
           op: 'content',
           tab_id: runtime.activeTabId,
           selector,
-          content_excerpt: typeof content === 'string' ? content.trim().slice(0, 120) : undefined,
+          content_excerpt:
+            typeof rawContent === 'string' ? rawContent.trim().slice(0, 120) : undefined,
         }
       );
     }

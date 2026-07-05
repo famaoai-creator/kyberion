@@ -651,6 +651,10 @@
       "types": "./dist/secure-io.d.ts",
       "default": "./dist/secure-io.js"
     },
+    "./untrusted-content": {
+      "types": "./dist/untrusted-content.d.ts",
+      "default": "./dist/untrusted-content.js"
+    },
     "./shell-command-policy": {
       "types": "./dist/shell-command-policy.d.ts",
       "default": "./dist/shell-command-policy.js"

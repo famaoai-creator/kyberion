@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { getReasoningBackend } from './reasoning-backend.js';
 import { executeServicePreset } from './service-engine.js';
 import { pathResolver } from './path-resolver.js';
+import { processUntrustedContent } from './untrusted-content.js';
 import {
   safeExistsSync,
   safeExec,
@@ -126,7 +127,8 @@ export interface GmailInboxArchiveResult {
 
 const GMAIL_INBOX_ARCHIVE_QUERY = 'in:inbox is:unread';
 const GMAIL_METADATA_HEADERS = ['From', 'Subject'];
-const GMAIL_AUTOMATED_SENDER_RE = /(?:no-?reply|noreply|newsletter|digest|notification|notify|alert|update|updates?|mailing)/i;
+const GMAIL_AUTOMATED_SENDER_RE =
+  /(?:no-?reply|noreply|newsletter|digest|notification|notify|alert|update|updates?|mailing)/i;
 const GMAIL_INBOX_ARCHIVE_LABEL = 'INBOX';
 
 export function resolveEmailDraftDir(): string {
@@ -206,8 +208,12 @@ export function extractBodyMarkdownFromDraft(draftMarkdown: string): string {
 }
 
 export function summarizeEmailSubject(triageText: string, fallback = 'Reply'): string {
-  const lines = triageText.split(/\n+/).map((line) => line.trim()).filter(Boolean);
-  const candidate = lines.find((line) => !/^#+\s/.test(line) && line.length > 8) || lines[0] || fallback;
+  const lines = triageText
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const candidate =
+    lines.find((line) => !/^#+\s/.test(line) && line.length > 8) || lines[0] || fallback;
   return candidate.replace(/^[-*]\s*/, '').slice(0, 90);
 }
 
@@ -228,7 +234,8 @@ export function parseEmailAddressHeader(value: string): { display_name: string; 
 
   if (emailMatch) {
     const email = emailMatch[0].toLowerCase();
-    const display_name = normalizeHeaderValue(trimmed.replace(emailMatch[0], '').replace(/[<>()"]/g, '')) || email;
+    const display_name =
+      normalizeHeaderValue(trimmed.replace(emailMatch[0], '').replace(/[<>()"]/g, '')) || email;
     return { display_name, email };
   }
 
@@ -238,9 +245,15 @@ export function parseEmailAddressHeader(value: string): { display_name: string; 
   };
 }
 
-function extractMessageHeader(message: GmailMessageMetadata | Record<string, any>, headerName: string): string {
+function extractMessageHeader(
+  message: GmailMessageMetadata | Record<string, any>,
+  headerName: string
+): string {
   const headers = Array.isArray(message?.payload?.headers) ? message.payload.headers : [];
-  const match = headers.find((header: GmailMessageHeader) => String(header?.name || '').toLowerCase() === headerName.toLowerCase());
+  const match = headers.find(
+    (header: GmailMessageHeader) =>
+      String(header?.name || '').toLowerCase() === headerName.toLowerCase()
+  );
   return typeof match?.value === 'string' ? match.value.trim() : '';
 }
 
@@ -269,7 +282,9 @@ function extractFilterList(payload: any): any[] {
 }
 
 function isAutomatedSender(senderEmail: string, senderDisplay: string): boolean {
-  return GMAIL_AUTOMATED_SENDER_RE.test(senderEmail) || GMAIL_AUTOMATED_SENDER_RE.test(senderDisplay);
+  return (
+    GMAIL_AUTOMATED_SENDER_RE.test(senderEmail) || GMAIL_AUTOMATED_SENDER_RE.test(senderDisplay)
+  );
 }
 
 function normalizeSenderKey(senderEmail: string): string {
@@ -281,27 +296,37 @@ function matchExistingArchiveFilter(filters: any[], senderEmail: string): string
   for (const filter of filters) {
     const criteria = filter?.criteria || {};
     const action = filter?.action || {};
-    const removeLabelIds = Array.isArray(action?.removeLabelIds) ? action.removeLabelIds.map((label: unknown) => String(label)) : [];
+    const removeLabelIds = Array.isArray(action?.removeLabelIds)
+      ? action.removeLabelIds.map((label: unknown) => String(label))
+      : [];
     if (!removeLabelIds.includes(GMAIL_INBOX_ARCHIVE_LABEL)) {
       continue;
     }
 
-    const fromCriteria = typeof criteria?.from === 'string'
-      ? normalizeSenderKey(parseEmailAddressHeader(criteria.from).email)
-      : '';
+    const fromCriteria =
+      typeof criteria?.from === 'string'
+        ? normalizeSenderKey(parseEmailAddressHeader(criteria.from).email)
+        : '';
     if (fromCriteria && fromCriteria === normalizedSender) {
       return typeof filter?.id === 'string' ? filter.id : null;
     }
 
     const query = typeof criteria?.query === 'string' ? criteria.query.toLowerCase() : '';
-    if (query.includes(`from:${normalizedSender}`) || query.includes(`from:"${normalizedSender}"`)) {
+    if (
+      query.includes(`from:${normalizedSender}`) ||
+      query.includes(`from:"${normalizedSender}"`)
+    ) {
       return typeof filter?.id === 'string' ? filter.id : null;
     }
   }
   return null;
 }
 
-async function gwsJson(action: string, params: Record<string, unknown>, body?: Record<string, unknown>): Promise<any> {
+async function gwsJson(
+  action: string,
+  params: Record<string, unknown>,
+  body?: Record<string, unknown>
+): Promise<any> {
   const request: Record<string, unknown> = { params };
   if (body !== undefined) {
     request.body = body;
@@ -328,7 +353,10 @@ async function listUnreadInboxMessages(limit: number): Promise<GmailMessageListI
         return collected;
       }
     }
-    pageToken = typeof page?.nextPageToken === 'string' && page.nextPageToken.trim() ? page.nextPageToken : undefined;
+    pageToken =
+      typeof page?.nextPageToken === 'string' && page.nextPageToken.trim()
+        ? page.nextPageToken
+        : undefined;
   } while (pageToken);
   return collected;
 }
@@ -347,20 +375,23 @@ async function getInboxMessageMetadata(messageId: string): Promise<GmailMessageM
   return {
     id: String(message.id || messageId),
     threadId: typeof message.threadId === 'string' ? message.threadId : undefined,
-    labelIds: Array.isArray(message.labelIds) ? message.labelIds.map((label: unknown) => String(label)) : [],
+    labelIds: Array.isArray(message.labelIds)
+      ? message.labelIds.map((label: unknown) => String(label))
+      : [],
     snippet: typeof message.snippet === 'string' ? message.snippet : undefined,
-    payload: message.payload && typeof message.payload === 'object'
-      ? {
-          headers: Array.isArray(message.payload.headers)
-            ? message.payload.headers
-                .map((header: GmailMessageHeader) => ({
-                  name: typeof header?.name === 'string' ? header.name : undefined,
-                  value: typeof header?.value === 'string' ? header.value : undefined,
-                }))
-                .filter((header: GmailMessageHeader) => Boolean(header.name || header.value))
-            : [],
-        }
-      : undefined,
+    payload:
+      message.payload && typeof message.payload === 'object'
+        ? {
+            headers: Array.isArray(message.payload.headers)
+              ? message.payload.headers
+                  .map((header: GmailMessageHeader) => ({
+                    name: typeof header?.name === 'string' ? header.name : undefined,
+                    value: typeof header?.value === 'string' ? header.value : undefined,
+                  }))
+                  .filter((header: GmailMessageHeader) => Boolean(header.name || header.value))
+              : [],
+          }
+        : undefined,
   };
 }
 
@@ -376,7 +407,7 @@ async function createArchiveFilter(senderEmail: string): Promise<any> {
     {
       criteria: extractFilterCriteriaFromSender(senderEmail),
       action: extractFilterAction(),
-    },
+    }
   );
 }
 
@@ -390,7 +421,7 @@ async function batchArchiveMessageIds(messageIds: string[]): Promise<any> {
     {
       ids: messageIds,
       removeLabelIds: [GMAIL_INBOX_ARCHIVE_LABEL],
-    },
+    }
   );
 }
 
@@ -400,12 +431,14 @@ export interface GmailInboxArchiveInput {
   apply?: boolean;
 }
 
-export async function organizeGmailInboxWithFilters(input: GmailInboxArchiveInput = {}): Promise<GmailInboxArchiveResult> {
+export async function organizeGmailInboxWithFilters(
+  input: GmailInboxArchiveInput = {}
+): Promise<GmailInboxArchiveResult> {
   const resolvedMaxMessages = Number(input.max_messages);
   const resolvedMinCount = Number(input.min_count);
   const maxMessages = Math.max(
     1,
-    Math.min(Number.isFinite(resolvedMaxMessages) ? resolvedMaxMessages : 50, 500),
+    Math.min(Number.isFinite(resolvedMaxMessages) ? resolvedMaxMessages : 50, 500)
   );
   const minCount = Math.max(1, Number.isFinite(resolvedMinCount) ? resolvedMinCount : 2);
   const apply = input.apply === true;
@@ -421,12 +454,15 @@ export async function organizeGmailInboxWithFilters(input: GmailInboxArchiveInpu
   }
 
   const filters = await listGmailFilters();
-  const grouped = new Map<string, {
-    sender_email: string;
-    sender_display: string;
-    message_ids: string[];
-    subject_samples: string[];
-  }>();
+  const grouped = new Map<
+    string,
+    {
+      sender_email: string;
+      sender_display: string;
+      message_ids: string[];
+      subject_samples: string[];
+    }
+  >();
 
   for (const message of messageDetails) {
     const headerValue = extractMessageHeader(message, 'From');
@@ -539,7 +575,12 @@ export function buildFallbackEmailDraft(input: {
     `Thanks for the update. I reviewed the inbox triage in a ${input.tone} tone.`,
     '',
     'Current understanding:',
-    triagePreview ? triagePreview.split('\n').map((line) => `- ${line}`).join('\n') : '- No triage details available yet.',
+    triagePreview
+      ? triagePreview
+          .split('\n')
+          .map((line) => `- ${line}`)
+          .join('\n')
+      : '- No triage details available yet.',
     '',
     'Suggested next step:',
     '- ',
@@ -569,17 +610,19 @@ export function readEmailDraftArtifact(): EmailDraftArtifact {
           exists: true,
           path: typeof parsed.path === 'string' ? parsed.path : markdown,
           json_path: json,
-          updated_at: typeof parsed.updated_at === 'string'
-            ? parsed.updated_at
-            : jsonStat?.mtime instanceof Date
-              ? jsonStat.mtime.toISOString()
-              : null,
+          updated_at:
+            typeof parsed.updated_at === 'string'
+              ? parsed.updated_at
+              : jsonStat?.mtime instanceof Date
+                ? jsonStat.mtime.toISOString()
+                : null,
           to: typeof parsed.to === 'string' ? parsed.to : '',
           subject: typeof parsed.subject === 'string' ? parsed.subject : '',
           tone: typeof parsed.tone === 'string' ? parsed.tone : 'clear and concise',
           body_markdown: typeof parsed.body_markdown === 'string' ? parsed.body_markdown : '',
           draft_markdown: typeof parsed.draft_markdown === 'string' ? parsed.draft_markdown : '',
-          triage_path: typeof parsed.triage_path === 'string' ? parsed.triage_path : resolveEmailTriagePath(),
+          triage_path:
+            typeof parsed.triage_path === 'string' ? parsed.triage_path : resolveEmailTriagePath(),
         };
       }
     } catch (_) {}
@@ -624,14 +667,17 @@ export function readGwsAuthStatus(): GwsAuthStatus {
       available: true,
       auth_method: typeof parsed.auth_method === 'string' ? parsed.auth_method : null,
       client_config_exists: Boolean(parsed.client_config_exists),
-      credential_source: typeof parsed.credential_source === 'string' ? parsed.credential_source : null,
+      credential_source:
+        typeof parsed.credential_source === 'string' ? parsed.credential_source : null,
       encrypted_credentials_exists: Boolean(parsed.encrypted_credentials_exists),
       plain_credentials_exists: Boolean(parsed.plain_credentials_exists),
       storage: typeof parsed.storage === 'string' ? parsed.storage : null,
       token_cache_exists: Boolean(parsed.token_cache_exists),
       client_config: typeof parsed.client_config === 'string' ? parsed.client_config : null,
-      encrypted_credentials: typeof parsed.encrypted_credentials === 'string' ? parsed.encrypted_credentials : null,
-      plain_credentials: typeof parsed.plain_credentials === 'string' ? parsed.plain_credentials : null,
+      encrypted_credentials:
+        typeof parsed.encrypted_credentials === 'string' ? parsed.encrypted_credentials : null,
+      plain_credentials:
+        typeof parsed.plain_credentials === 'string' ? parsed.plain_credentials : null,
       checked_at: checkedAt,
     };
   } catch (error: any) {
@@ -688,9 +734,9 @@ function writeDraftModeFallbackArtifact(request: EmailDeliveryRequest) {
         updated_at: timestamp,
       },
       null,
-      2,
+      2
     ),
-    { encoding: 'utf8' },
+    { encoding: 'utf8' }
   );
 
   const latest = resolveLatestEmailDraftPaths();
@@ -711,9 +757,9 @@ function writeDraftModeFallbackArtifact(request: EmailDeliveryRequest) {
         fallback_reason: 'gws delivery unavailable',
       },
       null,
-      2,
+      2
     ),
-    { encoding: 'utf8' },
+    { encoding: 'utf8' }
   );
 
   return {
@@ -731,15 +777,19 @@ function writeDraftModeFallbackArtifact(request: EmailDeliveryRequest) {
   };
 }
 
-export async function generateEmailReplyDraft(input: EmailDraftGenerationInput): Promise<EmailDraftGenerationResult> {
+export async function generateEmailReplyDraft(
+  input: EmailDraftGenerationInput
+): Promise<EmailDraftGenerationResult> {
   const requestId = input.requestId?.trim() || randomUUID();
   const recipient = input.recipient?.trim() || '';
   const subjectInput = input.subjectInput?.trim() || '';
   const tone = input.tone?.trim() || 'clear and concise';
-  const triageText = input.triageText.trim();
-  if (!triageText) {
+  const rawTriageText = input.triageText.trim();
+  if (!rawTriageText) {
     throw new Error('triage_text is required when no email triage file exists');
   }
+  const processed = processUntrustedContent(rawTriageText, 'email-triage');
+  const triageText = processed.wrapped;
 
   const draftDir = resolveEmailDraftDir();
   safeMkdir(draftDir, { recursive: true });
@@ -773,10 +823,15 @@ export async function generateEmailReplyDraft(input: EmailDraftGenerationInput):
     const raw = await delegateTask(prompt, `email-draft:${requestId}`);
     const parsed = extractFirstJsonBlock(raw);
     if (parsed) {
-      generatedTo = typeof parsed.to === 'string' && parsed.to.trim() ? parsed.to.trim() : generatedTo;
-      generatedSubject = typeof parsed.subject === 'string' && parsed.subject.trim() ? parsed.subject.trim() : generatedSubject;
+      generatedTo =
+        typeof parsed.to === 'string' && parsed.to.trim() ? parsed.to.trim() : generatedTo;
+      generatedSubject =
+        typeof parsed.subject === 'string' && parsed.subject.trim()
+          ? parsed.subject.trim()
+          : generatedSubject;
       body_markdown = typeof parsed.body_markdown === 'string' ? parsed.body_markdown.trim() : '';
-      draft_markdown = typeof parsed.draft_markdown === 'string' ? parsed.draft_markdown.trim() : '';
+      draft_markdown =
+        typeof parsed.draft_markdown === 'string' ? parsed.draft_markdown.trim() : '';
     }
   } catch (_) {
     // fall through to fallback draft
@@ -812,9 +867,9 @@ export async function generateEmailReplyDraft(input: EmailDraftGenerationInput):
         updated_at: new Date().toISOString(),
       },
       null,
-      2,
+      2
     ),
-    { encoding: 'utf8' },
+    { encoding: 'utf8' }
   );
 
   const latest = resolveLatestEmailDraftPaths();
@@ -835,9 +890,9 @@ export async function generateEmailReplyDraft(input: EmailDraftGenerationInput):
         triage_path: triagePath,
       },
       null,
-      2,
+      2
     ),
-    { encoding: 'utf8' },
+    { encoding: 'utf8' }
   );
 
   return {
@@ -867,9 +922,14 @@ export async function executeGmailDelivery(request: EmailDeliveryRequest) {
     if (!messageId) {
       throw new Error('message_id is required for reply mode');
     }
-    const action = replyMode === 'reply-all'
-      ? (draftMode ? 'gmail_reply_all_draft' : 'gmail_reply_all')
-      : (draftMode ? 'gmail_reply_draft' : 'gmail_reply');
+    const action =
+      replyMode === 'reply-all'
+        ? draftMode
+          ? 'gmail_reply_all_draft'
+          : 'gmail_reply_all'
+        : draftMode
+          ? 'gmail_reply_draft'
+          : 'gmail_reply';
     try {
       return await executeServicePreset('google-workspace', action, {
         message_id: messageId,

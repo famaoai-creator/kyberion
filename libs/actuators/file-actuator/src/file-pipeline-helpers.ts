@@ -18,6 +18,7 @@ import {
   resolveVars,
   evaluateCondition,
   resolveWriteArtifactSpec,
+  processUntrustedContent,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
@@ -216,15 +217,21 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
   const rootDir = pathResolver.rootDir();
   switch (op) {
     case 'read':
-    case 'read_file':
+    case 'read_file': {
+      const filePath = resolve(params.path);
+      const rawText = await retry(
+        async () => safeReadFile(path.resolve(rootDir, filePath), { encoding: 'utf8' }),
+        buildRetryOptions()
+      );
+      const wrappedText =
+        typeof rawText === 'string'
+          ? processUntrustedContent(rawText, `file:${filePath}`).wrapped
+          : rawText;
       return {
         ...ctx,
-        [params.export_as || 'last_capture']: await retry(
-          async () =>
-            safeReadFile(path.resolve(rootDir, resolve(params.path)), { encoding: 'utf8' }),
-          buildRetryOptions()
-        ),
+        [params.export_as || 'last_capture']: wrappedText,
       };
+    }
     case 'list':
       return {
         ...ctx,
@@ -265,7 +272,8 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
       return { ...ctx, [params.export_as || 'search_results']: JSON.parse(rgOutput) };
     }
     case 'tail': {
-      const tailPath = path.resolve(rootDir, resolve(params.path));
+      const filePath = resolve(params.path);
+      const tailPath = path.resolve(rootDir, filePath);
       const stats = await retry(async () => safeStat(tailPath), buildRetryOptions());
       const posKey = params.pos_key || 'last_pos';
       const lastPos = ctx[posKey] || 0;
@@ -274,7 +282,11 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
         buildRetryOptions()
       );
       const newText = fullText.substring(lastPos);
-      return { ...ctx, [params.export_as || 'last_capture']: newText, [posKey]: stats.size };
+      const wrappedText =
+        typeof newText === 'string'
+          ? processUntrustedContent(newText, `file:${filePath}`).wrapped
+          : newText;
+      return { ...ctx, [params.export_as || 'last_capture']: wrappedText, [posKey]: stats.size };
     }
     default:
       throw new Error(`[UNKNOWN_OP] Unknown capture op: ${op}`);
