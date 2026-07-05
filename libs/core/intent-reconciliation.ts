@@ -10,6 +10,7 @@ export interface IntentReconciliationInput {
   goal: CompletionGoal;
   evidenceRefs?: string[];
   artifactRefs?: string[];
+  evidenceTexts?: string[];
   requestedResult?: string;
 }
 
@@ -79,19 +80,50 @@ function tokenize(text: string): string[] {
   );
 }
 
+function normalizeTokens(text: string): Set<string> {
+  return new Set(tokenize(text));
+}
+
+const BINARY_EVIDENCE_EXTENSIONS = new Set([
+  '.docx',
+  '.xlsx',
+  '.pptx',
+  '.pdf',
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.webp',
+  '.zip',
+  '.gz',
+  '.tar',
+  '.mp3',
+  '.wav',
+  '.mp4',
+  '.mov',
+]);
+
 function segmentMatchesEvidence(segment: string, evidenceText: string): boolean {
   if (!segment || !evidenceText) return false;
   if (evidenceText.includes(segment)) return true;
   if (normalizeForMatch(evidenceText).includes(normalizeForMatch(segment))) return true;
   const segmentTokens = tokenize(segment);
   if (segmentTokens.length === 0) return false;
-  const evidenceTokens = new Set(tokenize(evidenceText));
-  return segmentTokens.some((token) => evidenceTokens.has(token));
+  const evidenceTokens = normalizeTokens(evidenceText);
+  if (segmentTokens.length === 1) {
+    return evidenceTokens.has(segmentTokens[0]);
+  }
+  return segmentTokens.every((token) => evidenceTokens.has(token));
 }
 
 function readEvidenceText(ref: string): string {
   const normalizedRef = String(ref || '').trim();
   if (!normalizedRef || !safeExistsSync(normalizedRef)) return '';
+  const dotIndex = normalizedRef.lastIndexOf('.');
+  if (dotIndex >= 0) {
+    const ext = normalizedRef.slice(dotIndex).toLowerCase();
+    if (BINARY_EVIDENCE_EXTENSIONS.has(ext)) return '';
+  }
   try {
     return normalizeText(String(safeReadFile(normalizedRef, { encoding: 'utf8' }) || ''));
   } catch {
@@ -102,19 +134,27 @@ function readEvidenceText(ref: string): string {
 function collectEvidenceBundle(
   input: IntentReconciliationInput
 ): Array<{ ref: string; text: string }> {
-  const refs = Array.from(
+  const pathRefs = Array.from(
     new Set(
       [...(input.evidenceRefs || []), ...(input.artifactRefs || [])]
         .map((entry) => String(entry || '').trim())
         .filter(Boolean)
     )
   );
-  return refs.map((ref) => ({ ref, text: readEvidenceText(ref) || normalizeText(ref) }));
+  const previewRefs = (input.evidenceTexts || [])
+    .map((entry) => normalizeText(entry))
+    .filter(Boolean)
+    .map((text) => ({ ref: 'preview_text', text }));
+  const bundle = [
+    ...pathRefs.map((ref) => ({ ref, text: readEvidenceText(ref) || normalizeText(ref) })),
+    ...previewRefs,
+  ];
+  return Array.from(new Map(bundle.map((entry) => [`${entry.ref}:${entry.text}`, entry])).values());
 }
 
 function structuralReconcile(input: IntentReconciliationInput): CompletionReconciliation {
   const evidenceBundle = collectEvidenceBundle(input);
-  const evidenceText = evidenceBundle.map((entry) => entry.text).join('\n');
+  const evidenceText = [...evidenceBundle.map((entry) => entry.text)].join('\n');
   const goalSummary = normalizeText(input.goal.summary);
   const successCondition = normalizeText(input.goal.success_condition || input.goal.summary);
   const segments = splitGoalSegments(successCondition || goalSummary);
@@ -185,21 +225,15 @@ export async function reconcileCompletion(
     ].join('\n');
     const raw = await backend.prompt(prompt);
     const parsed = JSON.parse(raw) as Partial<CompletionReconciliation>;
-    const delivered = Array.isArray(parsed.delivered)
-      ? parsed.delivered.map((entry) => String(entry).trim()).filter(Boolean)
-      : structural.delivered;
-    const gaps = Array.isArray(parsed.gaps)
-      ? parsed.gaps.map((entry) => String(entry).trim()).filter(Boolean)
-      : structural.gaps;
     const confidence =
       typeof parsed.confidence === 'number' && Number.isFinite(parsed.confidence)
         ? Math.max(0, Math.min(1, parsed.confidence))
         : structural.confidence;
     return {
-      satisfied: typeof parsed.satisfied === 'boolean' ? parsed.satisfied : structural.satisfied,
-      delivered,
-      gaps,
-      confidence,
+      satisfied: structural.satisfied,
+      delivered: structural.delivered,
+      gaps: structural.gaps,
+      confidence: Math.min(structural.confidence, confidence),
       evidence_refs: structural.evidence_refs,
     };
   } catch {
