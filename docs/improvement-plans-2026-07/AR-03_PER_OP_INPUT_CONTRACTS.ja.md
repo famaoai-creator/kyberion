@@ -10,6 +10,11 @@
 - **per-op の example がどこにも無い**(manifest/schema に `examples` なし)。作者は 99 テンプレを逆解析するしかない。
 - 誤った op/param は silent no-op(AR-06)や runtime throw になり、事前に teach されない。
 
+## 進捗(2026-07-06)
+
+- **完了済み(一部)**: `resolveRequiredStringParam` を導入し、`write_artifact` の `params.path` / `params.output_path` 必須判定を共通化した。file-actuator でも `write` / `append` / `delete` / `mkdir` / `copy` / `move` の path 系必須入力を前倒しで検証するようにした。
+- **未完了**: `OpSpec` の `input_schema` 付与、dispatch 前の共通 Ajv/Zod 検証、browser/system/file/service の高頻度 op への横展開。
+
 ## ゴール(受入条件)
 
 1. 各 op に **入力スキーマ(`schema_ref`)** が付き、必須/任意・型・例を宣言する(AR-02 の `OpSpec` に `input_schema` を持たせる)。

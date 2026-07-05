@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import * as path from 'node:path';
-import { evaluateCondition, getPathValue, resolveVars, resolveWriteArtifactSpec } from './logic-utils.js';
+import {
+  evaluateCondition,
+  getPathValue,
+  resolveVars,
+  resolveWriteArtifactSpec,
+  resolveRequiredStringParam,
+} from './logic-utils.js';
 import { pathResolver } from '../path-resolver.js';
 
 describe('logic-utils', () => {
@@ -20,7 +26,9 @@ describe('logic-utils', () => {
 
   it('resolves single variables and interpolated strings', () => {
     expect(resolveVars('{{mission.id}}', ctx)).toBe('MSN-123');
-    expect(resolveVars('Mission {{mission.id}} is {{mission.status}}', ctx)).toBe('Mission MSN-123 is active');
+    expect(resolveVars('Mission {{mission.id}} is {{mission.status}}', ctx)).toBe(
+      'Mission MSN-123 is active'
+    );
   });
 
   it('serializes embedded objects and falls back to empty string', () => {
@@ -43,13 +51,17 @@ describe('logic-utils', () => {
 
   it('resolveVars resolves inline @domain path tokens to machine-local paths', () => {
     expect(resolveVars('{{@root}}', ctx)).toBe(pathResolver.rootDir());
-    expect(resolveVars('{{@knowledge:product/x.md}}', ctx)).toBe(pathResolver.knowledge('product/x.md'));
+    expect(resolveVars('{{@knowledge:product/x.md}}', ctx)).toBe(
+      pathResolver.knowledge('product/x.md')
+    );
     expect(resolveVars('{{@shared:tmp/run.json}}', ctx)).toBe(pathResolver.shared('tmp/run.json'));
     expect(resolveVars('{{@tmp:run.json}}', ctx)).toBe(pathResolver.shared('tmp/run.json'));
   });
 
   it('resolveVars interpolates @domain path tokens within a larger string', () => {
-    expect(resolveVars('input={{@knowledge:a.json}}', ctx)).toBe(`input=${pathResolver.knowledge('a.json')}`);
+    expect(resolveVars('input={{@knowledge:a.json}}', ctx)).toBe(
+      `input=${pathResolver.knowledge('a.json')}`
+    );
   });
 
   it('resolveVars keeps an unknown @domain token literal', () => {
@@ -71,7 +83,9 @@ describe('logic-utils', () => {
   });
 
   it('resolves deep and indexed path values safely', () => {
-    expect(getPathValue({ report: { metrics: [{ count: 3 }] } }, 'report.metrics[0].count')).toBe(3);
+    expect(getPathValue({ report: { metrics: [{ count: 3 }] } }, 'report.metrics[0].count')).toBe(
+      3
+    );
     expect(getPathValue({ report: { metrics: { count: 5 } } }, 'report.metrics.count')).toBe(5);
     expect(getPathValue({ report: {} }, 'report.metrics.count')).toBeUndefined();
   });
@@ -81,11 +95,21 @@ describe('logic-utils', () => {
     expect(evaluateCondition({ from: 'mission.id', operator: 'exists' }, ctx)).toBe(true);
     expect(evaluateCondition({ from: 'mission.missing', operator: 'not_exists' }, ctx)).toBe(true);
     expect(evaluateCondition({ from: 'mission.tags', operator: 'not_empty' }, ctx)).toBe(true);
-    expect(evaluateCondition({ from: 'mission.tags', operator: 'empty' }, { mission: { tags: [] } })).toBe(true);
-    expect(evaluateCondition({ from: 'mission.status', operator: 'eq', value: 'active' }, ctx)).toBe(true);
-    expect(evaluateCondition({ from: 'mission.status', operator: 'ne', value: 'paused' }, ctx)).toBe(true);
-    expect(evaluateCondition({ from: 'mission.priority', operator: 'gt', value: 5 }, ctx)).toBe(true);
-    expect(evaluateCondition({ from: 'mission.priority', operator: 'lt', value: 10 }, ctx)).toBe(true);
+    expect(
+      evaluateCondition({ from: 'mission.tags', operator: 'empty' }, { mission: { tags: [] } })
+    ).toBe(true);
+    expect(
+      evaluateCondition({ from: 'mission.status', operator: 'eq', value: 'active' }, ctx)
+    ).toBe(true);
+    expect(
+      evaluateCondition({ from: 'mission.status', operator: 'ne', value: 'paused' }, ctx)
+    ).toBe(true);
+    expect(evaluateCondition({ from: 'mission.priority', operator: 'gt', value: 5 }, ctx)).toBe(
+      true
+    );
+    expect(evaluateCondition({ from: 'mission.priority', operator: 'lt', value: 10 }, ctx)).toBe(
+      true
+    );
     expect(evaluateCondition({ from: 'mission.priority', operator: 'unknown' }, ctx)).toBe(true);
   });
 
@@ -94,7 +118,9 @@ describe('logic-utils', () => {
       path: 'out.txt',
       content: 'hello',
     });
-    expect(resolveWriteArtifactSpec({ output_path: 'out.json', from: 'mission.meta' }, ctx)).toEqual({
+    expect(
+      resolveWriteArtifactSpec({ output_path: 'out.json', from: 'mission.meta' }, ctx)
+    ).toEqual({
       path: 'out.json',
       content: ctx.mission.meta,
     });
@@ -102,5 +128,14 @@ describe('logic-utils', () => {
       path: 'out.json',
       content: ctx.mission,
     });
+  });
+
+  it('requires at least one resolved path parameter when building write artifact specs', () => {
+    expect(() =>
+      resolveRequiredStringParam({}, ['path', 'output_path'], (value) => value, 'write_artifact')
+    ).toThrow(/write_artifact requires one of params.path or params.output_path/);
+    expect(() => resolveWriteArtifactSpec({ content: 'hello' }, ctx)).toThrow(
+      /write_artifact requires one of params.path or params.output_path/
+    );
   });
 });
