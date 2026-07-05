@@ -1687,3 +1687,12 @@ export type {
   ExecuteServiceProcedureResult,
 } from './service-procedure-executor.js';
 export { SERVICE_EXTERNAL_EFFECT_OP } from './procedure-dispatcher.js';
+
+// SA-03 Prompt Injection & Untrusted Content Defense
+export {
+  wrapUntrusted,
+  scanForInjection,
+  isInjectionSuspected,
+  setInjectionSuspected,
+  processUntrustedContent,
+} from './untrusted-content.js';
