@@ -4,11 +4,18 @@ import {
   resolveMissionClassification,
   type MissionClassification,
 } from './mission-classification.js';
-import { resolveMissionWorkflowDesign, type MissionWorkflowDesign } from './mission-workflow-catalog.js';
+import {
+  resolveMissionWorkflowDesign,
+  type MissionWorkflowDesign,
+} from './mission-workflow-catalog.js';
 import { resolveMissionReviewDesign, type MissionReviewDesign } from './mission-review-gates.js';
 import { composeMissionTeamPlan, type MissionTeamPlan } from './mission-team-plan-composer.js';
 import { type OrganizationProfile } from './organization-profile.js';
-import { inferMissingInputs, inferOptionalRoleHints, summarizeRequestText } from './mission-team-brief-utils.js';
+import {
+  inferMissingInputs,
+  inferOptionalRoleHints,
+  summarizeRequestText,
+} from './mission-team-brief-utils.js';
 import { safeWriteFile, safeExistsSync, safeMkdir } from './secure-io.js';
 
 export interface MissionTeamCompositionBriefInput {
@@ -44,7 +51,10 @@ export interface MissionTeamCompositionBrief {
  * Persist a composed brief to the mission's evidence directory.
  * Returns the path of the written file.
  */
-export function writeMissionTeamBrief(missionPath: string, brief: MissionTeamCompositionBrief): string {
+export function writeMissionTeamBrief(
+  missionPath: string,
+  brief: MissionTeamCompositionBrief
+): string {
   const evidenceDir = path.join(missionPath, 'evidence');
   if (!safeExistsSync(evidenceDir)) safeMkdir(evidenceDir, { recursive: true });
   const targetPath = path.join(evidenceDir, 'team-composition-brief.json');
@@ -52,7 +62,9 @@ export function writeMissionTeamBrief(missionPath: string, brief: MissionTeamCom
   return targetPath;
 }
 
-export function composeMissionTeamBrief(input: MissionTeamCompositionBriefInput): MissionTeamCompositionBrief {
+export function composeMissionTeamBrief(
+  input: MissionTeamCompositionBriefInput
+): MissionTeamCompositionBrief {
   const missionId = (input.missionId || 'MISSION-BRIEF').toUpperCase();
   const request = String(input.request || '').trim();
   const tier = input.tier || 'public';
@@ -65,7 +77,8 @@ export function composeMissionTeamBrief(input: MissionTeamCompositionBriefInput)
     artifactPaths: input.artifactPaths,
     progressSignals: input.progressSignals,
   });
-  const missionType = input.missionType || mapMissionClassToMissionTypeTemplate(missionClassification.mission_class);
+  const missionType =
+    input.missionType || mapMissionClassToMissionTypeTemplate(missionClassification.mission_class);
   const teamPlan = composeMissionTeamPlan({
     missionId,
     missionType,
@@ -85,6 +98,7 @@ export function composeMissionTeamBrief(input: MissionTeamCompositionBriefInput)
     riskProfile: missionClassification.risk_profile,
     stage: missionClassification.stage,
     executionShape: input.executionShape || 'mission',
+    missionTypeHint: input.missionType,
     intentId: input.intentId,
     taskType: input.taskType,
   });
@@ -97,7 +111,9 @@ export function composeMissionTeamBrief(input: MissionTeamCompositionBriefInput)
   });
 
   const assignedRoles = new Set(teamPlan.assignments.map((entry) => entry.team_role));
-  const recommendedOptionalRoles = inferOptionalRoleHints(request).filter((role) => !assignedRoles.has(role));
+  const recommendedOptionalRoles = inferOptionalRoleHints(request).filter(
+    (role) => !assignedRoles.has(role)
+  );
   const missingInputs = inferMissingInputs(request, input.artifactPaths);
 
   return {

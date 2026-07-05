@@ -2364,13 +2364,20 @@ export async function dispatchDecisionOp(
       });
       const outputPath = resolved('output_path');
       if (outputPath) {
-        writeJSON(outputPath, {
-          items: result.items,
-          written_count: result.written_count,
-          partial_count: result.partial_count,
-          restricted_count: result.restricted_count,
-          generated_at: nowIso(),
-        });
+        if (String(outputPath).endsWith('.jsonl')) {
+          safeWriteFile(
+            pathResolver.rootResolve(outputPath),
+            `${result.items.map((item) => JSON.stringify(item)).join('\n')}${result.items.length ? '\n' : ''}`
+          );
+        } else {
+          writeJSON(outputPath, {
+            items: result.items,
+            written_count: result.written_count,
+            partial_count: result.partial_count,
+            restricted_count: result.restricted_count,
+            generated_at: nowIso(),
+          });
+        }
       }
       return {
         handled: true,

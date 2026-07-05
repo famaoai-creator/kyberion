@@ -73,6 +73,13 @@
       "mission_class": "operations_and_release"
     },
     {
+      "id": "class-operations-release-meeting-facilitation",
+      "match": {
+        "mission_type_hints": ["meeting_facilitation"]
+      },
+      "mission_class": "operations_and_release"
+    },
+    {
       "id": "class-operations-release-hint",
       "match": {
         "mission_type_hints": ["operations"]
@@ -274,15 +281,11 @@
         ]
       },
       "mission_class": "platform_onboarding"
-    }
-    ,
+    },
     {
       "id": "class-customer-engagement-intent-extended",
       "match": {
-        "intent_ids": [
-          "schedule-read-agenda",
-          "clarify-user-request"
-        ]
+        "intent_ids": ["schedule-read-agenda", "clarify-user-request"]
       },
       "mission_class": "customer_engagement"
     },
@@ -301,50 +304,35 @@
     {
       "id": "class-decision-support-intent-extended",
       "match": {
-        "intent_ids": [
-          "review-text",
-          "technical-decision-memo"
-        ]
+        "intent_ids": ["review-text", "technical-decision-memo"]
       },
       "mission_class": "decision_support"
     },
     {
       "id": "class-content-media-intent-extended",
       "match": {
-        "intent_ids": [
-          "import-brand-from-pptx",
-          "import-brand-from-html",
-          "extract-brand-theme"
-        ]
+        "intent_ids": ["import-brand-from-pptx", "import-brand-from-html", "extract-brand-theme"]
       },
       "mission_class": "content_and_media"
     },
     {
       "id": "class-product-delivery-intent-extended",
       "match": {
-        "intent_ids": [
-          "build-web-concept"
-        ]
+        "intent_ids": ["build-web-concept"]
       },
       "mission_class": "product_delivery"
     },
     {
       "id": "class-operations-release-intent-extended",
       "match": {
-        "intent_ids": [
-          "diagnose-kyberion-system",
-          "maintenance-routine"
-        ]
+        "intent_ids": ["diagnose-kyberion-system", "maintenance-routine"]
       },
       "mission_class": "operations_and_release"
     },
     {
       "id": "class-environment-recovery-intent-extended",
       "match": {
-        "intent_ids": [
-          "recover-environment",
-          "handoff-mission"
-        ]
+        "intent_ids": ["recover-environment", "handoff-mission"]
       },
       "mission_class": "environment_and_recovery"
     },
@@ -388,6 +376,13 @@
         "task_types": ["meeting_operations"]
       },
       "delivery_shape": "interactive_exploration"
+    },
+    {
+      "id": "delivery-meeting-facilitation",
+      "match": {
+        "mission_type_hints": ["meeting_facilitation"]
+      },
+      "delivery_shape": "multi_artifact_pipeline"
     },
     {
       "id": "delivery-pipeline",
@@ -462,8 +457,7 @@
         ]
       },
       "delivery_shape": "cross_system_change"
-    }
-    ,
+    },
     {
       "id": "delivery-interactive-exploration-intent-extended",
       "match": {
@@ -480,11 +474,7 @@
     {
       "id": "delivery-pipeline-intent-extended",
       "match": {
-        "intent_ids": [
-          "review-text",
-          "contract-review",
-          "diagnose-kyberion-system"
-        ]
+        "intent_ids": ["review-text", "contract-review", "diagnose-kyberion-system"]
       },
       "delivery_shape": "multi_artifact_pipeline"
     },
@@ -515,9 +505,7 @@
     {
       "id": "delivery-long-running-intent-extended",
       "match": {
-        "intent_ids": [
-          "recover-environment"
-        ]
+        "intent_ids": ["recover-environment"]
       },
       "delivery_shape": "long_running_job"
     }
@@ -591,16 +579,11 @@
         "task_types": ["platform_onboarding", "organization_setup", "secrets_rotation"]
       },
       "risk_profile": "high_stakes"
-    }
-    ,
+    },
     {
       "id": "risk-low-intent-extended",
       "match": {
-        "intent_ids": [
-          "schedule-read-agenda",
-          "clarify-user-request",
-          "knowledge-query"
-        ]
+        "intent_ids": ["schedule-read-agenda", "clarify-user-request", "knowledge-query"]
       },
       "risk_profile": "low"
     },

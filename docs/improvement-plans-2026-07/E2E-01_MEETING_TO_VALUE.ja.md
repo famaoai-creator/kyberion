@@ -137,3 +137,13 @@
 ## 6. 実施順序
 
 Task 1(preflight)→ Task 2(voice)→ Task 3(テンプレート)→ Task 4(連結)→ Task 6(E2E テスト)→ Task 5(顧客提供)→ Task 7(手順書)。Task 1〜3 は並行可。
+
+## 7. 実装状況(2026-07-05)
+
+- Task 1: 完了。`pnpm meeting:preflight` と unit test を追加済み。
+- Task 2: 完了。`pipelines/voice-onboarding.json` と voice consent の一本化を追加済み。
+- Task 3: 完了。`meeting_facilitation` テンプレートとミッション分類・ワークフローの連携を追加済み。
+- Task 4: 完了。`pipelines/meeting-followup.json` と `pipelines/action-item-reminders.json`、および `action_item_reminders.ts` を追加済み。
+- Task 5: 完了。`meeting_facilitation` の finish 時 customer 配布フックを追加済み。
+- Task 6: 完了。fixture ベースの E2E リハーサル専用テストを追加済み。
+- Task 7: 完了。OPERATOR_UX_GUIDE に会議→価値提供手順を追記済み。

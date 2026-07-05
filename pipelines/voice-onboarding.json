@@ -1,0 +1,248 @@
+{
+  "action": "pipeline",
+  "name": "voice-onboarding",
+  "version": "2.0.0",
+  "description": "One-command voice onboarding: record three reference samples, register the voice profile, generate a short试听 artifact, and grant per-mission voice consent. Set dry_run=true to validate the flow without creating real samples or consent.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes).",
+  "context": {
+    "dry_run": false,
+    "profile_name": "owner-voice",
+    "profile_display_name": "Owner Voice",
+    "operator_handle": "operator",
+    "sample_language": "ja",
+    "voice_request_id": "voice-onboarding-{{profile_name}}",
+    "onboarding_check_path": "active/shared/tmp/voice-onboarding-check.wav",
+    "preview_text": "こんにちは。これは Kyberion の声オンボーディング試聴です。",
+    "sample_01_prompt": "サンプル 1。自己紹介を 1 分程度で読んでください。",
+    "sample_02_prompt": "サンプル 2。少し間を置いて、今日の予定を説明してください。",
+    "sample_03_prompt": "サンプル 3。最後に、この声で会議で話すイメージで短く話してください。"
+  },
+  "steps": [
+    {
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "🎙️ Voice onboarding starting for {{profile_name}} (dry_run={{dry_run}}). Samples will be recorded into active/shared/tmp/voice-onboarding/{{profile_name}}/."
+      }
+    },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "{{sample_01_prompt}}\nOutput: active/shared/tmp/voice-onboarding/{{profile_name}}/sample-01.wav"
+      }
+    },
+    {
+      "id": "record_sample_01",
+      "role": "source",
+      "op": "voice:record_voice_sample",
+      "produces": { "channel": "sample_01_result", "type": "VoiceSampleRecordingResult" },
+      "params": {
+        "action": "record_voice_sample",
+        "request_id": "{{voice_request_id}}",
+        "sample_id": "sample-01",
+        "duration_sec": 45,
+        "language": "{{sample_language}}",
+        "prompt_text": "{{sample_01_prompt}}",
+        "output_path": "active/shared/tmp/voice-onboarding/{{profile_name}}/sample-01.wav",
+        "dry_run": "{{dry_run}}"
+      }
+    },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "{{sample_02_prompt}}\nOutput: active/shared/tmp/voice-onboarding/{{profile_name}}/sample-02.wav"
+      }
+    },
+    {
+      "id": "record_sample_02",
+      "role": "source",
+      "op": "voice:record_voice_sample",
+      "produces": { "channel": "sample_02_result", "type": "VoiceSampleRecordingResult" },
+      "params": {
+        "action": "record_voice_sample",
+        "request_id": "{{voice_request_id}}",
+        "sample_id": "sample-02",
+        "duration_sec": 45,
+        "language": "{{sample_language}}",
+        "prompt_text": "{{sample_02_prompt}}",
+        "output_path": "active/shared/tmp/voice-onboarding/{{profile_name}}/sample-02.wav",
+        "dry_run": "{{dry_run}}"
+      }
+    },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "{{sample_03_prompt}}\nOutput: active/shared/tmp/voice-onboarding/{{profile_name}}/sample-03.wav"
+      }
+    },
+    {
+      "id": "record_sample_03",
+      "role": "source",
+      "op": "voice:record_voice_sample",
+      "produces": { "channel": "sample_03_result", "type": "VoiceSampleRecordingResult" },
+      "params": {
+        "action": "record_voice_sample",
+        "request_id": "{{voice_request_id}}",
+        "sample_id": "sample-03",
+        "duration_sec": 45,
+        "language": "{{sample_language}}",
+        "prompt_text": "{{sample_03_prompt}}",
+        "output_path": "active/shared/tmp/voice-onboarding/{{profile_name}}/sample-03.wav",
+        "dry_run": "{{dry_run}}"
+      }
+    },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "📦 Registering voice profile {{profile_name}} from the recorded samples."
+      }
+    },
+    {
+      "id": "register_voice_profile",
+      "role": "source",
+      "op": "voice:collect_and_register_voice_profile",
+      "produces": { "channel": "voice_registration_result", "type": "VoiceRegistrationResult" },
+      "params": {
+        "action": "collect_and_register_voice_profile",
+        "request_id": "{{voice_request_id}}",
+        "profile": {
+          "profile_id": "{{profile_name}}",
+          "display_name": "{{profile_display_name}}",
+          "tier": "personal",
+          "languages": ["{{sample_language}}"],
+          "default_engine_id": "mlx_audio_qwen3",
+          "notes": "Kyberion voice onboarding profile."
+        },
+        "samples": [
+          {
+            "sample_id": "sample-01",
+            "path": "active/shared/tmp/voice-onboarding/{{profile_name}}/sample-01.wav",
+            "language": "{{sample_language}}"
+          },
+          {
+            "sample_id": "sample-02",
+            "path": "active/shared/tmp/voice-onboarding/{{profile_name}}/sample-02.wav",
+            "language": "{{sample_language}}"
+          },
+          {
+            "sample_id": "sample-03",
+            "path": "active/shared/tmp/voice-onboarding/{{profile_name}}/sample-03.wav",
+            "language": "{{sample_language}}"
+          }
+        ],
+        "policy": { "allow_update": true, "strict_personal_voice": false },
+        "dry_run": "{{dry_run}}"
+      }
+    },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "✅ Voice profile registration prepared for {{profile_name}}. Trial artifact will be written to {{onboarding_check_path}}."
+      }
+    },
+    {
+      "id": "generate_trial_voice",
+      "role": "source",
+      "op": "voice:generate_voice",
+      "produces": { "channel": "voice_trial_result", "type": "VoiceResult" },
+      "params": {
+        "action": "generate_voice",
+        "request_id": "{{voice_request_id}}-trial",
+        "text": "{{preview_text}}",
+        "profile_ref": {
+          "profile_id": "{{profile_name}}"
+        },
+        "engine": {
+          "engine_id": "mlx_audio_qwen3"
+        },
+        "rendering": {
+          "language": "{{sample_language}}",
+          "chunking": {
+            "max_chunk_chars": 200,
+            "crossfade_ms": 50,
+            "preserve_paralinguistic_tags": true
+          }
+        },
+        "delivery": {
+          "mode": "artifact_and_playback",
+          "format": "wav",
+          "artifact_path": "{{onboarding_check_path}}",
+          "emit_progress_packets": true
+        },
+        "routing": {
+          "personal_voice_mode": "require_personal_voice"
+        },
+        "dry_run": "{{dry_run}}"
+      }
+    },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "試聴確認: macOS なら `afplay {{onboarding_check_path}}` で再生してください。"
+      }
+    },
+    {
+      "role": "gate",
+      "op": "core:if",
+      "params": {
+        "condition": {
+          "from": "dry_run",
+          "operator": "eq",
+          "value": true
+        },
+        "then": [
+          {
+            "role": "sink",
+            "op": "system:log",
+            "params": {
+              "message": "dry_run=true なので voice consent の登録はスキップしました。"
+            }
+          }
+        ],
+        "else": [
+          {
+            "id": "grant_voice_consent",
+            "role": "source",
+            "op": "system:exec",
+            "produces": { "channel": "voice_consent_result", "type": "ShellResult" },
+            "params": {
+              "command": "node",
+              "args": [
+                "dist/scripts/voice_consent.js",
+                "grant",
+                "--mission",
+                "{{mission_id}}",
+                "--operator",
+                "{{operator_handle}}",
+                "--scope",
+                "meeting speak",
+                "--force"
+              ]
+            }
+          },
+          {
+            "role": "sink",
+            "op": "system:log",
+            "consumes": "voice_consent_result",
+            "params": {
+              "message": "✅ Voice consent registered for mission {{mission_id}}."
+            }
+          }
+        ]
+      }
+    },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "🎧 Voice onboarding complete for {{profile_name}}."
+      }
+    }
+  ]
+}
