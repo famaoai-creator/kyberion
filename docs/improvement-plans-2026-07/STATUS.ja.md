@@ -8,8 +8,8 @@
 
 | 判定    | 件数 |
 | ------- | ---- |
-| DONE    | 24   |
-| PARTIAL | 25   |
+| DONE    | 25   |
+| PARTIAL | 24   |
 | TODO    | 45   |
 
 ## P0 残作業(プロダクション化のクリティカルパス)
@@ -87,7 +87,7 @@
 | ----- | ------- | ----------------------------------------------------------------------------------------------------------------- |
 | MO-01 | PARTIAL | プロセステンプレート機構一式(schema/テンプレ/worker 駆動化)                                                       |
 | MO-02 | PARTIAL | mission-gate-engine、新設ゲート共通化、planning/受入ゲート記録、受入 rework/owner 通知、exit/quality の修復ループ |
-| MO-03 | PARTIAL | mission-task-contract.schema.json + planner 出力検証+循環検出                                                     |
+| MO-03 | DONE    |                                                                                                                   |
 | MO-04 | DONE    |                                                                                                                   |
 | MO-05 | DONE    | (軽微: 集計スクリプト)                                                                                            |
 | MO-06 | DONE    |                                                                                                                   |

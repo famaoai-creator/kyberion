@@ -48,11 +48,16 @@ function makeTaskResultText(input: {
     .join('\n');
 }
 
-vi.mock('./a2a-bridge.js', () => ({
-  a2aBridge: {
-    route: mocks.route,
-  },
-}));
+vi.mock('./a2a-bridge.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./a2a-bridge.js')>();
+  return {
+    ...actual,
+    a2aBridge: {
+      ...actual.a2aBridge,
+      route: mocks.route,
+    },
+  };
+});
 
 vi.mock('./agent-runtime-supervisor.js', () => ({
   ensureMissionTeamRuntimeViaSupervisor: mocks.ensureMissionTeamRuntimeViaSupervisor,
@@ -1213,9 +1218,9 @@ describe('mission-orchestration-worker', () => {
     );
   });
 
-  it('defers tasks until dependency tasks are completed', async () => {
+  it('dispatches dependency-ready tasks after prerequisites complete within the same invocation', async () => {
     const { missionDir } = await import('./path-resolver.js');
-    const { safeWriteFile, safeReadFile } = await import('./secure-io.js');
+    const { safeWriteFile } = await import('./secure-io.js');
     const { dispatchMissionNextTasks } = await import('./mission-orchestration-worker.js');
 
     const missionPath = missionDir('MSN-FOLLOWUP', 'public');
@@ -1267,6 +1272,11 @@ describe('mission-orchestration-worker', () => {
     mocks.resolveMissionTeamPlan.mockReturnValue({
       mission_id: 'MSN-FOLLOWUP',
       mission_type: 'product_development',
+      team_governance: {
+        lifecycle: {
+          max_parallel_members: 1,
+        },
+      },
       assignments: [],
     });
     mocks.buildMissionTeamView.mockReturnValue({ planner: 'nerve-agent' });
@@ -1279,7 +1289,23 @@ describe('mission-orchestration-worker', () => {
         route_reason: 'phase_kind=mechanical -> small/low',
       },
     });
-    mocks.route.mockResolvedValue({
+    const pendingResponses: Array<{ resolve: (value: any) => void }> = [];
+    mocks.route.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          pendingResponses.push({ resolve });
+        })
+    );
+
+    const dispatchedPromise = dispatchMissionNextTasks('MSN-FOLLOWUP');
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(mocks.route).toHaveBeenCalledTimes(1);
+    expect(String((mocks.route.mock.calls[0]?.[0] as any)?.payload?.context?.task_id || '')).toBe(
+      'task-bootstrap'
+    );
+
+    pendingResponses[0]?.resolve({
       payload: {
         text: makeTaskResultText({
           summary: 'Completed the prerequisite task.',
@@ -1291,16 +1317,318 @@ describe('mission-orchestration-worker', () => {
       },
     });
 
-    const dispatched = await dispatchMissionNextTasks('MSN-FOLLOWUP');
-    const stored = JSON.parse(
-      safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }) as string
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(mocks.route).toHaveBeenCalledTimes(2);
+    expect(String((mocks.route.mock.calls[1]?.[0] as any)?.payload?.context?.task_id || '')).toBe(
+      'task-followup'
     );
+
+    pendingResponses[1]?.resolve({
+      payload: {
+        text: makeTaskResultText({
+          summary: 'Completed the follow-up task.',
+          artifacts: [{ path: 'deliverables/followup.md', kind: 'markdown' }],
+          verification_done: ['Confirmed the follow-up output.'],
+          gaps: [],
+          needs: [],
+        }),
+      },
+    });
+
+    const dispatched = await dispatchedPromise;
 
     expect(dispatched).toEqual([
       { task_id: 'task-bootstrap', team_role: 'implementer', agent_id: 'implementation-architect' },
+      { task_id: 'task-followup', team_role: 'reviewer', agent_id: 'implementation-architect' },
     ]);
-    expect(mocks.route).toHaveBeenCalledTimes(1);
-    expect(stored.map((task: any) => task.status)).toEqual(['completed', 'planned']);
+  });
+
+  it('retries a busy task on the next wave when another task makes progress', async () => {
+    const { missionDir } = await import('./path-resolver.js');
+    const { safeWriteFile } = await import('./secure-io.js');
+    const { dispatchMissionNextTasks } = await import('./mission-orchestration-worker.js');
+    const { AgentBusyError } =
+      await vi.importActual<typeof import('./a2a-bridge.js')>('./a2a-bridge.js');
+
+    const missionPath = missionDir('MSN-FOLLOWUP', 'public');
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify(
+        [
+          {
+            task_id: 'task-busy',
+            status: 'planned',
+            assigned_to: { role: 'implementer', agent_id: 'implementation-architect' },
+            description: 'Retry when the agent is briefly busy',
+            deliverable: 'deliverables/busy.md',
+          },
+          {
+            task_id: 'task-stable',
+            status: 'planned',
+            assigned_to: { role: 'reviewer', agent_id: 'implementation-architect' },
+            description: 'Progress even if another task is busy',
+            deliverable: 'deliverables/stable.md',
+          },
+        ],
+        null,
+        2
+      )
+    );
+    safeWriteFile(`${missionPath}/deliverables/busy.md`, '# busy');
+    safeWriteFile(`${missionPath}/deliverables/stable.md`, '# stable');
+    safeWriteFile(
+      `${missionPath}/TASK_BOARD.md`,
+      [
+        '# TASK_BOARD: MSN-FOLLOWUP',
+        '',
+        '## Status: Planning Ready',
+        '',
+        '### 🛠️ Execution Phase',
+        '- [x] Step 1: Research and Strategy',
+        '- [ ] Step 2: Implementation',
+        '- [ ] Step 3: Validation',
+        '',
+      ].join('\n')
+    );
+
+    mocks.ensureMissionTeamRuntimeViaSupervisor.mockResolvedValue({
+      runtime_plan: { mission_id: 'MSN-FOLLOWUP', assignments: [] },
+    });
+    mocks.resolveMissionTeamPlan.mockReturnValue({
+      mission_id: 'MSN-FOLLOWUP',
+      mission_type: 'product_development',
+      team_governance: {
+        lifecycle: {
+          max_parallel_members: 2,
+        },
+      },
+      assignments: [],
+    });
+    mocks.buildMissionTeamView.mockReturnValue({ planner: 'nerve-agent' });
+    mocks.resolveMissionTeamReceiver.mockReturnValue({
+      agent_id: 'implementation-architect',
+      model_hint: {
+        tier: 'small',
+        effort: 'low',
+        model_id: 'openai:gpt-5.4-mini',
+        route_reason: 'phase_kind=mechanical -> small/low',
+      },
+    });
+    mocks.route
+      .mockRejectedValueOnce(new AgentBusyError('busy', 10))
+      .mockResolvedValueOnce({
+        payload: {
+          text: makeTaskResultText({
+            summary: 'Completed the stable task.',
+            artifacts: [{ path: 'deliverables/stable.md', kind: 'markdown' }],
+            verification_done: ['Confirmed the stable output.'],
+            gaps: [],
+            needs: [],
+          }),
+        },
+      })
+      .mockResolvedValueOnce({
+        payload: {
+          text: makeTaskResultText({
+            summary: 'Completed the busy task after retry.',
+            artifacts: [{ path: 'deliverables/busy.md', kind: 'markdown' }],
+            verification_done: ['Confirmed the busy output.'],
+            gaps: [],
+            needs: [],
+          }),
+        },
+      });
+
+    const dispatched = await dispatchMissionNextTasks('MSN-FOLLOWUP');
+
+    expect(mocks.route).toHaveBeenCalledTimes(3);
+    expect(dispatched).toEqual([
+      { task_id: 'task-stable', team_role: 'reviewer', agent_id: 'implementation-architect' },
+      { task_id: 'task-busy', team_role: 'implementer', agent_id: 'implementation-architect' },
+    ]);
+  });
+
+  it('rejects malformed NEXT_TASKS input before dispatching', async () => {
+    const { missionDir } = await import('./path-resolver.js');
+    const { safeWriteFile } = await import('./secure-io.js');
+    const { dispatchMissionNextTasks } = await import('./mission-orchestration-worker.js');
+
+    const missionPath = missionDir('MSN-FOLLOWUP', 'public');
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify(
+        [
+          {
+            task_id: 'task-a',
+            status: 'planned',
+            assigned_to: { role: 'implementer', agent_id: 'implementation-architect' },
+            description: 'Task A',
+          },
+          {
+            task_id: 'task-a',
+            status: 'planned',
+            assigned_to: { role: 'reviewer', agent_id: 'implementation-architect' },
+            description: 'Duplicate task id',
+          },
+        ],
+        null,
+        2
+      )
+    );
+    safeWriteFile(
+      `${missionPath}/TASK_BOARD.md`,
+      [
+        '# TASK_BOARD: MSN-FOLLOWUP',
+        '',
+        '## Status: Planning Ready',
+        '',
+        '### 🛠️ Execution Phase',
+        '- [x] Step 1: Research and Strategy',
+        '- [ ] Step 2: Implementation',
+        '- [ ] Step 3: Validation',
+        '',
+      ].join('\n')
+    );
+
+    await expect(dispatchMissionNextTasks('MSN-FOLLOWUP')).rejects.toThrow(
+      /duplicate task_id task-a/
+    );
+    expect(mocks.route).not.toHaveBeenCalled();
+  });
+
+  it('keeps the final task state equivalent between serial and parallel dispatch', async () => {
+    const { missionDir } = await import('./path-resolver.js');
+    const { safeWriteFile, safeReadFile } = await import('./secure-io.js');
+    const { dispatchMissionNextTasks } = await import('./mission-orchestration-worker.js');
+    const { clearWorkCoordinationStore } = await import('./work-coordination.js');
+
+    const missionPath = missionDir('MSN-FOLLOWUP', 'public');
+    const writeFixture = (maxParallelMembers: number) => {
+      clearWorkCoordinationStore();
+      mocks.route.mockReset();
+      mocks.resolveMissionTeamPlan.mockReset();
+      mocks.resolveMissionTeamPlan.mockReturnValue({
+        mission_id: 'MSN-FOLLOWUP',
+        mission_type: 'product_development',
+        team_governance: {
+          lifecycle: {
+            max_parallel_members: maxParallelMembers,
+          },
+        },
+        assignments: [],
+      });
+      mocks.route.mockImplementation(async (request: any) => {
+        const taskId = String(request?.payload?.context?.task_id || '');
+        const deliverableName =
+          taskId === 'task-bootstrap'
+            ? 'bootstrap'
+            : taskId === 'task-followup'
+              ? 'followup'
+              : taskId === 'task-independent'
+                ? 'independent'
+                : taskId;
+        return {
+          payload: {
+            text: makeTaskResultText({
+              summary: `Completed ${taskId}.`,
+              artifacts: [{ path: `deliverables/${deliverableName}.md`, kind: 'markdown' }],
+              verification_done: [`Confirmed ${taskId}.`],
+              gaps: [],
+              needs: [],
+            }),
+          },
+        };
+      });
+      safeWriteFile(
+        `${missionPath}/NEXT_TASKS.json`,
+        JSON.stringify(
+          [
+            {
+              task_id: 'task-bootstrap',
+              status: 'planned',
+              assigned_to: { role: 'implementer', agent_id: 'implementation-architect' },
+              description: 'Set up the prerequisite',
+              deliverable: 'deliverables/bootstrap.md',
+            },
+            {
+              task_id: 'task-followup',
+              status: 'planned',
+              assigned_to: { role: 'reviewer', agent_id: 'implementation-architect' },
+              description: 'Use the prerequisite output',
+              dependencies: ['task-bootstrap'],
+              deliverable: 'deliverables/followup.md',
+            },
+            {
+              task_id: 'task-independent',
+              status: 'planned',
+              assigned_to: { role: 'implementer', agent_id: 'implementation-architect' },
+              description: 'Run in parallel with the chain',
+              deliverable: 'deliverables/independent.md',
+            },
+          ],
+          null,
+          2
+        )
+      );
+      safeWriteFile(`${missionPath}/deliverables/independent.md`, '# independent');
+      safeWriteFile(
+        `${missionPath}/TASK_BOARD.md`,
+        [
+          '# TASK_BOARD: MSN-FOLLOWUP',
+          '',
+          '## Status: Planning Ready',
+          '',
+          '### 🛠️ Execution Phase',
+          '- [x] Step 1: Research and Strategy',
+          '- [ ] Step 2: Implementation',
+          '- [ ] Step 3: Validation',
+          '',
+        ].join('\n')
+      );
+    };
+
+    mocks.ensureMissionTeamRuntimeViaSupervisor.mockResolvedValue({
+      runtime_plan: { mission_id: 'MSN-FOLLOWUP', assignments: [] },
+    });
+    mocks.buildMissionTeamView.mockReturnValue({ planner: 'nerve-agent' });
+    mocks.resolveMissionTeamReceiver.mockReturnValue({
+      agent_id: 'implementation-architect',
+      model_hint: {
+        tier: 'small',
+        effort: 'low',
+        model_id: 'openai:gpt-5.4-mini',
+        route_reason: 'phase_kind=mechanical -> small/low',
+      },
+    });
+
+    writeFixture(1);
+    await dispatchMissionNextTasks('MSN-FOLLOWUP');
+    const serialSnapshot = JSON.parse(
+      safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }) as string
+    );
+
+    writeFixture(2);
+    await dispatchMissionNextTasks('MSN-FOLLOWUP');
+    const parallelSnapshot = JSON.parse(
+      safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }) as string
+    );
+
+    const normalize = (entries: any[]) =>
+      entries
+        .map((entry) => ({
+          task_id: entry.task_id,
+          status: entry.status,
+          rework_count: Number(entry.rework_count || 0),
+        }))
+        .sort((left, right) => left.task_id.localeCompare(right.task_id));
+
+    expect(normalize(serialSnapshot)).toEqual(normalize(parallelSnapshot));
+    expect(normalize(serialSnapshot)).toEqual([
+      { task_id: 'task-bootstrap', status: 'completed', rework_count: 0 },
+      { task_id: 'task-followup', status: 'completed', rework_count: 0 },
+      { task_id: 'task-independent', status: 'completed', rework_count: 0 },
+    ]);
   });
 
   it('renders gate status and rework count into the task board', async () => {
