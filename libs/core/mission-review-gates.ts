@@ -11,6 +11,7 @@ import type {
 import type { ArtifactBundle } from './artifact-bundle.js';
 import { checkArtifactBundleFulfillment } from './artifact-bundle.js';
 import { evaluateDeliverableQuality, type DeliverableKind } from './deliverable-quality.js';
+import { evaluateIntentDriftGate } from './intent-snapshot-store.js';
 
 export type MissionReviewMode = 'lean' | 'standard' | 'strict';
 export type ReviewGateVerdict = 'ready' | 'concerns' | 'blocked';
@@ -250,6 +251,15 @@ export function evaluateArtifactBundleGate(
     };
   }
   return { gate_id: 'ARTIFACT_BUNDLE', verdict: 'ready' };
+}
+
+export function evaluateIntentDriftReviewGate(missionId: string): ReviewGateResult {
+  const gate = evaluateIntentDriftGate(missionId);
+  return {
+    gate_id: 'INTENT_DRIFT',
+    verdict: gate.passed ? 'ready' : 'blocked',
+    reason: gate.message,
+  };
 }
 
 export function evaluateDeliverableQualityGate(
