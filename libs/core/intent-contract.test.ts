@@ -142,7 +142,7 @@ describe('intent-contract compiler', () => {
     ];
 
     const flow = await compileUserIntentFlow(
-      { text: '提案資料を作って' },
+      { text: '提案資料を作って', correlationId: 'corr-intent-contract-001' },
       {
         askFn: async () => responses.shift() || '',
       }
@@ -151,6 +151,8 @@ describe('intent-contract compiler', () => {
     expect(flow.source).toBe('llm');
     expect(flow.executionBrief.kind).toBe('actuator-execution-brief');
     expect(flow.intentContract.intent_id).toBe('generate-presentation');
+    expect(flow.intentContract.correlation_id).toBe('corr-intent-contract-001');
+    expect(flow.correlationId).toBe('corr-intent-contract-001');
     expect(flow.workLoop.resolution.task_type).toBe('presentation_deck');
     expect(flow.routingDecision?.mode).toBe('subagent');
     expect(flow.routingDecision?.owner).toBe('document-specialist');
@@ -983,6 +985,34 @@ describe('intent-contract compiler', () => {
     expect(events[0]?.attributes?.reasoning_level).toBe(llmFlow.reasoningDecision?.level);
     expect(events[0]?.attributes?.recommended_model_id).toBe('openai:gpt-5.5');
     expect(events[0]?.attributes?.model_route_status).toBe('shadow');
+
+    events.length = 0;
+
+    const mismatchFlow = await compileUserIntentFlow(
+      {
+        text: '提案資料を作って',
+        resolutionPacket: {
+          kind: 'intent_resolution_packet',
+          utterance: '提案資料を作って',
+          selected_intent_id: 'generate-presentation',
+          selected_confidence: 0.91,
+          selected_resolution: {
+            shape: 'direct_reply',
+            task_kind: 'presentation_deck',
+          },
+          candidates: [],
+        },
+      },
+      {
+        askFn: async () => responses.shift() || '',
+        trace,
+      }
+    );
+
+    expect(mismatchFlow.intentContract.resolution.execution_shape).toBe('project_bootstrap');
+    expect(events[0]?.attributes?.shape_disagreement).toBe(true);
+    expect(events[0]?.attributes?.selected_resolution_shape).toBe('direct_reply');
+    expect(events[0]?.attributes?.contract_execution_shape).toBe('project_bootstrap');
 
     events.length = 0;
 

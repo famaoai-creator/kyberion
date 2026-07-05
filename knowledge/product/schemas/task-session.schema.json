@@ -16,13 +16,23 @@
   ],
   "properties": {
     "session_id": { "type": "string", "minLength": 1 },
+    "correlation_id": { "type": "string", "minLength": 1 },
     "surface": {
       "type": "string",
       "enum": ["presence", "slack", "terminal", "chronos", "web", "imessage", "discord", "telegram"]
     },
     "task_type": {
       "type": "string",
-      "enum": ["browser", "capture_photo", "workbook_wbs", "presentation_deck", "report_document", "service_operation", "document_generation", "analysis"]
+      "enum": [
+        "browser",
+        "capture_photo",
+        "workbook_wbs",
+        "presentation_deck",
+        "report_document",
+        "service_operation",
+        "document_generation",
+        "analysis"
+      ]
     },
     "status": {
       "type": "string",
@@ -166,7 +176,17 @@
           "ts": { "type": "string", "minLength": 1 },
           "type": {
             "type": "string",
-            "enum": ["instruction", "ack", "plan", "execution", "verification", "feedback", "error", "control", "artifact"]
+            "enum": [
+              "instruction",
+              "ack",
+              "plan",
+              "execution",
+              "verification",
+              "feedback",
+              "error",
+              "control",
+              "artifact"
+            ]
           },
           "text": { "type": "string", "minLength": 1 }
         },
@@ -284,7 +304,14 @@
                       "properties": {
                         "deck_purpose": {
                           "type": "string",
-                          "enum": ["proposal", "internal_share", "briefing", "marketing", "training", "comparison"]
+                          "enum": [
+                            "proposal",
+                            "internal_share",
+                            "briefing",
+                            "marketing",
+                            "training",
+                            "comparison"
+                          ]
                         },
                         "semantic_type": { "type": "string" },
                         "slide_type": { "type": "string" },
