@@ -194,6 +194,8 @@ export interface MissionState {
       drift_score: number;
       message: string;
     };
+    cancelled?: boolean;
+    cancel_reason?: string;
   };
   history: Array<{
     ts: string;
