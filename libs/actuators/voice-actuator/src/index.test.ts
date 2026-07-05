@@ -855,4 +855,64 @@ describe('voice actuator', () => {
       })
     );
   });
+
+  it('supports dry-run profile collection and registration without touching the registry', async () => {
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'collect_and_register_voice_profile',
+      request_id: 'collect-reg-dry-run',
+      dry_run: true,
+      profile: {
+        profile_id: 'user-ja-voice',
+        display_name: 'User JA',
+        tier: 'personal',
+        languages: ['ja'],
+        default_engine_id: 'open_voice_clone',
+      },
+      samples: [],
+    } as any);
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'succeeded',
+        action: 'collect_and_register_voice_profile',
+        request_id: 'collect-reg-dry-run',
+        dry_run: true,
+      })
+    );
+    expect(result.collection.summary.sample_count).toBe(0);
+    expect(result.registration.sample_refs).toEqual([]);
+    expect(mocks.collectVoiceSamples).not.toHaveBeenCalled();
+  });
+
+  it('supports dry-run generation without a registered profile or playback runtime', async () => {
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'generate_voice',
+      request_id: 'req-dry-run',
+      dry_run: true,
+      text: 'hello world',
+      profile_ref: { profile_id: 'missing-profile' },
+      engine: { engine_id: 'local_say' },
+      rendering: { language: 'ja' },
+      delivery: {
+        mode: 'artifact',
+        format: 'wav',
+        artifact_path: '/tmp/voice-onboarding-check.wav',
+        emit_progress_packets: true,
+      },
+    } as any);
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'succeeded',
+        request_id: 'req-dry-run',
+        profile_id: 'missing-profile',
+        dry_run: true,
+      })
+    );
+    expect(result.artifact_refs).toEqual(['/tmp/voice-onboarding-check.wav']);
+    expect(mocks.safeExec).not.toHaveBeenCalled();
+    expect(mocks.createVirtualAudioOutputPlaybackBridge).not.toHaveBeenCalled();
+  });
 });

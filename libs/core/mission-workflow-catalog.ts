@@ -21,6 +21,7 @@ export interface MissionWorkflowSelectionInput {
   riskProfile: MissionRiskProfile;
   stage: MissionStage;
   executionShape: ExecutionShape;
+  missionTypeHint?: string;
   intentId?: string;
   taskType?: string;
 }
@@ -61,8 +62,12 @@ type WorkflowCatalogFile = {
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
-const WORKFLOW_CATALOG_SCHEMA_PATH = pathResolver.knowledge('product/schemas/mission-workflow-catalog.schema.json');
-const WORKFLOW_CATALOG_PATH = pathResolver.knowledge('product/governance/mission-workflow-catalog.json');
+const WORKFLOW_CATALOG_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/mission-workflow-catalog.schema.json'
+);
+const WORKFLOW_CATALOG_PATH = pathResolver.knowledge(
+  'product/governance/mission-workflow-catalog.json'
+);
 
 let workflowCatalogValidateFn: ValidateFunction | null = null;
 
@@ -79,7 +84,17 @@ function normalize(value?: string): string | undefined {
 }
 
 function normalizeArray(values?: string[]): string[] {
-  return Array.from(new Set((values || []).map((value) => String(value || '').trim().toLowerCase()).filter(Boolean)));
+  return Array.from(
+    new Set(
+      (values || [])
+        .map((value) =>
+          String(value || '')
+            .trim()
+            .toLowerCase()
+        )
+        .filter(Boolean)
+    )
+  );
 }
 
 function matchesValue(value: string | undefined, allowed: string[] | undefined): boolean {
@@ -88,14 +103,17 @@ function matchesValue(value: string | undefined, allowed: string[] | undefined):
   return allowed.includes('*') || allowed.includes(value);
 }
 
-function templateMatches(input: {
-  missionClass: string;
-  deliveryShape: string;
-  riskProfile: string;
-  executionShape: WorkflowExecutionShape;
-  intentId?: string;
-  taskType?: string;
-}, template: WorkflowTemplate): boolean {
+function templateMatches(
+  input: {
+    missionClass: string;
+    deliveryShape: string;
+    riskProfile: string;
+    executionShape: WorkflowExecutionShape;
+    intentId?: string;
+    taskType?: string;
+  },
+  template: WorkflowTemplate
+): boolean {
   const match = template.match;
   if (!match) return false;
   return (
@@ -109,31 +127,44 @@ function templateMatches(input: {
 }
 
 function loadWorkflowCatalog(): WorkflowCatalogFile {
-  const parsed = JSON.parse(safeReadFile(WORKFLOW_CATALOG_PATH, { encoding: 'utf8' }) as string) as WorkflowCatalogFile;
+  const parsed = JSON.parse(
+    safeReadFile(WORKFLOW_CATALOG_PATH, { encoding: 'utf8' }) as string
+  ) as WorkflowCatalogFile;
   const validate = ensureWorkflowCatalogValidator();
   if (!validate(parsed)) {
-    const errors = (validate.errors || []).map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`).join('; ');
+    const errors = (validate.errors || [])
+      .map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`)
+      .join('; ');
     throw new Error(`Invalid mission-workflow-catalog: ${errors}`);
   }
   return parsed;
 }
 
-export function resolveMissionWorkflowDesign(input: MissionWorkflowSelectionInput): MissionWorkflowDesign {
+export function resolveMissionWorkflowDesign(
+  input: MissionWorkflowSelectionInput
+): MissionWorkflowDesign {
   const catalog = loadWorkflowCatalog();
   const projectedExecutionShape = projectExecutionShapeToWorkflowShape(
-    normalizeExecutionShape(input.executionShape),
+    normalizeExecutionShape(input.executionShape)
   );
+  const missionTypeHint = normalize(input.missionTypeHint);
+  const meetingFacilitationHint = missionTypeHint === 'meeting_facilitation';
   const normalizedInput = {
     missionClass: normalize(input.missionClass) || 'code_change',
-    deliveryShape: normalize(input.deliveryShape) || 'single_artifact',
+    deliveryShape:
+      normalize(input.deliveryShape) ||
+      (meetingFacilitationHint ? 'multi_artifact_pipeline' : 'single_artifact'),
     riskProfile: normalize(input.riskProfile) || 'review_required',
     executionShape: projectedExecutionShape,
-    intentId: normalize(input.intentId),
-    taskType: normalize(input.taskType),
+    intentId:
+      normalize(input.intentId) || (meetingFacilitationHint ? 'meeting-operations' : undefined),
+    taskType:
+      normalize(input.taskType) || (meetingFacilitationHint ? 'meeting_operations' : undefined),
   };
 
-  const selected = catalog.templates.find((template) => templateMatches(normalizedInput, template))
-    || catalog.templates.find((template) => template.id === catalog.defaults.workflow_id);
+  const selected =
+    catalog.templates.find((template) => templateMatches(normalizedInput, template)) ||
+    catalog.templates.find((template) => template.id === catalog.defaults.workflow_id);
 
   if (!selected) {
     throw new Error(`Missing default workflow template: ${catalog.defaults.workflow_id}`);
@@ -144,6 +175,8 @@ export function resolveMissionWorkflowDesign(input: MissionWorkflowSelectionInpu
     pattern: selected.pattern,
     stage: input.stage,
     phases: selected.phases,
-    rationale: selected.description || `Selected workflow ${selected.id} by mission classification and execution shape.`,
+    rationale:
+      selected.description ||
+      `Selected workflow ${selected.id} by mission classification and execution shape.`,
   };
 }

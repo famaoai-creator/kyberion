@@ -76,4 +76,27 @@ describe('mission-workflow-catalog', () => {
     expect(codeChange.phases.join('>')).not.toBe(research.phases.join('>'));
     expect(codeChange.phases.join('>')).not.toBe(content.phases.join('>'));
   });
+
+  it('selects the meeting facilitator follow-up workflow for meeting facilitation missions', () => {
+    const workflow = resolveMissionWorkflowDesign({
+      missionClass: 'operations_and_release',
+      deliveryShape: 'multi_artifact_pipeline',
+      riskProfile: 'review_required',
+      stage: 'planning',
+      executionShape: 'mission',
+      missionTypeHint: 'meeting_facilitation',
+    });
+
+    expect(workflow.workflow_id).toBe('ai-meeting-facilitator-followup');
+    expect(workflow.phases).toEqual(
+      expect.arrayContaining([
+        'agenda_and_role_boundary',
+        'live_facilitation',
+        'postprocess',
+        'self_execution',
+        'team_tracking',
+        'delivery',
+      ])
+    );
+  });
 });
