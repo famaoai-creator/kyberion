@@ -7,6 +7,7 @@ import type {
   PlanningPacketTask,
   TaskResultBlock,
   TaskResultArtifact,
+  TaskReviewFinding,
 } from './channel-surface-types.js';
 
 export const PlanningPacketTaskSchema: z.ZodType<PlanningPacketTask> = z
@@ -21,6 +22,7 @@ export const PlanningPacketTaskSchema: z.ZodType<PlanningPacketTask> = z
     risk: z.enum(['low', 'medium', 'high', 'approval_required', 'high_stakes']).optional(),
     expected_output_format: z.enum(['text', 'files', 'structured']).optional(),
     estimated_scope: z.enum(['S', 'M', 'L']).optional(),
+    review_target: z.string().optional(),
   })
   .strict();
 
@@ -40,6 +42,14 @@ export const TaskResultArtifactSchema: z.ZodType<TaskResultArtifact> = z
   })
   .strict();
 
+export const TaskReviewFindingSchema: z.ZodType<TaskReviewFinding> = z
+  .object({
+    severity: z.enum(['must_fix', 'should_fix', 'nit']),
+    location: z.string().min(1),
+    instruction: z.string().min(1),
+  })
+  .strict();
+
 export const TaskResultSchema: z.ZodType<TaskResultBlock> = z
   .object({
     summary: z.string().min(1).max(800),
@@ -47,6 +57,7 @@ export const TaskResultSchema: z.ZodType<TaskResultBlock> = z
     verification_done: z.array(z.string().min(1)),
     gaps: z.array(z.string().min(1)),
     needs: z.array(z.string().min(1)),
+    review_findings: z.array(TaskReviewFindingSchema).optional(),
   })
   .strict();
 
@@ -127,9 +138,7 @@ export const structuredOutputSchemas = {
 
 export type StructuredOutputSchemaName = keyof typeof structuredOutputSchemas;
 
-export type StructuredOutputSchemaRef<T = unknown> =
-  | z.ZodType<T>
-  | StructuredOutputSchemaName;
+export type StructuredOutputSchemaRef<T = unknown> = z.ZodType<T> | StructuredOutputSchemaName;
 
 export function resolveStructuredOutputSchema<T>(
   schema: StructuredOutputSchemaRef<T>
