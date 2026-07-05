@@ -19,6 +19,11 @@
 3. 各保守アクションが判断基準文書 §1-2 の 4 軸で自動/事後通知/承認必須に振り分けられ(`autonomous-ops-policy.json`)、承認分は AO-03 のエスカレーションへ。
 4. 長時間ミッションの auto-checkpoint が定期発火する。
 
+## 実装状況 (2026-07-05)
+
+- **完了済み**: `libs/core/src/pipeline-scheduler.ts` に missed-run catch-up と per-pipeline run-lock を追加し、`scripts/chronos_daemon.ts` は claim/complete ベースの実行に切り替えた。`registerScheduledPipeline` は ADF 再スキャン時に `lastRun` / `lastStatus` / `runLock` を保持するため、tick のたびに runtime state が消えない。
+- **検証済み**: `libs/core/src/pipeline-scheduler.test.ts` で cron catch-up、run-lock の単一実行、更新時の runtime state 保持を確認した。
+
 ## 実装タスク
 
 ### Task 1: スケジューラの堅牢化 — `claude-sonnet-4`

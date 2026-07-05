@@ -137,7 +137,7 @@
 
 | ID    | 状態    | 残作業                                                                              |
 | ----- | ------- | ----------------------------------------------------------------------------------- |
-| AO-01 | PARTIAL | scheduler run-lock/missed-run catch-up、autonomous-ops-policy/gate、auto-checkpoint |
+| AO-01 | PARTIAL | scheduler run-lock/missed-run catch-up 完了、autonomous-ops-policy/gate、auto-checkpoint |
 | AO-02 | TODO    | CVE スキャン/台帳、パッチルーブリック、適用フロー                                   |
 | AO-03 | DONE    |                                                                                     |
 | AO-04 | TODO    | soak ハーネス、リーク検出、再起動 e2e                                               |
