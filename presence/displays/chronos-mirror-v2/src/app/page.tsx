@@ -49,6 +49,7 @@ import {
   OPERATOR_VIEW_LINKS,
   SURFACE_ROLES,
 } from '../lib/operator-console';
+import { buildPlanPreviewSignature, isPlanPreviewStale } from '../lib/plan-preview';
 import { uxText } from '../lib/ux-vocabulary';
 import { useChronosLocale } from '../lib/hooks';
 
@@ -329,6 +330,7 @@ export default function ChronosMirrorV2() {
   const [planPreview, setPlanPreview] = useState<any | null>(null);
   const [planPreviewError, setPlanPreviewError] = useState<string | null>(null);
   const [planPreviewBusy, setPlanPreviewBusy] = useState(false);
+  const [planPreviewSignature, setPlanPreviewSignature] = useState<string | null>(null);
   const [deliverables, setDeliverables] = useState<any[]>([]);
   const [deliverablesError, setDeliverablesError] = useState<string | null>(null);
   const [deliverablesQuery, setDeliverablesQuery] = useState('');
@@ -337,6 +339,9 @@ export default function ChronosMirrorV2() {
   const [deliverableReviewComment, setDeliverableReviewComment] = useState('');
   const [deliverableReviewBusy, setDeliverableReviewBusy] = useState(false);
   const [deliverableReviewError, setDeliverableReviewError] = useState<string | null>(null);
+  const [operatorHomeSummary, setOperatorHomeSummary] = useState<any | null>(null);
+  const [operatorHomeError, setOperatorHomeError] = useState<string | null>(null);
+  const [operatorHomeRefreshTick, setOperatorHomeRefreshTick] = useState(0);
   const [missionHistory, setMissionHistory] = useState<any[]>([]);
   const [missionHistoryError, setMissionHistoryError] = useState<string | null>(null);
   const [missionHistoryQuery, setMissionHistoryQuery] = useState('');
@@ -349,6 +354,9 @@ export default function ChronosMirrorV2() {
   const [approvalQueueError, setApprovalQueueError] = useState<string | null>(null);
   const [approvalQueueQuery, setApprovalQueueQuery] = useState('');
   const [approvalDecisionBusyId, setApprovalDecisionBusyId] = useState<string | null>(null);
+  const [planApprovalBusy, setPlanApprovalBusy] = useState(false);
+  const [planApprovalMessage, setPlanApprovalMessage] = useState<string | null>(null);
+  const [planApprovalSessionId, setPlanApprovalSessionId] = useState<string | null>(null);
   const [connections, setConnections] = useState<any[]>([]);
   const [connectionsError, setConnectionsError] = useState<string | null>(null);
   const [connectionsQuery, setConnectionsQuery] = useState('');
@@ -362,6 +370,13 @@ export default function ChronosMirrorV2() {
   });
   const sendQueryRef = useRef<((q: string) => void) | null>(null);
   const mainSurfaceRef = useRef<HTMLElement | null>(null);
+  const currentPlanPreviewSignature = buildPlanPreviewSignature({
+    requestText: planRequestText,
+    missionType: planMissionType,
+    assignedPersona: planPersona,
+    tier: planTier,
+  });
+  const planPreviewIsStale = isPlanPreviewStale(planPreviewSignature, currentPlanPreviewSignature);
 
   useEffect(() => {
     const prefs = loadOperatorLayoutPrefs();
@@ -512,6 +527,30 @@ export default function ChronosMirrorV2() {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    void fetch('/api/operator-home?limit=8', {
+      headers: { 'Cache-Control': 'no-cache' },
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`operator-home ${response.status}`);
+        return (await response.json()) as { summary?: any };
+      })
+      .then((payload) => {
+        if (cancelled) return;
+        setOperatorHomeSummary(payload.summary || null);
+        setOperatorHomeError(null);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setOperatorHomeSummary(null);
+        setOperatorHomeError(error instanceof Error ? error.message : String(error));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [operatorHomeRefreshTick]);
+
+  useEffect(() => {
     if (!focusedOperatorView) return;
     window.requestAnimationFrame(() => {
       mainSurfaceRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -592,13 +631,77 @@ export default function ChronosMirrorV2() {
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || 'plan preview failed');
       setPlanPreview(payload.preview);
+      setPlanPreviewSignature(currentPlanPreviewSignature);
+      setPlanApprovalSessionId(payload.preview?.missionId || null);
+      setPlanApprovalMessage(null);
     } catch (error) {
       setPlanPreview(null);
+      setPlanApprovalSessionId(null);
+      setPlanPreviewSignature(null);
       setPlanPreviewError(error instanceof Error ? error.message : String(error));
     } finally {
       setPlanPreviewBusy(false);
     }
-  }, [locale, planMissionType, planPersona, planRequestText, planTier]);
+  }, [
+    currentPlanPreviewSignature,
+    locale,
+    planMissionType,
+    planPersona,
+    planRequestText,
+    planTier,
+  ]);
+
+  const approvePlanAndStart = useCallback(async () => {
+    if (!planPreview) {
+      setPlanApprovalMessage('先に plan preview を作成してください');
+      return;
+    }
+    if (planPreviewIsStale) {
+      setPlanApprovalMessage('入力を変更したので plan preview を再実行してください');
+      return;
+    }
+    const sessionId = planApprovalSessionId || planPreview.missionId;
+    setPlanApprovalBusy(true);
+    setPlanApprovalMessage(null);
+    try {
+      const proposalResponse = await fetch('/api/agent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: planRequestText,
+          sessionId,
+          locale,
+          requesterId: 'chronos-ui',
+        }),
+      });
+      const proposalPayload = await proposalResponse.json();
+      if (!proposalResponse.ok) throw new Error(proposalPayload.error || 'mission proposal failed');
+
+      const confirmResponse = await fetch('/api/agent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: 'はい',
+          sessionId,
+          locale,
+          requesterId: 'chronos-ui',
+        }),
+      });
+      const confirmPayload = await confirmResponse.json();
+      if (!confirmResponse.ok) throw new Error(confirmPayload.error || 'mission approval failed');
+
+      setPlanApprovalMessage(
+        confirmPayload.mission?.missionId
+          ? `Started ${confirmPayload.mission.missionId}`
+          : 'Mission started'
+      );
+      setOperatorHomeRefreshTick((value) => value + 1);
+    } catch (error) {
+      setPlanApprovalMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setPlanApprovalBusy(false);
+    }
+  }, [locale, planApprovalSessionId, planPreview, planPreviewIsStale, planRequestText]);
 
   const refreshDeliverables = useCallback(() => {
     setDeliverablesRefreshTick((value) => value + 1);
@@ -627,6 +730,7 @@ export default function ChronosMirrorV2() {
         if (!response.ok) throw new Error(payload.error || 'deliverable review failed');
         setDeliverableReviewComment('');
         refreshDeliverables();
+        setOperatorHomeRefreshTick((value) => value + 1);
         if (payload.state?.current_artifact_id) {
           setSelectedDeliverableId(payload.state.current_artifact_id);
         }
@@ -657,6 +761,7 @@ export default function ChronosMirrorV2() {
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.error || 'approval decision failed');
         setApprovalQueue((current) => current.filter((entry) => entry.id !== item.id));
+        setOperatorHomeRefreshTick((value) => value + 1);
       } catch (error) {
         setApprovalQueueError(error instanceof Error ? error.message : String(error));
       } finally {
@@ -694,6 +799,7 @@ export default function ChronosMirrorV2() {
           )
         );
         setConnectionReviewNote('');
+        setOperatorHomeRefreshTick((value) => value + 1);
       } catch (error) {
         setConnectionsError(error instanceof Error ? error.message : String(error));
       } finally {
@@ -917,6 +1023,100 @@ export default function ChronosMirrorV2() {
           </section>
 
           <FirstRunBanner />
+
+          <section className="kyberion-glass rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.28em] text-cyan-100/55">
+                  Operator Home
+                </div>
+                <h2 className="mt-1 text-lg font-semibold tracking-tight text-white/90">
+                  One place to see what needs attention
+                </h2>
+              </div>
+              <div className="text-[10px] uppercase tracking-[0.2em] text-white/40">
+                {operatorHomeSummary?.statusLabel || 'loading'}
+              </div>
+            </div>
+            {operatorHomeError ? (
+              <div className="mt-3 rounded-xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-[11px] text-red-100/80">
+                {operatorHomeError}
+              </div>
+            ) : null}
+            {operatorHomeSummary ? (
+              <>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                  <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4">
+                    <div className="text-[10px] uppercase tracking-[0.18em] text-white/42">
+                      Status
+                    </div>
+                    <div className="mt-2 text-2xl font-semibold text-white/92">
+                      {operatorHomeSummary.statusLabel}
+                    </div>
+                    <div className="mt-1 text-[10px] text-white/48">
+                      {operatorHomeSummary.statusDetail}
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4">
+                    <div className="text-[10px] uppercase tracking-[0.18em] text-white/42">
+                      Approvals
+                    </div>
+                    <div className="mt-2 text-2xl font-semibold text-white/92">
+                      {operatorHomeSummary.counts.pendingApprovals}
+                    </div>
+                    <div className="mt-1 text-[10px] text-white/48">pending review</div>
+                  </div>
+                  <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4">
+                    <div className="text-[10px] uppercase tracking-[0.18em] text-white/42">
+                      Inbox
+                    </div>
+                    <div className="mt-2 text-2xl font-semibold text-white/92">
+                      {operatorHomeSummary.counts.unreadInbox}
+                    </div>
+                    <div className="mt-1 text-[10px] text-white/48">
+                      {operatorHomeSummary.counts.totalInbox} total entries
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4">
+                    <div className="text-[10px] uppercase tracking-[0.18em] text-white/42">
+                      Active
+                    </div>
+                    <div className="mt-2 text-2xl font-semibold text-white/92">
+                      {operatorHomeSummary.counts.activeMissions}
+                    </div>
+                    <div className="mt-1 text-[10px] text-white/48">
+                      {operatorHomeSummary.counts.blockedMissions} blocked
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4">
+                    <div className="text-[10px] uppercase tracking-[0.18em] text-white/42">
+                      Next
+                    </div>
+                    <div className="mt-2 text-sm font-semibold text-white/92">
+                      {operatorHomeSummary.nextAction.title}
+                    </div>
+                    <div className="mt-1 text-[10px] text-white/48">
+                      {operatorHomeSummary.nextAction.reason}
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-4 flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-[0.16em] text-white/46">
+                  {operatorHomeSummary.activeMissions.slice(0, 4).map((mission: any) => (
+                    <button
+                      key={mission.missionId}
+                      type="button"
+                      onClick={() => setSelectedMissionId(mission.missionId)}
+                      className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-white/72 transition hover:bg-white/10"
+                    >
+                      {mission.missionId}
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="mt-4 text-[11px] text-white/50">Loading operator home summary…</div>
+            )}
+          </section>
 
           <section className="grid gap-4 xl:grid-cols-[1.05fr,0.95fr]">
             <div className="kyberion-glass rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
@@ -1350,15 +1550,30 @@ export default function ChronosMirrorV2() {
                     Plan preview and approval
                   </h2>
                 </div>
-                <button
-                  type="button"
-                  onClick={runPlanPreview}
-                  disabled={planPreviewBusy}
-                  className="rounded-lg border border-cyan-300/18 bg-cyan-400/10 px-3 py-2 text-[10px] uppercase tracking-[0.18em] text-cyan-100/82 transition hover:bg-cyan-400/16 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {planPreviewBusy ? 'previewing' : 'preview'}
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={runPlanPreview}
+                    disabled={planPreviewBusy}
+                    className="rounded-lg border border-cyan-300/18 bg-cyan-400/10 px-3 py-2 text-[10px] uppercase tracking-[0.18em] text-cyan-100/82 transition hover:bg-cyan-400/16 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {planPreviewBusy ? 'previewing' : 'preview'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={approvePlanAndStart}
+                    disabled={planApprovalBusy || !planPreview || planPreviewIsStale}
+                    className="rounded-lg border border-emerald-300/18 bg-emerald-400/10 px-3 py-2 text-[10px] uppercase tracking-[0.18em] text-emerald-100/82 transition hover:bg-emerald-400/16 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {planApprovalBusy ? 'starting' : 'approve & start'}
+                  </button>
+                </div>
               </div>
+              {planPreview && planPreviewIsStale ? (
+                <div className="mt-3 rounded-xl border border-amber-400/20 bg-amber-500/10 px-4 py-3 text-[11px] text-amber-100/80">
+                  Preview is stale. Re-run preview before approving.
+                </div>
+              ) : null}
               <textarea
                 value={planRequestText}
                 onChange={(event) => setPlanRequestText(event.target.value)}
@@ -1400,6 +1615,11 @@ export default function ChronosMirrorV2() {
               {planPreviewError ? (
                 <div className="mt-3 rounded-xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-[11px] text-red-100/80">
                   {planPreviewError}
+                </div>
+              ) : null}
+              {planApprovalMessage ? (
+                <div className="mt-3 rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-3 text-[11px] text-emerald-100/80">
+                  {planApprovalMessage}
                 </div>
               ) : null}
               {planPreview ? (
