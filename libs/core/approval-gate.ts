@@ -6,6 +6,8 @@
 
 import { resolveApprovalPolicy } from './approval-policy.js';
 import { summarizeApprovalGate } from './approval-gate-summary.js';
+import { evaluateDecisionRights, resolveDecisionRightsMatrix } from './decision-rights.js';
+import { resolveGoldenRulePriorityOrder, resolveVision } from './vision-resolver.js';
 import {
   createApprovalRequest,
   listApprovalRequests,
@@ -54,6 +56,34 @@ function firstString(...values: unknown[]): string | undefined {
     if (typeof value === 'string' && value.trim()) return value.trim();
   }
   return undefined;
+}
+
+function extractDecisionRightsContext(payload?: Record<string, unknown>): {
+  tenantSlug?: string;
+  decisionType?: string;
+  actorRole?: string;
+  amount?: number;
+  riskLevel?: string;
+} {
+  if (!payload) return {};
+  const tenantSlug = firstString(payload.tenant_slug, payload.tenantSlug, payload.company_id);
+  const decisionType = firstString(payload.decision_type, payload.decisionType, payload.operation_type);
+  const actorRole = firstString(payload.actor_role, payload.actorRole, payload.requested_role, payload.requestedRole);
+  const amountValue = payload.amount_jpy ?? payload.amount ?? payload.value;
+  const amount =
+    typeof amountValue === 'number'
+      ? amountValue
+      : typeof amountValue === 'string' && amountValue.trim() && Number.isFinite(Number(amountValue))
+        ? Number(amountValue)
+        : undefined;
+  const riskLevel = firstString(payload.risk_level, payload.riskLevel, payload.risk);
+  return {
+    tenantSlug,
+    decisionType,
+    actorRole,
+    amount,
+    riskLevel,
+  };
 }
 
 function buildApprovalDraft(params: {
@@ -160,6 +190,34 @@ export function enforceApprovalGate(
   const { intentId, operationId, agentId, correlationId, channel, payload } = params;
   recordGovernanceAction(agentId, 'approval_gate', operationId, false);
 
+  const decisionRightsContext = extractDecisionRightsContext(payload);
+  const decisionRightsMatrix =
+    decisionRightsContext.decisionType || decisionRightsContext.tenantSlug
+      ? resolveDecisionRightsMatrix(decisionRightsContext.tenantSlug ?? null)
+      : null;
+  const decisionRightsEvaluation = evaluateDecisionRights(decisionRightsMatrix, decisionRightsContext);
+  if (decisionRightsEvaluation && !decisionRightsEvaluation.requiresEscalation) {
+    const goldenRulePriority = resolveGoldenRulePriorityOrder(
+      resolveVision(decisionRightsContext.tenantSlug ?? null)
+    );
+    auditChain.record({
+      agentId,
+      action: 'approval_gate',
+      operation: operationId,
+      result: 'allowed',
+      reason: `Decision rights allow ${decisionRightsEvaluation.decisionType}`,
+      metadata: {
+        correlationId,
+        intentId,
+        decisionType: decisionRightsEvaluation.decisionType,
+        decisionRightsSource: decisionRightsMatrix?.source_path,
+        goldenRulePriority,
+      },
+    });
+    recordGovernanceAction(agentId, 'approval_gate', `${operationId}:allowed`, false);
+    return { allowed: true, status: 'not_required', message: `Decision rights allow ${decisionRightsEvaluation.decisionType}` };
+  }
+
   // --- Step 1: Resolve policy ---
   const policy = resolveApprovalPolicy({ intentId, payload });
 
@@ -253,6 +311,8 @@ export function enforceApprovalGate(
     allowed: false,
     status: 'pending',
     requestId: record.id,
-    message: `Approval request ${record.id} created; awaiting decision`,
+    message: decisionRightsEvaluation?.escalationReason
+      ? `Approval request ${record.id} created; ${decisionRightsEvaluation.escalationReason}`
+      : `Approval request ${record.id} created; awaiting decision`,
   };
 }

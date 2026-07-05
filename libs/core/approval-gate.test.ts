@@ -10,6 +10,11 @@ vi.mock('./approval-policy.js', () => ({
   resolveApprovalPolicy: vi.fn(),
 }));
 
+vi.mock('./decision-rights.js', () => ({
+  resolveDecisionRightsMatrix: vi.fn(),
+  evaluateDecisionRights: vi.fn(),
+}));
+
 vi.mock('./approval-store.js', () => ({
   createApprovalRequest: vi.fn(),
   listApprovalRequests: vi.fn(),
@@ -21,10 +26,14 @@ vi.mock('./audit-chain.js', () => ({
 
 import { enforceApprovalGate } from './approval-gate.js';
 import { resolveApprovalPolicy } from './approval-policy.js';
+import { evaluateDecisionRights, resolveDecisionRightsMatrix } from './decision-rights.js';
+import type { DecisionRightsMatrix } from './decision-rights.js';
 import { createApprovalRequest, listApprovalRequests } from './approval-store.js';
 import { auditChain } from './audit-chain.js';
 
 const mockResolvePolicy = vi.mocked(resolveApprovalPolicy);
+const mockResolveDecisionRightsMatrix = vi.mocked(resolveDecisionRightsMatrix);
+const mockEvaluateDecisionRights = vi.mocked(evaluateDecisionRights);
 const mockListRequests = vi.mocked(listApprovalRequests);
 const mockCreateRequest = vi.mocked(createApprovalRequest);
 const mockAuditRecord = vi.mocked(auditChain.record);
@@ -48,6 +57,8 @@ describe('enforceApprovalGate', () => {
       requiresApproval: false,
       missingRequirements: [],
     });
+    mockResolveDecisionRightsMatrix.mockReturnValue(null);
+    mockEvaluateDecisionRights.mockReturnValue(null);
 
     const result = enforceApprovalGate(baseParams);
 
@@ -66,6 +77,8 @@ describe('enforceApprovalGate', () => {
       requiresApproval: true,
       missingRequirements: [],
     });
+    mockResolveDecisionRightsMatrix.mockReturnValue(null);
+    mockEvaluateDecisionRights.mockReturnValue(null);
     mockListRequests.mockReturnValue([
       {
         id: 'req-1',
@@ -85,6 +98,8 @@ describe('enforceApprovalGate', () => {
 
   it('allows when an approved request has a future expiresAt', () => {
     mockResolvePolicy.mockReturnValue({ requiresApproval: true, missingRequirements: [] });
+    mockResolveDecisionRightsMatrix.mockReturnValue(null);
+    mockEvaluateDecisionRights.mockReturnValue(null);
     mockListRequests.mockReturnValue([
       {
         id: 'req-1',
@@ -103,6 +118,8 @@ describe('enforceApprovalGate', () => {
 
   it('blocks reuse of an approved request whose expiresAt has passed (CR-4)', () => {
     mockResolvePolicy.mockReturnValue({ requiresApproval: true, missingRequirements: [] });
+    mockResolveDecisionRightsMatrix.mockReturnValue(null);
+    mockEvaluateDecisionRights.mockReturnValue(null);
     mockListRequests.mockReturnValue([
       {
         id: 'req-1',
@@ -126,6 +143,8 @@ describe('enforceApprovalGate', () => {
       requiresApproval: true,
       missingRequirements: [],
     });
+    mockResolveDecisionRightsMatrix.mockReturnValue(null);
+    mockEvaluateDecisionRights.mockReturnValue(null);
     mockListRequests.mockReturnValue([
       {
         id: 'req-2',
@@ -152,6 +171,8 @@ describe('enforceApprovalGate', () => {
       requiresApproval: true,
       missingRequirements: [],
     });
+    mockResolveDecisionRightsMatrix.mockReturnValue(null);
+    mockEvaluateDecisionRights.mockReturnValue(null);
     mockListRequests.mockReturnValue([]);
     mockCreateRequest.mockReturnValue({
       id: 'req-new',
@@ -176,6 +197,8 @@ describe('enforceApprovalGate', () => {
       requiresApproval: true,
       missingRequirements: [],
     });
+    mockResolveDecisionRightsMatrix.mockReturnValue(null);
+    mockEvaluateDecisionRights.mockReturnValue(null);
     mockListRequests.mockReturnValue([]);
     mockCreateRequest.mockReturnValue({ id: 'req-custom' } as any);
 
@@ -197,6 +220,8 @@ describe('enforceApprovalGate', () => {
       requiresApproval: true,
       missingRequirements: [],
     });
+    mockResolveDecisionRightsMatrix.mockReturnValue(null);
+    mockEvaluateDecisionRights.mockReturnValue(null);
     mockListRequests.mockReturnValue([]);
     mockCreateRequest.mockReturnValue({ id: 'req-rich' } as any);
 
@@ -228,6 +253,8 @@ describe('enforceApprovalGate', () => {
       requiresApproval: false,
       missingRequirements: [],
     });
+    mockResolveDecisionRightsMatrix.mockReturnValue(null);
+    mockEvaluateDecisionRights.mockReturnValue(null);
 
     enforceApprovalGate(baseParams);
 
@@ -291,5 +318,52 @@ describe('enforceApprovalGate', () => {
     };
     const valid = validate(request);
     expect(valid, JSON.stringify(validate.errors || [])).toBe(true);
+  });
+
+  it('allows operations that decision-rights mark as within threshold', () => {
+    mockResolveDecisionRightsMatrix.mockReturnValue({
+      version: '1.0.0',
+      company_id: 'acme',
+      tenant_slug: 'acme',
+      source_kind: 'customer',
+      source_path: 'customer/acme/decision-rights.json',
+      decisions: [
+        {
+          decision_type: 'operational_spend',
+          authorized_role: 'finance_controller',
+          threshold: { metric: 'amount_jpy', value: 500000, unit: 'JPY' },
+        },
+      ],
+    } satisfies DecisionRightsMatrix);
+    mockEvaluateDecisionRights.mockReturnValue({
+      decisionType: 'operational_spend',
+      authorizedRole: 'finance_controller',
+      thresholdMetric: 'amount_jpy',
+      thresholdValue: 500000,
+      requiresEscalation: false,
+      escalationReason: null,
+    });
+    mockResolvePolicy.mockReturnValue({
+      requiresApproval: true,
+      missingRequirements: [],
+    });
+
+    const result = enforceApprovalGate({
+      ...baseParams,
+      payload: {
+        tenant_slug: 'acme',
+        decision_type: 'operational_spend',
+        actor_role: 'finance_controller',
+        amount_jpy: 250000,
+      },
+    });
+
+    expect(result.allowed).toBe(true);
+    expect(result.status).toBe('not_required');
+    expect(mockAuditRecord).toHaveBeenCalledWith(
+      expect.objectContaining({
+        reason: 'Decision rights allow operational_spend',
+      })
+    );
   });
 });
