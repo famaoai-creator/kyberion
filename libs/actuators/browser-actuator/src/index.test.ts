@@ -1044,7 +1044,8 @@ describe('browser-actuator v3 contract', () => {
     });
 
     expect(result.status).toBe('succeeded');
-    expect(result.context.page_content).toBe('<html></html>');
+    expect(result.context.page_content).toContain('[UNTRUSTED CONTENT WARNING]');
+    expect(result.context.page_content).toContain('<html></html>');
   });
 
   it('handles page title capture', async () => {

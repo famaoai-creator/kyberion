@@ -162,12 +162,12 @@
 
 ### SU(Surface UI)
 
-| ID    | 状態 | 残作業                                                   |
-| ----- | ---- | -------------------------------------------------------- |
-| SU-01 | TODO | plan-preview API、オペレータホーム(IL-01/04, MO-01 依存) |
-| SU-02 | TODO | pause/cancel/intervention_respond、kb-panel 配線         |
-| SU-03 | TODO | 成果物インボックス、verdict、版管理                      |
-| SU-04 | TODO | 履歴検索、コスト UI、承認キュー(OP-01 依存)              |
+| ID    | 状態 | 残作業                                                                 |
+| ----- | ---- | ---------------------------------------------------------------------- |
+| SU-01 | DONE | plan-preview API、オペレータホーム、goal/persona/tier 編集、承認開始   |
+| SU-02 | DONE | pause/cancel/intervention_respond、kb-panel 配線、mission control 連携 |
+| SU-03 | DONE | 成果物インボックス、verdict、request-changes 版管理、レビュー UI       |
+| SU-04 | DONE | 履歴検索、コスト UI、承認キュー、テナント/接続レビュー                 |
 
 ### HO(ハンドオフ)
 

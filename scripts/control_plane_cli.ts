@@ -12,6 +12,8 @@ import {
   safeExec,
   summarizeMissionSeedAssessment,
   validateNextActionContract,
+  safeExistsSync,
+  safeReaddir,
 } from '@agent/core';
 import * as path from 'node:path';
 import { readJsonFile } from './refactor/cli-input.js';
@@ -669,12 +671,52 @@ async function handleChronos(action: string, args: string[], json: boolean): Pro
       process.stdout.write(`- approvals: ${asArray(body.pendingApprovals).length}\n`);
       process.stdout.write(`- distill candidates: ${asArray(body.distillCandidates).length}\n`);
       process.stdout.write(`- memory candidates: ${memoryCandidates.length}\n`);
+
+      const conversationsDir = pathResolver.shared('runtime/a2a-conversations');
+      let threadCount = 0;
+      if (safeExistsSync(conversationsDir)) {
+        try {
+          threadCount = safeReaddir(conversationsDir).filter((f) => f.endsWith('.jsonl')).length;
+        } catch (_) {}
+      }
+      let inflightCount = 0;
+      try {
+        const { listAgentRuntimesViaDaemon } =
+          await import('@agent/core/agent-runtime-supervisor-client');
+        const runtimes = await listAgentRuntimesViaDaemon();
+        inflightCount = runtimes.filter((r) => r.status === 'busy').length;
+      } catch (_) {}
+      process.stdout.write(
+        `- A2A conversations: ${threadCount} threads · ${inflightCount} inflight\n`
+      );
+
       if (nextActions.length > 0) {
         process.stdout.write(`- next action: ${nextActions[0]?.reason}\n`);
         if (nextActions[0]?.suggested_command) {
           process.stdout.write(`  command: ${nextActions[0].suggested_command}\n`);
         }
       }
+    },
+    status: async (client, _args, outputJson) => {
+      const conversationsDir = pathResolver.shared('runtime/a2a-conversations');
+      let threadCount = 0;
+      if (safeExistsSync(conversationsDir)) {
+        try {
+          threadCount = safeReaddir(conversationsDir).filter((f) => f.endsWith('.jsonl')).length;
+        } catch (_) {}
+      }
+      let inflightCount = 0;
+      try {
+        const { listAgentRuntimesViaDaemon } =
+          await import('@agent/core/agent-runtime-supervisor-client');
+        const runtimes = await listAgentRuntimesViaDaemon();
+        inflightCount = runtimes.filter((r) => r.status === 'busy').length;
+      } catch (_) {}
+
+      if (outputJson) {
+        return printJson({ threadCount, inflightCount });
+      }
+      process.stdout.write(`A2A status: ${threadCount} threads · ${inflightCount} inflight\n`);
     },
     approvals: async (client, _args, outputJson) => {
       const items = await client.listApprovals();

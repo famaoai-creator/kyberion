@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import {
-  getChronosAccessRoleOrThrow,
-  guardRequest,
-  requireChronosAccess,
-  roleToMissionRole,
-} from '../../../lib/api-guard';
+import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
 import {
   collectA2AHandoffs,
   collectAgentMessages,
@@ -968,8 +963,23 @@ function collectControlActionCatalog(accessRole: 'readonly' | 'localadmin'): Con
         disabledReason,
       }),
       createControlActionDefinition({
+        operation: 'pause',
+        label: 'pause',
+        risk: 'safe',
+        enabled: controlEnabled,
+        disabledReason,
+      }),
+      createControlActionDefinition({
         operation: 'finish',
         label: 'finish',
+        risk: 'risky',
+        approvalRequired: true,
+        enabled: controlEnabled,
+        disabledReason,
+      }),
+      createControlActionDefinition({
+        operation: 'cancel',
+        label: 'cancel',
         risk: 'risky',
         approvalRequired: true,
         enabled: controlEnabled,
@@ -1025,10 +1035,40 @@ function collectControlActionAvailability(
     mission[item.missionId] = baseCatalog.mission.map((action) => {
       if (accessRole !== 'localadmin') return action;
       if (action.operation === 'resume') {
+        if (item.status === 'active') {
+          return createControlActionDefinition({
+            ...action,
+            enabled: false,
+            disabledReason: 'Mission is already active.',
+          });
+        }
         return createControlActionDefinition({
           ...action,
-          enabled: false,
-          disabledReason: 'Mission is already active.',
+          enabled: item.status === 'paused' || item.status === 'failed',
+          disabledReason:
+            item.status === 'paused' || item.status === 'failed'
+              ? undefined
+              : `Mission status is ${item.status}; resume is only available after a pause or failure.`,
+        });
+      }
+      if (action.operation === 'pause') {
+        return createControlActionDefinition({
+          ...action,
+          enabled: item.status === 'active',
+          disabledReason:
+            item.status === 'active'
+              ? undefined
+              : `Mission status is ${item.status}; pause is only available for active missions.`,
+        });
+      }
+      if (action.operation === 'cancel') {
+        return createControlActionDefinition({
+          ...action,
+          enabled: item.status !== 'completed' && item.status !== 'archived',
+          disabledReason:
+            item.status === 'completed' || item.status === 'archived'
+              ? 'Completed missions cannot be cancelled from the control plane.'
+              : undefined,
         });
       }
       return action;
@@ -1403,8 +1443,6 @@ export async function GET(req: NextRequest) {
   try {
     const denied = guardRequest(req);
     if (denied) return denied;
-    const accessRole = getChronosAccessRoleOrThrow(req);
-    process.env.MISSION_ROLE = roleToMissionRole(accessRole);
     const runtimeSupervisorClient = await import('@agent/core/agent-runtime-supervisor-client');
     const runtime = listAgentRuntimeSnapshots();
     const rawActiveMissions = collectActiveMissions();
@@ -1591,8 +1629,6 @@ export async function POST(req: NextRequest) {
     if (denied) return denied;
     const requiresAdmin = requireChronosAccess(req, 'localadmin');
     if (requiresAdmin) return requiresAdmin;
-    const accessRole = getChronosAccessRoleOrThrow(req);
-    process.env.MISSION_ROLE = roleToMissionRole(accessRole);
     const body = await req.json();
     const action = body?.action;
 
@@ -1603,6 +1639,7 @@ export async function POST(req: NextRequest) {
       action !== 'memory_promote_pending' &&
       action !== 'next_action_execute' &&
       action !== 'mission_control' &&
+      action !== 'intervention_respond' &&
       action !== 'surface_control' &&
       action !== 'promote_mission_seed' &&
       action !== 'create_track_seed' &&
@@ -1623,7 +1660,7 @@ export async function POST(req: NextRequest) {
       if (!requestId || !storageChannel || !channel || !decision) {
         return NextResponse.json({ error: 'Missing approval decision payload' }, { status: 400 });
       }
-      const updated = decideApprovalRequest(roleToMissionRole(accessRole), {
+      const updated = decideApprovalRequest('chronos_localadmin', {
         channel,
         storageChannel,
         requestId,
@@ -2053,7 +2090,17 @@ export async function POST(req: NextRequest) {
       if (!missionId || !operation) {
         return NextResponse.json({ error: 'Missing missionId or operation' }, { status: 400 });
       }
-      if (!['resume', 'refresh_team', 'prewarm_team', 'staff_team', 'finish'].includes(operation)) {
+      if (
+        ![
+          'resume',
+          'pause',
+          'cancel',
+          'refresh_team',
+          'prewarm_team',
+          'staff_team',
+          'finish',
+        ].includes(operation)
+      ) {
         return NextResponse.json({ error: 'Unsupported mission operation' }, { status: 400 });
       }
 
@@ -2074,6 +2121,32 @@ export async function POST(req: NextRequest) {
         missionId,
         operation,
         eventId: event.event_id,
+        ts: new Date().toISOString(),
+      });
+    }
+
+    if (action === 'intervention_respond') {
+      const missionId = typeof body?.missionId === 'string' ? body.missionId.toUpperCase() : '';
+      const response = typeof body?.response === 'string' ? body.response.trim() : '';
+      const question = typeof body?.question === 'string' ? body.question.trim() : '';
+      if (!missionId || !response) {
+        return NextResponse.json({ error: 'Missing missionId or response' }, { status: 400 });
+      }
+      emitMissionOrchestrationObservation({
+        decision: 'mission_intervention_response_recorded',
+        event_type: 'mission_intervention_response_recorded',
+        requested_by: 'chronos_localadmin',
+        mission_id: missionId,
+        why: question
+          ? `Intervention response recorded for blocking question: ${question}`
+          : 'Intervention response recorded from the control surface.',
+        response,
+      });
+      return NextResponse.json({
+        status: 'ok',
+        action,
+        missionId,
+        response,
         ts: new Date().toISOString(),
       });
     }

@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { isInjectionSuspected } from './untrusted-content.js';
 
 export type ShellCommandVerdict = 'allow' | 'deny' | 'require_approval';
 
@@ -150,6 +151,16 @@ export function evaluateShellCommandPolicy(
     matchesRule(rule, normalized, executable, args)
   );
   if (allowRule) {
+    if (isInjectionSuspected()) {
+      return {
+        verdict: 'require_approval',
+        command: normalized,
+        executable,
+        args,
+        matchedRuleId: allowRule.id,
+        reason: `Kyberion safety: Command normally allowed by '${allowRule.id}' requires approval due to suspected prompt injection in active context.`,
+      };
+    }
     return {
       verdict: 'allow',
       command: normalized,

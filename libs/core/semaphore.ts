@@ -36,7 +36,17 @@ export class Semaphore {
     const next = this.queue.shift();
     if (next) next();
   }
+
+  getActiveCount(): number {
+    return this.active;
+  }
+
+  getMaxConcurrent(): number {
+    return this.maxConcurrent;
+  }
 }
 
 const parsedLimit = Number.parseInt(process.env.KYBERION_LLM_CONCURRENCY ?? '1', 10);
-export const llmSemaphore = new Semaphore(Number.isInteger(parsedLimit) && parsedLimit > 0 ? parsedLimit : 1);
+export const llmSemaphore = new Semaphore(
+  Number.isInteger(parsedLimit) && parsedLimit > 0 ? parsedLimit : 1
+);
