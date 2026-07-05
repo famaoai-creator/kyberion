@@ -8,6 +8,8 @@ Intent -> Plan -> State -> Result
 
 This guide explains how to operate Kyberion without forcing people to think in raw pipelines, runtime registries, or actuator contracts first.
 
+Surface map: [`docs/SURFACES.md`](./SURFACES.md).
+
 For enterprise role separation above the operator layer, also read:
 
 - `knowledge/product/architecture/enterprise-operating-kernel.md`
