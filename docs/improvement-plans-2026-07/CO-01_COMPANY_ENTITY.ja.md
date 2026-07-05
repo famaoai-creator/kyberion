@@ -39,10 +39,22 @@
 
 ### Task 4: ダッシュボードの Company 起点化 — `claude-haiku`
 
-- `sovereign_dashboard` / SU-01 のオペレータホームが Company エンティティ(会社名・創業者・理念要約・組織/財務/KPI へのリンク)を表示の起点にする。UX-06 Task 2/3 の customer overlay 対応と統合。
+- `sovereign_dashboard` と Chronos の management-control-plane 表示起点化が完了し、Company エンティティ(会社名・創業者・理念要約・組織/財務/決裁へのリンク)を先頭に表示する。UX-06 Task 2/3 の customer overlay 対応と統合。
 
 ## リスクと注意
 
 - Company は既存5ファイルの集約ビューであり**新たな正本を作らない**(二重管理禁止)。各ファイルが正本のまま。
 - テナント vision の runtime 配線は判断に影響する。まず「参照可能にする(エージェントが読める)」まで実装し、「規範を強制する(判断を変える)」は慎重に段階導入(誤った規範適用を避ける)。
 - confidential テナントの財務・組織参照は tier 隔離を厳守(Company ビューが tier をまたいで漏らさない)。
+
+## 実装メモ
+
+- 2026-07-05: `libs/core/company.ts` と `libs/core/vision-resolver.ts` を追加し、`customer/{slug}/customer.json` / `identity.json` / `organization-profile.json` / `vision.md` と confidential 配下の参照を 1 つの読取ビューに束ねる基盤を実装した。
+- 2026-07-05: `knowledge/product/schemas/company.schema.json` を追加し、`getGoldenRule` は tenant-aware な vision 解決を優先するようにした。
+- 2026-07-05: mission 作成の `visionRef` を company 参照 URI(`company://<tenant>/vision`) に寄せ、Company vision を起点にした構造化参照へ切り替えた。
+- 2026-07-05: `sovereign_dashboard` に Company overview を追加し、Company 起点の表示を実装した。
+- 2026-07-05: Chronos の management-control-plane に Company context を追加し、Mission Control を Company 起点で表示するようにした。
+- 2026-07-05: `scripts/refactor/mission-creation.ts` の `normalizeMissionVisionRef` を公開し、`company://` / `vision://` / legacy free string の正規化を contract test で固定した。
+- 2026-07-05: `scripts/refactor/mission-controller-router.ts` で mission の routing decision に `vision_ref_summary` を載せ、Company vision 参照が mission state の経路記録にも残るようにした。
+- 2026-07-05: `libs/core/outcome-contract.ts` に `vision_ref` を追加し、mission outcome contract でも `company://<tenant>/vision` の構造化参照を保持できるようにした。
+- 2026-07-05: `libs/core/mission-context-pack.ts` / `.test.ts` でも mission outcome contract の `vision_ref` をそのまま pack に保持することを固定し、context pack 層で構造化参照が落ちないようにした。

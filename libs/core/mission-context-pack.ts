@@ -108,6 +108,13 @@ export interface MissionStateSummary {
     deliverable_kind?: string;
     success_criteria?: string[];
     evidence_required?: boolean;
+    vision_ref?: {
+      raw: string;
+      kind: 'company' | 'vision' | 'legacy';
+      tenant_slug: string | null;
+      path: string | null;
+      query: string | null;
+    } | null;
   };
 }
 

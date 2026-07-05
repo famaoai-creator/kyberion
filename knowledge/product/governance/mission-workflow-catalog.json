@@ -28,6 +28,144 @@
   },
   "templates": [
     {
+      "id": "procurement-vendor",
+      "pattern": "stage_gated_delivery",
+      "description": "Vendor procurement workflow that drafts a comparison memo and prepares contract review and finance_controller decision notes.",
+      "match": {
+        "mission_classes": ["operations_and_release"],
+        "delivery_shapes": ["multi_artifact_pipeline"],
+        "intent_ids": ["procurement-vendor", "procurement", "vendor-selection"]
+      },
+      "phases": [
+        "intake",
+        "classification",
+        "planning",
+        "contract_authoring",
+        "preflight",
+        "execution",
+        "verification",
+        "delivery"
+      ]
+    },
+    {
+      "id": "performance-review",
+      "pattern": "stage_gated_delivery",
+      "description": "Performance review workflow that drafts a review memo for line_manager and talent_culture review.",
+      "match": {
+        "mission_classes": ["decision_support", "operations_and_release"],
+        "delivery_shapes": ["multi_artifact_pipeline"],
+        "intent_ids": ["performance-review", "performance", "people-review"]
+      },
+      "phases": [
+        "intake",
+        "classification",
+        "planning",
+        "contract_authoring",
+        "preflight",
+        "execution",
+        "verification",
+        "delivery"
+      ]
+    },
+    {
+      "id": "fundraising-prep",
+      "pattern": "coordinated_multi_track_execution",
+      "description": "Fundraising preparation workflow that compiles investor brief and dataroom checklist from company and financial context.",
+      "match": {
+        "mission_classes": ["decision_support", "operations_and_release"],
+        "delivery_shapes": ["multi_artifact_pipeline"],
+        "intent_ids": ["fundraising-prep", "fundraising", "raise-prep"]
+      },
+      "phases": [
+        "intake",
+        "classification",
+        "planning",
+        "contract_authoring",
+        "execution",
+        "verification",
+        "delivery"
+      ]
+    },
+    {
+      "id": "hiring-workflow",
+      "pattern": "stage_gated_delivery",
+      "description": "Hiring workflow that drafts a JD, schedules interviews, and produces an evaluation memo for talent_culture and line_manager.",
+      "match": {
+        "mission_classes": ["decision_support", "operations_and_release"],
+        "delivery_shapes": ["multi_artifact_pipeline"],
+        "intent_ids": ["hiring-workflow", "hire", "recruiting", "talent-culture"]
+      },
+      "phases": [
+        "intake",
+        "classification",
+        "planning",
+        "contract_authoring",
+        "preflight",
+        "execution",
+        "verification",
+        "delivery"
+      ]
+    },
+    {
+      "id": "financial-close-monthly",
+      "pattern": "stage_gated_delivery",
+      "description": "Monthly financial close workflow for finance_controller review, reconciliation, and memo drafting.",
+      "match": {
+        "mission_classes": ["operations_and_release"],
+        "delivery_shapes": ["multi_artifact_pipeline"],
+        "intent_ids": ["financial-close-monthly", "monthly-close", "financial-close"]
+      },
+      "phases": [
+        "intake",
+        "classification",
+        "planning",
+        "contract_authoring",
+        "preflight",
+        "execution",
+        "verification",
+        "delivery"
+      ]
+    },
+    {
+      "id": "budget-review",
+      "pattern": "stage_gated_delivery",
+      "description": "Budget review workflow that compares budget input against the financial model and drafts approval notes.",
+      "match": {
+        "mission_classes": ["operations_and_release"],
+        "delivery_shapes": ["multi_artifact_pipeline"],
+        "intent_ids": ["budget-review", "budget", "budget-review-monthly"]
+      },
+      "phases": [
+        "intake",
+        "classification",
+        "planning",
+        "contract_authoring",
+        "preflight",
+        "execution",
+        "verification",
+        "delivery"
+      ]
+    },
+    {
+      "id": "board-meeting-prep",
+      "pattern": "coordinated_multi_track_execution",
+      "description": "Board meeting preparation workflow that compiles company, decision-rights, financial, and OKR context into a draft pack.",
+      "match": {
+        "mission_classes": ["decision_support", "operations_and_release"],
+        "delivery_shapes": ["multi_artifact_pipeline"],
+        "intent_ids": ["board-meeting-prep", "board-prep", "board-meeting"]
+      },
+      "phases": [
+        "intake",
+        "classification",
+        "planning",
+        "contract_authoring",
+        "execution",
+        "verification",
+        "delivery"
+      ]
+    },
+    {
       "id": "stage-gated-high-stakes",
       "pattern": "stage_gated_delivery",
       "description": "High-stakes work requiring explicit checkpoint gates.",

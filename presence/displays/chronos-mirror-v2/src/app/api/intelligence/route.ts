@@ -1,7 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
+import {
+  getChronosAccessRoleOrThrow,
+  guardRequest,
+  requireChronosAccess,
+  roleToMissionRole,
+} from '../../../lib/api-guard';
+import { buildCompanyVisionRef, resolveCompany, type CompanyAggregate } from '@agent/core/company';
+import {
+  summarizeApprovalAuditDrilldown,
+  summarizeApprovalAuditTrail,
+  type ApprovalAuditDrilldownSummary,
+} from '../../../../../../../libs/core/approval-audit.js';
+import {
+  resolveFinanceControllerDecision,
+  type FinanceControllerDecision,
+} from '../../../../../../../libs/core/finance-controller.js';
+import { activeCustomer } from '@agent/core/customer-resolver';
 import {
   collectA2AHandoffs,
   collectAgentMessages,
@@ -144,6 +160,70 @@ interface OwnerSummary {
   reviewed_count: number;
   completed_count: number;
   requested_count: number;
+}
+
+interface CompanySnapshot {
+  companyId: string;
+  tenantSlug: string;
+  name: string;
+  sovereign: string | null;
+  visionRef: string;
+  vision: {
+    sourceKind: CompanyAggregate['vision_ref']['source_kind'];
+    sourcePath: string;
+    title: string | null;
+    soul: string[];
+    steering: string[];
+    destination: string[];
+  };
+  organizationProfile: {
+    exists: boolean;
+    path: string;
+    name: string | null;
+  };
+  orgChart: {
+    exists: boolean;
+    path: string;
+    domainCount: number;
+    positionCount: number;
+    topLevelRoles: string[];
+  };
+  financial: {
+    exists: boolean;
+    path: string;
+    sourceKind: string | null;
+    periodCount: number;
+    latestPeriodId: string | null;
+    latestRevenueJpy: number | null;
+    latestOperatingCostJpy: number | null;
+    latestGrossProfitJpy: number | null;
+  };
+  financeController: FinanceControllerDecision;
+  okr: {
+    exists: boolean;
+    path: string;
+    sourceKind: string | null;
+    objectiveCount: number;
+    keyResultCount: number;
+    progressPercent: number;
+    latestObjective: string | null;
+  };
+  approvalAudit: {
+    total: number;
+    allowed: number;
+    denied: number;
+    pending: number;
+    recentCount: number;
+    latestCorrelationId: string | null;
+  };
+  approvalAuditDrilldown: ApprovalAuditDrilldownSummary;
+  decisionRights: {
+    exists: boolean;
+    path: string;
+    sourceKind: string | null;
+    ruleCount: number;
+    decisionTypes: string[];
+  };
 }
 
 interface SurfaceOutboxMessage {
@@ -1196,6 +1276,111 @@ function collectOwnerSummaries(): OwnerSummary[] {
   return summaries.sort((a, b) => b.ts.localeCompare(a.ts)).slice(0, 6);
 }
 
+function resolveChronosTenantSlug(): string | null {
+  try {
+    return activeCustomer();
+  } catch {
+    return null;
+  }
+}
+
+function summarizeCompany(company: CompanyAggregate): CompanySnapshot {
+  const approvalAudit = summarizeApprovalAuditTrail(6);
+  const financeController = resolveFinanceControllerDecision({ tenantSlug: company.tenant_slug });
+  const approvalAuditDrilldown = summarizeApprovalAuditDrilldown(6);
+  return {
+    companyId: company.company_id,
+    tenantSlug: company.tenant_slug,
+    name: company.name,
+    sovereign: company.sovereign,
+    visionRef: buildCompanyVisionRef(company.tenant_slug),
+    vision: {
+      sourceKind: company.vision_ref.source_kind,
+      sourcePath: company.vision_ref.source_path,
+      title: company.vision_ref.title,
+      soul: company.vision_ref.sections.soul,
+      steering: company.vision_ref.sections.steering,
+      destination: company.vision_ref.sections.destination,
+    },
+    organizationProfile: {
+      exists: company.organization_profile_ref.exists,
+      path: company.organization_profile_ref.path,
+      name:
+        typeof company.organization_profile_ref.data?.name === 'string'
+          ? company.organization_profile_ref.data.name
+          : null,
+    },
+    orgChart: {
+      exists: company.org_chart_ref.exists,
+      path: company.org_chart_ref.path,
+      domainCount: company.org_chart_ref.data?.domains.length || 0,
+      positionCount: company.org_chart_ref.data?.positions.length || 0,
+      topLevelRoles:
+        company.org_chart_ref.data?.positions
+          ?.filter((position) => position.reports_to == null)
+          .map((position) => position.role_id)
+          .sort() || [],
+    },
+    financial: {
+      exists: company.financial_ref.exists,
+      path: company.financial_ref.path,
+      sourceKind: company.financial_ref.data?.source_kind || null,
+      periodCount: company.financial_ref.data?.periods.length || 0,
+      latestPeriodId: company.financial_ref.data?.periods.at(-1)?.period_id || null,
+      latestRevenueJpy: company.financial_ref.data?.periods.at(-1)?.revenue_jpy ?? null,
+      latestOperatingCostJpy:
+        company.financial_ref.data?.periods.at(-1)?.operating_cost_jpy ?? null,
+      latestGrossProfitJpy: company.financial_ref.data?.periods.at(-1)?.gross_profit_jpy ?? null,
+    },
+    financeController,
+    okr: {
+      exists: company.okr_ref.exists,
+      path: company.okr_ref.path,
+      sourceKind: company.okr_ref.data?.source_kind || null,
+      objectiveCount: company.okr_ref.data?.objectives.length || 0,
+      keyResultCount:
+        company.okr_ref.data?.objectives.reduce(
+          (count, objective) => count + objective.key_results.length,
+          0
+        ) || 0,
+      progressPercent: (() => {
+        const keyResults =
+          company.okr_ref.data?.objectives.flatMap((objective) => objective.key_results) || [];
+        const completeCount = keyResults.filter((keyResult) => {
+          if (typeof keyResult.current === 'number' && typeof keyResult.target === 'number') {
+            return keyResult.current >= keyResult.target;
+          }
+          if (typeof keyResult.current === 'string' && typeof keyResult.target === 'string') {
+            return keyResult.current === keyResult.target;
+          }
+          return false;
+        }).length;
+        return keyResults.length > 0 ? Math.round((completeCount / keyResults.length) * 100) : 0;
+      })(),
+      latestObjective: company.okr_ref.data?.objectives.at(-1)?.objective || null,
+    },
+    approvalAudit: {
+      total: approvalAudit.total,
+      allowed: approvalAudit.allowed,
+      denied: approvalAudit.denied,
+      pending: approvalAudit.pending,
+      recentCount: approvalAudit.recent.length,
+      latestCorrelationId: approvalAudit.recent[0]?.correlationId || null,
+    },
+    approvalAuditDrilldown,
+    decisionRights: {
+      exists: company.decision_rights_ref.exists,
+      path: company.decision_rights_ref.path,
+      sourceKind: company.decision_rights_ref.data?.source_kind || null,
+      ruleCount: company.decision_rights_ref.data?.decisions.length || 0,
+      decisionTypes:
+        company.decision_rights_ref.data?.decisions
+          .map((decision) => decision.decision_type)
+          .sort() || [],
+    },
+  };
+}
+
 function collectRecentSurfaceOutbox(): SurfaceOutboxMessage[] {
   return [...listSurfaceOutboxMessages('slack'), ...listSurfaceOutboxMessages('chronos')]
     .sort((a, b) => b.created_at.localeCompare(a.created_at))
@@ -1553,7 +1738,9 @@ export async function GET(req: NextRequest) {
       tracks: projectTracks,
       artifacts: allArtifacts,
     });
+    const company = summarizeCompany(resolveCompany(resolveChronosTenantSlug()));
     return NextResponse.json({
+      company,
       activeMissions,
       missionProgress,
       projects,

@@ -21,6 +21,11 @@ import {
   loadTeamRoleIndex,
 } from './mission-team-index.js';
 import { loadOrganizationProfile, type OrganizationProfile } from './organization-profile.js';
+import {
+  resolveOrganizationOrgChart,
+  summarizeOrganizationOrgChart,
+  type OrganizationOrgChartSummary,
+} from './org-chart.js';
 
 export interface MissionTeamPlan {
   mission_id: string;
@@ -29,6 +34,7 @@ export interface MissionTeamPlan {
   template: string;
   assigned_persona?: string;
   organization_profile?: MissionTeamOrganizationProfileSummary;
+  organization_chart?: OrganizationOrgChartSummary;
   mission_classification?: MissionClassification;
   generated_at: string;
   team_governance?: MissionTeamGovernance;
@@ -161,6 +167,9 @@ export function composeMissionTeamPlan(input: {
   const teamRoles = loadTeamRoleIndex();
   const authorityRoles = loadAuthorityRoleIndex();
   const agents = loadAgentProfileIndex();
+  const organizationChart = summarizeOrganizationOrgChart(
+    resolveOrganizationOrgChart(organizationProfile?.organization_id || null)
+  );
   const organizationDefaultTemplate = organizationProfile?.mission_defaults?.default_team_template;
   const template = (templates[missionType] ||
     (organizationDefaultTemplate ? templates[organizationDefaultTemplate] : undefined) ||
@@ -271,6 +280,7 @@ export function composeMissionTeamPlan(input: {
         : 'default',
     assigned_persona: input.assignedPersona,
     organization_profile: summarizeMissionOrganizationProfile(organizationProfile),
+    organization_chart: organizationChart,
     mission_classification: missionClassification,
     generated_at: new Date().toISOString(),
     team_governance: buildTeamGovernance(template, assignments),
@@ -283,22 +293,34 @@ export function enrichMissionTeamPlanWithOrganizationProfile(
   organizationProfile?: OrganizationProfile | null
 ): MissionTeamPlan {
   const organization_profile = summarizeMissionOrganizationProfile(organizationProfile);
-  if (!organization_profile) return plan;
-  if (
-    plan.organization_profile &&
-    plan.organization_profile.organization_id === organization_profile.organization_id &&
-    plan.organization_profile.name === organization_profile.name &&
-    plan.organization_profile.default_team_template ===
-      organization_profile.default_team_template &&
-    plan.organization_profile.team_template_catalog_id ===
-      organization_profile.team_template_catalog_id &&
-    plan.organization_profile.default_agent_profile === organization_profile.default_agent_profile
-  ) {
+  const organization_chart = summarizeOrganizationOrgChart(
+    resolveOrganizationOrgChart(organizationProfile?.organization_id || null)
+  );
+  const profileMatches =
+    !organization_profile ||
+    (plan.organization_profile &&
+      plan.organization_profile.organization_id === organization_profile.organization_id &&
+      plan.organization_profile.name === organization_profile.name &&
+      plan.organization_profile.default_team_template ===
+        organization_profile.default_team_template &&
+      plan.organization_profile.team_template_catalog_id ===
+        organization_profile.team_template_catalog_id &&
+      plan.organization_profile.default_agent_profile === organization_profile.default_agent_profile);
+  const chartMatches =
+    !organization_chart ||
+    (plan.organization_chart &&
+      plan.organization_chart.organization_id === organization_chart.organization_id &&
+      plan.organization_chart.name === organization_chart.name &&
+      plan.organization_chart.source_kind === organization_chart.source_kind &&
+      plan.organization_chart.domain_count === organization_chart.domain_count &&
+      plan.organization_chart.position_count === organization_chart.position_count);
+  if (profileMatches && chartMatches) {
     return plan;
   }
   return {
     ...plan,
     organization_profile,
+    organization_chart,
   };
 }
 
