@@ -49,11 +49,35 @@ interface SupervisorResponse {
   ok: boolean;
   result?: Record<string, unknown> | Array<Record<string, unknown>> | null;
   error?: string;
+  errorDetail?: Record<string, any>;
 }
 
 const SOCKET_DIR = pathResolver.shared('runtime/agent-supervisor');
 const SOCKET_PATH = `${SOCKET_DIR}/agent-runtime-supervisor.sock`;
 const DAEMON_LOCK_PATH = `${SOCKET_DIR}/agent-supervisor-daemon.lock`;
+
+const GLOBAL_LIMIT = Number(process.env.KYBERION_GLOBAL_INFLIGHT_LIMIT || 8);
+const AGENT_LIMIT = Number(process.env.KYBERION_AGENT_INFLIGHT_LIMIT || 2);
+
+let daemonGlobalInflight = 0;
+const daemonAgentInflightMap = new Map<string, number>();
+
+setInterval(
+  () => {
+    try {
+      const agentInflightObj: Record<string, number> = {};
+      for (const [k, v] of daemonAgentInflightMap.entries()) {
+        if (v > 0) agentInflightObj[k] = v;
+      }
+      appendSupervisorEvent({
+        decision: 'a2a_inflight_metric',
+        inflight_total: daemonGlobalInflight,
+        inflight_by_agent: agentInflightObj,
+      });
+    } catch (_) {}
+  },
+  Number(process.env.KYBERION_RUNTIME_SWEEP_INTERVAL_MS || 30_000)
+).unref?.();
 
 export interface AgentRuntimeSupervisorDaemonOptions {
   socketPath?: string;
@@ -220,22 +244,48 @@ async function handleRequest(
       }
       case 'ask': {
         const payload = request.payload || {};
-        const text = await askAgentRuntime(
-          String(payload.agentId || ''),
-          String(payload.prompt || ''),
-          String(payload.requestedBy || 'supervisor_daemon'),
-          {
-            timeoutMs: typeof payload.timeoutMs === 'number' ? payload.timeoutMs : undefined,
-            correlationId:
-              typeof payload.correlationId === 'string' ? payload.correlationId : undefined,
-            taskModelHint: readTaskModelHint(payload.taskModelHint),
-          }
-        );
-        return {
-          id: request.id,
-          ok: true,
-          result: { text },
-        };
+        const agentId = String(payload.agentId || '');
+        const currentAgentInflight = daemonAgentInflightMap.get(agentId) || 0;
+
+        if (daemonGlobalInflight >= GLOBAL_LIMIT || currentAgentInflight >= AGENT_LIMIT) {
+          return {
+            id: request.id,
+            ok: false,
+            error: `Agent ${agentId} or global capacity is busy. Global: ${daemonGlobalInflight}/${GLOBAL_LIMIT}, Agent: ${currentAgentInflight}/${AGENT_LIMIT}`,
+            errorDetail: {
+              type: 'busy',
+              retry_after_ms: 1000,
+            },
+          };
+        }
+
+        daemonGlobalInflight++;
+        daemonAgentInflightMap.set(agentId, currentAgentInflight + 1);
+
+        try {
+          const text = await askAgentRuntime(
+            agentId,
+            String(payload.prompt || ''),
+            String(payload.requestedBy || 'supervisor_daemon'),
+            {
+              timeoutMs: typeof payload.timeoutMs === 'number' ? payload.timeoutMs : undefined,
+              correlationId:
+                typeof payload.correlationId === 'string' ? payload.correlationId : undefined,
+              taskModelHint: readTaskModelHint(payload.taskModelHint),
+            }
+          );
+          return {
+            id: request.id,
+            ok: true,
+            result: { text },
+          };
+        } finally {
+          daemonGlobalInflight = Math.max(0, daemonGlobalInflight - 1);
+          daemonAgentInflightMap.set(
+            agentId,
+            Math.max(0, (daemonAgentInflightMap.get(agentId) || 0) - 1)
+          );
+        }
       }
       case 'status': {
         const payload = request.payload || {};
