@@ -1066,6 +1066,7 @@ export {
   getReasoningBackend,
   delegateBestOf,
   delegateStructured,
+  delegateTaskWithUntrustedData,
   registerReasoningBackend,
   resetReasoningBackend,
   stubReasoningBackend,
@@ -1371,6 +1372,7 @@ export type {
   SimulationInput,
   SimulationResult,
   SynthesizedPersona,
+  UntrustedDataParams,
 } from './reasoning-backend.js';
 export {
   A2ATaskContractSchema,
