@@ -229,6 +229,12 @@ function collectTaskSessionEvidenceRefs(session: TaskSession): string[] {
     .filter(Boolean);
 }
 
+function collectTaskSessionEvidenceTexts(session: TaskSession): string[] {
+  return [session.artifact?.preview_text]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean);
+}
+
 function extractServiceNameFromUtterance(trimmed: string): string | undefined {
   const serviceMatch =
     trimmed.match(
@@ -1085,10 +1091,12 @@ export function validateTaskSession(session: unknown): ValidationResult<TaskSess
 export function saveTaskSession(session: TaskSession): string {
   if (session.status === 'completed') {
     const evidenceRefs = collectTaskSessionEvidenceRefs(session);
+    const evidenceTexts = collectTaskSessionEvidenceTexts(session);
     const completionReconciliation = reconcileCompletionStructurally({
       goal: session.goal,
       evidenceRefs,
       artifactRefs: evidenceRefs,
+      evidenceTexts,
       requestedResult: session.outcome_contract.requested_result,
     });
     if (!completionReconciliation.satisfied) {

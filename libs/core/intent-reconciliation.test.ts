@@ -42,4 +42,21 @@ describe('intent reconciliation', () => {
     expect(result.gaps.length).toBeGreaterThan(0);
     expect(result.confidence).toBeLessThan(0.5);
   });
+
+  it('does not satisfy on single-token overlap alone', async () => {
+    const evidencePath = `${tmpDir}/token-overlap.md`;
+    safeMkdir(tmpDir, { recursive: true });
+    safeWriteFile(evidencePath, 'report');
+
+    const result = await reconcileCompletion({
+      goal: {
+        summary: 'Deliver a closeout note',
+        success_condition: 'The report file is saved',
+      },
+      evidenceRefs: [evidencePath],
+    });
+
+    expect(result.satisfied).toBe(false);
+    expect(result.gaps.length).toBeGreaterThan(0);
+  });
 });
