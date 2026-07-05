@@ -1,6 +1,8 @@
 import * as path from 'node:path';
 import {
   buildCompanyVisionRef,
+  summarizeApprovalAuditDrilldown,
+  summarizeApprovalAuditTrail,
   resolveCompany,
   resolveActiveProfileRoot,
   listAgentRuntimeLeaseSummaries,
@@ -13,10 +15,6 @@ import {
   safeReaddir,
 } from '@agent/core';
 import { resolveFinanceControllerDecision } from '../libs/core/finance-controller.js';
-import {
-  summarizeApprovalAuditDrilldown,
-  summarizeApprovalAuditTrail,
-} from '../libs/core/approval-audit.js';
 import chalk from 'chalk';
 import { summarizeBackupStatus } from './backup.js';
 import { readJsonFile, readTextFile } from './refactor/cli-input.js';
