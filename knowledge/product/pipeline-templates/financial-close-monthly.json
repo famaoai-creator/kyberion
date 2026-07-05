@@ -1,0 +1,98 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "financial-close-monthly",
+  "version": "2.0.0",
+  "name": "Financial Close Monthly",
+  "description": "Monthly financial close template for reconciling the financial model, summarizing variance, and producing a close memo for finance_controller review.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes).",
+  "context": {
+    "mission_id": "",
+    "tenant_slug": "",
+    "fiscal_period": "",
+    "preflight_cmd": "pnpm --version",
+    "financial_model_path": "knowledge/confidential/{{tenant_slug}}/financial-model.json",
+    "close_input_path": "active/shared/tmp/financial-close-input-{{mission_id}}.json",
+    "close_memo_path": "active/shared/tmp/financial-close-monthly-{{mission_id}}.md",
+    "close_summary_path": "active/shared/tmp/financial-close-monthly-{{mission_id}}.json"
+  },
+  "steps": [
+    {
+      "id": "preflight",
+      "role": "gate",
+      "op": "core:include",
+      "params": { "fragment": "fragments/runtime-preflight.json" }
+    },
+    {
+      "id": "log_start",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "💹 Financial close monthly start for mission {{mission_id}} period={{fiscal_period}} tenant={{tenant_slug}}"
+      }
+    },
+    {
+      "id": "read_financial_model",
+      "role": "source",
+      "op": "system:read_file",
+      "produces": { "channel": "financial_model", "type": "FinancialModel" },
+      "params": {
+        "path": "{{financial_model_path}}"
+      }
+    },
+    {
+      "id": "read_close_input",
+      "role": "source",
+      "op": "system:read_file",
+      "produces": { "channel": "close_input", "type": "FinancialCloseInput" },
+      "params": {
+        "path": "{{close_input_path}}"
+      }
+    },
+    {
+      "id": "draft_close_memo",
+      "role": "transform",
+      "op": "reasoning:analyze",
+      "consumes": ["financial_model", "close_input"],
+      "produces": { "channel": "close_memo", "type": "FinancialCloseMemo" },
+      "params": {
+        "instruction": "以下の財務モデルと月次 close input をもとに、月次決算メモを Markdown で作成してください。外部決裁前の下書きであり、最終承認は人間が行う前提です。\n\n必須セクション:\n# Monthly Financial Close\n## 期間\n## 主要な差分\n## 予算対比\n## 現金・収益・費用の注記\n## 要確認事項\n## finance_controller への推奨アクション\n\n要件:\n- 事実と推測を分ける\n- 監査や再確認が必要な箇所を明示する\n- 予算超過や未照合の項目があれば先頭で示す",
+        "context": ["{{mission_id}}", "{{fiscal_period}}", "{{financial_model}}", "{{close_input}}"]
+      }
+    },
+    {
+      "id": "write_close_memo",
+      "role": "sink",
+      "op": "system:write_artifact",
+      "consumes": "close_memo",
+      "params": {
+        "path": "{{close_memo_path}}",
+        "content": "{{close_memo}}"
+      }
+    },
+    {
+      "id": "write_close_summary",
+      "role": "sink",
+      "op": "system:write_file",
+      "params": {
+        "path": "{{close_summary_path}}",
+        "content": {
+          "kind": "financial-close-monthly",
+          "mission_id": "{{mission_id}}",
+          "tenant_slug": "{{tenant_slug}}",
+          "fiscal_period": "{{fiscal_period}}",
+          "financial_model_path": "{{financial_model_path}}",
+          "close_memo_path": "{{close_memo_path}}",
+          "status": "draft"
+        }
+      }
+    },
+    {
+      "id": "log_done",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "✅ Financial close monthly complete: {{close_memo_path}}"
+      }
+    }
+  ]
+}

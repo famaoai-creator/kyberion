@@ -48,3 +48,10 @@
 - 財務データは最高機密。confidential tier 厳守、SA-04 の egress で外部漏洩防止、SA-01 の監査。ダミーテナントでテスト。
 - KPI 自動更新は誤った数値を経営判断に流すリスク。自動更新の source を明示し、手動確認/上書きを許す。confidence の低い自動値は「要確認」フラグ。
 - 完全な会計システムを作るのではない(それは会計ソフトの仕事)。ここは「経営判断に必要な財務・KPI の構造化と、Kyberion の判断ループへの接続」に絞る。外部会計ソフト(freee 等)との連携は AC-05 の日本 SaaS 連携に委ねる。
+
+## 実装メモ
+
+- 2026-07-05: `libs/core/financial-model.ts` を追加し、`customer/{slug}/customer.json` の legacy `financials_prev_fy` と confidential 配下の `financial-model.json` を構造化して読めるようにした。
+- 2026-07-05: `knowledge/product/schemas/financial-model.schema.json` を追加し、Company 集約の `financial_ref` から財務 period の要約を参照できるようにした。
+- 2026-07-05: `libs/core/okr-tracker.ts` / `knowledge/product/schemas/okr.schema.json` を追加し、財務・mission・運用メトリクスから OKR/KPI を自動更新できる最小経路を実装した。
+- 2026-07-05: `libs/core/finance-controller.ts` を追加し、財務モデル + OKR + OP-01 のコストレポートから `growth` / `monitor` / `cost_cutting` を決める経営判断フローを実装した。Chronos / sovereign dashboard の Company Context にも finance controller 要約を表示するようにした。

@@ -45,3 +45,10 @@
 - decision-rights の誤設定は「権限過大(勝手に高額決裁)」か「権限過小(些事で毎回エスカレート)」を生む。閾値は保守的に始め、warn 観測(強制せず記録)→ enforce。判断基準の fail-closed(不明は承認へ)を維持。
 - 黄金律のタイブレークは LLM 判断が絡む。決定論的な優先順位比較を第一段にし、曖昧部分のみモデル(HN-01 の tier)。恣意的なタイブレークを避け、根拠を記録。
 - 完全な RACI/コーポレートガバナンスを作るのでなく、「決裁権限のデータ化 + 承認ゲートへの強制統合」に絞る。
+
+## 実装メモ
+
+- 2026-07-05: `knowledge/product/schemas/decision-rights.schema.json` と `knowledge/product/governance/decision-rights.json` を追加し、`libs/core/decision-rights.ts` / `libs/core/company.ts` から Company 集約経由で読めるようにした。Company dashboard でも決裁ポリシー要約を表示する。
+- 2026-07-05: `libs/core/approval-gate.ts` が decision-rights を先に評価し、権限内の操作は即時許可するようにした。`libs/core/vision-resolver.ts` に黄金律優先順位ユーティリティを追加し、approval gate の監査メタデータへも流した。
+- 2026-07-05: `libs/core/approval-audit.ts` を拡張し、決裁種別・相関 ID ごとの drill-down 集計を追加した。Chronos / sovereign dashboard / Company API で approval audit の要約と drill-down を表示するようにした。
+- 2026-07-05: AO-01 の ops-gate 横断統合は引き続き別タスクだが、本計画の「決裁監査の詳細 drill-down」は完了した。

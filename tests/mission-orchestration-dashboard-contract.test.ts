@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import * as path from 'node:path';
 import { safeReadFile } from '@agent/core/secure-io';
 
@@ -12,6 +13,11 @@ function read(relPath: string): string {
 describe('mission orchestration dashboard contract', () => {
   it('shows mission orchestration state in the sovereign dashboard', () => {
     const dashboard = read('scripts/sovereign_dashboard.ts');
+    expect(dashboard).toContain('COMPANY OVERVIEW');
+    expect(dashboard).toContain('resolveCompany');
+    expect(dashboard).toContain('buildCompanyVisionRef');
+    expect(dashboard).toContain('resolveFinanceControllerDecision');
+    expect(dashboard).toContain('summarizeApprovalAuditDrilldown');
     expect(dashboard).toContain('ONBOARDING HOME');
     expect(dashboard).toContain('TENANT CONTEXT');
     expect(dashboard).toContain('CONNECTION REVIEW');
@@ -23,6 +29,34 @@ describe('mission orchestration dashboard contract', () => {
     expect(dashboard).toContain('SURFACE OUTBOX');
     expect(dashboard).toContain('PLAN READY');
     expect(dashboard).toContain('NEXT_TASKS.json');
+  });
+
+  it('renders the company overview section in once mode', () => {
+    const output = execFileSync(
+      'node',
+      [
+        '--import',
+        path.join(rootDir, 'scripts', 'ts-loader.mjs'),
+        path.join(rootDir, 'scripts', 'sovereign_dashboard.ts'),
+        '--once',
+        '--focus',
+        'onboarding',
+      ],
+      {
+        cwd: rootDir,
+        env: {
+          ...process.env,
+          FORCE_COLOR: '0',
+        },
+        encoding: 'utf8',
+      }
+    );
+
+    expect(output).toContain('COMPANY OVERVIEW');
+    expect(output).toContain('Company:');
+    expect(output).toContain('Vision:');
+    expect(output).toContain('OKR:');
+    expect(output).toContain('Approval audit:');
   });
 
   it('shows mission intelligence in Chronos default view', () => {
@@ -48,6 +82,11 @@ describe('mission orchestration dashboard contract', () => {
     expect(page).toContain('runtime-lease-doctor');
     expect(page).toContain('recent-surface-outbox');
     expect(component).toContain('Mission Control');
+    expect(component).toContain('Company Context');
+    expect(component).toContain('OKR');
+    expect(component).toContain('audit');
+    expect(component).toContain('finance controller');
+    expect(component).toContain('audit drilldown');
     expect(component).toContain('control summary');
     expect(component).toContain('requested by');
     expect(component).toContain('Recent Control Actions');
@@ -127,6 +166,13 @@ describe('mission orchestration dashboard contract', () => {
     expect(streamRoute).toContain('retry: 3000');
     expect(route).toContain('controlActionCatalog');
     expect(route).toContain('controlActionAvailability');
+    expect(route).toContain('resolveCompany');
+    expect(route).toContain('buildCompanyVisionRef');
+    expect(route).toContain('company');
+    expect(route).toContain('okr');
+    expect(route).toContain('approvalAudit');
+    expect(route).toContain('approvalAuditDrilldown');
+    expect(route).toContain('financeController');
     expect(route).toContain('approvalRequired');
     expect(route).toContain('disabledReason');
     expect(route).toContain('Mission is already active.');
@@ -161,6 +207,8 @@ describe('mission orchestration dashboard contract', () => {
     expect(route).toContain('restart_runtime_lease');
     expect(route).toContain('collectControlActionCatalog');
     expect(route).toContain('collectControlActionAvailability');
+    expect(route).toContain('resolveFinanceControllerDecision');
+    expect(route).toContain('summarizeApprovalAuditDrilldown');
     expect(agentRoute).toContain('RUN_PIPELINE_PATTERN');
     expect(agentRoute).toContain('dist/scripts/run_pipeline.js');
     expect(agentRoute).toContain('prereq-check');
