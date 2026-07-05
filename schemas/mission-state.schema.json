@@ -36,10 +36,67 @@
       "additionalProperties": true
     },
     "vision_ref": { "type": "string" },
+    "outcome_contract": {
+      "type": "object",
+      "required": [
+        "outcome_id",
+        "requested_result",
+        "deliverable_kind",
+        "success_criteria",
+        "evidence_required",
+        "expected_artifacts",
+        "verification_method"
+      ],
+      "properties": {
+        "outcome_id": { "type": "string" },
+        "requested_result": { "type": "string" },
+        "deliverable_kind": { "type": "string" },
+        "success_criteria": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "evidence_required": { "type": "boolean" },
+        "expected_artifacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "kind": { "type": "string" },
+              "storage_class": { "type": "string" }
+            },
+            "required": ["kind", "storage_class"],
+            "additionalProperties": true
+          }
+        },
+        "verification_method": { "type": "string" },
+        "vision_ref": {
+          "type": "object",
+          "required": ["raw", "kind", "tenant_slug", "path", "query"],
+          "properties": {
+            "raw": { "type": "string" },
+            "kind": { "type": "string" },
+            "tenant_slug": { "type": ["string", "null"] },
+            "path": { "type": ["string", "null"] },
+            "query": { "type": ["string", "null"] }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": true
+    },
     "tier": { "type": "string", "enum": ["personal", "confidential", "public"] },
     "status": {
       "type": "string",
-      "enum": ["planned", "active", "validating", "distilling", "completed", "paused", "failed", "archived"]
+      "enum": [
+        "planned",
+        "active",
+        "validating",
+        "distilling",
+        "completed",
+        "paused",
+        "failed",
+        "archived"
+      ]
     },
     "execution_mode": { "type": "string", "enum": ["local", "delegated"] },
     "priority": { "type": "number" },

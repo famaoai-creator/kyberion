@@ -1,5 +1,13 @@
 export type OutcomeVerificationMethod = 'self_check' | 'review_gate' | 'human_acceptance' | 'test';
 
+export interface VisionRefSummary {
+  raw: string;
+  kind: 'company' | 'vision' | 'legacy';
+  tenant_slug: string | null;
+  path: string | null;
+  query: string | null;
+}
+
 export interface OutcomeContract {
   outcome_id: string;
   requested_result: string;
@@ -8,6 +16,7 @@ export interface OutcomeContract {
   evidence_required: boolean;
   expected_artifacts: Array<{ kind: string; storage_class: string }>;
   verification_method: OutcomeVerificationMethod;
+  vision_ref?: VisionRefSummary | null;
 }
 
 export interface OutcomeCompletionInput {
@@ -22,6 +31,8 @@ export function createOutcomeContract(input: {
   evidenceRequired?: boolean;
   expectedArtifacts?: Array<{ kind: string; storage_class: string }>;
   verificationMethod?: OutcomeVerificationMethod;
+  visionRef?: string | VisionRefSummary | null;
+  tenantSlug?: string | null;
 }): OutcomeContract {
   const successCriteria = (input.successCriteria || [])
     .map((item) => String(item || '').trim())
@@ -29,6 +40,10 @@ export function createOutcomeContract(input: {
   const expectedArtifacts = (input.expectedArtifacts || [])
     .filter((item) => item && item.kind && item.storage_class)
     .map((item) => ({ kind: item.kind, storage_class: item.storage_class }));
+  const vision_ref =
+    typeof input.visionRef === 'string'
+      ? parseVisionRef(input.visionRef, input.tenantSlug ?? null)
+      : input.visionRef || null;
 
   return {
     outcome_id: input.outcomeId || `outcome_${Date.now().toString(36)}`,
@@ -38,6 +53,50 @@ export function createOutcomeContract(input: {
     evidence_required: Boolean(input.evidenceRequired),
     expected_artifacts: expectedArtifacts,
     verification_method: input.verificationMethod || 'self_check',
+    ...(vision_ref ? { vision_ref } : {}),
+  };
+}
+
+function parseVisionRef(input: string, tenantSlug?: string | null): VisionRefSummary {
+  const raw = String(input || '').trim();
+  if (!raw) {
+    return {
+      raw: '',
+      kind: 'legacy',
+      tenant_slug: tenantSlug?.trim() || null,
+      path: null,
+      query: null,
+    };
+  }
+  if (raw.startsWith('company://')) {
+    const remainder = raw.slice('company://'.length);
+    const [pathPart, queryPart] = remainder.split('?', 2);
+    const [parsedTenantSlug, ...segments] = pathPart.split('/').filter(Boolean);
+    return {
+      raw,
+      kind: 'company',
+      tenant_slug: parsedTenantSlug || tenantSlug?.trim() || null,
+      path: segments.length ? segments.join('/') : 'vision',
+      query: queryPart || null,
+    };
+  }
+  if (raw.startsWith('vision://')) {
+    const remainder = raw.slice('vision://'.length);
+    const [pathPart, queryPart] = remainder.split('?', 2);
+    return {
+      raw,
+      kind: 'vision',
+      tenant_slug: tenantSlug?.trim() || null,
+      path: pathPart || null,
+      query: queryPart || null,
+    };
+  }
+  return {
+    raw,
+    kind: 'legacy',
+    tenant_slug: tenantSlug?.trim() || null,
+    path: null,
+    query: null,
   };
 }
 
@@ -129,5 +188,6 @@ export function inferMissionOutcomeContract(input: {
     evidenceRequired: false,
     expectedArtifacts: [],
     verificationMethod: 'review_gate',
+    visionRef: input.visionRef,
   });
 }

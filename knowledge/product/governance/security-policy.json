@@ -33,17 +33,13 @@
       "weekly": "active/personal/weekly/<YYYY>-W<WW>.md",
       "adhoc_ttl": "active/shared/runtime/ttl/"
     },
-    "personal_tier_paths": [
-      "active/personal/"
-    ],
+    "personal_tier_paths": ["active/personal/"],
     "sidecar_pattern": "*.volatile.json",
     "schema_ref": "schemas/volatile-knowledge.schema.json"
   },
   "tenant_scope": {
     "slug_pattern": "^[a-z][a-z0-9-]{1,30}$",
-    "protected_prefixes": [
-      "knowledge/confidential/"
-    ],
+    "protected_prefixes": ["knowledge/confidential/"],
     "shared_prefixes": [
       "knowledge/confidential/tenant-groups/",
       "knowledge/confidential/heuristics/",
@@ -190,7 +186,12 @@
     },
     "analyst": {
       "allow_read": ["knowledge/", "active/audit/"],
-      "allow_write": ["active/shared/tmp/", "knowledge/product/evolution/", "active/audit/", "active/shared/logs/"]
+      "allow_write": [
+        "active/shared/tmp/",
+        "knowledge/product/evolution/",
+        "active/audit/",
+        "active/shared/logs/"
+      ]
     }
   },
   "authority_role_permissions": {
@@ -224,17 +225,11 @@
       ]
     },
     "knowledge_steward": {
-      "allow_read": [
-        "customer/"
-      ],
-      "allow_write": [
-        "customer/"
-      ]
+      "allow_read": ["customer/"],
+      "allow_write": ["customer/"]
     },
     "run_pipeline": {
-      "allow_read": [
-        "knowledge/personal/voice/profile-registry.json"
-      ],
+      "allow_read": ["knowledge/personal/voice/profile-registry.json"],
       "allow_write": [
         "active/shared/tmp/",
         "active/shared/logs/traces/",
@@ -283,23 +278,31 @@
         "active/shared/logs/surfaces/",
         "knowledge/product/governance/surfaces/"
       ],
-      "allow_write": [
-        "active/shared/runtime/",
-        "active/shared/logs/surfaces/",
-        "active/audit/"
-      ]
+      "allow_write": ["active/shared/runtime/", "active/shared/logs/surfaces/", "active/audit/"]
     },
     "software_developer": {
-      "allow_read": [
-        "active/projects/",
-        "tests/",
-        "libs/actuators/"
-      ],
-      "allow_write": [
-        "active/projects/",
-        "tests/",
-        "libs/actuators/"
-      ]
+      "allow_read": ["active/projects/", "tests/", "libs/actuators/"],
+      "allow_write": ["active/projects/", "tests/", "libs/actuators/"]
+    },
+    "finance_controller": {
+      "allow_read": ["knowledge/product/governance/finance/", "active/shared/tmp/"],
+      "allow_write": ["knowledge/product/governance/finance/", "active/shared/tmp/"]
+    },
+    "strategic_sales": {
+      "allow_read": ["active/projects/proposals/", "active/shared/tmp/"],
+      "allow_write": ["active/projects/proposals/", "active/shared/tmp/"]
+    },
+    "marketing_growth": {
+      "allow_read": ["active/projects/marketing/", "active/shared/tmp/"],
+      "allow_write": ["active/projects/marketing/", "active/shared/tmp/"]
+    },
+    "talent_culture": {
+      "allow_read": ["active/projects/people/", "active/shared/tmp/"],
+      "allow_write": ["active/projects/people/", "active/shared/tmp/"]
+    },
+    "line_manager": {
+      "allow_read": ["active/projects/people/", "active/shared/tmp/"],
+      "allow_write": ["active/projects/people/", "active/shared/tmp/"]
     },
     "system_configurator": {
       "allow_read": [
@@ -320,23 +323,12 @@
       ]
     },
     "ruthless_auditor": {
-      "allow_read": [
-        "active/audit/",
-        "customer/"
-      ],
-      "allow_write": [
-        "active/audit/"
-      ]
+      "allow_read": ["active/audit/", "customer/"],
+      "allow_write": ["active/audit/"]
     },
     "cyber_security": {
-      "allow_read": [
-        "active/audit/security/",
-        "knowledge/security/"
-      ],
-      "allow_write": [
-        "active/audit/security/",
-        "knowledge/security/"
-      ]
+      "allow_read": ["active/audit/security/", "knowledge/security/"],
+      "allow_write": ["active/audit/security/", "knowledge/security/"]
     },
     "infrastructure_sentinel": {
       "allow_read": [
@@ -391,10 +383,7 @@
       ]
     },
     "chronos_operator": {
-      "allow_read": [
-        "active/shared/observability/",
-        "active/shared/runtime/"
-      ],
+      "allow_read": ["active/shared/observability/", "active/shared/runtime/"],
       "allow_write": []
     },
     "chronos_localadmin": {
@@ -499,11 +488,7 @@
       ]
     },
     "SECRET_READ": {
-      "allow_read": [
-        "vault/",
-        "knowledge/personal/connections/",
-        "active/shared/auth-grants.json"
-      ]
+      "allow_read": ["vault/", "knowledge/personal/connections/", "active/shared/auth-grants.json"]
     },
     "NETWORK_FETCH": {
       "allow_read": ["knowledge/product/orchestration/"]

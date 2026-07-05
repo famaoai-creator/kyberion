@@ -5,6 +5,7 @@
 
 import { logger, auditChain, resolveIntentTrackGate, saveProjectTrackRecord } from '@agent/core';
 import { getOptionValue, parseCsvOption } from './mission-cli-args.js';
+import { parseMissionVisionRef } from './mission-creation.js';
 import type { MissionRelationships } from './mission-types.js';
 
 type Awaitable<T> = T | Promise<T>;
@@ -175,6 +176,21 @@ function parseRoutingDecision(raw?: string): Record<string, unknown> | null {
   }
 }
 
+function buildVisionRefRoutingSummary(
+  visionRef: string | undefined,
+  tenantSlug: string | undefined
+): Record<string, unknown> | null {
+  const parsed = parseMissionVisionRef(visionRef, tenantSlug);
+  if (!parsed) return null;
+  return {
+    raw: parsed.raw,
+    kind: parsed.kind,
+    tenant_slug: parsed.tenant_slug,
+    path: parsed.path,
+    query: parsed.query,
+  };
+}
+
 function parseIntentConfidence(value?: string): number {
   if (!value) throw new Error('--intent-confidence is required when --intent-id is provided');
   const confidence = Number(value);
@@ -290,7 +306,14 @@ export async function runMissionControllerAction(
       let createInput = context.validateMissionStartCreateInput('create', arg1, context.argv);
       const intentTrack = await applyIntentTrackGate(context, createInput, arg1);
       createInput = intentTrack.input;
-      const routingDecision = parseRoutingDecision(createInput?.routingDecision);
+      const visionRefSummary = buildVisionRefRoutingSummary(
+        createInput?.visionRef,
+        createInput?.tenantSlug || createInput?.tenantId
+      );
+      const routingDecision = {
+        ...(parseRoutingDecision(createInput?.routingDecision) || {}),
+        ...(visionRefSummary ? { vision_ref_summary: visionRefSummary } : {}),
+      };
       if (hasDryRun) {
         console.log(
           JSON.stringify(
@@ -323,7 +346,7 @@ export async function runMissionControllerAction(
       );
       persistIntentTrackGate(intentTrack.intentTrackGate);
       await syncRoutingDecisionSummary(context, arg1!, routingDecision, 'CREATE');
-      if (routingDecision) {
+      if (Object.keys(routingDecision).length > 0) {
         auditChain.record({
           agentId: process.env.KYBERION_PERSONA || 'mission_controller',
           action: 'mission.routing_decision_recorded',
@@ -341,7 +364,14 @@ export async function runMissionControllerAction(
       let input = context.validateMissionStartCreateInput('start', arg1, context.argv);
       const intentTrack = await applyIntentTrackGate(context, input, arg1);
       input = intentTrack.input;
-      const routingDecision = parseRoutingDecision(input?.routingDecision);
+      const visionRefSummary = buildVisionRefRoutingSummary(
+        input?.visionRef,
+        input?.tenantSlug || input?.tenantId
+      );
+      const routingDecision = {
+        ...(parseRoutingDecision(input?.routingDecision) || {}),
+        ...(visionRefSummary ? { vision_ref_summary: visionRefSummary } : {}),
+      };
       if (hasDryRun) {
         console.log(
           JSON.stringify(
@@ -371,7 +401,7 @@ export async function runMissionControllerAction(
       );
       persistIntentTrackGate(intentTrack.intentTrackGate);
       await syncRoutingDecisionSummary(context, arg1!, routingDecision, 'START');
-      if (routingDecision) {
+      if (Object.keys(routingDecision).length > 0) {
         auditChain.record({
           agentId: process.env.KYBERION_PERSONA || 'mission_controller',
           action: 'mission.routing_decision_recorded',
