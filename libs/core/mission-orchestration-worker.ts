@@ -261,6 +261,11 @@ function validatePlannedNextTasks(rawTasks: unknown, missionId: string): Planned
           `Invalid NEXT_TASKS.json for ${missionId}: reviewer task ${taskId} is missing review_target`
         );
       }
+      if (!dependencies.includes(reviewTarget)) {
+        throw new Error(
+          `Invalid NEXT_TASKS.json for ${missionId}: reviewer task ${taskId} must depend on review_target ${reviewTarget}`
+        );
+      }
       const expectedDeliverable = `REVIEW-${reviewTarget}.md`;
       if (!deliverable || nodePath.basename(deliverable) !== expectedDeliverable) {
         throw new Error(

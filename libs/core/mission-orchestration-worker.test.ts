@@ -1717,6 +1717,65 @@ describe('mission-orchestration-worker', () => {
     expect(mocks.route).not.toHaveBeenCalled();
   });
 
+  it('rejects reviewer tasks that do not depend on their review target', async () => {
+    const { missionDir } = await import('./path-resolver.js');
+    const { safeWriteFile } = await import('./secure-io.js');
+    const { dispatchMissionNextTasks } = await import('./mission-orchestration-worker.js');
+
+    const missionPath = missionDir('MSN-FOLLOWUP', 'public');
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify(
+        [
+          {
+            task_id: 'task-review',
+            status: 'planned',
+            assigned_to: { role: 'reviewer', agent_id: 'implementation-architect' },
+            description: 'Review the implementation',
+            deliverable: 'deliverables/REVIEW-task-target.md',
+            dependencies: ['task-base'],
+            review_target: 'task-target',
+          },
+          {
+            task_id: 'task-base',
+            status: 'completed',
+            assigned_to: { role: 'implementer', agent_id: 'implementation-architect' },
+            description: 'Base implementation',
+            deliverable: 'deliverables/task-a.md',
+          },
+          {
+            task_id: 'task-target',
+            status: 'completed',
+            assigned_to: { role: 'implementer', agent_id: 'implementation-architect' },
+            description: 'Target implementation',
+            deliverable: 'deliverables/task-target.md',
+          },
+        ],
+        null,
+        2
+      )
+    );
+    safeWriteFile(
+      `${missionPath}/TASK_BOARD.md`,
+      [
+        '# TASK_BOARD: MSN-FOLLOWUP',
+        '',
+        '## Status: Planning Ready',
+        '',
+        '### 🛠️ Execution Phase',
+        '- [x] Step 1: Research and Strategy',
+        '- [ ] Step 2: Implementation',
+        '- [ ] Step 3: Validation',
+        '',
+      ].join('\n')
+    );
+
+    await expect(dispatchMissionNextTasks('MSN-FOLLOWUP')).rejects.toThrow(
+      /reviewer task task-review must depend on review_target task-target/
+    );
+    expect(mocks.route).not.toHaveBeenCalled();
+  });
+
   it('keeps the final task state equivalent between serial and parallel dispatch', async () => {
     const { missionDir } = await import('./path-resolver.js');
     const { safeWriteFile, safeReadFile } = await import('./secure-io.js');
