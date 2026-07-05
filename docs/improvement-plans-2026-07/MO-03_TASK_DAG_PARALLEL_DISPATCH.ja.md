@@ -55,6 +55,6 @@
 
 ### Task 2 slice — 2026-07-04
 
-- `dispatchMissionNextTasks` は ready 集合を `max_parallel_members` で打ち切り、task_id 昇順で同時発行するように切り替えた。
-- `libs/core/mission-orchestration-worker.test.ts` に依存チェーンのディスパッチ/保留を固定するテストを追加した。
+- `dispatchMissionNextTasks` は ready 集合を `max_parallel_members` で打ち切り、wave ごとに依存解決済みタスクを再計算して次の ready を同一呼び出しで流すように切り替えた。
+- `libs/core/mission-orchestration-worker.test.ts` に依存チェーンの同一呼び出し内ディスパッチと、serial / parallel で最終状態が一致することを固定するテストを追加した。
 - `libs/core/mission-orchestration-worker.test.ts` に、並列 cap 内での task_id 順序と同時 route 発行を固定するテストを追加した。
