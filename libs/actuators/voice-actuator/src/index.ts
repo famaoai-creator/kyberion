@@ -124,6 +124,25 @@ export async function handleSingleAction(input: VoiceAction) {
     const payload = (input as any).params
       ? { action: 'record_voice_sample', ...((input as any).params || {}) }
       : input;
+    if ((payload as any).dry_run) {
+      const requestId = String((payload as any).request_id || '');
+      const sampleId = String((payload as any).sample_id || 'sample');
+      const outputPath = String(
+        (payload as any).output_path ||
+          pathResolver.sharedTmp(`voice-sample-recording/${requestId}/${sampleId}.wav`)
+      );
+      return {
+        status: 'succeeded',
+        action: 'record_voice_sample',
+        request_id: requestId,
+        sample_id: sampleId,
+        output_path: outputPath,
+        prompt_path: `${outputPath}.prompt.txt`,
+        duration_sec: Number((payload as any).duration_sec || 0),
+        backend: 'dry_run',
+        dry_run: true,
+      };
+    }
     return recordVoiceSample(payload as any);
   }
   if (input.action === 'collect_voice_samples') {
@@ -261,7 +280,47 @@ async function collectAndRegisterVoiceProfile(input: {
   };
   samples: Array<{ sample_id: string; path: string; language?: string; note?: string }>;
   policy?: { strict_personal_voice?: boolean; allow_update?: boolean };
+  dry_run?: boolean;
 }): Promise<any> {
+  if (input.dry_run) {
+    const collectionDir = pathResolver.sharedTmp(`voice-sample-collection/${input.request_id}`);
+    return {
+      status: 'succeeded',
+      action: 'collect_and_register_voice_profile',
+      request_id: input.request_id,
+      dry_run: true,
+      collection: {
+        status: 'dry_run',
+        request_id: input.request_id,
+        collection_manifest_path: path.join(collectionDir, 'collection-manifest.json'),
+        collection_dir: collectionDir,
+        staged_samples: [],
+        summary: {
+          sample_count: 0,
+          total_sample_bytes: 0,
+          collection_dir: collectionDir,
+        },
+        registration_candidate: {
+          action: 'register_voice_profile',
+          request_id: input.request_id,
+          profile: input.profile,
+          samples: [],
+        },
+      },
+      registration: {
+        status: 'dry_run',
+        action: 'register_voice_profile',
+        request_id: input.request_id,
+        profile_id: input.profile.profile_id,
+        sample_refs: [],
+        summary: {
+          sample_count: 0,
+          total_sample_bytes: 0,
+          strict_personal_voice: Boolean(input.policy?.strict_personal_voice),
+        },
+      },
+    };
+  }
   const collected = collectVoiceSamples({
     action: 'collect_voice_samples',
     request_id: input.request_id,
@@ -425,6 +484,30 @@ async function speakLocal(params: Record<string, unknown>): Promise<any> {
 }
 
 async function generateVoice(input: Record<string, any>): Promise<any> {
+  if (input.dry_run) {
+    const jobId = String(input.request_id || randomUUID());
+    const artifactPath = String(
+      input.delivery?.artifact_path || pathResolver.sharedTmp(`voice-out/${jobId}/generated.wav`)
+    );
+    return {
+      status: 'succeeded',
+      request_id: jobId,
+      profile_id: String(input.profile_ref?.profile_id || 'dry-run-profile'),
+      language: String(input.rendering?.language || 'ja').toLowerCase(),
+      engine_id: String(input.engine?.engine_id || 'dry_run'),
+      resolved_engine_id: String(input.engine?.engine_id || 'dry_run'),
+      backend_id: 'dry_run',
+      backend_kind: 'dry_run',
+      backend_provider: 'dry_run',
+      chunks: 0,
+      progress_packets: [],
+      artifact_refs: [artifactPath],
+      speaker_verification: [],
+      delivery_mode: String(input.delivery?.mode || 'artifact'),
+      format: String(input.delivery?.format || 'wav'),
+      dry_run: true,
+    };
+  }
   const profile = getVoiceProfileRecord(input.profile_ref?.profile_id);
   const policy = getVoiceRuntimePolicy();
   const jobId = String(input.request_id || randomUUID());

@@ -1466,6 +1466,7 @@ async function selectMissionWorkflow(
     riskProfile: classification.risk_profile,
     stage: classification.stage,
     executionShape: 'mission',
+    missionTypeHint: state.mission_type,
     intentId,
     taskType,
   });

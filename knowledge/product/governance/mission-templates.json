@@ -13,6 +13,23 @@
           "content_template": "# TASK_BOARD: {MISSION_ID}\n\n## 🛡️ Governance Pre-flight\n- [ ] Branch: `{BRANCH}` (Should not be main/master)\n- [ ] Initial Hash: `{HASH}`\n- [ ] Checkpoint: Initial state recorded\n\n## Vision Context\n- Tenant: {TENANT_ID}\n- Vision: {VISION_REF}\n\n## Status: Planned\n\n### 🛠️ Execution Phase\n- [ ] Step 1: Research and Strategy\n- [ ] Step 2: Implementation\n- [ ] Step 3: Validation\n\n### 🧠 Distillation & Reflex Phase\n- [ ] Step 4: Knowledge Distillation\n- [ ] Step 5: Mission Logic\n- [ ] Step 6: Final Cleanup\n"
         }
       ]
+    },
+    {
+      "name": "meeting_facilitation",
+      "files": [
+        {
+          "path": "mission-state.json",
+          "content_template": "{\n  \"mission_id\": \"{MISSION_ID}\",\n  \"type\": \"{TYPE}\",\n  \"version\": \"1.1\",\n  \"status\": \"planned\",\n  \"priority\": 5,\n  \"owner\": \"{OWNER}\",\n  \"tenant_id\": \"{TENANT_ID}\",\n  \"vision_ref\": \"{VISION_REF}\",\n  \"assigned_persona\": \"{PERSONA}\",\n  \"relationships\": {\n    \"project\": {\n      \"relationship_type\": \"independent\",\n      \"affected_artifacts\": [],\n      \"gate_impact\": \"none\",\n      \"traceability_refs\": []\n    }\n  },\n  \"git\": {\n    \"branch\": \"{BRANCH}\",\n    \"initial_hash\": \"{HASH}\",\n    \"checkpoints\": []\n  },\n  \"milestones\": [\n    { \"id\": \"M1\", \"title\": \"Initialization\", \"status\": \"completed\", \"completed_at\": \"{NOW}\" },\n    { \"id\": \"M2\", \"title\": \"Implementation\", \"status\": \"pending\" },\n    { \"id\": \"M3\", \"title\": \"Validation\", \"status\": \"pending\" }\n  ],\n  \"context\": { \"associated_projects\": [] },\n  \"history\": [\n    { \"ts\": \"{NOW}\", \"event\": \"CREATED\", \"note\": \"Mission created for tenant: {TENANT_ID}\" }\n  ]\n}"
+        },
+        {
+          "path": "TASK_BOARD.md",
+          "content_template": "# TASK_BOARD: {MISSION_ID}\n\n## 🛡️ Governance Pre-flight\n- [ ] Branch: `{BRANCH}` (Should not be main/master)\n- [ ] Initial Hash: `{HASH}`\n- [ ] Checkpoint: Initial state recorded\n\n## Vision Context\n- Tenant: {TENANT_ID}\n- Vision: {VISION_REF}\n\n## Status: Planned\n\n### 🛠️ Execution Phase\n- [ ] agenda_and_role_boundary\n- [ ] live_facilitation\n- [ ] postprocess\n- [ ] self_execution\n- [ ] team_tracking\n- [ ] delivery\n\n### 📦 PLAN Inputs and Outputs\n- Inputs: meeting URL, participants, agenda\n- Outputs: `minutes.md`, `action-items.jsonl`, delivery pack\n\n### 🧠 Distillation & Reflex Phase\n- [ ] Step 4: Knowledge Distillation\n- [ ] Step 5: Mission Logic\n- [ ] Step 6: Final Cleanup\n"
+        },
+        {
+          "path": "PLAN.md",
+          "content_template": "# PLAN: {MISSION_ID}\n\n## Meeting Brief\n- Meeting URL: capture the live meeting link before execution.\n- Participants: record the attendee list and role boundary.\n- Agenda: list the agenda items that will be facilitated.\n\n## Expected Outputs\n- `minutes.md`: concise meeting summary with decisions and open questions.\n- `action-items.jsonl`: structured follow-up items for ownership and tracking.\n- Delivery pack: the compiled artifacts needed for downstream handoff.\n\n## Execution Notes\n- Keep the flow aligned to the meeting facilitator workflow.\n- Preserve the live facilitation boundary before self-execution and team tracking.\n"
+        }
+      ]
     }
   ]
 }
