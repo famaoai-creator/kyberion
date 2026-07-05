@@ -1,0 +1,86 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "board-meeting-prep",
+  "version": "2.0.0",
+  "name": "Board Meeting Prep",
+  "description": "Board meeting preparation template that compiles decision-rights, OKR, and financial context into a draft board pack.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes).",
+  "context": {
+    "mission_id": "",
+    "tenant_slug": "",
+    "preflight_cmd": "pnpm --version",
+    "company_context_path": "active/shared/tmp/company-context-{{mission_id}}.json",
+    "board_pack_path": "active/shared/tmp/board-meeting-prep-{{mission_id}}.md",
+    "board_summary_path": "active/shared/tmp/board-meeting-prep-{{mission_id}}.json"
+  },
+  "steps": [
+    {
+      "id": "preflight",
+      "role": "gate",
+      "op": "core:include",
+      "params": { "fragment": "fragments/runtime-preflight.json" }
+    },
+    {
+      "id": "log_start",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "🏛️ Board meeting prep start for mission {{mission_id}} tenant={{tenant_slug}}"
+      }
+    },
+    {
+      "id": "read_company_context",
+      "role": "source",
+      "op": "system:read_file",
+      "produces": { "channel": "company_context", "type": "CompanyContext" },
+      "params": {
+        "path": "{{company_context_path}}"
+      }
+    },
+    {
+      "id": "draft_board_pack",
+      "role": "transform",
+      "op": "reasoning:analyze",
+      "consumes": "company_context",
+      "produces": { "channel": "board_pack", "type": "BoardPackMarkdown" },
+      "params": {
+        "instruction": "以下の company context をもとに、取締役会用の事前資料ドラフトを Markdown で作成してください。経営会議向けの下書きとして、意思決定の論点を明確にしてください。\n\n必須セクション:\n# Board Meeting Prep\n## 目的\n## 会社サマリ\n## 財務・KPI・OKR の要点\n## 決裁権限・エスカレーション論点\n## 取締役会で確認すべき質問\n## 事前配布向けの要約\n\n要件:\n- 事実と推測を分ける\n- decision-rights と approval audit がある場合は必ず参照する\n- 曖昧な点は質問として列挙する",
+        "context": ["{{mission_id}}", "{{tenant_slug}}", "{{company_context}}"]
+      }
+    },
+    {
+      "id": "write_board_pack",
+      "role": "sink",
+      "op": "system:write_artifact",
+      "consumes": "board_pack",
+      "params": {
+        "path": "{{board_pack_path}}",
+        "content": "{{board_pack}}"
+      }
+    },
+    {
+      "id": "write_board_summary",
+      "role": "sink",
+      "op": "system:write_file",
+      "params": {
+        "path": "{{board_summary_path}}",
+        "content": {
+          "kind": "board-meeting-prep",
+          "mission_id": "{{mission_id}}",
+          "tenant_slug": "{{tenant_slug}}",
+          "company_context_path": "{{company_context_path}}",
+          "board_pack_path": "{{board_pack_path}}",
+          "status": "draft"
+        }
+      }
+    },
+    {
+      "id": "log_done",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "✅ Board meeting prep complete: {{board_pack_path}}"
+      }
+    }
+  ]
+}

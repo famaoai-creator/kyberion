@@ -34,6 +34,147 @@ interface MissionSummary {
   controlRequestedBy?: string;
 }
 
+interface CompanySnapshot {
+  companyId: string;
+  tenantSlug: string;
+  name: string;
+  sovereign: string | null;
+  visionRef: string;
+  vision: {
+    sourceKind: 'customer' | 'tenant' | 'global';
+    sourcePath: string;
+    title: string | null;
+    soul: string[];
+    steering: string[];
+    destination: string[];
+  };
+  organizationProfile: {
+    exists: boolean;
+    path: string;
+    name: string | null;
+  };
+  orgChart: {
+    exists: boolean;
+    path: string;
+    domainCount: number;
+    positionCount: number;
+    topLevelRoles: string[];
+  };
+  financial: {
+    exists: boolean;
+    path: string;
+    sourceKind: string | null;
+    periodCount: number;
+    latestPeriodId: string | null;
+    latestRevenueJpy: number | null;
+    latestOperatingCostJpy: number | null;
+    latestGrossProfitJpy: number | null;
+  };
+  financeController: {
+    mode: 'growth' | 'monitor' | 'cost_cutting';
+    shouldCutCosts: boolean;
+    reasons: string[];
+    signals: {
+      revenueJpy: number | null;
+      operatingCostJpy: number | null;
+      grossProfitJpy: number | null;
+      budgetJpy: number | null;
+      budgetUtilization: number | null;
+      okrProgressPercent: number | null;
+      costReportTotalUsd: number | null;
+      costReportTotalTokens: number | null;
+    };
+    thresholds: {
+      budgetUtilizationWarning: number;
+      budgetUtilizationCritical: number;
+      negativeGrossProfitBudgetMode: boolean;
+      lowOkrProgressWarning: number;
+      lowOkrProgressCritical: number;
+      highTokenUsageWarning: number;
+      highTokenUsageCritical: number;
+    };
+    sources: {
+      financialPath: string;
+      okrPath: string;
+      costReportPath: string | null;
+    };
+  };
+  okr: {
+    exists: boolean;
+    path: string;
+    sourceKind: string | null;
+    objectiveCount: number;
+    keyResultCount: number;
+    progressPercent: number;
+    latestObjective: string | null;
+  };
+  approvalAudit: {
+    total: number;
+    allowed: number;
+    denied: number;
+    pending: number;
+    recentCount: number;
+    latestCorrelationId: string | null;
+  };
+  approvalAuditDrilldown: {
+    total: number;
+    allowed: number;
+    denied: number;
+    pending: number;
+    recent: Array<{
+      id: string;
+      timestamp: string;
+      agentId: string;
+      operation: string;
+      result: string;
+      reason: string | null;
+      correlationId: string | null;
+      intentId: string | null;
+      decisionType: string | null;
+      decisionRightsSource: string | null;
+    }>;
+    byDecisionType: Array<{
+      decisionType: string;
+      total: number;
+      allowed: number;
+      denied: number;
+      pending: number;
+      latestCorrelationId: string | null;
+      latestTimestamp: string | null;
+    }>;
+    byCorrelationId: Array<{
+      correlationId: string;
+      total: number;
+      allowed: number;
+      denied: number;
+      pending: number;
+      decisionTypes: string[];
+      latestDecisionType: string | null;
+      latestOperation: string | null;
+      latestTimestamp: string | null;
+      recent: Array<{
+        id: string;
+        timestamp: string;
+        agentId: string;
+        operation: string;
+        result: string;
+        reason: string | null;
+        correlationId: string | null;
+        intentId: string | null;
+        decisionType: string | null;
+        decisionRightsSource: string | null;
+      }>;
+    }>;
+  };
+  decisionRights: {
+    exists: boolean;
+    path: string;
+    sourceKind: string | null;
+    ruleCount: number;
+    decisionTypes: string[];
+  };
+}
+
 const MISSION_INTELLIGENCE_PREFS_KEY = 'chronos.mission-intelligence.prefs';
 
 function loadMissionIntelligenceSelectedMissionId(): string | null {
@@ -911,6 +1052,7 @@ function formatWorkCoordinationAttemptLabel(item: WorkCoordinationItemSummary): 
 
 interface IntelligencePayload {
   accessRole: 'readonly' | 'localadmin';
+  company?: CompanySnapshot;
   activeMissions: MissionSummary[];
   projects: ProjectRecordSummary[];
   projectTracks: ProjectTrackRecordSummary[];
@@ -2342,6 +2484,114 @@ export function MissionIntelligence({
               )
             : mt('chronos_control_actions_enabled', ' · control actions enabled.')}
         </div>
+        {data.company && (
+          <div className="mt-3 rounded-xl border border-cyan-300/12 bg-cyan-400/[0.06] px-3 py-3 text-[11px] text-cyan-100/80">
+            <div className="text-[10px] uppercase tracking-[0.24em] text-cyan-100/50">
+              Company Context
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-white/82">
+              <span className="font-semibold text-white/92">{data.company.name}</span>
+              <span className="text-white/35">·</span>
+              <span className="font-mono text-white/68">{data.company.companyId}</span>
+              <span className="text-white/35">·</span>
+              <span className="text-white/70">sovereign {data.company.sovereign || 'unknown'}</span>
+            </div>
+            <div className="mt-2 text-[11px] leading-5 text-white/72">
+              vision <span className="font-mono text-white/86">{data.company.visionRef}</span>
+              <span className="mx-2 text-white/35">·</span>
+              <span>{data.company.vision.title || data.company.vision.sourcePath}</span>
+            </div>
+            <div className="mt-2 text-[11px] leading-5 text-white/70">
+              org chart {data.company.orgChart.positionCount} positions /{' '}
+              {data.company.orgChart.domainCount} domains
+              {data.company.orgChart.topLevelRoles.length > 0 ? (
+                <>
+                  <span className="mx-2 text-white/35">·</span>
+                  top roles {data.company.orgChart.topLevelRoles.join(', ')}
+                </>
+              ) : null}
+            </div>
+            <div className="mt-2 text-[11px] leading-5 text-white/68">
+              decision rights {data.company.decisionRights.ruleCount} rules
+              {data.company.decisionRights.sourceKind ? (
+                <>
+                  <span className="mx-2 text-white/35">·</span>
+                  {data.company.decisionRights.sourceKind}
+                </>
+              ) : null}
+              <span className="mx-2 text-white/35">·</span>
+              financial {data.company.financial.exists ? 'available' : 'missing'}
+              {data.company.financial.exists ? (
+                <>
+                  <span className="mx-2 text-white/35">·</span>
+                  {data.company.financial.periodCount} period
+                  {data.company.financial.periodCount === 1 ? '' : 's'}
+                  {data.company.financial.latestPeriodId ? (
+                    <>
+                      <span className="mx-2 text-white/35">·</span>
+                      latest {data.company.financial.latestPeriodId}
+                    </>
+                  ) : null}
+                  {typeof data.company.financial.latestGrossProfitJpy === 'number' ? (
+                    <>
+                      <span className="mx-2 text-white/35">·</span>
+                      gross profit ¥{data.company.financial.latestGrossProfitJpy.toLocaleString()}
+                    </>
+                  ) : null}
+                </>
+              ) : null}
+              <span className="mx-2 text-white/35">·</span>
+              finance controller {data.company.financeController.mode}
+              {data.company.financeController.shouldCutCosts ? (
+                <>
+                  <span className="mx-2 text-white/35">·</span>
+                  cost cutting
+                </>
+              ) : null}
+              {data.company.financeController.reasons.length > 0 ? (
+                <>
+                  <span className="mx-2 text-white/35">·</span>
+                  {data.company.financeController.reasons.length} reason
+                  {data.company.financeController.reasons.length === 1 ? '' : 's'}
+                </>
+              ) : null}
+              <span className="mx-2 text-white/35">·</span>
+              OKR {data.company.okr.exists ? 'available' : 'missing'}
+              {data.company.okr.exists ? (
+                <>
+                  <span className="mx-2 text-white/35">·</span>
+                  {data.company.okr.objectiveCount} objective
+                  {data.company.okr.objectiveCount === 1 ? '' : 's'}
+                  <span className="mx-2 text-white/35">·</span>
+                  {data.company.okr.keyResultCount} KR
+                  <span className="mx-2 text-white/35">·</span>
+                  {data.company.okr.progressPercent}% progress
+                  {data.company.okr.latestObjective ? (
+                    <>
+                      <span className="mx-2 text-white/35">·</span>
+                      latest {data.company.okr.latestObjective}
+                    </>
+                  ) : null}
+                </>
+              ) : null}
+              <span className="mx-2 text-white/35">·</span>
+              audit {data.company.approvalAudit.total}
+              <span className="mx-2 text-white/35">·</span>
+              allowed {data.company.approvalAudit.allowed}
+              <span className="mx-2 text-white/35">·</span>
+              denied {data.company.approvalAudit.denied}
+              {data.company.approvalAudit.latestCorrelationId ? (
+                <>
+                  <span className="mx-2 text-white/35">·</span>
+                  latest {data.company.approvalAudit.latestCorrelationId}
+                </>
+              ) : null}
+              <span className="mx-2 text-white/35">·</span>
+              audit drilldown {data.company.approvalAuditDrilldown.byDecisionType.length} types /{' '}
+              {data.company.approvalAuditDrilldown.byCorrelationId.length} chains
+            </div>
+          </div>
+        )}
         {selectedProject && (
           <div className="mt-3 rounded-xl border border-cyan-300/12 bg-cyan-400/[0.06] px-3 py-3 text-[11px] text-cyan-100/80">
             project focus:{' '}
@@ -4529,7 +4779,10 @@ export function MissionIntelligence({
               </div>
             ) : (
               data.recentEvents.map((event, index) => (
-                <div key={`${event.ts}-${index}`} className="border-l border-kyberion-warning/20 pl-3">
+                <div
+                  key={`${event.ts}-${index}`}
+                  className="border-l border-kyberion-warning/20 pl-3"
+                >
                   <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] text-white/45">
                     <Activity size={10} />
                     <span>{event.decision}</span>
@@ -5476,7 +5729,9 @@ function Panel({ id, title, children }: { id?: string; title: string; children: 
   return (
     <div id={id} className="rounded-2xl border border-white/5 bg-black/25 p-4 scroll-mt-6">
       <div className="mb-4 flex items-center justify-between gap-3">
-        <div className="text-[10px] uppercase tracking-[0.3em] text-kyberion-warning/45">{title}</div>
+        <div className="text-[10px] uppercase tracking-[0.3em] text-kyberion-warning/45">
+          {title}
+        </div>
       </div>
       {children}
     </div>

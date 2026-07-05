@@ -40,6 +40,18 @@
     "verification_method": {
       "type": "string",
       "enum": ["self_check", "review_gate", "human_acceptance", "test"]
+    },
+    "vision_ref": {
+      "type": "object",
+      "required": ["raw", "kind", "tenant_slug", "path", "query"],
+      "properties": {
+        "raw": { "type": "string" },
+        "kind": { "type": "string", "enum": ["company", "vision", "legacy"] },
+        "tenant_slug": { "type": ["string", "null"] },
+        "path": { "type": ["string", "null"] },
+        "query": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
     }
   },
   "additionalProperties": false

@@ -1,0 +1,131 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "hiring-workflow",
+  "version": "2.0.0",
+  "name": "Hiring Workflow",
+  "description": "Hiring workflow that turns a role brief into a JD draft, schedules interview slots, and produces an evaluation memo for talent_culture and line_manager review.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes).",
+  "context": {
+    "mission_id": "",
+    "tenant_slug": "",
+    "role_name": "",
+    "role_domain": "",
+    "candidate_profile_path": "active/shared/tmp/hiring-candidate-profile-{{mission_id}}.json",
+    "jd_draft_path": "active/shared/tmp/hiring-jd-draft-{{mission_id}}.md",
+    "interview_schedule_path": "active/shared/tmp/hiring-interview-schedule-{{mission_id}}.json",
+    "evaluation_path": "active/shared/tmp/hiring-evaluation-{{mission_id}}.md"
+  },
+  "steps": [
+    {
+      "id": "preflight",
+      "role": "gate",
+      "op": "core:include",
+      "params": { "fragment": "fragments/browser-runtime-preflight.json" }
+    },
+    {
+      "id": "log_start",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "🧑‍💼 Hiring workflow start for mission {{mission_id}} role={{role_name}} domain={{role_domain}}"
+      }
+    },
+    {
+      "id": "read_candidate_profile",
+      "role": "source",
+      "op": "system:read_file",
+      "produces": { "channel": "candidate_profile", "type": "CandidateProfile" },
+      "params": {
+        "path": "{{candidate_profile_path}}"
+      }
+    },
+    {
+      "id": "draft_jd",
+      "role": "transform",
+      "op": "reasoning:analyze",
+      "consumes": "candidate_profile",
+      "produces": { "channel": "jd_draft", "type": "JobDescriptionDraft" },
+      "params": {
+        "instruction": "以下の candidate profile と role 情報をもとに、採用 JD の下書きを Markdown で作成してください。talent_culture と line_manager がレビューできる実務的な内容にしてください。\n\n必須セクション:\n# Hiring Workflow\n## 募集背景\n## 役割概要\n## 必須要件\n## 歓迎要件\n## 面接で確認する観点\n## オファー判断での注意点\n\n要件:\n- 役割の責務を明確にする\n- 判断基準を箇条書きにする\n- 採用可否の最終決定は人間承認前提であることを明示する",
+        "context": ["{{mission_id}}", "{{role_name}}", "{{role_domain}}", "{{candidate_profile}}"]
+      }
+    },
+    {
+      "id": "write_jd_draft",
+      "role": "sink",
+      "op": "system:write_artifact",
+      "consumes": "jd_draft",
+      "params": {
+        "path": "{{jd_draft_path}}",
+        "content": "{{jd_draft}}"
+      }
+    },
+    {
+      "id": "schedule_interviews",
+      "role": "sink",
+      "op": "calendar:create_event",
+      "params": {
+        "calendar_names": ["仕事"],
+        "title": "Hiring interview: {{role_name}}",
+        "start_date": "{{interview_start_iso}}",
+        "end_date": "{{interview_end_iso}}",
+        "location": "Zoom / Google Meet",
+        "description": "Kyberion hiring workflow mission {{mission_id}} for {{role_name}} (domain: {{role_domain}})."
+      }
+    },
+    {
+      "id": "write_schedule",
+      "role": "sink",
+      "op": "system:write_file",
+      "params": {
+        "path": "{{interview_schedule_path}}",
+        "content": {
+          "kind": "hiring-interview-schedule",
+          "mission_id": "{{mission_id}}",
+          "tenant_slug": "{{tenant_slug}}",
+          "role_name": "{{role_name}}",
+          "role_domain": "{{role_domain}}",
+          "calendar": "仕事",
+          "interview_start": "{{interview_start_iso}}",
+          "interview_end": "{{interview_end_iso}}"
+        },
+        "format": "json"
+      }
+    },
+    {
+      "id": "draft_evaluation",
+      "role": "transform",
+      "op": "reasoning:analyze",
+      "consumes": ["candidate_profile", "jd_draft"],
+      "produces": { "channel": "evaluation_memo", "type": "HiringEvaluationMemo" },
+      "params": {
+        "instruction": "以下の candidate profile と JD draft をもとに、面接評価メモを Markdown で作成してください。talent_culture / line_manager が評価観点を共有する前提です。\n\n必須セクション:\n# Hiring Evaluation\n## 候補者概要\n## 評価観点\n## 強み\n## 懸念点\n## 追加で聞く質問\n## 次のアクション\n\n要件:\n- 候補者の事実と推測を分ける\n- 評価の根拠を明確にする\n- 最終採用判断は人間承認前提であることを明記する",
+        "context": [
+          "{{mission_id}}",
+          "{{role_name}}",
+          "{{role_domain}}",
+          "{{candidate_profile}}",
+          "{{jd_draft}}"
+        ]
+      }
+    },
+    {
+      "id": "write_evaluation",
+      "role": "sink",
+      "op": "system:write_artifact",
+      "consumes": "evaluation_memo",
+      "params": {
+        "path": "{{evaluation_path}}",
+        "content": "{{evaluation_memo}}"
+      }
+    },
+    {
+      "id": "log_done",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "✅ Hiring workflow complete: {{jd_draft_path}}, {{interview_schedule_path}}, {{evaluation_path}}"
+      }
+    }
+  ]
+}
