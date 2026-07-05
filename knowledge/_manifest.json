@@ -1,10 +1,52 @@
 {
-  "generated": "2026-07-05T06:00:13.649Z",
+  "generated": "2026-07-05T08:13:09.282Z",
   "files": [
     {
       "path": "Ecosystem_Map.md",
       "tier": "public",
       "size": 2842,
+      "type": "md"
+    },
+    {
+      "path": "evolution/distill_board-protocol-commonization-2026-04-30_2026_04_29.md",
+      "tier": "public",
+      "size": 1231,
+      "type": "md"
+    },
+    {
+      "path": "evolution/distill_browser-direct-reply-commonization-2026-04-29_2026_04_29.md",
+      "tier": "public",
+      "size": 951,
+      "type": "md"
+    },
+    {
+      "path": "evolution/distill_msn-executive-pipelines_2026_05_02.md",
+      "tier": "public",
+      "size": 1995,
+      "type": "md"
+    },
+    {
+      "path": "evolution/distill_production-evidence-local-artifact-refs_2026_05_15.md",
+      "tier": "public",
+      "size": 1253,
+      "type": "md"
+    },
+    {
+      "path": "evolution/distill_production-evidence-register-text-nonblank_2026_05_15.md",
+      "tier": "public",
+      "size": 1255,
+      "type": "md"
+    },
+    {
+      "path": "evolution/distill_production-receipt-malformed-timestamps_2026_05_15.md",
+      "tier": "public",
+      "size": 1348,
+      "type": "md"
+    },
+    {
+      "path": "evolution/distill_resilience-actuators-v1_2026_05_11.md",
+      "tier": "public",
+      "size": 1337,
       "type": "md"
     },
     {
@@ -1226,6 +1268,12 @@
       "type": "json"
     },
     {
+      "path": "product/governance/autonomous-ops-policy.json",
+      "tier": "public",
+      "size": 1825,
+      "type": "json"
+    },
+    {
       "path": "product/governance/capability-bundle-registry.json",
       "tier": "public",
       "size": 5646,
@@ -1438,11 +1486,7 @@
     {
       "path": "product/governance/HINTS.md",
       "tier": "public",
-<<<<<<< HEAD
-      "size": 2421,
-=======
       "size": 1776,
->>>>>>> pr-432
       "type": "md"
     },
     {
@@ -1718,11 +1762,7 @@
     {
       "path": "product/governance/mission-workflow-catalog.json",
       "tier": "public",
-<<<<<<< HEAD
-      "size": 12821,
-=======
       "size": 17401,
->>>>>>> pr-432
       "type": "json"
     },
     {
@@ -2076,7 +2116,7 @@
     {
       "path": "product/governance/role-authority-map.json",
       "tier": "public",
-      "size": 3649,
+      "size": 3760,
       "type": "json"
     },
     {
@@ -2100,7 +2140,7 @@
     {
       "path": "product/governance/security-policy.json",
       "tier": "public",
-      "size": 17926,
+      "size": 17414,
       "type": "json"
     },
     {
@@ -4692,7 +4732,7 @@
     {
       "path": "product/pipeline-templates/hiring-workflow.json",
       "tier": "public",
-      "size": 5132,
+      "size": 5192,
       "type": "json"
     },
     {
@@ -6408,7 +6448,7 @@
     {
       "path": "product/schemas/org-chart.schema.json",
       "tier": "public",
-      "size": 2130,
+      "size": 2178,
       "type": "json"
     },
     {

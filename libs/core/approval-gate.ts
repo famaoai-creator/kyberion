@@ -72,8 +72,16 @@ function extractDecisionRightsContext(
   riskLevel?: string;
 } {
   const payloadData = payload || {};
-  const tenantSlug = firstString(payloadData.tenant_slug, payloadData.tenantSlug, payloadData.company_id);
-  const decisionType = firstString(payloadData.decision_type, payloadData.decisionType, payloadData.operation_type);
+  const tenantSlug = firstString(
+    payloadData.tenant_slug,
+    payloadData.tenantSlug,
+    payloadData.company_id
+  );
+  const decisionType = firstString(
+    payloadData.decision_type,
+    payloadData.decisionType,
+    payloadData.operation_type
+  );
   // SEC-FIX: Do not use process.env.MISSION_ROLE to avoid confused deputy in IPC scenarios.
   // The callerRole must be securely resolved and passed by the IPC/orchestrator boundary.
   const actorRole = callerRole || agentId;
@@ -81,7 +89,9 @@ function extractDecisionRightsContext(
   const amount =
     typeof amountValue === 'number'
       ? amountValue
-      : typeof amountValue === 'string' && amountValue.trim() && Number.isFinite(Number(amountValue))
+      : typeof amountValue === 'string' &&
+          amountValue.trim() &&
+          Number.isFinite(Number(amountValue))
         ? Number(amountValue)
         : undefined;
   const riskLevel = firstString(payload.risk_level, payload.riskLevel, payload.risk);
@@ -203,7 +213,10 @@ export function enforceApprovalGate(
     decisionRightsContext.decisionType || decisionRightsContext.tenantSlug
       ? resolveDecisionRightsMatrix(decisionRightsContext.tenantSlug ?? null)
       : null;
-  const decisionRightsEvaluation = evaluateDecisionRights(decisionRightsMatrix, decisionRightsContext);
+  const decisionRightsEvaluation = evaluateDecisionRights(
+    decisionRightsMatrix,
+    decisionRightsContext
+  );
   if (decisionRightsEvaluation && !decisionRightsEvaluation.requiresEscalation) {
     const goldenRulePriority = resolveGoldenRulePriorityOrder(
       resolveVision(decisionRightsContext.tenantSlug ?? null)
@@ -223,7 +236,11 @@ export function enforceApprovalGate(
       },
     });
     recordGovernanceAction(agentId, 'approval_gate', `${operationId}:allowed`, false);
-    return { allowed: true, status: 'not_required', message: `Decision rights allow ${decisionRightsEvaluation.decisionType}` };
+    return {
+      allowed: true,
+      status: 'not_required',
+      message: `Decision rights allow ${decisionRightsEvaluation.decisionType}`,
+    };
   }
 
   // --- Step 1: Resolve policy ---

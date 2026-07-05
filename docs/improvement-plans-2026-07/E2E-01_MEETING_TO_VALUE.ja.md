@@ -23,17 +23,17 @@
 
 **実装済みで動く部品(検証済み)**:
 
-| 段階 | 部品 | 場所 |
-|---|---|---|
-| ① | `collect_voice_samples` / `register_voice_profile` / `collect_and_register_voice_profile` | `libs/actuators/voice-actuator/manifest.json:23-26` |
-| ② | 本人ボイス TTS + BlackHole 経由の会議音声注入 | `libs/actuators/meeting-actuator/meeting-bridge.py:25,45-46`(voice_learning_bridge + blackhole_audio_router) |
-| ② | 発話同意ゲート(テナント/期限検査)・`pnpm meeting:consent` | `meeting-actuator-helpers.ts:309-321`、`package.json:97` |
-| ② | Playwright 会議参加ドライバ | `libs/actuators/meeting-browser-driver/` |
-| ② | ファシリテーションスクリプト生成 / 発話公平性監査 | `wisdom:generate_facilitation_script` / `audit_speaker_fairness`(`decision-ops.ts:2387,2480`) |
-| ④ | 議事録→アクションアイテム抽出・保存・話者確認 | `wisdom:extract_action_items`(`decision-ops.ts:2320`)+ `action-item-store.ts`(schema 付き JSONL) |
-| ⑤ | 自分担当アイテムの自動実行ディスパッチ / 他者担当の督促追跡 | `wisdom:execute_self_action_items` / `track_pending_action_items`(`decision-ops.ts:2421,2450`) |
-| ⑤ | フェーズ定義(会議代理・ファシリ後続・アイテム督促の3ワークフロー) | `mission-workflow-catalog.json`(`meeting-proxy-live-participation` / `ai-meeting-facilitator-followup` / `action-item-tracking-followup`) |
-| ⑥ | 成果物 delivery pack / テナント export / バックアップ | `artifact-actuator`、`scripts/backup.ts --scope tenant`(OP-02) |
+| 段階 | 部品                                                                                      | 場所                                                                                                                                      |
+| ---- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| ①    | `collect_voice_samples` / `register_voice_profile` / `collect_and_register_voice_profile` | `libs/actuators/voice-actuator/manifest.json:23-26`                                                                                       |
+| ②    | 本人ボイス TTS + BlackHole 経由の会議音声注入                                             | `libs/actuators/meeting-actuator/meeting-bridge.py:25,45-46`(voice_learning_bridge + blackhole_audio_router)                              |
+| ②    | 発話同意ゲート(テナント/期限検査)・`pnpm meeting:consent`                                 | `meeting-actuator-helpers.ts:309-321`、`package.json:97`                                                                                  |
+| ②    | Playwright 会議参加ドライバ                                                               | `libs/actuators/meeting-browser-driver/`                                                                                                  |
+| ②    | ファシリテーションスクリプト生成 / 発話公平性監査                                         | `wisdom:generate_facilitation_script` / `audit_speaker_fairness`(`decision-ops.ts:2387,2480`)                                             |
+| ④    | 議事録→アクションアイテム抽出・保存・話者確認                                             | `wisdom:extract_action_items`(`decision-ops.ts:2320`)+ `action-item-store.ts`(schema 付き JSONL)                                          |
+| ⑤    | 自分担当アイテムの自動実行ディスパッチ / 他者担当の督促追跡                               | `wisdom:execute_self_action_items` / `track_pending_action_items`(`decision-ops.ts:2421,2450`)                                            |
+| ⑤    | フェーズ定義(会議代理・ファシリ後続・アイテム督促の3ワークフロー)                         | `mission-workflow-catalog.json`(`meeting-proxy-live-participation` / `ai-meeting-facilitator-followup` / `action-item-tracking-followup`) |
+| ⑥    | 成果物 delivery pack / テナント export / バックアップ                                     | `artifact-actuator`、`scripts/backup.ts --scope tenant`(OP-02)                                                                            |
 
 **切れている継ぎ目(ギャップ)**:
 

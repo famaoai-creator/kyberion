@@ -122,6 +122,7 @@ export * from './mission-gate-engine.js';
 export * from './handoff-packet.js';
 export * from './presentation-slide-pattern.js';
 export * from './web-design-system.js';
+export * from './managed-process.js';
 export * from './meeting-environment-policy.js';
 export * from './meeting-participation-runtime-plan.js';
 export * from './deliverable-quality.js';
@@ -129,6 +130,8 @@ export { resolveInputBindings, classifyInputId, isPathInput } from './input-bind
 export type { InputBinding, InputBindingType } from './input-binding.js';
 export { distillIncident, summarizeIncidents } from './incident-distiller.js';
 export type { IncidentInput, IncidentRecord } from './incident-distiller.js';
+export * from './autonomous-ops-gate.js';
+export * from './patch-decision.js';
 export { recordTelemetryEvent, isTelemetryEnabled, readTelemetryStats } from './telemetry.js';
 export type { TelemetryEvent, TelemetryEventType, TelemetryStats } from './telemetry.js';
 export {

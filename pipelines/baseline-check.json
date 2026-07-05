@@ -4,6 +4,12 @@
   "description": "Unified Pre-Flight Check (L0-L5) for system awakening",
   "_migration_note": "v2: Typed Flow format. v1 used type only.",
   "action": "pipeline",
+  "schedule": {
+    "id": "baseline-check-hourly",
+    "cron": "0 * * * *",
+    "timezone": "Asia/Tokyo",
+    "enabled": true
+  },
   "steps": [
     {
       "id": "run-sentinel",

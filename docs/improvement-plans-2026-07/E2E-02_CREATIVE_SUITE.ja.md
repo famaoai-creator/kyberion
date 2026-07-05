@@ -24,13 +24,13 @@
 
 **動く部品(検証済み)**:
 
-| 成果物 | 部品 | 場所 |
-|---|---|---|
-| デッキ/文書/表計算 | native-pptx/docx/xlsx/pdf エンジン + proposal storyline + document briefs + `resolveThemeColors()` PPTX ブリッジ | `libs/core/src/native-*-engine/`、`media-actuator/src/index.ts:1397-1417` |
-| 画像/動画/音楽 | `generate_image` / `generate_video` / `generate_music`(music_adf 対応)/ `run_workflow`(ComfyUI) | `media-generation-actuator`(manifest 10 ops) |
-| ナレーション動画 | `compile_narrated_video_brief` → `create_narrated_video_from_content_brief` → `verify_rendered_video_artifact` + 合成 job 機構 | `video-composition-actuator`(manifest 9 ops)、`pipelines/kyberion-vtuber-narrated-demo*.json` |
-| Web | brand-tokens → `generate_design_tokens.ts` → 4 サーフェス CSS + `WebThemePack` / `WebDesignSystemPack` 型 | `knowledge/public/design-patterns/brand-tokens/kyberion.json`、`libs/core/web-design-system.ts` |
-| テナント上書き | `tenant-design-resolver` + `knowledge/confidential/<slug>/design/tenant-override.json` + DESIGN.md 取込カタログ | `@agent/core/tenant-design-resolver`、`design-md-catalog/` |
+| 成果物             | 部品                                                                                                                           | 場所                                                                                            |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| デッキ/文書/表計算 | native-pptx/docx/xlsx/pdf エンジン + proposal storyline + document briefs + `resolveThemeColors()` PPTX ブリッジ               | `libs/core/src/native-*-engine/`、`media-actuator/src/index.ts:1397-1417`                       |
+| 画像/動画/音楽     | `generate_image` / `generate_video` / `generate_music`(music_adf 対応)/ `run_workflow`(ComfyUI)                                | `media-generation-actuator`(manifest 10 ops)                                                    |
+| ナレーション動画   | `compile_narrated_video_brief` → `create_narrated_video_from_content_brief` → `verify_rendered_video_artifact` + 合成 job 機構 | `video-composition-actuator`(manifest 9 ops)、`pipelines/kyberion-vtuber-narrated-demo*.json`   |
+| Web                | brand-tokens → `generate_design_tokens.ts` → 4 サーフェス CSS + `WebThemePack` / `WebDesignSystemPack` 型                      | `knowledge/public/design-patterns/brand-tokens/kyberion.json`、`libs/core/web-design-system.ts` |
+| テナント上書き     | `tenant-design-resolver` + `knowledge/confidential/<slug>/design/tenant-override.json` + DESIGN.md 取込カタログ                | `@agent/core/tenant-design-resolver`、`design-md-catalog/`                                      |
 
 **切れている継ぎ目(ギャップ)**:
 
@@ -61,12 +61,15 @@
    interface ResolvedCreativeDesign {
      source: 'brand-default' | 'tenant-override' | 'design-md';
      tenant_slug?: string;
-     colors: { primary; secondary; accent; background; text; warning };  // hex
+     colors: { primary; secondary; accent; background; text; warning }; // hex
      fonts: { sans; mono };
      // surface 別 projection(下記 2.)
      projection: WebThemePack | MediaThemeRecord | VideoCssVars | PromptStylePack;
    }
-   function resolveCreativeDesign(input: { tenantSlug?: string; surface: CreativeSurface }): ResolvedCreativeDesign
+   function resolveCreativeDesign(input: {
+     tenantSlug?: string;
+     surface: CreativeSurface;
+   }): ResolvedCreativeDesign;
    ```
 2. 解決順序(既存資産の合成のみ。新しい形式を発明しない):
    1. `brand-tokens/kyberion.json` を読み基礎 colors/fonts とする(light を既定、video/prompt は dark を既定)
@@ -97,10 +100,10 @@
 1. Task 1 の `PromptStylePack` を定義:
    ```ts
    interface PromptStylePack {
-     palette_hex: string[];            // primary/secondary/accent/background
-     tone_words: string[];             // 例: ['clean','modern','tech','japanese-minimal']
-     typography_hint: string;          // 例: 'Inter / Noto Sans JP 系のジオメトリックサンセリフ'
-     avoid: string[];                  // 例: ['clip-art','watermark','off-brand colors']
+     palette_hex: string[]; // primary/secondary/accent/background
+     tone_words: string[]; // 例: ['clean','modern','tech','japanese-minimal']
+     typography_hint: string; // 例: 'Inter / Noto Sans JP 系のジオメトリックサンセリフ'
+     avoid: string[]; // 例: ['clip-art','watermark','off-brand colors']
      music?: { mood: string; bpm_range?: [number, number]; instrumentation_hint?: string };
    }
    ```
@@ -129,7 +132,7 @@
    - `intro_video` → video-composition `create_narrated_intro_movie`
    - `web_lp` → `web-design-system.ts` の `WebDesignSystemPack` から LP セクション HTML を出す既存機構(無ければ pack JSON + セクション markdown の出力に留める — judgment: HTML レンダラ新設はしない)
    - `mv` → Task 5 の mv-compose を `core:run_pipeline`(サブパイプライン呼び出し。既存に無ければ `system:exec` で `run_pipeline.js --input` を呼ぶ)
-   全成果物は `active/missions/<id>/evidence/campaign/<deliverable>/` に集約し、最後に manifest(`campaign-manifest.json`: 各成果物のパス + 使用した design source/hex)を書く。
+     全成果物は `active/missions/<id>/evidence/campaign/<deliverable>/` に集約し、最後に manifest(`campaign-manifest.json`: 各成果物のパス + 使用した design source/hex)を書く。
 3. **検証**: deliverables=['deck','doc'] の最小構成で実走(stub backend)し、manifest に両成果物と同一の primary hex が記録されること。
 
 ### Task 7: 「揃っている」ことの機械検証(E2E テスト)— `gpt-5.4-mini`

@@ -305,7 +305,8 @@ export function enrichMissionTeamPlanWithOrganizationProfile(
         organization_profile.default_team_template &&
       plan.organization_profile.team_template_catalog_id ===
         organization_profile.team_template_catalog_id &&
-      plan.organization_profile.default_agent_profile === organization_profile.default_agent_profile);
+      plan.organization_profile.default_agent_profile ===
+        organization_profile.default_agent_profile);
   const chartMatches =
     !organization_chart ||
     (plan.organization_chart &&
