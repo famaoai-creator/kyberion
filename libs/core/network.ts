@@ -141,22 +141,25 @@ export async function secureFetch<T = any>(options: SecureFetchOptions): Promise
     );
   }
 
-  // 2. Automatically scrub outbound payload
+  // 2. Automatically scrub outbound payload UNLESS explicitly authenticated
+  const isAuth = options.authenticateRequest === true;
   const requestOptions: AxiosRequestConfig = {
     ...axiosOptions,
-    data: redactSensitiveObject(axiosOptions.data),
-    params: redactSensitiveObject(axiosOptions.params),
-    headers: redactSensitiveObject(axiosOptions.headers),
+    data: isAuth ? axiosOptions.data : redactSensitiveObject(axiosOptions.data),
+    params: isAuth ? axiosOptions.params : redactSensitiveObject(axiosOptions.params),
+    headers: isAuth ? axiosOptions.headers : redactSensitiveObject(axiosOptions.headers),
   };
   enforcePayloadSize(requestOptions);
 
   try {
+    const finalHeaders = {
+      'User-Agent': 'Kyberion-Sovereign-Agent/2.1.0 (Physical-Integrity-Enforced)',
+      ...(requestOptions.headers || {}),
+    };
     const response = await axios({
       timeout: 15000,
-      headers: {
-        'User-Agent': 'Kyberion-Sovereign-Agent/2.1.0 (Physical-Integrity-Enforced)',
-      },
       ...requestOptions,
+      headers: finalHeaders,
     });
     auditChain.record({
       agentId: process.env.KYBERION_PERSONA || 'unknown',

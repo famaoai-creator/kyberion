@@ -34,6 +34,7 @@ describe('mission-intent-delta hooks', () => {
       stage: 'execution',
       text: 'please execute',
       source: 'user_prompt',
+      traceRef: 'corr-mission-intent-001',
     });
 
     expect(emitIntentSnapshot).toHaveBeenCalledWith(
@@ -41,6 +42,7 @@ describe('mission-intent-delta hooks', () => {
         missionId: 'MSN-T1',
         stage: 'execution',
         source: 'user_prompt',
+        traceRef: 'corr-mission-intent-001',
         intent: { goal: 'parsed goal' },
       }),
     );

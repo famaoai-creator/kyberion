@@ -31,6 +31,7 @@ export async function emitMissionLifecycleIntentSnapshot(input: {
   missionId: string;
   stage: string;
   text?: string;
+  traceRef?: string;
   source?: 'user_prompt' | 'mission_state' | 'gate_evaluation' | 'worker_transition' | 'manual';
 }): Promise<void> {
   if (!input.missionId) return;
@@ -53,6 +54,7 @@ export async function emitMissionLifecycleIntentSnapshot(input: {
         stage: input.stage,
         source,
         intent,
+        ...(input.traceRef ? { traceRef: input.traceRef } : {}),
       });
       return;
     }
@@ -61,6 +63,7 @@ export async function emitMissionLifecycleIntentSnapshot(input: {
       stage: input.stage,
       source,
       intent: { goal: fallbackGoalForStage(input.missionId, input.stage) },
+      ...(input.traceRef ? { traceRef: input.traceRef } : {}),
     });
   } catch (err: any) {
     logger.warn(

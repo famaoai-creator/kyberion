@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   evaluateArtifactBundleGate,
+  evaluateIntentDriftReviewGate,
   resolveMissionReviewDesign,
   summarizeReviewGateVerdicts,
 } from './mission-review-gates.js';
@@ -77,5 +78,41 @@ describe('mission-review-gates', () => {
         updated_at: '2026-06-05T00:00:00.000Z',
       })
     ).toMatchObject({ verdict: 'ready' });
+  });
+
+  it('maps intent drift snapshots into a blocking review gate when the origin baseline diverges', () => {
+    const summary = summarizeReviewGateVerdicts({
+      reviewMode: 'standard',
+      results: [
+        {
+          gate_id: 'CONTRACT_VALID',
+          verdict: 'ready',
+        },
+        {
+          gate_id: 'INTENT_DRIFT',
+          verdict: 'blocked',
+          reason: 'intent drift blocks progression (score=80, threshold=50)',
+        },
+      ],
+    });
+
+    expect(summary.overall_verdict).toBe('blocked');
+    expect(summary.gate_results).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          gate_id: 'INTENT_DRIFT',
+          verdict: 'blocked',
+        }),
+      ])
+    );
+  });
+
+  it('evaluates intent drift as a review gate result', () => {
+    const gate = evaluateIntentDriftReviewGate('MSN-UNKNOWN');
+
+    expect(gate).toMatchObject({
+      gate_id: 'INTENT_DRIFT',
+      verdict: 'ready',
+    });
   });
 });

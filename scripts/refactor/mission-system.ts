@@ -15,6 +15,7 @@ import {
   verifyMission as _verifyMission,
 } from './mission-lifecycle.js';
 import {
+  approveScopeChange as _approveScopeChange,
   createCheckpoint as _createCheckpoint,
   purgeMissions as _purgeMissions,
   recordEvidence as _recordEvidence,
@@ -150,6 +151,24 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
       }).then(() =>
         explicitMissionId ? syncProjectOperationalStateIfLinked(explicitMissionId) : undefined
       );
+    },
+    approveScopeChange(
+      id: string,
+      options?: {
+        approvedBy?: string;
+        reason?: string;
+        goalSummary?: string;
+        successCondition?: string;
+      }
+    ) {
+      return _approveScopeChange({
+        missionId: id,
+        approvedBy: options?.approvedBy,
+        reason: options?.reason || 'Approved scope adjustment.',
+        goalSummary: options?.goalSummary || '',
+        successCondition: options?.successCondition,
+        syncProjectLedgerIfLinked: syncProjectLedgerIfLinkedInternal,
+      }).then(() => syncProjectOperationalStateIfLinked(id));
     },
     resumeMission(id?: string) {
       return _resumeMission(id, {
