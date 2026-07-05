@@ -1,0 +1,105 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/org-chart.schema.json",
+  "title": "Organization Org Chart",
+  "type": "object",
+  "required": [
+    "version",
+    "organization_id",
+    "name",
+    "source_kind",
+    "source_path",
+    "domains",
+    "positions"
+  ],
+  "properties": {
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "organization_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_kind": {
+      "type": "string",
+      "enum": ["customer", "confidential", "public", "derived"]
+    },
+    "source_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "domains": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/domain"
+      }
+    },
+    "positions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/position"
+      }
+    }
+  },
+  "$defs": {
+    "domain": {
+      "type": "object",
+      "required": ["domain_id", "name", "role_ids"],
+      "properties": {
+        "domain_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "position": {
+      "type": "object",
+      "required": [
+        "role_id",
+        "reports_to",
+        "held_by",
+        "responsibility_scope",
+        "authority_role_ref"
+      ],
+      "properties": {
+        "role_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reports_to": {
+          "type": ["string", "null"]
+        },
+        "held_by": {
+          "type": "string",
+          "minLength": 1
+        },
+        "responsibility_scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "authority_role_ref": {
+          "type": ["string", "null"]
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,39 @@
+{
+  "action": "pipeline",
+  "name": "soak-endurance",
+  "version": "1.0.0",
+  "description": "Compressed soak / endurance harness for AO-04 with maintenance pulses and resource trend sampling.",
+  "_refs": {
+    "plan": "docs/improvement-plans-2026-07/AO-04_SOAK_ENDURANCE_VALIDATION.ja.md",
+    "implementation": "scripts/soak_endurance.ts"
+  },
+  "schedule": {
+    "id": "soak-endurance-daily",
+    "cron": "30 5 * * *",
+    "timezone": "Asia/Tokyo",
+    "enabled": false
+  },
+  "steps": [
+    {
+      "id": "run_soak_endurance",
+      "role": "source",
+      "op": "system:exec",
+      "produces": {
+        "channel": "soak_endurance_result",
+        "type": "CommandResult"
+      },
+      "params": {
+        "command": "node",
+        "args": [
+          "--import",
+          "./scripts/ts-loader.mjs",
+          "scripts/soak_endurance.ts",
+          "--cycles",
+          "8",
+          "--json"
+        ],
+        "timeout_ms": 120000
+      }
+    }
+  ]
+}

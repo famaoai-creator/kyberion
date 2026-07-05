@@ -1,0 +1,88 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "budget-review",
+  "version": "2.0.0",
+  "name": "Budget Review",
+  "description": "Budget review template that compares the financial model against the budget plan and prepares a review memo for approval.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes).",
+  "context": {
+    "mission_id": "",
+    "tenant_slug": "",
+    "budget_period": "",
+    "preflight_cmd": "pnpm --version",
+    "budget_input_path": "active/shared/tmp/budget-review-input-{{mission_id}}.json",
+    "budget_memo_path": "active/shared/tmp/budget-review-{{mission_id}}.md",
+    "budget_summary_path": "active/shared/tmp/budget-review-{{mission_id}}.json"
+  },
+  "steps": [
+    {
+      "id": "preflight",
+      "role": "gate",
+      "op": "core:include",
+      "params": { "fragment": "fragments/runtime-preflight.json" }
+    },
+    {
+      "id": "log_start",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "📊 Budget review start for mission {{mission_id}} period={{budget_period}} tenant={{tenant_slug}}"
+      }
+    },
+    {
+      "id": "read_budget_input",
+      "role": "source",
+      "op": "system:read_file",
+      "produces": { "channel": "budget_input", "type": "BudgetReviewInput" },
+      "params": {
+        "path": "{{budget_input_path}}"
+      }
+    },
+    {
+      "id": "draft_budget_memo",
+      "role": "transform",
+      "op": "reasoning:analyze",
+      "consumes": "budget_input",
+      "produces": { "channel": "budget_memo", "type": "BudgetReviewMemo" },
+      "params": {
+        "instruction": "以下の budget review input をもとに、予算対比レビューの Markdown を作成してください。finance_controller が人間承認に進める前の下書きです。\n\n必須セクション:\n# Budget Review\n## 期間\n## 予算対比の要点\n## 超過・未達の項目\n## 影響の大きい支出\n## 改善アクション\n## 承認が必要な論点\n\n要件:\n- 事実と推測を分ける\n- 閾値超過があれば明示する\n- 承認が必要な論点は最初に箇条書きにする",
+        "context": ["{{mission_id}}", "{{budget_period}}", "{{budget_input}}"]
+      }
+    },
+    {
+      "id": "write_budget_memo",
+      "role": "sink",
+      "op": "system:write_artifact",
+      "consumes": "budget_memo",
+      "params": {
+        "path": "{{budget_memo_path}}",
+        "content": "{{budget_memo}}"
+      }
+    },
+    {
+      "id": "write_budget_summary",
+      "role": "sink",
+      "op": "system:write_file",
+      "params": {
+        "path": "{{budget_summary_path}}",
+        "content": {
+          "kind": "budget-review",
+          "mission_id": "{{mission_id}}",
+          "tenant_slug": "{{tenant_slug}}",
+          "budget_period": "{{budget_period}}",
+          "budget_input_path": "{{budget_input_path}}",
+          "budget_memo_path": "{{budget_memo_path}}",
+          "status": "draft"
+        }
+      }
+    },
+    {
+      "id": "log_done",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "✅ Budget review complete: {{budget_memo_path}}"
+      }
+    }
+  ]
+}
