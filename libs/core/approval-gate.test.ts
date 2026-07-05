@@ -350,7 +350,7 @@ describe('enforceApprovalGate', () => {
 
     const result = enforceApprovalGate({
       ...baseParams,
-      agentId: 'finance_controller',
+      callerRole: 'finance_controller',
       payload: {
         tenant_slug: 'acme',
         decision_type: 'operational_spend',

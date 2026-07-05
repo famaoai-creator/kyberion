@@ -24,6 +24,8 @@ export interface ApprovalGateParams {
   operationId: string;
   /** Who is requesting. */
   agentId: string;
+  /** Authenticated role of the caller, resolved securely by the IPC/orchestrator layer. */
+  callerRole?: string;
   /** Correlation id to match approval requests. */
   correlationId: string;
   /** Surface channel. */
@@ -58,18 +60,24 @@ function firstString(...values: unknown[]): string | undefined {
   return undefined;
 }
 
-function extractDecisionRightsContext(agentId: string, payload?: Record<string, unknown>): {
+function extractDecisionRightsContext(
+  agentId: string,
+  callerRole?: string,
+  payload?: Record<string, unknown>
+): {
   tenantSlug?: string;
   decisionType?: string;
   actorRole?: string;
   amount?: number;
   riskLevel?: string;
 } {
-  if (!payload) return {};
-  const tenantSlug = firstString(payload.tenant_slug, payload.tenantSlug, payload.company_id);
-  const decisionType = firstString(payload.decision_type, payload.decisionType, payload.operation_type);
-  const actorRole = process.env.MISSION_ROLE || agentId;
-  const amountValue = payload.amount_jpy ?? payload.amount ?? payload.value;
+  const payloadData = payload || {};
+  const tenantSlug = firstString(payloadData.tenant_slug, payloadData.tenantSlug, payloadData.company_id);
+  const decisionType = firstString(payloadData.decision_type, payloadData.decisionType, payloadData.operation_type);
+  // SEC-FIX: Do not use process.env.MISSION_ROLE to avoid confused deputy in IPC scenarios.
+  // The callerRole must be securely resolved and passed by the IPC/orchestrator boundary.
+  const actorRole = callerRole || agentId;
+  const amountValue = payloadData.amount_jpy ?? payloadData.amount ?? payloadData.value;
   const amount =
     typeof amountValue === 'number'
       ? amountValue
@@ -187,10 +195,10 @@ export function enforceApprovalGate(
   params: ApprovalGateParams,
   role: GovernedArtifactRole = 'mission_controller'
 ): ApprovalGateResult {
-  const { intentId, operationId, agentId, correlationId, channel, payload } = params;
+  const { intentId, operationId, agentId, callerRole, correlationId, channel, payload } = params;
   recordGovernanceAction(agentId, 'approval_gate', operationId, false);
 
-  const decisionRightsContext = extractDecisionRightsContext(agentId, payload);
+  const decisionRightsContext = extractDecisionRightsContext(agentId, callerRole, payload);
   const decisionRightsMatrix =
     decisionRightsContext.decisionType || decisionRightsContext.tenantSlug
       ? resolveDecisionRightsMatrix(decisionRightsContext.tenantSlug ?? null)
