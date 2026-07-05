@@ -16,6 +16,24 @@ export interface ConversationTurn {
 
 const MAX_TURNS = 500;
 
+function sanitizeConversationId(conversationId: string): string {
+  const value = conversationId.trim();
+  if (!/^[A-Za-z0-9._-]{1,128}$/.test(value)) {
+    throw new Error('Invalid conversation_id');
+  }
+  return value;
+}
+
+function resolveConversationFilePath(conversationId: string): string {
+  const safeConversationId = sanitizeConversationId(conversationId);
+  const conversationsDir = path.resolve(pathResolver.shared('runtime/a2a-conversations'));
+  const filePath = path.resolve(conversationsDir, `${safeConversationId}.jsonl`);
+  if (!filePath.startsWith(`${conversationsDir}${path.sep}`)) {
+    throw new Error('Invalid conversation path');
+  }
+  return filePath;
+}
+
 /**
  * Checks if a mission has confidential or personal tier constraints.
  */
@@ -36,8 +54,7 @@ export async function appendConversationTurn(
 ): Promise<void> {
   if (!conversationId) return;
 
-  const conversationsDir = pathResolver.shared('runtime/a2a-conversations');
-  const filePath = path.join(conversationsDir, `${conversationId}.jsonl`);
+  const filePath = resolveConversationFilePath(conversationId);
 
   const isConfidential = isConfidentialMission(turnData.missionId);
 
@@ -83,8 +100,7 @@ export async function appendConversationTurn(
  */
 export function readConversationHistory(conversationId: string): ConversationTurn[] {
   if (!conversationId) return [];
-  const conversationsDir = pathResolver.shared('runtime/a2a-conversations');
-  const filePath = path.join(conversationsDir, `${conversationId}.jsonl`);
+  const filePath = resolveConversationFilePath(conversationId);
 
   if (!safeExistsSync(filePath)) return [];
 

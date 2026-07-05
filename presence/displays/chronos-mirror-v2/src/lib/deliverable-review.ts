@@ -33,6 +33,8 @@ export interface DeliverableReviewState {
   artifact_id: string;
   current_artifact_id: string;
   latest_version: number;
+  latest_review_sequence: number;
+  latest_artifact_version: number;
   reviews: DeliverableReviewEntry[];
   version_artifact_ids: string[];
 }
@@ -46,7 +48,24 @@ export interface DeliverableReviewInput {
 }
 
 function reviewStatePath(artifactId: string): string {
-  return `${REVIEW_DIR}/${artifactId}.json`;
+  return `${REVIEW_DIR}/${resolveReviewRootArtifactId(artifactId)}.json`;
+}
+
+function resolveReviewRootArtifactId(artifactId: string): string {
+  const visited = new Set<string>();
+  let current = artifactId;
+
+  while (!visited.has(current)) {
+    visited.add(current);
+    const artifact = loadArtifactRecord(current);
+    const parent = artifact?.metadata?.review_parent_artifact_id;
+    if (typeof parent !== 'string' || !parent.trim()) {
+      return current;
+    }
+    current = parent.trim();
+  }
+
+  return current;
 }
 
 function readReviewState(artifactId: string): DeliverableReviewState | null {
@@ -65,6 +84,8 @@ function ensureReviewState(artifactId: string): DeliverableReviewState {
     artifact_id: artifactId,
     current_artifact_id: artifactId,
     latest_version: 1,
+    latest_review_sequence: 1,
+    latest_artifact_version: 1,
     reviews: [],
     version_artifact_ids: [artifactId],
   };
@@ -94,11 +115,11 @@ export function reviewDeliverable(input: DeliverableReviewInput): {
 
   const role = input.reviewRole || 'mission_controller';
   const state = ensureReviewState(input.artifactId);
-  const version = state.latest_version + 1;
+  const reviewSequence = state.latest_review_sequence + 1;
   const review: DeliverableReviewEntry = {
     review_id: randomUUID(),
     artifact_id: input.artifactId,
-    version,
+    version: reviewSequence,
     verdict: input.verdict,
     comment: input.comment,
     reviewer: input.reviewer,
@@ -106,14 +127,16 @@ export function reviewDeliverable(input: DeliverableReviewInput): {
   };
 
   if (input.verdict === 'request-changes') {
-    const nextArtifactId = `${input.artifactId}-v${version}`;
+    const nextArtifactVersion = state.latest_artifact_version + 1;
+    const nextArtifactId = `${input.artifactId}-v${nextArtifactVersion}`;
     const nextArtifact: ArtifactRecord = {
       ...artifact,
       artifact_id: nextArtifactId,
       metadata: {
         ...(artifact.metadata || {}),
         review_parent_artifact_id: input.artifactId,
-        review_version: version,
+        review_version: reviewSequence,
+        review_artifact_version: nextArtifactVersion,
         review_verdict: input.verdict,
         review_comment: input.comment,
       },
@@ -121,12 +144,14 @@ export function reviewDeliverable(input: DeliverableReviewInput): {
     saveArtifactRecord(nextArtifact);
     review.new_artifact_id = nextArtifactId;
     state.current_artifact_id = nextArtifactId;
+    state.latest_artifact_version = nextArtifactVersion;
     state.version_artifact_ids.push(nextArtifactId);
   } else if (input.verdict === 'accept') {
     state.current_artifact_id = input.artifactId;
   }
 
-  state.latest_version = version;
+  state.latest_review_sequence = reviewSequence;
+  state.latest_version = reviewSequence;
   state.reviews.push(review);
   writeReviewState(role, state);
   appendGovernedArtifactJsonl(role, REVIEW_LOG, review);

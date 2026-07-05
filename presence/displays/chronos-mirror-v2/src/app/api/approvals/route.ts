@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
 import { buildApprovalQueueItems } from '../../../lib/su-surface-data';
 
 export function GET(req: NextRequest) {
+  const denied = guardRequest(req);
+  if (denied) return denied;
+  const requiresAccess = requireChronosAccess(req, 'readonly');
+  if (requiresAccess) return requiresAccess;
+
   const url = new URL(req.url);
   const approvals = buildApprovalQueueItems({
     query: url.searchParams.get('query') || undefined,

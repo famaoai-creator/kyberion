@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import {
-  getChronosAccessRoleOrThrow,
-  guardRequest,
-  requireChronosAccess,
-  roleToMissionRole,
-} from '../../../lib/api-guard';
+import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
 import {
   collectA2AHandoffs,
   collectAgentMessages,
@@ -1448,8 +1443,6 @@ export async function GET(req: NextRequest) {
   try {
     const denied = guardRequest(req);
     if (denied) return denied;
-    const accessRole = getChronosAccessRoleOrThrow(req);
-    process.env.MISSION_ROLE = roleToMissionRole(accessRole);
     const runtimeSupervisorClient = await import('@agent/core/agent-runtime-supervisor-client');
     const runtime = listAgentRuntimeSnapshots();
     const rawActiveMissions = collectActiveMissions();
@@ -1636,8 +1629,6 @@ export async function POST(req: NextRequest) {
     if (denied) return denied;
     const requiresAdmin = requireChronosAccess(req, 'localadmin');
     if (requiresAdmin) return requiresAdmin;
-    const accessRole = getChronosAccessRoleOrThrow(req);
-    process.env.MISSION_ROLE = roleToMissionRole(accessRole);
     const body = await req.json();
     const action = body?.action;
 
@@ -1669,7 +1660,7 @@ export async function POST(req: NextRequest) {
       if (!requestId || !storageChannel || !channel || !decision) {
         return NextResponse.json({ error: 'Missing approval decision payload' }, { status: 400 });
       }
-      const updated = decideApprovalRequest(roleToMissionRole(accessRole), {
+      const updated = decideApprovalRequest('chronos_localadmin', {
         channel,
         storageChannel,
         requestId,

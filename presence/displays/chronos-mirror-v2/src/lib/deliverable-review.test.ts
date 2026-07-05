@@ -20,11 +20,22 @@ describe('deliverable review', () => {
       reviewer: 'tester',
       reviewRole: 'mission_controller',
     });
+    const nextArtifactId = result.review.new_artifact_id!;
+    const accepted = reviewDeliverable({
+      artifactId: nextArtifactId,
+      verdict: 'accept',
+      reviewer: 'tester',
+      reviewRole: 'mission_controller',
+    });
 
     expect(result.review.verdict).toBe('request-changes');
     expect(result.review.new_artifact_id).toBeDefined();
+    expect(result.state.latest_review_sequence).toBe(2);
+    expect(result.state.latest_artifact_version).toBe(2);
     expect(result.state.latest_version).toBe(2);
-    expect(loadArtifactRecord(result.review.new_artifact_id!)).toBeTruthy();
-    expect(loadDeliverableReviewState(artifactId)?.reviews).toHaveLength(1);
+    expect(accepted.state.latest_review_sequence).toBe(3);
+    expect(accepted.state.latest_artifact_version).toBe(2);
+    expect(loadArtifactRecord(nextArtifactId)).toBeTruthy();
+    expect(loadDeliverableReviewState(artifactId)?.reviews).toHaveLength(2);
   });
 });
