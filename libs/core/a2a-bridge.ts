@@ -170,7 +170,8 @@ class A2ABridgeImpl {
     const handle = await this.ensureAgent(agentId, provider, envelope.payload, runtimeContextKey);
 
     // Extract prompt from payload
-    let prompt = this.buildPromptFromPayload(envelope.payload);
+    const rawPrompt = this.buildPromptFromPayload(envelope.payload);
+    let runtimePrompt = rawPrompt;
     let rehydrated = false;
 
     const conversationId = envelope.header.conversation_id;
@@ -192,7 +193,7 @@ class A2ABridgeImpl {
         ) {
           const rehydrationPrefix = rehydrateConversation(conversationId);
           if (rehydrationPrefix) {
-            prompt = rehydrationPrefix + prompt;
+            runtimePrompt = rehydrationPrefix + rawPrompt;
             rehydrated = true;
             logger.info(
               `[A2A_BRIDGE] Rehydrating conversation ${conversationId} due to session change from ${lastTurn.provider_session_id} to ${currentSessionId}`
@@ -205,12 +206,12 @@ class A2ABridgeImpl {
         sender: envelope.header.sender,
         receiver: agentId,
         performative: envelope.header.performative,
-        prompt,
+        prompt: rawPrompt,
         missionId,
       });
     }
 
-    logger.info(`[A2A_BRIDGE] Routing to ${agentId}: "${prompt.slice(0, 80)}..."`);
+    logger.info(`[A2A_BRIDGE] Routing to ${agentId}: "${runtimePrompt.slice(0, 80)}..."`);
 
     try {
       emitMissionOrchestrationObservation({
@@ -238,7 +239,7 @@ class A2ABridgeImpl {
           typeof envelope.payload?.intent === 'string'
             ? String(envelope.payload.intent)
             : undefined,
-        prompt_excerpt: prompt.slice(0, 240),
+        prompt_excerpt: runtimePrompt.slice(0, 240),
       });
     } catch (error: any) {
       logger.warn(
@@ -266,7 +267,7 @@ class A2ABridgeImpl {
       try {
         const result = await askAgentRuntimeViaDaemon({
           agentId,
-          prompt,
+          prompt: runtimePrompt,
           requestedBy: 'a2a_bridge',
           correlationId,
           ...(taskModelHint ? { taskModelHint } : {}),
@@ -282,9 +283,7 @@ class A2ABridgeImpl {
           );
           await this.ensureAgent(agentId, provider, envelope.payload, runtimeContextKey);
           const rehydrationPrefix = conversationId ? rehydrateConversation(conversationId) : '';
-          const retriedPrompt = rehydrationPrefix
-            ? rehydrationPrefix + this.buildPromptFromPayload(envelope.payload)
-            : prompt;
+          const retriedPrompt = rehydrationPrefix ? rehydrationPrefix + rawPrompt : runtimePrompt;
           rehydrated = true;
 
           appendSupervisorEvent({
@@ -323,7 +322,7 @@ class A2ABridgeImpl {
       try {
         responseText = await globalSemaphore.run(() =>
           agentSem.run(() =>
-            askAgentRuntime(agentId, prompt, 'a2a_bridge', {
+            askAgentRuntime(agentId, runtimePrompt, 'a2a_bridge', {
               correlationId,
               ...(taskModelHint ? { taskModelHint } : {}),
             })
@@ -336,9 +335,7 @@ class A2ABridgeImpl {
           );
           await this.ensureAgent(agentId, provider, envelope.payload, runtimeContextKey);
           const rehydrationPrefix = conversationId ? rehydrateConversation(conversationId) : '';
-          const retriedPrompt = rehydrationPrefix
-            ? rehydrationPrefix + this.buildPromptFromPayload(envelope.payload)
-            : prompt;
+          const retriedPrompt = rehydrationPrefix ? rehydrationPrefix + rawPrompt : runtimePrompt;
           rehydrated = true;
 
           appendSupervisorEvent({
