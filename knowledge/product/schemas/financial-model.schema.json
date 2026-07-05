@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "FinancialModel",
+  "type": "object",
+  "required": ["company_id", "tenant_slug", "source_kind", "source_path", "periods"],
+  "properties": {
+    "company_id": { "type": "string" },
+    "tenant_slug": { "type": ["string", "null"] },
+    "source_kind": {
+      "type": "string",
+      "enum": ["customer", "confidential", "public", "derived"]
+    },
+    "source_path": { "type": "string" },
+    "periods": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["period_id", "label"],
+        "properties": {
+          "period_id": { "type": "string" },
+          "label": { "type": "string" },
+          "revenue_jpy": { "type": ["number", "null"] },
+          "operating_cost_jpy": { "type": ["number", "null"] },
+          "gross_profit_jpy": { "type": ["number", "null"] },
+          "cash_balance_jpy": { "type": ["number", "null"] },
+          "budget_jpy": { "type": ["number", "null"] },
+          "forecast_jpy": { "type": ["number", "null"] },
+          "note": { "type": ["string", "null"] }
+        }
+      }
+    }
+  }
+}

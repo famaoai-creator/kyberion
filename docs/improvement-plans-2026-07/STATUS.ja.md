@@ -8,9 +8,9 @@
 
 | 判定    | 件数 |
 | ------- | ---- |
-| DONE    | 22   |
+| DONE    | 25   |
 | PARTIAL | 24   |
-| TODO    | 47   |
+| TODO    | 44   |
 
 ## P0 残作業(プロダクション化のクリティカルパス)
 
@@ -188,8 +188,8 @@
 
 | ID    | 状態 | 残作業                                                               |
 | ----- | ---- | -------------------------------------------------------------------- |
-| CO-01 | TODO | company schema/entity、vision-resolver、getGoldenRule のテナント対応 |
-| CO-02 | TODO | org-chart、カスタムロール作成フロー                                  |
-| CO-03 | TODO | financial-model、okr-tracker                                         |
-| CO-04 | TODO | decision-rights、承認ゲート統合                                      |
-| CO-05 | TODO | 基幹業務テンプレート(決算/取締役会/採用/調達 等)                     |
+| CO-01 | DONE | company schema/entity、vision-resolver、getGoldenRule のテナント対応(集約基盤完了 / dashboard + management-control-plane 起点化も実装済み) |
+| CO-02 | DONE | org-chart、カスタムロール作成フロー(組織図 loader/plan/role create CLI / role promote 昇格フロー / business role act grants 完了) |
+| CO-03 | DONE | financial-model、okr-tracker、finance_controller 経営判断フロー、Company/Chronos 表示 |
+| CO-04 | DONE | decision-rights read-view、Company 連結、黄金律タイブレーク、approval-audit drill-down 可視化 |
+| CO-05 | DONE | 基幹業務テンプレート(財務決算/取締役会/予算レビュー/採用/調達/人事評価/資金調達準備を追加)                     |
