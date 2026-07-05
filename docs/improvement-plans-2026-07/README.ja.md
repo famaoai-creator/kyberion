@@ -237,6 +237,7 @@ surface が提供する UI の機能的アフォーダンスの調査(2026-07-03
 | [E2E-01](./E2E-01_MEETING_TO_VALUE.ja.md) | 会議→価値提供の縦一気通貫(声学習→本人ボイス会議→議事録→アクションアイテム→タスク→顧客提供) | **P0** | M | なし(AC-01/UX-01/OP-02 の成果を利用) |
 | [E2E-02](./E2E-02_CREATIVE_SUITE.ja.md) | クリエイティブ統合(動画・パワポ・音楽・MV・Web を1つのデザインシステムで)| **P0** | M〜L | DS-01。DS-02/DS-04 未了分を引き取る |
 | [E2E-03](./E2E-03_AGENT_COLLABORATION.ja.md) | エージェント協調(上流成果の可視化・review往復・best-of-N・PR協調)| **P0** | M〜L | MO-03/MO-04/HO-01/IL-01 を利用。MO-02 と棲み分け |
+| [E2E-04](./E2E-04_OPERATOR_INTERFACE.ja.md) | オペレータ・インターフェース統合(入口・ホーム・通知・inbox・plan-preview・CLI 経路統一) | **P0** | M〜L | UX-01/IL-01/E2E-01〜03 の成果を利用。SU-01/SU-03 の最小形 |
 
 ### Company OS(会社を経営する OS 層)
 
