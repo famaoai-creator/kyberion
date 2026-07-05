@@ -1,0 +1,92 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "fundraising-prep",
+  "version": "2.0.0",
+  "name": "Fundraising Prep",
+  "description": "Fundraising preparation workflow that turns company and financial context into an investor brief and dataroom checklist.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes).",
+  "context": {
+    "mission_id": "",
+    "tenant_slug": "",
+    "company_context_path": "active/shared/tmp/fundraising-company-context-{{mission_id}}.json",
+    "investor_brief_path": "active/shared/tmp/fundraising-investor-brief-{{mission_id}}.md",
+    "dataroom_checklist_path": "active/shared/tmp/fundraising-dataroom-{{mission_id}}.json"
+  },
+  "steps": [
+    {
+      "id": "preflight",
+      "role": "gate",
+      "op": "core:include",
+      "params": { "fragment": "fragments/runtime-preflight.json" }
+    },
+    {
+      "id": "log_start",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "💰 Fundraising prep start for mission {{mission_id}} tenant={{tenant_slug}}"
+      }
+    },
+    {
+      "id": "read_company_context",
+      "role": "source",
+      "op": "system:read_file",
+      "produces": { "channel": "company_context", "type": "CompanyContext" },
+      "params": {
+        "path": "{{company_context_path}}"
+      }
+    },
+    {
+      "id": "draft_investor_brief",
+      "role": "transform",
+      "op": "reasoning:analyze",
+      "consumes": "company_context",
+      "produces": { "channel": "investor_brief", "type": "InvestorBriefMarkdown" },
+      "params": {
+        "instruction": "以下の company context をもとに、資金調達準備用の investor brief を Markdown で作成してください。CO-03 の財務・KPI・OKR を軸に、投資家向けに過度に断定しすぎず要点を整理してください。\n\n必須セクション:\n# Fundraising Prep\n## 会社概要\n## 直近の実績\n## 財務サマリ\n## KPI / OKR サマリ\n## 調達ストーリーの骨子\n## デューデリジェンスで必要な資料\n## 未確定事項\n\n要件:\n- 事実と推測を分ける\n- 財務・KPI が存在しない場合はその欠落を明示する\n- 投資家に見せる前提の確認事項を列挙する",
+        "context": ["{{mission_id}}", "{{tenant_slug}}", "{{company_context}}"]
+      }
+    },
+    {
+      "id": "write_investor_brief",
+      "role": "sink",
+      "op": "system:write_artifact",
+      "consumes": "investor_brief",
+      "params": {
+        "path": "{{investor_brief_path}}",
+        "content": "{{investor_brief}}"
+      }
+    },
+    {
+      "id": "write_dataroom_checklist",
+      "role": "sink",
+      "op": "system:write_file",
+      "params": {
+        "path": "{{dataroom_checklist_path}}",
+        "content": {
+          "kind": "fundraising-dataroom-checklist",
+          "mission_id": "{{mission_id}}",
+          "tenant_slug": "{{tenant_slug}}",
+          "company_context_path": "{{company_context_path}}",
+          "investor_brief_path": "{{investor_brief_path}}",
+          "includes": [
+            "company overview",
+            "financial model",
+            "okr tracker",
+            "decision rights",
+            "board prep"
+          ]
+        },
+        "format": "json"
+      }
+    },
+    {
+      "id": "log_done",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "✅ Fundraising prep complete: {{investor_brief_path}}"
+      }
+    }
+  ]
+}

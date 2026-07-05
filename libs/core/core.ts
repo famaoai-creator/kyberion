@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import * as v8 from 'node:v8';
 import * as readline from 'node:readline';
 import { pathResolver } from './path-resolver.js';
+import { resolveVision } from './vision-resolver.js';
 import {
   rawExistsSync,
   rawMkdirp,
@@ -129,11 +130,17 @@ export const ui = {
       if (data.length <= maxItems) return data;
       const head = data.slice(0, Math.ceil(maxItems / 2));
       const tail = data.slice(-Math.floor(maxItems / 2));
-      return [...head, color('dim', '... (' + (data.length - maxItems) + ' more items) ...'), ...tail];
+      return [
+        ...head,
+        color('dim', '... (' + (data.length - maxItems) + ' more items) ...'),
+        ...tail,
+      ];
     }
     if (typeof data === 'string' && data.length > 500) {
       return (
-        data.substring(0, 250) + color('dim', '\n\n... (content truncated) ...\n\n') + data.slice(-250)
+        data.substring(0, 250) +
+        color('dim', '\n\n... (content truncated) ...\n\n') +
+        data.slice(-250)
       );
     }
     return data;
@@ -421,6 +428,12 @@ export const fileUtils = {
     }
   },
   getGoldenRule: () => {
+    try {
+      const resolvedVision = resolveVision();
+      if (resolvedVision.raw.trim()) return resolvedVision.raw;
+    } catch {
+      // fall through to the global hard-coded fallback below
+    }
     const rulePath = pathResolver.vision('_default.md');
     if (rawExistsSync(rulePath)) {
       return rawReadTextFile(rulePath);

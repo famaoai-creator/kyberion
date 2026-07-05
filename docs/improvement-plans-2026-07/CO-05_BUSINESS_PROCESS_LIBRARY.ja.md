@@ -45,3 +45,13 @@
 - テンプレートを作りすぎて使われない「棚卸し倒れ」を避ける。**実際に市村さんが回す業務**(SBI グループ文脈・deal-tracker 等の既存実運用)を優先し、汎用の理想形でなく実需から作る。
 - 財務決算・人事・調達は決裁と機密を伴う。CO-04 の決裁権限・SA の統制・tier 隔離を必ず通す。自動化は「準備・下書き」まで、最終決裁は人間(判断基準の不可逆×広域は人間)。
 - 外部システム(会計・ATS・調達)との実連携は AC-05(日本 SaaS)/ AC 系に委ね、本計画は Kyberion 内のプロセス骨格に集中(二重実装しない)。
+
+## 実装メモ
+
+- 2026-07-05: `knowledge/product/pipeline-templates/financial-close-monthly.json` / `board-meeting-prep.json` / `budget-review.json` を追加し、月次決算・取締役会準備・予算レビューの最小プロセスをテンプレート化した。
+- 2026-07-05: `knowledge/product/governance/mission-workflow-catalog.json` に上記 3 テンプレートの選択規則を追加し、`mission-workflow-catalog` から実行相を引けるようにした。
+- 2026-07-05: `knowledge/product/pipeline-templates/hiring-workflow.json` を追加し、JD 下書き・面接調整・評価メモまでを採用フローとして型化した。`talent_culture` / `line_manager` の役割に接続する最小経路を実装した。
+- 2026-07-05: `knowledge/product/governance/mission-workflow-catalog.json` に `hiring-workflow` の選択規則を追加した。
+- 2026-07-05: `knowledge/product/pipeline-templates/procurement-vendor.json` / `performance-review.json` / `fundraising-prep.json` を追加し、調達・人事評価・資金調達準備の最小プロセスをテンプレート化した。
+- 2026-07-05: `knowledge/product/governance/mission-workflow-catalog.json` に上記 3 テンプレートの選択規則を追加した。
+- 完了: CO-05 の基幹業務テンプレート 6 本を揃え、`mission-workflow-catalog` から選択可能になった。

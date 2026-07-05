@@ -11,6 +11,12 @@
 - **パッチ適用は完全手動**: 透過的依存の CVE は、人間が赤い CI に気づいて手で `package.json`/lockfile を編集するまで放置。
 - コード脆弱性スキャン(semgrep、code-actuator、AC-01)は別物で、依存 CVE を見ない。
 
+## 実装状況 (2026-07-05)
+
+- **完了済み(Task 1)**: `scripts/scan_dependency_vulns.ts` を新設し、`pnpm audit --json` / `pnpm outdated --json` の出力から CVE 候補を抽出して `active/shared/runtime/vuln-ledger.jsonl` に追記する経路を実装した。
+- **完了済み(Task 2)**: `libs/core/patch-decision.ts` を新設し、§3 の判断ルーブリックを `auto_apply | urgent_approval | scheduled | defer | approval` に落とし込んだ。
+- **進行中(Task 3)**: `pipelines/dependency-vuln-scan.json` と `pnpm vuln:scan` を追加し、定期スキャンを配線した。適用フローは未了。
+
 ## ゴール(受入条件)
 
 1. 依存の更新候補と CVE が**定期的に検出・追跡**される(CVE 追跡台帳: CVE・該当依存・severity・到達可能性・状態)。

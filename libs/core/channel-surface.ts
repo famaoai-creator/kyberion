@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { safeAppendFileSync, safeExec, safeExistsSync, safeReaddir } from './secure-io.js';
+import { processUntrustedContent } from './untrusted-content.js';
 import { type GovernedArtifactRole } from './artifact-store.js';
 import {
   deriveSlackExecutionMode,
@@ -110,7 +111,11 @@ export type {
   OnboardingTurnResult,
 } from './channel-surface-types.js';
 
-export type { SlackApprovalRequestDraft, SlackApprovalRequestRecord, SlackOutboxMessage } from './channel-surface-types.js';
+export type {
+  SlackApprovalRequestDraft,
+  SlackApprovalRequestRecord,
+  SlackOutboxMessage,
+} from './channel-surface-types.js';
 
 export function prepareSlackSurfaceArtifact(input: SlackSurfaceInput): SlackSurfaceArtifact {
   const ts = new Date().toISOString();
@@ -118,7 +123,9 @@ export function prepareSlackSurfaceArtifact(input: SlackSurfaceInput): SlackSurf
   const stimulusId = correlationId;
   const threadTs = input.threadTs || input.ts || ts;
   const context = `${input.channel}:${threadTs}`;
-  const cleanPayload = input.text.trim();
+  const rawPayload = input.text.trim();
+  const processed = processUntrustedContent(rawPayload, `slack:${input.user || 'unknown'}`);
+  const cleanPayload = processed.wrapped;
   const shouldAck = input.channelType === 'im';
   const ackText = 'Received. I am routing this to Kyberion now.';
 

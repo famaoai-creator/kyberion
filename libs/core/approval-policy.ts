@@ -1,6 +1,7 @@
 import * as customerResolver from './customer-resolver.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { isInjectionSuspected } from './untrusted-content.js';
 
 export interface ApprovalPolicyRule {
   id: string;
@@ -91,6 +92,33 @@ export function resolveApprovalPolicy(input: {
   payload?: Record<string, unknown>;
 }): ApprovalPolicyResolution {
   const policy = loadApprovalPolicy();
+
+  if (isInjectionSuspected()) {
+    const isEgress =
+      /egress|network|http|https|fetch|request/i.test(input.intentId || '') ||
+      Boolean(input.payload?.url) ||
+      Boolean(input.payload?.base_url);
+    const isShell =
+      /shell|command|exec|run_shell|bash/i.test(input.intentId || '') ||
+      /(?:rm\s+-rf|curl\s+.*\|\s*(?:sh|bash|zsh|fish)|wget\s+.*\|\s*(?:sh|bash|zsh|fish)|base64\s+-(?:d|decode)|eval\s|\bexec\s*\()/i.test(
+        String(input.payload?.command ?? input.payload?.cmd ?? input.payload?.script ?? '')
+      );
+    const isModify =
+      /write|edit|update|delete|destroy|remove|deploy|release|publish|restart|stop|start/i.test(
+        input.intentId || ''
+      ) ||
+      /(?:write|edit|update|delete|destroy|remove|deploy|release|publish|restart|stop|start|wipe|purge)/i.test(
+        String(input.payload?.operation ?? input.payload?.action ?? '')
+      );
+
+    if (isEgress || isShell || isModify) {
+      return {
+        requiresApproval: true,
+        missingRequirements: ['approval_confirmation'],
+        matchedRuleId: 'injection-suspected-override',
+      };
+    }
+  }
   for (const rule of policy.rules || []) {
     if (rule.intent_ids?.length && (!input.intentId || !rule.intent_ids.includes(input.intentId)))
       continue;

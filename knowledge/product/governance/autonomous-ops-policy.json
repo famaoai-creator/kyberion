@@ -1,0 +1,70 @@
+{
+  "version": "1.0.0",
+  "decision_thresholds": {
+    "auto_max_score": 3,
+    "notify_max_score": 6
+  },
+  "axis_weights": {
+    "scope": 1,
+    "reversibility": 1,
+    "sensitivity": 1,
+    "confidence": 1
+  },
+  "actions": {
+    "storage_janitor": {
+      "title": "Storage janitor",
+      "description": "Remove stale runtime and temporary artifacts after safe verification.",
+      "axis_scores": {
+        "scope": 2,
+        "reversibility": 2,
+        "sensitivity": 1,
+        "confidence": 2
+      },
+      "budget_cap_tokens": 2000
+    },
+    "baseline_health_scan": {
+      "title": "Baseline health scan",
+      "description": "Run the baseline health and maintenance readiness scan.",
+      "axis_scores": {
+        "scope": 0,
+        "reversibility": 0,
+        "sensitivity": 0,
+        "confidence": 1
+      },
+      "budget_cap_tokens": 1000
+    },
+    "tenant_drift_watch": {
+      "title": "Tenant drift watch",
+      "description": "Observe tenant drift and surface drift signals.",
+      "axis_scores": {
+        "scope": 1,
+        "reversibility": 0,
+        "sensitivity": 1,
+        "confidence": 2
+      },
+      "budget_cap_tokens": 1500
+    },
+    "dependency_vuln_scan": {
+      "title": "Dependency vulnerability scan",
+      "description": "Scan dependency vulnerabilities and append to the ledger.",
+      "axis_scores": {
+        "scope": 1,
+        "reversibility": 0,
+        "sensitivity": 1,
+        "confidence": 1
+      },
+      "budget_cap_tokens": 4000
+    },
+    "auto_checkpoint": {
+      "title": "Automatic checkpoint",
+      "description": "Persist a durable checkpoint for long-running maintenance.",
+      "axis_scores": {
+        "scope": 0,
+        "reversibility": 0,
+        "sensitivity": 0,
+        "confidence": 1
+      },
+      "budget_cap_tokens": 1000
+    }
+  }
+}

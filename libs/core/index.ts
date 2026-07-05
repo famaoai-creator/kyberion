@@ -122,6 +122,7 @@ export * from './mission-gate-engine.js';
 export * from './handoff-packet.js';
 export * from './presentation-slide-pattern.js';
 export * from './web-design-system.js';
+export * from './managed-process.js';
 export * from './meeting-environment-policy.js';
 export * from './meeting-participation-runtime-plan.js';
 export * from './deliverable-quality.js';
@@ -129,6 +130,8 @@ export { resolveInputBindings, classifyInputId, isPathInput } from './input-bind
 export type { InputBinding, InputBindingType } from './input-binding.js';
 export { distillIncident, summarizeIncidents } from './incident-distiller.js';
 export type { IncidentInput, IncidentRecord } from './incident-distiller.js';
+export * from './autonomous-ops-gate.js';
+export * from './patch-decision.js';
 export { recordTelemetryEvent, isTelemetryEnabled, readTelemetryStats } from './telemetry.js';
 export type { TelemetryEvent, TelemetryEventType, TelemetryStats } from './telemetry.js';
 export {
@@ -150,6 +153,13 @@ export type {
 export { renderStatus, renderVocabularyText, resolveVocabularyLocale } from './ux-vocabulary.js';
 export type { UxStatusDomain, UxVocabularyLocale } from './ux-vocabulary.js';
 export { resolveActiveProfileRoot } from './profile-root.js';
+export * from './company.js';
+export * from './financial-model.js';
+export * from './finance-controller.js';
+export * from './okr-tracker.js';
+export * from './decision-rights.js';
+export * from './approval-audit.js';
+export * from './org-chart.js';
 export * from './daemon-heartbeat.js';
 export * from './ops-alert.js';
 export * from './chain-integrity.js';
@@ -1067,6 +1077,7 @@ export {
   getReasoningBackend,
   delegateBestOf,
   delegateStructured,
+  delegateTaskWithUntrustedData,
   registerReasoningBackend,
   resetReasoningBackend,
   stubReasoningBackend,
@@ -1372,6 +1383,7 @@ export type {
   SimulationInput,
   SimulationResult,
   SynthesizedPersona,
+  UntrustedDataParams,
 } from './reasoning-backend.js';
 export {
   A2ATaskContractSchema,
@@ -1688,3 +1700,16 @@ export type {
   ExecuteServiceProcedureResult,
 } from './service-procedure-executor.js';
 export { SERVICE_EXTERNAL_EFFECT_OP } from './procedure-dispatcher.js';
+
+// SA-03 Prompt Injection & Untrusted Content Defense
+export type { ScanOptions } from './untrusted-content.js';
+export {
+  wrapUntrusted,
+  scanForInjection,
+  scanForInjectionAsync,
+  isInjectionSuspected,
+  setInjectionSuspected,
+  processUntrustedContent,
+  processUntrustedContentAsync,
+  sanitizeUntrustedContentAsync,
+} from './untrusted-content.js';
