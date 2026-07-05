@@ -55,6 +55,7 @@ If `pnpm setup:report` shows auth or connection gaps:
 - Run `pnpm surfaces:setup` to inspect surface readiness.
 - Run `pnpm services:setup` to inspect service auth and connection files.
 - Fix the missing secret, preset, or connection file, then re-run `pnpm setup:report`.
+- Chronos control-plane routes still rely on `KYBERION_API_TOKEN` or `KYBERION_LOCALADMIN_TOKEN` locally; moving those routes to IdP-backed user sessions is still a follow-up task.
 
 ## 5. When to ask for more context
 

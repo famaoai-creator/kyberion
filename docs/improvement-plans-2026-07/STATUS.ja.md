@@ -100,7 +100,7 @@
 | DS-01 | PARTIAL | 生成ゲートの validate チェーン接続、operator-surface 残り約124 hex の変換 |
 | DS-02 | PARTIAL | tier 隔離テスト(受入4)、DESIGN_SYSTEM.md テナント節                       |
 | DS-03 | DONE    | pptx ea 日本語フォント、PDF CJK 埋め込み、日文ゴールデン                  |
-| DS-04 | PARTIAL | 動画シーンテンプレートの var(--kb-\*) 化、Task 4 の実写検証待ち            |
+| DS-04 | PARTIAL | 動画シーンテンプレートの var(--kb-\*) 化、Task 4 の実写検証待ち           |
 | DS-05 | TODO    | reduced-motion、コントラストゲート、light/dark トグル、ARIA               |
 
 ### AA(エージェント間通信)
@@ -162,12 +162,12 @@
 
 ### SU(Surface UI)
 
-| ID    | 状態 | 残作業                                                   |
-| ----- | ---- | -------------------------------------------------------- |
-| SU-01 | TODO | plan-preview API、オペレータホーム(IL-01/04, MO-01 依存) |
-| SU-02 | TODO | pause/cancel/intervention_respond、kb-panel 配線         |
-| SU-03 | TODO | 成果物インボックス、verdict、版管理                      |
-| SU-04 | TODO | 履歴検索、コスト UI、承認キュー(OP-01 依存)              |
+| ID    | 状態    | 残作業                                                     |
+| ----- | ------- | ---------------------------------------------------------- |
+| SU-01 | PARTIAL | plan-preview API、Chronos ホーム最小形、承認開始導線の残余 |
+| SU-02 | TODO    | pause/cancel/intervention_respond、kb-panel 配線           |
+| SU-03 | PARTIAL | inbox entries、operator-surface /inbox、版管理の残余       |
+| SU-04 | TODO    | 履歴検索、コスト UI、承認キュー(OP-01 依存)                |
 
 ### E2E(オペレータ接点の最小統合)
 
