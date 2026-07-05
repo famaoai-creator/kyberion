@@ -236,6 +236,7 @@ export async function createMission(args: {
         riskProfile: classification.risk_profile,
         stage: classification.stage,
         executionShape: 'mission',
+        missionTypeHint: missionType,
       })
     : undefined;
   if (classification && workflowDesign) {
@@ -460,6 +461,7 @@ export async function startMission(args: {
               riskProfile: classification.risk_profile,
               stage: classification.stage,
               executionShape: 'mission',
+              missionTypeHint: state.mission_type,
             });
             return {
               workflow_id: workflow.workflow_id,

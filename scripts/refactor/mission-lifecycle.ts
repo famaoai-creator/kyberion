@@ -6,6 +6,7 @@
 import * as path from 'node:path';
 import {
   findMissionPath,
+  customerResolver,
   grantAccess,
   grantAccessGuarded,
   createActuatorTrace,
@@ -17,6 +18,8 @@ import {
   pathResolver,
   queueMissionMemoryPromotionCandidate,
   safeExec,
+  safeAppendFileSync,
+  safeCopyFileSync,
   safeExistsSync,
   safeMkdir,
   safeReaddir,
@@ -44,6 +47,164 @@ function collectMissionEvidenceRefs(missionDir: string): string[] {
   return safeReaddir(evidenceDir)
     .filter((entry) => entry !== '.gitkeep')
     .map((entry) => path.join(missionDir, 'evidence', entry));
+}
+
+function publishMeetingDeliverablesIfNeeded(input: {
+  missionId: string;
+  missionDir: string;
+  state: any;
+  completionNextAction: any;
+  traceCtx: ReturnType<typeof createActuatorTrace>;
+}): void {
+  if (input.state.mission_type !== 'meeting_facilitation') return;
+
+  let activeCustomerSlug: string | null = null;
+  try {
+    activeCustomerSlug = customerResolver.activeCustomer(process.env);
+  } catch (err: any) {
+    logger.warn(
+      `⚠️ [DELIVERY] Meeting deliverables skipped for ${input.missionId}: ${err?.message || err}`
+    );
+    input.traceCtx.addEvent('meeting_delivery.skipped', {
+      reason: 'invalid_customer_slug',
+    });
+    return;
+  }
+
+  const tenantSlug = String(input.state.tenant_slug || '').trim();
+  if (!tenantSlug || !activeCustomerSlug || activeCustomerSlug !== tenantSlug) {
+    input.traceCtx.addEvent('meeting_delivery.skipped', {
+      reason: !tenantSlug ? 'missing_tenant_slug' : 'customer_mismatch',
+    });
+    return;
+  }
+
+  const customerRoot = customerResolver.customerRoot('', process.env);
+  if (!customerRoot || !safeExistsSync(customerRoot)) {
+    logger.warn(
+      `⚠️ [DELIVERY] Meeting deliverables skipped for ${input.missionId}: customer root missing for ${tenantSlug}.`
+    );
+    input.traceCtx.addEvent('meeting_delivery.skipped', {
+      reason: 'customer_root_missing',
+    });
+    return;
+  }
+
+  const evidenceDir = path.join(input.missionDir, 'evidence');
+  const deliverablesRoot = path.join(customerRoot, 'deliverables');
+  const missionDeliverablesDir = path.join(deliverablesRoot, input.missionId);
+  safeMkdir(missionDeliverablesDir, { recursive: true });
+
+  const copiedArtifacts: Array<{ kind: string; path: string; description: string }> = [];
+  const copyArtifact = (relativeName: string, kind: string, description: string): void => {
+    const sourcePath = path.join(evidenceDir, relativeName);
+    if (!safeExistsSync(sourcePath)) return;
+    const destinationPath = path.join(missionDeliverablesDir, relativeName);
+    safeMkdir(path.dirname(destinationPath), { recursive: true });
+    safeCopyFileSync(sourcePath, destinationPath);
+    copiedArtifacts.push({
+      kind,
+      path: path.relative(customerRoot, destinationPath),
+      description,
+    });
+  };
+
+  copyArtifact('minutes.md', 'minutes', 'Meeting minutes for the follow-up delivery.');
+  copyArtifact(
+    'action-items.jsonl',
+    'action-items',
+    'Structured action items captured from the meeting.'
+  );
+  copyArtifact(
+    'meeting-followup-pack.json',
+    'delivery-pack-source',
+    'Pipeline-generated follow-up pack.'
+  );
+
+  if (copiedArtifacts.length === 0) {
+    logger.warn(
+      `⚠️ [DELIVERY] Meeting deliverables skipped for ${input.missionId}: no follow-up evidence found under ${evidenceDir}.`
+    );
+    input.traceCtx.addEvent('meeting_delivery.skipped', {
+      reason: 'no_followup_evidence',
+    });
+    return;
+  }
+
+  let minutesExcerpt = '';
+  const minutesPath = path.join(missionDeliverablesDir, 'minutes.md');
+  if (safeExistsSync(minutesPath)) {
+    const minutes = String(safeReadFile(minutesPath, { encoding: 'utf8' }));
+    minutesExcerpt = minutes.split(/\r?\n/u).slice(0, 8).join('\n').trim();
+  }
+
+  const summary = [
+    `Meeting follow-up delivered for ${input.missionId} to customer ${tenantSlug}.`,
+    input.completionNextAction?.request || input.state.outcome_contract?.requested_result || '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+  const pack = {
+    kind: 'delivery-pack',
+    pack_id: `${input.missionId}-meeting-delivery`,
+    summary,
+    request_text:
+      input.completionNextAction?.request || input.state.outcome_contract?.requested_result,
+    ...(minutesExcerpt ? { conversation_summary: minutesExcerpt } : {}),
+    recommended_next_action: input.completionNextAction?.next_step,
+    artifacts_by_role: {
+      primary: [
+        path.relative(customerRoot, path.join(missionDeliverablesDir, 'delivery-summary.md')),
+      ],
+      evidence: copiedArtifacts.map((artifact) => artifact.path),
+    },
+    artifacts: copiedArtifacts.map((artifact, index) => ({
+      id: `${input.missionId}-${index + 1}`,
+      kind: artifact.kind,
+      path: artifact.path,
+      description: artifact.description,
+    })),
+  };
+
+  safeWriteFile(
+    path.join(missionDeliverablesDir, 'delivery-summary.md'),
+    [
+      `# Meeting Delivery Summary`,
+      ``,
+      `- Mission: ${input.missionId}`,
+      `- Tenant: ${tenantSlug}`,
+      `- Summary: ${summary}`,
+      `- Deliverables:`,
+      ...copiedArtifacts.map((artifact) => `  - ${artifact.path} (${artifact.kind})`),
+    ].join('\n')
+  );
+  safeWriteFile(
+    path.join(missionDeliverablesDir, 'delivery-pack.json'),
+    JSON.stringify(pack, null, 2)
+  );
+
+  const deliveryLogPath = path.join(deliverablesRoot, 'delivery-log.jsonl');
+  safeAppendFileSync(
+    deliveryLogPath,
+    `${JSON.stringify({
+      mission_id: input.missionId,
+      tenant_slug: tenantSlug,
+      delivered_at: new Date().toISOString(),
+      deliverable_dir: path.relative(pathResolver.rootDir(), missionDeliverablesDir),
+      artifacts: copiedArtifacts.map((artifact) => artifact.path),
+      summary,
+    })}\n`
+  );
+
+  input.traceCtx.addEvent('meeting_delivery.published', {
+    artifact_count: copiedArtifacts.length,
+  });
+  logger.info(
+    `📦 [DELIVERY] Published meeting deliverables for ${input.missionId} to ${path.relative(
+      pathResolver.rootDir(),
+      missionDeliverablesDir
+    )}.`
+  );
 }
 
 function sidecarPathForMarkdown(mdPath: string): string {
@@ -623,6 +784,21 @@ export async function finishMission(
   await saveState(upperId, state);
   await args.syncProjectLedgerIfLinked(upperId);
   traceCtx.addEvent('ledger.synced', { evidence_count: evidenceRefs.length });
+
+  traceCtx.startSpan('mission:customer-delivery');
+  try {
+    publishMeetingDeliverablesIfNeeded({
+      missionId: upperId,
+      missionDir,
+      state,
+      completionNextAction,
+      traceCtx,
+    });
+    traceCtx.endSpan('ok');
+  } catch (err: any) {
+    logger.warn(`⚠️ [DELIVERY] Meeting deliverables failed for ${upperId}: ${err?.message || err}`);
+    traceCtx.endSpan('error', err?.message || String(err));
+  }
 
   if (seal || (state.tier === 'personal' && process.env.AUTO_SEAL === 'true')) {
     traceCtx.startSpan('mission:seal');
