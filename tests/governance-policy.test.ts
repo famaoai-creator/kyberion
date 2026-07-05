@@ -89,6 +89,22 @@ describe('Governance Policy-as-Code Enforcement', () => {
     expect(safeExistsSync(WISDOM_FILE)).toBe(true);
     safeUnlinkSync(WISDOM_FILE);
   });
+
+  it('Scenario: business roles can act within explicit limited authority scopes', async () => {
+    process.env.KYBERION_PERSONA = 'analyst';
+
+    process.env.MISSION_ROLE = 'finance_controller';
+    expect(validateWritePermission(pathResolver.rootResolve('knowledge/product/governance/finance/monthly-close.md')).allowed).toBe(true);
+
+    process.env.MISSION_ROLE = 'strategic_sales';
+    expect(validateWritePermission(pathResolver.rootResolve('active/projects/proposals/deal-brief.md')).allowed).toBe(true);
+
+    process.env.MISSION_ROLE = 'marketing_growth';
+    expect(validateWritePermission(pathResolver.rootResolve('active/projects/marketing/campaign-brief.md')).allowed).toBe(true);
+
+    process.env.MISSION_ROLE = 'finance_controller';
+    expect(validateWritePermission(pathResolver.rootResolve('knowledge/product/roles/cfo/PROCEDURE.md')).allowed).toBe(false);
+  });
 });
 
 describe('Read Permission Control (validateReadPermission)', () => {
