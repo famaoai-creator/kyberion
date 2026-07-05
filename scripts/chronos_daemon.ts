@@ -20,8 +20,8 @@ import {
 import {
   registerScheduledPipeline,
   getSchedulesDueNow,
-  loadScheduleRegistry,
-  saveScheduleRegistry,
+  claimScheduledPipelineRun,
+  completeScheduledPipelineRun,
 } from '@agent/core/pipeline-scheduler';
 import { readValidatedPipelineAdf } from './refactor/adf-input.js';
 import { runSteps } from './run_pipeline.js';
@@ -92,24 +92,25 @@ function syncSchedulesFromAdf(): void {
 // ---------------------------------------------------------------------------
 
 async function tick(): Promise<void> {
+  const now = new Date();
   recordDaemonHeartbeat('chronos-daemon', {
     status: 'running',
     details: { phase: 'tick' },
   });
-  const due = getSchedulesDueNow();
+  const due = getSchedulesDueNow(undefined, now);
   if (due.length === 0) return;
 
   logger.info(`[CHRONOS] ${due.length} pipeline(s) due`);
 
   for (const scheduled of due) {
-    logger.info(`[CHRONOS] → Starting: ${scheduled.id}`);
+    const claimed = claimScheduledPipelineRun(scheduled.id, { now });
+    if (!claimed || !claimed.runLock) {
+      logger.info(`[CHRONOS] → Skipped: ${scheduled.id} (already running or no longer due)`);
+      continue;
+    }
 
-    // Stamp lastRun optimistically before execution to prevent duplicate fires
-    // in case the run takes longer than a tick interval.
-    const registry = loadScheduleRegistry();
-    const entry = registry.schedules.find((s) => s.id === scheduled.id);
-    if (entry) entry.lastRun = new Date().toISOString();
-    saveScheduleRegistry(registry);
+    const runToken = claimed.runLock.token;
+    logger.info(`[CHRONOS] → Starting: ${scheduled.id}`);
 
     try {
       const adf = readValidatedPipelineAdf(scheduled.pipelinePath);
@@ -119,17 +120,16 @@ async function tick(): Promise<void> {
         { pipelinePath: scheduled.pipelinePath }
       );
 
-      const registry2 = loadScheduleRegistry();
-      const entry2 = registry2.schedules.find((s) => s.id === scheduled.id);
-      if (entry2) entry2.lastStatus = result.status === 'succeeded' ? 'succeeded' : 'failed';
-      saveScheduleRegistry(registry2);
+      completeScheduledPipelineRun(
+        scheduled.id,
+        runToken,
+        result.status === 'succeeded' ? 'succeeded' : 'failed',
+        { now }
+      );
 
       logger.info(`[CHRONOS] ✓ ${scheduled.id}: ${result.status}`);
     } catch (err: any) {
-      const registry2 = loadScheduleRegistry();
-      const entry2 = registry2.schedules.find((s) => s.id === scheduled.id);
-      if (entry2) entry2.lastStatus = 'failed';
-      saveScheduleRegistry(registry2);
+      completeScheduledPipelineRun(scheduled.id, runToken, 'failed', { now });
 
       logger.error(`[CHRONOS] ✗ ${scheduled.id}: ${err.message}`);
       sendOpsAlert({
