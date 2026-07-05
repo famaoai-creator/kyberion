@@ -6,6 +6,7 @@ import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { getReasoningBackend } from './reasoning-backend.js';
 import { safeReadFile } from './secure-io.js';
+import { isInjectionSuspected } from './untrusted-content.js';
 import { classifyTaskSessionIntent } from './task-session.js';
 import {
   buildOrganizationWorkLoopSummary,
@@ -248,7 +249,10 @@ export interface IntentCompilerTarget {
   modelProvider?: string;
 }
 
-interface IntentCompilerTargetResolutionOptions extends Pick<LlmCompileOptions, 'provider' | 'model' | 'modelProvider'> {
+interface IntentCompilerTargetResolutionOptions extends Pick<
+  LlmCompileOptions,
+  'provider' | 'model' | 'modelProvider'
+> {
   selectedIntent?: StandardIntentDefinition;
   discoveredProviders?: ProviderInfo[];
   modelRegistry?: ModelRegistryFile;
@@ -381,7 +385,9 @@ function stripModelProviderPrefix(modelId: string): string {
   return idx >= 0 ? modelId.slice(idx + 1) : modelId;
 }
 
-function inferCompilerPhaseKind(intent?: StandardIntentDefinition): 'plan' | 'implement' | 'review' | 'mechanical' {
+function inferCompilerPhaseKind(
+  intent?: StandardIntentDefinition
+): 'plan' | 'implement' | 'review' | 'mechanical' {
   const haystack = [
     intent?.id,
     intent?.category,
@@ -1254,7 +1260,14 @@ export function formatClarificationPacket(packet: OperatorInteractionPacket): st
     (packet as any).execution_brief_summary.trim().length > 0
       ? (packet as any).execution_brief_summary
       : undefined;
-  const lines = [packet.headline, packet.summary];
+  const lines: string[] = [];
+  if (isInjectionSuspected()) {
+    lines.push(
+      '⚠️ 外部コンテンツにインジェクションの疑い (Injection suspected in external content)',
+      ''
+    );
+  }
+  lines.push(packet.headline, packet.summary);
   if (briefSummary) {
     lines.push('', `Brief: ${briefSummary}`);
   }
@@ -1286,10 +1299,19 @@ export function formatClarificationPacketConcise(
   const first = questions[0];
   const remaining = questions.length - 1;
 
+  let warning = '';
+  if (isInjectionSuspected()) {
+    warning =
+      '⚠️ 外部コンテンツにインジェクションの疑い (Injection suspected in external content)\n';
+  }
+
   if (!first) {
-    return locale === 'ja'
-      ? '不足している情報はありません。実行を進められます。'
-      : 'No missing inputs. Ready to proceed.';
+    return (
+      warning +
+      (locale === 'ja'
+        ? '不足している情報はありません。実行を進められます。'
+        : 'No missing inputs. Ready to proceed.')
+    );
   }
 
   if (locale === 'ja') {
@@ -1297,14 +1319,14 @@ export function formatClarificationPacketConcise(
     const lines = [`次に必要な情報${moreHint}: \`${first.id}\``, first.question];
     if (first.reason) lines.push(`理由: ${first.reason}`);
     if (first.default_assumption) lines.push(`デフォルト: ${first.default_assumption}`);
-    return lines.join('\n');
+    return warning + lines.join('\n');
   }
 
   const moreHint = remaining > 0 ? ` (+ ${remaining} more)` : '';
   const lines = [`Next required${moreHint}: \`${first.id}\``, first.question];
   if (first.reason) lines.push(`Reason: ${first.reason}`);
   if (first.default_assumption) lines.push(`Default: ${first.default_assumption}`);
-  return lines.join('\n');
+  return warning + lines.join('\n');
 }
 
 export function deriveIntentDeliveryDecision(contract: IntentContract): IntentDeliveryDecision {

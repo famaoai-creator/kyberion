@@ -122,7 +122,8 @@ describe('file-actuator', () => {
         });
 
         expect(result.status).toBe('succeeded');
-        expect(result.context.file_content).toBe('file content here');
+        expect(result.context.file_content).toContain('[UNTRUSTED CONTENT WARNING]');
+        expect(result.context.file_content).toContain('file content here');
         expect((await import('@agent/core')).retry).toHaveBeenCalled();
       });
 
