@@ -1,6 +1,6 @@
 # Ecosystem Knowledge Base Index
 
-_SSoT Index Version: 2.0.0 | Last Updated: 2026-07-04T18:47:20.488Z_
+_SSoT Index Version: 2.0.0 | Last Updated: 2026-07-05T06:00:13.649Z_
 
 > **Volatile / Working-Memory faces** (session, mission, project, personal, daily, weekly) are **not listed here** — they are ephemeral and not SSoT. See the generated volatile index: [`active/INDEX.volatile.md`](../active/INDEX.volatile.md) (non-SSoT, refreshed by `pnpm pipeline --input pipelines/volatile-index.json`). Schema: `schemas/volatile-knowledge.schema.json`.
 
@@ -8,16 +8,6 @@ _SSoT Index Version: 2.0.0 | Last Updated: 2026-07-04T18:47:20.488Z_
 
 - [Ecosystem Architecture & Knowledge Map](./Ecosystem_Map.md) (public | Kyberion Sovereign Entity)
 - [Kyberion Knowledge Base: Rights & Usage](./README.md) (public | Unknown)
-
-## 📁 evolution
-
-- [Adaptive Resilience and Backlog Recovery for Service Actuators](./evolution/distill_resilience-actuators-v1_2026_05_11.md) (public | Kyberion Wisdom Distiller)
-- [Executive ADF Pipelines with Environment-Resilient Validation](./evolution/distill_msn-executive-pipelines_2026_05_02.md) (public | Kyberion Wisdom Distiller)
-- [Fail-Closed Validation for Receipt Timestamps](./evolution/distill_production-receipt-malformed-timestamps_2026_05_15.md) (public | Kyberion Wisdom Distiller)
-- [Hardening Schema Validation for Non-Blank Text Fields](./evolution/distill_production-evidence-register-text-nonblank_2026_05_15.md) (public | Kyberion Wisdom Distiller)
-- [Mission BOARD-PROTOCOL-COMMONIZATION-2026-04-30 Completion Summary](./evolution/distill_board-protocol-commonization-2026-04-30_2026_04_29.md) (public | Kyberion Wisdom Distiller)
-- [Mission BROWSER-DIRECT-REPLY-COMMONIZATION-2026-04-29 Completion Summary](./evolution/distill_browser-direct-reply-commonization-2026-04-29_2026_04_29.md) (public | Kyberion Wisdom Distiller)
-- [Production Evidence Integrity: Local Artifact Validation](./evolution/distill_production-evidence-local-artifact-refs_2026_05_15.md) (public | Kyberion Wisdom Distiller)
 
 ## 📁 product/agents
 
@@ -144,8 +134,8 @@ _SSoT Index Version: 2.0.0 | Last Updated: 2026-07-04T18:47:20.488Z_
 - [Voice Generation Absorption Plan](./product/architecture/voice-generation-absorption-plan.md) (public | Ecosystem Architect)
 - [Wisdom: Excel Design Distillation & AI-Native Replication](./product/architecture/excel-design-distillation-pattern.md) (public | Ecosystem Architect)
 - [Wisdom: PowerPoint Design Distillation & Heritage Sync](./product/architecture/pptx-design-distillation-pattern.md) (public | Ecosystem Architect)
-- [検討報告：マルチテナント・ナレッジガバナンスの最適化案](./product/architecture/analysis-multi-tenant-governance-20260304.md) (public | Ecosystem Architect)
 - [分散システム ＆ アーキテクチャパターン](./product/architecture/distributed-systems.md) (public | Ecosystem Architect)
+- [検討報告：マルチテナント・ナレッジガバナンスの最適化案](./product/architecture/analysis-multi-tenant-governance-20260304.md) (public | Ecosystem Architect)
 
 ## 📁 product/architecture/decisions
 
@@ -331,10 +321,10 @@ _SSoT Index Version: 2.0.0 | Last Updated: 2026-07-04T18:47:20.488Z_
 - [ADF Pipeline Quickstart](./product/orchestration/adf-pipeline-quickstart.md) (public | Unknown)
 - [ADF Pipeline Template](./product/orchestration/adf-pipeline-template.md) (public | Kyberion)
 - [ADF Pipeline Validation & Design Patterns Report](./product/orchestration/adf-pipeline-validation-report.md) (public | Unknown)
-- [ADF パイプライン簡素化ミッション計画](./product/orchestration/adf-pipeline-simplification-mission-plan.md) (public | Unknown)
-- [ADF パイプライン検証計画](./product/orchestration/adf-pipeline-validation-plan.md) (public | Unknown)
 - [ADF パイプライン全体評価レポート](./product/orchestration/adf-pipeline-strategy-report.md) (public | Unknown)
 - [ADF パイプライン分類レポート](./product/orchestration/adf-pipeline-classification-report.md) (public | Unknown)
+- [ADF パイプライン検証計画](./product/orchestration/adf-pipeline-validation-plan.md) (public | Unknown)
+- [ADF パイプライン簡素化ミッション計画](./product/orchestration/adf-pipeline-simplification-mission-plan.md) (public | Unknown)
 - [AIDLC Integration Process](./product/orchestration/aidlc-integration-process.md) (public | Kyberion)
 - [Autonomous Sentinel Operations](./product/orchestration/sentinel-operations.md) (public | Ecosystem Architect)
 - [Blog Authoring Playbook](./product/orchestration/blog-authoring-playbook.md) (public | Unknown)
@@ -402,10 +392,10 @@ _SSoT Index Version: 2.0.0 | Last Updated: 2026-07-04T18:47:20.488Z_
 - [ハイブリッド型AIネイティブ開発フロー (Hybrid AI-Native Flow)](./product/orchestration/hybrid-development-flow.md) (public | Ecosystem Architect)
 - [ミッション実行規程 (Mission Execution Protocol v2.0)](./product/orchestration/mission-execution-protocol.md) (public | Kyberion Sovereign Entity)
 - [企業内ネットワーク環境セットアップガイド](./product/orchestration/corporate-env-guide.md) (public | Ecosystem Architect)
-- [高度な自律開発標準ワークフロー (Advanced Development Flow)](./product/orchestration/advanced-development-flow.md) (public | Ecosystem Architect)
 - [自律型シナジー標準基準 (Autonomous Synergy Standards)](./product/orchestration/optimization-standards.md) (public | Ecosystem Architect)
 - [自律型デバッグ・ループ (Autonomous Debug Loop)](./product/orchestration/autonomous-debug-loop.md) (public | Ecosystem Architect)
 - [自律的 Git ブランチ・PR 運用基準 (Git Flow Standards)](./product/orchestration/git-flow-standards.md) (public | Ecosystem Architect)
+- [高度な自律開発標準ワークフロー (Advanced Development Flow)](./product/orchestration/advanced-development-flow.md) (public | Ecosystem Architect)
 
 ## 📁 product/orchestration/agent-profiles
 

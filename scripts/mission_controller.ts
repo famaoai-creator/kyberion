@@ -556,6 +556,14 @@ async function resumeMission(id?: string) {
   return missionSystem.resumeMission(id);
 }
 
+async function pauseMission(id: string, note?: string) {
+  return missionSystem.pauseMission(id, note);
+}
+
+async function cancelMission(id: string, note?: string) {
+  return missionSystem.cancelMission(id, note);
+}
+
 async function recordTask(missionId: string, description: string, details: any = {}) {
   return missionSystem.recordTask(missionId, description, details);
 }
@@ -1241,6 +1249,8 @@ Lifecycle Commands:
   distill  <ID>                  Extract knowledge via LLM (distilling → completed)
   finish   <ID> [--seal]         Archive a completed mission (optionally encrypt)
   resume   [ID]                  Resume the last active mission and replay orchestration journal (or specify ID)
+  pause    <ID> [--note <TEXT>]  Pause an active mission without losing state
+  cancel   <ID> [--note <TEXT>]  Cancel a mission and mark it failed for follow-up
   dispatch-tickets <ID>          Register NEXT_TASKS as work items / issue payloads
                                  --ticket-targets workitem,github,jira
                                  --live-ticket-targets github,jira
@@ -1691,6 +1701,8 @@ export async function main() {
     promotePendingMemoryCandidates,
     finishMission,
     resumeMission,
+    pauseMission,
+    cancelMission,
     recordTask,
     recordEvidence,
     purgeMissions,
