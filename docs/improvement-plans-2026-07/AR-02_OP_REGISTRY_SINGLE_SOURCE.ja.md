@@ -44,6 +44,8 @@ op-registry ↔ code のドリフトで、`determineActuatorStepType('file','sta
 1. `determineActuatorStepType`(`actuator-op-registry.ts:35`)を生成 registry ベースにし、**未知 op は既定 apply に落とさず「未知」を返す**。呼び出し元(engine)は未知を AR-06 の error 経路へ。
 2. file の `stat`/`exists`/`tail`/`write_artifact` 等、registry と code の既知ドリフトが解消することをテストで固定。
 
+**進捗メモ(2026-07-06)**: 既定 `apply` フォールバックは除去済み。未知 op は `actuator-op-registry.ts` で `[UNKNOWN_OP]` として失敗し、`super-nerve` からもそのまま failed に伝播する。
+
 ### Task 4: 発見可能性ドキュメント — `claude-haiku`
 
 - `global_actuator_index` と CAPABILITIES を生成物に切替。`docs/GLOSSARY`/`CAPABILITIES_GUIDE` から「op の探し方(生成 index → per-op schema)」を1段落で案内。
