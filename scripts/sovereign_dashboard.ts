@@ -1,5 +1,7 @@
 import * as path from 'node:path';
 import {
+  buildCompanyVisionRef,
+  resolveCompany,
   resolveActiveProfileRoot,
   listAgentRuntimeLeaseSummaries,
   listAgentRuntimeSnapshots,
@@ -10,9 +12,15 @@ import {
   safeExistsSync,
   safeReaddir,
 } from '@agent/core';
+import { resolveFinanceControllerDecision } from '../libs/core/finance-controller.js';
+import {
+  summarizeApprovalAuditDrilldown,
+  summarizeApprovalAuditTrail,
+} from '../libs/core/approval-audit.js';
 import chalk from 'chalk';
 import { summarizeBackupStatus } from './backup.js';
 import { readJsonFile, readTextFile } from './refactor/cli-input.js';
+import { activeCustomer } from '@agent/core/customer-resolver';
 
 /**
  * Kyberion Sovereign Dashboard v1.0
@@ -23,6 +31,14 @@ const ROOT_DIR = pathResolver.rootDir();
 const PACKAGE_JSON_PATH = pathResolver.rootResolve('package.json');
 
 type DashboardFocus = 'all' | 'onboarding' | 'capabilities' | 'skills';
+
+function resolveDashboardTenantSlug(): string | null {
+  const onboardingState = readJsonIfExists<{
+    tenants?: { entries?: Array<{ tenant_slug: string }> };
+  }>(path.join(resolveActiveProfileRoot(), 'onboarding/onboarding-state.json'));
+  const onboardingTenant = onboardingState?.tenants?.entries?.[0]?.tenant_slug?.trim();
+  return onboardingTenant || activeCustomer() || null;
+}
 
 function getDashboardFocus(): DashboardFocus {
   const focusIndex = process.argv.indexOf('--focus');
@@ -127,6 +143,91 @@ function drawHeader() {
   console.log(
     ` Status: ${status === 'OPERATIONAL' ? chalk.green(status) : chalk.yellow(status)} | User: ${chalk.bold(identity?.name || 'Operator')} | Time: ${new Date().toLocaleTimeString()}\n`
   );
+}
+
+function drawCompanyOverview() {
+  console.log(chalk.bold.blue(' 🏢 COMPANY OVERVIEW'));
+
+  const tenantSlug = resolveDashboardTenantSlug();
+  const company = resolveCompany(tenantSlug);
+  const expectedVisionRef = buildCompanyVisionRef(company.tenant_slug);
+  const visionSource = `${company.vision_ref.source_kind} · ${company.vision_ref.source_path}`;
+  const topRoles =
+    company.org_chart_ref.data?.positions
+      ?.filter((position) => position.reports_to == null)
+      .map((position) => position.role_id) || [];
+  const decisionRightsCount = company.decision_rights_ref.data?.decisions.length || 0;
+  const approvalAudit = summarizeApprovalAuditTrail(6);
+  const approvalAuditDrilldown = summarizeApprovalAuditDrilldown(6);
+  const financeController = resolveFinanceControllerDecision({ tenantSlug: company.tenant_slug });
+  const okrRef = company.okr_ref || null;
+  const okrSummary = okrRef?.data
+    ? {
+        objectiveCount: okrRef.data.objectives.length,
+        keyResultCount: okrRef.data.objectives.reduce(
+          (count, objective) => count + objective.key_results.length,
+          0
+        ),
+        progressPercent:
+          okrRef.data.objectives.length > 0
+            ? Math.round(
+                (okrRef.data.objectives
+                  .flatMap((objective) => objective.key_results)
+                  .filter((keyResult) => {
+                    if (
+                      typeof keyResult.current === 'number' &&
+                      typeof keyResult.target === 'number'
+                    ) {
+                      return keyResult.current >= keyResult.target;
+                    }
+                    if (
+                      typeof keyResult.current === 'string' &&
+                      typeof keyResult.target === 'string'
+                    ) {
+                      return keyResult.current === keyResult.target;
+                    }
+                    return false;
+                  }).length /
+                  okrRef.data.objectives.flatMap((objective) => objective.key_results).length) *
+                  100
+              )
+            : 0,
+      }
+    : null;
+
+  console.log(
+    `  ${chalk.gray('•')} Company: ${chalk.cyan(company.name)} ${chalk.dim(`(${company.company_id})`)}`
+  );
+  console.log(`  ${chalk.gray('•')} Sovereign: ${chalk.white(company.sovereign || 'unknown')}`);
+  console.log(`  ${chalk.gray('•')} Vision ref: ${chalk.white(expectedVisionRef)}`);
+  console.log(`  ${chalk.gray('•')} Vision: ${chalk.white(visionSource)}`);
+  console.log(
+    `  ${chalk.gray('•')} Org chart: ${company.org_chart_ref.data?.positions.length || 0} positions / ${company.org_chart_ref.data?.domains.length || 0} domains`
+  );
+  console.log(
+    `  ${chalk.gray('•')} Top-level roles: ${topRoles.length > 0 ? chalk.green(topRoles.join(', ')) : chalk.dim('none')}`
+  );
+  console.log(
+    `  ${chalk.gray('•')} Financial: ${company.financial_ref.exists ? chalk.green('available') : chalk.dim('missing')} | Decision rights: ${company.decision_rights_ref.exists ? chalk.green('available') : chalk.dim('missing')}`
+  );
+  console.log(
+    `  ${chalk.gray('•')} Finance controller: ${chalk.white(financeController.mode)}${financeController.shouldCutCosts ? chalk.red(' (cost cutting)') : ''}`
+  );
+  console.log(
+    `  ${chalk.gray('•')} OKR: ${okrSummary ? chalk.green(`${okrSummary.objectiveCount} objectives / ${okrSummary.keyResultCount} KRs / ${okrSummary.progressPercent}%`) : chalk.dim('missing')}`
+  );
+  console.log(
+    `  ${chalk.gray('•')} Approval audit: ${chalk.white(`${approvalAudit.total} entries (${approvalAudit.allowed} allowed / ${approvalAudit.denied} denied)`)}`
+  );
+  console.log(
+    `  ${chalk.gray('•')} Audit drill-down: ${chalk.white(`${approvalAuditDrilldown.byDecisionType.length} decision types / ${approvalAuditDrilldown.byCorrelationId.length} correlation chains`)}`
+  );
+  if (company.decision_rights_ref.data) {
+    console.log(
+      `  ${chalk.gray('•')} Decision policy: ${chalk.white(`${decisionRightsCount} rules from ${company.decision_rights_ref.data.source_kind}`)}`
+    );
+  }
+  console.log('');
 }
 
 function readJsonIfExists<T>(logicalPath: string): T | null {
@@ -823,6 +924,7 @@ function render() {
   const focus = getDashboardFocus();
   clearScreen();
   drawHeader();
+  drawCompanyOverview();
   drawOnboardingHome();
   drawTenantContext();
   drawConnectionReview();
