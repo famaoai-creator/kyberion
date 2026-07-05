@@ -590,6 +590,13 @@ describe('a2a-bridge', () => {
       });
 
       expect(mocks.appendConversationTurn).toHaveBeenCalledTimes(2);
+      expect(mocks.appendConversationTurn).toHaveBeenNthCalledWith(
+        1,
+        'conv-123',
+        expect.objectContaining({
+          prompt: 'new prompt',
+        })
+      );
       expect(mocks.rehydrateConversation).toHaveBeenCalledWith('conv-123');
       expect(result.payload.metadata.rehydrated).toBe(true);
       expect(mocks.askAgentRuntimeViaDaemon).toHaveBeenCalledWith(

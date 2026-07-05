@@ -98,7 +98,9 @@ export function collectDeliverableInbox(input: DeliverableInboxQuery = {}): Deli
           ?.verdict,
         reviewComment: loadDeliverableReviewState(record.artifact_id)?.reviews.slice(-1)[0]
           ?.comment,
-        reviewVersion: loadDeliverableReviewState(record.artifact_id)?.latest_version,
+        reviewVersion:
+          loadDeliverableReviewState(record.artifact_id)?.latest_review_sequence ||
+          loadDeliverableReviewState(record.artifact_id)?.latest_version,
         reviewCurrentArtifactId: loadDeliverableReviewState(record.artifact_id)
           ?.current_artifact_id,
       } satisfies DeliverableInboxItem;

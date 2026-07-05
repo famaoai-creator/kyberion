@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'node:crypto';
 
-import { guardRequest, requireChronosAccess, roleToMissionRole } from '../../../lib/api-guard';
+import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
 import { compileUserIntentFlow } from '@agent/core/intent-contract';
 import { loadOrganizationProfile } from '@agent/core';
 import { buildPlanPreview } from '../../../lib/plan-preview';
@@ -23,7 +23,6 @@ export async function POST(req: NextRequest) {
       body?.tier === 'personal' || body?.tier === 'public' || body?.tier === 'confidential'
         ? body.tier
         : 'confidential';
-    process.env.MISSION_ROLE = roleToMissionRole('localadmin');
     const missionId =
       typeof body?.missionId === 'string'
         ? body.missionId.trim()

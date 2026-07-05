@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import {
-  getChronosAccessRoleOrThrow,
-  guardRequest,
-  roleToMissionRole,
-} from '../../../lib/api-guard';
+import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
 import { listConnectionReviewItems, recordConnectionReview } from '../../../lib/connection-review';
 
-export function GET() {
+export function GET(req: NextRequest) {
+  const denied = guardRequest(req);
+  if (denied) return denied;
+  const requiresAccess = requireChronosAccess(req, 'readonly');
+  if (requiresAccess) return requiresAccess;
+
   return NextResponse.json({ connections: listConnectionReviewItems() });
 }
 
@@ -14,8 +15,8 @@ export async function POST(req: NextRequest) {
   try {
     const denied = guardRequest(req);
     if (denied) return denied;
-    const accessRole = getChronosAccessRoleOrThrow(req);
-    process.env.MISSION_ROLE = roleToMissionRole(accessRole);
+    const requiresAccess = requireChronosAccess(req, 'localadmin');
+    if (requiresAccess) return requiresAccess;
 
     const body = await req.json();
     const bindingId = typeof body?.bindingId === 'string' ? body.bindingId : '';
