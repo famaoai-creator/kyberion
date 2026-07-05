@@ -651,6 +651,7 @@ export * from './agent-adapter.js';
 export * from './agent-registry.js';
 export * from './agent-lifecycle.js';
 export * from './a2a-bridge.js';
+export * from './a2a-conversation-store.js';
 export * from './agent-manifest.js';
 export * from './provider-discovery.js';
 export * from './agent-provider-resolution.js';
