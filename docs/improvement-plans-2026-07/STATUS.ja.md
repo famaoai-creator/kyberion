@@ -117,7 +117,7 @@
 | ----- | ------- | ----------------------------------------------------------------------- |
 | AR-01 | TODO    | adf-engine.ts 抽出、3エンジン統合、golden 回帰                          |
 | AR-02 | TODO    | describeOps、generate_op_registry、CI ゲート、未知 op の apply 既定撤廃 |
-| AR-03 | TODO    | per-op 入力契約(`params:any` → 検証付き契約・必須/例)                   |
+| AR-03 | PARTIAL | write_artifact/path 系の前倒し検証、共通 required-param helper          |
 | AR-04 | TODO    | 共有 op 語彙(io/capture/net/transform/core・命名エイリアス整理)         |
 | AR-05 | TODO    | 不整合アクチュエータの分割(観察/変更・ドメイン境界)                     |
 | AR-06 | PARTIAL | teach message、skipped 明示化、lint、AR-01 集約                         |
