@@ -1,6 +1,6 @@
 # Ecosystem Knowledge Base Index
 
-_SSoT Index Version: 2.0.0 | Last Updated: 2026-07-05T05:33:13.047Z_
+_SSoT Index Version: 2.0.0 | Last Updated: 2026-07-05T08:13:09.283Z_
 
 > **Volatile / Working-Memory faces** (session, mission, project, personal, daily, weekly) are **not listed here** — they are ephemeral and not SSoT. See the generated volatile index: [`active/INDEX.volatile.md`](../active/INDEX.volatile.md) (non-SSoT, refreshed by `pnpm pipeline --input pipelines/volatile-index.json`). Schema: `schemas/volatile-knowledge.schema.json`.
 
@@ -144,8 +144,8 @@ _SSoT Index Version: 2.0.0 | Last Updated: 2026-07-05T05:33:13.047Z_
 - [Voice Generation Absorption Plan](./product/architecture/voice-generation-absorption-plan.md) (public | Ecosystem Architect)
 - [Wisdom: Excel Design Distillation & AI-Native Replication](./product/architecture/excel-design-distillation-pattern.md) (public | Ecosystem Architect)
 - [Wisdom: PowerPoint Design Distillation & Heritage Sync](./product/architecture/pptx-design-distillation-pattern.md) (public | Ecosystem Architect)
-- [検討報告：マルチテナント・ナレッジガバナンスの最適化案](./product/architecture/analysis-multi-tenant-governance-20260304.md) (public | Ecosystem Architect)
 - [分散システム ＆ アーキテクチャパターン](./product/architecture/distributed-systems.md) (public | Ecosystem Architect)
+- [検討報告：マルチテナント・ナレッジガバナンスの最適化案](./product/architecture/analysis-multi-tenant-governance-20260304.md) (public | Ecosystem Architect)
 
 ## 📁 product/architecture/decisions
 
@@ -331,10 +331,10 @@ _SSoT Index Version: 2.0.0 | Last Updated: 2026-07-05T05:33:13.047Z_
 - [ADF Pipeline Quickstart](./product/orchestration/adf-pipeline-quickstart.md) (public | Unknown)
 - [ADF Pipeline Template](./product/orchestration/adf-pipeline-template.md) (public | Kyberion)
 - [ADF Pipeline Validation & Design Patterns Report](./product/orchestration/adf-pipeline-validation-report.md) (public | Unknown)
-- [ADF パイプライン簡素化ミッション計画](./product/orchestration/adf-pipeline-simplification-mission-plan.md) (public | Unknown)
-- [ADF パイプライン検証計画](./product/orchestration/adf-pipeline-validation-plan.md) (public | Unknown)
 - [ADF パイプライン全体評価レポート](./product/orchestration/adf-pipeline-strategy-report.md) (public | Unknown)
 - [ADF パイプライン分類レポート](./product/orchestration/adf-pipeline-classification-report.md) (public | Unknown)
+- [ADF パイプライン検証計画](./product/orchestration/adf-pipeline-validation-plan.md) (public | Unknown)
+- [ADF パイプライン簡素化ミッション計画](./product/orchestration/adf-pipeline-simplification-mission-plan.md) (public | Unknown)
 - [AIDLC Integration Process](./product/orchestration/aidlc-integration-process.md) (public | Kyberion)
 - [Autonomous Sentinel Operations](./product/orchestration/sentinel-operations.md) (public | Ecosystem Architect)
 - [Blog Authoring Playbook](./product/orchestration/blog-authoring-playbook.md) (public | Unknown)
@@ -402,10 +402,10 @@ _SSoT Index Version: 2.0.0 | Last Updated: 2026-07-05T05:33:13.047Z_
 - [ハイブリッド型AIネイティブ開発フロー (Hybrid AI-Native Flow)](./product/orchestration/hybrid-development-flow.md) (public | Ecosystem Architect)
 - [ミッション実行規程 (Mission Execution Protocol v2.0)](./product/orchestration/mission-execution-protocol.md) (public | Kyberion Sovereign Entity)
 - [企業内ネットワーク環境セットアップガイド](./product/orchestration/corporate-env-guide.md) (public | Ecosystem Architect)
-- [高度な自律開発標準ワークフロー (Advanced Development Flow)](./product/orchestration/advanced-development-flow.md) (public | Ecosystem Architect)
 - [自律型シナジー標準基準 (Autonomous Synergy Standards)](./product/orchestration/optimization-standards.md) (public | Ecosystem Architect)
 - [自律型デバッグ・ループ (Autonomous Debug Loop)](./product/orchestration/autonomous-debug-loop.md) (public | Ecosystem Architect)
 - [自律的 Git ブランチ・PR 運用基準 (Git Flow Standards)](./product/orchestration/git-flow-standards.md) (public | Ecosystem Architect)
+- [高度な自律開発標準ワークフロー (Advanced Development Flow)](./product/orchestration/advanced-development-flow.md) (public | Ecosystem Architect)
 
 ## 📁 product/orchestration/agent-profiles
 
