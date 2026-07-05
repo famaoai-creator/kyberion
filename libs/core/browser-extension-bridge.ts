@@ -4,6 +4,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { enforceApprovalGate, type ApprovalGateResult } from './approval-gate.js';
 import { pathResolver } from './path-resolver.js';
 import { safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import { resolveBrowserRecordingPipelineOp } from './op-vocabulary.js';
 
 /** Approval-gate operation id for governed Chrome extension execution. */
 export const BROWSER_EXTENSION_EXECUTE_OP = 'browser:extension_execute';
@@ -16,9 +17,15 @@ const ajv = new Ajv({ allErrors: true, allowUnionTypes: true });
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 addFormats(ajv);
 
-const RECORDING_SCHEMA_PATH = pathResolver.knowledge('product/schemas/browser-recording.schema.json');
-const SESSION_SCHEMA_PATH = pathResolver.knowledge('product/schemas/browser-extension-session.schema.json');
-const RECEIPT_SCHEMA_PATH = pathResolver.knowledge('product/schemas/browser-extension-receipt.schema.json');
+const RECORDING_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/browser-recording.schema.json'
+);
+const SESSION_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/browser-extension-session.schema.json'
+);
+const RECEIPT_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/browser-extension-receipt.schema.json'
+);
 
 const HIGH_RISK_OPERATIONS = new Set<BrowserExtensionOperation>([
   'submit_form',
@@ -182,7 +189,7 @@ function schemaValidator(schemaPath: string, cached: ValidateFunction | null): V
 
 function formatErrors(validate: ValidateFunction): string[] {
   return (validate.errors || []).map((error) =>
-    `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim(),
+    `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim()
   );
 }
 
@@ -228,10 +235,14 @@ function looksLikeSecretToken(text: string): boolean {
 function validateRecordingSemantics(recording: BrowserExtensionRecording): string[] {
   const errors: string[] = [];
   const highRiskActions = recording.actions.filter((action) => HIGH_RISK_OPERATIONS.has(action.op));
-  const omittedSensitiveActions = recording.actions.filter((action) => action.op === 'sensitive_input_omitted');
+  const omittedSensitiveActions = recording.actions.filter(
+    (action) => action.op === 'sensitive_input_omitted'
+  );
 
-  if (!canonicalOrigin(recording.tab.origin)) errors.push('recording tab.origin must be an http(s) origin');
-  if (!recording.risk_summary.requires_manual_review) errors.push('recordings must require manual review');
+  if (!canonicalOrigin(recording.tab.origin))
+    errors.push('recording tab.origin must be an http(s) origin');
+  if (!recording.risk_summary.requires_manual_review)
+    errors.push('recordings must require manual review');
   if (recording.risk_summary.approval_required_count !== highRiskActions.length) {
     errors.push('risk_summary.approval_required_count must match high-risk actions');
   }
@@ -258,16 +269,24 @@ function validateRecordingSemantics(recording: BrowserExtensionRecording): strin
     // navigate is an origin-transition (handoff) marker: observe-only, carries a
     // valid origin pair, and never targets a DOM element.
     if (action.op === 'navigate') {
-      if (action.risk !== 'observe') errors.push(`action ${action.action_id} (navigate) must be classified observe`);
-      if (!action.navigation || !canonicalOrigin(action.navigation.from_origin) || !canonicalOrigin(action.navigation.to_origin)) {
-        errors.push(`action ${action.action_id} (navigate) requires from_origin/to_origin http(s) origins`);
+      if (action.risk !== 'observe')
+        errors.push(`action ${action.action_id} (navigate) must be classified observe`);
+      if (
+        !action.navigation ||
+        !canonicalOrigin(action.navigation.from_origin) ||
+        !canonicalOrigin(action.navigation.to_origin)
+      ) {
+        errors.push(
+          `action ${action.action_id} (navigate) requires from_origin/to_origin http(s) origins`
+        );
       }
-      if (action.target) errors.push(`action ${action.action_id} (navigate) must not target an element`);
+      if (action.target)
+        errors.push(`action ${action.action_id} (navigate) must not target an element`);
     } else if (action.navigation) {
       errors.push(`action ${action.action_id} cannot attach navigation to ${action.op}`);
     }
     const texts = [action.summary, action.target?.name, action.selection?.label].filter(
-      (text): text is string => typeof text === 'string',
+      (text): text is string => typeof text === 'string'
     );
     if (texts.some((text) => PII_PATTERNS.some((pattern) => pattern.test(text)))) {
       errors.push(`action ${action.action_id} contains unredacted PII-like text`);
@@ -278,15 +297,19 @@ function validateRecordingSemantics(recording: BrowserExtensionRecording): strin
     // A real accessible name is short; a long one means the element's whole text
     // subtree (page body, other people's data) leaked into the label.
     if ((action.target?.name?.length ?? 0) > 300) {
-      errors.push(`action ${action.action_id} target name looks like captured body text, not a label`);
+      errors.push(
+        `action ${action.action_id} target name looks like captured body text, not a label`
+      );
     }
   }
   if (recording.review) {
     const actionIds = new Set(recording.actions.map((action) => action.action_id));
     const reviewedIds = new Set<string>();
     for (const decision of recording.review.decisions) {
-      if (!actionIds.has(decision.action_id)) errors.push(`review decision references unknown action ${decision.action_id}`);
-      if (reviewedIds.has(decision.action_id)) errors.push(`review contains duplicate decision for ${decision.action_id}`);
+      if (!actionIds.has(decision.action_id))
+        errors.push(`review decision references unknown action ${decision.action_id}`);
+      if (reviewedIds.has(decision.action_id))
+        errors.push(`review contains duplicate decision for ${decision.action_id}`);
       reviewedIds.add(decision.action_id);
     }
     if (recording.review.status === 'approved') {
@@ -304,11 +327,15 @@ function validateRecordingSemantics(recording: BrowserExtensionRecording): strin
 function selectedRecordingActions(recording: BrowserExtensionRecording): BrowserExtensionAction[] {
   const actionable = recording.actions.filter((action) => action.op !== 'sensitive_input_omitted');
   if (recording.review?.status !== 'approved') return actionable;
-  const decisions = new Map(recording.review.decisions.map((decision) => [decision.action_id, decision.status]));
+  const decisions = new Map(
+    recording.review.decisions.map((decision) => [decision.action_id, decision.status])
+  );
   return actionable.filter((action) => decisions.get(action.action_id) === 'approved');
 }
 
-export function validateBrowserExtensionRecording(input: unknown): BrowserExtensionValidationResult<BrowserExtensionRecording> {
+export function validateBrowserExtensionRecording(
+  input: unknown
+): BrowserExtensionValidationResult<BrowserExtensionRecording> {
   recordingValidator = schemaValidator(RECORDING_SCHEMA_PATH, recordingValidator);
   if (!recordingValidator(input)) return { valid: false, errors: formatErrors(recordingValidator) };
   const value = input as BrowserExtensionRecording;
@@ -316,31 +343,39 @@ export function validateBrowserExtensionRecording(input: unknown): BrowserExtens
   return errors.length > 0 ? { valid: false, errors } : { valid: true, errors: [], value };
 }
 
-export function validateBrowserExtensionSessionRequest(input: unknown): BrowserExtensionValidationResult<BrowserExtensionSessionRequest> {
+export function validateBrowserExtensionSessionRequest(
+  input: unknown
+): BrowserExtensionValidationResult<BrowserExtensionSessionRequest> {
   sessionValidator = schemaValidator(SESSION_SCHEMA_PATH, sessionValidator);
   if (!sessionValidator(input)) return { valid: false, errors: formatErrors(sessionValidator) };
   const value = input as BrowserExtensionSessionRequest;
-  if (!canonicalOrigin(value.origin)) return { valid: false, errors: ['session origin must be an http(s) origin'] };
+  if (!canonicalOrigin(value.origin))
+    return { valid: false, errors: ['session origin must be an http(s) origin'] };
   return { valid: true, errors: [], value };
 }
 
-export function validateBrowserExtensionReceipt(input: unknown): BrowserExtensionValidationResult<BrowserExtensionReceipt> {
+export function validateBrowserExtensionReceipt(
+  input: unknown
+): BrowserExtensionValidationResult<BrowserExtensionReceipt> {
   receiptValidator = schemaValidator(RECEIPT_SCHEMA_PATH, receiptValidator);
   if (!receiptValidator(input)) return { valid: false, errors: formatErrors(receiptValidator) };
   const value = input as BrowserExtensionReceipt;
-  if (!canonicalOrigin(value.origin)) return { valid: false, errors: ['receipt origin must be an http(s) origin'] };
+  if (!canonicalOrigin(value.origin))
+    return { valid: false, errors: ['receipt origin must be an http(s) origin'] };
   return { valid: true, errors: [], value };
 }
 
 export function hashBrowserExtensionAction(action: BrowserExtensionAction): string {
   return createHash('sha256')
-    .update(JSON.stringify({
-      action_id: action.action_id,
-      op: action.op,
-      target: action.target,
-      variable: action.variable,
-      selection: action.selection,
-    }))
+    .update(
+      JSON.stringify({
+        action_id: action.action_id,
+        op: action.op,
+        target: action.target,
+        variable: action.variable,
+        selection: action.selection,
+      })
+    )
     .digest('hex');
 }
 
@@ -365,17 +400,21 @@ export function preflightBrowserExtensionSession(input: {
   const recordingOrigin = canonicalOrigin(recording.value.tab.origin);
   const sessionOrigin = canonicalOrigin(session.value.origin);
   if (recordingOrigin !== sessionOrigin) errors.push('session origin must match recording origin');
-  if (recording.value.recording_id !== session.value.recording_id) errors.push('session recording_id must match recording');
+  if (recording.value.recording_id !== session.value.recording_id)
+    errors.push('session recording_id must match recording');
 
-  const actionableOps = selectedRecordingActions(recording.value)
-    .map((action) => action.op as Exclude<BrowserExtensionOperation, 'sensitive_input_omitted'>);
+  const actionableOps = selectedRecordingActions(recording.value).map(
+    (action) => action.op as Exclude<BrowserExtensionOperation, 'sensitive_input_omitted'>
+  );
   for (const operation of actionableOps) {
     if (!session.value.requested_operations.includes(operation)) {
       errors.push(`requested_operations must include recorded operation ${operation}`);
     }
   }
 
-  const highRiskActions = selectedRecordingActions(recording.value).filter((action) => HIGH_RISK_OPERATIONS.has(action.op));
+  const highRiskActions = selectedRecordingActions(recording.value).filter((action) =>
+    HIGH_RISK_OPERATIONS.has(action.op)
+  );
   const approvalRequired = highRiskActions.length > 0;
   const approvedStepHashes = highRiskActions.map(hashBrowserExtensionAction);
 
@@ -397,7 +436,9 @@ export function preflightBrowserExtensionSession(input: {
       }
     }
     if (!input.bridgeAvailable) {
-      errors.push('extension execution is unavailable until the Native Messaging bridge is installed');
+      errors.push(
+        'extension execution is unavailable until the Native Messaging bridge is installed'
+      );
     }
   }
 
@@ -412,7 +453,8 @@ export function preflightBrowserExtensionSession(input: {
 
 export function buildBrowserExtensionPipelineCandidate(recording: BrowserExtensionRecording) {
   const validation = validateBrowserExtensionRecording(recording);
-  if (!validation.value) throw new Error(`Invalid browser extension recording: ${validation.errors.join('; ')}`);
+  if (!validation.value)
+    throw new Error(`Invalid browser extension recording: ${validation.errors.join('; ')}`);
   const selectedActions = selectedRecordingActions(validation.value);
   const highRiskActions = selectedActions.filter((action) => HIGH_RISK_OPERATIONS.has(action.op));
   return {
@@ -421,11 +463,15 @@ export function buildBrowserExtensionPipelineCandidate(recording: BrowserExtensi
     origin: canonicalOrigin(validation.value.tab.origin),
     review_status: validation.value.review?.status || 'pending',
     operations: selectedActions.map((action) => action.op),
-    excluded_action_ids: validation.value.review?.status === 'approved'
-      ? validation.value.actions
-        .filter((action) => action.op !== 'sensitive_input_omitted' && !selectedActions.includes(action))
-        .map((action) => action.action_id)
-      : [],
+    excluded_action_ids:
+      validation.value.review?.status === 'approved'
+        ? validation.value.actions
+            .filter(
+              (action) =>
+                action.op !== 'sensitive_input_omitted' && !selectedActions.includes(action)
+            )
+            .map((action) => action.action_id)
+        : [],
     requires_manual_review: true,
     approval_required: highRiskActions.length > 0,
     approved_step_hashes: highRiskActions.map(hashBrowserExtensionAction),
@@ -486,7 +532,7 @@ export function segmentRecording(recording: BrowserExtensionRecording): Recordin
  */
 export function subRecordingForSegment(
   recording: BrowserExtensionRecording,
-  segment: RecordingSegment,
+  segment: RecordingSegment
 ): BrowserExtensionRecording {
   return {
     ...recording,
@@ -501,7 +547,7 @@ export function subRecordingForSegment(
       ? {
           ...recording.review,
           decisions: recording.review.decisions.filter((d) =>
-            segment.actions.some((a) => a.action_id === d.action_id),
+            segment.actions.some((a) => a.action_id === d.action_id)
           ),
         }
       : recording.review,
@@ -541,7 +587,11 @@ export function issueSegmentedLeases(input: {
       now: input.now,
     });
     if (issued.errors.length > 0 || !issued.lease) {
-      return { errors: [`segment ${segment.index} (${segment.origin}): ${issued.errors.join('; ') || 'lease issuance failed'}`] };
+      return {
+        errors: [
+          `segment ${segment.index} (${segment.origin}): ${issued.errors.join('; ') || 'lease issuance failed'}`,
+        ],
+      };
     }
     leases.push({
       segment_index: segment.index,
@@ -568,16 +618,21 @@ export function enforceBrowserExtensionApproval(input: {
   correlationId?: string;
 }): ApprovalGateResult {
   const highRiskActions = selectedRecordingActions(input.recording).filter((action) =>
-    HIGH_RISK_OPERATIONS.has(action.op),
+    HIGH_RISK_OPERATIONS.has(action.op)
   );
   if (highRiskActions.length === 0) {
-    return { allowed: true, status: 'not_required', message: 'No high-risk actions require approval' };
+    return {
+      allowed: true,
+      status: 'not_required',
+      message: 'No high-risk actions require approval',
+    };
   }
   return enforceApprovalGate({
     intentId: BROWSER_EXTENSION_EXECUTE_OP,
     operationId: BROWSER_EXTENSION_EXECUTE_OP,
     agentId: input.agentId,
-    correlationId: input.correlationId || `${input.session.mission_id}:${input.session.recording_id}`,
+    correlationId:
+      input.correlationId || `${input.session.mission_id}:${input.session.recording_id}`,
     channel: input.channel || 'browser-extension',
     payload: {
       origin: input.session.origin,
@@ -613,7 +668,7 @@ export function issueBrowserExtensionLease(input: {
     errors.push('lease session recording_id must match the recording');
   }
   const highRiskActions = selectedRecordingActions(input.recording).filter((action) =>
-    HIGH_RISK_OPERATIONS.has(action.op),
+    HIGH_RISK_OPERATIONS.has(action.op)
   );
   if (highRiskActions.length > 0 && !input.approval.allowed) {
     errors.push('lease requires granted approval for high-risk actions');
@@ -667,11 +722,13 @@ export function extendLeaseForMfa(input: {
   if (!Number.isFinite(expiresAt) || now.getTime() > expiresAt) {
     errors.push(
       `lease ${input.existingLease.lease_id} is expired; MFA extension requires a still-valid lease` +
-        ` (expired ${Number.isFinite(expiresAt) ? new Date(expiresAt).toISOString() : 'invalid'})`,
+        ` (expired ${Number.isFinite(expiresAt) ? new Date(expiresAt).toISOString() : 'invalid'})`
     );
   }
   if (input.existingLease.lease_id.startsWith(MFA_LEASE_PREFIX)) {
-    errors.push('lease has already been MFA-extended once; re-issue a lease instead of chaining extensions');
+    errors.push(
+      'lease has already been MFA-extended once; re-issue a lease instead of chaining extensions'
+    );
   }
   if (input.recording.review?.status !== 'approved') {
     errors.push('MFA lease extension requires an approved recording review');
@@ -698,19 +755,22 @@ export interface BrowserRecordingPipelineDraft {
   version: string;
   description: string;
   action: 'pipeline';
-  _source: { kind: 'browser-recording.v1'; recording_id: string; origin: string | null; review_status: string };
+  _source: {
+    kind: 'browser-recording.v1';
+    recording_id: string;
+    origin: string | null;
+    review_status: string;
+  };
   _draft: true;
   _review_required: string[];
   options: { record_trace: boolean };
-  steps: Array<{ id: string; type: 'apply' | 'capture' | 'transform' | 'control'; op: string; params: Record<string, unknown> }>;
+  steps: Array<{
+    id: string;
+    type: 'apply' | 'capture' | 'transform' | 'control';
+    op: string;
+    params: Record<string, unknown>;
+  }>;
 }
-
-const RECORDING_OP_TO_PIPELINE_OP: Record<string, string> = {
-  click_ref: 'click',
-  fill_ref: 'fill',
-  select_ref: 'click',
-  submit_form: 'click',
-};
 
 /**
  * Deterministically crystallize an (ideally approved) recording into a
@@ -721,10 +781,11 @@ const RECORDING_OP_TO_PIPELINE_OP: Record<string, string> = {
  */
 export function compileBrowserRecordingToPipeline(
   recording: BrowserExtensionRecording,
-  opts: { pipelineId?: string } = {},
+  opts: { pipelineId?: string } = {}
 ): BrowserRecordingPipelineDraft {
   const validation = validateBrowserExtensionRecording(recording);
-  if (!validation.value) throw new Error(`Invalid browser extension recording: ${validation.errors.join('; ')}`);
+  if (!validation.value)
+    throw new Error(`Invalid browser extension recording: ${validation.errors.join('; ')}`);
   const value = validation.value;
   const selected = selectedRecordingActions(value);
 
@@ -750,7 +811,7 @@ export function compileBrowserRecordingToPipeline(
     return {
       id: `step-${index + 1}`,
       type: 'apply' as const,
-      op: RECORDING_OP_TO_PIPELINE_OP[action.op] || 'log',
+      op: resolveBrowserRecordingPipelineOp(action.op),
       params,
     };
   });
@@ -827,7 +888,10 @@ const RECEIPT_STORE = pathResolver.shared('runtime/browser-receipts');
  * executed — acknowledging-and-dropping leaves no trail (review finding OP-H3).
  * The receipt is re-validated here so a malformed receipt is never written.
  */
-export function persistBrowserExtensionReceipt(receipt: unknown): { path?: string; errors: string[] } {
+export function persistBrowserExtensionReceipt(receipt: unknown): {
+  path?: string;
+  errors: string[];
+} {
   const validation = validateBrowserExtensionReceipt(receipt);
   if (!validation.valid || !validation.value) {
     return { errors: validation.errors };
@@ -838,6 +902,8 @@ export function persistBrowserExtensionReceipt(receipt: unknown): { path?: strin
     safeWriteFile(filePath, JSON.stringify(validation.value, null, 2));
     return { path: filePath, errors: [] };
   } catch (err) {
-    return { errors: [`failed to persist receipt: ${err instanceof Error ? err.message : String(err)}`] };
+    return {
+      errors: [`failed to persist receipt: ${err instanceof Error ? err.message : String(err)}`],
+    };
   }
 }
