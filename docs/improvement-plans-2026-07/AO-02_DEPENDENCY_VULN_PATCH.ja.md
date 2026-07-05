@@ -23,6 +23,8 @@
 
 - **完了済み**: `libs/core/patch-decision.ts` を新設し、severity / reachability / attack_surface / semver_jump / test_gap / rollback_difficulty をスコア化して `auto_apply | urgent_approval | scheduled | defer | approval` を返す判断ルーブリックを実装した。
 - **検証済み**: `libs/core/src/patch-decision.test.ts` で 5 つの分類と raw score を確認した。
+- **完了済み**: `scripts/scan_dependency_vulns.ts` を追加し、`pnpm audit --json` / `pnpm outdated --json` の結果から CVE・該当依存・severity・到達可能性・推奨判定を組み立てて `active/shared/runtime/vuln-ledger.jsonl` へ append-only 記録できるようにした。`pipelines/dependency-vuln-scan.json` で日次実行できる。
+- **検証済み**: `scripts/scan_dependency_vulns.test.ts` で direct dependency の判定と ledger 追記を確認した。
 
 ## 実装タスク
 

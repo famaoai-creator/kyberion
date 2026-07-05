@@ -1,0 +1,21 @@
+{
+  "schema": "kyberion.pipeline.v1",
+  "name": "dependency-vuln-scan",
+  "description": "Daily dependency vulnerability scan and vuln ledger write for AO-02.",
+  "schedule": {
+    "id": "dependency-vuln-scan",
+    "cron": "30 4 * * *",
+    "timezone": "Asia/Tokyo",
+    "enabled": true
+  },
+  "steps": [
+    {
+      "id": "scan_dependency_vulns",
+      "actuator": "system",
+      "op": "exec",
+      "params": {
+        "command": "pnpm vuln:scan -- --json"
+      }
+    }
+  ]
+}
