@@ -1,0 +1,90 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "procurement-vendor",
+  "version": "2.0.0",
+  "name": "Procurement Vendor",
+  "description": "Vendor procurement workflow that drafts a vendor comparison memo, routes the contract for review, and prepares a decision note for finance_controller and CO-04 approval.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes).",
+  "context": {
+    "mission_id": "",
+    "tenant_slug": "",
+    "vendor_name": "",
+    "vendor_category": "",
+    "vendor_brief_path": "active/shared/tmp/procurement-vendor-brief-{{mission_id}}.json",
+    "comparison_memo_path": "active/shared/tmp/procurement-vendor-comparison-{{mission_id}}.md",
+    "decision_note_path": "active/shared/tmp/procurement-vendor-decision-{{mission_id}}.json"
+  },
+  "steps": [
+    {
+      "id": "preflight",
+      "role": "gate",
+      "op": "core:include",
+      "params": { "fragment": "fragments/runtime-preflight.json" }
+    },
+    {
+      "id": "log_start",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "🛒 Procurement workflow start for mission {{mission_id}} vendor={{vendor_name}} category={{vendor_category}}"
+      }
+    },
+    {
+      "id": "read_vendor_brief",
+      "role": "source",
+      "op": "system:read_file",
+      "produces": { "channel": "vendor_brief", "type": "VendorBrief" },
+      "params": {
+        "path": "{{vendor_brief_path}}"
+      }
+    },
+    {
+      "id": "draft_comparison",
+      "role": "transform",
+      "op": "reasoning:analyze",
+      "consumes": "vendor_brief",
+      "produces": { "channel": "comparison_memo", "type": "VendorComparisonMemo" },
+      "params": {
+        "instruction": "以下の vendor brief をもとに、調達比較メモを Markdown で作成してください。contract-review と finance_controller のレビューに渡せる内容にしてください。\n\n必須セクション:\n# Procurement Vendor\n## 調達背景\n## 候補比較\n## コスト・リスク・機能比較\n## contract-review で確認する論点\n## finance_controller / CO-04 へのエスカレーション論点\n## 推奨アクション\n\n要件:\n- 事実と推測を分ける\n- 契約リスクを先に書く\n- 決裁が必要な箇所を明示する",
+        "context": ["{{mission_id}}", "{{vendor_name}}", "{{vendor_category}}", "{{vendor_brief}}"]
+      }
+    },
+    {
+      "id": "write_comparison",
+      "role": "sink",
+      "op": "system:write_artifact",
+      "consumes": "comparison_memo",
+      "params": {
+        "path": "{{comparison_memo_path}}",
+        "content": "{{comparison_memo}}"
+      }
+    },
+    {
+      "id": "write_decision_note",
+      "role": "sink",
+      "op": "system:write_file",
+      "params": {
+        "path": "{{decision_note_path}}",
+        "content": {
+          "kind": "procurement-vendor-decision",
+          "mission_id": "{{mission_id}}",
+          "tenant_slug": "{{tenant_slug}}",
+          "vendor_name": "{{vendor_name}}",
+          "vendor_category": "{{vendor_category}}",
+          "comparison_memo_path": "{{comparison_memo_path}}",
+          "approval_boundary": "requires_finance_controller_review",
+          "contract_review_pipeline": "knowledge/product/pipeline-templates/contract-review.json"
+        },
+        "format": "json"
+      }
+    },
+    {
+      "id": "log_done",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "✅ Procurement workflow complete: {{comparison_memo_path}}"
+      }
+    }
+  ]
+}
