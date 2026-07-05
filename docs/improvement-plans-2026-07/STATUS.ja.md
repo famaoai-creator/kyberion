@@ -24,7 +24,7 @@
 | SA-05 | PARTIAL | policyEngine の操作種別拡張、secure-io parse失敗 fail-open 解消、-y 破壊操作除外                                  |
 | OP-01 | PARTIAL | usage 計測の全経路接続、cost report、spend-guard、KPI 接続                                                        |
 | AR-01 | TODO    | adf-engine.ts 抽出、3エンジン統合、golden 回帰                                                                    |
-| AR-02 | TODO    | describeOps、generate_op_registry、CI ゲート                                                                      |
+| AR-02 | TODO    | describeOps、generate_op_registry、CI ゲート、未知 op の apply 既定撤廃                                           |
 | AO-02 | TODO    | CVE スキャン/台帳、パッチ判断ルーブリック、適用フロー                                                             |
 
 ## 全計画一覧
@@ -113,14 +113,14 @@
 
 ### AR(アクチュエータリファクタリング/使いやすさ)
 
-| ID    | 状態    | 残作業                                                          |
-| ----- | ------- | --------------------------------------------------------------- |
-| AR-01 | TODO    | adf-engine.ts 抽出、3エンジン統合、golden 回帰                  |
-| AR-02 | TODO    | describeOps、generate_op_registry、CI ゲート                    |
-| AR-03 | TODO    | per-op 入力契約(`params:any` → 検証付き契約・必須/例)           |
-| AR-04 | TODO    | 共有 op 語彙(io/capture/net/transform/core・命名エイリアス整理) |
-| AR-05 | TODO    | 不整合アクチュエータの分割(観察/変更・ドメイン境界)             |
-| AR-06 | PARTIAL | silent no-op の撲滅、未知 op を成功でなくエラーに               |
+| ID    | 状態    | 残作業                                                                  |
+| ----- | ------- | ----------------------------------------------------------------------- |
+| AR-01 | TODO    | adf-engine.ts 抽出、3エンジン統合、golden 回帰                          |
+| AR-02 | TODO    | describeOps、generate_op_registry、CI ゲート、未知 op の apply 既定撤廃 |
+| AR-03 | TODO    | per-op 入力契約(`params:any` → 検証付き契約・必須/例)                   |
+| AR-04 | TODO    | 共有 op 語彙(io/capture/net/transform/core・命名エイリアス整理)         |
+| AR-05 | TODO    | 不整合アクチュエータの分割(観察/変更・ドメイン境界)                     |
+| AR-06 | PARTIAL | teach message、skipped 明示化、lint、AR-01 集約                         |
 
 ### SA(セキュリティ・監査)
 

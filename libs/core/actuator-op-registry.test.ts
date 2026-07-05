@@ -5,7 +5,9 @@ describe('actuator-op-registry', () => {
   it('classifies media transform and apply ops through the shared registry', () => {
     expect(determineActuatorStepType('media', 'apply_theme')).toBe('transform');
     expect(determineActuatorStepType('media', 'merge_content')).toBe('transform');
-    expect(determineActuatorStepType('media', 'document_diagram_render_from_brief')).toBe('transform');
+    expect(determineActuatorStepType('media', 'document_diagram_render_from_brief')).toBe(
+      'transform'
+    );
     expect(determineActuatorStepType('media', 'pptx_render')).toBe('apply');
   });
 
@@ -27,5 +29,11 @@ describe('actuator-op-registry', () => {
     const mediaOps = listRegisteredDomainOps('media');
     expect(mediaOps.transform).toContain('apply_pattern');
     expect(mediaOps.apply).toContain('pptx_render');
+  });
+
+  it('fails loudly for unknown ops instead of defaulting to apply', () => {
+    expect(() => determineActuatorStepType('file', 'stat')).toThrowError(
+      /\[UNKNOWN_OP\] Unknown op "stat" for domain "file"/
+    );
   });
 });
