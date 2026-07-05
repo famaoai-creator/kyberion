@@ -24,6 +24,7 @@ import {
   type OutcomeContract,
 } from './outcome-contract.js';
 import { buildCompletionNextAction, type CompletionNextAction } from './next-action.js';
+import { recordIntentContractOutcome } from './intent-contract-learning.js';
 import { reconcileCompletionStructurally } from './intent-reconciliation.js';
 import { matchesAnyTextRule, type TextMatchRule } from './text-rule-matcher.js';
 import { buildFallbackExecutionBrief, type ExecutionBriefSeed } from './execution-brief.js';
@@ -233,6 +234,42 @@ function collectTaskSessionEvidenceTexts(session: TaskSession): string[] {
   return [session.artifact?.preview_text]
     .map((value) => String(value || '').trim())
     .filter(Boolean);
+}
+
+function recordTaskSessionCompletionLearning(session: TaskSession): void {
+  const intentId = String(session.payload?.intent_id || '').trim();
+  if (!intentId || !session.completion_summary) return;
+
+  try {
+    recordIntentContractOutcome({
+      intent_id: intentId,
+      execution_shape: session.work_loop?.resolution.execution_shape || session.task_type,
+      contract_ref: { kind: 'task_session_policy', ref: intentId },
+      success: session.completion_summary.satisfied,
+      ...(session.completion_summary.satisfied
+        ? {}
+        : { error: session.completion_summary.gaps.join('; ') || 'completion gap' }),
+      context_fingerprint: {
+        surface: session.surface,
+        locale: session.project_context?.locale,
+        execution_shape: session.work_loop?.resolution.execution_shape,
+      },
+      completion_summary: {
+        satisfied: session.completion_summary.satisfied,
+        delivered: [...session.completion_summary.delivered],
+        gaps: [...session.completion_summary.gaps],
+        next_step: session.completion_summary.next_step,
+        confidence: session.completion_summary.confidence,
+        evidence_refs: [...session.completion_summary.evidence_refs],
+      },
+    });
+  } catch (error) {
+    logger.warn(
+      `[task-session] intent-contract-memory sync skipped for ${session.session_id}: ${
+        (error as Error)?.message || String(error)
+      }`
+    );
+  }
 }
 
 function extractServiceNameFromUtterance(trimmed: string): string | undefined {
@@ -1131,6 +1168,9 @@ export function saveTaskSession(session: TaskSession): string {
   if (!safeExistsSync(TASK_SESSION_DIR)) safeMkdir(TASK_SESSION_DIR, { recursive: true });
   const filePath = taskSessionPath(session.session_id);
   safeWriteFile(filePath, JSON.stringify(session, null, 2));
+  if (session.status === 'completed') {
+    recordTaskSessionCompletionLearning(session);
+  }
   return filePath;
 }
 
