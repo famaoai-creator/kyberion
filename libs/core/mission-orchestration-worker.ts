@@ -1,4 +1,4 @@
-import { a2aBridge } from './a2a-bridge.js';
+import { a2aBridge, AgentBusyError } from './a2a-bridge.js';
 import {
   buildMissionTeamView,
   resolveMissionTeamPlan,
@@ -617,21 +617,44 @@ async function dispatchPlannedMissionTask(input: {
       estimated_scope: input.task.estimated_scope,
     },
   });
-  const dispatchContext = await buildTaskDispatchContext({
-    missionId: input.missionId,
-    task: input.task,
-    teamRole: input.teamRole,
-    agentId: input.assignment.agent_id,
-    taskModelHint: input.assignment.model_hint,
-  });
-  const response = await obtainTaskResultResponse({
-    missionId: input.missionId,
-    task: input.task,
-    teamRole: input.teamRole,
-    agentId: input.assignment.agent_id,
-    taskModelHint: input.assignment.model_hint,
-    prompt: dispatchContext.prompt,
-  });
+  let dispatchContext;
+  let response;
+  try {
+    dispatchContext = await buildTaskDispatchContext({
+      missionId: input.missionId,
+      task: input.task,
+      teamRole: input.teamRole,
+      agentId: input.assignment.agent_id,
+      taskModelHint: input.assignment.model_hint,
+    });
+    response = await obtainTaskResultResponse({
+      missionId: input.missionId,
+      task: input.task,
+      teamRole: input.teamRole,
+      agentId: input.assignment.agent_id,
+      taskModelHint: input.assignment.model_hint,
+      prompt: dispatchContext.prompt,
+    });
+  } catch (err: any) {
+    if (err instanceof AgentBusyError) {
+      logger.warn(
+        `[MISSION_WORKER] Agent ${input.assignment.agent_id} is busy. Resetting task ${input.task.task_id} to planned for retry.`
+      );
+      input.task.status = 'planned';
+      try {
+        releaseWorkItem({
+          itemId: workItem.item_id,
+          actorPeerId: 'mission-orchestration-worker',
+          expectedVersion: claimed.item.version,
+          leaseId: claimed.lease.lease_id,
+        });
+      } catch (releaseErr: any) {
+        logger.error(`[MISSION_WORKER] Failed to release work item claim: ${releaseErr.message}`);
+      }
+      return null;
+    }
+    throw err;
+  }
   const taskResultNeeds = response.taskResult?.needs || [];
   const taskResultObservability = summarizeTaskResultObservability({
     pruning: dispatchContext.missionContextPackPruningSummary,
@@ -2558,6 +2581,12 @@ async function handleMissionControlRequested(
         });
       }
       runMissionController(env, ['resume', missionId]);
+      break;
+    case 'pause':
+      runMissionController(env, ['pause', missionId]);
+      break;
+    case 'cancel':
+      runMissionController(env, ['cancel', missionId]);
       break;
     case 'refresh_team':
       runMissionController(env, ['team', missionId, '--refresh']);
