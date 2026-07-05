@@ -1,6 +1,6 @@
 # 改善計画 実装状況正本(STATUS)
 
-> **監査日**: 2026-07-05(全93計画を実コードと突き合わせて検証)
+> **監査日**: 2026-07-05(全94計画を実コードと突き合わせて検証)
 > **更新規約**: 計画の実装・レビュー完了時に本表を更新する。各計画文書内の「実装状況」節と矛盾する場合は本表を正とし、文書側を追従させる。
 > **判定基準**: DONE = 受入条件を実コードで検証済 / PARTIAL = 一部充足 / TODO = 実質未着手。
 
@@ -8,9 +8,9 @@
 
 | 判定    | 件数 |
 | ------- | ---- |
-| DONE    | 25   |
-| PARTIAL | 24   |
-| TODO    | 44   |
+| DONE    | 24   |
+| PARTIAL | 25   |
+| TODO    | 45   |
 
 ## P0 残作業(プロダクション化のクリティカルパス)
 
@@ -135,12 +135,12 @@
 
 ### AO(自律運用・保守)
 
-| ID    | 状態    | 残作業                                                                              |
-| ----- | ------- | ----------------------------------------------------------------------------------- |
-| AO-01 | PARTIAL | scheduler run-lock/missed-run catch-up、autonomous-ops-policy/gate、auto-checkpoint |
-| AO-02 | TODO    | CVE スキャン/台帳、パッチルーブリック、適用フロー                                   |
-| AO-03 | DONE    |                                                                                     |
-| AO-04 | TODO    | soak ハーネス、リーク検出、再起動 e2e                                               |
+| ID    | 状態    | 残作業                                      |
+| ----- | ------- | ------------------------------------------- |
+| AO-01 | PARTIAL | auto-checkpoint、統合 self-maintenance loop |
+| AO-02 | PARTIAL | 適用フロー、見送り再評価ループ              |
+| AO-03 | DONE    |                                             |
+| AO-04 | DONE    |                                             |
 
 ### IL(インテントライフサイクル)
 
@@ -162,12 +162,18 @@
 
 ### SU(Surface UI)
 
-| ID    | 状態 | 残作業                                                                 |
-| ----- | ---- | ---------------------------------------------------------------------- |
-| SU-01 | DONE | plan-preview API、オペレータホーム、goal/persona/tier 編集、承認開始   |
-| SU-02 | DONE | pause/cancel/intervention_respond、kb-panel 配線、mission control 連携 |
-| SU-03 | DONE | 成果物インボックス、verdict、request-changes 版管理、レビュー UI       |
-| SU-04 | DONE | 履歴検索、コスト UI、承認キュー、テナント/接続レビュー                 |
+| ID    | 状態 | 残作業                                                   |
+| ----- | ---- | -------------------------------------------------------- |
+| SU-01 | TODO | plan-preview API、オペレータホーム(IL-01/04, MO-01 依存) |
+| SU-02 | TODO | pause/cancel/intervention_respond、kb-panel 配線         |
+| SU-03 | TODO | 成果物インボックス、verdict、版管理                      |
+| SU-04 | TODO | 履歴検索、コスト UI、承認キュー(OP-01 依存)              |
+
+### E2E(オペレータ接点の最小統合)
+
+| ID     | 状態 | 残作業 |
+| ------ | ---- | ------ |
+| E2E-04 | DONE |        |
 
 ### HO(ハンドオフ)
 
@@ -188,8 +194,8 @@
 
 | ID    | 状態 | 残作業                                                               |
 | ----- | ---- | -------------------------------------------------------------------- |
-| CO-01 | DONE | company schema/entity、vision-resolver、getGoldenRule のテナント対応(集約基盤完了 / dashboard + management-control-plane 起点化も実装済み) |
-| CO-02 | DONE | org-chart、カスタムロール作成フロー(組織図 loader/plan/role create CLI / role promote 昇格フロー / business role act grants 完了) |
-| CO-03 | DONE | financial-model、okr-tracker、finance_controller 経営判断フロー、Company/Chronos 表示 |
-| CO-04 | DONE | decision-rights read-view、Company 連結、黄金律タイブレーク、approval-audit drill-down 可視化 |
-| CO-05 | DONE | 基幹業務テンプレート(財務決算/取締役会/予算レビュー/採用/調達/人事評価/資金調達準備を追加)                     |
+| CO-01 | TODO | company schema/entity、vision-resolver、getGoldenRule のテナント対応 |
+| CO-02 | TODO | org-chart、カスタムロール作成フロー                                  |
+| CO-03 | TODO | financial-model、okr-tracker                                         |
+| CO-04 | TODO | decision-rights、承認ゲート統合                                      |
+| CO-05 | TODO | 基幹業務テンプレート(決算/取締役会/採用/調達 等)                     |

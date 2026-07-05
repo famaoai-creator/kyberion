@@ -84,6 +84,7 @@ evidence_refs:
 Reusable weekly review note for the mission closure checklist.
 
 source_ref: MEM-MR7DQZAJ-B0069E94
+
 ## MEM-MR7EQHQ2-290DF988 (2026-07-05)
 
 Reusable weekly review note for the mission closure checklist.

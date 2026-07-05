@@ -1,0 +1,26 @@
+{
+  "action": "pipeline",
+  "name": "soak-restart-e2e",
+  "version": "1.0.0",
+  "description": "Task 3 soak restart e2e for AO-04.",
+  "_refs": {
+    "plan": "docs/improvement-plans-2026-07/AO-04_SOAK_ENDURANCE_VALIDATION.ja.md",
+    "implementation": "scripts/soak_restart_e2e.ts"
+  },
+  "steps": [
+    {
+      "id": "run_soak_restart_e2e",
+      "role": "source",
+      "op": "system:exec",
+      "produces": {
+        "channel": "soak_restart_e2e_result",
+        "type": "CommandResult"
+      },
+      "params": {
+        "command": "node",
+        "args": ["--import", "./scripts/ts-loader.mjs", "scripts/soak_restart_e2e.ts"],
+        "timeout_ms": 120000
+      }
+    }
+  ]
+}
