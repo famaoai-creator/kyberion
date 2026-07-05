@@ -728,6 +728,88 @@ export async function finishMission(
   logger.success(`📦 Mission ${upperId} archived and finalized.`);
 }
 
+export async function pauseMission(id: string, note?: string): Promise<void> {
+  if (!id) {
+    logger.error('Usage: mission_controller pause <MISSION_ID> [--note "..."]');
+    return;
+  }
+  const upperId = id.toUpperCase();
+  const state = loadState(upperId);
+  if (!state) {
+    logger.error(`Mission ${upperId} not found.`);
+    return;
+  }
+  if (state.status === 'completed' || state.status === 'archived') {
+    logger.info(`Mission ${upperId} is already ${state.status}.`);
+    return;
+  }
+  if (state.status === 'paused') {
+    logger.info(`Mission ${upperId} is already paused.`);
+    return;
+  }
+
+  state.status = 'paused';
+  state.context = {
+    ...(state.context || {}),
+    next_step: 'Resume the mission when the operator is ready.',
+  };
+  state.history.push({
+    ts: new Date().toISOString(),
+    event: 'PAUSE',
+    note: note || 'Mission paused by operator request.',
+  });
+  await saveState(upperId, state);
+  recordAgentRuntimeEvent(
+    pathResolver.shared('observability/mission-control/agent-runtime-events.jsonl'),
+    {
+      event: 'MISSION_PAUSED',
+      mission_id: upperId,
+      note: note || 'Mission paused by operator request.',
+    }
+  );
+  logger.warn(`⏸️ Mission ${upperId} paused.`);
+}
+
+export async function cancelMission(id: string, note?: string): Promise<void> {
+  if (!id) {
+    logger.error('Usage: mission_controller cancel <MISSION_ID> [--note "..."]');
+    return;
+  }
+  const upperId = id.toUpperCase();
+  const state = loadState(upperId);
+  if (!state) {
+    logger.error(`Mission ${upperId} not found.`);
+    return;
+  }
+  if (state.status === 'completed' || state.status === 'archived') {
+    logger.info(`Mission ${upperId} is already ${state.status}.`);
+    return;
+  }
+
+  state.status = 'failed';
+  state.context = {
+    ...(state.context || {}),
+    cancelled: true,
+    cancel_reason: note || 'Mission cancelled by operator request.',
+    next_step: 'Create a replacement mission if the work should continue.',
+  };
+  state.history.push({
+    ts: new Date().toISOString(),
+    event: 'CANCEL',
+    note: note || 'Mission cancelled by operator request.',
+  });
+  await saveState(upperId, state);
+  recordAgentRuntimeEvent(
+    pathResolver.shared('observability/mission-control/agent-runtime-events.jsonl'),
+    {
+      event: 'MISSION_CANCELLED',
+      mission_id: upperId,
+      note: note || 'Mission cancelled by operator request.',
+    }
+  );
+  logger.warn(`🛑 Mission ${upperId} cancelled.`);
+}
+
 export async function grantMissionAccess(
   missionId: string,
   serviceId: string,
