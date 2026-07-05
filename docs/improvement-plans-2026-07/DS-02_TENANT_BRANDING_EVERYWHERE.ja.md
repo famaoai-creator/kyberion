@@ -53,10 +53,11 @@
 
 ## 実装メモ
 
-### Task 1 slice — 2026-07-04
+### Task 1 slice — 2026-07-05
 
 - `libs/core/tenant-design-resolver.ts` を追加し、confidential tenant override / theme pack / layout catalog / logo path の解決を共通化した。
-- `libs/actuators/media-actuator/src/index.ts` の tenant override 解決は新 resolver 経由に差し替えた。
+- `libs/actuators/media-actuator/src/index.ts` の tenant override 解決は shared resolver 経由に差し替えた。
+- `scripts/verify-design-resolution.mjs` も shared resolver を参照するようにして、runtime と検証の二重実装を解消した。
 - `libs/core/tenant-design-resolver.test.ts` で tenant あり / default fallback を固定した。
 - 検証:
   - `pnpm exec vitest run libs/core/tenant-design-resolver.test.ts`
