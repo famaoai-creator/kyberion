@@ -1,0 +1,97 @@
+{
+  "action": "pipeline",
+  "name": "meeting-followup",
+  "version": "2.0.0",
+  "description": "Post-meeting follow-up flow: turn a meeting transcript into minutes.md, persist action items to the mission store, and emit a delivery pack for downstream handoff.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes).",
+  "context": {
+    "mission_id": "",
+    "transcript_path": "",
+    "attendees": [],
+    "operator_label": "Operator",
+    "language": "ja",
+    "minutes_path": "active/missions/confidential/{{mission_id}}/evidence/minutes.md",
+    "delivery_pack_path": "active/missions/confidential/{{mission_id}}/evidence/meeting-followup-pack.json"
+  },
+  "steps": [
+    {
+      "id": "open_log",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "🧾 Meeting follow-up start for mission {{mission_id}}."
+      }
+    },
+    {
+      "id": "read_transcript",
+      "role": "source",
+      "op": "system:read_file",
+      "produces": { "channel": "transcript_text", "type": "MeetingTranscriptText" },
+      "params": {
+        "path": "{{transcript_path}}"
+      }
+    },
+    {
+      "id": "draft_minutes",
+      "role": "transform",
+      "op": "reasoning:analyze",
+      "consumes": "transcript_text",
+      "produces": { "channel": "minutes_markdown", "type": "MarkdownText" },
+      "params": {
+        "instruction": "以下の会議 transcript をもとに、会議後に配布できる minutes.md を Markdown で作成してください。\n\n必須セクション:\n# Minutes\n## Summary\n## Decisions\n## Action Items\n## Risks\n## Follow-up\n\n要件:\n- Summary は 3〜5 行で簡潔に書く\n- Decisions は箇条書きで事実に限定する\n- Action Items は owner と due を明示する\n- Risks はフォローアップで気をつける点を列挙する\n- Follow-up には次の確認観点を 1〜3 件書く\n- transcript にない事実は作らない",
+        "context": ["{{mission_id}}", "{{language}}", "{{attendees}}", "{{transcript_text}}"]
+      }
+    },
+    {
+      "id": "write_minutes",
+      "role": "sink",
+      "op": "system:write_artifact",
+      "consumes": "minutes_markdown",
+      "params": {
+        "path": "active/missions/confidential/{{mission_id}}/evidence/minutes.md",
+        "content": "{{minutes_markdown}}"
+      }
+    },
+    {
+      "id": "extract_action_items",
+      "role": "source",
+      "op": "wisdom:extract_action_items",
+      "consumes": "transcript_text",
+      "produces": { "channel": "action_item_count", "type": "number" },
+      "params": {
+        "mission_id": "{{mission_id}}",
+        "transcript": "{{transcript_text}}",
+        "attendees": "{{attendees}}",
+        "operator_label": "{{operator_label}}",
+        "language": "{{language}}",
+        "output_path": "active/missions/confidential/{{mission_id}}/evidence/action-items.jsonl"
+      }
+    },
+    {
+      "id": "write_delivery_pack",
+      "role": "sink",
+      "op": "system:write_file",
+      "consumes": "action_item_count",
+      "params": {
+        "path": "active/missions/confidential/{{mission_id}}/evidence/meeting-followup-pack.json",
+        "content": {
+          "kind": "meeting-followup-delivery-pack",
+          "mission_id": "{{mission_id}}",
+          "transcript_path": "{{transcript_path}}",
+          "minutes_path": "active/missions/confidential/{{mission_id}}/evidence/minutes.md",
+          "action_items_path": "active/missions/confidential/{{mission_id}}/evidence/action-items.jsonl",
+          "action_item_count": "{{action_item_count}}"
+        }
+      }
+    },
+    {
+      "id": "log_summary",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "action_item_count",
+      "params": {
+        "message": "✅ Meeting follow-up complete: minutes=active/missions/confidential/{{mission_id}}/evidence/minutes.md, action-items=active/missions/confidential/{{mission_id}}/evidence/action-items.jsonl (count={{action_item_count}}), delivery-pack=active/missions/confidential/{{mission_id}}/evidence/meeting-followup-pack.json"
+      }
+    }
+  ]
+}
