@@ -61,6 +61,28 @@ export interface PlanPreviewResponse {
   team: MissionTeamPlan;
 }
 
+export function buildPlanPreviewSignature(input: {
+  requestText: string;
+  missionType: string;
+  assignedPersona: string;
+  tier: 'personal' | 'confidential' | 'public';
+}): string {
+  return JSON.stringify({
+    requestText: input.requestText.trim(),
+    missionType: input.missionType.trim(),
+    assignedPersona: input.assignedPersona.trim(),
+    tier: input.tier,
+  });
+}
+
+export function isPlanPreviewStale(
+  previewSignature: string | null,
+  currentSignature: string
+): boolean {
+  if (!previewSignature) return true;
+  return previewSignature !== currentSignature;
+}
+
 export function buildPlanPreview(
   input: PlanPreviewRequestContext,
   flow: UserIntentFlow
