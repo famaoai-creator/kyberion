@@ -1,23 +1,49 @@
-export function generateTheme(colors: { [key: string]: string } = {}): string {
+import {
+  DEFAULT_EAST_ASIA_FONT,
+  DEFAULT_LATIN_FONT,
+  resolveEastAsiaFontFamily,
+  resolveLatinFontFamily,
+} from '../font-stack.js';
+
+export function generateTheme(
+  colors: {
+    [key: string]: string | undefined;
+    majorFont?: string;
+    minorFont?: string;
+    eastAsiaFont?: string;
+  } = {}
+): string {
   const defaultColors: { [key: string]: string } = {
-    dk1: "000000",
-    lt1: "FFFFFF",
-    dk2: "44546A",
-    lt2: "E7E6E6",
-    accent1: "5B9BD5",
-    accent2: "ED7D31",
-    accent3: "A5A5A5",
-    accent4: "FFC000",
-    accent5: "4472C4",
-    accent6: "70AD47",
-    hlink: "0563C1",
-    folHlink: "954F72",
-    ...colors
+    dk1: '000000',
+    lt1: 'FFFFFF',
+    dk2: '44546A',
+    lt2: 'E7E6E6',
+    accent1: '5B9BD5',
+    accent2: 'ED7D31',
+    accent3: 'A5A5A5',
+    accent4: 'FFC000',
+    accent5: '4472C4',
+    accent6: '70AD47',
+    hlink: '0563C1',
+    folHlink: '954F72',
+    ...colors,
   };
 
   // Use extracted font/format schemes if available, otherwise use defaults
-  const fontScheme = colors['__fontSchemeXml'] || `<a:fontScheme name="Office"><a:majorFont><a:latin typeface="Calibri Light"/><a:ea typeface=""/><a:cs typeface=""/></a:majorFont><a:minorFont><a:latin typeface="Calibri"/><a:ea typeface=""/><a:cs typeface=""/></a:minorFont></a:fontScheme>`;
-  const fmtScheme = colors['__fmtSchemeXml'] || `<a:fmtScheme name="Office"><a:fillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:fillStyleLst><a:lnStyleLst><a:ln w="9525"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln><a:ln w="25400"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln><a:ln w="38100"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln></a:lnStyleLst><a:effectStyleLst><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle></a:effectStyleLst><a:bgFillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:bgFillStyleLst></a:fmtScheme>`;
+  const latinMajor = resolveLatinFontFamily(colors.majorFont || DEFAULT_LATIN_FONT);
+  const latinMinor = resolveLatinFontFamily(colors.minorFont || DEFAULT_LATIN_FONT);
+  const eastAsiaMajor = resolveEastAsiaFontFamily(
+    colors.eastAsiaFont || colors.majorFont || DEFAULT_EAST_ASIA_FONT
+  );
+  const eastAsiaMinor = resolveEastAsiaFontFamily(
+    colors.eastAsiaFont || colors.minorFont || DEFAULT_EAST_ASIA_FONT
+  );
+  const fontScheme =
+    colors['__fontSchemeXml'] ||
+    `<a:fontScheme name="Office"><a:majorFont><a:latin typeface="${latinMajor}"/><a:ea typeface="${eastAsiaMajor}"/><a:cs typeface="${eastAsiaMajor}"/></a:majorFont><a:minorFont><a:latin typeface="${latinMinor}"/><a:ea typeface="${eastAsiaMinor}"/><a:cs typeface="${eastAsiaMinor}"/></a:minorFont></a:fontScheme>`;
+  const fmtScheme =
+    colors['__fmtSchemeXml'] ||
+    `<a:fmtScheme name="Office"><a:fillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:fillStyleLst><a:lnStyleLst><a:ln w="9525"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln><a:ln w="25400"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln><a:ln w="38100"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln></a:lnStyleLst><a:effectStyleLst><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle></a:effectStyleLst><a:bgFillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:bgFillStyleLst></a:fmtScheme>`;
   const extraClr = colors['__extraClrSchemeXml'] || '';
 
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
