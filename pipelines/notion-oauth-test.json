@@ -1,0 +1,25 @@
+{
+  "pipeline_id": "notion-oauth-test",
+  "version": "1.0.0",
+  "action": "pipeline",
+  "steps": [
+    {
+      "id": "begin_notion_oauth",
+      "op": "service:oauth",
+      "params": {
+        "service_id": "notion",
+        "action": "begin",
+        "params": {
+          "email": "famaoai@gmail.com"
+        }
+      }
+    },
+    {
+      "id": "log_url",
+      "op": "system:log",
+      "params": {
+        "message": "Please open this URL: {{last_service_result.authorizationUrl}}"
+      }
+    }
+  ]
+}
