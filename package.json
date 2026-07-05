@@ -78,6 +78,7 @@
     "check:doc-examples": "node dist/scripts/check_doc_examples.js",
     "eval:japanese-contextual-intent": "node --import ./scripts/ts-loader.mjs scripts/eval_japanese_contextual_intent.ts",
     "check:first-win-smoke": "node dist/scripts/check_first_win_smoke.js",
+    "meeting:preflight": "node --import ./scripts/ts-loader.mjs scripts/meeting_preflight.ts",
     "find:dead-code": "node dist/scripts/find_dead_code.js",
     "dev:watch": "pnpm vitest watch libs/core/",
     "check:tier-hygiene": "node dist/scripts/check_tier_hygiene.js",

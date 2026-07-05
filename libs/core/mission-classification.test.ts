@@ -25,7 +25,10 @@ describe('mission-classification', () => {
   it('detects the furthest stage from progress signals and artifacts', () => {
     const classification = resolveMissionClassification({
       taskType: 'service_operation',
-      artifactPaths: ['active/shared/exports/delivery-pack.json', 'active/runtime/execution-receipt.json'],
+      artifactPaths: [
+        'active/shared/exports/delivery-pack.json',
+        'active/runtime/execution-receipt.json',
+      ],
       progressSignals: ['execution_started', 'verification_passed', 'delivery_ready'],
     });
 
@@ -45,6 +48,21 @@ describe('mission-classification', () => {
     expect(classification.stage).toBe('intake');
   });
 
+  it('routes meeting facilitation mission hints into operations and release with a multi-artifact shape', () => {
+    const classification = resolveMissionClassification({
+      missionTypeHint: 'meeting_facilitation',
+    });
+
+    expect(classification.mission_class).toBe('operations_and_release');
+    expect(classification.delivery_shape).toBe('multi_artifact_pipeline');
+    expect(classification.matched_rules.mission_class_rule_id).toBe(
+      'class-operations-release-meeting-facilitation'
+    );
+    expect(classification.matched_rules.delivery_shape_rule_id).toBe(
+      'delivery-meeting-facilitation'
+    );
+  });
+
   it('maps mission class to existing mission team templates', () => {
     expect(mapMissionClassToMissionTypeTemplate('product_delivery')).toBe('product_development');
     expect(mapMissionClassToMissionTypeTemplate('operations_and_release')).toBe('operations');
@@ -58,7 +76,10 @@ describe('mission-classification', () => {
   });
 
   it('keeps the runtime mission class list aligned with the schema enum', () => {
-    const schemaPath = path.resolve(process.cwd(), 'knowledge/product/schemas/mission-classification.schema.json');
+    const schemaPath = path.resolve(
+      process.cwd(),
+      'knowledge/product/schemas/mission-classification.schema.json'
+    );
     const schema = JSON.parse(safeReadFile(schemaPath, { encoding: 'utf8' }) as string) as {
       properties?: { mission_class?: { enum?: string[] } };
     };

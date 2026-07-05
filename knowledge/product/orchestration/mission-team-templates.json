@@ -92,6 +92,20 @@
         "cooldown_minutes": 5
       }
     },
+    "meeting_facilitation": {
+      "required_roles": ["owner", "planner", "operator", "reviewer"],
+      "optional_roles": [],
+      "lifecycle": {
+        "max_parallel_members": 4,
+        "max_members": 5,
+        "max_messages_per_run": 60,
+        "max_wall_clock_minutes": 180,
+        "max_member_turns": 4,
+        "shutdown_policy": "graceful_handoff",
+        "resume_policy": "checkpoint_resume",
+        "cooldown_minutes": 5
+      }
+    },
     "system_query": {
       "required_roles": ["owner", "planner", "operator"],
       "optional_roles": ["reviewer", "surface_liaison"],

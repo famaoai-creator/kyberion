@@ -166,6 +166,73 @@ Use `pnpm surfaces:setup` to inspect auth readiness, `pnpm surfaces:status` to i
 
 Use `pnpm surfaces:repair -- --surface <surface-id>` when a surface is tracked but unhealthy or stale and you want Kyberion to restart it without doing a full reconcile.
 
+### Voice Onboarding
+
+Use this when you want to register a new operator voice profile before meeting work:
+
+1. Run `pnpm meeting:preflight`.
+   - If it fails, fix the reported browser, BlackHole, mlx-audio, voice-consent, or reasoning backend gap first.
+2. Dry-run the onboarding flow with `pnpm pipeline --input pipelines/voice-onboarding.json --context '{"dry_run":true}'`.
+   - If dry-run fails, rerun `pnpm meeting:preflight` and inspect the failing step output.
+3. Run the real onboarding flow with `pnpm pipeline --input pipelines/voice-onboarding.json --context '{"mission_id":"MSN-...","operator_handle":"<handle>"}'`.
+   - The pipeline records three samples, registers the profile, renders a trial clip to `active/shared/tmp/voice-onboarding-check.wav`, and registers voice consent for the active mission.
+4. Verify the result with `pnpm meeting:consent status --mission MSN-...`.
+   - If consent is missing, rerun the onboarding pipeline with the correct mission ID.
+
+### 会議→価値提供 実行手順
+
+1. 事前前提をまとめて確認する。
+
+```bash
+pnpm meeting:preflight
+```
+
+失敗したら `pnpm doctor:meeting --mission MSN-...` を先に実行し、表示された `fix` を直してからやり直す。
+
+2. 初回だけ voice profile と consent をまとめて作る。
+
+```bash
+pnpm pipeline --input pipelines/voice-onboarding.json --context '{"mission_id":"MSN-...","operator_handle":"<handle>"}'
+```
+
+失敗したら `pnpm meeting:preflight` を再実行し、`pnpm meeting:consent status --mission MSN-...` で consent が有効か確認する。
+
+3. 会議ミッションを作る。
+
+```bash
+pnpm mission create MSN-... --mission-type meeting_facilitation --tenant-slug <slug> --persona <handle>
+```
+
+失敗したら `--tenant-slug` の形式と `pnpm mission create --help` の引数を確認し、テナント境界を直してからやり直す。
+
+4. 会議に参加する。
+
+```bash
+pnpm meeting:participate \
+  --mission MSN-... \
+  --meeting-url "https://meet.google.com/..." \
+  --platform meet \
+  --display-name "Kyberion (operator delegate)"
+```
+
+失敗したら `pnpm doctor:meeting --mission MSN-...` を再実行し、ブラウザ・音声・consent の欠落を先に解消する。
+
+5. 会議後フォローアップで議事録と action items を作る。
+
+```bash
+pnpm pipeline --input pipelines/meeting-followup.json --context '{"mission_id":"MSN-...","transcript_path":"<meeting:participate の完了ログで出た transcript_path>","attendees":[{"name":"Alice"},{"name":"Bob"},{"name":"Operator"}],"operator_label":"Operator","language":"ja"}'
+```
+
+失敗したら transcript の実パスと reasoning backend を見直し、必要なら `pnpm meeting:preflight` からやり直す。
+
+6. customer 提供まで finish する。
+
+```bash
+KYBERION_CUSTOMER=<slug> pnpm mission finish MSN-...
+```
+
+失敗したら `KYBERION_CUSTOMER` と `--tenant-slug` を一致させ、`customer/<slug>/` が存在することを確認してから finish を再実行する。
+
 For Google Workspace email and Meet work:
 
 - `pnpm email:workflow status`

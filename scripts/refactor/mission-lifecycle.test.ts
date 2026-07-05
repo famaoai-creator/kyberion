@@ -1,6 +1,8 @@
+import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
+  customerResolver,
   pathResolver,
   safeExec,
   safeExistsSync,
@@ -18,6 +20,8 @@ const missionPath = pathResolver.missionDir(missionId, 'public');
 
 function prepareMissionState(
   status: 'completed' | 'distilling' = 'completed',
+  missionType?: string,
+  tenantSlug?: string,
   outcomeContract?: {
     requested_result: string;
     success_criteria: string[];
@@ -37,6 +41,8 @@ function prepareMissionState(
       {
         mission_id: missionId,
         tier: 'public',
+        ...(missionType ? { mission_type: missionType } : {}),
+        ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
         status,
         execution_mode: 'local',
         priority: 1,
@@ -50,7 +56,14 @@ function prepareMissionState(
         },
         history: [],
         context: {},
-        ...(outcomeContract ? { outcome_contract: outcomeContract } : {}),
+        ...(outcomeContract
+          ? {
+              outcome_contract: {
+                outcome_id: `outcome-${missionId}`,
+                ...outcomeContract,
+              },
+            }
+          : {}),
       },
       null,
       2
@@ -72,6 +85,7 @@ beforeEach(() => {
 
 afterEach(() => {
   safeRmSync(pathResolver.rootResolve(`active/shared/tmp/mission-archives/${missionId}`));
+  safeRmSync(pathResolver.rootResolve('customer/demo'), { recursive: true, force: true });
   safeRmSync(missionPath, { recursive: true, force: true });
 });
 
@@ -137,7 +151,7 @@ describe('mission lifecycle finish gate', () => {
   });
 
   it('records a completion reconciliation summary when finish succeeds', async () => {
-    prepareMissionState('completed', {
+    prepareMissionState('completed', undefined, undefined, {
       requested_result: 'Mission closeout complete.',
       success_criteria: ['The closeout note is saved'],
       deliverable_kind: 'markdown',
@@ -192,7 +206,7 @@ describe('mission lifecycle finish gate', () => {
   });
 
   it('creates a repair task when finish quality validation fails', async () => {
-    prepareMissionState('completed', {
+    prepareMissionState('completed', undefined, undefined, {
       requested_result: 'Mission closeout complete.',
       success_criteria: ['The closeout note is saved'],
       deliverable_kind: 'markdown',
@@ -247,5 +261,101 @@ describe('mission lifecycle finish gate', () => {
     expect(safeExistsSync(`${missionPath}/gates`)).toBe(true);
     const gateFiles = safeReaddir(`${missionPath}/gates`);
     expect(gateFiles.some((name: string) => name.startsWith('finish-quality-'))).toBe(true);
+  });
+
+  it('publishes meeting_facilitation deliverables into the active customer root on finish', async () => {
+    const previousCustomer = process.env.KYBERION_CUSTOMER;
+    process.env.KYBERION_CUSTOMER = 'demo';
+    try {
+      const customerRoot = customerResolver.customerRoot('', process.env);
+      if (!customerRoot) throw new Error('Expected demo customer root to resolve.');
+      safeMkdir(customerRoot, { recursive: true });
+      safeMkdir(path.join(customerRoot, 'deliverables'), { recursive: true });
+
+      prepareMissionState('completed', 'meeting_facilitation', 'demo', {
+        requested_result: 'Meeting follow-up delivered to customer demo.',
+        success_criteria: ['Minutes and action items are delivered'],
+        deliverable_kind: 'delivery-pack',
+        evidence_required: true,
+        expected_artifacts: [{ kind: 'delivery-pack', storage_class: 'customer' }],
+        verification_method: 'self_check',
+      });
+      seedMissionEvidence('minutes.md', '# Minutes\n\n## Summary\nFollow-up summary.\n');
+      seedMissionEvidence(
+        'action-items.jsonl',
+        [
+          JSON.stringify({
+            item_id: 'AI-MTG-001',
+            title: 'Confirm the proposal outline',
+          }),
+          JSON.stringify({
+            item_id: 'AI-MTG-002',
+            title: 'Send the revised list',
+          }),
+        ].join('\n')
+      );
+      seedMissionEvidence(
+        'meeting-followup-pack.json',
+        JSON.stringify({ kind: 'meeting-followup-delivery-pack', mission_id: missionId }, null, 2)
+      );
+      safeWriteFile(
+        `${missionPath}/NEXT_TASKS.json`,
+        JSON.stringify(
+          [
+            {
+              task_id: 'task-1',
+              status: 'completed',
+              assigned_to: { role: 'operator', agent_id: 'implementation-architect' },
+              description: 'Close out the mission',
+              deliverable: 'evidence/minutes.md',
+              target_path: 'evidence/minutes.md',
+            },
+          ],
+          null,
+          2
+        )
+      );
+
+      const args = {
+        archiveDir: pathResolver.rootResolve('active/shared/tmp/mission-archives'),
+        agentRuntimeEventPath: `${missionPath}/runtime-events.jsonl`,
+        getGitHash: (cwd: string) => safeExec('git', ['rev-parse', 'HEAD'], { cwd }).trim(),
+        sealMission: async () => undefined,
+        syncProjectLedgerIfLinked: async () => undefined,
+        transitionStatus,
+      };
+
+      await finishMission(missionId, false, args);
+
+      const missionDeliverablesDir = path.join(customerRoot, 'deliverables', missionId);
+      expect(safeExistsSync(missionDeliverablesDir)).toBe(true);
+      expect(safeExistsSync(path.join(missionDeliverablesDir, 'minutes.md'))).toBe(true);
+      expect(safeExistsSync(path.join(missionDeliverablesDir, 'action-items.jsonl'))).toBe(true);
+      expect(safeExistsSync(path.join(missionDeliverablesDir, 'delivery-summary.md'))).toBe(true);
+      expect(safeExistsSync(path.join(missionDeliverablesDir, 'delivery-pack.json'))).toBe(true);
+
+      const deliveryPack = JSON.parse(
+        safeReadFile(path.join(missionDeliverablesDir, 'delivery-pack.json'), {
+          encoding: 'utf8',
+        }) as string
+      );
+      expect(deliveryPack).toMatchObject({
+        kind: 'delivery-pack',
+        pack_id: `${missionId}-meeting-delivery`,
+      });
+      expect(String(deliveryPack.summary)).toContain('customer demo');
+
+      const deliveryLog = safeReadFile(
+        path.join(customerRoot, 'deliverables', 'delivery-log.jsonl'),
+        {
+          encoding: 'utf8',
+        }
+      ) as string;
+      expect(deliveryLog).toContain(missionId);
+      expect(deliveryLog).toContain('customer/demo/deliverables');
+    } finally {
+      if (previousCustomer === undefined) delete process.env.KYBERION_CUSTOMER;
+      else process.env.KYBERION_CUSTOMER = previousCustomer;
+    }
   });
 });

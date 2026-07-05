@@ -154,7 +154,7 @@ function validateGrantedConsent(
   return { allowed: true };
 }
 
-function checkSpeakConsent(): { allowed: boolean; reason?: string } {
+export function checkSpeakConsent(): { allowed: boolean; reason?: string } {
   if (process.env.KYBERION_SUDO === 'true') return { allowed: true };
   const missionId = process.env.MISSION_ID;
   if (!missionId) {

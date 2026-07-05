@@ -95,6 +95,25 @@ describe('mission-team-composer classification integration', () => {
     expect(plan.team_governance?.lifecycle.max_wall_clock_minutes).toBe(240);
   });
 
+  it('uses the meeting facilitation team template when the mission type matches', () => {
+    const plan = composeMissionTeamPlan({
+      missionId: 'MSN-MEET-001',
+      missionType: 'meeting_facilitation',
+      intentId: 'meeting-operations',
+      taskType: 'meeting_operations',
+      shape: 'mission',
+      progressSignals: ['classified'],
+      tier: 'public',
+    });
+
+    expect(plan.template).toBe('meeting_facilitation');
+    expect(plan.team_governance?.composition.required_roles).toEqual(
+      expect.arrayContaining(['owner', 'planner', 'operator', 'reviewer'])
+    );
+    expect(plan.team_governance?.composition.optional_roles).toEqual([]);
+    expect(plan.team_governance?.lifecycle.max_member_turns).toBe(4);
+  });
+
   it('composes a security scan team with attacker and defender roles assigned', () => {
     const plan = composeMissionTeamPlan({
       missionId: 'MSN-SEC-001',

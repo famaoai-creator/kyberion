@@ -202,6 +202,26 @@
       ]
     },
     {
+      "id": "ai-meeting-facilitator-followup",
+      "pattern": "coordinated_multi_track_execution",
+      "description": "AI meeting facilitator workflow. Run the live meeting flow, extract action items, dispatch operator-owned work, and track team-member follow-up.",
+      "match": {
+        "mission_classes": ["operations_and_release"],
+        "delivery_shapes": ["multi_artifact_pipeline"],
+        "intent_ids": ["meeting-operations"],
+        "task_types": ["meeting_operations"]
+      },
+      "phases": [
+        "intake",
+        "agenda_and_role_boundary",
+        "live_facilitation",
+        "postprocess",
+        "self_execution",
+        "team_tracking",
+        "delivery"
+      ]
+    },
+    {
       "id": "crystallize-then-freeze",
       "pattern": "pipeline_crystallization_loop",
       "description": "Convert an exploratory mission into a stable pipeline artifact, then freeze the stable execution shape.",
@@ -416,26 +436,6 @@
         "browser_participation",
         "transcript_capture",
         "postprocess",
-        "delivery"
-      ]
-    },
-    {
-      "id": "ai-meeting-facilitator-followup",
-      "pattern": "coordinated_multi_track_execution",
-      "description": "AI meeting facilitator workflow. Run the live meeting flow, extract action items, dispatch operator-owned work, and track team-member follow-up.",
-      "match": {
-        "mission_classes": ["operations_and_release"],
-        "delivery_shapes": ["multi_artifact_pipeline"],
-        "intent_ids": ["meeting-operations"],
-        "task_types": ["meeting_operations"]
-      },
-      "phases": [
-        "intake",
-        "agenda_and_role_boundary",
-        "live_facilitation",
-        "postprocess",
-        "self_execution",
-        "team_tracking",
         "delivery"
       ]
     },

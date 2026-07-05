@@ -1,0 +1,58 @@
+{
+  "action": "pipeline",
+  "name": "action-item-reminders",
+  "version": "2.0.0",
+  "description": "Daily 09:00 JST reminder sweep across all active missions. Drafts reminder text, records reminder state, and mirrors reminder output into the Slack outbox.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes).",
+  "schedule": {
+    "id": "action-item-reminders",
+    "cron": "0 9 * * *",
+    "timezone": "Asia/Tokyo",
+    "enabled": true
+  },
+  "context": {
+    "report_path": "active/shared/tmp/action-item-reminders-report.json",
+    "tone": "friendly",
+    "language": "ja",
+    "max_items": 20
+  },
+  "steps": [
+    {
+      "id": "open_log",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "📨 Reminder sweep start (tone={{tone}}, language={{language}}, max_items={{max_items}})."
+      }
+    },
+    {
+      "id": "run_reminder_sweep",
+      "role": "source",
+      "op": "system:exec",
+      "produces": { "channel": "reminder_sweep_raw", "type": "ShellResult" },
+      "params": {
+        "command": "node",
+        "args": [
+          "dist/scripts/action_item_reminders.js",
+          "--tone",
+          "{{tone}}",
+          "--language",
+          "{{language}}",
+          "--max-items",
+          "{{max_items}}",
+          "--report-path",
+          "{{report_path}}"
+        ]
+      }
+    },
+    {
+      "id": "log_summary",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "reminder_sweep_raw",
+      "params": {
+        "message": "✅ Reminder sweep complete: report={{report_path}}"
+      }
+    }
+  ]
+}
