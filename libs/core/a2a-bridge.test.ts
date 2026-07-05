@@ -21,6 +21,10 @@ const mocks = vi.hoisted(() => {
   const getAgentManifest = vi.fn();
   const resolveAgentSelectionHints = vi.fn();
   const logAction = vi.fn();
+  const appendConversationTurn = vi.fn();
+  const readConversationHistory = vi.fn();
+  const rehydrateConversation = vi.fn();
+  const appendSupervisorEvent = vi.fn();
   return {
     warn,
     info,
@@ -38,6 +42,10 @@ const mocks = vi.hoisted(() => {
     getAgentManifest,
     resolveAgentSelectionHints,
     logAction,
+    appendConversationTurn,
+    readConversationHistory,
+    rehydrateConversation,
+    appendSupervisorEvent,
   };
 });
 const Ajv = (AjvModule as any).default ?? AjvModule;
@@ -61,6 +69,13 @@ vi.mock('./agent-runtime-supervisor.js', () => ({
   getAgentRuntimeHandle: mocks.getAgentRuntimeHandle,
   askAgentRuntime: mocks.askAgentRuntime,
   stopAgentRuntime: mocks.stopAgentRuntime,
+  appendSupervisorEvent: mocks.appendSupervisorEvent,
+}));
+
+vi.mock('./a2a-conversation-store.js', () => ({
+  appendConversationTurn: mocks.appendConversationTurn,
+  readConversationHistory: mocks.readConversationHistory,
+  rehydrateConversation: mocks.rehydrateConversation,
 }));
 
 vi.mock('./agent-runtime-supervisor-client.js', () => ({
@@ -531,5 +546,130 @@ describe('a2a-bridge', () => {
         payload: {},
       })
     ).toBe(false);
+  });
+
+  describe('AA-04 Conversation store and rehydration', () => {
+    it('appends conversation turns and rehydrates on session change', async () => {
+      const { a2aBridge } = await import('./a2a-bridge.js');
+      const mockHandle = {
+        agentId: 'nerve-agent',
+        getRecord: () => ({ sessionId: 'sess-new' }),
+      };
+      mocks.get.mockReturnValue({ status: 'ready' });
+      mocks.getAgentRuntimeHandle.mockReturnValue(mockHandle);
+      mocks.ensureAgentRuntimeViaDaemon.mockResolvedValue({
+        agent_id: 'nerve-agent',
+        provider: 'gemini',
+        session_id: 'sess-new',
+      });
+      mocks.createSupervisorBackedAgentHandle.mockReturnValue(mockHandle);
+      mocks.askAgentRuntimeViaDaemon.mockResolvedValue({ text: 'gemini-ok' });
+
+      // Mock conversation history with old session ID
+      mocks.readConversationHistory.mockReturnValue([
+        {
+          sender: 'sender-x',
+          receiver: 'nerve-agent',
+          performative: 'request',
+          prompt: 'hello',
+          provider_session_id: 'sess-old',
+        },
+      ]);
+      mocks.rehydrateConversation.mockReturnValue('REHYDRATE: ');
+
+      const result = await a2aBridge.route({
+        a2a_version: '1.0',
+        header: {
+          msg_id: 'MSG-REHYDRATE-1',
+          sender: 'sender-x',
+          receiver: 'nerve-agent',
+          performative: 'request',
+          conversation_id: 'conv-123',
+        },
+        payload: { text: 'new prompt' },
+      });
+
+      expect(mocks.appendConversationTurn).toHaveBeenCalledTimes(2);
+      expect(mocks.rehydrateConversation).toHaveBeenCalledWith('conv-123');
+      expect(result.payload.metadata.rehydrated).toBe(true);
+      expect(mocks.askAgentRuntimeViaDaemon).toHaveBeenCalledWith(
+        expect.objectContaining({
+          prompt: 'REHYDRATE: new prompt',
+        })
+      );
+    });
+
+    it('rehydrates on AgentRuntimeCrashedError during ask', async () => {
+      const { a2aBridge } = await import('./a2a-bridge.js');
+      const mockHandle = {
+        agentId: 'nerve-agent',
+        getRecord: () => ({ sessionId: 'sess-new' }),
+      };
+      mocks.get.mockReturnValue({ status: 'ready' });
+      mocks.getAgentRuntimeHandle.mockReturnValue(mockHandle);
+      mocks.ensureAgentRuntimeViaDaemon.mockResolvedValue({
+        agent_id: 'nerve-agent',
+        provider: 'gemini',
+        session_id: 'sess-new',
+      });
+      mocks.createSupervisorBackedAgentHandle.mockReturnValue(mockHandle);
+
+      const crashErr = new Error('crashed');
+      crashErr.name = 'AgentRuntimeCrashedError';
+
+      mocks.askAgentRuntimeViaDaemon
+        .mockRejectedValueOnce(crashErr)
+        .mockResolvedValueOnce({ text: 'recovered-ok' });
+
+      mocks.readConversationHistory.mockReturnValue([]);
+      mocks.rehydrateConversation.mockReturnValue('CRASH_RECOVERY: ');
+
+      const result = await a2aBridge.route({
+        a2a_version: '1.0',
+        header: {
+          msg_id: 'MSG-CRASH-1',
+          sender: 'sender-x',
+          receiver: 'nerve-agent',
+          performative: 'request',
+          conversation_id: 'conv-123',
+        },
+        payload: { text: 'try this' },
+      });
+
+      expect(result.payload.metadata.rehydrated).toBe(true);
+      expect(mocks.appendSupervisorEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          decision: 'a2a_conversation_rehydrated',
+          conversation_id: 'conv-123',
+        })
+      );
+    });
+
+    it('rejects with AgentBusyError when daemon is overloaded', async () => {
+      const { a2aBridge } = await import('./a2a-bridge.js');
+      const busyErr = new Error('busy');
+      (busyErr as any).errorDetail = { type: 'busy', retry_after_ms: 500 };
+      mocks.askAgentRuntimeViaDaemon.mockRejectedValueOnce(busyErr);
+
+      let thrown: any;
+      try {
+        await a2aBridge.route({
+          a2a_version: '1.0',
+          header: {
+            msg_id: 'MSG-BUSY-1',
+            sender: 'sender-x',
+            receiver: 'nerve-agent',
+            performative: 'request',
+          },
+          payload: { text: 'overload me' },
+        });
+      } catch (err: any) {
+        thrown = err;
+      }
+
+      expect(thrown).toBeDefined();
+      expect(thrown.name).toBe('AgentBusyError');
+      expect(thrown.retryAfterMs).toBe(500);
+    });
   });
 });

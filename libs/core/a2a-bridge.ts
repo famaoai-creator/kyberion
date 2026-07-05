@@ -14,6 +14,13 @@ import * as crypto from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
 import { ensureAgentRuntimeRoot } from './agent-runtime-root.js';
 import {
+  appendConversationTurn,
+  readConversationHistory,
+  rehydrateConversation,
+} from './a2a-conversation-store.js';
+import { Semaphore } from './semaphore.js';
+import {
+  appendSupervisorEvent,
   askAgentRuntime,
   ensureAgentRuntime,
   getAgentRuntimeHandle,
@@ -73,6 +80,31 @@ export function verifyA2ASignature(message: A2AMessage): boolean {
     Buffer.from(message.header.signature, 'hex'),
     Buffer.from(expected, 'hex')
   );
+}
+
+export class AgentBusyError extends Error {
+  public readonly retryAfterMs: number;
+  constructor(message: string, retryAfterMs = 1000) {
+    super(message);
+    this.name = 'AgentBusyError';
+    this.retryAfterMs = retryAfterMs;
+  }
+}
+
+// In-process fallback semaphores
+const GLOBAL_LIMIT = Number(process.env.KYBERION_GLOBAL_INFLIGHT_LIMIT || 8);
+const AGENT_LIMIT = Number(process.env.KYBERION_AGENT_INFLIGHT_LIMIT || 2);
+
+const globalSemaphore = new Semaphore(GLOBAL_LIMIT);
+const agentSemaphores = new Map<string, Semaphore>();
+
+function getAgentSemaphore(agentId: string): Semaphore {
+  let sem = agentSemaphores.get(agentId);
+  if (!sem) {
+    sem = new Semaphore(AGENT_LIMIT);
+    agentSemaphores.set(agentId, sem);
+  }
+  return sem;
 }
 
 class A2ABridgeImpl {
@@ -138,14 +170,48 @@ class A2ABridgeImpl {
     const handle = await this.ensureAgent(agentId, provider, envelope.payload, runtimeContextKey);
 
     // Extract prompt from payload
-    const prompt = this.buildPromptFromPayload(envelope.payload);
+    let prompt = this.buildPromptFromPayload(envelope.payload);
+    let rehydrated = false;
 
-    logger.info(`[A2A_BRIDGE] Routing to ${agentId}: "${prompt.slice(0, 80)}..."`);
-
+    const conversationId = envelope.header.conversation_id;
     const missionId =
       typeof envelope.payload?.context?.mission_id === 'string'
         ? String(envelope.payload.context.mission_id).toUpperCase()
         : undefined;
+
+    if (conversationId) {
+      const history = readConversationHistory(conversationId);
+      if (history && history.length > 0) {
+        const lastTurn = history[history.length - 1];
+        const currentSessionId =
+          typeof handle?.getRecord === 'function' ? handle.getRecord()?.sessionId || null : null;
+        if (
+          lastTurn.provider_session_id &&
+          currentSessionId &&
+          lastTurn.provider_session_id !== currentSessionId
+        ) {
+          const rehydrationPrefix = rehydrateConversation(conversationId);
+          if (rehydrationPrefix) {
+            prompt = rehydrationPrefix + prompt;
+            rehydrated = true;
+            logger.info(
+              `[A2A_BRIDGE] Rehydrating conversation ${conversationId} due to session change from ${lastTurn.provider_session_id} to ${currentSessionId}`
+            );
+          }
+        }
+      }
+
+      await appendConversationTurn(conversationId, {
+        sender: envelope.header.sender,
+        receiver: agentId,
+        performative: envelope.header.performative,
+        prompt,
+        missionId,
+      });
+    }
+
+    logger.info(`[A2A_BRIDGE] Routing to ${agentId}: "${prompt.slice(0, 80)}..."`);
+
     try {
       emitMissionOrchestrationObservation({
         decision: 'a2a_message_routed',
@@ -197,19 +263,103 @@ class A2ABridgeImpl {
     // Ask the agent
     let responseText: string;
     try {
-      const result = await askAgentRuntimeViaDaemon({
-        agentId,
-        prompt,
-        requestedBy: 'a2a_bridge',
-        correlationId,
-        ...(taskModelHint ? { taskModelHint } : {}),
-      });
-      responseText = result.text;
-    } catch (_) {
-      responseText = await askAgentRuntime(agentId, prompt, 'a2a_bridge', {
-        correlationId,
-        ...(taskModelHint ? { taskModelHint } : {}),
-      });
+      try {
+        const result = await askAgentRuntimeViaDaemon({
+          agentId,
+          prompt,
+          requestedBy: 'a2a_bridge',
+          correlationId,
+          ...(taskModelHint ? { taskModelHint } : {}),
+        });
+        responseText = result.text;
+      } catch (err: any) {
+        if (err?.errorDetail?.type === 'busy') {
+          throw new AgentBusyError(err.message, err.errorDetail.retry_after_ms);
+        }
+        if (err?.name === 'AgentRuntimeCrashedError') {
+          logger.warn(
+            `[A2A_BRIDGE] Crash detected during ask. Re-ensuring agent and retrying with rehydrated prompt...`
+          );
+          await this.ensureAgent(agentId, provider, envelope.payload, runtimeContextKey);
+          const rehydrationPrefix = conversationId ? rehydrateConversation(conversationId) : '';
+          const retriedPrompt = rehydrationPrefix
+            ? rehydrationPrefix + this.buildPromptFromPayload(envelope.payload)
+            : prompt;
+          rehydrated = true;
+
+          appendSupervisorEvent({
+            decision: 'a2a_conversation_rehydrated',
+            conversation_id: conversationId || 'NONE',
+            agent_id: agentId,
+            mission_id: missionId || 'NONE',
+          });
+
+          const result = await askAgentRuntimeViaDaemon({
+            agentId,
+            prompt: retriedPrompt,
+            requestedBy: 'a2a_bridge',
+            correlationId,
+            ...(taskModelHint ? { taskModelHint } : {}),
+          });
+          responseText = result.text;
+        } else {
+          throw err;
+        }
+      }
+    } catch (daemonErr: any) {
+      if (daemonErr instanceof AgentBusyError) throw daemonErr;
+
+      // Fallback in-process route with Semaphore limits
+      const agentSem = getAgentSemaphore(agentId);
+      if (
+        globalSemaphore.getActiveCount() >= GLOBAL_LIMIT ||
+        agentSem.getActiveCount() >= AGENT_LIMIT
+      ) {
+        throw new AgentBusyError(
+          `In-process capacity exceeded for ${agentId}. Global: ${globalSemaphore.getActiveCount()}/${GLOBAL_LIMIT}, Agent: ${agentSem.getActiveCount()}/${AGENT_LIMIT}`
+        );
+      }
+
+      try {
+        responseText = await globalSemaphore.run(() =>
+          agentSem.run(() =>
+            askAgentRuntime(agentId, prompt, 'a2a_bridge', {
+              correlationId,
+              ...(taskModelHint ? { taskModelHint } : {}),
+            })
+          )
+        );
+      } catch (inProcessErr: any) {
+        if (inProcessErr?.name === 'AgentRuntimeCrashedError') {
+          logger.warn(
+            `[A2A_BRIDGE] Crash detected during in-process ask. Re-ensuring agent and retrying with rehydrated prompt...`
+          );
+          await this.ensureAgent(agentId, provider, envelope.payload, runtimeContextKey);
+          const rehydrationPrefix = conversationId ? rehydrateConversation(conversationId) : '';
+          const retriedPrompt = rehydrationPrefix
+            ? rehydrationPrefix + this.buildPromptFromPayload(envelope.payload)
+            : prompt;
+          rehydrated = true;
+
+          appendSupervisorEvent({
+            decision: 'a2a_conversation_rehydrated',
+            conversation_id: conversationId || 'NONE',
+            agent_id: agentId,
+            mission_id: missionId || 'NONE',
+          });
+
+          responseText = await globalSemaphore.run(() =>
+            agentSem.run(() =>
+              askAgentRuntime(agentId, retriedPrompt, 'a2a_bridge', {
+                correlationId,
+                ...(taskModelHint ? { taskModelHint } : {}),
+              })
+            )
+          );
+        } else {
+          throw inProcessErr;
+        }
+      }
     }
 
     // Build signed response envelope
@@ -225,16 +375,36 @@ class A2ABridgeImpl {
         performative: 'result',
         timestamp: new Date().toISOString(),
       },
-      payload: { text: responseText },
+      payload: {
+        text: responseText,
+        ...(rehydrated ? { metadata: { rehydrated: true } } : {}),
+      },
     };
     response.header.signature = signA2AMessage(response);
+
+    if (conversationId) {
+      const providerSessionId =
+        typeof handle?.getRecord === 'function'
+          ? handle.getRecord()?.sessionId || undefined
+          : undefined;
+      await appendConversationTurn(conversationId, {
+        sender: agentId,
+        receiver: envelope.header.sender,
+        performative: 'result',
+        result: responseText,
+        provider_session_id: providerSessionId,
+        missionId,
+      });
+    }
 
     // Notify handlers
     const handlers = this.responseHandlers.get(envelope.header.sender) || [];
     for (const handler of handlers) {
       try {
         handler(response);
-      } catch (_) {}
+      } catch (err: any) {
+        logger.warn(`[A2A_BRIDGE] Response handler failed: ${err?.message || err}`);
+      }
     }
 
     return response;

@@ -60,3 +60,21 @@ source_ref: MEM-MR6POIEV-F7CA0750
 evidence_refs:
 
 - active/missions/MSN-TEST-AUTOPROMOTE/evidence/ledger.jsonl
+
+## MEM-MR6SXBJC-EEC4AE51 (2026-07-04)
+
+Reusable weekly review note for the mission closure checklist.
+
+source_ref: MEM-MR6SXBJC-EEC4AE51
+evidence_refs:
+
+- active/missions/MSN-TEST-AUTOPROMOTE/evidence/ledger.jsonl
+
+## MEM-MR6TCAQE-66C9C34F (2026-07-04)
+
+Reusable weekly review note for the mission closure checklist.
+
+source_ref: MEM-MR6TCAQE-66C9C34F
+evidence_refs:
+
+- active/missions/MSN-TEST-AUTOPROMOTE/evidence/ledger.jsonl
