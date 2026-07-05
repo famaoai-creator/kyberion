@@ -39,10 +39,18 @@ function createTestProtocol(): DocxDesignProtocol {
     generatedAt: new Date().toISOString(),
     theme: {
       colors: {
-        dk1: '000000', lt1: 'FFFFFF', dk2: '44546A', lt2: 'E7E6E6',
-        accent1: '5B9BD5', accent2: 'ED7D31', accent3: 'A5A5A5',
-        accent4: 'FFC000', accent5: '4472C4', accent6: '70AD47',
-        hlink: '0563C1', folHlink: '954F72',
+        dk1: '000000',
+        lt1: 'FFFFFF',
+        dk2: '44546A',
+        lt2: 'E7E6E6',
+        accent1: '5B9BD5',
+        accent2: 'ED7D31',
+        accent3: 'A5A5A5',
+        accent4: 'FFC000',
+        accent5: '4472C4',
+        accent6: '70AD47',
+        hlink: '0563C1',
+        folHlink: '954F72',
       },
     },
     styles: {
@@ -110,9 +118,7 @@ function createTestProtocol(): DocxDesignProtocol {
           ],
         },
       ],
-      nums: [
-        { numId: 1, abstractNumId: 0 },
-      ],
+      nums: [{ numId: 1, abstractNumId: 0 }],
     },
     body: [
       // Heading 1
@@ -174,18 +180,14 @@ function createTestProtocol(): DocxDesignProtocol {
         type: 'paragraph',
         paragraph: {
           pPr: { numPr: { ilvl: 0, numId: 1 } },
-          content: [
-            { type: 'run', run: { content: [{ type: 'text', text: '箇条書き項目1' }] } },
-          ],
+          content: [{ type: 'run', run: { content: [{ type: 'text', text: '箇条書き項目1' }] } }],
         },
       },
       {
         type: 'paragraph',
         paragraph: {
           pPr: { numPr: { ilvl: 0, numId: 1 } },
-          content: [
-            { type: 'run', run: { content: [{ type: 'text', text: '箇条書き項目2' }] } },
-          ],
+          content: [{ type: 'run', run: { content: [{ type: 'text', text: '箇条書き項目2' }] } }],
         },
       },
       // Heading 2
@@ -221,48 +223,60 @@ function createTestProtocol(): DocxDesignProtocol {
               cells: [
                 {
                   tcPr: { tcW: { w: 2500, type: 'dxa' }, shd: { val: 'clear', fill: '232F3E' } },
-                  content: [{
-                    type: 'paragraph',
-                    paragraph: {
-                      content: [{
-                        type: 'run',
-                        run: {
-                          rPr: { bold: true, color: { val: 'FFFFFF' } },
-                          content: [{ type: 'text', text: '列A' }],
-                        },
-                      }],
+                  content: [
+                    {
+                      type: 'paragraph',
+                      paragraph: {
+                        content: [
+                          {
+                            type: 'run',
+                            run: {
+                              rPr: { bold: true, color: { val: 'FFFFFF' } },
+                              content: [{ type: 'text', text: '列A' }],
+                            },
+                          },
+                        ],
+                      },
                     },
-                  }],
+                  ],
                 },
                 {
                   tcPr: { tcW: { w: 2500, type: 'dxa' }, shd: { val: 'clear', fill: '232F3E' } },
-                  content: [{
-                    type: 'paragraph',
-                    paragraph: {
-                      content: [{
-                        type: 'run',
-                        run: {
-                          rPr: { bold: true, color: { val: 'FFFFFF' } },
-                          content: [{ type: 'text', text: '列B' }],
-                        },
-                      }],
+                  content: [
+                    {
+                      type: 'paragraph',
+                      paragraph: {
+                        content: [
+                          {
+                            type: 'run',
+                            run: {
+                              rPr: { bold: true, color: { val: 'FFFFFF' } },
+                              content: [{ type: 'text', text: '列B' }],
+                            },
+                          },
+                        ],
+                      },
                     },
-                  }],
+                  ],
                 },
                 {
                   tcPr: { tcW: { w: 2500, type: 'dxa' }, shd: { val: 'clear', fill: '232F3E' } },
-                  content: [{
-                    type: 'paragraph',
-                    paragraph: {
-                      content: [{
-                        type: 'run',
-                        run: {
-                          rPr: { bold: true, color: { val: 'FFFFFF' } },
-                          content: [{ type: 'text', text: '列C' }],
-                        },
-                      }],
+                  content: [
+                    {
+                      type: 'paragraph',
+                      paragraph: {
+                        content: [
+                          {
+                            type: 'run',
+                            run: {
+                              rPr: { bold: true, color: { val: 'FFFFFF' } },
+                              content: [{ type: 'text', text: '列C' }],
+                            },
+                          },
+                        ],
+                      },
                     },
-                  }],
+                  ],
                 },
               ],
             },
@@ -270,30 +284,42 @@ function createTestProtocol(): DocxDesignProtocol {
               cells: [
                 {
                   tcPr: { tcW: { w: 2500, type: 'dxa' } },
-                  content: [{
-                    type: 'paragraph',
-                    paragraph: {
-                      content: [{ type: 'run', run: { content: [{ type: 'text', text: 'データ1' }] } }],
+                  content: [
+                    {
+                      type: 'paragraph',
+                      paragraph: {
+                        content: [
+                          { type: 'run', run: { content: [{ type: 'text', text: 'データ1' }] } },
+                        ],
+                      },
                     },
-                  }],
+                  ],
                 },
                 {
                   tcPr: { tcW: { w: 2500, type: 'dxa' } },
-                  content: [{
-                    type: 'paragraph',
-                    paragraph: {
-                      content: [{ type: 'run', run: { content: [{ type: 'text', text: 'データ2' }] } }],
+                  content: [
+                    {
+                      type: 'paragraph',
+                      paragraph: {
+                        content: [
+                          { type: 'run', run: { content: [{ type: 'text', text: 'データ2' }] } },
+                        ],
+                      },
                     },
-                  }],
+                  ],
                 },
                 {
                   tcPr: { tcW: { w: 2500, type: 'dxa' } },
-                  content: [{
-                    type: 'paragraph',
-                    paragraph: {
-                      content: [{ type: 'run', run: { content: [{ type: 'text', text: 'データ3' }] } }],
+                  content: [
+                    {
+                      type: 'paragraph',
+                      paragraph: {
+                        content: [
+                          { type: 'run', run: { content: [{ type: 'text', text: 'データ3' }] } },
+                        ],
+                      },
                     },
-                  }],
+                  ],
                 },
               ],
             },
@@ -309,10 +335,12 @@ function createTestProtocol(): DocxDesignProtocol {
               type: 'hyperlink',
               hyperlink: {
                 anchor: 'bookmark1',
-                runs: [{
-                  rPr: { color: { val: '0563C1' }, underline: 'single' },
-                  content: [{ type: 'text', text: '内部リンク' }],
-                }],
+                runs: [
+                  {
+                    rPr: { color: { val: '0563C1' }, underline: 'single' },
+                    content: [{ type: 'text', text: '内部リンク' }],
+                  },
+                ],
               },
             },
           ],
@@ -321,7 +349,7 @@ function createTestProtocol(): DocxDesignProtocol {
     ],
     sections: [
       {
-        pgSz: { w: 11906, h: 16838 },  // A4
+        pgSz: { w: 11906, h: 16838 }, // A4
         pgMar: { top: 1440, right: 1440, bottom: 1440, left: 1440, header: 720, footer: 720 },
         docGrid: { linePitch: 360 },
       },
@@ -355,7 +383,6 @@ describe('Native DOCX Engine', () => {
   // ═══════════════════════════════════════════════════════════
 
   describe('OOXML Spec Compliance', () => {
-
     it('should contain all required package parts', () => {
       const required = [
         '[Content_Types].xml',
@@ -440,6 +467,20 @@ describe('Native DOCX Engine', () => {
       const styles = files.get('word/styles.xml')!;
       expect(styles).toContain('w:styleId="Heading1"');
       expect(styles).toContain('w:styleId="Heading2"');
+    });
+
+    it('theme should carry the Japanese eastAsia font by default', () => {
+      const theme = files.get('word/theme/theme1.xml')!;
+      expect(theme).toContain('Noto Sans JP');
+      expect(theme).not.toContain('<a:ea typeface=""/>');
+    });
+
+    it('font table should not rely on MS Gothic / MS Mincho defaults', () => {
+      const fontTable = files.get('word/fontTable.xml')!;
+      expect(fontTable).toContain('Noto Sans JP');
+      expect(fontTable).toContain('Yu Gothic');
+      expect(fontTable).not.toContain('MS Gothic');
+      expect(fontTable).not.toContain('MS Mincho');
     });
 
     it('text content should be wrapped in <w:t> with xml:space="preserve"', () => {
@@ -535,9 +576,9 @@ describe('Native DOCX Engine', () => {
     it('fontTable.xml should contain font definitions', () => {
       const fontTable = files.get('word/fontTable.xml')!;
       expect(fontTable).toContain('<w:fonts');
-      expect(fontTable).toContain('w:name="Calibri"');
-      expect(fontTable).toContain('w:name="Times New Roman"');
-      expect(fontTable).toContain('w:name="MS Gothic"');
+      expect(fontTable).toContain('w:name="Inter"');
+      expect(fontTable).toContain('w:name="Noto Sans JP"');
+      expect(fontTable).toContain('w:name="Yu Gothic"');
     });
 
     it('theme should have valid effectStyleLst', () => {
@@ -597,12 +638,14 @@ describe('Native DOCX Engine', () => {
     });
 
     it('should preserve table structure', () => {
-      const origTables = originalProtocol.body.filter(b => b.type === 'table');
-      const rtTables = roundTrippedProtocol.body.filter(b => b.type === 'table');
+      const origTables = originalProtocol.body.filter((b) => b.type === 'table');
+      const rtTables = roundTrippedProtocol.body.filter((b) => b.type === 'table');
       expect(rtTables.length).toBe(origTables.length);
       if (origTables.length > 0 && rtTables.length > 0) {
         expect(rtTables[0].table.rows.length).toBe(origTables[0].table.rows.length);
-        expect(rtTables[0].table.rows[0].cells.length).toBe(origTables[0].table.rows[0].cells.length);
+        expect(rtTables[0].table.rows[0].cells.length).toBe(
+          origTables[0].table.rows[0].cells.length
+        );
       }
     });
 
@@ -619,8 +662,9 @@ describe('Native DOCX Engine', () => {
     it('should preserve style definitions count', () => {
       // Round-trip may add extra styles from Word's default inference,
       // but should have at least as many as the original
-      expect(roundTrippedProtocol.styles.definitions.length)
-        .toBeGreaterThanOrEqual(originalProtocol.styles.definitions.length);
+      expect(roundTrippedProtocol.styles.definitions.length).toBeGreaterThanOrEqual(
+        originalProtocol.styles.definitions.length
+      );
     });
 
     it('round-tripped DOCX should pass basic OOXML compliance', () => {
@@ -646,13 +690,12 @@ describe('Native DOCX Engine', () => {
   // ═══════════════════════════════════════════════════════════
 
   describe('Edge Cases', () => {
-
     it('should generate valid DOCX without numbering', async () => {
       const protocol = createTestProtocol();
       delete protocol.numbering;
       // Remove bullet paragraphs
-      protocol.body = protocol.body.filter(b =>
-        b.type !== 'paragraph' || !b.paragraph.pPr?.numPr
+      protocol.body = protocol.body.filter(
+        (b) => b.type !== 'paragraph' || !b.paragraph.pPr?.numPr
       );
 
       const noNumPath = path.join(tmpDir, 'no_numbering.docx');
@@ -671,18 +714,26 @@ describe('Native DOCX Engine', () => {
         version: '1.0.0',
         generatedAt: new Date().toISOString(),
         theme: { colors: { dk1: '000000', lt1: 'FFFFFF', accent1: '5B9BD5' } },
-        styles: { definitions: [{ styleId: 'Normal', type: 'paragraph', name: 'Normal', isDefault: true }] },
-        body: [{
-          type: 'table',
-          table: {
-            tblGrid: [5000],
-            rows: [{
-              cells: [{
-                content: [],  // Empty cell — engine should add <w:p/>
-              }],
-            }],
+        styles: {
+          definitions: [{ styleId: 'Normal', type: 'paragraph', name: 'Normal', isDefault: true }],
+        },
+        body: [
+          {
+            type: 'table',
+            table: {
+              tblGrid: [5000],
+              rows: [
+                {
+                  cells: [
+                    {
+                      content: [], // Empty cell — engine should add <w:p/>
+                    },
+                  ],
+                },
+              ],
+            },
           },
-        }],
+        ],
         sections: [{ pgSz: { w: 11906, h: 16838 } }],
         headersFooters: [],
         relationships: [],
@@ -703,13 +754,17 @@ describe('Native DOCX Engine', () => {
         version: '1.0.0',
         generatedAt: new Date().toISOString(),
         theme: { colors: { dk1: '000000', lt1: 'FFFFFF', accent1: '5B9BD5' } },
-        styles: { definitions: [{ styleId: 'Normal', type: 'paragraph', name: 'Normal', isDefault: true }] },
+        styles: {
+          definitions: [{ styleId: 'Normal', type: 'paragraph', name: 'Normal', isDefault: true }],
+        },
         body: [
           // Section 1 content
           {
             type: 'paragraph',
             paragraph: {
-              content: [{ type: 'run', run: { content: [{ type: 'text', text: 'セクション1の内容' }] } }],
+              content: [
+                { type: 'run', run: { content: [{ type: 'text', text: 'セクション1の内容' }] } },
+              ],
             },
           },
           // Section break paragraph (intermediate sectPr in pPr)
@@ -719,7 +774,14 @@ describe('Native DOCX Engine', () => {
               pPr: {
                 sectPr: {
                   pgSz: { w: 16838, h: 11906, orient: 'landscape' },
-                  pgMar: { top: 1440, right: 1440, bottom: 1440, left: 1440, header: 720, footer: 720 },
+                  pgMar: {
+                    top: 1440,
+                    right: 1440,
+                    bottom: 1440,
+                    left: 1440,
+                    header: 720,
+                    footer: 720,
+                  },
                 },
               },
               content: [],
@@ -729,7 +791,12 @@ describe('Native DOCX Engine', () => {
           {
             type: 'paragraph',
             paragraph: {
-              content: [{ type: 'run', run: { content: [{ type: 'text', text: 'セクション2（横向き）' }] } }],
+              content: [
+                {
+                  type: 'run',
+                  run: { content: [{ type: 'text', text: 'セクション2（横向き）' }] },
+                },
+              ],
             },
           },
         ],
@@ -768,10 +835,10 @@ describe('Native DOCX Engine', () => {
       expect(extracted.sections.length).toBe(1);
       // Intermediate section should be in paragraph pPr
       const sectBreakPara = extracted.body.find(
-        b => b.type === 'paragraph' && b.paragraph.pPr?.sectPr
+        (b) => b.type === 'paragraph' && b.paragraph.pPr?.sectPr
       );
       expect(sectBreakPara).toBeDefined();
-      expect( (sectBreakPara as any)!.paragraph.pPr!.sectPr!.pgSz?.orient).toBe('landscape');
+      expect((sectBreakPara as any)!.paragraph.pPr!.sectPr!.pgSz?.orient).toBe('landscape');
     });
 
     it('should escape XML special characters in text', async () => {
@@ -779,16 +846,22 @@ describe('Native DOCX Engine', () => {
         version: '1.0.0',
         generatedAt: new Date().toISOString(),
         theme: { colors: { dk1: '000000', lt1: 'FFFFFF', accent1: '5B9BD5' } },
-        styles: { definitions: [{ styleId: 'Normal', type: 'paragraph', name: 'Normal', isDefault: true }] },
-        body: [{
-          type: 'paragraph',
-          paragraph: {
-            content: [{
-              type: 'run',
-              run: { content: [{ type: 'text', text: 'A < B & C > D "quoted"' }] },
-            }],
+        styles: {
+          definitions: [{ styleId: 'Normal', type: 'paragraph', name: 'Normal', isDefault: true }],
+        },
+        body: [
+          {
+            type: 'paragraph',
+            paragraph: {
+              content: [
+                {
+                  type: 'run',
+                  run: { content: [{ type: 'text', text: 'A < B & C > D "quoted"' }] },
+                },
+              ],
+            },
           },
-        }],
+        ],
         sections: [],
         headersFooters: [],
         relationships: [],
@@ -814,16 +887,16 @@ describe('Native DOCX Engine', () => {
         headersFooters: [],
         relationships: [],
       };
-      await expect(
-        generateNativeDocx(protocol, path.join(tmpDir, 'empty.docx'))
-      ).rejects.toThrow('at least one body block');
+      await expect(generateNativeDocx(protocol, path.join(tmpDir, 'empty.docx'))).rejects.toThrow(
+        'at least one body block'
+      );
     });
 
     it('should reject non-existent output directory', async () => {
       const protocol = createTestProtocol();
-      await expect(
-        generateNativeDocx(protocol, '/nonexistent/dir/test.docx')
-      ).rejects.toThrow('output directory');
+      await expect(generateNativeDocx(protocol, '/nonexistent/dir/test.docx')).rejects.toThrow(
+        'output directory'
+      );
     });
 
     it('should generate Content_Types with header/footer overrides', async () => {
@@ -831,24 +904,54 @@ describe('Native DOCX Engine', () => {
         version: '1.0.0',
         generatedAt: new Date().toISOString(),
         theme: { colors: { dk1: '000000', lt1: 'FFFFFF', accent1: '5B9BD5' } },
-        styles: { definitions: [{ styleId: 'Normal', type: 'paragraph', name: 'Normal', isDefault: true }] },
-        body: [{
-          type: 'paragraph',
-          paragraph: { content: [{ type: 'run', run: { content: [{ type: 'text', text: 'Test' }] } }] },
-        }],
-        sections: [{
-          pgSz: { w: 11906, h: 16838 },
-          headerRefs: [{ type: 'default', rId: 'rId10' }],
-          footerRefs: [{ type: 'default', rId: 'rId11' }],
-        }],
+        styles: {
+          definitions: [{ styleId: 'Normal', type: 'paragraph', name: 'Normal', isDefault: true }],
+        },
+        body: [
+          {
+            type: 'paragraph',
+            paragraph: {
+              content: [{ type: 'run', run: { content: [{ type: 'text', text: 'Test' }] } }],
+            },
+          },
+        ],
+        sections: [
+          {
+            pgSz: { w: 11906, h: 16838 },
+            headerRefs: [{ type: 'default', rId: 'rId10' }],
+            footerRefs: [{ type: 'default', rId: 'rId11' }],
+          },
+        ],
         headersFooters: [
           {
-            type: 'header', rId: 'rId10', headerType: 'default',
-            content: [{ type: 'paragraph', paragraph: { content: [{ type: 'run', run: { content: [{ type: 'text', text: 'ヘッダー' }] } }] } }],
+            type: 'header',
+            rId: 'rId10',
+            headerType: 'default',
+            content: [
+              {
+                type: 'paragraph',
+                paragraph: {
+                  content: [
+                    { type: 'run', run: { content: [{ type: 'text', text: 'ヘッダー' }] } },
+                  ],
+                },
+              },
+            ],
           },
           {
-            type: 'footer', rId: 'rId11', headerType: 'default',
-            content: [{ type: 'paragraph', paragraph: { content: [{ type: 'run', run: { content: [{ type: 'text', text: 'フッター' }] } }] } }],
+            type: 'footer',
+            rId: 'rId11',
+            headerType: 'default',
+            content: [
+              {
+                type: 'paragraph',
+                paragraph: {
+                  content: [
+                    { type: 'run', run: { content: [{ type: 'text', text: 'フッター' }] } },
+                  ],
+                },
+              },
+            ],
           },
         ],
         relationships: [

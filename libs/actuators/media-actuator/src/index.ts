@@ -36,6 +36,8 @@ import {
   resolveReportSummaryTitle,
   resolveThemeColorRole as resolveThemeColorRolePolicy,
   resolveThemeHexRole as resolveThemeHexRolePolicy,
+  DEFAULT_EAST_ASIA_FONT,
+  DEFAULT_LATIN_FONT,
   resolveDrawioEdgeLabelStyleParts,
   resolveDrawioEdgeRoutingStyleParts,
   resolveDrawioBoundaryIconCandidates,
@@ -496,8 +498,8 @@ function buildPptxSlideFromPattern(
 
   const isHero = semanticType === 'hero';
   const themeFonts = theme?.fonts || theme?.theme?.fonts || {};
-  const headingFont = themeFonts.heading?.split(',')[0]?.trim() || 'Inter';
-  const bodyFont = themeFonts.body?.split(',')[0]?.trim() || 'System-ui';
+  const headingFont = themeFonts.heading?.split(',')[0]?.trim() || DEFAULT_LATIN_FONT;
+  const bodyFont = themeFonts.body?.split(',')[0]?.trim() || DEFAULT_LATIN_FONT;
   const bzl = resolveLayoutTemplate(rootDir, data.design_system_id, data, theme);
   const chr = bzl.chrome;
   const hro = bzl.hero;
@@ -3345,10 +3347,14 @@ function themeToDocxStyleHints(
 ): { headingFont: string; bodyFont: string; accent: string } {
   const themeFonts = theme?.fonts || theme?.theme?.fonts || {};
   const headingFont = normalizeFontFamily(
-    locale?.startsWith('ja') ? themeFonts.heading || 'Meiryo' : themeFonts.heading || 'Aptos'
+    locale?.startsWith('ja')
+      ? themeFonts.heading || DEFAULT_EAST_ASIA_FONT
+      : themeFonts.heading || DEFAULT_LATIN_FONT
   );
   const bodyFont = normalizeFontFamily(
-    locale?.startsWith('ja') ? themeFonts.body || 'Meiryo' : themeFonts.body || 'Aptos'
+    locale?.startsWith('ja')
+      ? themeFonts.body || DEFAULT_EAST_ASIA_FONT
+      : themeFonts.body || DEFAULT_LATIN_FONT
   );
   return {
     headingFont,

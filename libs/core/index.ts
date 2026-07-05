@@ -126,6 +126,7 @@ export * from './managed-process.js';
 export * from './meeting-environment-policy.js';
 export * from './meeting-participation-runtime-plan.js';
 export * from './deliverable-quality.js';
+export * from './src/font-stack.js';
 export { resolveInputBindings, classifyInputId, isPathInput } from './input-binding.js';
 export type { InputBinding, InputBindingType } from './input-binding.js';
 export { distillIncident, summarizeIncidents } from './incident-distiller.js';
