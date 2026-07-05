@@ -1,0 +1,17 @@
+{
+  "name": "setup-oauth",
+  "action": "pipeline",
+  "description": "Interactive pipeline to setup OAuth connection for a specific service",
+  "steps": [
+    {
+      "op": "system:shell",
+      "params": {
+        "cmd": "node --import ./scripts/ts-loader.mjs scripts/setup_oauth.ts",
+        "env": {
+          "KYBERION_OAUTH_SERVICE_ID": "{{service_name}}",
+          "KYBERION_PERSONA": "sovereign"
+        }
+      }
+    }
+  ]
+}
