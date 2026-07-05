@@ -18,6 +18,7 @@ import {
   resolveVars,
   evaluateCondition,
   resolveWriteArtifactSpec,
+  resolveRequiredStringParam,
   processUntrustedContent,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
@@ -321,7 +322,10 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
   const rootDir = pathResolver.rootDir();
   switch (op) {
     case 'write': {
-      const out = path.resolve(rootDir, resolve(params.path));
+      const out = path.resolve(
+        rootDir,
+        resolveRequiredStringParam(params, ['path'], resolve, 'write')
+      );
       const content =
         ctx[params.from || 'last_transform'] ||
         ctx[params.from || 'last_capture'] ||
@@ -350,7 +354,10 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       break;
     }
     case 'append': {
-      const out = path.resolve(rootDir, resolve(params.path));
+      const out = path.resolve(
+        rootDir,
+        resolveRequiredStringParam(params, ['path'], resolve, 'append')
+      );
       const content =
         ctx[params.from || 'last_transform'] ||
         ctx[params.from || 'last_capture'] ||
@@ -363,7 +370,10 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       break;
     }
     case 'delete': {
-      const target = path.resolve(rootDir, resolve(params.path));
+      const target = path.resolve(
+        rootDir,
+        resolveRequiredStringParam(params, ['path'], resolve, 'delete')
+      );
       await retry(async () => {
         safeRmSync(target, { recursive: true, force: true });
         return undefined;
@@ -372,13 +382,22 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
     }
     case 'mkdir':
       await retry(async () => {
-        safeMkdir(path.resolve(rootDir, resolve(params.path)), { recursive: true });
+        safeMkdir(
+          path.resolve(rootDir, resolveRequiredStringParam(params, ['path'], resolve, 'mkdir')),
+          { recursive: true }
+        );
         return undefined;
       }, buildRetryOptions());
       break;
     case 'copy': {
-      const src = path.resolve(rootDir, resolve(params.from));
-      const dest = path.resolve(rootDir, resolve(params.to));
+      const src = path.resolve(
+        rootDir,
+        resolveRequiredStringParam(params, ['from'], resolve, 'copy')
+      );
+      const dest = path.resolve(
+        rootDir,
+        resolveRequiredStringParam(params, ['to'], resolve, 'copy')
+      );
       await retry(async () => {
         if (!safeExistsSync(path.dirname(dest))) safeMkdir(path.dirname(dest), { recursive: true });
         safeCopyFileSync(src, dest);
@@ -387,8 +406,14 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       break;
     }
     case 'move': {
-      const src = path.resolve(rootDir, resolve(params.from));
-      const dest = path.resolve(rootDir, resolve(params.to));
+      const src = path.resolve(
+        rootDir,
+        resolveRequiredStringParam(params, ['from'], resolve, 'move')
+      );
+      const dest = path.resolve(
+        rootDir,
+        resolveRequiredStringParam(params, ['to'], resolve, 'move')
+      );
       await retry(async () => {
         if (!safeExistsSync(path.dirname(dest))) safeMkdir(path.dirname(dest), { recursive: true });
         safeMoveSync(src, dest);
