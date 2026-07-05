@@ -3,7 +3,14 @@ import AjvModule from 'ajv';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
-import { safeExistsSync, safeReadFile, safeReaddir, safeRmSync } from './secure-io.js';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeReaddir,
+  safeRmSync,
+  safeWriteFile,
+} from './secure-io.js';
 import {
   classifyTaskSessionIntent,
   createTaskSession,
@@ -166,7 +173,39 @@ describe('task-session', () => {
       },
     });
 
-    expect(() => saveTaskSession(session)).toThrow(/requires evidence/i);
+    expect(() => saveTaskSession(session)).toThrow(/intent goal not satisfied|requires evidence/i);
+  });
+
+  it('persists a completion summary when a completed task session has evidence', () => {
+    const artifactPath = pathResolver.shared(
+      'runtime/task-sessions/TSK-TEST-COMPLETION-SUMMARY.docx'
+    );
+    safeMkdir(path.dirname(artifactPath), { recursive: true });
+    safeWriteFile(artifactPath, 'The report file is saved.');
+    const session = createTaskSession({
+      sessionId: 'TSK-TEST-COMPLETION-SUMMARY',
+      surface: 'presence',
+      taskType: 'report_document',
+      status: 'completed',
+      goal: {
+        summary: 'Weekly report',
+        success_condition: 'The report file is saved.',
+      },
+    });
+    session.artifact = {
+      kind: 'docx',
+      output_path: artifactPath,
+      preview_text: 'Weekly report is complete.',
+    };
+
+    expect(() => saveTaskSession(session)).not.toThrow();
+    const loaded = loadTaskSession('TSK-TEST-COMPLETION-SUMMARY');
+    expect(loaded?.completion_summary).toMatchObject({
+      requested_result: expect.any(String),
+      satisfied: true,
+      next_step: expect.stringContaining('Proceed'),
+    });
+    expect(loaded?.completion_next_action?.satisfied).toBe(true);
   });
 
   it('classifies photo and workbook intents from conversational utterances', () => {

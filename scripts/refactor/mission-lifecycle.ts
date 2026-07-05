@@ -12,6 +12,7 @@ import {
   createActuatorTrace,
   finalizeActuatorTrace,
   buildCompletionNextAction,
+  reconcileCompletion,
   ledger,
   logger,
   latestSnapshot,
@@ -728,21 +729,25 @@ export async function finishMission(
   }
 
   const evidenceRefs = collectMissionEvidenceRefs(missionDir);
+  const completionGoal = {
+    summary:
+      state.intent?.goal_summary ||
+      state.outcome_contract?.requested_result ||
+      `Mission ${upperId}`,
+    success_condition:
+      state.intent?.success_condition ||
+      state.outcome_contract?.success_criteria?.join('; ') ||
+      state.outcome_contract?.requested_result ||
+      `Mission ${upperId}`,
+  };
+  const completionReconciliation = await reconcileCompletion({
+    goal: completionGoal,
+    evidenceRefs,
+    requestedResult: state.outcome_contract?.requested_result,
+  });
   const completionNextAction = buildCompletionNextAction({
-    goal: {
-      summary: state.outcome_contract?.requested_result || `Mission ${upperId}`,
-      success_condition:
-        state.outcome_contract?.success_criteria?.join('; ') ||
-        state.outcome_contract?.requested_result ||
-        `Mission ${upperId}`,
-    },
-    reconciliation: {
-      satisfied: evidenceRefs.length > 0,
-      delivered: evidenceRefs,
-      gaps: evidenceRefs.length > 0 ? [] : ['No mission evidence refs were collected.'],
-      confidence: evidenceRefs.length > 0 ? 0.9 : 0.35,
-      evidence_refs: evidenceRefs,
-    },
+    goal: completionGoal,
+    reconciliation: completionReconciliation,
   });
   const traceCtx = createActuatorTrace('mission-controller', 'finish', {
     pipelineId: upperId,

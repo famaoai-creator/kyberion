@@ -27,7 +27,7 @@
 | AR-02 | TODO    | describeOps、generate_op_registry、CI ゲート                                                                      |
 | AO-02 | TODO    | CVE スキャン/台帳、パッチ判断ルーブリック、適用フロー                                                             |
 | IL-01 | TODO    | goal/source_text/outcome_ids の昇格 seam 貫通、outcome-contract の goal 優先化                                    |
-| IL-04 | PARTIAL | intent-reconciliation エンジン、完了ゲート、学習記録                                                              |
+| IL-04 | PARTIAL | intent-reconciliation エンジン、task-session 完了ゲート、completion summary/next action 記録                      |
 
 ## 全計画一覧
 
@@ -144,13 +144,13 @@
 
 ### IL(インテントライフサイクル)
 
-| ID    | 状態    | 残作業                                                 |
-| ----- | ------- | ------------------------------------------------------ |
-| IL-01 | TODO    | goal の昇格 seam 貫通、outcome-contract の goal 優先化 |
-| IL-02 | TODO    | 相関 ID 貫通、intent trace コマンド                    |
-| IL-03 | TODO    | origin baseline、実行中ドリフトゲート                  |
-| IL-04 | PARTIAL | intent-reconciliation エンジン、完了ゲート、学習記録   |
-| IL-05 | TODO    | pending-intent-store、修正検知、completed 再オープン   |
+| ID    | 状態    | 残作業                                                                                       |
+| ----- | ------- | -------------------------------------------------------------------------------------------- |
+| IL-01 | TODO    | goal の昇格 seam 貫通、outcome-contract の goal 優先化                                       |
+| IL-02 | TODO    | 相関 ID 貫通、intent trace コマンド                                                          |
+| IL-03 | TODO    | origin baseline、実行中ドリフトゲート                                                        |
+| IL-04 | PARTIAL | intent-reconciliation エンジン、task-session 完了ゲート、completion summary/next action 記録 |
+| IL-05 | TODO    | pending-intent-store、修正検知、completed 再オープン                                         |
 
 ### ONB(初回オンボーディング)
 

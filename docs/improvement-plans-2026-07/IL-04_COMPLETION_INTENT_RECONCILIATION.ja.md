@@ -51,6 +51,13 @@
 - `libs/core/next-action.ts` に完了用の構造化 next-action を追加し、`scripts/refactor/mission-lifecycle.ts` の finish で `mission_completion_next_action` と `mission_completion_summary` を state.context に記録するようにした。
 - `libs/core/next-action.test.ts` で満足済み/未充足の両ケースを固定した。
 
+## 実装メモ
+
+- `libs/core/intent-reconciliation.ts` を新設し、`goal.success_condition` と evidence を構造的に突合する `reconcileCompletion` / `reconcileCompletionStructurally` を実装した。
+- `libs/core/task-session.ts` の完了保存時に突合ゲートを追加し、未充足のまま `completed` にできないようにした。
+- 完了時には `completion_summary` と `completion_next_action` を task-session に永続化し、`task-session.schema.json` でもトップレベル項目として受けるようにした。
+- ミッション finish 側は `scripts/refactor/mission-lifecycle.ts` で突合結果を取り込み、完了サマリと次アクションを state.context に残すようにした。
+
 ## リスクと注意
 
 - 突合ゲートは**完了を止め得る**。誤って「未充足」と判定して完了をブロックすると体験が悪化する。まず warn(gap を提示するが完了は通す)で観測 → gap 抽出精度を確認 → enforce。重大度でゲート強度を分け、軽微 gap は completed + 注記に留める。
