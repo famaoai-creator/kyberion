@@ -1,5 +1,22 @@
-import { logger, safeReadFile, safeWriteFile, safeMkdir, safeExistsSync, safeReaddir, safeRmSync, safeExec, pathResolver } from '@agent/core';
-import { chromium, type Browser, type BrowserContext, type CDPSession, type Page } from '@playwright/test';
+import {
+  logger,
+  safeReadFile,
+  safeWriteFile,
+  safeMkdir,
+  safeExistsSync,
+  safeReaddir,
+  safeRmSync,
+  safeExec,
+  pathResolver,
+  normalizeBrowserPipelineOp,
+} from '@agent/core';
+import {
+  chromium,
+  type Browser,
+  type BrowserContext,
+  type CDPSession,
+  type Page,
+} from '@playwright/test';
 import * as path from 'node:path';
 
 interface BrowserSnapshotElement {
@@ -102,13 +119,24 @@ interface BrowserRuntime {
   cdpSessions: WeakMap<Page, CDPSession>;
   activeTabId: string;
   consoleEvents: Array<{ tab_id: string; type: string; text: string; ts: string }>;
-  networkEvents: Array<{ tab_id: string; method: string; url: string; resourceType: string; ts: string }>;
+  networkEvents: Array<{
+    tab_id: string;
+    method: string;
+    url: string;
+    resourceType: string;
+    ts: string;
+  }>;
   webAuthn?: {
     authenticatorId?: string;
     enabled: boolean;
     options?: Record<string, any>;
     credentials: Array<Record<string, any>>;
-    events: Array<{ type: string; credential?: Record<string, any>; credentialId?: string; ts: string }>;
+    events: Array<{
+      type: string;
+      credential?: Record<string, any>;
+      credentialId?: string;
+      ts: string;
+    }>;
   };
 }
 
@@ -127,7 +155,9 @@ interface BrowserRuntimeLease {
 const BROWSER_RUNTIME_DIR = pathResolver.shared('runtime/browser');
 const BROWSER_SESSION_DIR = path.join(BROWSER_RUNTIME_DIR, 'sessions');
 const BROWSER_SNAPSHOT_DIR = path.join(BROWSER_RUNTIME_DIR, 'snapshots');
-const BROWSER_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/browser-actuator/manifest.json');
+const BROWSER_MANIFEST_PATH = pathResolver.rootResolve(
+  'libs/actuators/browser-actuator/manifest.json'
+);
 const browserRuntimeLeases = new Map<string, BrowserRuntimeLease>();
 
 const DEFAULT_BROWSER_RETRY = {
@@ -147,7 +177,9 @@ function isPlainObject(value: unknown): value is Record<string, any> {
 function loadRecoveryPolicy(): Record<string, any> {
   if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
   try {
-    const manifest = JSON.parse(safeReadFile(BROWSER_MANIFEST_PATH, { encoding: 'utf8' }) as string);
+    const manifest = JSON.parse(
+      safeReadFile(BROWSER_MANIFEST_PATH, { encoding: 'utf8' }) as string
+    );
     cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
     return cachedRecoveryPolicy;
   } catch (_) {
@@ -160,22 +192,36 @@ function buildRetryOptions(stepParams: Record<string, any>) {
   const recoveryPolicy = loadRecoveryPolicy();
   const manifestRetry = isPlainObject(recoveryPolicy.retry) ? recoveryPolicy.retry : {};
   const retryableCategories = new Set<string>(
-    Array.isArray(recoveryPolicy.retryable_categories) ? recoveryPolicy.retryable_categories.map(String) : [],
+    Array.isArray(recoveryPolicy.retryable_categories)
+      ? recoveryPolicy.retryable_categories.map(String)
+      : []
   );
   const explicitRetry = isPlainObject(stepParams.retry) ? stepParams.retry : {};
   const resolved = {
     ...DEFAULT_BROWSER_RETRY,
     ...manifestRetry,
     ...explicitRetry,
-    maxRetries: Number(stepParams.max_retries ?? explicitRetry.maxRetries ?? manifestRetry.maxRetries ?? DEFAULT_BROWSER_RETRY.maxRetries),
-    initialDelayMs: Number(stepParams.retry_delay_ms ?? explicitRetry.initialDelayMs ?? manifestRetry.initialDelayMs ?? DEFAULT_BROWSER_RETRY.initialDelayMs),
+    maxRetries: Number(
+      stepParams.max_retries ??
+        explicitRetry.maxRetries ??
+        manifestRetry.maxRetries ??
+        DEFAULT_BROWSER_RETRY.maxRetries
+    ),
+    initialDelayMs: Number(
+      stepParams.retry_delay_ms ??
+        explicitRetry.initialDelayMs ??
+        manifestRetry.initialDelayMs ??
+        DEFAULT_BROWSER_RETRY.initialDelayMs
+    ),
   };
   return {
     ...resolved,
     shouldRetry: (error: Error) => {
       const message = String(error?.message || '').toLowerCase();
       if (retryableCategories.size > 0) {
-        return [...retryableCategories].some((category) => message.includes(category.toLowerCase()));
+        return [...retryableCategories].some((category) =>
+          message.includes(category.toLowerCase())
+        );
       }
       return /timeout|network|rate limit|ECONNRESET|ETIMEDOUT/i.test(message);
     },
@@ -215,7 +261,9 @@ function registerBrowserPage(runtime: BrowserRuntime, page: Page, tabId: string)
 function attachPageObservers(runtime: BrowserRuntime, page: Page): void {
   const tabId = runtime.pageIds.get(page) || `tab-${runtime.tabs.size}`;
   page.on('dialog', async (dialog) => {
-    logger.info(`[BROWSER] Dialog intercepted: ${dialog.type()} - "${dialog.message().substring(0, 100)}"`);
+    logger.info(
+      `[BROWSER] Dialog intercepted: ${dialog.type()} - "${dialog.message().substring(0, 100)}"`
+    );
     await dialog.accept();
   });
   page.on('console', (msg) => {
@@ -246,7 +294,16 @@ function getActivePage(runtime: BrowserRuntime): Page {
 }
 
 function summarizeRecentActions(trail: any): BrowserSessionMetadata['recent_actions'] {
-  const actions = Array.isArray(trail) ? trail as Array<{ op: string; kind: 'control' | 'capture' | 'apply'; tab_id?: string; ref?: string; selector?: string; ts: string }> : [];
+  const actions = Array.isArray(trail)
+    ? (trail as Array<{
+        op: string;
+        kind: 'control' | 'capture' | 'apply';
+        tab_id?: string;
+        ref?: string;
+        selector?: string;
+        ts: string;
+      }>)
+    : [];
   return actions.slice(-8).map((action) => ({
     op: action.op,
     kind: action.kind,
@@ -260,13 +317,18 @@ function summarizeRecentActions(trail: any): BrowserSessionMetadata['recent_acti
 function loadBrowserSessionMetadata(filePath: string): BrowserSessionMetadata | null {
   if (!safeExistsSync(filePath)) return null;
   try {
-    return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as BrowserSessionMetadata;
+    return JSON.parse(
+      safeReadFile(filePath, { encoding: 'utf8' }) as string
+    ) as BrowserSessionMetadata;
   } catch {
     return null;
   }
 }
 
-async function waitForCdpEndpoint(userDataDir: string, timeoutMs = 5_000): Promise<{ cdpUrl: string; cdpPort: number } | null> {
+async function waitForCdpEndpoint(
+  userDataDir: string,
+  timeoutMs = 5_000
+): Promise<{ cdpUrl: string; cdpPort: number } | null> {
   if (process.env.VITEST) return null;
   const filePath = path.join(userDataDir, 'DevToolsActivePort');
   const startedAt = Date.now();
@@ -294,9 +356,7 @@ async function waitForCdpEndpoint(userDataDir: string, timeoutMs = 5_000): Promi
 function parseChromeRemoteDebuggingPorts(psOutput: string): number[] {
   const ports = new Set<number>();
   for (const line of psOutput.split(/\r?\n/)) {
-    const matches = [
-      ...line.matchAll(/--remote-debugging-port(?:=|\s+)(\d+)/gi),
-    ];
+    const matches = [...line.matchAll(/--remote-debugging-port(?:=|\s+)(\d+)/gi)];
     for (const match of matches) {
       const port = Number(match[1]);
       if (Number.isFinite(port) && port > 0 && port < 65536) {
@@ -307,7 +367,10 @@ function parseChromeRemoteDebuggingPorts(psOutput: string): number[] {
   return [...ports];
 }
 
-async function probeChromeCdpPort(port: number, timeoutMs = 600): Promise<ChromeCdpEndpoint | null> {
+async function probeChromeCdpPort(
+  port: number,
+  timeoutMs = 600
+): Promise<ChromeCdpEndpoint | null> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -337,15 +400,19 @@ async function probeChromeCdpPort(port: number, timeoutMs = 600): Promise<Chrome
 async function discoverChromeCdpEndpoint(): Promise<ChromeCdpEndpoint | null> {
   const candidatePorts = new Set<number>([9222, 9223, 9224, 9333, 9334]);
   try {
-    const psOutput = String(safeExec('ps', ['-axo', 'pid=,command='], {
-      timeoutMs: 2000,
-      maxOutputMB: 2,
-    }) || '');
+    const psOutput = String(
+      safeExec('ps', ['-axo', 'pid=,command='], {
+        timeoutMs: 2000,
+        maxOutputMB: 2,
+      }) || ''
+    );
     for (const port of parseChromeRemoteDebuggingPorts(psOutput)) {
       candidatePorts.add(port);
     }
   } catch (error: any) {
-    logger.info(`Could not inspect local process list for Chrome CDP discovery: ${error?.message || String(error)}`);
+    logger.info(
+      `Could not inspect local process list for Chrome CDP discovery: ${error?.message || String(error)}`
+    );
   }
 
   for (const port of candidatePorts) {
@@ -395,7 +462,8 @@ async function resetBrowserRuntimeLeasesForTest(): Promise<void> {
   }
   if (safeExistsSync(BROWSER_SESSION_DIR)) {
     for (const entry of safeReaddir(BROWSER_SESSION_DIR)) {
-      if (entry.endsWith('.json')) safeRmSync(path.join(BROWSER_SESSION_DIR, entry), { force: true });
+      if (entry.endsWith('.json'))
+        safeRmSync(path.join(BROWSER_SESSION_DIR, entry), { force: true });
     }
   }
 }
@@ -406,7 +474,10 @@ function saveBrowserSessionMetadata(filePath: string, metadata: BrowserSessionMe
 
 function saveBrowserSessionSnapshot(sessionId: string, snapshot: BrowserSnapshot): void {
   if (!safeExistsSync(BROWSER_SNAPSHOT_DIR)) safeMkdir(BROWSER_SNAPSHOT_DIR, { recursive: true });
-  safeWriteFile(path.join(BROWSER_SNAPSHOT_DIR, `${sessionId}.json`), JSON.stringify(snapshot, null, 2));
+  safeWriteFile(
+    path.join(BROWSER_SNAPSHOT_DIR, `${sessionId}.json`),
+    JSON.stringify(snapshot, null, 2)
+  );
 }
 
 async function summarizeTabs(runtime: BrowserRuntime): Promise<BrowserTabSummary[]> {
@@ -422,15 +493,25 @@ async function summarizeTabs(runtime: BrowserRuntime): Promise<BrowserTabSummary
   return summaries;
 }
 
-async function buildSnapshot(page: Page, options: { sessionId: string; tabId: string; maxElements: number }): Promise<BrowserSnapshot> {
+async function buildSnapshot(
+  page: Page,
+  options: { sessionId: string; tabId: string; maxElements: number }
+): Promise<BrowserSnapshot> {
   const { sessionId, tabId, maxElements } = options;
   const raw = await page.evaluate((max) => {
-    const candidates = Array.from(document.querySelectorAll('a, button, input, select, textarea, summary, [role], [tabindex]'));
+    const candidates = Array.from(
+      document.querySelectorAll('a, button, input, select, textarea, summary, [role], [tabindex]')
+    );
     const visible = candidates.filter((node) => {
       const el = node as HTMLElement;
       const rect = el.getBoundingClientRect();
       const style = window.getComputedStyle(el);
-      return rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && style.display !== 'none';
+      return (
+        rect.width > 0 &&
+        rect.height > 0 &&
+        style.visibility !== 'hidden' &&
+        style.display !== 'none'
+      );
     });
 
     return visible.slice(0, max).map((node, index) => {
@@ -439,12 +520,20 @@ async function buildSnapshot(page: Page, options: { sessionId: string; tabId: st
       const aria = el.getAttribute('aria-label');
       const placeholder = el.getAttribute('placeholder');
       const text = (el.innerText || el.textContent || '').trim().replace(/\s+/g, ' ');
-      const name = aria || placeholder || text || el.getAttribute('name') || el.id || el.tagName.toLowerCase();
+      const name =
+        aria || placeholder || text || el.getAttribute('name') || el.id || el.tagName.toLowerCase();
       const href = el instanceof HTMLAnchorElement ? el.href : null;
-      const value = 'value' in el ? String((el as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).value || '') : null;
+      const value =
+        'value' in el
+          ? String((el as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).value || '')
+          : null;
       const segments: string[] = [];
       let current: Element | null = el;
-      while (current && current.nodeType === Node.ELEMENT_NODE && current.tagName.toLowerCase() !== 'html') {
+      while (
+        current &&
+        current.nodeType === Node.ELEMENT_NODE &&
+        current.tagName.toLowerCase() !== 'html'
+      ) {
         const tag = current.tagName.toLowerCase();
         const htmlEl = current as HTMLElement;
         if (htmlEl.id) {
@@ -471,7 +560,10 @@ async function buildSnapshot(page: Page, options: { sessionId: string; tabId: st
         href,
         value,
         visible: true,
-        editable: el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement,
+        editable:
+          el instanceof HTMLInputElement ||
+          el instanceof HTMLTextAreaElement ||
+          el instanceof HTMLSelectElement,
         selector: segments.length ? segments.join(' > ') : 'body',
       };
     });
@@ -497,7 +589,7 @@ async function buildSessionHandoff(
     origin: string;
     browserSessionId: string;
     preferPersistentContext: boolean;
-  },
+  }
 ) {
   const storage = await page.evaluate(() => ({
     local_storage: Object.fromEntries(Object.entries(window.localStorage)),
@@ -520,7 +612,11 @@ async function buildSessionHandoff(
   };
 }
 
-async function resolveSessionHandoff(params: any, ctx: any, resolve: (value: any) => any): Promise<any> {
+async function resolveSessionHandoff(
+  params: any,
+  ctx: any,
+  resolve: (value: any) => any
+): Promise<any> {
   if (params.from) {
     const fromValue = ctx[String(params.from)];
     if (fromValue && typeof fromValue === 'object') return fromValue;
@@ -577,7 +673,7 @@ function readRecordedActions(ctx: any, from?: string): BrowserRecordedAction[] {
 
 function renderPlaywrightSkeleton(
   trail: BrowserRecordedAction[],
-  options: { assertions?: 'hint' | 'strict' } = {},
+  options: { assertions?: 'hint' | 'strict' } = {}
 ): string {
   const assertionMode = options.assertions || 'strict';
   const lines = [
@@ -596,62 +692,91 @@ function renderPlaywrightSkeleton(
     actionLines.push(`  ${statement}`);
   };
   const addAssertion = (statement: string, label?: string) => {
-    const rendered = assertionMode === 'strict' ? `  ${statement}` : `  // assertion hint: ${statement}`;
+    const rendered =
+      assertionMode === 'strict' ? `  ${statement}` : `  // assertion hint: ${statement}`;
     if (label) assertionLines.push(`  // ${label}`);
     assertionLines.push(rendered);
   };
 
   for (const action of trail) {
-    switch (action.op) {
+    switch (normalizeBrowserPipelineOp(action.op)) {
       case 'goto':
       case 'open_tab':
         if (action.url) {
           addAction(`await page.goto(${JSON.stringify(action.url)});`, `navigate to ${action.url}`);
-          addAssertion(`await expect(page).toHaveURL(${JSON.stringify(action.url)});`, 'navigation assertion');
+          addAssertion(
+            `await expect(page).toHaveURL(${JSON.stringify(action.url)});`,
+            'navigation assertion'
+          );
         }
         break;
       case 'snapshot':
-        if (action.url) addAssertion(`await expect(page).toHaveURL(${JSON.stringify(action.url)});`, 'snapshot assertion');
-        if (action.title) addAssertion(`await expect(page).toHaveTitle(${JSON.stringify(action.title)});`);
+        if (action.url)
+          addAssertion(
+            `await expect(page).toHaveURL(${JSON.stringify(action.url)});`,
+            'snapshot assertion'
+          );
+        if (action.title)
+          addAssertion(`await expect(page).toHaveTitle(${JSON.stringify(action.title)});`);
         break;
       case 'click':
-      case 'click_ref':
         if (action.selector) {
           addAssertion(
             `await expect(page.locator(${JSON.stringify(action.selector)})).toBeVisible();`,
-            `before click${action.element_name ? `: ${action.element_name}` : ''}`,
+            `before click${action.element_name ? `: ${action.element_name}` : ''}`
           );
-          addAction(`await page.click(${JSON.stringify(action.selector)});`, `click ${action.ref || action.selector}`);
+          addAction(
+            `await page.click(${JSON.stringify(action.selector)});`,
+            `click ${action.ref || action.selector}`
+          );
         }
         break;
       case 'fill':
-      case 'fill_ref':
         if (action.selector) {
           addAssertion(
             `await expect(page.locator(${JSON.stringify(action.selector)})).toBeVisible();`,
-            `before fill${action.element_name ? `: ${action.element_name}` : ''}`,
+            `before fill${action.element_name ? `: ${action.element_name}` : ''}`
           );
-          addAction(`await page.fill(${JSON.stringify(action.selector)}, ${JSON.stringify(action.text || '')});`, `fill ${action.ref || action.selector}`);
-          addAssertion(`await expect(page.locator(${JSON.stringify(action.selector)})).toHaveValue(${JSON.stringify(action.text || '')});`, 'value assertion');
+          addAction(
+            `await page.fill(${JSON.stringify(action.selector)}, ${JSON.stringify(action.text || '')});`,
+            `fill ${action.ref || action.selector}`
+          );
+          addAssertion(
+            `await expect(page.locator(${JSON.stringify(action.selector)})).toHaveValue(${JSON.stringify(action.text || '')});`,
+            'value assertion'
+          );
         }
         break;
       case 'press':
-      case 'press_ref':
         if (action.selector) {
-          addAssertion(`await expect(page.locator(${JSON.stringify(action.selector)})).toBeVisible();`, 'before keypress');
-          addAction(`await page.press(${JSON.stringify(action.selector)}, ${JSON.stringify(action.key || 'Enter')});`, `press ${action.key || 'Enter'}`);
+          addAssertion(
+            `await expect(page.locator(${JSON.stringify(action.selector)})).toBeVisible();`,
+            'before keypress'
+          );
+          addAction(
+            `await page.press(${JSON.stringify(action.selector)}, ${JSON.stringify(action.key || 'Enter')});`,
+            `press ${action.key || 'Enter'}`
+          );
         }
         break;
       case 'wait':
-      case 'wait_ref':
         if (action.selector) {
-          addAction(`await page.waitForSelector(${JSON.stringify(action.selector)});`, `wait for ${action.ref || action.selector}`);
-          addAssertion(`await expect(page.locator(${JSON.stringify(action.selector)})).toBeVisible();`, 'wait assertion');
+          addAction(
+            `await page.waitForSelector(${JSON.stringify(action.selector)});`,
+            `wait for ${action.ref || action.selector}`
+          );
+          addAssertion(
+            `await expect(page.locator(${JSON.stringify(action.selector)})).toBeVisible();`,
+            'wait assertion'
+          );
         }
         break;
       case 'content':
         if (action.selector && action.content_excerpt) {
-          addAssertion(`await expect(page.locator(${JSON.stringify(action.selector)})).toContainText(${JSON.stringify(action.content_excerpt)});`, 'content assertion');
+          addAssertion(
+            `await expect(page.locator(${JSON.stringify(action.selector)})).toContainText(${JSON.stringify(action.content_excerpt)});`,
+            'content assertion'
+          );
         }
         break;
       default:
@@ -681,34 +806,56 @@ function renderPlaywrightSkeleton(
 function renderBrowserAdf(trail: BrowserRecordedAction[], sessionId: string): BrowserAction {
   const steps: PipelineStep[] = [];
   for (const action of trail) {
-    switch (action.op) {
+    switch (normalizeBrowserPipelineOp(action.op)) {
       case 'goto':
       case 'open_tab':
         if (action.url) steps.push({ type: 'capture', op: 'goto', params: { url: action.url } });
         break;
-      case 'click_ref':
+      case 'click':
         if (action.ref) steps.push({ type: 'apply', op: 'click_ref', params: { ref: action.ref } });
         break;
-      case 'fill_ref':
-        if (action.ref) steps.push({ type: 'apply', op: 'fill_ref', params: { ref: action.ref, text: action.text || '' } });
-        break;
-      case 'press_ref':
-        if (action.ref) steps.push({ type: 'apply', op: 'press_ref', params: { ref: action.ref, key: action.key || 'Enter' } });
-        break;
-      case 'wait_ref':
-        if (action.ref) steps.push({ type: 'apply', op: 'wait_ref', params: { ref: action.ref } });
-        break;
-      case 'click':
-        if (action.selector) steps.push({ type: 'apply', op: 'click', params: { selector: action.selector } });
-        break;
       case 'fill':
-        if (action.selector) steps.push({ type: 'apply', op: 'fill', params: { selector: action.selector, text: action.text || '' } });
+        if (action.ref)
+          steps.push({
+            type: 'apply',
+            op: 'fill_ref',
+            params: { ref: action.ref, text: action.text || '' },
+          });
         break;
       case 'press':
-        if (action.selector) steps.push({ type: 'apply', op: 'press', params: { selector: action.selector, key: action.key || 'Enter' } });
+        if (action.ref)
+          steps.push({
+            type: 'apply',
+            op: 'press_ref',
+            params: { ref: action.ref, key: action.key || 'Enter' },
+          });
         break;
       case 'wait':
-        if (action.selector) steps.push({ type: 'apply', op: 'wait', params: { selector: action.selector } });
+        if (action.ref) steps.push({ type: 'apply', op: 'wait_ref', params: { ref: action.ref } });
+        break;
+      case 'click_ref':
+        if (action.selector)
+          steps.push({ type: 'apply', op: 'click', params: { selector: action.selector } });
+        break;
+      case 'fill_ref':
+        if (action.selector)
+          steps.push({
+            type: 'apply',
+            op: 'fill',
+            params: { selector: action.selector, text: action.text || '' },
+          });
+        break;
+      case 'press_ref':
+        if (action.selector)
+          steps.push({
+            type: 'apply',
+            op: 'press',
+            params: { selector: action.selector, key: action.key || 'Enter' },
+          });
+        break;
+      case 'wait_ref':
+        if (action.selector)
+          steps.push({ type: 'apply', op: 'wait', params: { selector: action.selector } });
         break;
       default:
         break;
@@ -777,7 +924,8 @@ async function waitForOperatorContinue(options: {
     return;
   }
 
-  const continueFile = options.continueFile || path.join(BROWSER_RUNTIME_DIR, `${options.sessionId}.continue`);
+  const continueFile =
+    options.continueFile || path.join(BROWSER_RUNTIME_DIR, `${options.sessionId}.continue`);
   logger.info(`⏸️ [BROWSER] ${options.message}`);
   logger.info(`📄 [BROWSER] Waiting for continue file: ${continueFile}`);
   while (true) {
@@ -825,7 +973,7 @@ export const browserRuntimeHelpers = {
     userDataDir: string,
     sessionMetadataPath: string,
     options: any,
-    videoDir: string,
+    videoDir: string
   ): Promise<BrowserContext> => {
     cleanupExpiredBrowserRuntimeLeases();
     const existing = browserRuntimeLeases.get(sessionId);
@@ -838,14 +986,21 @@ export const browserRuntimeHelpers = {
     const persistedCdpUrl = options.cdp_url || persistedMetadata?.cdp_url;
     const persistedCdpPort = Number(options.cdp_port || persistedMetadata?.cdp_port || 0);
 
-    if (!options.connect_over_cdp && persistedCdpUrl && persistedMetadata?.retained && persistedMetadata.lease_status === 'active') {
+    if (
+      !options.connect_over_cdp &&
+      persistedCdpUrl &&
+      persistedMetadata?.retained &&
+      persistedMetadata.lease_status === 'active'
+    ) {
       try {
         logger.info(`🔁 [BROWSER] Reattaching to persisted session via CDP: ${persistedCdpUrl}`);
         const browser = await chromium.connectOverCDP(persistedCdpUrl);
         const context = browser.contexts()[0];
         if (!context) {
           await browser.close();
-          throw new Error(`No browser context available via persisted CDP session at ${persistedCdpUrl}`);
+          throw new Error(
+            `No browser context available via persisted CDP session at ${persistedCdpUrl}`
+          );
         }
         browserRuntimeLeases.set(sessionId, {
           runtime: createBrowserRuntime(context),
@@ -859,23 +1014,25 @@ export const browserRuntimeHelpers = {
         });
         return context;
       } catch (error: any) {
-        logger.warn(`⚠️ [BROWSER] Failed to reattach persisted session ${sessionId} via CDP: ${error?.message || String(error)}`);
+        logger.warn(
+          `⚠️ [BROWSER] Failed to reattach persisted session ${sessionId} via CDP: ${error?.message || String(error)}`
+        );
       }
     }
 
     if (options.connect_over_cdp) {
       const discoveredEndpoint =
-        options.cdp_url || options.cdp_port
-          ? null
-          : await discoverChromeCdpEndpoint();
+        options.cdp_url || options.cdp_port ? null : await discoverChromeCdpEndpoint();
       const cdpUrl =
-        options.cdp_url
-        || (options.cdp_port ? `http://127.0.0.1:${Number(options.cdp_port || 9222)}` : undefined)
-        || discoveredEndpoint?.cdpUrl
-        || persistedCdpUrl
-        || 'http://127.0.0.1:9222';
+        options.cdp_url ||
+        (options.cdp_port ? `http://127.0.0.1:${Number(options.cdp_port || 9222)}` : undefined) ||
+        discoveredEndpoint?.cdpUrl ||
+        persistedCdpUrl ||
+        'http://127.0.0.1:9222';
       if (discoveredEndpoint && !options.cdp_url && !options.cdp_port) {
-        logger.info(`🔎 [BROWSER] Auto-discovered Chrome via CDP (${discoveredEndpoint.source}): ${cdpUrl}`);
+        logger.info(
+          `🔎 [BROWSER] Auto-discovered Chrome via CDP (${discoveredEndpoint.source}): ${cdpUrl}`
+        );
       }
       logger.info(`🔌 [BROWSER] Attaching to existing Chrome via CDP: ${cdpUrl}`);
       const browser = await chromium.connectOverCDP(cdpUrl);
@@ -897,7 +1054,9 @@ export const browserRuntimeHelpers = {
       return context;
     }
 
-    logger.info(`🚀 [BROWSER] Launching session: ${sessionId} (Headless: ${options.headless !== false})`);
+    logger.info(
+      `🚀 [BROWSER] Launching session: ${sessionId} (Headless: ${options.headless !== false})`
+    );
     const context = await chromium.launchPersistentContext(userDataDir, {
       channel: options.browser_channel === 'chrome' ? 'chrome' : undefined,
       headless: options.headless !== false,
@@ -927,7 +1086,7 @@ export const browserRuntimeHelpers = {
     sessionId: string,
     context: BrowserContext,
     userDataDir: string,
-    sessionMetadataPath: string,
+    sessionMetadataPath: string
   ): BrowserRuntime => {
     const existing = browserRuntimeLeases.get(sessionId);
     if (existing) return existing.runtime;

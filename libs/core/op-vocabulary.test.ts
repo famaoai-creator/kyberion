@@ -3,6 +3,7 @@ import {
   CANONICAL_OP_FAMILIES,
   listCanonicalOpFamilies,
   resolveBrowserRecordingPipelineOp,
+  normalizeBrowserPipelineOp,
 } from './op-vocabulary.js';
 
 describe('op-vocabulary', () => {
@@ -11,6 +12,14 @@ describe('op-vocabulary', () => {
     expect(resolveBrowserRecordingPipelineOp('fill_ref')).toBe('fill');
     expect(resolveBrowserRecordingPipelineOp('submit_form')).toBe('click');
     expect(resolveBrowserRecordingPipelineOp('snapshot')).toBe('snapshot');
+  });
+
+  it('normalizes browser pipeline aliases to canonical runtime ops', () => {
+    expect(normalizeBrowserPipelineOp('click_ref')).toBe('click');
+    expect(normalizeBrowserPipelineOp('fill_ref')).toBe('fill');
+    expect(normalizeBrowserPipelineOp('press_ref')).toBe('press');
+    expect(normalizeBrowserPipelineOp('wait_ref')).toBe('wait');
+    expect(normalizeBrowserPipelineOp('snapshot')).toBe('snapshot');
   });
 
   it('exposes the canonical op families used for AR-04 alignment', () => {

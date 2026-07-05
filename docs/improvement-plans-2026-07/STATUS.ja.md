@@ -118,7 +118,7 @@
 | AR-01 | TODO    | adf-engine.ts 抽出、3エンジン統合、golden 回帰                                  |
 | AR-02 | PARTIAL | describeOps、generate_op_registry、op-discovery 生成、未知 op の apply 既定撤廃 |
 | AR-03 | PARTIAL | write_artifact/path 系の前倒し検証、共通 required-param helper                  |
-| AR-04 | PARTIAL | canonical op family 定義、browser alias 共通化、命名エイリアス整理              |
+| AR-04 | PARTIAL | canonical op family 定義、browser alias 共通化、browser 実行側の正規化          |
 | AR-05 | TODO    | 不整合アクチュエータの分割(観察/変更・ドメイン境界)                             |
 | AR-06 | PARTIAL | teach message、skipped 明示化、lint、AR-01 集約                                 |
 
