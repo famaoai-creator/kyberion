@@ -158,6 +158,7 @@ export interface PlanningPacketTask {
   risk?: 'low' | 'medium' | 'high' | 'approval_required' | 'high_stakes';
   expected_output_format?: 'text' | 'files' | 'structured';
   estimated_scope?: 'S' | 'M' | 'L';
+  review_target?: string;
 }
 
 export interface PlanningPacket {
@@ -172,12 +173,19 @@ export interface TaskResultArtifact {
   kind: string;
 }
 
+export interface TaskReviewFinding {
+  severity: 'must_fix' | 'should_fix' | 'nit';
+  location: string;
+  instruction: string;
+}
+
 export interface TaskResultBlock {
   summary: string;
   artifacts: TaskResultArtifact[];
   verification_done: string[];
   gaps: string[];
   needs: string[];
+  review_findings?: TaskReviewFinding[];
 }
 
 export interface A2ATaskContext {
