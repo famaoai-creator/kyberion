@@ -112,6 +112,7 @@
     "service:preflight": "node dist/scripts/service_preflight.js",
     "generate-index": "node dist/scripts/cli.js list > /dev/null",
     "cli": "node dist/scripts/cli.js",
+    "kyberion": "node dist/scripts/kyberion_home.js",
     "cli:preview": "node dist/scripts/cli.js preview",
     "cli:schedule": "node dist/scripts/cli.js schedule",
     "email:workflow": "node --import ./scripts/ts-loader.mjs scripts/email-workflow.ts",
