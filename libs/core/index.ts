@@ -126,6 +126,7 @@ export * from './managed-process.js';
 export * from './meeting-environment-policy.js';
 export * from './meeting-participation-runtime-plan.js';
 export * from './deliverable-quality.js';
+export * from './deliverable-inbox.js';
 export * from './src/font-stack.js';
 export { resolveInputBindings, classifyInputId, isPathInput } from './input-binding.js';
 export type { InputBinding, InputBindingType } from './input-binding.js';
@@ -154,6 +155,7 @@ export type {
 } from './next-action.js';
 export { renderStatus, renderVocabularyText, resolveVocabularyLocale } from './ux-vocabulary.js';
 export type { UxStatusDomain, UxVocabularyLocale } from './ux-vocabulary.js';
+export * from './operator-home-summary.js';
 export { resolveActiveProfileRoot } from './profile-root.js';
 export * from './company.js';
 export * from './financial-model.js';
