@@ -3,6 +3,7 @@ import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
 import { logger } from './core.js';
 import { findMissionPath } from './path-resolver.js';
+import { Semaphore } from './semaphore.js';
 
 export interface ConversationTurn {
   ts: string; // ISO timestamp
@@ -15,6 +16,16 @@ export interface ConversationTurn {
 }
 
 const MAX_TURNS = 500;
+const conversationLocks = new Map<string, Semaphore>();
+
+function getConversationLock(conversationId: string): Semaphore {
+  let lock = conversationLocks.get(conversationId);
+  if (!lock) {
+    lock = new Semaphore(1);
+    conversationLocks.set(conversationId, lock);
+  }
+  return lock;
+}
 
 function sanitizeConversationId(conversationId: string): string {
   const value = conversationId.trim();
@@ -55,44 +66,47 @@ export async function appendConversationTurn(
   if (!conversationId) return;
 
   const filePath = resolveConversationFilePath(conversationId);
+  const lock = getConversationLock(conversationId);
 
-  const isConfidential = isConfidentialMission(turnData.missionId);
+  await lock.run(async () => {
+    const isConfidential = isConfidentialMission(turnData.missionId);
 
-  const turn: ConversationTurn = {
-    ts: new Date().toISOString(),
-    sender: turnData.sender,
-    receiver: turnData.receiver,
-    performative: turnData.performative,
-    prompt: isConfidential ? undefined : turnData.prompt?.slice(0, 200),
-    result: isConfidential ? undefined : turnData.result?.slice(0, 200),
-    provider_session_id: turnData.provider_session_id,
-  };
+    const turn: ConversationTurn = {
+      ts: new Date().toISOString(),
+      sender: turnData.sender,
+      receiver: turnData.receiver,
+      performative: turnData.performative,
+      prompt: isConfidential ? undefined : turnData.prompt?.slice(0, 200),
+      result: isConfidential ? undefined : turnData.result?.slice(0, 200),
+      provider_session_id: turnData.provider_session_id,
+    };
 
-  let lines: string[] = [];
-  if (safeExistsSync(filePath)) {
+    let lines: string[] = [];
+    if (safeExistsSync(filePath)) {
+      try {
+        const content = safeReadFile(filePath, { encoding: 'utf8' }) as string;
+        lines = content.split('\n').filter((l) => l.trim().length > 0);
+      } catch (err: any) {
+        logger.warn(
+          `[A2A_CONVERSATION_STORE] Failed to read conversation file ${filePath}: ${err?.message}`
+        );
+      }
+    }
+
+    lines.push(JSON.stringify(turn));
+
+    if (lines.length > MAX_TURNS) {
+      lines = lines.slice(-MAX_TURNS);
+    }
+
     try {
-      const content = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-      lines = content.split('\n').filter((l) => l.trim().length > 0);
+      safeWriteFile(filePath, lines.join('\n') + '\n');
     } catch (err: any) {
       logger.warn(
-        `[A2A_CONVERSATION_STORE] Failed to read conversation file ${filePath}: ${err?.message}`
+        `[A2A_CONVERSATION_STORE] Failed to write conversation file ${filePath}: ${err?.message}`
       );
     }
-  }
-
-  lines.push(JSON.stringify(turn));
-
-  if (lines.length > MAX_TURNS) {
-    lines = lines.slice(-MAX_TURNS);
-  }
-
-  try {
-    safeWriteFile(filePath, lines.join('\n') + '\n');
-  } catch (err: any) {
-    logger.warn(
-      `[A2A_CONVERSATION_STORE] Failed to write conversation file ${filePath}: ${err?.message}`
-    );
-  }
+  });
 }
 
 /**
