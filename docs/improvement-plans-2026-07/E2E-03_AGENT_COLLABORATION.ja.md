@@ -29,18 +29,18 @@ planner が DAG を作る(依存つき)
 
 **実装済みで動く部品(検証済み)**:
 
-| 部品 | 場所 |
-|---|---|
-| 依存つきタスク(`dependencies[]`)+ ready 判定(依存全 completed で発火) | `mission-orchestration-worker.ts:190-199` |
-| **並列 dispatch**(ready 集合 → `max_parallel_members` 上限で `Promise.all` バッチ) | `:1540-1666`(MO-03 は実装済み) |
-| 受入ゲート + **1回の rework**(`rework_count` / `rework_requested`) | `:788-819` |
-| ミッション context pack(`outcome_contract.requested_result` / success_criteria 入り) | `mission-context-pack.ts:105-107,411`(MO-04) |
-| 構造化 task_result 契約(結論・artifact パス・verification・gaps・needs) | `:314,400`(「file 内容を貼るな、結論とパスを返せ」規約) |
-| 自己完結ハンドオフパケット | HO-01(2026-07-05 commit `bb7f632d`) |
-| planner とは別コンテキストの planning reviewer | `:1946-1947` |
-| PR 発行スクリプト | `scripts/publish_pull_request.ts` |
-| work item / board / attempt 台帳 | `libs/core/work-coordination.ts:667-932` |
-| goal の state 永続化(元発話・success_condition) | IL-01(`state.intent` / `outcome_contract`) |
+| 部品                                                                                 | 場所                                                    |
+| ------------------------------------------------------------------------------------ | ------------------------------------------------------- |
+| 依存つきタスク(`dependencies[]`)+ ready 判定(依存全 completed で発火)                | `mission-orchestration-worker.ts:190-199`               |
+| **並列 dispatch**(ready 集合 → `max_parallel_members` 上限で `Promise.all` バッチ)   | `:1540-1666`(MO-03 は実装済み)                          |
+| 受入ゲート + **1回の rework**(`rework_count` / `rework_requested`)                   | `:788-819`                                              |
+| ミッション context pack(`outcome_contract.requested_result` / success_criteria 入り) | `mission-context-pack.ts:105-107,411`(MO-04)            |
+| 構造化 task_result 契約(結論・artifact パス・verification・gaps・needs)              | `:314,400`(「file 内容を貼るな、結論とパスを返せ」規約) |
+| 自己完結ハンドオフパケット                                                           | HO-01(2026-07-05 commit `bb7f632d`)                     |
+| planner とは別コンテキストの planning reviewer                                       | `:1946-1947`                                            |
+| PR 発行スクリプト                                                                    | `scripts/publish_pull_request.ts`                       |
+| work item / board / attempt 台帳                                                     | `libs/core/work-coordination.ts:667-932`                |
+| goal の state 永続化(元発話・success_condition)                                      | IL-01(`state.intent` / `outcome_contract`)              |
 
 **切れている継ぎ目(ギャップ)**:
 

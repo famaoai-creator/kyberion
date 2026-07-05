@@ -130,11 +130,17 @@ export const ui = {
       if (data.length <= maxItems) return data;
       const head = data.slice(0, Math.ceil(maxItems / 2));
       const tail = data.slice(-Math.floor(maxItems / 2));
-      return [...head, color('dim', '... (' + (data.length - maxItems) + ' more items) ...'), ...tail];
+      return [
+        ...head,
+        color('dim', '... (' + (data.length - maxItems) + ' more items) ...'),
+        ...tail,
+      ];
     }
     if (typeof data === 'string' && data.length > 500) {
       return (
-        data.substring(0, 250) + color('dim', '\n\n... (content truncated) ...\n\n') + data.slice(-250)
+        data.substring(0, 250) +
+        color('dim', '\n\n... (content truncated) ...\n\n') +
+        data.slice(-250)
       );
     }
     return data;

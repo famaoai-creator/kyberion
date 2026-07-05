@@ -3,6 +3,7 @@
 > 優先度: **P0**(中核ユースケース第4弾 — 人と Kyberion の接面) / 規模: M〜L(タスク分割済み) / 依存: なし(UX-01/IL-01/E2E-01〜03 の成果を利用。SU-01/SU-03 の未了分を本計画が最小形で引き取る)
 > 実装担当モデル: 各タスクに明記。**gpt-5.4-mini クラス単独で実装可能な粒度**(README §2.1 の読み替え表)
 > 調査日: 2026-07-05(実コード検証済み)
+> **実装状況**: 2026-07-05 時点で E2E 側へ編入済み。SU-01 / SU-03 の最小形として扱う。
 
 ## 0. 実装エージェントへ(E2E-01〜03 と同じ規約)
 
@@ -30,16 +31,16 @@ Kyberion からの用事(質問・承認・完了・アラート): 設定した1
 
 **動く部品(検証済み)**:
 
-| 部品 | 場所 |
-|---|---|
-| **意図処理の単一脳**: Slack/Telegram/Discord/iMessage/Chronos は全て `runSurfaceMessageConversation` を通る | 各 bridge `index.ts`、`chronos .../api/agent/route.ts:51,1278` |
-| goal 解釈と clarification packet(質問生成) | `compileUserIntentFlow` + `question-resolver`(IL-01 で goal 貫通済み) |
-| CLI ダッシュボード(focus 付き)・approval 監査サマリ | `scripts/sovereign_dashboard.ts:160-220`、`pnpm dashboard:*` |
-| doctor(健全性+次の一手 `buildNextAction`)・preflight 群 | `scripts/run_doctor.ts`(schedules/maintenance/governance/backup/mesh 表示済み) |
-| Slack 承認ブロック(approve/reject ボタン)・Chronos 危険操作確認モーダル(UX-04) | `slack-bridge:398-421`、`MissionIntelligence.tsx` |
-| ブリッジ送信部品(封筒・レート制限つき) | UX-01 `bridge-error-reply.ts` / slack outbox / `sendTelegramMessage` / `sendIMessage` |
-| 成果物の分類語彙(deliverables/artifacts/outputs/evidence) | `MissionIntelligence.tsx:292` |
-| 運用アラート sink | `ops-alert.ts`(AO-03) |
+| 部品                                                                                                        | 場所                                                                                  |
+| ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| **意図処理の単一脳**: Slack/Telegram/Discord/iMessage/Chronos は全て `runSurfaceMessageConversation` を通る | 各 bridge `index.ts`、`chronos .../api/agent/route.ts:51,1278`                        |
+| goal 解釈と clarification packet(質問生成)                                                                  | `compileUserIntentFlow` + `question-resolver`(IL-01 で goal 貫通済み)                 |
+| CLI ダッシュボード(focus 付き)・approval 監査サマリ                                                         | `scripts/sovereign_dashboard.ts:160-220`、`pnpm dashboard:*`                          |
+| doctor(健全性+次の一手 `buildNextAction`)・preflight 群                                                     | `scripts/run_doctor.ts`(schedules/maintenance/governance/backup/mesh 表示済み)        |
+| Slack 承認ブロック(approve/reject ボタン)・Chronos 危険操作確認モーダル(UX-04)                              | `slack-bridge:398-421`、`MissionIntelligence.tsx`                                     |
+| ブリッジ送信部品(封筒・レート制限つき)                                                                      | UX-01 `bridge-error-reply.ts` / slack outbox / `sendTelegramMessage` / `sendIMessage` |
+| 成果物の分類語彙(deliverables/artifacts/outputs/evidence)                                                   | `MissionIntelligence.tsx:292`                                                         |
+| 運用アラート sink                                                                                           | `ops-alert.ts`(AO-03)                                                                 |
 
 **切れている継ぎ目(ギャップ)**:
 
@@ -81,14 +82,23 @@ Kyberion からの用事(質問・承認・完了・アラート): 設定した1
 
 1. `libs/core/operator-notifications.ts` を新設:
    ```ts
-   type OperatorEvent = 'question' | 'approval_required' | 'mission_completed'
-     | 'mission_failed' | 'deliverable_ready' | 'ops_alert';
+   type OperatorEvent =
+     | 'question'
+     | 'approval_required'
+     | 'mission_completed'
+     | 'mission_failed'
+     | 'deliverable_ready'
+     | 'ops_alert';
    interface NotificationPreferences {
-     default_channel?: { surface: 'slack'|'imessage'|'telegram'|'discord'; target: string };  // 例 slack channel ID
+     default_channel?: { surface: 'slack' | 'imessage' | 'telegram' | 'discord'; target: string }; // 例 slack channel ID
      per_event?: Partial<Record<OperatorEvent, { surface; target } | 'mute'>>;
    }
-   function notifyOperator(event: OperatorEvent, payload: { title: string; body: string; link_hint?: string; correlation_id?: string }): Promise<boolean>
+   function notifyOperator(
+     event: OperatorEvent,
+     payload: { title: string; body: string; link_hint?: string; correlation_id?: string }
+   ): Promise<boolean>;
    ```
+
    - 設定は `knowledge/personal/notification-preferences.json`(スキーマ `schemas/notification-preferences.schema.json` 新設、`check:contract-schemas` 対象に)。未設定イベントは default_channel、default も無ければ **ops-alert JSONL に記録して false**(無言で捨てない)。
    - 送信実装は既存部品へ委譲: slack= slack outbox 書込(`listSlackOutboxMessages` の書込側 API を grep)、imessage= `sendIMessage`、telegram= `sendTelegramMessage`、discord= bridge が poll する outbox JSONL(無ければ slack と同型で新設 ±30行)。UX-01 の**会話単位レート制限**(`shouldPostBridgeError` と同型・イベント種別単位)を内蔵。
 2. 発火点の配線(各1〜3行の挿入。失敗許容 warn):
