@@ -1,5 +1,5 @@
 {
-  "generated": "2026-07-05T10:32:47.765Z",
+  "generated": "2026-07-05T13:04:48.172Z",
   "files": [
     {
       "path": "Ecosystem_Map.md",
@@ -1660,7 +1660,7 @@
     {
       "path": "product/governance/mission-classification-policy.json",
       "tier": "public",
-      "size": 18655,
+      "size": 18752,
       "type": "json"
     },
     {
@@ -1714,7 +1714,7 @@
     {
       "path": "product/governance/mission-templates.json",
       "tier": "public",
-      "size": 1941,
+      "size": 4721,
       "type": "json"
     },
     {
@@ -3370,7 +3370,7 @@
     {
       "path": "product/orchestration/mission-team-templates.json",
       "tier": "public",
-      "size": 4481,
+      "size": 4935,
       "type": "json"
     },
     {

@@ -33,6 +33,8 @@ This script automatically generates and updates the following files:
 5. `presence/displays/chronos-mirror-v2/tailwind.config.cjs`
 6. `knowledge/public/design-patterns/media-templates/themes.json`
 
+The generated Kyberion token block and theme entries are checked by `pnpm run check:catalogs` so committed files cannot drift from the canonical brand-token JSON.
+
 ## 3. Surface Application Patterns
 
 ### Web Apps (Next.js with React)
