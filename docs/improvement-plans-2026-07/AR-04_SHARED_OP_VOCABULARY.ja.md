@@ -57,5 +57,6 @@
 
 - **完了済み(一部)**: browser recording の op→pipeline 変換を `libs/core/op-vocabulary.ts` に切り出し、`click_ref` / `fill_ref` / `select_ref` / `submit_form` の別名を共通 helper で解決するようにした。
 - **完了済み(一部)**: browser 実行側でも `normalizeBrowserPipelineOp()` を使い、`click_ref` / `fill_ref` / `press_ref` / `wait_ref` を canonical な `click` / `fill` / `press` / `wait` に寄せた。
+- **完了済み(一部)**: 旧名の browser alias に 1 回だけ deprecate 警告を出すようにし、phase-out の入口を作った。
 - **完了済み(一部)**: `CANONICAL_OP_FAMILIES` を core に定義し、`io` / `capture` / `net` / `transform` / `core` の正準語彙の初期形をコード化した。
 - **未完了**: system/file/browser の各 actuator を正準語彙へ寄せる横展開、`run_pipeline`/browser 系の alias 正規化統合、旧名の deprecate 警告と phase-out。
