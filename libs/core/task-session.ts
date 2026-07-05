@@ -23,6 +23,9 @@ import {
   validateOutcomeContractAtCompletion,
   type OutcomeContract,
 } from './outcome-contract.js';
+import { buildCompletionNextAction, type CompletionNextAction } from './next-action.js';
+import { recordIntentContractOutcome } from './intent-contract-learning.js';
+import { reconcileCompletionStructurally } from './intent-reconciliation.js';
 import { matchesAnyTextRule, type TextMatchRule } from './text-rule-matcher.js';
 import { buildFallbackExecutionBrief, type ExecutionBriefSeed } from './execution-brief.js';
 import {
@@ -109,6 +112,16 @@ export interface TaskSession {
     awaiting_user_input: boolean;
   };
   outcome_contract: OutcomeContract;
+  completion_summary?: {
+    requested_result: string;
+    satisfied: boolean;
+    delivered: string[];
+    gaps: string[];
+    next_step: string;
+    confidence: number;
+    evidence_refs: string[];
+  };
+  completion_next_action?: CompletionNextAction;
   history: TaskSessionHistoryEntry[];
   updated_at: string;
   payload?: Record<string, unknown>;
@@ -207,6 +220,58 @@ function taskSessionPath(sessionId: string): string {
   return `${TASK_SESSION_DIR}/${sessionId}.json`;
 }
 
+function collectTaskSessionEvidenceRefs(session: TaskSession): string[] {
+  return [
+    session.artifact?.output_path,
+    session.artifact?.external_ref,
+    session.artifact?.artifact_id ? `artifact:${session.artifact.artifact_id}` : undefined,
+  ]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean);
+}
+
+function collectTaskSessionEvidenceTexts(session: TaskSession): string[] {
+  return [session.artifact?.preview_text]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean);
+}
+
+function recordTaskSessionCompletionLearning(session: TaskSession): void {
+  const intentId = String(session.payload?.intent_id || '').trim();
+  if (!intentId || !session.completion_summary) return;
+
+  try {
+    recordIntentContractOutcome({
+      intent_id: intentId,
+      execution_shape: session.work_loop?.resolution.execution_shape || session.task_type,
+      contract_ref: { kind: 'task_session_policy', ref: intentId },
+      success: session.completion_summary.satisfied,
+      ...(session.completion_summary.satisfied
+        ? {}
+        : { error: session.completion_summary.gaps.join('; ') || 'completion gap' }),
+      context_fingerprint: {
+        surface: session.surface,
+        locale: session.project_context?.locale,
+        execution_shape: session.work_loop?.resolution.execution_shape,
+      },
+      completion_summary: {
+        satisfied: session.completion_summary.satisfied,
+        delivered: [...session.completion_summary.delivered],
+        gaps: [...session.completion_summary.gaps],
+        next_step: session.completion_summary.next_step,
+        confidence: session.completion_summary.confidence,
+        evidence_refs: [...session.completion_summary.evidence_refs],
+      },
+    });
+  } catch (error) {
+    logger.warn(
+      `[task-session] intent-contract-memory sync skipped for ${session.session_id}: ${
+        (error as Error)?.message || String(error)
+      }`
+    );
+  }
+}
+
 function extractServiceNameFromUtterance(trimmed: string): string | undefined {
   const serviceMatch =
     trimmed.match(
@@ -228,7 +293,9 @@ function isRunningPid(pid: unknown): pid is number {
 function loadRunningServiceIds(): string[] {
   if (!safeExistsSync(SERVICE_PID_FILE)) return [];
   try {
-    const parsed = JSON.parse(safeReadFile(SERVICE_PID_FILE, { encoding: 'utf8' }) as string) as Record<string, unknown>;
+    const parsed = JSON.parse(
+      safeReadFile(SERVICE_PID_FILE, { encoding: 'utf8' }) as string
+    ) as Record<string, unknown>;
     return Object.entries(parsed)
       .filter(([, pid]) => isRunningPid(pid))
       .map(([serviceId]) => serviceId)
@@ -256,7 +323,7 @@ function loadSurfaceStateRunningIds(): Set<string> {
     return new Set(
       Object.entries(parsed.surfaces || {})
         .filter(([, record]) => isRunningPid(record?.pid))
-        .map(([surfaceId]) => surfaceId),
+        .map(([surfaceId]) => surfaceId)
     );
   } catch {
     return new Set();
@@ -283,9 +350,11 @@ function loadStartableServiceChoices(): SurfaceStartableChoice[] {
             return {
               service_name: serviceName,
               surface_id: serviceName,
-              description: typeof surface.description === 'string' ? surface.description : undefined,
+              description:
+                typeof surface.description === 'string' ? surface.description : undefined,
               kind: typeof surface.kind === 'string' ? surface.kind : undefined,
-              startup_mode: typeof surface.startupMode === 'string' ? surface.startupMode : undefined,
+              startup_mode:
+                typeof surface.startupMode === 'string' ? surface.startupMode : undefined,
               service_id: typeof surface.service_id === 'string' ? surface.service_id : undefined,
             } satisfies SurfaceStartableChoice;
           })
@@ -307,7 +376,9 @@ function resolveSurfaceId(serviceName: string): string | undefined {
   if (!normalized) return undefined;
   if (!safeExistsSync(SURFACE_MANIFEST_DIR)) return normalized;
   try {
-    for (const entry of safeReaddir(SURFACE_MANIFEST_DIR).filter((file) => file.endsWith('.json'))) {
+    for (const entry of safeReaddir(SURFACE_MANIFEST_DIR).filter((file) =>
+      file.endsWith('.json')
+    )) {
       const manifest = JSON.parse(
         safeReadFile(pathResolver.knowledge(`product/governance/surfaces/${entry}`), {
           encoding: 'utf8',
@@ -597,7 +668,10 @@ export type TaskSessionIntentBuilder = (trimmed: string) => TaskSessionIntent;
 
 const _taskIntentRegistry = new Map<string, TaskSessionIntentBuilder>();
 
-export function registerTaskIntentBuilder(intentId: string, builder: TaskSessionIntentBuilder): void {
+export function registerTaskIntentBuilder(
+  intentId: string,
+  builder: TaskSessionIntentBuilder
+): void {
   _taskIntentRegistry.set(intentId, builder);
 }
 
@@ -607,10 +681,18 @@ export function getTaskIntentBuilder(intentId: string): TaskSessionIntentBuilder
 
 // ─── Default Builders (Auto-registered) ──────────────────────────────────────
 
-registerTaskIntentBuilder('bootstrap-project', (trimmed) => buildPolicyBackedIntent('bootstrap-project', trimmed));
-registerTaskIntentBuilder('capture-photo', (trimmed) => buildPolicyBackedIntent('capture-photo', trimmed));
-registerTaskIntentBuilder('generate-workbook', (trimmed) => buildPolicyBackedIntent('generate-workbook', trimmed));
-registerTaskIntentBuilder('generate-report', (trimmed) => buildPolicyBackedIntent('generate-report', trimmed));
+registerTaskIntentBuilder('bootstrap-project', (trimmed) =>
+  buildPolicyBackedIntent('bootstrap-project', trimmed)
+);
+registerTaskIntentBuilder('capture-photo', (trimmed) =>
+  buildPolicyBackedIntent('capture-photo', trimmed)
+);
+registerTaskIntentBuilder('generate-workbook', (trimmed) =>
+  buildPolicyBackedIntent('generate-workbook', trimmed)
+);
+registerTaskIntentBuilder('generate-report', (trimmed) =>
+  buildPolicyBackedIntent('generate-report', trimmed)
+);
 registerTaskIntentBuilder('cross-project-remediation', (trimmed) => {
   const base = buildPolicyBackedIntent('cross-project-remediation', trimmed);
   return {
@@ -823,7 +905,8 @@ registerTaskIntentBuilder('resolve-approval', (trimmed) => {
     if (/(承認|可決|approve)/i.test(val)) decision = 'approved';
     else if (/(却下|否決|reject)/i.test(val)) decision = 'rejected';
   }
-  const idMatch = trimmed.match(/(?:REQ|req|id|ID|案件|番号)-?(\d+)/i) || trimmed.match(/([A-Z0-9]{8,10})/i);
+  const idMatch =
+    trimmed.match(/(?:REQ|req|id|ID|案件|番号)-?(\d+)/i) || trimmed.match(/([A-Z0-9]{8,10})/i);
   const requestId = idMatch ? idMatch[1] : undefined;
   const systemMatch = trimmed.match(/(Slack|Email|Mail|Teams|JXA)/i);
   const system = systemMatch ? systemMatch[1] : undefined;
@@ -863,10 +946,9 @@ registerTaskIntentBuilder('request-approval', (trimmed) => {
 
   const scopeMatch = trimmed.match(/(production|staging|sandbox|release|mutation)/i);
   const scope = scopeMatch ? scopeMatch[1] : undefined;
-  const missing = [
-    !system ? 'approval_system' : null,
-    !scope ? 'approval_scope' : null,
-  ].filter((x): x is string => x !== null);
+  const missing = [!system ? 'approval_system' : null, !scope ? 'approval_scope' : null].filter(
+    (x): x is string => x !== null
+  );
 
   const intent: TaskSessionIntent = {
     ...base,
@@ -1001,7 +1083,6 @@ registerTaskIntentBuilder('fetch-external-data', (trimmed) => {
   };
 });
 
-
 export function classifyTaskSessionIntent(utterance: string): TaskSessionIntent | null {
   const trimmed = utterance.trim();
   if (!trimmed) return null;
@@ -1046,12 +1127,35 @@ export function validateTaskSession(session: unknown): ValidationResult<TaskSess
 
 export function saveTaskSession(session: TaskSession): string {
   if (session.status === 'completed') {
+    const evidenceRefs = collectTaskSessionEvidenceRefs(session);
+    const evidenceTexts = collectTaskSessionEvidenceTexts(session);
+    const completionReconciliation = reconcileCompletionStructurally({
+      goal: session.goal,
+      evidenceRefs,
+      artifactRefs: evidenceRefs,
+      evidenceTexts,
+      requestedResult: session.outcome_contract.requested_result,
+    });
+    if (!completionReconciliation.satisfied) {
+      throw new Error(
+        `Cannot complete task session: intent goal not satisfied (${completionReconciliation.gaps.join('; ') || 'no matching evidence'})`
+      );
+    }
+    session.completion_next_action = buildCompletionNextAction({
+      goal: session.goal,
+      reconciliation: completionReconciliation,
+    });
+    session.completion_summary = {
+      requested_result: session.outcome_contract.requested_result,
+      satisfied: completionReconciliation.satisfied,
+      delivered: completionReconciliation.delivered,
+      gaps: completionReconciliation.gaps,
+      next_step: session.completion_next_action.next_step,
+      confidence: completionReconciliation.confidence,
+      evidence_refs: completionReconciliation.evidence_refs || [],
+    };
     const completionValidation = validateOutcomeContractAtCompletion(session.outcome_contract, {
-      artifactRefs: [
-        String(session.artifact?.artifact_id || ''),
-        String(session.artifact?.output_path || ''),
-        String(session.artifact?.external_ref || ''),
-      ],
+      artifactRefs: evidenceRefs,
     });
     if (!completionValidation.ok) {
       throw new Error(`Cannot complete task session: ${completionValidation.reason}`);
@@ -1064,6 +1168,9 @@ export function saveTaskSession(session: TaskSession): string {
   if (!safeExistsSync(TASK_SESSION_DIR)) safeMkdir(TASK_SESSION_DIR, { recursive: true });
   const filePath = taskSessionPath(session.session_id);
   safeWriteFile(filePath, JSON.stringify(session, null, 2));
+  if (session.status === 'completed') {
+    recordTaskSessionCompletionLearning(session);
+  }
   return filePath;
 }
 

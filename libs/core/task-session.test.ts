@@ -1,9 +1,20 @@
 import path from 'node:path';
 import AjvModule from 'ajv';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
-import { safeExistsSync, safeReadFile, safeReaddir, safeRmSync } from './secure-io.js';
+import {
+  safeExistsSync,
+  safeReadFile,
+  safeReaddir,
+  safeRmSync,
+  safeWriteFile,
+} from './secure-io.js';
+import {
+  loadIntentContractMemorySnapshot,
+  refreshIntentContractMemorySnapshot,
+  resolveIntentContractMemoryPaths,
+} from './intent-contract-learning.js';
 import {
   classifyTaskSessionIntent,
   createTaskSession,
@@ -26,8 +37,34 @@ function cleanupTestTaskSessions() {
 }
 
 describe('task-session', () => {
+  const { runtime: intentContractMemoryRuntimePath } = resolveIntentContractMemoryPaths();
+  let originalIntentContractMemoryRaw: string | null = null;
+  let originalIntentContractMemoryExists = false;
+
+  beforeAll(() => {
+    originalIntentContractMemoryExists = safeExistsSync(intentContractMemoryRuntimePath);
+    originalIntentContractMemoryRaw = originalIntentContractMemoryExists
+      ? (safeReadFile(intentContractMemoryRuntimePath, { encoding: 'utf8' }) as string)
+      : null;
+  });
+
+  afterAll(() => {
+    if (originalIntentContractMemoryExists && originalIntentContractMemoryRaw !== null) {
+      safeWriteFile(intentContractMemoryRuntimePath, originalIntentContractMemoryRaw);
+    } else if (safeExistsSync(intentContractMemoryRuntimePath)) {
+      safeRmSync(intentContractMemoryRuntimePath);
+    }
+    refreshIntentContractMemorySnapshot();
+  });
+
   beforeEach(() => {
     cleanupTestTaskSessions();
+    if (originalIntentContractMemoryExists && originalIntentContractMemoryRaw !== null) {
+      safeWriteFile(intentContractMemoryRuntimePath, originalIntentContractMemoryRaw);
+    } else if (safeExistsSync(intentContractMemoryRuntimePath)) {
+      safeRmSync(intentContractMemoryRuntimePath);
+    }
+    refreshIntentContractMemorySnapshot();
   });
 
   it('creates and validates a capture task session', () => {
@@ -166,7 +203,73 @@ describe('task-session', () => {
       },
     });
 
-    expect(() => saveTaskSession(session)).toThrow(/requires evidence/i);
+    expect(() => saveTaskSession(session)).toThrow(/intent goal not satisfied|requires evidence/i);
+  });
+
+  it('persists a completion summary when a completed task session has evidence', () => {
+    const artifactPath = pathResolver.shared(
+      'runtime/task-sessions/TSK-TEST-COMPLETION-SUMMARY.docx'
+    );
+    const session = createTaskSession({
+      sessionId: 'TSK-TEST-COMPLETION-SUMMARY',
+      surface: 'presence',
+      taskType: 'report_document',
+      status: 'completed',
+      goal: {
+        summary: 'Weekly report',
+        success_condition: 'The report file is saved.',
+      },
+    });
+    session.artifact = {
+      kind: 'docx',
+      output_path: artifactPath,
+      preview_text: 'The report file is saved.',
+    };
+
+    expect(() => saveTaskSession(session)).not.toThrow();
+    const loaded = loadTaskSession('TSK-TEST-COMPLETION-SUMMARY');
+    expect(loaded?.completion_summary).toMatchObject({
+      requested_result: expect.any(String),
+      satisfied: true,
+      next_step: expect.stringContaining('Proceed'),
+    });
+    expect(loaded?.completion_next_action?.satisfied).toBe(true);
+  });
+
+  it('records completion outcomes into intent-contract memory', () => {
+    const session = createTaskSession({
+      sessionId: 'TSK-TEST-COMPLETION-MEMORY',
+      surface: 'presence',
+      taskType: 'report_document',
+      intentId: 'generate-report',
+      status: 'completed',
+      goal: {
+        summary: 'Weekly report',
+        success_condition: 'The report file is saved.',
+      },
+      payload: {
+        report_kind: 'status',
+      },
+    });
+    session.artifact = {
+      kind: 'docx',
+      preview_text: 'The report file is saved.',
+    };
+
+    expect(() => saveTaskSession(session)).not.toThrow();
+    refreshIntentContractMemorySnapshot();
+    const snapshot = loadIntentContractMemorySnapshot();
+    const entry = snapshot.entries.find(
+      (candidate) =>
+        candidate.intent_id === 'generate-report' &&
+        candidate.contract_ref.kind === 'task_session_policy' &&
+        candidate.contract_ref.ref === 'generate-report'
+    );
+    expect(entry).toBeTruthy();
+    expect(entry?.completion_summary).toMatchObject({
+      satisfied: true,
+      next_step: expect.stringContaining('Proceed'),
+    });
   });
 
   it('classifies photo and workbook intents from conversational utterances', () => {

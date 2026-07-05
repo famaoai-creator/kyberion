@@ -1,8 +1,11 @@
 import {
+  DEFAULT_EAST_ASIA_FONT,
+  DEFAULT_LATIN_FONT,
   resolveDocumentContentsLabel,
   resolveDocumentContentsSubtitle,
   resolveReportSectionTitle,
   resolveReportSummaryTitle,
+  resolveEastAsiaFontFamily,
   resolveThemeColorRole as resolveThemeColorRolePolicy,
 } from '@agent/core';
 import {
@@ -13,10 +16,24 @@ import {
 
 export interface MediaReportPipelineDeps {
   resolveNamedTheme: (rootDir: string, preferredTheme?: string) => any;
-  resolveDocumentCompositionPreset: (rootDir: string, brief: any) => { profileId: string; preset: any };
-  resolveDocumentLayoutTemplate: (rootDir: string, brief: any) => { templateId: string; template: any };
-  resolveSemanticComponentRule: (rootDir: string, semanticType: string | undefined, medium: string, component: string) => any;
-  themeToDocxStyleHints: (theme: any, locale?: string) => { headingFont: string; bodyFont: string; accent: string };
+  resolveDocumentCompositionPreset: (
+    rootDir: string,
+    brief: any
+  ) => { profileId: string; preset: any };
+  resolveDocumentLayoutTemplate: (
+    rootDir: string,
+    brief: any
+  ) => { templateId: string; template: any };
+  resolveSemanticComponentRule: (
+    rootDir: string,
+    semanticType: string | undefined,
+    medium: string,
+    component: string
+  ) => any;
+  themeToDocxStyleHints: (
+    theme: any,
+    locale?: string
+  ) => { headingFont: string; bodyFont: string; accent: string };
   themeToPptxPalette: (theme: any) => any;
   normalizeFontFamily: (input: string) => string;
 }
@@ -33,7 +50,10 @@ function resolveThemeColorRole(palette: any, accentHex: string, role?: string): 
   }
 }
 
-function hexToPdfRgb(hex: string | undefined, fallback: [number, number, number]): [number, number, number] {
+function hexToPdfRgb(
+  hex: string | undefined,
+  fallback: [number, number, number]
+): [number, number, number] {
   if (!hex || typeof hex !== 'string') return fallback;
   const normalized = hex.replace('#', '').trim();
   if (normalized.length !== 6) return fallback;
@@ -65,12 +85,21 @@ function applyRounding(value: number, mode: string): number {
 
 export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) {
   function buildReportDocxProtocol(rootDir: string, brief: any): any {
-    const outline = buildReportNarrativeOutline(rootDir, brief, deps.resolveDocumentCompositionPreset, (template, tokens, fallback = '') => {
-      if (template === undefined || template === null) return fallback;
-      return String(template)
-        .replace(/\{\{([^}]+)\}\}/g, (_match, key) => String(tokens?.[String(key).trim()] || fallback || ''))
-        .trim() || fallback;
-    });
+    const outline = buildReportNarrativeOutline(
+      rootDir,
+      brief,
+      deps.resolveDocumentCompositionPreset,
+      (template, tokens, fallback = '') => {
+        if (template === undefined || template === null) return fallback;
+        return (
+          String(template)
+            .replace(/\{\{([^}]+)\}\}/g, (_match, key) =>
+              String(tokens?.[String(key).trim()] || fallback || '')
+            )
+            .trim() || fallback
+        );
+      }
+    );
     const { preset } = deps.resolveDocumentCompositionPreset(rootDir, brief);
     const { template } = deps.resolveDocumentLayoutTemplate(rootDir, {
       document_type: 'report',
@@ -84,19 +113,39 @@ export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) 
     const numberingPolicyTemplate = docxLayout.numbering_policy || {};
     const headingFont = deps.normalizeFontFamily(
       brief.locale?.startsWith('ja')
-        ? themeHints.headingFont || template?.fonts?.heading || 'Meiryo'
-        : themeHints.headingFont || template?.fonts?.heading || 'Aptos',
+        ? themeHints.headingFont || template?.fonts?.heading || DEFAULT_EAST_ASIA_FONT
+        : themeHints.headingFont || template?.fonts?.heading || DEFAULT_LATIN_FONT
     );
     const bodyFont = deps.normalizeFontFamily(
       brief.locale?.startsWith('ja')
-        ? themeHints.bodyFont || template?.fonts?.body || 'Meiryo'
-        : themeHints.bodyFont || template?.fonts?.body || 'Aptos',
+        ? themeHints.bodyFont || template?.fonts?.body || DEFAULT_EAST_ASIA_FONT
+        : themeHints.bodyFont || template?.fonts?.body || DEFAULT_LATIN_FONT
     );
-    const appendixHeadingRule = deps.resolveSemanticComponentRule(rootDir, 'appendix', 'docx', 'heading');
+    const appendixHeadingRule = deps.resolveSemanticComponentRule(
+      rootDir,
+      'appendix',
+      'docx',
+      'heading'
+    );
     const appendixBodyRule = deps.resolveSemanticComponentRule(rootDir, 'appendix', 'docx', 'body');
-    const evidenceCalloutTitleRule = deps.resolveSemanticComponentRule(rootDir, 'evidence', 'docx', 'callout_title');
-    const evidenceCalloutBodyRule = deps.resolveSemanticComponentRule(rootDir, 'evidence', 'docx', 'callout_body');
-    const tableCaptionRule = deps.resolveSemanticComponentRule(rootDir, 'content', 'docx', 'table_caption');
+    const evidenceCalloutTitleRule = deps.resolveSemanticComponentRule(
+      rootDir,
+      'evidence',
+      'docx',
+      'callout_title'
+    );
+    const evidenceCalloutBodyRule = deps.resolveSemanticComponentRule(
+      rootDir,
+      'evidence',
+      'docx',
+      'callout_body'
+    );
+    const tableCaptionRule = deps.resolveSemanticComponentRule(
+      rootDir,
+      'content',
+      'docx',
+      'table_caption'
+    );
     const reportSectionTitle = resolveReportSectionTitle();
     const contentsEntry = Array.isArray(outline.toc)
       ? outline.toc.find((entry: any) => String(entry.section_id) === 'contents')
@@ -106,7 +155,12 @@ export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) 
         type: 'paragraph',
         paragraph: {
           pPr: { pStyle: 'Heading1' },
-          content: [{ type: 'run', run: { content: [{ type: 'text', text: brief.payload.title || 'Report' }] } }],
+          content: [
+            {
+              type: 'run',
+              run: { content: [{ type: 'text', text: brief.payload.title || 'Report' }] },
+            },
+          ],
         },
       },
     ];
@@ -115,7 +169,9 @@ export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) 
       bodyBlocks.push({
         type: 'paragraph',
         paragraph: {
-          content: [{ type: 'run', run: { content: [{ type: 'text', text: brief.payload.summary }] } }],
+          content: [
+            { type: 'run', run: { content: [{ type: 'text', text: brief.payload.summary }] } },
+          ],
         },
       });
     }
@@ -125,7 +181,19 @@ export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) 
         type: 'paragraph',
         paragraph: {
           pPr: { pStyle: 'Heading2' },
-          content: [{ type: 'run', run: { content: [{ type: 'text', text: contentsEntry.title || resolveDocumentContentsLabel(brief.locale) }] } }],
+          content: [
+            {
+              type: 'run',
+              run: {
+                content: [
+                  {
+                    type: 'text',
+                    text: contentsEntry.title || resolveDocumentContentsLabel(brief.locale),
+                  },
+                ],
+              },
+            },
+          ],
         },
       });
       contentsEntry.body.forEach((line: string) => {
@@ -140,7 +208,9 @@ export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) 
     }
 
     for (const section of brief.payload.sections) {
-      const sectionId = String(section.heading || 'section').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      const sectionId = String(section.heading || 'section')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-');
       const sectionPlan = Array.isArray(outline.toc)
         ? outline.toc.find((entry: any) => entry.section_id === sectionId)
         : null;
@@ -149,7 +219,12 @@ export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) 
         type: 'paragraph',
         paragraph: {
           pPr: { pStyle: headingStyle },
-          content: [{ type: 'run', run: { content: [{ type: 'text', text: section.heading || reportSectionTitle }] } }],
+          content: [
+            {
+              type: 'run',
+              run: { content: [{ type: 'text', text: section.heading || reportSectionTitle }] },
+            },
+          ],
         },
       });
 
@@ -159,7 +234,9 @@ export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) 
             type: 'paragraph',
             paragraph: {
               pPr: { pStyle: headingStyle === 'Heading3' ? 'AppendixBody' : 'Normal' },
-              content: [{ type: 'run', run: { content: [{ type: 'text', text: String(paragraph) }] } }],
+              content: [
+                { type: 'run', run: { content: [{ type: 'text', text: String(paragraph) }] } },
+              ],
             },
           });
         }
@@ -171,7 +248,9 @@ export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) 
             type: 'paragraph',
             paragraph: {
               pPr: { numPr: { ilvl: 0, numId: 1 } },
-              content: [{ type: 'run', run: { content: [{ type: 'text', text: String(bullet) }] } }],
+              content: [
+                { type: 'run', run: { content: [{ type: 'text', text: String(bullet) }] } },
+              ],
             },
           });
         });
@@ -179,19 +258,30 @@ export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) 
 
       if (Array.isArray(section.callouts)) {
         section.callouts.forEach((callout: any) => {
-          const title = [callout.title, callout.tone ? `(${callout.tone})` : ''].filter(Boolean).join(' ');
+          const title = [callout.title, callout.tone ? `(${callout.tone})` : '']
+            .filter(Boolean)
+            .join(' ');
           if (title) {
             bodyBlocks.push({
               type: 'paragraph',
               paragraph: {
                 pPr: { pStyle: 'CalloutTitle' },
-                content: [{
-                  type: 'run',
-                  run: {
-                    rPr: { bold: true, color: { val: themeHints.accent || String(template?.colors?.accent || '#2563eb').replace('#', '') } },
-                    content: [{ type: 'text', text: title }],
+                content: [
+                  {
+                    type: 'run',
+                    run: {
+                      rPr: {
+                        bold: true,
+                        color: {
+                          val:
+                            themeHints.accent ||
+                            String(template?.colors?.accent || '#2563eb').replace('#', ''),
+                        },
+                      },
+                      content: [{ type: 'text', text: title }],
+                    },
                   },
-                }],
+                ],
               },
             });
           }
@@ -200,7 +290,9 @@ export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) 
               type: 'paragraph',
               paragraph: {
                 pPr: { pStyle: 'CalloutBody' },
-                content: [{ type: 'run', run: { content: [{ type: 'text', text: String(callout.body) }] } }],
+                content: [
+                  { type: 'run', run: { content: [{ type: 'text', text: String(callout.body) }] } },
+                ],
               },
             });
           }
@@ -214,17 +306,21 @@ export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) 
               type: 'paragraph',
               paragraph: {
                 pPr: { pStyle: 'TableCaption' },
-                content: [{
-                  type: 'run',
-                  run: {
-                    rPr: { bold: true },
-                    content: [{ type: 'text', text: String(table.title) }],
+                content: [
+                  {
+                    type: 'run',
+                    run: {
+                      rPr: { bold: true },
+                      content: [{ type: 'text', text: String(table.title) }],
+                    },
                   },
-                }],
+                ],
               },
             });
           }
-          const columns = Array.isArray(table.columns) ? table.columns.map((value: any) => String(value)) : [];
+          const columns = Array.isArray(table.columns)
+            ? table.columns.map((value: any) => String(value))
+            : [];
           const rows = Array.isArray(table.rows) ? table.rows : [];
           if (columns.length === 0) {
             return;
@@ -250,22 +346,31 @@ export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) 
                 {
                   trPr: { tblHeader: true },
                   cells: columns.map((column: string) => ({
-                      tcPr: {
-                        tcW: { w: cellWidth, type: 'dxa' },
-                        shd: { val: 'clear', fill: palette.dk1 || String(template?.colors?.primary || '#1f2937').replace('#', '') },
+                    tcPr: {
+                      tcW: { w: cellWidth, type: 'dxa' },
+                      shd: {
+                        val: 'clear',
+                        fill:
+                          palette.dk1 ||
+                          String(template?.colors?.primary || '#1f2937').replace('#', ''),
                       },
-                    content: [{
-                      type: 'paragraph',
-                      paragraph: {
-                        content: [{
-                          type: 'run',
-                          run: {
-                            rPr: { bold: true, color: { val: 'FFFFFF' } },
-                            content: [{ type: 'text', text: column }],
-                          },
-                        }],
+                    },
+                    content: [
+                      {
+                        type: 'paragraph',
+                        paragraph: {
+                          content: [
+                            {
+                              type: 'run',
+                              run: {
+                                rPr: { bold: true, color: { val: 'FFFFFF' } },
+                                content: [{ type: 'text', text: column }],
+                              },
+                            },
+                          ],
+                        },
                       },
-                    }],
+                    ],
                   })),
                 },
                 ...rows.map((row: any) => {
@@ -275,15 +380,19 @@ export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) 
                   return {
                     cells: values.map((value: any) => ({
                       tcPr: { tcW: { w: cellWidth, type: 'dxa' } },
-                      content: [{
-                        type: 'paragraph',
-                        paragraph: {
-                          content: [{
-                            type: 'run',
-                            run: { content: [{ type: 'text', text: String(value ?? '') }] },
-                          }],
+                      content: [
+                        {
+                          type: 'paragraph',
+                          paragraph: {
+                            content: [
+                              {
+                                type: 'run',
+                                run: { content: [{ type: 'text', text: String(value ?? '') }] },
+                              },
+                            ],
+                          },
                         },
-                      }],
+                      ],
                     })),
                   };
                 }),
@@ -300,18 +409,24 @@ export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) 
       source: {
         format: 'markdown',
         title: brief.payload.title || 'Report',
-      body: [
+        body: [
           brief.payload.summary || '',
           '',
           ...(Array.isArray(brief.payload.sections)
             ? brief.payload.sections.flatMap((section: any) => [
                 section.heading || reportSectionTitle,
-                ...(Array.isArray(section.body) ? section.body.map((paragraph: any) => String(paragraph)) : []),
-                ...(Array.isArray(section.bullets) ? section.bullets.map((bullet: string) => `- ${bullet}`) : []),
+                ...(Array.isArray(section.body)
+                  ? section.body.map((paragraph: any) => String(paragraph))
+                  : []),
+                ...(Array.isArray(section.bullets)
+                  ? section.bullets.map((bullet: string) => `- ${bullet}`)
+                  : []),
                 '',
               ])
             : []),
-        ].join('\n').trim(),
+        ]
+          .join('\n')
+          .trim(),
       },
       theme: {
         colors: {
@@ -322,20 +437,27 @@ export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) 
           accent1: palette.accent1 || '2563EB',
           accent2: palette.accent2 || palette.dk2 || '334155',
         },
-        majorFont: headingFont,
-        minorFont: bodyFont,
+        majorFont: brief.locale?.startsWith('ja')
+          ? resolveEastAsiaFontFamily(headingFont)
+          : headingFont,
+        minorFont: brief.locale?.startsWith('ja') ? resolveEastAsiaFontFamily(bodyFont) : bodyFont,
       },
       layoutProfile: {
         fonts: {
           bodyJa: deps.normalizeFontFamily(layoutProfileTemplate.fonts?.bodyJa || bodyFont),
           bodyEn: deps.normalizeFontFamily(layoutProfileTemplate.fonts?.bodyEn || bodyFont),
-          headingJa: deps.normalizeFontFamily(layoutProfileTemplate.fonts?.headingJa || headingFont),
-          headingEn: deps.normalizeFontFamily(layoutProfileTemplate.fonts?.headingEn || headingFont),
+          headingJa: deps.normalizeFontFamily(
+            layoutProfileTemplate.fonts?.headingJa || headingFont
+          ),
+          headingEn: deps.normalizeFontFamily(
+            layoutProfileTemplate.fonts?.headingEn || headingFont
+          ),
         },
         sizes: {
           body: layoutProfileTemplate.sizes?.body || 11,
           heading1: layoutProfileTemplate.sizes?.heading1 || (docxLayout.title_font_size || 32) / 2,
-          heading2: layoutProfileTemplate.sizes?.heading2 || (docxLayout.section_font_size || 26) / 2,
+          heading2:
+            layoutProfileTemplate.sizes?.heading2 || (docxLayout.section_font_size || 26) / 2,
           heading3: layoutProfileTemplate.sizes?.heading3,
           heading4: layoutProfileTemplate.sizes?.heading4,
           heading5: layoutProfileTemplate.sizes?.heading5,
@@ -345,9 +467,12 @@ export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) 
           width: layoutProfileTemplate.page?.width || docxLayout.page?.width || 11906,
           height: layoutProfileTemplate.page?.height || docxLayout.page?.height || 16838,
           marginTop: layoutProfileTemplate.page?.marginTop || docxLayout.page?.margin_top || 1440,
-          marginRight: layoutProfileTemplate.page?.marginRight || docxLayout.page?.margin_right || 1440,
-          marginBottom: layoutProfileTemplate.page?.marginBottom || docxLayout.page?.margin_bottom || 1440,
-          marginLeft: layoutProfileTemplate.page?.marginLeft || docxLayout.page?.margin_left || 1440,
+          marginRight:
+            layoutProfileTemplate.page?.marginRight || docxLayout.page?.margin_right || 1440,
+          marginBottom:
+            layoutProfileTemplate.page?.marginBottom || docxLayout.page?.margin_bottom || 1440,
+          marginLeft:
+            layoutProfileTemplate.page?.marginLeft || docxLayout.page?.margin_left || 1440,
           marginHeader: layoutProfileTemplate.page?.marginHeader || docxLayout.page?.header || 720,
           marginFooter: layoutProfileTemplate.page?.marginFooter || docxLayout.page?.footer || 720,
           marginGutter: layoutProfileTemplate.page?.marginGutter,
@@ -411,14 +536,24 @@ export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) 
             name: 'Heading 3',
             pPr: {
               spacing: {
-                before: appendixHeadingRule.spacing_before || ((docxLayout.section_spacing_before || 120) - 20),
+                before:
+                  appendixHeadingRule.spacing_before ||
+                  (docxLayout.section_spacing_before || 120) - 20,
                 after: appendixHeadingRule.spacing_after || docxLayout.section_spacing_after || 80,
               },
             },
             rPr: {
               bold: appendixHeadingRule.bold ?? true,
-              color: { val: resolveThemeColorRole(palette, themeHints.accent, appendixHeadingRule.color_role) },
-              sz: appendixHeadingRule.font_size || Math.max((docxLayout.section_font_size || 26) - 2, 20),
+              color: {
+                val: resolveThemeColorRole(
+                  palette,
+                  themeHints.accent,
+                  appendixHeadingRule.color_role
+                ),
+              },
+              sz:
+                appendixHeadingRule.font_size ||
+                Math.max((docxLayout.section_font_size || 26) - 2, 20),
             },
           },
           {
@@ -433,8 +568,16 @@ export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) 
             },
             rPr: {
               bold: evidenceCalloutTitleRule.bold ?? true,
-              color: { val: resolveThemeColorRole(palette, themeHints.accent, evidenceCalloutTitleRule.color_role) },
-              sz: evidenceCalloutTitleRule.font_size || Math.max((docxLayout.section_font_size || 26) - 4, 18),
+              color: {
+                val: resolveThemeColorRole(
+                  palette,
+                  themeHints.accent,
+                  evidenceCalloutTitleRule.color_role
+                ),
+              },
+              sz:
+                evidenceCalloutTitleRule.font_size ||
+                Math.max((docxLayout.section_font_size || 26) - 4, 18),
             },
           },
           {
@@ -448,7 +591,13 @@ export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) 
             },
             rPr: {
               italics: evidenceCalloutBodyRule.italics ?? true,
-              color: { val: resolveThemeColorRole(palette, themeHints.accent, evidenceCalloutBodyRule.color_role) },
+              color: {
+                val: resolveThemeColorRole(
+                  palette,
+                  themeHints.accent,
+                  evidenceCalloutBodyRule.color_role
+                ),
+              },
               sz: evidenceCalloutBodyRule.font_size || 21,
             },
           },
@@ -464,7 +613,9 @@ export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) 
             },
             rPr: {
               bold: tableCaptionRule.bold ?? true,
-              color: { val: resolveThemeColorRole(palette, themeHints.accent, tableCaptionRule.color_role) },
+              color: {
+                val: resolveThemeColorRole(palette, themeHints.accent, tableCaptionRule.color_role),
+              },
               sz: tableCaptionRule.font_size || 20,
             },
           },
@@ -478,14 +629,18 @@ export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) 
               },
             },
             rPr: {
-              color: { val: resolveThemeColorRole(palette, themeHints.accent, appendixBodyRule.color_role) },
+              color: {
+                val: resolveThemeColorRole(palette, themeHints.accent, appendixBodyRule.color_role),
+              },
               sz: appendixBodyRule.font_size || 20,
             },
           },
         ],
       },
       numbering: {
-        abstractNums: [{ abstractNumId: 0, levels: [{ ilvl: 0, numFmt: 'bullet', lvlText: '•', jc: 'left' }] }],
+        abstractNums: [
+          { abstractNumId: 0, levels: [{ ilvl: 0, numFmt: 'bullet', lvlText: '•', jc: 'left' }] },
+        ],
         nums: [{ numId: 1, abstractNumId: 0 }],
       },
       metadata: {
@@ -498,37 +653,49 @@ export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) 
               section_id: entry.section_id,
               layout_key: entry.layout_key,
               media_kind: entry.media_kind,
-              semantic_type: entry.semantic_type || classifyRenderSemantic(entry.layout_key, entry.media_kind),
+              semantic_type:
+                entry.semantic_type || classifyRenderSemantic(entry.layout_key, entry.media_kind),
             }))
           : [],
       },
       body: bodyBlocks,
-      sections: [{
-        pgSz: {
-          w: docxLayout.page?.width || 11906,
-          h: docxLayout.page?.height || 16838,
+      sections: [
+        {
+          pgSz: {
+            w: docxLayout.page?.width || 11906,
+            h: docxLayout.page?.height || 16838,
+          },
+          pgMar: {
+            top: docxLayout.page?.margin_top || 1440,
+            right: docxLayout.page?.margin_right || 1440,
+            bottom: docxLayout.page?.margin_bottom || 1440,
+            left: docxLayout.page?.margin_left || 1440,
+            header: docxLayout.page?.header || 720,
+            footer: docxLayout.page?.footer || 720,
+          },
         },
-        pgMar: {
-          top: docxLayout.page?.margin_top || 1440,
-          right: docxLayout.page?.margin_right || 1440,
-          bottom: docxLayout.page?.margin_bottom || 1440,
-          left: docxLayout.page?.margin_left || 1440,
-          header: docxLayout.page?.header || 720,
-          footer: docxLayout.page?.footer || 720,
-        },
-      }],
+      ],
       headersFooters: [],
       relationships: [],
     };
   }
 
   function buildReportPdfProtocol(rootDir: string, brief: any): any {
-    const outline = buildReportNarrativeOutline(rootDir, brief, deps.resolveDocumentCompositionPreset, (template, tokens, fallback = '') => {
-      if (template === undefined || template === null) return fallback;
-      return String(template)
-        .replace(/\{\{([^}]+)\}\}/g, (_match, key) => String(tokens?.[String(key).trim()] || fallback || ''))
-        .trim() || fallback;
-    });
+    const outline = buildReportNarrativeOutline(
+      rootDir,
+      brief,
+      deps.resolveDocumentCompositionPreset,
+      (template, tokens, fallback = '') => {
+        if (template === undefined || template === null) return fallback;
+        return (
+          String(template)
+            .replace(/\{\{([^}]+)\}\}/g, (_match, key) =>
+              String(tokens?.[String(key).trim()] || fallback || '')
+            )
+            .trim() || fallback
+        );
+      }
+    );
     const { preset } = deps.resolveDocumentCompositionPreset(rootDir, brief);
     const { template, templateId } = deps.resolveDocumentLayoutTemplate(rootDir, {
       document_type: 'report',
@@ -538,15 +705,24 @@ export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) 
     const pdfLayout = template?.pdf || {};
     const tableStyle = pdfLayout.table || {};
     const tableWidth = Number(tableStyle.width || 490);
-    const headerFill = hexToPdfRgb(tableStyle.header_fill, hexToPdfRgb(activeTheme?.colors?.primary, [0.12, 0.16, 0.22]));
+    const headerFill = hexToPdfRgb(
+      tableStyle.header_fill,
+      hexToPdfRgb(activeTheme?.colors?.primary, [0.12, 0.16, 0.22])
+    );
     const gridStroke = hexToPdfRgb(tableStyle.grid_stroke, [0.8, 0.84, 0.89]);
     const outerStroke = hexToPdfRgb(tableStyle.outer_stroke, [0.58, 0.64, 0.72]);
     const zebraFill = hexToPdfRgb(tableStyle.zebra_fill, [0.97, 0.98, 0.99]);
     const showZebra = tableStyle.show_zebra !== false;
     const accentFill = hexToPdfRgb(activeTheme?.colors?.accent, [0.93, 0.96, 1.0]);
-    const themePrimary = String(activeTheme?.colors?.primary || template?.colors?.primary || '#1f2937');
-    const themeSecondary = String(activeTheme?.colors?.secondary || template?.colors?.secondary || '#4b5563');
-    const themeAccent = String(activeTheme?.colors?.accent || template?.colors?.accent || '#2563eb');
+    const themePrimary = String(
+      activeTheme?.colors?.primary || template?.colors?.primary || '#1f2937'
+    );
+    const themeSecondary = String(
+      activeTheme?.colors?.secondary || template?.colors?.secondary || '#4b5563'
+    );
+    const themeAccent = String(
+      activeTheme?.colors?.accent || template?.colors?.accent || '#2563eb'
+    );
     const themeBackground = String(activeTheme?.colors?.background || '#ffffff');
     const reportSectionTitle = resolveReportSectionTitle();
     const vectors: any[] = [];
@@ -555,9 +731,10 @@ export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) 
       : null;
     const bodySections = (() => {
       const sections = Array.isArray(brief.payload.sections) ? brief.payload.sections : [];
-      const bodySectionOrder = Array.isArray(template?.body_sections) && template.body_sections.length > 0
-        ? template.body_sections.map((value: any) => String(value))
-        : ['title', 'summary', 'contents', 'section', 'callout', 'bullet', 'table'];
+      const bodySectionOrder =
+        Array.isArray(template?.body_sections) && template.body_sections.length > 0
+          ? template.body_sections.map((value: any) => String(value))
+          : ['title', 'summary', 'contents', 'section', 'callout', 'bullet', 'table'];
       const collected: string[] = [];
       const pushValue = (value: unknown) => {
         if (value === undefined || value === null) return;
@@ -592,7 +769,13 @@ export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) 
           for (const section of sections) {
             if (Array.isArray(section.callouts)) {
               for (const callout of section.callouts) {
-                pushValue(callout.title ? [callout.title, callout.tone ? `(${callout.tone})` : ''].filter(Boolean).join(' ') : '');
+                pushValue(
+                  callout.title
+                    ? [callout.title, callout.tone ? `(${callout.tone})` : '']
+                        .filter(Boolean)
+                        .join(' ')
+                    : ''
+                );
                 pushValue(callout.body || '');
               }
             }
@@ -617,7 +800,9 @@ export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) 
                 if (columns.length > 0) {
                   pushValue(columns.join(' | '));
                   rows.forEach((row: any) => {
-                    const values = Array.isArray(row) ? row : columns.map((column: string) => row?.[column] ?? '');
+                    const values = Array.isArray(row)
+                      ? row
+                      : columns.map((column: string) => row?.[column] ?? '');
                     pushValue(values.map((value: any) => String(value ?? '')).join(' | '));
                   });
                 }
@@ -676,39 +861,55 @@ export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) 
     }
 
     for (const section of brief.payload.sections) {
-      const sectionId = String(section.heading || 'section').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      const sectionId = String(section.heading || 'section')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-');
       const sectionPlan = Array.isArray(outline.toc)
         ? outline.toc.find((entry: any) => entry.section_id === sectionId)
         : null;
-      const semanticType = sectionPlan?.semantic_type || classifyRenderSemantic(sectionPlan?.layout_key, sectionPlan?.media_kind);
-      const semanticTokens = deps.resolveSemanticComponentRule(rootDir, semanticType, 'pdf', 'body');
+      const semanticType =
+        sectionPlan?.semantic_type ||
+        classifyRenderSemantic(sectionPlan?.layout_key, sectionPlan?.media_kind);
+      const semanticTokens = deps.resolveSemanticComponentRule(
+        rootDir,
+        semanticType,
+        'pdf',
+        'body'
+      );
       const pdfTokens = semanticTokens.pdf || {};
       const isAppendix = semanticType === 'appendix';
-      const sectionHeaderColor = pdfTokens.header_color === 'secondary'
-        ? hexToPdfRgb(themeSecondary, [0.3, 0.34, 0.39])
-        : pdfTokens.header_color === 'accent'
-          ? hexToPdfRgb(themeAccent, [0.15, 0.39, 0.92])
-          : hexToPdfRgb(themePrimary, [0.12, 0.16, 0.22]);
-      const sectionBodyX = pdfTokens.body_x === 'margin' ? (pdfLayout.margin_left || 48) : (pdfLayout.content_x || 56);
-      const bodyFontSize = (pdfLayout.body_font_size || 10) + Number(pdfTokens.body_font_size_delta || 0);
-      const blockFill = pdfTokens.block_fill === 'primary'
-        ? headerFill
-        : pdfTokens.block_fill === 'accent'
-          ? accentFill
-          : null;
+      const sectionHeaderColor =
+        pdfTokens.header_color === 'secondary'
+          ? hexToPdfRgb(themeSecondary, [0.3, 0.34, 0.39])
+          : pdfTokens.header_color === 'accent'
+            ? hexToPdfRgb(themeAccent, [0.15, 0.39, 0.92])
+            : hexToPdfRgb(themePrimary, [0.12, 0.16, 0.22]);
+      const sectionBodyX =
+        pdfTokens.body_x === 'margin' ? pdfLayout.margin_left || 48 : pdfLayout.content_x || 56;
+      const bodyFontSize =
+        (pdfLayout.body_font_size || 10) + Number(pdfTokens.body_font_size_delta || 0);
+      const blockFill =
+        pdfTokens.block_fill === 'primary'
+          ? headerFill
+          : pdfTokens.block_fill === 'accent'
+            ? accentFill
+            : null;
       elements.push({
         type: 'text',
         x: pdfLayout.margin_left || 48,
         y: cursorY,
         text: section.heading || reportSectionTitle,
-        fontSize: isAppendix ? Math.max((pdfLayout.section_font_size || 14) - 2, 11) : (pdfLayout.section_font_size || 14),
+        fontSize: isAppendix
+          ? Math.max((pdfLayout.section_font_size || 14) - 2, 11)
+          : pdfLayout.section_font_size || 14,
         color: sectionHeaderColor,
       });
       cursorY += 22;
       if (blockFill) {
         const blockHeight = Math.max(
-          (Array.isArray(section.body) ? section.body.length : 0) * (pdfLayout.line_height || 16) + 18,
-          26,
+          (Array.isArray(section.body) ? section.body.length : 0) * (pdfLayout.line_height || 16) +
+            18,
+          26
         );
         vectors.push({
           shape: {
@@ -748,9 +949,13 @@ export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) 
       }
       if (Array.isArray(section.callouts)) {
         for (const callout of section.callouts) {
-          const title = [callout.title, callout.tone ? `(${callout.tone})` : ''].filter(Boolean).join(' ');
+          const title = [callout.title, callout.tone ? `(${callout.tone})` : '']
+            .filter(Boolean)
+            .join(' ');
           const calloutBoxY = cursorY - 4;
-          const calloutBoxHeight = callout.body ? (pdfLayout.line_height || 16) * 2 : (pdfLayout.line_height || 16) + 4;
+          const calloutBoxHeight = callout.body
+            ? (pdfLayout.line_height || 16) * 2
+            : (pdfLayout.line_height || 16) + 4;
           vectors.push({
             shape: {
               kind: 'rect',
@@ -797,14 +1002,16 @@ export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) 
             });
             cursorY += pdfLayout.line_height || 16;
           }
-          const columns = Array.isArray(table.columns) ? table.columns.map((value: any) => String(value)) : [];
+          const columns = Array.isArray(table.columns)
+            ? table.columns.map((value: any) => String(value))
+            : [];
           const rows = Array.isArray(table.rows) ? table.rows : [];
           if (columns.length > 0) {
             const tableX = pdfLayout.table_x || 56;
             const columnWidth = tableWidth / columns.length;
             const tableHeaderY = cursorY - 4;
             const rowHeight = pdfLayout.line_height || 16;
-            const tableHeight = rowHeight + 4 + (rows.length * rowHeight);
+            const tableHeight = rowHeight + 4 + rows.length * rowHeight;
             vectors.push({
               shape: {
                 kind: 'rect',
@@ -843,7 +1050,7 @@ export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) 
               }
               elements.push({
                 type: 'text',
-                x: tableX + (columnWidth * index) + 4,
+                x: tableX + columnWidth * index + 4,
                 y: cursorY,
                 text: column,
                 fontSize: pdfLayout.body_font_size || 10,
@@ -881,7 +1088,7 @@ export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) 
               values.forEach((value: any, index: number) => {
                 elements.push({
                   type: 'text',
-                  x: tableX + (columnWidth * index) + 4,
+                  x: tableX + columnWidth * index + 4,
                   y: cursorY,
                   text: String(value ?? ''),
                   fontSize: pdfLayout.body_font_size || 10,
@@ -918,7 +1125,8 @@ export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) 
               section_id: entry.section_id,
               layout_key: entry.layout_key,
               media_kind: entry.media_kind,
-              semantic_type: entry.semantic_type || classifyRenderSemantic(entry.layout_key, entry.media_kind),
+              semantic_type:
+                entry.semantic_type || classifyRenderSemantic(entry.layout_key, entry.media_kind),
             }))
           : [],
       },

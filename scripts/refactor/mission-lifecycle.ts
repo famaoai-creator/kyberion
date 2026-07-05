@@ -17,7 +17,6 @@ import {
   latestSnapshot,
   pathResolver,
   queueMissionMemoryPromotionCandidate,
-  evaluateIntentDriftReviewGate,
   summarizeReviewGateVerdicts,
   safeExec,
   safeAppendFileSync,
@@ -626,9 +625,22 @@ export async function verifyMission(
   logger.info(`🛡️ Verifying Mission ${upperId}: Result = ${result.toUpperCase()}`);
 
   if (result === 'verified') {
+    const driftSummary = evaluateMissionIntentDrift(upperId);
     const driftReview = summarizeReviewGateVerdicts({
       reviewMode: 'standard',
-      results: [evaluateIntentDriftReviewGate(upperId)],
+      results: [
+        driftSummary
+          ? {
+              gate_id: 'INTENT_DRIFT',
+              verdict: driftSummary.passed ? 'ready' : 'blocked',
+              reason: driftSummary.message,
+            }
+          : {
+              gate_id: 'INTENT_DRIFT',
+              verdict: 'concerns',
+              reason: 'Intent drift gate unavailable.',
+            },
+      ],
     });
     const driftGate = driftReview.gate_results[0];
     if (driftReview.overall_verdict === 'blocked') {
@@ -841,25 +853,25 @@ export async function finishMission(
   }
 
   const evidence = collectMissionEvidence(missionDir);
+  const evidenceRefs = evidence.map((item) => item.ref);
+  const completionGoal = {
+    summary:
+      state.intent?.goal_summary ||
+      state.outcome_contract?.requested_result ||
+      `Mission ${upperId}`,
+    success_condition:
+      state.intent?.success_condition ||
+      state.outcome_contract?.success_criteria?.join('; ') ||
+      state.outcome_contract?.requested_result ||
+      `Mission ${upperId}`,
+  };
   const completionReconciliation = await reconcileCompletion({
-    goal: {
-      summary: state.outcome_contract?.requested_result || `Mission ${upperId}`,
-      success_condition:
-        state.outcome_contract?.success_criteria?.join('; ') ||
-        state.outcome_contract?.requested_result ||
-        `Mission ${upperId}`,
-    },
-    deliverables: evidence.map((item) => item.ref),
-    evidence,
+    goal: completionGoal,
+    evidenceRefs,
+    requestedResult: state.outcome_contract?.requested_result,
   });
   const completionNextAction = buildCompletionNextAction({
-    goal: {
-      summary: state.outcome_contract?.requested_result || `Mission ${upperId}`,
-      success_condition:
-        state.outcome_contract?.success_criteria?.join('; ') ||
-        state.outcome_contract?.requested_result ||
-        `Mission ${upperId}`,
-    },
+    goal: completionGoal,
     reconciliation: completionReconciliation,
   });
   const traceCtx = createActuatorTrace('mission-controller', 'finish', {

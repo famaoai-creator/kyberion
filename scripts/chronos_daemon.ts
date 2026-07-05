@@ -16,13 +16,11 @@ import {
   safeLstat,
   safeReaddir,
   sendOpsAlert,
-} from '@agent/core';
-import {
   registerScheduledPipeline,
   getSchedulesDueNow,
   claimScheduledPipelineRun,
   completeScheduledPipelineRun,
-} from '@agent/core/pipeline-scheduler';
+} from '@agent/core';
 import { readValidatedPipelineAdf } from './refactor/adf-input.js';
 import { runSteps } from './run_pipeline.js';
 

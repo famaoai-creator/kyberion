@@ -97,8 +97,8 @@
 | ----- | ------- | ------------------------------------------------------------------------- |
 | DS-01 | PARTIAL | 生成ゲートの validate チェーン接続、operator-surface 残り約124 hex の変換 |
 | DS-02 | PARTIAL | tier 隔離テスト(受入4)、DESIGN_SYSTEM.md テナント節                       |
-| DS-03 | TODO    | pptx ea 日本語フォント、PDF サブセット埋め込み、日本語ゴールデン          |
-| DS-04 | TODO    | 動画シーンテンプレートの var(--kb-\*) 化                                  |
+| DS-03 | DONE    | pptx ea 日本語フォント、PDF CJK 埋め込み、日文ゴールデン                  |
+| DS-04 | PARTIAL | 動画シーンテンプレートの var(--kb-\*) 化、Task 4 の実写検証待ち            |
 | DS-05 | TODO    | reduced-motion、コントラストゲート、light/dark トグル、ARIA               |
 
 ### AA(エージェント間通信)
