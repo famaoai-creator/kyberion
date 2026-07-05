@@ -147,7 +147,7 @@
 | ID    | 状態    | 残作業                                                                                                               |
 | ----- | ------- | -------------------------------------------------------------------------------------------------------------------- |
 | IL-01 | TODO    | goal の昇格 seam 貫通、outcome-contract の goal 優先化                                                               |
-| IL-02 | TODO    | 相関 ID 貫通、intent trace コマンド                                                                                  |
+| IL-02 | PARTIAL | intent trace コマンド、相関 ID 貫通の接続面                                                                          |
 | IL-03 | TODO    | origin baseline、実行中ドリフトゲート                                                                                |
 | IL-04 | PARTIAL | intent-reconciliation エンジン、task-session 完了ゲート、completion summary/next action、intent-contract-memory 記録 |
 | IL-05 | TODO    | pending-intent-store、修正検知、completed 再オープン                                                                 |
