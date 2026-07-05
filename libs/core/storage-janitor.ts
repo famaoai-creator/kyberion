@@ -25,6 +25,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 export const RUNTIME_RETENTION: ReadonlyArray<{ subdir: string; ttlMs: number }> = [
   { subdir: 'browser-receipts', ttlMs: 90 * DAY_MS },
   { subdir: 'procedure-deltas', ttlMs: 14 * DAY_MS },
+  { subdir: 'a2a-conversations', ttlMs: 30 * DAY_MS },
 ];
 
 export interface ScanTmpOptions {

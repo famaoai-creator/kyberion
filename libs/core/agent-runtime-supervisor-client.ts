@@ -35,6 +35,7 @@ interface SupervisorResponse<T = Record<string, unknown>> {
   ok: boolean;
   result?: T;
   error?: string;
+  errorDetail?: Record<string, any>;
 }
 
 export interface AgentRuntimeSupervisorHealth {
@@ -135,7 +136,11 @@ async function sendSupervisorRequest<TPayload, TResult>(
       try {
         const response = JSON.parse(line) as SupervisorResponse<TResult>;
         if (!response.ok) {
-          return finish(() => reject(new Error(response.error || 'supervisor_request_failed')));
+          const err = new Error(response.error || 'supervisor_request_failed');
+          if (response.errorDetail) {
+            (err as any).errorDetail = response.errorDetail;
+          }
+          return finish(() => reject(err));
         }
         return finish(() => resolve(response.result as TResult));
       } catch (error: any) {

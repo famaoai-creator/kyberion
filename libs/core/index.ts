@@ -153,6 +153,13 @@ export type {
 export { renderStatus, renderVocabularyText, resolveVocabularyLocale } from './ux-vocabulary.js';
 export type { UxStatusDomain, UxVocabularyLocale } from './ux-vocabulary.js';
 export { resolveActiveProfileRoot } from './profile-root.js';
+export * from './company.js';
+export * from './financial-model.js';
+export * from './finance-controller.js';
+export * from './okr-tracker.js';
+export * from './decision-rights.js';
+export * from './approval-audit.js';
+export * from './org-chart.js';
 export * from './daemon-heartbeat.js';
 export * from './ops-alert.js';
 export * from './chain-integrity.js';
@@ -654,6 +661,7 @@ export * from './agent-adapter.js';
 export * from './agent-registry.js';
 export * from './agent-lifecycle.js';
 export * from './a2a-bridge.js';
+export * from './a2a-conversation-store.js';
 export * from './agent-manifest.js';
 export * from './provider-discovery.js';
 export * from './agent-provider-resolution.js';
@@ -1069,6 +1077,7 @@ export {
   getReasoningBackend,
   delegateBestOf,
   delegateStructured,
+  delegateTaskWithUntrustedData,
   registerReasoningBackend,
   resetReasoningBackend,
   stubReasoningBackend,
@@ -1374,6 +1383,7 @@ export type {
   SimulationInput,
   SimulationResult,
   SynthesizedPersona,
+  UntrustedDataParams,
 } from './reasoning-backend.js';
 export {
   A2ATaskContractSchema,
@@ -1690,3 +1700,16 @@ export type {
   ExecuteServiceProcedureResult,
 } from './service-procedure-executor.js';
 export { SERVICE_EXTERNAL_EFFECT_OP } from './procedure-dispatcher.js';
+
+// SA-03 Prompt Injection & Untrusted Content Defense
+export type { ScanOptions } from './untrusted-content.js';
+export {
+  wrapUntrusted,
+  scanForInjection,
+  scanForInjectionAsync,
+  isInjectionSuspected,
+  setInjectionSuspected,
+  processUntrustedContent,
+  processUntrustedContentAsync,
+  sanitizeUntrustedContentAsync,
+} from './untrusted-content.js';
