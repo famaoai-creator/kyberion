@@ -1,7 +1,4 @@
-import {
-  pathResolver,
-  transitionStatus,
-} from '@agent/core';
+import { pathResolver, transitionStatus } from '@agent/core';
 import { getCurrentBranch, getGitHash } from './mission-git.js';
 import {
   createMission as _createMission,
@@ -9,10 +6,12 @@ import {
 } from './mission-creation.js';
 import {
   delegateMission as _delegateMission,
+  cancelMission as _cancelMission,
   finishMission as _finishMission,
   grantMissionAccess as _grantMissionAccess,
   grantMissionSudo as _grantMissionSudo,
   importMission as _importMission,
+  pauseMission as _pauseMission,
   verifyMission as _verifyMission,
 } from './mission-lifecycle.js';
 import {
@@ -26,12 +25,21 @@ import {
   syncProjectLedger as _syncProjectLedger,
   syncProjectLedgerIfLinked as _syncProjectLedgerIfLinked,
 } from './mission-project-ledger.js';
-import { prewarmMissionTeam as _prewarmMissionTeam, showMissionTeam as _showMissionTeam, staffMissionTeam as _staffMissionTeam } from './mission-runtime.js';
+import {
+  prewarmMissionTeam as _prewarmMissionTeam,
+  showMissionTeam as _showMissionTeam,
+  staffMissionTeam as _staffMissionTeam,
+} from './mission-runtime.js';
 import { distillMission as _distillMission } from './mission-distill.js';
 import { dispatchMissionTickets as _dispatchMissionTickets } from './mission-ticket-dispatch.js';
 import { dispatchMissionWorkItems as _dispatchMissionWorkItems } from './mission-workitem-dispatch.js';
 import { sealMission as _sealMission } from './mission-seal.js';
-import { loadState, saveState, readFocusedMissionId, writeFocusedMissionId } from './mission-state.js';
+import {
+  loadState,
+  saveState,
+  readFocusedMissionId,
+  writeFocusedMissionId,
+} from './mission-state.js';
 import { syncProjectOperationalStateIfLinked } from './project-state-sync.js';
 
 export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
@@ -41,7 +49,8 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
   const syncProjectLedgerInternal = async (missionId: string): Promise<void> =>
     _syncProjectLedger(missionId, rootDir);
   const readFocusedMissionIdBound = () => readFocusedMissionId(missionFocusPath);
-  const writeFocusedMissionIdBound = (missionId: string) => writeFocusedMissionId(missionFocusPath, missionId);
+  const writeFocusedMissionIdBound = (missionId: string) =>
+    writeFocusedMissionId(missionFocusPath, missionId);
 
   return {
     loadState,
@@ -56,7 +65,7 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
       visionRef?: string,
       persona: string = 'worker',
       relationships: any = {},
-      tenantSlug?: string,
+      tenantSlug?: string
     ) {
       const result = await _createMission({
         id,
@@ -80,7 +89,7 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
       missionType: string = 'development',
       visionRef?: string,
       relationships: any = {},
-      tenantSlug?: string,
+      tenantSlug?: string
     ) {
       await _startMission({
         id,
@@ -96,21 +105,33 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
       await syncProjectOperationalStateIfLinked(id);
     },
     delegateMission(id: string, agentId: string, a2aMessageId: string) {
-      return _delegateMission(id, agentId, a2aMessageId, syncProjectLedgerIfLinkedInternal)
-        .then(() => syncProjectOperationalStateIfLinked(id));
+      return _delegateMission(id, agentId, a2aMessageId, syncProjectLedgerIfLinkedInternal).then(
+        () => syncProjectOperationalStateIfLinked(id)
+      );
     },
     importMission(id: string, remoteUrl: string) {
-      return _importMission(id, remoteUrl, transitionStatus as any, syncProjectLedgerIfLinkedInternal)
-        .then(() => syncProjectOperationalStateIfLinked(id));
+      return _importMission(
+        id,
+        remoteUrl,
+        transitionStatus as any,
+        syncProjectLedgerIfLinkedInternal
+      ).then(() => syncProjectOperationalStateIfLinked(id));
     },
     verifyMission(id: string, result: 'verified' | 'rejected', note: string) {
-      return _verifyMission(id, result, note, transitionStatus as any, syncProjectLedgerIfLinkedInternal)
-        .then(() => syncProjectOperationalStateIfLinked(id));
+      return _verifyMission(
+        id,
+        result,
+        note,
+        transitionStatus as any,
+        syncProjectLedgerIfLinkedInternal
+      ).then(() => syncProjectOperationalStateIfLinked(id));
     },
     finishMission(id: string, seal = false) {
       return _finishMission(id, seal, {
         archiveDir: pathResolver.active('archive/missions'),
-        agentRuntimeEventPath: pathResolver.shared('observability/mission-control/agent-runtime-events.jsonl'),
+        agentRuntimeEventPath: pathResolver.shared(
+          'observability/mission-control/agent-runtime-events.jsonl'
+        ),
         getGitHash,
         sealMission: _sealMission,
         syncProjectLedgerIfLinked: syncProjectLedgerIfLinkedInternal,
@@ -126,7 +147,9 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
         writeFocusedMissionId: writeFocusedMissionIdBound,
         getGitHash,
         syncProjectLedgerIfLinked: syncProjectLedgerIfLinkedInternal,
-      }).then(() => (explicitMissionId ? syncProjectOperationalStateIfLinked(explicitMissionId) : undefined));
+      }).then(() =>
+        explicitMissionId ? syncProjectOperationalStateIfLinked(explicitMissionId) : undefined
+      );
     },
     resumeMission(id?: string) {
       return _resumeMission(id, {
@@ -136,9 +159,16 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
         syncProjectLedgerIfLinked: syncProjectLedgerIfLinkedInternal,
       }).then(() => (id ? syncProjectOperationalStateIfLinked(id) : Promise.resolve()));
     },
+    pauseMission(id: string, note?: string) {
+      return _pauseMission(id, note).then(() => syncProjectOperationalStateIfLinked(id));
+    },
+    cancelMission(id: string, note?: string) {
+      return _cancelMission(id, note).then(() => syncProjectOperationalStateIfLinked(id));
+    },
     recordTask(missionId: string, description: string, details: any = {}) {
-      return _recordTask(missionId, description, details)
-        .then(() => syncProjectOperationalStateIfLinked(missionId));
+      return _recordTask(missionId, description, details).then(() =>
+        syncProjectOperationalStateIfLinked(missionId)
+      );
     },
     recordEvidence(
       missionId: string,
@@ -147,7 +177,7 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
       evidence?: string[],
       teamRole?: string,
       actorId?: string,
-      actorType?: 'agent' | 'human' | 'service',
+      actorType?: 'agent' | 'human' | 'service'
     ) {
       return _recordEvidence({
         missionId,
@@ -189,7 +219,7 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
         liveTargets?: Array<'workitem' | 'github' | 'jira'>;
         github?: { owner?: string; repo?: string };
         jira?: { domain?: string; projectKey?: string };
-      },
+      }
     ) {
       const state = loadState(id.toUpperCase());
       if (!state) {
@@ -202,10 +232,12 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
       options?: {
         mode?: 'auto' | 'agent' | 'subagent';
         limit?: number;
-        statuses?: Array<'backlog' | 'ready' | 'in_progress' | 'blocked' | 'review' | 'done' | 'archived'>;
+        statuses?: Array<
+          'backlog' | 'ready' | 'in_progress' | 'blocked' | 'review' | 'done' | 'archived'
+        >;
         sources?: Array<'local' | 'github' | 'jira' | 'peer'>;
         finalStatus?: 'review' | 'done';
-      },
+      }
     ) {
       const state = loadState(id.toUpperCase());
       if (!state) {

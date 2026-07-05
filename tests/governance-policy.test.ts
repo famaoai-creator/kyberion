@@ -8,7 +8,7 @@ describe('Governance Policy-as-Code Enforcement', () => {
 
   afterAll(() => {
     process.env.KYBERION_PERSONA = 'ecosystem_architect';
-    process.env.MISSION_ROLE = 'ecosystem_architect'; 
+    process.env.MISSION_ROLE = 'ecosystem_architect';
     if (safeExistsSync(TEST_FILE)) safeUnlinkSync(TEST_FILE);
   });
 
@@ -17,7 +17,7 @@ describe('Governance Policy-as-Code Enforcement', () => {
     process.env.MISSION_ROLE = 'software_developer';
     const check = validateWritePermission(TEST_FILE);
     expect(check.allowed).toBe(true);
-    
+
     // Physical write test
     safeWriteFile(TEST_FILE, '# Policy Test');
     expect(safeExistsSync(TEST_FILE)).toBe(true);
@@ -41,27 +41,27 @@ describe('Governance Policy-as-Code Enforcement', () => {
 
   it('Scenario: unknown role cannot write to knowledge/confidential (Blocked by Tier Policy)', async () => {
     const CONFIDENTIAL_FILE = pathResolver.knowledge('confidential/test-block.md');
-    
+
     process.env.MISSION_ROLE = 'unknown_intruder';
     process.env.KYBERION_PERSONA = 'unknown';
-    process.env.MISSION_ID = ''; 
-    
+    process.env.MISSION_ID = '';
+
     const root = pathResolver.rootDir();
     const rel = path.relative(root, CONFIDENTIAL_FILE);
     console.log(`[TEST_DEBUG] Target: ${CONFIDENTIAL_FILE}`);
     console.log(`[TEST_DEBUG] Root: ${root}`);
     console.log(`[TEST_DEBUG] Relative: ${rel}`);
-    
+
     const check = validateWritePermission(CONFIDENTIAL_FILE);
     console.log(`[TEST_DEBUG] Result: allowed=${check.allowed}, reason=${check.reason}`);
     expect(check.allowed).toBe(false);
     expect(check.reason).toContain('Organization Confidential');
-    
+
     try {
       safeWriteFile(CONFIDENTIAL_FILE, 'Illegal content');
       throw new Error('Should have been blocked');
     } catch (err: any) {
-      expect(err.message).toContain('Organization Confidential'); 
+      expect(err.message).toContain('Organization Confidential');
     }
   });
 
@@ -78,7 +78,9 @@ describe('Governance Policy-as-Code Enforcement', () => {
   });
 
   it('Scenario: mission_controller can write distilled wisdom output', async () => {
-    const WISDOM_FILE = pathResolver.rootResolve('knowledge/evolution/test-mission-controller-distill.md');
+    const WISDOM_FILE = pathResolver.rootResolve(
+      'knowledge/evolution/test-mission-controller-distill.md'
+    );
     process.env.MISSION_ROLE = 'mission_controller';
     process.env.KYBERION_PERSONA = 'worker';
 
@@ -88,6 +90,36 @@ describe('Governance Policy-as-Code Enforcement', () => {
     safeWriteFile(WISDOM_FILE, '# Distilled Wisdom');
     expect(safeExistsSync(WISDOM_FILE)).toBe(true);
     safeUnlinkSync(WISDOM_FILE);
+  });
+
+  it('Scenario: business roles can act within explicit limited authority scopes', async () => {
+    process.env.KYBERION_PERSONA = 'analyst';
+
+    process.env.MISSION_ROLE = 'finance_controller';
+    expect(
+      validateWritePermission(
+        pathResolver.rootResolve('knowledge/product/governance/finance/monthly-close.md')
+      ).allowed
+    ).toBe(true);
+
+    process.env.MISSION_ROLE = 'strategic_sales';
+    expect(
+      validateWritePermission(pathResolver.rootResolve('active/projects/proposals/deal-brief.md'))
+        .allowed
+    ).toBe(true);
+
+    process.env.MISSION_ROLE = 'marketing_growth';
+    expect(
+      validateWritePermission(
+        pathResolver.rootResolve('active/projects/marketing/campaign-brief.md')
+      ).allowed
+    ).toBe(true);
+
+    process.env.MISSION_ROLE = 'finance_controller';
+    expect(
+      validateWritePermission(pathResolver.rootResolve('knowledge/product/roles/cfo/PROCEDURE.md'))
+        .allowed
+    ).toBe(false);
   });
 });
 
@@ -188,7 +220,9 @@ describe('Scoped SUDO enforcement', () => {
     process.env.KYBERION_SUDO_SCOPE = 'active/shared/tmp/';
 
     const allowed = validateWritePermission(pathResolver.sharedTmp('scoped-sudo.txt'));
-    const blocked = validateWritePermission(pathResolver.knowledge('public/scoped-sudo-blocked.md'));
+    const blocked = validateWritePermission(
+      pathResolver.knowledge('public/scoped-sudo-blocked.md')
+    );
 
     expect(allowed.allowed).toBe(true);
     expect(blocked.allowed).toBe(false);
