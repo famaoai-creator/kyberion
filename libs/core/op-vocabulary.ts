@@ -1,3 +1,5 @@
+import { logger } from './core.js';
+
 export const CANONICAL_OP_FAMILIES = {
   io: ['read', 'write', 'append', 'copy', 'move', 'delete', 'mkdir', 'stat', 'exists', 'glob'],
   capture: ['screen', 'page', 'window'],
@@ -18,16 +20,36 @@ export const BROWSER_PIPELINE_OP_ALIASES: Record<string, string> = {
   screenshot: 'screenshot',
   click_ref: 'click',
   fill_ref: 'fill',
+  select_ref: 'click',
+  submit_form: 'click',
   press_ref: 'press',
   wait_ref: 'wait',
 };
 
+const warnedBrowserOpAliases = new Set<string>();
+
+function warnDeprecatedBrowserOpAlias(
+  domain: 'recording' | 'pipeline',
+  op: string,
+  canonical: string
+): void {
+  if (op === canonical) return;
+  const warningKey = `${domain}:${op}`;
+  if (warnedBrowserOpAliases.has(warningKey)) return;
+  warnedBrowserOpAliases.add(warningKey);
+  logger.warn(`[op-vocabulary] ${domain} alias "${op}" is deprecated; use "${canonical}" instead.`);
+}
+
 export function resolveBrowserRecordingPipelineOp(op: string): string {
-  return BROWSER_RECORDING_OP_ALIASES[op] || op;
+  const canonical = BROWSER_RECORDING_OP_ALIASES[op] || op;
+  warnDeprecatedBrowserOpAlias('recording', op, canonical);
+  return canonical;
 }
 
 export function normalizeBrowserPipelineOp(op: string): string {
-  return BROWSER_PIPELINE_OP_ALIASES[op] || op;
+  const canonical = BROWSER_PIPELINE_OP_ALIASES[op] || op;
+  warnDeprecatedBrowserOpAlias('pipeline', op, canonical);
+  return canonical;
 }
 
 export function listCanonicalOpFamilies(): Record<string, readonly string[]> {
