@@ -62,6 +62,22 @@ describe('outcome-contract', () => {
     expect(mission.requested_result).not.toContain('Complete mission scope');
   });
 
+  it('captures structured company vision refs in mission outcome contracts (CO-01)', () => {
+    const mission = inferMissionOutcomeContract({
+      missionId: 'MSN-VISION',
+      missionType: 'development',
+      visionRef: 'company://acme/vision?source=legacy%20brief',
+    });
+
+    expect(mission.vision_ref).toEqual({
+      raw: 'company://acme/vision?source=legacy%20brief',
+      kind: 'company',
+      tenant_slug: 'acme',
+      path: 'vision',
+      query: 'source=legacy%20brief',
+    });
+  });
+
   it('falls back to the source utterance when the goal summary is empty (IL-01)', () => {
     const mission = inferMissionOutcomeContract({
       missionId: 'MSN-GOAL-2',
@@ -101,6 +117,7 @@ describe('outcome-contract', () => {
       evidenceRequired: true,
       expectedArtifacts: [{ kind: 'docx', storage_class: 'artifact_store' }],
       verificationMethod: 'review_gate',
+      visionRef: 'company://acme/vision',
     });
     const valid = validate(contract);
     expect(valid, JSON.stringify(validate.errors || [])).toBe(true);

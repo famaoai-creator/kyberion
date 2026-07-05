@@ -1,0 +1,41 @@
+{
+  "$schema": "../../schemas/decision-rights.schema.json",
+  "version": "1.0.0",
+  "company_id": "default",
+  "tenant_slug": null,
+  "source_kind": "public",
+  "source_path": "knowledge/product/governance/decision-rights.json",
+  "decisions": [
+    {
+      "decision_type": "operational_spend",
+      "authorized_role": "finance_controller",
+      "threshold": {
+        "metric": "amount_jpy",
+        "value": 500000,
+        "unit": "JPY"
+      },
+      "requires_review_from": "ceo",
+      "escalates_to": "ceo"
+    },
+    {
+      "decision_type": "contract_signature",
+      "authorized_role": "legal_strategist",
+      "threshold": {
+        "metric": "risk_level",
+        "value": "medium"
+      },
+      "requires_review_from": "ceo",
+      "escalates_to": "ceo"
+    },
+    {
+      "decision_type": "headcount_expansion",
+      "authorized_role": "talent_culture",
+      "threshold": {
+        "metric": "headcount",
+        "value": 1
+      },
+      "requires_review_from": "ceo",
+      "escalates_to": "ceo"
+    }
+  ]
+}
