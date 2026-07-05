@@ -56,6 +56,7 @@
 - `libs/core/intent-reconciliation.ts` を新設し、`goal.success_condition` と evidence を構造的に突合する `reconcileCompletion` / `reconcileCompletionStructurally` を実装した。
 - `libs/core/task-session.ts` の完了保存時に突合ゲートを追加し、未充足のまま `completed` にできないようにした。
 - 完了時には `completion_summary` と `completion_next_action` を task-session に永続化し、`task-session.schema.json` でもトップレベル項目として受けるようにした。
+- task-session 完了時の intent_id がある場合は `recordIntentContractOutcome` へ `completion_summary` を書き戻し、`intent-contract-memory` に満足/ギャップの学習結果を残すようにした。
 - ミッション finish 側は `scripts/refactor/mission-lifecycle.ts` で突合結果を取り込み、完了サマリと次アクションを state.context に残すようにした。
 
 ## リスクと注意

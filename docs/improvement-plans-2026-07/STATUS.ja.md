@@ -14,20 +14,20 @@
 
 ## P0 残作業(プロダクション化のクリティカルパス)
 
-| ID    | 状態    | 残作業の要点                                                                                                      |
-| ----- | ------- | ----------------------------------------------------------------------------------------------------------------- |
-| IP-07 | PARTIAL | claude-agent-reasoning-backend テスト、surface-runtime-orchestrator 特性化テスト                                  |
-| MO-01 | PARTIAL | プロセステンプレート機構(schema・4テンプレート・worker のテンプレート駆動化)                                      |
-| MO-02 | PARTIAL | mission-gate-engine、新設ゲート共通化、planning/受入ゲート記録、受入 rework/owner 通知、exit/quality の修復ループ |
-| AA-02 | TODO    | mesh_delivery_driver 新設、broker⇔dispatchToPeer 配線、writer fencing、E2E                                        |
-| SA-02 | PARTIAL | execution-bounds.ts 抽出、SECURITY.md、warn→enforce 到達                                                          |
-| SA-05 | PARTIAL | policyEngine の操作種別拡張、secure-io parse失敗 fail-open 解消、-y 破壊操作除外                                  |
-| OP-01 | TODO    | 全推論経路の usage 計測、cost report、spend-guard、KPI 接続                                                       |
-| AR-01 | TODO    | adf-engine.ts 抽出、3エンジン統合、golden 回帰                                                                    |
-| AR-02 | TODO    | describeOps、generate_op_registry、CI ゲート                                                                      |
-| AO-02 | TODO    | CVE スキャン/台帳、パッチ判断ルーブリック、適用フロー                                                             |
-| IL-01 | TODO    | goal/source_text/outcome_ids の昇格 seam 貫通、outcome-contract の goal 優先化                                    |
-| IL-04 | PARTIAL | intent-reconciliation エンジン、task-session 完了ゲート、completion summary/next action 記録                      |
+| ID    | 状態    | 残作業の要点                                                                                                         |
+| ----- | ------- | -------------------------------------------------------------------------------------------------------------------- |
+| IP-07 | PARTIAL | claude-agent-reasoning-backend テスト、surface-runtime-orchestrator 特性化テスト                                     |
+| MO-01 | PARTIAL | プロセステンプレート機構(schema・4テンプレート・worker のテンプレート駆動化)                                         |
+| MO-02 | PARTIAL | mission-gate-engine、新設ゲート共通化、planning/受入ゲート記録、受入 rework/owner 通知、exit/quality の修復ループ    |
+| AA-02 | TODO    | mesh_delivery_driver 新設、broker⇔dispatchToPeer 配線、writer fencing、E2E                                           |
+| SA-02 | PARTIAL | execution-bounds.ts 抽出、SECURITY.md、warn→enforce 到達                                                             |
+| SA-05 | PARTIAL | policyEngine の操作種別拡張、secure-io parse失敗 fail-open 解消、-y 破壊操作除外                                     |
+| OP-01 | TODO    | 全推論経路の usage 計測、cost report、spend-guard、KPI 接続                                                          |
+| AR-01 | TODO    | adf-engine.ts 抽出、3エンジン統合、golden 回帰                                                                       |
+| AR-02 | TODO    | describeOps、generate_op_registry、CI ゲート                                                                         |
+| AO-02 | TODO    | CVE スキャン/台帳、パッチ判断ルーブリック、適用フロー                                                                |
+| IL-01 | TODO    | goal/source_text/outcome_ids の昇格 seam 貫通、outcome-contract の goal 優先化                                       |
+| IL-04 | PARTIAL | intent-reconciliation エンジン、task-session 完了ゲート、completion summary/next action、intent-contract-memory 記録 |
 
 ## 全計画一覧
 
@@ -144,13 +144,13 @@
 
 ### IL(インテントライフサイクル)
 
-| ID    | 状態    | 残作業                                                                                       |
-| ----- | ------- | -------------------------------------------------------------------------------------------- |
-| IL-01 | TODO    | goal の昇格 seam 貫通、outcome-contract の goal 優先化                                       |
-| IL-02 | TODO    | 相関 ID 貫通、intent trace コマンド                                                          |
-| IL-03 | TODO    | origin baseline、実行中ドリフトゲート                                                        |
-| IL-04 | PARTIAL | intent-reconciliation エンジン、task-session 完了ゲート、completion summary/next action 記録 |
-| IL-05 | TODO    | pending-intent-store、修正検知、completed 再オープン                                         |
+| ID    | 状態    | 残作業                                                                                                               |
+| ----- | ------- | -------------------------------------------------------------------------------------------------------------------- |
+| IL-01 | TODO    | goal の昇格 seam 貫通、outcome-contract の goal 優先化                                                               |
+| IL-02 | TODO    | 相関 ID 貫通、intent trace コマンド                                                                                  |
+| IL-03 | TODO    | origin baseline、実行中ドリフトゲート                                                                                |
+| IL-04 | PARTIAL | intent-reconciliation エンジン、task-session 完了ゲート、completion summary/next action、intent-contract-memory 記録 |
+| IL-05 | TODO    | pending-intent-store、修正検知、completed 再オープン                                                                 |
 
 ### ONB(初回オンボーディング)
 
