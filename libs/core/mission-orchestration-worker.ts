@@ -179,13 +179,33 @@ interface PlannedNextTask {
   risk?: string;
   expected_output_format?: 'text' | 'files' | 'structured';
   estimated_scope?: 'S' | 'M' | 'L';
+  review_target?: string;
+  review_round?: number;
+  last_result?: TaskResultBlock;
+  review_findings?: Array<{
+    severity: 'must_fix' | 'should_fix' | 'nit';
+    location: string;
+    instruction: string;
+  }>;
+  rework_packet?: {
+    from_task: string;
+    findings: Array<{
+      severity: 'must_fix' | 'should_fix' | 'nit';
+      location: string;
+      instruction: string;
+    }>;
+    round: number;
+  };
 }
 
 const PLANNED_NEXT_TASK_STATUS_PRIORITY: Record<string, number> = {
   requested: 0,
   planned: 1,
-  blocked: 2,
-  completed: 3,
+  rework: 2,
+  blocked: 3,
+  reviewed: 4,
+  accepted: 5,
+  completed: 6,
 };
 
 function validatePlannedNextTasks(rawTasks: unknown, missionId: string): PlannedNextTask[] {
@@ -218,6 +238,36 @@ function validatePlannedNextTasks(rawTasks: unknown, missionId: string): Planned
     const acceptanceCriteria = Array.isArray(task.acceptance_criteria)
       ? task.acceptance_criteria.map((criterion) => String(criterion || '').trim()).filter(Boolean)
       : [];
+    const assignedRole =
+      typeof (task.assigned_to as Record<string, unknown> | undefined)?.role === 'string'
+        ? String((task.assigned_to as Record<string, unknown>).role || '').trim()
+        : '';
+    const reviewTarget =
+      typeof task.review_target === 'string' && task.review_target.trim()
+        ? task.review_target.trim()
+        : '';
+    const deliverable =
+      typeof task.deliverable === 'string' && task.deliverable.trim()
+        ? task.deliverable.trim()
+        : '';
+    if (assignedRole === 'reviewer' || assignedRole === 'qa') {
+      if (dependencies.length === 0) {
+        throw new Error(
+          `Invalid NEXT_TASKS.json for ${missionId}: reviewer task ${taskId} must depend on at least one completed task`
+        );
+      }
+      if (!reviewTarget) {
+        throw new Error(
+          `Invalid NEXT_TASKS.json for ${missionId}: reviewer task ${taskId} is missing review_target`
+        );
+      }
+      const expectedDeliverable = `REVIEW-${reviewTarget}.md`;
+      if (!deliverable || nodePath.basename(deliverable) !== expectedDeliverable) {
+        throw new Error(
+          `Invalid NEXT_TASKS.json for ${missionId}: reviewer task ${taskId} must use deliverable ${expectedDeliverable}`
+        );
+      }
+    }
 
     return {
       task_id: taskId,
@@ -246,9 +296,7 @@ function validatePlannedNextTasks(rawTasks: unknown, missionId: string): Planned
       ...(typeof task.description === 'string' && task.description.trim()
         ? { description: task.description.trim() }
         : {}),
-      ...(typeof task.deliverable === 'string' && task.deliverable.trim()
-        ? { deliverable: task.deliverable.trim() }
-        : {}),
+      ...(deliverable ? { deliverable } : {}),
       ...(typeof task.target_path === 'string' && task.target_path.trim()
         ? { target_path: task.target_path.trim() }
         : {}),
@@ -263,6 +311,77 @@ function validatePlannedNextTasks(rawTasks: unknown, missionId: string): Planned
         : {}),
       ...(typeof task.estimated_scope === 'string' && task.estimated_scope.trim()
         ? { estimated_scope: task.estimated_scope.trim() as PlannedNextTask['estimated_scope'] }
+        : {}),
+      ...(reviewTarget ? { review_target: reviewTarget } : {}),
+      ...(typeof task.review_round === 'number' && Number.isFinite(task.review_round)
+        ? { review_round: task.review_round }
+        : {}),
+      ...(task.last_result && typeof task.last_result === 'object'
+        ? { last_result: task.last_result as PlannedNextTask['last_result'] }
+        : {}),
+      ...(Array.isArray(task.review_findings)
+        ? {
+            review_findings: task.review_findings
+              .map((finding) => {
+                if (!finding || typeof finding !== 'object') return null;
+                const entry = finding as Record<string, unknown>;
+                const severity = String(entry.severity || '').trim();
+                const location = String(entry.location || '').trim();
+                const instruction = String(entry.instruction || '').trim();
+                if (
+                  (severity !== 'must_fix' && severity !== 'should_fix' && severity !== 'nit') ||
+                  !location ||
+                  !instruction
+                ) {
+                  return null;
+                }
+                return { severity, location, instruction };
+              })
+              .filter(
+                (finding): finding is NonNullable<PlannedNextTask['review_findings']>[number] =>
+                  Boolean(finding)
+              ),
+          }
+        : {}),
+      ...(task.rework_packet && typeof task.rework_packet === 'object'
+        ? {
+            rework_packet: {
+              from_task: String(
+                (task.rework_packet as Record<string, unknown>).from_task || ''
+              ).trim(),
+              findings: Array.isArray((task.rework_packet as Record<string, unknown>).findings)
+                ? ((task.rework_packet as Record<string, unknown>).findings as unknown[])
+                    .map((finding) => {
+                      if (!finding || typeof finding !== 'object') return null;
+                      const entry = finding as Record<string, unknown>;
+                      const severity = String(entry.severity || '').trim();
+                      const location = String(entry.location || '').trim();
+                      const instruction = String(entry.instruction || '').trim();
+                      if (
+                        (severity !== 'must_fix' &&
+                          severity !== 'should_fix' &&
+                          severity !== 'nit') ||
+                        !location ||
+                        !instruction
+                      ) {
+                        return null;
+                      }
+                      return { severity, location, instruction };
+                    })
+                    .filter(
+                      (
+                        finding
+                      ): finding is NonNullable<
+                        PlannedNextTask['rework_packet']
+                      >['findings'][number] => Boolean(finding)
+                    )
+                : [],
+              round: (() => {
+                const rawRound = (task.rework_packet as Record<string, unknown>).round;
+                return typeof rawRound === 'number' && Number.isFinite(rawRound) ? rawRound : 0;
+              })(),
+            },
+          }
         : {}),
     } satisfies PlannedNextTask;
   });
@@ -307,6 +426,8 @@ interface DispatchMissionTaskOutcome {
   team_role: string;
   agent_id: string;
   dispatched: boolean;
+  allowSameInvocationRedispatch?: boolean;
+  redispatchTaskIds?: string[];
   context_chars?: number;
   pruned_chars?: number;
   rollup_used: boolean;
@@ -330,6 +451,138 @@ function areTaskDependenciesSatisfied(task: PlannedNextTask, tasks: PlannedNextT
 function buildUnassignedRoleSummary(task: PlannedNextTask, teamRole?: string): string {
   const roleLabel = teamRole || 'unassigned';
   return `Task ${task.task_id} is blocked because role ${roleLabel} is not assigned.`;
+}
+
+function resolveReviewTargetForTask(task: PlannedNextTask): string | undefined {
+  if (typeof task.review_target === 'string' && task.review_target.trim()) {
+    return task.review_target.trim();
+  }
+  const deliverable = String(task.deliverable || '').trim();
+  const match = deliverable.match(/(?:^|\/)REVIEW-(.+)\.md$/u);
+  return match?.[1] ? match[1] : undefined;
+}
+
+function normalizeReviewFindings(
+  findings: unknown
+): Array<{ severity: 'must_fix' | 'should_fix' | 'nit'; location: string; instruction: string }> {
+  if (!Array.isArray(findings)) return [];
+  return findings
+    .map((entry) => {
+      if (!entry || typeof entry !== 'object') return null;
+      const finding = entry as Record<string, unknown>;
+      const severity = String(finding.severity || '').trim();
+      const location = String(finding.location || '').trim();
+      const instruction = String(finding.instruction || '').trim();
+      if (
+        (severity !== 'must_fix' && severity !== 'should_fix' && severity !== 'nit') ||
+        !location ||
+        !instruction
+      ) {
+        return null;
+      }
+      return { severity, location, instruction };
+    })
+    .filter(
+      (
+        entry
+      ): entry is {
+        severity: 'must_fix' | 'should_fix' | 'nit';
+        location: string;
+        instruction: string;
+      } => Boolean(entry)
+    );
+}
+
+function summarizeTaskResultForPrompt(task: PlannedNextTask): string | null {
+  const result = task.last_result;
+  if (!result) return null;
+  const summary = String(result.summary || '').trim();
+  const artifacts = Array.isArray(result.artifacts)
+    ? result.artifacts
+        .map((artifact) => String(artifact?.path || '').trim())
+        .filter(Boolean)
+        .join(', ')
+    : '';
+  const verification = Array.isArray(result.verification_done)
+    ? result.verification_done
+        .map((entry) => String(entry || '').trim())
+        .filter(Boolean)
+        .join('; ')
+    : '';
+  const gaps = Array.isArray(result.gaps)
+    ? result.gaps
+        .map((entry) => String(entry || '').trim())
+        .filter(Boolean)
+        .join('; ')
+    : '';
+  return [
+    summary ? `summary=${summary}` : '',
+    artifacts ? `artifacts=${artifacts}` : '',
+    verification ? `verification=${verification}` : '',
+    gaps ? `gaps=${gaps}` : '',
+  ]
+    .filter(Boolean)
+    .join(' / ');
+}
+
+function buildUpstreamResultLines(task: PlannedNextTask, tasks: PlannedNextTask[]): string[] {
+  const dependencies = Array.isArray(task.dependencies)
+    ? task.dependencies.map((dependency) => String(dependency || '').trim()).filter(Boolean)
+    : [];
+  if (dependencies.length === 0) return ['- none'];
+  const byTaskId = new Map(tasks.map((entry) => [entry.task_id, entry]));
+  return dependencies.slice(0, 10).map((dependency) => {
+    const upstream = byTaskId.get(dependency);
+    const role = upstream?.assigned_to?.role || 'unassigned';
+    const summary = upstream ? summarizeTaskResultForPrompt(upstream) : null;
+    if (!upstream) {
+      return `- ${dependency}: missing from NEXT_TASKS.json`;
+    }
+    if (!summary) {
+      const deliverable = upstream.deliverable || upstream.target_path || 'TASK_BOARD';
+      return `- ${dependency} [${role}]: completed (result summary unavailable — read the deliverable path from TASK_BOARD; deliverable=${deliverable})`;
+    }
+    return `- ${dependency} [${role}]: ${summary}`;
+  });
+}
+
+function buildTeamSnapshotLines(tasks: PlannedNextTask[]): string[] {
+  const lines = tasks.slice(0, 20).map((task) => {
+    const role = task.assigned_to?.role || 'unassigned';
+    const agent = task.assigned_to?.agent_id || 'unassigned';
+    const status = String(task.status || 'planned');
+    const symbol =
+      status === 'completed'
+        ? '✅'
+        : status === 'blocked'
+          ? '⛔'
+          : status === 'reviewed'
+            ? '📝'
+            : status === 'rework'
+              ? '🔁'
+              : status === 'accepted'
+                ? '✅'
+                : '⏳';
+    const deliverable = task.deliverable || task.target_path || 'n/a';
+    return `- ${task.task_id} [${role}/${agent}] ${symbol} ${status} ${deliverable}`;
+  });
+  if (tasks.length > 20) {
+    lines.push(`... ${tasks.length - 20} more`);
+  }
+  return lines.length > 0 ? lines : ['- none'];
+}
+
+function buildReviewFindingsLines(task: PlannedNextTask): string[] {
+  const findings = normalizeReviewFindings(
+    task.review_findings ||
+      task.rework_packet?.findings ||
+      (task.last_result as TaskResultBlock | undefined)?.review_findings ||
+      []
+  );
+  if (findings.length === 0) return ['- none'];
+  return findings
+    .slice(0, 10)
+    .map((finding) => `- ${finding.severity} @ ${finding.location}: ${finding.instruction}`);
 }
 
 type TaskResultBlock = NonNullable<ReturnType<typeof extractSurfaceBlocks>['taskResults']>[number];
@@ -422,6 +675,9 @@ function buildTaskExecutionPrompt(input: {
   agentId: string;
   taskModelHint?: { model_id?: string; tier?: string; effort?: string };
   missionContextPack: string;
+  upstreamResultLines: string[];
+  teamSnapshotLines: string[];
+  reviewFindingsLines: string[];
   targetPath?: string;
 }): string {
   const lines = [
@@ -433,13 +689,30 @@ function buildTaskExecutionPrompt(input: {
       : '',
     input.task.description ? `Description: ${input.task.description}` : '',
     input.task.deliverable ? `Deliverable: ${input.task.deliverable}` : '',
+    resolveReviewTargetForTask(input.task)
+      ? `Review target: ${resolveReviewTargetForTask(input.task)}`
+      : '',
     input.targetPath ? `Target path: ${input.targetPath}` : '',
     '',
+    '## Upstream results (inputs you MUST build on)',
+    ...input.upstreamResultLines,
+    '',
+    '## Team snapshot (do not duplicate; stay consistent with completed work)',
+    ...input.teamSnapshotLines,
+    'Already completed work must keep terminology, structure, and style aligned.',
+    'Do not trespass into another task’s scope; if needed, put it in needs.',
+    '',
+    ...(input.reviewFindingsLines.length > 0 &&
+    !(input.reviewFindingsLines.length === 1 && input.reviewFindingsLines[0] === '- none')
+      ? ['## Review findings to address', ...input.reviewFindingsLines, '']
+      : []),
     input.missionContextPack,
     '',
     'Return exactly one ```task_result``` block and nothing else structured.',
     `Schema: ${renderStructuredOutputSchemaPrompt('task_result')}`,
-    'Do not paste file contents. Include only conclusions, artifact paths, verification steps, gaps, and needs.',
+    resolveReviewTargetForTask(input.task)
+      ? 'For review tasks, put concrete findings into review_findings[] using severity, location, and instruction. Keep gaps for unresolved blockers.'
+      : 'Do not paste file contents. Include only conclusions, artifact paths, verification steps, gaps, and needs.',
   ].filter(Boolean);
   return lines.join('\n');
 }
@@ -605,6 +878,7 @@ async function buildTaskDispatchContext(input: {
   teamRole: string;
   agentId: string;
   taskModelHint?: { model_id?: string; tier?: string; effort?: string; route_reason?: string };
+  allTasks: PlannedNextTask[];
 }): Promise<{
   prompt: string;
   missionContextPackId?: string;
@@ -677,6 +951,14 @@ async function buildTaskDispatchContext(input: {
       ]
         .filter(Boolean)
         .join('\n');
+  const upstreamResultLines = buildUpstreamResultLines(input.task, input.allTasks);
+  const teamSnapshotLines = buildTeamSnapshotLines(input.allTasks);
+  const reviewFindingsLines = buildReviewFindingsLines(input.task);
+  const promptSupplementChars =
+    upstreamResultLines.join('\n').length +
+    teamSnapshotLines.join('\n').length +
+    reviewFindingsLines.join('\n').length +
+    256;
   const prompt = buildTaskExecutionPrompt({
     missionId: input.missionId,
     task: input.task,
@@ -684,16 +966,25 @@ async function buildTaskDispatchContext(input: {
     agentId: input.agentId,
     taskModelHint: input.taskModelHint,
     missionContextPack: missionContextPackText,
+    upstreamResultLines,
+    teamSnapshotLines,
+    reviewFindingsLines,
     targetPath: input.task.target_path || input.task.deliverable,
   });
+  const missionContextPackPruningSummary = missionContextPack?.pruning
+    ? {
+        ...(missionContextPack.pruning as MissionContextPackPruningSummary),
+        estimated_chars:
+          (missionContextPack.pruning as MissionContextPackPruningSummary).estimated_chars +
+          promptSupplementChars,
+      }
+    : undefined;
   return {
     prompt,
     missionContextPackId: missionContextPack?.context_pack_id,
     missionContextPackPath,
     missionContextPackSummary: missionContextPack?.summary || 'degraded mission context pack',
-    missionContextPackPruningSummary: missionContextPack?.pruning as
-      | MissionContextPackPruningSummary
-      | undefined,
+    missionContextPackPruningSummary,
   };
 }
 
@@ -705,6 +996,7 @@ async function dispatchPlannedMissionTask(input: {
     agent_id: string;
     model_hint?: { model_id?: string; tier?: string; effort?: string; route_reason?: string };
   };
+  allTasks: PlannedNextTask[];
 }): Promise<DispatchMissionTaskOutcome | null> {
   const workItemSourceRef = `mission:${input.missionId}:${input.task.task_id}`;
   const workItem = importExternalWorkItem({
@@ -754,6 +1046,7 @@ async function dispatchPlannedMissionTask(input: {
       teamRole: input.teamRole,
       agentId: input.assignment.agent_id,
       taskModelHint: input.assignment.model_hint,
+      allTasks: input.allTasks,
     });
     response = await obtainTaskResultResponse({
       missionId: input.missionId,
@@ -784,6 +1077,23 @@ async function dispatchPlannedMissionTask(input: {
     throw err;
   }
   const taskResultNeeds = response.taskResult?.needs || [];
+  const reviewFindings = normalizeReviewFindings(
+    response.taskResult?.review_findings ||
+      (input.teamRole === 'reviewer' || input.teamRole === 'qa'
+        ? (response.taskResult?.gaps || []).map((gap) => ({
+            severity: 'must_fix' as const,
+            location: reviewTarget || input.task.deliverable || input.task.task_id,
+            instruction: String(gap || '').trim(),
+          }))
+        : [])
+  );
+  if (response.taskResult) {
+    input.task.last_result = {
+      ...response.taskResult,
+      review_findings:
+        reviewFindings.length > 0 ? reviewFindings : response.taskResult.review_findings,
+    };
+  }
   const taskResultObservability = summarizeTaskResultObservability({
     pruning: dispatchContext.missionContextPackPruningSummary,
     taskResult: response.taskResult,
@@ -929,6 +1239,204 @@ async function dispatchPlannedMissionTask(input: {
     };
   }
 
+  const reviewTarget = resolveReviewTargetForTask(input.task);
+  const targetTask =
+    (input.teamRole === 'reviewer' || input.teamRole === 'qa') && reviewTarget
+      ? input.allTasks.find((task) => task.task_id === reviewTarget)
+      : undefined;
+  const hasMustFixFindings = reviewFindings.some((finding) => finding.severity === 'must_fix');
+  if ((input.teamRole === 'reviewer' || input.teamRole === 'qa') && reviewTarget) {
+    input.task.review_findings = reviewFindings;
+    const currentReviewRound = Math.max(
+      Number(input.task.review_round || 0),
+      Number(input.task.rework_count || 0)
+    );
+    const nextReviewRound = currentReviewRound + 1;
+    if (!targetTask) {
+      updateWorkItem({
+        itemId: claimed.item.item_id,
+        expectedVersion: claimed.item.version,
+        status: 'blocked',
+        metadata: {
+          summary: response.taskResult?.summary || input.task.description || input.task.task_id,
+          blocked_reason: `missing review target ${reviewTarget}`,
+          mission_id: input.missionId,
+          task_id: input.task.task_id,
+          team_role: input.teamRole,
+        },
+      });
+      input.task.status = 'blocked';
+      emitMissionTaskEvent({
+        event_type: 'task_reviewed',
+        mission_id: input.missionId,
+        task_id: input.task.task_id,
+        agent_id: input.assignment.agent_id,
+        team_role: input.teamRole,
+        decision: 'task_reviewed',
+        why: `Reviewer task references missing review target ${reviewTarget}.`,
+        policy_used: 'mission_orchestration_control_plane_v1',
+        evidence: input.task.deliverable ? [String(input.task.deliverable)] : [],
+        payload: {
+          description: input.task.description,
+          deliverable: input.task.deliverable,
+          review_target: reviewTarget,
+          task_result: response.taskResult,
+          review_findings: reviewFindings,
+          ...taskResultObservability,
+        },
+      });
+      return {
+        task_id: input.task.task_id,
+        team_role: input.teamRole,
+        agent_id: input.assignment.agent_id,
+        dispatched: false,
+        allowSameInvocationRedispatch: false,
+        redispatchTaskIds: [],
+        ...taskResultObservability,
+      };
+    }
+
+    if (hasMustFixFindings && currentReviewRound >= 2) {
+      updateWorkItem({
+        itemId: claimed.item.item_id,
+        expectedVersion: claimed.item.version,
+        status: 'blocked',
+        metadata: {
+          summary: response.taskResult?.summary || input.task.description || input.task.task_id,
+          blocked_reason: 'review_rework_round_limit',
+          mission_id: input.missionId,
+          task_id: input.task.task_id,
+          team_role: input.teamRole,
+        },
+      });
+      input.task.status = 'blocked';
+      input.task.review_round = nextReviewRound;
+      input.task.rework_count = nextReviewRound;
+      targetTask.status = 'blocked';
+      targetTask.rework_count = Math.max(Number(targetTask.rework_count || 0), nextReviewRound);
+      targetTask.rework_packet = {
+        from_task: input.task.task_id,
+        findings: reviewFindings,
+        round: nextReviewRound,
+      };
+      emitMissionTaskEvent({
+        event_type: 'task_reviewed',
+        mission_id: input.missionId,
+        task_id: input.task.task_id,
+        agent_id: input.assignment.agent_id,
+        team_role: input.teamRole,
+        decision: 'task_reviewed',
+        why: 'Review findings exceeded the re-review limit.',
+        policy_used: 'mission_orchestration_control_plane_v1',
+        evidence: input.task.deliverable ? [String(input.task.deliverable)] : [],
+        payload: {
+          description: input.task.description,
+          deliverable: input.task.deliverable,
+          review_target: reviewTarget,
+          task_result: response.taskResult,
+          review_findings: reviewFindings,
+          review_round: nextReviewRound,
+          ...taskResultObservability,
+        },
+      });
+      emitMissionOrchestrationObservation({
+        event_type: 'mission_owner_notified',
+        decision: 'mission_owner_notified',
+        mission_id: input.missionId,
+        task_id: input.task.task_id,
+        team_role: input.teamRole,
+        reason: 'Review findings exceeded the re-review limit.',
+        gate_rework_count: nextReviewRound,
+        gate_reasons: reviewFindings.map(
+          (finding) => `${finding.location}: ${finding.instruction}`
+        ),
+      });
+      return {
+        task_id: input.task.task_id,
+        team_role: input.teamRole,
+        agent_id: input.assignment.agent_id,
+        dispatched: false,
+        allowSameInvocationRedispatch: false,
+        redispatchTaskIds: [],
+        ...taskResultObservability,
+      };
+    }
+
+    if (hasMustFixFindings) {
+      targetTask.status = 'rework';
+      targetTask.rework_count = Math.max(Number(targetTask.rework_count || 0), nextReviewRound);
+      targetTask.rework_packet = {
+        from_task: input.task.task_id,
+        findings: reviewFindings,
+        round: nextReviewRound,
+      };
+      targetTask.review_findings = reviewFindings;
+      input.task.status = 'planned';
+      input.task.review_round = nextReviewRound;
+      input.task.rework_count = nextReviewRound;
+      releaseWorkItem({
+        itemId: claimed.item.item_id,
+        expectedVersion: claimed.item.version,
+        leaseId: claimed.lease.lease_id,
+        actorPeerId: 'mission-orchestration-worker',
+        summary: response.taskResult?.summary || input.task.description || input.task.task_id,
+        metadata: {
+          summary: response.taskResult?.summary || input.task.description || input.task.task_id,
+          blocked_reason: 'review_rework_requested',
+          mission_id: input.missionId,
+          task_id: input.task.task_id,
+          team_role: input.teamRole,
+          review_target: reviewTarget,
+          review_round: nextReviewRound,
+        },
+      });
+      emitMissionTaskEvent({
+        event_type: 'task_reviewed',
+        mission_id: input.missionId,
+        task_id: input.task.task_id,
+        agent_id: input.assignment.agent_id,
+        team_role: input.teamRole,
+        decision: 'task_reviewed',
+        why: 'Review requested rework on the target task.',
+        policy_used: 'mission_orchestration_control_plane_v1',
+        evidence: input.task.deliverable ? [String(input.task.deliverable)] : [],
+        payload: {
+          description: input.task.description,
+          deliverable: input.task.deliverable,
+          review_target: reviewTarget,
+          task_result: response.taskResult,
+          review_findings: reviewFindings,
+          review_round: nextReviewRound,
+          rework_requested: true,
+          ...taskResultObservability,
+        },
+      });
+      recordMissionContextTask(
+        input.missionId,
+        `Review rework requested for ${input.task.task_id}`,
+        {
+          next_step: 're-dispatch the target task with review findings to address',
+          work_item_id: input.task.task_id,
+          team_role: input.teamRole,
+          assignee_peer_id: input.assignment.agent_id,
+          review_target: reviewTarget,
+          review_round: nextReviewRound,
+          review_findings: reviewFindings,
+          ...taskResultObservability,
+        }
+      );
+      return {
+        task_id: input.task.task_id,
+        team_role: input.teamRole,
+        agent_id: input.assignment.agent_id,
+        dispatched: false,
+        allowSameInvocationRedispatch: true,
+        redispatchTaskIds: [targetTask.task_id],
+        ...taskResultObservability,
+      };
+    }
+  }
+
   const acceptance = await evaluateTaskAcceptanceGate({
     missionId: input.missionId,
     task: input.task,
@@ -1004,6 +1512,8 @@ async function dispatchPlannedMissionTask(input: {
         team_role: input.teamRole,
         agent_id: input.assignment.agent_id,
         dispatched: false,
+        allowSameInvocationRedispatch: false,
+        redispatchTaskIds: [],
         ...taskResultObservability,
       };
     }
@@ -1078,6 +1588,8 @@ async function dispatchPlannedMissionTask(input: {
       team_role: input.teamRole,
       agent_id: input.assignment.agent_id,
       dispatched: false,
+      allowSameInvocationRedispatch: false,
+      redispatchTaskIds: [],
       ...taskResultObservability,
     };
   }
@@ -1481,6 +1993,9 @@ export function persistPlanningPacket(missionId: string, packet: PlanningPacket)
       risk,
       expected_output_format: expectedOutputFormat,
       estimated_scope: estimatedScope,
+      ...(typeof task.review_target === 'string' && task.review_target.trim()
+        ? { review_target: task.review_target.trim() }
+        : {}),
     };
   });
   const nextTasks = validation.value.next_tasks.map((task, index) => ({
@@ -1490,7 +2005,10 @@ export function persistPlanningPacket(missionId: string, packet: PlanningPacket)
 }
 
 function loadPlannedNextTasks(missionId: string): PlannedNextTask[] {
-  return loadAllNextTasks(missionId).filter((task) => (task.status || 'planned') === 'planned');
+  return loadAllNextTasks(missionId).filter((task) => {
+    const status = String(task.status || 'planned');
+    return status === 'planned' || status === 'rework';
+  });
 }
 
 function loadAllNextTasks(missionId: string): PlannedNextTask[] {
@@ -1673,7 +2191,10 @@ export async function dispatchMissionNextTasks(
   const nextTasksPath = `${missionDir(missionId, 'public')}/NEXT_TASKS.json`;
   if (!safeExistsSync(nextTasksPath)) return [];
   const allTasks = loadAllNextTasks(missionId);
-  const plannedTasks = allTasks.filter((task) => (task.status || 'planned') === 'planned');
+  const plannedTasks = allTasks.filter((task) => {
+    const status = String(task.status || 'planned');
+    return status === 'planned' || status === 'rework';
+  });
   if (plannedTasks.length === 0) return [];
 
   const uniqueRoles = Array.from(
@@ -1708,9 +2229,12 @@ export async function dispatchMissionNextTasks(
 
   while (true) {
     const readyTasks = plannedTasks
-      .filter((task) => (task.status || 'planned') === 'planned')
+      .filter((task) => {
+        const status = String(task.status || 'planned');
+        return status === 'planned' || status === 'rework';
+      })
       .filter((task) => areTaskDependenciesSatisfied(task, allTasks))
-      .filter((task) => !dispatchedTaskIds.has(task.task_id))
+      .filter((task) => task.status === 'rework' || !dispatchedTaskIds.has(task.task_id))
       .sort((left, right) => left.task_id.localeCompare(right.task_id));
 
     if (readyTasks.length === 0) break;
@@ -1839,6 +2363,7 @@ export async function dispatchMissionNextTasks(
           task,
           teamRole,
           assignment,
+          allTasks,
         })
       );
     }
@@ -1848,7 +2373,14 @@ export async function dispatchMissionNextTasks(
     const results = await Promise.all(batch);
     for (const result of results) {
       if (result) {
-        dispatchedTaskIds.add(result.task_id);
+        if (!result.allowSameInvocationRedispatch) {
+          dispatchedTaskIds.add(result.task_id);
+        }
+        if (Array.isArray(result.redispatchTaskIds)) {
+          for (const redispatchTaskId of result.redispatchTaskIds) {
+            dispatchedTaskIds.delete(redispatchTaskId);
+          }
+        }
         waveMadeProgress = true;
         dispatchObservability.push(result);
         if (result.dispatched || result.result_schema_ok) {
