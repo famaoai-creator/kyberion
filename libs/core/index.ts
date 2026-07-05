@@ -1689,10 +1689,14 @@ export type {
 export { SERVICE_EXTERNAL_EFFECT_OP } from './procedure-dispatcher.js';
 
 // SA-03 Prompt Injection & Untrusted Content Defense
+export type { ScanOptions } from './untrusted-content.js';
 export {
   wrapUntrusted,
   scanForInjection,
+  scanForInjectionAsync,
   isInjectionSuspected,
   setInjectionSuspected,
   processUntrustedContent,
+  processUntrustedContentAsync,
+  sanitizeUntrustedContentAsync,
 } from './untrusted-content.js';
