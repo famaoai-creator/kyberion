@@ -547,6 +547,7 @@ export function buildSurfaceConversationInputFromMessage(
     agentId: options.agentId,
     query,
     senderAgentId: options.senderAgentId,
+    correlationId: message.correlationId,
     surface: message.surface,
     surfaceText: message.text,
     threadContext: options.threadContext,

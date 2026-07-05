@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomUUID } from 'node:crypto';
 import { queryKnowledge, queryKnowledgeHybrid } from './src/knowledge-index.js';
 
@@ -34,11 +35,17 @@ import { buildSurfaceConversationInput } from './surface-interaction-model.js';
 import {
   classifyTaskSessionIntent,
   createTaskSession,
+  getLatestCompletedTaskSession,
+  reopenTaskSession,
   saveTaskSession,
   updateTaskSession,
   getActiveTaskSession,
 } from './task-session.js';
 import type { TaskSession } from './task-session.js';
+import {
+  loadPendingIntent,
+  savePendingIntent,
+} from './pending-intent-store.js';
 import { executeCapturePhotoTaskSession } from './capture-photo-task-session-executor.js';
 import { executeApprovedClaudeTaskSession } from './claude-task-session-executor.js';
 import { truncateTextWithCount } from './text-truncation.js';
@@ -52,6 +59,7 @@ import {
 import { extractSurfaceBlocks, sanitizeSurfaceReplyText } from './surface-response-blocks.js';
 import { buildContextualIntentFrame } from './contextual-intent-frame.js';
 import { assessContextualClarification } from './contextual-intent-clarification-policy.js';
+import { isCorrectionUtterance } from './correction-detection.js';
 import {
   recordSchedulePreference,
   resolveDefaultScheduleSource,
@@ -111,6 +119,8 @@ export {
   extractFollowUpRequests,
 } from './surface-runtime-helpers.js';
 
+const surfaceRuntimeContextStore = new AsyncLocalStorage<SurfaceConversationInput>();
+
 import type {
   NerveRoutingProposal,
   ParsedSlackSurfacePrompt,
@@ -132,6 +142,28 @@ function appendCompletionClosure(text: string, completionSummary: string[]): str
   const closure = completionSummary.filter((line) => String(line || '').trim().length > 0);
   if (closure.length === 0) return text;
   return [text, '', ...closure].join('\n');
+}
+
+function buildPendingRuntimeContext(
+  pendingIntent: ReturnType<typeof loadPendingIntent> | null,
+  input: SurfaceConversationInput
+): Record<string, unknown> {
+  return {
+    ...(input.threadContext ? { thread_context: input.threadContext } : {}),
+    ...(pendingIntent
+      ? {
+          pending_intent: {
+            correlation_id: pendingIntent.correlation_id,
+            intent_id: pendingIntent.intent_id,
+            required_inputs: pendingIntent.required_inputs,
+            source_surface: pendingIntent.source_surface,
+            source_text: pendingIntent.source_text,
+            expires_at: pendingIntent.expires_at,
+          },
+        }
+      : {}),
+    correction_detected: isCorrectionUtterance(input.query || ''),
+  };
 }
 
 function toCompletionSummaryRecord(action: ReturnType<typeof buildCompletionNextAction>): {
@@ -326,11 +358,25 @@ async function handleTaskSessionRoute(
   context: SurfaceRuntimeRouteContext
 ): Promise<SurfaceConversationResult> {
   const queryText = structuredSurfaceQueryText(context);
+  const correctionDetected = isCorrectionUtterance(queryText);
 
   // 1. Intercept for Progressive Slot-filling state machine
   const activeSession = getActiveTaskSession(context.input.surface || 'presence');
   let session = activeSession;
   let intent: any = null;
+
+  if (activeSession && activeSession.requirements?.missing?.length > 0 && correctionDetected) {
+    const currentSlot = activeSession.requirements.missing[0];
+    return emptySurfaceResult(
+      buildTaskSessionReply({
+        session: activeSession,
+        status: 'pending',
+        intentId: (activeSession.payload?.intent_id as string) || '',
+        summary: `了解です。${currentSlot} をもう一度教えてください。`,
+        missingInputs: activeSession.requirements.missing,
+      })
+    );
+  }
 
   if (
     activeSession &&
@@ -414,6 +460,28 @@ async function handleTaskSessionRoute(
 
   // 2. Fresh intent classification if no active slot-filling session
   if (!intent) {
+    if (correctionDetected) {
+      const completedSession = context.input.correlationId
+        ? getLatestCompletedTaskSession(context.input.surface || 'presence', context.input.correlationId)
+        : null;
+      if (completedSession) {
+        const reopened = reopenTaskSession(completedSession.session_id, {
+          reason: `correction utterance: ${queryText}`,
+          status: completedSession.requirements?.missing?.length ? 'collecting_requirements' : 'planning',
+        });
+        if (reopened) {
+          return emptySurfaceResult(
+            buildTaskSessionReply({
+              session: reopened,
+              status: 'pending',
+              intentId: (reopened.payload?.intent_id as string) || '',
+              summary: '前回のセッションを再オープンしました。修正したい点を教えてください。',
+              missingInputs: reopened.requirements?.missing || [],
+            })
+          );
+        }
+      }
+    }
     const freshIntent = classifyTaskSessionIntent(queryText);
     if (!freshIntent?.intentId) {
       return emptySurfaceResult('No task-session intent could be resolved.');
@@ -422,6 +490,7 @@ async function handleTaskSessionRoute(
 
     session = createTaskSession({
       sessionId: `TSK-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 8).toUpperCase()}`,
+      correlationId: context.input.correlationId,
       surface: context.input.surface || 'presence',
       taskType: intent.taskType,
       status: intent.requirements?.missing?.length ? 'collecting_requirements' : 'planning',
@@ -791,7 +860,11 @@ async function handleTaskSessionRoute(
             decidedBy: session.payload?.decidedBy || 'operator',
             requestedBy: session.payload?.requestedBy || 'operator',
             threadTs: session.payload?.threadTs || `ts-${Date.now()}`,
-            correlationId: session.payload?.correlationId || session.session_id,
+            correlationId:
+              session.correlation_id ||
+              session.payload?.correlation_id ||
+              session.payload?.correlationId ||
+              session.session_id,
             draft: session.payload?.draft || {
               title: 'Governance request',
               summary: queryText,
@@ -1035,7 +1108,12 @@ function recordLearningOutcomeSafely(
   params: Parameters<typeof recordIntentContractOutcome>[0]
 ): void {
   try {
-    recordIntentContractOutcome(params);
+    const surfaceInput = surfaceRuntimeContextStore.getStore();
+    recordIntentContractOutcome({
+      ...params,
+      ...(surfaceInput?.missionId ? { mission_id: surfaceInput.missionId } : {}),
+      ...(surfaceInput?.correlationId ? { correlation_id: surfaceInput.correlationId } : {}),
+    });
   } catch {
     // Learning updates are best-effort and must not block primary execution paths.
   }
@@ -1148,8 +1226,14 @@ function buildIntentGoalHandoffArgs(
   const summary = contract?.goal?.summary?.trim();
   if (!summary && !sourceText) return [];
   try {
+    const correlationId = context.input.correlationId || contract?.intent_id || undefined;
     const handoffPath = writeIntentGoalHandoff(missionId, {
       source_text: sourceText || undefined,
+      correlation_id: correlationId,
+      origin_intent_id: contract?.intent_id || undefined,
+      origin_utterance_ref: context.input.correlationId
+        ? `surface://${context.input.correlationId}`
+        : undefined,
       goal: contract?.goal
         ? {
             summary: contract.goal.summary,
@@ -1901,12 +1985,20 @@ const SURFACE_RUNTIME_ROUTE_HANDLERS: SurfaceRuntimeRouteHandler[] = [
 export async function runSurfaceConversation(
   input: SurfaceConversationInput
 ): Promise<SurfaceConversationResult> {
+  surfaceRuntimeContextStore.enterWith(input);
   const forcedReceiver = normalizeSurfaceDelegationReceiver(input.forcedReceiver);
   const routedSurfaceInput = surfaceRoutingText(input);
   const surface = input.surface || surfaceChannelFromAgentId(input.agentId);
-  const routingText = input.threadContext
-    ? `${input.threadContext}\n\nCurrent incoming message:\n${routedSurfaceInput.text}`
-    : routedSurfaceInput.text;
+  const pendingIntent = input.correlationId ? loadPendingIntent(input.correlationId) : null;
+  const routingTextParts = [
+    input.threadContext,
+    pendingIntent?.thread_context,
+    pendingIntent?.source_text
+      ? `Pending clarification context:\n${pendingIntent.source_text}`
+      : undefined,
+    `Current incoming message:\n${routedSurfaceInput.text}`,
+  ].filter((part): part is string => typeof part === 'string' && part.trim().length > 0);
+  const routingText = routingTextParts.join('\n\n');
   const ruleBasedReceiver = forcedReceiver || deriveSurfaceDelegationReceiver(routingText, surface);
   const compiledFlow: UserIntentFlow | null = shouldCompileSurfaceIntent(
     input,
@@ -1916,6 +2008,8 @@ export async function runSurfaceConversation(
     ? await compileUserIntentFlow({
         text: routingText,
         channel: surface || 'surface',
+        correlationId: input.correlationId,
+        runtimeContext: buildPendingRuntimeContext(pendingIntent, input),
       }).catch((error: any) => {
         logger.warn(
           `[SURFACE] Intent contract compilation failed: ${error?.message || String(error)}`
@@ -1925,6 +2019,18 @@ export async function runSurfaceConversation(
     : null;
 
   if (compiledFlow?.clarificationPacket) {
+    if (input.correlationId) {
+      savePendingIntent({
+        correlation_id: input.correlationId,
+        intent_id: compiledFlow.intentContract?.intent_id || compiledFlow.executionBrief?.archetype_id,
+        source_text: routingText,
+        required_inputs: compiledFlow.intentContract?.required_inputs || compiledFlow.executionBrief?.missing_inputs || [],
+        source_surface: surface,
+        thread_context: input.threadContext,
+        clarification_packet: compiledFlow.clarificationPacket,
+        runtime_context: buildPendingRuntimeContext(pendingIntent, input),
+      });
+    }
     return attachRoutingDecision(
       {
         text: formatClarificationPacketConcise(compiledFlow.clarificationPacket, { locale: 'ja' }),

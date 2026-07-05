@@ -1514,6 +1514,7 @@ export * from './intent-track-resolver.js';
 export * from './capability-bundle-registry.js';
 export * from './outcome-contract.js';
 export * from './analysis-contract.js';
+export * from './intent-reconciliation.js';
 export * from './approval-policy.js';
 export * from './router-contract.js';
 export * from './analysis-intent-support.js';

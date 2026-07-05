@@ -33,7 +33,7 @@ import {
   safeExec,
   pathResolver,
 } from '@agent/core';
-import { buildKnowledgeIndex, queryKnowledge } from '@agent/core';
+import { buildKnowledgeIndex, queryKnowledge, executeServicePreset } from '@agent/core';
 import { deliverToCowork, listCoworkOutbox } from '@agent/core/cowork-surface.js';
 import { listPendingApprovalsForCowork, decideApprovalFromCowork, recordAuditExportRequest } from '@agent/core/approval-cowork-adapter.js';
 import { runCoworkKnowledgeSync } from '@agent/core/cowork-knowledge-bridge.js';
@@ -319,6 +319,39 @@ export function createKyberionMcpServer(): McpServer {
       } catch (err) {
         return {
           content: [{ type: 'text' as const, text: `Failed to list capabilities: ${err}` }],
+          isError: true,
+        };
+      }
+    },
+  );
+
+  // ── kyberion.service.actuate ──────────────────────────────────────────────
+  server.tool(
+    'kyberion.service.actuate',
+    'Execute a Kyberion service actuator (e.g. Notion API) operation.',
+    {
+      service_id: z.string().describe('The ID of the service (e.g. "notion")'),
+      action: z.string().describe('The operation to execute (e.g. "search", "retrieve_page")'),
+      params: z.record(z.string(), z.any()).optional().describe('Parameters for the operation (payload/query string)'),
+    },
+    async ({ service_id, action, params }) => {
+      try {
+        if (process.env.KYBERION_ENABLE_SERVICE_ACTUATE_TOOL !== '1') {
+          return {
+            content: [
+              {
+                type: 'text' as const,
+                text: 'Service actuate tool is disabled. Set KYBERION_ENABLE_SERVICE_ACTUATE_TOOL=1 to enable it for trusted operators.',
+              },
+            ],
+            isError: true,
+          };
+        }
+        const result = await executeServicePreset(service_id, action, params ?? {}, 'secret-guard');
+        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      } catch (err) {
+        return {
+          content: [{ type: 'text' as const, text: `Service actuate failed: ${err}` }],
           isError: true,
         };
       }

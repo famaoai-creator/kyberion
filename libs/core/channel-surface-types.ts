@@ -270,6 +270,7 @@ interface SurfaceConversationInputBase {
   agentId: string;
   query: string;
   senderAgentId: string;
+  correlationId?: string;
   surfaceText?: string;
   threadContext?: string;
   cwd?: string;
