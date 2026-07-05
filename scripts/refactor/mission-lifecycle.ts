@@ -12,12 +12,12 @@ import {
   createActuatorTrace,
   finalizeActuatorTrace,
   buildCompletionNextAction,
-  reconcileCompletion,
   ledger,
   logger,
   latestSnapshot,
   pathResolver,
   queueMissionMemoryPromotionCandidate,
+  summarizeReviewGateVerdicts,
   safeExec,
   safeAppendFileSync,
   safeCopyFileSync,
@@ -30,6 +30,7 @@ import {
   recordMissionGateOverride,
   writeMissionGateRecord,
 } from '@agent/core';
+import { reconcileCompletion } from '@agent/core/intent-reconciliation';
 import { loadState, saveState } from './mission-state.js';
 import {
   readTrustLedger,
@@ -42,12 +43,21 @@ import {
   evaluateMissionIntentDrift,
 } from './mission-intent-delta.js';
 
-function collectMissionEvidenceRefs(missionDir: string): string[] {
+function collectMissionEvidence(missionDir: string): Array<{ ref: string; text?: string }> {
   const evidenceDir = path.join(missionDir, 'evidence');
   if (!safeExistsSync(evidenceDir)) return [];
   return safeReaddir(evidenceDir)
     .filter((entry) => entry !== '.gitkeep')
-    .map((entry) => path.join(missionDir, 'evidence', entry));
+    .map((entry) => {
+      const ref = path.join(missionDir, 'evidence', entry);
+      let text: string | undefined;
+      try {
+        if (safeExistsSync(ref)) {
+          text = String(safeReadFile(ref, { encoding: 'utf8' })).slice(0, 2000);
+        }
+      } catch (_) {}
+      return { ref, text };
+    });
 }
 
 function publishMeetingDeliverablesIfNeeded(input: {
@@ -280,7 +290,7 @@ function writeMissionNextTasks(missionDir: string, tasks: Array<Record<string, u
   safeWriteFile(nextTasksPath, JSON.stringify(tasks, null, 2));
 }
 
-function upsertMissionFinishRepairTask(input: {
+function upsertMissionGateRepairTask(input: {
   missionDir: string;
   gateId: string;
   reason: string;
@@ -295,13 +305,13 @@ function upsertMissionFinishRepairTask(input: {
       role: 'operator',
       agent_id: 'mission_controller',
     },
-    description: `Repair mission finish gate failure: ${input.reason}`,
+    description: `Repair mission ${input.gateId} gate failure: ${input.reason}`,
     deliverable: `evidence/${repairTaskId}.md`,
     target_path: `evidence/${repairTaskId}.md`,
     dependencies: input.pendingTasks,
     acceptance_criteria: [
-      `Resolve finish gate issue: ${input.reason}`,
-      'Update mission evidence and task board to reflect the repaired finish state.',
+      `Resolve ${input.gateId} gate issue: ${input.reason}`,
+      'Update mission evidence and task board to reflect the repaired gate state.',
     ],
     risk: 'medium',
     expected_output_format: 'files',
@@ -358,7 +368,7 @@ function recordMissionFinishGateFailure(input: {
     mission_finish_gate_last_reason: input.reason,
     mission_finish_gate_last_checked_at: now,
   };
-  const repairTaskIds = upsertMissionFinishRepairTask({
+  const repairTaskIds = upsertMissionGateRepairTask({
     missionDir: input.missionDir,
     gateId: input.gateId,
     reason: input.reason,
@@ -392,6 +402,63 @@ function recordMissionFinishGateFailure(input: {
   input.state.context = {
     ...(input.state.context || {}),
     mission_finish_gate_last_path: gatePath,
+  };
+  return gatePath;
+}
+
+function recordMissionIntentDriftGateFailure(input: {
+  missionId: string;
+  state: any;
+  missionDir: string;
+  reason: string;
+  agentRuntimeEventPath: string;
+}): string {
+  const now = new Date().toISOString();
+  const context = input.state.context || {};
+  const failureCount = Number(context.intent_drift_gate_failure_count || 0) + 1;
+  const nextStatus =
+    input.state.status === 'active' || input.state.status === 'validating'
+      ? 'validating'
+      : input.state.status;
+
+  input.state.context = {
+    ...context,
+    intent_drift_gate_failure_count: failureCount,
+    intent_drift_gate_last_reason: input.reason,
+    intent_drift_gate_last_checked_at: now,
+  };
+  const repairTaskIds = upsertMissionGateRepairTask({
+    missionDir: input.missionDir,
+    gateId: 'intent-drift',
+    reason: input.reason,
+    pendingTasks: [],
+  });
+  input.state.status = nextStatus;
+  input.state.history.push({
+    ts: now,
+    event: 'REALIGN',
+    note: `Intent drift detected; realigning mission. Reason: ${input.reason}`,
+  });
+  recordAgentRuntimeEvent(input.agentRuntimeEventPath, {
+    event: 'MISSION_INTENT_DRIFT_BLOCKED',
+    mission_id: input.missionId,
+    gate_id: 'intent-drift',
+    failure_count: failureCount,
+    reason: input.reason,
+    next_status: input.state.status,
+    repair_task_ids: repairTaskIds,
+  });
+  const gatePath = recordMissionGateOverride({
+    missionId: input.missionId,
+    gateId: 'intent-drift',
+    outcome: 'rejected',
+    note: input.reason,
+    actorId: 'mission_controller',
+    evidenceDir: path.join(input.missionDir, 'gates'),
+  });
+  input.state.context = {
+    ...(input.state.context || {}),
+    intent_drift_gate_last_path: gatePath,
   };
   return gatePath;
 }
@@ -548,9 +615,64 @@ export async function verifyMission(
     return;
   }
 
+  const missionDir = findMissionPath(upperId);
+  if (!missionDir) {
+    logger.error(`Mission directory for ${upperId} not found.`);
+    return;
+  }
+  const runtimeEventPath = path.join(missionDir, 'runtime-events.jsonl');
+
   logger.info(`🛡️ Verifying Mission ${upperId}: Result = ${result.toUpperCase()}`);
 
   if (result === 'verified') {
+    const driftSummary = evaluateMissionIntentDrift(upperId);
+    const driftReview = summarizeReviewGateVerdicts({
+      reviewMode: 'standard',
+      results: [
+        driftSummary
+          ? {
+              gate_id: 'INTENT_DRIFT',
+              verdict: driftSummary.passed ? 'ready' : 'blocked',
+              reason: driftSummary.message,
+            }
+          : {
+              gate_id: 'INTENT_DRIFT',
+              verdict: 'concerns',
+              reason: 'Intent drift gate unavailable.',
+            },
+      ],
+    });
+    const driftGate = driftReview.gate_results[0];
+    if (driftReview.overall_verdict === 'blocked') {
+      logger.error(
+        `❌ [INTENT_DRIFT] Mission ${upperId} blocked: ${driftGate.reason || 'drift gate blocked'}`
+      );
+      recordMissionIntentDriftGateFailure({
+        missionId: upperId,
+        state,
+        missionDir,
+        reason: driftGate.reason || 'intent drift gate blocked',
+        agentRuntimeEventPath: runtimeEventPath,
+      });
+      await saveState(upperId, state);
+      await syncProjectLedgerIfLinked(upperId);
+      return;
+    }
+    state.context = {
+      ...(state.context || {}),
+      intent_review_summary: driftReview,
+    } as any;
+    writeMissionGateRecord({
+      missionId: upperId,
+      gateId: 'intent-drift',
+      evidenceDir: path.join(missionDir, 'gates'),
+      payload: {
+        verdict: 'pass',
+        checked_at: new Date().toISOString(),
+        reason: driftGate.reason || 'intent drift gate passed',
+        review_summary: driftReview,
+      },
+    });
     state.status = transitionStatus(state.status, 'distilling');
   } else if (state.status !== 'active') {
     state.status = transitionStatus(state.status, 'active');
@@ -574,6 +696,7 @@ export async function verifyMission(
     stage: 'verification',
     text: note,
     source: 'mission_state',
+    traceRef: state.correlation_id,
   });
   logger.success(`✅ Mission ${upperId} verification complete. Status: ${state.status}`);
 }
@@ -627,6 +750,7 @@ export async function finishMission(
     stage: 'delivery',
     text: latestSnapshot(upperId)?.intent.goal || `Mission ${upperId} progressing through learn`,
     source: 'mission_state',
+    traceRef: preState.correlation_id,
   });
   const missionDir = findMissionPath(upperId);
   if (!missionDir) return;
@@ -728,7 +852,8 @@ export async function finishMission(
     };
   }
 
-  const evidenceRefs = collectMissionEvidenceRefs(missionDir);
+  const evidence = collectMissionEvidence(missionDir);
+  const evidenceRefs = evidence.map((item) => item.ref);
   const completionGoal = {
     summary:
       state.intent?.goal_summary ||
@@ -754,7 +879,7 @@ export async function finishMission(
     missionId: upperId,
   });
   traceCtx.startSpan('mission:finish', {
-    evidence_count: evidenceRefs.length,
+    evidence_count: evidence.length,
     tier: state.tier,
   });
 
@@ -782,13 +907,13 @@ export async function finishMission(
     traceCtx.endSpan('ok');
   }
   traceCtx.startSpan('mission:evidence');
-  for (const ref of evidenceRefs) {
-    traceCtx.addArtifact('file', ref, 'mission evidence ref');
+  for (const item of evidence) {
+    traceCtx.addArtifact('file', item.ref, 'mission evidence ref');
   }
   traceCtx.endSpan('ok');
   await saveState(upperId, state);
   await args.syncProjectLedgerIfLinked(upperId);
-  traceCtx.addEvent('ledger.synced', { evidence_count: evidenceRefs.length });
+  traceCtx.addEvent('ledger.synced', { evidence_count: evidence.length });
 
   traceCtx.startSpan('mission:customer-delivery');
   try {
@@ -820,7 +945,9 @@ export async function finishMission(
     const memorySummary = safeExistsSync(memoryPath)
       ? extractPromotableMissionMemory(safeReadFile(memoryPath, { encoding: 'utf8' }) as string)
       : null;
-    const memoryEvidenceRefs = memorySummary ? [...evidenceRefs, memoryPath] : evidenceRefs;
+    const memoryEvidenceRefs = memorySummary
+      ? [...evidence.map((item) => item.ref), memoryPath]
+      : evidence.map((item) => item.ref);
     const queued = queueMissionMemoryPromotionCandidate({
       missionId: upperId,
       missionType: state.mission_type,
@@ -902,6 +1029,7 @@ export async function finishMission(
       next_step: completionNextAction.next_step,
       confidence: completionNextAction.confidence,
     },
+    mission_completion_reconciliation: completionReconciliation,
     mission_finish_trace_summary: traceResult.trace_summary,
     mission_finish_trace_persisted_path: traceResult.trace_persisted_path,
   };

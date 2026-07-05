@@ -192,6 +192,7 @@
     "pipeline": "node dist/scripts/run_pipeline.js",
     "pipeline:super": "node dist/scripts/run_super_pipeline.js",
     "intent:run": "node dist/scripts/run_intent.js",
+    "intent": "node --import ./scripts/ts-loader.mjs scripts/intent.ts",
     "release:notes": "node dist/scripts/extract_changelog_section.js",
     "migration:run": "pnpm exec tsx scripts/run_migrations.ts",
     "migration:rollback": "pnpm exec tsx scripts/run_migrations.ts --rollback",

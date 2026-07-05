@@ -7,6 +7,9 @@ import type { HandoffPacket, MissionClassification } from '@agent/core';
 
 export interface MissionState {
   mission_id: string;
+  correlation_id?: string;
+  origin_intent_id?: string;
+  origin_utterance_ref?: string;
   /**
    * Free-string mission type. Kept for backward compatibility as a
    * classification hint and team-template key; `classification` below is the
@@ -187,12 +190,28 @@ export interface MissionState {
       next_step: string;
       confidence: number;
     };
+    mission_completion_reconciliation?: {
+      satisfied: boolean;
+      delivered: string[];
+      gaps: string[];
+      confidence: number;
+      evidence_refs?: string[];
+    };
     intent_delta_summary?: {
       checked_at: string;
       passed: boolean;
       verdict: string;
       drift_score: number;
       message: string;
+    };
+    approved_scope_change?: {
+      approved_by: string;
+      approved_at: string;
+      reason: string;
+      previous_origin_snapshot_id?: string | null;
+      new_origin_snapshot_id: string;
+      goal_summary: string;
+      success_condition: string;
     };
     cancelled?: boolean;
     cancel_reason?: string;

@@ -16,6 +16,7 @@
   ],
   "properties": {
     "session_id": { "type": "string", "minLength": 1 },
+    "correlation_id": { "type": "string", "minLength": 1 },
     "surface": {
       "type": "string",
       "enum": ["presence", "slack", "terminal", "chronos", "web", "imessage", "discord", "telegram"]
