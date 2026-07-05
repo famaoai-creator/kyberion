@@ -1,8 +1,8 @@
 import * as path from 'node:path';
 import {
-  auditChain,
   loadIntentContractMemorySnapshot,
   listTaskSessions,
+  pathResolver,
   renderStatus,
   safeExistsSync,
   safeReadFile,
@@ -83,11 +83,19 @@ interface IntentTraceEvidence {
   missionEvidence: MissionTraceEvidence[];
   traces: TraceRecord[];
   journals: ReturnType<typeof loadMissionOrchestrationJournal>;
-  audits: ReturnType<typeof auditChain.loadAll>;
+  audits: TraceAuditEntry[];
   taskSessions: TaskSession[];
   memoryMatches: IntentContractMemoryEntry[];
   candidateContracts: ReturnType<typeof selectContractCandidates>;
   inferredIntentIds: string[];
+}
+
+interface TraceAuditEntry {
+  timestamp: string;
+  operation: string;
+  result: string;
+  correlationId: string | null;
+  intentId: string | null;
 }
 
 function normalizeText(value: unknown): string {
@@ -204,8 +212,55 @@ function collectTraceFiles(dir: string): TraceRecord[] {
   return traces;
 }
 
-function collectMissionEvidence(correlationId: string): MissionTraceEvidence[] {
-  return listMissionsInSearchDirs()
+function collectAuditEntries(
+  correlationId: string,
+  missionEvidence: MissionTraceEvidence[]
+): TraceAuditEntry[] {
+  const auditDirs = new Set<string>();
+  const globalAuditDir = pathResolver.shared('logs/audit');
+  if (safeExistsSync(globalAuditDir)) {
+    auditDirs.add(globalAuditDir);
+  }
+  for (const mission of missionEvidence) {
+    const missionAuditDir = path.join(mission.missionPath, 'audit');
+    if (safeExistsSync(missionAuditDir)) {
+      auditDirs.add(missionAuditDir);
+    }
+  }
+
+  const entries: TraceAuditEntry[] = [];
+  for (const auditDir of auditDirs) {
+    for (const fileName of listJsonlFiles(auditDir)) {
+      const fileEntries = readJsonlRecords<JsonRecord>(path.join(auditDir, fileName));
+      for (const entry of fileEntries) {
+        if (entry.action !== 'approval_gate') continue;
+        const metadata = entry.metadata as JsonRecord | undefined;
+        const entryCorrelationId = normalizeId(metadata?.correlationId);
+        const entryIntentId = normalizeId(metadata?.intentId);
+        if (entryCorrelationId !== correlationId && entryIntentId !== correlationId) continue;
+        entries.push({
+          timestamp: normalizeText(entry.timestamp),
+          operation: normalizeText(entry.operation),
+          result: normalizeText(entry.result),
+          correlationId: entryCorrelationId,
+          intentId: entryIntentId,
+        });
+      }
+    }
+  }
+
+  return entries.sort((left, right) => right.timestamp.localeCompare(left.timestamp));
+}
+
+function collectMissionEvidence(
+  correlationId: string,
+  candidateMissionIds?: Set<string>
+): MissionTraceEvidence[] {
+  const missions = listMissionsInSearchDirs().filter(({ missionId }) => {
+    if (!candidateMissionIds || candidateMissionIds.size === 0) return true;
+    return candidateMissionIds.has(missionId);
+  });
+  return missions
     .map(({ missionId, missionPath }) => {
       const state = loadState(missionId);
       const evidenceDir = path.join(missionPath, 'evidence');
@@ -256,29 +311,28 @@ function collectIntentTraceEvidence(
   correlationId: string,
   opts: { locale?: string; traceDirs?: string[] } = {}
 ): IntentTraceEvidence {
-  const missionEvidence = collectMissionEvidence(correlationId);
-  const missionIds = new Set(
-    missionEvidence.map((entry) => entry.missionId).filter((missionId) => Boolean(missionId))
-  );
   const traceDirs = opts.traceDirs || [traceLogDir()];
   const traces = traceDirs.flatMap((dir) => collectTraceFiles(dir));
   const matchingTraces = traces.filter((trace) => {
     if (trace.traceId === correlationId) return true;
-    if (trace.metadata?.missionId && missionIds.has(trace.metadata.missionId)) return true;
     if (trace.metadata?.pipelineId === correlationId) return true;
     return collectTraceIntentIds(trace).includes(correlationId);
   });
 
+  const missionIds = new Set<string>();
+  for (const trace of matchingTraces) {
+    if (trace.metadata?.missionId) {
+      missionIds.add(trace.metadata.missionId);
+    }
+  }
+  const missionEvidence = collectMissionEvidence(correlationId, missionIds);
+  for (const entry of missionEvidence) {
+    missionIds.add(entry.missionId);
+  }
+
   const journals = missionEvidence.flatMap((entry) =>
     loadMissionOrchestrationJournal(entry.missionId)
   );
-  const audits = auditChain
-    .loadAll()
-    .filter(
-      (entry) =>
-        entry.metadata?.correlationId === correlationId ||
-        entry.metadata?.intentId === correlationId
-    );
 
   const derivedIntentIds = new Set<string>([correlationId]);
   for (const trace of matchingTraces) {
@@ -309,6 +363,7 @@ function collectIntentTraceEvidence(
   const candidateContracts = [...derivedIntentIds].flatMap((intentId) =>
     selectContractCandidates(intentId, 3)
   );
+  const audits = collectAuditEntries(correlationId, missionEvidence);
 
   return {
     correlationId,
@@ -340,12 +395,19 @@ function formatTraceReport(evidence: IntentTraceEvidence, locale = 'en'): string
         const stateLabel = entry.state?.status
           ? renderStatus('mission', entry.state.status, locale)
           : 'unknown';
-        const rows = [`${entry.missionId} [${stateLabel}]`, `  path: ${entry.missionPath}`];
-        if (entry.state?.intent?.goal_summary) {
-          rows.push(`  goal: ${entry.state.intent.goal_summary}`);
-        }
-        if (entry.state?.intent?.success_condition) {
-          rows.push(`  success: ${entry.state.intent.success_condition}`);
+        const isSensitive = entry.state?.tier !== 'public';
+        const rows = [`${entry.missionId} [${stateLabel}]`];
+        if (isSensitive) {
+          rows.push('  path: [redacted]');
+          rows.push(`  tier: ${entry.state?.tier || 'unknown'}`);
+        } else {
+          rows.push(`  path: ${entry.missionPath}`);
+          if (entry.state?.intent?.goal_summary) {
+            rows.push(`  goal: ${entry.state.intent.goal_summary}`);
+          }
+          if (entry.state?.intent?.success_condition) {
+            rows.push(`  success: ${entry.state.intent.success_condition}`);
+          }
         }
         if (entry.snapshots.length > 0) {
           rows.push(
@@ -389,7 +451,7 @@ function formatTraceReport(evidence: IntentTraceEvidence, locale = 'en'): string
 
   const auditLines = evidence.audits.length
     ? evidence.audits.map((entry) =>
-        `${entry.timestamp} ${entry.operation} ${entry.result} ${entry.metadata?.correlationId ? `corr=${entry.metadata.correlationId}` : ''} ${entry.metadata?.intentId ? `intent=${entry.metadata.intentId}` : ''}`.trim()
+        `${entry.timestamp} ${entry.operation} ${entry.result} ${entry.correlationId ? `corr=${entry.correlationId}` : ''} ${entry.intentId ? `intent=${entry.intentId}` : ''}`.trim()
       )
     : ['(no matching audit entries found)'];
   lines.push(...formatSection('Approval audit', auditLines));
