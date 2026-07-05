@@ -73,37 +73,114 @@
   ],
   "domains": {
     "browser": {
-      "capture": ["content", "evaluate", "goto", "screenshot"],
+      "capture": [
+        "content",
+        "evaluate",
+        "goto",
+        "screenshot"
+      ],
       "transform": [],
-      "apply": ["click", "extension_session", "fill", "log", "press", "wait"]
+      "apply": [
+        "click",
+        "extension_session",
+        "fill",
+        "log",
+        "press",
+        "wait"
+      ]
     },
     "code": {
-      "capture": ["glob_files", "list", "read", "read_file"],
-      "transform": ["apply_pattern", "merge_content", "set"],
-      "apply": ["append", "copy", "log", "move", "write", "write_file"]
+      "capture": [
+        "glob_files",
+        "list",
+        "read",
+        "read_file"
+      ],
+      "transform": [
+        "apply_pattern",
+        "merge_content",
+        "set"
+      ],
+      "apply": [
+        "append",
+        "copy",
+        "log",
+        "move",
+        "write",
+        "write_file"
+      ]
     },
     "codex": {
-      "capture": ["app-server", "cloud", "features", "mcp", "review"],
+      "capture": [
+        "app-server",
+        "cloud",
+        "features",
+        "mcp",
+        "review"
+      ],
       "transform": [],
-      "apply": ["exec", "plugin"]
+      "apply": [
+        "exec",
+        "plugin"
+      ]
     },
     "file": {
-      "capture": ["glob_files", "list", "read", "read_file", "read_json"],
-      "transform": ["json_parse", "json_query", "path_join"],
-      "apply": ["append", "copy", "delete", "mkdir", "move", "symlink", "write", "write_file"]
+      "capture": [
+        "glob_files",
+        "list",
+        "read",
+        "read_file",
+        "read_json"
+      ],
+      "transform": [
+        "json_parse",
+        "json_query",
+        "path_join"
+      ],
+      "apply": [
+        "append",
+        "copy",
+        "delete",
+        "mkdir",
+        "move",
+        "symlink",
+        "write",
+        "write_file"
+      ]
     },
     "gemini": {
-      "capture": ["extensions", "hooks", "mcp", "skills"],
+      "capture": [
+        "extensions",
+        "hooks",
+        "mcp",
+        "skills"
+      ],
       "transform": [],
-      "apply": ["log", "prompt"]
+      "apply": [
+        "log",
+        "prompt"
+      ]
     },
     "gh": {
       "capture": [],
       "transform": [],
-      "apply": ["agent-task", "api", "issue", "pr", "repo", "run-workflow", "skill"]
+      "apply": [
+        "agent-task",
+        "api",
+        "issue",
+        "pr",
+        "repo",
+        "run-workflow",
+        "skill"
+      ]
     },
     "media": {
-      "capture": ["json_read", "pptx_extract", "pptx_slide_text", "xlsx_extract"],
+      "capture": [
+        "json_read",
+        "pptx_extract",
+        "pptx_slide_text",
+        "xlsx_extract"
+      ],
       "transform": [
         "apply_pattern",
         "apply_theme",
@@ -123,19 +200,37 @@
       ]
     },
     "network": {
-      "capture": ["fetch", "read"],
+      "capture": [
+        "fetch",
+        "read"
+      ],
       "transform": [],
-      "apply": ["log"]
+      "apply": [
+        "log"
+      ]
     },
     "orchestrator": {
-      "capture": ["discover_capabilities", "discover_skills"],
+      "capture": [
+        "discover_capabilities",
+        "discover_skills"
+      ],
       "transform": [],
-      "apply": ["deploy", "log"]
+      "apply": [
+        "deploy",
+        "log"
+      ]
     },
     "service": {
-      "capture": ["list", "read"],
+      "capture": [
+        "list",
+        "read"
+      ],
       "transform": [],
-      "apply": ["deploy", "log", "notify"]
+      "apply": [
+        "deploy",
+        "log",
+        "notify"
+      ]
     },
     "system": {
       "capture": [
@@ -173,7 +268,12 @@
         "vision_consult",
         "window_list"
       ],
-      "transform": ["json_query", "regex_extract", "run_js", "sre_analyze"],
+      "transform": [
+        "json_query",
+        "regex_extract",
+        "run_js",
+        "sre_analyze"
+      ],
       "apply": [
         "activate_application",
         "app_quit",
@@ -204,9 +304,22 @@
       ]
     },
     "wisdom": {
-      "capture": ["read", "read_file", "search"],
-      "transform": ["json_parse", "json_query", "regex_extract", "regex_replace", "yaml_update"],
-      "apply": ["log", "register_presentation_preference_profile"]
+      "capture": [
+        "read",
+        "read_file",
+        "search"
+      ],
+      "transform": [
+        "json_parse",
+        "json_query",
+        "regex_extract",
+        "regex_replace",
+        "yaml_update"
+      ],
+      "apply": [
+        "log",
+        "register_presentation_preference_profile"
+      ]
     }
   }
 }
