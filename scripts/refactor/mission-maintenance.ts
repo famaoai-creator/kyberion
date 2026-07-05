@@ -23,7 +23,9 @@ import {
   loadMissionOrchestrationReplayPlan,
   recoverMissionRequestedTasks,
 } from '@agent/core';
+import { recordApprovedIntentScopeChange } from '@agent/core/intent-snapshot-store';
 import {
+  assertCanGrantMissionAuthority,
   listActiveMissions,
   listMissionsInSearchDirs,
   loadState,
@@ -31,6 +33,17 @@ import {
 } from './mission-state.js';
 import { emitMissionLifecycleIntentSnapshot } from './mission-intent-delta.js';
 import { readJsonFile } from './cli-input.js';
+
+function resolveApprovalActor(requestedBy?: string): string {
+  const resolvedActor = process.env.KYBERION_PERSONA || process.env.USER || 'mission_controller';
+  const requested = String(requestedBy || '').trim();
+  if (requested && requested !== resolvedActor) {
+    throw new Error(
+      `Approved-by identity mismatch: expected ${resolvedActor} but received ${requested}.`
+    );
+  }
+  return resolvedActor;
+}
 
 export async function createCheckpoint(args: {
   taskId: string;
@@ -113,6 +126,7 @@ async function recordCheckpointForMission(
   const traceCtx = new TraceContext(`mission_controller:checkpoint:${activeMissionId}`, {
     actuator: 'mission_controller',
     missionId: activeMissionId,
+    correlationId: state.correlation_id,
   });
   traceCtx.addEvent('checkpoint.requested', { task_id: taskId, note: note.slice(0, 200) });
 
@@ -184,6 +198,7 @@ async function recordCheckpointForMission(
         stage: 'execution',
         text: note || taskId,
         source: 'mission_state',
+        traceRef: state.correlation_id,
       });
       traceCtx.endSpan('ok');
     } catch (err: any) {
@@ -210,6 +225,100 @@ async function recordCheckpointForMission(
       );
     }
   }
+}
+
+export async function approveScopeChange(args: {
+  missionId: string;
+  approvedBy?: string;
+  reason: string;
+  goalSummary: string;
+  successCondition?: string;
+  syncProjectLedgerIfLinked: (missionId: string) => Promise<void>;
+}): Promise<void> {
+  assertCanGrantMissionAuthority();
+  const missionId = args.missionId.toUpperCase();
+  const missionPath = findMissionPath(missionId);
+  if (!missionPath) {
+    throw new Error(`Mission directory for ${missionId} not found.`);
+  }
+
+  const goalSummary = String(args.goalSummary || '').trim();
+  if (!goalSummary) {
+    throw new Error('A non-empty goal summary is required to approve a scope change.');
+  }
+  const successCondition = String(args.successCondition || goalSummary).trim();
+  const approvedAt = new Date().toISOString();
+  const approvedBy = resolveApprovalActor(args.approvedBy);
+
+  await withLock(`mission-${missionId}`, async () => {
+    const state = loadState(missionId);
+    if (!state) {
+      throw new Error(`Mission ${missionId} not found.`);
+    }
+
+    const intent = {
+      goal: goalSummary,
+      constraints: state.outcome_contract?.success_criteria || [],
+      deliverables:
+        state.outcome_contract?.expected_artifacts?.map((artifact) => artifact.kind) || [],
+      stakeholders: state.relationships?.project?.project_id
+        ? [state.relationships.project.project_id]
+        : [],
+    };
+
+    const change = recordApprovedIntentScopeChange({
+      missionId,
+      approvedBy,
+      reason: args.reason,
+      intent,
+      stage: 'scope_change',
+      approvedAt,
+    });
+
+    state.intent = {
+      ...(state.intent || {}),
+      goal_summary: goalSummary,
+      success_condition: successCondition,
+      outcome_ids: state.intent?.outcome_ids || [],
+    };
+    state.context = {
+      ...(state.context || {}),
+      approved_scope_change: {
+        approved_by: change.change.approved_by,
+        approved_at: change.change.approved_at,
+        reason: change.change.reason,
+        previous_origin_snapshot_id: change.change.previous_origin_snapshot_id,
+        new_origin_snapshot_id: change.change.new_origin_snapshot_id,
+        goal_summary: goalSummary,
+        success_condition: successCondition,
+      },
+    };
+    state.history.push({
+      ts: approvedAt,
+      event: 'SCOPE_APPROVED',
+      note: `Approved scope change by ${approvedBy}: ${args.reason}`,
+    });
+
+    await saveState(missionId, state, { alreadyLocked: true });
+    await emitMissionLifecycleIntentSnapshot({
+      missionId,
+      stage: 'scope_change',
+      text: goalSummary,
+      source: 'manual',
+      traceRef: state.correlation_id,
+    });
+  });
+
+  try {
+    await args.syncProjectLedgerIfLinked(missionId);
+  } catch (err: any) {
+    logger.warn(
+      `[mission-maintenance] scope approval ledger sync skipped for ${missionId}: ${err?.message || err}`
+    );
+  }
+  logger.success(
+    `✅ Approved scope change for ${missionId} by ${approvedBy} and reset the origin baseline to "${goalSummary}".`
+  );
 }
 
 /**

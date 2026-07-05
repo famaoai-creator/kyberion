@@ -16,6 +16,9 @@
   ],
   "properties": {
     "mission_id": { "type": "string", "minLength": 1 },
+    "correlation_id": { "type": "string", "minLength": 1 },
+    "origin_intent_id": { "type": "string", "minLength": 1 },
+    "origin_utterance_ref": { "type": "string", "minLength": 1 },
     "mission_type": { "type": "string" },
     "tenant_id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
     "tenant_slug": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" },

@@ -1,7 +1,6 @@
 /**
  * Intent Snapshot Store — append-only per-mission snapshot persistence
- * plus a small drift-gate helper that reads the last two snapshots and
- * computes an intent_delta.
+ * plus drift-gate helpers for origin-baseline management.
  *
  * Implements the storage/emission side of CONCEPT_INTEGRATION_BACKLOG
  * P1-7 residual (lifecycle hooks). Worker stage transitions can call
@@ -24,12 +23,14 @@ import {
 
 const SNAPSHOT_FILE = 'intent-snapshots.jsonl';
 const DELTA_FILE = 'intent-deltas.jsonl';
+const SCOPE_CHANGE_FILE = 'intent-scope-changes.jsonl';
 
 export interface EmitSnapshotParams {
   missionId: string;
   stage: string;
   source: IntentSnapshot['source'];
   intent: IntentBody;
+  kind?: IntentSnapshot['kind'];
   traceRef?: string;
 }
 
@@ -43,6 +44,12 @@ function deltaPath(missionId: string): string | null {
   const dir = missionEvidenceDir(missionId);
   if (!dir) return null;
   return path.join(dir, DELTA_FILE);
+}
+
+function scopeChangePath(missionId: string): string | null {
+  const dir = missionEvidenceDir(missionId);
+  if (!dir) return null;
+  return path.join(dir, SCOPE_CHANGE_FILE);
 }
 
 function readJsonl<T>(filePath: string): T[] {
@@ -69,6 +76,27 @@ export function latestSnapshot(missionId: string): IntentSnapshot | null {
   return snapshots.length > 0 ? snapshots[snapshots.length - 1] : null;
 }
 
+export interface ApprovedIntentScopeChange {
+  change_id: string;
+  mission_id: string;
+  approved_by: string;
+  approved_at: string;
+  reason: string;
+  previous_origin_snapshot_id: string | null;
+  new_origin_snapshot_id: string;
+  intent: IntentBody;
+}
+
+function appendScopeChange(missionId: string, record: ApprovedIntentScopeChange): void {
+  const filePath = scopeChangePath(missionId);
+  if (!filePath) {
+    throw new Error(
+      `[intent-snapshot-store] mission evidence dir not found for ${missionId} scope change`
+    );
+  }
+  appendJsonl(filePath, record);
+}
+
 /**
  * Persist a new snapshot and, if there is a previous one, compute and
  * persist the resulting intent_delta. Returns both so the caller can
@@ -76,12 +104,13 @@ export function latestSnapshot(missionId: string): IntentSnapshot | null {
  */
 export function emitIntentSnapshot(
   params: EmitSnapshotParams,
-  thresholds: DriftThresholds = DEFAULT_THRESHOLDS,
+  thresholds: DriftThresholds = DEFAULT_THRESHOLDS
 ): { snapshot: IntentSnapshot; delta: IntentDelta | null } {
   const snapshot: IntentSnapshot = {
     snapshot_id: randomUUID(),
     mission_id: params.missionId,
     stage: params.stage,
+    kind: params.kind || (latestSnapshot(params.missionId) ? 'current' : 'origin'),
     created_at: new Date().toISOString(),
     source: params.source,
     intent: params.intent,
@@ -91,7 +120,7 @@ export function emitIntentSnapshot(
   const snapFile = snapshotPath(params.missionId);
   if (!snapFile) {
     throw new Error(
-      `[intent-snapshot-store] mission evidence dir not found for ${params.missionId}`,
+      `[intent-snapshot-store] mission evidence dir not found for ${params.missionId}`
     );
   }
 
@@ -108,6 +137,45 @@ export function emitIntentSnapshot(
   return { snapshot, delta };
 }
 
+/**
+ * Record an approved scope change by emitting a fresh origin snapshot and
+ * persisting an audit record for the baseline shift.
+ */
+export function recordApprovedIntentScopeChange(input: {
+  missionId: string;
+  approvedBy: string;
+  reason: string;
+  intent: IntentBody;
+  stage?: string;
+  traceRef?: string;
+  approvedAt?: string;
+}): { snapshot: IntentSnapshot; delta: IntentDelta | null; change: ApprovedIntentScopeChange } {
+  const previousOrigin =
+    [...listSnapshots(input.missionId)].reverse().find((snapshot) => snapshot.kind === 'origin') ||
+    null;
+  const approvedAt = input.approvedAt || new Date().toISOString();
+  const { snapshot, delta } = emitIntentSnapshot({
+    missionId: input.missionId,
+    stage: input.stage || 'scope_change',
+    source: 'manual',
+    intent: input.intent,
+    kind: 'origin',
+    traceRef: input.traceRef,
+  });
+  const change: ApprovedIntentScopeChange = {
+    change_id: randomUUID(),
+    mission_id: input.missionId,
+    approved_by: input.approvedBy,
+    approved_at: approvedAt,
+    reason: input.reason,
+    previous_origin_snapshot_id: previousOrigin?.snapshot_id || null,
+    new_origin_snapshot_id: snapshot.snapshot_id,
+    intent: input.intent,
+  };
+  appendScopeChange(input.missionId, change);
+  return { snapshot, delta, change };
+}
+
 export interface IntentDriftGateResult {
   passed: boolean;
   verdict: IntentDelta['drift_verdict'] | 'no_history';
@@ -117,13 +185,13 @@ export interface IntentDriftGateResult {
 }
 
 /**
- * Evaluate the INTENT_DRIFT review gate for a mission. Reads the last
- * two snapshots (or evaluates against an explicit snapshot pair) and
- * compares the resulting drift_verdict to the blocking threshold.
+ * Evaluate the INTENT_DRIFT review gate for a mission. Compares the
+ * origin snapshot against the latest snapshot so the gate measures drift
+ * from the original user intent, not just the last step.
  */
 export function evaluateIntentDriftGate(
   missionId: string,
-  thresholds: DriftThresholds = DEFAULT_THRESHOLDS,
+  thresholds: DriftThresholds = DEFAULT_THRESHOLDS
 ): IntentDriftGateResult {
   const snapshots = listSnapshots(missionId);
   if (snapshots.length < 2) {
@@ -139,7 +207,9 @@ export function evaluateIntentDriftGate(
     };
   }
 
-  const from = snapshots[snapshots.length - 2];
+  const originSnapshots = snapshots.filter((snapshot) => snapshot.kind === 'origin');
+  const from =
+    originSnapshots.length > 0 ? originSnapshots[originSnapshots.length - 1] : snapshots[0];
   const to = snapshots[snapshots.length - 1];
   const delta = computeIntentDelta(from, to, thresholds);
   const passed = delta.drift_verdict !== 'blocking';
@@ -186,7 +256,7 @@ export function mapStageToLoopPhase(missionStage: string): string {
  */
 export function reclassifyDrift(
   delta: IntentDelta,
-  thresholds: DriftThresholds,
+  thresholds: DriftThresholds
 ): IntentDelta['drift_verdict'] {
   return classifyDrift(delta.drift_score, thresholds);
 }

@@ -49,6 +49,8 @@
       ],
       "properties": {
         "intent_id": { "type": "string", "minLength": 1 },
+        "correlation_id": { "type": "string" },
+        "mission_id": { "type": "string" },
         "context_fingerprint": { "$ref": "#/$defs/contextFingerprint" },
         "contract_ref": { "$ref": "#/$defs/contractRef" },
         "execution_shape": { "type": "string", "minLength": 1 },
