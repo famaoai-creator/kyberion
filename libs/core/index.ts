@@ -118,6 +118,7 @@ export * from './question-resolver.js';
 export * from './guided-coordination-brief.js';
 export * from './email-workflow.js';
 export * from './calendar-workflow.js';
+export * from './op-vocabulary.js';
 export * from './mission-gate-engine.js';
 export * from './handoff-packet.js';
 export * from './presentation-slide-pattern.js';
