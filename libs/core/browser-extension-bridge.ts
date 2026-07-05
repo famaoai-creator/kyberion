@@ -4,7 +4,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { enforceApprovalGate, type ApprovalGateResult } from './approval-gate.js';
 import { pathResolver } from './path-resolver.js';
 import { safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
-import { resolveBrowserRecordingPipelineOp } from './op-vocabulary.js';
+import { resolveBrowserRecordingPipelineOp, normalizeBrowserPipelineOp } from './op-vocabulary.js';
 
 /** Approval-gate operation id for governed Chrome extension execution. */
 export const BROWSER_EXTENSION_EXECUTE_OP = 'browser:extension_execute';
@@ -811,7 +811,7 @@ export function compileBrowserRecordingToPipeline(
     return {
       id: `step-${index + 1}`,
       type: 'apply' as const,
-      op: resolveBrowserRecordingPipelineOp(action.op),
+      op: normalizeBrowserPipelineOp(resolveBrowserRecordingPipelineOp(action.op)),
       params,
     };
   });
