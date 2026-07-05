@@ -32,6 +32,12 @@
 2. フォントファイルの取得・配置(ライセンス: Noto は SIL OFL で同梱可。`knowledge/public/design-patterns/fonts/` 等に配置し、パスは pathResolver 経由)。
 3. 埋め込み有無のオプション(`embed_cjk_font: boolean`、既定 true)。ゴールデンテスト: 日本語 PDF のバイト内にフォントデータが存在し、既存 ASCII 文書のサイズが増えないこと。
 
+#### 実装メモ
+
+- 採用方式は `fontkit` + システム CJK フォント解決(`fc-match`)。
+- PDF は日本語テキストがある場合にシステム CJK フォントを `CIDFontType2` として埋め込み、`embed_cjk_font` は既定 `true`。(現実装は glyph-id ベースの埋め込みで、サブセット化は未採用)
+- PPTX / DOCX / PDF の回帰テストは追加済み。
+
 ### Task 3: フォント既定の一元化 — `claude-haiku`(DS-01 Task 2 完了後、置換表を添付して)
 
 - `media-actuator/src/index.ts:423-424,2433,2438`、`media-report-pipeline-helpers.ts:87,92`、`native-docx-engine/engine.ts:571-573` のフォント直書きを正準トークン参照(または pack 経由の解決関数)に置換する。1 ファイルごとに該当テスト実行。

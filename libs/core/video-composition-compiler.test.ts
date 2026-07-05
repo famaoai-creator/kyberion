@@ -199,6 +199,8 @@ describe('video composition compiler', () => {
     }) as string;
     expect(html).toContain('Brief intake');
     expect(html).toContain('Render package');
+    expect(html).toContain('var(--kb-accent-blue-soft, #93c5fd)');
+    expect(html).toContain('var(--kb-bg-main, #081225)');
   });
 
   it('renders howto guide templates with step chips and fallback stage text', () => {

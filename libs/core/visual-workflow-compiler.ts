@@ -1,6 +1,7 @@
 import type { KyberionImageGenerationADF } from './src/types/image-generation-adf.js';
 import type { KyberionVideoGenerationADF } from './src/types/video-generation-adf.js';
 import { slugify } from './text-utils.js';
+import { buildVideoDesignCssVars, resolveVideoModeDefaults } from './video-design-system.js';
 
 function seedOrRandom(seed?: number): number {
   return Number.isInteger(seed) ? Number(seed) : Math.floor(Date.now() % 2147483647);
@@ -99,6 +100,11 @@ export function compileVideoGenerationADF(adf: KyberionVideoGenerationADF) {
       fallback: 'kyberion-media',
     });
   const workflow = JSON.parse(JSON.stringify(template));
+  const videoModeDefaults = resolveVideoModeDefaults('howto');
+  const videoBackgroundColor =
+    typeof adf.composition.background_color === 'string' && adf.composition.background_color.trim()
+      ? adf.composition.background_color
+      : videoModeDefaults.background_color;
   const replace = (value: any): any => {
     if (typeof value === 'string') {
       return value
@@ -123,6 +129,12 @@ export function compileVideoGenerationADF(adf: KyberionVideoGenerationADF) {
       duration_sec: adf.composition.duration_sec,
       fps: adf.composition.fps || 24,
       workflow_template: adf.engine.workflow_template,
+      css_vars: buildVideoDesignCssVars({
+        backgroundColor: videoBackgroundColor,
+        layoutFamily: videoModeDefaults.layout_family,
+        motionProfile: videoModeDefaults.motion_profile,
+        designSystemRef: { css_vars: {} } as any,
+      }),
     },
   };
 }

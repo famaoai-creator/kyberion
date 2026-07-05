@@ -23,10 +23,10 @@ export interface PdfLayoutElement {
 
 export interface PdfImageElement {
   x: number;
-  y: number;         // Top-down (engine converts to PDF coords)
+  y: number; // Top-down (engine converts to PDF coords)
   width: number;
   height: number;
-  path: string;      // Absolute path to JPEG or PNG
+  path: string; // Absolute path to JPEG or PNG
 }
 
 // ─── Vector / Graphics Element (ISO 32000-2 §8.4, §8.5) ──
@@ -34,7 +34,7 @@ export interface PdfImageElement {
 export type PdfVectorShape =
   | { kind: 'rect'; x: number; y: number; width: number; height: number }
   | { kind: 'line'; x1: number; y1: number; x2: number; y2: number }
-  | { kind: 'path'; d: string };  // SVG-style 'M x y L x y Z ...'
+  | { kind: 'path'; d: string }; // SVG-style 'M x y L x y Z ...'
 
 export interface PdfVectorElement {
   shape: PdfVectorShape;
@@ -143,9 +143,26 @@ export interface PdfFormXObject {
 // ─── Tagged PDF Structure (ISO 32000-2 §14.7, WTPDF 1.0) ──
 
 export type PdfStructTag =
-  | 'Document' | 'Sect' | 'P' | 'H' | 'H1' | 'H2' | 'H3'
-  | 'L' | 'LI' | 'LBody' | 'Table' | 'TR' | 'TH' | 'TD'
-  | 'Figure' | 'Formula' | 'Span' | 'Link' | 'Annot' | 'Art';
+  | 'Document'
+  | 'Sect'
+  | 'P'
+  | 'H'
+  | 'H1'
+  | 'H2'
+  | 'H3'
+  | 'L'
+  | 'LI'
+  | 'LBody'
+  | 'Table'
+  | 'TR'
+  | 'TH'
+  | 'TD'
+  | 'Figure'
+  | 'Formula'
+  | 'Span'
+  | 'Link'
+  | 'Annot'
+  | 'Art';
 
 export interface PdfStructElement {
   tag: PdfStructTag;
@@ -161,8 +178,12 @@ export interface PdfStructElement {
 // ─── Page Label (ISO 32000-2 §12.4.2) ─────────────────────
 
 export type PdfPageLabelStyle =
-  | 'decimal' | 'roman-upper' | 'roman-lower'
-  | 'alpha-upper' | 'alpha-lower' | 'none';
+  | 'decimal'
+  | 'roman-upper'
+  | 'roman-lower'
+  | 'alpha-upper'
+  | 'alpha-lower'
+  | 'none';
 
 export interface PdfPageLabel {
   startIndex: number;
@@ -212,6 +233,8 @@ export interface PdfRenderOptions {
   unicode?: boolean;
   objectStreams?: boolean;
   xmpMetadata?: boolean;
+  /** Embed a Japanese CJK font when text requires it (default: true). */
+  embed_cjk_font?: boolean;
   /** Emit /MarkInfo for Tagged PDF (default: auto if structTree present) */
   tagged?: boolean;
   /** Enable linearization (web-optimized output) */
@@ -298,7 +321,14 @@ export interface PdfDesignProtocol {
 
 // ─── P3-1: AcroForms (ISO 32000-2 §12.7) ───────────────
 
-export type PdfFieldType = 'text' | 'checkbox' | 'radio' | 'dropdown' | 'listbox' | 'button' | 'signature';
+export type PdfFieldType =
+  | 'text'
+  | 'checkbox'
+  | 'radio'
+  | 'dropdown'
+  | 'listbox'
+  | 'button'
+  | 'signature';
 
 export interface PdfFormField {
   /** Unique field name */
@@ -348,12 +378,18 @@ export interface PdfLayer {
 // ─── P3-4: Encryption (ISO/TS 32003:2023 + PDF 2.0 §7.6) ───
 
 export type PdfEncryptAlgorithm = 'AES256' | 'AES-GCM';
-export type PdfHashAlgorithm = 'SHA256' | 'SHA384' | 'SHA512' | 'SHA3-256' | 'SHA3-384' | 'SHA3-512';
+export type PdfHashAlgorithm =
+  | 'SHA256'
+  | 'SHA384'
+  | 'SHA512'
+  | 'SHA3-256'
+  | 'SHA3-384'
+  | 'SHA3-512';
 
 export interface PdfEncryptOptions {
   algorithm?: PdfEncryptAlgorithm; // default: AES256
-  userPassword?: string;           // empty = no user password
-  ownerPassword?: string;          // required
+  userPassword?: string; // empty = no user password
+  ownerPassword?: string; // required
   /** Permissions bits (bit 3=Print, 4=Modify, 5=Copy, 6=Annot, 9=Fill, 11=Extract, 12=Assemble, 13=PrintHQ) */
   permissions?: number;
   /** Hash algorithm for key derivation (ISO/TS 32001: SHA256+) */
@@ -372,9 +408,9 @@ export interface PdfMacOptions {
 // ─── P3-7: Digital Signatures (ISO/TS 32002:2022) ────────
 
 export type PdfSignatureSubFilter =
-  | 'adbe.pkcs7.detached'   // PKCS#7 detached (widest compat)
-  | 'ETSI.CAdES.detached'   // CAdES (ISO/TS 32002)
-  | 'ETSI.RFC3161';         // RFC 3161 timestamp token
+  | 'adbe.pkcs7.detached' // PKCS#7 detached (widest compat)
+  | 'ETSI.CAdES.detached' // CAdES (ISO/TS 32002)
+  | 'ETSI.RFC3161'; // RFC 3161 timestamp token
 
 export interface PdfSignatureOptions {
   subFilter?: PdfSignatureSubFilter;
