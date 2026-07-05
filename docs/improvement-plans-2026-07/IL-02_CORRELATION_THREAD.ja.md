@@ -43,6 +43,8 @@
 3. AA-05 の `mission flow` と共通の相関キーで結合できるよう出力形式を揃える(将来 1 コマンドに統合可能に)。
 4. fixture での unit test + 実データ 1 件の手動確認。
 
+- 実装済み: `scripts/intent.ts` と `pnpm intent` を追加。旧 `history[].handoff_packet.correlation_id` も拾い、confidential では本文を伏せて参照ベースで表示する。
+
 ## リスクと注意
 
 - 相関 ID の貫通は多数のモジュールを横断する薄い変更の集合で、AA-05・SA-01・統一 Trace と接触する。**フィールド追加のみ**を厳守し、これらの計画と相関キー名を統一(`correlation_id`)しておく(各計画の該当箇所に相互参照を明記)。

@@ -295,6 +295,13 @@ export async function createMission(args: {
     is_ephemeral: isEphemeral,
     relationships: normalizedRelationships,
     ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
+    ...(intentHandoff?.correlation_id ? { correlation_id: intentHandoff.correlation_id } : {}),
+    ...(intentHandoff?.origin_intent_id
+      ? { origin_intent_id: intentHandoff.origin_intent_id }
+      : {}),
+    ...(intentHandoff?.origin_utterance_ref
+      ? { origin_utterance_ref: intentHandoff.origin_utterance_ref }
+      : {}),
     priority: 3,
     assigned_persona: persona,
     confidence_score: 1.0,
@@ -337,6 +344,17 @@ export async function createMission(args: {
     ],
   };
   await saveState(upperId, initialState);
+  await emitMissionLifecycleIntentSnapshot({
+    missionId: upperId,
+    stage: 'intake',
+    text:
+      intentHandoff?.goal?.summary ||
+      intentHandoff?.source_text ||
+      resolvedVision ||
+      `Mission ${upperId} (${missionType})`,
+    source: intentHandoff ? 'user_prompt' : 'mission_state',
+    traceRef: intentHandoff?.correlation_id,
+  });
 
   ledger.record('MISSION_CREATE', {
     mission_id: upperId,
@@ -504,8 +522,13 @@ export async function startMission(args: {
     await emitMissionLifecycleIntentSnapshot({
       missionId: upperId,
       stage: 'intake',
-      text: visionRef || `Start mission ${upperId} (${missionType})`,
+      text:
+        state?.intent?.goal_summary ||
+        state?.intent?.source_text ||
+        visionRef ||
+        `Start mission ${upperId} (${missionType})`,
       source: 'mission_state',
+      traceRef: state?.correlation_id,
     });
 
     const missionPath = findMissionPath(upperId);

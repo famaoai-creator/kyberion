@@ -81,6 +81,7 @@ describe('audit-chain — tenant mirror', () => {
       action: 'login',
       operation: 'auth',
       result: 'allowed',
+      correlationId: 'corr-audit-001',
       tenantSlug: 'tenant-a',
     });
 
@@ -96,6 +97,7 @@ describe('audit-chain — tenant mirror', () => {
       .map((l) => JSON.parse(l));
     expect(entries[0].tenantSlug).toBe('tenant-a');
     expect(entries[0].action).toBe('login');
+    expect(entries[0].correlationId).toBe('corr-audit-001');
   });
 
   it('does not create tenant directory when no tenantSlug', async () => {

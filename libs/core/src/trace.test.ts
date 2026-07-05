@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { TraceContext, persistTrace, finalizeAndPersist } from './trace.js';
 
 const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
-const TEST_TMP_BASE = path.join(PROJECT_ROOT, 'tests', '_tmp');
+const TEST_TMP_BASE = path.join(PROJECT_ROOT, 'active', 'shared', 'tmp', 'trace-tests');
 
 function makeTestTmpDir(label: string): string {
   if (!fs.existsSync(TEST_TMP_BASE)) fs.mkdirSync(TEST_TMP_BASE, { recursive: true });
@@ -48,6 +48,26 @@ describe('trace', () => {
       expect(trace.rootSpan.events[0].name).toBe('step-started');
       expect(trace.rootSpan.events[0].attributes).toEqual({ op: 'click' });
       expect(trace.rootSpan.events[1].name).toBe('step-completed');
+    });
+
+    it('auto-attaches correlationId to spans and events when present', () => {
+      const ctx = new TraceContext('root', { correlationId: 'corr-trace-001' });
+
+      const spanId = ctx.startSpan('child-span', { step: 'first' });
+      expect(spanId).toBeTruthy();
+      ctx.addEvent('child-event', { op: 'click' });
+      ctx.endSpan('ok');
+
+      const trace = ctx.finalize();
+      expect(trace.metadata.correlationId).toBe('corr-trace-001');
+      expect(trace.rootSpan.children[0].attributes).toEqual({
+        step: 'first',
+        correlationId: 'corr-trace-001',
+      });
+      expect(trace.rootSpan.children[0].events[0].attributes).toEqual({
+        op: 'click',
+        correlationId: 'corr-trace-001',
+      });
     });
 
     it('addArtifact adds artifacts to current span', () => {
@@ -108,9 +128,9 @@ describe('trace', () => {
       ctx.startSpan('level-2');
       ctx.startSpan('level-3');
       ctx.addEvent('deep-event');
-      ctx.endSpan('ok');  // close level-3
-      ctx.endSpan('ok');  // close level-2
-      ctx.endSpan('ok');  // close level-1
+      ctx.endSpan('ok'); // close level-3
+      ctx.endSpan('ok'); // close level-2
+      ctx.endSpan('ok'); // close level-1
 
       const trace = ctx.finalize();
 
@@ -134,26 +154,12 @@ describe('trace', () => {
   });
 
   describe('persistTrace', () => {
-    let savedPersona: string | undefined;
-    let savedRole: string | undefined;
-
-    beforeEach(() => {
-      savedPersona = process.env.KYBERION_PERSONA;
-      savedRole = process.env.MISSION_ROLE;
-      process.env.KYBERION_PERSONA = 'ecosystem_architect';
-      process.env.MISSION_ROLE = 'mission_controller';
-    });
-
-    afterEach(() => {
-      if (savedPersona === undefined) delete process.env.KYBERION_PERSONA;
-      else process.env.KYBERION_PERSONA = savedPersona;
-      if (savedRole === undefined) delete process.env.MISSION_ROLE;
-      else process.env.MISSION_ROLE = savedRole;
-    });
-
     it('appends a single JSONL line and creates the directory', () => {
       const tmpDir = makeTestTmpDir('persist');
-      const ctx = new TraceContext('persist-test', { actuator: 'test-actuator' });
+      const ctx = new TraceContext('persist-test', {
+        actuator: 'test-actuator',
+        correlationId: 'corr-persist-001',
+      });
       ctx.startSpan('child');
       ctx.addEvent('did-something');
       ctx.endSpan('ok');
@@ -167,6 +173,7 @@ describe('trace', () => {
       const parsed = JSON.parse(lines[0]);
       expect(parsed.traceId).toBe(trace.traceId);
       expect(parsed.rootSpan.name).toBe('persist-test');
+      expect(parsed.metadata.correlationId).toBe('corr-persist-001');
       expect(parsed._persistedAt).toBeTruthy();
 
       fs.rmSync(tmpDir, { recursive: true, force: true });
@@ -191,29 +198,13 @@ describe('trace', () => {
   });
 
   describe('finalizeAndPersist', () => {
-    let savedPersona: string | undefined;
-    let savedRole: string | undefined;
-
-    beforeEach(() => {
-      savedPersona = process.env.KYBERION_PERSONA;
-      savedRole = process.env.MISSION_ROLE;
-      process.env.KYBERION_PERSONA = 'ecosystem_architect';
-      process.env.MISSION_ROLE = 'mission_controller';
-    });
-
-    afterEach(() => {
-      if (savedPersona === undefined) delete process.env.KYBERION_PERSONA;
-      else process.env.KYBERION_PERSONA = savedPersona;
-      if (savedRole === undefined) delete process.env.MISSION_ROLE;
-      else process.env.MISSION_ROLE = savedRole;
-    });
-
     it('finalizes the context and persists in one call', () => {
       const tmpDir = makeTestTmpDir('persist');
-      const ctx = new TraceContext('combined');
+      const ctx = new TraceContext('combined', { correlationId: 'corr-finalize-001' });
       const { trace, path: written } = finalizeAndPersist(ctx, { dir: tmpDir });
 
       expect(trace.rootSpan.endTime).toBeTruthy();
+      expect(trace.metadata.correlationId).toBe('corr-finalize-001');
       expect(fs.existsSync(written)).toBe(true);
 
       fs.rmSync(tmpDir, { recursive: true, force: true });

@@ -83,6 +83,7 @@ export interface IntentContract {
   kind: 'intent-contract';
   source_text: string;
   intent_id: string;
+  correlation_id?: string;
   capability_bundle_id?: string;
   execution_profile_id?: string;
   goal: {
@@ -142,6 +143,7 @@ export interface UserIntentFlow {
   executionBrief: ActuatorExecutionBrief;
   intentContract: IntentContract;
   workLoop: OrganizationWorkLoopSummary;
+  correlationId?: string;
   routingDecision?: AgentRoutingDecision;
   reasoningDecision: ReasoningLevelDecision;
   shadowModelRoute: ReasoningModelRoute;
@@ -151,6 +153,7 @@ export interface UserIntentFlow {
 
 export interface CompileUserIntentFlowInput {
   text: string;
+  correlationId?: string;
   channel?: string;
   locale?: string;
   projectId?: string;
@@ -734,6 +737,18 @@ function resolveIntentPacketForInput(input: CompileUserIntentFlowInput): IntentR
   });
 }
 
+function resolveCorrelationId(input: CompileUserIntentFlowInput): string | undefined {
+  const runtime = input.runtimeContext || {};
+  const candidates = [
+    input.correlationId,
+    typeof runtime.correlation_id === 'string' ? runtime.correlation_id : undefined,
+    typeof runtime.correlationId === 'string' ? runtime.correlationId : undefined,
+  ];
+  return candidates
+    .find((value): value is string => typeof value === 'string' && value.trim().length > 0)
+    ?.trim();
+}
+
 function buildFallbackIntentContract(
   input: CompileUserIntentFlowInput,
   executionBrief?: ActuatorExecutionBrief
@@ -748,6 +763,7 @@ function buildFallbackIntentContract(
     packet.selected_resolution?.shape || (executionBrief ? 'task_session' : 'direct_reply')
   );
   const contextualFrame = buildContextualIntentFrame(input.text);
+  const correlationId = resolveCorrelationId(input);
   if (
     isApprovalWorkflowRequest(input.text) ||
     packet.selected_intent_id === 'resolve-approval' ||
@@ -774,6 +790,7 @@ function buildFallbackIntentContract(
         kind: 'intent-contract',
         source_text: input.text,
         intent_id: intentId,
+        ...(correlationId ? { correlation_id: correlationId } : {}),
         goal: {
           summary:
             executionBrief?.summary ||
@@ -837,6 +854,7 @@ function buildFallbackIntentContract(
         kind: 'intent-contract',
         source_text: input.text,
         intent_id: executionBrief?.archetype_id || classified.intentId || classified.taskType,
+        ...(correlationId ? { correlation_id: correlationId } : {}),
         goal: {
           summary: executionBrief?.summary || classified.goal.summary,
           success_condition: classified.goal.success_condition,
@@ -897,6 +915,7 @@ function buildFallbackIntentContract(
       kind: 'intent-contract',
       source_text: input.text,
       intent_id: resolvedExecutionBrief.archetype_id || 'general_request',
+      ...(correlationId ? { correlation_id: correlationId } : {}),
       goal: {
         summary: resolvedExecutionBrief.summary || 'Clarify and respond to the current request',
         success_condition:
@@ -1034,6 +1053,7 @@ function buildIntentContractPrompt(
         kind: 'intent-contract',
         source_text: 'string',
         intent_id: 'string',
+        correlation_id: 'string?',
         capability_bundle_id: 'string?',
         execution_profile_id: 'string?',
         goal: { summary: 'string', success_condition: 'string' },
@@ -1194,7 +1214,11 @@ async function compileIntentContractWithLlm(
   const parsed = parseJsonObject<IntentContract>(raw);
   if (!parsed) return null;
   const result = validateIntentContract(parsed);
-  return result.valid ? attachExecutionProfile(attachCapabilityBundle(result.value!), input) : null;
+  if (!result.valid) return null;
+  return attachCorrelationId(
+    attachExecutionProfile(attachCapabilityBundle(result.value!), input),
+    input
+  );
 }
 
 async function compileWorkLoopWithLlm(
@@ -1252,6 +1276,18 @@ function buildClarificationPacket(
     'More context is required before execution',
     contract.goal.summary
   );
+}
+
+function attachCorrelationId(
+  contract: IntentContract,
+  input: CompileUserIntentFlowInput
+): IntentContract {
+  const correlationId = resolveCorrelationId(input);
+  if (!correlationId) return contract;
+  return {
+    ...contract,
+    correlation_id: contract.correlation_id || correlationId,
+  };
 }
 
 export function formatClarificationPacket(packet: OperatorInteractionPacket): string {
@@ -1509,8 +1545,14 @@ function emitIntentCompilationCompletedEvent(
     compilerModel: string;
     fallbackReason: CompilationFallbackReason;
     reasoningPolicyVersion: string;
+    selectedResolutionShape?: string;
+    contractExecutionShape?: string;
   }
 ): void {
+  const shapeDisagreement =
+    Boolean(input.selectedResolutionShape) &&
+    Boolean(input.contractExecutionShape) &&
+    input.selectedResolutionShape !== input.contractExecutionShape;
   trace?.addEvent('intent_compilation.completed', {
     reasoning_level: input.reasoningDecision.level,
     reasoning_rule_id: input.reasoningDecision.rule_id,
@@ -1524,6 +1566,9 @@ function emitIntentCompilationCompletedEvent(
     cache_status: input.cacheStatus,
     fallback_reason: input.fallbackReason,
     reasoning_policy_version: input.reasoningPolicyVersion,
+    shape_disagreement: shapeDisagreement,
+    selected_resolution_shape: input.selectedResolutionShape || '',
+    contract_execution_shape: input.contractExecutionShape || '',
   });
 }
 
@@ -1585,8 +1630,13 @@ export async function compileUserIntentFlow(
       compilerModel: compilerTarget.model || 'default',
       fallbackReason: 'none',
       reasoningPolicyVersion: reasoningPolicy.version,
+      selectedResolutionShape: resolutionPacket.selected_resolution?.shape,
+      contractExecutionShape: cacheLookup.cachedFlow.intentContract.resolution.execution_shape,
     });
-    return cacheLookup.cachedFlow;
+    return {
+      ...cacheLookup.cachedFlow,
+      correlationId: cacheLookup.cachedFlow.correlationId || resolveCorrelationId(input),
+    };
   }
   let executionBrief: ActuatorExecutionBrief | null = null;
   let intentContract: IntentContract | null = null;
@@ -1600,10 +1650,12 @@ export async function compileUserIntentFlow(
   if (isSimpleGreeting) {
     source = 'fallback';
     fallbackReason = 'simple_greeting';
+    const correlationId = resolveCorrelationId(input);
     intentContract = {
       kind: 'intent-contract',
       source_text: input.text,
       intent_id: 'generic-conversation',
+      ...(correlationId ? { correlation_id: correlationId } : {}),
       goal: {
         summary: 'Conversational acknowledgment',
         success_condition: 'Polite greeting acknowledged.',
@@ -1700,12 +1752,15 @@ export async function compileUserIntentFlow(
     fallbackReason,
     reasoningPolicyVersion: reasoningPolicy.version,
     cacheStatus,
+    selectedResolutionShape: resolutionPacket.selected_resolution?.shape,
+    contractExecutionShape: intentContract.resolution.execution_shape,
   });
 
   return {
     executionBrief: finalExecutionBrief,
     intentContract,
     workLoop,
+    correlationId: resolveCorrelationId(input),
     routingDecision,
     reasoningDecision,
     shadowModelRoute,

@@ -79,6 +79,15 @@ export interface MissionControllerRoutingContext {
   grantMissionAccess: (missionId: string, serviceId: string, ttl?: number) => Awaitable<void>;
   grantMissionSudo: (missionId: string, on?: boolean, ttl?: number) => Awaitable<void>;
   createCheckpoint: (taskId: string, note: string, explicitMissionId?: string) => Awaitable<void>;
+  approveScopeChange: (
+    id: string,
+    options?: {
+      approvedBy?: string;
+      reason?: string;
+      goalSummary?: string;
+      successCondition?: string;
+    }
+  ) => Awaitable<void>;
   delegateMission: (id: string, agentId: string, a2aMessageId: string) => Awaitable<void>;
   importMission: (id: string, remoteUrl: string) => Awaitable<void>;
   verifyMission: (id: string, result: 'verified' | 'rejected', note: string) => Awaitable<void>;
@@ -435,6 +444,14 @@ export async function runMissionControllerAction(
       } else {
         await context.createCheckpoint(arg1 || 'manual', arg2 || 'progress update');
       }
+      break;
+    case 'scope-approve':
+      await context.approveScopeChange(arg1!, {
+        approvedBy: getValue('--approved-by', context.argv) || getValue('--by', context.argv),
+        reason: getValue('--reason', context.argv) || arg2 || 'Approved scope adjustment.',
+        goalSummary: getValue('--goal', context.argv) || arg3 || '',
+        successCondition: getValue('--success-condition', context.argv) || arg4,
+      });
       break;
     case 'delegate':
       await context.delegateMission(arg1!, arg2!, arg3!);
