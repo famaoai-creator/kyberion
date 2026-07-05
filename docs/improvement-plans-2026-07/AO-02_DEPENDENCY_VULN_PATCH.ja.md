@@ -19,6 +19,11 @@
 4. **見送り判断も台帳に記録**(CVE・理由・再評価条件)。無音放置しない。
 5. パッチ適用の受け渡しは環境制約に従う(GitHub PR に限定しない — 隔離ブランチ/パッチファイル + 承認での適用も可能に。confidential 漏洩スキャンを通す)。
 
+## 実装状況 (2026-07-05)
+
+- **完了済み**: `libs/core/patch-decision.ts` を新設し、severity / reachability / attack_surface / semver_jump / test_gap / rollback_difficulty をスコア化して `auto_apply | urgent_approval | scheduled | defer | approval` を返す判断ルーブリックを実装した。
+- **検証済み**: `libs/core/src/patch-decision.test.ts` で 5 つの分類と raw score を確認した。
+
 ## 実装タスク
 
 ### Task 1: 依存・CVE 検出と追跡台帳 — `claude-sonnet-4`

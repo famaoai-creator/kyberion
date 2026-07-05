@@ -455,6 +455,10 @@
       "types": "./dist/pipeline-contract.d.ts",
       "default": "./dist/pipeline-contract.js"
     },
+    "./patch-decision": {
+      "types": "./dist/patch-decision.d.ts",
+      "default": "./dist/patch-decision.js"
+    },
     "./python-voice-bridge": {
       "types": "./dist/python-voice-bridge.d.ts",
       "default": "./dist/python-voice-bridge.js"

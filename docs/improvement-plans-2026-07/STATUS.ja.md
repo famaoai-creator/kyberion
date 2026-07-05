@@ -25,7 +25,7 @@
 | OP-01 | TODO    | 全推論経路の usage 計測、cost report、spend-guard、KPI 接続                                                       |
 | AR-01 | TODO    | adf-engine.ts 抽出、3エンジン統合、golden 回帰                                                                    |
 | AR-02 | TODO    | describeOps、generate_op_registry、CI ゲート                                                                      |
-| AO-02 | TODO    | CVE スキャン/台帳、パッチ判断ルーブリック、適用フロー                                                             |
+| AO-02 | PARTIAL | patch-decision ルーブリック完了、CVE スキャン/台帳、適用フロー                                                     |
 | IL-01 | TODO    | goal/source_text/outcome_ids の昇格 seam 貫通、outcome-contract の goal 優先化                                    |
 | IL-04 | PARTIAL | intent-reconciliation エンジン、完了ゲート、学習記録                                                              |
 
@@ -138,7 +138,7 @@
 | ID    | 状態    | 残作業                                                                              |
 | ----- | ------- | ----------------------------------------------------------------------------------- |
 | AO-01 | PARTIAL | scheduler run-lock/missed-run catch-up 完了、autonomous-ops-policy/gate、auto-checkpoint |
-| AO-02 | TODO    | CVE スキャン/台帳、パッチルーブリック、適用フロー                                   |
+| AO-02 | PARTIAL | patch-decision ルーブリック完了、CVE スキャン/台帳、適用フロー                                   |
 | AO-03 | DONE    |                                                                                     |
 | AO-04 | TODO    | soak ハーネス、リーク検出、再起動 e2e                                               |
 

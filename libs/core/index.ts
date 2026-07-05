@@ -1510,6 +1510,7 @@ export * from './analysis-execution-contract.js';
 export * from './work-design.js';
 export * from './booking-preference-profile.js';
 export * from './presentation-preference-profile.js';
+export * from './patch-decision.js';
 export * from './project-registry.js';
 export * from './project-operational-state-registry.js';
 export * from './project-track-registry.js';
