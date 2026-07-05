@@ -228,6 +228,17 @@ surface が提供する UI の機能的アフォーダンスの調査(2026-07-03
 | [AO-03](./AO-03_DAEMON_SUPERVISION_ESCALATION.ja.md) | デーモン監督と人間エスカレーション(watchdog・launchd完備・実アラートsink・自己修復の承認ゲート化) | **P0** | M    | なし              |
 | [AO-04](./AO-04_SOAK_ENDURANCE_VALIDATION.ja.md)     | 長時間運用の耐久検証(soak・リーク検出・再起動e2e・30日エビデンス)                                 | P1     | M    | AO-01,AO-02,AO-03 |
 
+### E2E 縦一気通貫(中核ユースケースの実流)
+
+「部品はあるのに流れない」を、継ぎ目の配線と前提の事前検出で解消する実流計画(2026-07-05 追加)。
+
+| ID | タイトル | 優先度 | 規模 | 依存 |
+| --- | --- | --- | --- | --- |
+| [E2E-01](./E2E-01_MEETING_TO_VALUE.ja.md) | 会議→価値提供の縦一気通貫(声学習→本人ボイス会議→議事録→アクションアイテム→タスク→顧客提供) | **P0** | M | なし(AC-01/UX-01/OP-02 の成果を利用) |
+| [E2E-02](./E2E-02_CREATIVE_SUITE.ja.md) | クリエイティブ統合(動画・パワポ・音楽・MV・Web を1つのデザインシステムで)| **P0** | M〜L | DS-01。DS-02/DS-04 未了分を引き取る |
+| [E2E-03](./E2E-03_AGENT_COLLABORATION.ja.md) | エージェント協調(上流成果の可視化・review往復・best-of-N・PR協調)| **P0** | M〜L | MO-03/MO-04/HO-01/IL-01 を利用。MO-02 と棲み分け |
+| [E2E-04](./E2E-04_OPERATOR_INTERFACE.ja.md) | オペレータ・インターフェース統合(入口・ホーム・通知・inbox・plan-preview・CLI 経路統一) | **P0** | M〜L | UX-01/IL-01/E2E-01〜03 の成果を利用。SU-01/SU-03 の最小形 |
+
 ### Company OS(会社を経営する OS 層)
 
 「1人 + AI で AIスタートアップを回す」ための会社経営レイヤーの調査(2026-07-03)に基づく。コンセプトは参照文書 [COMPANY_OS_CONCEPT](../COMPANY_OS_CONCEPT.ja.md)(可能かの診断・組織/業務の表現方法)。既存プリミティブ(vision/role/agent/tenant/mission/pipeline)で業務は表現・実行できるが、会社を束ねる集約層・財務/KPI/意思決定のデータ化が未完。それを埋める。
