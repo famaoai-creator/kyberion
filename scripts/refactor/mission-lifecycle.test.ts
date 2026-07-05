@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
   customerResolver,
+  emitIntentSnapshot,
   pathResolver,
   safeExec,
   safeExistsSync,
@@ -13,13 +14,13 @@ import {
   safeWriteFile,
   transitionStatus,
 } from '@agent/core';
-import { finishMission } from './mission-lifecycle.js';
+import { finishMission, verifyMission } from './mission-lifecycle.js';
 
 const missionId = 'MSN-LIFECYCLE-GATE-001';
 const missionPath = pathResolver.missionDir(missionId, 'public');
 
 function prepareMissionState(
-  status: 'completed' | 'distilling' = 'completed',
+  status: 'completed' | 'distilling' | 'active' = 'completed',
   missionType?: string,
   tenantSlug?: string,
   outcomeContract?: {
@@ -90,6 +91,43 @@ afterEach(() => {
 });
 
 describe('mission lifecycle finish gate', () => {
+  it('blocks verification when the intent drift gate sees a blocking origin mismatch', async () => {
+    prepareMissionState('active');
+    safeMkdir(`${missionPath}/evidence`, { recursive: true });
+    emitIntentSnapshot({
+      missionId,
+      stage: 'intake',
+      source: 'user_prompt',
+      intent: { goal: 'Build a customer onboarding flow' },
+      kind: 'origin',
+    });
+    emitIntentSnapshot({
+      missionId,
+      stage: 'execution',
+      source: 'mission_state',
+      intent: { goal: 'Rewrite the release checklist instead' },
+    });
+
+    const args = {
+      transitionStatus,
+      syncProjectLedgerIfLinked: async () => undefined,
+    };
+
+    await verifyMission(missionId, 'verified', 'Scope drift detected during verification.', args.transitionStatus, args.syncProjectLedgerIfLinked);
+
+    const state = JSON.parse(
+      safeReadFile(`${missionPath}/mission-state.json`, { encoding: 'utf8' }) as string
+    );
+    expect(state.status).toBe('validating');
+    expect(state.context.intent_drift_gate_failure_count).toBe(1);
+    expect(state.context.intent_drift_gate_last_reason).toContain('intent drift');
+    expect(safeExistsSync(`${missionPath}/NEXT_TASKS.json`)).toBe(true);
+    const nextTasks = JSON.parse(
+      safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }) as string
+    );
+    expect(nextTasks.some((task: any) => task.task_id === 'repair-intent-drift')).toBe(true);
+  });
+
   it('keeps a mission in validating when pending tasks remain, then realigns on repeated failure', async () => {
     prepareMissionState('completed');
     safeWriteFile(

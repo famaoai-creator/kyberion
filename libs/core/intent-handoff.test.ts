@@ -33,8 +33,11 @@ describe('intent-handoff', () => {
   it('round-trips the payload and deletes the file on consume', () => {
     tmpBase = fs.mkdtempSync(path.join(os.tmpdir(), 'kyberion-intent-handoff-'));
     const payload = {
-      source_text: '来週のSBI向け提案資料を作って',
-      goal: { summary: 'SBI向け提案資料の作成', success_condition: 'PPTXが成果物として存在する' },
+      source_text: '来週の提案資料を作って',
+      correlation_id: 'corr-handoff-001',
+      origin_intent_id: 'bootstrap-project',
+      origin_utterance_ref: 'surface://corr-handoff-001',
+      goal: { summary: '提案資料の作成', success_condition: 'PPTXが成果物として存在する' },
       outcome_ids: ['OUT-1'],
     };
 

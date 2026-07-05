@@ -1308,6 +1308,8 @@ Maintenance Commands:
   record-task <ID> <description> Record a task intention (flight recorder)
   record-evidence <ID> <task_id> <note>
                                  Append an execution-ledger evidence entry and commit it
+  scope-approve <ID> [--goal <TEXT>] [--reason <TEXT>]
+                                 Approve a scope change and rebaseline the origin intent
   purge    [--execute]            Preview stale missions to archive (--execute to apply)
     sync                           Sync mission registry
   organization-catalogs [--json] [--organization-id <ORG>] [--selected-only] [--summary]
@@ -1641,6 +1643,19 @@ async function grantMissionSudo(missionId: string, on: boolean = true, ttl: numb
   return missionSystem.grantMissionSudo(missionId, on, ttl);
 }
 
+async function approveScopeChange(
+  missionId: string,
+  options?: {
+    approvedBy?: string;
+    reason?: string;
+    goalSummary?: string;
+    successCondition?: string;
+  }
+): Promise<void> {
+  assertCanGrantMissionAuthority();
+  return missionSystem.approveScopeChange(missionId, options);
+}
+
 /**
  * 7. Main Entry
  */
@@ -1684,6 +1699,7 @@ export async function main() {
     recordRoutingDecisionInMissionState,
     grantMissionAccess,
     grantMissionSudo,
+    approveScopeChange,
     createCheckpoint,
     delegateMission,
     importMission,

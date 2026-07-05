@@ -227,6 +227,10 @@
       "types": "./dist/next-action-contract.d.ts",
       "default": "./dist/next-action-contract.js"
     },
+    "./intent-reconciliation": {
+      "types": "./dist/intent-reconciliation.d.ts",
+      "default": "./dist/intent-reconciliation.js"
+    },
     "./mission-context-pack": {
       "types": "./dist/mission-context-pack.d.ts",
       "default": "./dist/mission-context-pack.js"

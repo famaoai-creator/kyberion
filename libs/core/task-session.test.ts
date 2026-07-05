@@ -19,8 +19,10 @@ import {
   classifyTaskSessionIntent,
   createTaskSession,
   getActiveTaskSession,
+  getLatestCompletedTaskSession,
   loadTaskSession,
   recordTaskSessionHistory,
+  reopenTaskSession,
   saveTaskSession,
   validateTaskSession,
 } from './task-session.js';
@@ -69,6 +71,7 @@ describe('task-session', () => {
 
   it('creates and validates a capture task session', () => {
     const session = createTaskSession({
+      correlationId: 'corr-task-session-001',
       surface: 'presence',
       taskType: 'capture_photo',
       status: 'collecting_requirements',
@@ -86,6 +89,7 @@ describe('task-session', () => {
     });
     const result = validateTaskSession(session);
     expect(result.valid).toBe(true);
+    expect(session.correlation_id).toBe('corr-task-session-001');
     expect(session.outcome_contract.success_criteria.length).toBeGreaterThan(0);
     expect(session.work_loop?.resolution.execution_shape).toBe('task_session');
     expect(session.work_loop?.intent.label).toBe('capture_photo');
@@ -94,6 +98,7 @@ describe('task-session', () => {
   it('persists and loads task sessions', () => {
     const session = createTaskSession({
       sessionId: 'TSK-TEST-WBS',
+      correlationId: 'corr-task-session-002',
       surface: 'presence',
       taskType: 'workbook_wbs',
       intentId: 'generate-workbook',
@@ -116,6 +121,7 @@ describe('task-session', () => {
     saveTaskSession(session);
     const loaded = loadTaskSession('TSK-TEST-WBS');
     expect(loaded?.task_type).toBe('workbook_wbs');
+    expect(loaded?.correlation_id).toBe('corr-task-session-002');
     expect(loaded?.work_loop?.outcome_design.labels.length).toBeGreaterThan(0);
     expect(loaded?.work_loop?.context.track_id).toBe('TRK-TEST-REL1');
     expect(loaded?.work_loop?.context.track_name).toBe('Release 1');
@@ -125,6 +131,7 @@ describe('task-session', () => {
   it('persists iMessage-backed task sessions', () => {
     const session = createTaskSession({
       sessionId: 'TSK-TEST-IMESSAGE',
+      correlationId: 'corr-task-session-003',
       surface: 'imessage',
       taskType: 'analysis',
       intentId: 'incident-informed-review',
@@ -141,6 +148,7 @@ describe('task-session', () => {
     expect(() => saveTaskSession(session)).not.toThrow();
     const loaded = loadTaskSession('TSK-TEST-IMESSAGE');
     expect(loaded?.surface).toBe('imessage');
+    expect(loaded?.correlation_id).toBe('corr-task-session-003');
   });
 
   it('derives approval-required control state from classified service operations', () => {
@@ -204,6 +212,41 @@ describe('task-session', () => {
     });
 
     expect(() => saveTaskSession(session)).toThrow(/intent goal not satisfied|requires evidence/i);
+  });
+
+  it('reopens completed sessions with a correction note', () => {
+    const session = createTaskSession({
+      sessionId: 'TSK-TEST-REOPEN',
+      correlationId: 'corr-task-session-reopen',
+      surface: 'presence',
+      taskType: 'analysis',
+      status: 'completed',
+      goal: {
+        summary: 'レビュー結果をまとめる',
+        success_condition: '要点が返る',
+      },
+      payload: {
+        intent_id: 'review-summary',
+      },
+    });
+    session.artifact = {
+      kind: 'note',
+      output_path: pathResolver.shared('runtime/task-sessions/TSK-TEST-REOPEN.md'),
+      preview_text: '要点が返る',
+    };
+    saveTaskSession(session);
+    expect(getLatestCompletedTaskSession('presence', 'corr-task-session-reopen')?.session_id).toBe(
+      'TSK-TEST-REOPEN'
+    );
+    expect(getLatestCompletedTaskSession('presence', 'different-correlation')).toBeNull();
+
+    const reopened = reopenTaskSession('TSK-TEST-REOPEN', {
+      reason: 'correction utterance: 違う',
+      status: 'planning',
+    });
+    expect(reopened?.status).toBe('planning');
+    expect(reopened?.payload?.reopened_from_session_id).toBe('TSK-TEST-REOPEN');
+    expect(String(reopened?.payload?.reopen_reason || '')).toContain('違う');
   });
 
   it('persists a completion summary when a completed task session has evidence', () => {

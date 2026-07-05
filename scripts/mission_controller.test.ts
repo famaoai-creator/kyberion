@@ -427,6 +427,9 @@ describe('mission_controller argument parsing', () => {
     expect(help).toContain(
       'resume   [ID]                  Resume the last active mission and replay orchestration journal (or specify ID)'
     );
+    expect(help).toContain(
+      'scope-approve <ID> [--goal <TEXT>] [--reason <TEXT>]'
+    );
   });
 
   it('treats --json as a boolean flag for organization profile inventory', () => {

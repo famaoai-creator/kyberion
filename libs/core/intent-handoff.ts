@@ -14,6 +14,9 @@ import { safeExistsSync, safeReadFile, safeUnlinkSync, safeWriteFile } from './s
 
 export interface IntentGoalHandoff {
   source_text?: string;
+  correlation_id?: string;
+  origin_intent_id?: string;
+  origin_utterance_ref?: string;
   goal?: {
     summary?: string;
     success_condition?: string;

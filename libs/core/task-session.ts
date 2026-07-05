@@ -78,6 +78,7 @@ export interface TaskSessionHistoryEntry {
 
 export interface TaskSession {
   session_id: string;
+  correlation_id?: string;
   surface: TaskSessionSurface;
   task_type: TaskSessionType;
   status: TaskSessionStatus;
@@ -130,6 +131,7 @@ export interface TaskSession {
 export interface TaskSessionIntent {
   taskType: TaskSessionType;
   intentId?: string;
+  correlationId?: string;
   goal: TaskSession['goal'];
   projectContext?: TaskSession['project_context'];
   requirements?: TaskSession['requirements'];
@@ -445,6 +447,7 @@ function applyApprovalPolicy(
 
 export function createTaskSession(input: {
   sessionId?: string;
+  correlationId?: string;
   surface: TaskSessionSurface;
   taskType: TaskSessionType;
   status?: TaskSessionStatus;
@@ -462,6 +465,7 @@ export function createTaskSession(input: {
 }): TaskSession {
   const now = new Date().toISOString();
   const requiresApproval = inferRequiresApproval(input);
+  const correlationId = input.correlationId;
   const workLoop =
     input.workLoop ||
     buildOrganizationWorkLoopSummary({
@@ -502,12 +506,13 @@ export function createTaskSession(input: {
   const payload = input.intentId
     ? {
         ...(input.payload || {}),
-        intent_id: input.intentId,
+        ...(input.intentId ? { intent_id: input.intentId } : {}),
       }
     : input.payload;
 
   return {
     session_id: provisionalSessionId,
+    correlation_id: correlationId,
     surface: input.surface,
     task_type: input.taskType,
     status: input.status || 'awaiting_instruction',
@@ -1203,6 +1208,50 @@ export function getActiveTaskSession(surface?: TaskSessionSurface): TaskSession 
       (session) => !['completed', 'failed', 'released'].includes(session.status)
     ) || null
   );
+}
+
+export function getLatestCompletedTaskSession(
+  surface?: TaskSessionSurface,
+  correlationId?: string
+): TaskSession | null {
+  return (
+    listTaskSessions(surface).find((session) => {
+      if (session.status !== 'completed') return false;
+      if (!correlationId) return true;
+      return session.correlation_id === correlationId;
+    }) || null
+  );
+}
+
+export function reopenTaskSession(
+  sessionId: string,
+  input: {
+    reason: string;
+    status?: Exclude<TaskSessionStatus, 'completed' | 'failed' | 'released'>;
+    payload?: Record<string, unknown>;
+    requirements?: TaskSession['requirements'];
+  }
+): TaskSession | null {
+  const session = loadTaskSession(sessionId);
+  if (!session) return null;
+  const reopened = updateTaskSession(sessionId, {
+    status: input.status || (session.requirements?.missing?.length ? 'collecting_requirements' : 'planning'),
+    requirements: input.requirements || session.requirements,
+    payload: {
+      ...(session.payload || {}),
+      ...(input.payload || {}),
+      reopened_from_session_id: session.session_id,
+      reopened_at: new Date().toISOString(),
+      reopen_reason: input.reason,
+    },
+  });
+  if (!reopened) return null;
+  recordTaskSessionHistory(sessionId, {
+    ts: new Date().toISOString(),
+    type: 'control',
+    text: `Session reopened: ${input.reason}`,
+  });
+  return loadTaskSession(sessionId);
 }
 
 export function updateTaskSession(
