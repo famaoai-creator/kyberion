@@ -8,9 +8,9 @@
 
 | 判定    | 件数 |
 | ------- | ---- |
-| DONE    | 30   |
-| PARTIAL | 23   |
-| TODO    | 42   |
+| DONE    | 38   |
+| PARTIAL | 35   |
+| TODO    | 22   |
 
 ## P0 残作業(プロダクション化のクリティカルパス)
 
@@ -19,10 +19,10 @@
 | IP-07 | PARTIAL | claude-agent-reasoning-backend テスト、surface-runtime-orchestrator 特性化テスト                                  |
 | MO-01 | PARTIAL | プロセステンプレート機構(schema・4テンプレート・worker のテンプレート駆動化)                                      |
 | MO-02 | PARTIAL | mission-gate-engine、新設ゲート共通化、planning/受入ゲート記録、受入 rework/owner 通知、exit/quality の修復ループ |
-| AA-02 | TODO    | mesh_delivery_driver 新設、broker⇔dispatchToPeer 配線、writer fencing、E2E                                        |
+| AA-02 | PARTIAL | mesh_delivery_driver 新設、broker⇔dispatchToPeer 配線、writer fencing、2-peer E2E                                 |
 | SA-02 | PARTIAL | execution-bounds.ts 抽出、SECURITY.md、warn→enforce 到達                                                          |
 | SA-05 | PARTIAL | policyEngine の操作種別拡張、secure-io parse失敗 fail-open 解消、-y 破壊操作除外                                  |
-| OP-01 | TODO    | 全推論経路の usage 計測、cost report、spend-guard、KPI 接続                                                       |
+| OP-01 | PARTIAL | usage 計測の全経路接続、cost report、spend-guard、KPI 接続                                                        |
 | AR-01 | TODO    | adf-engine.ts 抽出、3エンジン統合、golden 回帰                                                                    |
 | AR-02 | TODO    | describeOps、generate_op_registry、CI ゲート                                                                      |
 | AO-02 | TODO    | CVE スキャン/台帳、パッチ判断ルーブリック、適用フロー                                                             |
@@ -106,10 +106,21 @@
 | ID    | 状態    | 残作業                                                    |
 | ----- | ------- | --------------------------------------------------------- |
 | AA-01 | DONE    |                                                           |
-| AA-02 | TODO    | mesh_delivery_driver、writer fencing、2-peer E2E          |
+| AA-02 | PARTIAL | mesh_delivery_driver、writer fencing、2-peer E2E          |
 | AA-03 | PARTIAL | 署名モジュール+秘密永続化、warn→enforce、鍵運用文書       |
-| AA-04 | TODO    | 会話ストア、rehydrate、inflight admission                 |
+| AA-04 | PARTIAL | 会話ストア、rehydrate、inflight admission                 |
 | AA-05 | PARTIAL | mission flow コマンド、file 版 transport の quarantine 化 |
+
+### AR(アクチュエータリファクタリング/使いやすさ)
+
+| ID    | 状態    | 残作業                                                          |
+| ----- | ------- | --------------------------------------------------------------- |
+| AR-01 | TODO    | adf-engine.ts 抽出、3エンジン統合、golden 回帰                  |
+| AR-02 | TODO    | describeOps、generate_op_registry、CI ゲート                    |
+| AR-03 | TODO    | per-op 入力契約(`params:any` → 検証付き契約・必須/例)           |
+| AR-04 | TODO    | 共有 op 語彙(io/capture/net/transform/core・命名エイリアス整理) |
+| AR-05 | TODO    | 不整合アクチュエータの分割(観察/変更・ドメイン境界)             |
+| AR-06 | PARTIAL | silent no-op の撲滅、未知 op を成功でなくエラーに               |
 
 ### SA(セキュリティ・監査)
 
@@ -125,7 +136,7 @@
 
 | ID    | 状態    | 残作業                                                   |
 | ----- | ------- | -------------------------------------------------------- |
-| OP-01 | TODO    | usage 計測、cost report、spend-guard                     |
+| OP-01 | PARTIAL | usage 計測、cost report、spend-guard                     |
 | OP-02 | DONE    | (残: 外部ボリューム定期運用の実績)                       |
 | OP-03 | PARTIAL | bin フィールド+CLI、docker deploy サービス               |
 | OP-04 | TODO    | 劣化検知ループ、healthz/status、provider-health 永続化   |
@@ -144,6 +155,7 @@
 
 | ID    | 状態 | 残作業                                                                                     |
 | ----- | ---- | ------------------------------------------------------------------------------------------ |
+| IL-01 | DONE | ゴールの貫通、元 intent の goal を実行まで運ぶ                                             |
 | IL-02 | DONE | 相関 ID 貫通(契約/ミッション state・snapshot・memory・trace・audit)、intent trace コマンド |
 | IL-03 | DONE | origin baseline、実行中ドリフトゲート(verification 配線)                                   |
 | IL-04 | DONE | intent-reconciliation エンジン、完了ゲート、学習記録                                       |
@@ -168,10 +180,14 @@
 
 ### E2E(オペレータ接点の最小統合)
 
-| ID     | 状態 | 残作業                                       |
-| ------ | ---- | -------------------------------------------- |
-| E2E-01 | DONE | 会議→価値提供の縦一気通貫(Task 1-7 実装済み) |
-| E2E-04 | DONE |                                              |
+| ID     | 状態    | 残作業                                       |
+| ------ | ------- | -------------------------------------------- |
+| E2E-01 | DONE    | 会議→価値提供の縦一気通貫(Task 1-7 実装済み) |
+| E2E-02 | TODO    | クリエイティブ統合(デザインシステム一括生成) |
+| E2E-03 | PARTIAL | エージェント協調、review 往復、PR 協調       |
+| E2E-04 | DONE    |                                              |
+| E2E-05 | TODO    | アプリ開発ライフサイクル(iOS/Android)        |
+| E2E-06 | TODO    | 顧客対話ドリブン、deal と SDLC の接続        |
 
 ### HO(ハンドオフ)
 
