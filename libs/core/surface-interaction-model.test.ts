@@ -169,6 +169,7 @@ describe('surface-interaction-model', () => {
         channelType: 'im',
       },
     });
+    expect(slackInput.correlationId).toBe('corr-1');
     expect(slackInput.query).toContain('Surface: slack');
     expect(slackInput.query).toContain('Channel: C123');
     expect(slackInput.query).toContain('User message:\nレビューして');
@@ -241,6 +242,7 @@ describe('surface-interaction-model', () => {
     expect(unifiedIMessageInput.agentId).toBe('imessage-surface-agent');
     expect(unifiedIMessageInput.surface).toBe('imessage');
     expect(unifiedIMessageInput.surfaceText).toBe('iMessageで会話して');
+    expect(unifiedIMessageInput.correlationId).toBeDefined();
     expect(unifiedIMessageInput.threadContext).toBeUndefined();
 
     const unifiedSlackInput = buildSurfaceConversationInput({
