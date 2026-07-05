@@ -146,7 +146,14 @@ interface SlackPayload {
 }
 
 interface MissionControlPayload {
-  operation: 'resume' | 'refresh_team' | 'prewarm_team' | 'staff_team' | 'finish';
+  operation:
+    | 'resume'
+    | 'pause'
+    | 'cancel'
+    | 'refresh_team'
+    | 'prewarm_team'
+    | 'staff_team'
+    | 'finish';
   requested_by_surface?: 'chronos';
 }
 

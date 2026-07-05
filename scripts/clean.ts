@@ -1,9 +1,8 @@
 #!/usr/bin/env node
-import * as path from 'node:path';
-import { withExecutionContext } from '@agent/core';
-import { safeRmSync } from '@agent/core';
-import { pathResolver } from '@agent/core';
-import { getAllFiles } from '@agent/core';
+import { withExecutionContext } from '../libs/core/authority.js';
+import { safeRmSync } from '../libs/core/secure-io.js';
+import { pathResolver } from '../libs/core/path-resolver.js';
+import { getAllFiles } from '../libs/core/fs-utils.js';
 
 function removeIfExists(targetPath: string): void {
   safeRmSync(targetPath, { recursive: true, force: true });
