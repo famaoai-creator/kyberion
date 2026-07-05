@@ -12,6 +12,12 @@
 - **auto-checkpoint 未実装**: 長時間ミッションの自動チェックポイントが未整備(`MISSION_LIFECYCLE_AUDIT.md:124` F4 未了)。
 - **判断基準に沿った自動/承認の振り分けが無い**: 何を無人で行い何を人間に回すかのポリシーが未実装(判断基準 §1-2 が未実装)。
 
+## 実装状況 (2026-07-05)
+
+- **完了済み(Task 1)**: `pipeline-scheduler.ts` に missed-run catch-up と per-pipeline run-lock を実装し、`chronos_daemon.ts` が claim/complete 経由で tick を回すようになった。
+- **完了済み(Task 2)**: `knowledge/product/governance/autonomous-ops-policy.json` を追加し、`libs/core/autonomous-ops-gate.ts` で maintenance action を `auto | notify | approve` に振り分けられるようにした。fail-closed(未知 action / 不正ポリシーは承認)を確認済み。
+- **完了済み(Task 3)**: `baseline-check` の hourly schedule、`tenant-drift-watch` の daily pipeline、`auto-checkpoint` の daily pipeline を追加し、定期メンテ配線を実装した。
+
 ## ゴール(受入条件)
 
 1. 実際の定期メンテパイプライン(janitor 実行・健全性スキャン・tenant-drift・依存/脆弱性スキャン AO-02・auto-checkpoint)が `schedule.cron` で登録され、chronos で無人実行される。

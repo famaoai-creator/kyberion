@@ -1,5 +1,5 @@
 {
-  "generated": "2026-07-05T05:33:13.047Z",
+  "generated": "2026-07-05T08:13:09.282Z",
   "files": [
     {
       "path": "Ecosystem_Map.md",
@@ -1268,6 +1268,12 @@
       "type": "json"
     },
     {
+      "path": "product/governance/autonomous-ops-policy.json",
+      "tier": "public",
+      "size": 1825,
+      "type": "json"
+    },
+    {
       "path": "product/governance/capability-bundle-registry.json",
       "tier": "public",
       "size": 5646,
@@ -2110,7 +2116,7 @@
     {
       "path": "product/governance/role-authority-map.json",
       "tier": "public",
-      "size": 3649,
+      "size": 3760,
       "type": "json"
     },
     {
@@ -2134,7 +2140,7 @@
     {
       "path": "product/governance/security-policy.json",
       "tier": "public",
-      "size": 17926,
+      "size": 17414,
       "type": "json"
     },
     {
@@ -4726,7 +4732,7 @@
     {
       "path": "product/pipeline-templates/hiring-workflow.json",
       "tier": "public",
-      "size": 5132,
+      "size": 5192,
       "type": "json"
     },
     {
@@ -6442,7 +6448,7 @@
     {
       "path": "product/schemas/org-chart.schema.json",
       "tier": "public",
-      "size": 2130,
+      "size": 2178,
       "type": "json"
     },
     {

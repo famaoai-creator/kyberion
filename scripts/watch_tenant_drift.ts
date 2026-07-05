@@ -139,6 +139,20 @@ function scan(): DriftReport {
   };
 }
 
+export function recordTenantDriftAudit(report: DriftReport): void {
+  auditChain.record({
+    agentId: 'watch_tenant_drift',
+    action: 'integrity_check',
+    operation: 'tenant_drift_scan',
+    result: 'denied',
+    reason: `${report.findings.length} drift finding(s); see report`,
+    metadata: {
+      finding_count: report.findings.length,
+      scanned_paths: report.scanned_paths,
+    },
+  });
+}
+
 function main(): number {
   const args = process.argv.slice(2);
   const json = args.includes('--json');
@@ -163,14 +177,7 @@ function main(): number {
 
   if (report.findings.length > 0) {
     try {
-      auditChain.record({
-        agentId: 'watch_tenant_drift',
-        action: 'integrity_check',
-        operation: 'tenant_drift_scan',
-        result: 'denied',
-        reason: `${report.findings.length} drift finding(s); see report`,
-        metadata: { findings: report.findings, scanned_paths: report.scanned_paths },
-      });
+      recordTenantDriftAudit(report);
     } catch (err) {
       logger.warn(`[tenant-drift] failed to append audit entry: ${(err as Error).message ?? err}`);
     }

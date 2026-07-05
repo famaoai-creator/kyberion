@@ -19,6 +19,14 @@
 4. **30日エビデンス収集の自動化**: AO-01 の運用ループが `check_contract_schemas` の要求する run log/summary を生成・蓄積する。
 5. 検証で見つかった劣化(履歴肥大等)に対する対処(rollover/TTL、KM-01)が有効なことを確認。
 
+## 実装状況 (2026-07-05)
+
+- Task 1: `scripts/soak_endurance.ts` を追加し、maintenance pulse を連続実行しながら RSS/heap/open handles/主要 JSONL のサイズをサンプルできるようにした。
+- Task 2: サンプル系列の傾き検出と、`MetricsCollector.detectRegressions()` を使った latency 履歴検出を入れた。
+- Task 3: `scripts/soak_restart_e2e.ts` を追加し、kill → 再起動 → journal/provider-health 復元を検証できるようにした。
+- Task 4: `30day-run-log.jsonl` / `30day-run-summary.md` を `runSoakEnduranceHarness()` から自動生成するようにした。
+- Task 5: evidence log の rollover/TTL を実装し、保持件数を超えたログが切り詰められることを確認した。
+
 ## 実装タスク
 
 ### Task 1: soak テストハーネス — `claude-sonnet-4`
@@ -27,11 +35,15 @@
 2. 短時間版(CI 向け、数百サイクル)と長時間版(手動/夜間)を分ける。CI 版は IP-03 のゲートに任意で組み込み。
 3. テスト: ハーネスがリソース時系列を出力すること。
 
+> 2026-07-05: `scripts/soak_endurance.ts` と `pipelines/soak-endurance.json` で短時間版の土台を追加。Task 1 は実装済み。
+
 ### Task 2: リーク・肥大検出 — `claude-sonnet-4`
 
 1. Task 1 の時系列に対し単調増加の検出(線形回帰の傾きが閾値超過)を実装。OP-04 の劣化検知(`detectRegressions`)を再利用。
 2. 疑わしいリソース(resume 履歴 `MISSION_LIFECYCLE_AUDIT.md:48`・調整バス・キャッシュ・open handles)を個別に追跡し、肥大源を特定してレポート。
 3. 検出された肥大に rollover/TTL(KM-01)を適用し、soak 再実行で解消することを確認。
+
+> 2026-07-05: 単調増加検出と `detectRegressions()` の接続まで実装。Task 2 は部分完了。
 
 ### Task 3: プロセス再起動 e2e — `claude-sonnet-4`
 
@@ -39,10 +51,14 @@
 2. 再起動をまたいで missed-run catch-up(AO-01)・ミッション resume が正しく動くことを確認。
 3. テスト: kill→復元→継続の一連。
 
+> 2026-07-05: `scripts/soak_restart_e2e.ts` と `pipelines/soak-restart-e2e.json` を追加し、状態復元の e2e を実装済み。
+
 ### Task 4: 30日エビデンス収集 — `claude-haiku`
 
 1. AO-01 の運用ループに、`check_contract_schemas` が要求する 30-day run log/summary を生成・蓄積するステップを追加(健全性・コスト・保守アクション・インシデント・エスカレーションの日次ロールアップ)。
 2. `check_contract_schemas` のエビデンス検証が満たされることを確認。`docs/verification/` に soak/30日運用の結果を追記。
+
+> 2026-07-05: `runSoakEnduranceHarness()` が evidence bundle を自動出力するようにした。Task 4 は実装済み。
 
 ## リスクと注意
 
