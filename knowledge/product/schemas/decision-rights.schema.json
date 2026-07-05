@@ -1,0 +1,75 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/decision-rights.schema.json",
+  "title": "Decision Rights Matrix",
+  "type": "object",
+  "required": ["version", "company_id", "tenant_slug", "source_kind", "source_path", "decisions"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "company_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tenant_slug": {
+      "type": ["string", "null"]
+    },
+    "source_kind": {
+      "type": "string",
+      "enum": ["customer", "confidential", "public"]
+    },
+    "source_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "decisions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/decisionRight"
+      }
+    }
+  },
+  "$defs": {
+    "decisionRight": {
+      "type": "object",
+      "required": ["decision_type", "authorized_role", "threshold"],
+      "properties": {
+        "decision_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "authorized_role": {
+          "type": "string",
+          "minLength": 1
+        },
+        "threshold": {
+          "type": "object",
+          "required": ["metric", "value"],
+          "properties": {
+            "metric": {
+              "type": "string",
+              "minLength": 1
+            },
+            "value": {
+              "type": ["number", "string"]
+            },
+            "unit": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "requires_review_from": {
+          "type": "string"
+        },
+        "escalates_to": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
