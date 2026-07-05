@@ -1,9 +1,6 @@
 #!/usr/bin/env node
-import * as path from 'node:path';
-import { withExecutionContext } from '@agent/core';
-import { safeRmSync } from '@agent/core';
-import { pathResolver } from '@agent/core';
-import { getAllFiles } from '@agent/core';
+import { withExecutionContext } from '@agent/core/governance';
+import { safeRmSync, pathResolver, getAllFiles } from '@agent/core';
 
 function removeIfExists(targetPath: string): void {
   safeRmSync(targetPath, { recursive: true, force: true });

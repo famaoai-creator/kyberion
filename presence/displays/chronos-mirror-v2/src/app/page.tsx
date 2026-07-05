@@ -32,7 +32,11 @@ import {
   DEFAULT_CHRONOS_WEB_DESIGN_SYSTEM_PACK,
   DEFAULT_CHRONOS_WEB_THEME_PACK,
 } from '@agent/core/web-design-system';
-import { A2UIRenderer } from '../components/A2UIComponentLibrary';
+import {
+  A2UIRenderer,
+  KbArtifactTile,
+  KbInterventionPanel,
+} from '../components/A2UIComponentLibrary';
 import { FocusedOperatorView } from '../components/FocusedOperatorView';
 import { SovereignChat } from '../components/SovereignChat';
 import { AgentPanel } from '../components/AgentPanel';
@@ -318,6 +322,39 @@ export default function ChronosMirrorV2() {
   const [focusedOperatorMissionId, setFocusedOperatorMissionId] = useState<string | null>(null);
   const [tenantCssVars, setTenantCssVars] = useState<Record<string, string>>({});
   const [tenantLabel, setTenantLabel] = useState<string | null>(null);
+  const [planRequestText, setPlanRequestText] = useState('');
+  const [planMissionType, setPlanMissionType] = useState('proposal-brief');
+  const [planPersona, setPlanPersona] = useState('operator');
+  const [planTier, setPlanTier] = useState<'personal' | 'confidential' | 'public'>('confidential');
+  const [planPreview, setPlanPreview] = useState<any | null>(null);
+  const [planPreviewError, setPlanPreviewError] = useState<string | null>(null);
+  const [planPreviewBusy, setPlanPreviewBusy] = useState(false);
+  const [deliverables, setDeliverables] = useState<any[]>([]);
+  const [deliverablesError, setDeliverablesError] = useState<string | null>(null);
+  const [deliverablesQuery, setDeliverablesQuery] = useState('');
+  const [deliverablesRefreshTick, setDeliverablesRefreshTick] = useState(0);
+  const [selectedDeliverableId, setSelectedDeliverableId] = useState<string | null>(null);
+  const [deliverableReviewComment, setDeliverableReviewComment] = useState('');
+  const [deliverableReviewBusy, setDeliverableReviewBusy] = useState(false);
+  const [deliverableReviewError, setDeliverableReviewError] = useState<string | null>(null);
+  const [missionHistory, setMissionHistory] = useState<any[]>([]);
+  const [missionHistoryError, setMissionHistoryError] = useState<string | null>(null);
+  const [missionHistoryQuery, setMissionHistoryQuery] = useState('');
+  const [missionHistoryStatus, setMissionHistoryStatus] = useState('completed');
+  const [missionHistoryTier, setMissionHistoryTier] = useState('');
+  const [selectedMissionId, setSelectedMissionId] = useState<string | null>(null);
+  const [costSummary, setCostSummary] = useState<any | null>(null);
+  const [costSummaryError, setCostSummaryError] = useState<string | null>(null);
+  const [approvalQueue, setApprovalQueue] = useState<any[]>([]);
+  const [approvalQueueError, setApprovalQueueError] = useState<string | null>(null);
+  const [approvalQueueQuery, setApprovalQueueQuery] = useState('');
+  const [approvalDecisionBusyId, setApprovalDecisionBusyId] = useState<string | null>(null);
+  const [connections, setConnections] = useState<any[]>([]);
+  const [connectionsError, setConnectionsError] = useState<string | null>(null);
+  const [connectionsQuery, setConnectionsQuery] = useState('');
+  const [connectionReviewBusyId, setConnectionReviewBusyId] = useState<string | null>(null);
+  const [connectionReviewNote, setConnectionReviewNote] = useState('');
+  const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     taxonomy: false,
     cycle: false,
@@ -336,6 +373,143 @@ export default function ChronosMirrorV2() {
   useEffect(() => {
     saveOperatorLayoutPrefs(focusedOperatorView, missionIntelligenceFocus);
   }, [focusedOperatorView, missionIntelligenceFocus]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch(
+      `/api/deliverables?limit=24${deliverablesQuery ? `&query=${encodeURIComponent(deliverablesQuery)}` : ''}`,
+      {
+        headers: { 'Cache-Control': 'no-cache' },
+      }
+    )
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(`deliverables ${response.status}`);
+        }
+        return (await response.json()) as { deliverables?: any[] };
+      })
+      .then((payload) => {
+        if (cancelled) return;
+        setDeliverables(Array.isArray(payload.deliverables) ? payload.deliverables : []);
+        setDeliverablesError(null);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setDeliverables([]);
+        setDeliverablesError(error instanceof Error ? error.message : String(error));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [deliverablesQuery, deliverablesRefreshTick]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const params = new URLSearchParams();
+    params.set('limit', '24');
+    if (missionHistoryQuery) params.set('query', missionHistoryQuery);
+    if (missionHistoryStatus) params.set('status', missionHistoryStatus);
+    if (missionHistoryTier) params.set('tier', missionHistoryTier);
+    void fetch(`/api/missions/search?${params.toString()}`, {
+      headers: { 'Cache-Control': 'no-cache' },
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`missions ${response.status}`);
+        return (await response.json()) as { missions?: any[] };
+      })
+      .then((payload) => {
+        if (cancelled) return;
+        setMissionHistory(Array.isArray(payload.missions) ? payload.missions : []);
+        setMissionHistoryError(null);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setMissionHistory([]);
+        setMissionHistoryError(error instanceof Error ? error.message : String(error));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [missionHistoryQuery, missionHistoryStatus, missionHistoryTier]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const params = new URLSearchParams();
+    if (selectedMissionId) params.set('missionId', selectedMissionId);
+    params.set('since', new Date().toISOString().slice(0, 10));
+    void fetch(`/api/cost?${params.toString()}`, {
+      headers: { 'Cache-Control': 'no-cache' },
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`cost ${response.status}`);
+        return (await response.json()) as { summary?: any };
+      })
+      .then((payload) => {
+        if (cancelled) return;
+        setCostSummary(payload.summary || null);
+        setCostSummaryError(null);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setCostSummary(null);
+        setCostSummaryError(error instanceof Error ? error.message : String(error));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedMissionId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const params = new URLSearchParams();
+    params.set('status', 'pending');
+    params.set('limit', '24');
+    if (approvalQueueQuery) params.set('query', approvalQueueQuery);
+    void fetch(`/api/approvals?${params.toString()}`, {
+      headers: { 'Cache-Control': 'no-cache' },
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`approvals ${response.status}`);
+        return (await response.json()) as { approvals?: any[] };
+      })
+      .then((payload) => {
+        if (cancelled) return;
+        setApprovalQueue(Array.isArray(payload.approvals) ? payload.approvals : []);
+        setApprovalQueueError(null);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setApprovalQueue([]);
+        setApprovalQueueError(error instanceof Error ? error.message : String(error));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [approvalQueueQuery]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch('/api/connections', {
+      headers: { 'Cache-Control': 'no-cache' },
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`connections ${response.status}`);
+        return (await response.json()) as { connections?: any[] };
+      })
+      .then((payload) => {
+        if (cancelled) return;
+        setConnections(Array.isArray(payload.connections) ? payload.connections : []);
+        setConnectionsError(null);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setConnections([]);
+        setConnectionsError(error instanceof Error ? error.message : String(error));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!focusedOperatorView) return;
@@ -395,6 +569,139 @@ export default function ChronosMirrorV2() {
     if (!element) return;
     element.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, []);
+
+  const runPlanPreview = useCallback(async () => {
+    if (!planRequestText.trim()) {
+      setPlanPreviewError('依頼文を入力してください');
+      return;
+    }
+    setPlanPreviewBusy(true);
+    setPlanPreviewError(null);
+    try {
+      const response = await fetch('/api/plan-preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requestText: planRequestText,
+          missionType: planMissionType,
+          assignedPersona: planPersona,
+          tier: planTier,
+          locale: locale,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'plan preview failed');
+      setPlanPreview(payload.preview);
+    } catch (error) {
+      setPlanPreview(null);
+      setPlanPreviewError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setPlanPreviewBusy(false);
+    }
+  }, [locale, planMissionType, planPersona, planRequestText, planTier]);
+
+  const refreshDeliverables = useCallback(() => {
+    setDeliverablesRefreshTick((value) => value + 1);
+  }, []);
+
+  const submitDeliverableReview = useCallback(
+    async (verdict: 'accept' | 'reject' | 'request-changes') => {
+      const item = deliverables.find((entry) => entry.artifactId === selectedDeliverableId);
+      if (!item) {
+        setDeliverableReviewError('成果物を選択してください');
+        return;
+      }
+      setDeliverableReviewBusy(true);
+      setDeliverableReviewError(null);
+      try {
+        const response = await fetch('/api/deliverable-review', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            artifactId: item.artifactId,
+            verdict,
+            comment: deliverableReviewComment,
+          }),
+        });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || 'deliverable review failed');
+        setDeliverableReviewComment('');
+        refreshDeliverables();
+        if (payload.state?.current_artifact_id) {
+          setSelectedDeliverableId(payload.state.current_artifact_id);
+        }
+      } catch (error) {
+        setDeliverableReviewError(error instanceof Error ? error.message : String(error));
+      } finally {
+        setDeliverableReviewBusy(false);
+      }
+    },
+    [deliverableReviewComment, deliverables, refreshDeliverables, selectedDeliverableId]
+  );
+
+  const submitApprovalDecision = useCallback(
+    async (item: any, decision: 'approved' | 'rejected') => {
+      setApprovalDecisionBusyId(item.id);
+      try {
+        const response = await fetch('/api/intelligence', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'approval_decision',
+            requestId: item.id,
+            storageChannel: item.storageChannel,
+            channel: item.channel,
+            decision,
+          }),
+        });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || 'approval decision failed');
+        setApprovalQueue((current) => current.filter((entry) => entry.id !== item.id));
+      } catch (error) {
+        setApprovalQueueError(error instanceof Error ? error.message : String(error));
+      } finally {
+        setApprovalDecisionBusyId(null);
+      }
+    },
+    []
+  );
+
+  const submitConnectionReview = useCallback(
+    async (bindingId: string, action: 'approve' | 'hold' | 'delete' | 'modify') => {
+      setConnectionReviewBusyId(bindingId);
+      try {
+        const response = await fetch('/api/connections', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            bindingId,
+            action,
+            note: connectionReviewNote,
+          }),
+        });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || 'connection review failed');
+        setConnections((current) =>
+          current.map((entry) =>
+            entry.binding_id === bindingId
+              ? {
+                  ...entry,
+                  reviewAction: payload.review?.action,
+                  reviewNote: payload.review?.note,
+                  reviewedAt: payload.review?.reviewed_at,
+                }
+              : entry
+          )
+        );
+        setConnectionReviewNote('');
+      } catch (error) {
+        setConnectionsError(error instanceof Error ? error.message : String(error));
+      } finally {
+        setConnectionReviewBusyId(null);
+      }
+    },
+    [connectionReviewNote]
+  );
 
   const handleOperatorViewOpen = useCallback(
     (targetId: string, missionId: string | null = null) => {
@@ -610,6 +917,746 @@ export default function ChronosMirrorV2() {
           </section>
 
           <FirstRunBanner />
+
+          <section className="grid gap-4 xl:grid-cols-[1.05fr,0.95fr]">
+            <div className="kyberion-glass rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-[10px] uppercase tracking-[0.28em] text-cyan-100/55">
+                    SU history
+                  </div>
+                  <h2 className="mt-1 text-lg font-semibold tracking-tight text-white/90">
+                    Mission history
+                  </h2>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    value={missionHistoryQuery}
+                    onChange={(event) => setMissionHistoryQuery(event.target.value)}
+                    placeholder="search"
+                    className="w-36 rounded-lg border border-white/10 bg-black/25 px-3 py-2 text-[10px] uppercase tracking-[0.16em] text-white/72 outline-none placeholder:text-white/28 focus:border-cyan-300/25"
+                  />
+                  <select
+                    value={missionHistoryStatus}
+                    onChange={(event) => setMissionHistoryStatus(event.target.value)}
+                    className="rounded-lg border border-white/10 bg-black/25 px-3 py-2 text-[10px] uppercase tracking-[0.16em] text-white/72 outline-none focus:border-cyan-300/25"
+                  >
+                    <option value="">all</option>
+                    <option value="completed">completed</option>
+                    <option value="active">active</option>
+                    <option value="paused">paused</option>
+                    <option value="failed">failed</option>
+                  </select>
+                  <select
+                    value={missionHistoryTier}
+                    onChange={(event) => setMissionHistoryTier(event.target.value)}
+                    className="rounded-lg border border-white/10 bg-black/25 px-3 py-2 text-[10px] uppercase tracking-[0.16em] text-white/72 outline-none focus:border-cyan-300/25"
+                  >
+                    <option value="">all tiers</option>
+                    <option value="public">public</option>
+                    <option value="confidential">confidential</option>
+                    <option value="personal">personal</option>
+                  </select>
+                </div>
+              </div>
+              {missionHistoryError ? (
+                <div className="mt-3 rounded-xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-[11px] text-red-100/80">
+                  {missionHistoryError}
+                </div>
+              ) : null}
+              <div className="mt-4 max-h-[420px] overflow-y-auto pr-1 chronos-scroll space-y-3">
+                {missionHistory.length === 0 ? (
+                  <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4 text-[11px] text-white/45">
+                    No missions match the current filter.
+                  </div>
+                ) : (
+                  missionHistory.map((mission) => (
+                    <button
+                      key={mission.missionId}
+                      type="button"
+                      onClick={() => setSelectedMissionId(mission.missionId)}
+                      className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
+                        selectedMissionId === mission.missionId
+                          ? 'border-cyan-400/25 bg-cyan-400/10'
+                          : 'border-white/8 bg-black/20 hover:border-white/16 hover:bg-white/[0.05]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <div className="text-[10px] uppercase tracking-[0.18em] text-white/48">
+                            {mission.missionId}
+                          </div>
+                          <div className="mt-1 text-sm font-semibold text-white/90">
+                            {mission.goalSummary ||
+                              mission.intentText ||
+                              mission.missionType ||
+                              'Mission'}
+                          </div>
+                        </div>
+                        <div className="text-right text-[10px] uppercase tracking-[0.18em] text-cyan-100/68">
+                          {mission.status}
+                        </div>
+                      </div>
+                      <div className="mt-2 grid gap-2 text-[10px] text-white/52 sm:grid-cols-2">
+                        <div>tier {mission.tier}</div>
+                        <div>artifacts {mission.artifactCount}</div>
+                        <div>updated {mission.updatedAt || mission.startedAt || '-'}</div>
+                        <div className="truncate">
+                          tenant {mission.tenantSlug || mission.tenantId || '-'}
+                        </div>
+                      </div>
+                      {mission.successCondition ? (
+                        <div className="mt-2 text-[11px] leading-6 text-slate-200/60">
+                          {mission.successCondition}
+                        </div>
+                      ) : null}
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="grid gap-4">
+              <div className="kyberion-glass rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-[10px] uppercase tracking-[0.28em] text-white/42">
+                      SU cost
+                    </div>
+                    <h2 className="mt-1 text-lg font-semibold tracking-tight text-white/90">
+                      Cost visibility
+                    </h2>
+                  </div>
+                  <div className="text-[10px] uppercase tracking-[0.2em] text-white/40">
+                    {selectedMissionId ? selectedMissionId : 'today'}
+                  </div>
+                </div>
+                {costSummaryError ? (
+                  <div className="mt-3 rounded-xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-[11px] text-red-100/80">
+                    {costSummaryError}
+                  </div>
+                ) : null}
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4">
+                    <div className="text-[10px] uppercase tracking-[0.18em] text-white/42">usd</div>
+                    <div className="mt-2 text-2xl font-semibold text-white/92">
+                      {typeof costSummary?.totalUsd === 'number'
+                        ? `$${costSummary.totalUsd.toFixed(3)}`
+                        : '-'}
+                    </div>
+                    <div className="mt-1 text-[10px] text-white/48">
+                      {costSummary?.entryCount || 0} entries
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4">
+                    <div className="text-[10px] uppercase tracking-[0.18em] text-white/42">
+                      tokens
+                    </div>
+                    <div className="mt-2 text-2xl font-semibold text-white/92">
+                      {typeof costSummary?.totalTokens === 'number'
+                        ? costSummary.totalTokens.toLocaleString()
+                        : '-'}
+                    </div>
+                    <div className="mt-1 text-[10px] text-white/48">
+                      {costSummary?.missionCount || 0} missions
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4">
+                    <div className="text-[10px] uppercase tracking-[0.18em] text-white/42">
+                      budget
+                    </div>
+                    <div className="mt-2 text-2xl font-semibold text-white/92">
+                      {typeof costSummary?.budgetUsd === 'number'
+                        ? `$${costSummary.budgetUsd.toFixed(3)}`
+                        : 'n/a'}
+                    </div>
+                    <div className="mt-1 text-[10px] text-white/48">
+                      {typeof costSummary?.remainingUsd === 'number'
+                        ? `remaining $${costSummary.remainingUsd.toFixed(3)}`
+                        : 'no spend guard configured'}
+                    </div>
+                  </div>
+                </div>
+                {Array.isArray(costSummary?.missionBreakdown) &&
+                costSummary.missionBreakdown.length > 0 ? (
+                  <div className="mt-4 space-y-2">
+                    {costSummary.missionBreakdown.slice(0, 4).map((item: any) => (
+                      <div
+                        key={item.missionId}
+                        className="rounded-xl border border-white/8 bg-black/18 px-3 py-2 text-[10px] text-white/58"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setSelectedMissionId(
+                                item.missionId === 'UNASSIGNED' ? null : item.missionId
+                              )
+                            }
+                            className="font-mono text-[10px] uppercase tracking-[0.16em] text-cyan-100/70"
+                          >
+                            {item.missionId}
+                          </button>
+                          <div className="text-white/80">${item.usd.toFixed(3)}</div>
+                        </div>
+                        <div className="mt-1 text-white/42">
+                          {item.tokens.toLocaleString()} tokens · {item.entryCount} entries
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="kyberion-glass rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-[10px] uppercase tracking-[0.28em] text-white/42">
+                      SU approvals
+                    </div>
+                    <h2 className="mt-1 text-lg font-semibold tracking-tight text-white/90">
+                      Approval queue
+                    </h2>
+                  </div>
+                  <input
+                    value={approvalQueueQuery}
+                    onChange={(event) => setApprovalQueueQuery(event.target.value)}
+                    placeholder="search"
+                    className="w-36 rounded-lg border border-white/10 bg-black/25 px-3 py-2 text-[10px] uppercase tracking-[0.16em] text-white/72 outline-none placeholder:text-white/28 focus:border-cyan-300/25"
+                  />
+                </div>
+                {approvalQueueError ? (
+                  <div className="mt-3 rounded-xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-[11px] text-red-100/80">
+                    {approvalQueueError}
+                  </div>
+                ) : null}
+                <div className="mt-4 max-h-[310px] overflow-y-auto pr-1 chronos-scroll space-y-3">
+                  {approvalQueue.length === 0 ? (
+                    <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4 text-[11px] text-white/45">
+                      No pending approvals.
+                    </div>
+                  ) : (
+                    approvalQueue.map((item) => (
+                      <div
+                        key={item.id}
+                        className="rounded-2xl border border-white/8 bg-black/20 px-4 py-3"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <div className="text-[10px] uppercase tracking-[0.18em] text-white/48">
+                              {item.kind} · {item.channel}
+                            </div>
+                            <div className="mt-1 text-sm font-semibold text-white/90">
+                              {item.title}
+                            </div>
+                          </div>
+                          <div className="text-right text-[10px] uppercase tracking-[0.18em] text-cyan-100/68">
+                            {item.status}
+                          </div>
+                        </div>
+                        <div className="mt-2 text-[11px] leading-6 text-slate-200/58">
+                          {item.summary}
+                        </div>
+                        <div className="mt-2 grid gap-2 text-[10px] text-white/48 sm:grid-cols-2">
+                          <div>mission {item.missionId || '-'}</div>
+                          <div>service {item.serviceId || '-'}</div>
+                          <div>risk {item.riskLevel || '-'}</div>
+                          <div>requested {item.requestedAt}</div>
+                        </div>
+                        <div className="mt-3 flex gap-2">
+                          <button
+                            type="button"
+                            disabled={approvalDecisionBusyId === item.id}
+                            onClick={() => submitApprovalDecision(item, 'approved')}
+                            className="rounded-lg border border-emerald-400/20 bg-emerald-400/10 px-3 py-2 text-[10px] uppercase tracking-[0.16em] text-emerald-100/80 transition hover:bg-emerald-400/16 disabled:opacity-50"
+                          >
+                            approve
+                          </button>
+                          <button
+                            type="button"
+                            disabled={approvalDecisionBusyId === item.id}
+                            onClick={() => submitApprovalDecision(item, 'rejected')}
+                            className="rounded-lg border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-[10px] uppercase tracking-[0.16em] text-rose-100/80 transition hover:bg-rose-400/16 disabled:opacity-50"
+                          >
+                            reject
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div className="kyberion-glass rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-[10px] uppercase tracking-[0.28em] text-white/42">
+                      SU connections
+                    </div>
+                    <h2 className="mt-1 text-lg font-semibold tracking-tight text-white/90">
+                      Connection review
+                    </h2>
+                  </div>
+                  <input
+                    value={connectionsQuery}
+                    onChange={(event) => setConnectionsQuery(event.target.value)}
+                    placeholder="search"
+                    className="w-36 rounded-lg border border-white/10 bg-black/25 px-3 py-2 text-[10px] uppercase tracking-[0.16em] text-white/72 outline-none placeholder:text-white/28 focus:border-cyan-300/25"
+                  />
+                </div>
+                {connectionsError ? (
+                  <div className="mt-3 rounded-xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-[11px] text-red-100/80">
+                    {connectionsError}
+                  </div>
+                ) : null}
+                <div className="mt-4 max-h-[240px] overflow-y-auto pr-1 chronos-scroll space-y-3">
+                  {connections
+                    .filter((item) => {
+                      if (!connectionsQuery.trim()) return true;
+                      const haystack = [
+                        item.binding_id,
+                        item.service_id,
+                        item.service_type,
+                        item.scope,
+                        item.target,
+                        item.reviewAction,
+                        item.reviewNote,
+                      ]
+                        .filter(Boolean)
+                        .join(' ')
+                        .toLowerCase();
+                      return haystack.includes(connectionsQuery.trim().toLowerCase());
+                    })
+                    .map((item) => (
+                      <button
+                        key={item.binding_id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedConnectionId(item.binding_id);
+                          setConnectionsError(null);
+                        }}
+                        className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
+                          selectedConnectionId === item.binding_id
+                            ? 'border-cyan-400/25 bg-cyan-400/10'
+                            : 'border-white/8 bg-black/20 hover:border-white/16 hover:bg-white/[0.05]'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <div className="text-[10px] uppercase tracking-[0.18em] text-white/48">
+                              {item.service_type || 'service'} · {item.binding_id}
+                            </div>
+                            <div className="mt-1 text-sm font-semibold text-white/90">
+                              {item.service_id || item.target}
+                            </div>
+                          </div>
+                          <div className="text-[10px] uppercase tracking-[0.18em] text-cyan-100/68">
+                            {item.reviewAction || 'pending'}
+                          </div>
+                        </div>
+                        <div className="mt-2 grid gap-2 text-[10px] text-white/52 sm:grid-cols-2">
+                          <div>scope {item.scope}</div>
+                          <div>target {item.target}</div>
+                          <div>policy {Object.keys(item.approval_policy || {}).length}</div>
+                          <div>reviewed {item.reviewedAt || '-'}</div>
+                        </div>
+                      </button>
+                    ))}
+                </div>
+                {selectedConnectionId ? (
+                  <div className="mt-4 rounded-2xl border border-cyan-300/15 bg-cyan-400/[0.05] p-4">
+                    {(() => {
+                      const selected = connections.find(
+                        (item) => item.binding_id === selectedConnectionId
+                      );
+                      if (!selected)
+                        return (
+                          <div className="text-[11px] text-white/50">
+                            Selected connection not found.
+                          </div>
+                        );
+                      return (
+                        <>
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <div className="text-[10px] uppercase tracking-[0.22em] text-cyan-100/60">
+                                review
+                              </div>
+                              <div className="mt-1 text-sm font-semibold text-white/90">
+                                {selected.service_id || selected.binding_id}
+                              </div>
+                            </div>
+                            <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">
+                              {selected.reviewAction || 'pending'}
+                            </div>
+                          </div>
+                          <textarea
+                            value={connectionReviewNote}
+                            onChange={(event) => setConnectionReviewNote(event.target.value)}
+                            placeholder="review note"
+                            className="mt-3 min-h-[80px] w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-[12px] leading-6 text-white/82 placeholder:text-white/28 outline-none ring-0 focus:border-cyan-300/25"
+                          />
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              disabled={connectionReviewBusyId === selected.binding_id}
+                              onClick={() => submitConnectionReview(selected.binding_id, 'approve')}
+                              className="rounded-lg border border-emerald-400/20 bg-emerald-400/10 px-3 py-2 text-[10px] uppercase tracking-[0.16em] text-emerald-100/80 transition hover:bg-emerald-400/16 disabled:opacity-50"
+                            >
+                              approve
+                            </button>
+                            <button
+                              type="button"
+                              disabled={connectionReviewBusyId === selected.binding_id}
+                              onClick={() => submitConnectionReview(selected.binding_id, 'modify')}
+                              className="rounded-lg border border-cyan-400/20 bg-cyan-400/10 px-3 py-2 text-[10px] uppercase tracking-[0.16em] text-cyan-100/80 transition hover:bg-cyan-400/16 disabled:opacity-50"
+                            >
+                              modify
+                            </button>
+                            <button
+                              type="button"
+                              disabled={connectionReviewBusyId === selected.binding_id}
+                              onClick={() => submitConnectionReview(selected.binding_id, 'hold')}
+                              className="rounded-lg border border-amber-400/20 bg-amber-400/10 px-3 py-2 text-[10px] uppercase tracking-[0.16em] text-amber-100/80 transition hover:bg-amber-400/16 disabled:opacity-50"
+                            >
+                              hold
+                            </button>
+                            <button
+                              type="button"
+                              disabled={connectionReviewBusyId === selected.binding_id}
+                              onClick={() => submitConnectionReview(selected.binding_id, 'delete')}
+                              className="rounded-lg border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-[10px] uppercase tracking-[0.16em] text-rose-100/80 transition hover:bg-rose-400/16 disabled:opacity-50"
+                            >
+                              delete
+                            </button>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </section>
+
+          <section className="grid gap-4 xl:grid-cols-[1.1fr,0.9fr]">
+            <div className="kyberion-glass rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-[10px] uppercase tracking-[0.28em] text-cyan-100/55">
+                    SU workbench
+                  </div>
+                  <h2 className="mt-1 text-lg font-semibold tracking-tight text-white/90">
+                    Plan preview and approval
+                  </h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={runPlanPreview}
+                  disabled={planPreviewBusy}
+                  className="rounded-lg border border-cyan-300/18 bg-cyan-400/10 px-3 py-2 text-[10px] uppercase tracking-[0.18em] text-cyan-100/82 transition hover:bg-cyan-400/16 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {planPreviewBusy ? 'previewing' : 'preview'}
+                </button>
+              </div>
+              <textarea
+                value={planRequestText}
+                onChange={(event) => setPlanRequestText(event.target.value)}
+                placeholder="例: 来週までに顧客向け提案資料を作って、承認前にレビューしたい"
+                className="mt-4 min-h-[120px] w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-[12px] leading-6 text-white/82 placeholder:text-white/28 outline-none ring-0 focus:border-cyan-300/25"
+              />
+              <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                <label className="rounded-2xl border border-white/8 bg-black/20 px-3 py-3 text-[10px] uppercase tracking-[0.16em] text-white/52">
+                  mission type
+                  <input
+                    value={planMissionType}
+                    onChange={(event) => setPlanMissionType(event.target.value)}
+                    className="mt-2 w-full rounded-lg border border-white/10 bg-black/25 px-3 py-2 text-[11px] tracking-normal text-white/82 outline-none focus:border-cyan-300/25"
+                  />
+                </label>
+                <label className="rounded-2xl border border-white/8 bg-black/20 px-3 py-3 text-[10px] uppercase tracking-[0.16em] text-white/52">
+                  persona
+                  <input
+                    value={planPersona}
+                    onChange={(event) => setPlanPersona(event.target.value)}
+                    className="mt-2 w-full rounded-lg border border-white/10 bg-black/25 px-3 py-2 text-[11px] tracking-normal text-white/82 outline-none focus:border-cyan-300/25"
+                  />
+                </label>
+                <label className="rounded-2xl border border-white/8 bg-black/20 px-3 py-3 text-[10px] uppercase tracking-[0.16em] text-white/52">
+                  tier
+                  <select
+                    value={planTier}
+                    onChange={(event) =>
+                      setPlanTier(event.target.value as 'personal' | 'confidential' | 'public')
+                    }
+                    className="mt-2 w-full rounded-lg border border-white/10 bg-black/25 px-3 py-2 text-[11px] tracking-normal text-white/82 outline-none focus:border-cyan-300/25"
+                  >
+                    <option value="personal">personal</option>
+                    <option value="confidential">confidential</option>
+                    <option value="public">public</option>
+                  </select>
+                </label>
+              </div>
+              {planPreviewError ? (
+                <div className="mt-3 rounded-xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-[11px] text-red-100/80">
+                  {planPreviewError}
+                </div>
+              ) : null}
+              {planPreview ? (
+                <div className="mt-4 grid gap-4 lg:grid-cols-[1fr,0.85fr]">
+                  <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4">
+                    <div className="text-[10px] uppercase tracking-[0.18em] text-white/42">
+                      goal
+                    </div>
+                    <div className="mt-2 text-sm font-semibold text-white/90">
+                      {planPreview.goal?.summary}
+                    </div>
+                    <div className="mt-2 text-[11px] leading-6 text-white/58">
+                      {planPreview.goal?.successCondition}
+                    </div>
+                    <div className="mt-4 grid grid-cols-2 gap-3 text-[10px] text-white/52">
+                      <div>
+                        delivery mode{' '}
+                        <span className="font-mono text-white/80">
+                          {planPreview.delivery?.mode}
+                        </span>
+                      </div>
+                      <div>
+                        clarification{' '}
+                        <span className="font-mono text-white/80">
+                          {planPreview.delivery?.clarificationNeeded ? 'needed' : 'clear'}
+                        </span>
+                      </div>
+                      <div>
+                        execution{' '}
+                        <span className="font-mono text-white/80">
+                          {planPreview.execution?.shape}
+                        </span>
+                      </div>
+                      <div>
+                        confidence{' '}
+                        <span className="font-mono text-white/80">
+                          {Math.round((Number(planPreview.confidence) || 0) * 100)}%
+                        </span>
+                      </div>
+                    </div>
+                    {Array.isArray(planPreview.execution?.clarificationQuestions) &&
+                    planPreview.execution.clarificationQuestions.length > 0 ? (
+                      <div className="mt-4">
+                        <KbInterventionPanel
+                          reason="Clarification is required before approval."
+                          isBlocking
+                          options={planPreview.execution.clarificationQuestions.map(
+                            (question: any) => ({
+                              label: question.question,
+                              variant: 'neutral' as const,
+                              value: question.id,
+                            })
+                          )}
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4">
+                    <div className="text-[10px] uppercase tracking-[0.18em] text-white/42">
+                      team + workflow
+                    </div>
+                    <div className="mt-2 text-[11px] text-white/55">
+                      {planPreview.team?.assignments?.length || 0} assignments ·{' '}
+                      {planPreview.team?.team_governance?.composition?.required_roles?.length || 0}{' '}
+                      required roles
+                    </div>
+                    <div className="mt-3 space-y-2">
+                      {(planPreview.team?.assignments || []).slice(0, 5).map((assignment: any) => (
+                        <div
+                          key={`${assignment.team_role}-${assignment.agent_id || 'unfilled'}`}
+                          className="rounded-xl border border-white/6 bg-white/[0.03] px-3 py-2"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="text-[10px] uppercase tracking-[0.16em] text-white/44">
+                              {assignment.team_role}
+                            </div>
+                            <div className="text-[9px] uppercase tracking-[0.16em] text-white/34">
+                              {assignment.status}
+                            </div>
+                          </div>
+                          <div className="mt-1 font-mono text-[10px] text-white/78">
+                            {assignment.agent_id || 'unfilled'}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-4 text-[10px] uppercase tracking-[0.16em] text-white/40">
+                      workflow steps
+                    </div>
+                    <div className="mt-2 space-y-2">
+                      {(planPreview.workflow || []).slice(0, 5).map((step: any) => (
+                        <div
+                          key={step.id}
+                          className="rounded-xl border border-white/6 bg-white/[0.03] px-3 py-2"
+                        >
+                          <div className="text-[10px] text-white/82">{step.label}</div>
+                          <div className="mt-1 text-[9px] leading-5 text-white/48">
+                            {step.description}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="kyberion-glass rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-[10px] uppercase tracking-[0.28em] text-white/42">
+                    SU inbox
+                  </div>
+                  <h2 className="mt-1 text-lg font-semibold tracking-tight text-white/90">
+                    Deliverables
+                  </h2>
+                </div>
+                <input
+                  value={deliverablesQuery}
+                  onChange={(event) => setDeliverablesQuery(event.target.value)}
+                  placeholder="search"
+                  className="w-36 rounded-lg border border-white/10 bg-black/25 px-3 py-2 text-[10px] uppercase tracking-[0.16em] text-white/72 outline-none placeholder:text-white/28 focus:border-cyan-300/25"
+                />
+              </div>
+              {deliverablesError ? (
+                <div className="mt-3 rounded-xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-[11px] text-red-100/80">
+                  {deliverablesError}
+                </div>
+              ) : null}
+              <div className="mt-4 max-h-[540px] overflow-y-auto pr-1 chronos-scroll space-y-3">
+                {deliverables.length === 0 ? (
+                  <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4 text-[11px] text-white/45">
+                    No deliverables found yet.
+                  </div>
+                ) : (
+                  deliverables.map((item) => (
+                    <KbArtifactTile
+                      key={item.artifactId}
+                      type={item.kind}
+                      path={item.path || item.externalRef || item.artifactId}
+                      previewContent={[
+                        item.previewText || item.kind,
+                        item.reviewVerdict ? `review: ${item.reviewVerdict}` : '',
+                        item.reviewVersion ? `v${item.reviewVersion}` : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
+                      onSelect={() => {
+                        setSelectedDeliverableId(item.artifactId);
+                        setDeliverableReviewError(null);
+                      }}
+                      onOpen={() => {
+                        if (item.missionId && item.path) {
+                          window.open(
+                            `/api/mission-asset?missionId=${encodeURIComponent(item.missionId)}&path=${encodeURIComponent(item.path)}`,
+                            '_blank',
+                            'noreferrer'
+                          );
+                        }
+                      }}
+                      onPreview={() => {
+                        if (item.missionId && item.path) {
+                          window.open(
+                            `/api/mission-asset?missionId=${encodeURIComponent(item.missionId)}&path=${encodeURIComponent(item.path)}`,
+                            '_blank',
+                            'noreferrer'
+                          );
+                        }
+                      }}
+                    />
+                  ))
+                )}
+              </div>
+              {selectedDeliverableId ? (
+                <div className="mt-4 rounded-2xl border border-cyan-300/15 bg-cyan-400/[0.05] p-4">
+                  {(() => {
+                    const selected = deliverables.find(
+                      (item) => item.artifactId === selectedDeliverableId
+                    );
+                    if (!selected) {
+                      return (
+                        <div className="text-[11px] text-white/50">
+                          Selected deliverable not found.
+                        </div>
+                      );
+                    }
+                    return (
+                      <>
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <div className="text-[10px] uppercase tracking-[0.22em] text-cyan-100/60">
+                              review
+                            </div>
+                            <div className="mt-1 text-sm font-semibold text-white/90">
+                              {selected.artifactId}
+                            </div>
+                          </div>
+                          <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">
+                            {selected.reviewVerdict
+                              ? `latest ${selected.reviewVerdict}`
+                              : 'not reviewed'}
+                          </div>
+                        </div>
+                        <div className="mt-2 text-[11px] leading-6 text-slate-200/62">
+                          {selected.previewText || selected.kind}
+                        </div>
+                        <textarea
+                          value={deliverableReviewComment}
+                          onChange={(event) => setDeliverableReviewComment(event.target.value)}
+                          placeholder="review comment"
+                          className="mt-3 min-h-[88px] w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-[12px] leading-6 text-white/82 placeholder:text-white/28 outline-none ring-0 focus:border-cyan-300/25"
+                        />
+                        {deliverableReviewError ? (
+                          <div className="mt-3 rounded-xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-[11px] text-red-100/80">
+                            {deliverableReviewError}
+                          </div>
+                        ) : null}
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            disabled={deliverableReviewBusy}
+                            onClick={() => submitDeliverableReview('accept')}
+                            className="rounded-lg border border-emerald-400/20 bg-emerald-400/10 px-3 py-2 text-[10px] uppercase tracking-[0.16em] text-emerald-100/80 transition hover:bg-emerald-400/16 disabled:opacity-50"
+                          >
+                            accept
+                          </button>
+                          <button
+                            type="button"
+                            disabled={deliverableReviewBusy}
+                            onClick={() => submitDeliverableReview('request-changes')}
+                            className="rounded-lg border border-cyan-400/20 bg-cyan-400/10 px-3 py-2 text-[10px] uppercase tracking-[0.16em] text-cyan-100/80 transition hover:bg-cyan-400/16 disabled:opacity-50"
+                          >
+                            request-changes
+                          </button>
+                          <button
+                            type="button"
+                            disabled={deliverableReviewBusy}
+                            onClick={() => submitDeliverableReview('reject')}
+                            className="rounded-lg border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-[10px] uppercase tracking-[0.16em] text-rose-100/80 transition hover:bg-rose-400/16 disabled:opacity-50"
+                          >
+                            reject
+                          </button>
+                        </div>
+                        <div className="mt-3 text-[10px] uppercase tracking-[0.16em] text-white/40">
+                          version {selected.reviewVersion || 1}
+                          {selected.reviewCurrentArtifactId &&
+                          selected.reviewCurrentArtifactId !== selected.artifactId
+                            ? ` · current ${selected.reviewCurrentArtifactId}`
+                            : ''}
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+              ) : null}
+            </div>
+          </section>
 
           <div className="grid flex-1 gap-6 min-h-0 xl:grid-cols-[280px,1fr]">
             <aside className="min-h-0 xl:max-h-[calc(100vh-8rem)] xl:overflow-y-auto xl:pr-2 chronos-scroll">
