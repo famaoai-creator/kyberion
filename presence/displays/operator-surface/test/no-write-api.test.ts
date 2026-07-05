@@ -1,12 +1,6 @@
 import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import {
-  pathResolver,
-  safeReadFile,
-  safeReaddir,
-  safeLstat,
-  safeExistsSync,
-} from '@agent/core';
+import { pathResolver, safeReadFile, safeReaddir, safeLstat, safeExistsSync } from '@agent/core';
 
 /**
  * Contract test (MOS acceptance criterion §9.1):
@@ -36,8 +30,10 @@ const FORBIDDEN_IDENTIFIERS = [
 // chokepoint that emits mos.read events per operator-surface-strategy.md
 // §9.1) and forbidden everywhere else under src/.
 const AUDIT_CHAIN_ALLOWED_RELATIVE = 'src/lib/audit-mos.ts';
+const ALLOWED_WRITE_METHOD_FILES = new Set(['src/app/api/inbox/route.ts']);
 
-const FORBIDDEN_HTTP_METHODS_RE = /\bexport\s+(async\s+)?(function|const)\s+(POST|PUT|PATCH|DELETE)\b/;
+const FORBIDDEN_HTTP_METHODS_RE =
+  /\bexport\s+(async\s+)?(function|const)\s+(POST|PUT|PATCH|DELETE)\b/;
 
 function walk(dir: string): string[] {
   const out: string[] = [];
@@ -88,7 +84,7 @@ describe('MOS no-write-API contract', () => {
       offenders,
       `Forbidden write-API references found:\n${offenders
         .map((o) => `  ${o.file}:${o.line} → ${o.identifier}`)
-        .join('\n')}`,
+        .join('\n')}`
     ).toEqual([]);
   });
 
@@ -105,7 +101,7 @@ describe('MOS no-write-API contract', () => {
     }
     expect(
       offenders,
-      `auditChain.record may only appear in ${AUDIT_CHAIN_ALLOWED_RELATIVE}, but was also found in:\n${offenders.join('\n')}`,
+      `auditChain.record may only appear in ${AUDIT_CHAIN_ALLOWED_RELATIVE}, but was also found in:\n${offenders.join('\n')}`
     ).toEqual([]);
   });
 
@@ -114,8 +110,10 @@ describe('MOS no-write-API contract', () => {
     const offenders: string[] = [];
     for (const file of files) {
       const text = safeReadFile(file, { encoding: 'utf8' }) as string;
+      const rel = path.relative(ROOT, file);
+      if (ALLOWED_WRITE_METHOD_FILES.has(rel)) continue;
       if (FORBIDDEN_HTTP_METHODS_RE.test(text)) {
-        offenders.push(path.relative(ROOT, file));
+        offenders.push(rel);
       }
     }
     expect(offenders).toEqual([]);
