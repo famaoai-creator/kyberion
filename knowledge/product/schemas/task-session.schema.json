@@ -22,7 +22,16 @@
     },
     "task_type": {
       "type": "string",
-      "enum": ["browser", "capture_photo", "workbook_wbs", "presentation_deck", "report_document", "service_operation", "document_generation", "analysis"]
+      "enum": [
+        "browser",
+        "capture_photo",
+        "workbook_wbs",
+        "presentation_deck",
+        "report_document",
+        "service_operation",
+        "document_generation",
+        "analysis"
+      ]
     },
     "status": {
       "type": "string",
@@ -157,6 +166,51 @@
       },
       "additionalProperties": false
     },
+    "completion_summary": {
+      "type": "object",
+      "properties": {
+        "requested_result": { "type": "string", "minLength": 1 },
+        "satisfied": { "type": "boolean" },
+        "delivered": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "gaps": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "next_step": { "type": "string", "minLength": 1 },
+        "confidence": { "type": "number" },
+        "evidence_refs": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      },
+      "additionalProperties": false
+    },
+    "completion_next_action": {
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "minLength": 1 },
+        "request": { "type": "string", "minLength": 1 },
+        "delivered": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "gaps": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "next_step": { "type": "string", "minLength": 1 },
+        "satisfied": { "type": "boolean" },
+        "confidence": { "type": "number" },
+        "evidence_refs": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      },
+      "additionalProperties": false
+    },
     "history": {
       "type": "array",
       "items": {
@@ -166,7 +220,17 @@
           "ts": { "type": "string", "minLength": 1 },
           "type": {
             "type": "string",
-            "enum": ["instruction", "ack", "plan", "execution", "verification", "feedback", "error", "control", "artifact"]
+            "enum": [
+              "instruction",
+              "ack",
+              "plan",
+              "execution",
+              "verification",
+              "feedback",
+              "error",
+              "control",
+              "artifact"
+            ]
           },
           "text": { "type": "string", "minLength": 1 }
         },
@@ -284,7 +348,14 @@
                       "properties": {
                         "deck_purpose": {
                           "type": "string",
-                          "enum": ["proposal", "internal_share", "briefing", "marketing", "training", "comparison"]
+                          "enum": [
+                            "proposal",
+                            "internal_share",
+                            "briefing",
+                            "marketing",
+                            "training",
+                            "comparison"
+                          ]
                         },
                         "semantic_type": { "type": "string" },
                         "slide_type": { "type": "string" },
