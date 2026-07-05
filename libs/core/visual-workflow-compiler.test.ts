@@ -159,5 +159,12 @@ describe('visual workflow compiler', () => {
       },
     });
     expect(result.resolved.workflow_template).toBe('basic_text_clip');
+    expect(result.resolved.css_vars).toEqual(
+      expect.objectContaining({
+        '--kb-bg-main': '#07111f',
+        '--kb-accent': '#3b82f6',
+        '--kb-text-primary': '#f8fafc',
+      })
+    );
   });
 });

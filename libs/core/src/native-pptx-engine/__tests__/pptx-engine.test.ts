@@ -46,10 +46,18 @@ function createTestProtocol(): PptxDesignProtocol {
     generatedAt: new Date().toISOString(),
     canvas: { w: 10, h: 7.5 },
     theme: {
-      dk1: '000000', lt1: 'FFFFFF', dk2: '44546A', lt2: 'E7E6E6',
-      accent1: '5B9BD5', accent2: 'ED7D31', accent3: 'A5A5A5',
-      accent4: 'FFC000', accent5: '4472C4', accent6: '70AD47',
-      hlink: '0563C1', folHlink: '954F72',
+      dk1: '000000',
+      lt1: 'FFFFFF',
+      dk2: '44546A',
+      lt2: 'E7E6E6',
+      accent1: '5B9BD5',
+      accent2: 'ED7D31',
+      accent3: 'A5A5A5',
+      accent4: 'FFC000',
+      accent5: '4472C4',
+      accent6: '70AD47',
+      hlink: '0563C1',
+      folHlink: '954F72',
     },
     master: { elements: [] },
     slides: [
@@ -62,7 +70,13 @@ function createTestProtocol(): PptxDesignProtocol {
             type: 'text',
             pos: { x: 1, y: 1, w: 8, h: 1 },
             text: 'タイトルテスト',
-            style: { fontSize: 36, bold: true, color: '#FFFFFF', align: 'center', fontFamily: 'Yu Gothic' },
+            style: {
+              fontSize: 36,
+              bold: true,
+              color: '#FFFFFF',
+              align: 'center',
+              fontFamily: 'Yu Gothic',
+            },
           },
           // Shape without text (must still have <p:txBody>)
           {
@@ -105,7 +119,14 @@ function createTestProtocol(): PptxDesignProtocol {
             shapeType: 'roundRect',
             pos: { x: 2, y: 2, w: 6, h: 3 },
             text: '2枚目スライド',
-            style: { fill: '#F59E0B', color: '#FFFFFF', fontSize: 24, bold: true, align: 'center', valign: 'middle' },
+            style: {
+              fill: '#F59E0B',
+              color: '#FFFFFF',
+              fontSize: 24,
+              bold: true,
+              align: 'center',
+              valign: 'middle',
+            },
           },
         ],
       },
@@ -137,7 +158,6 @@ describe('Native PPTX Engine', () => {
   // ═══════════════════════════════════════════════════════════
 
   describe('OOXML Spec Compliance', () => {
-
     it('should contain all required package parts', () => {
       const required = [
         '[Content_Types].xml',
@@ -185,9 +205,11 @@ describe('Native PPTX Engine', () => {
       const pres = files.get('ppt/presentation.xml')!;
       const rels = files.get('ppt/_rels/presentation.xml.rels')!;
       // Extract all rId references from presentation.xml
-      const rIds = [...pres.matchAll(/r:id="(rId\d+)"/g)].map(m => m[1]);
+      const rIds = [...pres.matchAll(/r:id="(rId\d+)"/g)].map((m) => m[1]);
       for (const rId of rIds) {
-        expect(rels, `presentation.xml references ${rId} not found in rels`).toContain(`Id="${rId}"`);
+        expect(rels, `presentation.xml references ${rId} not found in rels`).toContain(
+          `Id="${rId}"`
+        );
       }
     });
 
@@ -205,7 +227,7 @@ describe('Native PPTX Engine', () => {
 
     it('slideMaster sldLayoutId IDs should be > 2147483648', () => {
       const master = files.get('ppt/slideMasters/slideMaster1.xml')!;
-      const ids = [...master.matchAll(/sldLayoutId id="(\d+)"/g)].map(m => parseInt(m[1]));
+      const ids = [...master.matchAll(/sldLayoutId id="(\d+)"/g)].map((m) => parseInt(m[1]));
       expect(ids.length).toBeGreaterThan(0);
       for (const id of ids) {
         expect(id).toBeGreaterThan(2147483648);
@@ -252,9 +274,11 @@ describe('Native PPTX Engine', () => {
       const slide1 = files.get('ppt/slides/slide1.xml')!;
       // The test data has "改行\nテスト" which should produce 2 <a:p> in that cell
       // Extract individual cells using non-greedy match
-      const cells = (slide1.match(/<a:tc>\s*<a:txBody>[\s\S]*?<\/a:txBody>\s*<a:tcPr[\s\S]*?<\/a:tc>/g) || []) as string[];
+      const cells = (slide1.match(
+        /<a:tc>\s*<a:txBody>[\s\S]*?<\/a:txBody>\s*<a:tcPr[\s\S]*?<\/a:tc>/g
+      ) || []) as string[];
       // Find the cell containing "改行"
-      const targetCell = cells.find(c => c.includes('改行'));
+      const targetCell = cells.find((c) => c.includes('改行'));
       expect(targetCell, 'Should find cell with 改行').toBeDefined();
       if (targetCell) {
         const pCount = countTag(targetCell, 'a:p');
@@ -281,9 +305,18 @@ describe('Native PPTX Engine', () => {
       const effectStyleLst = theme.match(/<a:effectStyleLst>[\s\S]*?<\/a:effectStyleLst>/);
       expect(effectStyleLst).not.toBeNull();
       if (effectStyleLst) {
-        const bareEffectLst = effectStyleLst[0].replace(/<a:effectStyle>[\s\S]*?<\/a:effectStyle>/g, '');
+        const bareEffectLst = effectStyleLst[0].replace(
+          /<a:effectStyle>[\s\S]*?<\/a:effectStyle>/g,
+          ''
+        );
         expect(bareEffectLst).not.toContain('<a:effectLst');
       }
+    });
+
+    it('theme should set an east Asian font in the default font scheme', () => {
+      const theme = files.get('ppt/theme/theme1.xml')!;
+      expect(theme).toContain('<a:ea typeface="Noto Sans JP"/>');
+      expect(theme).not.toContain('<a:ea typeface=""/>');
     });
 
     it('bodyPr should have anchor attribute when valign is set', () => {
@@ -348,10 +381,9 @@ describe('Native PPTX Engine', () => {
           const origEl = origSlide.elements[ei];
           const rtEl = rtSlide.elements[ei];
           if (origEl.text && origEl.type !== 'table') {
-            expect(
-              rtEl.text?.trim(),
-              `Slide ${si + 1} element ${ei} text mismatch`
-            ).toBe(origEl.text.trim());
+            expect(rtEl.text?.trim(), `Slide ${si + 1} element ${ei} text mismatch`).toBe(
+              origEl.text.trim()
+            );
           }
         }
       }
@@ -374,8 +406,8 @@ describe('Native PPTX Engine', () => {
 
     it('should preserve table row/column counts', () => {
       for (let si = 0; si < originalProtocol.slides.length; si++) {
-        const origTables = originalProtocol.slides[si].elements.filter(e => e.type === 'table');
-        const rtTables = roundTrippedProtocol.slides[si].elements.filter(e => e.type === 'table');
+        const origTables = originalProtocol.slides[si].elements.filter((e) => e.type === 'table');
+        const rtTables = roundTrippedProtocol.slides[si].elements.filter((e) => e.type === 'table');
         expect(rtTables.length).toBe(origTables.length);
         for (let ti = 0; ti < origTables.length; ti++) {
           expect(rtTables[ti].rows?.length).toBe(origTables[ti].rows?.length);
@@ -415,12 +447,13 @@ describe('Native PPTX Engine', () => {
   // ═══════════════════════════════════════════════════════════
 
   describe('Builder Unit Tests', () => {
-
     describe('buildShape', () => {
       it('should produce valid <p:sp> with <p:txBody> for text element', () => {
         const el: PptxElement = {
-          type: 'text', pos: { x: 1, y: 2, w: 5, h: 1 },
-          text: 'Hello', style: { fontSize: 24, bold: true, color: '#FF0000' },
+          type: 'text',
+          pos: { x: 1, y: 2, w: 5, h: 1 },
+          text: 'Hello',
+          style: { fontSize: 24, bold: true, color: '#FF0000' },
         };
         const xml = buildShape(el, 1);
         expect(xml).toContain('<p:sp>');
@@ -434,7 +467,9 @@ describe('Native PPTX Engine', () => {
 
       it('should produce <p:txBody> even without text (OOXML requirement)', () => {
         const el: PptxElement = {
-          type: 'shape', shapeType: 'ellipse', pos: { x: 0, y: 0, w: 2, h: 2 },
+          type: 'shape',
+          shapeType: 'ellipse',
+          pos: { x: 0, y: 0, w: 2, h: 2 },
           style: { fill: '#0000FF' },
         };
         const xml = buildShape(el, 2);
@@ -446,8 +481,10 @@ describe('Native PPTX Engine', () => {
 
       it('should apply valign as anchor attribute on bodyPr', () => {
         const el: PptxElement = {
-          type: 'text', pos: { x: 0, y: 0, w: 4, h: 3 },
-          text: 'Center', style: { valign: 'middle' },
+          type: 'text',
+          pos: { x: 0, y: 0, w: 4, h: 3 },
+          text: 'Center',
+          style: { valign: 'middle' },
         };
         const xml = buildShape(el, 3);
         expect(xml).toContain('anchor="ctr"');
@@ -455,8 +492,11 @@ describe('Native PPTX Engine', () => {
 
       it('should apply rotation via rot attribute', () => {
         const el: PptxElement = {
-          type: 'shape', shapeType: 'rect', pos: { x: 0, y: 0, w: 2, h: 1 },
-          text: 'Rotated', style: { rotate: 45 },
+          type: 'shape',
+          shapeType: 'rect',
+          pos: { x: 0, y: 0, w: 2, h: 1 },
+          text: 'Rotated',
+          style: { rotate: 45 },
         };
         const xml = buildShape(el, 4);
         expect(xml).toContain('rot="2700000"'); // 45 * 60000
@@ -464,7 +504,8 @@ describe('Native PPTX Engine', () => {
 
       it('should escape XML special characters in text', () => {
         const el: PptxElement = {
-          type: 'text', pos: { x: 0, y: 0, w: 3, h: 1 },
+          type: 'text',
+          pos: { x: 0, y: 0, w: 3, h: 1 },
           text: 'A < B & C > D',
         };
         const xml = buildShape(el, 5);
@@ -474,7 +515,8 @@ describe('Native PPTX Engine', () => {
 
       it('should strip invalid XML control characters from text', () => {
         const el: PptxElement = {
-          type: 'text', pos: { x: 0, y: 0, w: 3, h: 1 },
+          type: 'text',
+          pos: { x: 0, y: 0, w: 3, h: 1 },
           text: 'A\u000fB\u001cC',
         };
         const xml = buildShape(el, 5);
@@ -485,7 +527,8 @@ describe('Native PPTX Engine', () => {
 
       it('should split newlines into multiple <a:p> paragraphs', () => {
         const el: PptxElement = {
-          type: 'text', pos: { x: 0, y: 0, w: 5, h: 2 },
+          type: 'text',
+          pos: { x: 0, y: 0, w: 5, h: 2 },
           text: 'Line1\nLine2\nLine3',
         };
         const xml = buildShape(el, 6);
@@ -497,7 +540,9 @@ describe('Native PPTX Engine', () => {
 
       it('should use preset geometry from shapeType', () => {
         const el: PptxElement = {
-          type: 'shape', shapeType: 'roundRect', pos: { x: 0, y: 0, w: 3, h: 2 },
+          type: 'shape',
+          shapeType: 'roundRect',
+          pos: { x: 0, y: 0, w: 3, h: 2 },
           text: 'Rounded',
         };
         const xml = buildShape(el, 7);
@@ -506,7 +551,9 @@ describe('Native PPTX Engine', () => {
 
       it('should include altText as descr attribute', () => {
         const el: PptxElement = {
-          type: 'shape', shapeType: 'rect', pos: { x: 0, y: 0, w: 2, h: 1 },
+          type: 'shape',
+          shapeType: 'rect',
+          pos: { x: 0, y: 0, w: 2, h: 1 },
           altText: 'Accessible description',
         };
         const xml = buildShape(el, 8);
@@ -517,7 +564,8 @@ describe('Native PPTX Engine', () => {
     describe('buildConnector', () => {
       it('should produce valid <p:cxnSp> element', () => {
         const el: PptxElement = {
-          type: 'line', pos: { x: 1, y: 1, w: 5, h: 0 },
+          type: 'line',
+          pos: { x: 1, y: 1, w: 5, h: 0 },
           style: { line: '#333333', lineWidth: 2 },
         };
         const xml = buildConnector(el, 10);
@@ -529,7 +577,8 @@ describe('Native PPTX Engine', () => {
 
       it('should default to line shape type', () => {
         const el: PptxElement = {
-          type: 'line', pos: { x: 0, y: 0, w: 3, h: 0 },
+          type: 'line',
+          pos: { x: 0, y: 0, w: 3, h: 0 },
         };
         const xml = buildConnector(el, 11);
         expect(xml).toContain('prst="line"');
@@ -537,7 +586,8 @@ describe('Native PPTX Engine', () => {
 
       it('should use spPrXml when provided (round-trip)', () => {
         const el: PptxElement = {
-          type: 'line', pos: { x: 2, y: 3, w: 4, h: 0 },
+          type: 'line',
+          pos: { x: 2, y: 3, w: 4, h: 0 },
           spPrXml: '<p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></a:xfrm></p:spPr>',
         };
         const xml = buildConnector(el, 12);
@@ -550,8 +600,12 @@ describe('Native PPTX Engine', () => {
     describe('buildTable', () => {
       it('should produce valid <p:graphicFrame> with table data', () => {
         const el: PptxElement = {
-          type: 'table', pos: { x: 1, y: 1, w: 8, h: 3 },
-          rows: [['A', 'B'], ['C', 'D']],
+          type: 'table',
+          pos: { x: 1, y: 1, w: 8, h: 3 },
+          rows: [
+            ['A', 'B'],
+            ['C', 'D'],
+          ],
           colWidths: [4, 4],
         };
         const xml = buildTable(el, 20);
@@ -564,7 +618,8 @@ describe('Native PPTX Engine', () => {
 
       it('should return empty string for empty rows', () => {
         const el: PptxElement = {
-          type: 'table', pos: { x: 0, y: 0, w: 5, h: 2 },
+          type: 'table',
+          pos: { x: 0, y: 0, w: 5, h: 2 },
           rows: [],
         };
         const xml = buildTable(el, 21);
@@ -573,7 +628,8 @@ describe('Native PPTX Engine', () => {
 
       it('should style header row differently', () => {
         const el: PptxElement = {
-          type: 'table', pos: { x: 0, y: 0, w: 6, h: 2 },
+          type: 'table',
+          pos: { x: 0, y: 0, w: 6, h: 2 },
           rows: [['Header'], ['Data']],
         };
         const xml = buildTable(el, 22);
@@ -585,13 +641,14 @@ describe('Native PPTX Engine', () => {
 
       it('should split newlines in cells into multiple <a:p>', () => {
         const el: PptxElement = {
-          type: 'table', pos: { x: 0, y: 0, w: 5, h: 2 },
+          type: 'table',
+          pos: { x: 0, y: 0, w: 5, h: 2 },
           rows: [['H1'], ['Line1\nLine2']],
         };
         const xml = buildTable(el, 23);
         // Find the cell with "Line1"
         const cells = (xml.match(/<a:tc>[\s\S]*?<\/a:tc>/g) || []) as string[];
-        const targetCell = cells.find(c => c.includes('Line1'));
+        const targetCell = cells.find((c) => c.includes('Line1'));
         expect(targetCell).toBeDefined();
         const pCount = (targetCell!.match(/<a:p>/g) || []).length;
         expect(pCount).toBe(2);
@@ -599,8 +656,12 @@ describe('Native PPTX Engine', () => {
 
       it('should have lang="ja-JP" on all rPr elements', () => {
         const el: PptxElement = {
-          type: 'table', pos: { x: 0, y: 0, w: 4, h: 2 },
-          rows: [['A', 'B'], ['C', 'D']],
+          type: 'table',
+          pos: { x: 0, y: 0, w: 4, h: 2 },
+          rows: [
+            ['A', 'B'],
+            ['C', 'D'],
+          ],
         };
         const xml = buildTable(el, 24);
         const rPrs = xml.match(/<a:rPr[^>]*>/g) || [];
@@ -612,7 +673,8 @@ describe('Native PPTX Engine', () => {
 
       it('should have <a:endParaRPr> in every paragraph', () => {
         const el: PptxElement = {
-          type: 'table', pos: { x: 0, y: 0, w: 4, h: 2 },
+          type: 'table',
+          pos: { x: 0, y: 0, w: 4, h: 2 },
           rows: [['X'], ['Y']],
         };
         const xml = buildTable(el, 25);

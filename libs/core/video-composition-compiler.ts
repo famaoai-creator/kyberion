@@ -4,6 +4,7 @@ import { getVideoRenderRuntimePolicy } from './video-render-runtime-policy.js';
 import * as pathResolver from './path-resolver.js';
 import { slugify } from './text-utils.js';
 import { safeCopyFileSync, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import { buildVideoDesignCssVars } from './video-design-system.js';
 import type {
   CompiledVideoCompositionScene,
   VideoCompositionADF,
@@ -92,7 +93,7 @@ export function writeVideoCompositionBundle(
   safeMkdir(path.join(plan.bundle_dir, 'compositions'), { recursive: true });
 
   for (const scene of plan.scenes) {
-    const sceneSource = renderSceneHtml(adf, scene);
+    const sceneSource = applyVideoThemeTokens(renderSceneHtml(adf, scene));
     const scenePath = path.join(plan.bundle_dir, scene.output_html);
     safeWriteFile(scenePath, sceneSource);
 
@@ -100,7 +101,7 @@ export function writeVideoCompositionBundle(
     copySceneAssets(plan.bundle_dir, scene.asset_refs);
   }
 
-  safeWriteFile(plan.index_html, renderBundleIndexHtml(plan, adf));
+  safeWriteFile(plan.index_html, applyVideoThemeTokens(renderBundleIndexHtml(plan, adf)));
   safeWriteFile(path.join(plan.bundle_dir, 'render-plan.json'), JSON.stringify(plan, null, 2));
   safeWriteFile(path.join(plan.bundle_dir, 'README.md'), renderBundleReadme(plan, adf));
 
@@ -1301,6 +1302,58 @@ function sceneLayoutVariant(scene: CompiledVideoCompositionScene): string {
   );
 }
 
+function sceneThemeLayoutFamily(scene: CompiledVideoCompositionScene): string {
+  return String(
+    scene.content?.layout_family || scene.content?.layout_variant || scene.template_id || 'default'
+  );
+}
+
+function sceneThemeMotionProfile(scene: CompiledVideoCompositionScene): string {
+  return String(scene.content?.motion_profile || scene.content?.motion || 'guided-step');
+}
+
+function normalizeSceneDesignSystemVars(value: unknown): Record<string, string> {
+  if (!value || typeof value !== 'object') return {};
+  return Object.entries(value as Record<string, unknown>).reduce<Record<string, string>>(
+    (acc, [key, entry]) => {
+      if (typeof entry === 'string' && entry.trim()) {
+        acc[key] = entry.trim();
+      }
+      return acc;
+    },
+    {}
+  );
+}
+
+function buildSceneCssVars(
+  scene: CompiledVideoCompositionScene,
+  adf: VideoCompositionADF
+): Record<string, string> {
+  const designSystemVars = normalizeSceneDesignSystemVars(scene.content?.design_system_vars);
+  const background =
+    designSystemVars['--kb-bg-main'] ||
+    designSystemVars['--bg'] ||
+    adf.composition.background_color ||
+    '#07111f';
+  const themeVars = buildVideoDesignCssVars({
+    backgroundColor: background,
+    layoutFamily: sceneThemeLayoutFamily(scene),
+    motionProfile: sceneThemeMotionProfile(scene),
+    designSystemRef: { css_vars: designSystemVars } as any,
+  });
+  return {
+    ...themeVars,
+    '--bg': `var(--kb-bg-main, ${themeVars['--kb-bg-main'] || background})`,
+    '--panel': `var(--kb-panel-bg, ${themeVars['--kb-panel-bg'] || 'rgba(15, 23, 42, 0.88)'})`,
+    '--accent': `var(--kb-accent, ${themeVars['--kb-accent'] || '#60a5fa'})`,
+    '--text': `var(--kb-text-primary, ${themeVars['--kb-text-primary'] || '#f8fafc'})`,
+    '--subtext': `var(--kb-text-secondary, ${themeVars['--kb-text-secondary'] || '#94a3b8'})`,
+    '--font-sans': `var(--kb-font-sans, ${themeVars['--kb-font-sans'] || '"Inter", -apple-system, BlinkMacSystemFont, sans-serif'})`,
+    '--radius-panel': `var(--kb-panel-radius, ${themeVars['--kb-panel-radius'] || '32px'})`,
+    '--radius-surface': `var(--kb-surface-radius, ${themeVars['--kb-surface-radius'] || '24px'})`,
+  };
+}
+
 function renderSceneCssVars(
   scene: CompiledVideoCompositionScene,
   adf: VideoCompositionADF
@@ -1316,48 +1369,7 @@ function extractSceneCssVars(
   scene: CompiledVideoCompositionScene,
   adf: VideoCompositionADF
 ): Record<string, string> {
-  const contentVars = scene.content?.design_system_vars;
-  const background = adf.composition.background_color || '#07111f';
-  const defaultVars: Record<string, string> = {
-    '--bg': background,
-    '--panel': 'rgba(15, 23, 42, 0.88)',
-    '--accent': '#60a5fa',
-    '--text': '#f8fafc',
-    '--subtext': '#94a3b8',
-    '--font-sans': '"Inter", -apple-system, BlinkMacSystemFont, sans-serif',
-    '--radius-panel': '32px',
-    '--radius-surface': '24px',
-  };
-  if (!contentVars || typeof contentVars !== 'object') {
-    return defaultVars;
-  }
-  const normalized = Object.entries(contentVars as Record<string, unknown>).reduce<
-    Record<string, string>
-  >((acc, [key, value]) => {
-    if (typeof value === 'string' && value.trim()) {
-      acc[key] = value;
-    }
-    return acc;
-  }, {});
-  return {
-    ...defaultVars,
-    '--bg': normalized['--kb-bg-main'] || normalized['--bg'] || defaultVars['--bg'],
-    '--panel': normalized['--kb-panel-bg'] || normalized['--panel'] || defaultVars['--panel'],
-    '--accent': normalized['--kb-accent'] || normalized['--accent'] || defaultVars['--accent'],
-    '--text': normalized['--kb-text-primary'] || normalized['--text'] || defaultVars['--text'],
-    '--subtext':
-      normalized['--kb-text-secondary'] || normalized['--subtext'] || defaultVars['--subtext'],
-    '--font-sans':
-      normalized['--kb-font-sans'] || normalized['--font-sans'] || defaultVars['--font-sans'],
-    '--radius-panel':
-      normalized['--kb-panel-radius'] ||
-      normalized['--radius-panel'] ||
-      defaultVars['--radius-panel'],
-    '--radius-surface':
-      normalized['--kb-surface-radius'] ||
-      normalized['--radius-surface'] ||
-      defaultVars['--radius-surface'],
-  };
+  return buildSceneCssVars(scene, adf);
 }
 
 function resolveAsset(
@@ -1422,6 +1434,98 @@ function resolveAvatarAsset(
     }
   }
   return supporting;
+}
+
+function tokenizeVideoCss(css: string): string {
+  const tokenized = [
+    { pattern: /#0B1020/gi, token: '--kb-bg-main' },
+    { pattern: /#0b1224/gi, token: '--kb-bg-deep' },
+    { pattern: /#09111f/gi, token: '--kb-bg-surface' },
+    { pattern: /#07111f/gi, token: '--kb-bg-ink' },
+    { pattern: /#070912/gi, token: '--kb-bg-surface-strong' },
+    { pattern: /#060913/gi, token: '--kb-bg-canvas' },
+    { pattern: /#050814/gi, token: '--kb-bg-deep-strong' },
+    { pattern: /#050714/gi, token: '--kb-bg-deepest' },
+    { pattern: /#93c5fd/gi, token: '--kb-accent-blue-soft' },
+    { pattern: /#60a5fa/gi, token: '--kb-accent-blue' },
+    { pattern: /#bfdbfe/gi, token: '--kb-accent-blue-text' },
+    { pattern: /#cfe3ff/gi, token: '--kb-accent-blue-muted' },
+    { pattern: /#f59e0b/gi, token: '--kb-accent-orange' },
+    { pattern: /#fed7aa/gi, token: '--kb-accent-orange-muted' },
+    { pattern: /#fecaca/gi, token: '--kb-danger-soft' },
+    { pattern: /#f8fafc/gi, token: '--kb-text-primary' },
+    { pattern: /#e2e8f0/gi, token: '--kb-text-secondary' },
+    { pattern: /#cbd5e1/gi, token: '--kb-text-secondary' },
+    { pattern: /#94a3b8/gi, token: '--kb-text-muted' },
+    { pattern: /#64748b/gi, token: '--kb-text-subtle' },
+    { pattern: /#22c55e/gi, token: '--kb-accent-green' },
+    { pattern: /#bbf7d0/gi, token: '--kb-accent-green-muted' },
+    { pattern: /#fff/gi, token: '--kb-text-inverse' },
+    { pattern: /rgba\(\s*59,\s*130,\s*246,\s*0\.1\s*\)/gi, token: '--kb-accent-blue-soft' },
+    { pattern: /rgba\(\s*59,\s*130,\s*246,\s*0\.12\s*\)/gi, token: '--kb-accent-blue-soft' },
+    { pattern: /rgba\(\s*59,\s*130,\s*246,\s*0\.15\s*\)/gi, token: '--kb-accent-blue-soft' },
+    { pattern: /rgba\(\s*59,\s*130,\s*246,\s*0\.16\s*\)/gi, token: '--kb-accent-blue-soft' },
+    { pattern: /rgba\(\s*59,\s*130,\s*246,\s*0\.18\s*\)/gi, token: '--kb-accent-blue-soft' },
+    { pattern: /rgba\(\s*59,\s*130,\s*246,\s*0\.2\s*\)/gi, token: '--kb-accent-blue-soft' },
+    { pattern: /rgba\(\s*59,\s*130,\s*246,\s*0\.22\s*\)/gi, token: '--kb-accent-blue-strong' },
+    { pattern: /rgba\(\s*59,\s*130,\s*246,\s*0\.24\s*\)/gi, token: '--kb-accent-blue-strong' },
+    { pattern: /rgba\(\s*59,\s*130,\s*246,\s*0\.28\s*\)/gi, token: '--kb-accent-blue-strong' },
+    { pattern: /rgba\(\s*59,\s*130,\s*246,\s*0\.34\s*\)/gi, token: '--kb-accent-blue-strong' },
+    { pattern: /rgba\(\s*96,\s*165,\s*250,\s*0\.12\s*\)/gi, token: '--kb-accent-blue-strong' },
+    { pattern: /rgba\(\s*96,\s*165,\s*250,\s*0\.16\s*\)/gi, token: '--kb-accent-blue-strong' },
+    { pattern: /rgba\(\s*96,\s*165,\s*250,\s*0\.18\s*\)/gi, token: '--kb-accent-blue-strong' },
+    { pattern: /rgba\(\s*96,\s*165,\s*250,\s*0\.22\s*\)/gi, token: '--kb-accent-blue-strong' },
+    { pattern: /rgba\(\s*96,\s*165,\s*250,\s*0\.28\s*\)/gi, token: '--kb-accent-blue-strong' },
+    { pattern: /rgba\(\s*96,\s*165,\s*250,\s*0\.44\s*\)/gi, token: '--kb-accent-blue-strong' },
+    { pattern: /rgba\(\s*96,\s*165,\s*250,\s*0\.6\s*\)/gi, token: '--kb-accent-blue-strong' },
+    { pattern: /rgba\(\s*147,\s*197,\s*253,\s*0\s*\)/gi, token: '--kb-accent-blue-muted' },
+    { pattern: /rgba\(\s*147,\s*197,\s*253,\s*0\.9\s*\)/gi, token: '--kb-accent-blue-muted' },
+    { pattern: /rgba\(\s*249,\s*115,\s*22,\s*0\.14\s*\)/gi, token: '--kb-accent-orange-soft' },
+    { pattern: /rgba\(\s*249,\s*115,\s*22,\s*0\.18\s*\)/gi, token: '--kb-accent-orange-soft' },
+    { pattern: /rgba\(\s*249,\s*115,\s*22,\s*0\.2\s*\)/gi, token: '--kb-accent-orange-soft' },
+    { pattern: /rgba\(\s*249,\s*115,\s*22,\s*0\.22\s*\)/gi, token: '--kb-accent-orange-soft' },
+    { pattern: /rgba\(\s*245,\s*158,\s*11,\s*0\.42\s*\)/gi, token: '--kb-glow-warning' },
+    { pattern: /rgba\(\s*34,\s*197,\s*94,\s*0\.12\s*\)/gi, token: '--kb-accent-green-soft' },
+    { pattern: /rgba\(\s*34,\s*197,\s*94,\s*0\.14\s*\)/gi, token: '--kb-accent-green-soft' },
+    { pattern: /rgba\(\s*34,\s*197,\s*94,\s*0\.18\s*\)/gi, token: '--kb-accent-green-soft' },
+    { pattern: /rgba\(\s*34,\s*197,\s*94,\s*0\.5\s*\)/gi, token: '--kb-glow-success' },
+    { pattern: /rgba\(\s*220,\s*38,\s*38,\s*0\.2\s*\)/gi, token: '--kb-danger-soft' },
+    { pattern: /rgba\(\s*248,\s*113,\s*113,\s*0\.2\s*\)/gi, token: '--kb-danger-soft' },
+    { pattern: /rgba\(\s*148,\s*163,\s*184,\s*0\.12\s*\)/gi, token: '--kb-border-subtle' },
+    { pattern: /rgba\(\s*148,\s*163,\s*184,\s*0\.14\s*\)/gi, token: '--kb-border-subtle' },
+    { pattern: /rgba\(\s*148,\s*163,\s*184,\s*0\.16\s*\)/gi, token: '--kb-border-subtle' },
+    { pattern: /rgba\(\s*148,\s*163,\s*184,\s*0\.18\s*\)/gi, token: '--kb-border-subtle' },
+    { pattern: /rgba\(\s*15,\s*23,\s*42,\s*0\.82\s*\)/gi, token: '--kb-panel-bg' },
+    { pattern: /rgba\(\s*15,\s*23,\s*42,\s*0\.86\s*\)/gi, token: '--kb-panel-bg' },
+    { pattern: /rgba\(\s*15,\s*23,\s*42,\s*0\.88\s*\)/gi, token: '--kb-panel-bg' },
+    { pattern: /rgba\(\s*15,\s*23,\s*42,\s*0\.9\s*\)/gi, token: '--kb-panel-bg' },
+    { pattern: /rgba\(\s*15,\s*23,\s*42,\s*0\.92\s*\)/gi, token: '--kb-panel-bg' },
+    { pattern: /rgba\(\s*15,\s*23,\s*42,\s*0\.95\s*\)/gi, token: '--kb-panel-bg' },
+    { pattern: /rgba\(\s*15,\s*23,\s*42,\s*0\.96\s*\)/gi, token: '--kb-panel-bg' },
+    { pattern: /rgba\(\s*7,\s*17,\s*31,\s*0\.6\s*\)/gi, token: '--kb-bg-ink' },
+    { pattern: /rgba\(\s*7,\s*17,\s*31,\s*0\.7\s*\)/gi, token: '--kb-bg-ink' },
+    { pattern: /rgba\(\s*7,\s*17,\s*31,\s*0\.76\s*\)/gi, token: '--kb-bg-ink' },
+    { pattern: /rgba\(\s*7,\s*17,\s*31,\s*0\.9\s*\)/gi, token: '--kb-bg-ink' },
+    { pattern: /rgba\(\s*7,\s*17,\s*31,\s*0\.94\s*\)/gi, token: '--kb-bg-ink' },
+    { pattern: /rgba\(\s*255,\s*255,\s*255,\s*0\.03\s*\)/gi, token: '--kb-overlay-light' },
+    { pattern: /rgba\(\s*255,\s*255,\s*255,\s*0\.1\s*\)/gi, token: '--kb-overlay-heavy' },
+    { pattern: /rgba\(\s*0,\s*0,\s*0,\s*0\.24\s*\)/gi, token: '--kb-shadow-soft' },
+    { pattern: /rgba\(\s*0,\s*0,\s*0,\s*0\.25\s*\)/gi, token: '--kb-shadow-soft' },
+    { pattern: /rgba\(\s*0,\s*0,\s*0,\s*0\.3\s*\)/gi, token: '--kb-shadow-soft' },
+    { pattern: /rgba\(\s*0,\s*0,\s*0,\s*0\.35\s*\)/gi, token: '--kb-shadow-strong' },
+    { pattern: /rgba\(\s*0,\s*0,\s*0,\s*0\.45\s*\)/gi, token: '--kb-shadow-strong' },
+    { pattern: /rgba\(\s*0,\s*0,\s*0,\s*0\.5\s*\)/gi, token: '--kb-shadow-strong' },
+  ];
+  return tokenized.reduce(
+    (result, entry) => result.replace(entry.pattern, (match) => `var(${entry.token}, ${match})`),
+    css
+  );
+}
+
+function applyVideoThemeTokens(html: string): string {
+  return html.replace(/<style([^>]*)>([\s\S]*?)<\/style>/gi, (_match, attrs, css) => {
+    return `<style${attrs}>${tokenizeVideoCss(css)}</style>`;
+  });
 }
 
 function safeAssetName(assetPath: string): string {

@@ -9,6 +9,13 @@
 - `visual-workflow-compiler.ts`(110行)にはトークンが一切ない。
 - つまり DS-02(テナントブランド動画)を実装しても、実際に変わるのは背景と文字色程度 — 本計画がその残りを埋める。
 
+## 実装ステータス
+
+- `video-composition-compiler.ts` のシーン HTML は `--kb-*` 系トークンへ置換済みで、既定値は fallback に保持している。
+- `video-design-system.ts` へ動画向けの共有 CSS 変数群を追加済みで、`visual-workflow-compiler.ts` も同じ変数セットを返す。
+- `video-composition-compiler.test.ts` と `visual-workflow-compiler.test.ts` で、トークン化出力と共有 CSS 変数を検証済み。
+- 残作業は Task 4 の実写/スクリーンショット検証のみ。
+
 ## ゴール(受入条件)
 
 1. シーンテンプレート内の色・フォント指定が、正準トークン由来の CSS 変数(`--kb-*` 系。既存 3 変数は互換維持)に置き換わり、css_vars の差し替えでシーン全体の見た目が変わる。

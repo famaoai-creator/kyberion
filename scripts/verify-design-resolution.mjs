@@ -3,9 +3,9 @@
  * Reads the same JSON files as the runtime, exercises the same logic,
  * and prints a resolution table without building a full PPTX.
  */
-import { resolve, join } from 'path';
+import { resolve } from 'path';
 import { fileURLToPath } from 'url';
-import { safeExistsSync, safeReadFile } from '@agent/core';
+import { resolveTenantDesign, safeExistsSync, safeReadFile } from '@agent/core';
 
 const moduleDir = fileURLToPath(new URL('.', import.meta.url));
 const rootDir = resolve(moduleDir, '..');
@@ -14,47 +14,19 @@ function safeRead(p) {
   return JSON.parse(String(safeReadFile(resolve(rootDir, p), { encoding: 'utf8' }) || ''));
 }
 
-// --- replica of the runtime resolution logic ---
-
-let _cachedRegistry = null;
-function resolveConfidentialTenant(brandName, designSystemId) {
-  if (!brandName) return null;
-  try {
-    if (!_cachedRegistry) {
-      _cachedRegistry = safeRead('knowledge/confidential/tenants/index.json');
-    }
-    const key = brandName.toLowerCase();
-    for (const entry of _cachedRegistry.tenants || []) {
-      try {
-        const ov = safeRead(entry.override_path);
-        if (designSystemId && ov.design_system_id && ov.design_system_id !== designSystemId)
-          continue;
-        if (Array.isArray(ov.matchers) && ov.matchers.some((m) => key.includes(m.toLowerCase()))) {
-          return { ...ov, _source: entry.override_path };
-        }
-      } catch {
-        /* skip */
-      }
-    }
-  } catch {
-    /* registry unavailable */
-  }
-  return null;
-}
-
-function resolveLayoutTemplate(brief, tenantOverride) {
+function resolveLayoutTemplate(brief, tenantResolution) {
   const systems = safeRead(
     'knowledge/public/design-patterns/media-templates/media-design-systems/systems.json'
   );
   const system = systems.systems?.[brief.design_system_id];
 
   // Priority 1: tenant confidential catalog
-  if (tenantOverride?.layout_template_catalog) {
+  if (tenantResolution?.layoutCatalog) {
     try {
-      const catalog = safeRead(tenantOverride.layout_template_catalog);
-      const id = tenantOverride.layout_template_id || catalog.default;
+      const catalog = safeRead(tenantResolution.layoutCatalog);
+      const id = tenantResolution.tenantOverride?.layout_template_id || catalog.default;
       if (catalog.templates?.[id]) {
-        return { templateId: id, source: tenantOverride.layout_template_catalog };
+        return { templateId: id, source: tenantResolution.layoutCatalog };
       }
     } catch {
       /* fall through */
@@ -62,7 +34,8 @@ function resolveLayoutTemplate(brief, tenantOverride) {
   }
 
   // Priority 2: system-level public catalog
-  const templateId = tenantOverride?.layout_template_id || system?.layout_template_id || null;
+  const templateId =
+    tenantResolution?.tenantOverride?.layout_template_id || system?.layout_template_id || null;
   if (templateId) {
     const publicCatalog = safeRead(
       'knowledge/public/design-patterns/media-templates/slide-layout-presets/layout-templates.json'
@@ -140,10 +113,12 @@ for (const scenario of SCENARIOS) {
   console.log(`  brand_name       : ${brandName}`);
 
   // Tenant resolution
-  const tenant = resolveConfidentialTenant(brandName, dsId);
-  if (tenant) {
-    console.log(`  テナントマッチ   : ✅ ${tenant._source}`);
-    console.log(`  theme            : ${tenant.theme}`);
+  const tenant = resolveTenantDesign({ rootDir, brandName, designSystemId: dsId });
+  if (tenant.source === 'tenant') {
+    console.log(`  テナントマッチ   : ✅ ${tenant.matchedPath}`);
+    console.log(
+      `  theme            : ${tenant.tenantOverride?.theme || tenant.themePack?.theme?.name || ''}`
+    );
   } else {
     console.log(`  テナントマッチ   : なし（デフォルト使用）`);
   }
