@@ -7,6 +7,7 @@ import * as path from 'node:path';
 import {
   composeMissionTeamPlan,
   customerResolver,
+  resolveCompany,
   findMissionPath,
   initializeMissionTeamBindings,
   ledger,
@@ -25,6 +26,7 @@ import {
   transitionStatus,
   withExecutionContext,
   writeMissionTeamPlan,
+  buildCompanyVisionRef,
 } from '@agent/core';
 import { readJsonFile } from './cli-input.js';
 import { getCurrentBranch, getGitHash, initMissionRepo } from './mission-git.js';
@@ -48,10 +50,75 @@ function normalizeTenantSlug(value: string | undefined | null): string | undefin
   return TENANT_SLUG_RE.test(trimmed) ? trimmed : undefined;
 }
 
-function profileVisionRef(): string {
-  return (
-    customerResolver.customerRoot('my-vision.md') ?? pathResolver.knowledge('personal/my-vision.md')
+export interface MissionVisionRefSummary {
+  raw: string;
+  kind: 'company' | 'vision' | 'legacy';
+  tenant_slug: string | null;
+  path: string | null;
+  query: string | null;
+}
+
+export function parseMissionVisionRef(
+  inputVisionRef: string | undefined | null,
+  tenantSlug?: string | undefined
+): MissionVisionRefSummary | null {
+  const raw = String(inputVisionRef || '').trim();
+  if (!raw) return null;
+
+  if (raw.startsWith('company://')) {
+    const remainder = raw.slice('company://'.length);
+    const [pathPart, queryPart] = remainder.split('?', 2);
+    const [parsedTenantSlug, ...segments] = pathPart.split('/').filter(Boolean);
+    return {
+      raw,
+      kind: 'company',
+      tenant_slug: normalizeTenantSlug(parsedTenantSlug || tenantSlug || undefined) || null,
+      path: segments.length ? segments.join('/') : 'vision',
+      query: queryPart || null,
+    };
+  }
+
+  if (raw.startsWith('vision://')) {
+    const remainder = raw.slice('vision://'.length);
+    const [pathPart, queryPart] = remainder.split('?', 2);
+    return {
+      raw,
+      kind: 'vision',
+      tenant_slug: normalizeTenantSlug(tenantSlug || undefined) || null,
+      path: pathPart || null,
+      query: queryPart || null,
+    };
+  }
+
+  return {
+    raw,
+    kind: 'legacy',
+    tenant_slug: normalizeTenantSlug(tenantSlug || undefined) || null,
+    path: null,
+    query: null,
+  };
+}
+
+export function normalizeMissionVisionRef(
+  inputVisionRef: string | undefined,
+  tenantSlug: string | undefined,
+  rootDir: string
+): string {
+  const raw = String(inputVisionRef || '').trim();
+  if (raw.startsWith('company://') || raw.startsWith('vision://')) {
+    return raw;
+  }
+
+  const company = resolveCompany(
+    tenantSlug || customerResolver.activeCustomer() || 'default',
+    rootDir
   );
+  const structuredRef = buildCompanyVisionRef(company.tenant_slug);
+  if (!raw) {
+    return structuredRef;
+  }
+
+  return `${structuredRef}?source=${encodeURIComponent(raw)}`;
 }
 
 export async function createMission(args: {
@@ -132,7 +199,7 @@ export async function createMission(args: {
   const gitHash = getGitHash(rootDir);
   const now = new Date().toISOString();
   const owner = process.env.USER || 'famao';
-  const resolvedVision = visionRef || profileVisionRef();
+  const resolvedVision = normalizeMissionVisionRef(visionRef, tenantSlug, rootDir);
 
   for (const file of template.files) {
     const content = file.content_template

@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import * as v8 from 'node:v8';
 import * as readline from 'node:readline';
 import { pathResolver } from './path-resolver.js';
+import { resolveVision } from './vision-resolver.js';
 import {
   rawExistsSync,
   rawMkdirp,
@@ -421,6 +422,12 @@ export const fileUtils = {
     }
   },
   getGoldenRule: () => {
+    try {
+      const resolvedVision = resolveVision();
+      if (resolvedVision.raw.trim()) return resolvedVision.raw;
+    } catch {
+      // fall through to the global hard-coded fallback below
+    }
     const rulePath = pathResolver.vision('_default.md');
     if (rawExistsSync(rulePath)) {
       return rawReadTextFile(rulePath);
