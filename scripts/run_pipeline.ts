@@ -24,6 +24,7 @@ import {
   runJanitor,
   checkActuatorCapabilities,
   killSwitch,
+  validateOpInput,
 } from '@agent/core';
 import { tryRepairJson } from '@agent/core/json-repair';
 import { installPythonVoiceBridgeIfAvailable } from '@agent/core/python-voice-bridge';
@@ -453,6 +454,14 @@ export function normalizePipelineOp(op: string): string {
   if (op === 'parallel_foreach') return 'core:parallel_foreach';
   if (op === 'accumulate') return 'core:accumulate';
   return `system:${op}`;
+}
+
+function validatePipelineOpInput(domain: string, action: string, params: Record<string, unknown>) {
+  if (domain === 'core' || domain === 'reasoning') return;
+  const validation = validateOpInput(domain as any, action, params);
+  if (!validation.valid) {
+    throw new Error(`[INVALID_OP_INPUT] ${domain}:${action}: ${validation.errors.join('; ')}`);
+  }
 }
 
 function resolveLogMessage(params: Record<string, unknown>, ctx: Record<string, unknown>): string {
@@ -1173,6 +1182,7 @@ export async function runSteps(
               });
             }
           }
+          validatePipelineOpInput(domain, action, params);
           await assertPipelineStepCapabilityAvailable(domain, action);
           const dispatch = await loadActuatorDispatch(domain);
           const result = await dispatch(

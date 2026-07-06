@@ -28,6 +28,8 @@ import {
   createScreenDisplayInventoryBridge,
   listToolRuntimeInventory,
   listServiceRuntimeInventory,
+  listOpInputContracts,
+  suggestClosestStrings,
   type ScreenDisplayInventory,
   type ScreenDisplayRecord,
   StubVideoFrameBus,
@@ -74,6 +76,7 @@ import {
 } from '@agent/core/os-automation';
 import type { FocusedInputState } from '@agent/core/os-automation';
 import { osAutomationBridge } from '@agent/core/os-automation-bridge';
+import { validateOpInput } from '@agent/core';
 import {
   systemDisplayHelpers,
   type ResolvedScreenDisplaySelection,
@@ -96,6 +99,7 @@ const DEFAULT_SYSTEM_RETRY = {
   factor: 2,
   jitter: true,
 };
+const warnedSystemOpAliases = new Set<string>();
 
 let cachedRecoveryPolicy: Record<string, any> | undefined;
 
@@ -168,12 +172,43 @@ function buildRetryOptions(override?: Record<string, any>) {
 }
 
 async function delegateToFilePipeline(step: PipelineStep, ctx: any): Promise<any> {
+  const delegatedCtx = { ...ctx };
+  delete delegatedCtx.context_path;
   const result = await handleFileAction({
     action: 'pipeline',
     steps: [step],
-    context: ctx,
+    context: delegatedCtx,
   } as any);
   return result.context || ctx;
+}
+
+function buildUnknownSystemOpMessage(op: string): string {
+  const knownOps = [
+    ...Object.keys(listOpInputContracts('system')),
+    ...Array.from(SYSTEM_ACTUATOR_CAPTURE_ALIAS_OPS),
+    'if',
+    'while',
+  ];
+  const suggestions = suggestClosestStrings(op, knownOps);
+  return suggestions.length > 0
+    ? `[UNKNOWN_OP] Unknown op: ${op}. Did you mean: ${suggestions.join(', ')}?`
+    : `[UNKNOWN_OP] Unknown op: ${op}`;
+}
+
+function warnDeprecatedSystemOpAlias(alias: string, canonical: string) {
+  const warningKey = `${alias}->${canonical}`;
+  if (warnedSystemOpAliases.has(warningKey)) return;
+  warnedSystemOpAliases.add(warningKey);
+  logger.warn(`[system-actuator] alias "${alias}" is deprecated; use "${canonical}" instead.`);
+}
+
+function assertSystemOpInput(op: string, params: any) {
+  const validation = validateOpInput('system', op, params);
+  if (!validation.valid) {
+    throw new Error(
+      `[INVALID_OP_INPUT] system:${op} ${'errors' in validation ? validation.errors.join('; ') : ''}`
+    );
+  }
 }
 
 function promoteDelegatedCapture(resultCtx: any, params: any, fallbackKey: string): any {
@@ -360,12 +395,13 @@ async function opControl(
     }
 
     default:
-      throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
+      throw new Error(buildUnknownSystemOpMessage(op));
   }
 }
 
 async function opCapture(op: string, params: any, ctx: any, resolve: (value: any) => any) {
   const rootDir = pathResolver.rootDir();
+  assertSystemOpInput(op, params);
   switch (op) {
     case 'screenshot': {
       const displaySelection = await systemDisplayHelpers.resolveScreenDisplaySelection(
@@ -1278,12 +1314,13 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
       return { ...sandbox.ctx };
     }
     default:
-      throw new Error(`Unsupported transform operator in System-Actuator: ${op}`);
+      throw new Error(buildUnknownSystemOpMessage(op));
   }
 }
 
 async function opApply(op: string, params: any, ctx: any, resolve: (value: any) => any) {
   const rootDir = pathResolver.rootDir();
+  assertSystemOpInput(op, params);
   if (SYSTEM_ACTUATOR_CAPTURE_ALIAS_OPS.has(op)) {
     return opCapture(op === 'list' ? 'list_missions' : op, params, ctx, resolve);
   }
@@ -1397,9 +1434,13 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       }
       break;
     }
-    case 'notify':
-      logger.info(`🔔 [NOTIFICATION] ${resolve(params.text)}`);
+    case 'notify': {
+      const title = String(resolve(params.title || 'Kyberion'));
+      const message = String(resolve(params.message || params.text || ''));
+      const subtitle = params.subtitle ? String(resolve(params.subtitle)) : undefined;
+      systemNotify(title, message, subtitle);
       break;
+    }
     case 'write_file':
     case 'write_artifact':
       await delegateToFilePipeline(
@@ -1475,8 +1516,9 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       break;
     }
     case 'system_notify': {
+      warnDeprecatedSystemOpAlias('system_notify', 'notify');
       const title = String(resolve(params.title || 'Kyberion'));
-      const message = String(resolve(params.message || ''));
+      const message = String(resolve(params.message || params.text || ''));
       const subtitle = params.subtitle ? String(resolve(params.subtitle)) : undefined;
       systemNotify(title, message, subtitle);
       break;
@@ -1541,7 +1583,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       break;
     }
     default:
-      throw new Error(`Unsupported apply operator in System-Actuator: ${op}`);
+      throw new Error(buildUnknownSystemOpMessage(op));
   }
   return ctx;
 }
