@@ -40,6 +40,8 @@
     "check:esm": "node dist/scripts/check_esm_integrity.js",
     "check:catalogs": "node dist/scripts/check_catalog_integrity.js",
     "check:governance-rules": "node dist/scripts/check_governance_rules.js",
+    "generate:op-registry": "node --import ./scripts/ts-loader.mjs scripts/generate_op_registry.ts",
+    "check:op-registry": "node --import ./scripts/ts-loader.mjs scripts/generate_op_registry.ts --check",
     "check:design-contrast": "node --import ./scripts/ts-loader.mjs scripts/check_design_contrast.ts",
     "sync:intent-contract-memory": "node dist/scripts/sync_intent_contract_memory.js",
     "sync:component-inventory": "node dist/scripts/sync_component_inventory.js",

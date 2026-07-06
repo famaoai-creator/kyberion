@@ -28,6 +28,7 @@ import {
   createScreenDisplayInventoryBridge,
   listToolRuntimeInventory,
   listServiceRuntimeInventory,
+  buildUnknownActuatorOpError,
   type ScreenDisplayInventory,
   type ScreenDisplayRecord,
   StubVideoFrameBus,
@@ -39,6 +40,7 @@ import {
   DEFAULT_PIPELINE_TIMEOUT_MS,
   DEFAULT_MAX_LOOP_ITERATIONS,
 } from '@agent/core';
+import { handleAction as handleFileAction } from '../../file-actuator/src/file-pipeline-helpers.js';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { createApprovalRequest, loadApprovalRequest } from '@agent/core/governance';
 import {
@@ -73,6 +75,7 @@ import {
 } from '@agent/core/os-automation';
 import type { FocusedInputState } from '@agent/core/os-automation';
 import { osAutomationBridge } from '@agent/core/os-automation-bridge';
+import { validateOpInput } from '@agent/core';
 import {
   systemDisplayHelpers,
   type ResolvedScreenDisplaySelection,
@@ -95,6 +98,7 @@ const DEFAULT_SYSTEM_RETRY = {
   factor: 2,
   jitter: true,
 };
+const warnedSystemOpAliases = new Set<string>();
 
 let cachedRecoveryPolicy: Record<string, any> | undefined;
 
@@ -164,6 +168,44 @@ function buildRetryOptions(override?: Record<string, any>) {
       );
     },
   };
+}
+
+async function delegateToFilePipeline(step: PipelineStep, ctx: any): Promise<any> {
+  const delegatedCtx = { ...ctx };
+  delete delegatedCtx.context_path;
+  const result = await handleFileAction({
+    action: 'pipeline',
+    steps: [step],
+    context: delegatedCtx,
+  } as any);
+  return result.context || ctx;
+}
+
+function buildUnknownSystemOpMessage(op: string): string {
+  return buildUnknownActuatorOpError('system', op).message;
+}
+
+function warnDeprecatedSystemOpAlias(alias: string, canonical: string) {
+  const warningKey = `${alias}->${canonical}`;
+  if (warnedSystemOpAliases.has(warningKey)) return;
+  warnedSystemOpAliases.add(warningKey);
+  logger.warn(`[system-actuator] alias "${alias}" is deprecated; use "${canonical}" instead.`);
+}
+
+function assertSystemOpInput(op: string, params: any) {
+  const validation = validateOpInput('system', op, params);
+  if (!validation.valid) {
+    throw new Error(
+      `[INVALID_OP_INPUT] system:${op} ${'errors' in validation ? validation.errors.join('; ') : ''}`
+    );
+  }
+}
+
+function promoteDelegatedCapture(resultCtx: any, params: any, fallbackKey: string): any {
+  const exportAs = params.export_as;
+  if (!exportAs || resultCtx?.[exportAs] !== undefined) return resultCtx;
+  if (resultCtx?.[fallbackKey] === undefined) return resultCtx;
+  return { ...resultCtx, [exportAs]: resultCtx[fallbackKey] };
 }
 
 function normalizeDisplayName(value: unknown): string | undefined {
@@ -343,12 +385,13 @@ async function opControl(
     }
 
     default:
-      throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
+      throw new Error(buildUnknownSystemOpMessage(op));
   }
 }
 
 async function opCapture(op: string, params: any, ctx: any, resolve: (value: any) => any) {
   const rootDir = pathResolver.rootDir();
+  assertSystemOpInput(op, params);
   switch (op) {
     case 'screenshot': {
       const displaySelection = await systemDisplayHelpers.resolveScreenDisplaySelection(
@@ -572,13 +615,18 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
       };
     }
     case 'read_file':
-      return {
-        ...ctx,
-        [params.export_as || 'last_capture']: safeReadFile(
-          path.resolve(rootDir, resolve(params.path)),
-          { encoding: 'utf8' }
+      return promoteDelegatedCapture(
+        await delegateToFilePipeline(
+          {
+            type: 'capture',
+            op: 'read_file',
+            params: { ...params, path: resolve(params.path) },
+          },
+          ctx
         ),
-      };
+        params,
+        'last_capture'
+      );
     case 'read_json':
       return {
         ...ctx,
@@ -1256,12 +1304,13 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
       return { ...sandbox.ctx };
     }
     default:
-      throw new Error(`Unsupported transform operator in System-Actuator: ${op}`);
+      throw new Error(buildUnknownSystemOpMessage(op));
   }
 }
 
 async function opApply(op: string, params: any, ctx: any, resolve: (value: any) => any) {
   const rootDir = pathResolver.rootDir();
+  assertSystemOpInput(op, params);
   if (SYSTEM_ACTUATOR_CAPTURE_ALIAS_OPS.has(op)) {
     return opCapture(op === 'list' ? 'list_missions' : op, params, ctx, resolve);
   }
@@ -1375,43 +1424,54 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       }
       break;
     }
-    case 'notify':
-      logger.info(`🔔 [NOTIFICATION] ${resolve(params.text)}`);
-      break;
-    case 'write_file':
-    case 'write_artifact': {
-      const spec = resolveWriteArtifactSpec(params, ctx, resolve);
-      const out = path.resolve(rootDir, spec.path);
-      const content = spec.content;
-      if (!safeExistsSync(path.dirname(out))) safeMkdir(path.dirname(out), { recursive: true });
-      safeWriteFile(
-        out,
-        typeof content === 'string'
-          ? content
-          : content === undefined
-            ? ''
-            : JSON.stringify(content, null, 2)
-      );
+    case 'notify': {
+      const title = String(resolve(params.title || 'Kyberion'));
+      const message = String(resolve(params.message || params.text || ''));
+      const subtitle = params.subtitle ? String(resolve(params.subtitle)) : undefined;
+      systemNotify(title, message, subtitle);
       break;
     }
+    case 'write_file':
+    case 'write_artifact':
+      await delegateToFilePipeline(
+        {
+          type: 'apply',
+          op,
+          params,
+        },
+        ctx
+      );
+      break;
     case 'mkdir':
-      safeMkdir(path.resolve(rootDir, resolve(params.path)), { recursive: true });
+      await delegateToFilePipeline(
+        {
+          type: 'apply',
+          op: 'mkdir',
+          params,
+        },
+        ctx
+      );
       break;
     case 'log':
       logger.info(`[SYSTEM_LOG] ${resolve(params.message || 'Action completed')}`);
       break;
-    case 'write_json': {
-      const targetPath = pathResolver.rootResolve(resolve(params.path));
-      const content = params.content
-        ? resolve(params.content)
-        : params.from
-          ? getPathValue(ctx, params.from)
-          : ctx.last_capture_data;
-      if (!safeExistsSync(path.dirname(targetPath)))
-        safeMkdir(path.dirname(targetPath), { recursive: true });
-      safeWriteFile(targetPath, JSON.stringify(content, null, 2));
+    case 'write_json':
+      await delegateToFilePipeline(
+        {
+          type: 'apply',
+          op: 'write_file',
+          params: {
+            path: resolve(params.path),
+            content: params.content
+              ? resolve(params.content)
+              : params.from
+                ? getPathValue(ctx, params.from)
+                : ctx.last_capture_data,
+          },
+        },
+        ctx
+      );
       break;
-    }
     case 'scroll': {
       const direction = String(resolve(params.direction || 'down')) as
         | 'up'
@@ -1446,8 +1506,9 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       break;
     }
     case 'system_notify': {
+      warnDeprecatedSystemOpAlias('system_notify', 'notify');
       const title = String(resolve(params.title || 'Kyberion'));
-      const message = String(resolve(params.message || ''));
+      const message = String(resolve(params.message || params.text || ''));
       const subtitle = params.subtitle ? String(resolve(params.subtitle)) : undefined;
       systemNotify(title, message, subtitle);
       break;
@@ -1512,7 +1573,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       break;
     }
     default:
-      throw new Error(`Unsupported apply operator in System-Actuator: ${op}`);
+      throw new Error(buildUnknownSystemOpMessage(op));
   }
   return ctx;
 }

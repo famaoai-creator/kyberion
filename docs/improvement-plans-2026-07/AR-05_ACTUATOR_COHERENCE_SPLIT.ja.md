@@ -42,3 +42,9 @@
 - **IP-10 と重複しないこと**が重要。IP-10=行数分割、AR-05=op-set 一貫性。media/wisdom は**1つの分割作業に統合**し、二重に割らない(本文書 Task 3 で IP-10 に合流)。
 - 分割は高 blast-radius。純 move + 特性化テスト(IP-07)+ golden を各段で。op 名は AR-04 のエイリアスで後方互換。
 - deploy_release の移設は AC-03 のオーナーシップに従う。
+
+## 進捗(2026-07-06)
+
+- **完了済み(一部)**: `system-pipeline-helpers.ts` の `write_file` / `write_artifact` / `mkdir` を file-actuator へ forward し、system の混載領域を少し縮めた。`read_json` は既存互換のため system 側に残した。
+- **完了済み(一部)**: `AR-03` で file/input contract を導入済みのため、system→file の forward でも前倒し検証が効くようになった。
+- **未完了**: wisdom/media の大きな分割、system 残りの OS-input/device-test 境界整理、file I/O の更なる切り出し。

@@ -30,7 +30,7 @@
 
 ### Task 1: 正準エンジンの抽出と契約定義 — `claude-opus`(設計)
 
-1. `runSteps`(`run_pipeline.ts:321`)を `libs/core/adf-engine.ts` として抽出し、`executeSteps(steps, { opHandlers, resolveVars, evaluateCondition, bounds })` の形にする。制御 op・vars・condition は canonical `logic-utils` を単一ソースに。
+1. `runSteps`(`run_pipeline.ts:321`)を `libs/core/adf-engine.ts` として抽出し、`executeAdfSteps(steps, { opHandlers, resolveVars, evaluateCondition, bounds })` の形にする。制御 op・vars・condition は canonical `logic-utils` を単一ソースに。
 2. super-nerve と per-actuator の現状挙動差(制御 op・subprocess・repair)を洗い、**互換のための移行表**を本文書末尾に作る。while/parallel を正準に含めるか(HN-03 と協調)を決定。
 3. 段階移行計画(どのランナーから薄アダプタ化するか、golden での回帰確認点)を定義。
 
@@ -47,6 +47,10 @@
 ### Task 4: autonomous-repair 統合 — `claude-sonnet-4`
 
 - `run_pipeline.ts:632` と super-nerve の repair を1実装に統合。SA-02 のガードレールと整合(repair が .env/authority を無承認で書き換えない、AO-03/SA-05 と連携)。
+
+## 実装状況 (2026-07-06)
+
+- **進行中(Task 2/3 の土台)**: `libs/core/adf-engine.ts` を新設し、capture / transform / apply / control の共通 step runner を切り出した。`file-actuator` と `super-nerve` はこの runner を使う薄いアダプタへ寄せ、制御フロー・step budget・自動修復の共通化を進めた。残りは `run_pipeline.ts` と golden 回帰の確認。
 
 ## リスクと注意
 

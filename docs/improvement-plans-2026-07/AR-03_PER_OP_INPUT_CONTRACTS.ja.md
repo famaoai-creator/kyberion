@@ -10,6 +10,15 @@
 - **per-op の example がどこにも無い**(manifest/schema に `examples` なし)。作者は 99 テンプレを逆解析するしかない。
 - 誤った op/param は silent no-op(AR-06)や runtime throw になり、事前に teach されない。
 
+## 進捗(2026-07-06)
+
+- **完了済み(一部)**: `resolveRequiredStringParam` を導入し、`write_artifact` の `params.path` / `params.output_path` 必須判定を共通化した。file-actuator でも `write` / `append` / `delete` / `mkdir` / `copy` / `move` の path 系必須入力を前倒しで検証するようにした。
+- **完了済み(一部)**: `libs/core/op-input-contracts.ts` を追加し、browser/file/system の主要 op に JSON Schema を付与した。browser recording の compile/run と file pipeline の dispatch 前、`system-actuator` の capture/apply 入口、さらに `run_pipeline` の system/browser/file dispatch 前で `validateOpInput()` を通すようにした。
+- **完了済み(一部)**: `system:notify` に加えて `system:read_file` / `system:read_json` / `system:open_file` / `system:app_quit` / `system:process_kill` も input contract に追加し、host notification と host file/path/process 系の入力を前倒しで検証できるようにした。
+- **完了済み(一部)**: `system-actuator` の `describeOps()` に `input_schema` / examples を載せ、`generate_op_registry` の discovery 出力に反映できるようにした。
+- **完了済み(一部)**: `actuator-op-discovery.json` も contract-backed op について `input_schema` / examples を持つように再生成した。
+- **未完了**: AR-01 の正準 dispatch に全面接続すること、browser/system/file/service の残り高頻度 op への横展開、型付き params の dispatch 伝播。
+
 ## ゴール(受入条件)
 
 1. 各 op に **入力スキーマ(`schema_ref`)** が付き、必須/任意・型・例を宣言する(AR-02 の `OpSpec` に `input_schema` を持たせる)。

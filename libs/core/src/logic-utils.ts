@@ -95,44 +95,83 @@ export function resolveVars(val: any, ctx: any): any {
   });
 }
 
+export function resolveRequiredStringParam(
+  params: Record<string, any> | undefined,
+  keys: string[],
+  resolveFn: (value: any) => any = (value) => value,
+  label = 'operation'
+): string {
+  const normalizedKeys = [...new Set(keys.map((key) => String(key).trim()).filter(Boolean))];
+  for (const key of normalizedKeys) {
+    const resolved = resolveFn(params?.[key]);
+    if (typeof resolved === 'string' && resolved.trim()) {
+      return resolved.trim();
+    }
+  }
+
+  if (normalizedKeys.length === 1) {
+    throw new Error(`${label} requires params.${normalizedKeys[0]}`);
+  }
+  throw new Error(
+    `${label} requires one of ${normalizedKeys.map((key) => `params.${key}`).join(' or ')}`
+  );
+}
+
 /**
  * Evaluates a condition against the provided context.
  */
 export function evaluateCondition(cond: any, ctx: any): boolean {
   if (!cond) return true;
-  
+
   if (typeof cond === 'string') {
     return !!getPathValue(ctx, cond);
   }
 
   const val = getPathValue(ctx, cond.from);
-  
+
   switch (cond.operator) {
-    case 'exists': return val !== undefined && val !== null;
-    case 'not_exists': return val === undefined || val === null;
-    case 'empty': return Array.isArray(val) ? val.length === 0 : !val;
-    case 'not_empty': return Array.isArray(val) ? val.length > 0 : !!val;
-    case 'eq': return val === cond.value;
-    case 'ne': return val !== cond.value;
-    case 'gt': return Number(val) > cond.value;
-    case 'lt': return Number(val) < cond.value;
-    case 'and': 
-      return Array.isArray(cond.conditions) && cond.conditions.every((c: any) => evaluateCondition(c, ctx));
+    case 'exists':
+      return val !== undefined && val !== null;
+    case 'not_exists':
+      return val === undefined || val === null;
+    case 'empty':
+      return Array.isArray(val) ? val.length === 0 : !val;
+    case 'not_empty':
+      return Array.isArray(val) ? val.length > 0 : !!val;
+    case 'eq':
+      return val === cond.value;
+    case 'ne':
+      return val !== cond.value;
+    case 'gt':
+      return Number(val) > cond.value;
+    case 'lt':
+      return Number(val) < cond.value;
+    case 'and':
+      return (
+        Array.isArray(cond.conditions) &&
+        cond.conditions.every((c: any) => evaluateCondition(c, ctx))
+      );
     case 'or':
-      return Array.isArray(cond.conditions) && cond.conditions.some((c: any) => evaluateCondition(c, ctx));
-    default: return !!val;
+      return (
+        Array.isArray(cond.conditions) &&
+        cond.conditions.some((c: any) => evaluateCondition(c, ctx))
+      );
+    default:
+      return !!val;
   }
 }
 
 export function resolveWriteArtifactSpec(
   params: any,
   ctx: any,
-  resolveFn: (value: any) => any = (value) => value,
+  resolveFn: (value: any) => any = (value) => value
 ): { path: string; content: any } {
-  const pathValue = resolveFn(params?.path || params?.output_path);
-  if (!pathValue || typeof pathValue !== 'string') {
-    throw new Error('write_artifact requires params.path or params.output_path');
-  }
+  const pathValue = resolveRequiredStringParam(
+    params,
+    ['path', 'output_path'],
+    resolveFn,
+    'write_artifact'
+  );
 
   if (params?.content !== undefined) {
     return {

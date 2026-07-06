@@ -22,9 +22,9 @@
 | AA-02 | TODO    | mesh_delivery_driver 新設、broker⇔dispatchToPeer 配線、writer fencing、E2E                                        |
 | SA-02 | PARTIAL | execution-bounds.ts 抽出、SECURITY.md、warn→enforce 到達                                                          |
 | SA-05 | PARTIAL | policyEngine の操作種別拡張、secure-io parse失敗 fail-open 解消、-y 破壊操作除外                                  |
-| OP-01 | TODO    | 全推論経路の usage 計測、cost report、spend-guard、KPI 接続                                                       |
-| AR-01 | TODO    | adf-engine.ts 抽出、3エンジン統合、golden 回帰                                                                    |
-| AR-02 | TODO    | describeOps、generate_op_registry、CI ゲート                                                                      |
+| OP-01 | PARTIAL | usage 計測の全経路接続、cost report、spend-guard、KPI 接続                                                        |
+| AR-01 | PARTIAL | adf-engine.ts 抽出、file-actuator/super-nerve アダプタ化、3エンジン統合、golden 回帰                              |
+| AR-02 | PARTIAL | describeOps、generate_op_registry、op-discovery に input_schema 反映、未知 op の apply 既定撤廃                   |
 | AO-02 | TODO    | CVE スキャン/台帳、パッチ判断ルーブリック、適用フロー                                                             |
 | IL-01 | TODO    | goal/source_text/outcome_ids の昇格 seam 貫通、outcome-contract の goal 優先化                                    |
 | IL-04 | PARTIAL | intent-reconciliation エンジン、完了ゲート、学習記録                                                              |
@@ -112,6 +112,17 @@
 | AA-03 | PARTIAL | 署名モジュール+秘密永続化、warn→enforce、鍵運用文書       |
 | AA-04 | TODO    | 会話ストア、rehydrate、inflight admission                 |
 | AA-05 | PARTIAL | mission flow コマンド、file 版 transport の quarantine 化 |
+
+### AR(アクチュエータリファクタリング/使いやすさ)
+
+| ID    | 状態    | 残作業                                                                                                                                                                                    |
+| ----- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AR-01 | PARTIAL | adf-engine.ts 抽出、file-actuator/super-nerve アダプタ化、3エンジン統合、golden 回帰                                                                                                      |
+| AR-02 | PARTIAL | describeOps、generate_op_registry、op-discovery に input_schema 反映、未知 op の apply 既定撤廃                                                                                           |
+| AR-03 | PARTIAL | write_artifact/path 前倒し検証、notify/read_file/read_json/open_file 含む op_input_contracts、generate_op_registry/discovery 反映、browser/file/system の契約 coverage 検査、主要 op 検証 |
+| AR-04 | PARTIAL | canonical op family 定義、browser alias 共通化、browser/system の正規化と警告                                                                                                             |
+| AR-05 | PARTIAL | system file I/O の file-actuator forward、観察/変更・ドメイン境界の分割準備                                                                                                               |
+| AR-06 | PARTIAL | teach message(shared helper で network/orchestrator/file/system へ展開)、skipped 明示化(run_pipeline 含む)、silent default 回帰検知、AR-01 集約                                           |
 
 ### SA(セキュリティ・監査)
 
