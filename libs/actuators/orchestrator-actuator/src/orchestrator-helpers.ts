@@ -12,6 +12,7 @@ import {
   retry,
   derivePipelineStatus,
   pathResolver,
+  buildUnknownActuatorOpError,
   validatePipelineAdf,
 } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
@@ -98,6 +99,10 @@ function loadRecoveryPolicy(): Record<string, any> {
     cachedRecoveryPolicy = {};
     return cachedRecoveryPolicy;
   }
+}
+
+function buildUnknownOrchestratorOpError(op: string): Error {
+  return buildUnknownActuatorOpError('orchestrator', op);
 }
 
 export function buildRetryOptions(override?: Record<string, any>) {
@@ -225,7 +230,7 @@ async function opControl(op: string, params: any, ctx: any, options: any, state:
       return ctx;
 
     default:
-      throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
+      throw buildUnknownOrchestratorOpError(op);
   }
 }
 
@@ -265,7 +270,7 @@ async function opCapture(op: string, params: any, ctx: any) {
       );
       return { ...ctx, [params.export_as || 'detected_intent']: detected };
     default:
-      throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
+      throw buildUnknownOrchestratorOpError(op);
   }
 }
 
@@ -944,6 +949,8 @@ async function opApply(op: string, params: any, ctx: any) {
       }
       break;
     }
+    default:
+      throw buildUnknownOrchestratorOpError(op);
   }
 }
 
