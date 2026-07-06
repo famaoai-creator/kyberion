@@ -170,9 +170,21 @@ async function opControl(
     case 'if':
       if (evaluateCondition(params.condition, ctx)) {
         const res = await runSteps(params.then, ctx);
+        if (res.status === 'failed') {
+          throw new Error(
+            res.results.find((result: any) => result.status === 'failed')?.error ||
+              'nested pipeline failed'
+          );
+        }
         return res.context;
       } else if (params.else) {
         const res = await runSteps(params.else, ctx);
+        if (res.status === 'failed') {
+          throw new Error(
+            res.results.find((result: any) => result.status === 'failed')?.error ||
+              'nested pipeline failed'
+          );
+        }
         return res.context;
       }
       return skipAdfStep(
@@ -187,6 +199,12 @@ async function opControl(
       while (evaluateCondition(params.condition, ctx) && iterations < maxIter) {
         executed = true;
         const res = await runSteps(params.pipeline, ctx);
+        if (res.status === 'failed') {
+          throw new Error(
+            res.results.find((result: any) => result.status === 'failed')?.error ||
+              'nested pipeline failed'
+          );
+        }
         ctx = res.context;
         iterations++;
       }

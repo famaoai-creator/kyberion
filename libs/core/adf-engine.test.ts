@@ -36,7 +36,12 @@ describe('executeAdfSteps', () => {
         apply: async (_op, _params, ctx) => ({ ...ctx, applied: true }),
         control: async (_op, params, ctx, runSteps) => {
           const nested = await runSteps(params.then, ctx);
-          return nested;
+          if (nested.status === 'failed') {
+            throw new Error(
+              nested.results.find((result) => result.status === 'failed')?.error || 'nested failure'
+            );
+          }
+          return nested.context;
         },
       }
     );
@@ -93,5 +98,43 @@ describe('executeAdfSteps', () => {
 
     expect(result.status).toBe('succeeded');
     expect(result.results).toEqual([{ op: 'if', status: 'skipped' }]);
+  });
+
+  it('propagates nested control failures to the parent pipeline', async () => {
+    const result = await executeAdfSteps(
+      [
+        {
+          type: 'control',
+          op: 'if',
+          params: {
+            condition: { enabled: true },
+            then: [{ type: 'capture', op: 'fail', params: {} }],
+          },
+        },
+      ],
+      {},
+      { maxSteps: 10, timeoutMs: 10_000 },
+      {
+        capture: async (_op, _params, ctx) => {
+          throw new Error('nested capture failed');
+        },
+        transform: async (_op, _params, ctx) => ctx,
+        apply: async (_op, _params, ctx) => ctx,
+        control: async (_op, params, ctx, runSteps) => {
+          const nested = await runSteps(params.then, ctx);
+          if (nested.status === 'failed') {
+            throw new Error(
+              nested.results.find((result) => result.status === 'failed')?.error || 'nested failure'
+            );
+          }
+          return nested.context;
+        },
+      }
+    );
+
+    expect(result.status).toBe('failed');
+    expect(result.results).toEqual([
+      { op: 'if', status: 'failed', error: 'nested capture failed' },
+    ]);
   });
 });

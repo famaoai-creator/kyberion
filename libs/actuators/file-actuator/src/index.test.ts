@@ -401,6 +401,39 @@ describe('file-actuator', () => {
         expect(result.status).toBe('succeeded');
         expect(result.results).toEqual([{ op: 'if', status: 'skipped' }]);
       });
+
+      it('nested control の失敗を親 pipeline に伝播する', async () => {
+        const { safeReadFile } = await import('@agent/core');
+        vi.mocked(safeReadFile).mockImplementation((filePath: string) => {
+          if (String(filePath).includes('manifest.json')) {
+            return JSON.stringify({ recovery_policy: {} });
+          }
+          throw new Error('File not found');
+        });
+
+        const result = await handleAction({
+          action: 'pipeline',
+          context: { flag: true },
+          steps: [
+            {
+              type: 'control',
+              op: 'if',
+              params: {
+                condition: { from: 'flag', operator: 'eq', value: true },
+                then: [{ type: 'capture', op: 'read', params: { path: 'missing.txt' } }],
+              },
+            },
+          ],
+        });
+
+        expect(result.status).toBe('failed');
+        expect(result.results).toHaveLength(1);
+        expect(result.results[0]).toMatchObject({
+          op: 'if',
+          status: 'failed',
+          error: expect.stringContaining('File not found'),
+        });
+      });
     });
   });
 
