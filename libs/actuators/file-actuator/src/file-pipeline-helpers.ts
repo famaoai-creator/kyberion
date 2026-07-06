@@ -13,7 +13,6 @@ import {
   safeRmSync,
   retry,
   classifyError,
-  derivePipelineStatus,
   pathResolver,
   resolveVars,
   evaluateCondition,
@@ -21,6 +20,7 @@ import {
   resolveRequiredStringParam,
   validateOpInput,
   processUntrustedContent,
+  executeAdfSteps,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
@@ -78,15 +78,9 @@ function buildRetryOptions() {
  * Restored specialized ops: tail, append, exists, copy, move.
  */
 
-interface PipelineStep {
-  type: 'capture' | 'transform' | 'apply' | 'control';
-  op: string;
-  params: any;
-}
-
 interface FileAction {
   action: 'pipeline';
-  steps: PipelineStep[];
+  steps: Array<{ type: 'capture' | 'transform' | 'apply' | 'control'; op: string; params: any }>;
   context?: Record<string, any>;
   options?: {
     max_steps?: number;
@@ -104,10 +98,9 @@ export async function handleAction(input: FileAction) {
 }
 
 async function executePipeline(
-  steps: PipelineStep[],
+  steps: Array<{ type: 'capture' | 'transform' | 'apply' | 'control'; op: string; params: any }>,
   initialCtx: any = {},
-  options: any = {},
-  state: any = { stepCount: 0, startTime: Date.now() }
+  options: any = {}
 ) {
   const rootDir = pathResolver.rootDir();
   const MAX_STEPS = options.max_steps || 1000;
@@ -127,44 +120,23 @@ async function executePipeline(
     );
     ctx = { ...ctx, ...saved };
   }
-
-  const resolve = (val: any) => resolveVars(val, ctx);
-
-  const results = [];
-  for (const step of steps) {
-    state.stepCount++;
-    if (state.stepCount > MAX_STEPS)
-      throw new Error(`[SAFETY_LIMIT] Exceeded maximum pipeline steps (${MAX_STEPS})`);
-    if (Date.now() - state.startTime > TIMEOUT)
-      throw new Error(`[SAFETY_LIMIT] Pipeline execution timed out (${TIMEOUT}ms)`);
-
-    try {
-      logger.info(`  [FILE_PIPELINE] [Step ${state.stepCount}] ${step.type}:${step.op}...`);
-
-      if (step.type === 'control') {
-        ctx = await opControl(step.op, step.params, ctx, options, state, resolve);
-      } else {
-        switch (step.type) {
-          case 'capture':
-            ctx = await opCapture(step.op, step.params, ctx, resolve);
-            break;
-          case 'transform':
-            ctx = await opTransform(step.op, step.params, ctx, resolve);
-            break;
-          case 'apply':
-            await opApply(step.op, step.params, ctx, resolve);
-            break;
-          default:
-            throw new Error(`[UNKNOWN_TYPE] Unknown step type: ${step.type}`);
-        }
-      }
-      results.push({ op: step.op, status: 'success' });
-    } catch (err: any) {
-      logger.error(`  [FILE_PIPELINE] Step failed (${step.op}): ${err.message}`);
-      results.push({ op: step.op, status: 'failed', error: err.message });
-      break;
+  const result = await executeAdfSteps(
+    steps,
+    ctx,
+    {
+      maxSteps: MAX_STEPS,
+      timeoutMs: TIMEOUT,
+    },
+    {
+      capture: opCapture,
+      transform: opTransform,
+      apply: opApply,
+      control: async (op, params, currentCtx, runSteps, resolve) =>
+        await opControl(op, params, currentCtx, runSteps, resolve),
     }
-  }
+  );
+
+  ctx = result.context;
 
   if (initialCtx.context_path) {
     await retry(async () => {
@@ -173,29 +145,23 @@ async function executePipeline(
     }, buildRetryOptions());
   }
 
-  return {
-    status: derivePipelineStatus(results),
-    results,
-    context: ctx,
-    total_steps: state.stepCount,
-  };
+  return result;
 }
 
 async function opControl(
   op: string,
   params: any,
   ctx: any,
-  options: any,
-  state: any,
-  resolve: (value: any) => any
+  runSteps: (steps: any[], seedCtx?: any) => Promise<any>,
+  _resolve: (value: any) => any
 ) {
   switch (op) {
     case 'if':
       if (evaluateCondition(params.condition, ctx)) {
-        const res = await executePipeline(params.then, ctx, options, state);
+        const res = await runSteps(params.then, ctx);
         return res.context;
       } else if (params.else) {
-        const res = await executePipeline(params.else, ctx, options, state);
+        const res = await runSteps(params.else, ctx);
         return res.context;
       }
       return ctx;
@@ -204,7 +170,7 @@ async function opControl(
       let iterations = 0;
       const maxIter = params.max_iterations || 100;
       while (evaluateCondition(params.condition, ctx) && iterations < maxIter) {
-        const res = await executePipeline(params.pipeline, ctx, options, state);
+        const res = await runSteps(params.pipeline, ctx);
         ctx = res.context;
         iterations++;
       }
