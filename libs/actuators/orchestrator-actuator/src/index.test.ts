@@ -187,6 +187,24 @@ describe('orchestrator-actuator', () => {
     );
   });
 
+  it('unknown capture op suggests a nearby known op', async () => {
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'pipeline',
+      steps: [
+        {
+          type: 'capture',
+          op: 'read_fiel',
+          params: { path: 'active/shared/tmp/orchestrator-tests/input.json' },
+        },
+      ],
+    } as any);
+
+    const error = result.results.find((entry: any) => entry.error)?.error || '';
+    expect(error).toContain('[UNKNOWN_OP]');
+    expect(error).toContain('Did you mean: read_file');
+  });
+
   it('renders an image pipeline bundle into an execution plan set', async () => {
     const bundle = {
       kind: 'actuator-pipeline-bundle',

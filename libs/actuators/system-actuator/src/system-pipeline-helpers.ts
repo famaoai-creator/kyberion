@@ -28,8 +28,7 @@ import {
   createScreenDisplayInventoryBridge,
   listToolRuntimeInventory,
   listServiceRuntimeInventory,
-  listOpInputContracts,
-  suggestClosestStrings,
+  buildUnknownActuatorOpError,
   type ScreenDisplayInventory,
   type ScreenDisplayRecord,
   StubVideoFrameBus,
@@ -183,16 +182,7 @@ async function delegateToFilePipeline(step: PipelineStep, ctx: any): Promise<any
 }
 
 function buildUnknownSystemOpMessage(op: string): string {
-  const knownOps = [
-    ...Object.keys(listOpInputContracts('system')),
-    ...Array.from(SYSTEM_ACTUATOR_CAPTURE_ALIAS_OPS),
-    'if',
-    'while',
-  ];
-  const suggestions = suggestClosestStrings(op, knownOps);
-  return suggestions.length > 0
-    ? `[UNKNOWN_OP] Unknown op: ${op}. Did you mean: ${suggestions.join(', ')}?`
-    : `[UNKNOWN_OP] Unknown op: ${op}`;
+  return buildUnknownActuatorOpError('system', op).message;
 }
 
 function warnDeprecatedSystemOpAlias(alias: string, canonical: string) {

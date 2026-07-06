@@ -57,6 +57,23 @@ describe('network-actuator', () => {
       );
     });
 
+    it('未知のcaptureオペレーターは候補付きで失敗する', async () => {
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [
+          {
+            type: 'capture',
+            op: 'ftech',
+            params: { url: 'https://example.com' },
+          },
+        ],
+      });
+
+      expect(result.status).toBe('failed');
+      expect(result.results[0].error).toContain('[UNKNOWN_OP]');
+      expect(result.results[0].error).toContain('Did you mean: fetch');
+    });
+
     it('ステップが失敗した場合、残りのステップを実行しない', async () => {
       const { secureFetch } = await import('@agent/core');
       vi.mocked(secureFetch).mockRejectedValueOnce(new Error('Network error'));
