@@ -14,6 +14,7 @@ import {
   retry,
   derivePipelineStatus,
   classifyError,
+  buildUnknownActuatorOpError,
 } from '@agent/core';
 import * as path from 'node:path';
 import { sendA2AMessage, pollA2AInbox } from './a2a-transport.js';
@@ -103,6 +104,10 @@ function buildRetryOptions(stepParams: Record<string, any>) {
       );
     },
   };
+}
+
+function buildUnknownNetworkOpError(op: string): Error {
+  return buildUnknownActuatorOpError('network', op);
 }
 
 export interface PipelineStep {
@@ -222,7 +227,7 @@ async function opControl(op: string, params: any, ctx: any, options: any, state:
       return ctx;
 
     default:
-      throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
+      throw buildUnknownNetworkOpError(op);
   }
 }
 
@@ -251,7 +256,7 @@ async function opCapture(op: string, params: any, ctx: any) {
       return { ...ctx, [params.export_as || 'inbox_messages']: messages };
 
     default:
-      throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
+      throw buildUnknownNetworkOpError(op);
   }
 }
 
@@ -268,7 +273,7 @@ async function opTransform(op: string, params: any, ctx: any) {
       return { ...ctx, [params.export_as]: match ? match[1] || match[0] : null };
 
     default:
-      throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
+      throw buildUnknownNetworkOpError(op);
   }
 }
 

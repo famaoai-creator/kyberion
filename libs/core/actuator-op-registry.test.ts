@@ -1,6 +1,11 @@
 import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { determineActuatorStepType, listRegisteredDomainOps } from './actuator-op-registry.js';
+import {
+  buildUnknownActuatorOpError,
+  determineActuatorStepType,
+  listKnownActuatorOps,
+  listRegisteredDomainOps,
+} from './actuator-op-registry.js';
 import { pathResolver, safeReadFile, safeReaddir, safeStat } from './index.js';
 
 function collectSourceFiles(dir: string): string[] {
@@ -50,9 +55,16 @@ describe('actuator-op-registry', () => {
     expect(mediaOps.apply).toContain('pptx_render');
   });
 
+  it('builds unknown-op hints from the shared registry plus domain extras', () => {
+    const message = buildUnknownActuatorOpError('network', 'ftech', ['shell']).message;
+    expect(message).toContain('[UNKNOWN_OP]');
+    expect(message).toContain('Did you mean: fetch');
+    expect(listKnownActuatorOps('network')).toContain('fetch');
+  });
+
   it('fails loudly for unknown ops instead of defaulting to apply', () => {
-    expect(() => determineActuatorStepType('file', 'stat')).toThrowError(
-      /\[UNKNOWN_OP\] Unknown op "stat" for domain "file"/
+    expect(() => determineActuatorStepType('file', 'stta')).toThrowError(
+      /\[UNKNOWN_OP\] Unknown op "stta" for domain "file"/
     );
   });
 

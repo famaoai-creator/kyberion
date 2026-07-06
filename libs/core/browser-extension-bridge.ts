@@ -648,6 +648,14 @@ export function enforceBrowserExtensionApproval(input: {
   });
 }
 
+function sanitizeReceiptFileName(receiptId: string): string {
+  const normalized = String(receiptId || '')
+    .trim()
+    .replace(/[^A-Za-z0-9_-]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  return normalized.length > 0 ? normalized : `receipt-${randomUUID()}`;
+}
+
 /**
  * Issue a short-lived execution lease for an approved recording. The lease binds
  * the approved high-risk step hashes so the extension can only replay what was
@@ -792,6 +800,7 @@ export function compileBrowserRecordingToPipeline(
 
   const steps = selected.map((action, index) => {
     const params: Record<string, unknown> = {};
+    params.original_op = action.op;
     if (action.target) {
       params.ref = action.target.ref;
       params.role = action.target.role;
@@ -833,7 +842,9 @@ export function compileBrowserRecordingToPipeline(
     reviewRequired.push('High-risk steps require an approval gate at run time');
   }
   if (selected.some((action) => action.op === 'select_ref')) {
-    reviewRequired.push('select/toggle was mapped to click; verify the selection mapping');
+    reviewRequired.push(
+      'select_ref was normalized to click; verify the selection mapping before promotion'
+    );
   }
   if (value.review?.status !== 'approved') {
     reviewRequired.push('Recording review is not finalized; approve before promotion');
@@ -907,7 +918,7 @@ export function persistBrowserExtensionReceipt(receipt: unknown): {
   }
   try {
     safeMkdir(RECEIPT_STORE, { recursive: true });
-    const filePath = `${RECEIPT_STORE}/${validation.value.receipt_id}.json`;
+    const filePath = `${RECEIPT_STORE}/${sanitizeReceiptFileName(validation.value.receipt_id)}.json`;
     safeWriteFile(filePath, JSON.stringify(validation.value, null, 2));
     return { path: filePath, errors: [] };
   } catch (err) {

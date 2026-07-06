@@ -159,6 +159,17 @@ const listOpInputContracts = vi.fn((domain: string) => {
 const suggestClosestStrings = vi.fn((target: string, candidates: string[]) =>
   [...new Set(candidates)].slice(0, 3)
 );
+const buildUnknownActuatorOpError = vi.fn(
+  (domain: string, op: string, extraCandidates: string[] = []) => {
+    const knownOps = [...Object.keys(listOpInputContracts(domain)), ...extraCandidates];
+    const suggestions = suggestClosestStrings(op, knownOps);
+    return new Error(
+      suggestions.length > 0
+        ? `[UNKNOWN_OP] Unknown op: ${op}. Did you mean: ${suggestions.join(', ')}?`
+        : `[UNKNOWN_OP] Unknown op: ${op}`
+    );
+  }
+);
 const activateApplication = vi.fn((application: string) =>
   safeExec('osascript', ['-e', `tell application "${application}" to activate`])
 );
@@ -838,6 +849,7 @@ vi.mock('@agent/core', () => ({
   validateOpInput,
   listOpInputContracts,
   suggestClosestStrings,
+  buildUnknownActuatorOpError,
   safeExec,
   classifyError,
   retry,
