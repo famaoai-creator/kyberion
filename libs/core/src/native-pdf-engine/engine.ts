@@ -17,8 +17,9 @@
 import * as path from 'path';
 import * as zlib from 'zlib';
 import * as crypto from 'crypto';
-import * as fontkit from 'fontkit';
-import { safeExistsSync, safeExecResult, safeReadFile, safeWriteFile } from '../../secure-io.js';
+import { createRequire } from 'node:module';
+import { safeExistsSync, safeReadFile, safeWriteFile } from '../../secure-io.js';
+import { pathResolver } from '../../path-resolver.js';
 import type {
   PdfDesignProtocol,
   PdfRenderOptions,
@@ -229,103 +230,6 @@ function escapeXml(s: string): string {
     .replace(/'/g, '&apos;');
 }
 
-type TextEncoderFn = (text: string) => string;
-
-interface EmbeddedCjkFontStrategy {
-  baseFontName: string;
-  fontPath: string;
-  fontBytes: Buffer;
-  fontDescriptor: {
-    flags: number;
-    ascent: number;
-    descent: number;
-    capHeight: number;
-    italicAngle: number;
-    stemV: number;
-    bbox: [number, number, number, number];
-  };
-  encodeText: TextEncoderFn;
-}
-
-const CJK_FONT_CANDIDATES = [
-  'Noto Sans JP',
-  'Yu Gothic',
-  'Hiragino Sans',
-  'Meiryo',
-  'Source Han Sans JP',
-];
-
-function toHex4(n: number): string {
-  return Math.max(0, n).toString(16).toUpperCase().padStart(4, '0');
-}
-
-function resolveSystemFontPath(fontFamily: string): string | null {
-  const result = safeExecResult('fc-match', ['-f', '%{file}\n', fontFamily]);
-  const file = result.stdout.trim().split('\n')[0]?.trim();
-  return file && safeExistsSync(file) ? file : null;
-}
-
-function resolveEmbeddedCjkFontPath(): string | null {
-  for (const candidate of CJK_FONT_CANDIDATES) {
-    const file = resolveSystemFontPath(candidate);
-    if (file) return file;
-  }
-  return null;
-}
-
-async function createEmbeddedCjkFontStrategy(): Promise<EmbeddedCjkFontStrategy | null> {
-  const fontPath = resolveEmbeddedCjkFontPath();
-  if (!fontPath) return null;
-
-  const opened = fontkit.openSync(fontPath) as any;
-  const font = Array.isArray(opened?.fonts)
-    ? opened.fonts.find((face: any) => typeof face?.glyphForCodePoint === 'function') ||
-      opened.fonts[0]
-    : opened;
-  const baseFontName = String(
-    font.postscriptName || font.fullName || font.familyName || 'EmbeddedCJKFont'
-  )
-    .replace(/\s+/g, '-')
-    .replace(/[^A-Za-z0-9_.-]/g, '-');
-
-  const fontBytes = Buffer.from(font.stream?.buffer ?? []);
-  const encodeText: TextEncoderFn = (text: string) => {
-    const glyphIds: number[] = [];
-    for (const ch of Array.from(text)) {
-      const codePoint = ch.codePointAt(0) || 0;
-      const glyph =
-        typeof font.glyphForCodePoint === 'function' ? font.glyphForCodePoint(codePoint) : null;
-      glyphIds.push(glyph?.id ?? 0);
-    }
-    return `<${glyphIds.map((gid) => toHex4(gid)).join('')}>`;
-  };
-
-  const bbox = Array.isArray(font.bbox)
-    ? (font.bbox as [number, number, number, number])
-    : ([0, font.descent || -200, font.unitsPerEm || 1000, font.ascent || 800] as [
-        number,
-        number,
-        number,
-        number,
-      ]);
-
-  return {
-    baseFontName,
-    fontPath,
-    fontBytes,
-    fontDescriptor: {
-      flags: 4,
-      ascent: Math.round(font.ascent || 880),
-      descent: Math.round(font.descent || -120),
-      capHeight: Math.round(font.capHeight || font.ascent || 880),
-      italicAngle: Math.round(font.italicAngle || 0),
-      stemV: 80,
-      bbox,
-    },
-    encodeText,
-  };
-}
-
 // ─── XMP Metadata ────────────────────────────────────────────
 
 function buildXmp(meta: {
@@ -381,6 +285,259 @@ interface ImageInfo {
   bitsPerComponent: number;
   filter?: string;
   data: Buffer;
+}
+
+type EmbeddedCjkFont = {
+  font: FontKitFont;
+  subsetBuffer: Buffer;
+  fontName: string;
+  glyphWidthByCid: Map<number, number>;
+  encodeText: (text: string) => string;
+  toUnicodeCMap: string;
+  defaultWidth: number;
+};
+
+type FontKitGlyph = {
+  id: number;
+  advanceWidth: number;
+};
+
+type FontKitSubset = {
+  includeGlyph: (glyph: FontKitGlyph) => number;
+  encode: () => Uint8Array;
+};
+
+type FontKitFont = {
+  subfamilyName?: string;
+  fullName?: string;
+  familyName?: string;
+  postscriptName?: string;
+  unitsPerEm: number;
+  ascent?: number;
+  descent?: number;
+  capHeight?: number;
+  italicAngle?: number;
+  bbox?: { minX: number; minY: number; maxX: number; maxY: number };
+  glyphForCodePoint: (codePoint: number) => FontKitGlyph;
+  createSubset: () => FontKitSubset;
+};
+
+type FontKitCollection = {
+  fonts?: FontKitFont[];
+};
+
+const FONTKIT_REQUIRE = createRequire(import.meta.url);
+const FONTKIT = FONTKIT_REQUIRE('fontkit') as {
+  openSync: (source: string) => FontKitFont | FontKitCollection;
+};
+const CJK_FONT_CANDIDATES = [
+  pathResolver.rootResolve('knowledge/public/design-patterns/fonts/NotoSansJP-Regular.ttf'),
+  '/System/Library/Fonts/ヒラギノ角ゴシック W4.ttc',
+  '/System/Library/Fonts/Hiragino Sans W4.ttc',
+  '/System/Library/Fonts/Supplemental/Hiragino Sans W4.ttc',
+  '/System/Library/Fonts/Supplemental/Yu Gothic Medium.otf',
+  '/System/Library/Fonts/Supplemental/Yu Gothic.ttf',
+];
+
+function toUtf16BeHex(codePoint: number): string {
+  if (codePoint <= 0xffff) {
+    return codePoint.toString(16).toUpperCase().padStart(4, '0');
+  }
+  const cp = codePoint - 0x10000;
+  const high = 0xd800 + (cp >> 10);
+  const low = 0xdc00 + (cp & 0x3ff);
+  return `${high.toString(16).toUpperCase().padStart(4, '0')}${low
+    .toString(16)
+    .toUpperCase()
+    .padStart(4, '0')}`;
+}
+
+function collectCodePoints(text: string): number[] {
+  const points: number[] = [];
+  for (const ch of Array.from(text)) {
+    const cp = ch.codePointAt(0);
+    if (cp !== undefined) points.push(cp);
+  }
+  return points;
+}
+
+function pickCjkFontSource(): string {
+  for (const candidate of CJK_FONT_CANDIDATES) {
+    if (safeExistsSync(candidate)) return candidate;
+  }
+  throw new Error(`No CJK font source found. Checked: ${CJK_FONT_CANDIDATES.join(', ')}`);
+}
+
+function openCjkFont(): FontKitFont {
+  const source = pickCjkFontSource();
+  const opened = FONTKIT.openSync(source);
+  if ('fonts' in opened && opened.fonts?.length) {
+    return (
+      opened.fonts.find((entry) =>
+        /w4|regular/i.test(String(entry?.subfamilyName || entry?.fullName || ''))
+      ) ?? opened.fonts[0]
+    );
+  }
+  return opened as FontKitFont;
+}
+
+function buildEmbeddedCjkFont(protocol: PdfDesignProtocol): EmbeddedCjkFont {
+  const font = openCjkFont();
+  const subset = font.createSubset();
+  const cidByCodePoint = new Map<number, number>();
+  const widthByCid = new Map<number, number>();
+
+  const textCorpus: string[] = [];
+  if (protocol.source?.title) textCorpus.push(protocol.source.title);
+  if (protocol.source?.body) textCorpus.push(protocol.source.body);
+  if (protocol.metadata?.title) textCorpus.push(String(protocol.metadata.title));
+  if (protocol.metadata?.author) textCorpus.push(String(protocol.metadata.author));
+  if (protocol.metadata?.subject) textCorpus.push(String(protocol.metadata.subject));
+  for (const page of protocol.content?.pages ?? []) {
+    if (page.text) textCorpus.push(page.text);
+  }
+  for (const element of protocol.aesthetic?.elements ?? []) {
+    if ((element.type === 'text' || element.type === 'heading') && element.text) {
+      textCorpus.push(element.text);
+    }
+  }
+  const collectOutlineTitles = (item: PdfOutlineItem): void => {
+    textCorpus.push(item.title);
+    for (const child of item.children ?? []) collectOutlineTitles(child);
+  };
+  for (const outline of protocol.outlines ?? []) collectOutlineTitles(outline);
+
+  const codePoints = new Set<number>();
+  for (const entry of textCorpus) {
+    for (const cp of collectCodePoints(entry)) {
+      codePoints.add(cp);
+    }
+  }
+  codePoints.add(0x20);
+
+  const sortedCodePoints = [...codePoints].sort((a, b) => a - b);
+  for (const codePoint of sortedCodePoints) {
+    const glyph = font.glyphForCodePoint(codePoint);
+    const cid = subset.includeGlyph(glyph);
+    cidByCodePoint.set(codePoint, cid);
+    const width = Math.max(0, Math.round((glyph.advanceWidth * 1000) / font.unitsPerEm));
+    widthByCid.set(cid, width);
+  }
+
+  const subsetBuffer = Buffer.from(subset.encode());
+  const defaultWidth = Math.max(
+    0,
+    Math.round(((font.glyphForCodePoint(0x20)?.advanceWidth || 0) * 1000) / font.unitsPerEm)
+  );
+  const fontName = String(font.postscriptName || font.fullName || font.familyName || 'KyberionCJK');
+
+  const encodeText = (text: string): string => {
+    let hex = '';
+    for (const ch of Array.from(text)) {
+      const cp = ch.codePointAt(0);
+      if (cp === undefined) continue;
+      const cid = cidByCodePoint.get(cp) ?? cidByCodePoint.get(0x20) ?? 0;
+      hex += cid.toString(16).toUpperCase().padStart(4, '0');
+    }
+    return `<${hex}>`;
+  };
+
+  const bfChars: string[] = [];
+  for (const [codePoint, cid] of cidByCodePoint.entries()) {
+    bfChars.push(
+      `<${cid.toString(16).toUpperCase().padStart(4, '0')}> <${toUtf16BeHex(codePoint)}>`
+    );
+  }
+  const toUnicodeCMap = [
+    '/CIDInit /ProcSet findresource begin',
+    '12 dict begin',
+    'begincmap',
+    '/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def',
+    `/CMapName /${fontName.replace(/[^A-Za-z0-9_-]/g, '') || 'KyberionCJK'} def`,
+    '/CMapType 2 def',
+    '1 begincodespacerange',
+    '<0000> <FFFF>',
+    'endcodespacerange',
+    `${bfChars.length} beginbfchar`,
+    ...bfChars,
+    'endbfchar',
+    'endcmap',
+    'CMapName currentdict /CMap defineresource pop',
+    'end',
+    'end',
+  ].join('\n');
+
+  return {
+    font,
+    subsetBuffer,
+    fontName,
+    glyphWidthByCid: widthByCid,
+    encodeText,
+    toUnicodeCMap,
+    defaultWidth,
+  };
+}
+
+function buildWidthArray(font: EmbeddedCjkFont): string {
+  const entries = [...font.glyphWidthByCid.entries()].sort(([a], [b]) => a - b);
+  if (entries.length === 0) return '[]';
+  const chunks: string[] = [];
+  for (const [cid, width] of entries) {
+    chunks.push(`${cid} [${width}]`);
+  }
+  return `[${chunks.join(' ')}]`;
+}
+
+function buildEmbeddedFontDescriptor(font: EmbeddedCjkFont, fontFileId: number): string {
+  const unitsPerEm = font.font.unitsPerEm || 1000;
+  const bbox = font.font.bbox || { minX: 0, minY: 0, maxX: 1000, maxY: 1000 };
+  const flags = 32;
+  return [
+    '<<',
+    '/Type /FontDescriptor',
+    `/FontName /${font.fontName.replace(/[^A-Za-z0-9_-]/g, '') || 'KyberionCJK'}`,
+    `/Flags ${flags}`,
+    `/FontBBox [${bbox.minX} ${bbox.minY} ${bbox.maxX} ${bbox.maxY}]`,
+    `/ItalicAngle ${font.font.italicAngle || 0}`,
+    `/Ascent ${font.font.ascent || unitsPerEm}`,
+    `/Descent ${font.font.descent || 0}`,
+    `/CapHeight ${font.font.capHeight || font.font.ascent || unitsPerEm}`,
+    `/StemV 80`,
+    `/FontFile2 ${fontFileId} 0 R`,
+    '>>',
+  ].join(' ');
+}
+
+function buildEmbeddedDescendantFontObject(font: EmbeddedCjkFont, descriptorId: number): string {
+  return [
+    '<<',
+    '/Type /Font',
+    '/Subtype /CIDFontType2',
+    `/BaseFont /${font.fontName.replace(/[^A-Za-z0-9_-]/g, '') || 'KyberionCJK'}`,
+    '/CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >>',
+    `/FontDescriptor ${descriptorId} 0 R`,
+    `/DW ${font.defaultWidth || 1000}`,
+    `/W ${buildWidthArray(font)}`,
+    '/CIDToGIDMap /Identity',
+    '>>',
+  ].join(' ');
+}
+
+function buildEmbeddedType0FontObject(
+  font: EmbeddedCjkFont,
+  descendantFontId: number,
+  toUnicodeId: number
+): string {
+  return [
+    '<<',
+    '/Type /Font',
+    '/Subtype /Type0',
+    `/BaseFont /${font.fontName.replace(/[^A-Za-z0-9_-]/g, '') || 'KyberionCJK'}`,
+    '/Encoding /Identity-H',
+    `/DescendantFonts [${descendantFontId} 0 R]`,
+    `/ToUnicode ${toUnicodeId} 0 R`,
+    '>>',
+  ].join(' ');
 }
 
 function decodeImage(imgPath: string): ImageInfo {
@@ -750,7 +907,7 @@ function buildStructElem(
 function buildTextContent(
   page: { text: string },
   unicode: boolean,
-  encodeText?: TextEncoderFn
+  encodeText?: (text: string) => string
 ): string {
   let s = 'BT\n/F1 12 Tf\n50 800 Td\n';
   for (const line of page.text.split('\n')) {
@@ -765,7 +922,7 @@ function buildAestheticContent(
   elements: Array<{ type: string; x: number; y: number; text?: string; fontSize?: number }>,
   pageHeight: number,
   unicode: boolean,
-  encodeText?: TextEncoderFn
+  encodeText?: (text: string) => string
 ): string {
   let s = 'BT\n';
   for (const el of elements) {
@@ -788,75 +945,33 @@ function protocolRequiresCjkFont(protocol: PdfDesignProtocol): boolean {
   if (hasNonAscii(protocol.metadata?.title || '')) return true;
   if (hasNonAscii(protocol.metadata?.author || '')) return true;
   if (hasNonAscii(protocol.metadata?.subject || '')) return true;
-  for (const field of protocol.acroForm?.fields ?? []) {
-    if (
-      hasNonAscii(field.name) ||
-      hasNonAscii(field.tooltip || '') ||
-      hasNonAscii(field.value || '') ||
-      hasNonAscii(field.defaultValue || '')
-    ) {
-      return true;
-    }
-    for (const option of field.options ?? []) {
-      if (hasNonAscii(option)) return true;
-    }
-  }
   for (const page of protocol.content?.pages ?? []) {
     if (hasNonAscii(page.text || '')) return true;
   }
   for (const element of protocol.aesthetic?.elements ?? []) {
-    if (
-      (element.type === 'text' || element.type === 'heading') &&
-      hasNonAscii((element as any).text || '')
-    )
+    if ((element.type === 'text' || element.type === 'heading') && hasNonAscii(element.text || ''))
       return true;
   }
   return false;
 }
 
-function buildPrimaryFontObject(
-  protocol: PdfDesignProtocol,
-  strategy?: EmbeddedCjkFontStrategy | null,
-  fontFileId?: number
-): string {
+function buildPrimaryFontObject(protocol: PdfDesignProtocol): string {
   if (!protocolRequiresCjkFont(protocol)) {
     return '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>';
   }
-
-  if (!strategy || fontFileId === undefined) {
-    return [
-      '<<',
-      '/Type /Font',
-      '/Subtype /Type0',
-      '/BaseFont /HeiseiKakuGo-W5',
-      '/Encoding /UniJIS-UCS2-H',
-      '/DescendantFonts [<<',
-      '  /Type /Font',
-      '  /Subtype /CIDFontType0',
-      '  /BaseFont /HeiseiKakuGo-W5',
-      '  /CIDSystemInfo << /Registry (Adobe) /Ordering (Japan1) /Supplement 6 >>',
-      '  /DW 1000',
-      '>>]',
-      '>>',
-    ].join(' ');
-  }
-
-  const { baseFontName, fontDescriptor } = strategy;
-  const fontBBox = `[${fontDescriptor.bbox.join(' ')}]`;
 
   return [
     '<<',
     '/Type /Font',
     '/Subtype /Type0',
-    `/BaseFont /${baseFontName}`,
-    '/Encoding /Identity-H',
+    '/BaseFont /HeiseiKakuGo-W5',
+    '/Encoding /UniJIS-UCS2-H',
     '/DescendantFonts [<<',
     '  /Type /Font',
-    '  /Subtype /CIDFontType2',
-    `  /BaseFont /${baseFontName}`,
-    '  /CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >>',
+    '  /Subtype /CIDFontType0',
+    '  /BaseFont /HeiseiKakuGo-W5',
+    '  /CIDSystemInfo << /Registry (Adobe) /Ordering (Japan1) /Supplement 6 >>',
     '  /DW 1000',
-    `  /FontDescriptor << /Type /FontDescriptor /FontName /${baseFontName} /Flags ${fontDescriptor.flags} /FontBBox ${fontBBox} /ItalicAngle ${fontDescriptor.italicAngle} /Ascent ${fontDescriptor.ascent} /Descent ${fontDescriptor.descent} /CapHeight ${fontDescriptor.capHeight} /StemV ${fontDescriptor.stemV} /FontFile2 ${fontFileId} 0 R >>`,
     '>>]',
     '>>',
   ].join(' ');
@@ -883,18 +998,14 @@ function buildImageContent(
  * Generate Appearance Stream for a form field widget annotation.
  * Returns a minimal /AP /N stream string for the field type.
  */
-function buildFieldAppearance(
-  field: PdfFormField,
-  fontId: number,
-  encodeText?: TextEncoderFn
-): string {
+function buildFieldAppearance(field: PdfFormField, fontId: number): string {
   const [, , w, h] = field.rect;
   const fontSize = field.fontSize || 10;
   const da = field.defaultAppearance || '/F1 10 Tf 0 g';
 
   if (field.type === 'text') {
     const val = field.value || field.defaultValue || '';
-    return `BT ${da} 2 ${h / 2 - fontSize / 3} Td ${encodeText ? encodeText(val) : `(${escapeLit(val)})`} Tj ET`;
+    return `BT ${da} 2 ${h / 2 - fontSize / 3} Td (${escapeLit(val)}) Tj ET`;
   }
   if (field.type === 'checkbox') {
     if (field.checked) {
@@ -904,9 +1015,7 @@ function buildFieldAppearance(
   }
   if (field.type === 'button') {
     const label = field.value || '';
-    return `q 0.8 0.8 0.8 rg 0 0 ${w} ${h} re f 0 g BT ${da} ${w / 2} ${h / 2 - fontSize / 3} Td ${
-      encodeText ? encodeText(label) : `(${escapeLit(label)})`
-    } Tj ET Q`;
+    return `q 0.8 0.8 0.8 rg 0 0 ${w} ${h} re f 0 g BT ${da} ${w / 2} ${h / 2 - fontSize / 3} Td (${escapeLit(label)}) Tj ET Q`;
   }
   // radio, dropdown, listbox, signature: minimal border
   return `q 0.5 G 0.5 w 0 0 ${w} ${h} re S Q`;
@@ -922,8 +1031,7 @@ function buildAcroForm(
   pageIds: number[],
   fontId: number,
   compress: boolean,
-  pendingObjStm: Array<[number, string]>,
-  encodeText?: TextEncoderFn
+  pendingObjStm: Array<[number, string]>
 ): { acroFormId: number; fieldAnnotIds: Map<string, number[]> } {
   const fieldAnnotIds = new Map<string, number[]>();
   const rootFieldIds: number[] = [];
@@ -949,7 +1057,7 @@ function buildAcroForm(
     const ft = `/FT /${ftMap[field.type] ?? 'Tx'}`;
 
     // Appearance Stream
-    const apContent = buildFieldAppearance(field, fontId, encodeText);
+    const apContent = buildFieldAppearance(field, fontId);
     const apId = writer.addStream(
       {
         '/Type': '/XObject',
@@ -978,7 +1086,7 @@ function buildAcroForm(
     if (flags) fieldDict += ` /Ff ${flags}`;
     fieldDict += ` /AP << /N ${apId} 0 R >>`;
     if (field.options?.length) {
-      const opts = field.options.map((o) => encodePdfString(o, hasNonAscii(o))).join(' ');
+      const opts = field.options.map((o) => `(${escapeLit(o)})`).join(' ');
       fieldDict += ` /Opt [${opts}]`;
     }
     fieldDict += ` /DA (${escapeLit(field.defaultAppearance || '/F1 10 Tf 0 g')})`;
@@ -1283,18 +1391,25 @@ export async function generateNativePdf(
     unicode: options?.unicode ?? protocol.renderOptions?.unicode ?? true,
     objectStreams: options?.objectStreams ?? protocol.renderOptions?.objectStreams ?? false,
     xmpMetadata: options?.xmpMetadata ?? protocol.renderOptions?.xmpMetadata ?? true,
-    embed_cjk_font: options?.embed_cjk_font ?? protocol.renderOptions?.embed_cjk_font ?? true,
     tagged: options?.tagged ?? protocol.renderOptions?.tagged ?? !!protocol.structTree,
     linearize: options?.linearize ?? protocol.renderOptions?.linearize ?? false,
     encrypt: options?.encrypt ?? protocol.renderOptions?.encrypt ?? (undefined as any),
+    embedCjkFont:
+      options?.embedCjkFont ??
+      options?.embed_cjk_font ??
+      protocol.renderOptions?.embedCjkFont ??
+      protocol.renderOptions?.embed_cjk_font ??
+      true,
+    embed_cjk_font:
+      options?.embed_cjk_font ??
+      options?.embedCjkFont ??
+      protocol.renderOptions?.embed_cjk_font ??
+      protocol.renderOptions?.embedCjkFont ??
+      true,
   };
 
   const writer = new PdfWriter();
   const pendingObjStm: Array<[number, string]> = []; // for Object Stream batching
-  const cjkFontStrategy =
-    opts.embed_cjk_font && protocolRequiresCjkFont(protocol)
-      ? await createEmbeddedCjkFontStrategy()
-      : null;
 
   // Helper: write reserved object either inline or into pending ObjStm
   const writeReserved = (id: number, content: string) => {
@@ -1303,6 +1418,28 @@ export async function generateNativePdf(
     } else {
       writer.writeObj(id, content);
     }
+  };
+
+  const writeReservedStream = (
+    id: number,
+    dictEntries: Record<string, string>,
+    data: Buffer,
+    compress: boolean
+  ) => {
+    writer['reg'].push({ id, offset: writer.currentOffset });
+    let body = data;
+    const dict = { ...dictEntries };
+    if (compress) {
+      body = zlib.deflateSync(data);
+      dict['/Filter'] = '/FlateDecode';
+    }
+    dict['/Length'] = String(body.length);
+    const ds = Object.entries(dict)
+      .map(([k, v]) => `${k} ${v}`)
+      .join('\n');
+    writer['raw'](`${id} 0 obj\n<<\n${ds}\n>>\nstream\n`);
+    writer['raw'](body);
+    writer['raw']('\nendstream\nendobj\n');
   };
 
   // ── Prepare pages ────────────────────────────────────────
@@ -1316,9 +1453,16 @@ export async function generateNativePdf(
   const pagesRootId = writer.reserveId();
   const infoId = writer.reserveId();
   const fontId = writer.reserveId();
-  const embeddedFontFileId = cjkFontStrategy
-    ? writer.addStream({}, cjkFontStrategy.fontBytes, opts.compress)
-    : undefined;
+  const embeddedFont =
+    opts.embedCjkFont && protocolRequiresCjkFont(protocol) ? buildEmbeddedCjkFont(protocol) : null;
+  const embeddedFontIds = embeddedFont
+    ? {
+        toUnicodeId: writer.reserveId(),
+        fontFileId: writer.reserveId(),
+        fontDescriptorId: writer.reserveId(),
+        descendantFontId: writer.reserveId(),
+      }
+    : null;
 
   // ── XMP Metadata Stream (P1-1) ───────────────────────────
   let metadataId: number | undefined;
@@ -1348,8 +1492,9 @@ export async function generateNativePdf(
     try {
       const streamId = buildEmbeddedFileStream(writer, af, opts.compress);
       afList.push({ af, streamId });
-    } catch (e: any) {
-      console.warn(`[PDF] Associated file skipped: ${af.path} — ${e.message}`);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      console.warn(`[PDF] Associated file skipped: ${af.path} — ${message}`);
     }
   }
 
@@ -1403,8 +1548,9 @@ export async function generateNativePdf(
       writer['raw'](`${id} 0 obj\n<<\n${ds}\n>>\nstream\n`);
       writer['raw'](body);
       writer['raw']('\nendstream\nendobj\n');
-    } catch (e: any) {
-      console.warn(`[PDF] Image skipped: ${imgPath} — ${e.message}`);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      console.warn(`[PDF] Image skipped: ${imgPath} — ${message}`);
     }
   }
 
@@ -1458,8 +1604,7 @@ export async function generateNativePdf(
       pageIds,
       fontId,
       opts.compress,
-      pendingObjStm,
-      cjkFontStrategy?.encodeText
+      pendingObjStm
     );
     acroFormId = result.acroFormId;
     for (const [k, v] of result.fieldAnnotIds) acroFieldAnnotIds.set(k, v);
@@ -1499,10 +1644,10 @@ export async function generateNativePdf(
         protocol.aesthetic.elements,
         page.height,
         opts.unicode,
-        cjkFontStrategy?.encodeText
+        embeddedFont?.encodeText
       );
     } else if (page.text) {
-      content += buildTextContent(page, opts.unicode, cjkFontStrategy?.encodeText);
+      content += buildTextContent(page, opts.unicode, embeddedFont?.encodeText);
     }
 
     const contentId = writer.addStream({}, Buffer.from(content, 'binary'), opts.compress);
@@ -1628,7 +1773,38 @@ export async function generateNativePdf(
   );
 
   // Font
-  writeReserved(fontId, buildPrimaryFontObject(protocol, cjkFontStrategy, embeddedFontFileId));
+  if (embeddedFont && embeddedFontIds) {
+    writeReservedStream(
+      embeddedFontIds.fontFileId,
+      { '/Length1': String(embeddedFont.subsetBuffer.length) },
+      embeddedFont.subsetBuffer,
+      false
+    );
+    writeReservedStream(
+      embeddedFontIds.toUnicodeId,
+      {},
+      Buffer.from(embeddedFont.toUnicodeCMap, 'utf8'),
+      false
+    );
+    writeReserved(
+      embeddedFontIds.fontDescriptorId,
+      buildEmbeddedFontDescriptor(embeddedFont, embeddedFontIds.fontFileId)
+    );
+    writeReserved(
+      embeddedFontIds.descendantFontId,
+      buildEmbeddedDescendantFontObject(embeddedFont, embeddedFontIds.fontDescriptorId)
+    );
+    writeReserved(
+      fontId,
+      buildEmbeddedType0FontObject(
+        embeddedFont,
+        embeddedFontIds.descendantFontId,
+        embeddedFontIds.toUnicodeId
+      )
+    );
+  } else {
+    writeReserved(fontId, buildPrimaryFontObject(protocol));
+  }
 
   // Pages Root
   writeReserved(

@@ -2,7 +2,18 @@
  * styles.xml generator for XLSX packages
  * Generates the complete styles part from XlsxDesignProtocol.styles
  */
-import type { XlsxDesignProtocol, XlsxFont, XlsxFill, XlsxBorder, XlsxBorderEdge, XlsxCellStyle, XlsxNumberFormat, XlsxColor, XlsxDxfStyle } from '../types/xlsx-protocol.js';
+import type {
+  XlsxDesignProtocol,
+  XlsxFont,
+  XlsxFill,
+  XlsxBorder,
+  XlsxBorderEdge,
+  XlsxCellStyle,
+  XlsxNumberFormat,
+  XlsxColor,
+  XlsxDxfStyle,
+} from '../types/xlsx-protocol.js';
+import { resolveLatinFontFamily } from '../../design-fonts.js';
 
 function colorXml(color: XlsxColor | undefined, tagName: string): string {
   if (!color) return '';
@@ -83,7 +94,14 @@ function borderXml(border: XlsxBorder): string {
   return xml;
 }
 
-function xfXml(style: XlsxCellStyle, index: number, isCellXf: boolean, fontIdx?: number, fillIdx?: number, borderIdx?: number): string {
+function xfXml(
+  style: XlsxCellStyle,
+  index: number,
+  isCellXf: boolean,
+  fontIdx?: number,
+  fillIdx?: number,
+  borderIdx?: number
+): string {
   // If raw XML is preserved, use it
   if (style.xfXml) return style.xfXml;
 
@@ -112,14 +130,16 @@ function xfXml(style: XlsxCellStyle, index: number, isCellXf: boolean, fontIdx?:
       if (style.alignment.vertical) xml += ` vertical="${style.alignment.vertical}"`;
       if (style.alignment.wrapText) xml += ' wrapText="1"';
       if (style.alignment.shrinkToFit) xml += ' shrinkToFit="1"';
-      if (style.alignment.textRotation !== undefined) xml += ` textRotation="${style.alignment.textRotation}"`;
+      if (style.alignment.textRotation !== undefined)
+        xml += ` textRotation="${style.alignment.textRotation}"`;
       if (style.alignment.indent) xml += ` indent="${style.alignment.indent}"`;
       if (style.alignment.readingOrder) xml += ` readingOrder="${style.alignment.readingOrder}"`;
       xml += '/>';
     }
     if (style.protection) {
       xml += '<protection';
-      if (style.protection.locked !== undefined) xml += ` locked="${style.protection.locked ? '1' : '0'}"`;
+      if (style.protection.locked !== undefined)
+        xml += ` locked="${style.protection.locked ? '1' : '0'}"`;
       if (style.protection.hidden) xml += ' hidden="1"';
       xml += '/>';
     }
@@ -129,7 +149,11 @@ function xfXml(style: XlsxCellStyle, index: number, isCellXf: boolean, fontIdx?:
 }
 
 function escXml(str: string): string {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 export function generateStyles(protocol: XlsxDesignProtocol): string {
@@ -142,7 +166,7 @@ export function generateStyles(protocol: XlsxDesignProtocol): string {
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="x14ac x16r2 xr" xmlns:x14ac="http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac" xmlns:x16r2="http://schemas.microsoft.com/office/spreadsheetml/2015/02/main" xmlns:xr="http://schemas.microsoft.com/office/spreadsheetml/2014/revision">`;
 
   // Number formats (only custom ones, id >= 164)
-  const customFmts = numFmts.filter(f => f.id >= 164);
+  const customFmts = numFmts.filter((f) => f.id >= 164);
   if (customFmts.length > 0) {
     xml += `<numFmts count="${customFmts.length}">`;
     for (const f of customFmts) {
@@ -154,7 +178,7 @@ export function generateStyles(protocol: XlsxDesignProtocol): string {
   // Fonts
   xml += `<fonts count="${fonts.length || 1}">`;
   if (fonts.length === 0) {
-    xml += '<font><sz val="11"/><color theme="1"/><name val="Calibri"/><family val="2"/><scheme val="minor"/></font>';
+    xml += `<font><sz val="11"/><color theme="1"/><name val="${escXml(resolveLatinFontFamily(undefined))}"/><family val="2"/><scheme val="minor"/></font>`;
   } else {
     for (const f of fonts) xml += fontXml(f);
   }
@@ -180,7 +204,8 @@ export function generateStyles(protocol: XlsxDesignProtocol): string {
   xml += '</borders>';
 
   // Cell Style Xfs (master formats)
-  xml += '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>';
+  xml +=
+    '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>';
 
   // Cell Xfs - resolve font/fill/border indices by object identity
   xml += `<cellXfs count="${Math.max(cellXfs.length, 1)}">`;
@@ -191,10 +216,14 @@ export function generateStyles(protocol: XlsxDesignProtocol): string {
       const fontIdx = xf.font ? fonts.indexOf(xf.font) : 0;
       const fillIdx = xf.fill ? fills.indexOf(xf.fill) : 0;
       const borderIdx = xf.border ? borders.indexOf(xf.border) : 0;
-      xml += xfXml(xf, i, true,
+      xml += xfXml(
+        xf,
+        i,
+        true,
         fontIdx >= 0 ? fontIdx : 0,
         fillIdx >= 0 ? fillIdx : 0,
-        borderIdx >= 0 ? borderIdx : 0);
+        borderIdx >= 0 ? borderIdx : 0
+      );
     });
   }
   xml += '</cellXfs>';
@@ -220,11 +249,13 @@ export function generateStyles(protocol: XlsxDesignProtocol): string {
     if (dxf.font) xml += fontXml(dxf.font);
     if (dxf.fill) xml += fillXml(dxf.fill);
     if (dxf.border) xml += borderXml(dxf.border);
-    if (dxf.numFmt) xml += `<numFmt numFmtId="${dxf.numFmt.id}" formatCode="${escXml(dxf.numFmt.formatCode)}"/>`;
+    if (dxf.numFmt)
+      xml += `<numFmt numFmtId="${dxf.numFmt.id}" formatCode="${escXml(dxf.numFmt.formatCode)}"/>`;
     xml += '</dxf>';
   }
   xml += '</dxfs>';
-  xml += '<tableStyles count="0" defaultTableStyle="TableStyleMedium2" defaultPivotStyle="PivotStyleLight16"/>';
+  xml +=
+    '<tableStyles count="0" defaultTableStyle="TableStyleMedium2" defaultPivotStyle="PivotStyleLight16"/>';
   xml += '</styleSheet>';
 
   return xml;
