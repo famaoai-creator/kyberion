@@ -47,6 +47,23 @@ const resolveWriteArtifactSpec = vi.fn((params: any, ctx: any, resolve: (value: 
   path: String(resolve(params.path || params.output_path || 'active/shared/tmp/output.txt')),
   content: params.content ?? params.data ?? resolve(params.from ? `{{${params.from}}}` : ''),
 }));
+const getOpInputContract = vi.fn((domain: string, op: string) => {
+  if (domain === 'system' && op === 'write_file') {
+    return {
+      summary: 'Write a file on the host.',
+      examples: [{ path: 'active/shared/tmp/system-note.txt', content: 'hello' }],
+      schema: {
+        type: 'object',
+        required: ['path'],
+        properties: {
+          path: { type: 'string', minLength: 1 },
+        },
+        additionalProperties: true,
+      },
+    };
+  }
+  return null;
+});
 const activateApplication = vi.fn((application: string) =>
   safeExec('osascript', ['-e', `tell application "${application}" to activate`])
 );
@@ -722,6 +739,7 @@ vi.mock('@agent/core', () => ({
   evaluateCondition,
   getPathValue,
   resolveWriteArtifactSpec,
+  getOpInputContract,
   safeExec,
   classifyError,
   retry,
@@ -2379,6 +2397,14 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
           expect.objectContaining({ op: 'voice_input_toggle', kind: 'apply' }),
           expect.objectContaining({ op: 'if', kind: 'control' }),
         ])
+      );
+      expect(ops.find((op) => op.op === 'write_file')).toEqual(
+        expect.objectContaining({
+          input_schema: expect.objectContaining({
+            type: 'object',
+            required: ['path'],
+          }),
+        })
       );
     });
   });
