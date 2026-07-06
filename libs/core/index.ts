@@ -1479,8 +1479,14 @@ export * from './surface-provider-manifest-catalog.js';
 export * from './service-bootstrap-catalog.js';
 export * from './service-onboarding-catalog.js';
 export * from './surface-provider-policy.js';
-export { resolveRef, handleStepError } from './src/pipeline-engine.js';
-export type { OnErrorConfig, RefParams } from './src/pipeline-engine.js';
+export { resolveRef, handleStepError, executeAdfSteps } from './src/pipeline-engine.js';
+export type {
+  OnErrorConfig,
+  RefParams,
+  AdfRunOptions,
+  AdfStepHandlers,
+  AdfRunResult,
+} from './src/pipeline-engine.js';
 export * from './channel-surface.js';
 export * from './cowork-surface.js';
 export * from './cowork-knowledge-bridge.js';

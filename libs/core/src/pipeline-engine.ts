@@ -2,7 +2,8 @@ import * as path from 'node:path';
 import { safeReadFile } from '../secure-io.js';
 import { logger } from '../core.js';
 import { pathResolver } from '../path-resolver.js';
-import type { PipelineAdfStep } from '../pipeline-contract.js';
+import { derivePipelineStatus } from '../pipeline-contract.js';
+import type { PipelineAdfStep, PipelineStepResult } from '../pipeline-contract.js';
 
 const MAX_REF_DEPTH = 10;
 
@@ -19,6 +20,94 @@ export interface RefParams {
   export_as?: string;
 }
 
+export interface AdfRunOptions {
+  maxSteps?: number;
+  timeoutMs?: number;
+  quiet?: boolean;
+  label?: string;
+  resolveVars?: (value: any, ctx: Record<string, any>) => any;
+}
+
+export interface AdfStepHandlers<Ctx extends Record<string, any> = Record<string, any>> {
+  capture: (op: string, params: any, ctx: Ctx, resolve: (value: any) => any) => Promise<Ctx>;
+  transform: (op: string, params: any, ctx: Ctx, resolve: (value: any) => any) => Promise<Ctx>;
+  apply: (op: string, params: any, ctx: Ctx, resolve: (value: any) => any) => Promise<void | Ctx>;
+  control?: (
+    op: string,
+    params: any,
+    ctx: Ctx,
+    runSteps: (steps: PipelineAdfStep[], seedCtx?: Ctx) => Promise<AdfRunResult<Ctx>>,
+    resolve: (value: any) => any
+  ) => Promise<Ctx>;
+}
+
+export interface AdfRunResult<Ctx extends Record<string, any> = Record<string, any>> {
+  status: 'succeeded' | 'failed';
+  results: PipelineStepResult[];
+  context: Ctx;
+  total_steps: number;
+}
+
+export async function executeAdfSteps<Ctx extends Record<string, any> = Record<string, any>>(
+  steps: PipelineAdfStep[],
+  initialCtx: Ctx,
+  options: AdfRunOptions,
+  handlers: AdfStepHandlers<Ctx>,
+  state: { stepCount: number; startTime: number } = { stepCount: 0, startTime: Date.now() }
+): Promise<AdfRunResult<Ctx>> {
+  const maxSteps = options.maxSteps ?? 1000;
+  const timeoutMs = options.timeoutMs ?? 60_000;
+  const label = options.label || '[ADF]';
+  let ctx = { ...initialCtx } as Ctx;
+  const results: PipelineStepResult[] = [];
+
+  const runNestedSteps = async (nestedSteps: PipelineAdfStep[], seedCtx: Ctx = ctx) =>
+    executeAdfSteps(nestedSteps, seedCtx, options, handlers, state);
+
+  for (const step of steps) {
+    state.stepCount += 1;
+    if (state.stepCount > maxSteps) {
+      throw new Error(`[SAFETY_LIMIT] Exceeded maximum pipeline steps (${maxSteps})`);
+    }
+    if (Date.now() - state.startTime > timeoutMs) {
+      throw new Error(`[SAFETY_LIMIT] Pipeline execution timed out (${timeoutMs}ms)`);
+    }
+
+    try {
+      logger.info(`  ${label} [Step ${state.stepCount}] ${step.type}:${step.op}...`);
+      const resolve = (value: any) =>
+        options.resolveVars ? options.resolveVars(value, ctx) : value;
+      if (step.type === 'control') {
+        if (!handlers.control) {
+          throw new Error(`[UNKNOWN_TYPE] Unknown control step op: ${step.op}`);
+        }
+        ctx = await handlers.control(step.op, step.params, ctx, runNestedSteps, resolve);
+      } else if (step.type === 'capture') {
+        ctx = await handlers.capture(step.op, step.params, ctx, resolve);
+      } else if (step.type === 'transform') {
+        ctx = await handlers.transform(step.op, step.params, ctx, resolve);
+      } else if (step.type === 'apply') {
+        const nextCtx = await handlers.apply(step.op, step.params, ctx, resolve);
+        if (nextCtx) ctx = nextCtx;
+      } else {
+        throw new Error(`[UNKNOWN_TYPE] Unknown step type: ${step.type}`);
+      }
+      results.push({ op: step.op, status: 'success' });
+    } catch (error: any) {
+      logger.error(`  [ADF] Step failed (${step.op}): ${error?.message || String(error)}`);
+      results.push({ op: step.op, status: 'failed', error: error?.message || String(error) });
+      break;
+    }
+  }
+
+  return {
+    status: derivePipelineStatus(results),
+    results,
+    context: ctx,
+    total_steps: state.stepCount,
+  };
+}
+
 /**
  * Loads a sub-pipeline JSON from disk, merges bind params into context,
  * and returns the steps + merged context.
@@ -32,11 +121,15 @@ export async function resolveRef(
 ): Promise<{ steps: any[]; mergedCtx: any }> {
   const currentDepth = (parentCtx._refDepth || 0) + 1;
   if (currentDepth > MAX_REF_DEPTH) {
-    throw new Error(`[PIPELINE] Circular ref or depth exceeded: depth=${currentDepth}, path=${refPath}`);
+    throw new Error(
+      `[PIPELINE] Circular ref or depth exceeded: depth=${currentDepth}, path=${refPath}`
+    );
   }
 
   const resolvedPath = pathResolver.rootResolve(refPath);
-  logger.info(`[PIPELINE] resolveRef: loading sub-pipeline from ${resolvedPath} (depth=${currentDepth})`);
+  logger.info(
+    `[PIPELINE] resolveRef: loading sub-pipeline from ${resolvedPath} (depth=${currentDepth})`
+  );
 
   const raw = safeReadFile(resolvedPath, { encoding: 'utf8' }) as string;
   const parsed = JSON.parse(raw);
@@ -83,18 +176,15 @@ export async function handleStepError(
       throw error;
 
     case 'fallback': {
-      logger.warn(`[PIPELINE] on_error:fallback — executing fallback for step ${step.id || step.op}`);
+      logger.warn(
+        `[PIPELINE] on_error:fallback — executing fallback for step ${step.id || step.op}`
+      );
       let fallbackSteps: any[];
       if (onError.fallback) {
         fallbackSteps = onError.fallback;
       } else if (onError.ref) {
         const refBind = onError.bind || {};
-        const refResult = await resolveRef(
-          resolveVarsFn(onError.ref),
-          refBind,
-          ctx,
-          resolveVarsFn
-        );
+        const refResult = await resolveRef(resolveVarsFn(onError.ref), refBind, ctx, resolveVarsFn);
         fallbackSteps = refResult.steps;
         ctx = { ...ctx, ...refResult.mergedCtx };
       } else {
