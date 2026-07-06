@@ -1,5 +1,5 @@
+import { resolveEastAsianFontFamily, resolveLatinFontFamily } from '../../design-fonts.js';
 import type { PptxElement, PptxPos, PptxStyle } from '../types/pptx-protocol.js';
-import { resolveFontPair } from '../font-stack.js';
 
 function inToEmu(inches: number): number {
   return Math.round(inches * 914400);
@@ -201,8 +201,7 @@ export function buildShape(el: PptxElement, id: number, rIdLink?: string): strin
       }
       if (run.options?.fontFamily || el.style?.fontFamily) {
         const font = run.options?.fontFamily || el.style?.fontFamily;
-        const { latin, eastAsia, cs } = resolveFontPair(font);
-        const fontXml = `<a:latin typeface="${latin}"/><a:ea typeface="${eastAsia}"/><a:cs typeface="${cs}"/>`;
+        const fontXml = `<a:latin typeface="${resolveLatinFontFamily(font)}"/><a:ea typeface="${resolveEastAsianFontFamily(font)}"/>`;
         if (rPr.includes('<a:latin') || rPr.includes('<a:ea')) {
           rPr = rPr
             .replace(/<a:latin[^>]*\/>/g, '')
