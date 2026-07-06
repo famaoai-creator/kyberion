@@ -49,6 +49,11 @@ describe('actuator-op-registry', () => {
     expect(determineActuatorStepType('codex', 'exec')).toBe('apply');
   });
 
+  it('returns unknown for unmapped ops instead of falling through to apply', () => {
+    expect(determineActuatorStepType('file', 'stat')).toBe('unknown');
+    expect(determineActuatorStepType('file', 'does_not_exist')).toBe('unknown');
+  });
+
   it('exposes registered ops for a domain', () => {
     const mediaOps = listRegisteredDomainOps('media');
     expect(mediaOps.transform).toContain('apply_pattern');
