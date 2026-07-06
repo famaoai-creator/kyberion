@@ -13,12 +13,16 @@ import {
   safeRmSync,
   retry,
   classifyError,
-  derivePipelineStatus,
   pathResolver,
   resolveVars,
   evaluateCondition,
   resolveWriteArtifactSpec,
+  resolveRequiredStringParam,
+  validateOpInput,
   processUntrustedContent,
+  executeAdfSteps,
+  skipAdfStep,
+  buildUnknownActuatorOpError,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
@@ -69,6 +73,10 @@ function buildRetryOptions() {
   };
 }
 
+function buildUnknownFileOpMessage(op: string): string {
+  return buildUnknownActuatorOpError('file', op).message;
+}
+
 /**
  * File-Actuator v2.1.1 [RESILIENT PIPELINE]
  * Strictly compliant with Layer 2 (Shield).
@@ -76,15 +84,9 @@ function buildRetryOptions() {
  * Restored specialized ops: tail, append, exists, copy, move.
  */
 
-interface PipelineStep {
-  type: 'capture' | 'transform' | 'apply' | 'control';
-  op: string;
-  params: any;
-}
-
 interface FileAction {
   action: 'pipeline';
-  steps: PipelineStep[];
+  steps: Array<{ type: 'capture' | 'transform' | 'apply' | 'control'; op: string; params: any }>;
   context?: Record<string, any>;
   options?: {
     max_steps?: number;
@@ -102,10 +104,9 @@ export async function handleAction(input: FileAction) {
 }
 
 async function executePipeline(
-  steps: PipelineStep[],
+  steps: Array<{ type: 'capture' | 'transform' | 'apply' | 'control'; op: string; params: any }>,
   initialCtx: any = {},
-  options: any = {},
-  state: any = { stepCount: 0, startTime: Date.now() }
+  options: any = {}
 ) {
   const rootDir = pathResolver.rootDir();
   const MAX_STEPS = options.max_steps || 1000;
@@ -125,44 +126,23 @@ async function executePipeline(
     );
     ctx = { ...ctx, ...saved };
   }
-
-  const resolve = (val: any) => resolveVars(val, ctx);
-
-  const results = [];
-  for (const step of steps) {
-    state.stepCount++;
-    if (state.stepCount > MAX_STEPS)
-      throw new Error(`[SAFETY_LIMIT] Exceeded maximum pipeline steps (${MAX_STEPS})`);
-    if (Date.now() - state.startTime > TIMEOUT)
-      throw new Error(`[SAFETY_LIMIT] Pipeline execution timed out (${TIMEOUT}ms)`);
-
-    try {
-      logger.info(`  [FILE_PIPELINE] [Step ${state.stepCount}] ${step.type}:${step.op}...`);
-
-      if (step.type === 'control') {
-        ctx = await opControl(step.op, step.params, ctx, options, state, resolve);
-      } else {
-        switch (step.type) {
-          case 'capture':
-            ctx = await opCapture(step.op, step.params, ctx, resolve);
-            break;
-          case 'transform':
-            ctx = await opTransform(step.op, step.params, ctx, resolve);
-            break;
-          case 'apply':
-            await opApply(step.op, step.params, ctx, resolve);
-            break;
-          default:
-            throw new Error(`[UNKNOWN_TYPE] Unknown step type: ${step.type}`);
-        }
-      }
-      results.push({ op: step.op, status: 'success' });
-    } catch (err: any) {
-      logger.error(`  [FILE_PIPELINE] Step failed (${step.op}): ${err.message}`);
-      results.push({ op: step.op, status: 'failed', error: err.message });
-      break;
+  const result = await executeAdfSteps(
+    steps,
+    ctx,
+    {
+      maxSteps: MAX_STEPS,
+      timeoutMs: TIMEOUT,
+    },
+    {
+      capture: opCapture,
+      transform: opTransform,
+      apply: opApply,
+      control: async (op, params, currentCtx, runSteps, resolve) =>
+        await opControl(op, params, currentCtx, runSteps, resolve),
     }
-  }
+  );
+
+  ctx = result.context;
 
   if (initialCtx.context_path) {
     await retry(async () => {
@@ -171,50 +151,75 @@ async function executePipeline(
     }, buildRetryOptions());
   }
 
-  return {
-    status: derivePipelineStatus(results),
-    results,
-    context: ctx,
-    total_steps: state.stepCount,
-  };
+  return result;
 }
 
 async function opControl(
   op: string,
   params: any,
   ctx: any,
-  options: any,
-  state: any,
-  resolve: (value: any) => any
+  runSteps: (steps: any[], seedCtx?: any) => Promise<any>,
+  _resolve: (value: any) => any
 ) {
   switch (op) {
     case 'if':
       if (evaluateCondition(params.condition, ctx)) {
-        const res = await executePipeline(params.then, ctx, options, state);
+        const res = await runSteps(params.then, ctx);
+        if (res.status === 'failed') {
+          throw new Error(
+            res.results.find((result: any) => result.status === 'failed')?.error ||
+              'nested pipeline failed'
+          );
+        }
         return res.context;
       } else if (params.else) {
-        const res = await executePipeline(params.else, ctx, options, state);
+        const res = await runSteps(params.else, ctx);
+        if (res.status === 'failed') {
+          throw new Error(
+            res.results.find((result: any) => result.status === 'failed')?.error ||
+              'nested pipeline failed'
+          );
+        }
         return res.context;
       }
-      return ctx;
+      return skipAdfStep(
+        ctx,
+        'core:if condition evaluated to false and no else branch was provided'
+      );
 
     case 'while':
       let iterations = 0;
       const maxIter = params.max_iterations || 100;
+      let executed = false;
       while (evaluateCondition(params.condition, ctx) && iterations < maxIter) {
-        const res = await executePipeline(params.pipeline, ctx, options, state);
+        executed = true;
+        const res = await runSteps(params.pipeline, ctx);
+        if (res.status === 'failed') {
+          throw new Error(
+            res.results.find((result: any) => result.status === 'failed')?.error ||
+              'nested pipeline failed'
+          );
+        }
         ctx = res.context;
         iterations++;
       }
-      return ctx;
+      return executed
+        ? ctx
+        : skipAdfStep(ctx, 'core:while condition evaluated to false before execution');
 
     default:
-      throw new Error(`[UNKNOWN_OP] Unknown control op: ${op}`);
+      throw new Error(buildUnknownFileOpMessage(op));
   }
 }
 
 async function opCapture(op: string, params: any, ctx: any, resolve: (value: any) => any) {
   const rootDir = pathResolver.rootDir();
+  const validation = validateOpInput('file', op, params);
+  if (!validation.valid) {
+    throw new Error(
+      `[INVALID_OP_INPUT] ${op}: ${'errors' in validation ? validation.errors.join('; ') : ''}`
+    );
+  }
   switch (op) {
     case 'read':
     case 'read_file': {
@@ -230,6 +235,18 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
       return {
         ...ctx,
         [params.export_as || 'last_capture']: wrappedText,
+      };
+    }
+    case 'read_json': {
+      const filePath = resolve(params.path);
+      const rawText = await retry(
+        async () => safeReadFile(path.resolve(rootDir, filePath), { encoding: 'utf8' }),
+        buildRetryOptions()
+      );
+      const parsed = JSON.parse(String(rawText));
+      return {
+        ...ctx,
+        [params.export_as || 'last_capture_data']: parsed,
       };
     }
     case 'list':
@@ -289,7 +306,7 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
       return { ...ctx, [params.export_as || 'last_capture']: wrappedText, [posKey]: stats.size };
     }
     default:
-      throw new Error(`[UNKNOWN_OP] Unknown capture op: ${op}`);
+      throw new Error(buildUnknownFileOpMessage(op));
   }
 }
 
@@ -313,15 +330,24 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
         [params.export_as]: path.join(...params.parts.map((p: string) => resolve(p))),
       };
     default:
-      throw new Error(`[UNKNOWN_OP] Unknown transform op: ${op}`);
+      throw new Error(buildUnknownFileOpMessage(op));
   }
 }
 
 async function opApply(op: string, params: any, ctx: any, resolve: (value: any) => any) {
   const rootDir = pathResolver.rootDir();
+  const validation = validateOpInput('file', op, params);
+  if (!validation.valid) {
+    throw new Error(
+      `[INVALID_OP_INPUT] ${op}: ${'errors' in validation ? validation.errors.join('; ') : ''}`
+    );
+  }
   switch (op) {
     case 'write': {
-      const out = path.resolve(rootDir, resolve(params.path));
+      const out = path.resolve(
+        rootDir,
+        resolveRequiredStringParam(params, ['path'], resolve, 'write')
+      );
       const content =
         ctx[params.from || 'last_transform'] ||
         ctx[params.from || 'last_capture'] ||
@@ -350,7 +376,10 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       break;
     }
     case 'append': {
-      const out = path.resolve(rootDir, resolve(params.path));
+      const out = path.resolve(
+        rootDir,
+        resolveRequiredStringParam(params, ['path'], resolve, 'append')
+      );
       const content =
         ctx[params.from || 'last_transform'] ||
         ctx[params.from || 'last_capture'] ||
@@ -363,7 +392,10 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       break;
     }
     case 'delete': {
-      const target = path.resolve(rootDir, resolve(params.path));
+      const target = path.resolve(
+        rootDir,
+        resolveRequiredStringParam(params, ['path'], resolve, 'delete')
+      );
       await retry(async () => {
         safeRmSync(target, { recursive: true, force: true });
         return undefined;
@@ -372,13 +404,22 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
     }
     case 'mkdir':
       await retry(async () => {
-        safeMkdir(path.resolve(rootDir, resolve(params.path)), { recursive: true });
+        safeMkdir(
+          path.resolve(rootDir, resolveRequiredStringParam(params, ['path'], resolve, 'mkdir')),
+          { recursive: true }
+        );
         return undefined;
       }, buildRetryOptions());
       break;
     case 'copy': {
-      const src = path.resolve(rootDir, resolve(params.from));
-      const dest = path.resolve(rootDir, resolve(params.to));
+      const src = path.resolve(
+        rootDir,
+        resolveRequiredStringParam(params, ['from'], resolve, 'copy')
+      );
+      const dest = path.resolve(
+        rootDir,
+        resolveRequiredStringParam(params, ['to'], resolve, 'copy')
+      );
       await retry(async () => {
         if (!safeExistsSync(path.dirname(dest))) safeMkdir(path.dirname(dest), { recursive: true });
         safeCopyFileSync(src, dest);
@@ -387,8 +428,14 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       break;
     }
     case 'move': {
-      const src = path.resolve(rootDir, resolve(params.from));
-      const dest = path.resolve(rootDir, resolve(params.to));
+      const src = path.resolve(
+        rootDir,
+        resolveRequiredStringParam(params, ['from'], resolve, 'move')
+      );
+      const dest = path.resolve(
+        rootDir,
+        resolveRequiredStringParam(params, ['to'], resolve, 'move')
+      );
       await retry(async () => {
         if (!safeExistsSync(path.dirname(dest))) safeMkdir(path.dirname(dest), { recursive: true });
         safeMoveSync(src, dest);
@@ -397,7 +444,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       break;
     }
     default:
-      throw new Error(`[UNKNOWN_OP] Unknown apply op: ${op}`);
+      throw new Error(buildUnknownFileOpMessage(op));
   }
 }
 

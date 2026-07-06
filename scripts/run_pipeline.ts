@@ -24,6 +24,7 @@ import {
   runJanitor,
   checkActuatorCapabilities,
   killSwitch,
+  validateOpInput,
 } from '@agent/core';
 import { tryRepairJson } from '@agent/core/json-repair';
 import { installPythonVoiceBridgeIfAvailable } from '@agent/core/python-voice-bridge';
@@ -455,6 +456,14 @@ export function normalizePipelineOp(op: string): string {
   return `system:${op}`;
 }
 
+function validatePipelineOpInput(domain: string, action: string, params: Record<string, unknown>) {
+  if (domain === 'core' || domain === 'reasoning') return;
+  const validation = validateOpInput(domain as any, action, params);
+  if (!validation.valid) {
+    throw new Error(`[INVALID_OP_INPUT] ${domain}:${action}: ${validation.errors.join('; ')}`);
+  }
+}
+
 function resolveLogMessage(params: Record<string, unknown>, ctx: Record<string, unknown>): string {
   const template = params.message ?? params.template ?? params.text ?? '';
   return String(resolveVars(template, ctx));
@@ -606,6 +615,7 @@ export async function runSteps(
 
     let attempt = 0;
     let stepSucceeded = false;
+    let stepSkipped = false;
     let lastError: any = null;
     let currentNormalizedOp = step.op;
     const finishStepTrace = (
@@ -643,7 +653,7 @@ export async function runSteps(
         return { status: 'failed', results, context: ctx };
       }
       if (beforeDecision === 'skip') {
-        results.push({ op: step.op, status: 'success' });
+        results.push({ op: currentNormalizedOp, status: 'skipped' });
         finishStepTrace('step.skipped', 'skipped');
         opts.trace?.endSpan('ok');
         continue;
@@ -777,6 +787,15 @@ export async function runSteps(
             const nested = await runSteps(branch as PipelineAdfStep[], ctx, opts);
             ctx = nested.context;
             results.push(...nested.results);
+          } else if (!conditionResult) {
+            stepSkipped = true;
+            results.push({ op: currentNormalizedOp, status: 'skipped' });
+            finishStepTrace('step.skipped', 'skipped', {
+              reason: 'core:if condition evaluated to false and no else branch was provided',
+            });
+            opts.trace?.endSpan('ok');
+            stepSucceeded = true;
+            continue;
           }
         } else if (
           domain === 'core' &&
@@ -825,6 +844,16 @@ export async function runSteps(
               const shouldContinue = Boolean(evaluateCondition(condition, ctx));
               if (!shouldContinue) break;
             }
+          }
+          if (loopCount === 0) {
+            stepSkipped = true;
+            results.push({ op: currentNormalizedOp, status: 'skipped' });
+            finishStepTrace('step.skipped', 'skipped', {
+              reason: 'core:while condition evaluated to false before execution',
+            });
+            opts.trace?.endSpan('ok');
+            stepSucceeded = true;
+            continue;
           }
           ctx = {
             ...ctx,
@@ -1153,6 +1182,7 @@ export async function runSteps(
               });
             }
           }
+          validatePipelineOpInput(domain, action, params);
           await assertPipelineStepCapabilityAvailable(domain, action);
           const dispatch = await loadActuatorDispatch(domain);
           const result = await dispatch(
@@ -1252,6 +1282,9 @@ export async function runSteps(
     }
 
     if (stepSucceeded) {
+      if (stepSkipped) {
+        continue;
+      }
       // ── after hooks ─────────────────────────────────────────────
       if (step.hooks?.after?.length) {
         const afterDecision = await runStepHooks(

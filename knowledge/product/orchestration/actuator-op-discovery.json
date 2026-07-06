@@ -1,0 +1,1578 @@
+{
+  "v": "1.0.0",
+  "actuators": [
+    {
+      "n": "agent-actuator",
+      "path": "libs/actuators/agent-actuator",
+      "source": "registry",
+      "ops": []
+    },
+    {
+      "n": "android-actuator",
+      "path": "libs/actuators/android-actuator",
+      "source": "registry",
+      "ops": []
+    },
+    {
+      "n": "approval-actuator",
+      "path": "libs/actuators/approval-actuator",
+      "source": "registry",
+      "ops": []
+    },
+    {
+      "n": "artifact-actuator",
+      "path": "libs/actuators/artifact-actuator",
+      "source": "registry",
+      "ops": []
+    },
+    {
+      "n": "blockchain-actuator",
+      "path": "libs/actuators/blockchain-actuator",
+      "source": "registry",
+      "ops": []
+    },
+    {
+      "n": "browser-actuator",
+      "path": "libs/actuators/browser-actuator",
+      "source": "registry",
+      "ops": [
+        {
+          "op": "content",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "required": ["selector", "content_excerpt"],
+            "properties": {
+              "selector": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content_excerpt": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "selector": "#status",
+              "content_excerpt": "Ready"
+            }
+          ]
+        },
+        {
+          "op": "evaluate",
+          "kind": "capture"
+        },
+        {
+          "op": "goto",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "required": ["url"],
+            "properties": {
+              "url": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "url": "https://example.com"
+            }
+          ]
+        },
+        {
+          "op": "screenshot",
+          "kind": "capture"
+        },
+        {
+          "op": "snapshot",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string",
+                "minLength": 1
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "url": "https://example.com",
+              "title": "Example Domain"
+            }
+          ]
+        },
+        {
+          "op": "click",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "anyOf": [
+              {
+                "required": ["selector"]
+              },
+              {
+                "required": ["ref"]
+              }
+            ],
+            "properties": {
+              "selector": {
+                "type": "string",
+                "minLength": 1
+              },
+              "ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "element_name": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "selector": "button[type=\"submit\"]"
+            },
+            {
+              "ref": "login-submit"
+            }
+          ]
+        },
+        {
+          "op": "extension_session",
+          "kind": "apply"
+        },
+        {
+          "op": "fill",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "anyOf": [
+              {
+                "required": ["selector"]
+              },
+              {
+                "required": ["ref"]
+              }
+            ],
+            "properties": {
+              "selector": {
+                "type": "string",
+                "minLength": 1
+              },
+              "ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "text": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "selector": "input[name=\"email\"]",
+              "text": "user@example.com"
+            }
+          ]
+        },
+        {
+          "op": "log",
+          "kind": "apply"
+        },
+        {
+          "op": "press",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "anyOf": [
+              {
+                "required": ["selector"]
+              },
+              {
+                "required": ["ref"]
+              }
+            ],
+            "properties": {
+              "selector": {
+                "type": "string",
+                "minLength": 1
+              },
+              "ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "key": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "selector": "input[name=\"email\"]",
+              "key": "Enter"
+            }
+          ]
+        },
+        {
+          "op": "wait",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "anyOf": [
+              {
+                "required": ["selector"]
+              },
+              {
+                "required": ["ref"]
+              }
+            ],
+            "properties": {
+              "selector": {
+                "type": "string",
+                "minLength": 1
+              },
+              "ref": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "selector": "#ready-state"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "n": "calendar-actuator",
+      "path": "libs/actuators/calendar-actuator",
+      "source": "registry",
+      "ops": []
+    },
+    {
+      "n": "code-actuator",
+      "path": "libs/actuators/code-actuator",
+      "source": "registry",
+      "ops": [
+        {
+          "op": "glob_files",
+          "kind": "capture"
+        },
+        {
+          "op": "list",
+          "kind": "capture"
+        },
+        {
+          "op": "read",
+          "kind": "capture"
+        },
+        {
+          "op": "read_file",
+          "kind": "capture"
+        },
+        {
+          "op": "apply_pattern",
+          "kind": "transform"
+        },
+        {
+          "op": "merge_content",
+          "kind": "transform"
+        },
+        {
+          "op": "set",
+          "kind": "transform"
+        },
+        {
+          "op": "append",
+          "kind": "apply"
+        },
+        {
+          "op": "copy",
+          "kind": "apply"
+        },
+        {
+          "op": "log",
+          "kind": "apply"
+        },
+        {
+          "op": "move",
+          "kind": "apply"
+        },
+        {
+          "op": "write",
+          "kind": "apply"
+        },
+        {
+          "op": "write_file",
+          "kind": "apply"
+        }
+      ]
+    },
+    {
+      "n": "email-actuator",
+      "path": "libs/actuators/email-actuator",
+      "source": "registry",
+      "ops": []
+    },
+    {
+      "n": "file-actuator",
+      "path": "libs/actuators/file-actuator",
+      "source": "registry",
+      "ops": [
+        {
+          "op": "exists",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "required": ["path"],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "path": "knowledge/product/README.md"
+            }
+          ]
+        },
+        {
+          "op": "glob_files",
+          "kind": "capture"
+        },
+        {
+          "op": "list",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "required": ["path"],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "path": "knowledge/product"
+            }
+          ]
+        },
+        {
+          "op": "read",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "required": ["path"],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "path": "knowledge/product/README.md"
+            }
+          ]
+        },
+        {
+          "op": "read_file",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "required": ["path"],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "path": "knowledge/product/README.md"
+            }
+          ]
+        },
+        {
+          "op": "read_json",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "required": ["path"],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "path": "knowledge/product/config.json"
+            }
+          ]
+        },
+        {
+          "op": "search",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "required": ["path", "pattern"],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "pattern": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "path": "knowledge/product",
+              "pattern": "AR-03"
+            }
+          ]
+        },
+        {
+          "op": "stat",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "required": ["path"],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "path": "knowledge/product/README.md"
+            }
+          ]
+        },
+        {
+          "op": "tail",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "required": ["path"],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "path": "logs/latest.log"
+            }
+          ]
+        },
+        {
+          "op": "json_parse",
+          "kind": "transform"
+        },
+        {
+          "op": "json_query",
+          "kind": "transform"
+        },
+        {
+          "op": "path_join",
+          "kind": "transform"
+        },
+        {
+          "op": "append",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "required": ["path"],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content": {},
+              "from": {
+                "type": "string",
+                "minLength": 1
+              },
+              "newline": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "path": "knowledge/product/log.txt",
+              "content": "line"
+            }
+          ]
+        },
+        {
+          "op": "copy",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "required": ["from", "to"],
+            "properties": {
+              "from": {
+                "type": "string",
+                "minLength": 1
+              },
+              "to": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "from": "knowledge/product/a.txt",
+              "to": "active/shared/tmp/a.txt"
+            }
+          ]
+        },
+        {
+          "op": "delete",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "required": ["path"],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "path": "active/shared/tmp/stale.json"
+            }
+          ]
+        },
+        {
+          "op": "mkdir",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "required": ["path"],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "path": "active/shared/tmp/new-folder"
+            }
+          ]
+        },
+        {
+          "op": "move",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "required": ["from", "to"],
+            "properties": {
+              "from": {
+                "type": "string",
+                "minLength": 1
+              },
+              "to": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "from": "knowledge/product/a.txt",
+              "to": "active/shared/tmp/a.txt"
+            }
+          ]
+        },
+        {
+          "op": "symlink",
+          "kind": "apply"
+        },
+        {
+          "op": "write",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "required": ["path"],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content": {},
+              "from": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "path": "knowledge/product/note.txt",
+              "content": "hello"
+            }
+          ]
+        },
+        {
+          "op": "write_artifact",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "anyOf": [
+              {
+                "required": ["path"]
+              },
+              {
+                "required": ["output_path"]
+              }
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "output_path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content": {},
+              "data": {},
+              "from": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "output_path": "active/shared/tmp/report.json",
+              "content": {
+                "ok": true
+              }
+            }
+          ]
+        },
+        {
+          "op": "write_file",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "required": ["path"],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "output_path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content": {},
+              "data": {},
+              "from": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "path": "knowledge/product/note.txt",
+              "content": "hello"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "n": "ios-actuator",
+      "path": "libs/actuators/ios-actuator",
+      "source": "registry",
+      "ops": []
+    },
+    {
+      "n": "media-actuator",
+      "path": "libs/actuators/media-actuator",
+      "source": "manifest",
+      "ops": [
+        {
+          "op": "json_read",
+          "kind": "capture"
+        },
+        {
+          "op": "pptx_extract",
+          "kind": "capture"
+        },
+        {
+          "op": "pptx_slide_text",
+          "kind": "capture"
+        },
+        {
+          "op": "xlsx_extract",
+          "kind": "capture"
+        },
+        {
+          "op": "apply_pattern",
+          "kind": "transform"
+        },
+        {
+          "op": "apply_theme",
+          "kind": "transform"
+        },
+        {
+          "op": "merge_content",
+          "kind": "transform"
+        },
+        {
+          "op": "proposal_content_from_storyline",
+          "kind": "transform"
+        },
+        {
+          "op": "proposal_storyline_from_brief",
+          "kind": "transform"
+        },
+        {
+          "op": "set",
+          "kind": "transform"
+        },
+        {
+          "op": "theme_from_pptx_design",
+          "kind": "transform"
+        },
+        {
+          "op": "docx_render",
+          "kind": "apply"
+        },
+        {
+          "op": "pptx_filter_slides",
+          "kind": "apply"
+        },
+        {
+          "op": "pptx_patch",
+          "kind": "apply"
+        },
+        {
+          "op": "pptx_render",
+          "kind": "apply"
+        },
+        {
+          "op": "write_file",
+          "kind": "apply"
+        },
+        {
+          "op": "xlsx_render",
+          "kind": "apply"
+        }
+      ]
+    },
+    {
+      "n": "media-generation-actuator",
+      "path": "libs/actuators/media-generation-actuator",
+      "source": "registry",
+      "ops": []
+    },
+    {
+      "n": "meeting-actuator",
+      "path": "libs/actuators/meeting-actuator",
+      "source": "registry",
+      "ops": []
+    },
+    {
+      "n": "meeting-browser-driver",
+      "path": "libs/actuators/meeting-browser-driver",
+      "source": "registry",
+      "ops": []
+    },
+    {
+      "n": "modeling-actuator",
+      "path": "libs/actuators/modeling-actuator",
+      "source": "registry",
+      "ops": []
+    },
+    {
+      "n": "network-actuator",
+      "path": "libs/actuators/network-actuator",
+      "source": "registry",
+      "ops": [
+        {
+          "op": "fetch",
+          "kind": "capture"
+        },
+        {
+          "op": "read",
+          "kind": "capture"
+        },
+        {
+          "op": "log",
+          "kind": "apply"
+        }
+      ]
+    },
+    {
+      "n": "orchestrator-actuator",
+      "path": "libs/actuators/orchestrator-actuator",
+      "source": "registry",
+      "ops": [
+        {
+          "op": "discover_capabilities",
+          "kind": "capture"
+        },
+        {
+          "op": "discover_skills",
+          "kind": "capture"
+        },
+        {
+          "op": "deploy",
+          "kind": "apply"
+        },
+        {
+          "op": "log",
+          "kind": "apply"
+        }
+      ]
+    },
+    {
+      "n": "presence-actuator",
+      "path": "libs/actuators/presence-actuator",
+      "source": "registry",
+      "ops": []
+    },
+    {
+      "n": "process-actuator",
+      "path": "libs/actuators/process-actuator",
+      "source": "registry",
+      "ops": []
+    },
+    {
+      "n": "secret-actuator",
+      "path": "libs/actuators/secret-actuator",
+      "source": "registry",
+      "ops": []
+    },
+    {
+      "n": "service-actuator",
+      "path": "libs/actuators/service-actuator",
+      "source": "registry",
+      "ops": [
+        {
+          "op": "list",
+          "kind": "capture"
+        },
+        {
+          "op": "read",
+          "kind": "capture"
+        },
+        {
+          "op": "deploy",
+          "kind": "apply"
+        },
+        {
+          "op": "log",
+          "kind": "apply"
+        },
+        {
+          "op": "notify",
+          "kind": "apply"
+        }
+      ]
+    },
+    {
+      "n": "system-actuator",
+      "path": "libs/actuators/system-actuator",
+      "source": "describeOps",
+      "ops": [
+        {
+          "op": "screenshot",
+          "kind": "capture"
+        },
+        {
+          "op": "clipboard_read",
+          "kind": "capture"
+        },
+        {
+          "op": "get_focused_input",
+          "kind": "capture"
+        },
+        {
+          "op": "get_screen_size",
+          "kind": "capture"
+        },
+        {
+          "op": "window_list",
+          "kind": "capture"
+        },
+        {
+          "op": "chrome_tab_list",
+          "kind": "capture"
+        },
+        {
+          "op": "read_file",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "required": ["path"],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "path": "knowledge/product/README.md"
+            }
+          ]
+        },
+        {
+          "op": "read_json",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "required": ["path"],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "path": "knowledge/product/config.json"
+            }
+          ]
+        },
+        {
+          "op": "probe",
+          "kind": "capture"
+        },
+        {
+          "op": "glob_files",
+          "kind": "capture"
+        },
+        {
+          "op": "scan_directory",
+          "kind": "capture"
+        },
+        {
+          "op": "pulse_status",
+          "kind": "capture"
+        },
+        {
+          "op": "exec",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "required": ["command"],
+            "properties": {
+              "command": {
+                "type": "string",
+                "minLength": 1
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "command": "pnpm",
+              "args": ["build"]
+            }
+          ]
+        },
+        {
+          "op": "shell",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "required": ["command"],
+            "properties": {
+              "command": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "command": "pnpm build"
+            }
+          ]
+        },
+        {
+          "op": "cli_health_check",
+          "kind": "capture"
+        },
+        {
+          "op": "list_missions",
+          "kind": "capture"
+        },
+        {
+          "op": "list_projects",
+          "kind": "capture"
+        },
+        {
+          "op": "list_capabilities",
+          "kind": "capture"
+        },
+        {
+          "op": "list_incidents",
+          "kind": "capture"
+        },
+        {
+          "op": "list_knowledge",
+          "kind": "capture"
+        },
+        {
+          "op": "list_running_apps",
+          "kind": "capture"
+        },
+        {
+          "op": "list_input_devices",
+          "kind": "capture"
+        },
+        {
+          "op": "list_displays",
+          "kind": "capture"
+        },
+        {
+          "op": "list_media_devices",
+          "kind": "capture"
+        },
+        {
+          "op": "list_tool_runtimes",
+          "kind": "capture"
+        },
+        {
+          "op": "list_service_runtimes",
+          "kind": "capture"
+        },
+        {
+          "op": "control_media_devices",
+          "kind": "capture"
+        },
+        {
+          "op": "collect_artifacts",
+          "kind": "capture"
+        },
+        {
+          "op": "sample_traces",
+          "kind": "capture"
+        },
+        {
+          "op": "vision_consult",
+          "kind": "capture"
+        },
+        {
+          "op": "test_screen_stream",
+          "kind": "capture"
+        },
+        {
+          "op": "test_screen_mp4_roundtrip",
+          "kind": "capture"
+        },
+        {
+          "op": "test_camera_injection",
+          "kind": "capture"
+        },
+        {
+          "op": "regex_extract",
+          "kind": "transform"
+        },
+        {
+          "op": "json_query",
+          "kind": "transform"
+        },
+        {
+          "op": "sre_analyze",
+          "kind": "transform"
+        },
+        {
+          "op": "run_js",
+          "kind": "transform"
+        },
+        {
+          "op": "scroll",
+          "kind": "apply"
+        },
+        {
+          "op": "drag",
+          "kind": "apply"
+        },
+        {
+          "op": "clipboard_write",
+          "kind": "apply"
+        },
+        {
+          "op": "system_notify",
+          "kind": "apply"
+        },
+        {
+          "op": "open_file",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "required": ["path"],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "path": "knowledge/product/README.md"
+            }
+          ]
+        },
+        {
+          "op": "app_quit",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "required": ["application"],
+            "properties": {
+              "application": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "application": "Finder"
+            }
+          ]
+        },
+        {
+          "op": "process_kill",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "anyOf": [
+              {
+                "required": ["pid"]
+              },
+              {
+                "required": ["name"]
+              }
+            ],
+            "properties": {
+              "pid": {
+                "type": "number",
+                "minimum": 1
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "signal": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "pid": 1234
+            },
+            {
+              "name": "Finder"
+            }
+          ]
+        },
+        {
+          "op": "run_applescript",
+          "kind": "apply"
+        },
+        {
+          "op": "keyboard",
+          "kind": "apply"
+        },
+        {
+          "op": "paste_text",
+          "kind": "apply"
+        },
+        {
+          "op": "press_key",
+          "kind": "apply"
+        },
+        {
+          "op": "voice_input_toggle",
+          "kind": "apply"
+        },
+        {
+          "op": "mouse_click",
+          "kind": "apply"
+        },
+        {
+          "op": "mouse_move",
+          "kind": "apply"
+        },
+        {
+          "op": "activate_application",
+          "kind": "apply"
+        },
+        {
+          "op": "open_url",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "required": ["url"],
+            "properties": {
+              "url": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "url": "https://example.com"
+            }
+          ]
+        },
+        {
+          "op": "write_file",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "required": ["path"],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content": {},
+              "data": {},
+              "from": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "path": "active/shared/tmp/system-note.txt",
+              "content": "hello"
+            }
+          ]
+        },
+        {
+          "op": "write_artifact",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "anyOf": [
+              {
+                "required": ["path"]
+              },
+              {
+                "required": ["output_path"]
+              }
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "output_path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content": {},
+              "data": {},
+              "from": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "output_path": "active/shared/tmp/system-note.txt",
+              "content": "hello"
+            }
+          ]
+        },
+        {
+          "op": "write_json",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "required": ["path"],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "data": {}
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "path": "active/shared/tmp/data.json",
+              "data": {
+                "ok": true
+              }
+            }
+          ]
+        },
+        {
+          "op": "mkdir",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "required": ["path"],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "path": "active/shared/tmp/new-folder"
+            }
+          ]
+        },
+        {
+          "op": "log",
+          "kind": "apply"
+        },
+        {
+          "op": "voice",
+          "kind": "apply"
+        },
+        {
+          "op": "native_tts_speak",
+          "kind": "apply"
+        },
+        {
+          "op": "check_native_tts",
+          "kind": "apply"
+        },
+        {
+          "op": "notify",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "anyOf": [
+              {
+                "required": ["message"]
+              },
+              {
+                "required": ["text"]
+              }
+            ],
+            "properties": {
+              "title": {
+                "type": "string",
+                "minLength": 1
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1
+              },
+              "text": {
+                "type": "string",
+                "minLength": 1
+              },
+              "subtitle": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "title": "Kyberion",
+              "message": "Build finished"
+            }
+          ]
+        },
+        {
+          "op": "wait",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "ms": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "ms": 1000
+            }
+          ]
+        },
+        {
+          "op": "if",
+          "kind": "control"
+        },
+        {
+          "op": "while",
+          "kind": "control"
+        }
+      ]
+    },
+    {
+      "n": "terminal-actuator",
+      "path": "libs/actuators/terminal-actuator",
+      "source": "registry",
+      "ops": []
+    },
+    {
+      "n": "video-composition-actuator",
+      "path": "libs/actuators/video-composition-actuator",
+      "source": "registry",
+      "ops": []
+    },
+    {
+      "n": "vision-actuator",
+      "path": "libs/actuators/vision-actuator",
+      "source": "registry",
+      "ops": []
+    },
+    {
+      "n": "voice-actuator",
+      "path": "libs/actuators/voice-actuator",
+      "source": "registry",
+      "ops": []
+    },
+    {
+      "n": "wisdom-actuator",
+      "path": "libs/actuators/wisdom-actuator",
+      "source": "registry",
+      "ops": [
+        {
+          "op": "read",
+          "kind": "capture"
+        },
+        {
+          "op": "read_file",
+          "kind": "capture"
+        },
+        {
+          "op": "search",
+          "kind": "capture"
+        },
+        {
+          "op": "json_parse",
+          "kind": "transform"
+        },
+        {
+          "op": "json_query",
+          "kind": "transform"
+        },
+        {
+          "op": "regex_extract",
+          "kind": "transform"
+        },
+        {
+          "op": "regex_replace",
+          "kind": "transform"
+        },
+        {
+          "op": "yaml_update",
+          "kind": "transform"
+        },
+        {
+          "op": "log",
+          "kind": "apply"
+        },
+        {
+          "op": "register_presentation_preference_profile",
+          "kind": "apply"
+        }
+      ]
+    },
+    {
+      "n": "working-memory-actuator",
+      "path": "libs/actuators/working-memory-actuator",
+      "source": "registry",
+      "ops": []
+    }
+  ]
+}
