@@ -39,6 +39,7 @@ import {
   DEFAULT_PIPELINE_TIMEOUT_MS,
   DEFAULT_MAX_LOOP_ITERATIONS,
 } from '@agent/core';
+import { handleAction as handleFileAction } from '../../file-actuator/src/file-pipeline-helpers.js';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { createApprovalRequest, loadApprovalRequest } from '@agent/core/governance';
 import {
@@ -164,6 +165,22 @@ function buildRetryOptions(override?: Record<string, any>) {
       );
     },
   };
+}
+
+async function delegateToFilePipeline(step: PipelineStep, ctx: any): Promise<any> {
+  const result = await handleFileAction({
+    action: 'pipeline',
+    steps: [step],
+    context: ctx,
+  } as any);
+  return result.context || ctx;
+}
+
+function promoteDelegatedCapture(resultCtx: any, params: any, fallbackKey: string): any {
+  const exportAs = params.export_as;
+  if (!exportAs || resultCtx?.[exportAs] !== undefined) return resultCtx;
+  if (resultCtx?.[fallbackKey] === undefined) return resultCtx;
+  return { ...resultCtx, [exportAs]: resultCtx[fallbackKey] };
 }
 
 function normalizeDisplayName(value: unknown): string | undefined {
@@ -572,13 +589,18 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
       };
     }
     case 'read_file':
-      return {
-        ...ctx,
-        [params.export_as || 'last_capture']: safeReadFile(
-          path.resolve(rootDir, resolve(params.path)),
-          { encoding: 'utf8' }
+      return promoteDelegatedCapture(
+        await delegateToFilePipeline(
+          {
+            type: 'capture',
+            op: 'read_file',
+            params: { ...params, path: resolve(params.path) },
+          },
+          ctx
         ),
-      };
+        params,
+        'last_capture'
+      );
     case 'read_json':
       return {
         ...ctx,
@@ -1379,39 +1401,46 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       logger.info(`🔔 [NOTIFICATION] ${resolve(params.text)}`);
       break;
     case 'write_file':
-    case 'write_artifact': {
-      const spec = resolveWriteArtifactSpec(params, ctx, resolve);
-      const out = path.resolve(rootDir, spec.path);
-      const content = spec.content;
-      if (!safeExistsSync(path.dirname(out))) safeMkdir(path.dirname(out), { recursive: true });
-      safeWriteFile(
-        out,
-        typeof content === 'string'
-          ? content
-          : content === undefined
-            ? ''
-            : JSON.stringify(content, null, 2)
+    case 'write_artifact':
+      await delegateToFilePipeline(
+        {
+          type: 'apply',
+          op,
+          params,
+        },
+        ctx
       );
       break;
-    }
     case 'mkdir':
-      safeMkdir(path.resolve(rootDir, resolve(params.path)), { recursive: true });
+      await delegateToFilePipeline(
+        {
+          type: 'apply',
+          op: 'mkdir',
+          params,
+        },
+        ctx
+      );
       break;
     case 'log':
       logger.info(`[SYSTEM_LOG] ${resolve(params.message || 'Action completed')}`);
       break;
-    case 'write_json': {
-      const targetPath = pathResolver.rootResolve(resolve(params.path));
-      const content = params.content
-        ? resolve(params.content)
-        : params.from
-          ? getPathValue(ctx, params.from)
-          : ctx.last_capture_data;
-      if (!safeExistsSync(path.dirname(targetPath)))
-        safeMkdir(path.dirname(targetPath), { recursive: true });
-      safeWriteFile(targetPath, JSON.stringify(content, null, 2));
+    case 'write_json':
+      await delegateToFilePipeline(
+        {
+          type: 'apply',
+          op: 'write_file',
+          params: {
+            path: resolve(params.path),
+            content: params.content
+              ? resolve(params.content)
+              : params.from
+                ? getPathValue(ctx, params.from)
+                : ctx.last_capture_data,
+          },
+        },
+        ctx
+      );
       break;
-    }
     case 'scroll': {
       const direction = String(resolve(params.direction || 'down')) as
         | 'up'

@@ -119,7 +119,7 @@
 | AR-02 | PARTIAL | describeOps、generate_op_registry、op-discovery 生成、未知 op の apply 既定撤廃        |
 | AR-03 | PARTIAL | write_artifact/path 前倒し検証、op_input_contracts、browser/file/system の主要 op 検証 |
 | AR-04 | PARTIAL | canonical op family 定義、browser alias 共通化、browser 実行側の正規化と警告           |
-| AR-05 | TODO    | 不整合アクチュエータの分割(観察/変更・ドメイン境界)                                    |
+| AR-05 | PARTIAL | system file I/O の file-actuator forward、観察/変更・ドメイン境界の分割準備            |
 | AR-06 | PARTIAL | teach message、skipped 明示化、lint、AR-01 集約                                        |
 
 ### SA(セキュリティ・監査)
