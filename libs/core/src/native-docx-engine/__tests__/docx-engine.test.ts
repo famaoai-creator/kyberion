@@ -568,6 +568,25 @@ describe('Native DOCX Engine', () => {
       expect(fontTable).toContain('w:name="MS Mincho"');
     });
 
+    it('fontTable.xml should honor explicit major and minor fonts', async () => {
+      const output = path.join(tmpDir, 'theme-fonts.docx');
+      await generateNativeDocx(
+        {
+          ...createTestProtocol(),
+          theme: {
+            ...createTestProtocol().theme,
+            majorFont: 'Yu Gothic',
+            minorFont: 'Georgia',
+          },
+        },
+        output
+      );
+      const themedFiles = extractDocx(output);
+      const fontTable = themedFiles.get('word/fontTable.xml')!;
+      expect(fontTable).toContain('w:name="Yu Gothic"');
+      expect(fontTable).toContain('w:name="Georgia"');
+    });
+
     it('theme should have valid effectStyleLst', () => {
       const theme = files.get('word/theme/theme1.xml')!;
       expect(theme).toContain('<a:effectStyleLst>');

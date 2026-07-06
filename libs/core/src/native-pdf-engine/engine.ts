@@ -361,15 +361,16 @@ function collectCodePoints(text: string): number[] {
   return points;
 }
 
-function pickCjkFontSource(): string {
+function pickCjkFontSource(): string | null {
   for (const candidate of CJK_FONT_CANDIDATES) {
     if (safeExistsSync(candidate)) return candidate;
   }
-  throw new Error(`No CJK font source found. Checked: ${CJK_FONT_CANDIDATES.join(', ')}`);
+  return null;
 }
 
-function openCjkFont(): FontKitFont {
+function openCjkFont(): FontKitFont | null {
   const source = pickCjkFontSource();
+  if (!source) return null;
   const opened = FONTKIT.openSync(source);
   if ('fonts' in opened && opened.fonts?.length) {
     return (
@@ -381,8 +382,9 @@ function openCjkFont(): FontKitFont {
   return opened as FontKitFont;
 }
 
-function buildEmbeddedCjkFont(protocol: PdfDesignProtocol): EmbeddedCjkFont {
+function buildEmbeddedCjkFont(protocol: PdfDesignProtocol): EmbeddedCjkFont | null {
   const font = openCjkFont();
+  if (!font) return null;
   const subset = font.createSubset();
   const cidByCodePoint = new Map<number, number>();
   const widthByCid = new Map<number, number>();
@@ -945,6 +947,19 @@ function protocolRequiresCjkFont(protocol: PdfDesignProtocol): boolean {
   if (hasNonAscii(protocol.metadata?.title || '')) return true;
   if (hasNonAscii(protocol.metadata?.author || '')) return true;
   if (hasNonAscii(protocol.metadata?.subject || '')) return true;
+  for (const field of protocol.acroForm?.fields ?? []) {
+    if (
+      hasNonAscii(field.name) ||
+      hasNonAscii(field.tooltip || '') ||
+      hasNonAscii(field.value || '') ||
+      hasNonAscii(field.defaultValue || '')
+    ) {
+      return true;
+    }
+    for (const option of field.options ?? []) {
+      if (hasNonAscii(option)) return true;
+    }
+  }
   for (const page of protocol.content?.pages ?? []) {
     if (hasNonAscii(page.text || '')) return true;
   }
@@ -998,14 +1013,23 @@ function buildImageContent(
  * Generate Appearance Stream for a form field widget annotation.
  * Returns a minimal /AP /N stream string for the field type.
  */
-function buildFieldAppearance(field: PdfFormField, fontId: number): string {
+function buildFieldAppearance(
+  field: PdfFormField,
+  fontId: number,
+  encodeText?: (text: string) => string
+): string {
   const [, , w, h] = field.rect;
   const fontSize = field.fontSize || 10;
   const da = field.defaultAppearance || '/F1 10 Tf 0 g';
 
   if (field.type === 'text') {
     const val = field.value || field.defaultValue || '';
-    return `BT ${da} 2 ${h / 2 - fontSize / 3} Td (${escapeLit(val)}) Tj ET`;
+    const text = encodeText
+      ? encodeText(val)
+      : hasNonAscii(val)
+        ? encodePdfString(val, true)
+        : `(${escapeLit(val)})`;
+    return `BT ${da} 2 ${h / 2 - fontSize / 3} Td ${text} Tj ET`;
   }
   if (field.type === 'checkbox') {
     if (field.checked) {
@@ -1015,7 +1039,12 @@ function buildFieldAppearance(field: PdfFormField, fontId: number): string {
   }
   if (field.type === 'button') {
     const label = field.value || '';
-    return `q 0.8 0.8 0.8 rg 0 0 ${w} ${h} re f 0 g BT ${da} ${w / 2} ${h / 2 - fontSize / 3} Td (${escapeLit(label)}) Tj ET Q`;
+    const text = encodeText
+      ? encodeText(label)
+      : hasNonAscii(label)
+        ? encodePdfString(label, true)
+        : `(${escapeLit(label)})`;
+    return `q 0.8 0.8 0.8 rg 0 0 ${w} ${h} re f 0 g BT ${da} ${w / 2} ${h / 2 - fontSize / 3} Td ${text} Tj ET Q`;
   }
   // radio, dropdown, listbox, signature: minimal border
   return `q 0.5 G 0.5 w 0 0 ${w} ${h} re S Q`;
@@ -1031,7 +1060,8 @@ function buildAcroForm(
   pageIds: number[],
   fontId: number,
   compress: boolean,
-  pendingObjStm: Array<[number, string]>
+  pendingObjStm: Array<[number, string]>,
+  encodeText?: (text: string) => string
 ): { acroFormId: number; fieldAnnotIds: Map<string, number[]> } {
   const fieldAnnotIds = new Map<string, number[]>();
   const rootFieldIds: number[] = [];
@@ -1057,7 +1087,7 @@ function buildAcroForm(
     const ft = `/FT /${ftMap[field.type] ?? 'Tx'}`;
 
     // Appearance Stream
-    const apContent = buildFieldAppearance(field, fontId);
+    const apContent = buildFieldAppearance(field, fontId, encodeText);
     const apId = writer.addStream(
       {
         '/Type': '/XObject',
@@ -1086,7 +1116,7 @@ function buildAcroForm(
     if (flags) fieldDict += ` /Ff ${flags}`;
     fieldDict += ` /AP << /N ${apId} 0 R >>`;
     if (field.options?.length) {
-      const opts = field.options.map((o) => `(${escapeLit(o)})`).join(' ');
+      const opts = field.options.map((o) => encodePdfString(o, hasNonAscii(o))).join(' ');
       fieldDict += ` /Opt [${opts}]`;
     }
     fieldDict += ` /DA (${escapeLit(field.defaultAppearance || '/F1 10 Tf 0 g')})`;
@@ -1604,7 +1634,8 @@ export async function generateNativePdf(
       pageIds,
       fontId,
       opts.compress,
-      pendingObjStm
+      pendingObjStm,
+      embeddedFont?.encodeText
     );
     acroFormId = result.acroFormId;
     for (const [k, v] of result.fieldAnnotIds) acroFieldAnnotIds.set(k, v);
