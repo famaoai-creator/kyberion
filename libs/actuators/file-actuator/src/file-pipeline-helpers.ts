@@ -21,6 +21,9 @@ import {
   validateOpInput,
   processUntrustedContent,
   executeAdfSteps,
+  skipAdfStep,
+  listOpInputContracts,
+  suggestClosestStrings,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
@@ -69,6 +72,14 @@ function buildRetryOptions() {
             classification.category === 'timeout';
     },
   };
+}
+
+function buildUnknownFileOpMessage(op: string): string {
+  const knownOps = Object.keys(listOpInputContracts('file'));
+  const suggestions = suggestClosestStrings(op, knownOps);
+  return suggestions.length > 0
+    ? `[UNKNOWN_OP] Unknown op: ${op}. Did you mean: ${suggestions.join(', ')}?`
+    : `[UNKNOWN_OP] Unknown op: ${op}`;
 }
 
 /**
@@ -164,20 +175,27 @@ async function opControl(
         const res = await runSteps(params.else, ctx);
         return res.context;
       }
-      return ctx;
+      return skipAdfStep(
+        ctx,
+        'core:if condition evaluated to false and no else branch was provided'
+      );
 
     case 'while':
       let iterations = 0;
       const maxIter = params.max_iterations || 100;
+      let executed = false;
       while (evaluateCondition(params.condition, ctx) && iterations < maxIter) {
+        executed = true;
         const res = await runSteps(params.pipeline, ctx);
         ctx = res.context;
         iterations++;
       }
-      return ctx;
+      return executed
+        ? ctx
+        : skipAdfStep(ctx, 'core:while condition evaluated to false before execution');
 
     default:
-      throw new Error(`[UNKNOWN_OP] Unknown control op: ${op}`);
+      throw new Error(buildUnknownFileOpMessage(op));
   }
 }
 
@@ -273,7 +291,7 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
       return { ...ctx, [params.export_as || 'last_capture']: wrappedText, [posKey]: stats.size };
     }
     default:
-      throw new Error(`[UNKNOWN_OP] Unknown capture op: ${op}`);
+      throw new Error(buildUnknownFileOpMessage(op));
   }
 }
 
@@ -297,7 +315,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
         [params.export_as]: path.join(...params.parts.map((p: string) => resolve(p))),
       };
     default:
-      throw new Error(`[UNKNOWN_OP] Unknown transform op: ${op}`);
+      throw new Error(buildUnknownFileOpMessage(op));
   }
 }
 
@@ -409,7 +427,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       break;
     }
     default:
-      throw new Error(`[UNKNOWN_OP] Unknown apply op: ${op}`);
+      throw new Error(buildUnknownFileOpMessage(op));
   }
 }
 

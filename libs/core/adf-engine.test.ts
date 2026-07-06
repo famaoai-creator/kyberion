@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { executeAdfSteps } from './adf-engine.js';
+import { executeAdfSteps, skipAdfStep } from './adf-engine.js';
 
 vi.mock('./core.js', () => ({
   logger: {
@@ -67,5 +67,31 @@ describe('executeAdfSteps', () => {
         }
       )
     ).rejects.toThrow('[SAFETY_LIMIT]');
+  });
+
+  it('records skipped control-flow steps explicitly', async () => {
+    const result = await executeAdfSteps(
+      [
+        {
+          type: 'control',
+          op: 'if',
+          params: {
+            condition: { enabled: false },
+            then: [{ type: 'apply', op: 'finish', params: {} }],
+          },
+        },
+      ],
+      {},
+      { maxSteps: 10, timeoutMs: 10_000 },
+      {
+        capture: async (_op, _params, ctx) => ctx,
+        transform: async (_op, _params, ctx) => ctx,
+        apply: async (_op, _params, ctx) => ctx,
+        control: async (_op, _params, ctx) => skipAdfStep(ctx, 'branch did not match'),
+      }
+    );
+
+    expect(result.status).toBe('succeeded');
+    expect(result.results).toEqual([{ op: 'if', status: 'skipped' }]);
   });
 });
