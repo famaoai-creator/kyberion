@@ -19,6 +19,7 @@ import {
   evaluateCondition,
   resolveWriteArtifactSpec,
   resolveRequiredStringParam,
+  validateOpInput,
   processUntrustedContent,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
@@ -216,6 +217,10 @@ async function opControl(
 
 async function opCapture(op: string, params: any, ctx: any, resolve: (value: any) => any) {
   const rootDir = pathResolver.rootDir();
+  const validation = validateOpInput('file', op, params);
+  if (!validation.valid) {
+    throw new Error(`[INVALID_OP_INPUT] ${op}: ${validation.errors.join('; ')}`);
+  }
   switch (op) {
     case 'read':
     case 'read_file': {
@@ -320,6 +325,10 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
 
 async function opApply(op: string, params: any, ctx: any, resolve: (value: any) => any) {
   const rootDir = pathResolver.rootDir();
+  const validation = validateOpInput('file', op, params);
+  if (!validation.valid) {
+    throw new Error(`[INVALID_OP_INPUT] ${op}: ${validation.errors.join('; ')}`);
+  }
   switch (op) {
     case 'write': {
       const out = path.resolve(

@@ -9,6 +9,7 @@ import {
   safeExec,
   pathResolver,
   normalizeBrowserPipelineOp,
+  validateOpInput,
 } from '@agent/core';
 import {
   chromium,
@@ -699,7 +700,12 @@ function renderPlaywrightSkeleton(
   };
 
   for (const action of trail) {
-    switch (normalizeBrowserPipelineOp(action.op)) {
+    const op = normalizeBrowserPipelineOp(action.op);
+    const validation = validateOpInput('browser', op, action);
+    if (!validation.valid) {
+      throw new Error(`[INVALID_OP_INPUT] browser:${op}: ${validation.errors.join('; ')}`);
+    }
+    switch (op) {
       case 'goto':
       case 'open_tab':
         if (action.url) {
@@ -806,7 +812,12 @@ function renderPlaywrightSkeleton(
 function renderBrowserAdf(trail: BrowserRecordedAction[], sessionId: string): BrowserAction {
   const steps: PipelineStep[] = [];
   for (const action of trail) {
-    switch (normalizeBrowserPipelineOp(action.op)) {
+    const op = normalizeBrowserPipelineOp(action.op);
+    const validation = validateOpInput('browser', op, action);
+    if (!validation.valid) {
+      throw new Error(`[INVALID_OP_INPUT] browser:${op}: ${validation.errors.join('; ')}`);
+    }
+    switch (op) {
       case 'goto':
       case 'open_tab':
         if (action.url) steps.push({ type: 'capture', op: 'goto', params: { url: action.url } });

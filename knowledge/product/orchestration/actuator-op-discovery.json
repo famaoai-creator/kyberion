@@ -467,11 +467,50 @@
         },
         {
           "op": "exec",
-          "kind": "capture"
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "required": ["command"],
+            "properties": {
+              "command": {
+                "type": "string",
+                "minLength": 1
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "command": "pnpm",
+              "args": ["build"]
+            }
+          ]
         },
         {
           "op": "shell",
-          "kind": "capture"
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "required": ["command"],
+            "properties": {
+              "command": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "command": "pnpm build"
+            }
+          ]
         },
         {
           "op": "cli_health_check",
@@ -627,23 +666,132 @@
         },
         {
           "op": "open_url",
-          "kind": "apply"
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "required": ["url"],
+            "properties": {
+              "url": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "url": "https://example.com"
+            }
+          ]
         },
         {
           "op": "write_file",
-          "kind": "apply"
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "required": ["path"],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content": {},
+              "data": {},
+              "from": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "path": "active/shared/tmp/system-note.txt",
+              "content": "hello"
+            }
+          ]
         },
         {
           "op": "write_artifact",
-          "kind": "apply"
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "anyOf": [
+              {
+                "required": ["path"]
+              },
+              {
+                "required": ["output_path"]
+              }
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "output_path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content": {},
+              "data": {},
+              "from": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "output_path": "active/shared/tmp/system-note.txt",
+              "content": "hello"
+            }
+          ]
         },
         {
           "op": "write_json",
-          "kind": "apply"
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "required": ["path"],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "data": {}
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "path": "active/shared/tmp/data.json",
+              "data": {
+                "ok": true
+              }
+            }
+          ]
         },
         {
           "op": "mkdir",
-          "kind": "apply"
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "required": ["path"],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "path": "active/shared/tmp/new-folder"
+            }
+          ]
         },
         {
           "op": "log",
@@ -667,7 +815,22 @@
         },
         {
           "op": "wait",
-          "kind": "apply"
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "ms": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "ms": 1000
+            }
+          ]
         },
         {
           "op": "if",

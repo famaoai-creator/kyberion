@@ -4,6 +4,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { enforceApprovalGate, type ApprovalGateResult } from './approval-gate.js';
 import { pathResolver } from './path-resolver.js';
 import { safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import { validateOpInput } from './op-input-contracts.js';
 import { resolveBrowserRecordingPipelineOp, normalizeBrowserPipelineOp } from './op-vocabulary.js';
 
 /** Approval-gate operation id for governed Chrome extension execution. */
@@ -808,10 +809,18 @@ export function compileBrowserRecordingToPipeline(
       params.high_risk = true;
       params.original_op = action.op;
     }
+    const op = normalizeBrowserPipelineOp(resolveBrowserRecordingPipelineOp(action.op));
+    const validation = validateOpInput('browser', op, { ...action, ...params });
+    if (!validation.valid) {
+      const { errors } = validation as { valid: false; errors: string[] };
+      throw new Error(
+        `Invalid browser recording action ${action.action_id} (${action.op}): ${errors.join('; ')}`
+      );
+    }
     return {
       id: `step-${index + 1}`,
       type: 'apply' as const,
-      op: normalizeBrowserPipelineOp(resolveBrowserRecordingPipelineOp(action.op)),
+      op,
       params,
     };
   });

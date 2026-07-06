@@ -115,6 +115,7 @@ export * from './mobile-profile-validators.js';
 export * from './schema-loader.js';
 export * from './operator-learning.js';
 export * from './question-resolver.js';
+export * from './op-input-contracts.js';
 export * from './guided-coordination-brief.js';
 export * from './email-workflow.js';
 export * from './calendar-workflow.js';
