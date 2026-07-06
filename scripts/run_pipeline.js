@@ -487,6 +487,7 @@ async function runSteps(steps, initialCtx = {}, opts = {}) {
     opts.trace?.addEvent('step.started', stepTraceBase);
     let attempt = 0;
     let stepSucceeded = false;
+    let stepSkipped = false;
     let lastError = null;
     let currentNormalizedOp = step.op;
     const finishStepTrace = (eventName, status, attributes = {}) => {
@@ -512,7 +513,7 @@ async function runSteps(steps, initialCtx = {}, opts = {}) {
         return { status: 'failed', results, context: ctx };
       }
       if (beforeDecision === 'skip') {
-        results.push({ op: step.op, status: 'success' });
+        results.push({ op: currentNormalizedOp, status: 'skipped' });
         finishStepTrace('step.skipped', 'skipped');
         opts.trace?.endSpan('ok');
         continue;
@@ -641,6 +642,15 @@ async function runSteps(steps, initialCtx = {}, opts = {}) {
             const nested = await runSteps(branch, ctx, opts);
             ctx = nested.context;
             results.push(...nested.results);
+          } else if (!conditionResult) {
+            stepSkipped = true;
+            results.push({ op: currentNormalizedOp, status: 'skipped' });
+            finishStepTrace('step.skipped', 'skipped', {
+              reason: 'core:if condition evaluated to false and no else branch was provided',
+            });
+            opts.trace?.endSpan('ok');
+            stepSucceeded = true;
+            continue;
           }
         } else if (
           domain === 'core' &&
@@ -679,6 +689,16 @@ async function runSteps(steps, initialCtx = {}, opts = {}) {
               const shouldContinue = Boolean(evaluateCondition(condition, ctx));
               if (!shouldContinue) break;
             }
+          }
+          if (loopCount === 0) {
+            stepSkipped = true;
+            results.push({ op: currentNormalizedOp, status: 'skipped' });
+            finishStepTrace('step.skipped', 'skipped', {
+              reason: 'core:while condition evaluated to false before execution',
+            });
+            opts.trace?.endSpan('ok');
+            stepSucceeded = true;
+            continue;
           }
           ctx = {
             ...ctx,
@@ -1060,6 +1080,9 @@ Context: ${JSON.stringify(resolvedContext)}${buildReasoningPolicyNote(stepPolicy
       }
     }
     if (stepSucceeded) {
+      if (stepSkipped) {
+        continue;
+      }
       if (step.hooks?.after?.length) {
         const afterDecision = await runStepHooks(
           step.hooks.after,
