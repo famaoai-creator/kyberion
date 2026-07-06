@@ -23,7 +23,7 @@
 | SA-02 | PARTIAL | execution-bounds.ts 抽出、SECURITY.md、warn→enforce 到達                                                          |
 | SA-05 | PARTIAL | policyEngine の操作種別拡張、secure-io parse失敗 fail-open 解消、-y 破壊操作除外                                  |
 | OP-01 | PARTIAL | usage 計測の全経路接続、cost report、spend-guard、KPI 接続                                                        |
-| AR-01 | TODO    | adf-engine.ts 抽出、3エンジン統合、golden 回帰                                                                    |
+| AR-01 | PARTIAL | adf-engine.ts 抽出、file-actuator アダプタ化、3エンジン統合、golden 回帰                                          |
 | AR-02 | PARTIAL | describeOps、generate_op_registry、op-discovery 生成、未知 op の apply 既定撤廃                                   |
 | AO-02 | TODO    | CVE スキャン/台帳、パッチ判断ルーブリック、適用フロー                                                             |
 
@@ -115,7 +115,7 @@
 
 | ID    | 状態    | 残作業                                                                                 |
 | ----- | ------- | -------------------------------------------------------------------------------------- |
-| AR-01 | TODO    | adf-engine.ts 抽出、3エンジン統合、golden 回帰                                         |
+| AR-01 | PARTIAL | adf-engine.ts 抽出、file-actuator アダプタ化、3エンジン統合、golden 回帰               |
 | AR-02 | PARTIAL | describeOps、generate_op_registry、op-discovery 生成、未知 op の apply 既定撤廃        |
 | AR-03 | PARTIAL | write_artifact/path 前倒し検証、op_input_contracts、browser/file/system の主要 op 検証 |
 | AR-04 | PARTIAL | canonical op family 定義、browser alias 共通化、browser 実行側の正規化と警告           |
