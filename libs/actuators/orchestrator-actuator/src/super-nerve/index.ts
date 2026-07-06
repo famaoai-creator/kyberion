@@ -187,9 +187,23 @@ async function handleCoreAction(
   switch (action) {
     case 'if':
       if (evaluateCondition(params.condition, ctx)) {
-        return await runSteps(normalizeNestedSteps(params.then), ctx);
+        const nested = await runSteps(normalizeNestedSteps(params.then), ctx);
+        if (nested.status === 'failed') {
+          throw new Error(
+            nested.results.find((result: any) => result.status === 'failed')?.error ||
+              'nested pipeline failed'
+          );
+        }
+        return nested.context;
       } else if (params.else) {
-        return await runSteps(normalizeNestedSteps(params.else), ctx);
+        const nested = await runSteps(normalizeNestedSteps(params.else), ctx);
+        if (nested.status === 'failed') {
+          throw new Error(
+            nested.results.find((result: any) => result.status === 'failed')?.error ||
+              'nested pipeline failed'
+          );
+        }
+        return nested.context;
       }
       return skipAdfStep(
         ctx,
@@ -203,7 +217,14 @@ async function handleCoreAction(
       let executed = false;
       while (evaluateCondition(params.condition, currentCtx) && iterations < maxIter) {
         executed = true;
-        currentCtx = await runSteps(normalizeNestedSteps(params.pipeline), currentCtx);
+        const nested = await runSteps(normalizeNestedSteps(params.pipeline), currentCtx);
+        if (nested.status === 'failed') {
+          throw new Error(
+            nested.results.find((result: any) => result.status === 'failed')?.error ||
+              'nested pipeline failed'
+          );
+        }
+        currentCtx = nested.context;
         iterations += 1;
       }
       return executed
@@ -216,7 +237,14 @@ async function handleCoreAction(
       const ref = String(resolveVars(params.path ?? params.fragment ?? '', ctx));
       const macroPath = pathResolver.rootResolve(ref);
       const macroDef = JSON.parse(safeReadFile(macroPath, { encoding: 'utf8' }) as string);
-      return await runSteps(normalizeNestedSteps(macroDef.steps || []), ctx);
+      const nested = await runSteps(normalizeNestedSteps(macroDef.steps || []), ctx);
+      if (nested.status === 'failed') {
+        throw new Error(
+          nested.results.find((result: any) => result.status === 'failed')?.error ||
+            'nested pipeline failed'
+        );
+      }
+      return nested.context;
     }
 
     case 'set':

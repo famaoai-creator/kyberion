@@ -33,7 +33,7 @@ export interface AdfStepHandlers<Ctx extends AdfEngineContext = AdfEngineContext
     op: string,
     params: any,
     ctx: Ctx,
-    runSteps: (steps: AdfStep[], seedCtx?: Ctx) => Promise<Ctx>,
+    runSteps: (steps: AdfStep[], seedCtx?: Ctx) => Promise<AdfRunResult<Ctx>>,
     resolve: (value: any) => any
   ) => Promise<Ctx | AdfSkippedStep>;
 }
@@ -75,10 +75,11 @@ async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineC
   const results: PipelineStepResult[] = [];
 
   const resolve = (value: any) => resolveVars(value, ctx);
-  const runNestedSteps = async (nestedSteps: AdfStep[], seedCtx: Ctx = ctx): Promise<Ctx> => {
-    const nested = await executeAdfStepsInternal(nestedSteps, seedCtx, options, handlers, state);
-    return nested.context;
-  };
+  const runNestedSteps = async (
+    nestedSteps: AdfStep[],
+    seedCtx: Ctx = ctx
+  ): Promise<AdfRunResult<Ctx>> =>
+    executeAdfStepsInternal(nestedSteps, seedCtx, options, handlers, state);
 
   for (const step of steps) {
     state.stepCount += 1;
