@@ -6,6 +6,11 @@
 import AdmZip from 'adm-zip';
 import * as path from 'path';
 import { safeExistsSync, safeReadFile } from '../../secure-io.js';
+import {
+  KYBERION_BRAND_FONT_STACK,
+  resolveEastAsianFontFamily,
+  resolveLatinFontFamily,
+} from '../../design-fonts.js';
 import type {
   DocxDesignProtocol,
   DocxBlockContent,
@@ -27,11 +32,6 @@ import type {
 
 // Re-use PPTX engine's theme generator (DrawingML theme is identical)
 import { generateTheme } from '../native-pptx-engine/theme.js';
-import {
-  DEFAULT_EAST_ASIA_FONT,
-  DEFAULT_LATIN_FONT,
-  resolveEastAsiaFontFamily,
-} from '../font-stack.js';
 
 const WML_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 const REL_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
@@ -576,13 +576,18 @@ function generateDocument(protocol: DocxDesignProtocol): string {
   return xml;
 }
 
-function generateFontTable(): string {
+function generateFontTable(theme: DocxTheme): string {
+  const headingFont = resolveLatinFontFamily(theme.majorFont || KYBERION_BRAND_FONT_STACK);
+  const bodyFont = theme.minorFont ? resolveLatinFontFamily(theme.minorFont) : 'Times New Roman';
+  const eastAsianFont = resolveEastAsianFontFamily(
+    theme.majorFont || theme.minorFont || KYBERION_BRAND_FONT_STACK
+  );
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:fonts xmlns:w="${WML_NS}" xmlns:r="${REL_NS}">
-  <w:font w:name="${DEFAULT_LATIN_FONT}"><w:panose1 w:val="020B0604030504040204"/><w:charset w:val="00"/><w:family w:val="swiss"/><w:pitch w:val="variable"/></w:font>
-  <w:font w:name="Aptos"><w:panose1 w:val="020B0604030504040204"/><w:charset w:val="00"/><w:family w:val="swiss"/><w:pitch w:val="variable"/></w:font>
-  <w:font w:name="${DEFAULT_EAST_ASIA_FONT}"><w:charset w:val="80"/><w:family w:val="modern"/><w:pitch w:val="variable"/></w:font>
-  <w:font w:name="Yu Gothic"><w:charset w:val="80"/><w:family w:val="modern"/><w:pitch w:val="variable"/></w:font>
+  <w:font w:name="${headingFont}"><w:panose1 w:val="020F0502020204030204"/><w:charset w:val="00"/><w:family w:val="swiss"/><w:pitch w:val="variable"/></w:font>
+  <w:font w:name="${bodyFont}"><w:panose1 w:val="02020603050405020304"/><w:charset w:val="00"/><w:family w:val="roman"/><w:pitch w:val="variable"/></w:font>
+  <w:font w:name="${eastAsianFont}"><w:charset w:val="80"/><w:family w:val="modern"/><w:pitch w:val="fixed"/></w:font>
+  <w:font w:name="MS Mincho"><w:charset w:val="80"/><w:family w:val="roman"/><w:pitch w:val="variable"/></w:font>
 </w:fonts>`;
 }
 
@@ -640,18 +645,13 @@ export async function generateNativeDocx(
   zip.addFile('word/document.xml', Buffer.from(generateDocument(protocol), 'utf8'));
   zip.addFile('word/_rels/document.xml.rels', Buffer.from(generateDocumentRels(protocol), 'utf8'));
   zip.addFile('word/styles.xml', Buffer.from(generateStyles(protocol), 'utf8'));
-  zip.addFile('word/fontTable.xml', Buffer.from(generateFontTable(), 'utf8'));
+  zip.addFile('word/fontTable.xml', Buffer.from(generateFontTable(protocol.theme), 'utf8'));
 
   // Theme
   const themeColors: Record<string, string> = {};
   for (const [key, val] of Object.entries(protocol.theme.colors)) {
     themeColors[key] = val;
   }
-  themeColors.majorFont = protocol.theme.majorFont || DEFAULT_LATIN_FONT;
-  themeColors.minorFont = protocol.theme.minorFont || DEFAULT_LATIN_FONT;
-  themeColors.eastAsiaFont = resolveEastAsiaFontFamily(
-    protocol.theme.majorFont || protocol.theme.minorFont || DEFAULT_EAST_ASIA_FONT
-  );
   zip.addFile(
     'word/theme/theme1.xml',
     Buffer.from(protocol.theme.rawXml || generateTheme(themeColors), 'utf8')

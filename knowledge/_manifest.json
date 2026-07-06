@@ -1,5 +1,5 @@
 {
-  "generated": "2026-07-05T13:04:48.172Z",
+  "generated": "2026-07-05T07:16:16.009Z",
   "files": [
     {
       "path": "Ecosystem_Map.md",
@@ -1226,12 +1226,6 @@
       "type": "json"
     },
     {
-      "path": "product/governance/autonomous-ops-policy.json",
-      "tier": "public",
-      "size": 1825,
-      "type": "json"
-    },
-    {
       "path": "product/governance/capability-bundle-registry.json",
       "tier": "public",
       "size": 5646,
@@ -1283,12 +1277,6 @@
       "path": "product/governance/cowork-sync-policy.json",
       "tier": "public",
       "size": 3762,
-      "type": "json"
-    },
-    {
-      "path": "product/governance/decision-rights.json",
-      "tier": "public",
-      "size": 1032,
       "type": "json"
     },
     {
@@ -1426,7 +1414,7 @@
     {
       "path": "product/governance/governance-policy.md",
       "tier": "public",
-      "size": 3455,
+      "size": 2220,
       "type": "md"
     },
     {
@@ -1444,7 +1432,7 @@
     {
       "path": "product/governance/HINTS.md",
       "tier": "public",
-      "size": 2559,
+      "size": 2421,
       "type": "md"
     },
     {
@@ -1660,7 +1648,7 @@
     {
       "path": "product/governance/mission-classification-policy.json",
       "tier": "public",
-      "size": 18752,
+      "size": 18655,
       "type": "json"
     },
     {
@@ -1714,13 +1702,13 @@
     {
       "path": "product/governance/mission-templates.json",
       "tier": "public",
-      "size": 4721,
+      "size": 1941,
       "type": "json"
     },
     {
       "path": "product/governance/mission-workflow-catalog.json",
       "tier": "public",
-      "size": 17401,
+      "size": 12821,
       "type": "json"
     },
     {
@@ -2074,7 +2062,7 @@
     {
       "path": "product/governance/role-authority-map.json",
       "tier": "public",
-      "size": 3760,
+      "size": 3429,
       "type": "json"
     },
     {
@@ -2098,7 +2086,7 @@
     {
       "path": "product/governance/security-policy.json",
       "tier": "public",
-      "size": 17414,
+      "size": 16776,
       "type": "json"
     },
     {
@@ -3370,7 +3358,7 @@
     {
       "path": "product/orchestration/mission-team-templates.json",
       "tier": "public",
-      "size": 4935,
+      "size": 4481,
       "type": "json"
     },
     {
@@ -4490,18 +4478,6 @@
       "type": "json"
     },
     {
-      "path": "product/pipeline-templates/board-meeting-prep.json",
-      "tier": "public",
-      "size": 3188,
-      "type": "json"
-    },
-    {
-      "path": "product/pipeline-templates/budget-review.json",
-      "tier": "public",
-      "size": 3147,
-      "type": "json"
-    },
-    {
       "path": "product/pipeline-templates/build-web-concept-preview.json",
       "tier": "public",
       "size": 990,
@@ -4658,18 +4634,6 @@
       "type": "json"
     },
     {
-      "path": "product/pipeline-templates/financial-close-monthly.json",
-      "tier": "public",
-      "size": 3684,
-      "type": "json"
-    },
-    {
-      "path": "product/pipeline-templates/fundraising-prep.json",
-      "tier": "public",
-      "size": 3445,
-      "type": "json"
-    },
-    {
       "path": "product/pipeline-templates/generate-video-smoke.json",
       "tier": "public",
       "size": 628,
@@ -4685,12 +4649,6 @@
       "path": "product/pipeline-templates/high-fidelity-logic.json",
       "tier": "public",
       "size": 403,
-      "type": "json"
-    },
-    {
-      "path": "product/pipeline-templates/hiring-workflow.json",
-      "tier": "public",
-      "size": 5192,
       "type": "json"
     },
     {
@@ -4904,12 +4862,6 @@
       "type": "json"
     },
     {
-      "path": "product/pipeline-templates/performance-review.json",
-      "tier": "public",
-      "size": 3323,
-      "type": "json"
-    },
-    {
       "path": "product/pipeline-templates/persona-beginner-competitor-research.json",
       "tier": "public",
       "size": 2111,
@@ -4937,12 +4889,6 @@
       "path": "product/pipeline-templates/pptx-template-inherit.json",
       "tier": "public",
       "size": 2841,
-      "type": "json"
-    },
-    {
-      "path": "product/pipeline-templates/procurement-vendor.json",
-      "tier": "public",
-      "size": 3516,
       "type": "json"
     },
     {
@@ -5696,12 +5642,6 @@
       "type": "json"
     },
     {
-      "path": "product/schemas/company.schema.json",
-      "tier": "public",
-      "size": 2808,
-      "type": "json"
-    },
-    {
       "path": "product/schemas/connection-inventory.schema.json",
       "tier": "public",
       "size": 621,
@@ -5735,12 +5675,6 @@
       "path": "product/schemas/corporate-design-adf.schema.json",
       "tier": "public",
       "size": 6841,
-      "type": "json"
-    },
-    {
-      "path": "product/schemas/decision-rights.schema.json",
-      "tier": "public",
-      "size": 1793,
       "type": "json"
     },
     {
@@ -5801,12 +5735,6 @@
       "path": "product/schemas/execution-receipt.schema.json",
       "tier": "public",
       "size": 2832,
-      "type": "json"
-    },
-    {
-      "path": "product/schemas/financial-model.schema.json",
-      "tier": "public",
-      "size": 1134,
       "type": "json"
     },
     {
@@ -6350,12 +6278,6 @@
       "type": "json"
     },
     {
-      "path": "product/schemas/okr.schema.json",
-      "tier": "public",
-      "size": 1693,
-      "type": "json"
-    },
-    {
       "path": "product/schemas/onboarding-flow-policy.schema.json",
       "tier": "public",
       "size": 1254,
@@ -6401,12 +6323,6 @@
       "path": "product/schemas/operator-request-log.schema.json",
       "tier": "public",
       "size": 4561,
-      "type": "json"
-    },
-    {
-      "path": "product/schemas/org-chart.schema.json",
-      "tier": "public",
-      "size": 2178,
       "type": "json"
     },
     {
