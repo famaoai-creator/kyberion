@@ -22,8 +22,7 @@ import {
   processUntrustedContent,
   executeAdfSteps,
   skipAdfStep,
-  listOpInputContracts,
-  suggestClosestStrings,
+  buildUnknownActuatorOpError,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
@@ -75,11 +74,7 @@ function buildRetryOptions() {
 }
 
 function buildUnknownFileOpMessage(op: string): string {
-  const knownOps = Object.keys(listOpInputContracts('file'));
-  const suggestions = suggestClosestStrings(op, knownOps);
-  return suggestions.length > 0
-    ? `[UNKNOWN_OP] Unknown op: ${op}. Did you mean: ${suggestions.join(', ')}?`
-    : `[UNKNOWN_OP] Unknown op: ${op}`;
+  return buildUnknownActuatorOpError('file', op).message;
 }
 
 /**

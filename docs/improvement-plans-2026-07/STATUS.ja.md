@@ -113,14 +113,14 @@
 
 ### AR(アクチュエータリファクタリング/使いやすさ)
 
-| ID    | 状態    | 残作業                                                                                                                                                                                             |
-| ----- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| AR-01 | PARTIAL | adf-engine.ts 抽出、file-actuator/super-nerve アダプタ化、3エンジン統合、golden 回帰                                                                                                               |
-| AR-02 | PARTIAL | describeOps、generate_op_registry、op-discovery に input_schema 反映、未知 op の apply 既定撤廃                                                                                                    |
-| AR-03 | PARTIAL | write_artifact/path 前倒し検証、notify/read_file/read_json/open_file 含む op_input_contracts、generate_op_registry/discovery 反映、browser/file/system/run_pipeline/system-actuator の主要 op 検証 |
-| AR-04 | PARTIAL | canonical op family 定義、browser alias 共通化、browser/system の正規化と警告                                                                                                                      |
-| AR-05 | PARTIAL | system file I/O の file-actuator forward、観察/変更・ドメイン境界の分割準備                                                                                                                        |
-| AR-06 | PARTIAL | teach message、skipped 明示化(run_pipeline 含む)、silent default 回帰検知、AR-01 集約                                                                                                              |
+| ID    | 状態    | 残作業                                                                                                                                                                                    |
+| ----- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AR-01 | PARTIAL | adf-engine.ts 抽出、file-actuator/super-nerve アダプタ化、3エンジン統合、golden 回帰                                                                                                      |
+| AR-02 | PARTIAL | describeOps、generate_op_registry、op-discovery に input_schema 反映、未知 op の apply 既定撤廃                                                                                           |
+| AR-03 | PARTIAL | write_artifact/path 前倒し検証、notify/read_file/read_json/open_file 含む op_input_contracts、generate_op_registry/discovery 反映、browser/file/system の契約 coverage 検査、主要 op 検証 |
+| AR-04 | PARTIAL | canonical op family 定義、browser alias 共通化、browser/system の正規化と警告                                                                                                             |
+| AR-05 | PARTIAL | system file I/O の file-actuator forward、観察/変更・ドメイン境界の分割準備                                                                                                               |
+| AR-06 | PARTIAL | teach message(shared helper で network/orchestrator/file/system へ展開)、skipped 明示化(run_pipeline 含む)、silent default 回帰検知、AR-01 集約                                           |
 
 ### SA(セキュリティ・監査)
 

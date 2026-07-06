@@ -1,6 +1,7 @@
 import { pathResolver } from './path-resolver.js';
 import { safeReadFile } from './secure-io.js';
 import { recordConfigFallback } from './config-fallback-registry.js';
+import { suggestClosestStrings } from './op-suggestions.js';
 
 export type PipelineStepType = 'capture' | 'transform' | 'apply' | 'control';
 
@@ -18,32 +19,10 @@ interface ActuatorOpRegistryFile {
 }
 
 let _cachedOpRegistry: ActuatorOpRegistryFile | null = null;
+const DEFAULT_CONTROL_OPS = ['if', 'while'];
 
 function unique(values: string[]): string[] {
   return [...new Set(values.filter((value) => value.length > 0))];
-}
-
-function levenshteinDistance(a: string, b: string): number {
-  if (a === b) return 0;
-  if (a.length === 0) return b.length;
-  if (b.length === 0) return a.length;
-
-  const previous = Array.from({ length: b.length + 1 }, (_, index) => index);
-  for (let i = 1; i <= a.length; i++) {
-    const current = [i];
-    for (let j = 1; j <= b.length; j++) {
-      const substitutionCost = a[i - 1] === b[j - 1] ? 0 : 1;
-      current[j] = Math.min(
-        previous[j] + 1,
-        current[j - 1] + 1,
-        previous[j - 1] + substitutionCost
-      );
-    }
-    for (let j = 0; j < current.length; j++) {
-      previous[j] = current[j];
-    }
-  }
-  return previous[b.length];
 }
 
 function collectKnownOps(domain: string, registry: ActuatorOpRegistryFile): string[] {
@@ -56,30 +35,6 @@ function collectKnownOps(domain: string, registry: ActuatorOpRegistryFile): stri
     ...registry.shared_transform_ops,
     ...registry.shared_apply_ops,
   ]);
-}
-
-function formatSuggestions(action: string, candidates: string[]): string {
-  if (candidates.length === 0) return '';
-
-  const ranked = candidates
-    .map((candidate) => ({
-      candidate,
-      score:
-        candidate === action
-          ? 0
-          : candidate.includes(action) || action.includes(candidate)
-            ? 1
-            : levenshteinDistance(action, candidate),
-    }))
-    .filter(({ score }) => score <= Math.max(3, Math.ceil(action.length / 2)))
-    .sort(
-      (left, right) => left.score - right.score || left.candidate.localeCompare(right.candidate)
-    )
-    .slice(0, 3)
-    .map(({ candidate }) => candidate);
-
-  if (ranked.length === 0) return '';
-  return ` Did you mean: ${ranked.join(', ')}?`;
 }
 
 function loadActuatorOpRegistry(): ActuatorOpRegistryFile {
@@ -106,6 +61,25 @@ function loadActuatorOpRegistry(): ActuatorOpRegistryFile {
   return _cachedOpRegistry;
 }
 
+export function listKnownActuatorOps(domain: string, extraOps: string[] = []): string[] {
+  const registry = loadActuatorOpRegistry();
+  return unique([...collectKnownOps(domain, registry), ...extraOps]);
+}
+
+export function buildUnknownActuatorOpError(
+  domain: string,
+  action: string,
+  extraOps: string[] = DEFAULT_CONTROL_OPS
+): Error {
+  const candidates = listKnownActuatorOps(domain, extraOps);
+  const suggestions = suggestClosestStrings(action, candidates);
+  return new Error(
+    suggestions.length > 0
+      ? `[UNKNOWN_OP] Unknown op "${action}" for domain "${domain}". Did you mean: ${suggestions.join(', ')}?`
+      : `[UNKNOWN_OP] Unknown op "${action}" for domain "${domain}"`
+  );
+}
+
 export function determineActuatorStepType(domain: string, action: string): PipelineStepType {
   const { shared_capture_ops, shared_transform_ops, shared_apply_ops, domains } =
     loadActuatorOpRegistry();
@@ -118,11 +92,7 @@ export function determineActuatorStepType(domain: string, action: string): Pipel
   if (shared_transform_ops.includes(action)) return 'transform';
   if (shared_apply_ops.includes(action)) return 'apply';
 
-  const suggestions = formatSuggestions(
-    action,
-    collectKnownOps(domain, { shared_capture_ops, shared_transform_ops, shared_apply_ops, domains })
-  );
-  throw new Error(`[UNKNOWN_OP] Unknown op "${action}" for domain "${domain}".${suggestions}`);
+  throw buildUnknownActuatorOpError(domain, action);
 }
 
 export function listRegisteredDomainOps(domain: string): DomainOpRegistry {

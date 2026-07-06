@@ -90,6 +90,30 @@
           "kind": "capture"
         },
         {
+          "op": "snapshot",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string",
+                "minLength": 1
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "url": "https://example.com",
+              "title": "Example Domain"
+            }
+          ]
+        },
+        {
           "op": "click",
           "kind": "apply",
           "input_schema": {
@@ -315,6 +339,26 @@
       "source": "registry",
       "ops": [
         {
+          "op": "exists",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "required": ["path"],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "path": "knowledge/product/README.md"
+            }
+          ]
+        },
+        {
           "op": "glob_files",
           "kind": "capture"
         },
@@ -395,6 +439,71 @@
           "examples": [
             {
               "path": "knowledge/product/config.json"
+            }
+          ]
+        },
+        {
+          "op": "search",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "required": ["path", "pattern"],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "pattern": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "path": "knowledge/product",
+              "pattern": "AR-03"
+            }
+          ]
+        },
+        {
+          "op": "stat",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "required": ["path"],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "path": "knowledge/product/README.md"
+            }
+          ]
+        },
+        {
+          "op": "tail",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "required": ["path"],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "path": "logs/latest.log"
             }
           ]
         },
@@ -556,6 +665,46 @@
             {
               "path": "knowledge/product/note.txt",
               "content": "hello"
+            }
+          ]
+        },
+        {
+          "op": "write_artifact",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "anyOf": [
+              {
+                "required": ["path"]
+              },
+              {
+                "required": ["output_path"]
+              }
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "output_path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content": {},
+              "data": {},
+              "from": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "output_path": "active/shared/tmp/report.json",
+              "content": {
+                "ok": true
+              }
             }
           ]
         },
