@@ -50,7 +50,7 @@
 
 ## 実装状況 (2026-07-06)
 
-- **進行中(Task 2 の土台)**: `libs/core/adf-engine.ts` を新設し、capture / transform / apply / control の共通 step runner を切り出した。`file-actuator` はこの runner を使う薄いアダプタへ寄せ、制御フローと step budget の共通化を進めた。残りは `run_pipeline.ts` と super-nerve の統合、および golden 回帰の確認。
+- **進行中(Task 2/3 の土台)**: `libs/core/adf-engine.ts` を新設し、capture / transform / apply / control の共通 step runner を切り出した。`file-actuator` と `super-nerve` はこの runner を使う薄いアダプタへ寄せ、制御フロー・step budget・自動修復の共通化を進めた。残りは `run_pipeline.ts` と golden 回帰の確認。
 
 ## リスクと注意
 
