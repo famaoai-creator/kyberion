@@ -1,3 +1,5 @@
+const KYBERION_BRAND_FONT_STACK = "Inter, 'Noto Sans JP', sans-serif";
+
 export interface WebThemePack {
   kind: 'web-theme-pack';
   version: string;
@@ -126,7 +128,9 @@ export interface ResolvedWebDesignSystem {
 }
 
 function hexToRgb(value: string): [number, number, number] | null {
-  const normalized = String(value || '').trim().replace(/^#/, '');
+  const normalized = String(value || '')
+    .trim()
+    .replace(/^#/, '');
   if (/^[0-9a-fA-F]{3}$/.test(normalized)) {
     const parts = normalized.split('').map((entry) => Number.parseInt(`${entry}${entry}`, 16));
     return [parts[0], parts[1], parts[2]];
@@ -165,7 +169,7 @@ export function webThemePackToCssVars(themePack: WebThemePack): Record<string, s
 
 export function composeWebDesignSystem(
   themePack: WebThemePack,
-  designSystemPack: WebDesignSystemPack,
+  designSystemPack: WebDesignSystemPack
 ): ResolvedWebDesignSystem {
   return {
     theme: themePack,
@@ -210,8 +214,8 @@ export const DEFAULT_CHRONOS_WEB_THEME_PACK: WebThemePack = {
       text: '#F8FAFC',
     },
     fonts: {
-      heading: 'Inter, sans-serif',
-      body: 'Inter, sans-serif',
+      heading: KYBERION_BRAND_FONT_STACK,
+      body: KYBERION_BRAND_FONT_STACK,
     },
   },
   web: {
@@ -219,7 +223,8 @@ export const DEFAULT_CHRONOS_WEB_THEME_PACK: WebThemePack = {
     snapshot_summary: 'Dense command surface for missions, agents, and traceable operator actions.',
     hero: {
       title: 'Chronos Mirror',
-      subtitle: 'A web control surface that keeps mission state, operator views, and runtime evidence in one place.',
+      subtitle:
+        'A web control surface that keeps mission state, operator views, and runtime evidence in one place.',
       cta: 'Open command surface',
     },
     layout_grid: {
@@ -235,7 +240,14 @@ export const DEFAULT_CHRONOS_WEB_THEME_PACK: WebThemePack = {
       xl: '40px',
     },
     breakpoints: ['640px', '1024px', '1280px'],
-    sections: ['hero', 'design-system', 'quick-actions', 'operator-views', 'mission-intelligence', 'trace-viewer'],
+    sections: [
+      'hero',
+      'design-system',
+      'quick-actions',
+      'operator-views',
+      'mission-intelligence',
+      'trace-viewer',
+    ],
     typography: {
       heading: 'Inter, sans-serif',
       body: 'Inter, sans-serif',
@@ -291,13 +303,41 @@ export const DEFAULT_CHRONOS_WEB_DESIGN_SYSTEM_PACK: WebDesignSystemPack = {
       layout_key: 'hero-command-split',
       region_order: ['title', 'supporting_copy', 'actions', 'signals'],
       slots: [
-        { slot_id: 'title', role: 'Primary title', required: true, max_items: 1, max_chars_per_item: 42 },
-        { slot_id: 'supporting_copy', role: 'Supporting copy', required: true, max_items: 1, max_chars_per_item: 120 },
-        { slot_id: 'actions', role: 'Primary actions', required: false, max_items: 3, max_chars_per_item: 24 },
-        { slot_id: 'signals', role: 'Design system signals', required: false, max_items: 4, max_chars_per_item: 24 },
+        {
+          slot_id: 'title',
+          role: 'Primary title',
+          required: true,
+          max_items: 1,
+          max_chars_per_item: 42,
+        },
+        {
+          slot_id: 'supporting_copy',
+          role: 'Supporting copy',
+          required: true,
+          max_items: 1,
+          max_chars_per_item: 120,
+        },
+        {
+          slot_id: 'actions',
+          role: 'Primary actions',
+          required: false,
+          max_items: 3,
+          max_chars_per_item: 24,
+        },
+        {
+          slot_id: 'signals',
+          role: 'Design system signals',
+          required: false,
+          max_items: 4,
+          max_chars_per_item: 24,
+        },
       ],
       constraints: [
-        { kind: 'single_message', slots: ['title'], message: 'Keep the hero focused on one clear operating model.' },
+        {
+          kind: 'single_message',
+          slots: ['title'],
+          message: 'Keep the hero focused on one clear operating model.',
+        },
       ],
     },
     {
@@ -308,10 +348,35 @@ export const DEFAULT_CHRONOS_WEB_DESIGN_SYSTEM_PACK: WebDesignSystemPack = {
       layout_key: 'supporting-grid',
       region_order: ['theme', 'layout', 'tokens', 'sections'],
       slots: [
-        { slot_id: 'theme', role: 'Theme tokens', required: true, max_items: 1, max_chars_per_item: 60 },
-        { slot_id: 'layout', role: 'Layout tokens', required: true, max_items: 1, max_chars_per_item: 60 },
-        { slot_id: 'tokens', role: 'Surface tokens', required: false, max_items: 4, max_chars_per_item: 30 },
-        { slot_id: 'sections', role: 'Section order', required: true, min_items: 3, max_items: 7, max_chars_per_item: 24 },
+        {
+          slot_id: 'theme',
+          role: 'Theme tokens',
+          required: true,
+          max_items: 1,
+          max_chars_per_item: 60,
+        },
+        {
+          slot_id: 'layout',
+          role: 'Layout tokens',
+          required: true,
+          max_items: 1,
+          max_chars_per_item: 60,
+        },
+        {
+          slot_id: 'tokens',
+          role: 'Surface tokens',
+          required: false,
+          max_items: 4,
+          max_chars_per_item: 30,
+        },
+        {
+          slot_id: 'sections',
+          role: 'Section order',
+          required: true,
+          min_items: 3,
+          max_items: 7,
+          max_chars_per_item: 24,
+        },
       ],
     },
     {
@@ -322,7 +387,14 @@ export const DEFAULT_CHRONOS_WEB_DESIGN_SYSTEM_PACK: WebDesignSystemPack = {
       layout_key: 'action-rail',
       region_order: ['grouped_actions'],
       slots: [
-        { slot_id: 'grouped_actions', role: 'Action groups', required: true, min_items: 4, max_items: 8, max_chars_per_item: 28 },
+        {
+          slot_id: 'grouped_actions',
+          role: 'Action groups',
+          required: true,
+          min_items: 4,
+          max_items: 8,
+          max_chars_per_item: 28,
+        },
       ],
     },
     {
@@ -333,7 +405,14 @@ export const DEFAULT_CHRONOS_WEB_DESIGN_SYSTEM_PACK: WebDesignSystemPack = {
       layout_key: 'scenario-grid',
       region_order: ['scenario_cards', 'hotkeys'],
       slots: [
-        { slot_id: 'scenario_cards', role: 'Scenario cards', required: true, min_items: 3, max_items: 7, max_chars_per_item: 32 },
+        {
+          slot_id: 'scenario_cards',
+          role: 'Scenario cards',
+          required: true,
+          min_items: 3,
+          max_items: 7,
+          max_chars_per_item: 32,
+        },
       ],
     },
     {
@@ -344,7 +423,14 @@ export const DEFAULT_CHRONOS_WEB_DESIGN_SYSTEM_PACK: WebDesignSystemPack = {
       layout_key: 'view-switcher',
       region_order: ['views', 'details'],
       slots: [
-        { slot_id: 'views', role: 'View selector', required: true, min_items: 3, max_items: 8, max_chars_per_item: 40 },
+        {
+          slot_id: 'views',
+          role: 'View selector',
+          required: true,
+          min_items: 3,
+          max_items: 8,
+          max_chars_per_item: 40,
+        },
       ],
     },
     {
@@ -355,7 +441,14 @@ export const DEFAULT_CHRONOS_WEB_DESIGN_SYSTEM_PACK: WebDesignSystemPack = {
       layout_key: 'status-grid',
       region_order: ['cards'],
       slots: [
-        { slot_id: 'cards', role: 'Jump cards', required: true, min_items: 3, max_items: 5, max_chars_per_item: 30 },
+        {
+          slot_id: 'cards',
+          role: 'Jump cards',
+          required: true,
+          min_items: 3,
+          max_items: 5,
+          max_chars_per_item: 30,
+        },
       ],
     },
     {
@@ -366,8 +459,45 @@ export const DEFAULT_CHRONOS_WEB_DESIGN_SYSTEM_PACK: WebDesignSystemPack = {
       layout_key: 'process-stack',
       region_order: ['steps'],
       slots: [
-        { slot_id: 'steps', role: 'Lifecycle steps', required: true, min_items: 4, max_items: 5, max_chars_per_item: 40 },
+        {
+          slot_id: 'steps',
+          role: 'Lifecycle steps',
+          required: true,
+          min_items: 4,
+          max_items: 5,
+          max_chars_per_item: 40,
+        },
       ],
     },
   ],
 };
+
+export function createChronosWebThemePack(mode: 'dark' | 'light' = 'dark'): WebThemePack {
+  if (mode === 'light') {
+    return {
+      ...DEFAULT_CHRONOS_WEB_THEME_PACK,
+      theme: {
+        ...DEFAULT_CHRONOS_WEB_THEME_PACK.theme,
+        name: 'Chronos Bright Command',
+        colors: {
+          primary: '#0f172a',
+          secondary: '#334155',
+          accent: '#0057b8',
+          background: '#f8fafc',
+          text: '#0f172a',
+        },
+      },
+    };
+  }
+
+  return DEFAULT_CHRONOS_WEB_THEME_PACK;
+}
+
+export function createChronosWebDesignSystem(
+  mode: 'dark' | 'light' = 'dark'
+): ResolvedWebDesignSystem {
+  return composeWebDesignSystem(
+    createChronosWebThemePack(mode),
+    DEFAULT_CHRONOS_WEB_DESIGN_SYSTEM_PACK
+  );
+}

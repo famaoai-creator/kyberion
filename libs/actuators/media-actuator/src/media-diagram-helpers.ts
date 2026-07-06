@@ -1,3 +1,4 @@
+import { resolveLatinFontFamily } from '@agent/core/design-fonts';
 import { safeExistsSync, safeReadFile } from '@agent/core';
 import * as path from 'node:path';
 
@@ -22,12 +23,17 @@ export function buildMermaidConfig(theme: any, backgroundColor?: string): Record
       tertiaryColor: colors.background || '#ffffff',
       mainBkg: colors.background || '#ffffff',
       textColor,
-      fontFamily: fonts.body || fonts.heading || 'Arial, sans-serif',
+      fontFamily: fonts.body || fonts.heading || resolveLatinFontFamily(undefined),
     },
   };
 }
 
-export function resolveGraphDefinition(rootDir: string, params: any, ctx: any, resolve: Function): any {
+export function resolveGraphDefinition(
+  rootDir: string,
+  params: any,
+  ctx: any,
+  resolve: Function
+): any {
   if (params.from && ctx[params.from]) {
     return ctx[params.from];
   }
@@ -48,7 +54,10 @@ export function resolveGraphDefinition(rootDir: string, params: any, ctx: any, r
 export function resolveDrawioIconMap(rootDir: string, params: any, resolve: Function): any {
   const mapPath = params.icon_map_path
     ? path.resolve(rootDir, resolve(params.icon_map_path))
-    : path.resolve(rootDir, 'knowledge/public/design-patterns/media-templates/aws-drawio-icon-map.json');
+    : path.resolve(
+        rootDir,
+        'knowledge/public/design-patterns/media-templates/aws-drawio-icon-map.json'
+      );
 
   if (!safeExistsSync(mapPath)) {
     return { resources: {} };
@@ -60,7 +69,7 @@ export function resolveDrawioIconMap(rootDir: string, params: any, resolve: Func
 export function loadFallbackDrawioTheme(
   rootDir: string,
   preferredTheme?: string,
-  loadThemeCatalog?: (rootDir: string) => any,
+  loadThemeCatalog?: (rootDir: string) => any
 ): any {
   const themes = loadThemeCatalog ? loadThemeCatalog(rootDir) : null;
   if (!themes || typeof themes !== 'object' || !themes.themes) {
@@ -73,10 +82,15 @@ export function loadFallbackDrawioTheme(
         text: '#111827',
       },
       fonts: {
-        heading: 'Arial, sans-serif',
-        body: 'Arial, sans-serif',
+        heading: resolveLatinFontFamily(undefined),
+        body: resolveLatinFontFamily(undefined),
       },
     };
   }
-  return themes.themes?.[preferredTheme || ''] || themes.themes?.['aws-architecture'] || themes.themes?.['kyberion-sovereign'] || themes.themes?.['kyberion-standard'];
+  return (
+    themes.themes?.[preferredTheme || ''] ||
+    themes.themes?.['aws-architecture'] ||
+    themes.themes?.['kyberion-sovereign'] ||
+    themes.themes?.['kyberion-standard']
+  );
 }
