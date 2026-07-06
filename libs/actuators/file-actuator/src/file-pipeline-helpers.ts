@@ -238,6 +238,18 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
         [params.export_as || 'last_capture']: wrappedText,
       };
     }
+    case 'read_json': {
+      const filePath = resolve(params.path);
+      const rawText = await retry(
+        async () => safeReadFile(path.resolve(rootDir, filePath), { encoding: 'utf8' }),
+        buildRetryOptions()
+      );
+      const parsed = JSON.parse(String(rawText));
+      return {
+        ...ctx,
+        [params.export_as || 'last_capture_data']: parsed,
+      };
+    }
     case 'list':
       return {
         ...ctx,
