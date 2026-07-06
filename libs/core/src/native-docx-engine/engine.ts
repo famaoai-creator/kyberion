@@ -576,13 +576,16 @@ function generateDocument(protocol: DocxDesignProtocol): string {
   return xml;
 }
 
-function generateFontTable(): string {
-  const headingFont = resolveLatinFontFamily(KYBERION_BRAND_FONT_STACK);
-  const eastAsianFont = resolveEastAsianFontFamily(KYBERION_BRAND_FONT_STACK);
+function generateFontTable(theme: DocxTheme): string {
+  const headingFont = resolveLatinFontFamily(theme.majorFont || KYBERION_BRAND_FONT_STACK);
+  const bodyFont = theme.minorFont ? resolveLatinFontFamily(theme.minorFont) : 'Times New Roman';
+  const eastAsianFont = resolveEastAsianFontFamily(
+    theme.majorFont || theme.minorFont || KYBERION_BRAND_FONT_STACK
+  );
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:fonts xmlns:w="${WML_NS}" xmlns:r="${REL_NS}">
   <w:font w:name="${headingFont}"><w:panose1 w:val="020F0502020204030204"/><w:charset w:val="00"/><w:family w:val="swiss"/><w:pitch w:val="variable"/></w:font>
-  <w:font w:name="Times New Roman"><w:panose1 w:val="02020603050405020304"/><w:charset w:val="00"/><w:family w:val="roman"/><w:pitch w:val="variable"/></w:font>
+  <w:font w:name="${bodyFont}"><w:panose1 w:val="02020603050405020304"/><w:charset w:val="00"/><w:family w:val="roman"/><w:pitch w:val="variable"/></w:font>
   <w:font w:name="${eastAsianFont}"><w:charset w:val="80"/><w:family w:val="modern"/><w:pitch w:val="fixed"/></w:font>
   <w:font w:name="MS Mincho"><w:charset w:val="80"/><w:family w:val="roman"/><w:pitch w:val="variable"/></w:font>
 </w:fonts>`;
@@ -642,7 +645,7 @@ export async function generateNativeDocx(
   zip.addFile('word/document.xml', Buffer.from(generateDocument(protocol), 'utf8'));
   zip.addFile('word/_rels/document.xml.rels', Buffer.from(generateDocumentRels(protocol), 'utf8'));
   zip.addFile('word/styles.xml', Buffer.from(generateStyles(protocol), 'utf8'));
-  zip.addFile('word/fontTable.xml', Buffer.from(generateFontTable(), 'utf8'));
+  zip.addFile('word/fontTable.xml', Buffer.from(generateFontTable(protocol.theme), 'utf8'));
 
   // Theme
   const themeColors: Record<string, string> = {};

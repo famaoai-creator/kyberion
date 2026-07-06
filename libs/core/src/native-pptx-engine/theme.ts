@@ -2,14 +2,28 @@ import { resolveEastAsianFontFamily, resolveLatinFontFamily } from '../../design
 
 export function generateTheme(colors: { [key: string]: string } = {}): string {
   const fontStack = typeof colors['__fontStack'] === 'string' ? colors['__fontStack'] : undefined;
-  const latinFont =
-    typeof colors['__latinFont'] === 'string'
-      ? colors['__latinFont']
-      : resolveLatinFontFamily(fontStack);
-  const eastAsianFont =
-    typeof colors['__eastAsianFont'] === 'string'
-      ? colors['__eastAsianFont']
-      : resolveEastAsianFontFamily(fontStack);
+  const majorFont = typeof colors.majorFont === 'string' ? colors.majorFont : undefined;
+  const minorFont = typeof colors.minorFont === 'string' ? colors.minorFont : undefined;
+  const eastAsianFontOverride =
+    typeof colors.eastAsiaFont === 'string' ? colors.eastAsiaFont : undefined;
+  const latinMajor =
+    typeof colors['__latinMajorFont'] === 'string'
+      ? colors['__latinMajorFont']
+      : resolveLatinFontFamily(majorFont ?? fontStack);
+  const latinMinor =
+    typeof colors['__latinMinorFont'] === 'string'
+      ? colors['__latinMinorFont']
+      : resolveLatinFontFamily(minorFont ?? fontStack ?? majorFont ?? latinMajor);
+  const eastAsianMajor =
+    typeof colors['__eastAsianMajorFont'] === 'string'
+      ? colors['__eastAsianMajorFont']
+      : resolveEastAsianFontFamily(eastAsianFontOverride ?? majorFont ?? fontStack ?? latinMajor);
+  const eastAsianMinor =
+    typeof colors['__eastAsianMinorFont'] === 'string'
+      ? colors['__eastAsianMinorFont']
+      : resolveEastAsianFontFamily(
+          eastAsianFontOverride ?? minorFont ?? fontStack ?? majorFont ?? latinMinor
+        );
   const defaultColors: { [key: string]: string } = {
     dk1: '000000',
     lt1: 'FFFFFF',
@@ -29,7 +43,7 @@ export function generateTheme(colors: { [key: string]: string } = {}): string {
   // Use extracted font/format schemes if available, otherwise use defaults
   const fontScheme =
     colors['__fontSchemeXml'] ||
-    `<a:fontScheme name="Office"><a:majorFont><a:latin typeface="${latinFont}"/><a:ea typeface="${eastAsianFont}"/><a:cs typeface="${eastAsianFont}"/></a:majorFont><a:minorFont><a:latin typeface="${latinFont}"/><a:ea typeface="${eastAsianFont}"/><a:cs typeface="${eastAsianFont}"/></a:minorFont></a:fontScheme>`;
+    `<a:fontScheme name="Office"><a:majorFont><a:latin typeface="${latinMajor}"/><a:ea typeface="${eastAsianMajor}"/><a:cs typeface="${eastAsianMajor}"/></a:majorFont><a:minorFont><a:latin typeface="${latinMinor}"/><a:ea typeface="${eastAsianMinor}"/><a:cs typeface="${eastAsianMinor}"/></a:minorFont></a:fontScheme>`;
   const fmtScheme =
     colors['__fmtSchemeXml'] ||
     `<a:fmtScheme name="Office"><a:fillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:fillStyleLst><a:lnStyleLst><a:ln w="9525"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln><a:ln w="25400"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln><a:ln w="38100"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln></a:lnStyleLst><a:effectStyleLst><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle></a:effectStyleLst><a:bgFillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:bgFillStyleLst></a:fmtScheme>`;
