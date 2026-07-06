@@ -1,11 +1,9 @@
+import { resolveEastAsianFontFamily } from '@agent/core/design-fonts';
 import {
-  DEFAULT_EAST_ASIA_FONT,
-  DEFAULT_LATIN_FONT,
   resolveDocumentContentsLabel,
   resolveDocumentContentsSubtitle,
   resolveReportSectionTitle,
   resolveReportSummaryTitle,
-  resolveEastAsiaFontFamily,
   resolveThemeColorRole as resolveThemeColorRolePolicy,
 } from '@agent/core';
 import {
@@ -113,13 +111,13 @@ export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) 
     const numberingPolicyTemplate = docxLayout.numbering_policy || {};
     const headingFont = deps.normalizeFontFamily(
       brief.locale?.startsWith('ja')
-        ? themeHints.headingFont || template?.fonts?.heading || DEFAULT_EAST_ASIA_FONT
-        : themeHints.headingFont || template?.fonts?.heading || DEFAULT_LATIN_FONT
+        ? resolveEastAsianFontFamily(themeHints.headingFont || template?.fonts?.heading)
+        : themeHints.headingFont || template?.fonts?.heading || 'Aptos'
     );
     const bodyFont = deps.normalizeFontFamily(
       brief.locale?.startsWith('ja')
-        ? themeHints.bodyFont || template?.fonts?.body || DEFAULT_EAST_ASIA_FONT
-        : themeHints.bodyFont || template?.fonts?.body || DEFAULT_LATIN_FONT
+        ? resolveEastAsianFontFamily(themeHints.bodyFont || template?.fonts?.body)
+        : themeHints.bodyFont || template?.fonts?.body || 'Aptos'
     );
     const appendixHeadingRule = deps.resolveSemanticComponentRule(
       rootDir,
@@ -437,10 +435,8 @@ export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) 
           accent1: palette.accent1 || '2563EB',
           accent2: palette.accent2 || palette.dk2 || '334155',
         },
-        majorFont: brief.locale?.startsWith('ja')
-          ? resolveEastAsiaFontFamily(headingFont)
-          : headingFont,
-        minorFont: brief.locale?.startsWith('ja') ? resolveEastAsiaFontFamily(bodyFont) : bodyFont,
+        majorFont: headingFont,
+        minorFont: bodyFont,
       },
       layoutProfile: {
         fonts: {
