@@ -200,7 +200,9 @@ export function SovereignChat({
   if (!isOpen) {
     return (
       <button
+        type="button"
         onClick={() => setIsOpen(true)}
+        aria-label={uxText('chronos_chat_open', 'Open Sovereign chat', locale)}
         className="fixed bottom-6 right-6 w-14 h-14 bg-kyberion-warning/20 border border-kyberion-warning/30 rounded-full flex items-center justify-center hover:bg-kyberion-warning/30 transition z-50"
       >
         <MessageSquare className="text-kyberion-warning w-6 h-6" />
@@ -228,7 +230,9 @@ export function SovereignChat({
           </span>
         </div>
         <button
+          type="button"
           onClick={() => setIsOpen(false)}
+          aria-label={uxText('chronos_chat_minimize', 'Minimize Sovereign chat', locale)}
           className="text-[10px] opacity-40 hover:opacity-80 transition"
           onPointerDown={(e) => e.stopPropagation()}
         >
@@ -237,7 +241,13 @@ export function SovereignChat({
       </div>
 
       {/* Messages */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div
+        ref={scrollRef}
+        className="flex-1 overflow-y-auto p-4 space-y-3"
+        role="log"
+        aria-live="polite"
+        aria-relevant="additions text"
+      >
         {messages.length === 0 && (
           <div className="flex flex-col gap-6 pt-4">
             <div className="text-center text-[11px] leading-6 text-white/45">
@@ -256,6 +266,8 @@ export function SovereignChat({
                 {GUIDED_PROMPTS.map((hint) => (
                   <button
                     key={hint.label}
+                    type="button"
+                    aria-label={`${hint.label}: ${hint.query}`}
                     onClick={() => void sendQuery(hint.query)}
                     className="rounded-xl border border-white/8 bg-white/5 p-3 text-left transition hover:border-cyan-400/30 hover:bg-cyan-400/[0.06]"
                   >
@@ -303,6 +315,7 @@ export function SovereignChat({
       <div className="p-3 border-t border-white/5">
         <div className="flex gap-2">
           <input
+            aria-label={uxText('chronos_chat_input', 'Chat input', locale)}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
@@ -328,7 +341,9 @@ export function SovereignChat({
             disabled={isLoading}
           />
           <button
+            type="button"
             onClick={toggleVoice}
+            aria-label={isListening ? 'Stop voice input' : 'Start voice input'}
             className={`p-2 rounded-lg border transition ${
               isListening
                 ? 'bg-red-900/30 border-red-500/30 text-red-400'
@@ -338,8 +353,10 @@ export function SovereignChat({
             {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
           </button>
           <button
+            type="button"
             onClick={sendMessage}
             disabled={isLoading || !input.trim()}
+            aria-label={uxText('chronos_chat_send', 'Send message', locale)}
             className="p-2 bg-kyberion-warning/20 border border-kyberion-warning/20 rounded-lg hover:bg-kyberion-warning/30 transition disabled:opacity-20"
           >
             <Send className="w-4 h-4 text-kyberion-warning" />

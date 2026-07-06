@@ -27,11 +27,7 @@ import {
   type CSSProperties,
 } from 'react';
 import { useSearchParams } from 'next/navigation';
-import {
-  composeWebDesignSystem,
-  DEFAULT_CHRONOS_WEB_DESIGN_SYSTEM_PACK,
-  DEFAULT_CHRONOS_WEB_THEME_PACK,
-} from '@agent/core/web-design-system';
+import { createChronosWebDesignSystem } from '@agent/core/web-design-system';
 import {
   A2UIRenderer,
   KbArtifactTile,
@@ -79,6 +75,9 @@ type StatusCard = {
 };
 
 const OPERATOR_LAYOUT_PREFS_KEY = 'chronos.operator-layout.prefs';
+const CHRONOS_THEME_PREFS_KEY = 'chronos.theme-mode';
+
+type ChronosThemeMode = 'system' | 'light' | 'dark';
 
 function loadOperatorLayoutPrefs(): {
   focusedOperatorView: string | null;
@@ -118,6 +117,33 @@ function saveOperatorLayoutPrefs(
   } catch {
     // localStorage may be denied; ignore.
   }
+}
+
+function loadChronosThemeMode(): ChronosThemeMode | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(CHRONOS_THEME_PREFS_KEY);
+    return raw === 'light' || raw === 'dark' || raw === 'system' ? raw : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveChronosThemeMode(mode: ChronosThemeMode): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(CHRONOS_THEME_PREFS_KEY, mode);
+  } catch {
+    // localStorage may be denied; ignore.
+  }
+}
+
+function resolveChronosThemeMode(
+  mode: ChronosThemeMode,
+  systemPrefersDark: boolean
+): 'light' | 'dark' {
+  if (mode === 'light' || mode === 'dark') return mode;
+  return systemPrefersDark ? 'dark' : 'light';
 }
 
 const QUICK_ACTION_GROUPS: QuickActionGroup[] = [
@@ -306,11 +332,6 @@ const STATUS_CARDS: StatusCard[] = [
   },
 ];
 
-const WEB_DESIGN_SYSTEM = composeWebDesignSystem(
-  DEFAULT_CHRONOS_WEB_THEME_PACK,
-  DEFAULT_CHRONOS_WEB_DESIGN_SYSTEM_PACK
-);
-
 export default function ChronosMirrorV2() {
   const locale = useChronosLocale();
   const [surface, setSurface] = useState<any>(null);
@@ -323,6 +344,8 @@ export default function ChronosMirrorV2() {
   const [focusedOperatorMissionId, setFocusedOperatorMissionId] = useState<string | null>(null);
   const [tenantCssVars, setTenantCssVars] = useState<Record<string, string>>({});
   const [tenantLabel, setTenantLabel] = useState<string | null>(null);
+  const [themeModePreference, setThemeModePreference] = useState<ChronosThemeMode>('system');
+  const [systemPrefersDark, setSystemPrefersDark] = useState(true);
   const [planRequestText, setPlanRequestText] = useState('');
   const [planMissionType, setPlanMissionType] = useState('proposal-brief');
   const [planPersona, setPlanPersona] = useState('operator');
@@ -388,6 +411,37 @@ export default function ChronosMirrorV2() {
   useEffect(() => {
     saveOperatorLayoutPrefs(focusedOperatorView, missionIntelligenceFocus);
   }, [focusedOperatorView, missionIntelligenceFocus]);
+
+  useEffect(() => {
+    const prefs = loadChronosThemeMode();
+    if (prefs) setThemeModePreference(prefs);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const update = () => setSystemPrefersDark(media.matches);
+    update();
+    if (typeof media.addEventListener === 'function') {
+      media.addEventListener('change', update);
+      return () => media.removeEventListener('change', update);
+    }
+    media.addListener(update);
+    return () => media.removeListener(update);
+  }, []);
+
+  useEffect(() => {
+    saveChronosThemeMode(themeModePreference);
+  }, [themeModePreference]);
+
+  const themeMode = resolveChronosThemeMode(themeModePreference, systemPrefersDark);
+  const webDesignSystem = useMemo(() => createChronosWebDesignSystem(themeMode), [themeMode]);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    document.documentElement.dataset.theme = themeMode;
+    document.documentElement.style.colorScheme = themeMode;
+  }, [themeMode]);
 
   useEffect(() => {
     let cancelled = false;
@@ -886,8 +940,8 @@ export default function ChronosMirrorV2() {
     return () => window.removeEventListener('keydown', handleScenarioHotkey);
   }, [handleScenarioOpen]);
 
-  const webTheme = WEB_DESIGN_SYSTEM.theme.theme;
-  const webLayout = WEB_DESIGN_SYSTEM.layout;
+  const webTheme = webDesignSystem.theme.theme;
+  const webLayout = webDesignSystem.layout;
 
   return (
     <Suspense fallback={null}>
@@ -899,7 +953,8 @@ export default function ChronosMirrorV2() {
       />
       <main
         className="min-h-screen w-screen overflow-hidden bg-[var(--kb-bg-main)] text-white"
-        style={{ ...(WEB_DESIGN_SYSTEM.css_vars as CSSProperties), ...tenantCssVars }}
+        data-theme={themeMode}
+        style={{ ...(webDesignSystem.css_vars as CSSProperties), ...tenantCssVars }}
       >
         <div className="absolute inset-0 pointer-events-none opacity-60">
           <div className="absolute left-[-8%] top-[-6%] h-[32rem] w-[32rem] rounded-full bg-cyan-500/10 blur-[160px]" />
@@ -930,10 +985,24 @@ export default function ChronosMirrorV2() {
               ) : null}
 
               <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setThemeModePreference((current) =>
+                      current === 'system' ? 'light' : current === 'light' ? 'dark' : 'system'
+                    )
+                  }
+                  aria-label={`Chronos theme: ${themeModePreference}`}
+                  className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-white/70 transition hover:bg-white/10 hover:text-cyan-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
+                >
+                  <Palette size={12} />
+                  <span>{themeModePreference}</span>
+                </button>
                 <IdentityBadge />
                 <button
+                  type="button"
                   onClick={() => setAgentPanelOpen(true)}
-                  className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-white/70 transition hover:bg-white/10 hover:text-cyan-400"
+                  className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-white/70 transition hover:bg-white/10 hover:text-cyan-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
                 >
                   <Cpu size={12} />
                   <span>{uxText('chronos_agent_runtimes', 'Agent Runtimes', locale)}</span>
@@ -947,7 +1016,7 @@ export default function ChronosMirrorV2() {
               <div className="flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-[0.28em] text-white/42">
                 <span>{webTheme.name}</span>
                 <span className="text-white/20">·</span>
-                <span>{WEB_DESIGN_SYSTEM.design_system.pack_id}</span>
+                <span>{webDesignSystem.design_system.pack_id}</span>
                 <span className="text-white/20">·</span>
                 <span>{webTheme.colors.accent}</span>
               </div>
@@ -961,7 +1030,7 @@ export default function ChronosMirrorV2() {
                 </p>
               </div>
               <div className="mt-5 flex flex-wrap gap-2">
-                {WEB_DESIGN_SYSTEM.section_order.map((sectionId) => (
+                {webDesignSystem.section_order.map((sectionId) => (
                   <span
                     key={sectionId}
                     className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-white/68"
@@ -980,7 +1049,7 @@ export default function ChronosMirrorV2() {
                 </div>
                 <div className="mt-2 text-sm font-semibold text-white/90">{webTheme.name}</div>
                 <div className="mt-2 text-[11px] leading-6 text-cyan-50/72">
-                  {WEB_DESIGN_SYSTEM.theme.web.snapshot_summary}
+                  {webDesignSystem.theme.web.snapshot_summary}
                 </div>
               </div>
               <div className="kyberion-glass rounded-[24px] border border-white/10 bg-black/18 p-4">
