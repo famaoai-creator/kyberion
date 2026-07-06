@@ -1,3 +1,5 @@
+import { getOpInputContract } from '@agent/core';
+
 export const SYSTEM_ACTUATOR_CAPTURE_OPS = [
   'screenshot',
   'clipboard_read',
@@ -72,11 +74,25 @@ export const SYSTEM_ACTUATOR_TRANSFORM_OPS = [
 
 export const SYSTEM_ACTUATOR_CONTROL_OPS = ['if', 'while'] as const;
 
+export interface SystemOpSpec {
+  op: string;
+  kind: 'capture' | 'transform' | 'apply' | 'control';
+  input_schema?: Record<string, unknown>;
+  examples?: Array<Record<string, unknown>>;
+}
+
+function withInputSchema(op: string, kind: SystemOpSpec['kind']): SystemOpSpec {
+  const contract = getOpInputContract('system', op);
+  return contract
+    ? { op, kind, input_schema: contract.schema, examples: contract.examples }
+    : { op, kind };
+}
+
 export function describeOps() {
   return [
-    ...SYSTEM_ACTUATOR_CAPTURE_OPS.map((op) => ({ op, kind: 'capture' as const })),
-    ...SYSTEM_ACTUATOR_TRANSFORM_OPS.map((op) => ({ op, kind: 'transform' as const })),
-    ...SYSTEM_ACTUATOR_APPLY_OPS.map((op) => ({ op, kind: 'apply' as const })),
-    ...SYSTEM_ACTUATOR_CONTROL_OPS.map((op) => ({ op, kind: 'control' as const })),
+    ...SYSTEM_ACTUATOR_CAPTURE_OPS.map((op) => withInputSchema(op, 'capture')),
+    ...SYSTEM_ACTUATOR_TRANSFORM_OPS.map((op) => withInputSchema(op, 'transform')),
+    ...SYSTEM_ACTUATOR_APPLY_OPS.map((op) => withInputSchema(op, 'apply')),
+    ...SYSTEM_ACTUATOR_CONTROL_OPS.map((op) => withInputSchema(op, 'control')),
   ];
 }

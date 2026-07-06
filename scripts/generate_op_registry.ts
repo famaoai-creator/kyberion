@@ -38,7 +38,12 @@ interface OpDiscoveryRecord {
   n: string;
   path: string;
   source: 'describeOps' | 'manifest' | 'registry';
-  ops: Array<{ op: string; kind: PipelineOpKind }>;
+  ops: Array<{
+    op: string;
+    kind: PipelineOpKind;
+    input_schema?: Record<string, unknown>;
+    examples?: Array<Record<string, unknown>>;
+  }>;
 }
 
 interface OpDiscoveryReport {
@@ -110,7 +115,12 @@ function buildOpDiscoveryReport(
         n: actuatorId,
         path: entry.path,
         source: 'describeOps',
-        ops: ops.map((item) => ({ op: item.op, kind: item.kind })),
+        ops: ops.map((item) => ({
+          op: item.op,
+          kind: item.kind,
+          input_schema: (item as { input_schema?: Record<string, unknown> }).input_schema,
+          examples: (item as { examples?: Array<Record<string, unknown>> }).examples,
+        })),
       });
       continue;
     }

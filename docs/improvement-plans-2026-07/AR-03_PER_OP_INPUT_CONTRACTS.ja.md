@@ -13,7 +13,9 @@
 ## 進捗(2026-07-06)
 
 - **完了済み(一部)**: `resolveRequiredStringParam` を導入し、`write_artifact` の `params.path` / `params.output_path` 必須判定を共通化した。file-actuator でも `write` / `append` / `delete` / `mkdir` / `copy` / `move` の path 系必須入力を前倒しで検証するようにした。
-- **未完了**: `OpSpec` の `input_schema` 付与、dispatch 前の共通 Ajv/Zod 検証、browser/system/file/service の高頻度 op への横展開。
+- **完了済み(一部)**: `libs/core/op-input-contracts.ts` を追加し、browser/file/system の主要 op に JSON Schema を付与した。browser recording の compile/run と file pipeline の dispatch 前で `validateOpInput()` を通すようにした。
+- **完了済み(一部)**: `system-actuator` の `describeOps()` に `input_schema` / examples を載せ、`generate_op_registry` の discovery 出力に反映できるようにした。
+- **未完了**: AR-01 の正準 dispatch に全面接続すること、browser/system/file/service の残り高頻度 op への横展開、型付き params の dispatch 伝播。
 
 ## ゴール(受入条件)
 
