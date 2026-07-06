@@ -1,20 +1,14 @@
 import * as path from 'node:path';
 import {
-  pathResolver,
   safeExistsSync,
   safeLstat,
   safeMkdir,
   safeReaddir,
+  safeReadFile,
   safeWriteFile,
-} from '@agent/core';
-import { withExecutionContext } from '@agent/core/governance';
-import {
-  SYSTEM_ACTUATOR_APPLY_OPS,
-  SYSTEM_ACTUATOR_CAPTURE_OPS,
-  SYSTEM_ACTUATOR_CONTROL_OPS,
-  SYSTEM_ACTUATOR_TRANSFORM_OPS,
-} from '../libs/actuators/system-actuator/src/index.js';
-import { readJsonFile } from './refactor/cli-input.js';
+} from '../libs/core/secure-io.ts';
+import { pathResolver } from '../libs/core/path-resolver.ts';
+import { withExecutionContext } from '../libs/core/authority.ts';
 
 interface CapabilityManifest {
   actuator_id: string;
@@ -42,6 +36,7 @@ interface CurrentIndexRecord {
   s: 'implemented';
   version: string;
   capability_count: number;
+  ops: string[];
   contract_schema?: string;
   prerequisites_summary: string;
 }
@@ -91,8 +86,36 @@ function summarizePrerequisites(manifest: CapabilityManifest): string {
   return parts.size > 0 ? Array.from(parts).sort().join(', ') : '-';
 }
 
+function listOps(manifest: CapabilityManifest): string[] {
+  return Array.from(
+    new Set(
+      (manifest.capabilities || []).map((capability) => String(capability.op || '')).filter(Boolean)
+    )
+  ).sort();
+}
+
+function loadSystemActuatorOps(constName: string): string[] {
+  const source = safeReadFile(
+    pathResolver.rootResolve('libs/actuators/system-actuator/src/index.ts'),
+    { encoding: 'utf8' }
+  ) as string;
+  const pattern = new RegExp(`export const ${constName} = \\[(.*?)\\] as const;`, 's');
+  const match = source.match(pattern);
+  if (!match) {
+    throw new Error(`Unable to extract ${constName} from system-actuator source`);
+  }
+  return Array.from(match[1].matchAll(/'([^']+)'/g), (result) => result[1]);
+}
+
+const SYSTEM_ACTUATOR_CAPTURE_OPS = loadSystemActuatorOps('SYSTEM_ACTUATOR_CAPTURE_OPS');
+const SYSTEM_ACTUATOR_TRANSFORM_OPS = loadSystemActuatorOps('SYSTEM_ACTUATOR_TRANSFORM_OPS');
+const SYSTEM_ACTUATOR_APPLY_OPS = loadSystemActuatorOps('SYSTEM_ACTUATOR_APPLY_OPS');
+const SYSTEM_ACTUATOR_CONTROL_OPS = loadSystemActuatorOps('SYSTEM_ACTUATOR_CONTROL_OPS');
+
 function loadManifest(manifestPath: string): CapabilityManifest {
-  return readJsonFile<CapabilityManifest>(manifestPath);
+  return JSON.parse(
+    safeReadFile(manifestPath, { encoding: 'utf8' }) as string
+  ) as CapabilityManifest;
 }
 
 function collectComponentInventory() {
@@ -117,6 +140,7 @@ function collectComponentInventory() {
         s: 'implemented',
         version: manifest.version,
         capability_count: manifest.capabilities.length,
+        ops: listOps(manifest),
         contract_schema: manifest.contract_schema,
         prerequisites_summary: summarizePrerequisites(manifest),
       });
@@ -203,11 +227,13 @@ function buildCapabilitiesGuide(current: CurrentIndexRecord[]): string {
     'Legacy or conceptual capability names are intentionally excluded here. If a component is not manifest-backed, it is not part of the current runtime catalog.'
   );
   lines.push('');
-  lines.push('| Actuator | Description | Version | Ops | Prerequisites | Contract Schema | Path |');
-  lines.push('| :--- | :--- | :--- | :---: | :--- | :--- | :--- |');
+  lines.push(
+    '| Actuator | Description | Version | Ops Count | Ops | Prerequisites | Contract Schema | Path |'
+  );
+  lines.push('| :--- | :--- | :--- | :---: | :--- | :--- | :--- | :--- |');
   for (const actuator of current) {
     lines.push(
-      `| \`${actuator.n}\` | ${actuator.d} | ${actuator.version} | ${actuator.capability_count} | \`${actuator.prerequisites_summary}\` | \`${actuator.contract_schema || '-'}\` | \`${actuator.path}\` |`
+      `| \`${actuator.n}\` | ${actuator.d} | ${actuator.version} | ${actuator.capability_count} | \`${actuator.ops.join(', ') || '-'}\` | \`${actuator.prerequisites_summary}\` | \`${actuator.contract_schema || '-'}\` | \`${actuator.path}\` |`
     );
   }
   lines.push('');
@@ -255,7 +281,6 @@ function buildCapabilitiesGuide(current: CurrentIndexRecord[]): string {
   lines.push(
     `- [component-lifecycle-inventory.md](${path.relative(pathResolver.rootDir(), REPORT_PATH)})`
   );
-  lines.push('');
   return `${lines.join('\n')}\n`;
 }
 
@@ -318,7 +343,6 @@ function buildReport(current: CurrentIndexRecord[], legacy: LegacyRecord[]): str
   lines.push(
     '- Do not use `CAPABILITIES_GUIDE.md` as the source of truth for runtime discovery; it is broader and currently includes historical capability names that do not map 1:1 to actuator packages.'
   );
-  lines.push('');
   return `${lines.join('\n')}\n`;
 }
 
@@ -328,7 +352,7 @@ function main() {
     () => {
       const knowledgeDir = path.dirname(REPORT_PATH);
       if (!safeExistsSync(knowledgeDir)) {
-        safeMkdir(knowledgeDir, { recursive: true });
+        safeMkdir(knowledgeDir);
       }
 
       const { current, legacy } = collectComponentInventory();

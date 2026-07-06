@@ -20,6 +20,7 @@ export interface ActuatorCatalogEntry {
   s: 'implemented';
   version: string;
   capability_count: number;
+  ops: string[];
   contract_schema?: string;
   entrypoint?: string;
   manifest_path: string;
@@ -29,10 +30,22 @@ const DEFAULT_ACTUATORS_DIR = pathResolver.rootResolve('libs/actuators');
 const catalogCache = new Map<string, ActuatorCatalogEntry[]>();
 
 function readManifest(manifestPath: string): ActuatorManifestFile {
-  return JSON.parse(safeReadFile(manifestPath, { encoding: 'utf8' }) as string) as ActuatorManifestFile;
+  return JSON.parse(
+    safeReadFile(manifestPath, { encoding: 'utf8' }) as string
+  ) as ActuatorManifestFile;
 }
 
-export function loadActuatorManifestCatalog(actuatorsDir = DEFAULT_ACTUATORS_DIR): ActuatorCatalogEntry[] {
+function listOps(manifest: ActuatorManifestFile): string[] {
+  return Array.from(
+    new Set(
+      (manifest.capabilities || []).map((capability) => String(capability.op || '')).filter(Boolean)
+    )
+  ).sort();
+}
+
+export function loadActuatorManifestCatalog(
+  actuatorsDir = DEFAULT_ACTUATORS_DIR
+): ActuatorCatalogEntry[] {
   const dir = pathResolver.rootResolve(actuatorsDir);
   const cached = catalogCache.get(dir);
   if (cached) {
@@ -69,6 +82,7 @@ export function loadActuatorManifestCatalog(actuatorsDir = DEFAULT_ACTUATORS_DIR
       s: 'implemented',
       version: manifest.version || '0.0.0',
       capability_count: Array.isArray(manifest.capabilities) ? manifest.capabilities.length : 0,
+      ops: listOps(manifest),
       contract_schema: manifest.contract_schema,
       entrypoint: manifest.entrypoint,
       manifest_path: path.relative(pathResolver.rootDir(), manifestPath),

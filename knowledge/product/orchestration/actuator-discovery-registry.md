@@ -35,7 +35,7 @@ runtime catalog.
 
 ## 2. Global Compatibility Snapshot
 
-[`global_actuator_index.json`](global_actuator_index.json) is the compatibility snapshot generated from the package manifests.
+[`global_actuator_index.json`](global_actuator_index.json) is the compatibility snapshot generated from the package manifests, including each actuator's op list for compatibility checks.
 
 It remains readable for tooling that still expects the historical catalog shape, but it is no longer the canonical source of truth.
 
