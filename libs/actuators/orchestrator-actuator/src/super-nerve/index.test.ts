@@ -71,6 +71,28 @@ describe('super-nerve engine', () => {
     expect(result.results).toEqual([{ op: 'if', status: 'skipped' }]);
   });
 
+  it('propagates nested control failures to the parent pipeline', async () => {
+    const result = await executeSuperPipeline(
+      [
+        {
+          op: 'core:if',
+          params: {
+            condition: { from: 'flag', operator: 'eq', value: true },
+            then: [{ op: 'system:does_not_exist', params: {} }],
+          },
+        },
+      ],
+      { flag: true }
+    );
+
+    expect(result.status).toBe('failed');
+    expect(result.results).toHaveLength(1);
+    expect(result.results[0]).toMatchObject({
+      op: 'if',
+      status: 'failed',
+    });
+  });
+
   it('resolves core call/include through the canonical resolver', async () => {
     const result = await executeSuperPipeline([
       { op: 'core:call', params: { path: 'macros/sample.json' } },
