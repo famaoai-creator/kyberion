@@ -180,6 +180,24 @@ describe('run_pipeline compatibility', () => {
     });
   }, 30000);
 
+  it('marks a false core:if branch as skipped when no else branch exists', async () => {
+    const result = await runSteps(
+      [
+        {
+          op: 'core:if',
+          params: {
+            condition: { from: 'flag', operator: 'eq', value: true },
+            then: [{ op: 'system:log', params: { message: 'should not run' } }],
+          },
+        },
+      ],
+      { flag: false }
+    );
+
+    expect(result.status).toBe('succeeded');
+    expect(result.results).toEqual([{ op: 'core:if', status: 'skipped' }]);
+  });
+
   it('runs parallel_foreach with bounded concurrency and collects per-item outputs', async () => {
     const startedAt = Date.now();
     const result = await runSteps([

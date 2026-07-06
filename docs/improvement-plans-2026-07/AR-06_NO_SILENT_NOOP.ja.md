@@ -8,7 +8,7 @@
 - **完了済み(Task 1 の大半)**: file / android / ios / code / media / modeling / network / orchestrator / system / wisdom の各 pipeline-helpers で silent `default: return ctx;`(および warn+素通し)を `throw new Error('[UNKNOWN_OP] Unknown op: ...')` に置換。file-actuator は未知 step type も `[UNKNOWN_TYPE]` エラー化。
 - **完了済み(Task 3 の一部)**: android / ios の代表テストを「未知 op → status=failed + `[UNKNOWN_OP]` エラー」を固定する形に更新。
 - **完了済み(Task 2 の一部)**: `determineActuatorStepType` の既定 `apply` フォールバックを除去し、未知 op は `file` / `media` / `system` を含む全体で `[UNKNOWN_OP]` エラーに倒れるようにした。
-- **進行中(2026-07-06)**: shared `libs/core/adf-engine.ts` に `skipped` step outcome を追加し、条件不成立の `core:if` / `core:while` を明示的な skipped として返すようにした。`file-actuator` と `super-nerve` は teach 付き未知 op エラーに寄せ、近い候補を提示するようにした。
+- **進行中(2026-07-06)**: shared `libs/core/adf-engine.ts` に `skipped` step outcome を追加し、条件不成立の `core:if` / `core:while` を明示的な skipped として返すようにした。`file-actuator` と `super-nerve` は teach 付き未知 op エラーに寄せ、`run_pipeline.ts` でも `core:if` / `core:while` の no-op を skipped として明示化した。
 - **未完了**: 「近い op を suggest」する teach メッセージ(Task 1-1 後半 / Task 2-2)、正当な no-op の `skipped` 明示化(受入条件3)、silent default を検出する lint / 専用チェック(Task 3 前半)、AR-01 正準エンジンへの集約(Task 2-1)。
 
 ## 背景と課題

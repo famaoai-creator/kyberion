@@ -606,6 +606,7 @@ export async function runSteps(
 
     let attempt = 0;
     let stepSucceeded = false;
+    let stepSkipped = false;
     let lastError: any = null;
     let currentNormalizedOp = step.op;
     const finishStepTrace = (
@@ -643,7 +644,7 @@ export async function runSteps(
         return { status: 'failed', results, context: ctx };
       }
       if (beforeDecision === 'skip') {
-        results.push({ op: step.op, status: 'success' });
+        results.push({ op: currentNormalizedOp, status: 'skipped' });
         finishStepTrace('step.skipped', 'skipped');
         opts.trace?.endSpan('ok');
         continue;
@@ -777,6 +778,15 @@ export async function runSteps(
             const nested = await runSteps(branch as PipelineAdfStep[], ctx, opts);
             ctx = nested.context;
             results.push(...nested.results);
+          } else if (!conditionResult) {
+            stepSkipped = true;
+            results.push({ op: currentNormalizedOp, status: 'skipped' });
+            finishStepTrace('step.skipped', 'skipped', {
+              reason: 'core:if condition evaluated to false and no else branch was provided',
+            });
+            opts.trace?.endSpan('ok');
+            stepSucceeded = true;
+            continue;
           }
         } else if (
           domain === 'core' &&
@@ -825,6 +835,16 @@ export async function runSteps(
               const shouldContinue = Boolean(evaluateCondition(condition, ctx));
               if (!shouldContinue) break;
             }
+          }
+          if (loopCount === 0) {
+            stepSkipped = true;
+            results.push({ op: currentNormalizedOp, status: 'skipped' });
+            finishStepTrace('step.skipped', 'skipped', {
+              reason: 'core:while condition evaluated to false before execution',
+            });
+            opts.trace?.endSpan('ok');
+            stepSucceeded = true;
+            continue;
           }
           ctx = {
             ...ctx,
@@ -1252,6 +1272,9 @@ export async function runSteps(
     }
 
     if (stepSucceeded) {
+      if (stepSkipped) {
+        continue;
+      }
       // ── after hooks ─────────────────────────────────────────────
       if (step.hooks?.after?.length) {
         const afterDecision = await runStepHooks(
