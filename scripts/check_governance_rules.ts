@@ -1,6 +1,13 @@
 import * as AjvModule from 'ajv';
 import * as path from 'node:path';
-import { loadActuatorManifestCatalog, pathResolver, safeExistsSync, safeReaddir, safeReadFile, safeStat } from '@agent/core';
+import {
+  loadActuatorManifestCatalog,
+  pathResolver,
+  safeExistsSync,
+  safeReaddir,
+  safeReadFile,
+  safeStat,
+} from '@agent/core';
 import { readJsonFile } from './refactor/cli-input.js';
 import { fileURLToPath } from 'node:url';
 
@@ -213,20 +220,29 @@ function readJson<T>(relativePath: string): T {
 function validateAgentProfileDirectoryConsistency(violations: string[]) {
   const directory = pathResolver.rootResolve('knowledge/product/orchestration/agent-profiles');
   if (!safeExistsSync(directory)) {
-    violations.push('agent-profile-index: knowledge/product/orchestration/agent-profiles directory is missing');
+    violations.push(
+      'agent-profile-index: knowledge/product/orchestration/agent-profiles directory is missing'
+    );
     return;
   }
 
-  const files = safeReaddir(directory).filter((entry) => entry.endsWith('.json')).sort();
+  const files = safeReaddir(directory)
+    .filter((entry) => entry.endsWith('.json'))
+    .sort();
   if (!files.length) {
-    violations.push('agent-profile-index: knowledge/product/orchestration/agent-profiles directory is empty');
+    violations.push(
+      'agent-profile-index: knowledge/product/orchestration/agent-profiles directory is empty'
+    );
     return;
   }
 
   const schemaPath = 'knowledge/product/schemas/agent-profile-index.schema.json';
   const schema = readJson<Record<string, unknown>>(schemaPath);
-  const validate = ajv.getSchema((schema as { $id?: string }).$id || schemaPath) || ajv.compile(schema);
-  const snapshot = readJson<{ agents?: Record<string, unknown> }>('knowledge/product/orchestration/agent-profile-index.json');
+  const validate =
+    ajv.getSchema((schema as { $id?: string }).$id || schemaPath) || ajv.compile(schema);
+  const snapshot = readJson<{ agents?: Record<string, unknown> }>(
+    'knowledge/product/orchestration/agent-profile-index.json'
+  );
   const snapshotAgents = snapshot.agents || {};
   const seenAgentIds = new Set<string>();
 
@@ -236,7 +252,9 @@ function validateAgentProfileDirectoryConsistency(violations: string[]) {
     const ok = validate(data);
     if (!ok) {
       for (const error of validate.errors || []) {
-        violations.push(`agent-profile-index/${file}: ${error.instancePath || '/'} ${error.message || 'schema violation'}`);
+        violations.push(
+          `agent-profile-index/${file}: ${error.instancePath || '/'} ${error.message || 'schema violation'}`
+        );
       }
     }
 
@@ -253,7 +271,10 @@ function validateAgentProfileDirectoryConsistency(violations: string[]) {
 
     if (!(agentId in snapshotAgents)) {
       violations.push(`agent-profile-index/${file}: snapshot is missing agent ${agentId}`);
-    } else if (JSON.stringify((data.agents as Record<string, unknown>)[agentId]) !== JSON.stringify(snapshotAgents[agentId])) {
+    } else if (
+      JSON.stringify((data.agents as Record<string, unknown>)[agentId]) !==
+      JSON.stringify(snapshotAgents[agentId])
+    ) {
       violations.push(`agent-profile-index/${file}: directory entry does not match snapshot`);
     }
 
@@ -270,22 +291,30 @@ function validateAgentProfileDirectoryConsistency(violations: string[]) {
 function validateVoiceProfileDirectoryConsistency(violations: string[]) {
   const directory = pathResolver.rootResolve('knowledge/product/governance/voice-profiles');
   if (!safeExistsSync(directory)) {
-    violations.push('voice-profile-registry: knowledge/product/governance/voice-profiles directory is missing');
+    violations.push(
+      'voice-profile-registry: knowledge/product/governance/voice-profiles directory is missing'
+    );
     return;
   }
 
-  const files = safeReaddir(directory).filter((entry) => entry.endsWith('.json')).sort();
+  const files = safeReaddir(directory)
+    .filter((entry) => entry.endsWith('.json'))
+    .sort();
   if (!files.length) {
-    violations.push('voice-profile-registry: knowledge/product/governance/voice-profiles directory is empty');
+    violations.push(
+      'voice-profile-registry: knowledge/product/governance/voice-profiles directory is empty'
+    );
     return;
   }
 
   const schemaPath = 'knowledge/product/schemas/voice-profile-registry.schema.json';
   const schema = readJson<Record<string, unknown>>(schemaPath);
-  const validate = ajv.getSchema((schema as { $id?: string }).$id || schemaPath) || ajv.compile(schema);
-  const snapshot = readJson<{ default_profile_id?: string; profiles?: Array<{ profile_id?: string }> }>(
-    'knowledge/product/governance/voice-profile-registry.json',
-  );
+  const validate =
+    ajv.getSchema((schema as { $id?: string }).$id || schemaPath) || ajv.compile(schema);
+  const snapshot = readJson<{
+    default_profile_id?: string;
+    profiles?: Array<{ profile_id?: string }>;
+  }>('knowledge/product/governance/voice-profile-registry.json');
   const snapshotProfiles = snapshot.profiles || [];
   const snapshotIds = new Set(snapshotProfiles.map((profile) => String(profile.profile_id || '')));
   const directoryIds: string[] = [];
@@ -296,19 +325,25 @@ function validateVoiceProfileDirectoryConsistency(violations: string[]) {
     const ok = validate(data);
     if (!ok) {
       for (const error of validate.errors || []) {
-        violations.push(`voice-profile-registry/${file}: ${error.instancePath || '/'} ${error.message || 'schema violation'}`);
+        violations.push(
+          `voice-profile-registry/${file}: ${error.instancePath || '/'} ${error.message || 'schema violation'}`
+        );
       }
     }
 
     const typed = data as { profiles?: Array<{ profile_id?: string }> };
-    const profileIds = (typed.profiles || []).map((profile) => String(profile.profile_id || '')).filter(Boolean);
+    const profileIds = (typed.profiles || [])
+      .map((profile) => String(profile.profile_id || ''))
+      .filter(Boolean);
     if (profileIds.length !== 1) {
       violations.push(`voice-profile-registry/${file}: must contain exactly one profile`);
       continue;
     }
     const profileId = profileIds[0];
     if (file.replace(/\.json$/i, '') !== profileId) {
-      violations.push(`voice-profile-registry/${file}: file name must match profile id ${profileId}`);
+      violations.push(
+        `voice-profile-registry/${file}: file name must match profile id ${profileId}`
+      );
     }
     if (!snapshotIds.has(profileId)) {
       violations.push(`voice-profile-registry/${file}: snapshot is missing profile ${profileId}`);
@@ -322,29 +357,41 @@ function validateVoiceProfileDirectoryConsistency(violations: string[]) {
     violations.push('voice-profile-registry: snapshot and canonical directory profile ids diverge');
   }
 
-  if (String(snapshot.default_profile_id || '') && !snapshotIds.has(String(snapshot.default_profile_id || ''))) {
-    violations.push('voice-profile-registry: default_profile_id must reference a profile in the canonical directory');
+  if (
+    String(snapshot.default_profile_id || '') &&
+    !snapshotIds.has(String(snapshot.default_profile_id || ''))
+  ) {
+    violations.push(
+      'voice-profile-registry: default_profile_id must reference a profile in the canonical directory'
+    );
   }
 }
 
 function validateAuthorityRoleDirectoryConsistency(violations: string[]) {
   const directory = pathResolver.rootResolve('knowledge/product/governance/authority-roles');
   if (!safeExistsSync(directory)) {
-    violations.push('authority-role-index: knowledge/product/governance/authority-roles directory is missing');
+    violations.push(
+      'authority-role-index: knowledge/product/governance/authority-roles directory is missing'
+    );
     return;
   }
 
-  const files = safeReaddir(directory).filter((entry) => entry.endsWith('.json')).sort();
+  const files = safeReaddir(directory)
+    .filter((entry) => entry.endsWith('.json'))
+    .sort();
   if (!files.length) {
-    violations.push('authority-role-index: knowledge/product/governance/authority-roles directory is empty');
+    violations.push(
+      'authority-role-index: knowledge/product/governance/authority-roles directory is empty'
+    );
     return;
   }
 
   const schemaPath = 'knowledge/product/schemas/authority-role.schema.json';
   const schema = readJson<Record<string, unknown>>(schemaPath);
-  const validate = ajv.getSchema((schema as { $id?: string }).$id || schemaPath) || ajv.compile(schema);
+  const validate =
+    ajv.getSchema((schema as { $id?: string }).$id || schemaPath) || ajv.compile(schema);
   const snapshot = readJson<{ authority_roles?: Record<string, unknown> }>(
-    'knowledge/product/governance/authority-role-index.json',
+    'knowledge/product/governance/authority-role-index.json'
   );
   const snapshotRoles = snapshot.authority_roles || {};
   const seenRoleIds = new Set<string>();
@@ -355,7 +402,9 @@ function validateAuthorityRoleDirectoryConsistency(violations: string[]) {
     const ok = validate(data);
     if (!ok) {
       for (const error of validate.errors || []) {
-        violations.push(`authority-role-index/${file}: ${error.instancePath || '/'} ${error.message || 'schema violation'}`);
+        violations.push(
+          `authority-role-index/${file}: ${error.instancePath || '/'} ${error.message || 'schema violation'}`
+        );
       }
     }
 
@@ -391,20 +440,29 @@ function validateAuthorityRoleDirectoryConsistency(violations: string[]) {
 function validateTeamRoleDirectoryConsistency(violations: string[]) {
   const directory = pathResolver.rootResolve('knowledge/product/orchestration/team-roles');
   if (!safeExistsSync(directory)) {
-    violations.push('team-role-index: knowledge/product/orchestration/team-roles directory is missing');
+    violations.push(
+      'team-role-index: knowledge/product/orchestration/team-roles directory is missing'
+    );
     return;
   }
 
-  const files = safeReaddir(directory).filter((entry) => entry.endsWith('.json')).sort();
+  const files = safeReaddir(directory)
+    .filter((entry) => entry.endsWith('.json'))
+    .sort();
   if (!files.length) {
-    violations.push('team-role-index: knowledge/product/orchestration/team-roles directory is empty');
+    violations.push(
+      'team-role-index: knowledge/product/orchestration/team-roles directory is empty'
+    );
     return;
   }
 
   const schemaPath = 'knowledge/product/schemas/team-role.schema.json';
   const schema = readJson<Record<string, unknown>>(schemaPath);
-  const validate = ajv.getSchema((schema as { $id?: string }).$id || schemaPath) || ajv.compile(schema);
-  const snapshot = readJson<{ team_roles?: Record<string, unknown> }>('knowledge/product/orchestration/team-role-index.json');
+  const validate =
+    ajv.getSchema((schema as { $id?: string }).$id || schemaPath) || ajv.compile(schema);
+  const snapshot = readJson<{ team_roles?: Record<string, unknown> }>(
+    'knowledge/product/orchestration/team-role-index.json'
+  );
   const snapshotRoles = snapshot.team_roles || {};
   const seenRoleIds = new Set<string>();
 
@@ -414,7 +472,9 @@ function validateTeamRoleDirectoryConsistency(violations: string[]) {
     const ok = validate(data);
     if (!ok) {
       for (const error of validate.errors || []) {
-        violations.push(`team-role-index/${file}: ${error.instancePath || '/'} ${error.message || 'schema violation'}`);
+        violations.push(
+          `team-role-index/${file}: ${error.instancePath || '/'} ${error.message || 'schema violation'}`
+        );
       }
     }
 
@@ -448,22 +508,33 @@ function validateTeamRoleDirectoryConsistency(violations: string[]) {
 }
 
 function validateSurfaceProviderCatalogDirectoryConsistency(violations: string[]) {
-  const directory = pathResolver.rootResolve('knowledge/product/governance/surface-provider-manifest-catalogs');
+  const directory = pathResolver.rootResolve(
+    'knowledge/product/governance/surface-provider-manifest-catalogs'
+  );
   if (!safeExistsSync(directory)) {
-    violations.push('surface-provider-manifest-catalog: knowledge/product/governance/surface-provider-manifest-catalogs directory is missing');
+    violations.push(
+      'surface-provider-manifest-catalog: knowledge/product/governance/surface-provider-manifest-catalogs directory is missing'
+    );
     return;
   }
 
-  const files = safeReaddir(directory).filter((entry) => entry.endsWith('.json')).sort();
+  const files = safeReaddir(directory)
+    .filter((entry) => entry.endsWith('.json'))
+    .sort();
   if (!files.length) {
-    violations.push('surface-provider-manifest-catalog: knowledge/product/governance/surface-provider-manifest-catalogs directory is empty');
+    violations.push(
+      'surface-provider-manifest-catalog: knowledge/product/governance/surface-provider-manifest-catalogs directory is empty'
+    );
     return;
   }
 
   const schemaPath = 'knowledge/product/schemas/surface-provider-manifest-catalog.schema.json';
   const schema = readJson<Record<string, unknown>>(schemaPath);
-  const validate = ajv.getSchema((schema as { $id?: string }).$id || schemaPath) || ajv.compile(schema);
-  const snapshot = readJson<{ entries?: Array<{ id?: string }> }>('knowledge/product/governance/surface-provider-manifest-catalog.json');
+  const validate =
+    ajv.getSchema((schema as { $id?: string }).$id || schemaPath) || ajv.compile(schema);
+  const snapshot = readJson<{ entries?: Array<{ id?: string }> }>(
+    'knowledge/product/governance/surface-provider-manifest-catalog.json'
+  );
   const snapshotIds = new Set((snapshot.entries || []).map((entry) => String(entry.id || '')));
   const directoryIds: string[] = [];
 
@@ -473,7 +544,9 @@ function validateSurfaceProviderCatalogDirectoryConsistency(violations: string[]
     const ok = validate(data);
     if (!ok) {
       for (const error of validate.errors || []) {
-        violations.push(`surface-provider-manifest-catalog/${file}: ${error.instancePath || '/'} ${error.message || 'schema violation'}`);
+        violations.push(
+          `surface-provider-manifest-catalog/${file}: ${error.instancePath || '/'} ${error.message || 'schema violation'}`
+        );
       }
     }
 
@@ -485,7 +558,9 @@ function validateSurfaceProviderCatalogDirectoryConsistency(violations: string[]
     }
     const id = ids[0];
     if (file.replace(/\.json$/i, '') !== id) {
-      violations.push(`surface-provider-manifest-catalog/${file}: file name must match entry id ${id}`);
+      violations.push(
+        `surface-provider-manifest-catalog/${file}: file name must match entry id ${id}`
+      );
     }
     if (!snapshotIds.has(id)) {
       violations.push(`surface-provider-manifest-catalog/${file}: snapshot is missing entry ${id}`);
@@ -494,28 +569,42 @@ function validateSurfaceProviderCatalogDirectoryConsistency(violations: string[]
   }
 
   if (JSON.stringify(directoryIds.sort()) !== JSON.stringify([...snapshotIds].sort())) {
-    violations.push('surface-provider-manifest-catalog: snapshot and canonical directory entry ids diverge');
+    violations.push(
+      'surface-provider-manifest-catalog: snapshot and canonical directory entry ids diverge'
+    );
   }
 }
 
 function validateServiceEndpointsDirectoryConsistency(violations: string[]) {
   const directory = pathResolver.rootResolve('knowledge/product/orchestration/service-endpoints');
   if (!safeExistsSync(directory)) {
-    violations.push('service-endpoints: knowledge/product/orchestration/service-endpoints directory is missing');
+    violations.push(
+      'service-endpoints: knowledge/product/orchestration/service-endpoints directory is missing'
+    );
     return;
   }
 
-  const files = safeReaddir(directory).filter((entry) => entry.endsWith('.json')).sort();
+  const files = safeReaddir(directory)
+    .filter((entry) => entry.endsWith('.json'))
+    .sort();
   if (!files.length) {
-    violations.push('service-endpoints: knowledge/product/orchestration/service-endpoints directory is empty');
+    violations.push(
+      'service-endpoints: knowledge/product/orchestration/service-endpoints directory is empty'
+    );
     return;
   }
 
   const schemaPath = 'knowledge/product/schemas/service-endpoints.schema.json';
   const schema = readJson<Record<string, unknown>>(schemaPath);
-  const validate = ajv.getSchema((schema as { $id?: string }).$id || schemaPath) || ajv.compile(schema);
-  const snapshot = readJson<{ default_pattern?: string; services?: Record<string, { intent_aliases?: string[] }> }>('knowledge/product/orchestration/service-endpoints.json');
-  const snapshotIds = new Set(Object.keys(snapshot.services || {}).map((entry) => String(entry || '')));
+  const validate =
+    ajv.getSchema((schema as { $id?: string }).$id || schemaPath) || ajv.compile(schema);
+  const snapshot = readJson<{
+    default_pattern?: string;
+    services?: Record<string, { intent_aliases?: string[] }>;
+  }>('knowledge/product/orchestration/service-endpoints.json');
+  const snapshotIds = new Set(
+    Object.keys(snapshot.services || {}).map((entry) => String(entry || ''))
+  );
   const directoryIds: string[] = [];
 
   for (const file of files) {
@@ -524,11 +613,16 @@ function validateServiceEndpointsDirectoryConsistency(violations: string[]) {
     const ok = validate(data);
     if (!ok) {
       for (const error of validate.errors || []) {
-        violations.push(`service-endpoints/${file}: ${error.instancePath || '/'} ${error.message || 'schema violation'}`);
+        violations.push(
+          `service-endpoints/${file}: ${error.instancePath || '/'} ${error.message || 'schema violation'}`
+        );
       }
     }
 
-    const typed = data as { default_pattern?: string; services?: Record<string, { intent_aliases?: string[] }> };
+    const typed = data as {
+      default_pattern?: string;
+      services?: Record<string, { intent_aliases?: string[] }>;
+    };
     const ids = Object.keys(typed.services || {}).filter(Boolean);
     if (ids.length !== 1) {
       violations.push(`service-endpoints/${file}: must contain exactly one service`);
@@ -546,7 +640,7 @@ function validateServiceEndpointsDirectoryConsistency(violations: string[]) {
       violations.push(`service-endpoints/${file}: snapshot is missing service ${id}`);
     }
     const snapshotAliasList = snapshot.services?.[id]?.intent_aliases || [];
-    const directoryAliasList = (typed.services?.[id]?.intent_aliases || []);
+    const directoryAliasList = typed.services?.[id]?.intent_aliases || [];
     if (JSON.stringify(snapshotAliasList) !== JSON.stringify(directoryAliasList)) {
       violations.push(`service-endpoints/${file}: intent_aliases must match the snapshot`);
     }
@@ -561,21 +655,32 @@ function validateServiceEndpointsDirectoryConsistency(violations: string[]) {
 function validateSpecialistCatalogDirectoryConsistency(violations: string[]) {
   const directory = pathResolver.rootResolve('knowledge/product/orchestration/specialists');
   if (!safeExistsSync(directory)) {
-    violations.push('specialist-catalog: knowledge/product/orchestration/specialists directory is missing');
+    violations.push(
+      'specialist-catalog: knowledge/product/orchestration/specialists directory is missing'
+    );
     return;
   }
 
-  const files = safeReaddir(directory).filter((entry) => entry.endsWith('.json')).sort();
+  const files = safeReaddir(directory)
+    .filter((entry) => entry.endsWith('.json'))
+    .sort();
   if (!files.length) {
-    violations.push('specialist-catalog: knowledge/product/orchestration/specialists directory is empty');
+    violations.push(
+      'specialist-catalog: knowledge/product/orchestration/specialists directory is empty'
+    );
     return;
   }
 
   const schemaPath = 'knowledge/product/schemas/specialist-catalog.schema.json';
   const schema = readJson<Record<string, unknown>>(schemaPath);
-  const validate = ajv.getSchema((schema as { $id?: string }).$id || schemaPath) || ajv.compile(schema);
-  const snapshot = readJson<{ version?: string; specialists?: Record<string, unknown> }>('knowledge/product/orchestration/specialist-catalog.json');
-  const snapshotIds = new Set(Object.keys(snapshot.specialists || {}).map((entry) => String(entry || '')));
+  const validate =
+    ajv.getSchema((schema as { $id?: string }).$id || schemaPath) || ajv.compile(schema);
+  const snapshot = readJson<{ version?: string; specialists?: Record<string, unknown> }>(
+    'knowledge/product/orchestration/specialist-catalog.json'
+  );
+  const snapshotIds = new Set(
+    Object.keys(snapshot.specialists || {}).map((entry) => String(entry || ''))
+  );
   const directoryIds: string[] = [];
 
   for (const file of files) {
@@ -584,7 +689,9 @@ function validateSpecialistCatalogDirectoryConsistency(violations: string[]) {
     const ok = validate(data);
     if (!ok) {
       for (const error of validate.errors || []) {
-        violations.push(`specialist-catalog/${file}: ${error.instancePath || '/'} ${error.message || 'schema violation'}`);
+        violations.push(
+          `specialist-catalog/${file}: ${error.instancePath || '/'} ${error.message || 'schema violation'}`
+        );
       }
     }
 
@@ -616,22 +723,30 @@ function validateSpecialistCatalogDirectoryConsistency(violations: string[]) {
 function validateVoiceEngineDirectoryConsistency(violations: string[]) {
   const directory = pathResolver.rootResolve('knowledge/product/governance/voice-engines');
   if (!safeExistsSync(directory)) {
-    violations.push('voice-engine-registry: knowledge/product/governance/voice-engines directory is missing');
+    violations.push(
+      'voice-engine-registry: knowledge/product/governance/voice-engines directory is missing'
+    );
     return;
   }
 
-  const files = safeReaddir(directory).filter((entry) => entry.endsWith('.json')).sort();
+  const files = safeReaddir(directory)
+    .filter((entry) => entry.endsWith('.json'))
+    .sort();
   if (!files.length) {
-    violations.push('voice-engine-registry: knowledge/product/governance/voice-engines directory is empty');
+    violations.push(
+      'voice-engine-registry: knowledge/product/governance/voice-engines directory is empty'
+    );
     return;
   }
 
   const schemaPath = 'knowledge/product/schemas/voice-engine-registry.schema.json';
   const schema = readJson<Record<string, unknown>>(schemaPath);
-  const validate = ajv.getSchema((schema as { $id?: string }).$id || schemaPath) || ajv.compile(schema);
-  const snapshot = readJson<{ default_engine_id?: string; engines?: Array<{ engine_id?: string }> }>(
-    'knowledge/product/governance/voice-engine-registry.json',
-  );
+  const validate =
+    ajv.getSchema((schema as { $id?: string }).$id || schemaPath) || ajv.compile(schema);
+  const snapshot = readJson<{
+    default_engine_id?: string;
+    engines?: Array<{ engine_id?: string }>;
+  }>('knowledge/product/governance/voice-engine-registry.json');
   const snapshotEngines = snapshot.engines || [];
   const snapshotIds = new Set(snapshotEngines.map((engine) => String(engine.engine_id || '')));
   const directoryIds: string[] = [];
@@ -642,12 +757,16 @@ function validateVoiceEngineDirectoryConsistency(violations: string[]) {
     const ok = validate(data);
     if (!ok) {
       for (const error of validate.errors || []) {
-        violations.push(`voice-engine-registry/${file}: ${error.instancePath || '/'} ${error.message || 'schema violation'}`);
+        violations.push(
+          `voice-engine-registry/${file}: ${error.instancePath || '/'} ${error.message || 'schema violation'}`
+        );
       }
     }
 
     const typed = data as { engines?: Array<{ engine_id?: string }>; default_engine_id?: string };
-    const engineIds = (typed.engines || []).map((engine) => String(engine.engine_id || '')).filter(Boolean);
+    const engineIds = (typed.engines || [])
+      .map((engine) => String(engine.engine_id || ''))
+      .filter(Boolean);
     if (engineIds.length !== 1) {
       violations.push(`voice-engine-registry/${file}: must contain exactly one engine`);
       continue;
@@ -666,15 +785,22 @@ function validateVoiceEngineDirectoryConsistency(violations: string[]) {
     violations.push('voice-engine-registry: snapshot and canonical directory engine ids diverge');
   }
 
-  if (String(snapshot.default_engine_id || '') && !snapshotIds.has(String(snapshot.default_engine_id || ''))) {
-    violations.push('voice-engine-registry: default_engine_id must reference an engine in the canonical directory');
+  if (
+    String(snapshot.default_engine_id || '') &&
+    !snapshotIds.has(String(snapshot.default_engine_id || ''))
+  ) {
+    violations.push(
+      'voice-engine-registry: default_engine_id must reference an engine in the canonical directory'
+    );
   }
 }
 
 function validateActuatorCatalogDirectoryConsistency(violations: string[]) {
   const catalog = loadActuatorManifestCatalog();
   if (!catalog.length) {
-    violations.push('global_actuator_index: libs/actuators directory has no manifest-backed actuators');
+    violations.push(
+      'global_actuator_index: libs/actuators directory has no manifest-backed actuators'
+    );
     return;
   }
 
@@ -685,15 +811,20 @@ function validateActuatorCatalogDirectoryConsistency(violations: string[]) {
       d?: string;
       version?: string;
       capability_count?: number;
+      ops?: string[];
       contract_schema?: string;
     }>;
   }>('knowledge/product/orchestration/global_actuator_index.json');
-  const snapshotById = new Map((snapshot.actuators || []).map((entry) => [String(entry.n || ''), entry]));
+  const snapshotById = new Map(
+    (snapshot.actuators || []).map((entry) => [String(entry.n || ''), entry])
+  );
   const catalogById = new Map(catalog.map((entry) => [entry.n, entry]));
 
   for (const entry of catalog) {
     if (path.basename(entry.path) !== entry.n) {
-      violations.push(`global_actuator_index/${entry.n}: directory name mismatch (${path.basename(entry.path)} !== ${entry.n})`);
+      violations.push(
+        `global_actuator_index/${entry.n}: directory name mismatch (${path.basename(entry.path)} !== ${entry.n})`
+      );
     }
     const snapshotEntry = snapshotById.get(entry.n);
     if (!snapshotEntry) {
@@ -701,7 +832,9 @@ function validateActuatorCatalogDirectoryConsistency(violations: string[]) {
       continue;
     }
     if (snapshotEntry.path !== entry.path) {
-      violations.push(`global_actuator_index/${entry.n}: path mismatch (${snapshotEntry.path} !== ${entry.path})`);
+      violations.push(
+        `global_actuator_index/${entry.n}: path mismatch (${snapshotEntry.path} !== ${entry.path})`
+      );
     }
     if (snapshotEntry.d !== entry.d) {
       violations.push(`global_actuator_index/${entry.n}: description mismatch`);
@@ -712,6 +845,15 @@ function validateActuatorCatalogDirectoryConsistency(violations: string[]) {
     if (snapshotEntry.capability_count !== entry.capability_count) {
       violations.push(`global_actuator_index/${entry.n}: capability_count mismatch`);
     }
+    const snapshotOps = [
+      ...new Set((snapshotEntry.ops || []).map((op) => String(op || '')).filter(Boolean)),
+    ].sort();
+    const catalogOps = [
+      ...new Set((entry.ops || []).map((op) => String(op || '')).filter(Boolean)),
+    ].sort();
+    if (JSON.stringify(snapshotOps) !== JSON.stringify(catalogOps)) {
+      violations.push(`global_actuator_index/${entry.n}: ops mismatch`);
+    }
     if ((snapshotEntry.contract_schema || '') !== (entry.contract_schema || '')) {
       violations.push(`global_actuator_index/${entry.n}: contract_schema mismatch`);
     }
@@ -719,7 +861,9 @@ function validateActuatorCatalogDirectoryConsistency(violations: string[]) {
 
   for (const entry of snapshot.actuators || []) {
     if (!catalogById.has(String(entry.n || ''))) {
-      violations.push(`global_actuator_index: snapshot includes unknown actuator ${String(entry.n || '')}`);
+      violations.push(
+        `global_actuator_index: snapshot includes unknown actuator ${String(entry.n || '')}`
+      );
     }
   }
 }
@@ -731,7 +875,9 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
   const ok = validate(data);
   if (!ok) {
     for (const error of validate.errors || []) {
-      violations.push(`${check.id}: ${error.instancePath || '/'} ${error.message || 'schema violation'}`);
+      violations.push(
+        `${check.id}: ${error.instancePath || '/'} ${error.message || 'schema violation'}`
+      );
     }
   }
 
@@ -757,10 +903,14 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
       violations.push('work-policy: specialist_routing.fallback_specialist_id must not be empty');
     }
     if (!String(typed.profile_routing?.defaults?.execution_boundary_profile_id || '')) {
-      violations.push('work-policy: profile_routing.defaults.execution_boundary_profile_id must not be empty');
+      violations.push(
+        'work-policy: profile_routing.defaults.execution_boundary_profile_id must not be empty'
+      );
     }
     if (!String(typed.profile_routing?.defaults?.runtime_design_profile_id || '')) {
-      violations.push('work-policy: profile_routing.defaults.runtime_design_profile_id must not be empty');
+      violations.push(
+        'work-policy: profile_routing.defaults.runtime_design_profile_id must not be empty'
+      );
     }
     if (!(typed.design_rules?.process_checklist_rules || []).length) {
       violations.push('work-policy: design_rules.process_checklist_rules must not be empty');
@@ -809,10 +959,14 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
       legacy_candidates?: Array<{ intent_id?: string; patterns?: unknown[] }>;
     };
     if ((typed.catalog_scoring?.selected_confidence_threshold || 0) <= 0) {
-      violations.push('intent-resolution-policy: catalog_scoring.selected_confidence_threshold must be > 0');
+      violations.push(
+        'intent-resolution-policy: catalog_scoring.selected_confidence_threshold must be > 0'
+      );
     }
     if (!String(typed.catalog_scoring?.catalog_intent_category || '')) {
-      violations.push('intent-resolution-policy: catalog_scoring.catalog_intent_category must not be empty');
+      violations.push(
+        'intent-resolution-policy: catalog_scoring.catalog_intent_category must not be empty'
+      );
     }
     if (!(typed.legacy_candidates || []).length) {
       violations.push('intent-resolution-policy: legacy_candidates must not be empty');
@@ -822,7 +976,9 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
         violations.push('intent-resolution-policy: every legacy candidate must define intent_id');
       }
       if (!(candidate.patterns || []).length) {
-        violations.push(`intent-resolution-policy: ${String(candidate.intent_id || 'unknown')} must define patterns`);
+        violations.push(
+          `intent-resolution-policy: ${String(candidate.intent_id || 'unknown')} must define patterns`
+        );
       }
     }
   }
@@ -843,13 +999,19 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
         violations.push('task-session-policy: every intent must define id');
       }
       if (!String(intent.task_type || '')) {
-        violations.push(`task-session-policy: ${String(intent.id || 'unknown')} must define task_type`);
+        violations.push(
+          `task-session-policy: ${String(intent.id || 'unknown')} must define task_type`
+        );
       }
       if (!String(intent.goal?.summary || '')) {
-        violations.push(`task-session-policy: ${String(intent.id || 'unknown')} must define goal.summary`);
+        violations.push(
+          `task-session-policy: ${String(intent.id || 'unknown')} must define goal.summary`
+        );
       }
       if (!String(intent.goal?.success_condition || '')) {
-        violations.push(`task-session-policy: ${String(intent.id || 'unknown')} must define goal.success_condition`);
+        violations.push(
+          `task-session-policy: ${String(intent.id || 'unknown')} must define goal.success_condition`
+        );
       }
     }
   }
@@ -943,7 +1105,9 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
     for (const scenario of typed.scenarios || []) {
       const id = String(scenario.scenario_id || '');
       if (!id) {
-        violations.push('mission-orchestration-scenario-pack: every scenario must define scenario_id');
+        violations.push(
+          'mission-orchestration-scenario-pack: every scenario must define scenario_id'
+        );
         continue;
       }
       if (ids.has(id)) {
@@ -996,19 +1160,27 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
         violations.push(`standard-intents: ${String(intent.id || 'unknown')} must define category`);
       }
       if (!String(intent.legacy_category || '')) {
-        violations.push(`standard-intents: ${String(intent.id || 'unknown')} must define legacy_category`);
+        violations.push(
+          `standard-intents: ${String(intent.id || 'unknown')} must define legacy_category`
+        );
       }
       if (typeof intent.exposed_to_surface !== 'boolean') {
-        violations.push(`standard-intents: ${String(intent.id || 'unknown')} must define exposed_to_surface`);
+        violations.push(
+          `standard-intents: ${String(intent.id || 'unknown')} must define exposed_to_surface`
+        );
       }
       if (!(intent.trigger_keywords || []).length) {
-        violations.push(`standard-intents: ${String(intent.id || 'unknown')} must define trigger_keywords`);
+        violations.push(
+          `standard-intents: ${String(intent.id || 'unknown')} must define trigger_keywords`
+        );
       }
     }
   }
 
   if (check.id === 'intent-domain-ontology') {
-    const typed = data as { intents?: Array<{ intent_id?: string; legacy_category?: string; category?: string }> };
+    const typed = data as {
+      intents?: Array<{ intent_id?: string; legacy_category?: string; category?: string }>;
+    };
     if (!(typed.intents || []).length) {
       violations.push('intent-domain-ontology: intents must not be empty');
     }
@@ -1043,11 +1215,18 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
     const surfacesDir = pathResolver.rootResolve('knowledge/product/governance/surfaces');
     if (safeExistsSync(surfacesDir)) {
       const directorySurfaces: Array<{ id?: string; enabled?: boolean }> = [];
-      for (const entry of safeReaddir(surfacesDir).filter((name) => name.endsWith('.json')).sort()) {
-        const surfaceManifest = readJson<{ version?: number; surfaces?: Array<{ id?: string; enabled?: boolean }> }>(path.join('knowledge/product/governance/surfaces', entry));
+      for (const entry of safeReaddir(surfacesDir)
+        .filter((name) => name.endsWith('.json'))
+        .sort()) {
+        const surfaceManifest = readJson<{
+          version?: number;
+          surfaces?: Array<{ id?: string; enabled?: boolean }>;
+        }>(path.join('knowledge/product/governance/surfaces', entry));
         if (!validate(surfaceManifest)) {
           for (const error of validate.errors || []) {
-            violations.push(`active-surfaces:${entry}: ${error.instancePath || '/'} ${error.message || 'schema violation'}`);
+            violations.push(
+              `active-surfaces:${entry}: ${error.instancePath || '/'} ${error.message || 'schema violation'}`
+            );
           }
         }
         if (!(surfaceManifest.surfaces || []).length) {
@@ -1055,22 +1234,31 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
           continue;
         }
         if ((surfaceManifest.surfaces || []).length !== 1) {
-          violations.push(`active-surfaces:${entry}: surface manifest files must contain exactly one surface`);
+          violations.push(
+            `active-surfaces:${entry}: surface manifest files must contain exactly one surface`
+          );
           continue;
         }
         const surfaces = surfaceManifest.surfaces || [];
         const surface = surfaces[0];
         const expectedId = entry.replace(/\.json$/i, '');
         if (String(surface.id || '') !== expectedId) {
-          violations.push(`active-surfaces:${entry}: surface id must match file name (${expectedId})`);
+          violations.push(
+            `active-surfaces:${entry}: surface id must match file name (${expectedId})`
+          );
         }
         directorySurfaces.push(surface);
       }
-      const sortById = (items: Array<{ id?: string }>) => [...items].sort((left, right) => String(left.id || '').localeCompare(String(right.id || '')));
+      const sortById = (items: Array<{ id?: string }>) =>
+        [...items].sort((left, right) =>
+          String(left.id || '').localeCompare(String(right.id || ''))
+        );
       const snapshotIds = JSON.stringify(sortById(typed.surfaces || []));
       const directoryIds = JSON.stringify(sortById(directorySurfaces));
       if (snapshotIds !== directoryIds) {
-        violations.push('active-surfaces: compatibility snapshot must match knowledge/product/governance/surfaces/*.json');
+        violations.push(
+          'active-surfaces: compatibility snapshot must match knowledge/product/governance/surfaces/*.json'
+        );
       }
     }
   }
@@ -1100,7 +1288,9 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
       violations.push('model-registry: default_model_id must not be empty');
       return;
     }
-    const defaultModel = (typed.models || []).find((model) => model.model_id === typed.default_model_id);
+    const defaultModel = (typed.models || []).find(
+      (model) => model.model_id === typed.default_model_id
+    );
     if (!defaultModel) {
       violations.push('model-registry: default_model_id must reference an existing model_id');
       return;
@@ -1109,7 +1299,9 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
       violations.push('model-registry: default_model_id must point to an approved model');
     }
     if (!(typed.models || []).some((model) => model.status === 'candidate')) {
-      violations.push('model-registry: at least one candidate model is required for shadow adaptation');
+      violations.push(
+        'model-registry: at least one candidate model is required for shadow adaptation'
+      );
     }
   }
 
@@ -1122,19 +1314,30 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
       rollback?: { min_signal_count?: number };
     };
     const lifecycleSteps = typed.lifecycle?.steps || [];
-    const requiredLifecycleSteps = ['detect', 'profile', 'evaluate', 'adapt', 'shadow', 'promote_or_rollback'];
+    const requiredLifecycleSteps = [
+      'detect',
+      'profile',
+      'evaluate',
+      'adapt',
+      'shadow',
+      'promote_or_rollback',
+    ];
     for (const step of requiredLifecycleSteps) {
       if (!lifecycleSteps.includes(step)) {
         violations.push(`model-adaptation-policy: lifecycle.steps must include ${step}`);
       }
     }
-    const benchmarkIds = new Set((typed.benchmark_suites || []).map((suite) => String(suite.id || '')));
+    const benchmarkIds = new Set(
+      (typed.benchmark_suites || []).map((suite) => String(suite.id || ''))
+    );
     if (!benchmarkIds.size) {
       violations.push('model-adaptation-policy: benchmark_suites must not be empty');
     }
     for (const suiteId of typed.promotion_gates?.required_suites || []) {
       if (!benchmarkIds.has(suiteId)) {
-        violations.push(`model-adaptation-policy: promotion_gates.required_suites contains unknown suite id (${suiteId})`);
+        violations.push(
+          `model-adaptation-policy: promotion_gates.required_suites contains unknown suite id (${suiteId})`
+        );
       }
     }
     const decisionRuleIds = new Set<string>();
@@ -1174,12 +1377,20 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
         continue;
       }
       if (capabilityIds.has(capabilityId)) {
-        violations.push(`harness-capability-registry: duplicate capability_id detected (${capabilityId})`);
+        violations.push(
+          `harness-capability-registry: duplicate capability_id detected (${capabilityId})`
+        );
       }
       capabilityIds.add(capabilityId);
 
-      if (capability.status === 'active' && capability.fallback_path?.mode !== 'none' && !String(capability.fallback_path?.target || '')) {
-        violations.push(`harness-capability-registry: active capability ${capabilityId} must define fallback_path.target when fallback is enabled`);
+      if (
+        capability.status === 'active' &&
+        capability.fallback_path?.mode !== 'none' &&
+        !String(capability.fallback_path?.target || '')
+      ) {
+        violations.push(
+          `harness-capability-registry: active capability ${capabilityId} must define fallback_path.target when fallback is enabled`
+        );
       }
     }
     if (!(typed.capabilities || []).some((capability) => capability.status === 'active')) {
@@ -1213,7 +1424,9 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
       adapterIds.add(adapterId);
 
       if (profile.enabled && !String(profile.fallback_contract || '')) {
-        violations.push(`harness-adapter-registry: enabled adapter ${adapterId} must define fallback_contract`);
+        violations.push(
+          `harness-adapter-registry: enabled adapter ${adapterId} must define fallback_contract`
+        );
       }
       if (!String(profile.capability_id || '')) {
         violations.push(`harness-adapter-registry: adapter ${adapterId} must define capability_id`);
@@ -1251,18 +1464,26 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
         continue;
       }
       if (providerNames.has(providerName)) {
-        violations.push(`provider-capability-scan-policy: duplicate provider detected (${providerName})`);
+        violations.push(
+          `provider-capability-scan-policy: duplicate provider detected (${providerName})`
+        );
       }
       providerNames.add(providerName);
       if (!String(provider.primary_probe?.command || '')) {
-        violations.push(`provider-capability-scan-policy: provider ${providerName} must define primary_probe.command`);
+        violations.push(
+          `provider-capability-scan-policy: provider ${providerName} must define primary_probe.command`
+        );
       }
       for (const evidenceProbe of provider.evidence_probes || []) {
         if (!String(evidenceProbe.probe?.command || '')) {
-          violations.push(`provider-capability-scan-policy: provider ${providerName} evidence probe must define probe.command`);
+          violations.push(
+            `provider-capability-scan-policy: provider ${providerName} evidence probe must define probe.command`
+          );
         }
         if (!(evidenceProbe.capability_ids || []).length) {
-          violations.push(`provider-capability-scan-policy: provider ${providerName} evidence probe must define capability_ids`);
+          violations.push(
+            `provider-capability-scan-policy: provider ${providerName} evidence probe must define capability_ids`
+          );
         }
       }
     }
@@ -1289,16 +1510,30 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
       };
     };
     const requiredSections = new Set(typed.required_sections || []);
-    for (const key of ['intent', 'deliverable', 'missing_inputs', 'approval', 'execution', 'status']) {
+    for (const key of [
+      'intent',
+      'deliverable',
+      'missing_inputs',
+      'approval',
+      'execution',
+      'status',
+    ]) {
       if (!requiredSections.has(key)) {
         violations.push(`execution-receipt-policy: required_sections must include ${key}`);
       }
     }
     if ((typed.clarification?.max_blocking_questions_per_turn || 0) > 3) {
-      violations.push('execution-receipt-policy: clarification.max_blocking_questions_per_turn must be <= 3');
+      violations.push(
+        'execution-receipt-policy: clarification.max_blocking_questions_per_turn must be <= 3'
+      );
     }
-    if ((typed.compactness?.max_next_action_chars || 0) > (typed.compactness?.max_interpreted_goal_chars || 0)) {
-      violations.push('execution-receipt-policy: compactness.max_next_action_chars must be <= compactness.max_interpreted_goal_chars');
+    if (
+      (typed.compactness?.max_next_action_chars || 0) >
+      (typed.compactness?.max_interpreted_goal_chars || 0)
+    ) {
+      violations.push(
+        'execution-receipt-policy: compactness.max_next_action_chars must be <= compactness.max_interpreted_goal_chars'
+      );
     }
     if (
       typed.approval_binding?.require_policy_refs_when_approval_required &&
@@ -1312,7 +1547,9 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
       violations.push('execution-receipt-policy: routing_binding.allowed_modes must not be empty');
     }
     if (!(typed.routing_binding?.allowed_routing || []).length) {
-      violations.push('execution-receipt-policy: routing_binding.allowed_routing must not be empty');
+      violations.push(
+        'execution-receipt-policy: routing_binding.allowed_routing must not be empty'
+      );
     }
   }
 
@@ -1357,7 +1594,9 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
       return;
     }
     if (!profileIds.has(String(typed.default_profile_id || ''))) {
-      violations.push('voice-profile-registry: default_profile_id must reference an existing profile_id');
+      violations.push(
+        'voice-profile-registry: default_profile_id must reference an existing profile_id'
+      );
     }
     if (!(typed.profiles || []).some((profile) => profile.status === 'active')) {
       violations.push('voice-profile-registry: at least one active profile is required');
@@ -1366,12 +1605,16 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
     const engineRegistry = readJson<{ engines?: Array<{ engine_id?: string }> }>(
       'knowledge/product/governance/voice-engine-registry.json'
     );
-    const engineIds = new Set((engineRegistry.engines || []).map((engine) => String(engine.engine_id || '')));
+    const engineIds = new Set(
+      (engineRegistry.engines || []).map((engine) => String(engine.engine_id || ''))
+    );
     for (const profile of typed.profiles || []) {
       const profileId = String(profile.profile_id || 'unknown');
       const engineId = String(profile.default_engine_id || '');
       if (engineId && !engineIds.has(engineId)) {
-        violations.push(`voice-profile-registry: ${profileId} references unknown default_engine_id (${engineId})`);
+        violations.push(
+          `voice-profile-registry: ${profileId} references unknown default_engine_id (${engineId})`
+        );
       }
     }
     validateVoiceProfileDirectoryConsistency(violations);
@@ -1420,11 +1663,19 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
     if ((typed.progress?.min_percent_delta || 0) < 0) {
       violations.push('voice-runtime-policy: progress.min_percent_delta must be >= 0');
     }
-    if (!['allow_fallback', 'require_personal_voice'].includes(String(typed.routing?.default_personal_voice_mode || ''))) {
-      violations.push('voice-runtime-policy: routing.default_personal_voice_mode must be allow_fallback or require_personal_voice');
+    if (
+      !['allow_fallback', 'require_personal_voice'].includes(
+        String(typed.routing?.default_personal_voice_mode || '')
+      )
+    ) {
+      violations.push(
+        'voice-runtime-policy: routing.default_personal_voice_mode must be allow_fallback or require_personal_voice'
+      );
     }
     if (typed.routing?.enforce_clone_engine_for_personal_tier === undefined) {
-      violations.push('voice-runtime-policy: routing.enforce_clone_engine_for_personal_tier must be defined');
+      violations.push(
+        'voice-runtime-policy: routing.enforce_clone_engine_for_personal_tier must be defined'
+      );
     }
   }
 
@@ -1453,8 +1704,13 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
         violations.push(`voice-engine-registry: duplicate engine_id detected (${engineId})`);
       }
       engineIds.add(engineId);
-      if (engine.supports?.playback === false && (engine.supports?.artifact_formats || []).length === 0) {
-        violations.push(`voice-engine-registry: ${engineId} must support playback or at least one artifact format`);
+      if (
+        engine.supports?.playback === false &&
+        (engine.supports?.artifact_formats || []).length === 0
+      ) {
+        violations.push(
+          `voice-engine-registry: ${engineId} must support playback or at least one artifact format`
+        );
       }
     }
     if (!String(typed.default_engine_id || '')) {
@@ -1462,7 +1718,9 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
       return;
     }
     if (!engineIds.has(String(typed.default_engine_id || ''))) {
-      violations.push('voice-engine-registry: default_engine_id must reference an existing engine_id');
+      violations.push(
+        'voice-engine-registry: default_engine_id must reference an existing engine_id'
+      );
     }
     if (!(typed.engines || []).some((engine) => engine.status === 'active')) {
       violations.push('voice-engine-registry: at least one active engine is required');
@@ -1471,10 +1729,14 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
       const engineId = String(engine.engine_id || '');
       const fallbackId = String(engine.fallback_engine_id || '');
       if (fallbackId && !engineIds.has(fallbackId)) {
-        violations.push(`voice-engine-registry: ${engineId} references unknown fallback_engine_id (${fallbackId})`);
+        violations.push(
+          `voice-engine-registry: ${engineId} references unknown fallback_engine_id (${fallbackId})`
+        );
       }
       if (fallbackId && fallbackId === engineId) {
-        violations.push(`voice-engine-registry: ${engineId} must not reference itself as fallback_engine_id`);
+        violations.push(
+          `voice-engine-registry: ${engineId} must not reference itself as fallback_engine_id`
+        );
       }
     }
   }
@@ -1498,25 +1760,41 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
       violations.push('voice-sample-ingestion-policy: sample_limits.min_samples must be >= 1');
     }
     if ((typed.sample_limits?.max_samples || 0) < (typed.sample_limits?.min_samples || 0)) {
-      violations.push('voice-sample-ingestion-policy: sample_limits.max_samples must be >= sample_limits.min_samples');
+      violations.push(
+        'voice-sample-ingestion-policy: sample_limits.max_samples must be >= sample_limits.min_samples'
+      );
     }
     if ((typed.sample_limits?.min_sample_bytes || 0) < 1024) {
-      violations.push('voice-sample-ingestion-policy: sample_limits.min_sample_bytes must be >= 1024');
+      violations.push(
+        'voice-sample-ingestion-policy: sample_limits.min_sample_bytes must be >= 1024'
+      );
     }
-    if ((typed.sample_limits?.max_sample_bytes || 0) < (typed.sample_limits?.min_sample_bytes || 0)) {
-      violations.push('voice-sample-ingestion-policy: sample_limits.max_sample_bytes must be >= sample_limits.min_sample_bytes');
+    if (
+      (typed.sample_limits?.max_sample_bytes || 0) < (typed.sample_limits?.min_sample_bytes || 0)
+    ) {
+      violations.push(
+        'voice-sample-ingestion-policy: sample_limits.max_sample_bytes must be >= sample_limits.min_sample_bytes'
+      );
     }
     if (!(typed.sample_limits?.allowed_extensions || []).length) {
-      violations.push('voice-sample-ingestion-policy: sample_limits.allowed_extensions must not be empty');
+      violations.push(
+        'voice-sample-ingestion-policy: sample_limits.allowed_extensions must not be empty'
+      );
     }
     if (!(typed.profile_rules?.allowed_tiers || []).length) {
-      violations.push('voice-sample-ingestion-policy: profile_rules.allowed_tiers must not be empty');
+      violations.push(
+        'voice-sample-ingestion-policy: profile_rules.allowed_tiers must not be empty'
+      );
     }
     if (typed.profile_rules?.require_unique_sample_paths === undefined) {
-      violations.push('voice-sample-ingestion-policy: profile_rules.require_unique_sample_paths must be defined');
+      violations.push(
+        'voice-sample-ingestion-policy: profile_rules.require_unique_sample_paths must be defined'
+      );
     }
     if (typed.profile_rules?.require_language_coverage === undefined) {
-      violations.push('voice-sample-ingestion-policy: profile_rules.require_language_coverage must be defined');
+      violations.push(
+        'voice-sample-ingestion-policy: profile_rules.require_language_coverage must be defined'
+      );
     }
   }
 
@@ -1539,21 +1817,31 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
     for (const template of typed.templates || []) {
       const templateId = String(template.template_id || '');
       if (!templateId) {
-        violations.push('video-composition-template-registry: every template must define template_id');
+        violations.push(
+          'video-composition-template-registry: every template must define template_id'
+        );
         continue;
       }
       if (templateIds.has(templateId)) {
-        violations.push(`video-composition-template-registry: duplicate template_id detected (${templateId})`);
+        violations.push(
+          `video-composition-template-registry: duplicate template_id detected (${templateId})`
+        );
       }
       templateIds.add(templateId);
       if (!(template.supported_roles || []).length) {
-        violations.push(`video-composition-template-registry: ${templateId} must define supported_roles`);
+        violations.push(
+          `video-composition-template-registry: ${templateId} must define supported_roles`
+        );
       }
       if (!(template.required_content_fields || []).length) {
-        violations.push(`video-composition-template-registry: ${templateId} must define required_content_fields`);
+        violations.push(
+          `video-composition-template-registry: ${templateId} must define required_content_fields`
+        );
       }
       if (!(template.supported_output_formats || []).length) {
-        violations.push(`video-composition-template-registry: ${templateId} must define supported_output_formats`);
+        violations.push(
+          `video-composition-template-registry: ${templateId} must define supported_output_formats`
+        );
       }
     }
     if (!String(typed.default_template_id || '')) {
@@ -1561,10 +1849,14 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
       return;
     }
     if (!templateIds.has(String(typed.default_template_id || ''))) {
-      violations.push('video-composition-template-registry: default_template_id must reference an existing template_id');
+      violations.push(
+        'video-composition-template-registry: default_template_id must reference an existing template_id'
+      );
     }
     if (!(typed.templates || []).some((template) => template.status === 'active')) {
-      violations.push('video-composition-template-registry: at least one active template is required');
+      violations.push(
+        'video-composition-template-registry: at least one active template is required'
+      );
     }
   }
 
@@ -1593,19 +1885,24 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
       violations.push('video-render-runtime-policy: bundle.default_bundle_root must not be empty');
     }
     if (!(typed.render?.allowed_output_formats || []).length) {
-      violations.push('video-render-runtime-policy: render.allowed_output_formats must not be empty');
+      violations.push(
+        'video-render-runtime-policy: render.allowed_output_formats must not be empty'
+      );
     }
     if (!['none', 'hyperframes_cli'].includes(String(typed.render?.backend || ''))) {
-      violations.push('video-render-runtime-policy: render.backend must be one of none|hyperframes_cli');
+      violations.push(
+        'video-render-runtime-policy: render.backend must be one of none|hyperframes_cli'
+      );
     }
     if (!['draft', 'standard', 'high'].includes(String(typed.render?.quality || ''))) {
-      violations.push('video-render-runtime-policy: render.quality must be one of draft|standard|high');
+      violations.push(
+        'video-render-runtime-policy: render.quality must be one of draft|standard|high'
+      );
     }
     if ((typed.render?.command_timeout_ms || 0) < 1000) {
       violations.push('video-render-runtime-policy: render.command_timeout_ms must be >= 1000');
     }
   }
-
 }
 
 // ── (c) Machine-absolute path lint ────────────────────────────────────────
@@ -1616,7 +1913,8 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
 // inline marker `governance-allow-abs-path` (e.g. this scanner's own pattern,
 // or a test fixture that intentionally asserts on an absolute path).
 
-const MACHINE_ABS_PATH_RE = /(?:\/Users\/|\/home\/[A-Za-z0-9._-]+\/|\/private\/(?:var\/folders|tmp)\/|[A-Za-z]:\\Users\\)/; // governance-allow-abs-path
+const MACHINE_ABS_PATH_RE =
+  /(?:\/Users\/|\/home\/[A-Za-z0-9._-]+\/|\/private\/(?:var\/folders|tmp)\/|[A-Za-z]:\\Users\\)/; // governance-allow-abs-path
 const ABS_PATH_ALLOW_MARKER = 'governance-allow-abs-path';
 // Roots to scan and the extensions that matter in each. Only authored sources are
 // scanned: `.json` config and `.ts` code. Generated `.js`/`.d.ts`/`.map` mirrors are
@@ -1627,8 +1925,13 @@ const ABS_PATH_SCAN_ROOTS: Array<{ root: string; extensions: string[] }> = [
   { root: 'scripts', extensions: ['.ts', '.json'] },
 ];
 const ABS_PATH_SKIP_DIRS = new Set([
-  'node_modules', 'dist', 'build', 'coverage', '.git',
-  'personal', 'confidential', // gitignored knowledge tiers
+  'node_modules',
+  'dist',
+  'build',
+  'coverage',
+  '.git',
+  'personal',
+  'confidential', // gitignored knowledge tiers
   'examples', // demonstration scripts legitimately reference a developer's local output paths
 ]);
 // JSON cannot carry an inline allow marker, so documented per-file exemptions live here.
@@ -1643,17 +1946,20 @@ const PRODUCT_DISALLOWED_PATTERNS: Array<{ id: string; regex: RegExp; message: s
   {
     id: 'product-no-dot-venv-default',
     regex: /\.venv\/bin\/python3/,
-    message: 'product-tier JSON must not default to .venv/bin/python3; use python3 or a governed runtime override',
+    message:
+      'product-tier JSON must not default to .venv/bin/python3; use python3 or a governed runtime override',
   },
   {
     id: 'product-no-ad-hoc-pip-install',
     regex: /\b(?:uv\s+pip\s+install|python(?:3)?\s+-m\s+pip\s+install|pip\s+install)\b/,
-    message: 'product-tier JSON must not embed ad hoc pip/uv install guidance; point to env:bootstrap or a governed runtime policy instead',
+    message:
+      'product-tier JSON must not embed ad hoc pip/uv install guidance; point to env:bootstrap or a governed runtime policy instead',
   },
   {
     id: 'product-no-playwright-install',
     regex: /\bpnpm\s+exec\s+playwright\s+install\b/,
-    message: 'product-tier JSON must not embed manual Playwright browser install steps; point to env:bootstrap instead',
+    message:
+      'product-tier JSON must not embed manual Playwright browser install steps; point to env:bootstrap instead',
   },
 ];
 
@@ -1672,7 +1978,9 @@ function scanFileForAbsolutePaths(absPath: string, relPath: string, violations: 
     const line = lines[i];
     if (line.includes(ABS_PATH_ALLOW_MARKER)) continue;
     if (MACHINE_ABS_PATH_RE.test(line)) {
-      violations.push(`machine-absolute-path: ${relPath}:${i + 1} embeds a machine-specific path; use a repo-relative path + pathResolver (or mark the line with ${ABS_PATH_ALLOW_MARKER})`);
+      violations.push(
+        `machine-absolute-path: ${relPath}:${i + 1} embeds a machine-specific path; use a repo-relative path + pathResolver (or mark the line with ${ABS_PATH_ALLOW_MARKER})`
+      );
     }
   }
 }
@@ -1683,12 +1991,20 @@ function findMachineAbsolutePathViolations(violations: string[]) {
   const scannerBase = path.basename(fileURLToPath(import.meta.url)).replace(/\.[tj]s$/, '');
   const walk = (absDir: string, extensions: string[]) => {
     let entries: string[];
-    try { entries = safeReaddir(absDir); } catch { return; }
+    try {
+      entries = safeReaddir(absDir);
+    } catch {
+      return;
+    }
     for (const entry of entries) {
       if (entry.startsWith('.') || ABS_PATH_SKIP_DIRS.has(entry)) continue;
       const absEntry = path.join(absDir, entry);
       let stat: ReturnType<typeof safeStat>;
-      try { stat = safeStat(absEntry); } catch { continue; }
+      try {
+        stat = safeStat(absEntry);
+      } catch {
+        continue;
+      }
       if (stat.isDirectory()) {
         walk(absEntry, extensions);
       } else if (extensions.some((ext) => entry.endsWith(ext))) {
@@ -1708,12 +2024,20 @@ function findMachineAbsolutePathViolations(violations: string[]) {
 function scanProductJsonForPlacementDrift(violations: string[]) {
   const walk = (absDir: string) => {
     let entries: string[];
-    try { entries = safeReaddir(absDir); } catch { return; }
+    try {
+      entries = safeReaddir(absDir);
+    } catch {
+      return;
+    }
     for (const entry of entries) {
       if (entry.startsWith('.')) continue;
       const absEntry = path.join(absDir, entry);
       let stat: ReturnType<typeof safeStat>;
-      try { stat = safeStat(absEntry); } catch { continue; }
+      try {
+        stat = safeStat(absEntry);
+      } catch {
+        continue;
+      }
       if (stat.isDirectory()) {
         walk(absEntry);
         continue;
@@ -1770,7 +2094,8 @@ export function main() {
   console.log('[check:governance-rules] OK');
 }
 
-const isDirectRun = process.argv[1] && pathResolver.rootResolve(process.argv[1]) === fileURLToPath(import.meta.url);
+const isDirectRun =
+  process.argv[1] && pathResolver.rootResolve(process.argv[1]) === fileURLToPath(import.meta.url);
 
 if (isDirectRun) {
   main();
