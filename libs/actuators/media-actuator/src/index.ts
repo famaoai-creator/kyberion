@@ -36,8 +36,6 @@ import {
   resolveReportSummaryTitle,
   resolveThemeColorRole as resolveThemeColorRolePolicy,
   resolveThemeHexRole as resolveThemeHexRolePolicy,
-  DEFAULT_EAST_ASIA_FONT,
-  DEFAULT_LATIN_FONT,
   resolveDrawioEdgeLabelStyleParts,
   resolveDrawioEdgeRoutingStyleParts,
   resolveDrawioBoundaryIconCandidates,
@@ -50,7 +48,6 @@ import {
   resolveDocumentProfileCandidates as resolveDocumentProfileCandidatesPolicy,
   resolveDocumentProfileKeywords as resolveDocumentProfileKeywordsPolicy,
   resolveProposalSectionKeywords,
-  resolveTenantDesign,
   isLegacyMediaOp,
   retry,
 } from '@agent/core';
@@ -137,6 +134,7 @@ import { createHash } from 'node:crypto';
 import * as excelUtils from '@agent/shared-media';
 import { PDFParse } from 'pdf-parse';
 import { runActuatorCli } from '@agent/core';
+import { resolveEastAsianFontFamily, resolveLatinFontFamily } from '@agent/core/design-fonts';
 
 const MEDIA_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/media-actuator/manifest.json');
 const DEFAULT_MEDIA_RETRY = {
@@ -337,44 +335,80 @@ function loadLayoutTemplateCatalog(rootDir: string): any {
   return _cachedLayoutTemplates;
 }
 
+let _cachedTenantRegistry: any = null;
+
 /** Build entry list from index.json, or fall back to directory-scanning knowledge/confidential/. */
-function resolveMediaTenantDesign(
-  rootDir: string,
-  brandNames: Array<string | undefined | null> = [],
-  customerId?: string,
-  designSystemId?: string
-): ReturnType<typeof resolveTenantDesign> {
-  const candidates = brandNames
-    .map((value) => String(value || '').trim())
-    .filter(Boolean);
-
-  for (const brandName of candidates) {
-    const baseResolution = resolveTenantDesign({
-      rootDir,
-      brandName: brandName || undefined,
-      customerId,
-    });
-    if (baseResolution.source === 'tenant') {
-      return baseResolution;
+function loadTenantEntries(rootDir: string): { override_path: string }[] {
+  const entries: { override_path: string }[] = [];
+  const indexPath = path.join(rootDir, 'knowledge/confidential/tenants/index.json');
+  try {
+    const registry = JSON.parse(safeReadFile(indexPath, { encoding: 'utf8' }) as string);
+    if (Array.isArray(registry.tenants)) {
+      entries.push(...registry.tenants.filter((entry: any) => entry?.override_path));
     }
-    const systemResolution = designSystemId
-      ? resolveTenantDesign({
-          rootDir,
-          brandName: brandName || undefined,
-          customerId,
-          designSystemId,
-        })
-      : baseResolution;
-    if (systemResolution.source === 'tenant') {
-      return systemResolution;
-    }
+  } catch {
+    /* index.json absent or unreadable — fall through to directory scan */
   }
-
-  return resolveTenantDesign({
-    rootDir,
-    customerId,
-    designSystemId,
+  // Fallback: scan knowledge/confidential/*/design/tenant-override.json
+  try {
+    const confidentialDir = path.join(rootDir, 'knowledge/confidential');
+    const names = safeReaddir(confidentialDir);
+    const slugs = names.filter((name) => {
+      try {
+        return safeStat(path.join(confidentialDir, name)).isDirectory();
+      } catch {
+        return false;
+      }
+    });
+    entries.push(
+      ...slugs.map((s: string) => ({
+        override_path: `knowledge/confidential/${s}/design/tenant-override.json`,
+      }))
+    );
+  } catch {
+    /* confidential directory absent or unreadable */
+  }
+  const seen = new Set<string>();
+  return entries.filter((entry) => {
+    if (!entry.override_path || seen.has(entry.override_path)) return false;
+    seen.add(entry.override_path);
+    return true;
   });
+}
+
+function resolveConfidentialTenantOverride(
+  rootDir: string,
+  brandName: string,
+  designSystemId?: string
+): any {
+  if (!brandName) return null;
+  try {
+    if (!_cachedTenantRegistry) {
+      _cachedTenantRegistry = { entries: loadTenantEntries(rootDir) };
+    }
+    const key = brandName.toLowerCase();
+    for (const entry of _cachedTenantRegistry.entries || []) {
+      const overridePath = path.resolve(rootDir, entry.override_path);
+      try {
+        const override = JSON.parse(safeReadFile(overridePath, { encoding: 'utf8' }) as string);
+        if (
+          designSystemId &&
+          override.design_system_id &&
+          override.design_system_id !== designSystemId
+        )
+          continue;
+        const matched =
+          Array.isArray(override.matchers) &&
+          override.matchers.some((m: string) => key.includes(m.toLowerCase()));
+        if (matched) return override;
+      } catch {
+        /* skip unreadable override */
+      }
+    }
+  } catch {
+    /* unexpected failure */
+  }
+  return null;
 }
 
 function resolveLayoutTemplate(
@@ -398,25 +432,12 @@ function resolveLayoutTemplate(
   }
   const designSystems = loadMediaDesignSystemsCatalog(rootDir);
   const system = designSystemId ? designSystems.systems?.[designSystemId] : null;
-  const brandCandidates = [
-    slideData?.branding?.brand_name,
-    slideData?.brand_name,
-    slideData?.client_key,
-    slideData?.tenant_id,
-    slideData?.client,
-  ];
-  const customerId = String(slideData?.tenant_id || slideData?.client_key || '').trim() || undefined;
-  const tenantResolution = resolveMediaTenantDesign(
-    rootDir,
-    brandCandidates,
-    customerId,
-    designSystemId
-  );
-  const tenantOverride = tenantResolution.tenantOverride;
+  const brandName: string = slideData?.branding?.brand_name || '';
+  const tenantOverride = resolveConfidentialTenantOverride(rootDir, brandName, designSystemId);
   // Priority 1: tenant override with an explicit confidential catalog path
-  if (tenantResolution.layoutCatalog) {
+  if (tenantOverride?.layout_template_catalog) {
     try {
-      const catalogPath = path.resolve(rootDir, tenantResolution.layoutCatalog);
+      const catalogPath = path.resolve(rootDir, tenantOverride.layout_template_catalog);
       const catalog = JSON.parse(safeReadFile(catalogPath, { encoding: 'utf8' }) as string);
       const templateId = tenantOverride.layout_template_id || catalog.default;
       const tpl = catalog.templates?.[templateId];
@@ -498,8 +519,8 @@ function buildPptxSlideFromPattern(
 
   const isHero = semanticType === 'hero';
   const themeFonts = theme?.fonts || theme?.theme?.fonts || {};
-  const headingFont = themeFonts.heading?.split(',')[0]?.trim() || DEFAULT_LATIN_FONT;
-  const bodyFont = themeFonts.body?.split(',')[0]?.trim() || DEFAULT_LATIN_FONT;
+  const headingFont = resolveLatinFontFamily(themeFonts.heading);
+  const bodyFont = resolveLatinFontFamily(themeFonts.body);
   const bzl = resolveLayoutTemplate(rootDir, data.design_system_id, data, theme);
   const chr = bzl.chrome;
   const hro = bzl.hero;
@@ -2938,23 +2959,17 @@ function resolveMediaDesignSystem(
   const recommendations = recommendImportedDesignReferences(rootDir, brief);
   const explicit = String(bindingHints.design_system_id || '').trim();
   const resolveTenantOverride = (_system: any, designSystemId?: string) => {
-    const brandCandidates = [
-      bindingHints.branding?.brand_name ||
-        brief?.branding?.brand_name ||
-      brief?.client,
-      brief?.payload?.client,
-      bindingHints.client_key,
-      bindingHints.tenant_id,
-    ];
-    const customerId =
-      String(bindingHints.tenant_id || bindingHints.client_key || '').trim() || undefined;
-    const tenantResolution = resolveMediaTenantDesign(
-      rootDir,
-      brandCandidates,
-      customerId,
-      designSystemId
-    );
-    return tenantResolution.tenantOverride;
+    const clientHint =
+      bindingHints.tenant_id ||
+      bindingHints.client_key ||
+      brief?.client ||
+      brief?.payload?.client ||
+      '';
+    const override = resolveConfidentialTenantOverride(rootDir, String(clientHint));
+    if (override) return override;
+    return designSystemId
+      ? resolveConfidentialTenantOverride(rootDir, String(clientHint), designSystemId)
+      : null;
   };
   const buildResult = (designSystemId: string, system: any) => {
     const tenantOverride = resolveTenantOverride(system, designSystemId);
@@ -2966,10 +2981,7 @@ function resolveMediaDesignSystem(
       system,
       tenantOverride,
       resolvedThemeName: String(
-        bindingHints.theme ||
-          tenantOverride?.theme ||
-          system?.theme ||
-          'kyberion-standard'
+        bindingHints.theme || tenantOverride?.theme || system?.theme || 'kyberion-standard'
       ),
       branding: {
         ...(system?.branding || {}),
@@ -3348,13 +3360,13 @@ function themeToDocxStyleHints(
   const themeFonts = theme?.fonts || theme?.theme?.fonts || {};
   const headingFont = normalizeFontFamily(
     locale?.startsWith('ja')
-      ? themeFonts.heading || DEFAULT_EAST_ASIA_FONT
-      : themeFonts.heading || DEFAULT_LATIN_FONT
+      ? resolveEastAsianFontFamily(themeFonts.heading || themeFonts.body)
+      : themeFonts.heading || 'Aptos'
   );
   const bodyFont = normalizeFontFamily(
     locale?.startsWith('ja')
-      ? themeFonts.body || DEFAULT_EAST_ASIA_FONT
-      : themeFonts.body || DEFAULT_LATIN_FONT
+      ? resolveEastAsianFontFamily(themeFonts.body || themeFonts.heading)
+      : themeFonts.body || 'Aptos'
   );
   return {
     headingFont,

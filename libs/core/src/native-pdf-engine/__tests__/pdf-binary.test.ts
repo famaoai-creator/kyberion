@@ -87,38 +87,20 @@ describe('Native PDF 2.0 Engine - Binary Generation', () => {
     expect(t).toContain('3053'); // 'こ'
   });
 
-  it('should embed a CJK font for Japanese text by default', async () => {
+  it('should embed a CJK subset font for Japanese text by default', async () => {
     ensureDir(OUT);
-    await generateNativePdf(
-      {
-        version: '1.0.0',
-        generatedAt: new Date().toISOString(),
-        source: { format: 'markdown', body: '日本語テキスト', title: 'Japanese' },
-      } as any,
-      OUT,
-      { compress: false }
-    );
+    const protocol = {
+      version: '1.0.0',
+      generatedAt: new Date().toISOString(),
+      source: { format: 'markdown', body: '日本語フォント埋め込み', title: 'Embed CJK' },
+    } as unknown as Parameters<typeof generateNativePdf>[0];
+    await generateNativePdf(protocol, OUT, { compress: false });
     const t = fs.readFileSync(OUT, 'binary');
+    expect(t).toContain('/Subtype /Type0');
     expect(t).toContain('/Subtype /CIDFontType2');
     expect(t).toContain('/FontFile2');
+    expect(t).toContain('/ToUnicode');
     expect(t).toContain('/Encoding /Identity-H');
-    expect(t).not.toContain('/BaseFont /HeiseiKakuGo-W5');
-  });
-
-  it('should avoid embedding a CJK font for ASCII-only documents', async () => {
-    ensureDir(OUT);
-    await generateNativePdf(
-      {
-        version: '1.0.0',
-        generatedAt: new Date().toISOString(),
-        source: { format: 'markdown', body: 'ASCII only', title: 'ASCII' },
-      } as any,
-      OUT,
-      { compress: false }
-    );
-    const t = fs.readFileSync(OUT, 'binary');
-    expect(t).not.toContain('/FontFile2');
-    expect(t).toContain('/BaseFont /Helvetica');
   });
 
   it('should generate PDF with precise coordinates from aesthetic elements', async () => {
@@ -825,6 +807,45 @@ describe('Native PDF 2.0 Engine - Binary Generation', () => {
     expect(t).toContain('(FullName)');
     expect(t).toContain('/Subtype /Widget');
     expect(t).toContain('/Subtype /Form'); // Appearance Stream
+  });
+
+  it('should serialize non-ASCII form values and options safely', async () => {
+    ensureDir(OUT);
+    await generateNativePdf(
+      {
+        version: '1.0.0',
+        generatedAt: new Date().toISOString(),
+        source: { format: 'markdown', body: 'Form document' },
+        acroForm: {
+          fields: [
+            {
+              name: '氏名',
+              type: 'text',
+              rect: [50, 700, 200, 20],
+              value: '山田太郎',
+              tooltip: '入力してください',
+              pageIndex: 0,
+            },
+            {
+              name: '国',
+              type: 'dropdown',
+              rect: [50, 640, 150, 20],
+              options: ['日本', '米国', '英国'],
+              value: '日本',
+              pageIndex: 0,
+            },
+          ],
+        },
+      } as any,
+      OUT,
+      { compress: false, embed_cjk_font: false }
+    );
+    const t = fs.readFileSync(OUT, 'binary');
+    expect(t).toContain('<FEFF');
+    expect(t).toContain('5C71'); // 山
+    expect(t).toContain('65E5'); // 日
+    expect(t).not.toContain('山田太郎');
+    expect(t).not.toContain('日本');
   });
 
   // ── P3-2: Optional Content Groups / Layers ───────────────

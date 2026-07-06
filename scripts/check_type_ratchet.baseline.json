@@ -3,16 +3,16 @@
   "generated_at": "2026-07-05T06:00:00.000Z",
   "counts": {
     "src": {
-      "any_keywords": 2991,
+      "any_keywords": 2989,
       "as_any": 582,
       "ts_ignore": 7,
-      "files": 950
+      "files": 933
     },
     "test": {
-      "any_keywords": 1043,
-      "as_any": 739,
+      "any_keywords": 1040,
+      "as_any": 736,
       "ts_ignore": 2,
-      "files": 669
+      "files": 651
     }
   }
 }
