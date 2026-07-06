@@ -703,7 +703,9 @@ function renderPlaywrightSkeleton(
     const op = normalizeBrowserPipelineOp(action.op);
     const validation = validateOpInput('browser', op, action);
     if (!validation.valid) {
-      throw new Error(`[INVALID_OP_INPUT] browser:${op}: ${validation.errors.join('; ')}`);
+      throw new Error(
+        `[INVALID_OP_INPUT] browser:${op}: ${'errors' in validation ? validation.errors.join('; ') : ''}`
+      );
     }
     switch (op) {
       case 'goto':
@@ -815,7 +817,9 @@ function renderBrowserAdf(trail: BrowserRecordedAction[], sessionId: string): Br
     const op = normalizeBrowserPipelineOp(action.op);
     const validation = validateOpInput('browser', op, action);
     if (!validation.valid) {
-      throw new Error(`[INVALID_OP_INPUT] browser:${op}: ${validation.errors.join('; ')}`);
+      throw new Error(
+        `[INVALID_OP_INPUT] browser:${op}: ${'errors' in validation ? validation.errors.join('; ') : ''}`
+      );
     }
     switch (op) {
       case 'goto':

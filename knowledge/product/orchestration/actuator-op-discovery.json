@@ -38,7 +38,28 @@
       "ops": [
         {
           "op": "content",
-          "kind": "capture"
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "required": ["selector", "content_excerpt"],
+            "properties": {
+              "selector": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content_excerpt": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "selector": "#status",
+              "content_excerpt": "Ready"
+            }
+          ]
         },
         {
           "op": "evaluate",
@@ -46,7 +67,23 @@
         },
         {
           "op": "goto",
-          "kind": "capture"
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "required": ["url"],
+            "properties": {
+              "url": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "url": "https://example.com"
+            }
+          ]
         },
         {
           "op": "screenshot",
@@ -54,7 +91,40 @@
         },
         {
           "op": "click",
-          "kind": "apply"
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "anyOf": [
+              {
+                "required": ["selector"]
+              },
+              {
+                "required": ["ref"]
+              }
+            ],
+            "properties": {
+              "selector": {
+                "type": "string",
+                "minLength": 1
+              },
+              "ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "element_name": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "selector": "button[type=\"submit\"]"
+            },
+            {
+              "ref": "login-submit"
+            }
+          ]
         },
         {
           "op": "extension_session",
@@ -62,7 +132,38 @@
         },
         {
           "op": "fill",
-          "kind": "apply"
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "anyOf": [
+              {
+                "required": ["selector"]
+              },
+              {
+                "required": ["ref"]
+              }
+            ],
+            "properties": {
+              "selector": {
+                "type": "string",
+                "minLength": 1
+              },
+              "ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "text": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "selector": "input[name=\"email\"]",
+              "text": "user@example.com"
+            }
+          ]
         },
         {
           "op": "log",
@@ -70,11 +171,70 @@
         },
         {
           "op": "press",
-          "kind": "apply"
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "anyOf": [
+              {
+                "required": ["selector"]
+              },
+              {
+                "required": ["ref"]
+              }
+            ],
+            "properties": {
+              "selector": {
+                "type": "string",
+                "minLength": 1
+              },
+              "ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "key": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "selector": "input[name=\"email\"]",
+              "key": "Enter"
+            }
+          ]
         },
         {
           "op": "wait",
-          "kind": "apply"
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "anyOf": [
+              {
+                "required": ["selector"]
+              },
+              {
+                "required": ["ref"]
+              }
+            ],
+            "properties": {
+              "selector": {
+                "type": "string",
+                "minLength": 1
+              },
+              "ref": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "selector": "#ready-state"
+            }
+          ]
         }
       ]
     },
@@ -160,19 +320,83 @@
         },
         {
           "op": "list",
-          "kind": "capture"
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "required": ["path"],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "path": "knowledge/product"
+            }
+          ]
         },
         {
           "op": "read",
-          "kind": "capture"
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "required": ["path"],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "path": "knowledge/product/README.md"
+            }
+          ]
         },
         {
           "op": "read_file",
-          "kind": "capture"
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "required": ["path"],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "path": "knowledge/product/README.md"
+            }
+          ]
         },
         {
           "op": "read_json",
-          "kind": "capture"
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "required": ["path"],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "path": "knowledge/product/config.json"
+            }
+          ]
         },
         {
           "op": "json_parse",
@@ -188,23 +412,122 @@
         },
         {
           "op": "append",
-          "kind": "apply"
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "required": ["path"],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content": {},
+              "from": {
+                "type": "string",
+                "minLength": 1
+              },
+              "newline": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "path": "knowledge/product/log.txt",
+              "content": "line"
+            }
+          ]
         },
         {
           "op": "copy",
-          "kind": "apply"
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "required": ["from", "to"],
+            "properties": {
+              "from": {
+                "type": "string",
+                "minLength": 1
+              },
+              "to": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "from": "knowledge/product/a.txt",
+              "to": "active/shared/tmp/a.txt"
+            }
+          ]
         },
         {
           "op": "delete",
-          "kind": "apply"
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "required": ["path"],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "path": "active/shared/tmp/stale.json"
+            }
+          ]
         },
         {
           "op": "mkdir",
-          "kind": "apply"
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "required": ["path"],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "path": "active/shared/tmp/new-folder"
+            }
+          ]
         },
         {
           "op": "move",
-          "kind": "apply"
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "required": ["from", "to"],
+            "properties": {
+              "from": {
+                "type": "string",
+                "minLength": 1
+              },
+              "to": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "from": "knowledge/product/a.txt",
+              "to": "active/shared/tmp/a.txt"
+            }
+          ]
         },
         {
           "op": "symlink",
@@ -212,11 +535,60 @@
         },
         {
           "op": "write",
-          "kind": "apply"
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "required": ["path"],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content": {},
+              "from": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "path": "knowledge/product/note.txt",
+              "content": "hello"
+            }
+          ]
         },
         {
           "op": "write_file",
-          "kind": "apply"
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "required": ["path"],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "output_path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content": {},
+              "data": {},
+              "from": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "path": "knowledge/product/note.txt",
+              "content": "hello"
+            }
+          ]
         }
       ]
     },
@@ -443,11 +815,43 @@
         },
         {
           "op": "read_file",
-          "kind": "capture"
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "required": ["path"],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "path": "knowledge/product/README.md"
+            }
+          ]
         },
         {
           "op": "read_json",
-          "kind": "capture"
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "required": ["path"],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "path": "knowledge/product/config.json"
+            }
+          ]
         },
         {
           "op": "probe",
@@ -622,15 +1026,81 @@
         },
         {
           "op": "open_file",
-          "kind": "apply"
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "required": ["path"],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "path": "knowledge/product/README.md"
+            }
+          ]
         },
         {
           "op": "app_quit",
-          "kind": "apply"
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "required": ["application"],
+            "properties": {
+              "application": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "application": "Finder"
+            }
+          ]
         },
         {
           "op": "process_kill",
-          "kind": "apply"
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "anyOf": [
+              {
+                "required": ["pid"]
+              },
+              {
+                "required": ["name"]
+              }
+            ],
+            "properties": {
+              "pid": {
+                "type": "number",
+                "minimum": 1
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "signal": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "pid": 1234
+            },
+            {
+              "name": "Finder"
+            }
+          ]
         },
         {
           "op": "run_applescript",
@@ -811,7 +1281,43 @@
         },
         {
           "op": "notify",
-          "kind": "apply"
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "anyOf": [
+              {
+                "required": ["message"]
+              },
+              {
+                "required": ["text"]
+              }
+            ],
+            "properties": {
+              "title": {
+                "type": "string",
+                "minLength": 1
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1
+              },
+              "text": {
+                "type": "string",
+                "minLength": 1
+              },
+              "subtitle": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "title": "Kyberion",
+              "message": "Build finished"
+            }
+          ]
         },
         {
           "op": "wait",
