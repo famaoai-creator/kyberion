@@ -3,6 +3,7 @@ import { loadActuatorManifestCatalog } from '../libs/core/src/actuator-manifest-
 import { pathResolver } from '../libs/core/path-resolver.js';
 import { safeExistsSync, safeReadFile, safeWriteFile } from '../libs/core/secure-io.js';
 import { withExecutionContext } from '../libs/core/governance.js';
+import { getOpInputContract } from '../libs/core/op-input-contracts.js';
 import { describeOps as describeSystemOps } from '../libs/actuators/system-actuator/src/op-catalog.js';
 
 type PipelineOpKind = 'capture' | 'transform' | 'apply' | 'control';
@@ -69,6 +70,18 @@ function normalizeDomainRegistry(registry: DomainOpRegistry | undefined): Domain
 
 function loadJson<T>(filePath: string): T {
   return JSON.parse(String(safeReadFile(filePath, { encoding: 'utf8' }) || '{}')) as T;
+}
+
+function annotateOp(domain: string, op: string, kind: PipelineOpKind) {
+  const contract = getOpInputContract(domain as 'browser' | 'file' | 'system', op);
+  return contract
+    ? {
+        op,
+        kind,
+        input_schema: contract.schema,
+        examples: contract.examples,
+      }
+    : { op, kind };
 }
 
 function loadMediaManifest(): MediaManifestFile | null {
@@ -147,9 +160,9 @@ function buildOpDiscoveryReport(
       path: entry.path,
       source: 'registry',
       ops: [
-        ...(domainOps.capture || []).map((op) => ({ op, kind: 'capture' as const })),
-        ...(domainOps.transform || []).map((op) => ({ op, kind: 'transform' as const })),
-        ...(domainOps.apply || []).map((op) => ({ op, kind: 'apply' as const })),
+        ...(domainOps.capture || []).map((op) => annotateOp(domainName, op, 'capture')),
+        ...(domainOps.transform || []).map((op) => annotateOp(domainName, op, 'transform')),
+        ...(domainOps.apply || []).map((op) => annotateOp(domainName, op, 'apply')),
       ],
     });
   }

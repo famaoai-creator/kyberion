@@ -198,6 +198,23 @@ describe('run_pipeline compatibility', () => {
     expect(result.results).toEqual([{ op: 'core:if', status: 'skipped' }]);
   });
 
+  it('rejects system ops that fail input contract validation before dispatch', async () => {
+    const result = await runSteps([
+      {
+        op: 'system:open_url',
+        params: {},
+      },
+    ]);
+
+    expect(result.status).toBe('failed');
+    const failed = result.results.find(
+      (entry: { status: string; error?: string }) => entry.status === 'failed'
+    );
+    expect(failed?.error).toContain('[INVALID_OP_INPUT]');
+    expect(failed?.error).toContain('system:open_url');
+    expect(failed?.error).toContain('url');
+  });
+
   it('runs parallel_foreach with bounded concurrency and collects per-item outputs', async () => {
     const startedAt = Date.now();
     const result = await runSteps([

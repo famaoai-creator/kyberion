@@ -369,6 +369,42 @@ const INPUT_CONTRACTS: ContractCatalog = {
         additionalProperties: true,
       },
     },
+    open_file: {
+      summary: 'Open a file path on the host.',
+      examples: [{ path: 'knowledge/product/README.md' }],
+      schema: {
+        type: 'object',
+        required: ['path'],
+        properties: {
+          path: { type: 'string', minLength: 1 },
+        },
+        additionalProperties: true,
+      },
+    },
+    read_file: {
+      summary: 'Read a file on the host.',
+      examples: [{ path: 'knowledge/product/README.md' }],
+      schema: {
+        type: 'object',
+        required: ['path'],
+        properties: {
+          path: { type: 'string', minLength: 1 },
+        },
+        additionalProperties: true,
+      },
+    },
+    read_json: {
+      summary: 'Read a JSON file on the host.',
+      examples: [{ path: 'knowledge/product/config.json' }],
+      schema: {
+        type: 'object',
+        required: ['path'],
+        properties: {
+          path: { type: 'string', minLength: 1 },
+        },
+        additionalProperties: true,
+      },
+    },
     write_file: {
       summary: 'Write a file on the host.',
       examples: [{ path: 'active/shared/tmp/system-note.txt', content: 'hello' }],
@@ -409,6 +445,47 @@ const INPUT_CONTRACTS: ContractCatalog = {
         properties: {
           path: { type: 'string', minLength: 1 },
           data: {},
+        },
+        additionalProperties: true,
+      },
+    },
+    notify: {
+      summary: 'Send a host notification.',
+      examples: [{ title: 'Kyberion', message: 'Build finished' }],
+      schema: {
+        type: 'object',
+        anyOf: [{ required: ['message'] }, { required: ['text'] }],
+        properties: {
+          title: { type: 'string', minLength: 1 },
+          message: { type: 'string', minLength: 1 },
+          text: { type: 'string', minLength: 1 },
+          subtitle: { type: 'string', minLength: 1 },
+        },
+        additionalProperties: true,
+      },
+    },
+    app_quit: {
+      summary: 'Quit a host application.',
+      examples: [{ application: 'Finder' }],
+      schema: {
+        type: 'object',
+        required: ['application'],
+        properties: {
+          application: { type: 'string', minLength: 1 },
+        },
+        additionalProperties: true,
+      },
+    },
+    process_kill: {
+      summary: 'Terminate a host process by pid or name.',
+      examples: [{ pid: 1234 }, { name: 'Finder' }],
+      schema: {
+        type: 'object',
+        anyOf: [{ required: ['pid'] }, { required: ['name'] }],
+        properties: {
+          pid: { type: 'number', minimum: 1 },
+          name: { type: 'string', minLength: 1 },
+          signal: { type: 'string', minLength: 1 },
         },
         additionalProperties: true,
       },

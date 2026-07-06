@@ -16,6 +16,25 @@ describe('op-input-contracts', () => {
         schema: expect.objectContaining({ type: 'object' }),
       })
     );
+    expect(getOpInputContract('system', 'read_json')).toEqual(
+      expect.objectContaining({
+        examples: expect.arrayContaining([
+          expect.objectContaining({ path: 'knowledge/product/config.json' }),
+        ]),
+      })
+    );
+    expect(getOpInputContract('system', 'notify')).toEqual(
+      expect.objectContaining({
+        examples: expect.arrayContaining([
+          expect.objectContaining({ title: 'Kyberion', message: 'Build finished' }),
+        ]),
+      })
+    );
+    expect(getOpInputContract('system', 'process_kill')).toEqual(
+      expect.objectContaining({
+        examples: expect.arrayContaining([expect.objectContaining({ pid: 1234 })]),
+      })
+    );
     expect(listOpInputContracts('file').write_artifact).toEqual(
       expect.objectContaining({
         examples: expect.arrayContaining([

@@ -48,10 +48,30 @@ const resolveWriteArtifactSpec = vi.fn((params: any, ctx: any, resolve: (value: 
   content: params.content ?? params.data ?? resolve(params.from ? `{{${params.from}}}` : ''),
 }));
 const getOpInputContract = vi.fn((domain: string, op: string) => {
-  if (domain === 'system' && op === 'write_file') {
+  if (domain === 'system' && op === 'open_url') {
     return {
-      summary: 'Write a file on the host.',
-      examples: [{ path: 'active/shared/tmp/system-note.txt', content: 'hello' }],
+      summary: 'Open a URL on the host.',
+      examples: [{ url: 'https://example.com' }],
+      schema: {
+        type: 'object',
+        required: ['url'],
+        properties: {
+          url: { type: 'string', minLength: 1 },
+        },
+        additionalProperties: true,
+      },
+    };
+  }
+  if (domain === 'system' && ['write_file', 'read_file', 'read_json', 'open_file'].includes(op)) {
+    const examplePath =
+      op === 'read_json'
+        ? 'knowledge/product/config.json'
+        : op === 'open_file'
+          ? 'knowledge/product/README.md'
+          : 'active/shared/tmp/system-note.txt';
+    return {
+      summary: op === 'write_file' ? 'Write a file on the host.' : `Contract for ${op}.`,
+      examples: [{ path: examplePath }],
       schema: {
         type: 'object',
         required: ['path'],
@@ -62,8 +82,83 @@ const getOpInputContract = vi.fn((domain: string, op: string) => {
       },
     };
   }
+  if (domain === 'system' && op === 'app_quit') {
+    return {
+      summary: 'Quit a host application.',
+      examples: [{ application: 'Finder' }],
+      schema: {
+        type: 'object',
+        required: ['application'],
+        properties: {
+          application: { type: 'string', minLength: 1 },
+        },
+        additionalProperties: true,
+      },
+    };
+  }
+  if (domain === 'system' && op === 'process_kill') {
+    return {
+      summary: 'Terminate a host process by pid or name.',
+      examples: [{ pid: 1234 }, { name: 'Finder' }],
+      schema: {
+        type: 'object',
+        anyOf: [{ required: ['pid'] }, { required: ['name'] }],
+        properties: {
+          pid: { type: 'number', minimum: 1 },
+          name: { type: 'string', minLength: 1 },
+          signal: { type: 'string', minLength: 1 },
+        },
+        additionalProperties: true,
+      },
+    };
+  }
   return null;
 });
+const validateOpInput = vi.fn((domain: string, op: string, params: any) => {
+  if (domain === 'system' && op === 'open_url') {
+    const url = typeof params?.url === 'string' ? params.url.trim() : '';
+    if (!url) {
+      return { valid: false, errors: ['url is required'] };
+    }
+  }
+  if (domain === 'system' && ['write_file', 'read_file', 'read_json', 'open_file'].includes(op)) {
+    const path = typeof params?.path === 'string' ? params.path.trim() : '';
+    if (!path) {
+      return { valid: false, errors: ['path is required'] };
+    }
+  }
+  if (domain === 'system' && op === 'app_quit') {
+    const application = typeof params?.application === 'string' ? params.application.trim() : '';
+    if (!application) {
+      return { valid: false, errors: ['application is required'] };
+    }
+  }
+  if (domain === 'system' && op === 'process_kill') {
+    const pid = typeof params?.pid === 'number' ? params.pid : Number.NaN;
+    const name = typeof params?.name === 'string' ? params.name.trim() : '';
+    if (!Number.isFinite(pid) && !name) {
+      return { valid: false, errors: ['pid or name is required'] };
+    }
+  }
+  return { valid: true };
+});
+const listOpInputContracts = vi.fn((domain: string) => {
+  if (domain === 'system') {
+    return {
+      open_url: getOpInputContract('system', 'open_url'),
+      open_file: getOpInputContract('system', 'open_file'),
+      read_file: getOpInputContract('system', 'read_file'),
+      read_json: getOpInputContract('system', 'read_json'),
+      app_quit: getOpInputContract('system', 'app_quit'),
+      process_kill: getOpInputContract('system', 'process_kill'),
+      write_file: getOpInputContract('system', 'write_file'),
+    };
+  }
+  return {};
+});
+const suggestClosestStrings = vi.fn((target: string, candidates: string[]) =>
+  [...new Set(candidates)].slice(0, 3)
+);
 const activateApplication = vi.fn((application: string) =>
   safeExec('osascript', ['-e', `tell application "${application}" to activate`])
 );
@@ -740,6 +835,9 @@ vi.mock('@agent/core', () => ({
   getPathValue,
   resolveWriteArtifactSpec,
   getOpInputContract,
+  validateOpInput,
+  listOpInputContracts,
+  suggestClosestStrings,
   safeExec,
   classifyError,
   retry,
@@ -950,7 +1048,9 @@ describe('system-actuator computer_interaction adapter', () => {
   it('persists pipeline context to rootDir-based context_path', async () => {
     const { handleAction } = await import('./index');
     const core = await import('@agent/core');
-    vi.mocked(core.safeReadFile).mockReturnValueOnce('{"a":1}');
+    vi.mocked(core.safeReadFile).mockImplementation((filePath: string) =>
+      String(filePath).includes('active/shared/tmp/input.json') ? '{"a":1}' : '{}'
+    );
 
     const result = await handleAction({
       action: 'pipeline',
@@ -2219,8 +2319,27 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
       expect(dragFrom).toHaveBeenCalledWith(10, 20, 300, 400);
     });
 
+    it('notify: calls systemNotify with title, message and subtitle', async () => {
+      const { handleAction } = await import('./index');
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [
+          {
+            type: 'apply',
+            op: 'notify',
+            params: { title: 'Hi', message: 'Done', subtitle: 'detail' },
+          },
+        ],
+      } as any);
+
+      expect(result.status).toBe('succeeded');
+      expect(systemNotify).toHaveBeenCalledWith('Hi', 'Done', 'detail');
+    });
+
     it('system_notify: calls systemNotify with title, message and subtitle', async () => {
       const { handleAction } = await import('./index');
+      const core = await import('@agent/core');
 
       const result = await handleAction({
         action: 'pipeline',
@@ -2235,6 +2354,9 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
 
       expect(result.status).toBe('succeeded');
       expect(systemNotify).toHaveBeenCalledWith('Hi', 'Done', 'detail');
+      expect(vi.mocked(core.logger.warn)).toHaveBeenCalledWith(
+        '[system-actuator] alias "system_notify" is deprecated; use "notify" instead.'
+      );
     });
 
     it('system_notify: works without subtitle', async () => {
@@ -2246,6 +2368,58 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
       } as any);
 
       expect(systemNotify).toHaveBeenCalledWith('Hi', 'Done', undefined);
+    });
+
+    it('open_url: rejects missing url input with contract validation', async () => {
+      const { handleAction } = await import('./index');
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'apply', op: 'open_url', params: {} }],
+      } as any);
+
+      expect(result.status).toBe('failed');
+      expect(result.results[0].error).toMatch(/\[INVALID_OP_INPUT\] system:open_url/);
+      expect(result.results[0].error).toMatch(/url/);
+    });
+
+    it('write_file: rejects missing path input with contract validation', async () => {
+      const { handleAction } = await import('./index');
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'apply', op: 'write_file', params: { content: 'hello' } }],
+      } as any);
+
+      expect(result.status).toBe('failed');
+      expect(result.results[0].error).toMatch(/\[INVALID_OP_INPUT\] system:write_file/);
+      expect(result.results[0].error).toMatch(/path/);
+    });
+
+    it('read_json: rejects missing path input with contract validation', async () => {
+      const { handleAction } = await import('./index');
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'capture', op: 'read_json', params: {} }],
+      } as any);
+
+      expect(result.status).toBe('failed');
+      expect(result.results[0].error).toMatch(/\[INVALID_OP_INPUT\] system:read_json/);
+      expect(result.results[0].error).toMatch(/path/);
+    });
+
+    it('open_file: rejects missing path input with contract validation', async () => {
+      const { handleAction } = await import('./index');
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'apply', op: 'open_file', params: {} }],
+      } as any);
+
+      expect(result.status).toBe('failed');
+      expect(result.results[0].error).toMatch(/\[INVALID_OP_INPUT\] system:open_file/);
+      expect(result.results[0].error).toMatch(/path/);
     });
 
     it('clipboard_write: calls clipboardWrite with text', async () => {
@@ -2272,7 +2446,7 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
       expect(quitApplication).toHaveBeenCalledWith('Finder');
     });
 
-    it('app_quit: throws when application param is missing', async () => {
+    it('app_quit: rejects missing application input with contract validation', async () => {
       const { handleAction } = await import('./index');
 
       const result = await handleAction({
@@ -2281,6 +2455,7 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
       } as any);
 
       expect(result.status).toBe('failed');
+      expect(result.results[0].error).toMatch(/\[INVALID_OP_INPUT\] system:app_quit/);
       expect(result.results[0].error).toMatch(/application/);
     });
 
@@ -2361,6 +2536,19 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
       expect(result.results[0].error).toMatch(/SECURITY|disabled/i);
 
       process.env.KYBERION_ALLOW_UNSAFE_SHELL = savedEnv;
+    });
+
+    it('unknown op: suggests a close system op name', async () => {
+      const { handleAction } = await import('./index');
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'apply', op: 'open_ur', params: {} }],
+      } as any);
+
+      expect(result.status).toBe('failed');
+      expect(result.results[0].error).toMatch(/\[UNKNOWN_OP\] Unknown op: open_ur/);
+      expect(result.results[0].error).toMatch(/open_url/);
     });
 
     it('open_file: rejects path traversal outside repo root', async () => {

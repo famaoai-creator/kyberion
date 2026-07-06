@@ -203,7 +203,9 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
   const rootDir = pathResolver.rootDir();
   const validation = validateOpInput('file', op, params);
   if (!validation.valid) {
-    throw new Error(`[INVALID_OP_INPUT] ${op}: ${validation.errors.join('; ')}`);
+    throw new Error(
+      `[INVALID_OP_INPUT] ${op}: ${'errors' in validation ? validation.errors.join('; ') : ''}`
+    );
   }
   switch (op) {
     case 'read':
@@ -323,7 +325,9 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
   const rootDir = pathResolver.rootDir();
   const validation = validateOpInput('file', op, params);
   if (!validation.valid) {
-    throw new Error(`[INVALID_OP_INPUT] ${op}: ${validation.errors.join('; ')}`);
+    throw new Error(
+      `[INVALID_OP_INPUT] ${op}: ${'errors' in validation ? validation.errors.join('; ') : ''}`
+    );
   }
   switch (op) {
     case 'write': {

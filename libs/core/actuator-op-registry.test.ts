@@ -1,5 +1,24 @@
+import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { determineActuatorStepType, listRegisteredDomainOps } from './actuator-op-registry.js';
+import { pathResolver, safeReadFile, safeReaddir, safeStat } from './index.js';
+
+function collectSourceFiles(dir: string): string[] {
+  const entries = safeReaddir(dir);
+  const files: string[] = [];
+  for (const entry of entries) {
+    if (entry.startsWith('.')) continue;
+    const abs = path.join(dir, entry);
+    const stats = safeStat(abs);
+    if (stats.isDirectory()) {
+      files.push(...collectSourceFiles(abs));
+      continue;
+    }
+    if (!entry.endsWith('.ts') || entry.endsWith('.test.ts') || entry.endsWith('.d.ts')) continue;
+    files.push(abs);
+  }
+  return files;
+}
 
 describe('actuator-op-registry', () => {
   it('classifies media transform and apply ops through the shared registry', () => {
@@ -35,5 +54,20 @@ describe('actuator-op-registry', () => {
     expect(() => determineActuatorStepType('file', 'stat')).toThrowError(
       /\[UNKNOWN_OP\] Unknown op "stat" for domain "file"/
     );
+  });
+
+  it('keeps actuator sources free of silent default ctx fallthroughs', () => {
+    const actuatorRoot = pathResolver.rootResolve('libs/actuators');
+    const scanTargets = [
+      ...collectSourceFiles(actuatorRoot),
+      pathResolver.rootResolve('scripts/run_pipeline.ts'),
+    ];
+    const offenders = scanTargets.filter((file) =>
+      String(safeReadFile(file, { encoding: 'utf8' }) || '').match(
+        /default:\s*(?:return ctx;|return currentCtx;|return;)/m
+      )
+    );
+
+    expect(offenders).toEqual([]);
   });
 });
