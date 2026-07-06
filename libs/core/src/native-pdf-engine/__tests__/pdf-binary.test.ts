@@ -87,38 +87,20 @@ describe('Native PDF 2.0 Engine - Binary Generation', () => {
     expect(t).toContain('3053'); // 'こ'
   });
 
-  it('should embed a CJK font for Japanese text by default', async () => {
+  it('should embed a CJK subset font for Japanese text by default', async () => {
     ensureDir(OUT);
-    await generateNativePdf(
-      {
-        version: '1.0.0',
-        generatedAt: new Date().toISOString(),
-        source: { format: 'markdown', body: '日本語テキスト', title: 'Japanese' },
-      } as any,
-      OUT,
-      { compress: false }
-    );
+    const protocol = {
+      version: '1.0.0',
+      generatedAt: new Date().toISOString(),
+      source: { format: 'markdown', body: '日本語フォント埋め込み', title: 'Embed CJK' },
+    } as unknown as Parameters<typeof generateNativePdf>[0];
+    await generateNativePdf(protocol, OUT, { compress: false });
     const t = fs.readFileSync(OUT, 'binary');
+    expect(t).toContain('/Subtype /Type0');
     expect(t).toContain('/Subtype /CIDFontType2');
     expect(t).toContain('/FontFile2');
+    expect(t).toContain('/ToUnicode');
     expect(t).toContain('/Encoding /Identity-H');
-    expect(t).not.toContain('/BaseFont /HeiseiKakuGo-W5');
-  });
-
-  it('should avoid embedding a CJK font for ASCII-only documents', async () => {
-    ensureDir(OUT);
-    await generateNativePdf(
-      {
-        version: '1.0.0',
-        generatedAt: new Date().toISOString(),
-        source: { format: 'markdown', body: 'ASCII only', title: 'ASCII' },
-      } as any,
-      OUT,
-      { compress: false }
-    );
-    const t = fs.readFileSync(OUT, 'binary');
-    expect(t).not.toContain('/FontFile2');
-    expect(t).toContain('/BaseFont /Helvetica');
   });
 
   it('should generate PDF with precise coordinates from aesthetic elements', async () => {

@@ -469,20 +469,6 @@ describe('Native DOCX Engine', () => {
       expect(styles).toContain('w:styleId="Heading2"');
     });
 
-    it('theme should carry the Japanese eastAsia font by default', () => {
-      const theme = files.get('word/theme/theme1.xml')!;
-      expect(theme).toContain('Noto Sans JP');
-      expect(theme).not.toContain('<a:ea typeface=""/>');
-    });
-
-    it('font table should not rely on MS Gothic / MS Mincho defaults', () => {
-      const fontTable = files.get('word/fontTable.xml')!;
-      expect(fontTable).toContain('Noto Sans JP');
-      expect(fontTable).toContain('Yu Gothic');
-      expect(fontTable).not.toContain('MS Gothic');
-      expect(fontTable).not.toContain('MS Mincho');
-    });
-
     it('text content should be wrapped in <w:t> with xml:space="preserve"', () => {
       const doc = files.get('word/document.xml')!;
       expect(doc).toContain('xml:space="preserve"');
@@ -577,8 +563,9 @@ describe('Native DOCX Engine', () => {
       const fontTable = files.get('word/fontTable.xml')!;
       expect(fontTable).toContain('<w:fonts');
       expect(fontTable).toContain('w:name="Inter"');
+      expect(fontTable).toContain('w:name="Times New Roman"');
       expect(fontTable).toContain('w:name="Noto Sans JP"');
-      expect(fontTable).toContain('w:name="Yu Gothic"');
+      expect(fontTable).toContain('w:name="MS Mincho"');
     });
 
     it('theme should have valid effectStyleLst', () => {

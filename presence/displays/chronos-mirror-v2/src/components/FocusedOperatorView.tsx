@@ -620,6 +620,7 @@ export function FocusedOperatorView({
           <button
             type="button"
             onClick={onBack}
+            aria-label="Return to full Chronos console"
             className="self-start rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-[10px] uppercase tracking-[0.2em] text-white/75 transition hover:bg-white/10"
           >
             Show Full Console
@@ -653,6 +654,7 @@ export function FocusedOperatorView({
                   {onOpenView && attentionItemTargetViewId(item) ? (
                     <button
                       type="button"
+                      aria-label={`Open related view: ${attentionItemTargetViewLabel(item) || 'view'}`}
                       onClick={() =>
                         onOpenView(
                           attentionItemTargetViewId(item)!,

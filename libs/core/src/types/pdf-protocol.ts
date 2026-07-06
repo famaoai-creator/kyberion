@@ -233,7 +233,7 @@ export interface PdfRenderOptions {
   unicode?: boolean;
   objectStreams?: boolean;
   xmpMetadata?: boolean;
-  /** Embed a Japanese CJK font when text requires it (default: true). */
+  embedCjkFont?: boolean;
   embed_cjk_font?: boolean;
   /** Emit /MarkInfo for Tagged PDF (default: auto if structTree present) */
   tagged?: boolean;
