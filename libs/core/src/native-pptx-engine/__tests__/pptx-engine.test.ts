@@ -319,6 +319,29 @@ describe('Native PPTX Engine', () => {
       expect(theme).not.toContain('<a:ea typeface=""/>');
     });
 
+    it('theme should honor explicit major and minor fonts', async () => {
+      const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'pptx-theme-'));
+      const output = path.join(tmp, 'fonts.pptx');
+      await generateNativePptx(
+        {
+          ...createTestProtocol(),
+          theme: {
+            ...createTestProtocol().theme,
+            majorFont: 'Yu Gothic',
+            minorFont: 'Georgia',
+            eastAsiaFont: 'MS Gothic',
+          },
+        },
+        output
+      );
+      const themedFiles = extractPptx(output);
+      const theme = themedFiles.get('ppt/theme/theme1.xml')!;
+      expect(theme).toContain('typeface="Yu Gothic"');
+      expect(theme).toContain('typeface="Georgia"');
+      expect(theme).toContain('typeface="MS Gothic"');
+      fs.rmSync(tmp, { recursive: true, force: true });
+    });
+
     it('bodyPr should have anchor attribute when valign is set', () => {
       const slide1 = files.get('ppt/slides/slide1.xml')!;
       // The third element has valign: 'middle' → anchor="ctr"

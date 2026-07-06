@@ -1,3 +1,4 @@
+import { resolveLatinFontFamily } from '@agent/core/design-fonts';
 import {
   resolveDrawioEdgeLabelStyleParts,
   resolveDrawioEdgeRoutingStyleParts,
@@ -51,8 +52,10 @@ function drawioNodeDepth(node: any, nodeMap: Map<string, any>): number {
 }
 
 function compareDrawioNodesByTier(left: any, right: any): number {
-  const leftTier = typeof left?.render_hints?.semantic_tier === 'string' ? left.render_hints.semantic_tier : '';
-  const rightTier = typeof right?.render_hints?.semantic_tier === 'string' ? right.render_hints.semantic_tier : '';
+  const leftTier =
+    typeof left?.render_hints?.semantic_tier === 'string' ? left.render_hints.semantic_tier : '';
+  const rightTier =
+    typeof right?.render_hints?.semantic_tier === 'string' ? right.render_hints.semantic_tier : '';
   const leftRank = resolveMediaDrawioTierRank(leftTier);
   const rightRank = resolveMediaDrawioTierRank(rightTier);
   if (leftRank !== rightRank) {
@@ -85,13 +88,25 @@ function compareDrawioLeafNodes(left: any, right: any): number {
   if (!leftClusterKey && rightClusterKey) {
     return 1;
   }
-  if (leftType === 'aws_security_group' && rightType === 'aws_security_group_rule' && rightRelatedSg.includes(`${relationPrefix}${leftName}`)) {
+  if (
+    leftType === 'aws_security_group' &&
+    rightType === 'aws_security_group_rule' &&
+    rightRelatedSg.includes(`${relationPrefix}${leftName}`)
+  ) {
     return -1;
   }
-  if (leftType === 'aws_security_group_rule' && rightType === 'aws_security_group' && leftRelatedSg.includes(`${relationPrefix}${rightName}`)) {
+  if (
+    leftType === 'aws_security_group_rule' &&
+    rightType === 'aws_security_group' &&
+    leftRelatedSg.includes(`${relationPrefix}${rightName}`)
+  ) {
     return 1;
   }
-  if (leftType === 'aws_security_group_rule' && rightType === 'aws_security_group_rule' && leftRelatedSg !== rightRelatedSg) {
+  if (
+    leftType === 'aws_security_group_rule' &&
+    rightType === 'aws_security_group_rule' &&
+    leftRelatedSg !== rightRelatedSg
+  ) {
     return leftRelatedSg.localeCompare(rightRelatedSg);
   }
   return leftName.localeCompare(rightName);
@@ -115,17 +130,24 @@ function resolveDrawioBoundaryIcon(node: any, iconRoot?: string): string | null 
     if (!safeExistsSync(absolutePath)) continue;
     const buffer = safeReadFile(absolutePath, { encoding: null }) as Buffer;
     const extension = path.extname(absolutePath).toLowerCase();
-    const mimeType = extension === '.svg' ? 'image/svg+xml' : extension === '.png' ? 'image/png' : null;
+    const mimeType =
+      extension === '.svg' ? 'image/svg+xml' : extension === '.png' ? 'image/png' : null;
     if (!mimeType) continue;
     return `data:${mimeType},${buffer.toString('base64')}`;
   }
   return null;
 }
 
-function resolveDrawioBoundaryPalette(node: any, fallbackFill: string, fallbackStroke: string): { fill: string; stroke: string } {
+function resolveDrawioBoundaryPalette(
+  node: any,
+  fallbackFill: string,
+  fallbackStroke: string
+): { fill: string; stroke: string } {
   const boundary = String(node?.boundary || '');
   const type = String(node?.type || '');
-  const tier = String(node?.render_hints?.semantic_tier || '').trim().toLowerCase();
+  const tier = String(node?.render_hints?.semantic_tier || '')
+    .trim()
+    .toLowerCase();
   const override = resolveDrawioBoundaryPaletteOverride({ boundary, type, tier, name: node?.name });
   if (override) return override;
   return resolveMediaDrawioBoundaryPalette({
@@ -144,7 +166,8 @@ function resolveDrawioNodeSize(node: any): { width: number; height: number } {
     return { width: explicitWidth, height: explicitHeight };
   }
 
-  const tier = typeof node?.render_hints?.semantic_tier === 'string' ? node.render_hints.semantic_tier : '';
+  const tier =
+    typeof node?.render_hints?.semantic_tier === 'string' ? node.render_hints.semantic_tier : '';
   const resolved = resolveMediaDrawioNodeSize({ type: node?.type, tier });
   if (resolved) return resolved;
   return { width: 160, height: 120 };
@@ -157,7 +180,9 @@ function resolveEmbeddedIcon(resourceType: string, entry: any, iconRoot?: string
     ...awsIconCandidatesForResourceType(resourceType),
   ]
     .filter(Boolean)
-    .sort((left, right) => iconCandidatePriority(String(left)) - iconCandidatePriority(String(right)));
+    .sort(
+      (left, right) => iconCandidatePriority(String(left)) - iconCandidatePriority(String(right))
+    );
 
   for (const candidate of candidates) {
     const absolutePath = iconRoot
@@ -167,7 +192,8 @@ function resolveEmbeddedIcon(resourceType: string, entry: any, iconRoot?: string
 
     const buffer = safeReadFile(absolutePath, { encoding: null }) as Buffer;
     const extension = path.extname(absolutePath).toLowerCase();
-    const mimeType = extension === '.svg' ? 'image/svg+xml' : extension === '.png' ? 'image/png' : null;
+    const mimeType =
+      extension === '.svg' ? 'image/svg+xml' : extension === '.png' ? 'image/png' : null;
     if (!mimeType) continue;
     return `data:${mimeType},${buffer.toString('base64')}`;
   }
@@ -184,14 +210,20 @@ function buildDrawioNodeStyle(
   isContainer: boolean,
   options: { iconMap: any; iconRoot?: string },
   colors: Record<string, string>,
-  fonts: Record<string, string>,
+  fonts: Record<string, string>
 ): string {
   const resourceKey = node.icon_key || node.type;
-  const resourceEntry = options.iconMap?.resources?.[resourceKey] || options.iconMap?.resources?.[node.type] || options.iconMap?.resources?.default || {};
+  const resourceEntry =
+    options.iconMap?.resources?.[resourceKey] ||
+    options.iconMap?.resources?.[node.type] ||
+    options.iconMap?.resources?.default ||
+    {};
   const background = resourceEntry.fillColor || colors.background || '#ffffff';
   const stroke = resourceEntry.strokeColor || colors.primary || '#232f3e';
   const accent = resourceEntry.accentColor || colors.accent || '#ff9900';
-  const fontFamily = normalizeFontFamily(fonts.body || fonts.heading || 'Arial');
+  const fontFamily = normalizeFontFamily(
+    fonts.body || fonts.heading || resolveLatinFontFamily(undefined)
+  );
 
   if (isContainer) {
     const boundaryPalette = resolveDrawioBoundaryPalette(node, background, stroke);
@@ -209,13 +241,15 @@ function buildDrawioNodeStyle(
       `fontColor=${colors.text || '#111827'}`,
       `fontFamily=${fontFamily}`,
       'fontStyle=1',
-      ...(boundaryIcon ? [
-        `image=${boundaryIcon}`,
-        'align=left',
-        'verticalAlign=middle',
-        'spacingLeft=40',
-        'spacing=8',
-      ] : []),
+      ...(boundaryIcon
+        ? [
+            `image=${boundaryIcon}`,
+            'align=left',
+            'verticalAlign=middle',
+            'spacingLeft=40',
+            'spacing=8',
+          ]
+        : []),
     ].join(';');
   }
 
@@ -267,7 +301,9 @@ function resolveDiagramSource(rootDir: string, params: any, ctx: any, resolve: F
     return safeReadFile(inputPath, { encoding: 'utf8' }) as string;
   }
 
-  throw new Error('Missing diagram source. Provide one of: params.source, params.from, params.input_path');
+  throw new Error(
+    'Missing diagram source. Provide one of: params.source, params.from, params.input_path'
+  );
 }
 
 function resolveDiagramTheme(params: any, ctx: any): any {
@@ -288,8 +324,8 @@ function resolveDiagramTheme(params: any, ctx: any): any {
       text: '#1e293b',
     },
     fonts: {
-      heading: 'Inter, sans-serif',
-      body: 'System-ui, sans-serif',
+      heading: resolveLatinFontFamily(undefined),
+      body: resolveLatinFontFamily(undefined),
     },
   };
 }
@@ -301,7 +337,7 @@ function generateDrawioDocument(
     theme: any;
     iconMap: any;
     iconRoot?: string;
-  },
+  }
 ): string {
   const nodes = Array.isArray(graph?.nodes) ? graph.nodes : [];
   const edges = Array.isArray(graph?.edges) ? graph.edges : [];
@@ -327,10 +363,18 @@ function generateDrawioDocument(
   const geometry = new Map<string, { x: number; y: number; width: number; height: number }>();
   let cursorX = 40;
   let cursorY = 40;
-  const layoutNode = (node: any, depth: number, parentX: number, parentY: number): { width: number; height: number } => {
+  const layoutNode = (
+    node: any,
+    depth: number,
+    parentX: number,
+    parentY: number
+  ): { width: number; height: number } => {
     const nodeChildren = childrenByParent.get(node.id) || [];
     const { width: preferredWidth, height: preferredHeight } = resolveDrawioNodeSize(node);
-    const shouldTreatAsContainer = nodeChildren.length > 0 || node?.render_hints?.container === true || Boolean(node?.boundary && !node?.parent);
+    const shouldTreatAsContainer =
+      nodeChildren.length > 0 ||
+      node?.render_hints?.container === true ||
+      Boolean(node?.boundary && !node?.parent);
     if (!shouldTreatAsContainer) {
       const width = preferredWidth;
       const height = preferredHeight;
@@ -347,18 +391,23 @@ function generateDrawioDocument(
     const childContainers: any[] = [];
     const leafChildren: any[] = [];
     for (const child of nodeChildren) {
-      const childHasChildren = (childrenByParent.get(child.id) || []).length > 0 || child?.render_hints?.container === true || Boolean(child?.boundary && !child?.parent);
+      const childHasChildren =
+        (childrenByParent.get(child.id) || []).length > 0 ||
+        child?.render_hints?.container === true ||
+        Boolean(child?.boundary && !child?.parent);
       if (childHasChildren) childContainers.push(child);
       else leafChildren.push(child);
     }
 
     const groupedLeaves = new Map<string, any[]>();
     for (const child of leafChildren) {
-      const group = typeof child?.render_hints?.semantic_tier === 'string' && child.render_hints.semantic_tier.trim()
-        ? child.render_hints.semantic_tier.trim()
-        : typeof child?.group === 'string' && child.group.trim()
-          ? child.group.trim()
-          : 'application';
+      const group =
+        typeof child?.render_hints?.semantic_tier === 'string' &&
+        child.render_hints.semantic_tier.trim()
+          ? child.render_hints.semantic_tier.trim()
+          : typeof child?.group === 'string' && child.group.trim()
+            ? child.group.trim()
+            : 'application';
       const bucket = groupedLeaves.get(group) || [];
       bucket.push(child);
       groupedLeaves.set(group, bucket);
@@ -424,8 +473,18 @@ function generateDrawioDocument(
   }
 
   const sortedNodes = [...nodes].sort((left, right) => {
-    const leftIsContainer = ((childrenByParent.get(left.id) || []).length > 0 || left?.render_hints?.container === true || Boolean(left?.boundary && !left?.parent)) ? 1 : 0;
-    const rightIsContainer = ((childrenByParent.get(right.id) || []).length > 0 || right?.render_hints?.container === true || Boolean(right?.boundary && !right?.parent)) ? 1 : 0;
+    const leftIsContainer =
+      (childrenByParent.get(left.id) || []).length > 0 ||
+      left?.render_hints?.container === true ||
+      Boolean(left?.boundary && !left?.parent)
+        ? 1
+        : 0;
+    const rightIsContainer =
+      (childrenByParent.get(right.id) || []).length > 0 ||
+      right?.render_hints?.container === true ||
+      Boolean(right?.boundary && !right?.parent)
+        ? 1
+        : 0;
     if (leftIsContainer !== rightIsContainer) {
       return rightIsContainer - leftIsContainer;
     }
@@ -436,7 +495,10 @@ function generateDrawioDocument(
 
   for (const node of sortedNodes) {
     const geo = geometry.get(node.id) || { x: 40, y: 40, width: 160, height: 120 };
-    const hasChildren = (childrenByParent.get(node.id) || []).length > 0 || node?.render_hints?.container === true || Boolean(node?.boundary && !node?.parent);
+    const hasChildren =
+      (childrenByParent.get(node.id) || []).length > 0 ||
+      node?.render_hints?.container === true ||
+      Boolean(node?.boundary && !node?.parent);
     const parentId = node.parent && nodeMap.has(node.parent) ? node.parent : '1';
     const parentGeo = parentId !== '1' ? geometry.get(parentId) : undefined;
     const relativeX = parentGeo ? Math.max(0, geo.x - parentGeo.x) : geo.x;
@@ -446,15 +508,19 @@ function generateDrawioDocument(
     cellXml.push(
       `<mxCell id="${escapeXml(node.id)}" value="${label}" style="${escapeXml(style)}" vertex="1" parent="${escapeXml(parentId)}">` +
         `<mxGeometry x="${relativeX}" y="${relativeY}" width="${geo.width}" height="${geo.height}" as="geometry"/>` +
-      `</mxCell>`,
+        `</mxCell>`
     );
   }
 
   edges.forEach((edge: any, index: number) => {
     const sourceNode = nodeMap.get(edge.from);
     const targetNode = nodeMap.get(edge.to);
-    const sourceTier = String(sourceNode?.render_hints?.semantic_tier || sourceNode?.group || '').toLowerCase();
-    const targetTier = String(targetNode?.render_hints?.semantic_tier || targetNode?.group || '').toLowerCase();
+    const sourceTier = String(
+      sourceNode?.render_hints?.semantic_tier || sourceNode?.group || ''
+    ).toLowerCase();
+    const targetTier = String(
+      targetNode?.render_hints?.semantic_tier || targetNode?.group || ''
+    ).toLowerCase();
     const styleParts = [
       'edgeStyle=orthogonalEdgeStyle',
       'rounded=1',
@@ -463,12 +529,12 @@ function generateDrawioDocument(
       'html=1',
       `strokeColor=${colors.primary || '#232f3e'}`,
       `fontColor=${colors.text || '#111827'}`,
-      `fontFamily=${normalizeFontFamily(fonts.body || fonts.heading || 'Arial')}`,
+      `fontFamily=${normalizeFontFamily(fonts.body || fonts.heading || resolveLatinFontFamily(undefined))}`,
     ];
     const labelStyleParts = resolveDrawioEdgeLabelStyleParts(edge.label);
     if (labelStyleParts.length > 0) {
       styleParts.push(
-        ...labelStyleParts.map((part) => (
+        ...labelStyleParts.map((part) =>
           part.includes('strokeColor=')
             ? part.replace(
                 /strokeColor=[^;]+/,
@@ -477,7 +543,7 @@ function generateDrawioDocument(
                   : `strokeColor=${colors.secondary || '#4b5563'}`
               )
             : part
-        )),
+        )
       );
     }
     styleParts.push(...resolveDrawioEdgeRoutingStyleParts({ sourceTier, targetTier }));
@@ -486,7 +552,7 @@ function generateDrawioDocument(
     cellXml.push(
       `<mxCell id="edge-${index + 1}"${label} style="${escapeXml(style)}" edge="1" parent="1" source="${escapeXml(edge.from)}" target="${escapeXml(edge.to)}">` +
         '<mxGeometry relative="1" as="geometry"/>' +
-      '</mxCell>',
+        '</mxCell>'
     );
   });
 
@@ -510,56 +576,75 @@ function extractChromeGeometryFromPptxDesign(design: any): any {
   const r2 = (v: number) => Math.round(v * 100) / 100;
   const SEP = 0.024;
 
-  const titleEl  = elements.find((e) => e.placeholderType === 'title' || e.placeholderType === 'ctrTitle');
-  const bodyEl   = elements.find((e) => e.placeholderType === 'body'  || e.placeholderType === 'obj');
-  const footerEl = elements.find((e) => ['ftr','sldNum','dt'].includes(e.placeholderType));
-  const logoEl   = elements.find((e) => e.type === 'image' && e.pos?.x > canvas.w * 0.6 && e.pos?.y < 1.0);
+  const titleEl = elements.find(
+    (e) => e.placeholderType === 'title' || e.placeholderType === 'ctrTitle'
+  );
+  const bodyEl = elements.find((e) => e.placeholderType === 'body' || e.placeholderType === 'obj');
+  const footerEl = elements.find((e) => ['ftr', 'sldNum', 'dt'].includes(e.placeholderType));
+  const logoEl = elements.find(
+    (e) => e.type === 'image' && e.pos?.x > canvas.w * 0.6 && e.pos?.y < 1.0
+  );
 
-  const bodyY = bodyEl?.pos?.y  ?? (titleEl ? r2(titleEl.pos.y + titleEl.pos.h + SEP) : 0.78);
-  const bodyX = bodyEl?.pos?.x  ?? titleEl?.pos?.x ?? 0.44;
-  const bodyW = bodyEl?.pos?.w  ?? r2(canvas.w - bodyX * 2);
-  const bodyH = bodyEl?.pos?.h  ?? (footerEl ? r2(footerEl.pos.y - bodyY - 0.1) : r2(canvas.h - bodyY - 0.4));
+  const bodyY = bodyEl?.pos?.y ?? (titleEl ? r2(titleEl.pos.y + titleEl.pos.h + SEP) : 0.78);
+  const bodyX = bodyEl?.pos?.x ?? titleEl?.pos?.x ?? 0.44;
+  const bodyW = bodyEl?.pos?.w ?? r2(canvas.w - bodyX * 2);
+  const bodyH =
+    bodyEl?.pos?.h ?? (footerEl ? r2(footerEl.pos.y - bodyY - 0.1) : r2(canvas.h - bodyY - 0.4));
   const footerY = footerEl?.pos?.y ?? r2(bodyY + bodyH + 0.05);
   const footerH = footerEl?.pos?.h ?? 0.28;
-  const titleX  = titleEl?.pos?.x ?? bodyX;
+  const titleX = titleEl?.pos?.x ?? bodyX;
 
   return {
     canvas,
     chrome: {
-      header_h:         r2(bodyY - SEP),
-      separator_h:      SEP,
-      footer_y:         r2(footerY),
-      footer_h:         r2(footerH),
+      header_h: r2(bodyY - SEP),
+      separator_h: SEP,
+      footer_y: r2(footerY),
+      footer_h: r2(footerH),
       footer_font_size: 8,
-      body_y:           r2(bodyY),
-      body_x:           r2(bodyX),
-      body_w:           r2(bodyW),
-      body_h:           r2(bodyH),
-      title_x:          r2(titleX),
-      title_font_size:  titleEl?.style?.fontSize ?? 24,
-      title_w_logo:     logoEl ? r2(logoEl.pos.x - titleX - 0.1) : r2(bodyW),
-      title_w_no_logo:  r2(bodyW + (bodyX - titleX)),
-      accent_strip_x:   r2(titleX - 0.14),
-      accent_strip_w:   0.065,
-      logo_zone_x:      logoEl ? r2(logoEl.pos.x)          : r2(canvas.w - 2.5),
-      logo_zone_y:      logoEl ? r2(logoEl.pos.y)          : 0.03,
-      logo_zone_w:      logoEl ? r2(logoEl.pos.w + 0.1)    : 2.27,
-      logo_zone_h:      logoEl ? r2(logoEl.pos.h + 0.1)    : 0.79,
-      logo_display_h:   0.38,
-      logo_display_max_w: logoEl ? r2(logoEl.pos.w)        : 2.1,
+      body_y: r2(bodyY),
+      body_x: r2(bodyX),
+      body_w: r2(bodyW),
+      body_h: r2(bodyH),
+      title_x: r2(titleX),
+      title_font_size: titleEl?.style?.fontSize ?? 24,
+      title_w_logo: logoEl ? r2(logoEl.pos.x - titleX - 0.1) : r2(bodyW),
+      title_w_no_logo: r2(bodyW + (bodyX - titleX)),
+      accent_strip_x: r2(titleX - 0.14),
+      accent_strip_w: 0.065,
+      logo_zone_x: logoEl ? r2(logoEl.pos.x) : r2(canvas.w - 2.5),
+      logo_zone_y: logoEl ? r2(logoEl.pos.y) : 0.03,
+      logo_zone_w: logoEl ? r2(logoEl.pos.w + 0.1) : 2.27,
+      logo_zone_h: logoEl ? r2(logoEl.pos.h + 0.1) : 0.79,
+      logo_display_h: 0.38,
+      logo_display_max_w: logoEl ? r2(logoEl.pos.w) : 2.1,
     },
     _geometry_source: 'pptx_master',
   };
 }
 
-function pickSlideHeroElements(design: any): { titleEl?: any; subtitleEl?: any; logoEl?: any; slideIndex?: number } {
-  const masterElements: any[] = Array.isArray(design?.master?.elements) ? design.master.elements : [];
+function pickSlideHeroElements(design: any): {
+  titleEl?: any;
+  subtitleEl?: any;
+  logoEl?: any;
+  slideIndex?: number;
+} {
+  const masterElements: any[] = Array.isArray(design?.master?.elements)
+    ? design.master.elements
+    : [];
   const slides: any[] = Array.isArray(design?.slides) ? design.slides : [];
   const slide = slides[0] || null;
   const slideElements: any[] = Array.isArray(slide?.elements) ? slide.elements : [];
   const combined = [...slideElements, ...masterElements];
-  const findByPlaceholder = (placeholderTypes: string[]) => combined.find((e) => placeholderTypes.includes(e?.placeholderType));
-  const findLogo = combined.find((e) => e?.type === 'image' && typeof e?.pos?.x === 'number' && typeof e?.pos?.y === 'number' && e.pos.x > (design?.canvas?.w || 10) * 0.6);
+  const findByPlaceholder = (placeholderTypes: string[]) =>
+    combined.find((e) => placeholderTypes.includes(e?.placeholderType));
+  const findLogo = combined.find(
+    (e) =>
+      e?.type === 'image' &&
+      typeof e?.pos?.x === 'number' &&
+      typeof e?.pos?.y === 'number' &&
+      e.pos.x > (design?.canvas?.w || 10) * 0.6
+  );
   return {
     titleEl: findByPlaceholder(['title', 'ctrTitle']),
     subtitleEl: findByPlaceholder(['subTitle', 'body']),
@@ -582,14 +667,24 @@ function deriveLayoutTemplateFromPptxDesign(design: any, fallbackTemplate: any =
     ? r2(Math.max(0.08, canvas.w - logoEl.pos.x - logoEl.pos.w))
     : baseHero.logo_right_margin;
   const derivedWhitePanelY = subtitleEl
-    ? r2(Math.min(canvas.h - 0.85, Math.max(subtitleEl.pos.y + subtitleEl.pos.h + 0.65, canvas.h * 0.56)))
+    ? r2(
+        Math.min(
+          canvas.h - 0.85,
+          Math.max(subtitleEl.pos.y + subtitleEl.pos.h + 0.65, canvas.h * 0.56)
+        )
+      )
     : baseHero.white_panel_y;
   const separatorH = baseHero.separator_h ?? geometry.chrome.separator_h ?? 0.03;
-  const derivedSeparatorY = typeof derivedWhitePanelY === 'number' ? r2(Math.max(0, derivedWhitePanelY - separatorH)) : baseHero.separator_y;
+  const derivedSeparatorY =
+    typeof derivedWhitePanelY === 'number'
+      ? r2(Math.max(0, derivedWhitePanelY - separatorH))
+      : baseHero.separator_y;
   const derivedBrandNameY = subtitleEl
     ? r2(subtitleEl.pos.y + subtitleEl.pos.h + 0.15)
     : baseHero.brand_name_y;
-  const derivedTitleW = titleEl?.pos?.w ? r2(titleEl.pos.w) : (baseHero.title_w ?? baseHero.title_w_logo ?? baseHero.title_w_no_logo);
+  const derivedTitleW = titleEl?.pos?.w
+    ? r2(titleEl.pos.w)
+    : (baseHero.title_w ?? baseHero.title_w_logo ?? baseHero.title_w_no_logo);
   const derivedSubtitleW = subtitleEl?.pos?.w ? r2(subtitleEl.pos.w) : baseHero.subtitle_w;
 
   return {
@@ -600,8 +695,12 @@ function deriveLayoutTemplateFromPptxDesign(design: any, fallbackTemplate: any =
       white_panel_h: baseHero.white_panel_h,
       separator_y: derivedSeparatorY ?? baseHero.separator_y,
       separator_h: separatorH,
-      logo_display_h: logoEl?.pos?.h ? r2(Math.max(0.2, Math.min(logoEl.pos.h, 0.8))) : baseHero.logo_display_h,
-      logo_display_max_w: logoEl?.pos?.w ? r2(Math.max(logoEl.pos.w, 0.5)) : baseHero.logo_display_max_w,
+      logo_display_h: logoEl?.pos?.h
+        ? r2(Math.max(0.2, Math.min(logoEl.pos.h, 0.8)))
+        : baseHero.logo_display_h,
+      logo_display_max_w: logoEl?.pos?.w
+        ? r2(Math.max(logoEl.pos.w, 0.5))
+        : baseHero.logo_display_max_w,
       logo_right_margin: derivedLogoRightMargin ?? baseHero.logo_right_margin,
       logo_y: logoEl?.pos?.y ? r2(logoEl.pos.y) : baseHero.logo_y,
       brand_name_x: baseHero.brand_name_x ?? geometry.chrome.title_x,
@@ -637,9 +736,9 @@ function matchLayoutTemplate(geometry: any, catalog: any): { id: string; score: 
     if (!c) continue;
     const diffs = [
       Math.abs((c.header_h ?? 0) - (g.header_h ?? 0)) / 0.5,
-      Math.abs((c.body_y    ?? 0) - (g.body_y    ?? 0)) / 0.5,
-      Math.abs((c.body_x    ?? 0) - (g.body_x    ?? 0)) / 0.5,
-      Math.abs((c.body_w    ?? 0) - (g.body_w    ?? 0)) / 2.0,
+      Math.abs((c.body_y ?? 0) - (g.body_y ?? 0)) / 0.5,
+      Math.abs((c.body_x ?? 0) - (g.body_x ?? 0)) / 0.5,
+      Math.abs((c.body_w ?? 0) - (g.body_w ?? 0)) / 2.0,
     ];
     const score = Math.max(0, 1 - diffs.reduce((a, b) => a + b, 0) / diffs.length);
     if (!best || score > best.score) best = { id, score };
@@ -647,14 +746,18 @@ function matchLayoutTemplate(geometry: any, catalog: any): { id: string; score: 
   return best;
 }
 
-function pickFontFromElements(elements: any[] | undefined, placeholderTypes: string[]): string | undefined {
+function pickFontFromElements(
+  elements: any[] | undefined,
+  placeholderTypes: string[]
+): string | undefined {
   if (!Array.isArray(elements)) {
     return undefined;
   }
 
-  const candidates = placeholderTypes.length > 0
-    ? elements.filter((element) => placeholderTypes.includes(element?.placeholderType))
-    : elements;
+  const candidates =
+    placeholderTypes.length > 0
+      ? elements.filter((element) => placeholderTypes.includes(element?.placeholderType))
+      : elements;
 
   for (const element of candidates) {
     if (typeof element?.style?.fontFamily === 'string' && element.style.fontFamily.trim()) {
@@ -690,7 +793,9 @@ function normalizeHexColor(value: string | undefined, fallback: string): string 
 
 function deriveThemeFromPptxDesign(design: any, explicitName?: string): Record<string, any> {
   const palette = design?.theme || {};
-  const slideElements = Array.isArray(design?.slides) ? design.slides.flatMap((slide: any) => slide?.elements || []) : [];
+  const slideElements = Array.isArray(design?.slides)
+    ? design.slides.flatMap((slide: any) => slide?.elements || [])
+    : [];
   const titleFont = pickFontFromElements(design?.master?.elements, ['title', 'ctrTitle']);
   const bodyFont = pickFontFromElements(design?.master?.elements, ['body', 'subTitle']);
   const slideTitleFont = pickFontFromElements(slideElements, ['title', 'ctrTitle']);
@@ -712,8 +817,14 @@ function deriveThemeFromPptxDesign(design: any, explicitName?: string): Record<s
   return {
     name: explicitName || 'pptx-extracted-theme',
     colors: {
-      primary: normalizeHexColor(palette.dk1 || palette.tx1 || palette.accent2 || palette.accent1, '#1F2937'),
-      secondary: normalizeHexColor(palette.dk2 || palette.tx2 || palette.accent2 || palette.accent3, '#4B5563'),
+      primary: normalizeHexColor(
+        palette.dk1 || palette.tx1 || palette.accent2 || palette.accent1,
+        '#1F2937'
+      ),
+      secondary: normalizeHexColor(
+        palette.dk2 || palette.tx2 || palette.accent2 || palette.accent3,
+        '#4B5563'
+      ),
       accent: normalizeHexColor(palette.accent1 || palette.hlink || palette.accent2, '#2563EB'),
       background: normalizeHexColor(palette.lt1 || palette.bg1 || palette.lt2, '#FFFFFF'),
       text: normalizeHexColor(palette.tx1 || palette.dk1 || palette.dk2, '#111827'),

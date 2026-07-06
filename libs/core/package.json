@@ -155,6 +155,10 @@
       "types": "./dist/core.d.ts",
       "default": "./dist/core.js"
     },
+    "./design-fonts": {
+      "types": "./dist/design-fonts.d.ts",
+      "default": "./dist/design-fonts.js"
+    },
     "./fs-primitives": {
       "types": "./dist/fs-primitives.d.ts",
       "default": "./dist/fs-primitives.js"
@@ -755,6 +759,7 @@
   "dependencies": {
     "axios": "^1.18.0",
     "chalk": "^4.1.2",
+    "fontkit": "^2.0.4",
     "js-yaml": "^4.1.1",
     "marked": "^12.0.2",
     "openai": "^6.35.0",
