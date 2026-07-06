@@ -19,6 +19,12 @@ export interface AdfRunOptions {
   timeoutMs?: number;
 }
 
+export interface AdfSkippedStep {
+  skipped: true;
+  reason: string;
+  context: AdfEngineContext;
+}
+
 export interface AdfStepHandlers<Ctx extends AdfEngineContext = AdfEngineContext> {
   capture: (op: string, params: any, ctx: Ctx, resolve: (value: any) => any) => Promise<Ctx>;
   transform: (op: string, params: any, ctx: Ctx, resolve: (value: any) => any) => Promise<Ctx>;
@@ -29,7 +35,7 @@ export interface AdfStepHandlers<Ctx extends AdfEngineContext = AdfEngineContext
     ctx: Ctx,
     runSteps: (steps: AdfStep[], seedCtx?: Ctx) => Promise<Ctx>,
     resolve: (value: any) => any
-  ) => Promise<Ctx>;
+  ) => Promise<Ctx | AdfSkippedStep>;
 }
 
 export interface AdfRunResult<Ctx extends AdfEngineContext = AdfEngineContext> {
@@ -89,7 +95,20 @@ async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineC
         if (!handlers.control) {
           throw new Error(`[UNKNOWN_TYPE] Unknown control step op: ${step.op}`);
         }
-        ctx = await handlers.control(step.op, step.params, ctx, runNestedSteps, resolve);
+        const controlResult = await handlers.control(
+          step.op,
+          step.params,
+          ctx,
+          runNestedSteps,
+          resolve
+        );
+        if (isSkippedStep(controlResult)) {
+          ctx = controlResult.context as Ctx;
+          results.push({ op: step.op, status: 'skipped' });
+          logger.info(`  [ADF] Step skipped (${step.op}): ${controlResult.reason}`);
+          continue;
+        }
+        ctx = controlResult;
       } else if (step.type === 'capture') {
         ctx = await handlers.capture(step.op, step.params, ctx, resolve);
       } else if (step.type === 'transform') {
@@ -116,4 +135,15 @@ async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineC
     context: ctx,
     total_steps: state.stepCount,
   };
+}
+
+export function skipAdfStep<Ctx extends AdfEngineContext>(
+  context: Ctx,
+  reason: string
+): AdfSkippedStep {
+  return { skipped: true, reason, context };
+}
+
+function isSkippedStep(value: unknown): value is AdfSkippedStep {
+  return Boolean(value) && typeof value === 'object' && (value as AdfSkippedStep).skipped === true;
 }

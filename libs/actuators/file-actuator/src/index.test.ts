@@ -381,6 +381,26 @@ describe('file-actuator', () => {
 
         expect(result.status).toBe('succeeded');
       });
+
+      it('if オペレーターで条件が偽の場合は skipped を返す', async () => {
+        const result = await handleAction({
+          action: 'pipeline',
+          context: { flag: false },
+          steps: [
+            {
+              type: 'control',
+              op: 'if',
+              params: {
+                condition: { from: 'flag', operator: 'eq', value: true },
+                then: [{ type: 'apply', op: 'log', params: { message: 'should not run' } }],
+              },
+            },
+          ],
+        });
+
+        expect(result.status).toBe('succeeded');
+        expect(result.results).toEqual([{ op: 'if', status: 'skipped' }]);
+      });
     });
   });
 

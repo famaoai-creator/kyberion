@@ -7,11 +7,13 @@ import {
   logger,
   pathResolver,
   resolveVars,
+  skipAdfStep,
   safeExistsSync,
   safeExec,
   safeReadFile,
   safeUnlinkSync,
   safeWriteFile,
+  suggestClosestStrings,
 } from '@agent/core';
 import * as path from 'node:path';
 
@@ -189,17 +191,24 @@ async function handleCoreAction(
       } else if (params.else) {
         return await runSteps(normalizeNestedSteps(params.else), ctx);
       }
-      return ctx;
+      return skipAdfStep(
+        ctx,
+        'core:if condition evaluated to false and no else branch was provided'
+      );
 
     case 'while': {
       let iterations = 0;
       const maxIter = params.max_iterations || 100;
       let currentCtx = ctx;
+      let executed = false;
       while (evaluateCondition(params.condition, currentCtx) && iterations < maxIter) {
+        executed = true;
         currentCtx = await runSteps(normalizeNestedSteps(params.pipeline), currentCtx);
         iterations += 1;
       }
-      return currentCtx;
+      return executed
+        ? currentCtx
+        : skipAdfStep(ctx, 'core:while condition evaluated to false before execution');
     }
 
     case 'call':
@@ -214,8 +223,15 @@ async function handleCoreAction(
       return { ...ctx, [params.export_as]: resolveVars(params.value, ctx) };
 
     default:
-      throw new Error(`Unknown core action: ${action}`);
+      throw new Error(buildUnknownCoreActionMessage(action));
   }
+}
+
+function buildUnknownCoreActionMessage(action: string): string {
+  const suggestions = suggestClosestStrings(action, ['if', 'while', 'call', 'include', 'set']);
+  return suggestions.length > 0
+    ? `Unknown core action: ${action}. Did you mean: ${suggestions.join(', ')}?`
+    : `Unknown core action: ${action}`;
 }
 
 async function dispatchToActuator(domain: string, action: string, params: any, ctx: any) {

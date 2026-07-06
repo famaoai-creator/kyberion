@@ -53,6 +53,24 @@ describe('super-nerve engine', () => {
     expect(result.context.flag).toBe(true);
   });
 
+  it('marks false branches as skipped instead of silently succeeding', async () => {
+    const result = await executeSuperPipeline(
+      [
+        {
+          op: 'core:if',
+          params: {
+            condition: { from: 'flag', operator: 'eq', value: true },
+            then: [{ op: 'system:log', params: { message: 'branch taken' } }],
+          },
+        },
+      ],
+      { flag: false }
+    );
+
+    expect(result.status).toBe('succeeded');
+    expect(result.results).toEqual([{ op: 'if', status: 'skipped' }]);
+  });
+
   it('resolves core call/include through the canonical resolver', async () => {
     const result = await executeSuperPipeline([
       { op: 'core:call', params: { path: 'macros/sample.json' } },
