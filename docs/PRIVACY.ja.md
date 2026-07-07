@@ -41,6 +41,7 @@ Kyberion がデータに対して何をして、何をしないか。
 | Anthropic / Claude | 会話 context + tool 呼び出し | `anthropic` reasoning backend を選んだとき |
 | OpenAI / Codex | 同上 | `codex-cli` backend を選んだとき |
 | Google Gemini CLI | 同上 | `gemini-cli` backend を選んだとき |
+| Google Gemini API / AI Studio | 画像生成・音声生成の入力 prompt / text + 生成結果 | `gemini` service preset / Gemini image-TTS bridge を選んだとき |
 | NVIDIA Nemotron API | 同上 | `nemotron-api` backend を選んだとき |
 | Local Claude CLI | 同上、ただしローカル CLI 経由 | `claude-cli` を選んだとき |
 | Local OpenAI-compatible LLM | 同上、ただし自分で用意した endpoint 経由 | `local` を選んだとき |

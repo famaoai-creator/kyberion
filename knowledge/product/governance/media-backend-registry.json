@@ -24,6 +24,22 @@
       "notes": "Routes governed image generation through the media-generation service preset. ComfyUI availability and managed location are also tracked via the service runtime abstraction."
     },
     {
+      "backend_id": "media-generation.gemini",
+      "modality": "image",
+      "display_name": "Google AI Studio Gemini Image Generation",
+      "kind": "service_preset",
+      "provider": "gemini_api",
+      "status": "active",
+      "platforms": ["any"],
+      "supports": {
+        "artifact_formats": ["jpg", "jpeg", "png", "webp"],
+        "async": false
+      },
+      "service_id": "gemini",
+      "action": "generate_image",
+      "notes": "Routes image generation through the Gemini API / AI Studio service preset using GEMINI_API_KEY."
+    },
+    {
       "backend_id": "media-generation.local_flux",
       "modality": "image",
       "display_name": "Local FLUX Image Generation",
