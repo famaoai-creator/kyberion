@@ -46,6 +46,13 @@ function main(): number {
           violations.push(`${template.id}: phase ${spec.id} ${refKey} not found: ${ref}`);
         }
       }
+      // Every task-bearing phase needs an exit gate — otherwise gate-pass
+      // can never mark its tasks completed (SR-01 finding #2).
+      if ((spec.default_tasks?.length ?? 0) > 0 && !spec.exit_gate) {
+        violations.push(
+          `${template.id}: phase ${spec.id} has default_tasks but no exit_gate`
+        );
+      }
       for (const task of spec.default_tasks ?? []) {
         if (typeof task.pipeline_ref === 'string' && task.pipeline_ref.trim()) {
           const resolved = path.isAbsolute(task.pipeline_ref)

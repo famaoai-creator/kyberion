@@ -138,6 +138,57 @@ describe('mission-gate-engine', () => {
     expect(gate.reasons.join(' ')).toContain('Deliverable not found');
   });
 
+  it('llm_review verdicts follow the backend and fail closed on stub', async () => {
+    const { registerReasoningBackend, resetReasoningBackend } = await import(
+      './reasoning-backend.js'
+    );
+    safeMkdir(`${missionPath}/evidence`, { recursive: true });
+    safeWriteFile(`${missionPath}/evidence/report.md`, '# 提案\n結論と根拠が揃った文書。');
+    const gateDef = {
+      id: 'llm-gate',
+      checks: [
+        {
+          kind: 'llm_review' as const,
+          params: { path: `${missionPath}/evidence/report.md`, criteria: ['根拠がある'] },
+        },
+      ],
+    };
+
+    resetReasoningBackend();
+    const stubGate = await evaluateMissionGate({
+      missionId,
+      gate: gateDef,
+      evidenceDir: `${missionPath}/gates`,
+    });
+    expect(stubGate.verdict).toBe('fail');
+    expect(stubGate.reasons.join(' ')).toContain('real reasoning backend');
+
+    registerReasoningBackend({
+      name: 'fake-llm',
+      prompt: async () => '{"pass": true, "reasons": ["根拠と結論が対応"]}',
+    } as never);
+    const passGate = await evaluateMissionGate({
+      missionId,
+      gate: gateDef,
+      evidenceDir: `${missionPath}/gates`,
+    });
+    expect(passGate.verdict).toBe('pass');
+
+    registerReasoningBackend({
+      name: 'fake-llm',
+      prompt: async () =>
+        '{"pass": false, "reasons": ["結論に根拠がない"], "improvements": ["出典を追加"]}',
+    } as never);
+    const failGate = await evaluateMissionGate({
+      missionId,
+      gate: gateDef,
+      evidenceDir: `${missionPath}/gates`,
+    });
+    expect(failGate.verdict).toBe('fail');
+    expect(failGate.reasons.join(' ')).toContain('結論に根拠がない');
+    resetReasoningBackend();
+  });
+
   it('records manual overrides as gate records', () => {
     const recordPath = recordMissionGateOverride({
       missionId,

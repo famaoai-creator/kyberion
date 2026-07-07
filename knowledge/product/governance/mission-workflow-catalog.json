@@ -1,5 +1,5 @@
 {
-  "version": "1.2.0",
+  "version": "1.3.0",
   "defaults": {
     "workflow_id": "single-track-default"
   },
@@ -32,9 +32,17 @@
       "pattern": "stage_gated_delivery",
       "description": "Vendor procurement workflow that drafts a comparison memo and prepares contract review and finance_controller decision notes.",
       "match": {
-        "mission_classes": ["operations_and_release"],
-        "delivery_shapes": ["multi_artifact_pipeline"],
-        "intent_ids": ["procurement-vendor", "procurement", "vendor-selection"]
+        "mission_classes": [
+          "operations_and_release"
+        ],
+        "delivery_shapes": [
+          "multi_artifact_pipeline"
+        ],
+        "intent_ids": [
+          "procurement-vendor",
+          "procurement",
+          "vendor-selection"
+        ]
       },
       "phases": [
         "intake",
@@ -89,7 +97,18 @@
               "deliverable": "evidence/vendor-comparison.md",
               "deliverable_kind": "doc"
             }
-          ]
+          ],
+          "exit_gate": {
+            "id": "CONTRACT_AUTHORING_DONE",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/vendor-comparison.md"
+                }
+              }
+            ]
+          }
         },
         "preflight",
         {
@@ -99,7 +118,7 @@
           "default_tasks": [
             {
               "task_id_suffix": "vendor-evaluation",
-              "team_role": "worker",
+              "team_role": "implementer",
               "description": "各候補ベンダーを評価基準でスコアリングし、根拠つきで evidence/vendor-evaluation.md にまとめる",
               "acceptance_criteria": [
                 "全候補に基準別スコアと根拠がある",
@@ -111,7 +130,18 @@
               "deliverable": "evidence/vendor-evaluation.md",
               "deliverable_kind": "doc"
             }
-          ]
+          ],
+          "exit_gate": {
+            "id": "EXECUTION_DONE",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/vendor-evaluation.md"
+                }
+              }
+            ]
+          }
         },
         {
           "id": "verification",
@@ -122,7 +152,10 @@
               "task_id_suffix": "selection-review",
               "team_role": "reviewer",
               "description": "ベンダー評価を公平性・根拠妥当性・リスク網羅の観点でレビューし判定を記録する",
-              "acceptance_criteria": ["スコアリングの根拠に飛躍がない", "利益相反が確認されている"],
+              "acceptance_criteria": [
+                "スコアリングの根拠に飛躍がない",
+                "利益相反が確認されている"
+              ],
               "expected_output_format": "structured",
               "estimated_scope": "S",
               "risk": "medium",
@@ -156,9 +189,11 @@
           "default_tasks": [
             {
               "task_id_suffix": "selection-report",
-              "team_role": "worker",
+              "team_role": "implementer",
               "description": "選定結果と契約条件の要点を稟議用に evidence/vendor-selection-report.md へ整形する",
-              "acceptance_criteria": ["選定理由と次点比較が明記されている"],
+              "acceptance_criteria": [
+                "選定理由と次点比較が明記されている"
+              ],
               "expected_output_format": "files",
               "estimated_scope": "S",
               "risk": "low",
@@ -188,9 +223,18 @@
       "pattern": "stage_gated_delivery",
       "description": "Performance review workflow that drafts a review memo for line_manager and talent_culture review.",
       "match": {
-        "mission_classes": ["decision_support", "operations_and_release"],
-        "delivery_shapes": ["multi_artifact_pipeline"],
-        "intent_ids": ["performance-review", "performance", "people-review"]
+        "mission_classes": [
+          "decision_support",
+          "operations_and_release"
+        ],
+        "delivery_shapes": [
+          "multi_artifact_pipeline"
+        ],
+        "intent_ids": [
+          "performance-review",
+          "performance",
+          "people-review"
+        ]
       },
       "phases": [
         "intake",
@@ -235,14 +279,27 @@
               "task_id_suffix": "evaluation-criteria",
               "team_role": "planner",
               "description": "役割別の評価基準・行動指標・レーティング定義を evidence/evaluation-criteria.md に確定する",
-              "acceptance_criteria": ["レーティング段階ごとの行動例がある"],
+              "acceptance_criteria": [
+                "レーティング段階ごとの行動例がある"
+              ],
               "expected_output_format": "files",
               "estimated_scope": "M",
               "risk": "medium",
               "deliverable": "evidence/evaluation-criteria.md",
               "deliverable_kind": "doc"
             }
-          ]
+          ],
+          "exit_gate": {
+            "id": "CONTRACT_AUTHORING_DONE",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/evaluation-criteria.md"
+                }
+              }
+            ]
+          }
         },
         "preflight",
         {
@@ -252,7 +309,7 @@
           "default_tasks": [
             {
               "task_id_suffix": "evaluation-drafts",
-              "team_role": "worker",
+              "team_role": "implementer",
               "description": "評価入力を収集・集約し、評価ドラフトを evidence/evaluation-drafts.md にまとめる",
               "acceptance_criteria": [
                 "全対象者分のドラフトが揃っている",
@@ -264,7 +321,18 @@
               "deliverable": "evidence/evaluation-drafts.md",
               "deliverable_kind": "doc"
             }
-          ]
+          ],
+          "exit_gate": {
+            "id": "EXECUTION_DONE",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/evaluation-drafts.md"
+                }
+              }
+            ]
+          }
         },
         {
           "id": "verification",
@@ -312,9 +380,11 @@
           "default_tasks": [
             {
               "task_id_suffix": "final-evaluations",
-              "team_role": "worker",
+              "team_role": "implementer",
               "description": "校正済み評価を最終化し、通知用資料を evidence/final-evaluations.md に整形する",
-              "acceptance_criteria": ["全対象者の最終評価とフィードバック要点がある"],
+              "acceptance_criteria": [
+                "全対象者の最終評価とフィードバック要点がある"
+              ],
               "expected_output_format": "files",
               "estimated_scope": "S",
               "risk": "low",
@@ -344,9 +414,18 @@
       "pattern": "coordinated_multi_track_execution",
       "description": "Fundraising preparation workflow that compiles investor brief and dataroom checklist from company and financial context.",
       "match": {
-        "mission_classes": ["decision_support", "operations_and_release"],
-        "delivery_shapes": ["multi_artifact_pipeline"],
-        "intent_ids": ["fundraising-prep", "fundraising", "raise-prep"]
+        "mission_classes": [
+          "decision_support",
+          "operations_and_release"
+        ],
+        "delivery_shapes": [
+          "multi_artifact_pipeline"
+        ],
+        "intent_ids": [
+          "fundraising-prep",
+          "fundraising",
+          "raise-prep"
+        ]
       },
       "phases": [
         "intake",
@@ -360,7 +439,9 @@
               "task_id_suffix": "narrative",
               "team_role": "planner",
               "description": "調達ラウンドの目的・エクイティストーリー・想定投資家像を evidence/fundraising-narrative.json に定義する",
-              "acceptance_criteria": ["調達額・使途・マイルストーンが整合している"],
+              "acceptance_criteria": [
+                "調達額・使途・マイルストーンが整合している"
+              ],
               "expected_output_format": "structured",
               "estimated_scope": "M",
               "risk": "medium",
@@ -388,14 +469,27 @@
               "task_id_suffix": "financial-model",
               "team_role": "planner",
               "description": "財務モデルと主要 KPI の根拠を evidence/financial-model-summary.md に整理する",
-              "acceptance_criteria": ["前提条件が明示され感度が示されている"],
+              "acceptance_criteria": [
+                "前提条件が明示され感度が示されている"
+              ],
               "expected_output_format": "files",
               "estimated_scope": "M",
               "risk": "medium",
               "deliverable": "evidence/financial-model-summary.md",
               "deliverable_kind": "doc"
             }
-          ]
+          ],
+          "exit_gate": {
+            "id": "CONTRACT_AUTHORING_DONE",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/financial-model-summary.md"
+                }
+              }
+            ]
+          }
         },
         {
           "id": "execution",
@@ -404,7 +498,7 @@
           "default_tasks": [
             {
               "task_id_suffix": "pitch-materials",
-              "team_role": "worker",
+              "team_role": "implementer",
               "description": "ピッチデックとデータルームの索引を evidence/pitch-materials-index.md に準備する",
               "acceptance_criteria": [
                 "デック構成がストーリー骨子と一致",
@@ -416,7 +510,18 @@
               "deliverable": "evidence/pitch-materials-index.md",
               "deliverable_kind": "doc"
             }
-          ]
+          ],
+          "exit_gate": {
+            "id": "EXECUTION_DONE",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/pitch-materials-index.md"
+                }
+              }
+            ]
+          }
         },
         {
           "id": "verification",
@@ -427,7 +532,10 @@
               "task_id_suffix": "pitch-review",
               "team_role": "reviewer",
               "description": "ピッチ資料を投資家目線(トラクション根拠・希薄化・リスク開示)でレビューする",
-              "acceptance_criteria": ["数字の裏付けに飛躍がない", "想定問答が準備されている"],
+              "acceptance_criteria": [
+                "数字の裏付けに飛躍がない",
+                "想定問答が準備されている"
+              ],
               "expected_output_format": "structured",
               "estimated_scope": "S",
               "risk": "medium",
@@ -461,9 +569,11 @@
           "default_tasks": [
             {
               "task_id_suffix": "investor-package",
-              "team_role": "worker",
+              "team_role": "implementer",
               "description": "レビュー済み資料一式を投資家送付用パッケージとして evidence/investor-package.md に確定する",
-              "acceptance_criteria": ["送付先リストと送付順序が定義されている"],
+              "acceptance_criteria": [
+                "送付先リストと送付順序が定義されている"
+              ],
               "expected_output_format": "files",
               "estimated_scope": "S",
               "risk": "low",
@@ -493,9 +603,19 @@
       "pattern": "stage_gated_delivery",
       "description": "Hiring workflow that drafts a JD, schedules interviews, and produces an evaluation memo for talent_culture and line_manager.",
       "match": {
-        "mission_classes": ["decision_support", "operations_and_release"],
-        "delivery_shapes": ["multi_artifact_pipeline"],
-        "intent_ids": ["hiring-workflow", "hire", "recruiting", "talent-culture"]
+        "mission_classes": [
+          "decision_support",
+          "operations_and_release"
+        ],
+        "delivery_shapes": [
+          "multi_artifact_pipeline"
+        ],
+        "intent_ids": [
+          "hiring-workflow",
+          "hire",
+          "recruiting",
+          "talent-culture"
+        ]
       },
       "phases": [
         "intake",
@@ -540,14 +660,28 @@
               "task_id_suffix": "job-description",
               "team_role": "planner",
               "description": "JD を確定し、選考ステップと各ステップの評価観点を evidence/job-description.md に設計する",
-              "acceptance_criteria": ["JD が要件定義と一致", "選考ステップ毎の評価観点がある"],
+              "acceptance_criteria": [
+                "JD が要件定義と一致",
+                "選考ステップ毎の評価観点がある"
+              ],
               "expected_output_format": "files",
               "estimated_scope": "M",
               "risk": "medium",
               "deliverable": "evidence/job-description.md",
               "deliverable_kind": "doc"
             }
-          ]
+          ],
+          "exit_gate": {
+            "id": "CONTRACT_AUTHORING_DONE",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/job-description.md"
+                }
+              }
+            ]
+          }
         },
         "preflight",
         {
@@ -557,7 +691,7 @@
           "default_tasks": [
             {
               "task_id_suffix": "interview-kit",
-              "team_role": "worker",
+              "team_role": "implementer",
               "description": "面接ガイド・構造化質問・評価シートを evidence/interview-kit.md に作成する",
               "acceptance_criteria": [
                 "質問が評価観点にマップされている",
@@ -569,7 +703,18 @@
               "deliverable": "evidence/interview-kit.md",
               "deliverable_kind": "doc"
             }
-          ]
+          ],
+          "exit_gate": {
+            "id": "EXECUTION_DONE",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/interview-kit.md"
+                }
+              }
+            ]
+          }
         },
         {
           "id": "verification",
@@ -580,7 +725,9 @@
               "task_id_suffix": "kit-review",
               "team_role": "reviewer",
               "description": "JD と面接キットを公平性・法令適合・評価一貫性の観点でレビューする",
-              "acceptance_criteria": ["不適切/差別的な質問が排除されている"],
+              "acceptance_criteria": [
+                "不適切/差別的な質問が排除されている"
+              ],
               "expected_output_format": "structured",
               "estimated_scope": "S",
               "risk": "medium",
@@ -614,9 +761,11 @@
           "default_tasks": [
             {
               "task_id_suffix": "hiring-launch-plan",
-              "team_role": "worker",
+              "team_role": "implementer",
               "description": "募集チャネル・スケジュール・体制を evidence/hiring-launch-plan.md にまとめ募集開始準備を完了する",
-              "acceptance_criteria": ["公開チャネルと開始日が確定している"],
+              "acceptance_criteria": [
+                "公開チャネルと開始日が確定している"
+              ],
               "expected_output_format": "files",
               "estimated_scope": "S",
               "risk": "low",
@@ -646,9 +795,17 @@
       "pattern": "stage_gated_delivery",
       "description": "Monthly financial close workflow for finance_controller review, reconciliation, and memo drafting.",
       "match": {
-        "mission_classes": ["operations_and_release"],
-        "delivery_shapes": ["multi_artifact_pipeline"],
-        "intent_ids": ["financial-close-monthly", "monthly-close", "financial-close"]
+        "mission_classes": [
+          "operations_and_release"
+        ],
+        "delivery_shapes": [
+          "multi_artifact_pipeline"
+        ],
+        "intent_ids": [
+          "financial-close-monthly",
+          "monthly-close",
+          "financial-close"
+        ]
       },
       "phases": [
         "intake",
@@ -662,7 +819,9 @@
               "task_id_suffix": "close-checklist",
               "team_role": "planner",
               "description": "当月の決算タスク・担当・締切を evidence/close-checklist.json に定義する",
-              "acceptance_criteria": ["全決算タスクに担当と期限がある"],
+              "acceptance_criteria": [
+                "全決算タスクに担当と期限がある"
+              ],
               "expected_output_format": "structured",
               "estimated_scope": "M",
               "risk": "medium",
@@ -690,14 +849,27 @@
               "task_id_suffix": "reconciliation-plan",
               "team_role": "planner",
               "description": "勘定科目ごとの照合手順と必要データを evidence/reconciliation-plan.md に割り当てる",
-              "acceptance_criteria": ["重要勘定が全て照合対象に含まれている"],
+              "acceptance_criteria": [
+                "重要勘定が全て照合対象に含まれている"
+              ],
               "expected_output_format": "files",
               "estimated_scope": "M",
               "risk": "medium",
               "deliverable": "evidence/reconciliation-plan.md",
               "deliverable_kind": "doc"
             }
-          ]
+          ],
+          "exit_gate": {
+            "id": "CONTRACT_AUTHORING_DONE",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/reconciliation-plan.md"
+                }
+              }
+            ]
+          }
         },
         "preflight",
         {
@@ -707,7 +879,7 @@
           "default_tasks": [
             {
               "task_id_suffix": "reconciliation-report",
-              "team_role": "worker",
+              "team_role": "implementer",
               "description": "照合を実施し、調整仕訳と未解決差異を evidence/reconciliation-report.md に記録する",
               "acceptance_criteria": [
                 "差異が閾値内または説明済み",
@@ -719,7 +891,18 @@
               "deliverable": "evidence/reconciliation-report.md",
               "deliverable_kind": "doc"
             }
-          ]
+          ],
+          "exit_gate": {
+            "id": "EXECUTION_DONE",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/reconciliation-report.md"
+                }
+              }
+            ]
+          }
         },
         {
           "id": "verification",
@@ -730,7 +913,10 @@
               "task_id_suffix": "variance-review",
               "team_role": "reviewer",
               "description": "前月比・予実の増減分析をレビューし、異常値の説明妥当性を判定する",
-              "acceptance_criteria": ["重要増減に説明がある", "未解決事項に対応期限がある"],
+              "acceptance_criteria": [
+                "重要増減に説明がある",
+                "未解決事項に対応期限がある"
+              ],
               "expected_output_format": "structured",
               "estimated_scope": "S",
               "risk": "medium",
@@ -764,9 +950,11 @@
           "default_tasks": [
             {
               "task_id_suffix": "monthly-close-report",
-              "team_role": "worker",
+              "team_role": "implementer",
               "description": "月次決算報告書を evidence/monthly-close-report.md に整形し経営報告へ回付する",
-              "acceptance_criteria": ["P/L・B/S ハイライトと増減説明がある"],
+              "acceptance_criteria": [
+                "P/L・B/S ハイライトと増減説明がある"
+              ],
               "expected_output_format": "files",
               "estimated_scope": "S",
               "risk": "low",
@@ -796,9 +984,17 @@
       "pattern": "stage_gated_delivery",
       "description": "Budget review workflow that compares budget input against the financial model and drafts approval notes.",
       "match": {
-        "mission_classes": ["operations_and_release"],
-        "delivery_shapes": ["multi_artifact_pipeline"],
-        "intent_ids": ["budget-review", "budget", "budget-review-monthly"]
+        "mission_classes": [
+          "operations_and_release"
+        ],
+        "delivery_shapes": [
+          "multi_artifact_pipeline"
+        ],
+        "intent_ids": [
+          "budget-review",
+          "budget",
+          "budget-review-monthly"
+        ]
       },
       "phases": [
         "intake",
@@ -812,7 +1008,9 @@
               "task_id_suffix": "review-scope",
               "team_role": "planner",
               "description": "対象部門・期間・重点論点を evidence/budget-review-scope.json に定義する",
-              "acceptance_criteria": ["対象と論点が合意済み"],
+              "acceptance_criteria": [
+                "対象と論点が合意済み"
+              ],
               "expected_output_format": "structured",
               "estimated_scope": "M",
               "risk": "medium",
@@ -840,14 +1038,27 @@
               "task_id_suffix": "budget-actuals",
               "team_role": "planner",
               "description": "予算・実績・見込みデータを収集し evidence/budget-actuals.md に整理する",
-              "acceptance_criteria": ["データ出所と時点が明記されている"],
+              "acceptance_criteria": [
+                "データ出所と時点が明記されている"
+              ],
               "expected_output_format": "files",
               "estimated_scope": "M",
               "risk": "medium",
               "deliverable": "evidence/budget-actuals.md",
               "deliverable_kind": "doc"
             }
-          ]
+          ],
+          "exit_gate": {
+            "id": "CONTRACT_AUTHORING_DONE",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/budget-actuals.md"
+                }
+              }
+            ]
+          }
         },
         "preflight",
         {
@@ -857,16 +1068,29 @@
           "default_tasks": [
             {
               "task_id_suffix": "variance-analysis",
-              "team_role": "worker",
+              "team_role": "implementer",
               "description": "予実差異と要因を分析し evidence/variance-analysis.md にまとめる",
-              "acceptance_criteria": ["重要差異に要因と恒常/一時の区別がある"],
+              "acceptance_criteria": [
+                "重要差異に要因と恒常/一時の区別がある"
+              ],
               "expected_output_format": "files",
               "estimated_scope": "M",
               "risk": "medium",
               "deliverable": "evidence/variance-analysis.md",
               "deliverable_kind": "doc"
             }
-          ]
+          ],
+          "exit_gate": {
+            "id": "EXECUTION_DONE",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/variance-analysis.md"
+                }
+              }
+            ]
+          }
         },
         {
           "id": "verification",
@@ -877,7 +1101,9 @@
               "task_id_suffix": "analysis-review",
               "team_role": "reviewer",
               "description": "差異分析を要因の妥当性・見落とし・数字整合の観点でレビューする",
-              "acceptance_criteria": ["要因説明がデータと整合している"],
+              "acceptance_criteria": [
+                "要因説明がデータと整合している"
+              ],
               "expected_output_format": "structured",
               "estimated_scope": "S",
               "risk": "medium",
@@ -911,9 +1137,11 @@
           "default_tasks": [
             {
               "task_id_suffix": "budget-recommendation",
-              "team_role": "worker",
+              "team_role": "implementer",
               "description": "予算改訂・アクション提案を evidence/budget-recommendation.md に整形し意思決定へ回付する",
-              "acceptance_criteria": ["提案ごとに影響額と根拠がある"],
+              "acceptance_criteria": [
+                "提案ごとに影響額と根拠がある"
+              ],
               "expected_output_format": "files",
               "estimated_scope": "S",
               "risk": "low",
@@ -943,9 +1171,18 @@
       "pattern": "coordinated_multi_track_execution",
       "description": "Board meeting preparation workflow that compiles company, decision-rights, financial, and OKR context into a draft pack.",
       "match": {
-        "mission_classes": ["decision_support", "operations_and_release"],
-        "delivery_shapes": ["multi_artifact_pipeline"],
-        "intent_ids": ["board-meeting-prep", "board-prep", "board-meeting"]
+        "mission_classes": [
+          "decision_support",
+          "operations_and_release"
+        ],
+        "delivery_shapes": [
+          "multi_artifact_pipeline"
+        ],
+        "intent_ids": [
+          "board-meeting-prep",
+          "board-prep",
+          "board-meeting"
+        ]
       },
       "phases": [
         "intake",
@@ -959,7 +1196,9 @@
               "task_id_suffix": "board-agenda",
               "team_role": "planner",
               "description": "決議事項・報告事項・時間配分を evidence/board-agenda.json に策定する",
-              "acceptance_criteria": ["決議事項と必要な事前資料が対応している"],
+              "acceptance_criteria": [
+                "決議事項と必要な事前資料が対応している"
+              ],
               "expected_output_format": "structured",
               "estimated_scope": "M",
               "risk": "medium",
@@ -987,14 +1226,27 @@
               "task_id_suffix": "materials-outline",
               "team_role": "planner",
               "description": "議題ごとの資料構成・担当・締切を evidence/board-materials-outline.md に設計する",
-              "acceptance_criteria": ["全議題に資料担当と締切がある"],
+              "acceptance_criteria": [
+                "全議題に資料担当と締切がある"
+              ],
               "expected_output_format": "files",
               "estimated_scope": "M",
               "risk": "medium",
               "deliverable": "evidence/board-materials-outline.md",
               "deliverable_kind": "doc"
             }
-          ]
+          ],
+          "exit_gate": {
+            "id": "CONTRACT_AUTHORING_DONE",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/board-materials-outline.md"
+                }
+              }
+            ]
+          }
         },
         {
           "id": "execution",
@@ -1003,16 +1255,30 @@
           "default_tasks": [
             {
               "task_id_suffix": "materials-draft",
-              "team_role": "worker",
+              "team_role": "implementer",
               "description": "議題資料のドラフトを集約し evidence/board-materials-draft.md に統合する",
-              "acceptance_criteria": ["全議題分のドラフトが揃っている", "決議事項に決議案文がある"],
+              "acceptance_criteria": [
+                "全議題分のドラフトが揃っている",
+                "決議事項に決議案文がある"
+              ],
               "expected_output_format": "files",
               "estimated_scope": "M",
               "risk": "medium",
               "deliverable": "evidence/board-materials-draft.md",
               "deliverable_kind": "doc"
             }
-          ]
+          ],
+          "exit_gate": {
+            "id": "EXECUTION_DONE",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/board-materials-draft.md"
+                }
+              }
+            ]
+          }
         },
         {
           "id": "verification",
@@ -1023,7 +1289,10 @@
               "task_id_suffix": "materials-review",
               "team_role": "reviewer",
               "description": "取締役会資料を正確性・一貫性・開示適切性の観点でレビューする",
-              "acceptance_criteria": ["数字が最新の確定値と一致", "法務・開示上の懸念が解消済み"],
+              "acceptance_criteria": [
+                "数字が最新の確定値と一致",
+                "法務・開示上の懸念が解消済み"
+              ],
               "expected_output_format": "structured",
               "estimated_scope": "S",
               "risk": "medium",
@@ -1057,9 +1326,11 @@
           "default_tasks": [
             {
               "task_id_suffix": "board-package-final",
-              "team_role": "worker",
+              "team_role": "implementer",
               "description": "最終資料パッケージを evidence/board-package-final.md に確定し事前送付を準備する",
-              "acceptance_criteria": ["送付期限までに全資料が確定している"],
+              "acceptance_criteria": [
+                "送付期限までに全資料が確定している"
+              ],
               "expected_output_format": "files",
               "estimated_scope": "S",
               "risk": "low",
@@ -1089,8 +1360,13 @@
       "pattern": "stage_gated_delivery",
       "description": "顧客層定義 → ストーリー設計 → コンテンツ執筆 → デザイン選定 → レビュー → 成果物作成のステージゲート型プレゼン資料作成プロセス。判断フェーズは semantic brief、レンダリングは pipelines/fragments/pptx-produce-from-brief.json の決定的 media チェーンを再利用する。",
       "match": {
-        "mission_classes": ["content_and_media"],
-        "delivery_shapes": ["single_artifact", "multi_artifact_pipeline"],
+        "mission_classes": [
+          "content_and_media"
+        ],
+        "delivery_shapes": [
+          "single_artifact",
+          "multi_artifact_pipeline"
+        ],
         "intent_ids": [
           "presentation-deck",
           "proposal-deck",
@@ -1168,7 +1444,7 @@
           "default_tasks": [
             {
               "task_id_suffix": "deck-brief",
-              "team_role": "worker",
+              "team_role": "implementer",
               "description": "story-outline に沿って proposal-brief スキーマ準拠の evidence/deck-brief.json(全スライドの本文・speaker_notes 込み)を執筆する",
               "deliverable": "evidence/deck-brief.json",
               "acceptance_criteria": [
@@ -1201,15 +1477,28 @@
           "default_tasks": [
             {
               "task_id_suffix": "design-protocol",
-              "team_role": "worker",
+              "team_role": "implementer",
               "description": "deck-brief にテナントのデザインシステムを適用し media:brief_to_design_protocol でデザインプロトコルを確定する",
               "deliverable": "evidence/design-protocol.json",
-              "acceptance_criteria": ["design_system_id とテナントテーマが解決済み"],
+              "acceptance_criteria": [
+                "design_system_id とテナントテーマが解決済み"
+              ],
               "expected_output_format": "files",
               "estimated_scope": "S",
               "risk": "low"
             }
-          ]
+          ],
+          "exit_gate": {
+            "id": "DESIGN_SELECTION_DONE",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/design-protocol.json"
+                }
+              }
+            ]
+          }
         },
         {
           "id": "review",
@@ -1246,6 +1535,19 @@
                   "kind": "deck",
                   "min_score": 0.7
                 }
+              },
+              {
+                "kind": "llm_review",
+                "params": {
+                  "path": "evidence/deck-brief.json",
+                  "allow_stub": true,
+                  "model_tier": "standard",
+                  "criteria": [
+                    "結論が根拠・出典に対応しており論理飛躍がない",
+                    "未完了・プレースホルダのまま残っている箇所がない",
+                    "読者(意思決定者)がそのまま行動に移せる具体性がある"
+                  ]
+                }
               }
             ]
           }
@@ -1258,7 +1560,7 @@
           "default_tasks": [
             {
               "task_id_suffix": "render-pptx",
-              "team_role": "worker",
+              "team_role": "implementer",
               "description": "レビュー承認済みの deck-brief から pipelines/fragments/pptx-produce-from-brief.json で PPTX を生成し、承認ゲートファイルを作成する",
               "deliverable": "evidence/proposal-deck.pptx",
               "acceptance_criteria": [
@@ -1293,9 +1595,19 @@
       "pattern": "stage_gated_delivery",
       "description": "読者定義 → 構成設計 → 本文執筆 → レビュー → 発行のステージゲート型ドキュメント作成プロセス(presentation-deck-production の文書版)。",
       "match": {
-        "mission_classes": ["content_and_media"],
-        "delivery_shapes": ["single_artifact", "multi_artifact_pipeline"],
-        "intent_ids": ["document-authoring", "authoring-document", "write-report", "write-document"]
+        "mission_classes": [
+          "content_and_media"
+        ],
+        "delivery_shapes": [
+          "single_artifact",
+          "multi_artifact_pipeline"
+        ],
+        "intent_ids": [
+          "document-authoring",
+          "authoring-document",
+          "write-report",
+          "write-document"
+        ]
       },
       "phases": [
         {
@@ -1308,7 +1620,9 @@
               "team_role": "planner",
               "description": "想定読者・目的・読後に促したいアクションを evidence/audience-brief.json に定義する",
               "deliverable": "evidence/audience-brief.json",
-              "acceptance_criteria": ["audience / purpose / desired_action が揃っている"],
+              "acceptance_criteria": [
+                "audience / purpose / desired_action が揃っている"
+              ],
               "expected_output_format": "structured",
               "estimated_scope": "S",
               "risk": "low"
@@ -1336,12 +1650,26 @@
               "team_role": "planner",
               "description": "audience-brief を踏まえ、章立てと各章の要旨を evidence/document-outline.json に設計する",
               "deliverable": "evidence/document-outline.json",
-              "acceptance_criteria": ["章立てが目的と読者に整合", "各章に要旨がある"],
+              "acceptance_criteria": [
+                "章立てが目的と読者に整合",
+                "各章に要旨がある"
+              ],
               "expected_output_format": "structured",
               "estimated_scope": "M",
               "risk": "medium"
             }
-          ]
+          ],
+          "exit_gate": {
+            "id": "OUTLINE_DESIGN_DONE",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/document-outline.json"
+                }
+              }
+            ]
+          }
         },
         {
           "id": "content_drafting",
@@ -1350,16 +1678,30 @@
           "default_tasks": [
             {
               "task_id_suffix": "draft",
-              "team_role": "worker",
+              "team_role": "implementer",
               "description": "document-outline に沿って evidence/document-draft.md に本文を執筆する",
               "deliverable": "evidence/document-draft.md",
-              "acceptance_criteria": ["全章が執筆済み", "根拠・参照が明記されている"],
+              "acceptance_criteria": [
+                "全章が執筆済み",
+                "根拠・参照が明記されている"
+              ],
               "expected_output_format": "files",
               "estimated_scope": "M",
               "risk": "medium",
               "deliverable_kind": "doc"
             }
-          ]
+          ],
+          "exit_gate": {
+            "id": "CONTENT_DRAFTING_DONE",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/document-draft.md"
+                }
+              }
+            ]
+          }
         },
         {
           "id": "review",
@@ -1371,7 +1713,10 @@
               "team_role": "reviewer",
               "description": "本文を読者適合・論理一貫性・根拠の観点でレビューし、指摘と判定を記録する",
               "review_target_suffix": "draft",
-              "acceptance_criteria": ["読者と目的に整合", "重大な指摘が解消済み"],
+              "acceptance_criteria": [
+                "読者と目的に整合",
+                "重大な指摘が解消済み"
+              ],
               "expected_output_format": "structured",
               "estimated_scope": "S",
               "risk": "medium"
@@ -1404,10 +1749,12 @@
           "default_tasks": [
             {
               "task_id_suffix": "publish",
-              "team_role": "worker",
+              "team_role": "implementer",
               "description": "レビュー承認済みの本文を最終形式(PDF/Markdown)に整形し、納品先へ配置する",
               "deliverable": "evidence/document-final.md",
-              "acceptance_criteria": ["最終成果物が生成される"],
+              "acceptance_criteria": [
+                "最終成果物が生成される"
+              ],
               "expected_output_format": "files",
               "estimated_scope": "S",
               "risk": "low",
@@ -1436,8 +1783,14 @@
       "pattern": "stage_gated_delivery",
       "description": "トリアージ → 証跡収集 → タイムライン再構成 → 根本原因分析 → レビュー → 報告のステージゲート型インシデント分析プロセス。根本原因分析は incident-post-mortem パイプラインを再利用する。封じ込め(containment)は gated-incident-containment を使うこと。",
       "match": {
-        "mission_classes": ["operations_and_release", "environment_and_recovery"],
-        "delivery_shapes": ["single_artifact", "multi_artifact_pipeline"],
+        "mission_classes": [
+          "operations_and_release",
+          "environment_and_recovery"
+        ],
+        "delivery_shapes": [
+          "single_artifact",
+          "multi_artifact_pipeline"
+        ],
         "intent_ids": [
           "incident-analysis",
           "post-mortem",
@@ -1464,7 +1817,18 @@
               "estimated_scope": "S",
               "risk": "medium"
             }
-          ]
+          ],
+          "exit_gate": {
+            "id": "TRIAGE_DONE",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/triage-assessment.json"
+                }
+              }
+            ]
+          }
         },
         {
           "id": "evidence_collection",
@@ -1473,10 +1837,12 @@
           "default_tasks": [
             {
               "task_id_suffix": "collect-evidence",
-              "team_role": "worker",
+              "team_role": "implementer",
               "description": "ログ・トレース・設定など関連証跡を収集し、索引を evidence/evidence-index.json に作成する",
               "deliverable": "evidence/evidence-index.json",
-              "acceptance_criteria": ["証跡の出所と取得時刻が索引化されている"],
+              "acceptance_criteria": [
+                "証跡の出所と取得時刻が索引化されている"
+              ],
               "expected_output_format": "structured",
               "estimated_scope": "M",
               "risk": "low"
@@ -1501,16 +1867,29 @@
           "default_tasks": [
             {
               "task_id_suffix": "timeline",
-              "team_role": "worker",
+              "team_role": "implementer",
               "description": "証跡から事象の時系列を再構成し evidence/incident-timeline.md に記録する",
               "deliverable": "evidence/incident-timeline.md",
-              "acceptance_criteria": ["検知から収束までの主要事象が時刻つきで並んでいる"],
+              "acceptance_criteria": [
+                "検知から収束までの主要事象が時刻つきで並んでいる"
+              ],
               "expected_output_format": "files",
               "estimated_scope": "M",
               "risk": "low",
               "deliverable_kind": "doc"
             }
-          ]
+          ],
+          "exit_gate": {
+            "id": "TIMELINE_RECONSTRUCTION_DONE",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/incident-timeline.md"
+                }
+              }
+            ]
+          }
         },
         {
           "id": "root_cause_analysis",
@@ -1520,7 +1899,7 @@
           "default_tasks": [
             {
               "task_id_suffix": "post-mortem",
-              "team_role": "worker",
+              "team_role": "implementer",
               "description": "失敗を Environment/Logic/Governance に分類し、根本原因と再発防止策を evidence/post-mortem.md に執筆する(incident-post-mortem パイプライン相当)",
               "deliverable": "evidence/post-mortem.md",
               "acceptance_criteria": [
@@ -1532,7 +1911,18 @@
               "risk": "medium",
               "deliverable_kind": "doc"
             }
-          ]
+          ],
+          "exit_gate": {
+            "id": "ROOT_CAUSE_ANALYSIS_DONE",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/post-mortem.md"
+                }
+              }
+            ]
+          }
         },
         {
           "id": "review",
@@ -1544,7 +1934,10 @@
               "team_role": "reviewer",
               "description": "post-mortem を根本原因の妥当性・証跡整合・blameless 観点でレビューし判定を記録する",
               "review_target_suffix": "post-mortem",
-              "acceptance_criteria": ["原因と対策の因果が通っている", "証跡と矛盾がない"],
+              "acceptance_criteria": [
+                "原因と対策の因果が通っている",
+                "証跡と矛盾がない"
+              ],
               "expected_output_format": "structured",
               "estimated_scope": "S",
               "risk": "medium"
@@ -1577,10 +1970,12 @@
           "default_tasks": [
             {
               "task_id_suffix": "final-report",
-              "team_role": "worker",
+              "team_role": "implementer",
               "description": "レビュー済み post-mortem を最終報告として evidence/incident-report-final.md に整形し関係者へ共有する",
               "deliverable": "evidence/incident-report-final.md",
-              "acceptance_criteria": ["最終報告が生成されている"],
+              "acceptance_criteria": [
+                "最終報告が生成されている"
+              ],
               "expected_output_format": "files",
               "estimated_scope": "S",
               "risk": "low",
@@ -1609,7 +2004,10 @@
       "pattern": "exploratory_to_deterministic_conversion",
       "description": "リサーチクエスチョン定義 → 情報収集 → 統合分析 → レビュー → レポート納品の調査プロセス。多角的な情報源の走査と出典管理を必須とする。",
       "match": {
-        "mission_classes": ["research_and_absorption", "decision_support"],
+        "mission_classes": [
+          "research_and_absorption",
+          "decision_support"
+        ],
         "delivery_shapes": [
           "single_artifact",
           "multi_artifact_pipeline",
@@ -1662,7 +2060,7 @@
           "default_tasks": [
             {
               "task_id_suffix": "source-notes",
-              "team_role": "worker",
+              "team_role": "implementer",
               "description": "複数の情報源(一次情報・統計・報道・専門家見解)を走査し、出典つきの調査ノートを evidence/source-notes.md に蓄積する",
               "acceptance_criteria": [
                 "各クエスチョンに2つ以上の独立した情報源",
@@ -1694,16 +2092,30 @@
           "default_tasks": [
             {
               "task_id_suffix": "synthesis-draft",
-              "team_role": "worker",
+              "team_role": "implementer",
               "description": "調査ノートを統合し、クエスチョン毎の結論・確度・反証を evidence/research-synthesis.md にまとめる",
-              "acceptance_criteria": ["結論ごとに確度と根拠が対応", "対立する情報源の扱いが明記"],
+              "acceptance_criteria": [
+                "結論ごとに確度と根拠が対応",
+                "対立する情報源の扱いが明記"
+              ],
               "expected_output_format": "files",
               "estimated_scope": "M",
               "risk": "medium",
               "deliverable": "evidence/research-synthesis.md",
               "deliverable_kind": "doc"
             }
-          ]
+          ],
+          "exit_gate": {
+            "id": "SYNTHESIS_DONE",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/research-synthesis.md"
+                }
+              }
+            ]
+          }
         },
         {
           "id": "review",
@@ -1714,7 +2126,10 @@
               "task_id_suffix": "synthesis-review",
               "team_role": "reviewer",
               "description": "統合分析を出典妥当性・論理飛躍・確度表現の観点でレビューし判定を記録する",
-              "acceptance_criteria": ["重要な結論が出典で裏付けられている", "過大な断定がない"],
+              "acceptance_criteria": [
+                "重要な結論が出典で裏付けられている",
+                "過大な断定がない"
+              ],
               "expected_output_format": "structured",
               "estimated_scope": "S",
               "risk": "medium",
@@ -1737,6 +2152,19 @@
                   "kind": "doc",
                   "min_score": 0.5
                 }
+              },
+              {
+                "kind": "llm_review",
+                "params": {
+                  "path": "evidence/research-synthesis.md",
+                  "allow_stub": true,
+                  "model_tier": "standard",
+                  "criteria": [
+                    "結論が根拠・出典に対応しており論理飛躍がない",
+                    "未完了・プレースホルダのまま残っている箇所がない",
+                    "読者(意思決定者)がそのまま行動に移せる具体性がある"
+                  ]
+                }
               }
             ]
           }
@@ -1748,9 +2176,11 @@
           "default_tasks": [
             {
               "task_id_suffix": "final-report",
-              "team_role": "worker",
+              "team_role": "implementer",
               "description": "レビュー済み分析を読者向けレポートとして evidence/research-report-final.md に整形し納品する",
-              "acceptance_criteria": ["要旨・結論・根拠・参考文献の構成が揃っている"],
+              "acceptance_criteria": [
+                "要旨・結論・根拠・参考文献の構成が揃っている"
+              ],
               "expected_output_format": "files",
               "estimated_scope": "S",
               "risk": "low",
@@ -1780,9 +2210,20 @@
       "pattern": "stage_gated_delivery",
       "description": "分析課題定義 → データ収集・検証 → 分析 → 可視化・報告 → レビュー → 納品のデータ分析プロセス。再現手順の記録を必須とする。",
       "match": {
-        "mission_classes": ["decision_support", "research_and_absorption"],
-        "delivery_shapes": ["single_artifact", "multi_artifact_pipeline"],
-        "intent_ids": ["data-analysis", "data-analysis-report", "analyze-data", "kpi-analysis"]
+        "mission_classes": [
+          "decision_support",
+          "research_and_absorption"
+        ],
+        "delivery_shapes": [
+          "single_artifact",
+          "multi_artifact_pipeline"
+        ],
+        "intent_ids": [
+          "data-analysis",
+          "data-analysis-report",
+          "analyze-data",
+          "kpi-analysis"
+        ]
       },
       "phases": [
         {
@@ -1794,7 +2235,9 @@
               "task_id_suffix": "analysis-questions",
               "team_role": "planner",
               "description": "意思決定に必要な分析課題・仮説・成功指標を evidence/analysis-questions.json に定義する",
-              "acceptance_criteria": ["各課題に判断アクションが対応している"],
+              "acceptance_criteria": [
+                "各課題に判断アクションが対応している"
+              ],
               "expected_output_format": "structured",
               "estimated_scope": "S",
               "risk": "medium",
@@ -1820,7 +2263,7 @@
           "default_tasks": [
             {
               "task_id_suffix": "dataset-inventory",
-              "team_role": "worker",
+              "team_role": "implementer",
               "description": "必要データを収集し、出所・期間・品質検証結果を evidence/dataset-inventory.md に記録する",
               "acceptance_criteria": [
                 "データ出所と抽出条件が再現可能",
@@ -1852,7 +2295,7 @@
           "default_tasks": [
             {
               "task_id_suffix": "analysis-results",
-              "team_role": "worker",
+              "team_role": "implementer",
               "description": "仮説ごとに分析を実施し、手順・結果・限界を evidence/analysis-results.md に記録する(分析ジョブは analysis-job パイプラインを利用可)",
               "acceptance_criteria": [
                 "結果が再現手順つきで記録されている",
@@ -1865,7 +2308,18 @@
               "deliverable_kind": "doc",
               "pipeline_ref": "knowledge/product/pipeline-templates/analysis-job.json"
             }
-          ]
+          ],
+          "exit_gate": {
+            "id": "ANALYSIS_DONE",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/analysis-results.md"
+                }
+              }
+            ]
+          }
         },
         {
           "id": "visualization_reporting",
@@ -1874,7 +2328,7 @@
           "default_tasks": [
             {
               "task_id_suffix": "report-draft",
-              "team_role": "worker",
+              "team_role": "implementer",
               "description": "主要ファインディングを図表つき報告書ドラフトとして evidence/analysis-report-draft.md に作成する",
               "acceptance_criteria": [
                 "図表が結論を直接支持している",
@@ -1886,7 +2340,18 @@
               "deliverable": "evidence/analysis-report-draft.md",
               "deliverable_kind": "doc"
             }
-          ]
+          ],
+          "exit_gate": {
+            "id": "VISUALIZATION_REPORTING_DONE",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/analysis-report-draft.md"
+                }
+              }
+            ]
+          }
         },
         {
           "id": "review",
@@ -1897,7 +2362,10 @@
               "task_id_suffix": "report-review",
               "team_role": "reviewer",
               "description": "報告書を数値整合・因果の飛躍・可視化の誤誘導の観点でレビューし判定を記録する",
-              "acceptance_criteria": ["相関と因果が区別されている", "図表に誤誘導(軸操作等)がない"],
+              "acceptance_criteria": [
+                "相関と因果が区別されている",
+                "図表に誤誘導(軸操作等)がない"
+              ],
               "expected_output_format": "structured",
               "estimated_scope": "S",
               "risk": "medium",
@@ -1920,6 +2388,19 @@
                   "kind": "doc",
                   "min_score": 0.5
                 }
+              },
+              {
+                "kind": "llm_review",
+                "params": {
+                  "path": "evidence/analysis-report-draft.md",
+                  "allow_stub": true,
+                  "model_tier": "standard",
+                  "criteria": [
+                    "結論が根拠・出典に対応しており論理飛躍がない",
+                    "未完了・プレースホルダのまま残っている箇所がない",
+                    "読者(意思決定者)がそのまま行動に移せる具体性がある"
+                  ]
+                }
               }
             ]
           }
@@ -1931,9 +2412,11 @@
           "default_tasks": [
             {
               "task_id_suffix": "final-analysis-report",
-              "team_role": "worker",
+              "team_role": "implementer",
               "description": "レビュー済み報告書を evidence/analysis-report-final.md に確定し関係者へ共有する",
-              "acceptance_criteria": ["最終報告書が確定している"],
+              "acceptance_criteria": [
+                "最終報告書が確定している"
+              ],
               "expected_output_format": "files",
               "estimated_scope": "S",
               "risk": "low",
@@ -1963,8 +2446,14 @@
       "pattern": "coordinated_multi_track_execution",
       "description": "ターゲット・ゴール定義 → メッセージング戦略 → コンテンツ制作 → レビュー → ローンチ → 振り返りのマーケティングキャンペーンプロセス。",
       "match": {
-        "mission_classes": ["content_and_media", "customer_engagement"],
-        "delivery_shapes": ["single_artifact", "multi_artifact_pipeline"],
+        "mission_classes": [
+          "content_and_media",
+          "customer_engagement"
+        ],
+        "delivery_shapes": [
+          "single_artifact",
+          "multi_artifact_pipeline"
+        ],
         "intent_ids": [
           "marketing-campaign",
           "campaign-launch",
@@ -1982,7 +2471,9 @@
               "task_id_suffix": "campaign-brief",
               "team_role": "planner",
               "description": "ターゲットセグメント・キャンペーンゴール・KPI・予算を evidence/campaign-brief.json に定義する",
-              "acceptance_criteria": ["KPI が測定可能でゴールと対応"],
+              "acceptance_criteria": [
+                "KPI が測定可能でゴールと対応"
+              ],
               "expected_output_format": "structured",
               "estimated_scope": "S",
               "risk": "medium",
@@ -2010,7 +2501,9 @@
               "task_id_suffix": "messaging-strategy",
               "team_role": "planner",
               "description": "コアメッセージ・チャネル別トーン・訴求軸を evidence/messaging-strategy.md に設計する(marketing-strategy パイプライン利用可)",
-              "acceptance_criteria": ["チャネルごとの訴求とCTAが定義されている"],
+              "acceptance_criteria": [
+                "チャネルごとの訴求とCTAが定義されている"
+              ],
               "expected_output_format": "files",
               "estimated_scope": "M",
               "risk": "medium",
@@ -2018,7 +2511,18 @@
               "deliverable_kind": "doc",
               "pipeline_ref": "knowledge/product/pipeline-templates/marketing-strategy.json"
             }
-          ]
+          ],
+          "exit_gate": {
+            "id": "MESSAGING_STRATEGY_DONE",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/messaging-strategy.md"
+                }
+              }
+            ]
+          }
         },
         {
           "id": "content_production",
@@ -2027,7 +2531,7 @@
           "default_tasks": [
             {
               "task_id_suffix": "campaign-assets",
-              "team_role": "worker",
+              "team_role": "implementer",
               "description": "チャネル別コンテンツ(コピー・ビジュアル指示・LP骨子)を制作し索引を evidence/campaign-assets-index.md にまとめる(marketing-content パイプライン利用可)",
               "acceptance_criteria": [
                 "全チャネル分のアセットが揃っている",
@@ -2040,7 +2544,18 @@
               "deliverable_kind": "doc",
               "pipeline_ref": "knowledge/product/pipeline-templates/marketing-content.json"
             }
-          ]
+          ],
+          "exit_gate": {
+            "id": "CONTENT_PRODUCTION_DONE",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/campaign-assets-index.md"
+                }
+              }
+            ]
+          }
         },
         {
           "id": "review",
@@ -2051,7 +2566,10 @@
               "task_id_suffix": "campaign-review",
               "team_role": "reviewer",
               "description": "コンテンツをメッセージ一貫性・ブランド適合・法務/景表法リスクの観点でレビューする",
-              "acceptance_criteria": ["誇大表現・根拠なき比較がない", "トーンが戦略と一致"],
+              "acceptance_criteria": [
+                "誇大表現・根拠なき比較がない",
+                "トーンが戦略と一致"
+              ],
               "expected_output_format": "structured",
               "estimated_scope": "S",
               "risk": "medium",
@@ -2085,9 +2603,12 @@
           "default_tasks": [
             {
               "task_id_suffix": "launch-runbook",
-              "team_role": "worker",
+              "team_role": "implementer",
               "description": "配信スケジュール・チャネル設定・計測設定を evidence/launch-runbook.md に確定しローンチを実行する",
-              "acceptance_criteria": ["計測(UTM等)が設定済み", "ロールバック手順がある"],
+              "acceptance_criteria": [
+                "計測(UTM等)が設定済み",
+                "ロールバック手順がある"
+              ],
               "expected_output_format": "files",
               "estimated_scope": "S",
               "risk": "medium",
@@ -2119,14 +2640,27 @@
               "task_id_suffix": "campaign-retrospective",
               "team_role": "planner",
               "description": "KPI 実績と学びを evidence/campaign-retrospective.md に記録し次回施策への提言をまとめる",
-              "acceptance_criteria": ["KPI実績と目標の差異に考察がある"],
+              "acceptance_criteria": [
+                "KPI実績と目標の差異に考察がある"
+              ],
               "expected_output_format": "files",
               "estimated_scope": "S",
               "risk": "low",
               "deliverable": "evidence/campaign-retrospective.md",
               "deliverable_kind": "doc"
             }
-          ]
+          ],
+          "exit_gate": {
+            "id": "RETROSPECTIVE_DONE",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/campaign-retrospective.md"
+                }
+              }
+            ]
+          }
         }
       ]
     },
@@ -2135,8 +2669,14 @@
       "pattern": "stage_gated_delivery",
       "description": "契約内容の把握 → 条項リスクレビュー → 修正案(レッドライン) → 法務レビュー → 承認・締結準備の契約レビュープロセス。",
       "match": {
-        "mission_classes": ["decision_support", "operations_and_release"],
-        "delivery_shapes": ["single_artifact", "multi_artifact_pipeline"],
+        "mission_classes": [
+          "decision_support",
+          "operations_and_release"
+        ],
+        "delivery_shapes": [
+          "single_artifact",
+          "multi_artifact_pipeline"
+        ],
         "intent_ids": [
           "contract-review",
           "legal-review",
@@ -2154,7 +2694,9 @@
               "task_id_suffix": "contract-summary",
               "team_role": "planner",
               "description": "契約の目的・当事者・主要条件・社内標準との差分を evidence/contract-summary.json に整理する",
-              "acceptance_criteria": ["金額・期間・解約条件が抽出されている"],
+              "acceptance_criteria": [
+                "金額・期間・解約条件が抽出されている"
+              ],
               "expected_output_format": "structured",
               "estimated_scope": "S",
               "risk": "medium",
@@ -2180,7 +2722,7 @@
           "default_tasks": [
             {
               "task_id_suffix": "risk-assessment",
-              "team_role": "worker",
+              "team_role": "implementer",
               "description": "責任制限・補償・知財・データ保護・解約等の条項リスクを evidence/contract-risk-assessment.md に重大度つきで評価する",
               "acceptance_criteria": [
                 "重大度(高/中/低)と根拠条項番号がある",
@@ -2212,16 +2754,29 @@
           "default_tasks": [
             {
               "task_id_suffix": "redline-proposal",
-              "team_role": "worker",
+              "team_role": "implementer",
               "description": "高・中リスク条項への修正案と交渉方針を evidence/contract-redline.md に作成する",
-              "acceptance_criteria": ["高リスク条項全てに修正案または受容理由がある"],
+              "acceptance_criteria": [
+                "高リスク条項全てに修正案または受容理由がある"
+              ],
               "expected_output_format": "files",
               "estimated_scope": "M",
               "risk": "medium",
               "deliverable": "evidence/contract-redline.md",
               "deliverable_kind": "doc"
             }
-          ]
+          ],
+          "exit_gate": {
+            "id": "REDLINE_DONE",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/contract-redline.md"
+                }
+              }
+            ]
+          }
         },
         {
           "id": "legal_review",
@@ -2232,7 +2787,9 @@
               "task_id_suffix": "legal-review",
               "team_role": "reviewer",
               "description": "リスク評価と修正案を法的妥当性・見落とし・交渉現実性の観点でレビューする",
-              "acceptance_criteria": ["重大リスクの評価に法的根拠がある"],
+              "acceptance_criteria": [
+                "重大リスクの評価に法的根拠がある"
+              ],
               "expected_output_format": "structured",
               "estimated_scope": "S",
               "risk": "high",
@@ -2266,9 +2823,11 @@
           "default_tasks": [
             {
               "task_id_suffix": "approval-package",
-              "team_role": "worker",
+              "team_role": "implementer",
               "description": "承認用サマリ(リスク受容事項・修正合意状況)を evidence/contract-approval-package.md に整形する",
-              "acceptance_criteria": ["残存リスクと受容者が明記されている"],
+              "acceptance_criteria": [
+                "残存リスクと受容者が明記されている"
+              ],
               "expected_output_format": "files",
               "estimated_scope": "S",
               "risk": "medium",
@@ -2298,9 +2857,19 @@
       "pattern": "stage_gated_delivery",
       "description": "オンボーディング計画 → キックオフ準備 → 環境設定 → トレーニング・定着 → レビュー → 本稼働の顧客オンボーディングプロセス。",
       "match": {
-        "mission_classes": ["customer_engagement"],
-        "delivery_shapes": ["single_artifact", "multi_artifact_pipeline", "cross_system_change"],
-        "intent_ids": ["customer-onboarding", "onboarding-plan", "client-onboarding"]
+        "mission_classes": [
+          "customer_engagement"
+        ],
+        "delivery_shapes": [
+          "single_artifact",
+          "multi_artifact_pipeline",
+          "cross_system_change"
+        ],
+        "intent_ids": [
+          "customer-onboarding",
+          "onboarding-plan",
+          "client-onboarding"
+        ]
       },
       "phases": [
         {
@@ -2312,7 +2881,10 @@
               "task_id_suffix": "onboarding-plan",
               "team_role": "planner",
               "description": "顧客のゴール・成功指標・マイルストーン・体制を evidence/onboarding-plan.json に定義する",
-              "acceptance_criteria": ["成功指標が顧客と合意可能な形", "マイルストーンに期日がある"],
+              "acceptance_criteria": [
+                "成功指標が顧客と合意可能な形",
+                "マイルストーンに期日がある"
+              ],
               "expected_output_format": "structured",
               "estimated_scope": "S",
               "risk": "medium",
@@ -2338,16 +2910,29 @@
           "default_tasks": [
             {
               "task_id_suffix": "kickoff-package",
-              "team_role": "worker",
+              "team_role": "implementer",
               "description": "キックオフ資料・アジェンダ・役割分担を evidence/kickoff-package.md に準備する",
-              "acceptance_criteria": ["顧客側の宿題と期日が明確"],
+              "acceptance_criteria": [
+                "顧客側の宿題と期日が明確"
+              ],
               "expected_output_format": "files",
               "estimated_scope": "S",
               "risk": "medium",
               "deliverable": "evidence/kickoff-package.md",
               "deliverable_kind": "doc"
             }
-          ]
+          ],
+          "exit_gate": {
+            "id": "KICKOFF_PREPARATION_DONE",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/kickoff-package.md"
+                }
+              }
+            ]
+          }
         },
         {
           "id": "environment_provisioning",
@@ -2356,9 +2941,11 @@
           "default_tasks": [
             {
               "task_id_suffix": "provisioning-checklist",
-              "team_role": "worker",
+              "team_role": "implementer",
               "description": "アカウント・権限・連携設定を実施し evidence/provisioning-checklist.md に完了記録を残す",
-              "acceptance_criteria": ["全設定項目に完了確認がある"],
+              "acceptance_criteria": [
+                "全設定項目に完了確認がある"
+              ],
               "expected_output_format": "files",
               "estimated_scope": "M",
               "risk": "medium",
@@ -2385,16 +2972,29 @@
           "default_tasks": [
             {
               "task_id_suffix": "enablement-report",
-              "team_role": "worker",
+              "team_role": "implementer",
               "description": "トレーニング実施と初期利用の定着状況を evidence/enablement-report.md に記録する",
-              "acceptance_criteria": ["主要ユーザーの利用開始が確認できる"],
+              "acceptance_criteria": [
+                "主要ユーザーの利用開始が確認できる"
+              ],
               "expected_output_format": "files",
               "estimated_scope": "M",
               "risk": "medium",
               "deliverable": "evidence/enablement-report.md",
               "deliverable_kind": "doc"
             }
-          ]
+          ],
+          "exit_gate": {
+            "id": "ENABLEMENT_DONE",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/enablement-report.md"
+                }
+              }
+            ]
+          }
         },
         {
           "id": "review",
@@ -2405,7 +3005,9 @@
               "task_id_suffix": "readiness-review",
               "team_role": "reviewer",
               "description": "本稼働準備状況を成功指標・未解決課題・サポート体制の観点でレビューする",
-              "acceptance_criteria": ["未解決課題に対応計画がある"],
+              "acceptance_criteria": [
+                "未解決課題に対応計画がある"
+              ],
               "expected_output_format": "structured",
               "estimated_scope": "S",
               "risk": "medium",
@@ -2439,9 +3041,11 @@
           "default_tasks": [
             {
               "task_id_suffix": "go-live-report",
-              "team_role": "worker",
+              "team_role": "implementer",
               "description": "本稼働移行と引き継ぎ(CS/サポート)を完了し evidence/go-live-report.md に記録する",
-              "acceptance_criteria": ["引き継ぎ先と定例の設定が完了"],
+              "acceptance_criteria": [
+                "引き継ぎ先と定例の設定が完了"
+              ],
               "expected_output_format": "files",
               "estimated_scope": "S",
               "risk": "low",
@@ -2471,8 +3075,13 @@
       "pattern": "stage_gated_delivery",
       "description": "受講者定義 → カリキュラム設計 → 教材執筆 → 演習設計 → レビュー → 公開の研修・教育資料作成プロセス。",
       "match": {
-        "mission_classes": ["content_and_media"],
-        "delivery_shapes": ["single_artifact", "multi_artifact_pipeline"],
+        "mission_classes": [
+          "content_and_media"
+        ],
+        "delivery_shapes": [
+          "single_artifact",
+          "multi_artifact_pipeline"
+        ],
         "intent_ids": [
           "training-material",
           "course-authoring",
@@ -2490,7 +3099,9 @@
               "task_id_suffix": "learner-profile",
               "team_role": "planner",
               "description": "受講者の前提知識・到達目標(学習目標)・所要時間制約を evidence/learner-profile.json に定義する",
-              "acceptance_criteria": ["学習目標が観察可能な行動で書かれている"],
+              "acceptance_criteria": [
+                "学習目標が観察可能な行動で書かれている"
+              ],
               "expected_output_format": "structured",
               "estimated_scope": "S",
               "risk": "medium",
@@ -2518,7 +3129,9 @@
               "task_id_suffix": "curriculum",
               "team_role": "planner",
               "description": "モジュール構成・各モジュールの学習目標と時間配分を evidence/curriculum.md に設計する",
-              "acceptance_criteria": ["全学習目標がモジュールにマップされている"],
+              "acceptance_criteria": [
+                "全学習目標がモジュールにマップされている"
+              ],
               "expected_output_format": "files",
               "estimated_scope": "M",
               "risk": "medium",
@@ -2545,7 +3158,7 @@
           "default_tasks": [
             {
               "task_id_suffix": "material-draft",
-              "team_role": "worker",
+              "team_role": "implementer",
               "description": "カリキュラムに沿って教材本文(スライド/テキスト)を evidence/training-material-draft.md に執筆する",
               "acceptance_criteria": [
                 "全モジュール分の本文が揃っている",
@@ -2557,7 +3170,18 @@
               "deliverable": "evidence/training-material-draft.md",
               "deliverable_kind": "doc"
             }
-          ]
+          ],
+          "exit_gate": {
+            "id": "CONTENT_DRAFTING_DONE",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/training-material-draft.md"
+                }
+              }
+            ]
+          }
         },
         {
           "id": "exercise_design",
@@ -2566,16 +3190,29 @@
           "default_tasks": [
             {
               "task_id_suffix": "exercises",
-              "team_role": "worker",
+              "team_role": "implementer",
               "description": "理解確認の演習・模範解答・採点基準を evidence/exercises.md に設計する",
-              "acceptance_criteria": ["各学習目標に対応する演習がある"],
+              "acceptance_criteria": [
+                "各学習目標に対応する演習がある"
+              ],
               "expected_output_format": "files",
               "estimated_scope": "S",
               "risk": "medium",
               "deliverable": "evidence/exercises.md",
               "deliverable_kind": "doc"
             }
-          ]
+          ],
+          "exit_gate": {
+            "id": "EXERCISE_DESIGN_DONE",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/exercises.md"
+                }
+              }
+            ]
+          }
         },
         {
           "id": "review",
@@ -2586,7 +3223,10 @@
               "task_id_suffix": "material-review",
               "team_role": "reviewer",
               "description": "教材を正確性・難易度適合・学習目標カバレッジの観点でレビューする",
-              "acceptance_criteria": ["技術的な誤りがない", "難易度が受講者前提と一致"],
+              "acceptance_criteria": [
+                "技術的な誤りがない",
+                "難易度が受講者前提と一致"
+              ],
               "expected_output_format": "structured",
               "estimated_scope": "S",
               "risk": "medium",
@@ -2620,9 +3260,11 @@
           "default_tasks": [
             {
               "task_id_suffix": "published-package",
-              "team_role": "worker",
+              "team_role": "implementer",
               "description": "レビュー済み教材を配布形式に整形し evidence/training-package-final.md として公開準備を完了する",
-              "acceptance_criteria": ["配布形式と公開先が確定している"],
+              "acceptance_criteria": [
+                "配布形式と公開先が確定している"
+              ],
               "expected_output_format": "files",
               "estimated_scope": "S",
               "risk": "low",
@@ -2652,9 +3294,20 @@
       "pattern": "coordinated_multi_track_execution",
       "description": "ゴール定義 → 会場・ロジ計画 → プログラム設計 → 集客・受付準備 → レビュー → 開催準備完了のイベント企画・運営プロセス。",
       "match": {
-        "mission_classes": ["operations_and_release", "customer_engagement"],
-        "delivery_shapes": ["multi_artifact_pipeline", "cross_system_change"],
-        "intent_ids": ["event-planning", "event-operations", "seminar-planning", "webinar-planning"]
+        "mission_classes": [
+          "operations_and_release",
+          "customer_engagement"
+        ],
+        "delivery_shapes": [
+          "multi_artifact_pipeline",
+          "cross_system_change"
+        ],
+        "intent_ids": [
+          "event-planning",
+          "event-operations",
+          "seminar-planning",
+          "webinar-planning"
+        ]
       },
       "phases": [
         {
@@ -2666,7 +3319,10 @@
               "task_id_suffix": "event-brief",
               "team_role": "planner",
               "description": "イベントの目的・ターゲット・成功指標・予算・日程候補を evidence/event-brief.json に定義する",
-              "acceptance_criteria": ["成功指標が測定可能", "予算枠が承認済みレンジ内"],
+              "acceptance_criteria": [
+                "成功指標が測定可能",
+                "予算枠が承認済みレンジ内"
+              ],
               "expected_output_format": "structured",
               "estimated_scope": "S",
               "risk": "medium",
@@ -2692,7 +3348,7 @@
           "default_tasks": [
             {
               "task_id_suffix": "logistics-plan",
-              "team_role": "worker",
+              "team_role": "implementer",
               "description": "会場(またはオンライン基盤)・機材・人員・タイムラインを evidence/event-logistics-plan.md に計画する",
               "acceptance_criteria": [
                 "当日タイムラインに担当が割当済み",
@@ -2724,16 +3380,29 @@
           "default_tasks": [
             {
               "task_id_suffix": "program",
-              "team_role": "worker",
+              "team_role": "implementer",
               "description": "セッション構成・登壇者・進行台本を evidence/event-program.md に設計する",
-              "acceptance_criteria": ["全セッションに目的と担当がある"],
+              "acceptance_criteria": [
+                "全セッションに目的と担当がある"
+              ],
               "expected_output_format": "files",
               "estimated_scope": "M",
               "risk": "medium",
               "deliverable": "evidence/event-program.md",
               "deliverable_kind": "doc"
             }
-          ]
+          ],
+          "exit_gate": {
+            "id": "PROGRAM_DESIGN_DONE",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/event-program.md"
+                }
+              }
+            ]
+          }
         },
         {
           "id": "promotion_registration",
@@ -2742,16 +3411,29 @@
           "default_tasks": [
             {
               "task_id_suffix": "promotion-plan",
-              "team_role": "worker",
+              "team_role": "implementer",
               "description": "告知計画・申込導線・受付オペレーションを evidence/promotion-registration-plan.md に準備する",
-              "acceptance_criteria": ["申込から受付までの導線が通しで確認済み"],
+              "acceptance_criteria": [
+                "申込から受付までの導線が通しで確認済み"
+              ],
               "expected_output_format": "files",
               "estimated_scope": "S",
               "risk": "medium",
               "deliverable": "evidence/promotion-registration-plan.md",
               "deliverable_kind": "doc"
             }
-          ]
+          ],
+          "exit_gate": {
+            "id": "PROMOTION_REGISTRATION_DONE",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/promotion-registration-plan.md"
+                }
+              }
+            ]
+          }
         },
         {
           "id": "review",
@@ -2762,7 +3444,9 @@
               "task_id_suffix": "readiness-review",
               "team_role": "reviewer",
               "description": "開催準備をロジ・プログラム・リスク(キャンセル/トラブル対応)の観点でレビューする",
-              "acceptance_criteria": ["主要リスクに対応手順がある"],
+              "acceptance_criteria": [
+                "主要リスクに対応手順がある"
+              ],
               "expected_output_format": "structured",
               "estimated_scope": "S",
               "risk": "medium",
@@ -2796,9 +3480,11 @@
           "default_tasks": [
             {
               "task_id_suffix": "runbook-final",
-              "team_role": "worker",
+              "team_role": "implementer",
               "description": "当日運営ランブック(進行・緊急連絡・役割)を evidence/event-runbook-final.md に確定する",
-              "acceptance_criteria": ["当日体制と緊急時手順が確定している"],
+              "acceptance_criteria": [
+                "当日体制と緊急時手順が確定している"
+              ],
               "expected_output_format": "files",
               "estimated_scope": "S",
               "risk": "low",
@@ -2828,8 +3514,14 @@
       "pattern": "stage_gated_delivery",
       "description": "High-stakes work requiring explicit checkpoint gates.",
       "match": {
-        "risk_profiles": ["high_stakes", "approval_required"],
-        "execution_shapes": ["mission", "project_bootstrap"]
+        "risk_profiles": [
+          "high_stakes",
+          "approval_required"
+        ],
+        "execution_shapes": [
+          "mission",
+          "project_bootstrap"
+        ]
       },
       "phases": [
         "intake",
@@ -2847,7 +3539,9 @@
       "pattern": "exploratory_to_deterministic_conversion",
       "description": "Use exploration before deterministic governed execution; this is the pre-pipeline crystallization path.",
       "match": {
-        "delivery_shapes": ["interactive_exploration"]
+        "delivery_shapes": [
+          "interactive_exploration"
+        ]
       },
       "phases": [
         "intake",
@@ -2864,10 +3558,18 @@
       "pattern": "coordinated_multi_track_execution",
       "description": "AI meeting facilitator workflow. Run the live meeting flow, extract action items, dispatch operator-owned work, and track team-member follow-up.",
       "match": {
-        "mission_classes": ["operations_and_release"],
-        "delivery_shapes": ["multi_artifact_pipeline"],
-        "intent_ids": ["meeting-operations"],
-        "task_types": ["meeting_operations"]
+        "mission_classes": [
+          "operations_and_release"
+        ],
+        "delivery_shapes": [
+          "multi_artifact_pipeline"
+        ],
+        "intent_ids": [
+          "meeting-operations"
+        ],
+        "task_types": [
+          "meeting_operations"
+        ]
       },
       "phases": [
         "intake",
@@ -2889,7 +3591,10 @@
           "research_and_absorption",
           "operations_and_release"
         ],
-        "delivery_shapes": ["interactive_exploration", "multi_artifact_pipeline"]
+        "delivery_shapes": [
+          "interactive_exploration",
+          "multi_artifact_pipeline"
+        ]
       },
       "phases": [
         "intake",
@@ -2907,9 +3612,19 @@
       "pattern": "capability_lifecycle_procedure",
       "description": "Use the shared capability lifecycle skeleton to scan, normalize, register, reconcile, and refresh provider/gateway/platform capabilities.",
       "match": {
-        "mission_classes": ["operations_and_release", "platform_onboarding"],
-        "delivery_shapes": ["multi_artifact_pipeline", "task_session"],
-        "risk_profiles": ["review_required", "approval_required", "high_stakes"]
+        "mission_classes": [
+          "operations_and_release",
+          "platform_onboarding"
+        ],
+        "delivery_shapes": [
+          "multi_artifact_pipeline",
+          "task_session"
+        ],
+        "risk_profiles": [
+          "review_required",
+          "approval_required",
+          "high_stakes"
+        ]
       },
       "phases": [
         "intake",
@@ -2931,7 +3646,9 @@
       "pattern": "stage_gated_delivery",
       "description": "Platform onboarding missions (organization integration, secrets rotation, adapter registration) route through strict stage gates — cross_system_change delivery, SECURITY_READY and ARCHITECTURE_READY required, because these touch governance-scope config.",
       "match": {
-        "mission_classes": ["platform_onboarding"]
+        "mission_classes": [
+          "platform_onboarding"
+        ]
       },
       "phases": [
         "intake",
@@ -2950,8 +3667,15 @@
       "pattern": "coordinated_multi_track_execution",
       "description": "Cross-system work requiring a coordinated owner and delegated specialists.",
       "match": {
-        "delivery_shapes": ["cross_system_change", "multi_artifact_pipeline"],
-        "execution_shapes": ["mission", "project_bootstrap", "task_session"]
+        "delivery_shapes": [
+          "cross_system_change",
+          "multi_artifact_pipeline"
+        ],
+        "execution_shapes": [
+          "mission",
+          "project_bootstrap",
+          "task_session"
+        ]
       },
       "phases": [
         "intake",
@@ -2968,7 +3692,9 @@
       "pattern": "exploratory_to_deterministic_conversion",
       "description": "Decision-support missions start interactive (stakeholder 1-on-1s, hypothesis divergence, rehearsal) and end producing governed evidence artifacts (readiness_matrix / dissent-log / heuristic-entry).",
       "match": {
-        "mission_classes": ["decision_support"]
+        "mission_classes": [
+          "decision_support"
+        ]
       },
       "phases": [
         "intake",
@@ -2985,7 +3711,9 @@
       "pattern": "stage_gated_delivery",
       "description": "Customer-facing missions (requirements elicitation, discovery, kickoff) route through stage-gated delivery so the transcript → draft → review → customer signoff sequence is explicit.",
       "match": {
-        "mission_classes": ["customer_engagement"]
+        "mission_classes": [
+          "customer_engagement"
+        ]
       },
       "phases": [
         "intake",
@@ -3003,31 +3731,64 @@
       "pattern": "pipeline_crystallization_loop",
       "description": "Deterministic multi-site patrol workflow. Use pipelines/fragments/executive-report-patrol.json after session handoff and target list are bound.",
       "match": {
-        "mission_classes": ["operations_and_release"],
-        "delivery_shapes": ["multi_artifact_pipeline"],
-        "intent_ids": ["generate-report"]
+        "mission_classes": [
+          "operations_and_release"
+        ],
+        "delivery_shapes": [
+          "multi_artifact_pipeline"
+        ],
+        "intent_ids": [
+          "generate-report"
+        ]
       },
-      "phases": ["intake", "planning", "session_handoff", "execution", "normalization", "delivery"]
+      "phases": [
+        "intake",
+        "planning",
+        "session_handoff",
+        "execution",
+        "normalization",
+        "delivery"
+      ]
     },
     {
       "id": "governed-content-narration",
       "pattern": "coordinated_multi_track_execution",
       "description": "Governed presentation narration workflow. Use pipelines/fragments/governed-voice-narration.json when PPTX input and voice profile are available.",
       "match": {
-        "mission_classes": ["content_and_media"],
-        "delivery_shapes": ["multi_artifact_pipeline"],
-        "intent_ids": ["generate-presentation"]
+        "mission_classes": [
+          "content_and_media"
+        ],
+        "delivery_shapes": [
+          "multi_artifact_pipeline"
+        ],
+        "intent_ids": [
+          "generate-presentation"
+        ]
       },
-      "phases": ["intake", "design", "generation", "narration_layer", "rendering", "delivery"]
+      "phases": [
+        "intake",
+        "design",
+        "generation",
+        "narration_layer",
+        "rendering",
+        "delivery"
+      ]
     },
     {
       "id": "gated-incident-containment",
       "pattern": "stage_gated_delivery",
       "description": "High-integrity security incident containment workflow. Use pipelines/fragments/security-incident-containment.json with explicit approval and audit gates.",
       "match": {
-        "mission_classes": ["operations_and_release"],
-        "delivery_shapes": ["cross_system_change"],
-        "risk_profiles": ["high_stakes", "approval_required"]
+        "mission_classes": [
+          "operations_and_release"
+        ],
+        "delivery_shapes": [
+          "cross_system_change"
+        ],
+        "risk_profiles": [
+          "high_stakes",
+          "approval_required"
+        ]
       },
       "phases": [
         "triage",
@@ -3043,9 +3804,15 @@
       "pattern": "coordinated_multi_track_execution",
       "description": "Purchase workflow through point/loyalty sites. Chain browser-point-site-hop and browser-purchase-checkout fragments, with payment approval gated.",
       "match": {
-        "mission_classes": ["operations_and_release"],
-        "delivery_shapes": ["single_artifact"],
-        "risk_profiles": ["approval_required"]
+        "mission_classes": [
+          "operations_and_release"
+        ],
+        "delivery_shapes": [
+          "single_artifact"
+        ],
+        "risk_profiles": [
+          "approval_required"
+        ]
       },
       "phases": [
         "intake",
@@ -3062,9 +3829,15 @@
       "pattern": "stage_gated_delivery",
       "description": "End-to-end travel booking workflow. Chain browser-travel-search-select and browser-purchase-checkout fragments with selection rationale and payment approval.",
       "match": {
-        "mission_classes": ["operations_and_release"],
-        "delivery_shapes": ["single_artifact"],
-        "risk_profiles": ["approval_required"]
+        "mission_classes": [
+          "operations_and_release"
+        ],
+        "delivery_shapes": [
+          "single_artifact"
+        ],
+        "risk_profiles": [
+          "approval_required"
+        ]
       },
       "phases": [
         "intake",
@@ -3081,10 +3854,20 @@
       "pattern": "stage_gated_delivery",
       "description": "Live meeting proxy workflow for Zoom/Teams/Meet browser participation. Requires meeting-participation-runtime readiness and voice consent before speaking.",
       "match": {
-        "mission_classes": ["operations_and_release"],
-        "delivery_shapes": ["cross_system_change", "multi_artifact_pipeline"],
-        "risk_profiles": ["approval_required", "high_stakes"],
-        "intent_ids": ["meeting-operations"]
+        "mission_classes": [
+          "operations_and_release"
+        ],
+        "delivery_shapes": [
+          "cross_system_change",
+          "multi_artifact_pipeline"
+        ],
+        "risk_profiles": [
+          "approval_required",
+          "high_stakes"
+        ],
+        "intent_ids": [
+          "meeting-operations"
+        ]
       },
       "phases": [
         "intake",
@@ -3102,9 +3885,16 @@
       "pattern": "stage_gated_delivery",
       "description": "Cron-able action-item follow-up workflow backed by action-item-store. Restricted or non-declarative items remain gated until explicit confirmation.",
       "match": {
-        "mission_classes": ["operations_and_release"],
-        "delivery_shapes": ["single_artifact", "long_running_job"],
-        "risk_profiles": ["review_required"]
+        "mission_classes": [
+          "operations_and_release"
+        ],
+        "delivery_shapes": [
+          "single_artifact",
+          "long_running_job"
+        ],
+        "risk_profiles": [
+          "review_required"
+        ]
       },
       "phases": [
         "load_pending_items",
@@ -3119,8 +3909,12 @@
       "pattern": "aidlc_code_change",
       "description": "Code-change missions follow the AI-DLC phase structure with per-phase default tasks and gates (MO-01/MO-02); each phase references its SDLC pipeline template.",
       "match": {
-        "mission_classes": ["code_change"],
-        "execution_shapes": ["mission"]
+        "mission_classes": [
+          "code_change"
+        ],
+        "execution_shapes": [
+          "mission"
+        ]
       },
       "phases": [
         "intake",
@@ -3176,7 +3970,18 @@
               "estimated_scope": "M",
               "risk": "medium"
             }
-          ]
+          ],
+          "exit_gate": {
+            "id": "PLANNING_DONE",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/implementation-plan.json"
+                }
+              }
+            ]
+          }
         },
         {
           "id": "contract_authoring",
@@ -3189,7 +3994,9 @@
               "team_role": "planner",
               "description": "要求からアーキテクチャ設計仕様を evidence/design-spec.json に導出する(ARCHITECTURE_READY 判定対象)",
               "deliverable": "evidence/design-spec.json",
-              "acceptance_criteria": ["open_decisions に blocking=true が残っていない"],
+              "acceptance_criteria": [
+                "open_decisions に blocking=true が残っていない"
+              ],
               "expected_output_format": "structured",
               "estimated_scope": "M",
               "risk": "medium"
@@ -3215,16 +4022,30 @@
           "default_tasks": [
             {
               "task_id_suffix": "implement",
-              "team_role": "worker",
+              "team_role": "implementer",
               "description": "実装計画に沿ってコード変更を1件ずつ適用し、結果を evidence/implementation-report.md に記録する",
               "deliverable": "evidence/implementation-report.md",
-              "acceptance_criteria": ["計画された変更が適用されている", "ビルドが通っている"],
+              "acceptance_criteria": [
+                "計画された変更が適用されている",
+                "ビルドが通っている"
+              ],
               "expected_output_format": "files",
               "estimated_scope": "L",
               "risk": "medium",
               "deliverable_kind": "doc"
             }
-          ]
+          ],
+          "exit_gate": {
+            "id": "EXECUTION_DONE",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/implementation-report.md"
+                }
+              }
+            ]
+          }
         },
         {
           "id": "test",
@@ -3234,7 +4055,7 @@
           "default_tasks": [
             {
               "task_id_suffix": "test-run",
-              "team_role": "worker",
+              "team_role": "implementer",
               "description": "テスト計画に沿ってテストを実行し、結果を evidence/test-report.md に記録する",
               "deliverable": "evidence/test-report.md",
               "acceptance_criteria": [
@@ -3270,7 +4091,9 @@
               "team_role": "reviewer",
               "description": "実装を正しさ・セキュリティ・回帰の観点でレビューし、指摘と判定を記録する(code-review-cycle 相当)",
               "review_target_suffix": "implement",
-              "acceptance_criteria": ["must_fix 指摘が解消済み"],
+              "acceptance_criteria": [
+                "must_fix 指摘が解消済み"
+              ],
               "expected_output_format": "structured",
               "estimated_scope": "S",
               "risk": "medium"
@@ -3297,10 +4120,12 @@
           "default_tasks": [
             {
               "task_id_suffix": "deliver",
-              "team_role": "worker",
+              "team_role": "implementer",
               "description": "検証済みの変更をリリース/PR として提出し、結果を evidence/delivery-report.md に記録する",
               "deliverable": "evidence/delivery-report.md",
-              "acceptance_criteria": ["リリース/PR が作成されている"],
+              "acceptance_criteria": [
+                "リリース/PR が作成されている"
+              ],
               "expected_output_format": "files",
               "estimated_scope": "S",
               "risk": "medium",
@@ -3333,13 +4158,26 @@
               "team_role": "planner",
               "description": "学びと改善点を evidence/retrospective.md に蒸留し knowledge へ昇格候補を挙げる",
               "deliverable": "evidence/retrospective.md",
-              "acceptance_criteria": ["学びが成功・失敗の両面で記録されている"],
+              "acceptance_criteria": [
+                "学びが成功・失敗の両面で記録されている"
+              ],
               "expected_output_format": "files",
               "estimated_scope": "S",
               "risk": "low",
               "deliverable_kind": "doc"
             }
-          ]
+          ],
+          "exit_gate": {
+            "id": "RETROSPECTIVE_DONE",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/retrospective.md"
+                }
+              }
+            ]
+          }
         }
       ]
     },
@@ -3359,10 +4197,25 @@
           "customer_engagement",
           "platform_onboarding"
         ],
-        "delivery_shapes": ["single_artifact", "long_running_job", "*"],
-        "execution_shapes": ["direct_reply", "task_session", "mission", "project_bootstrap"]
+        "delivery_shapes": [
+          "single_artifact",
+          "long_running_job",
+          "*"
+        ],
+        "execution_shapes": [
+          "direct_reply",
+          "task_session",
+          "mission",
+          "project_bootstrap"
+        ]
       },
-      "phases": ["intake", "planning", "execution", "verification", "delivery"]
+      "phases": [
+        "intake",
+        "planning",
+        "execution",
+        "verification",
+        "delivery"
+      ]
     }
   ]
 }

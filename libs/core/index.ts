@@ -1474,6 +1474,7 @@ export * from './realtime-voice-conversation.js';
 export * from './surface-coordination-store.js';
 export * from './surface-mutation-guard.js';
 export * from './ceo-surface-summary.js';
+export * from './agent-activity-board.js';
 export * from './mic-capture.js';
 export * from './in-room-minutes-recorder.js';
 export * from './in-room-meeting-driver.js';
