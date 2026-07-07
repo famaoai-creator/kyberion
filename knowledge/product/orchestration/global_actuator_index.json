@@ -1,6 +1,7 @@
 {
   "v": "2.0.0",
-  "t": 29,
+  "t": 30,
+  "u": "2026-07-07T14:02:10.934Z",
   "actuators": [
     {
       "n": "agent-actuator",
@@ -22,7 +23,7 @@
       "capability_count": 1,
       "ops": ["pipeline"],
       "contract_schema": "schemas/mobile-device-pipeline.schema.json",
-      "prerequisites_summary": "-"
+      "prerequisites_summary": "bin:adb, env:ANDROID_HOME, os:darwin, os:linux, os:win32"
     },
     {
       "n": "approval-actuator",
@@ -69,6 +70,26 @@
       "prerequisites_summary": "-"
     },
     {
+      "n": "build-actuator",
+      "path": "libs/actuators/build-actuator",
+      "d": "iOS/Android build, test, archive and app scaffolding — the build stage of the mobile AI-DLC/SDLC loop",
+      "s": "implemented",
+      "version": "1.0.0",
+      "capability_count": 8,
+      "ops": [
+        "android_build",
+        "android_bundle",
+        "android_test",
+        "ios_archive",
+        "ios_build",
+        "ios_generate_project",
+        "ios_test",
+        "scaffold_app"
+      ],
+      "contract_schema": "schemas/build-pipeline.schema.json",
+      "prerequisites_summary": "bin:xcodebuild, bin:xcodegen, bin:xcrun, env:ANDROID_HOME, os:darwin, os:linux, os:win32"
+    },
+    {
       "n": "calendar-actuator",
       "path": "libs/actuators/calendar-actuator",
       "d": "macOS Calendar.app integration using JXA for cross-account schedule coordination",
@@ -85,8 +106,8 @@
       "d": "ADF-driven code analysis and refactoring pipeline engine",
       "s": "implemented",
       "version": "2.2.0",
-      "capability_count": 3,
-      "ops": ["pipeline", "reconcile", "semgrep_scan"],
+      "capability_count": 4,
+      "ops": ["impact_analysis", "pipeline", "reconcile", "semgrep_scan"],
       "contract_schema": "schemas/code-pipeline.schema.json",
       "prerequisites_summary": "bin:semgrep, os:darwin, os:linux"
     },
@@ -121,7 +142,7 @@
       "capability_count": 1,
       "ops": ["pipeline"],
       "contract_schema": "schemas/mobile-device-pipeline.schema.json",
-      "prerequisites_summary": "-"
+      "prerequisites_summary": "bin:xcodebuild, bin:xcrun, os:darwin"
     },
     {
       "n": "media-actuator",

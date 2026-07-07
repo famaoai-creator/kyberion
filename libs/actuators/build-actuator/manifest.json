@@ -1,0 +1,95 @@
+{
+  "actuator_id": "build-actuator",
+  "version": "1.0.0",
+  "description": "iOS/Android build, test, archive and app scaffolding — the build stage of the mobile AI-DLC/SDLC loop",
+  "contract_schema": "schemas/build-pipeline.schema.json",
+  "resilience_tier": "fail_fast",
+  "recovery_policy": {
+    "fallback_strategy": "report_error_summary",
+    "retry": {
+      "maxRetries": 0,
+      "initialDelayMs": 0,
+      "maxDelayMs": 0,
+      "factor": 1,
+      "jitter": false
+    },
+    "retryable_categories": []
+  },
+  "capabilities": [
+    {
+      "op": "scaffold_app",
+      "schema_ref": "schemas/build-pipeline.schema.json",
+      "platforms": ["darwin", "linux", "win32"]
+    },
+    {
+      "op": "ios_generate_project",
+      "schema_ref": "schemas/build-pipeline.schema.json",
+      "platforms": ["darwin"],
+      "prerequisites": {
+        "binaries": ["xcodegen"],
+        "platforms": ["darwin"],
+        "install": { "darwin": "brew install xcodegen" }
+      }
+    },
+    {
+      "op": "ios_build",
+      "schema_ref": "schemas/build-pipeline.schema.json",
+      "platforms": ["darwin"],
+      "prerequisites": {
+        "binaries": ["xcodebuild"],
+        "platforms": ["darwin"],
+        "install": { "darwin": "Xcode を App Store から導入し xcode-select を設定" }
+      }
+    },
+    {
+      "op": "ios_test",
+      "schema_ref": "schemas/build-pipeline.schema.json",
+      "platforms": ["darwin"],
+      "prerequisites": {
+        "binaries": ["xcodebuild", "xcrun"],
+        "platforms": ["darwin"],
+        "install": { "darwin": "Xcode を App Store から導入し xcode-select を設定" }
+      }
+    },
+    {
+      "op": "ios_archive",
+      "schema_ref": "schemas/build-pipeline.schema.json",
+      "platforms": ["darwin"],
+      "prerequisites": {
+        "binaries": ["xcodebuild"],
+        "platforms": ["darwin"],
+        "install": { "darwin": "Xcode を App Store から導入し xcode-select を設定" }
+      }
+    },
+    {
+      "op": "android_build",
+      "schema_ref": "schemas/build-pipeline.schema.json",
+      "platforms": ["darwin", "linux", "win32"],
+      "prerequisites": {
+        "env": ["ANDROID_HOME"],
+        "platforms": ["darwin", "linux", "win32"],
+        "install": { "darwin": "Android Studio / cmdline-tools を導入し ANDROID_HOME を設定" }
+      }
+    },
+    {
+      "op": "android_test",
+      "schema_ref": "schemas/build-pipeline.schema.json",
+      "platforms": ["darwin", "linux", "win32"],
+      "prerequisites": {
+        "env": ["ANDROID_HOME"],
+        "platforms": ["darwin", "linux", "win32"],
+        "install": { "darwin": "Android Studio / cmdline-tools を導入し ANDROID_HOME を設定" }
+      }
+    },
+    {
+      "op": "android_bundle",
+      "schema_ref": "schemas/build-pipeline.schema.json",
+      "platforms": ["darwin", "linux", "win32"],
+      "prerequisites": {
+        "env": ["ANDROID_HOME"],
+        "platforms": ["darwin", "linux", "win32"],
+        "install": { "darwin": "Android Studio / cmdline-tools を導入し ANDROID_HOME を設定" }
+      }
+    }
+  ]
+}

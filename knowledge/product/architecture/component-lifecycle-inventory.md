@@ -4,6 +4,7 @@ category: Architecture
 tags: [architecture, actuators, cleanup, governance]
 importance: 8
 author: Ecosystem Architect
+last_updated: 2026-07-07
 ---
 
 # Component Lifecycle Inventory
@@ -13,7 +14,7 @@ This inventory is generated from the filesystem. Manifest-backed actuators are t
 ## Current Runtime Surface
 
 - Source of truth: `libs/actuators/*/manifest.json`
-- Count: 29
+- Count: 30
 - Rule: If a component should be discoverable by the CLI or governance layer, it needs a `manifest.json`.
 
 - `agent-actuator`: Meta-Actuator for Agent Lifecycle and A2A (6 ops, v1.0.0, schema schemas/agent-action.schema.json)
@@ -22,8 +23,9 @@ This inventory is generated from the filesystem. Manifest-backed actuators are t
 - `artifact-actuator`: Governed Artifact and Delivery Pack Manager (4 ops, v1.0.0, schema schemas/artifact-action.schema.json)
 - `blockchain-actuator`: Local Ledger Anchoring Simulation (3 ops, v1.1.0, schema schemas/blockchain-action.schema.json)
 - `browser-actuator`: Pipeline-driven Playwright browser execution and session artifact actuator (2 ops, v1.1.0, schema schemas/browser-pipeline.schema.json)
+- `build-actuator`: iOS/Android build, test, archive and app scaffolding — the build stage of the mobile AI-DLC/SDLC loop (8 ops, v1.0.0, schema schemas/build-pipeline.schema.json)
 - `calendar-actuator`: macOS Calendar.app integration using JXA for cross-account schedule coordination (3 ops, v1.0.0, schema schemas/calendar-action.schema.json)
-- `code-actuator`: ADF-driven code analysis and refactoring pipeline engine (3 ops, v2.2.0, schema schemas/code-pipeline.schema.json)
+- `code-actuator`: ADF-driven code analysis and refactoring pipeline engine (4 ops, v2.2.0, schema schemas/code-pipeline.schema.json)
 - `email-actuator`: Email composition and sending via macOS Mail.app (JXA) with SMTP fallback via nodemailer (3 ops, v1.0.0, schema libs/actuators/email-actuator/schemas/email-action.schema.json)
 - `file-actuator`: Generic File-Actuator for Kyberion (1 ops, v1.1.0, schema schemas/file-pipeline.schema.json)
 - `ios-actuator`: simctl-driven iOS Simulator Actuator (1 ops, v1.1.0, schema schemas/mobile-device-pipeline.schema.json)
