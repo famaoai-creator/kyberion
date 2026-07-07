@@ -1,0 +1,115 @@
+{
+  "version": "1.0.0",
+  "organization_id": "{COMPANY_SLUG}",
+  "name": "{COMPANY_NAME} 組織図(コンサルティングファーム)",
+  "source_kind": "customer",
+  "source_path": "customer/{COMPANY_SLUG}/org-chart.json",
+  "domains": [
+    {
+      "domain_id": "leadership",
+      "name": "Partners & Leadership",
+      "role_ids": ["ceo", "business_owner"]
+    },
+    {
+      "domain_id": "consulting",
+      "name": "Consulting & Research",
+      "role_ids": ["solution_architect", "knowledge_steward", "ruthless_auditor", "pmo_governance"]
+    },
+    {
+      "domain_id": "client",
+      "name": "Client Relations",
+      "role_ids": ["strategic_sales", "customer_success", "executive_assistant"]
+    },
+    {
+      "domain_id": "corporate",
+      "name": "Corporate",
+      "role_ids": ["legal_strategist", "finance_controller", "talent_culture"]
+    }
+  ],
+  "positions": [
+    {
+      "role_id": "ceo",
+      "reports_to": null,
+      "held_by": "human",
+      "responsibility_scope": "ファーム経営・最終品質責任",
+      "authority_role_ref": "mission_controller"
+    },
+    {
+      "role_id": "business_owner",
+      "reports_to": "ceo",
+      "held_by": "sovereign-brain",
+      "responsibility_scope": "エンゲージメント統括(パートナー)・受注判断",
+      "authority_role_ref": null
+    },
+    {
+      "role_id": "pmo_governance",
+      "reports_to": "business_owner",
+      "held_by": "sovereign-brain",
+      "responsibility_scope": "案件PMO・デリバリー統制・スコープ管理",
+      "authority_role_ref": null
+    },
+    {
+      "role_id": "solution_architect",
+      "reports_to": "business_owner",
+      "held_by": "sovereign-brain",
+      "responsibility_scope": "ソリューション設計・提言の構造化",
+      "authority_role_ref": "ecosystem_architect"
+    },
+    {
+      "role_id": "knowledge_steward",
+      "reports_to": "business_owner",
+      "held_by": "sovereign-brain",
+      "responsibility_scope": "リサーチ・ナレッジ蓄積・事例整備",
+      "authority_role_ref": "knowledge_steward"
+    },
+    {
+      "role_id": "ruthless_auditor",
+      "reports_to": "ceo",
+      "held_by": "sovereign-brain",
+      "responsibility_scope": "成果物の品質監査・レッドチームレビュー",
+      "authority_role_ref": null
+    },
+    {
+      "role_id": "strategic_sales",
+      "reports_to": "ceo",
+      "held_by": "sovereign-brain",
+      "responsibility_scope": "新規開拓・提案リード",
+      "authority_role_ref": null
+    },
+    {
+      "role_id": "customer_success",
+      "reports_to": "business_owner",
+      "held_by": "sovereign-brain",
+      "responsibility_scope": "クライアントリレーション・継続案件化",
+      "authority_role_ref": null
+    },
+    {
+      "role_id": "executive_assistant",
+      "reports_to": "business_owner",
+      "held_by": "sovereign-brain",
+      "responsibility_scope": "会議設計・調整・議事",
+      "authority_role_ref": "sovereign_concierge"
+    },
+    {
+      "role_id": "legal_strategist",
+      "reports_to": "ceo",
+      "held_by": "sovereign-brain",
+      "responsibility_scope": "契約・秘密保持・コンフリクトチェック",
+      "authority_role_ref": null
+    },
+    {
+      "role_id": "finance_controller",
+      "reports_to": "ceo",
+      "held_by": "sovereign-brain",
+      "responsibility_scope": "稼働管理・請求・収益性分析",
+      "authority_role_ref": null
+    },
+    {
+      "role_id": "talent_culture",
+      "reports_to": "ceo",
+      "held_by": "sovereign-brain",
+      "responsibility_scope": "採用・稼働アサイン・育成",
+      "authority_role_ref": null
+    }
+  ]
+}

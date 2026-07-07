@@ -10,7 +10,12 @@ import {
   safeWriteFile,
 } from './secure-io.js';
 
-export type DeliverableInboxStatus = 'unread' | 'read' | 'accepted';
+export type DeliverableInboxStatus =
+  | 'unread'
+  | 'read'
+  | 'accepted'
+  | 'rejected'
+  | 'changes_requested';
 
 export interface DeliverableInboxEntry {
   entry_id: string;
@@ -23,6 +28,10 @@ export interface DeliverableInboxEntry {
   status: DeliverableInboxStatus;
   tenant_slug?: string;
   kind?: string;
+  /** SU-03: reviewer note attached with a rejected / changes_requested verdict. */
+  verdict_note?: string;
+  /** SU-03: who recorded the latest verdict. */
+  reviewed_by?: string;
 }
 
 export interface DeliverableInboxQuery {
@@ -140,7 +149,11 @@ function normalizeStatusFilter(
       .map((value) => String(value).trim().toLowerCase())
       .filter(
         (value): value is DeliverableInboxStatus =>
-          value === 'unread' || value === 'read' || value === 'accepted'
+          value === 'unread' ||
+          value === 'read' ||
+          value === 'accepted' ||
+          value === 'rejected' ||
+          value === 'changes_requested'
       )
   );
 }
@@ -229,7 +242,8 @@ export function listInboxEntries(query: DeliverableInboxQuery = {}): Deliverable
 
 export function markInboxEntry(
   entryId: string,
-  status: DeliverableInboxStatus
+  status: DeliverableInboxStatus,
+  options: { verdictNote?: string; reviewedBy?: string } = {}
 ): DeliverableInboxEntry | null {
   const normalizedId = String(entryId || '').trim();
   if (!normalizedId) return null;
@@ -237,9 +251,13 @@ export function markInboxEntry(
     const entries = readInboxEntries();
     const index = entries.findIndex((entry) => entry.entry_id === normalizedId);
     if (index < 0) return null;
+    const verdictNote = options.verdictNote?.trim();
+    const reviewedBy = options.reviewedBy?.trim();
     entries[index] = {
       ...entries[index],
       status,
+      ...(verdictNote ? { verdict_note: verdictNote } : {}),
+      ...(reviewedBy ? { reviewed_by: reviewedBy } : {}),
       updated_at: new Date().toISOString(),
     };
     writeInboxEntries(entries);

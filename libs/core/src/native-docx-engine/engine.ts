@@ -28,6 +28,7 @@ import type {
   DocxBorderEdge,
   DocxShading,
   DocxDrawing,
+  DocxTheme,
 } from '../types/docx-protocol.js';
 
 // Re-use PPTX engine's theme generator (DrawingML theme is identical)
