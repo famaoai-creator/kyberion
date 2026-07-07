@@ -1,5 +1,5 @@
 {
-  "generated": "2026-07-07T12:51:48.850Z",
+  "generated": "2026-07-07T14:02:34.785Z",
   "files": [
     {
       "path": "Ecosystem_Map.md",
@@ -268,7 +268,7 @@
     {
       "path": "product/architecture/component-lifecycle-inventory.md",
       "tier": "public",
-      "size": 6153,
+      "size": 6337,
       "type": "md"
     },
     {
@@ -2212,7 +2212,7 @@
     {
       "path": "product/governance/shell-command-policy.json",
       "tier": "public",
-      "size": 2106,
+      "size": 2732,
       "type": "json"
     },
     {
@@ -3328,13 +3328,13 @@
     {
       "path": "product/orchestration/global_actuator_index.json",
       "tier": "public",
-      "size": 14584,
+      "size": 16136,
       "type": "json"
     },
     {
       "path": "product/orchestration/global_skill_index.json",
       "tier": "public",
-      "size": 7734,
+      "size": 8021,
       "type": "json"
     },
     {
@@ -5564,10 +5564,28 @@
       "type": "md"
     },
     {
+      "path": "product/sales/contract-templates/basic-service-agreement.md",
+      "tier": "public",
+      "size": 1294,
+      "type": "md"
+    },
+    {
       "path": "product/sales/price-book.json",
       "tier": "public",
       "size": 917,
       "type": "json"
+    },
+    {
+      "path": "product/scaffolds/android-compose-minimal/README.md",
+      "tier": "public",
+      "size": 475,
+      "type": "md"
+    },
+    {
+      "path": "product/scaffolds/ios-swiftui-minimal/project.yml",
+      "tier": "public",
+      "size": 447,
+      "type": "yml"
     },
     {
       "path": "product/schema/detection-patterns.yaml",
@@ -5848,7 +5866,7 @@
     {
       "path": "product/schemas/deployment-adapter-config.schema.json",
       "tier": "public",
-      "size": 472,
+      "size": 1040,
       "type": "json"
     },
     {

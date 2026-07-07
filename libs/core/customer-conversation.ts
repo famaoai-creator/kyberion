@@ -5,6 +5,7 @@ import { logger } from './core.js';
 import { getReasoningBackend } from './reasoning-backend.js';
 import { enforceApprovalGate } from './approval-gate.js';
 import { sendOpsAlert } from './ops-alert.js';
+import { notifyOperator } from './operator-notifications.js';
 import type { ResolvedCustomerBinding } from './customer-channel-binding.js';
 import {
   appendDealNote,
@@ -161,6 +162,14 @@ export async function runCustomerConversation(
   const customerText = replyText.split(ESCALATION_MARKER)[0].trim();
   if (escalated) {
     const question = replyText.split(ESCALATION_MARKER)[1]?.trim() || input.text.slice(0, 200);
+    // E2E-04 Task 2 landed: push the question to the operator's channel;
+    // sendOpsAlert stays as the durable JSONL record (deduped).
+    void notifyOperator('question', {
+      title: `顧客からの確認事項 (${tenantSlug} / ${deal.deal_id})`,
+      body: question,
+      link_hint: `deal ${deal.deal_id} on ${binding.binding.surface}:${binding.binding.channel_id}`,
+      correlation_id: `${deal.deal_id}:${question.slice(0, 40)}`,
+    });
     sendOpsAlert({
       severity: 'warning',
       title: `Customer question needs operator (${tenantSlug} / ${deal.deal_id})`,

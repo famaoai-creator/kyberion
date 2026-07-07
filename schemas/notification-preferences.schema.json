@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "NotificationPreferences",
+  "description": "E2E-04 Task 2: where operator-facing workflow events (question / approval_required / mission_completed / mission_failed / deliverable_ready / ops_alert) are pushed. Lives at knowledge/personal/notification-preferences.json.",
+  "type": "object",
+  "additionalProperties": false,
+  "definitions": {
+    "channelTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["surface", "target"],
+      "properties": {
+        "surface": { "enum": ["slack", "imessage", "telegram", "discord"] },
+        "target": { "type": "string", "minLength": 1 }
+      }
+    },
+    "eventRoute": {
+      "oneOf": [{ "$ref": "#/definitions/channelTarget" }, { "const": "mute" }]
+    }
+  },
+  "properties": {
+    "default_channel": { "$ref": "#/definitions/channelTarget" },
+    "per_event": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "question": { "$ref": "#/definitions/eventRoute" },
+        "approval_required": { "$ref": "#/definitions/eventRoute" },
+        "mission_completed": { "$ref": "#/definitions/eventRoute" },
+        "mission_failed": { "$ref": "#/definitions/eventRoute" },
+        "deliverable_ready": { "$ref": "#/definitions/eventRoute" },
+        "ops_alert": { "$ref": "#/definitions/eventRoute" }
+      }
+    }
+  }
+}
