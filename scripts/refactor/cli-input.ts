@@ -1,6 +1,6 @@
 import * as path from 'node:path';
-import { pathResolver } from '../../libs/core/path-resolver.ts';
-import { safeReadFile } from '../../libs/core/secure-io.ts';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeReadFile } from '@agent/core/secure-io';
 
 export function resolveCliInputPath(inputPath: string): string {
   return path.isAbsolute(inputPath) ? inputPath : path.resolve(pathResolver.rootDir(), inputPath);

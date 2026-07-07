@@ -51,6 +51,20 @@
 6. `pnpm pipeline --input pipelines/campaign-suite.json --context '{"brief_path":"..."}'` 1本で、同一 brief からデッキ+文書+イントロ動画+Web LP セクション(+任意で MV)が同一デザインで一括生成される。
 7. E2E テスト: 全成果物のメタデータから抽出した primary/accent hex が一致することを機械検証(stub backend・ComfyUI 不要のモック経路)。
 
+## 実装状況 (2026-07-07)
+
+**判定: DONE**(全7タスク実装・検証済み。逸脱と残余は下記)
+
+- **Task 1 完了**: `libs/core/creative-design-resolver.ts` — `resolveCreativeDesign({surface, tenantSlug, mode})` が brand-tokens → tenant override(`customer/<slug>/design/` または `knowledge/confidential/<slug>/design/` の tenant-override.json + theme.json)→ 面別 projection(web=WebThemePack / pptx・doc・xlsx=MediaThemeRecord / video=css_vars / prompt=PromptStylePack)を返す。`renderPromptStyleBlock()` も同居。unit 6件。
+- **Task 2 完了(構造の実態に合わせ設計修正)**: 調査時の想定と異なり、正本は分割ディレクトリ(`themes/`: default-theme + design-md-imports + themes.json)で、**`themes/themes-core.json` がマージ順で完全に影になったまま stale 化**していた(kyberion-\* が旧色)。これを削除(挙動不変)し、flat `themes.json` と `themes/themes.json` は生成ペアとして **theme マップ全量一致検査**を `check:catalogs` に追加(DS-01 の brand-tokens 突合検査は既存)。**VDS-07 実装**: `video-content-brief-contract.ts` の `design_profile.tenant_slug` と `narrated-video-brief-compiler.ts` の `design_system.tenant_slug` から resolver 経由で css_vars / background を注入(明示指定が常に優先)。テナント fixture の回帰テスト付き。
+- **Task 3 完了**: シーン CSS のリテラル色のうち**既定トークン値と完全一致する10種**(accent-blue 系4・orange・green 系3・rgba soft/strong)を `var(--kb-*, literal)` 化(既定描画は不変)。ランタイムのリテラル→トークン正規化表(`normalizeSceneDesignSystemVars`)は既存で、両者で DS-04 の中核を充足。`design_system_vars` がレンダリング HTML に到達する回帰テストを追加。
+- **Task 4 完了**: `preparePromptBasedGeneration`(generate_image/video/music/run_workflow の共通経路)で `params.prompt` と `*_adf.prompt` に style pack(palette hex・tone・avoid、music は mood/BPM)を注入。`no_style_pack: true` でオプトアウト、二重注入ガード付き。文言は `media-design-systems.json` の `style_pack` セクションで上書き可(未定義時は既定)。unit 4件。
+- **Task 5 完了(調査修正: G5 は過大評価)**: mux は `video-render-backend.ts` の `muxAudioTrack` + ADF `audio.music_ref` で**既に end-to-end 実装済み**、MV パイプラインも `knowledge/product/pipeline-templates/music-video-from-brief-{submit,smoke}.json` が既存(generate_music → collect → music_ref 付き composition)。追加したのは `NarratedVideoBrief.music.artifact_ref` → `audio.music_ref` の写像(ナレーション+BGM の同時 mux 用)のみ。新規 `mux_audio_track` op は不要と判断。歌詞字幕同期は残余(必要時に srt サイドカーから)。
+- **Task 6 完了**: `schemas/campaign-brief.schema.json` + `libs/core/campaign-suite.ts`(純関数 `buildCampaignPlan`: 面別に resolver を1回ずつ呼び、deck/doc/intro_video/web_lp/mv の actuator 入力と design fingerprint を生成)+ `scripts/campaign_suite.ts`(`pnpm campaign:suite`: 実行・失敗分離・`campaign-manifest.json` 書出)+ `pipelines/campaign-suite.json`。dry-run 実走確認済み(manifest に primary/accent hex 記録)。
+- **Task 7 完了**: `tests/creative-suite-consistency.test.ts` — fixture テナント(primary #123456)で **4面 projection の hex 一致・prompt block への浸透・campaign manifest の単一 fingerprint・brand 既定フォールバック**を機械検証(4件)。
+- **検証**: typecheck / lint / 影響スイート(creative-resolver 6・video 系 22・media-generation 17・consistency 4 ほか)緑。unit 全体は HEAD 既存の 42 失敗(op-catalog 系ほか並行セッション起因)を除き緑 — 本実装による新規失敗ゼロを stash 比較で確認。
+- **副修正(HEAD 破損の直し込み)**: `sync_component_inventory.ts` の import 欠落+旧 op 導出ブロック残骸、`cli-input.ts` の `.ts` 拡張子 import、guide ヘッダ検査の Ops Count 列追随、`setup_oauth.ts` の lint(追跡付き disable)、eslint ignores へ `.tmp-mulmoclaude/`・`.pnpm-store/` 追加。
+
 ## 4. 実装タスク
 
 ### Task 1: デザイン解決の単一入口 `resolveCreativeDesign` — `gpt-5.4-mini`

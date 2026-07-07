@@ -13,6 +13,8 @@ import {
   compileVideoGenerationADF,
   resolveImageBackend,
   sleep,
+  resolveCreativeDesign,
+  renderPromptStyleBlock,
 } from '@agent/core';
 import * as path from 'node:path';
 
@@ -203,7 +205,39 @@ function resolveImageProviderPreference(params: any): string[] | undefined {
   return Array.isArray(preference) && preference.length > 0 ? preference : undefined;
 }
 
-function preparePromptBasedGeneration(action: string, params: any): PromptGenerationRequest {
+/**
+ * E2E-02 Task 4: inject the brand/tenant style pack into generation prompts so
+ * image / video / music output stays on-palette. Deterministic (vocabulary +
+ * resolver only), opt-out via params.no_style_pack.
+ */
+function applyPromptStylePack(action: string, params: any): any {
+  if (!params || params.no_style_pack === true) return params;
+  const resolved = resolveCreativeDesign({
+    surface: 'prompt',
+    tenantSlug: typeof params.tenant_slug === 'string' ? params.tenant_slug : undefined,
+  });
+  if (resolved.projection.surface !== 'prompt') return params;
+  const block = renderPromptStyleBlock(resolved.projection.style_pack, {
+    music: action === 'generate_music',
+  });
+  const appendTo = (prompt: unknown): unknown =>
+    typeof prompt === 'string' && prompt.trim().length > 0 && !prompt.includes('Style: palette=')
+      ? `${prompt}\n\n${block}`
+      : prompt;
+
+  const next = { ...params };
+  if (typeof next.prompt === 'string') next.prompt = appendTo(next.prompt);
+  for (const key of ['image_adf', 'video_adf', 'music_adf'] as const) {
+    const adf = next[key];
+    if (adf && typeof adf === 'object' && typeof adf.prompt === 'string') {
+      next[key] = { ...adf, prompt: appendTo(adf.prompt) };
+    }
+  }
+  return next;
+}
+
+function preparePromptBasedGeneration(action: string, input: any): PromptGenerationRequest {
+  const params = applyPromptStylePack(action, input);
   const compiled =
     action === 'generate_music' && params.music_adf
       ? compileMusicGenerationADF(params.music_adf)
