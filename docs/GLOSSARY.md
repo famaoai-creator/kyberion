@@ -24,6 +24,10 @@ A concrete execution component under `libs/actuators/` that performs physical wo
 
 Distilled operational knowledge or reusable method stored in the knowledge tier, often used to guide actuator behavior.
 
+### Process Template
+
+A declarative, per-mission-class process definition in the mission workflow catalog (`knowledge/product/governance/mission-workflow-catalog.json`): an ordered phase list where each phase may declare default tasks, entry/exit gates, and the pipeline that executes it. At mission creation (or via `mission_controller plan-tasks`), phases expand deterministically into `NEXT_TASKS.json` tasks and gate definitions, so the process (e.g. audience → story → content → design → review → production for presentation decks) is executable rather than a label. See MO-01.
+
 ### ADF (Agentic Data Format)
 
 A human-readable structured contract between reasoning and execution layers. In Kyberion, ADF is preferred over opaque script fragments.

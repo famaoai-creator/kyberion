@@ -59,6 +59,8 @@ function resolveExportKey(step: PipelineAdfStep, defaultKey: string): string {
   return String(step.params?.export_as ?? defaultKey);
 }
 
+type RunStepResult = { op: string; status: 'success' | 'failed' | 'skipped'; error?: string };
+
 function runTsFallbackPipeline(fallbackPath: string): ReturnType<typeof safeExecResult> {
   const fallbackEntry = pathResolver.rootResolve('scripts/run_pipeline.ts');
   const tsxAvailable = safeExecResult('node', ['--import', 'tsx', '--eval', 'process.exit(0)'], {
@@ -460,7 +462,8 @@ function validatePipelineOpInput(domain: string, action: string, params: Record<
   if (domain === 'core' || domain === 'reasoning') return;
   const validation = validateOpInput(domain as any, action, params);
   if (!validation.valid) {
-    throw new Error(`[INVALID_OP_INPUT] ${domain}:${action}: ${validation.errors.join('; ')}`);
+    const errors = 'errors' in validation ? validation.errors : ['invalid input'];
+    throw new Error(`[INVALID_OP_INPUT] ${domain}:${action}: ${errors.join('; ')}`);
   }
 }
 
@@ -589,7 +592,7 @@ export async function runSteps(
   opts: RunStepsOptions = {}
 ) {
   let ctx: Record<string, unknown> = { ...initialCtx };
-  const results: { op: string; status: 'success' | 'failed'; error?: string }[] = [];
+  const results: RunStepResult[] = [];
   const shellBin = 'bash';
   const rootDir = pathResolver.rootDir();
   for (const step of steps) {
@@ -889,14 +892,12 @@ export async function runSteps(
             const originalItemValue = ctx[itemName];
             const originalSharedCtx = { ...ctx };
             const perItemContexts: Array<Record<string, unknown>> = [];
-            const perItemResults: Array<
-              { op: string; status: 'success' | 'failed'; error?: string }[]
-            > = [];
+            const perItemResults: Array<RunStepResult[]> = [];
             const perItemOutputs: Array<{
               index: number;
               item: unknown;
               context: Record<string, unknown>;
-              results: { op: string; status: 'success' | 'failed'; error?: string }[];
+              results: RunStepResult[];
             }> = [];
 
             await runParallelBatches(items, concurrency, async (item, index) => {
@@ -960,7 +961,7 @@ export async function runSteps(
             item: unknown;
             value: unknown;
             context: Record<string, unknown>;
-            results: { op: string; status: 'success' | 'failed'; error?: string }[];
+            results: RunStepResult[];
           }> = [];
           let dryStreak = 0;
           let loopCount = 0;

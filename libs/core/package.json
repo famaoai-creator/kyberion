@@ -235,6 +235,10 @@
       "types": "./dist/intent-reconciliation.d.ts",
       "default": "./dist/intent-reconciliation.js"
     },
+    "./intent-snapshot-store": {
+      "types": "./dist/intent-snapshot-store.d.ts",
+      "default": "./dist/intent-snapshot-store.js"
+    },
     "./mission-context-pack": {
       "types": "./dist/mission-context-pack.d.ts",
       "default": "./dist/mission-context-pack.js"

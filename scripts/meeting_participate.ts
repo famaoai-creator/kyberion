@@ -28,6 +28,7 @@ import {
   MeetingParticipationCoordinator,
   StubMeetingJoinDriver,
   getMeetingJoinDriver,
+  installInRoomMeetingJoinDriver,
   getStreamingSttBridge,
   getStreamingTtsBridge,
   getVoiceProfileRegistry,
@@ -66,12 +67,17 @@ const FORMAT: AudioFormat = {
 class ReasoningBackendAgent implements ConversationAgent {
   private readonly backend = getReasoningBackend();
   private utterances: TranscriptChunk[] = [];
-  constructor(private readonly missionId: string, private readonly persona: string) {}
+  constructor(
+    private readonly missionId: string,
+    private readonly persona: string
+  ) {}
 
   async onUtterance(utt: TranscriptChunk): Promise<{ speech?: string; leave?: boolean }> {
     this.utterances.push(utt);
     if (utt.text.trim().length === 0) return {};
-    const transcript = this.utterances.map((u) => `- ${u.speaker_label ?? 'speaker'}: ${u.text}`).join('\n');
+    const transcript = this.utterances
+      .map((u) => `- ${u.speaker_label ?? 'speaker'}: ${u.text}`)
+      .join('\n');
     const prompt = [
       `You are participating in a live meeting as ${this.persona}.`,
       'Output ONLY a JSON object: { "speech": str (≤2 sentences), "leave": bool }.',
@@ -103,7 +109,9 @@ function extractFirstJson(text: string): any {
   }
 }
 
-export function prepareMeetingTarget(target: MeetingTarget): MeetingTarget & { platform: 'meet' | 'zoom' | 'teams' } {
+export function prepareMeetingTarget(
+  target: MeetingTarget
+): MeetingTarget & { platform: 'meet' | 'zoom' | 'teams' | 'in_room' } {
   return validateMeetingTarget(target);
 }
 
@@ -121,8 +129,15 @@ async function loadDriver(
     cdpUrl?: string;
     cdpPort?: number;
     browserChannel?: 'chrome' | 'chromium';
-  } = {},
+  } = {}
 ): Promise<MeetingJoinDriver> {
+  if (driverId === 'in-room') {
+    // 同席モード: attend the physical meeting through the machine's own
+    // microphone/speakers — no browser, no external bot service.
+    installInRoomMeetingJoinDriver({
+      mic: opts.microphoneDevice ? { device: opts.microphoneDevice } : undefined,
+    });
+  }
   if (driverId === 'browser-playwright') {
     try {
       const mod = await import('@actuator/meeting-browser-driver');
@@ -141,7 +156,9 @@ async function loadDriver(
       });
     } catch (err: any) {
       try {
-        const fallbackPath = pathResolver.rootResolve('dist/libs/actuators/meeting-browser-driver/src/index.js');
+        const fallbackPath = pathResolver.rootResolve(
+          'dist/libs/actuators/meeting-browser-driver/src/index.js'
+        );
         const mod = await import(pathToFileURL(fallbackPath).href);
         if (typeof mod.installBrowserMeetingJoinDriver === 'function') {
           mod.installBrowserMeetingJoinDriver({
@@ -163,7 +180,7 @@ async function loadDriver(
         }
       } catch (fallbackErr: any) {
         logger.warn(
-          `[participate-cli] browser driver not installed; falling back to stub. (${fallbackErr?.message ?? err?.message ?? err})`,
+          `[participate-cli] browser driver not installed; falling back to stub. (${fallbackErr?.message ?? err?.message ?? err})`
         );
       }
     }
@@ -172,7 +189,9 @@ async function loadDriver(
   if (driver) {
     const probe = await driver.probe();
     if (probe.available) return driver;
-    logger.warn(`[participate-cli] driver '${driverId}' unavailable: ${probe.reason}; falling back to stub`);
+    logger.warn(
+      `[participate-cli] driver '${driverId}' unavailable: ${probe.reason}; falling back to stub`
+    );
   }
   registerMeetingJoinDriver(new StubMeetingJoinDriver());
   return new StubMeetingJoinDriver();
@@ -190,7 +209,7 @@ export async function evaluateMeetingBootstrapGate(
     skipBootstrapCheck: boolean;
     loadManifest?: typeof loadEnvironmentManifest;
     readinessCheck?: typeof verifyReady;
-  },
+  }
 ): Promise<MeetingBootstrapGateResult> {
   const loadManifest = opts.loadManifest ?? loadEnvironmentManifest;
   const readinessCheck = opts.readinessCheck ?? verifyReady;
@@ -249,25 +268,27 @@ export function assertMeetingParticipationRuntime(input: {
   const { runtimePlan, bus, busProbe, stt, tts } = input;
   if (runtimePlan.require_real_audio_bus && (bus.bus_id === 'stub' || !busProbe.available)) {
     throw new Error(
-      `[participate-cli] transport mode '${runtimePlan.transport_mode}' requires a real audio bus, but bus='${bus.bus_id}' probe='${busProbe.reason ?? 'unavailable'}'`,
+      `[participate-cli] transport mode '${runtimePlan.transport_mode}' requires a real audio bus, but bus='${bus.bus_id}' probe='${busProbe.reason ?? 'unavailable'}'`
     );
   }
   if (runtimePlan.require_streaming_stt && stt.bridge_id === 'stub') {
     throw new Error(
-      `[participate-cli] transport mode '${runtimePlan.transport_mode}' requires streaming STT, but only the stub bridge is registered. Set KYBERION_STT_COMMAND or register a real bridge.`,
+      `[participate-cli] transport mode '${runtimePlan.transport_mode}' requires streaming STT, but only the stub bridge is registered. Set KYBERION_STT_COMMAND or register a real bridge.`
     );
   }
   if (runtimePlan.require_streaming_tts && tts.bridge_id === 'stub') {
     throw new Error(
-      `[participate-cli] transport mode '${runtimePlan.transport_mode}' requires streaming TTS, but only the stub bridge is registered. Set KYBERION_TTS_COMMAND or register a real bridge.`,
+      `[participate-cli] transport mode '${runtimePlan.transport_mode}' requires streaming TTS, but only the stub bridge is registered. Set KYBERION_TTS_COMMAND or register a real bridge.`
     );
   }
 }
 
-export function resolveMeetingParticipationVoiceProfile(input: {
-  voiceProfileId?: string;
-  registry?: ReturnType<typeof getVoiceProfileRegistry>;
-} = {}) {
+export function resolveMeetingParticipationVoiceProfile(
+  input: {
+    voiceProfileId?: string;
+    registry?: ReturnType<typeof getVoiceProfileRegistry>;
+  } = {}
+) {
   const registry = input.registry ?? getVoiceProfileRegistry();
   const requestedProfileId = input.voiceProfileId?.trim();
 
@@ -275,7 +296,7 @@ export function resolveMeetingParticipationVoiceProfile(input: {
     const explicit = registry.profiles.find((profile) => profile.profile_id === requestedProfileId);
     if (!explicit) {
       throw new Error(
-        `[participate-cli] requested voice profile '${requestedProfileId}' is not present in the active registry.`,
+        `[participate-cli] requested voice profile '${requestedProfileId}' is not present in the active registry.`
       );
     }
     return explicit;
@@ -300,7 +321,7 @@ export function shouldResolveMeetingParticipationVoiceProfile(input: {
 async function main(): Promise<void> {
   const argv = await createStandardYargs()
     .option('mission', { type: 'string', demandOption: true })
-    .option('meeting-url', { type: 'string', demandOption: true })
+    .option('meeting-url', { type: 'string' })
     .option('platform', { type: 'string', default: 'auto' })
     .option('meeting-id', { type: 'string' })
     .option('passcode', { type: 'string' })
@@ -347,13 +368,13 @@ async function main(): Promise<void> {
     });
     if (!gate.ready) {
       logger.error(
-        `[participate-cli] environment-capability gate is not satisfied for mission ${missionId}.`,
+        `[participate-cli] environment-capability gate is not satisfied for mission ${missionId}.`
       );
       logger.error(
-        'Run `pnpm env:bootstrap --manifest meeting-participation-runtime --apply [--force]` to install,',
+        'Run `pnpm env:bootstrap --manifest meeting-participation-runtime --apply [--force]` to install,'
       );
       logger.error(
-        'or pass --skip-bootstrap-check (only for incident response — every skip is audited downstream).',
+        'or pass --skip-bootstrap-check (only for incident response — every skip is audited downstream).'
       );
       exitCode = 2;
       return;
@@ -369,53 +390,84 @@ async function main(): Promise<void> {
       dry_run: Boolean(argv['dry-run']),
     });
     logger.info(
-      `[participate-cli] runtime plan transport=${runtimePlan.transport_mode} dry_run=${runtimePlan.dry_run} real_audio_bus=${runtimePlan.require_real_audio_bus} stt=${runtimePlan.require_streaming_stt} tts=${runtimePlan.require_streaming_tts} voice_profile=${runtimePlan.require_voice_profile}`,
+      `[participate-cli] runtime plan transport=${runtimePlan.transport_mode} dry_run=${runtimePlan.dry_run} real_audio_bus=${runtimePlan.require_real_audio_bus} stt=${runtimePlan.require_streaming_stt} tts=${runtimePlan.require_streaming_tts} voice_profile=${runtimePlan.require_voice_profile}`
     );
 
+    // 同席モード (--driver in-room): the meeting is in the physical room, so
+    // no meeting URL is required and the platform is forced to in_room.
+    const inRoom = String(argv.driver) === 'in-room' || argv.platform === 'in_room';
+    const meetingUrl =
+      typeof argv['meeting-url'] === 'string' && argv['meeting-url']
+        ? String(argv['meeting-url'])
+        : inRoom
+          ? 'room://local'
+          : '';
+    if (!meetingUrl) {
+      logger.error('[participate-cli] --meeting-url is required (except with --driver in-room).');
+      exitCode = 2;
+      return;
+    }
     const target: MeetingTarget = {
-      url: String(argv['meeting-url']),
-      platform: (argv.platform as MeetingTarget['platform']) ?? 'auto',
+      url: meetingUrl,
+      platform: inRoom ? 'in_room' : ((argv.platform as MeetingTarget['platform']) ?? 'auto'),
       meeting_id: typeof argv['meeting-id'] === 'string' ? String(argv['meeting-id']) : undefined,
       passcode: typeof argv.passcode === 'string' ? String(argv.passcode) : undefined,
       display_name: String(argv['display-name']),
     };
     const validatedTarget = prepareMeetingTarget(target);
-    const requestedVoiceProfileId = typeof argv['voice-profile-id'] === 'string' ? String(argv['voice-profile-id']) : undefined;
-    const voiceProfile = shouldResolveMeetingParticipationVoiceProfile({ runtimePlan, voiceProfileId: requestedVoiceProfileId })
+    const requestedVoiceProfileId =
+      typeof argv['voice-profile-id'] === 'string' ? String(argv['voice-profile-id']) : undefined;
+    const voiceProfile = shouldResolveMeetingParticipationVoiceProfile({
+      runtimePlan,
+      voiceProfileId: requestedVoiceProfileId,
+    })
       ? resolveMeetingParticipationVoiceProfile({ voiceProfileId: requestedVoiceProfileId })
       : null;
     if (runtimePlan.require_voice_profile && voiceProfile?.status !== 'active') {
       throw new Error(
-        `[participate-cli] transport mode '${runtimePlan.transport_mode}' requires an active voice profile, but '${voiceProfile?.profile_id ?? 'none'}' is ${voiceProfile?.status ?? 'missing'}`,
+        `[participate-cli] transport mode '${runtimePlan.transport_mode}' requires an active voice profile, but '${voiceProfile?.profile_id ?? 'none'}' is ${voiceProfile?.status ?? 'missing'}`
       );
     }
 
     const driver = await loadDriver(String(argv.driver), {
       headed: Boolean(argv.headed),
       accountSlug: String(argv['account-slug']),
-      microphoneDevice: typeof argv['microphone-device'] === 'string' ? String(argv['microphone-device']) : undefined,
-      speakerDevice: typeof argv['speaker-device'] === 'string' ? String(argv['speaker-device']) : undefined,
-      cameraDevice: typeof argv['camera-device'] === 'string' ? String(argv['camera-device']) : undefined,
-      userDataDir: typeof argv['user-data-dir'] === 'string' ? String(argv['user-data-dir']) : undefined,
-      profileDirectory: typeof argv['profile-directory'] === 'string' ? String(argv['profile-directory']) : undefined,
+      microphoneDevice:
+        typeof argv['microphone-device'] === 'string'
+          ? String(argv['microphone-device'])
+          : undefined,
+      speakerDevice:
+        typeof argv['speaker-device'] === 'string' ? String(argv['speaker-device']) : undefined,
+      cameraDevice:
+        typeof argv['camera-device'] === 'string' ? String(argv['camera-device']) : undefined,
+      userDataDir:
+        typeof argv['user-data-dir'] === 'string' ? String(argv['user-data-dir']) : undefined,
+      profileDirectory:
+        typeof argv['profile-directory'] === 'string'
+          ? String(argv['profile-directory'])
+          : undefined,
       connectOverCdp: Boolean(argv['connect-over-cdp']),
       cdpUrl: typeof argv['cdp-url'] === 'string' ? String(argv['cdp-url']) : undefined,
       cdpPort: typeof argv['cdp-port'] === 'number' ? Number(argv['cdp-port']) : undefined,
       browserChannel: (argv['browser-channel'] as 'chrome' | 'chromium' | undefined) ?? undefined,
     });
     const selectedDevices = {
-      microphone: typeof argv['microphone-device'] === 'string' ? String(argv['microphone-device']) : undefined,
-      speaker: typeof argv['speaker-device'] === 'string' ? String(argv['speaker-device']) : undefined,
+      microphone:
+        typeof argv['microphone-device'] === 'string'
+          ? String(argv['microphone-device'])
+          : undefined,
+      speaker:
+        typeof argv['speaker-device'] === 'string' ? String(argv['speaker-device']) : undefined,
       camera: typeof argv['camera-device'] === 'string' ? String(argv['camera-device']) : undefined,
     };
     if (selectedDevices.microphone || selectedDevices.speaker || selectedDevices.camera) {
       logger.info(
-        `[participate-cli] device preferences microphone=${selectedDevices.microphone ?? 'default'} speaker=${selectedDevices.speaker ?? 'default'} camera=${selectedDevices.camera ?? 'default'}`,
+        `[participate-cli] device preferences microphone=${selectedDevices.microphone ?? 'default'} speaker=${selectedDevices.speaker ?? 'default'} camera=${selectedDevices.camera ?? 'default'}`
       );
     }
     if (argv['connect-over-cdp'] || argv['user-data-dir']) {
       logger.info(
-        `[participate-cli] browser mode ${argv['connect-over-cdp'] ? 'cdp-attach' : 'persistent-profile'}${argv['profile-directory'] ? ` profile=${argv['profile-directory']}` : ''}${argv['cdp-url'] ? ` cdp_url=${argv['cdp-url']}` : ''}${argv['cdp-port'] ? ` cdp_port=${argv['cdp-port']}` : ''}`,
+        `[participate-cli] browser mode ${argv['connect-over-cdp'] ? 'cdp-attach' : 'persistent-profile'}${argv['profile-directory'] ? ` profile=${argv['profile-directory']}` : ''}${argv['cdp-url'] ? ` cdp_url=${argv['cdp-url']}` : ''}${argv['cdp-port'] ? ` cdp_port=${argv['cdp-port']}` : ''}`
       );
     }
     const bus = resolveAudioBus((argv['audio-bus'] as any) || undefined);
@@ -441,7 +493,7 @@ async function main(): Promise<void> {
     });
 
     logger.info(
-      `🎙️ meeting_participate (mission=${missionId} driver=${driver.driver_id} bus=${bus.bus_id} platform=${validatedTarget.platform} voice_profile=${voiceProfile?.profile_id ?? 'not_required'})`,
+      `🎙️ meeting_participate (mission=${missionId} driver=${driver.driver_id} bus=${bus.bus_id} platform=${validatedTarget.platform} voice_profile=${voiceProfile?.profile_id ?? 'not_required'})`
     );
 
     const report = await coordinator.run(validatedTarget, {

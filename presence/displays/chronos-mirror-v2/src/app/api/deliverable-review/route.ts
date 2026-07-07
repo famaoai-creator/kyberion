@@ -1,6 +1,46 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { listInboxEntries, markInboxEntry } from '@agent/core';
 import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
 import { reviewDeliverable } from '../../../lib/deliverable-review';
+
+const VERDICT_TO_INBOX_STATUS = {
+  accept: 'accepted',
+  reject: 'rejected',
+  'request-changes': 'changes_requested',
+} as const;
+
+/**
+ * SU-03: keep the shared deliverable inbox (active/shared/inbox/entries.jsonl)
+ * in sync with review verdicts so the concierge/operator inbox views reflect
+ * the decision without a separate action.
+ */
+function syncInboxWithVerdict(input: {
+  verdict: keyof typeof VERDICT_TO_INBOX_STATUS;
+  comment: string;
+  missionId?: string;
+  artifactPath?: string;
+}): number {
+  const status = VERDICT_TO_INBOX_STATUS[input.verdict];
+  const candidates = listInboxEntries({
+    missionId: input.missionId,
+    limit: 100,
+  }).filter((entry) => {
+    if (!input.artifactPath) return Boolean(input.missionId);
+    return entry.artifact_paths.some((artifactPath) => artifactPath === input.artifactPath);
+  });
+  let updated = 0;
+  for (const entry of candidates) {
+    if (
+      markInboxEntry(entry.entry_id, status, {
+        verdictNote: input.comment,
+        reviewedBy: 'chronos-localadmin',
+      })
+    ) {
+      updated += 1;
+    }
+  }
+  return updated;
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -30,10 +70,23 @@ export async function POST(req: NextRequest) {
       reviewRole: 'mission_controller',
     });
 
+    let inboxUpdated = 0;
+    try {
+      inboxUpdated = syncInboxWithVerdict({
+        verdict,
+        comment,
+        missionId: result.artifact?.mission_id,
+        artifactPath: result.artifact?.path,
+      });
+    } catch {
+      // Inbox sync is best-effort; the review record is the source of truth.
+    }
+
     return NextResponse.json({
       ok: true,
       review: result.review,
       state: result.state,
+      inboxUpdated,
     });
   } catch (err: any) {
     return NextResponse.json(

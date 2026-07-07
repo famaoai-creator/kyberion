@@ -562,41 +562,54 @@ export async function startAgentRuntimeSupervisorDaemon(
       status: 'error',
       details: { error: error?.message || String(error) },
     });
-    sendOpsAlert({
-      severity: 'critical',
-      title: 'Agent runtime supervisor daemon error',
-      context: {
-        daemon_id: 'agent-runtime-supervisor-daemon',
-        error: error?.message || String(error),
-      },
-      recommendation: 'Restart the supervisor daemon and inspect the runtime supervisor log.',
-      dedupe_key: 'agent-runtime-supervisor-daemon:error',
-    });
+    try {
+      sendOpsAlert({
+        severity: 'critical',
+        title: 'Agent runtime supervisor daemon error',
+        context: {
+          daemon_id: 'agent-runtime-supervisor-daemon',
+          error: error?.message || String(error),
+        },
+        recommendation: 'Restart the supervisor daemon and inspect the runtime supervisor log.',
+        dedupe_key: 'agent-runtime-supervisor-daemon:error',
+      });
+    } catch (alertError: any) {
+      logger.warn(
+        `[agent-runtime-supervisor-daemon] failed to write ops alert: ${alertError?.message || alertError}`
+      );
+    }
     if (options.exitOnFatalError !== false) process.exit(1);
   });
 
   await new Promise<void>((resolve, reject) => {
-    server.once('listening', resolve);
-    server.listen(listenTarget, () => {
-      const address = server.address();
-      if (transport === 'tcp' && typeof address === 'object' && address) {
-        socketLabel = `${address.address}:${address.port}`;
-      }
-      appendSupervisorEvent({
-        decision: 'agent_runtime_supervisor_daemon_started',
-        pid: process.pid,
-        socket_path: socketLabel || socketPath,
-      });
-      recordDaemonHeartbeat('agent-runtime-supervisor-daemon', {
-        status: 'running',
-        details: { socket_path: socketLabel || socketPath, transport },
-      });
-      logger.info(`[agent-runtime-supervisor-daemon] listening on ${socketLabel || socketPath}`);
-    });
     const timeout = setTimeout(
       () => reject(new Error('agent_runtime_supervisor_daemon_start_timeout')),
-      5000
+      60000
     );
+    const finish = () => {
+      clearTimeout(timeout);
+      resolve();
+    };
+    server.listen(listenTarget, () => {
+      try {
+        const address = server.address();
+        if (transport === 'tcp' && typeof address === 'object' && address) {
+          socketLabel = `${address.address}:${address.port}`;
+        }
+        appendSupervisorEvent({
+          decision: 'agent_runtime_supervisor_daemon_started',
+          pid: process.pid,
+          socket_path: socketLabel || socketPath,
+        });
+        recordDaemonHeartbeat('agent-runtime-supervisor-daemon', {
+          status: 'running',
+          details: { socket_path: socketLabel || socketPath, transport },
+        });
+        logger.info(`[agent-runtime-supervisor-daemon] listening on ${socketLabel || socketPath}`);
+      } finally {
+        finish();
+      }
+    });
     timeout.unref?.();
   });
 

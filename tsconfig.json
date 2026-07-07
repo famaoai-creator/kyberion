@@ -23,6 +23,7 @@
 
       "@agent/shared-nerve": ["./libs/shared-nerve/src/index.ts"],
       "@actuator/service": ["./libs/actuators/service-actuator/src/index.ts"],
+      "@actuator/system": ["./libs/actuators/system-actuator/src/index.ts"],
       "@actuator/meeting-browser-driver": ["./libs/actuators/meeting-browser-driver/src/index.ts"]
     }
   },
@@ -32,6 +33,8 @@
     "dist",
     "coverage",
     "test-results",
-    "presence/displays/chronos-mirror-v2/"
+    "presence/displays/chronos-mirror-v2/",
+    "presence/displays/operator-surface/",
+    "presence/displays/concierge/"
   ]
 }

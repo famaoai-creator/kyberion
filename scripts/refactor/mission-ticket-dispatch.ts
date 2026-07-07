@@ -317,6 +317,8 @@ export async function dispatchMissionTickets(
           acceptance_criteria: task.acceptance_criteria || [],
           expected_output_format: task.expected_output_format || null,
           dependencies: task.dependencies || [],
+          ...(typeof task.phase === 'string' && task.phase ? { phase: task.phase } : {}),
+          ...(typeof task.origin === 'string' && task.origin ? { origin: task.origin } : {}),
         },
       });
       workItemId = sourceResult.item_id;

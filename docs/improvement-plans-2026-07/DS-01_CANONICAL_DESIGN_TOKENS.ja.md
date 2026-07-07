@@ -56,3 +56,7 @@
 
 - 見た目の変化はユーザーに直接見える。**operator-surface の色替えは before/after のスクリーンショットを PR/パッチ説明に添付**する。presence-studio のライトテーマは変えない(light バリアントとして正式化するだけ)。
 - 生成ゲートを入れる前に、既存の手編集値と生成値の diff を必ず確認し、意図的な調整(コントラスト補正等)を正準側に取り込んでから切り替える。
+
+## 実装メモ 追記 (2026-07-06)
+
+- SR-01 にて presence-studio の face 配線をクローズ: `GET /api/design-tokens.css`(`createCompanionWebThemePack` → `webThemePackToCssVars`)を index.html が静的トークンの後に読み込み、canonical 値が優先される。concierge(新設)は `/api/theme` で `createConciergeWebThemePack` を消費。残余: operator-surface の hex 置換、computer-surface。

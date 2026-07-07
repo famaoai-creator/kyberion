@@ -1,0 +1,92 @@
+{
+  "action": "pipeline",
+  "name": "pptx-produce-from-brief-fragment",
+  "version": "1.0.0",
+  "description": "承認済みの deck-brief.json（proposal-brief スキーマ）から PPTX を決定的に生成する再利用フラグメント。storyline 構築 → デザインプロトコル確定 → PPTX レンダリング → PRESENTATION_APPROVAL_GATE 作成。presentation-deck-production プロセスの production_delivery フェーズが参照する。",
+  "context": {
+    "mission_id": "MSN-AUTO-GENERATED",
+    "mission_evidence_dir": "active/shared/tmp",
+    "deck_brief_path": "{{mission_evidence_dir}}/deck-brief.json",
+    "deck_title": "",
+    "tenant_slug": "sbiss",
+    "output_filename": "proposal-deck.pptx"
+  },
+  "steps": [
+    {
+      "id": "read_deck_brief",
+      "role": "source",
+      "op": "system:read_file",
+      "produces": { "channel": "deck_brief_text", "type": "DeckBriefText" },
+      "params": {
+        "path": "{{deck_brief_path}}"
+      }
+    },
+    {
+      "id": "parse_brief",
+      "role": "transform",
+      "op": "core:transform",
+      "consumes": "deck_brief_text",
+      "produces": { "channel": "deck_brief", "type": "DeckBrief" },
+      "params": {
+        "script": "const raw = ctx.deck_brief_text; if (!raw) throw new Error('deck_brief_text is missing from context'); const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw; return {...parsed, kind: 'proposal-brief', tenant_id: ctx.tenant_slug || parsed.tenant_slug};"
+      }
+    },
+    {
+      "id": "build_storyline",
+      "role": "transform",
+      "op": "media:proposal_storyline_from_brief",
+      "consumes": "deck_brief",
+      "produces": { "channel": "proposal_storyline", "type": "ProposalStoryline" },
+      "params": {
+        "from": "deck_brief"
+      }
+    },
+    {
+      "id": "compile_design",
+      "role": "transform",
+      "op": "media:brief_to_design_protocol",
+      "consumes": "deck_brief",
+      "produces": { "channel": "pptx_design", "type": "PptxDesign" },
+      "params": {
+        "from": "deck_brief"
+      }
+    },
+    {
+      "id": "render_pptx",
+      "role": "sink",
+      "op": "media:pptx_render",
+      "consumes": "pptx_design",
+      "produces": { "channel": "pptx_output_path", "type": "FilePath" },
+      "params": {
+        "design_from": "pptx_design",
+        "path": "{{mission_evidence_dir}}/{{output_filename}}"
+      }
+    },
+    {
+      "id": "write_approval_gate",
+      "role": "sink",
+      "op": "system:write_file",
+      "params": {
+        "path": "{{mission_evidence_dir}}/presentation-approval-gate.json",
+        "content": {
+          "gate": "PRESENTATION_APPROVAL_GATE",
+          "track": "delivery",
+          "status": "pending_operator_confirmation",
+          "deck_title": "{{deck_title}}",
+          "tenant": "{{tenant_slug}}",
+          "artifacts": ["{{deck_brief_path}}", "{{mission_evidence_dir}}/{{output_filename}}"],
+          "instructions": "生成された PPTX を確認し、顧客に提示可能なレベルであれば status を 'passed' に更新してください。修正が必要な場合は rejection_reason に記載し 'rejected' に更新してください。",
+          "created_at": "{{$now}}"
+        }
+      }
+    },
+    {
+      "id": "log_done",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "🏁 [PPTX-PRODUCE] Complete. PPTX: {{mission_evidence_dir}}/{{output_filename}} | Gate: pending review"
+      }
+    }
+  ]
+}

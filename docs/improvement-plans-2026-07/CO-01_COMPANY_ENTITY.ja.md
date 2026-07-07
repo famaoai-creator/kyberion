@@ -58,3 +58,7 @@
 - 2026-07-05: `scripts/refactor/mission-controller-router.ts` で mission の routing decision に `vision_ref_summary` を載せ、Company vision 参照が mission state の経路記録にも残るようにした。
 - 2026-07-05: `libs/core/outcome-contract.ts` に `vision_ref` を追加し、mission outcome contract でも `company://<tenant>/vision` の構造化参照を保持できるようにした。
 - 2026-07-05: `libs/core/mission-context-pack.ts` / `.test.ts` でも mission outcome contract の `vision_ref` をそのまま pack に保持することを固定し、context pack 層で構造化参照が落ちないようにした。
+
+## 実装メモ 追記 (2026-07-06)
+
+- 業態別会社テンプレート(`templates/companies/`、CO-02 追記参照)が Company 集約の構成ファイル(customer.json / identity.json / vision.md / organization-profile.json / org-chart.json)を一式で生成するようになった。`pnpm company:bootstrap` 後に `resolveCompany(tenantSlug)` がそのまま集約可能。
