@@ -165,11 +165,11 @@
 
 ### ONB(初回オンボーディング)
 
-| ID     | 状態 | 残作業                                                                              |
-| ------ | ---- | ----------------------------------------------------------------------------------- |
-| ONB-01 | DONE |                                                                                     |
-| ONB-02 | DONE | (2026-07-05 完了: Node 24 統一・floor probe・Playwright 非致命警告・正本リンク統一) |
-| ONB-03 | TODO | express、onboard:reset、identity.example.json、vital-check の overlay 対応          |
+| ID     | 状態    | 残作業                                                                                |
+| ------ | ------- | ------------------------------------------------------------------------------------- |
+| ONB-01 | DONE    |                                                                                       |
+| ONB-02 | DONE    | (2026-07-05 完了: Node 24 統一・floor probe・Playwright 非致命警告・正本リンク統一)   |
+| ONB-03 | PARTIAL | onboard:reset を追加。残: express、identity.example.json、vital-check の overlay 対応 |
 
 ### SU(Surface UI)
 
