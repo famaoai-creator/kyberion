@@ -10,6 +10,7 @@ import {
 } from './onboarding_apply.js';
 
 const ROOT = pathResolver.rootDir();
+const TEMPLATE_PATH = 'knowledge/public/templates/onboarding/identity.example.json';
 
 function read(relPath: string): string {
   return String(safeReadFile(path.join(ROOT, relPath), { encoding: 'utf8' }) || '');
@@ -57,8 +58,19 @@ describe('onboarding_apply', () => {
 
   it('points missing identity files to the onboarding template', async () => {
     await expect(readInput('knowledge/public/templates/onboarding/missing.json')).rejects.toThrow(
-      'knowledge/public/templates/onboarding/identity.example.json'
+      TEMPLATE_PATH
     );
+  });
+
+  it('keeps the template aligned with onboarding input validation', () => {
+    const template = JSON.parse(read(TEMPLATE_PATH)) as typeof FIXTURE_INPUT;
+    expect(() => validateInput(template)).not.toThrow();
+    expect(template.identity.name).toBeTruthy();
+    expect(template.identity.language).toBeTruthy();
+    expect(template.identity.interaction_style).toBeTruthy();
+    expect(template.identity.primary_domain).toBeTruthy();
+    expect(template.identity.vision).toBeTruthy();
+    expect(template.identity.agent_id).toBeTruthy();
   });
 
   it('builds a summary and state from the onboarding input', () => {
