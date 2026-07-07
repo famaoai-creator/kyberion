@@ -5,10 +5,10 @@
  */
 
 import {
-  logger, 
-  terminalBridge, 
-  safeReadFile, 
-  safeWriteFile, 
+  logger,
+  terminalBridge,
+  safeReadFile,
+  safeWriteFile,
   pathResolver,
   secretGuard,
   safeMkdir,
@@ -35,18 +35,18 @@ const NEXUS_MISSION_ID = 'MSN-SYSTEM-NEXUS-DISPATCH';
 function ensureSystemMission() {
   const missionDir = path.join(ROOT_DIR, 'active/missions', NEXUS_MISSION_ID);
   const statePath = path.join(missionDir, 'mission-state.json');
-  
+
   if (!safeExistsSync(missionDir)) {
     safeMkdir(missionDir, { recursive: true });
   }
-  
+
   const state = {
     mission_id: NEXUS_MISSION_ID,
     status: 'Active',
     started_at: new Date().toISOString(),
-    role: 'System Dispatcher'
+    role: 'System Dispatcher',
   };
-  
+
   safeWriteFile(statePath, JSON.stringify(state, null, 2));
   logger.info(`🛡️ [Nexus] System Mission physical state established.`);
 }
@@ -60,7 +60,7 @@ interface GUSPStimulus {
   origin: { channel: string; source_id: string; context?: string; metadata?: any };
   signal: { type: string; priority: number; payload: string };
   policy: { flow: string; feedback: string; retention: string };
-  control: { 
+  control: {
     status: 'pending' | 'injected' | 'processed' | 'expired' | 'failed';
     evidence: Array<{ step: string; ts: string; agent: string }>;
   };
@@ -84,18 +84,27 @@ async function loadChannelRegistry(): Promise<Channel[]> {
   }
 }
 
-async function updateStimulusStatus(id: string, status: GUSPStimulus['control']['status'], step?: string) {
+async function updateStimulusStatus(
+  id: string,
+  status: GUSPStimulus['control']['status'],
+  step?: string
+) {
   try {
     const content = safeReadFile(STIMULI_PATH, { encoding: 'utf8' }) as string;
-    const lines = content.trim().split('\n').map(line => {
-      if (!line) return '';
-      const s = JSON.parse(line) as GUSPStimulus;
-      if (s.id === id) {
-        s.control.status = status;
-        if (step) s.control.evidence.push({ step, ts: new Date().toISOString(), agent: 'nexus-daemon' });
-      }
-      return JSON.stringify(s);
-    }).filter(l => l !== '');
+    const lines = content
+      .trim()
+      .split('\n')
+      .map((line) => {
+        if (!line) return '';
+        const s = JSON.parse(line) as GUSPStimulus;
+        if (s.id === id) {
+          s.control.status = status;
+          if (step)
+            s.control.evidence.push({ step, ts: new Date().toISOString(), agent: 'nexus-daemon' });
+        }
+        return JSON.stringify(s);
+      })
+      .filter((l) => l !== '');
     safeWriteFile(STIMULI_PATH, lines.join('\n') + '\n');
     return true;
   } catch (err: any) {
@@ -105,29 +114,33 @@ async function updateStimulusStatus(id: string, status: GUSPStimulus['control'][
 }
 
 async function dispatchFeedback(stimulus: GUSPStimulus, text: string, channels: Channel[]) {
-  const channelCfg = channels.find(c => c.id === stimulus.origin.channel);
-  
+  const channelCfg = channels.find((c) => c.id === stimulus.origin.channel);
+
   if (channelCfg?.connector_skill) {
-    logger.info(`📤 [Nexus] Dispatching feedback for ${stimulus.id} via ${channelCfg.connector_skill}`);
-    
+    logger.info(
+      `📤 [Nexus] Dispatching feedback for ${stimulus.id} via ${channelCfg.connector_skill}`
+    );
+
     const cleanText = text.replace(/^\/(gemini|claude|codex|shell)\s+/i, '').trim();
     const contextParts = stimulus.origin.context?.split(':') || [];
-    const targetChannel = contextParts[0] || 'C0AJ7EHH8BB'; 
+    const targetChannel = contextParts[0] || 'C0AJ7EHH8BB';
     const threadTs = contextParts[1];
 
     const payload = {
       service_id: channelCfg.service_id || stimulus.origin.channel,
       mode: channelCfg.execution_mode || 'API',
-      action: 'chat.postMessage', 
+      action: 'chat.postMessage',
       params: {
         channel: targetChannel,
         thread_ts: threadTs,
-        text: cleanText
+        text: cleanText,
       },
-      auth: 'secret-guard'
+      auth: 'secret-guard',
     };
 
-    const tempPath = pathResolver.resolve(`active/shared/logs/dispatch_${stimulus.id}_${Date.now()}.json`);
+    const tempPath = pathResolver.resolve(
+      `active/shared/logs/dispatch_${stimulus.id}_${Date.now()}.json`
+    );
     safeWriteFile(tempPath, JSON.stringify(payload, null, 2));
 
     try {
@@ -136,11 +149,11 @@ async function dispatchFeedback(stimulus: GUSPStimulus, text: string, channels: 
 
       const actuatorPath = capabilityEntry(channelCfg.connector_skill);
       logger.info(`🚀 [Nexus] Dispatching via node ${actuatorPath}...`);
-      
+
       const rawOutput = await safeExec('node', [actuatorPath, '--input', tempPath], {
-        env: { ...process.env, MISSION_ID: NEXUS_MISSION_ID }
+        env: { ...process.env, MISSION_ID: NEXUS_MISSION_ID },
       });
-      
+
       const jsonStart = rawOutput.indexOf('{');
       if (jsonStart === -1) {
         logger.error(`❌ [Nexus] Dispatch Error: No JSON found in output.`);
@@ -160,16 +173,18 @@ async function dispatchFeedback(stimulus: GUSPStimulus, text: string, channels: 
       logger.error(`❌ [Nexus] Dispatch failed: ${err.message}`);
     }
   } else {
-    logger.info(`📝 [Nexus] Internal feedback for ${stimulus.id} (No connector): ${text.substring(0, 100)}...`);
+    logger.info(
+      `📝 [Nexus] Internal feedback for ${stimulus.id} (No connector): ${text.substring(0, 100)}...`
+    );
   }
 }
 
-function extractBrainProfile(payload: string): { profile: string, cleanPayload: string } {
+function extractBrainProfile(payload: string): { profile: string; cleanPayload: string } {
   const match = payload.match(/^\/([a-z0-9_-]+)\s+(.*)/is);
   if (match) {
     const profile = match[1].toLowerCase();
     const cleanPayload = match[2];
-    
+
     try {
       const registryPath = pathResolver.resolve('knowledge/orchestration/brain-profiles.json');
       if (safeExistsSync(registryPath)) {
@@ -180,7 +195,7 @@ function extractBrainProfile(payload: string): { profile: string, cleanPayload: 
       }
     } catch (_) {}
   }
-  
+
   return { profile: 'default', cleanPayload: payload };
 }
 
@@ -188,14 +203,16 @@ async function scanAndDispatch(channels: Channel[]) {
   if (!safeExistsSync(STIMULI_PATH)) return;
 
   const content = safeReadFile(STIMULI_PATH, { encoding: 'utf8' }) as string;
-  const allStimuli = content.trim().split('\n')
-    .filter(l => l.length > 0)
-    .map(line => JSON.parse(line) as GUSPStimulus);
+  const allStimuli = content
+    .trim()
+    .split('\n')
+    .filter((l) => l.length > 0)
+    .map((line) => JSON.parse(line) as GUSPStimulus);
 
-  const injected = allStimuli.filter(s => s.control.status === 'injected');
+  const injected = allStimuli.filter((s) => s.control.status === 'injected');
 
   for (const stimulus of injected) {
-    if (stimulus.policy.feedback === 'silent') {
+    if (stimulus.policy?.feedback === 'silent') {
       await updateStimulusStatus(stimulus.id, 'processed', 'ignored_by_silent_policy');
       continue;
     }
@@ -216,7 +233,7 @@ async function scanAndDispatch(channels: Channel[]) {
             logger.info(`🎯 [Nexus] Match found! Stimulus ${stimulus.id} -> Session ${sid}`);
             await dispatchFeedback(stimulus, text, channels);
             await updateStimulusStatus(stimulus.id, 'processed', 'feedback_dispatched');
-            
+
             safeUnlinkSync(metaPath);
             break;
           }
@@ -242,7 +259,7 @@ async function nexusLoop() {
         mode: 'API',
         action: action,
         params: params,
-        auth: 'secret-guard'
+        auth: 'secret-guard',
       });
     }
   });
@@ -250,14 +267,16 @@ async function nexusLoop() {
   while (true) {
     try {
       const channels = await loadChannelRegistry();
-      
+
       if (safeExistsSync(STIMULI_PATH)) {
         const content = safeReadFile(STIMULI_PATH, { encoding: 'utf8' }) as string;
-        const allStimuli = content.trim().split('\n')
-          .filter(l => l.length > 0)
-          .map(line => JSON.parse(line) as GUSPStimulus);
+        const allStimuli = content
+          .trim()
+          .split('\n')
+          .filter((l) => l.length > 0)
+          .map((line) => JSON.parse(line) as GUSPStimulus);
 
-        const pending = allStimuli.filter(s => s.control.status === 'pending');
+        const pending = allStimuli.filter((s) => s.control.status === 'pending');
 
         for (const stimulus of pending) {
           // 1. Add to Sensory Memory for context
@@ -273,25 +292,41 @@ async function nexusLoop() {
           }
 
           const sessionPrefix = 's-';
-          const sessionSuffix = stimulus.origin.source_id.substring(stimulus.origin.source_id.length - 8).toLowerCase();
+          const sessionSuffix = stimulus.origin.source_id
+            .substring(stimulus.origin.source_id.length - 8)
+            .toLowerCase();
           const targetSessionId = `${sessionPrefix}${sessionSuffix}`;
 
-          logger.info(`🚀 [Nexus] Routing ${stimulus.id} to session ${targetSessionId} (Affinity: ${stimulus.origin.source_id})`);
-          
+          logger.info(
+            `🚀 [Nexus] Routing ${stimulus.id} to session ${targetSessionId} (Affinity: ${stimulus.origin.source_id})`
+          );
+
           const { profile, cleanPayload } = extractBrainProfile(stimulus.signal.payload);
-          
+
           const sessionInDir = path.join(RUNTIME_BASE, targetSessionId, 'in');
           if (!safeExistsSync(sessionInDir)) safeMkdir(sessionInDir, { recursive: true });
 
           const metaInPath = path.join(sessionInDir, 'metadata.json');
-          safeWriteFile(metaInPath, JSON.stringify({
-            stimulus_id: stimulus.id,
-            origin: stimulus.origin,
-            policy: stimulus.policy,
-            brain_profile: profile
-          }, null, 2));
+          safeWriteFile(
+            metaInPath,
+            JSON.stringify(
+              {
+                stimulus_id: stimulus.id,
+                origin: stimulus.origin,
+                policy: stimulus.policy,
+                brain_profile: profile,
+              },
+              null,
+              2
+            )
+          );
 
-          const success = await terminalBridge.injectAndExecute(null as any, targetSessionId, cleanPayload, 'ReflexTerminal');
+          const success = await terminalBridge.injectAndExecute(
+            null as any,
+            targetSessionId,
+            cleanPayload,
+            'ReflexTerminal'
+          );
           if (success) {
             await updateStimulusStatus(stimulus.id, 'injected', 'injection_success');
           } else {
@@ -301,16 +336,15 @@ async function nexusLoop() {
       }
 
       await scanAndDispatch(channels);
-
     } catch (err: any) {
       logger.error(`[Nexus] Loop Error: ${err.message}`);
     }
-    
-    await new Promise(resolve => setTimeout(resolve, CHECK_INTERVAL_MS));
+
+    await new Promise((resolve) => setTimeout(resolve, CHECK_INTERVAL_MS));
   }
 }
 
-nexusLoop().catch(err => {
+nexusLoop().catch((err) => {
   logger.error(`Nexus Daemon crashed: ${err.message}`);
   process.exit(1);
 });
