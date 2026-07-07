@@ -4,6 +4,7 @@ import { logger } from '../core.js';
 import { pathResolver } from '../path-resolver.js';
 import { derivePipelineStatus } from '../pipeline-contract.js';
 import type { PipelineAdfStep, PipelineStepResult } from '../pipeline-contract.js';
+import { resolveVars as defaultResolveVars } from './logic-utils.js';
 
 const MAX_REF_DEPTH = 10;
 
@@ -75,13 +76,37 @@ export async function executeAdfSteps<Ctx extends Record<string, any> = Record<s
 
     try {
       logger.info(`  ${label} [Step ${state.stepCount}] ${step.type}:${step.op}...`);
+      // Default to the shared template resolver — an identity default made
+      // `{{mission_id}}`-style params silently land as literal paths in every
+      // caller that forgot to pass resolveVars (meeting-followup regression).
       const resolve = (value: any) =>
-        options.resolveVars ? options.resolveVars(value, ctx) : value;
+        options.resolveVars ? options.resolveVars(value, ctx) : defaultResolveVars(value, ctx);
       if (step.type === 'control') {
         if (!handlers.control) {
           throw new Error(`[UNKNOWN_TYPE] Unknown control step op: ${step.op}`);
         }
-        ctx = await handlers.control(step.op, step.params, ctx, runNestedSteps, resolve);
+        const controlResult = await handlers.control(
+          step.op,
+          step.params,
+          ctx,
+          runNestedSteps,
+          resolve
+        );
+        // Honor the adf-engine skip marker (skipAdfStep): a false branch is
+        // recorded as skipped — never as success, and never merged into ctx.
+        if (
+          controlResult &&
+          typeof controlResult === 'object' &&
+          (controlResult as { skipped?: boolean }).skipped === true
+        ) {
+          ctx = ((controlResult as { context?: Ctx }).context ?? ctx) as Ctx;
+          results.push({ op: step.op, status: 'skipped' });
+          logger.info(
+            `  ${label} Step skipped (${step.op}): ${(controlResult as { reason?: string }).reason || ''}`
+          );
+          continue;
+        }
+        ctx = controlResult;
       } else if (step.type === 'capture') {
         ctx = await handlers.capture(step.op, step.params, ctx, resolve);
       } else if (step.type === 'transform') {

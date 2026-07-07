@@ -15,7 +15,11 @@
     ".DS_Store",
     "tmp",
     "temp",
-    ".kyberion"
+    ".kyberion",
+    ".worktrees",
+    ".tmp-mulmoclaude",
+    ".tmp-agency-agents",
+    ".pnpm-store"
   ],
   "ignore_extensions": [
     ".png",

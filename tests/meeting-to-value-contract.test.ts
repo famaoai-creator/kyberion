@@ -219,7 +219,10 @@ describe('meeting-to-value contract', () => {
       message.correlation_id?.startsWith(SLACK_CORRELATION_PREFIX)
     );
     expect(outbox).toHaveLength(2);
-    expect(outbox[0]?.text).toContain('Confirm customer list');
-    expect(outbox[1]?.text).toContain('Prepare the proposal outline');
+    // Both reminders are enqueued within the same millisecond, so listing
+    // order is not deterministic — assert content, not position.
+    const outboxTexts = outbox.map((message) => message?.text || '').join('\n');
+    expect(outboxTexts).toContain('Confirm customer list');
+    expect(outboxTexts).toContain('Prepare the proposal outline');
   });
 });

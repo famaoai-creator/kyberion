@@ -1,16 +1,16 @@
-name: { { APP_NAME } }
+name: __APP_NAME__
 options:
-  bundleIdPrefix: { { BUNDLE_ID } }
+  bundleIdPrefix: __BUNDLE_ID__
   deploymentTarget:
     iOS: '16.0'
 targets:
-  { { APP_NAME } }:
+  __APP_NAME__:
     type: application
     platform: iOS
     sources: [Sources]
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: { { BUNDLE_ID } }
+        PRODUCT_BUNDLE_IDENTIFIER: __BUNDLE_ID__
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
         INFOPLIST_KEY_UILaunchScreen_Generation: YES

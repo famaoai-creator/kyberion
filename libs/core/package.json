@@ -47,10 +47,6 @@
       "types": "./dist/agent-manifest.d.ts",
       "default": "./dist/agent-manifest.js"
     },
-    "./agent-registry": {
-      "types": "./dist/agent-registry.d.ts",
-      "default": "./dist/agent-registry.js"
-    },
     "./agent-provider-resolution": {
       "types": "./dist/agent-provider-resolution.d.ts",
       "default": "./dist/agent-provider-resolution.js"
@@ -58,10 +54,6 @@
     "./agent-runtime-supervisor": {
       "types": "./dist/agent-runtime-supervisor.d.ts",
       "default": "./dist/agent-runtime-supervisor.js"
-    },
-    "./agent-runtime-supervisor-client": {
-      "types": "./dist/agent-runtime-supervisor-client.d.ts",
-      "default": "./dist/agent-runtime-supervisor-client.js"
     },
     "./approval-store": {
       "types": "./dist/approval-store.d.ts",
@@ -766,6 +758,22 @@
     "./work-coordination": {
       "types": "./dist/work-coordination.d.ts",
       "default": "./dist/work-coordination.js"
+    },
+    "./company": {
+      "types": "./dist/company.d.ts",
+      "default": "./dist/company.js"
+    },
+    "./mission-process-task-expansion": {
+      "types": "./dist/mission-process-task-expansion.d.ts",
+      "default": "./dist/mission-process-task-expansion.js"
+    },
+    "./op-input-contracts": {
+      "types": "./dist/op-input-contracts.d.ts",
+      "default": "./dist/op-input-contracts.js"
+    },
+    "./presence-bridge": {
+      "types": "./dist/presence-bridge.d.ts",
+      "default": "./dist/presence-bridge.js"
     }
   },
   "dependencies": {
@@ -775,7 +783,6 @@
     "js-yaml": "^4.1.1",
     "marked": "^12.0.2",
     "openai": "^6.35.0",
-    "fontkit": "^2.0.4",
     "yargs": "^18.0.0"
   }
 }

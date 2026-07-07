@@ -728,7 +728,12 @@ class AgentLifecycleManagerImpl {
 const GLOBAL_KEY = Symbol.for('@kyberion/agent-lifecycle');
 if (!(globalThis as any)[GLOBAL_KEY]) {
   (globalThis as any)[GLOBAL_KEY] = new AgentLifecycleManagerImpl();
-  runtimeSupervisor.startSweep(Number(process.env.KYBERION_RUNTIME_SWEEP_INTERVAL_MS || 30_000));
+  // In an import cycle (runtime-supervisor → … → agent-lifecycle) the
+  // supervisor binding may still be mid-evaluation here; defer the sweep
+  // start one tick so module init order can never crash the process.
+  queueMicrotask(() => {
+    runtimeSupervisor?.startSweep(Number(process.env.KYBERION_RUNTIME_SWEEP_INTERVAL_MS || 30_000));
+  });
 }
 export const agentLifecycle: AgentLifecycleManagerImpl = (globalThis as any)[GLOBAL_KEY];
 

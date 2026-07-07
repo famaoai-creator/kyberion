@@ -49,6 +49,49 @@ const ALLOWED_TEST_SOURCE_IMPORTS = new Map<string, string[]>([
     ['../libs/core/schema-loader.js'],
   ],
   ['tests/weekly-executive-digest-contract.test.ts', ['../libs/core/schema-loader.js']],
+  [
+    'tests/co-business-process-library-contract.test.ts',
+    ['../libs/core/mission-workflow-catalog.js'],
+  ],
+  // Orchestration-worker white-box suites: vi.mock of internal collaborators
+  // (a2a route, supervisor, ledger, task events) requires source-module paths.
+  ...([
+    'tests/agent-collaboration-e2e.test.ts',
+    'tests/best-of-n-judge.test.ts',
+    'tests/code-change-pr-collaboration.test.ts',
+  ].map(
+    (testPath) =>
+      [
+        testPath,
+        [
+          '../libs/core/a2a-bridge.js',
+          '../libs/core/agent-runtime-supervisor.js',
+          '../libs/core/ledger.js',
+          '../libs/core/mission-orchestration-worker.js',
+          '../libs/core/mission-task-events.js',
+          '../libs/core/mission-team-plan-composer.js',
+          '../libs/core/path-resolver.js',
+          '../libs/core/secure-io.js',
+          '../libs/core/work-coordination.js',
+        ],
+      ] as [string, string[]]
+  ) as Array<[string, string[]]>),
+  [
+    'tests/customer-dialogue-e2e.test.ts',
+    [
+      '../libs/core/approval-gate.js',
+      '../libs/core/core.js',
+      '../libs/core/customer-channel-binding.js',
+      '../libs/core/customer-conversation.js',
+      '../libs/core/deal-documents.js',
+      '../libs/core/deal-store.js',
+      '../libs/core/memory-promotion-queue.js',
+      '../libs/core/operator-notifications.js',
+      '../libs/core/ops-alert.js',
+      '../libs/core/reasoning-backend.js',
+      '../libs/core/secure-io.js',
+    ],
+  ],
 ]);
 const ALLOWED_SCRIPT_CANONICAL_ROOT_CWD = new Set<string>([]);
 const ALLOWED_PLUGIN_SATELLITE_CANONICAL_ROOT_CWD = new Set<string>([]);

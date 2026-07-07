@@ -15,7 +15,10 @@ const RUN_ID = Date.now();
 function ensurePersonalFixtures() {
   fs.mkdirSync(path.dirname(IDENTITY_PATH), { recursive: true });
   fs.mkdirSync(path.dirname(LEDGER_PATH), { recursive: true });
-  fs.writeFileSync(IDENTITY_PATH, JSON.stringify({ sovereign: 'test', initialized_at: new Date().toISOString() }, null, 2));
+  fs.writeFileSync(
+    IDENTITY_PATH,
+    JSON.stringify({ sovereign: 'test', initialized_at: new Date().toISOString() }, null, 2)
+  );
   if (!safeExistsSync(LEDGER_PATH)) fs.writeFileSync(LEDGER_PATH, JSON.stringify({}, null, 2));
 }
 
@@ -31,7 +34,6 @@ function readLedger(): Record<string, any> {
 }
 
 describe.sequential('A2A Mission Lifecycle & Trust Engine Integration', () => {
-  
   beforeAll(() => {
     process.env.MISSION_ROLE = 'mission_controller';
     ensurePersonalFixtures();
@@ -39,6 +41,20 @@ describe.sequential('A2A Mission Lifecycle & Trust Engine Integration', () => {
 
   afterAll(() => {
     fs.rmSync(TEST_KNOWLEDGE_ROOT, { recursive: true, force: true });
+    // Missions created via the real mission_controller land in the REAL
+    // personal missions tier — remove this run's fixtures so test debris does
+    // not accumulate in the operator home view.
+    for (const root of [
+      pathResolver.knowledge('personal/missions'),
+      path.join(process.cwd(), 'active', 'archive', 'missions'),
+    ]) {
+      if (!fs.existsSync(root)) continue;
+      for (const entry of fs.readdirSync(root)) {
+        if (entry.includes(`-${RUN_ID}`) && entry.startsWith('MSN-TEST-LIFE-')) {
+          fs.rmSync(path.join(root, entry), { recursive: true, force: true });
+        }
+      }
+    }
   });
 
   beforeEach(() => {
@@ -53,35 +69,35 @@ describe.sequential('A2A Mission Lifecycle & Trust Engine Integration', () => {
     const missionId = `MSN-TEST-LIFE-A2A-${RUN_ID}`;
     // 1. Create Mission
     runMissionController('start', missionId, 'personal');
-    
+
     // 2. Delegate
     runMissionController('delegate', missionId, AGENT_ID, 'MSG-SUCCESS');
-    
+
     // 3. Verify
     runMissionController('verify', missionId, 'verified', 'Good work');
-    
+
     // 4. Check Score
     const ledger = readLedger();
     expect(ledger[AGENT_ID].current_score).toBe(515);
-    
+
     // Cleanup for next test
     runMissionController('finish', missionId);
   }, 60000);
 
   it('Scenario 2: Failure Flow (Rejected & Score Decrease)', async () => {
     const FAIL_MISSION_ID = `MSN-TEST-LIFE-FAIL-${RUN_ID}`;
-    
+
     // 1. Create and Delegate
     runMissionController('start', FAIL_MISSION_ID, 'personal');
     runMissionController('delegate', FAIL_MISSION_ID, AGENT_ID, 'MSG-FAIL');
-    
+
     // 2. Verify with Rejection
     runMissionController('verify', FAIL_MISSION_ID, 'rejected', 'Poor work');
-    
+
     // 3. Check Score after one rejection from the default baseline
     const ledger = readLedger();
     expect(ledger[AGENT_ID].current_score).toBe(480);
-    
+
     runMissionController('finish', FAIL_MISSION_ID);
   }, 60000);
 
@@ -107,7 +123,7 @@ describe.sequential('A2A Mission Lifecycle & Trust Engine Integration', () => {
 
     // 2. Try to delegate a personal mission (Should fail)
     runMissionController('start', GUARD_MISSION_ID, 'personal');
-    
+
     try {
       runMissionController('delegate', GUARD_MISSION_ID, LOW_TRUST_AGENT, 'MSG-X');
       throw new Error('Should have failed due to low trust');
