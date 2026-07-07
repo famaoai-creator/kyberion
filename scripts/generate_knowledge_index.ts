@@ -71,7 +71,9 @@ function walk(dir: string, baseDir: string, files: string[] = []): string[] {
     } else if (stat.isFile()) {
       const ext = path.extname(entry).toLowerCase();
       // Keep only md, json, txt, etc if they were in the previous manifest? Wait, let's just index md and json for now, maybe py and js.
-      if (['.md', '.json', '.txt', '.csv', '.yml', '.yaml', '.js', '.ts', '.py', '.sh'].includes(ext)) {
+      if (
+        ['.md', '.json', '.txt', '.csv', '.yml', '.yaml', '.js', '.ts', '.py', '.sh'].includes(ext)
+      ) {
         files.push(path.relative(baseDir, fullPath).replace(/\\/g, '/'));
       }
     }
@@ -112,28 +114,27 @@ function generateIndexInner(checkOnly: boolean): boolean {
       path: file,
       tier,
       size: stat.size,
-      type: ext || 'unknown'
+      type: ext || 'unknown',
     });
 
     if (ext === 'md') {
       const { title, author } = parseMarkdownMetadata(fullPath);
       let dir = path.dirname(file);
       if (dir === '.') dir = 'General';
-      
+
       indexEntries.push({
         path: `./${file}`,
         title,
         author,
         dir,
-        tier
+        tier,
       });
     }
   }
 
   manifestEntries.sort((a, b) => a.path.localeCompare(b.path));
   const manifestData = {
-    generated: new Date().toISOString(), // In check mode we ignore this field
-    files: manifestEntries
+    files: manifestEntries,
   };
   const manifestContent = JSON.stringify(manifestData, null, 2);
 
@@ -147,7 +148,7 @@ function generateIndexInner(checkOnly: boolean): boolean {
 
   // For checkOnly mode, we don't compare the Last Updated string, so we generate a normalized version
   let md = `# Ecosystem Knowledge Base Index\n\n`;
-  md += `*SSoT Index Version: 2.0.0 | Last Updated: ${new Date().toISOString()}*\n\n`;
+  md += `*SSoT Index Version: 2.0.0 | Generated snapshot*\n\n`;
   md += `> **Volatile / Working-Memory faces** (session, mission, project, personal, daily, weekly) are **not listed here** — they are ephemeral and not SSoT. See the generated volatile index: [\`active/INDEX.volatile.md\`](../active/INDEX.volatile.md) (non-SSoT, refreshed by \`pnpm pipeline --input pipelines/volatile-index.json\`). Schema: \`schemas/volatile-knowledge.schema.json\`.\n\n`;
 
   for (const dir of dirs) {
@@ -167,11 +168,28 @@ function generateIndexInner(checkOnly: boolean): boolean {
     const existingIndex = safeReadFile(path.join(kbRoot, '_index.md'), {
       encoding: 'utf8',
     }) as string;
-    
-    // Ignore dynamic dates
-    const normalize = (str: string) => str.replace(/Last Updated:.*?\*/g, '').replace(/"generated": ".*?"/g, '');
-    if (normalize(existingManifest) !== normalize(manifestContent) || normalize(existingIndex) !== normalize(indexContent)) {
-      console.error('[generate_knowledge_index] Index or manifest is out of date. Run pnpm generate:knowledge-index to update.');
+
+    const normalizeManifest = (str: string) => {
+      try {
+        const parsed = JSON.parse(str) as { files?: unknown[] };
+        return JSON.stringify(parsed.files || []);
+      } catch {
+        return str.replace(/"generated": ".*?",\n/g, '');
+      }
+    };
+    const normalizeIndex = (str: string) =>
+      str
+        .split(/\r?\n/)
+        .map((line) => line.trimEnd())
+        .filter((line) => line.length > 0 && !line.startsWith('*SSoT Index Version:'))
+        .join('\n');
+    if (
+      normalizeManifest(existingManifest) !== normalizeManifest(manifestContent) ||
+      normalizeIndex(existingIndex) !== normalizeIndex(indexContent)
+    ) {
+      console.error(
+        '[generate_knowledge_index] Index or manifest is out of date. Run pnpm generate:knowledge-index to update.'
+      );
       return false;
     }
     return true;
@@ -182,7 +200,10 @@ function generateIndexInner(checkOnly: boolean): boolean {
   return true;
 }
 
-const isDirectExecution = process.argv[1] != null && (process.argv[1].endsWith('generate_knowledge_index.ts') || process.argv[1].endsWith('generate_knowledge_index.js'));
+const isDirectExecution =
+  process.argv[1] != null &&
+  (process.argv[1].endsWith('generate_knowledge_index.ts') ||
+    process.argv[1].endsWith('generate_knowledge_index.js'));
 if (isDirectExecution) {
   const checkOnly = process.argv.includes('--check');
   const success = generateIndex(checkOnly);

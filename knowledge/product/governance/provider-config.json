@@ -1,8 +1,9 @@
 {
   "version": "1.0.0",
   "description": "Agent provider configuration. Defines default provider priority, default model IDs, and lifecycle boot commands. Read by agent-provider-resolution.ts and agent-lifecycle.ts. Edit here to change provider order or upgrade model IDs without code changes.",
-  "default_priority": ["gemini", "claude", "codex", "copilot"],
+  "default_priority": ["agy", "gemini", "claude", "codex", "copilot"],
   "default_models": {
+    "agy": "agy",
     "gemini": "gemini-3.5-flash",
     "claude": "claude-opus-4-8",
     "codex": "gpt-5.5",

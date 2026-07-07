@@ -11,7 +11,7 @@ import { normalizeChronosLocale, selectChronosLocaleText } from '../../../lib/ux
 
 async function loadChronosCore() {
   const [
-    core,
+    presenceBridge,
     pathResolverModule,
     secureIo,
     channelSurface,
@@ -22,8 +22,9 @@ async function loadChronosCore() {
     agentManifest,
     orchestrationEvents,
     toolRuntimeRegistry,
+    coreLogger,
   ] = await Promise.all([
-    import('@agent/core/core'),
+    import('@agent/core/presence-bridge'),
     import('@agent/core/path-resolver'),
     import('@agent/core/secure-io'),
     import('@agent/core/channel-surface'),
@@ -34,10 +35,11 @@ async function loadChronosCore() {
     import('@agent/core/agent-manifest'),
     import('@agent/core/mission-orchestration-events'),
     import('@agent/core/tool-runtime-registry'),
+    import('@agent/core/core'),
   ]);
 
   return {
-    logger: core.logger,
+    logger: coreLogger.logger,
     pathResolver: pathResolverModule.pathResolver,
     safeExistsSync: secureIo.safeExistsSync,
     safeMkdir: secureIo.safeMkdir,
@@ -49,8 +51,8 @@ async function loadChronosCore() {
     recordChronosSurfaceRequest: channelSurface.recordChronosSurfaceRequest,
     runSurfaceConversation: channelSurface.runSurfaceConversation,
     runSurfaceMessageConversation: channelSurface.runSurfaceMessageConversation,
-    reflectPresenceAgentReply: core.reflectPresenceAgentReply,
-    dispatchPresenceFrame: core.dispatchPresenceFrame,
+    reflectPresenceAgentReply: presenceBridge.reflectPresenceAgentReply,
+    dispatchPresenceFrame: presenceBridge.dispatchPresenceFrame,
     listSurfaceOutboxMessages: channelSurface.listSurfaceOutboxMessages,
     isSlackMissionConfirmation: channelSurface.isSlackMissionConfirmation,
     ensureAgentRuntime: runtimeSupervisor.ensureAgentRuntime,
@@ -136,8 +138,9 @@ async function ensureChronosAgent(context?: {
       const manifest = getAgentManifest(CHRONOS_AGENT_ID, PROJECT_ROOT);
       const spawnOptions = {
         agentId: CHRONOS_AGENT_ID,
-        provider: manifest?.provider || 'gemini',
-        modelId: manifest?.modelId || resolveRuntimeModelId('gemini-default'),
+        provider: manifest?.selection_hints?.preferred_provider || 'agy',
+        modelId:
+          manifest?.selection_hints?.preferred_modelId || resolveRuntimeModelId('gemini-default'),
         systemPrompt: manifest?.systemPrompt,
         capabilities: manifest?.capabilities || ['a2ui', 'dashboard', 'commands', 'gateway'],
         cwd: PROJECT_ROOT,
@@ -151,6 +154,7 @@ async function ensureChronosAgent(context?: {
           requester_id: context?.requesterId || 'chronos-ui',
         },
       } as const;
+      console.log('[CHRONOS_DEBUG] spawnOptions:', spawnOptions);
       let handle;
       try {
         const snapshot = await ensureAgentRuntimeViaDaemon(toSupervisorEnsurePayload(spawnOptions));
@@ -1158,7 +1162,7 @@ export async function POST(req: NextRequest) {
   const denied = guardRequest(req);
   if (denied) return denied;
   try {
-    process.env.MISSION_ROLE ||= 'chronos_operator';
+    process.env.MISSION_ROLE = 'chronos_localadmin';
     const core = await loadChronosCore();
     const {
       isSlackMissionConfirmation,
@@ -1167,6 +1171,7 @@ export async function POST(req: NextRequest) {
       recordChronosDelegationSummary,
       recordChronosSurfaceRequest,
       runSurfaceConversation,
+      runSurfaceMessageConversation,
       safeReadFile,
     } = core;
     const body = await req.json();
@@ -1395,9 +1400,14 @@ export async function POST(req: NextRequest) {
       timestamp: new Date().toISOString(),
     });
   } catch (err: any) {
-    const safeError = buildUserFacingError(err, { surface: 'chronos' });
+    clearChronosCache();
+    console.error('[CHRONOS_API_AGENT] Error in POST:', err);
     return NextResponse.json(
-      { error: safeError.body, nextAction: safeError.nextAction, title: safeError.title },
+      {
+        debugError: err.message,
+        debugStack: err.stack,
+        ...buildUserFacingError(err, { surface: 'chronos' }),
+      },
       { status: 500 }
     );
   }

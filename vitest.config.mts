@@ -1,11 +1,48 @@
 import { defineConfig } from 'vitest/config';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url));
 
+function preferTypeScriptSourceForJsImports() {
+  return {
+    name: 'prefer-typescript-source-for-js-imports',
+    enforce: 'pre' as const,
+    resolveId(source: string, importer?: string) {
+      if (!importer) return null;
+      if (!source.startsWith('.') || (!source.endsWith('.js') && !source.endsWith('.mjs'))) {
+        return null;
+      }
+
+      const importerPath = importer.startsWith('file://')
+        ? fileURLToPath(importer)
+        : importer;
+      const resolved = path.resolve(path.dirname(importerPath), source);
+      const base = resolved.slice(0, resolved.lastIndexOf('.'));
+      const candidates = [
+        `${base}.ts`,
+        `${base}.mts`,
+        `${base}.tsx`,
+        path.join(path.dirname(base), 'index.ts'),
+        path.join(path.dirname(base), 'index.mts'),
+        path.join(path.dirname(base), 'index.tsx'),
+      ];
+
+      for (const candidate of candidates) {
+        if (fs.existsSync(candidate)) {
+          return candidate;
+        }
+      }
+
+      return null;
+    },
+  };
+}
+
 export default defineConfig({
   cacheDir: 'node_modules/.vitest',
+  plugins: [preferTypeScriptSourceForJsImports()],
   test: {
     include: [
       '**/src/**/*.test.ts',

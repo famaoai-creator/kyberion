@@ -15,9 +15,7 @@
     },
     "knowledge_core": {
       "description": "Governed knowledge and architecture assets.",
-      "allow_prefixes": [
-        "knowledge/"
-      ]
+      "allow_prefixes": ["knowledge/"]
     },
     "codebase_core": {
       "description": "Core implementation and automation code.",
@@ -32,10 +30,7 @@
     },
     "project_delivery": {
       "description": "Project-local delivery artifacts and outputs.",
-      "allow_prefixes": [
-        "active/projects/",
-        "active/shared/exports/"
-      ]
+      "allow_prefixes": ["active/projects/", "active/shared/exports/"]
     },
     "tenant_confidential": {
       "description": "Tenant-specific confidential knowledge and assets.",
@@ -49,39 +44,29 @@
       "allow_prefixes": [
         "presence/bridge/runtime/",
         "active/shared/coordination/channels/",
-        "active/shared/coordination/chronos/"
+        "active/shared/coordination/chronos/",
+        "active/shared/inbox/"
       ]
     },
     "operations_runtime": {
       "description": "Operational runtime state and terminal resources.",
-      "allow_prefixes": [
-        "active/shared/runtime/",
-        "active/shared/logs/"
-      ]
+      "allow_prefixes": ["active/shared/runtime/", "active/shared/logs/"]
     },
     "observability": {
       "description": "Observability and metrics traces.",
-      "allow_prefixes": [
-        "active/shared/observability/"
-      ]
+      "allow_prefixes": ["active/shared/observability/"]
     },
     "audit": {
       "description": "Audit and governance traces.",
-      "allow_prefixes": [
-        "active/audit/"
-      ]
+      "allow_prefixes": ["active/audit/"]
     },
     "confidential_heuristics": {
       "description": "Personal judgment heuristics captured by intuition-capture missions. Intended writers: decision_support missions with subtype=intuition_capture. Mission-aware enforcement deferred to preflight layer.",
-      "allow_prefixes": [
-        "knowledge/confidential/heuristics/"
-      ]
+      "allow_prefixes": ["knowledge/confidential/heuristics/"]
     },
     "confidential_relationships": {
       "description": "Structured relationship-graph nodes (trust_level, history, communication_style, ng_topics, outstanding_asks). Intended writers: presence-actuator and voice-actuator hooks only. Actuator-aware enforcement deferred to runtime.",
-      "allow_prefixes": [
-        "knowledge/confidential/relationships/"
-      ]
+      "allow_prefixes": ["knowledge/confidential/relationships/"]
     }
   }
 }

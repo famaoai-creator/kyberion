@@ -1,0 +1,44 @@
+{
+  "action": "pipeline",
+  "name": "music-video-compose-fragment",
+  "version": "1.0.0",
+  "description": "Reusable fragment: writes the content brief and storyboard video action JSON, invokes the video-composition-actuator, and validates the output. Required context vars: content_brief_path, content_brief_data, video_action_path, video_action_data, video_output_path, video_bundle_dir, music_path, video_slug, mission_evidence_dir.",
+  "steps": [
+    {
+      "id": "write_content_brief",
+      "role": "sink",
+      "op": "system:write_file",
+      "params": {
+        "path": "{{content_brief_path}}",
+        "content": "{{content_brief_data}}",
+        "format": "json"
+      }
+    },
+    {
+      "id": "write_video_action",
+      "role": "sink",
+      "op": "system:write_file",
+      "params": {
+        "path": "{{video_action_path}}",
+        "content": "{{video_action_data}}",
+        "format": "json"
+      }
+    },
+    {
+      "id": "generate_video",
+      "role": "source",
+      "op": "system:shell",
+      "produces": { "channel": "video_result", "type": "ShellResult" },
+      "params": {
+        "cmd": "node dist/libs/actuators/video-composition-actuator/src/index.js --input {{video_action_path}}",
+        "timeout_ms": 900000
+      }
+    },
+    {
+      "id": "validate",
+      "role": "gate",
+      "op": "core:include",
+      "params": { "fragment": "fragments/narrated-video-validate.json" }
+    }
+  ]
+}
