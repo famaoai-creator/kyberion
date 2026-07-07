@@ -1,0 +1,8 @@
+{
+  "sovereign": "TBD",
+  "initialized_at": "YYYY-MM-DDTHH:MM:SS.sssZ",
+  "language": "ja",
+  "interaction_style": "concise",
+  "specialties": [],
+  "notes": "Mirrors knowledge/personal/my-identity.json. Edit during pnpm onboard, not by hand."
+}

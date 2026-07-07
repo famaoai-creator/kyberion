@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "surfaces": [
+    {
+      "id": "concierge",
+      "kind": "ui",
+      "description": "Concierge (秘書室) — CEO executive-secretary surface: intent inbox, approval queue, outcome feed, exception feed",
+      "command": "pnpm",
+      "args": ["--dir", "presence/displays/concierge", "start", "-H", "127.0.0.1", "-p", "3050"],
+      "cwd": ".",
+      "shutdownPolicy": "detached",
+      "startupMode": "workspace-app",
+      "ownerType": "surface-runtime-manifest",
+      "port": 3050,
+      "healthPath": "/api/summary",
+      "enabled": true
+    }
+  ]
+}

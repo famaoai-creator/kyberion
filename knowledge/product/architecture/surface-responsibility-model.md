@@ -75,20 +75,39 @@ It should not become:
 - the only artifact viewer
 - a replacement for mission authority
 
-### 3.3 CEO UX
+### 3.3 CEO UX — Concierge (秘書室)
 
-The CEO UX is the leadership decision surface.
+The CEO UX is the leadership decision surface. It is implemented as the
+**concierge** app (`presence/displays/concierge`, port 3050) — the CEO's
+executive secretary.
 
 Its job is to:
 
-- receive high-level intent
-- show waiting approvals
-- show current company-level outcomes
-- surface major exceptions
+- receive high-level intent (Intent Inbox)
+- show waiting approvals (Approval Queue)
+- show current company-level outcomes (Outcome Feed)
+- surface major exceptions (Exception Feed)
 
-The CEO UX should feel like a strategic dashboard and approval inbox.
+The concierge should feel like a strategic dashboard and approval inbox run
+by a competent secretary: polite Japanese microcopy, a daily briefing, and
+nothing that requires knowledge of the execution machinery.
 
 It should not expose low-level execution machinery by default.
+
+### 3.3b Operator Surface (監査モニタ)
+
+The operator surface (`presence/displays/operator-surface`, port 3331) is the
+**read-only audit monitor**: missions, audit chain, health, inbox inspection.
+It answers "what happened, with evidence" for operators, compliance, and
+anyone who must verify without the ability to mutate. Its no-write contract is
+enforced by tests; the single exception is inbox read/accept marking.
+
+### 3.3c Computer Surface (作業の手元ミラー)
+
+The computer surface (`presence/displays/computer-surface`, port 3040) is the
+**hands mirror**: a passive live view of what Kyberion's browser/terminal
+executors are doing right now (A2UI state sink). It never initiates work;
+control lives in Chronos and Presence Studio.
 
 ### 3.4 Thread-First Messaging
 
@@ -115,18 +134,18 @@ Avoid `Current user message` when the message may have come from someone other t
 
 ## 4. Responsibility Table
 
-| Responsibility | Presence Studio | Chronos | CEO UX |
-| --- | --- | --- | --- |
-| Natural language request intake | Primary | Secondary | Secondary |
-| Slot filling and clarifications | Primary | Rare | Rare |
-| Short plan display | Primary | Secondary | Summary only |
-| Current work detail | Primary | Secondary | Minimal |
-| Project overview | Secondary | Primary | Summary only |
-| Mission seed management | Secondary | Primary | No |
-| Approval queue | Secondary | Primary | Primary |
-| Risk and runtime inspection | No | Primary | Summary only |
-| Artifact delivery | Primary | Secondary | Summary only |
-| Audit and evidence drill-down | No | Primary | Linked only |
+| Responsibility                  | Presence Studio (相棒) | Chronos (管制塔) | Concierge (CEO秘書)     | Operator Surface (監査モニタ) | Computer Surface (手元ミラー) |
+| ------------------------------- | ---------------------- | ---------------- | ----------------------- | ----------------------------- | ----------------------------- |
+| Natural language request intake | Primary                | Secondary        | Secondary               | No                            | No                            |
+| Slot filling and clarifications | Primary                | Rare             | Rare                    | No                            | No                            |
+| Short plan display              | Primary                | Secondary        | Summary only            | Read-only                     | No                            |
+| Current work detail             | Primary                | Secondary        | Minimal                 | Read-only                     | Live mirror                   |
+| Project overview                | Secondary              | Primary          | Summary only            | Read-only                     | No                            |
+| Mission seed management         | Secondary              | Primary          | No                      | No                            | No                            |
+| Approval queue                  | Secondary              | Primary          | Primary                 | No                            | No                            |
+| Risk and runtime inspection     | No                     | Primary          | Summary only            | Read-only                     | Live mirror                   |
+| Artifact delivery               | Primary                | Secondary        | Verdict (受領/差し戻し) | Read-only                     | No                            |
+| Audit and evidence drill-down   | No                     | Primary          | Linked only             | Primary                       | No                            |
 
 ## 5. Authority Boundaries
 

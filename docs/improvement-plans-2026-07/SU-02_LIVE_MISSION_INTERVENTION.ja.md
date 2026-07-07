@@ -46,3 +46,7 @@
 - cancel/abort は実行中の外部副作用(ファイル書き込み・送信)を中途半端に残し得る。安全な打ち切り点(タスク境界)でのみ停止し、進行中のアクチュエータ呼び出しは完了を待つか明示的にロールバック方針を示す。
 - pause 中の long-lived runtime のアイドル回収(AA-01)と競合しないよう、paused は idle-reap の例外にする。
 - 介入操作は localadmin ロール限定(既存の権限モデル `api/intelligence/route.ts:1573` を踏襲)。
+
+## 実装メモ 追記 (2026-07-06)
+
+- SR-01 にて介入配線を実装: `A2UIRenderer` に `onAction` コールバックを追加し、`kb-intervention-panel` のボタンが `approval_id` → `/api/intelligence action=approval_decision`、`mission_id` → `action=intervention_respond` を実行するようになった(`page.tsx handleA2UIComponentAction`)。plan-preview の確認事項パネルはクリックで依頼文に回答欄を追記。`kb-artifact-tile` は open/preview で mission-asset を開く。
