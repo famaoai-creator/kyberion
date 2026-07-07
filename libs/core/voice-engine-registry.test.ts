@@ -57,6 +57,13 @@ describe('voice engine registry', () => {
     expect(engine.supports.artifact_formats).toEqual(['wav']);
   });
 
+  it('exposes the Gemini TTS engine metadata', () => {
+    const engine = getVoiceEngineRecord('gemini_tts');
+    expect(engine.engine_id).toBe('gemini_tts');
+    expect(engine.provider).toBe('gemini_api');
+    expect(engine.supports.artifact_formats).toEqual(['wav']);
+  });
+
   it('falls back to default when unknown engine id is requested', () => {
     const engine = resolveVoiceEngineForPlatform('unknown-engine', 'linux');
     expect(engine.engine_id).toBe('local_say');

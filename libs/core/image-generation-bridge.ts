@@ -3,6 +3,7 @@ import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExecResult, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import { executeServicePreset } from './service-engine.js';
+import { resolveServiceBinding } from './service-binding.js';
 import { resolveLocalFluxGenerationPolicy } from './image-generation-policy.js';
 import { probeToolRuntime } from './tool-runtime-registry.js';
 import { probeServiceRuntime } from './service-runtime-registry.js';
@@ -179,6 +180,65 @@ export class ComfyUiImageGenerationProvider implements ImageGenerationProvider {
   }
 }
 
+export class GeminiServiceImageGenerationProvider implements ImageGenerationProvider {
+  readonly id = 'gemini_service';
+
+  async isAvailable(): Promise<boolean> {
+    if (!process.env.GEMINI_API_KEY && !process.env.GOOGLE_API_KEY) return false;
+    try {
+      resolveServiceBinding('gemini', 'secret-guard');
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  async generate(request: ImageGenerationRequest): Promise<ImageGenerationResult> {
+    const startedAt = Date.now();
+    try {
+      const response = await executeServicePreset(
+        'gemini',
+        'generate_image',
+        {
+          prompt: request.prompt,
+          aspect_ratio: request.aspectRatio || '1:1',
+        },
+        'secret-guard',
+      );
+
+      const imageBytes =
+        typeof response === 'string'
+          ? response
+          : (response as any)?.imageBytes
+            || (response as any)?.generatedImages?.[0]?.image?.imageBytes
+            || (response as any)?.result?.imageBytes;
+
+      if (!imageBytes || typeof imageBytes !== 'string') {
+        throw new Error('Gemini image service returned no image bytes');
+      }
+
+      const targetPath = getFallbackTargetPath(request);
+      const buffer = Buffer.from(imageBytes, 'base64');
+      safeWriteFile(targetPath, buffer);
+
+      return {
+        status: 'succeeded',
+        provider: this.id,
+        path: targetPath,
+        elapsedMs: Date.now() - startedAt,
+      };
+    } catch (error: any) {
+      logger.error(`[image_generation_bridge] Gemini service generation failed: ${error.message}`);
+      return {
+        status: 'failed',
+        provider: this.id,
+        elapsedMs: Date.now() - startedAt,
+        error: error.message || 'gemini_image_generation_failed',
+      };
+    }
+  }
+}
+
 export class LlmApiImageGenerationProvider implements ImageGenerationProvider {
   readonly id = 'llm_api';
 
@@ -349,10 +409,10 @@ export class AdaptivePolicyRouter {
     if (mode === 'local_only' || mode === 'privacy_first') {
       defaultChain = ['local_flux', 'local_diffusion', 'comfyui'];
     } else if (mode === 'artistic') {
-      defaultChain = ['llm_api', 'local_flux', 'comfyui'];
+      defaultChain = ['gemini_service', 'llm_api', 'local_flux', 'comfyui'];
     } else {
       // balanced
-      defaultChain = ['local_flux', 'comfyui', 'llm_api'];
+      defaultChain = ['local_flux', 'comfyui', 'gemini_service', 'llm_api'];
     }
 
     for (const id of defaultChain) {
@@ -372,6 +432,7 @@ function getRouter(): AdaptivePolicyRouter {
   if (!globalRouter) {
     globalRouter = new AdaptivePolicyRouter([
       new ComfyUiImageGenerationProvider(),
+      new GeminiServiceImageGenerationProvider(),
       new LlmApiImageGenerationProvider(),
       new LocalFluxImageGenerationProvider(),
       new LocalDiffusionImageGenerationProvider()
