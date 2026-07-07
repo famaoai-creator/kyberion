@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pathResolver, safeReadFile } from '../libs/core/index.js';
+import { pathResolver, safeReadFile } from '@agent/core';
 
 describe('generate_op_registry discovery output', () => {
   it('includes input schemas and examples for contract-backed ops', () => {
