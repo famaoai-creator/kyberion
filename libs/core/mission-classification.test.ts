@@ -63,6 +63,71 @@ describe('mission-classification', () => {
     );
   });
 
+  it('routes presentation/document production hints into content_and_media (MO-01)', () => {
+    const presentation = resolveMissionClassification({
+      missionTypeHint: 'presentation_production',
+    });
+    const document = resolveMissionClassification({
+      missionTypeHint: 'document_production',
+    });
+
+    expect(presentation.mission_class).toBe('content_and_media');
+    expect(presentation.matched_rules.mission_class_rule_id).toBe(
+      'class-content-media-presentation-hint'
+    );
+    expect(document.mission_class).toBe('content_and_media');
+  });
+
+  it('routes incident analysis hints and intents into operations_and_release (MO-01)', () => {
+    const byHint = resolveMissionClassification({ missionTypeHint: 'incident_analysis' });
+    const byIntent = resolveMissionClassification({ intentId: 'incident-analysis' });
+
+    expect(byHint.mission_class).toBe('operations_and_release');
+    expect(byIntent.mission_class).toBe('operations_and_release');
+  });
+
+  it('routes presentation utterances into content_and_media (MO-01)', () => {
+    const classification = resolveMissionClassification({
+      utterance: '顧客向けの提案書パワーポイントを作成したい',
+    });
+
+    expect(classification.mission_class).toBe('content_and_media');
+  });
+
+  it('routes the new business process hints onto their mission classes (MO-01)', () => {
+    const expectations: Array<[string, string]> = [
+      ['research_report', 'research_and_absorption'],
+      ['data_analysis', 'decision_support'],
+      ['marketing_campaign', 'content_and_media'],
+      ['contract_review', 'decision_support'],
+      ['customer_onboarding', 'customer_engagement'],
+      ['training_material', 'content_and_media'],
+      ['event_planning', 'operations_and_release'],
+    ];
+    for (const [hint, expectedClass] of expectations) {
+      const classification = resolveMissionClassification({ missionTypeHint: hint });
+      expect(classification.mission_class, `hint ${hint}`).toBe(expectedClass);
+    }
+  });
+
+  it('routes event planning onto a multi-artifact delivery shape', () => {
+    const classification = resolveMissionClassification({ missionTypeHint: 'event_planning' });
+    expect(classification.delivery_shape).toBe('multi_artifact_pipeline');
+  });
+
+  it('routes business process utterances onto their mission classes (MO-01)', () => {
+    expect(
+      resolveMissionClassification({ utterance: '来期に向けた市場調査レポートをまとめたい' })
+        .mission_class
+    ).toBe('research_and_absorption');
+    expect(
+      resolveMissionClassification({ utterance: '新製品の研修資料を作成してほしい' }).mission_class
+    ).toBe('content_and_media');
+    expect(
+      resolveMissionClassification({ utterance: '委託契約書の確認をお願いしたい' }).mission_class
+    ).toBe('decision_support');
+  });
+
   it('maps mission class to existing mission team templates', () => {
     expect(mapMissionClassToMissionTypeTemplate('product_delivery')).toBe('product_development');
     expect(mapMissionClassToMissionTypeTemplate('operations_and_release')).toBe('operations');
