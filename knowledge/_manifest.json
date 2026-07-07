@@ -7,6 +7,48 @@
       "type": "md"
     },
     {
+      "path": "evolution/distill_board-protocol-commonization-2026-04-30_2026_04_29.md",
+      "tier": "public",
+      "size": 1231,
+      "type": "md"
+    },
+    {
+      "path": "evolution/distill_browser-direct-reply-commonization-2026-04-29_2026_04_29.md",
+      "tier": "public",
+      "size": 951,
+      "type": "md"
+    },
+    {
+      "path": "evolution/distill_msn-executive-pipelines_2026_05_02.md",
+      "tier": "public",
+      "size": 1995,
+      "type": "md"
+    },
+    {
+      "path": "evolution/distill_production-evidence-local-artifact-refs_2026_05_15.md",
+      "tier": "public",
+      "size": 1253,
+      "type": "md"
+    },
+    {
+      "path": "evolution/distill_production-evidence-register-text-nonblank_2026_05_15.md",
+      "tier": "public",
+      "size": 1255,
+      "type": "md"
+    },
+    {
+      "path": "evolution/distill_production-receipt-malformed-timestamps_2026_05_15.md",
+      "tier": "public",
+      "size": 1348,
+      "type": "md"
+    },
+    {
+      "path": "evolution/distill_resilience-actuators-v1_2026_05_11.md",
+      "tier": "public",
+      "size": 1337,
+      "type": "md"
+    },
+    {
       "path": "product/agents/chronos-mirror.agent.md",
       "tier": "public",
       "size": 6866,
