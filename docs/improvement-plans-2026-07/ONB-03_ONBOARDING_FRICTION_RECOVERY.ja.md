@@ -12,6 +12,10 @@
 - **Path B が薄い**: `onboard:apply` は完全な identity JSON 必須(部分不可・既定なし、`onboarding_apply.ts:79-93`)。README/QUICKSTART に記載が無く(INITIALIZATION のみ)、サンプル identity JSON も同梱されない。エージェント運用リポなのにエージェント向け入口が埋もれている。`--dry-run`(`:256-258`)は良い。
 - **vital-check.json が personal ハードコード**: `p_identity`/`p_vision` ステップが `knowledge/personal/my-identity.json`/`my-vision.md` を直参照。`KYBERION_CUSTOMER` オーバーレイで正常オンボードしても vital が Identity/Vision を「欠落」と誤報(UX-06 が名指ししていない別ファイル。Chronos `api/identity/route.ts:47` も同じハードコードで FirstRunBanner がオーバーレイで不可視になる)。
 
+### 実装メモ
+
+- 2026-07-07: `pnpm onboard:reset` を追加。`onboarding/`、`my-identity.json`、`my-vision.md`、`agent-identity.json` を customer overlay / personal root の両方で安全に削除できるようにした。`--force` で無確認、TTY では確認プロンプトを出す。
+
 ## ゴール(受入条件)
 
 1. 対話ウィザードに **express パス**(`--express` or 冒頭で「既定で進めて後で調整しますか?」)があり、identity 最小(名前・言語のみ)で "Welcome aboard" まで最短到達、残りは後から設定可能。

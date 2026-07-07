@@ -170,6 +170,7 @@ pnpm onboard
 - **目的**: 主権者の名前、言語、対話スタイル、専門分野、vision をシステムに記憶させます。
 - **非対話環境の場合**: TTY が無い環境では `pnpm onboard` は exit 2 で停止します。代わりに以下のいずれかを使用:
   - `pnpm onboard:apply --identity <path/to/identity.json>` — JSON ファイルからアイデンティティを適用（Path B）
+  - `pnpm onboard:reset` — onboarding state と生成 identity/vision/agent 成果物を削除してやり直す
   - エージェントが直接 `customer/{slug}/` を優先し、未設定時のみ `knowledge/personal/` 配下のスキーマ準拠ファイルを書き込み
   - `KYBERION_ONBOARDING_NON_INTERACTIVE_OK=1 pnpm onboard` — 意図的に default 値で進める（評価環境向け）
 - **物理的変化**:
