@@ -48,16 +48,16 @@ describe('onboarding_reset', () => {
         path.join(profileRoot, 'my-identity.json'),
         path.join(profileRoot, 'my-vision.md'),
         path.join(profileRoot, 'agent-identity.json'),
-        path.join(profileRoot, 'connections'),
-        path.join(profileRoot, 'tenants'),
       ])
     );
     expect(safeExistsSync(path.join(profileRoot, 'onboarding'))).toBe(false);
     expect(safeExistsSync(path.join(profileRoot, 'my-identity.json'))).toBe(false);
     expect(safeExistsSync(path.join(profileRoot, 'my-vision.md'))).toBe(false);
     expect(safeExistsSync(path.join(profileRoot, 'agent-identity.json'))).toBe(false);
-    expect(safeExistsSync(path.join(profileRoot, 'connections'))).toBe(false);
-    expect(safeExistsSync(path.join(profileRoot, 'tenants'))).toBe(false);
+    expect(safeExistsSync(path.join(profileRoot, 'connections'))).toBe(true);
+    expect(safeExistsSync(path.join(profileRoot, 'connections/slack.json'))).toBe(true);
+    expect(safeExistsSync(path.join(profileRoot, 'tenants'))).toBe(true);
+    expect(safeExistsSync(path.join(profileRoot, 'tenants/acme.json'))).toBe(true);
     expect(safeReadFile(path.join(profileRoot, 'notes.txt'), { encoding: 'utf8' })).toBe('keep me');
     expect(formatResetSummary(result)).toContain('Onboarding reset complete.');
   });
