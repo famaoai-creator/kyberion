@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import * as path from 'node:path';
 import { pathResolver, safeReadFile } from '@agent/core';
-import { buildApplySummary, buildState, buildSummary, validateInput } from './onboarding_apply.js';
+import {
+  buildApplySummary,
+  buildState,
+  buildSummary,
+  readInput,
+  validateInput,
+} from './onboarding_apply.js';
 
 const ROOT = pathResolver.rootDir();
 
@@ -47,6 +53,12 @@ describe('onboarding_apply', () => {
         tenants: [{ ...FIXTURE_INPUT.tenants[0], tenant_slug: 'INVALID_SLUG' }],
       })
     ).toThrow('Invalid tenant_slug');
+  });
+
+  it('points missing identity files to the onboarding template', async () => {
+    await expect(readInput('knowledge/public/templates/onboarding/missing.json')).rejects.toThrow(
+      'knowledge/public/templates/onboarding/identity.example.json'
+    );
   });
 
   it('builds a summary and state from the onboarding input', () => {

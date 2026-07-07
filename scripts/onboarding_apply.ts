@@ -25,6 +25,7 @@ import {
 
 const AjvCtor: any = (AjvModule as any).default || (AjvModule as any);
 const addFormats: any = (AjvFormats as any).default || AjvFormats;
+const ONBOARDING_IDENTITY_EXAMPLE = 'knowledge/public/templates/onboarding/identity.example.json';
 
 interface ApplyInput {
   identity: {
@@ -69,12 +70,18 @@ export function ensureDir(p: string) {
 
 export async function readInput(file?: string): Promise<ApplyInput> {
   if (file) {
-    if (!safeExistsSync(file)) throw new Error(`identity file not found: ${file}`);
+    if (!safeExistsSync(file)) {
+      throw new Error(
+        `identity file not found: ${file}. Copy ${ONBOARDING_IDENTITY_EXAMPLE} and retry, or use --dry-run first.`
+      );
+    }
     return JSON.parse(safeReadFile(file, { encoding: 'utf8' }) as string) as ApplyInput;
   }
   // stdin fallback
   if (process.stdin.isTTY) {
-    throw new Error('No --identity given and stdin is a TTY. Pipe JSON or pass --identity <path>.');
+    throw new Error(
+      `No --identity given and stdin is a TTY. Pipe JSON or pass --identity <path>. Example: ${ONBOARDING_IDENTITY_EXAMPLE}. Use --dry-run first if you want to validate the payload.`
+    );
   }
   const chunks: Buffer[] = [];
   for await (const chunk of process.stdin) chunks.push(chunk as Buffer);
@@ -82,11 +89,13 @@ export async function readInput(file?: string): Promise<ApplyInput> {
 }
 
 export function validateInput(input: ApplyInput) {
-  if (!input?.identity) throw new Error('identity block is required');
+  if (!input?.identity) {
+    throw new Error(`identity block is required. See ${ONBOARDING_IDENTITY_EXAMPLE}.`);
+  }
   const { name, language, interaction_style, primary_domain, vision, agent_id } = input.identity;
   if (!name || !language || !interaction_style || !primary_domain || !vision || !agent_id) {
     throw new Error(
-      'identity requires {name, language, interaction_style, primary_domain, vision, agent_id}'
+      `identity requires {name, language, interaction_style, primary_domain, vision, agent_id}. See ${ONBOARDING_IDENTITY_EXAMPLE}.`
     );
   }
   if (!['Senior Partner', 'Concierge', 'Minimalist'].includes(interaction_style)) {
