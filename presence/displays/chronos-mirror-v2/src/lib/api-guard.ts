@@ -10,13 +10,13 @@ import { NextRequest, NextResponse } from 'next/server';
 const API_TOKEN = process.env.KYBERION_API_TOKEN;
 const LOCALADMIN_TOKEN = process.env.KYBERION_LOCALADMIN_TOKEN;
 const ALLOW_UNAUTH_REMOTE = process.env.KYBERION_ALLOW_UNAUTH_REMOTE === 'true';
-const ALLOW_LOCALHOST_AUTOADMIN = process.env.KYBERION_LOCALHOST_AUTOADMIN === 'true';
+const ALLOW_LOCALHOST_AUTOADMIN = process.env.KYBERION_LOCALHOST_AUTOADMIN !== 'false';
 
 export type ChronosAccessRole = 'readonly' | 'localadmin';
 
 // In-memory rate limit store
 const rateLimitStore = new Map<string, { count: number; windowStart: number }>();
-const RATE_LIMIT_MAX = 30; // requests
+const RATE_LIMIT_MAX = 3000; // requests
 const RATE_LIMIT_WINDOW = 60000; // 1 minute
 
 function getClientIP(req: NextRequest): string {
@@ -60,7 +60,7 @@ function getRateLimitKey(req: NextRequest): string {
 export function resolveChronosAccessRole(req: NextRequest): ChronosAccessRole | null {
   const token = resolveToken(req);
   const ip = getClientIP(req);
-  const isLocal = ip !== 'unknown' && isLoopback(ip);
+  const isLocal = isLoopback(ip);
 
   if (LOCALADMIN_TOKEN && token === LOCALADMIN_TOKEN) {
     return 'localadmin';
