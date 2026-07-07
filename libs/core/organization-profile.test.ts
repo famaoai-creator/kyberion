@@ -65,8 +65,8 @@ describe('organization-profile', () => {
           },
         },
         null,
-        2,
-      ),
+        2
+      )
     );
 
     const profile = loadOrganizationProfile(overlayRoot);
@@ -96,7 +96,8 @@ describe('organization-profile', () => {
           version: '1.0.0',
           organization_id: 'demo-org',
           name: 'Demo Org',
-          description: 'Demonstration organization profile for development-oriented mission composition.',
+          description:
+            'Demonstration organization profile for development-oriented mission composition.',
           operating_principles: [
             'Prefer compact teams for early-stage development.',
             'Use organization overlays to specialize mission templates without forking the base catalog.',
@@ -125,8 +126,8 @@ describe('organization-profile', () => {
           },
         },
         null,
-        2,
-      ),
+        2
+      )
     );
 
     const profile = loadOrganizationProfile(demoRoot);
@@ -162,8 +163,8 @@ describe('organization-profile', () => {
           },
         },
         null,
-        2,
-        ),
+        2
+      )
     );
 
     const profile = loadOrganizationProfile(alternateRoot);
@@ -176,11 +177,18 @@ describe('organization-profile', () => {
     const catalogs = listOrganizationMissionTeamTemplateCatalogSummaries();
 
     expect(catalogs.map((catalog) => catalog.catalog_id)).toEqual([
+      'consulting-firm',
       'default',
       'demo-org',
+      'financial-services-backoffice',
+      'it-managed-services',
+      'marketing-agency',
       'ops-org',
+      'saas-product-company',
     ]);
-    expect(catalogs.find((catalog) => catalog.catalog_id === 'demo-org')?.template_ids).toContain('development');
+    expect(catalogs.find((catalog) => catalog.catalog_id === 'demo-org')?.template_ids).toContain(
+      'development'
+    );
     expect(catalogs.find((catalog) => catalog.catalog_id === 'ops-org')?.template_ids).toEqual([
       'incident',
       'operations',
