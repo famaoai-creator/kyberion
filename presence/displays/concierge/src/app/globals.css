@@ -1,0 +1,216 @@
+/* 秘書室 (Concierge) — calm executive-secretary surface.
+   Color/typography come from /api/theme (--kb-* vars via web-design-system). */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--kb-font-body, 'Noto Sans JP', 'Inter', sans-serif);
+  background: var(--kb-bg-main, #faf9f6);
+  color: var(--kb-text-primary, #1f2937);
+  line-height: 1.65;
+}
+
+.concierge-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 32px;
+  background: #ffffff;
+  border-bottom: 2px solid var(--kb-accent, #8a6d3b);
+}
+
+.concierge-header-title {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.concierge-crest {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--kb-accent, #8a6d3b);
+  color: #fff;
+  font-weight: 700;
+  font-size: 18px;
+}
+
+.concierge-header-title strong {
+  font-size: 18px;
+  letter-spacing: 0.08em;
+}
+
+.concierge-tagline {
+  font-size: 12px;
+  color: var(--kb-text-secondary, #6b7280);
+}
+
+.concierge-header-note {
+  font-size: 11px;
+  color: var(--kb-text-secondary, #9ca3af);
+}
+
+.concierge-main {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px 32px 64px;
+}
+
+.briefing-card {
+  background: #ffffff;
+  border: 1px solid #e7e2d8;
+  border-left: 4px solid var(--kb-accent, #8a6d3b);
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-bottom: 24px;
+}
+
+.briefing-sentence {
+  font-size: 16px;
+  margin: 0 0 12px;
+}
+
+.briefing-counts {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--kb-text-secondary, #6b7280);
+}
+
+.briefing-counts strong {
+  color: var(--kb-text-primary, #1f2937);
+  font-size: 18px;
+  margin-right: 4px;
+}
+
+.pane-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+
+@media (min-width: 1024px) {
+  .pane-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.pane {
+  background: #ffffff;
+  border: 1px solid #e7e2d8;
+  border-radius: 12px;
+  padding: 18px 20px;
+}
+
+.pane h2 {
+  margin: 0 0 4px;
+  font-size: 15px;
+  letter-spacing: 0.04em;
+}
+
+.pane-subtitle {
+  font-size: 12px;
+  color: var(--kb-text-secondary, #6b7280);
+  margin: 0 0 14px;
+}
+
+.pane-empty {
+  font-size: 13px;
+  color: var(--kb-text-secondary, #9ca3af);
+  padding: 12px 0;
+}
+
+.item-card {
+  border: 1px solid #efeae0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  background: #fffdf9;
+}
+
+.item-title {
+  font-weight: 600;
+  font-size: 14px;
+  margin: 0 0 4px;
+}
+
+.item-meta {
+  font-size: 11px;
+  color: var(--kb-text-secondary, #9ca3af);
+}
+
+.item-body {
+  font-size: 13px;
+  margin: 6px 0;
+  white-space: pre-wrap;
+}
+
+.status-chip {
+  display: inline-block;
+  font-size: 11px;
+  padding: 1px 10px;
+  border-radius: 999px;
+  border: 1px solid #d8d2c4;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+.status-chip.attention {
+  border-color: #d97706;
+  color: #b45309;
+  background: #fef3c7;
+}
+
+.button-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.action-button {
+  border: 1px solid var(--kb-accent, #8a6d3b);
+  background: var(--kb-accent, #8a6d3b);
+  color: #fff;
+  border-radius: 8px;
+  padding: 6px 16px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.action-button.secondary {
+  background: transparent;
+  color: var(--kb-accent, #8a6d3b);
+}
+
+.action-button.danger {
+  background: transparent;
+  border-color: #b91c1c;
+  color: #b91c1c;
+}
+
+.action-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.notice {
+  font-size: 13px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid #d8ecd8;
+  background: #f2faf2;
+  margin-bottom: 16px;
+}
+
+.notice.error {
+  border-color: #f3caca;
+  background: #fdf3f3;
+}

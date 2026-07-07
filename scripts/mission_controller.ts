@@ -87,6 +87,12 @@ import {
 } from './refactor/mission-queue.js';
 import { buildMissionStatusView, listMissionSummaries } from './refactor/mission-read-model.js';
 import { missionSystem } from './refactor/mission-system.js';
+import {
+  advanceCurrentPhase,
+  evaluateStoredMissionGate,
+  markPhaseTasksForRework,
+  planProcessTemplateTasks,
+} from './refactor/mission-process-planning.js';
 import { runMissionControllerAction } from './refactor/mission-controller-router.js';
 
 // Re-export public API for backward compatibility (tests import these directly)
@@ -1292,6 +1298,7 @@ Visibility Commands:
   classify <ID> [intent] [task]  Classify mission context into class/delivery/risk/stage
   workflow-select <ID> [intent] [task]
                                  Resolve workflow template from mission classification
+  plan-tasks <ID> [--force]      Expand the mission's process template phases into NEXT_TASKS.json + gate definitions
   review-worker-output <ID> [verified|rejected] [note]
                                  Record worker-output review result via mission verification
   handoff <ID> <persona> [note]  Transfer mission persona ownership with audit history
@@ -1572,9 +1579,49 @@ async function resolveGate(missionId: string, gateFile?: string): Promise<string
 async function gatePass(missionId: string, gateFile?: string, note?: string): Promise<void> {
   if (!missionId) {
     logger.error(
-      'Usage: mission_controller gate-pass <MISSION_ID> [gate-file.json] [--note "..."]'
+      'Usage: mission_controller gate-pass <MISSION_ID> [gate-file.json|GATE_ID] [--note "..."]'
     );
     return;
+  }
+  // Process-template gates (MO-01/MO-02): when a stored gate definition
+  // exists, machine-evaluate its checks instead of recording a bare override.
+  // The operator command itself satisfies reviewer/human confirmation checks.
+  if (gateFile && !gateFile.endsWith('.json')) {
+    const stored = await evaluateStoredMissionGate({
+      missionId,
+      gateId: gateFile,
+      humanConfirmed: true,
+    });
+    if (stored.found && stored.evaluation) {
+      const upperId = missionId.toUpperCase();
+      auditChain.record({
+        agentId: process.env.KYBERION_PERSONA || 'operator',
+        action: stored.evaluation.verdict === 'pass' ? 'gate.passed' : 'gate.rejected',
+        operation: `gate-pass:${gateFile}`,
+        result: 'completed',
+        metadata: {
+          mission_id: upperId,
+          gate_id: gateFile,
+          verdict: stored.evaluation.verdict,
+          reasons: stored.evaluation.reasons,
+          evidence_path: stored.evaluation.evidence_path,
+          note,
+        },
+      });
+      if (stored.evaluation.verdict === 'pass') {
+        if (stored.position === 'exit' && stored.phase) {
+          await advanceCurrentPhase(upperId, stored.phase);
+        }
+        logger.success(`✅ [GATE] ${gateFile} → passed (mission: ${upperId})`);
+      } else {
+        logger.warn(`❌ [GATE] ${gateFile} checks failed (mission: ${upperId}):`);
+        for (const reason of stored.evaluation.reasons) logger.warn(`   - ${reason}`);
+        logger.info(
+          '   Resolve the failing checks, or record a legacy override via a gate evidence file.'
+        );
+      }
+      return;
+    }
   }
   const gatePath = await resolveGate(missionId, gateFile);
   const overridePath = recordMissionGateOverride({
@@ -1606,9 +1653,37 @@ async function gatePass(missionId: string, gateFile?: string, note?: string): Pr
 async function gateFail(missionId: string, gateFile?: string, note?: string): Promise<void> {
   if (!missionId) {
     logger.error(
-      'Usage: mission_controller gate-fail <MISSION_ID> [gate-file.json] [--note "..."]'
+      'Usage: mission_controller gate-fail <MISSION_ID> [gate-file.json|GATE_ID] [--note "..."]'
     );
     return;
+  }
+  // Process-template gates: record the failure and flip the phase's tasks to
+  // rework so dependency-first dispatch re-executes them.
+  if (gateFile && !gateFile.endsWith('.json')) {
+    const stored = await evaluateStoredMissionGate({ missionId, gateId: gateFile });
+    if (stored.found) {
+      const upperId = missionId.toUpperCase();
+      const reworked = stored.phase ? markPhaseTasksForRework(upperId, stored.phase) : 0;
+      auditChain.record({
+        agentId: process.env.KYBERION_PERSONA || 'operator',
+        action: 'gate.rejected',
+        operation: `gate-fail:${gateFile}`,
+        result: 'completed',
+        metadata: {
+          mission_id: upperId,
+          gate_id: gateFile,
+          phase: stored.phase,
+          reworked_tasks: reworked,
+          note,
+        },
+      });
+      logger.warn(`❌ [GATE] ${gateFile} → rejected (mission: ${upperId})`);
+      if (reworked > 0) {
+        logger.info(`   ${reworked} task(s) in phase ${stored.phase} flipped to rework.`);
+      }
+      if (note) logger.info(`   Reason: ${note}`);
+      return;
+    }
   }
   const gatePath = await resolveGate(missionId, gateFile);
   const overridePath = recordMissionGateOverride({
@@ -1736,6 +1811,7 @@ export async function main() {
     prewarmMissionTeam,
     classifyMission,
     selectMissionWorkflow,
+    planProcessTemplateTasks,
     reviewWorkerOutput,
     handoffMission,
     gatePass,

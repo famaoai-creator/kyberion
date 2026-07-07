@@ -1,0 +1,23 @@
+{
+  "version": "1.0.0",
+  "organization_id": "consulting-firm",
+  "templates": {
+    "default": {
+      "required_roles": ["owner", "planner", "implementer", "reviewer"],
+      "optional_roles": ["devils_advocate", "counterparty_persona", "scribe"],
+      "lifecycle": {
+        "max_parallel_members": 4,
+        "max_members": 7,
+        "max_messages_per_run": 70,
+        "max_wall_clock_minutes": 240,
+        "max_member_turns": 10,
+        "shutdown_policy": "graceful_handoff",
+        "resume_policy": "checkpoint_resume",
+        "cooldown_minutes": 10
+      }
+    },
+    "operations": {
+      "optional_roles": ["scribe", "tracker", "surface_liaison"]
+    }
+  }
+}

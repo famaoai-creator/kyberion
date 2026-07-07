@@ -869,14 +869,44 @@ function sanitizeProps(props: Record<string, any>): Record<string, any> {
   return clean;
 }
 
+/** Action emitted when the operator interacts with an actionable A2UI component (SU-02). */
+export interface A2UIComponentAction {
+  componentType: string;
+  action: 'select-option' | 'open' | 'preview';
+  option?: { label: string; variant?: 'primary' | 'danger' | 'neutral'; value?: string };
+  props: Record<string, any>;
+}
+
 /**
  * Renders an A2UI component by type lookup with prop sanitization.
+ * When `onAction` is provided, actionable components (kb-intervention-panel,
+ * kb-artifact-tile) get their callbacks wired so operator clicks actually
+ * move things forward instead of being decorative.
  */
-export const A2UIRenderer = ({ type, props }: { type: string; props: Record<string, any> }) => {
+export const A2UIRenderer = ({
+  type,
+  props,
+  onAction,
+}: {
+  type: string;
+  props: Record<string, any>;
+  onAction?: (action: A2UIComponentAction) => void;
+}) => {
   // Security: Only render whitelisted component types
   const Component = A2UI_COMPONENT_REGISTRY[type];
   if (!Component) {
     return <div className="text-[9px] opacity-30 italic p-2">Unknown component: {type}</div>;
   }
-  return <Component {...sanitizeProps(props)} />;
+  const clean = sanitizeProps(props);
+  const actionProps: Record<string, unknown> = {};
+  if (onAction && type === 'kb-intervention-panel') {
+    actionProps.onSelectOption = (option: A2UIComponentAction['option']) =>
+      onAction({ componentType: type, action: 'select-option', option, props: clean });
+  }
+  if (onAction && type === 'kb-artifact-tile') {
+    actionProps.onOpen = () => onAction({ componentType: type, action: 'open', props: clean });
+    actionProps.onPreview = () =>
+      onAction({ componentType: type, action: 'preview', props: clean });
+  }
+  return <Component {...clean} {...actionProps} />;
 };

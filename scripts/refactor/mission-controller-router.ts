@@ -166,6 +166,7 @@ export interface MissionControllerRoutingContext {
   ) => Awaitable<void>;
   classifyMission: (id: string, intentId?: string, taskType?: string) => Awaitable<void>;
   selectMissionWorkflow: (id: string, intentId?: string, taskType?: string) => Awaitable<void>;
+  planProcessTemplateTasks: (args: { id: string; force?: boolean }) => Awaitable<void>;
   reviewWorkerOutput: (
     id: string,
     result?: 'verified' | 'rejected',
@@ -613,6 +614,12 @@ export async function runMissionControllerAction(
       break;
     case 'workflow-select':
       await context.selectMissionWorkflow(arg1!, arg2, arg3);
+      break;
+    case 'plan-tasks':
+      await context.planProcessTemplateTasks({
+        id: arg1!,
+        force: context.argv.includes('--force'),
+      });
       break;
     case 'review-worker-output':
       await context.reviewWorkerOutput(

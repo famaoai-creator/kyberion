@@ -3,7 +3,7 @@
  * Core type definitions for the Mission Controller.
  */
 
-import type { HandoffPacket, MissionClassification } from '@agent/core';
+import type { HandoffPacket, MissionClassification, WorkflowPhaseSpec } from '@agent/core';
 
 export interface MissionState {
   mission_id: string;
@@ -23,6 +23,10 @@ export interface MissionState {
     workflow_id: string;
     pattern: string;
     phases: string[];
+    /** Rich per-phase specs (gates, default tasks) when the catalog template declares them. */
+    phase_specs?: WorkflowPhaseSpec[];
+    /** Phase id the mission is currently executing (advanced by gate-pass). */
+    current_phase?: string;
   };
   /**
    * IL-01: the original utterance and agreed goal from the surface intent,

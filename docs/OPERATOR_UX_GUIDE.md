@@ -113,15 +113,31 @@ Use when you want:
 Chronos is the control surface.
 It explains and intervenes, but it does not replace the durable control plane.
 
+### Concierge (秘書室)
+
+Use when you want (as the CEO / sovereign):
+
+- 本日のブリーフィング(何件の承認・依頼・成果・例外があるか)
+- ご承認待ちの判断(承認する / 差し戻す)
+- お届けした成果の受領・修正依頼・差し戻し
+- 通常フローから外れた例外の確認
+
+The concierge is the executive secretary (`http://127.0.0.1:3050`,
+`presence/displays/concierge`). It never shows execution machinery —
+only decisions and outcomes, in polite Japanese.
+
 ### Presence Studio
 
 Use when you want:
 
 - conversational interaction
 - hands-free or voice interaction
+- 会議の録音 → 自動議事録(「会議を記録」ボタン / `pnpm minutes:record --mission <ID>`)
 - browser assistance
 - live task detail and artifact access
 - immediate project bootstrap context
+
+Presence Studio is the companion workbench (相棒).
 
 For hands-free dictation on macOS, use `system:voice_input_toggle` as the fallback when browser-based capture is unavailable or the focused app expects the OS dictation shortcut. That keeps the shortcut in the OS-control layer instead of mixing it into `voice-actuator`.
 

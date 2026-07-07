@@ -1,14 +1,20 @@
 import * as path from 'node:path';
 import {
+  pathResolver,
   safeExistsSync,
   safeLstat,
   safeMkdir,
   safeReaddir,
-  safeReadFile,
   safeWriteFile,
-} from '../libs/core/secure-io.ts';
-import { pathResolver } from '../libs/core/path-resolver.ts';
-import { withExecutionContext } from '../libs/core/authority.ts';
+} from '@agent/core';
+import { withExecutionContext } from '@agent/core/governance';
+import {
+  SYSTEM_ACTUATOR_APPLY_OPS,
+  SYSTEM_ACTUATOR_CAPTURE_OPS,
+  SYSTEM_ACTUATOR_CONTROL_OPS,
+  SYSTEM_ACTUATOR_TRANSFORM_OPS,
+} from '../libs/actuators/system-actuator/src/op-catalog.js';
+import { readJsonFile } from './refactor/cli-input.js';
 
 interface CapabilityManifest {
   actuator_id: string;

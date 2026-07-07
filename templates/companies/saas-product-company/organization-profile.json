@@ -1,0 +1,27 @@
+{
+  "version": "1.0.0",
+  "organization_id": "{COMPANY_SLUG}",
+  "name": "{COMPANY_NAME} — SaaS・プロダクト開発企業",
+  "description": "SaaS・プロダクト開発企業向けの組織プロファイル(業態テンプレート: saas-product-company)。",
+  "mission_defaults": {
+    "default_mission_class": "product_delivery",
+    "default_team_template": "product_development",
+    "default_agent_profile": "default"
+  },
+  "team_defaults": {
+    "default_team_template": "product_development",
+    "team_template_catalog_id": "saas-product-company",
+    "default_lifecycle_template": "default",
+    "max_parallel_missions": 6
+  },
+  "llm": {
+    "purpose_map": {
+      "distill": "heavy",
+      "validate": "standard",
+      "summarize": "light",
+      "classify": "light"
+    },
+    "default_profile": "standard",
+    "profile_overrides": {}
+  }
+}

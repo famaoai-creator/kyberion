@@ -501,3 +501,73 @@ export function createChronosWebDesignSystem(
     DEFAULT_CHRONOS_WEB_DESIGN_SYSTEM_PACK
   );
 }
+
+/**
+ * Concierge (秘書室 / CEO secretary) theme: calm light palette, executive
+ * stationery feel. Derived from the Kyberion brand neutrals with a single
+ * restrained accent.
+ */
+export function createConciergeWebThemePack(): WebThemePack {
+  return {
+    ...DEFAULT_CHRONOS_WEB_THEME_PACK,
+    theme_id: 'concierge-secretary-office',
+    brand_name: '秘書室',
+    design_system_id: 'concierge-secretary-surface',
+    theme: {
+      ...DEFAULT_CHRONOS_WEB_THEME_PACK.theme,
+      name: 'Concierge Secretary Office',
+      colors: {
+        primary: '#1f2937',
+        secondary: '#6b7280',
+        accent: '#8a6d3b',
+        background: '#faf9f6',
+        text: '#1f2937',
+      },
+    },
+    web: {
+      ...DEFAULT_CHRONOS_WEB_THEME_PACK.web,
+      source_url: 'https://kyberion.local/concierge',
+      snapshot_summary:
+        'Calm executive-secretary surface: intent inbox, approval queue, outcome feed, exception feed.',
+      hero: {
+        title: '秘書室',
+        subtitle: 'CEO秘書 — 依頼・承認・成果・例外',
+        cta: '本日のご確認事項へ',
+      },
+    },
+  };
+}
+
+/**
+ * Companion (相棒 / Presence Studio) theme: warm light workbench palette.
+ */
+export function createCompanionWebThemePack(): WebThemePack {
+  return {
+    ...DEFAULT_CHRONOS_WEB_THEME_PACK,
+    theme_id: 'presence-studio-companion',
+    brand_name: 'Presence Studio',
+    design_system_id: 'companion-workbench-surface',
+    theme: {
+      ...DEFAULT_CHRONOS_WEB_THEME_PACK.theme,
+      name: 'Presence Studio Companion',
+      colors: {
+        primary: '#13343b',
+        secondary: '#4a6d73',
+        accent: '#0d9488',
+        background: '#fcfcf9',
+        text: '#13343b',
+      },
+    },
+    web: {
+      ...DEFAULT_CHRONOS_WEB_THEME_PACK.web,
+      source_url: 'https://kyberion.local/presence-studio',
+      snapshot_summary:
+        'Warm companion workbench: voice, minutes, email, approvals, quick actions.',
+      hero: {
+        title: 'Presence Studio',
+        subtitle: '相棒 — いっしょに作業するワークベンチ',
+        cta: 'できることを見る',
+      },
+    },
+  };
+}

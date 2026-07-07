@@ -30,6 +30,7 @@ import {
 } from '@agent/core';
 import { readJsonFile } from './cli-input.js';
 import { getCurrentBranch, getGitHash, initMissionRepo } from './mission-git.js';
+import { applyProcessTemplatePlan } from './mission-process-planning.js';
 import {
   calculateRequiredTier,
   checkPrerequisites,
@@ -252,6 +253,22 @@ export async function createMission(args: {
     }
   }
 
+  // MO-01: when the selected process template declares per-phase default
+  // tasks, expand them deterministically into NEXT_TASKS.json + gate
+  // definitions so the phases are executable, not just labels.
+  if (workflowDesign?.phase_specs) {
+    const planResult = applyProcessTemplatePlan({
+      missionId: upperId,
+      missionDir,
+      design: workflowDesign,
+    });
+    if (planResult.tasks.length > 0) {
+      logger.info(
+        `📋 [Process] Expanded ${workflowDesign.workflow_id} into ${planResult.tasks.length} tasks (${planResult.gatePaths.length} gates).`
+      );
+    }
+  }
+
   const evidenceDir = path.join(missionDir, 'evidence');
   if (!safeExistsSync(evidenceDir)) {
     safeMkdir(evidenceDir, { recursive: true });
@@ -286,6 +303,7 @@ export async function createMission(args: {
             workflow_id: workflowDesign.workflow_id,
             pattern: workflowDesign.pattern,
             phases: workflowDesign.phases,
+            ...(workflowDesign.phase_specs ? { phase_specs: workflowDesign.phase_specs } : {}),
           },
         }
       : {}),
@@ -485,6 +503,7 @@ export async function startMission(args: {
               workflow_id: workflow.workflow_id,
               pattern: workflow.pattern,
               phases: workflow.phases,
+              ...(workflow.phase_specs ? { phase_specs: workflow.phase_specs } : {}),
             };
           })();
         } catch (err) {

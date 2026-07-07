@@ -1,10 +1,9 @@
 import * as path from 'node:path';
-import { loadActuatorManifestCatalog } from '../libs/core/src/actuator-manifest-index.js';
-import { pathResolver } from '../libs/core/path-resolver.js';
-import { safeExistsSync, safeReadFile, safeWriteFile } from '../libs/core/secure-io.js';
-import { withExecutionContext } from '../libs/core/governance.js';
-import { getOpInputContract } from '../libs/core/op-input-contracts.js';
-import { describeOps as describeSystemOps } from '../libs/actuators/system-actuator/src/op-catalog.js';
+import { loadActuatorManifestCatalog } from '@agent/core';
+import { pathResolver, safeExistsSync, safeReadFile, safeWriteFile } from '@agent/core';
+import { withExecutionContext } from '@agent/core/governance';
+import { getOpInputContract } from '@agent/core/op-input-contracts';
+import { describeOps as describeSystemOps } from '@actuator/system';
 
 type PipelineOpKind = 'capture' | 'transform' | 'apply' | 'control';
 

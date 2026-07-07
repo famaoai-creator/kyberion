@@ -1,0 +1,120 @@
+{
+  "version": "1.0.0",
+  "organization_id": "{COMPANY_SLUG}",
+  "name": "{COMPANY_NAME} 組織図(IT運用・マネージドサービス(MSP))",
+  "source_kind": "customer",
+  "source_path": "customer/{COMPANY_SLUG}/org-chart.json",
+  "domains": [
+    {
+      "domain_id": "leadership",
+      "name": "Leadership",
+      "role_ids": ["ceo", "business_owner"]
+    },
+    {
+      "domain_id": "operations",
+      "name": "Service Operations",
+      "role_ids": [
+        "reliability_engineer",
+        "incident_commander",
+        "infrastructure_sentinel",
+        "performance_engineer"
+      ]
+    },
+    {
+      "domain_id": "engineering",
+      "name": "Engineering & Integration",
+      "role_ids": ["solution_architect", "integration_steward", "cyber_security"]
+    },
+    {
+      "domain_id": "service",
+      "name": "Service Management",
+      "role_ids": ["customer_success", "pmo_governance", "finance_controller"]
+    }
+  ],
+  "positions": [
+    {
+      "role_id": "ceo",
+      "reports_to": null,
+      "held_by": "human",
+      "responsibility_scope": "経営・サービス品質最終責任",
+      "authority_role_ref": "mission_controller"
+    },
+    {
+      "role_id": "business_owner",
+      "reports_to": "ceo",
+      "held_by": "sovereign-brain",
+      "responsibility_scope": "サービスポートフォリオ・契約収益責任",
+      "authority_role_ref": null
+    },
+    {
+      "role_id": "solution_architect",
+      "reports_to": "business_owner",
+      "held_by": "sovereign-brain",
+      "responsibility_scope": "サービス設計・技術標準",
+      "authority_role_ref": "ecosystem_architect"
+    },
+    {
+      "role_id": "reliability_engineer",
+      "reports_to": "solution_architect",
+      "held_by": "sovereign-brain",
+      "responsibility_scope": "SLO 運用・自動化・変更管理",
+      "authority_role_ref": null
+    },
+    {
+      "role_id": "incident_commander",
+      "reports_to": "reliability_engineer",
+      "held_by": "sovereign-brain",
+      "responsibility_scope": "重大インシデント指揮・ポストモーテム主宰",
+      "authority_role_ref": null
+    },
+    {
+      "role_id": "infrastructure_sentinel",
+      "reports_to": "reliability_engineer",
+      "held_by": "sovereign-brain",
+      "responsibility_scope": "監視・パトロール・一次対応",
+      "authority_role_ref": "system_configurator"
+    },
+    {
+      "role_id": "performance_engineer",
+      "reports_to": "solution_architect",
+      "held_by": "sovereign-brain",
+      "responsibility_scope": "性能・キャパシティ管理",
+      "authority_role_ref": null
+    },
+    {
+      "role_id": "integration_steward",
+      "reports_to": "solution_architect",
+      "held_by": "sovereign-brain",
+      "responsibility_scope": "顧客システム連携・API 管理",
+      "authority_role_ref": null
+    },
+    {
+      "role_id": "cyber_security",
+      "reports_to": "ceo",
+      "held_by": "sovereign-brain",
+      "responsibility_scope": "セキュリティ監視・脆弱性対応",
+      "authority_role_ref": null
+    },
+    {
+      "role_id": "customer_success",
+      "reports_to": "business_owner",
+      "held_by": "sovereign-brain",
+      "responsibility_scope": "サービスレビュー・SLA 報告・顧客窓口",
+      "authority_role_ref": null
+    },
+    {
+      "role_id": "pmo_governance",
+      "reports_to": "business_owner",
+      "held_by": "sovereign-brain",
+      "responsibility_scope": "変更諮問(CAB)・手順書統制",
+      "authority_role_ref": null
+    },
+    {
+      "role_id": "finance_controller",
+      "reports_to": "ceo",
+      "held_by": "sovereign-brain",
+      "responsibility_scope": "原価・請求・契約更新管理",
+      "authority_role_ref": null
+    }
+  ]
+}

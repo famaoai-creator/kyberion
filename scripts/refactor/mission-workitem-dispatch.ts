@@ -44,6 +44,7 @@ import {
   writeJsonFile as writeJsonFileFromDispatchIO,
 } from './mission-dispatch-io.js';
 import { appendDispatchEvent, writeDispatchArtifact } from './mission-dispatch-lifecycle.js';
+import { evaluatePhaseEntryGate } from './mission-process-planning.js';
 import { recordTask } from './mission-maintenance.js';
 
 export type MissionWorkItemDispatchMode = 'auto' | 'agent' | 'subagent';
@@ -65,7 +66,7 @@ export interface MissionWorkItemDispatchRecord {
   context_pack_id?: string;
   context_pack_path?: string;
   execution_mode: MissionWorkItemDispatchMode | 'agent' | 'subagent';
-  status: 'created' | 'updated' | 'skipped' | 'failed';
+  status: 'created' | 'updated' | 'skipped' | 'failed' | 'deferred';
   work_item_status_before?: WorkItemStatus;
   work_item_status_after?: WorkItemStatus;
   response_path?: string;
@@ -1555,6 +1556,31 @@ export async function dispatchMissionWorkItems(
         notes: validation.notes,
       });
       continue;
+    }
+
+    // MO-01/MO-02: a process-template phase with an unmet entry gate defers
+    // its tasks — same UX as unmet dependencies, re-dispatched once the gate
+    // passes.
+    const itemPhase = (item.metadata as Record<string, unknown> | undefined)?.phase;
+    if (typeof itemPhase === 'string' && itemPhase) {
+      const entryGate = await evaluatePhaseEntryGate({ missionId, phase: itemPhase });
+      if (entryGate && entryGate.verdict === 'fail') {
+        record.status = 'deferred';
+        record.notes.push(
+          `entry gate ${entryGate.gateId} not passed: ${entryGate.reasons.join('; ') || 'checks failed'}`
+        );
+        records.push(record);
+        appendDispatchEvent(dispatchEventPath(missionPath), {
+          event_type: 'workitem_dispatch_deferred',
+          mission_id: missionId,
+          item_id: item.item_id,
+          team_role: teamRole,
+          phase: itemPhase,
+          gate_id: entryGate.gateId,
+          notes: entryGate.reasons,
+        });
+        continue;
+      }
     }
 
     const dispatchContext = await buildWorkItemDispatchContext({

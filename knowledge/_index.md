@@ -1,6 +1,6 @@
 # Ecosystem Knowledge Base Index
 
-_SSoT Index Version: 2.0.0 | Last Updated: 2026-07-05T07:16:16.009Z_
+_SSoT Index Version: 2.0.0 | Last Updated: 2026-07-06T19:47:59.878Z_
 
 > **Volatile / Working-Memory faces** (session, mission, project, personal, daily, weekly) are **not listed here** — they are ephemeral and not SSoT. See the generated volatile index: [`active/INDEX.volatile.md`](../active/INDEX.volatile.md) (non-SSoT, refreshed by `pnpm pipeline --input pipelines/volatile-index.json`). Schema: `schemas/volatile-knowledge.schema.json`.
 
