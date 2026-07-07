@@ -45,7 +45,6 @@ import {
   OPERATOR_VIEW_LINKS,
   SURFACE_ROLES,
 } from '../lib/operator-console';
-import { buildPlanPreviewSignature, isPlanPreviewStale } from '../lib/plan-preview';
 import { uxText } from '../lib/ux-vocabulary';
 import { useChronosLocale } from '../lib/hooks';
 
@@ -78,6 +77,25 @@ const OPERATOR_LAYOUT_PREFS_KEY = 'chronos.operator-layout.prefs';
 const CHRONOS_THEME_PREFS_KEY = 'chronos.theme-mode';
 
 type ChronosThemeMode = 'system' | 'light' | 'dark';
+
+function buildPlanPreviewSignature(input: {
+  requestText: string;
+  missionType: string;
+  assignedPersona: string;
+  tier: 'personal' | 'confidential' | 'public';
+}): string {
+  return JSON.stringify({
+    requestText: input.requestText.trim(),
+    missionType: input.missionType.trim(),
+    assignedPersona: input.assignedPersona.trim(),
+    tier: input.tier,
+  });
+}
+
+function isPlanPreviewStale(previewSignature: string | null, currentSignature: string): boolean {
+  if (!previewSignature) return true;
+  return previewSignature !== currentSignature;
+}
 
 function loadOperatorLayoutPrefs(): {
   focusedOperatorView: string | null;
@@ -663,6 +681,71 @@ export default function ChronosMirrorV2() {
     element.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, []);
 
+  const [a2uiActionNotice, setA2uiActionNotice] = useState<string | null>(null);
+
+  // SU-02: operator clicks on actionable A2UI components move things forward.
+  const handleA2UIComponentAction = useCallback(async (action: any) => {
+    try {
+      if (action.componentType === 'kb-intervention-panel' && action.action === 'select-option') {
+        const props = action.props || {};
+        const option = action.option || {};
+        const optionValue = String(option.value ?? option.label ?? '').trim();
+        const approvalId = String(props.approval_id || props.approvalId || '').trim();
+        const missionId = String(props.mission_id || props.missionId || '').trim();
+        if (approvalId && (optionValue === 'approved' || optionValue === 'rejected')) {
+          const response = await fetch('/api/intelligence', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'approval_decision',
+              requestId: approvalId,
+              channel: props.channel || 'chronos',
+              storageChannel:
+                props.storage_channel || props.storageChannel || props.channel || 'chronos',
+              decision: optionValue,
+            }),
+          });
+          if (!response.ok) throw new Error('approval decision failed');
+          setA2uiActionNotice(
+            `承認リクエスト ${approvalId} を ${optionValue === 'approved' ? '承認' : '差し戻し'}しました。`
+          );
+          return;
+        }
+        if (missionId) {
+          const response = await fetch('/api/intelligence', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'intervention_respond',
+              missionId,
+              question: props.reason || '',
+              response: optionValue || option.label,
+            }),
+          });
+          if (!response.ok) throw new Error('intervention response failed');
+          setA2uiActionNotice(
+            `ミッション ${missionId} へ介入回答「${option.label}」を送信しました。`
+          );
+          return;
+        }
+        setA2uiActionNotice(
+          'この介入パネルには対象（mission_id / approval_id）が指定されていません。'
+        );
+        return;
+      }
+      if (action.componentType === 'kb-artifact-tile') {
+        const path = String(action.props?.path || '').trim();
+        if (path) {
+          window.open(`/api/mission-asset?path=${encodeURIComponent(path)}`, '_blank');
+          return;
+        }
+        setA2uiActionNotice('この成果物タイルにはパスがありません。');
+      }
+    } catch (error) {
+      setA2uiActionNotice(error instanceof Error ? error.message : String(error));
+    }
+  }, []);
+
   const runPlanPreview = useCallback(async () => {
     if (!planRequestText.trim()) {
       setPlanPreviewError('依頼文を入力してください');
@@ -976,6 +1059,12 @@ export default function ChronosMirrorV2() {
                     Chronos Mirror
                   </div>
                   <h1 className="text-lg font-bold tracking-tight text-white/90">Control Plane</h1>
+                </div>
+                <div
+                  className="ml-2 rounded-full border border-cyan-400/20 bg-cyan-400/5 px-3 py-1 text-[11px] text-cyan-100/70"
+                  title="このサーフェスの役割"
+                >
+                  管制塔 — 実行状態の監視と介入
                 </div>
               </div>
               {tenantLabel ? (
@@ -1733,7 +1822,7 @@ export default function ChronosMirrorV2() {
                     planPreview.execution.clarificationQuestions.length > 0 ? (
                       <div className="mt-4">
                         <KbInterventionPanel
-                          reason="Clarification is required before approval."
+                          reason="Clarification is required before approval. 質問をクリックすると依頼文に回答欄が追加されます。"
                           isBlocking
                           options={planPreview.execution.clarificationQuestions.map(
                             (question: any) => ({
@@ -1742,6 +1831,15 @@ export default function ChronosMirrorV2() {
                               value: question.id,
                             })
                           )}
+                          onSelectOption={(option) => {
+                            setPlanRequestText(
+                              (current) =>
+                                `${current.trimEnd()}\n\n【確認事項への回答】${option.label}\n→ `
+                            );
+                            setPlanApprovalMessage(
+                              '確認事項を依頼文に追記しました。回答を書いてから再プレビューしてください。'
+                            );
+                          }}
                         />
                       </div>
                     ) : null}
@@ -2380,11 +2478,17 @@ export default function ChronosMirrorV2() {
                   )
                 ) : (
                   <div className="flex flex-col gap-6">
+                    {a2uiActionNotice ? (
+                      <div className="rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-4 py-3 text-[11px] text-cyan-100/80">
+                        {a2uiActionNotice}
+                      </div>
+                    ) : null}
                     {surface.components?.map((component: any, index: number) => (
                       <A2UIRenderer
                         key={component.id || index}
                         type={component.type}
                         props={component.props || {}}
+                        onAction={handleA2UIComponentAction}
                       />
                     ))}
                   </div>
