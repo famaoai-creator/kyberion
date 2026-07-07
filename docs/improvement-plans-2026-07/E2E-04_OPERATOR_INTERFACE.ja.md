@@ -168,3 +168,18 @@ Kyberion からの用事(質問・承認・完了・アラート): 設定した1
 
 Task 1(CLI ホーム)→ Task 2(通知)→ Task 3(inbox)→ Task 4(Chronos ホーム)→ Task 8(E2E)→ Task 5(計画承認)→ Task 7(地図)→ Task 6(CLI 統一)。
 **Task 1〜3 で「見に行かなくても届く・1コマンドで全部見える」が成立**し、体感が最も変わる。Task 4〜5 が Web ホーム、6〜7 は仕上げ。
+
+## 実装状況 追記(2026-07-07 UX ブラッシュアップ)
+
+`pnpm kyberion` を「案内するコマンドは全部その場で動く」単一導線に再実装:
+
+- **`pnpm kyberion ask "<依頼>"`** — ターミナルからブリッジと同じ脳(`runSurfaceMessageConversation`)に話しかける。G5(CLI だけ脳が別)の最小解消: `cli` surface provider を registry と `surface-provider-manifests.json` の両方に登録。
+- **`pnpm kyberion inbox`** — 一覧+`--read <id>` / `--accept <id>`(従来は案内のみで未実装だった)。
+- **`pnpm kyberion approvals`** — 承認待ち一覧+`--approve <id>` / `--deny <id> [--note]`。
+- **`pnpm kyberion help`** — yargs のダンプではなくコマンド表を返す。
+- Next Action の suggested_command を実在コマンドに修正(従来は inbox 対応に `pnpm chronos`=デーモン起動を案内していた)。
+- 「実行中ミッション N 件」のノイズ対策: `counts.recentlyActiveMissions`(直近7日で動きあり)を追加し正直な数を併記、直近3件を表示。
+- ホームに顧客モード channel binding のアクティブ一覧警告を表示(E2E-06 残余の消化)。
+- 権限修正: home CLI は `MISSION_ROLE=mission_controller` で動作(inbox 書込は active/shared/ 配下のため)。
+
+Task 6(cli.ts 自由文経路の完全統一)は残余のまま — `ask` が同等機能の推奨経路。

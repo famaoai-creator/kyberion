@@ -11,5 +11,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "{{APP_NAME}}"
+rootProject.name = "__APP_NAME__"
 include(":app")

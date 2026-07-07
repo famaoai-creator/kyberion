@@ -212,8 +212,10 @@ describe('meeting-to-value e2e', () => {
       message.correlation_id?.startsWith(`${MISSION_ID}:`)
     );
     expect(outbox).toHaveLength(2);
-    expect(outbox[0]?.text).toContain('Confirm customer list');
-    expect(outbox[1]?.text).toContain('Prepare the proposal outline');
+    // Same-millisecond enqueue order is not deterministic — assert content.
+    const outboxTexts = outbox.map((message) => message?.text || '').join('\n');
+    expect(outboxTexts).toContain('Confirm customer list');
+    expect(outboxTexts).toContain('Prepare the proposal outline');
     expect(
       safeReadFile(path.join(MISSION_DIR, 'evidence', 'minutes.md'), { encoding: 'utf8' }) as string
     ).toContain('# Minutes');

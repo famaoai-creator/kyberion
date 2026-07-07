@@ -52,6 +52,9 @@ export interface OperatorHomeSummary {
   statusDetail: string;
   counts: {
     activeMissions: number;
+    /** Active missions with any state change in the last 7 days — the honest
+     * "actually moving" number (long-lived active states accumulate). */
+    recentlyActiveMissions: number;
     blockedMissions: number;
     pendingApprovals: number;
     clarificationQuestions: number;
@@ -286,14 +289,14 @@ export function collectOperatorHomeSummary(
             title: 'Review the approval queue',
             reason: `${pendingApprovals.length} approval request(s) are waiting for operator review.`,
             next_action_type: 'run_command',
-            suggested_command: 'pnpm chronos',
+            suggested_command: 'pnpm kyberion approvals',
           })
         : unreadInbox > 0
           ? buildNextAction({
               title: 'Acknowledge new deliverables',
               reason: `${unreadInbox} inbox item(s) were delivered and are still unread.`,
               next_action_type: 'inspect_artifact',
-              suggested_command: 'pnpm chronos',
+              suggested_command: 'pnpm kyberion inbox',
             })
           : buildNextAction({
               title: 'Keep monitoring the surface',
@@ -309,6 +312,10 @@ export function collectOperatorHomeSummary(
     statusDetail,
     counts: {
       activeMissions: activeMissions.length,
+      recentlyActiveMissions: activeMissions.filter((item) => {
+        const updated = Date.parse(String(item.updatedAt || ''));
+        return Number.isFinite(updated) && Date.now() - updated < 7 * 24 * 60 * 60 * 1000;
+      }).length,
       blockedMissions: blockedMissions.length,
       pendingApprovals: pendingApprovals.length,
       clarificationQuestions,
