@@ -21,8 +21,6 @@ function onboardingArtifactPaths(profileRoot: string): string[] {
     path.join(profileRoot, 'my-identity.json'),
     path.join(profileRoot, 'my-vision.md'),
     path.join(profileRoot, 'agent-identity.json'),
-    path.join(profileRoot, 'connections'),
-    path.join(profileRoot, 'tenants'),
   ];
 }
 
