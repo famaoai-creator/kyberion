@@ -179,7 +179,9 @@ function validateMissionTicketTask(
   }
   if (!description) {
     notes.push('missing task description');
-  } else if (countWordsFromDispatchIO(description) < 4) {
+  } else if (countWordsFromDispatchIO(description) < 4 && description.length < 16) {
+    // Word counting is whitespace-based and undercounts CJK text; a 16+
+    // character description is substantive regardless of word count.
     notes.push('task description too short');
   }
   if (!task.deliverable && !task.target_path) {
