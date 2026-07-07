@@ -20,21 +20,37 @@ const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 
 describe('surface-provider-policy', () => {
   it('loads all provider manifest records from governed knowledge', () => {
-    const ids = listSurfaceProviderManifestRecords().map((entry) => entry.id).sort();
-    expect(ids).toEqual(['chronos', 'discord', 'imessage', 'presence', 'slack', 'telegram']);
+    const ids = listSurfaceProviderManifestRecords()
+      .map((entry) => entry.id)
+      .sort();
+    expect(ids).toEqual(['chronos', 'cli', 'discord', 'imessage', 'presence', 'slack', 'telegram']);
   });
 
   it('derives delegation receivers per provider policy', () => {
-    expect(deriveSurfaceDelegationReceiverForProvider('slack', 'ミッション一覧を教えて')).toBe('chronos-mirror');
-    expect(deriveSurfaceDelegationReceiverForProvider('presence', 'システム状態を教えて')).toBe('chronos-mirror');
-    expect(deriveSurfaceDelegationReceiverForProvider('imessage', '設計をレビューして')).toBe('nerve-agent');
-    expect(deriveSurfaceDelegationReceiverForProvider('chronos', '設計をレビューして')).toBe('nerve-agent');
-    expect(deriveSurfaceDelegationReceiverForProvider('discord', '設計をレビューして')).toBe('nerve-agent');
-    expect(deriveSurfaceDelegationReceiverForProvider('telegram', '設計をレビューして')).toBe('nerve-agent');
+    expect(deriveSurfaceDelegationReceiverForProvider('slack', 'ミッション一覧を教えて')).toBe(
+      'chronos-mirror'
+    );
+    expect(deriveSurfaceDelegationReceiverForProvider('presence', 'システム状態を教えて')).toBe(
+      'chronos-mirror'
+    );
+    expect(deriveSurfaceDelegationReceiverForProvider('imessage', '設計をレビューして')).toBe(
+      'nerve-agent'
+    );
+    expect(deriveSurfaceDelegationReceiverForProvider('chronos', '設計をレビューして')).toBe(
+      'nerve-agent'
+    );
+    expect(deriveSurfaceDelegationReceiverForProvider('discord', '設計をレビューして')).toBe(
+      'nerve-agent'
+    );
+    expect(deriveSurfaceDelegationReceiverForProvider('telegram', '設計をレビューして')).toBe(
+      'nerve-agent'
+    );
   });
 
   it('loads slack-specific intent and execution rules from provider policy', () => {
-    expect(deriveSlackIntentLabelFromProviderPolicy('この設計をレビューして')).toBe('request_review');
+    expect(deriveSlackIntentLabelFromProviderPolicy('この設計をレビューして')).toBe(
+      'request_review'
+    );
     expect(deriveSlackExecutionModeFromProviderPolicy('お願いできますか？')).toBe('conversation');
     expect(deriveSlackExecutionModeFromProviderPolicy('このファイルを作成して')).toBe('task');
     expect(shouldForceSlackDelegationFromProviderPolicy('thanks')).toBe(false);
@@ -183,12 +199,15 @@ describe('surface-provider-policy', () => {
     addFormats(ajv);
     const validate = compileSchemaFromPath(
       ajv,
-      path.resolve(root, 'knowledge/product/schemas/surface-provider-manifests.schema.json'),
+      path.resolve(root, 'knowledge/product/schemas/surface-provider-manifests.schema.json')
     );
     const manifests = JSON.parse(
-      safeReadFile(path.resolve(root, 'knowledge/product/governance/surface-provider-manifests.json'), {
-        encoding: 'utf8',
-      }) as string,
+      safeReadFile(
+        path.resolve(root, 'knowledge/product/governance/surface-provider-manifests.json'),
+        {
+          encoding: 'utf8',
+        }
+      ) as string
     );
 
     expect(validate(manifests)).toBe(true);
@@ -198,7 +217,7 @@ describe('surface-provider-policy', () => {
         providers: {
           slack: manifests.providers.slack,
         },
-      }),
+      })
     ).toBe(false);
   });
 });

@@ -19,10 +19,14 @@ const IGNORED_DIRS = new Set([
   'active',
   'work',
   'vault',
+  // parallel-session debris — other checkouts and scratch trees are not
+  // this repo's runtime code and must never enter the baseline.
+  '.worktrees',
+  '.tmp-mulmoclaude',
+  '.tmp-agency-agents',
+  '.pnpm-store',
 ]);
-const EXCLUDED_FILES = new Set([
-  'tests/governance-import-baseline.test.ts',
-]);
+const EXCLUDED_FILES = new Set(['tests/governance-import-baseline.test.ts']);
 
 function walk(dirPath: string, relativeBase = ''): string[] {
   const entries = fs.readdirSync(dirPath, { withFileTypes: true });
