@@ -16,28 +16,11 @@
         "3000"
       ],
       "cwd": ".",
-      "env": {
-        "MISSION_ROLE": "chronos_localadmin"
-      },
       "shutdownPolicy": "detached",
       "startupMode": "workspace-app",
       "ownerType": "surface-runtime-manifest",
       "port": 3000,
       "healthPath": "/api/agents",
-      "enabled": true
-    },
-    {
-      "id": "concierge",
-      "kind": "ui",
-      "description": "Concierge (秘書室) — CEO executive-secretary surface: intent inbox, approval queue, outcome feed, exception feed",
-      "command": "pnpm",
-      "args": ["--dir", "presence/displays/concierge", "start", "-H", "127.0.0.1", "-p", "3050"],
-      "cwd": ".",
-      "shutdownPolicy": "detached",
-      "startupMode": "workspace-app",
-      "ownerType": "surface-runtime-manifest",
-      "port": 3050,
-      "healthPath": "/api/summary",
       "enabled": true
     },
     {
@@ -55,19 +38,17 @@
       "enabled": true
     },
     {
-      "id": "mcp-server-cowork",
-      "kind": "gateway",
-      "description": "Kyberion MCP Server facade — exposes Kyberion capabilities to Claude Cowork and other MCP clients via stdio transport.",
-      "command": "node",
-      "args": ["dist/scripts/mcp_server.js"],
-      "env": {
-        "KYBERION_PERSONA": "sovereign_concierge",
-        "MISSION_ROLE": "mcp_server"
-      },
+      "id": "concierge",
+      "kind": "ui",
+      "description": "Concierge (秘書室) — CEO executive-secretary surface: intent inbox, approval queue, outcome feed, exception feed",
+      "command": "pnpm",
+      "args": ["--dir", "presence/displays/concierge", "start", "-H", "127.0.0.1", "-p", "3050"],
       "cwd": ".",
       "shutdownPolicy": "detached",
-      "startupMode": "background",
+      "startupMode": "workspace-app",
       "ownerType": "surface-runtime-manifest",
+      "port": 3050,
+      "healthPath": "/api/summary",
       "enabled": true
     },
     {
@@ -104,6 +85,22 @@
       "ownerType": "surface-runtime-manifest",
       "port": 3034,
       "healthPath": "/health",
+      "enabled": true
+    },
+    {
+      "id": "mcp-server-cowork",
+      "kind": "gateway",
+      "description": "Kyberion MCP Server facade — exposes Kyberion capabilities to Claude Cowork and other MCP clients via stdio transport.",
+      "command": "node",
+      "args": ["dist/scripts/mcp_server.js"],
+      "env": {
+        "KYBERION_PERSONA": "sovereign_concierge",
+        "MISSION_ROLE": "mcp_server"
+      },
+      "cwd": ".",
+      "shutdownPolicy": "detached",
+      "startupMode": "background",
+      "ownerType": "surface-runtime-manifest",
       "enabled": true
     },
     {
@@ -193,8 +190,8 @@
       "id": "terminal-bridge",
       "kind": "service",
       "description": "Background terminal bridge service for runtime sessions",
-      "command": "pnpm",
-      "args": ["--dir", "presence/bridge/terminal", "start"],
+      "command": "node",
+      "args": ["dist/presence/bridge/terminal/server.js"],
       "env": {
         "KYBERION_PERSONA": "sovereign",
         "MISSION_ROLE": "infrastructure_sentinel"

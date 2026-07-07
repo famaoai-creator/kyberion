@@ -402,7 +402,12 @@ class PtyRegistry {
 const GLOBAL_PTY_KEY = Symbol.for('@kyberion/pty-engine');
 if (!(globalThis as any)[GLOBAL_PTY_KEY]) {
   (globalThis as any)[GLOBAL_PTY_KEY] = new PtyRegistry();
-  runtimeSupervisor.startSweep(Number(process.env.KYBERION_RUNTIME_SWEEP_INTERVAL_MS || 30_000));
+  // In an import cycle (runtime-supervisor -> ... -> pty-engine) the supervisor
+  // binding may still be mid-evaluation here; defer the sweep start one tick
+  // so module init order can never crash the process.
+  queueMicrotask(() => {
+    runtimeSupervisor?.startSweep(Number(process.env.KYBERION_RUNTIME_SWEEP_INTERVAL_MS || 30_000));
+  });
 }
 
 export const ptyEngine: PtyRegistry = (globalThis as any)[GLOBAL_PTY_KEY];

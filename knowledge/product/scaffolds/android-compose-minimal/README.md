@@ -1,6 +1,6 @@
 # android-compose-minimal scaffold
 
-E2E-05 Task 3 fixture. Placeholders `{{APP_NAME}}` / `{{BUNDLE_ID}}` are
+E2E-05 Task 3 fixture. Placeholders `__APP_NAME__` / `__BUNDLE_ID__` are
 replaced by the build-actuator `scaffold_app` op.
 
 Note (documented deviation): the gradle-wrapper **jar** is intentionally not

@@ -7,8 +7,10 @@ import {
 
 describe('surface-provider-manifest', () => {
   it('lists manifests for all supported human-facing surfaces', () => {
-    const ids = listSurfaceProviderManifests().map((entry) => entry.id).sort();
-    expect(ids).toEqual(['chronos', 'discord', 'imessage', 'presence', 'slack', 'telegram']);
+    const ids = listSurfaceProviderManifests()
+      .map((entry) => entry.id)
+      .sort();
+    expect(ids).toEqual(['chronos', 'cli', 'discord', 'imessage', 'presence', 'slack', 'telegram']);
   });
 
   it('keeps provider capabilities explicit', () => {

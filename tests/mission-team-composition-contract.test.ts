@@ -46,10 +46,22 @@ describe('Mission team composition contract', () => {
   it('validates authority/team/agent indexes against schemas', () => {
     const ajv = new Ajv({ allErrors: true });
     const fixtures: Array<[string, string]> = [
-      ['knowledge/product/governance/authority-role-index.json', 'knowledge/product/schemas/authority-role-index.schema.json'],
-      ['knowledge/product/orchestration/team-role-index.json', 'knowledge/product/schemas/team-role-index.schema.json'],
-      ['knowledge/product/orchestration/agent-profile-index.json', 'knowledge/product/schemas/agent-profile-index.schema.json'],
-      ['knowledge/product/orchestration/mission-team-templates.json', 'knowledge/product/schemas/mission-team-templates.schema.json'],
+      [
+        'knowledge/product/governance/authority-role-index.json',
+        'knowledge/product/schemas/authority-role-index.schema.json',
+      ],
+      [
+        'knowledge/product/orchestration/team-role-index.json',
+        'knowledge/product/schemas/team-role-index.schema.json',
+      ],
+      [
+        'knowledge/product/orchestration/agent-profile-index.json',
+        'knowledge/product/schemas/agent-profile-index.schema.json',
+      ],
+      [
+        'knowledge/product/orchestration/mission-team-templates.json',
+        'knowledge/product/schemas/mission-team-templates.schema.json',
+      ],
     ];
 
     for (const [jsonPath, schemaPath] of fixtures) {
@@ -64,19 +76,33 @@ describe('Mission team composition contract', () => {
     const roleIndex = loadJson('knowledge/product/orchestration/team-role-index.json');
 
     for (const [agentId, record] of Object.entries(agentIndex.agents || {})) {
-      expect(record.selection_hints?.preferred_provider, `missing provider hint for ${agentId}`).toBeTruthy();
-      expect(record.selection_hints?.preferred_modelId, `missing model hint for ${agentId}`).toBeTruthy();
+      expect(
+        record.selection_hints?.preferred_provider,
+        `missing provider hint for ${agentId}`
+      ).toBeTruthy();
+      expect(
+        record.selection_hints?.preferred_modelId,
+        `missing model hint for ${agentId}`
+      ).toBeTruthy();
     }
 
     for (const [teamRole, record] of Object.entries(roleIndex.team_roles || {})) {
-      expect(record.selection_hints?.preferred_agents?.length, `missing agent hints for ${teamRole}`).toBeGreaterThan(0);
-      expect(record.selection_hints?.preferred_models?.length, `missing model hints for ${teamRole}`).toBeGreaterThan(0);
+      expect(
+        record.selection_hints?.preferred_agents?.length,
+        `missing agent hints for ${teamRole}`
+      ).toBeGreaterThan(0);
+      expect(
+        record.selection_hints?.preferred_models?.length,
+        `missing model hints for ${teamRole}`
+      ).toBeGreaterThan(0);
     }
   });
 
   it('keeps the canonical agent profile directory in sync with the snapshot', () => {
     const ajv = new Ajv({ allErrors: true });
-    const validate = ajv.compile(loadJson('knowledge/product/schemas/agent-profile-index.schema.json'));
+    const validate = ajv.compile(
+      loadJson('knowledge/product/schemas/agent-profile-index.schema.json')
+    );
     const snapshot = loadJson('knowledge/product/orchestration/agent-profile-index.json');
     const snapshotAgents = snapshot.agents || {};
     const dirPayloads = loadAgentProfileDirectoryPayloads();
@@ -93,7 +119,9 @@ describe('Mission team composition contract', () => {
       const agentId = agentIds[0];
       expect(entry.replace(/\.json$/i, '')).toBe(agentId);
       dirAgents[agentId] = (payload as { agents: Record<string, unknown> }).agents[agentId];
-      expect(snapshotAgents[agentId], `snapshot missing agent ${agentId}`).toEqual(dirAgents[agentId]);
+      expect(snapshotAgents[agentId], `snapshot missing agent ${agentId}`).toEqual(
+        dirAgents[agentId]
+      );
     }
 
     expect(Object.keys(dirAgents).sort()).toEqual(Object.keys(snapshotAgents).sort());
@@ -138,14 +166,24 @@ describe('Mission team composition contract', () => {
     expect(plan.template).toBe('development');
     expect(plan.team_governance?.lifecycle.max_parallel_members).toBeGreaterThan(0);
     expect(plan.team_governance?.composition.required_roles).toContain('owner');
-    expect(plan.assignments.find((entry) => entry.team_role === 'owner')?.agent_id).toBe('nerve-agent');
-    expect(plan.assignments.find((entry) => entry.team_role === 'implementer')?.agent_id).toBe('implementation-architect');
-    expect(plan.assignments.find((entry) => entry.team_role === 'implementer')?.provider).toMatch(/^(gemini|codex)$/);
-    expect(plan.assignments.find((entry) => entry.team_role === 'surface_liaison')?.required).toBe(false);
+    expect(plan.assignments.find((entry) => entry.team_role === 'owner')?.agent_id).toBe(
+      'nerve-agent'
+    );
+    expect(plan.assignments.find((entry) => entry.team_role === 'implementer')?.agent_id).toBe(
+      'implementation-architect'
+    );
+    expect(plan.assignments.find((entry) => entry.team_role === 'implementer')?.provider).toMatch(
+      /^(gemini|codex|agy)$/
+    );
+    expect(plan.assignments.find((entry) => entry.team_role === 'surface_liaison')?.required).toBe(
+      false
+    );
 
     for (const assignment of plan.assignments.filter((entry) => entry.status === 'assigned')) {
       expect(agents[assignment.agent_id!].team_roles).toContain(assignment.team_role);
-      expect(teamRoles[assignment.team_role].compatible_authority_roles).toContain(assignment.authority_role!);
+      expect(teamRoles[assignment.team_role].compatible_authority_roles).toContain(
+        assignment.authority_role!
+      );
       expect(authorityRoles[assignment.authority_role!]).toBeDefined();
     }
   });
@@ -154,9 +192,11 @@ describe('Mission team composition contract', () => {
     const ajv = new Ajv({ allErrors: true });
     ajv.addSchema(
       loadJson('knowledge/product/schemas/mission-classification.schema.json'),
-      'mission-classification.schema.json',
+      'mission-classification.schema.json'
     );
-    const validate = ajv.compile(loadJson('knowledge/product/schemas/mission-team-plan.schema.json'));
+    const validate = ajv.compile(
+      loadJson('knowledge/product/schemas/mission-team-plan.schema.json')
+    );
     const plan = composeMissionTeamPlan({
       missionId: 'MSN-TEAM-PLAN',
       missionType: 'operations',
@@ -178,9 +218,15 @@ describe('Mission team composition contract', () => {
     });
 
     expect(plan.template).toBe('product_development');
-    expect(plan.assignments.find((entry) => entry.team_role === 'product_strategist')?.agent_id).toBe('sovereign-brain');
-    expect(plan.assignments.find((entry) => entry.team_role === 'experience_designer')?.required).toBe(false);
-    expect(plan.assignments.find((entry) => entry.team_role === 'operator')?.provider).toMatch(/^(gemini|codex)$/);
+    expect(
+      plan.assignments.find((entry) => entry.team_role === 'product_strategist')?.agent_id
+    ).toBe('sovereign-brain');
+    expect(
+      plan.assignments.find((entry) => entry.team_role === 'experience_designer')?.required
+    ).toBe(false);
+    expect(plan.assignments.find((entry) => entry.team_role === 'operator')?.provider).toMatch(
+      /^(gemini|codex|agy)$/
+    );
     expect(plan.assignments.find((entry) => entry.team_role === 'operator')?.modelId).toBeTruthy();
   });
 

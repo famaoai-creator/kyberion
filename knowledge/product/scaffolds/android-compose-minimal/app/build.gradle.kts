@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "{{BUNDLE_ID}}"
+    namespace = "__BUNDLE_ID__"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "{{BUNDLE_ID}}"
+        applicationId = "__BUNDLE_ID__"
         minSdk = 26
         targetSdk = 34
         versionCode = 1

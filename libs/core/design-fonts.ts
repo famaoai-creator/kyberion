@@ -70,10 +70,21 @@ function firstFontFamily(fontStack: string | undefined, fallback: string): strin
   return fallback;
 }
 
+// Module-init IO must never take the whole import graph down: on a fresh
+// clone (tokens not generated yet) or under partial test mocks we fall back
+// to the built-in stacks instead of throwing at import time.
+function loadBrandTokensOrFallback(): BrandTokens {
+  try {
+    return loadBrandTokens();
+  } catch {
+    return {} as BrandTokens;
+  }
+}
+
 export const KYBERION_BRAND_FONT_STACK =
-  loadBrandTokens().tokens?.fonts?.sans ?? FALLBACK_SANS_STACK;
+  loadBrandTokensOrFallback().tokens?.fonts?.sans ?? FALLBACK_SANS_STACK;
 export const KYBERION_BRAND_MONO_STACK =
-  loadBrandTokens().tokens?.fonts?.mono ?? FALLBACK_MONO_STACK;
+  loadBrandTokensOrFallback().tokens?.fonts?.mono ?? FALLBACK_MONO_STACK;
 
 export function resolveLatinFontFamily(fontStack?: string): string {
   return firstFontFamily(fontStack ?? KYBERION_BRAND_FONT_STACK, 'Inter');

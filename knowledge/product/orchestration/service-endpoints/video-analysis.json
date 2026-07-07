@@ -1,0 +1,10 @@
+{
+  "default_pattern": "https://api.{service_id}.com/v1",
+  "services": {
+    "video-analysis": {
+      "preset_path": "knowledge/product/orchestration/service-presets/video-analysis.json",
+      "allow_unsafe_cli": true,
+      "intent_aliases": ["analyze-video", "extract-keyframes"]
+    }
+  }
+}

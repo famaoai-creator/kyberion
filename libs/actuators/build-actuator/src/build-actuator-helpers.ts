@@ -246,9 +246,11 @@ export function scaffoldApp(input: BuildActuatorInput): BuildActuatorResult {
     throw new Error(`scaffold fixture missing: ${sourceDir}`);
   }
   const destDir = pathResolver.rootResolve(input.dest_dir);
+  // Placeholder style is __NAME__ (formatter-inert; `{{ }}` gets mangled by
+  // YAML/Kotlin formatters into `{ { NAME } }`).
   const written = copyScaffoldDir(sourceDir, destDir, {
-    '{{APP_NAME}}': input.app_name,
-    '{{BUNDLE_ID}}': input.bundle_id,
+    __APP_NAME__: input.app_name,
+    __BUNDLE_ID__: input.bundle_id,
   });
   logger.info(
     `[build-actuator] scaffolded ${platform} app into ${destDir} (${written.length} files)`

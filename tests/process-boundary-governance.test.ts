@@ -17,6 +17,7 @@ const allowedManagedProcessConsumers = [
   'libs/core/mission-orchestration-events.ts',
   'libs/core/mission-orchestration-worker.resume.test.ts',
   'scripts/run_baseline_check.ts',
+  'scripts/soak_restart_e2e.ts',
   'scripts/surface_runtime.ts',
   'tests/managed-process.test.ts',
   'tests/surface-auth.test.ts',

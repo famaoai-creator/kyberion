@@ -120,10 +120,12 @@ describe('secureFetch', () => {
           token: '[REDACTED_SECRET]',
           path: '[REDACTED_PATH]/project/secrets.txt',
         },
-        headers: {
+        // secureFetch injects its own User-Agent — match the redactions
+        // without pinning the full header set.
+        headers: expect.objectContaining({
           Authorization: '[REDACTED_SECRET]',
           'X-Trace': 'safe-value',
-        },
+        }),
       })
     );
   });

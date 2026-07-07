@@ -92,6 +92,12 @@ import { fileURLToPath } from 'node:url';
 import * as visionJudge from '@agent/shared-vision';
 import { runActuatorCli } from '@agent/core';
 export { describeOps } from './op-catalog.js';
+export {
+  SYSTEM_ACTUATOR_CAPTURE_OPS,
+  SYSTEM_ACTUATOR_APPLY_OPS,
+  SYSTEM_ACTUATOR_TRANSFORM_OPS,
+  SYSTEM_ACTUATOR_CONTROL_OPS,
+} from './op-catalog.js';
 
 /**
  * System-Actuator v2.1.0 [AUTONOMOUS CONTROL ENABLED]

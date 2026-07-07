@@ -41,7 +41,7 @@ Kyberion turns intent into governed execution. You ask `今週の進捗レポー
 
 Kyberion's first visible result comes in three short paths:
 
-- 30 seconds: run `pnpm doctor` and see Kyberion's readiness boundary
+- 30 seconds: run `pnpm doctor` and see Kyberion's readiness/value boundary
 - 5 minutes: run the clean browser smoke and get `active/shared/tmp/first-win-session.png`
 - 15 minutes: read the Quickstart structure map, then inspect the pipeline and actuator entrypoints
 

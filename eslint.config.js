@@ -8,6 +8,7 @@ export default [
       '.tmp-mulmoclaude/**',
       '.pnpm-store/**',
       '.worktrees/**',
+      '.tmp-agency-agents/**',
       'node_modules/**',
       '**/node_modules/**',
       '.venv/**',

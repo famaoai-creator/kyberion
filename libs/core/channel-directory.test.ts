@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { formatChannelDirectoryEntry, getChannelDirectoryEntry, listChannelDirectoryEntries } from './channel-directory.js';
+import {
+  formatChannelDirectoryEntry,
+  getChannelDirectoryEntry,
+  listChannelDirectoryEntries,
+} from './channel-directory.js';
 
 describe('channel-directory', () => {
   it('lists the governed channel directory entries in stable order', () => {
@@ -7,6 +11,7 @@ describe('channel-directory', () => {
 
     expect(entries.map((entry) => entry.channel)).toEqual([
       'chronos',
+      'cli',
       'discord',
       'imessage',
       'presence',

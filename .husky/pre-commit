@@ -1,1 +1,24 @@
+# Block newly added compiled-JS shadows next to TS sources. Stray build
+# artifacts staged via `git add .` broke boundary tests and shadowed modules
+# at runtime (2026-07-08 incident); legacy tracked mirrors are unaffected
+# because only newly ADDED files are checked.
+shadows=""
+for f in $(git diff --cached --name-only --diff-filter=A | grep -E '\.(js|js\.map|d\.ts|d\.ts\.map)$' || true); do
+  base="$f"
+  case "$f" in
+    *.d.ts.map) base="${f%.d.ts.map}" ;;
+    *.d.ts) base="${f%.d.ts}" ;;
+    *.js.map) base="${f%.js.map}" ;;
+    *.js) base="${f%.js}" ;;
+  esac
+  if [ -f "${base}.ts" ] || [ -f "${base}.tsx" ]; then
+    shadows="$shadows\n  $f"
+  fi
+done
+if [ -n "$shadows" ]; then
+  printf 'ERROR: staged compiled artifacts shadow TypeScript sources:%b\n' "$shadows"
+  echo 'Unstage them (git reset HEAD <file>) and delete; build output belongs in dist/.'
+  exit 1
+fi
+
 npx lint-staged
