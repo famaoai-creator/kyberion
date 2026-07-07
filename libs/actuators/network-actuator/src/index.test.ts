@@ -318,6 +318,27 @@ describe('network-actuator', () => {
 
         expect(result.status).toBe('succeeded');
       });
+
+      it('control step のネスト実行でも total_steps を共有して数える', async () => {
+        const result = await handleAction({
+          action: 'pipeline',
+          context: { flag: true },
+          steps: [
+            {
+              type: 'control',
+              op: 'if',
+              params: {
+                condition: { from: 'flag', operator: 'eq', value: true },
+                then: [{ type: 'apply', op: 'log', params: { message: 'nested branch' } }],
+              },
+            },
+          ],
+        });
+
+        expect(result.status).toBe('succeeded');
+        expect(result.total_steps).toBe(2);
+        expect(result.results).toHaveLength(1);
+      });
     });
   });
 

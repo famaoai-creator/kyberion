@@ -18,7 +18,8 @@ import * as path from 'path';
 import * as zlib from 'zlib';
 import * as crypto from 'crypto';
 import { createRequire } from 'node:module';
-import { safeExistsSync, safeReadFile, safeWriteFile } from '../../secure-io.js';
+import fontkit from './fontkit-shim.js';
+import { safeExistsSync, safeExecResult, safeReadFile, safeWriteFile } from '../../secure-io.js';
 import { pathResolver } from '../../path-resolver.js';
 import type {
   PdfDesignProtocol,

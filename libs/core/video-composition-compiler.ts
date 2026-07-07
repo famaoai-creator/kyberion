@@ -263,7 +263,7 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
         font-size: 13px;
         letter-spacing: 0.18em;
         text-transform: uppercase;
-        color: #93c5fd;
+        color: var(--kb-accent-blue-soft, #93c5fd);
         margin-bottom: 18px;
       }
       .eyebrow::before {
@@ -271,7 +271,7 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
         width: 10px;
         height: 10px;
         border-radius: 999px;
-        background: #60a5fa;
+        background: var(--kb-accent-blue, #60a5fa);
         box-shadow: 0 0 18px rgba(96,165,250,0.6);
       }
       h1 {
@@ -313,7 +313,7 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
         height: 56px;
         border-radius: 18px;
         background: rgba(96,165,250,0.16);
-        color: #bfdbfe;
+        color: var(--kb-accent-blue-text, #bfdbfe);
         font-weight: 800;
         letter-spacing: 0.08em;
       }
@@ -329,7 +329,7 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
         padding: 10px 14px;
         border-radius: 999px;
         background: rgba(96,165,250,0.12);
-        color: #cfe3ff;
+        color: var(--kb-accent-blue-muted, #cfe3ff);
         border: 1px solid rgba(96,165,250,0.18);
         font-size: 14px;
       }
@@ -451,7 +451,7 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
         gap: 10px;
         text-transform: uppercase;
         letter-spacing: 0.22em;
-        color: #f59e0b;
+        color: var(--kb-accent-orange, #f59e0b);
         font-size: 13px;
         margin-bottom: 16px;
       }
@@ -515,7 +515,7 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
         background: rgba(7,17,31,0.7);
         border: 1px solid rgba(148,163,184,0.12);
       }
-      .metric span { display: block; color: #f59e0b; font-size: 12px; text-transform: uppercase; letter-spacing: 0.18em; margin-bottom: 8px; }
+      .metric span { display: block; color: var(--kb-accent-orange, #f59e0b); font-size: 12px; text-transform: uppercase; letter-spacing: 0.18em; margin-bottom: 8px; }
       .metric strong { font-size: 22px; line-height: 1.15; }
       @keyframes pulse { from { transform: translateY(0); } to { transform: translateY(-6px); } }
       @keyframes fadeIn { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
@@ -719,14 +719,14 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
         font-size: 13px;
         letter-spacing: 0.18em;
         text-transform: uppercase;
-        color: #93c5fd;
+        color: var(--kb-accent-blue-soft, #93c5fd);
       }
       .persona-line::before {
         content: '';
         width: 10px;
         height: 10px;
         border-radius: 999px;
-        background: #22c55e;
+        background: var(--kb-accent-green, #22c55e);
         box-shadow: 0 0 16px rgba(34,197,94,0.5);
       }
       .panel {
@@ -764,7 +764,7 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
       .bubble strong {
         display: block;
         margin-bottom: 4px;
-        color: #93c5fd;
+        color: var(--kb-accent-blue-soft, #93c5fd);
         text-transform: uppercase;
         letter-spacing: 0.16em;
         font-size: 12px;
@@ -784,8 +784,8 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
         padding: 10px 14px;
         border-radius: 999px;
         background: rgba(34,197,94,0.12);
-        color: #bbf7d0;
-        border: 1px solid rgba(34,197,94,0.18);
+        color: var(--kb-accent-green-muted, #bbf7d0);
+        border: 1px solid var(--kb-accent-green-soft, rgba(34,197,94,0.18));
         font-size: 14px;
       }
 
@@ -965,7 +965,7 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
         height: 56px;
         border-radius: 18px;
         background: rgba(59, 130, 246, 0.16);
-        color: #93c5fd;
+        color: var(--kb-accent-blue-soft, #93c5fd);
         font-weight: 800;
         font-size: 16px;
         letter-spacing: 0.08em;
@@ -1303,7 +1303,9 @@ function sceneLayoutVariant(scene: CompiledVideoCompositionScene): string {
 }
 
 function sceneThemeLayoutFamily(scene: CompiledVideoCompositionScene): string {
-  return String(scene.content?.layout_family || scene.content?.layout_variant || scene.template_id || 'default');
+  return String(
+    scene.content?.layout_family || scene.content?.layout_variant || scene.template_id || 'default'
+  );
 }
 
 function sceneThemeMotionProfile(scene: CompiledVideoCompositionScene): string {
@@ -1346,8 +1348,7 @@ function buildSceneCssVars(
     '--accent': `var(--kb-accent, ${themeVars['--kb-accent'] || '#60a5fa'})`,
     '--text': `var(--kb-text-primary, ${themeVars['--kb-text-primary'] || '#f8fafc'})`,
     '--subtext': `var(--kb-text-secondary, ${themeVars['--kb-text-secondary'] || '#94a3b8'})`,
-    '--font-sans':
-      `var(--kb-font-sans, ${themeVars['--kb-font-sans'] || '"Inter", -apple-system, BlinkMacSystemFont, sans-serif'})`,
+    '--font-sans': `var(--kb-font-sans, ${themeVars['--kb-font-sans'] || '"Inter", -apple-system, BlinkMacSystemFont, sans-serif'})`,
     '--radius-panel': `var(--kb-panel-radius, ${themeVars['--kb-panel-radius'] || '32px'})`,
     '--radius-surface': `var(--kb-surface-radius, ${themeVars['--kb-surface-radius'] || '24px'})`,
   };

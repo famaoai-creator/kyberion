@@ -288,7 +288,9 @@ function validateDesignTokenCatalog(violations: string[]) {
 
   for (const filePath of tokenFiles) {
     if (!safeExistsSync(filePath)) {
-      violations.push(`design-tokens: missing file ${path.relative(pathResolver.rootDir(), filePath)}`);
+      violations.push(
+        `design-tokens: missing file ${path.relative(pathResolver.rootDir(), filePath)}`
+      );
       continue;
     }
     const actual = String(safeReadFile(filePath, { encoding: 'utf8' }) || '').trim();
@@ -327,7 +329,9 @@ function validateDesignTokenCatalog(violations: string[]) {
 
   for (const filePath of themeFiles) {
     if (!safeExistsSync(filePath)) {
-      violations.push(`design-tokens: missing file ${path.relative(pathResolver.rootDir(), filePath)}`);
+      violations.push(
+        `design-tokens: missing file ${path.relative(pathResolver.rootDir(), filePath)}`
+      );
       continue;
     }
     const raw = JSON.parse(String(safeReadFile(filePath, { encoding: 'utf8' }) || '')) as {
@@ -361,6 +365,24 @@ function validateDesignTokenCatalog(violations: string[]) {
       );
     }
   }
+
+  // E2E-02: the flat catalog and the decomposed directory copy are a generated
+  // pair; their theme maps must stay identical so neither drifts silently.
+  try {
+    const flat = JSON.parse(String(safeReadFile(themeFiles[0], { encoding: 'utf8' }) || '')) as {
+      themes?: Record<string, unknown>;
+    };
+    const nested = JSON.parse(String(safeReadFile(themeFiles[1], { encoding: 'utf8' }) || '')) as {
+      themes?: Record<string, unknown>;
+    };
+    if (JSON.stringify(flat.themes || {}) !== JSON.stringify(nested.themes || {})) {
+      violations.push(
+        'design-tokens: themes.json and themes/themes.json theme maps diverged. Run pnpm tsx scripts/generate_design_tokens.ts and align manual edits.'
+      );
+    }
+  } catch {
+    // missing-file violations are already reported above
+  }
 }
 
 function validateCapabilitiesGuideDrift(violations: string[]) {
@@ -379,7 +401,7 @@ function validateCapabilitiesGuideDrift(violations: string[]) {
     );
   }
   if (
-    !/\|\s*Actuator\s*\|\s*Description\s*\|\s*Version\s*\|\s*Ops\s*\|\s*Prerequisites\s*\|\s*Contract Schema\s*\|\s*Path\s*\|/u.test(
+    !/\|\s*Actuator\s*\|\s*Description\s*\|\s*Version\s*\|\s*Ops Count\s*\|\s*Ops\s*\|\s*Prerequisites\s*\|\s*Contract Schema\s*\|\s*Path\s*\|/u.test(
       guide
     )
   ) {
