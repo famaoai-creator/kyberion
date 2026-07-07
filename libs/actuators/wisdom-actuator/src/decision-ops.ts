@@ -46,6 +46,8 @@ import {
   type MeetingFacilitatorPolicy,
   type PresentationPreferenceProfile,
   delegateBestOf,
+  resolveToolsForContext,
+  inferContextType,
 } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
 import * as path from 'node:path';
@@ -2848,9 +2850,29 @@ export async function dispatchDecisionOp(
         params.use_subagent === true ||
         String(params.execution_mode ?? params.mode ?? '') === 'subagent' ||
         String(params.execution_mode ?? params.mode ?? '') === 'delegate';
-      const response = useSubagent
-        ? await backend.delegateTask(instruction, contextRaw)
-        : await backend.prompt(fullPrompt);
+
+      if (useSubagent) {
+        const response = await backend.delegateTask(instruction, contextRaw);
+        return { handled: true, ctx: assign(response) };
+      }
+
+      // ── Tool-Context Resolution ──────────────────────────────────────────
+      // Infer the appropriate tool set from execution context, then pass to
+      // generateWithTools if the backend supports it and tools are non-empty.
+      // Falls back to plain prompt() for 'ask' contexts or unsupported backends.
+      const contextType = inferContextType(ctx, params);
+      const tools = resolveToolsForContext(contextType);
+      const supportsTools = typeof backend.generateWithTools === 'function' && tools.length > 0;
+
+      if (supportsTools) {
+        logger.info(
+          `[wisdom:reasoning] context=${contextType} → ${tools.length} tool(s) resolved; using generateWithTools.`
+        );
+        const result = await backend.generateWithTools!(fullPrompt, tools);
+        return { handled: true, ctx: assign(result.text ?? result) };
+      }
+
+      const response = await backend.prompt(fullPrompt);
       return { handled: true, ctx: assign(response) };
     }
 

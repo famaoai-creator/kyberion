@@ -1127,6 +1127,12 @@ export type {
   OpenAiCompatibleBackendOptions,
   OpenAiCompatibleBackendAvailability,
 } from './openai-compatible-backend.js';
+export {
+  resolveToolsForContext,
+  inferContextType,
+  resetToolContextResolverCache,
+} from './tool-context-resolver.js';
+export type { ToolContextType } from './tool-context-resolver.js';
 export { OpenRouterBackend, buildOpenRouterBackendFromEnv } from './openrouter-backend.js';
 export type { OpenRouterBackendOptions } from './openrouter-backend.js';
 export { runGeminiCliQuery, buildGeminiCliBackendFromEnv } from './gemini-cli-backend.js';
