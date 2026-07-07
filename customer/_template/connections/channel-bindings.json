@@ -1,0 +1,4 @@
+{
+  "_comment": "E2E-06: bind surface channels to this customer. Messages on a bound channel run in customer mode (catalog-grounded, approval-gated outbound). See schemas/customer-channel-binding.schema.json.",
+  "bindings": []
+}
