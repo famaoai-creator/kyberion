@@ -1,0 +1,142 @@
+{
+  "version": "1.0.0",
+  "organization_id": "{COMPANY_SLUG}",
+  "name": "{COMPANY_NAME} 組織図(SaaS・プロダクト開発企業)",
+  "source_kind": "customer",
+  "source_path": "customer/{COMPANY_SLUG}/org-chart.json",
+  "domains": [
+    {
+      "domain_id": "leadership",
+      "name": "Leadership & Strategy",
+      "role_ids": ["ceo", "business_owner", "product_manager"]
+    },
+    {
+      "domain_id": "engineering",
+      "name": "Engineering & Reliability",
+      "role_ids": [
+        "solution_architect",
+        "software_developer",
+        "qa_lead",
+        "reliability_engineer",
+        "performance_engineer"
+      ]
+    },
+    {
+      "domain_id": "growth",
+      "name": "Sales & Growth",
+      "role_ids": ["strategic_sales", "marketing_growth", "customer_success"]
+    },
+    {
+      "domain_id": "governance",
+      "name": "Governance & Corporate",
+      "role_ids": ["pmo_governance", "cyber_security", "legal_strategist", "finance_controller"]
+    }
+  ],
+  "positions": [
+    {
+      "role_id": "ceo",
+      "reports_to": null,
+      "held_by": "human",
+      "responsibility_scope": "経営方針・最終意思決定・リソース配分",
+      "authority_role_ref": "mission_controller"
+    },
+    {
+      "role_id": "business_owner",
+      "reports_to": "ceo",
+      "held_by": "sovereign-brain",
+      "responsibility_scope": "事業計画・P/L 責任・優先順位の裁定",
+      "authority_role_ref": null
+    },
+    {
+      "role_id": "product_manager",
+      "reports_to": "ceo",
+      "held_by": "sovereign-brain",
+      "responsibility_scope": "プロダクト戦略・ロードマップ・要求定義",
+      "authority_role_ref": null
+    },
+    {
+      "role_id": "solution_architect",
+      "reports_to": "product_manager",
+      "held_by": "sovereign-brain",
+      "responsibility_scope": "アーキテクチャ設計・技術選定",
+      "authority_role_ref": "ecosystem_architect"
+    },
+    {
+      "role_id": "software_developer",
+      "reports_to": "solution_architect",
+      "held_by": "sovereign-brain",
+      "responsibility_scope": "機能実装・コード品質",
+      "authority_role_ref": "software_developer"
+    },
+    {
+      "role_id": "qa_lead",
+      "reports_to": "product_manager",
+      "held_by": "sovereign-brain",
+      "responsibility_scope": "品質保証戦略・テスト計画・リリース判定",
+      "authority_role_ref": null
+    },
+    {
+      "role_id": "reliability_engineer",
+      "reports_to": "solution_architect",
+      "held_by": "sovereign-brain",
+      "responsibility_scope": "SLO 管理・運用自動化・障害対応",
+      "authority_role_ref": null
+    },
+    {
+      "role_id": "performance_engineer",
+      "reports_to": "solution_architect",
+      "held_by": "sovereign-brain",
+      "responsibility_scope": "性能分析・キャパシティ計画",
+      "authority_role_ref": null
+    },
+    {
+      "role_id": "strategic_sales",
+      "reports_to": "business_owner",
+      "held_by": "sovereign-brain",
+      "responsibility_scope": "エンタープライズ営業・パイプライン管理",
+      "authority_role_ref": null
+    },
+    {
+      "role_id": "marketing_growth",
+      "reports_to": "business_owner",
+      "held_by": "sovereign-brain",
+      "responsibility_scope": "マーケティング施策・リード獲得・ブランド",
+      "authority_role_ref": null
+    },
+    {
+      "role_id": "customer_success",
+      "reports_to": "business_owner",
+      "held_by": "sovereign-brain",
+      "responsibility_scope": "オンボーディング・解約防止・アップセル",
+      "authority_role_ref": null
+    },
+    {
+      "role_id": "pmo_governance",
+      "reports_to": "ceo",
+      "held_by": "sovereign-brain",
+      "responsibility_scope": "プロジェクト統制・進捗ガバナンス",
+      "authority_role_ref": null
+    },
+    {
+      "role_id": "cyber_security",
+      "reports_to": "ceo",
+      "held_by": "sovereign-brain",
+      "responsibility_scope": "セキュリティ統制・脆弱性管理",
+      "authority_role_ref": null
+    },
+    {
+      "role_id": "legal_strategist",
+      "reports_to": "ceo",
+      "held_by": "sovereign-brain",
+      "responsibility_scope": "契約・知財・利用規約",
+      "authority_role_ref": null
+    },
+    {
+      "role_id": "finance_controller",
+      "reports_to": "ceo",
+      "held_by": "sovereign-brain",
+      "responsibility_scope": "予実管理・請求・監査対応",
+      "authority_role_ref": null
+    }
+  ]
+}

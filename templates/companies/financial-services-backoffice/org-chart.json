@@ -1,0 +1,113 @@
+{
+  "version": "1.0.0",
+  "organization_id": "{COMPANY_SLUG}",
+  "name": "{COMPANY_NAME} 組織図(金融・管理部門バックオフィス運営)",
+  "source_kind": "customer",
+  "source_path": "customer/{COMPANY_SLUG}/org-chart.json",
+  "domains": [
+    {
+      "domain_id": "leadership",
+      "name": "Leadership",
+      "role_ids": ["ceo", "line_manager"]
+    },
+    {
+      "domain_id": "finance",
+      "name": "Finance & Accounting",
+      "role_ids": ["finance_controller", "ruthless_auditor"]
+    },
+    {
+      "domain_id": "governance",
+      "name": "Governance / Risk / Compliance",
+      "role_ids": ["pmo_governance", "legal_strategist", "cyber_security"]
+    },
+    {
+      "domain_id": "operations",
+      "name": "Operations & Systems",
+      "role_ids": ["integration_steward", "infrastructure_sentinel", "executive_assistant"]
+    },
+    {
+      "domain_id": "people",
+      "name": "People",
+      "role_ids": ["talent_culture"]
+    }
+  ],
+  "positions": [
+    {
+      "role_id": "ceo",
+      "reports_to": null,
+      "held_by": "human",
+      "responsibility_scope": "管掌役員・最終決裁",
+      "authority_role_ref": "mission_controller"
+    },
+    {
+      "role_id": "line_manager",
+      "reports_to": "ceo",
+      "held_by": "sovereign-brain",
+      "responsibility_scope": "部門運営・業務割当・エスカレーション裁定",
+      "authority_role_ref": null
+    },
+    {
+      "role_id": "finance_controller",
+      "reports_to": "line_manager",
+      "held_by": "sovereign-brain",
+      "responsibility_scope": "月次決算・予実管理・支払・稟議起票",
+      "authority_role_ref": null
+    },
+    {
+      "role_id": "ruthless_auditor",
+      "reports_to": "ceo",
+      "held_by": "sovereign-brain",
+      "responsibility_scope": "内部監査・証跡検証・統制テスト",
+      "authority_role_ref": null
+    },
+    {
+      "role_id": "pmo_governance",
+      "reports_to": "line_manager",
+      "held_by": "sovereign-brain",
+      "responsibility_scope": "業務プロセス統制・規程管理・進捗管理",
+      "authority_role_ref": null
+    },
+    {
+      "role_id": "legal_strategist",
+      "reports_to": "ceo",
+      "held_by": "sovereign-brain",
+      "responsibility_scope": "契約審査・コンプライアンス・当局対応",
+      "authority_role_ref": null
+    },
+    {
+      "role_id": "cyber_security",
+      "reports_to": "ceo",
+      "held_by": "sovereign-brain",
+      "responsibility_scope": "情報セキュリティ統制・アクセス権管理",
+      "authority_role_ref": null
+    },
+    {
+      "role_id": "integration_steward",
+      "reports_to": "line_manager",
+      "held_by": "sovereign-brain",
+      "responsibility_scope": "基幹システム連携・データ授受運用",
+      "authority_role_ref": null
+    },
+    {
+      "role_id": "infrastructure_sentinel",
+      "reports_to": "line_manager",
+      "held_by": "sovereign-brain",
+      "responsibility_scope": "システム監視・定常運用・障害一次対応",
+      "authority_role_ref": "system_configurator"
+    },
+    {
+      "role_id": "executive_assistant",
+      "reports_to": "line_manager",
+      "held_by": "sovereign-brain",
+      "responsibility_scope": "庶務・会議体運営・文書管理",
+      "authority_role_ref": "sovereign_concierge"
+    },
+    {
+      "role_id": "talent_culture",
+      "reports_to": "ceo",
+      "held_by": "sovereign-brain",
+      "responsibility_scope": "人事評価運用・労務・研修",
+      "authority_role_ref": null
+    }
+  ]
+}

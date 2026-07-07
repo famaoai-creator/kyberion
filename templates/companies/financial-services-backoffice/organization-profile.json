@@ -1,0 +1,27 @@
+{
+  "version": "1.0.0",
+  "organization_id": "{COMPANY_SLUG}",
+  "name": "{COMPANY_NAME} — 金融・管理部門バックオフィス運営",
+  "description": "金融・管理部門バックオフィス運営向けの組織プロファイル(業態テンプレート: financial-services-backoffice)。",
+  "mission_defaults": {
+    "default_mission_class": "operations_and_release",
+    "default_team_template": "operations",
+    "default_agent_profile": "default"
+  },
+  "team_defaults": {
+    "default_team_template": "operations",
+    "team_template_catalog_id": "financial-services-backoffice",
+    "default_lifecycle_template": "default",
+    "max_parallel_missions": 4
+  },
+  "llm": {
+    "purpose_map": {
+      "distill": "heavy",
+      "validate": "standard",
+      "summarize": "light",
+      "classify": "light"
+    },
+    "default_profile": "standard",
+    "profile_overrides": {}
+  }
+}

@@ -53,3 +53,11 @@
 - 2026-07-05: `pnpm org role create` を追加し、`authority-roles/*.json` / `team-roles/*.json` / `role-authority-map.json` / `security-policy.json` / `roles/{id}/PROCEDURE.md` / `mission.md` を一括生成・更新できるようにした。
 - 2026-07-05: `security-policy.json` と `role-authority-map.json` に finance_controller / strategic_sales / marketing_growth / talent_culture / line_manager の限定 authority_role を追加し、`validateWritePermission` が business role の act を認める最小経路を実装した。
 - 2026-07-05: `pnpm org role promote` を追加し、既存 role の advise→act 昇格を明示操作として扱えるようにした。昇格時は authority role / team role / security policy / role-write-access / role-authority-map / promotion notes を一括更新する。
+
+## 実装メモ 追記 (2026-07-06) — 業態別 会社・組織図テンプレート
+
+- `templates/companies/` に業態別会社テンプレート 5 種を追加: `saas-product-company` / `consulting-firm` / `marketing-agency` / `financial-services-backoffice` / `it-managed-services`。各テンプレートは `organization-profile.json` + `org-chart.json`(ドメイン・ポジション・レポートライン・authority 参照)+ `customer.json` / `identity.json` / `vision.md` + README で構成。
+- 組織図は全業態で「CEO のみ `held_by: human`(最終決裁は人間)、他はエージェント」を既定とし、CO-02 の「既定の出発点」原則を README に明記。role_id は `knowledge/product/roles/` の 26 ビジネスロール、authority_role_ref は `governance/authority-roles/` の実在 id のみ使用(契約テストで強制)。
+- 業態別チームテンプレートカタログ 5 種を `organization-team-template-catalogs/` に追加し、各プロファイルの `team_defaults.team_template_catalog_id` から参照。
+- 実体化 CLI `pnpm company:bootstrap --vertical <id> --slug <slug> --name "<会社名>"`(`scripts/company_bootstrap.ts`)を追加。プレースホルダ置換で `customer/<slug>/` に生成し、`resolveOrganizationOrgChart` / `loadOrganizationProfile` / `composeMissionTeamPlan`(organization_chart summary)まで E2E 確認済み。
+- 契約テスト `tests/company-vertical-templates-contract.test.ts` がスキーマ適合・ロール/権限の実在・レポートライン解決・「root は human 1 名」を全業態に対して固定。

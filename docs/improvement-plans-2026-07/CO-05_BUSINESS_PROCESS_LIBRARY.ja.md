@@ -55,3 +55,5 @@
 - 2026-07-05: `knowledge/product/pipeline-templates/procurement-vendor.json` / `performance-review.json` / `fundraising-prep.json` を追加し、調達・人事評価・資金調達準備の最小プロセスをテンプレート化した。
 - 2026-07-05: `knowledge/product/governance/mission-workflow-catalog.json` に上記 3 テンプレートの選択規則を追加した。
 - 完了: CO-05 の基幹業務テンプレート 6 本を揃え、`mission-workflow-catalog` から選択可能になった。
+- 2026-07-06: MO-01 の phaseSpec 機構に載せ、既存 7 テンプレート(procurement-vendor / performance-review / fundraising-prep / hiring-workflow / financial-close-monthly / budget-review / board-meeting-prep)へ**フェーズ別 default_tasks・レビューフェーズ・evidence/human ゲート**を付与した(フェーズ id は不変)。ミッション作成時に NEXT_TASKS.json とゲート定義まで自動展開される。
+- 2026-07-06: ライブラリを 7 業務プロセス追加で拡充: `research-report`(調査)/ `data-analysis-report`(データ分析)/ `marketing-campaign-production`(マーケ)/ `contract-review-approval`(契約レビュー)/ `customer-onboarding-engagement`(顧客オンボーディング)/ `training-material-authoring`(研修資料)/ `event-planning-operations`(イベント運営)。すべて intent/mission-type/日本語発話で分類ポリシーからルーティングされる(カタログ v1.2.0)。
