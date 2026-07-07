@@ -2,10 +2,21 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Deployment Adapter Config",
   "type": "object",
-  "required": ["command"],
+  "anyOf": [{ "required": ["command"] }, { "required": ["adapter", "platform", "project_dir"] }],
   "properties": {
+    "adapter": {
+      "enum": ["shell", "mobile-beta"],
+      "description": "Adapter kind. Default shell (command). mobile-beta delegates to fastlane (E2E-05 Task 6)."
+    },
     "command": { "type": "string", "minLength": 1 },
     "shell": { "type": "string" },
+    "platform": { "enum": ["ios", "android"], "description": "mobile-beta only" },
+    "project_dir": {
+      "type": "string",
+      "minLength": 1,
+      "description": "mobile-beta: app repo root containing fastlane/Fastfile"
+    },
+    "lane": { "type": "string", "description": "mobile-beta: fastlane lane (default beta)" },
     "timeout_ms": { "type": "integer", "minimum": 1 },
     "cwd": { "type": "string" },
     "env": {

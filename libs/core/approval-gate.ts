@@ -16,6 +16,7 @@ import {
 import type { GovernedArtifactRole } from './artifact-store.js';
 import { auditChain } from './audit-chain.js';
 import { recordGovernanceAction } from './kill-switch.js';
+import { notifyOperator } from './operator-notifications.js';
 
 export interface ApprovalGateParams {
   /** Intent being executed. */
@@ -331,6 +332,12 @@ export function enforceApprovalGate(
     metadata: { correlationId, intentId, requestId: record.id },
   });
   recordGovernanceAction(agentId, 'approval_gate', `${operationId}:pending`, true);
+  void notifyOperator('approval_required', {
+    title: draft.title || `Approval required: ${operationId}`,
+    body: draft.summary || `Agent ${agentId} requested ${operationId}.`,
+    link_hint: `approval request ${record.id}`,
+    correlation_id: record.id,
+  });
 
   return {
     allowed: false,

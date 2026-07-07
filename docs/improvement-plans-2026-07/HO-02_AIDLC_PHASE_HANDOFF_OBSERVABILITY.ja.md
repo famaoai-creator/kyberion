@@ -49,3 +49,7 @@
 - AI-DLC の自動化は大規模。**まず state オブジェクトの受け渡し(Task 1)を最小フェーズ(Execution→Test)で実証**し、全 5 フェーズ + circuit-breaker は段階的に。人手ランブックは当面 fallback として残す(いきなり全自動化しない)。
 - フェーズ状態が肥大化しやすい(diff・ログ全文)。state は参照 + 要約中心にし(MO-04 の予算原則)、全文は成果物ストアに置いて ref を渡す。
 - 統合履歴ビューは複数ストア横断で重い。相関 ID インデックス前提、ページング。AA-05 の実装と統合して二重にしない。
+
+## ステータス追記(2026-07-07)
+
+E2E-05 Task 4 の `pipelines/sdlc-cycle.json` により、中核ギャップ「工程間の人手コピペ」は1本のパイプラインで塞がった(intent → requirements → design → task-plan → NEXT_TASKS → test-plan)。以降の工程可視化・handoff 観測は本計画の残余スコープ。

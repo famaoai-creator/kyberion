@@ -5,6 +5,8 @@
 
 import * as path from 'node:path';
 import {
+  addInboxEntry,
+  notifyOperator,
   findMissionPath,
   customerResolver,
   grantAccess,
@@ -390,6 +392,12 @@ function recordMissionFinishGateFailure(input: {
     reason: input.reason,
     next_status: input.state.status,
     repair_task_ids: repairTaskIds,
+  });
+  void notifyOperator('mission_failed', {
+    title: `Mission ${input.missionId} blocked at ${input.gateId}`,
+    body: input.reason,
+    link_hint: `pnpm mission status ${input.missionId}`,
+    correlation_id: `${input.missionId}:${input.gateId}`,
   });
   const gatePath = recordMissionGateOverride({
     missionId: input.missionId,
@@ -914,6 +922,38 @@ export async function finishMission(
   await saveState(upperId, state);
   await args.syncProjectLedgerIfLinked(upperId);
   traceCtx.addEvent('ledger.synced', { evidence_count: evidence.length });
+
+  // E2E-04 Tasks 2+3: deliverables land in the operator inbox and the
+  // completion is pushed to the configured channel (failure-tolerant).
+  try {
+    if (evidenceRefs.length > 0) {
+      addInboxEntry({
+        missionId: upperId,
+        title: completionGoal.summary,
+        artifactPaths: evidenceRefs,
+        summary:
+          (typeof completionNextAction === 'string'
+            ? completionNextAction
+            : completionNextAction?.next_step) || `Mission ${upperId} completed.`,
+      });
+      void notifyOperator('deliverable_ready', {
+        title: completionGoal.summary,
+        body: `成果物 ${evidenceRefs.length} 件が inbox に届きました。`,
+        link_hint: 'pnpm kyberion inbox',
+        correlation_id: upperId,
+      });
+    }
+    void notifyOperator('mission_completed', {
+      title: `Mission ${upperId} completed`,
+      body: completionGoal.summary,
+      link_hint: `pnpm mission status ${upperId}`,
+      correlation_id: upperId,
+    });
+  } catch (err: any) {
+    logger.warn(
+      `⚠️ [NOTIFY] Completion notification failed for ${upperId}: ${err?.message || err}`
+    );
+  }
 
   traceCtx.startSpan('mission:customer-delivery');
   try {

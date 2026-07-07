@@ -61,3 +61,7 @@ repo には**2つの断絶した世界**がある:
 - ルーブリックの過剰厳格は正常な成果物を「poor」と誤判定し無駄な redo を生む。まず warn(採点を記録するが redo しない)で観測 → 精度確認 → redo/escalation 有効化。
 - judge/reviewer も LLM なので誤判定する。redo は上限付き(無限ループ防止)、判定に confidence を添え、low は人間レビュー(SU-03)へ回す。
 - stub backend では品質機構が形骸化。テストは judge/critique 応答を fixture 注入。
+
+## 実装状況(2026-07-07)
+
+最小起動済み(E2E-03 Task 5): `risk === 'high' | 'high_stakes'` の implement 系タスクは best-of-2(最小実装優先 vs 堅牢性優先)+ 独立 judge で採択される(`mission-orchestration-worker.ts` の `obtainBestOfTaskResultResponse`)。敗者は `evidence/alternatives/` に保存、judge 判定は task イベント `best_of_judged`(cost_multiplier: 2)で記録。`KYBERION_BEST_OF_N=0` で無効化。draft-refine / 敵対レビュー全面適用は残余。

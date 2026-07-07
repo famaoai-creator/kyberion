@@ -24,6 +24,7 @@ import { logger } from './core.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { MobileBetaDeploymentAdapter } from './deployment-adapters/mobile-beta.js';
 
 export interface DeployInput {
   /** Semantic environment — prod / staging / canary / dr etc. */
@@ -95,8 +96,12 @@ export interface ShellDeploymentAdapterOptions {
 }
 
 export interface ShellDeploymentAdapterConfig {
-  command: string;
+  adapter?: 'shell' | 'mobile-beta';
+  command?: string;
   shell?: string;
+  platform?: 'ios' | 'android';
+  project_dir?: string;
+  lane?: string;
   timeout_ms?: number;
   cwd?: string;
   env?: Record<string, string>;
@@ -209,6 +214,34 @@ export function installShellDeploymentAdapterFromConfigIfAvailable(
 ): boolean {
   const loaded = loadShellDeploymentAdapterConfig(env);
   if (!loaded) return false;
+  // E2E-05 Task 6: config can select the fastlane-delegating mobile adapter.
+  if (loaded.config.adapter === 'mobile-beta') {
+    if (!loaded.config.platform || !loaded.config.project_dir) {
+      throw new Error(
+        `Invalid deployment adapter config at ${loaded.path}: mobile-beta requires platform and project_dir`
+      );
+    }
+    registerDeploymentAdapter(
+      new MobileBetaDeploymentAdapter({
+        platform: loaded.config.platform,
+        projectDir: pathResolver.rootResolve(loaded.config.project_dir),
+        ...(typeof loaded.config.lane === 'string' ? { lane: loaded.config.lane } : {}),
+        ...(typeof loaded.config.timeout_ms === 'number'
+          ? { timeoutMs: loaded.config.timeout_ms }
+          : {}),
+        ...(loaded.config.env ? { env: loaded.config.env } : {}),
+      })
+    );
+    logger.success(
+      `[deployment-adapter] installed MobileBetaDeploymentAdapter from ${loaded.path}`
+    );
+    return true;
+  }
+  if (!loaded.config.command) {
+    throw new Error(
+      `Invalid deployment adapter config at ${loaded.path}: shell adapter requires command`
+    );
+  }
   registerDeploymentAdapter(
     new ShellDeploymentAdapter({
       command: loaded.config.command,

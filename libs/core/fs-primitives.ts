@@ -11,6 +11,13 @@ import * as path from 'node:path';
  * - This module is foundation-only and should not be used by feature code.
  */
 function foundationRoot(): string {
+  // Keep in lockstep with path-resolver's findProjectRoot: an explicit
+  // KYBERION_ROOT override wins, so governed writes resolve against the same
+  // root the resolver produced paths from (test roots, sub-dir execution).
+  const envRoot = process.env.KYBERION_ROOT;
+  if (envRoot && fs.existsSync(path.join(envRoot, 'package.json'))) {
+    return path.resolve(envRoot);
+  }
   let current = path.resolve(process.cwd());
   const root = path.parse(current).root;
 
@@ -32,7 +39,9 @@ function assertFoundationWritePath(targetPath: string): string {
   const root = foundationRoot();
   const relative = path.relative(root, resolved);
   if (relative === '..' || relative.startsWith(`..${path.sep}`)) {
-    throw new Error(`[FOUNDATION_IO_VIOLATION] Write outside project root is not allowed: ${resolved}`);
+    throw new Error(
+      `[FOUNDATION_IO_VIOLATION] Write outside project root is not allowed: ${resolved}`
+    );
   }
   return resolved;
 }
