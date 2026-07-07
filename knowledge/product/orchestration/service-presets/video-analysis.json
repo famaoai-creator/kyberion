@@ -4,8 +4,10 @@
   "operations": {
     "analyze_video": {
       "type": "cli",
-      "command": "python3",
+      "command": "uv",
       "args": [
+        "run",
+        "python3",
         "-m",
         "claude_real_video",
         "{{source}}",
@@ -15,10 +17,7 @@
         "--viewer",
         "{{extra_args}}"
       ],
-      "env": {
-        "PYTHONPATH": "/Users/famao/forcheck/claude-real-video/src"
-      },
-      "description": "Run local video analysis using the claude-real-video (crv) package"
+      "description": "Run local video analysis using the claude-real-video (crv) package via uv run"
     }
   }
 }
