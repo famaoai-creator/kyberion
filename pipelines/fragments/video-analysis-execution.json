@@ -1,0 +1,18 @@
+{
+  "action": "pipeline",
+  "name": "video-analysis-execution-fragment",
+  "version": "1.0.0",
+  "description": "Reusable fragment: Run local video analysis using the claude-real-video package via uv. Required context vars: video_source_path, video_analysis_output_dir.",
+  "steps": [
+    {
+      "id": "run_video_analysis",
+      "role": "source",
+      "op": "system:shell",
+      "produces": { "channel": "analysis_result", "type": "ShellResult" },
+      "params": {
+        "cmd": "uv run python3 -m claude_real_video {{video_source_path}} -o {{video_analysis_output_dir}} --grid --viewer",
+        "timeout_ms": 300000
+      }
+    }
+  ]
+}
