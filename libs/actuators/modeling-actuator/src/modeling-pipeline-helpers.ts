@@ -570,6 +570,33 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
         },
       };
     }
+    case 'test_inventory_to_device_pipeline': {
+      const tests = ctx[params.from || 'test_case_inventory'];
+      const profile = ctx[params.profile_from || 'app_profile'];
+      const platform = String(params.platform || profile?.platform || '');
+      if (!tests || typeof tests !== 'object' || !Array.isArray(tests.cases)) {
+        throw new Error('test_inventory_to_device_pipeline requires a test-case-adf object');
+      }
+      if (platform !== 'android' && platform !== 'ios') {
+        throw new Error("test_inventory_to_device_pipeline requires platform 'android' | 'ios'");
+      }
+      if (!profile || typeof profile !== 'object') {
+        throw new Error('test_inventory_to_device_pipeline requires an app profile object');
+      }
+      return {
+        ...ctx,
+        [params.export_as || 'device_execution_pipeline']: compileTestInventoryToDevicePipeline(
+          tests as { app_id?: string; cases: TestInventoryCase[] },
+          profile,
+          {
+            platform,
+            artifactsDir: String(
+              params.artifacts_dir || profile.artifacts_dir || 'active/shared/tmp/test-runs'
+            ),
+          }
+        ),
+      };
+    }
     case 'terraform_to_architecture_adf': {
       const rootDir = pathResolver.rootDir();
       const terraformRoot = path.resolve(
@@ -669,4 +696,134 @@ export async function performReconcile(input: ModelingAction) {
     await executePipeline(strategy.pipeline, strategy.params || {}, input.options);
   }
   return { status: 'reconciled' };
+}
+
+// ---------------------------------------------------------------------------
+// E2E-05 Task 5: test-case-adf → device execution pipeline compiler.
+// android: full step compilation (find/tap/input + text assertions +
+// per-case screenshot). ios: deep-link navigation + screenshot evidence only —
+// richer iOS UI-interaction ops are documented residual work in the plan.
+// ---------------------------------------------------------------------------
+
+export interface TestInventoryCase {
+  case_id: string;
+  title: string;
+  objective: string;
+  steps: string[];
+  expected: string[];
+  automation_backend?: 'browser' | 'android' | 'ios';
+}
+
+interface DevicePipelineStep {
+  type: 'capture' | 'transform' | 'apply' | 'control';
+  op: string;
+  params: Record<string, unknown>;
+}
+
+function extractQuotedTarget(text: string): string {
+  const quoted = text.match(/"([^"]+)"|「([^」]+)」/);
+  return (quoted?.[1] || quoted?.[2] || text).trim();
+}
+
+function compileAndroidStep(stepText: string): DevicePipelineStep[] {
+  const input =
+    stepText.match(/input\s+"([^"]+)"\s+into\s+"([^"]+)"/i) ||
+    stepText.match(/「([^」]+)」を「([^」]+)」に入力/);
+  if (input) {
+    const [, value, field] = input;
+    return [
+      { type: 'capture', op: 'extract_ui_tree', params: {} },
+      { type: 'transform', op: 'find_ui_nodes', params: { text: field } },
+      { type: 'apply', op: 'input_text_into_ui_node', params: { text: value } },
+    ];
+  }
+  const target = extractQuotedTarget(stepText);
+  return [
+    { type: 'capture', op: 'extract_ui_tree', params: {} },
+    { type: 'transform', op: 'find_ui_nodes', params: { text: target } },
+    { type: 'apply', op: 'tap_ui_node', params: { text: target } },
+  ];
+}
+
+export function compileTestInventoryToDevicePipeline(
+  tests: { app_id?: string; cases: TestInventoryCase[] },
+  profile: Record<string, any>,
+  options: { platform: string; artifactsDir: string }
+): { action: 'pipeline'; context: Record<string, unknown>; steps: DevicePipelineStep[] } {
+  const { platform, artifactsDir } = options;
+  const steps: DevicePipelineStep[] = [];
+  const cases = tests.cases.filter(
+    (entry) => !entry.automation_backend || entry.automation_backend === platform
+  );
+
+  for (const testCase of cases) {
+    if (platform === 'android') {
+      const component = String(profile.launch_component || profile.component || '');
+      steps.push({
+        type: 'apply',
+        op: 'launch_app',
+        params: component
+          ? { component }
+          : { component: `${profile.package || tests.app_id}/.MainActivity` },
+      });
+      for (const stepText of testCase.steps) {
+        steps.push(...compileAndroidStep(stepText));
+      }
+      for (const expectation of testCase.expected) {
+        steps.push({
+          type: 'apply',
+          op: 'wait_for_ui_text',
+          params: { text: extractQuotedTarget(expectation), timeout_ms: 10_000 },
+        });
+      }
+    } else {
+      steps.push(
+        { type: 'apply', op: 'boot_simulator', params: {} },
+        ...(profile.app_path
+          ? [{ type: 'apply' as const, op: 'install_app', params: { app_path: profile.app_path } }]
+          : []),
+        {
+          type: 'apply',
+          op: 'launch_app',
+          params: { bundle_id: profile.bundle_id || tests.app_id },
+        }
+      );
+      for (const stepText of testCase.steps) {
+        const deepLink = stepText.match(/open\s+(\S+:\/\/\S+)/i);
+        if (deepLink) {
+          steps.push({ type: 'apply', op: 'open_deep_link', params: { url: deepLink[1] } });
+        } else if (profile.deep_link_base) {
+          steps.push({
+            type: 'apply',
+            op: 'open_deep_link',
+            params: { url: `${profile.deep_link_base}${extractQuotedTarget(stepText)}` },
+          });
+        } else {
+          steps.push({
+            type: 'control',
+            op: 'log',
+            params: {
+              message: `iOS UI interaction not yet automated (residual: E2E-05 Task 5): ${stepText}`,
+            },
+          });
+        }
+      }
+    }
+    steps.push({
+      type: 'capture',
+      op: 'capture_screen',
+      params: { path: `${artifactsDir}/${platform}-${testCase.case_id}.png` },
+    });
+  }
+
+  return {
+    action: 'pipeline',
+    context: {
+      generated_from: String(tests.app_id || 'unknown-app'),
+      platform,
+      case_count: cases.length,
+      artifacts_dir: artifactsDir,
+    },
+    steps,
+  };
 }

@@ -10,6 +10,10 @@ import {
   safeWriteFile,
 } from './secure-io.js';
 import type { ResolvedCustomerBinding } from './customer-channel-binding.js';
+import {
+  createMemoryPromotionCandidate,
+  enqueueMemoryPromotionCandidate,
+} from './memory-promotion-queue.js';
 
 /**
  * E2E-06 Task 4: the deal state machine — the persistent spine of a customer
@@ -211,7 +215,95 @@ export function advanceDealStage(input: {
     to: input.stage,
     ...(input.evidence ? { evidence: input.evidence } : {}),
   });
+  // E2E-06 Task 7: agreement snapshots and the learning loop are transition
+  // side effects of the state machine itself — failure-tolerant, never block.
+  try {
+    if (
+      input.stage === 'won' ||
+      input.stage === 'delivering' ||
+      input.stage === 'delivered' ||
+      input.stage === 'invoiced'
+    ) {
+      snapshotDealAgreement(next);
+    }
+  } catch {
+    /* observability only */
+  }
+  try {
+    if (input.stage === 'delivered' || input.stage === 'lost') {
+      queueDealDistillCandidate(next);
+    }
+  } catch {
+    /* the promotion queue may reject ineligible candidates — never block */
+  }
   return next;
+}
+
+function snapshotDealAgreement(deal: DealRecord): void {
+  if (!deal.agreed) return;
+  const dir = path.join(dealsDir(deal.tenant_slug), deal.deal_id);
+  safeMkdir(dir, { recursive: true });
+  let version = 1;
+  try {
+    const versions = safeReaddir(dir)
+      .map((entry) => entry.match(/^agreement-v(\d+)\.json$/))
+      .filter(Boolean)
+      .map((match) => Number(match![1]));
+    version = versions.length > 0 ? Math.max(...versions) + 1 : 1;
+  } catch {
+    version = 1;
+  }
+  safeWriteFile(
+    path.join(dir, `agreement-v${version}.json`),
+    JSON.stringify(
+      {
+        kind: 'deal-agreement-snapshot',
+        deal_id: deal.deal_id,
+        stage: deal.stage,
+        agreed: deal.agreed,
+        quote_ref: deal.quote_ref,
+        contract_ref: deal.contract_ref,
+        mission_ids: deal.mission_ids,
+        snapshotted_at: nowIso(),
+      },
+      null,
+      2
+    )
+  );
+}
+
+function queueDealDistillCandidate(deal: DealRecord): void {
+  const outcome = deal.stage === 'delivered' ? '受注・納品まで完了' : '失注';
+  const recentNotes = deal.notes
+    .slice(-8)
+    .map((note) => `${note.role}: ${note.text.slice(0, 120)}`);
+  const candidate = createMemoryPromotionCandidate({
+    sourceType: 'artifact',
+    sourceRef: `deal:${deal.tenant_slug}/${deal.deal_id}`,
+    proposedMemoryKind: 'heuristic',
+    summary: [
+      `商談 ${deal.deal_id}(${outcome})の学び候補: ${deal.summary.slice(0, 160)}`,
+      deal.agreed?.amount
+        ? `合意金額 ${deal.agreed.amount.value} ${deal.agreed.amount.currency}`
+        : '',
+      recentNotes.length > 0 ? `直近のやりとり: ${recentNotes.join(' / ').slice(0, 400)}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n'),
+    evidenceRefs: [
+      path.join('customer', deal.tenant_slug, 'deals', `${deal.deal_id}.json`),
+      ...(deal.quote_ref ? [deal.quote_ref] : []),
+      ...(deal.contract_ref ? [deal.contract_ref] : []),
+    ],
+    sensitivityTier: 'confidential',
+    ratificationRequired: true,
+  });
+  enqueueMemoryPromotionCandidate(candidate);
+  appendDealLog(deal.tenant_slug, {
+    event: 'deal_distill_candidate_queued',
+    deal_id: deal.deal_id,
+    candidate_id: candidate.candidate_id,
+  });
 }
 
 export function appendDealNote(input: {

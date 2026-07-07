@@ -108,7 +108,10 @@
 - [x] **IP-07**: Critical Path Tests (`IP-07_CRITICAL_PATH_TESTS.ja.md`) — orchestrator 追加特性化は IP-10 前に
 - [x] **AA-02**: Mesh Hub Delivery Driver (`AA-02_MESH_HUB_DELIVERY_DRIVER.ja.md`) — 2プロセス実HTTP E2E は E3 パイロットで
 - [x] **E2E-02**: Creative Suite (`E2E-02_CREATIVE_SUITE.ja.md`) — 単一 resolver・VDS-07・style pack 注入・campaign-suite。歌詞字幕同期のみ残余
-- [x] **E2E-06**: Customer Dialogue (`E2E-06_CUSTOMER_DIALOGUE.ja.md`) — Task 1〜4+見積決定論+対話系 E2E 完了(会話土台成立)。契約書 pipeline・要件→SDLC・distill 還流は残余(原文 §7)
+- [x] **E2E-06**: Customer Dialogue (`E2E-06_CUSTOMER_DIALOGUE.ja.md`) — Task 1〜8 完了(見積/契約生成+レビューゲート・impact_analysis・won→SDLC handoff・distill 還流)。帳票整形(xlsx/pdf)と intake pipeline のみ残余(原文 §7)
+- [x] **E2E-03**: Agent Collaboration (`E2E-03_AGENT_COLLABORATION.ja.md`) — 全 Task 完了(best-of-2+judge、code_change PR 協調を追加)
+- [x] **E2E-04**: Operator Interface (`E2E-04_OPERATOR_INTERFACE.ja.md`) — Task 2(notifyOperator 通知ルーティング)を追加実装し発火点(承認・質問・完了/失敗・inbox)を配線。CLI 統一(Task 6)は残余
+- [x] **E2E-05**: App Lifecycle (`E2E-05_APP_LIFECYCLE.ja.md`) — Task 1〜7 完了(app:preflight・build-actuator・scaffold・sdlc-cycle・device compiler・mobile-beta)。実機実走記録のみ未取得(原文 §7)
 
 ## 2. 使い方
 

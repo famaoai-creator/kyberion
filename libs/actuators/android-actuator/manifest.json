@@ -16,6 +16,19 @@
     "retryable_categories": ["resource_unavailable", "timeout", "network"]
   },
   "capabilities": [
-    { "op": "pipeline", "schema_ref": "schemas/mobile-device-pipeline.schema.json", "platforms": ["darwin", "linux", "win32"] }
+    {
+      "op": "pipeline",
+      "schema_ref": "schemas/mobile-device-pipeline.schema.json",
+      "platforms": ["darwin", "linux", "win32"],
+      "prerequisites": {
+        "binaries": ["adb"],
+        "env": ["ANDROID_HOME"],
+        "platforms": ["darwin", "linux", "win32"],
+        "install": {
+          "darwin": "Android Studio または cmdline-tools を導入し ANDROID_HOME を設定",
+          "linux": "Android cmdline-tools を導入し ANDROID_HOME を設定"
+        }
+      }
+    }
   ]
 }

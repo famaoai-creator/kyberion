@@ -59,7 +59,12 @@ function deriveBlockers(
     const lastAttempt = item.attempts?.[item.attempts.length - 1];
     blockers.push({
       kind: 'blocked',
-      reason: String(lastAttempt?.note || 'タスクがブロック状態です(needs_input の可能性)'),
+      reason: String(
+        lastAttempt?.blocked_reason ||
+          lastAttempt?.failure_reason ||
+          lastAttempt?.summary ||
+          'タスクがブロック状態です(needs_input の可能性)'
+      ),
     });
   }
   const dependencies = Array.isArray(metadata.dependencies)

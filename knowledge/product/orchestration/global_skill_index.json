@@ -1,6 +1,7 @@
 {
   "v": "3.0.0",
-  "t": 29,
+  "t": 30,
+  "u": "2026-07-07T14:02:10.950Z",
   "s": [
     {
       "n": "agent-actuator",
@@ -51,6 +52,14 @@
       "capability_count": 2
     },
     {
+      "n": "build-actuator",
+      "path": "libs/actuators/build-actuator",
+      "d": "iOS/Android build, test, archive and app scaffolding — the build stage of the mobile AI-DLC/SDLC loop",
+      "s": "implemented",
+      "version": "1.0.0",
+      "capability_count": 8
+    },
+    {
       "n": "calendar-actuator",
       "path": "libs/actuators/calendar-actuator",
       "d": "macOS Calendar.app integration using JXA for cross-account schedule coordination",
@@ -64,7 +73,7 @@
       "d": "ADF-driven code analysis and refactoring pipeline engine",
       "s": "implemented",
       "version": "2.2.0",
-      "capability_count": 3
+      "capability_count": 4
     },
     {
       "n": "email-actuator",

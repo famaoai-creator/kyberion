@@ -438,9 +438,128 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
       vm.createContext(sandbox);
       await new vm.Script(resolve(params.code)).runInContext(sandbox);
       return { ...sandbox.ctx };
+    case 'impact_analysis':
+      return {
+        ...ctx,
+        [params.export_as || 'impact_analysis']: await impactAnalysisOp({
+          repo_path: String(
+            resolve(params.repo_path) || ctx[params.repo_path_from || 'repo_path'] || ''
+          ),
+          requirements:
+            params.requirements !== undefined
+              ? resolve(params.requirements)
+              : ctx[params.requirements_from || 'requirements_draft'],
+          output_path: resolve(params.output_path),
+        }),
+      };
     default:
       throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
   }
+}
+
+// ---------------------------------------------------------------------------
+// E2E-06 Task 6: impact analysis — "既存資産への変更明記" as a first-class
+// artifact. Deterministic file inventory + reasoning-backend judgment,
+// validated into impact-analysis.schema.json shape. The size (S/M/L) feeds
+// the price-book estimate_rules for quoting.
+// ---------------------------------------------------------------------------
+
+const IMPACT_CODE_EXTENSIONS = new Set([
+  '.ts',
+  '.tsx',
+  '.js',
+  '.jsx',
+  '.mjs',
+  '.cjs',
+  '.json',
+  '.swift',
+  '.kt',
+  '.kts',
+  '.java',
+  '.py',
+  '.rb',
+  '.go',
+  '.rs',
+  '.md',
+  '.yml',
+  '.yaml',
+  '.gradle',
+]);
+
+export interface ImpactAnalysisResult {
+  kind: 'impact-analysis';
+  generated_at: string;
+  repo_path: string;
+  summary: string;
+  files: Array<{ path: string; change: string }>;
+  risks: string[];
+  size: 'S' | 'M' | 'L';
+}
+
+export async function impactAnalysisOp(input: {
+  repo_path: string;
+  requirements: unknown;
+  output_path?: string;
+}): Promise<ImpactAnalysisResult> {
+  if (!input.repo_path) throw new Error('[impact_analysis] requires repo_path');
+  if (!input.requirements) throw new Error('[impact_analysis] requires requirements');
+  const rootDir = pathResolver.rootDir();
+  const repoPath = path.resolve(rootDir, input.repo_path);
+  if (!safeExistsSync(repoPath)) throw new Error(`[impact_analysis] repo not found: ${repoPath}`);
+  const files = getAllFiles(repoPath)
+    .filter((file) => IMPACT_CODE_EXTENSIONS.has(path.extname(file)))
+    .filter((file) => !/node_modules|\.git\/|dist\//.test(file))
+    .slice(0, 400)
+    .map((file) => path.relative(repoPath, file));
+
+  const { getReasoningBackend } = await import('@agent/core');
+  const prompt = [
+    'You are performing an impact analysis for a change request against an existing codebase.',
+    'Return JSON only, exactly this shape:',
+    '{ "summary": string, "files": [{ "path": string, "change": string }], "risks": string[], "size": "S" | "M" | "L" }',
+    '- files: which existing files must change and how (paths MUST come from the inventory below)',
+    '- size: S = hours, M = days, L = a week or more',
+    '',
+    '--- REPOSITORY FILE INVENTORY ---',
+    files.join('\n'),
+    '',
+    '--- CHANGE REQUEST / REQUIREMENTS ---',
+    typeof input.requirements === 'string'
+      ? input.requirements
+      : JSON.stringify(input.requirements, null, 1).slice(0, 8000),
+  ].join('\n');
+
+  const raw = await getReasoningBackend().prompt(prompt);
+  const start = raw.indexOf('{');
+  const end = raw.lastIndexOf('}');
+  if (start < 0 || end <= start) {
+    throw new Error('[impact_analysis] backend did not return JSON');
+  }
+  const parsed = JSON.parse(raw.slice(start, end + 1)) as Partial<ImpactAnalysisResult>;
+  const size =
+    parsed.size === 'S' || parsed.size === 'M' || parsed.size === 'L' ? parsed.size : 'M';
+  const result: ImpactAnalysisResult = {
+    kind: 'impact-analysis',
+    generated_at: new Date().toISOString(),
+    repo_path: input.repo_path,
+    summary: String(parsed.summary || '').trim(),
+    files: Array.isArray(parsed.files)
+      ? parsed.files
+          .filter((entry): entry is { path: string; change: string } =>
+            Boolean(entry && typeof entry === 'object' && (entry as any).path)
+          )
+          .map((entry) => ({ path: String(entry.path), change: String(entry.change || '') }))
+      : [],
+    risks: Array.isArray(parsed.risks) ? parsed.risks.map(String) : [],
+    size,
+  };
+  if (input.output_path) {
+    const outPath = path.resolve(rootDir, input.output_path);
+    if (!safeExistsSync(path.dirname(outPath)))
+      safeMkdir(path.dirname(outPath), { recursive: true });
+    safeWriteFile(outPath, JSON.stringify(result, null, 2));
+  }
+  return result;
 }
 
 async function opApply(op: string, params: any, ctx: any, resolve: (value: any) => any) {

@@ -43,7 +43,15 @@ import {
   type MissionContextPackPruningSummary,
 } from './mission-context-pack.js';
 import * as nodePath from 'node:path';
-import { safeExec, safeExistsSync, safeReadFile, safeReaddir, safeWriteFile } from './secure-io.js';
+import * as path from 'node:path';
+import {
+  safeExec,
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeReaddir,
+  safeWriteFile,
+} from './secure-io.js';
 import { emitMissionTaskEvent } from './mission-task-events.js';
 import {
   enqueueMissionOrchestrationEvent,
@@ -423,7 +431,34 @@ function validatePlannedNextTasks(rawTasks: unknown, missionId: string): Planned
     visit(task.task_id);
   }
 
+  // E2E-03 Task 6: code changes are review-mandatory. A code_change mission
+  // whose plan has implement work but no reviewer/qa task is a planner
+  // contract violation — block before dispatch, not after damage.
+  if (missionClassOf(missionId) === 'code_change') {
+    const hasImplementWork = tasks.some((task) => {
+      const role = String(task.assigned_to?.role || '').toLowerCase();
+      return role !== 'reviewer' && role !== 'qa' && role !== 'planner';
+    });
+    const hasReviewTask = tasks.some((task) => {
+      const role = String(task.assigned_to?.role || '').toLowerCase();
+      return role === 'reviewer' || role === 'qa';
+    });
+    if (hasImplementWork && !hasReviewTask) {
+      throw new Error(
+        `Invalid NEXT_TASKS.json for ${missionId}: code_change missions require at least one reviewer/qa task (planner contract violation)`
+      );
+    }
+  }
+
   return tasks;
+}
+
+function missionClassOf(missionId: string): string | undefined {
+  const state = loadMissionStateSnapshot(missionId);
+  const missionClass = String(
+    (state?.classification as Record<string, unknown> | undefined)?.mission_class || ''
+  ).trim();
+  return missionClass || undefined;
 }
 
 interface DispatchMissionTaskOutcome {
@@ -956,7 +991,10 @@ async function buildTaskDispatchContext(input: {
       ]
         .filter(Boolean)
         .join('\n');
-  const upstreamResultLines = buildUpstreamResultLines(input.task, input.allTasks);
+  const upstreamResultLines = [
+    ...buildUpstreamResultLines(input.task, input.allTasks),
+    ...buildReviewDiffLines(input.missionId, input.task),
+  ];
   const teamSnapshotLines = buildTeamSnapshotLines(input.allTasks);
   const reviewFindingsLines = buildReviewFindingsLines(input.task);
   const promptSupplementChars =
@@ -1053,14 +1091,17 @@ async function dispatchPlannedMissionTask(input: {
       taskModelHint: input.assignment.model_hint,
       allTasks: input.allTasks,
     });
-    response = await obtainTaskResultResponse({
+    const dispatchArgs = {
       missionId: input.missionId,
       task: input.task,
       teamRole: input.teamRole,
       agentId: input.assignment.agent_id,
       taskModelHint: input.assignment.model_hint,
       prompt: dispatchContext.prompt,
-    });
+    };
+    response = isBestOfNCandidate({ teamRole: input.teamRole, task: input.task })
+      ? await obtainBestOfTaskResultResponse(dispatchArgs)
+      : await obtainTaskResultResponse(dispatchArgs);
   } catch (err: any) {
     if (err instanceof AgentBusyError || err?.name === 'AgentBusyError') {
       logger.warn(
@@ -1612,6 +1653,19 @@ async function dispatchPlannedMissionTask(input: {
     },
   });
   input.task.status = 'completed';
+  let prRef: string | undefined;
+  try {
+    prRef = publishTaskPrArtifacts({
+      missionId: input.missionId,
+      task: input.task,
+      teamRole: input.teamRole,
+      taskResult: response.taskResult,
+    });
+  } catch (err: any) {
+    logger.warn(
+      `[MISSION_WORKER] PR artifact publication failed for ${input.task.task_id}: ${err?.message || err}`
+    );
+  }
   emitMissionTaskEvent({
     event_type: 'task_completed',
     mission_id: input.missionId,
@@ -1634,6 +1688,7 @@ async function dispatchPlannedMissionTask(input: {
       task_result: response.taskResult,
       task_result_retried: response.retried,
       gate_record_path: acceptance.recordPath,
+      ...(prRef ? { pr_ref: prRef } : {}),
       ...taskResultObservability,
     },
   });
@@ -1797,6 +1852,306 @@ async function obtainTaskResultResponse(input: {
     retried: needsRetry,
     notes,
   };
+}
+
+// ---------------------------------------------------------------------------
+// E2E-03 Task 5: MO-07 minimal activation — best-of-2 + judge.
+// High-risk implement work runs twice with different approach directives, an
+// independent judge picks the winner, and the loser is kept as evidence.
+// Narrow by design (cost doubles); KYBERION_BEST_OF_N=0 disables it.
+// ---------------------------------------------------------------------------
+
+export function isBestOfNCandidate(input: { teamRole: string; task: PlannedNextTask }): boolean {
+  if (process.env.KYBERION_BEST_OF_N === '0') return false;
+  const role = String(input.teamRole || '').toLowerCase();
+  if (role === 'reviewer' || role === 'qa' || role === 'planner') return false;
+  const risk = String(input.task.risk || '').toLowerCase();
+  return risk === 'high' || risk === 'high_stakes';
+}
+
+const BEST_OF_APPROACHES = [
+  { key: 'A', directive: 'アプローチA: 最小実装優先 — deliver the smallest correct change first.' },
+  {
+    key: 'B',
+    directive:
+      'アプローチB: 堅牢性優先 — prioritize robustness: edge cases, failure handling, verification.',
+  },
+] as const;
+
+function parseBestOfJudgeVerdict(
+  text: string
+): { winner: 'A' | 'B'; rationale?: string; merge_hints?: string[] } | null {
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  if (start < 0 || end <= start) return null;
+  try {
+    const parsed = JSON.parse(text.slice(start, end + 1)) as Record<string, unknown>;
+    const winner = String(parsed.winner || '').toUpperCase();
+    if (winner !== 'A' && winner !== 'B') return null;
+    return {
+      winner,
+      rationale: typeof parsed.rationale === 'string' ? parsed.rationale : undefined,
+      merge_hints: Array.isArray(parsed.merge_hints) ? parsed.merge_hints.map(String) : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function obtainBestOfTaskResultResponse(input: {
+  missionId: string;
+  task: PlannedNextTask;
+  teamRole: string;
+  agentId: string;
+  taskModelHint?: { model_id?: string; tier?: string; effort?: string; route_reason?: string };
+  prompt: string;
+}): Promise<Awaited<ReturnType<typeof obtainTaskResultResponse>>> {
+  const attempts: Array<{
+    key: string;
+    response: Awaited<ReturnType<typeof obtainTaskResultResponse>>;
+  }> = [];
+  for (const approach of BEST_OF_APPROACHES) {
+    const response = await obtainTaskResultResponse({
+      ...input,
+      prompt: `## Approach directive (best-of-N candidate ${approach.key})\n${approach.directive}\n\n${input.prompt}`,
+    });
+    attempts.push({ key: approach.key, response });
+  }
+  const [first, second] = attempts;
+  // If either attempt failed structurally, prefer the one that parsed.
+  if (!second.response.taskResult) return first.response;
+  if (!first.response.taskResult) return second.response;
+
+  const judgePrompt = [
+    `You are an independent judge in a separate context from both implementers.`,
+    `Two candidate task results were produced for mission ${input.missionId}, task ${input.task.task_id}.`,
+    `Task: ${input.task.description || input.task.task_id}`,
+    input.task.acceptance_criteria?.length
+      ? `Acceptance criteria:\n- ${input.task.acceptance_criteria.join('\n- ')}`
+      : '',
+    '',
+    `Candidate A (${BEST_OF_APPROACHES[0].directive}):`,
+    JSON.stringify(first.response.taskResult, null, 2).slice(0, 6000),
+    '',
+    `Candidate B (${BEST_OF_APPROACHES[1].directive}):`,
+    JSON.stringify(second.response.taskResult, null, 2).slice(0, 6000),
+    '',
+    'Pick the candidate that best satisfies the task and criteria.',
+    'Return JSON only: { "winner": "A" | "B", "rationale": string, "merge_hints": string[] }',
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  let verdict: { winner: 'A' | 'B'; rationale?: string; merge_hints?: string[] } | null = null;
+  try {
+    const judgeResponse = await a2aBridge.route({
+      a2a_version: '1.0',
+      header: {
+        msg_id: `REQ-${Date.now().toString(36).toUpperCase()}-${input.task.task_id}-judge`,
+        sender: 'kyberion:mission-orchestrator',
+        receiver: input.agentId,
+        performative: 'request',
+        timestamp: new Date().toISOString(),
+      },
+      payload: {
+        intent: 'mission_task_execution',
+        text: judgePrompt,
+        objective: `Judge best-of-2 candidates for ${input.task.task_id}`,
+        context: {
+          mission_id: input.missionId,
+          team_role: 'reviewer',
+          task_id: `${input.task.task_id}-judge`,
+          execution_mode: 'task',
+        },
+      },
+    });
+    verdict = parseBestOfJudgeVerdict(String(judgeResponse.payload?.text || ''));
+  } catch (err: any) {
+    logger.warn(
+      `[MISSION_WORKER] best-of judge failed for ${input.task.task_id}: ${err?.message || err}`
+    );
+  }
+
+  const winnerKey = verdict?.winner || 'A';
+  const winner = winnerKey === 'B' ? second : first;
+  const loser = winnerKey === 'B' ? first : second;
+
+  // Keep the losing candidate — it is evidence, not garbage (MO-07 rule).
+  try {
+    const evidenceDir = missionEvidenceDir(input.missionId);
+    if (evidenceDir) {
+      const alternativesDir = path.join(evidenceDir, 'alternatives');
+      safeMkdir(alternativesDir, { recursive: true });
+      safeWriteFile(
+        path.join(alternativesDir, `${input.task.task_id}-candidate-${loser.key}.json`),
+        JSON.stringify(
+          {
+            task_id: input.task.task_id,
+            candidate: loser.key,
+            winner: winnerKey,
+            judge_rationale: verdict?.rationale,
+            merge_hints: verdict?.merge_hints,
+            task_result: loser.response.taskResult,
+          },
+          null,
+          2
+        )
+      );
+    }
+  } catch (err: any) {
+    logger.warn(
+      `[MISSION_WORKER] failed to persist best-of alternative for ${input.task.task_id}: ${err?.message || err}`
+    );
+  }
+
+  emitMissionTaskEvent({
+    event_type: 'task_reviewed',
+    mission_id: input.missionId,
+    task_id: input.task.task_id,
+    agent_id: input.agentId,
+    team_role: input.teamRole,
+    decision: 'best_of_judged',
+    why: verdict?.rationale || 'best-of-2 judge verdict (fallback to candidate A on judge failure)',
+    policy_used: 'mo07_best_of_n_v1',
+    payload: {
+      winner: winnerKey,
+      judge_succeeded: Boolean(verdict),
+      cost_multiplier: 2,
+      merge_hints: verdict?.merge_hints || [],
+    },
+  });
+
+  if (verdict?.merge_hints?.length && winner.response.taskResult) {
+    winner.response.notes.push(`best-of judge merge hints: ${verdict.merge_hints.join('; ')}`);
+  }
+  return winner.response;
+}
+
+// ---------------------------------------------------------------------------
+// E2E-03 Task 6: PR-style collaboration for code_change missions.
+// Completed implement work is committed to the mission micro-repo, a
+// task/<task_id> branch marks the commit, and evidence/prs/<task_id>/
+// {diff.patch, PR.md} become the reviewable object. No GitHub remote is
+// required — the local patch is the default; a real PR is a later opt-in.
+// ---------------------------------------------------------------------------
+
+function publishTaskPrArtifacts(input: {
+  missionId: string;
+  task: PlannedNextTask;
+  teamRole: string;
+  taskResult?: TaskResultBlock;
+}): string | undefined {
+  const role = String(input.teamRole || '').toLowerCase();
+  if (role === 'reviewer' || role === 'qa' || role === 'planner') return undefined;
+  if (missionClassOf(input.missionId) !== 'code_change') return undefined;
+  const missionPath = missionDir(input.missionId, 'public');
+  try {
+    safeExec('git', ['rev-parse', '--git-dir'], { cwd: missionPath });
+  } catch {
+    return undefined; // no micro-repo (fixture missions); nothing to publish
+  }
+  const branch = `task/${input.task.task_id}`;
+  const summary = (input.taskResult?.summary || input.task.description || input.task.task_id)
+    .replace(/\s+/g, ' ')
+    .slice(0, 120);
+  let committed = true;
+  try {
+    safeExec('git', ['add', '-A'], { cwd: missionPath });
+    safeExec('git', ['commit', '-m', `task ${input.task.task_id}: ${summary}`], {
+      cwd: missionPath,
+    });
+  } catch {
+    committed = false; // nothing new to commit — still publish the PR record
+  }
+  try {
+    safeExec('git', ['branch', '-f', branch, 'HEAD'], { cwd: missionPath });
+  } catch (err: any) {
+    logger.warn(
+      `[MISSION_WORKER] failed to mark branch ${branch} for ${input.missionId}: ${err?.message || err}`
+    );
+  }
+  let diff = '';
+  let changedFiles: string[] = [];
+  if (committed) {
+    try {
+      diff = String(
+        safeExec('git', ['format-patch', '-1', 'HEAD', '--stdout'], { cwd: missionPath }) || ''
+      );
+      changedFiles = String(
+        safeExec('git', ['show', '--name-only', '--pretty=format:', 'HEAD'], {
+          cwd: missionPath,
+        }) || ''
+      )
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean);
+    } catch (err: any) {
+      logger.warn(
+        `[MISSION_WORKER] failed to capture diff for ${input.task.task_id}: ${err?.message || err}`
+      );
+    }
+  }
+  const prDir = path.join(missionPath, 'evidence', 'prs', input.task.task_id);
+  safeMkdir(prDir, { recursive: true });
+  safeWriteFile(
+    path.join(prDir, 'diff.patch'),
+    diff || `(no committed changes for task ${input.task.task_id})\n`
+  );
+  safeWriteFile(
+    path.join(prDir, 'PR.md'),
+    [
+      `# ${summary}`,
+      '',
+      `- Mission: ${input.missionId}`,
+      `- Task: ${input.task.task_id}`,
+      `- Branch: ${branch}`,
+      `- Deliverable: ${input.task.deliverable || input.task.target_path || 'n/a'}`,
+      '',
+      '## Description',
+      input.taskResult?.summary || input.task.description || '(no summary)',
+      '',
+      '## Changed files',
+      ...(changedFiles.length > 0
+        ? changedFiles.map((file) => `- ${file}`)
+        : ['- (none committed)']),
+      '',
+    ].join('\n')
+  );
+  return `evidence/prs/${input.task.task_id}/PR.md`;
+}
+
+const REVIEW_DIFF_MAX_LINES = 2000;
+
+function buildReviewDiffLines(missionId: string, task: PlannedNextTask): string[] {
+  const role = String(task.assigned_to?.role || '').toLowerCase();
+  if (role !== 'reviewer' && role !== 'qa') return [];
+  const target = resolveReviewTargetForTask(task);
+  if (!target) return [];
+  const diffPath = path.join(
+    missionDir(missionId, 'public'),
+    'evidence',
+    'prs',
+    target,
+    'diff.patch'
+  );
+  if (!safeExistsSync(diffPath)) return [];
+  const diff = String(safeReadFile(diffPath, { encoding: 'utf8' }) || '');
+  if (!diff.trim()) return [];
+  const lines = diff.split('\n');
+  const changedFiles = lines
+    .filter((line) => line.startsWith('diff --git '))
+    .map((line) => line.replace(/^diff --git a\/(\S+).*$/, '$1'));
+  if (lines.length > REVIEW_DIFF_MAX_LINES) {
+    return [
+      `- Diff under review (evidence/prs/${target}/diff.patch — truncated to first ${REVIEW_DIFF_MAX_LINES} of ${lines.length} lines):`,
+      '```diff',
+      ...lines.slice(0, REVIEW_DIFF_MAX_LINES),
+      '```',
+      `- Changed files (${changedFiles.length}):`,
+      ...changedFiles.map((file) => `  - ${file}`),
+    ];
+  }
+  return [`- Diff under review (evidence/prs/${target}/diff.patch):`, '```diff', ...lines, '```'];
 }
 
 type MissionGateRecord = {

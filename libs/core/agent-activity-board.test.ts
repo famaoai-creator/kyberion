@@ -4,10 +4,20 @@ import type { WorkItem } from './work-coordination.js';
 
 function item(partial: Partial<WorkItem>): WorkItem {
   return {
-    item_id: 'w1', title: 't', description: '', status: 'ready', priority: 'medium',
-    source: 'local', source_ref: 'r', project_id: 'P', labels: ['mission:MSN-A'],
-    dependencies: [], version: 1, created_at: '2026-07-07T00:00:00Z',
-    updated_at: '2026-07-07T00:00:00Z', metadata: {},
+    item_id: 'w1',
+    title: 't',
+    description: '',
+    status: 'ready',
+    priority: 'medium',
+    source: 'local',
+    source_ref: 'r',
+    project_id: 'P',
+    labels: ['mission:MSN-A'],
+    dependencies: [],
+    version: 1,
+    created_at: '2026-07-07T00:00:00Z',
+    updated_at: '2026-07-07T00:00:00Z',
+    metadata: {},
     ...partial,
   } as WorkItem;
 }
@@ -16,14 +26,39 @@ describe('agent-activity-board', () => {
   it('maps items to per-agent entries with blockers', () => {
     const board = composeAgentActivityBoard({
       items: [
-        item({ item_id: 'w1', assignee_peer_id: 'planner-agent', status: 'in_progress',
-          metadata: { task_id: 'a', team_role: 'planner', phase: 'intake' } }),
-        item({ item_id: 'w2', assignee_peer_id: 'impl-agent', status: 'ready',
-          metadata: { task_id: 'b', dependencies: ['a'], team_role: 'implementer' } }),
-        item({ item_id: 'w3', status: 'review', assignee_peer_id: 'impl-agent',
-          metadata: { task_id: 'c' } }),
-        item({ item_id: 'w4', status: 'blocked', assignee_peer_id: 'impl-agent',
-          metadata: { task_id: 'd' }, attempts: [{ attempt_id: 'x', status: 'blocked', note: '入力待ち' } as never] }),
+        item({
+          item_id: 'w1',
+          assignee_peer_id: 'planner-agent',
+          status: 'in_progress',
+          metadata: { task_id: 'a', team_role: 'planner', phase: 'intake' },
+        }),
+        item({
+          item_id: 'w2',
+          assignee_peer_id: 'impl-agent',
+          status: 'ready',
+          metadata: { task_id: 'b', dependencies: ['a'], team_role: 'implementer' },
+        }),
+        item({
+          item_id: 'w3',
+          status: 'review',
+          assignee_peer_id: 'impl-agent',
+          metadata: { task_id: 'c' },
+        }),
+        item({
+          item_id: 'w4',
+          status: 'blocked',
+          assignee_peer_id: 'impl-agent',
+          metadata: { task_id: 'd' },
+          attempts: [
+            {
+              attempt_id: 'x',
+              run_id: 'run-x',
+              status: 'blocked',
+              started_at: '2026-07-07T00:00:00Z',
+              blocked_reason: '入力待ち',
+            },
+          ],
+        }),
       ],
       tenantByMission: { 'MSN-A': 'aurora' },
       now: '2026-07-07T01:00:00Z',
