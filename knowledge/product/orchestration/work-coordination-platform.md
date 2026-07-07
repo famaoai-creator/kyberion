@@ -13,6 +13,8 @@ tags: [coordination, kanban, work-item, github, jira, peer, todo]
 
 Mission lifecycle の記録と連動させる場合は、[`mission-lifecycle-and-record-keeping.md`](../architecture/mission-lifecycle-and-record-keeping.md) を先に参照してください。
 
+Kyberion の開発ワークフロー全体は [`kyberion-development-workflow.md`](./kyberion-development-workflow.md) を参照してください。
+
 ## What It Does
 
 - `WorkItem` を共通の作業実体として扱う
