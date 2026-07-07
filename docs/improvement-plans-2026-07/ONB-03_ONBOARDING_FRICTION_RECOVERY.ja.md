@@ -14,7 +14,7 @@
 
 ### 実装メモ
 
-- 2026-07-07: `pnpm onboard:reset` を追加。`onboarding/`、`my-identity.json`、`my-vision.md`、`agent-identity.json`、`connections/`、`tenants/` を customer overlay / personal root の両方で安全に削除できるようにした。`--force` で無確認、TTY では確認プロンプトを出す。
+- 2026-07-07: `pnpm onboard:reset` を追加。`onboarding/`、`my-identity.json`、`my-vision.md`、`agent-identity.json` を customer overlay / personal root の両方で安全に削除できるようにした。`--force` で無確認、TTY では確認プロンプトを出す。
 
 ## ゴール(受入条件)
 
