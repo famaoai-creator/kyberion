@@ -44,6 +44,14 @@ pnpm surfaces:reconcile
 pnpm onboard          # customer/{slug}/ preferred when KYBERION_CUSTOMER is set
 ```
 
+If you already have an onboarding payload, use Path B instead of the wizard:
+
+```bash
+pnpm onboard:apply --identity knowledge/public/templates/onboarding/identity.example.json --dry-run
+```
+
+Copy the template, edit it, and rerun without `--dry-run` when you are ready to apply it.
+
 ## 2. First Win Smoke
 
 If you only want the shortest path to a visible result, start here.

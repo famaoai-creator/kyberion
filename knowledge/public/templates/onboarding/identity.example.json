@@ -1,0 +1,22 @@
+{
+  "identity": {
+    "name": "Sovereign",
+    "language": "ja",
+    "interaction_style": "Minimalist",
+    "primary_domain": "Kyberion operations",
+    "vision": "Start small, validate quickly, and expand only after the baseline is healthy.",
+    "agent_id": "KYBERION-PRIME"
+  },
+  "tenants": [
+    {
+      "tenant_slug": "alpha-team",
+      "display_name": "Alpha Team",
+      "assigned_role": "owner",
+      "purpose": "Starter tenant for Path B onboarding."
+    }
+  ],
+  "tutorial": {
+    "mode": "simulate",
+    "summary": "Run the tutorial as a dry-run before promoting it."
+  }
+}
