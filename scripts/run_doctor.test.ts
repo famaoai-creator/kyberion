@@ -110,6 +110,37 @@ describe('run_doctor', () => {
     expect(mocks.loadEnvironmentManifest).toHaveBeenCalledWith('meeting-participation-runtime');
   });
 
+  it('includes the on-demand pull resolver for browser runtime doctor output', async () => {
+    const yargsStub = {
+      option: vi.fn(() => yargsStub),
+      parseSync: vi.fn(() => ({ runtime: 'browser' })),
+    };
+    mocks.createStandardYargs.mockReturnValue(yargsStub);
+    mocks.loadEnvironmentManifest.mockReturnValue({
+      manifest_id: 'meeting-participation-runtime',
+      version: '2026-04-29',
+      capabilities: [
+        {
+          capability_id: 'browser-meeting-join-driver',
+          optional: false,
+          required_for: ['browser-meeting-join-driver'],
+          install: { instruction: 'Install Playwright' },
+        },
+      ],
+    });
+    mocks.probeManifest.mockResolvedValue([
+      { capability_id: 'browser-meeting-join-driver', satisfied: false, reason: 'missing' },
+    ]);
+
+    const { runDoctor } = await import('./run_doctor.js');
+
+    await runDoctor();
+
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining('pnpm deps:check --actuator browser')
+    );
+  });
+
   it('prints a runnable next action when required doctor capabilities are missing', async () => {
     const yargsStub = {
       option: vi.fn(() => yargsStub),
