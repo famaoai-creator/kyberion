@@ -297,7 +297,11 @@
         "patch",
         "terminal",
         "debugging",
-        "structured_json"
+        "structured_json",
+        "reasoning",
+        "coordination",
+        "analysis",
+        "strategy"
       ],
       "modelCapabilities": {
         "codex": [
@@ -307,7 +311,11 @@
           "patch",
           "terminal",
           "debugging",
-          "structured_json"
+          "structured_json",
+          "reasoning",
+          "coordination",
+          "analysis",
+          "strategy"
         ]
       }
     },

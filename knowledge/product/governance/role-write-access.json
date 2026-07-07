@@ -1,9 +1,23 @@
 {
   "version": "1.0.0",
-  "default_allow": ["active/missions/${MISSION_ID}/", "active/shared/tmp/", "active/shared/exports/", "work/metrics/"],
+  "default_allow": [
+    "active/missions/${MISSION_ID}/",
+    "active/shared/tmp/",
+    "active/shared/exports/",
+    "work/metrics/"
+  ],
   "roles": {
     "ecosystem_architect": {
-      "allow": ["active/missions/", "knowledge/", "libs/core/", "scripts/", "README.md", "CAPABILITIES_GUIDE.md", "CONTRIBUTING.md", "evidence/browser/"]
+      "allow": [
+        "active/missions/",
+        "knowledge/",
+        "libs/core/",
+        "scripts/",
+        "README.md",
+        "CAPABILITIES_GUIDE.md",
+        "CONTRIBUTING.md",
+        "evidence/browser/"
+      ]
     },
     "software_developer": {
       "allow": ["active/projects/", "tests/"]
@@ -57,6 +71,13 @@
     },
     "chronos_operator": {
       "allow": []
+    },
+    "chronos_mirror_v2": {
+      "allow": [
+        "active/shared/coordination/chronos/",
+        "active/shared/observability/chronos/",
+        "active/audit/"
+      ]
     },
     "chronos_localadmin": {
       "allow": [

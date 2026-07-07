@@ -2,7 +2,7 @@
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
 import { ACPMediator, ACPMediatorOptions } from './acp-mediator.js';
-import { CodexAdapter, CodexAppServerAdapter, ClaudeAdapter } from './agent-adapter.js';
+import { CodexAdapter, CodexAppServerAdapter, ClaudeAdapter, AgyAdapter } from './agent-adapter.js';
 import {
   agentRegistry,
   AgentRecord,
@@ -132,8 +132,10 @@ const loadProviderLifecycle = () => loadProviderConfig().lifecycle;
 
 class AgentLifecycleManagerImpl {
   private mediators: Map<string, ACPMediator> = new Map();
-  private execAdapters: Map<string, CodexAdapter | CodexAppServerAdapter | ClaudeAdapter> =
-    new Map();
+  private execAdapters: Map<
+    string,
+    CodexAdapter | CodexAppServerAdapter | ClaudeAdapter | AgyAdapter
+  > = new Map();
   private handles: Map<string, AgentHandle> = new Map();
   private pendingSpawns: Map<string, Promise<AgentHandle>> = new Map();
   private healthInterval: ReturnType<typeof setInterval> | null = null;
@@ -358,11 +360,21 @@ class AgentLifecycleManagerImpl {
       );
     }
 
-    // Codex and Claude use exec mode, not ACP
-    if (resolvedOptions.provider === 'codex' || resolvedOptions.provider === 'claude') {
-      let adapter: CodexAdapter | CodexAppServerAdapter | ClaudeAdapter;
+    // Codex, Claude, and Agy use exec mode, not ACP
+    if (
+      resolvedOptions.provider === 'codex' ||
+      resolvedOptions.provider === 'claude' ||
+      resolvedOptions.provider === 'agy'
+    ) {
+      let adapter: CodexAdapter | CodexAppServerAdapter | ClaudeAdapter | AgyAdapter;
 
-      if (resolvedOptions.provider === 'claude') {
+      if (resolvedOptions.provider === 'agy') {
+        adapter = new AgyAdapter({
+          bin: 'agy',
+          cwd: resolvedOptions.cwd || PROJECT_ROOT,
+          model: resolvedOptions.modelId,
+        });
+      } else if (resolvedOptions.provider === 'claude') {
         const taskModelHint = readTaskModelHint(runtimeMetadata);
         // Resolve tool restrictions from manifest
         const { allowedTools, disallowedTools } = ClaudeAdapter.resolveToolRestrictions(

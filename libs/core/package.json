@@ -71,6 +71,10 @@
       "types": "./dist/approval-cowork-adapter.d.ts",
       "default": "./dist/approval-cowork-adapter.js"
     },
+    "./approval-cowork-adapter.js": {
+      "types": "./dist/approval-cowork-adapter.d.ts",
+      "default": "./dist/approval-cowork-adapter.js"
+    },
     "./approval-gate-summary": {
       "types": "./dist/approval-gate-summary.d.ts",
       "default": "./dist/approval-gate-summary.js"
@@ -140,6 +144,10 @@
       "default": "./dist/cowork-knowledge-bridge.js"
     },
     "./cowork-surface": {
+      "types": "./dist/cowork-surface.d.ts",
+      "default": "./dist/cowork-surface.js"
+    },
+    "./cowork-surface.js": {
       "types": "./dist/cowork-surface.d.ts",
       "default": "./dist/cowork-surface.js"
     },

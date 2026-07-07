@@ -9,7 +9,12 @@ import type { SurfaceDelegationReceiver } from './surface-provider-policy.js';
 import type { SurfaceIntentResolution } from './router-contract.js';
 export type { SurfaceDelegationReceiver } from './surface-provider-policy.js';
 
-import type { SurfaceConversationInput, SlackExecutionMode, ParsedSlackSurfacePrompt, SlackSurfaceMetadata } from './channel-surface-types.js';
+import type {
+  SurfaceConversationInput,
+  SlackExecutionMode,
+  ParsedSlackSurfacePrompt,
+  SlackSurfaceMetadata,
+} from './channel-surface-types.js';
 import type { UserIntentFlow } from './intent-contract.js';
 
 export interface SurfaceRuntimeRouteContext {
@@ -32,7 +37,10 @@ export function buildDelegationFallbackText(query: string): string {
 }
 
 export function parseSlackSurfacePrompt(query: string): ParsedSlackSurfacePrompt | null {
-  if (!query.includes('Surface: slack') && !query.includes('You are handling a Slack conversation as the Slack Surface Agent.')) {
+  if (
+    !query.includes('Surface: slack') &&
+    !query.includes('You are handling a Slack conversation as the Slack Surface Agent.')
+  ) {
     return null;
   }
 
@@ -57,13 +65,15 @@ export function surfaceChannelFromAgentId(agentId: string): string {
   const manifests = listSurfaceProviderManifests();
   const exact = manifests.find((entry) => entry.agentId === normalized);
   if (exact) return exact.id;
-  const inferred = manifests.find((entry) => normalized.includes(entry.id) || normalized.includes(entry.agentId));
+  const inferred = manifests.find(
+    (entry) => normalized.includes(entry.id) || normalized.includes(entry.agentId)
+  );
   return inferred?.id || 'slack';
 }
 
 export function deriveSurfaceDelegationReceiver(
   text: string,
-  surface: string = 'slack',
+  surface: string = 'slack'
 ): SurfaceDelegationReceiver | undefined {
   return deriveSurfaceDelegationReceiverForProvider(surface, text);
 }
@@ -72,21 +82,29 @@ export function deriveSlackDelegationReceiver(text: string): SurfaceDelegationRe
   return deriveSurfaceDelegationReceiver(text, 'slack');
 }
 
-export function normalizeSurfaceDelegationReceiver(value?: string): SurfaceDelegationReceiver | undefined {
+export function normalizeSurfaceDelegationReceiver(
+  value?: string
+): SurfaceDelegationReceiver | undefined {
   return value === 'chronos-mirror' || value === 'nerve-agent' ? value : undefined;
 }
 
 export function resolveSurfaceConversationReceiver(
   forcedReceiver: string | undefined,
   compiledFlow: UserIntentFlow | null | undefined,
-  surface: string = 'slack',
+  surface: string = 'slack'
 ): SurfaceDelegationReceiver | undefined {
   if (forcedReceiver) return forcedReceiver as SurfaceDelegationReceiver;
   return resolveSurfaceConversationReceiverForProvider(surface, compiledFlow) || 'chronos-mirror';
 }
 
-export function surfaceRoutingText(input: SurfaceConversationInput): { text: string; parsedSlackPrompt: ParsedSlackSurfacePrompt | null } {
-  const slackMetadata = input.surface === 'slack' ? input.surfaceMetadata as SlackSurfaceMetadata | undefined : undefined;
+export function surfaceRoutingText(input: SurfaceConversationInput): {
+  text: string;
+  parsedSlackPrompt: ParsedSlackSurfacePrompt | null;
+} {
+  const slackMetadata =
+    input.surface === 'slack'
+      ? (input.surfaceMetadata as SlackSurfaceMetadata | undefined)
+      : undefined;
   const hasStructuredSlackMetadata =
     input.agentId === 'slack-surface-agent' &&
     input.surface === 'slack' &&
@@ -95,17 +113,18 @@ export function surfaceRoutingText(input: SurfaceConversationInput): { text: str
       typeof slackMetadata?.threadTs === 'string' ||
       typeof slackMetadata?.user === 'string');
   const parsedSlackPrompt = hasStructuredSlackMetadata
-    ? ({
-      channel: typeof slackMetadata?.channel === 'string' ? slackMetadata.channel : undefined,
-      thread: typeof slackMetadata?.threadTs === 'string' ? slackMetadata.threadTs : undefined,
-      user: typeof slackMetadata?.user === 'string' ? slackMetadata.user : undefined,
-      derivedLanguage: /[ぁ-んァ-ン一-龯]/.test(input.surfaceText || input.query) ? 'ja' : 'en',
-      executionMode:
-        slackMetadata?.execution_mode === 'conversation' || slackMetadata?.execution_mode === 'task'
-          ? (slackMetadata.execution_mode as SlackExecutionMode)
-          : undefined,
-      userMessage: input.surfaceText || buildDelegationFallbackText(input.query),
-    })
+    ? {
+        channel: typeof slackMetadata?.channel === 'string' ? slackMetadata.channel : undefined,
+        thread: typeof slackMetadata?.threadTs === 'string' ? slackMetadata.threadTs : undefined,
+        user: typeof slackMetadata?.user === 'string' ? slackMetadata.user : undefined,
+        derivedLanguage: /[ぁ-んァ-ン一-龯]/.test(input.surfaceText || input.query) ? 'ja' : 'en',
+        executionMode:
+          slackMetadata?.execution_mode === 'conversation' ||
+          slackMetadata?.execution_mode === 'task'
+            ? (slackMetadata.execution_mode as SlackExecutionMode)
+            : undefined,
+        userMessage: input.surfaceText || buildDelegationFallbackText(input.query),
+      }
     : null;
   return {
     text: input.surfaceText || parsedSlackPrompt?.userMessage || input.query,
@@ -116,14 +135,18 @@ export function surfaceRoutingText(input: SurfaceConversationInput): { text: str
 export function shouldCompileSurfaceIntent(
   input: SurfaceConversationInput,
   routingText: string,
-  ruleBasedReceiver?: SurfaceDelegationReceiver,
+  ruleBasedReceiver?: SurfaceDelegationReceiver
 ): boolean {
   if (input.forcedReceiver || ruleBasedReceiver) return false;
+  const originalText = (input.surfaceText || input.query || '').trim();
   const normalized = routingText.trim();
-  if (!normalized) return false;
-  if (input.agentId === 'slack-surface-agent' && !shouldForceSurfaceDelegationFromProviderPolicy('slack', normalized)) {
+  if (!normalized || !originalText) return false;
+  if (
+    input.agentId === 'slack-surface-agent' &&
+    !shouldForceSurfaceDelegationFromProviderPolicy('slack', normalized)
+  ) {
     return false;
   }
-  if (classifyTaskSessionIntent(normalized)) return true;
-  return normalized.length > 80 || normalized.includes('\n');
+  if (classifyTaskSessionIntent(originalText)) return true;
+  return originalText.length > 80 || originalText.includes('\n');
 }

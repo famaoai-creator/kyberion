@@ -1035,7 +1035,7 @@ export default function ChronosMirrorV2() {
         }}
       />
       <main
-        className="min-h-screen w-screen overflow-hidden bg-[var(--kb-bg-main)] text-white"
+        className="min-h-screen w-screen overflow-x-hidden bg-[var(--kb-bg-main)] text-white"
         data-theme={themeMode}
         style={{ ...(webDesignSystem.css_vars as CSSProperties), ...tenantCssVars }}
       >
@@ -1047,7 +1047,7 @@ export default function ChronosMirrorV2() {
         <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(to_right,rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:88px_88px] opacity-[0.06]" />
         <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(180deg,rgba(255,248,225,0.05)_0%,transparent_18%,transparent_82%,rgba(148,163,184,0.04)_100%)]" />
 
-        <div className="relative z-10 flex min-h-screen flex-col gap-6 p-4 md:p-6 xl:h-screen xl:overflow-hidden">
+        <div className="relative z-10 flex min-h-screen flex-col gap-6 p-4 md:p-6">
           <header className="px-1 py-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -1111,7 +1111,7 @@ export default function ChronosMirrorV2() {
               </div>
               <div className="mt-4 max-w-3xl">
                 <h2 className="text-2xl font-semibold tracking-tight text-white/92 md:text-[2rem]">
-                  Web site も PowerPoint と同じように、Theme と Structure を分けて組み立てる。
+                  Kyberionは、環境全体を自律的に制御し、あなたの意図（Intent）に合わせてシステムが最適に連携・動作する高度なインテリジェント・インターフェースです。
                 </h2>
                 <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-200/68">
                   この surface は `web-theme-pack` で色とタイポグラフィを、`web-design-system-pack`
