@@ -16,6 +16,9 @@
         "3000"
       ],
       "cwd": ".",
+      "env": {
+        "MISSION_ROLE": "chronos_localadmin"
+      },
       "shutdownPolicy": "detached",
       "startupMode": "workspace-app",
       "ownerType": "surface-runtime-manifest",

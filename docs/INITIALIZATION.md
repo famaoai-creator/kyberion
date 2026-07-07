@@ -8,6 +8,12 @@
 
 システムをゼロから立ち上げるための標準的なコマンド列です。
 
+最短経路だけ先に知りたい場合は、次の 1 本から始められます。
+
+```bash
+pnpm install && pnpm prereq:check && pnpm build && pnpm setup:report --persona first-time-user
+```
+
 前提:
 
 - Node.js `24+`（`package.json` の `engines` が正。`.nvmrc` も `24`。`nvm use` で揃えられます）
@@ -24,6 +30,12 @@ pnpm prereq:check
 #     未導入でも起動はできますが、ブラウザ経路(スクリーンショット first-win 等)は
 #     テキストへフォールバックします。postinstall では自動ダウンロードしません。
 pnpm exec playwright install chromium
+
+# 2c. (必要時のみ) アクチュエータ単位の on-demand pull
+#     browser / voice / media-generation のように、起動前に個別依存だけ確認したい場合に使います。
+pnpm deps:check --actuator browser
+pnpm deps:check --actuator voice
+pnpm deps:check --actuator media-generation
 
 # 3. システムの具現化 (ビルド)
 pnpm build
@@ -159,6 +171,7 @@ pnpm onboard
 - **非対話環境の場合**: TTY が無い環境では `pnpm onboard` は exit 2 で停止します。代わりに以下のいずれかを使用:
   - `pnpm onboard:apply --identity <path/to/identity.json>` — JSON ファイルからアイデンティティを適用（Path B）
     - ひな形は [`knowledge/public/templates/onboarding/identity.example.json`](../knowledge/public/templates/onboarding/identity.example.json) をコピーして使ってください。まず `--dry-run` で検証すると安全です。
+  - `pnpm onboard:reset` — onboarding state と生成 identity/vision/agent 成果物を削除してやり直す
   - エージェントが直接 `customer/{slug}/` を優先し、未設定時のみ `knowledge/personal/` 配下のスキーマ準拠ファイルを書き込み
   - `KYBERION_ONBOARDING_NON_INTERACTIVE_OK=1 pnpm onboard` — 意図的に default 値で進める（評価環境向け）
 - **物理的変化**:
