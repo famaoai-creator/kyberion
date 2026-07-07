@@ -13,7 +13,7 @@ import {
   SYSTEM_ACTUATOR_CAPTURE_OPS,
   SYSTEM_ACTUATOR_CONTROL_OPS,
   SYSTEM_ACTUATOR_TRANSFORM_OPS,
-} from '../libs/actuators/system-actuator/src/index.js';
+} from '../libs/actuators/system-actuator/src/op-catalog.js';
 import { readJsonFile } from './refactor/cli-input.js';
 
 interface CapabilityManifest {

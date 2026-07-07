@@ -48,3 +48,7 @@
 - in-app の pptx/docx プレビューは重い/依存増になりがち。**まずダウンロード + 画像/PDF プレビュー**を確実にし、Office 形式のリッチプレビューは「次の一手」に回す(依存を増やさない)。
 - 版管理は成果物ストレージを増やす。KM-01 の janitor に古い版の TTL/世代保持を登録。
 - confidential 成果物のプレビュー/ギャラリー表示は tier 境界を厳守(SU-01/DS-02 の tenant 文脈と整合)。
+
+## 実装メモ 追記 (2026-07-06)
+
+- SR-01 にて verdict 配線を実装: `DeliverableInboxStatus` に `rejected` / `changes_requested` を追加し `markInboxEntry` が `verdict_note` / `reviewed_by` を記録。chronos `/api/deliverable-review` は verdict を共有インボックス(active/shared/inbox/entries.jsonl)へ同期。concierge(秘書室)の Outcome Feed から 受領/修正依頼/差し戻し を実行可能。アプリ内プレビュー・バージョンギャラリーは残余。

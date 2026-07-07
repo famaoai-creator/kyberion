@@ -1,6 +1,6 @@
 # 改善計画 実装状況正本(STATUS)
 
-> **監査日**: 2026-07-05(全93計画を実コードと突き合わせて検証)
+> **監査日**: 2026-07-05(全93計画を実コードと突き合わせて検証)/ 2026-07-06 MO-01 を DONE に更新
 > **更新規約**: 計画の実装・レビュー完了時に本表を更新する。各計画文書内の「実装状況」節と矛盾する場合は本表を正とし、文書側を追従させる。
 > **判定基準**: DONE = 受入条件を実コードで検証済 / PARTIAL = 一部充足 / TODO = 実質未着手。
 
@@ -8,26 +8,26 @@
 
 | 判定    | 件数 |
 | ------- | ---- |
-| DONE    | 24   |
-| PARTIAL | 24   |
+| DONE    | 25   |
+| PARTIAL | 23   |
 | TODO    | 45   |
 
 ## P0 残作業(プロダクション化のクリティカルパス)
 
-| ID    | 状態    | 残作業の要点                                                                                                      |
-| ----- | ------- | ----------------------------------------------------------------------------------------------------------------- |
-| IP-07 | PARTIAL | claude-agent-reasoning-backend テスト、surface-runtime-orchestrator 特性化テスト                                  |
-| MO-01 | PARTIAL | プロセステンプレート機構(schema・4テンプレート・worker のテンプレート駆動化)                                      |
-| MO-02 | PARTIAL | mission-gate-engine、新設ゲート共通化、planning/受入ゲート記録、受入 rework/owner 通知、exit/quality の修復ループ |
-| AA-02 | TODO    | mesh_delivery_driver 新設、broker⇔dispatchToPeer 配線、writer fencing、E2E                                        |
-| SA-02 | PARTIAL | execution-bounds.ts 抽出、SECURITY.md、warn→enforce 到達                                                          |
-| SA-05 | PARTIAL | policyEngine の操作種別拡張、secure-io parse失敗 fail-open 解消、-y 破壊操作除外                                  |
-| OP-01 | PARTIAL | usage 計測の全経路接続、cost report、spend-guard、KPI 接続                                                        |
-| AR-01 | PARTIAL | adf-engine.ts 抽出、file-actuator/super-nerve アダプタ化、3エンジン統合、golden 回帰                              |
-| AR-02 | PARTIAL | describeOps、generate_op_registry、op-discovery に input_schema 反映、未知 op の apply 既定撤廃                   |
-| AO-02 | TODO    | CVE スキャン/台帳、パッチ判断ルーブリック、適用フロー                                                             |
-| IL-01 | TODO    | goal/source_text/outcome_ids の昇格 seam 貫通、outcome-contract の goal 優先化                                    |
-| IL-04 | PARTIAL | intent-reconciliation エンジン、完了ゲート、学習記録                                                              |
+| ID    | 状態    | 残作業の要点                                                                                                                                                                     |
+| ----- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| IP-07 | PARTIAL | claude-agent-reasoning-backend テスト、surface-runtime-orchestrator 特性化テスト                                                                                                 |
+| MO-01 | DONE    | 2026-07-06 完了: phaseSpec スキーマ(catalog v1.1.0)+タスク展開(plan-tasks/createMission)+3プロセステンプレート追加。worker イベント連鎖のフェーズ駆動化は計画どおり MO-02 に委譲 |
+| MO-02 | PARTIAL | mission-gate-engine、新設ゲート共通化、planning/受入ゲート記録、受入 rework/owner 通知、exit/quality の修復ループ                                                                |
+| AA-02 | TODO    | mesh_delivery_driver 新設、broker⇔dispatchToPeer 配線、writer fencing、E2E                                                                                                       |
+| SA-02 | PARTIAL | execution-bounds.ts 抽出、SECURITY.md、warn→enforce 到達                                                                                                                         |
+| SA-05 | PARTIAL | policyEngine の操作種別拡張、secure-io parse失敗 fail-open 解消、-y 破壊操作除外                                                                                                 |
+| OP-01 | PARTIAL | usage 計測の全経路接続、cost report、spend-guard、KPI 接続                                                                                                                       |
+| AR-01 | PARTIAL | adf-engine.ts 抽出、file-actuator/super-nerve アダプタ化、3エンジン統合、golden 回帰                                                                                             |
+| AR-02 | PARTIAL | describeOps、generate_op_registry、op-discovery に input_schema 反映、未知 op の apply 既定撤廃                                                                                  |
+| AO-02 | TODO    | CVE スキャン/台帳、パッチ判断ルーブリック、適用フロー                                                                                                                            |
+| IL-01 | TODO    | goal/source_text/outcome_ids の昇格 seam 貫通、outcome-contract の goal 優先化                                                                                                   |
+| IL-04 | PARTIAL | intent-reconciliation エンジン、完了ゲート、学習記録                                                                                                                             |
 
 ## 全計画一覧
 
@@ -83,15 +83,15 @@
 
 ### MO(ミッション・オーケストレーション)
 
-| ID    | 状態    | 残作業                                                                                                            |
-| ----- | ------- | ----------------------------------------------------------------------------------------------------------------- |
-| MO-01 | PARTIAL | プロセステンプレート機構一式(schema/テンプレ/worker 駆動化)                                                       |
-| MO-02 | PARTIAL | mission-gate-engine、新設ゲート共通化、planning/受入ゲート記録、受入 rework/owner 通知、exit/quality の修復ループ |
-| MO-03 | PARTIAL | mission-task-contract.schema.json + planner 出力検証+循環検出                                                     |
-| MO-04 | DONE    |                                                                                                                   |
-| MO-05 | DONE    | (軽微: 集計スクリプト)                                                                                            |
-| MO-06 | DONE    |                                                                                                                   |
-| MO-07 | PARTIAL | tier 昇格連動の再実行、media draft→refine                                                                         |
+| ID    | 状態    | 残作業                                                                                                                                               |
+| ----- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| MO-01 | DONE    | (worker イベント連鎖のフェーズ駆動化は MO-02 側で実施。gate-pass 機械評価・entry_gate deferral・deliverable_quality check は MO-01 側で先行実装済み) |
+| MO-02 | PARTIAL | mission-gate-engine、新設ゲート共通化、planning/受入ゲート記録、受入 rework/owner 通知、exit/quality の修復ループ                                    |
+| MO-03 | PARTIAL | mission-task-contract.schema.json + planner 出力検証+循環検出                                                                                        |
+| MO-04 | DONE    |                                                                                                                                                      |
+| MO-05 | DONE    | (軽微: 集計スクリプト)                                                                                                                               |
+| MO-06 | DONE    |                                                                                                                                                      |
+| MO-07 | PARTIAL | tier 昇格連動の再実行、media draft→refine                                                                                                            |
 
 ### DS(デザインシステム)
 

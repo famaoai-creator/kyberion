@@ -1,0 +1,26 @@
+{
+  "version": "1.0.0",
+  "organization_id": "saas-product-company",
+  "templates": {
+    "product_development": {
+      "required_roles": ["owner", "planner", "implementer", "reviewer", "tester"],
+      "optional_roles": ["product_strategist", "experience_designer", "operator"],
+      "lifecycle": {
+        "max_parallel_members": 5,
+        "max_members": 8,
+        "max_messages_per_run": 80,
+        "max_wall_clock_minutes": 300,
+        "max_member_turns": 10,
+        "shutdown_policy": "graceful_handoff",
+        "resume_policy": "checkpoint_resume",
+        "cooldown_minutes": 10
+      }
+    },
+    "development": {
+      "optional_roles": ["tester", "product_strategist", "devils_advocate"]
+    },
+    "operations": {
+      "optional_roles": ["tester", "surface_liaison", "tracker"]
+    }
+  }
+}
