@@ -36,6 +36,9 @@ overrides:
 importers:
   .:
     dependencies:
+      '@actuator/service':
+        specifier: workspace:*
+        version: link:libs/actuators/service-actuator
       '@agent/core':
         specifier: workspace:*
         version: link:libs/core

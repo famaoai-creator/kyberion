@@ -738,6 +738,7 @@ export interface AgyAdapterOptions {
   cwd?: string;
   timeoutMs?: number;
   extraArgs?: string[];
+  model?: string;
 }
 
 export class AgyAdapter implements AgentAdapter {
@@ -802,6 +803,10 @@ export class AgyAdapter implements AgentAdapter {
       const useSandbox = options?.sandbox === true || process.env.KYBERION_AGY_SANDBOX === '1';
       if (useSandbox) {
         args.push('--sandbox');
+      }
+
+      if (this.options.model) {
+        args.push('--model', this.options.model);
       }
 
       if (this.options.extraArgs) {

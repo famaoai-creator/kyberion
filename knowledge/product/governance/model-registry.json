@@ -25,6 +25,28 @@
       "notes": "Default production model for governed intent compilation and surface orchestration."
     },
     {
+      "model_id": "openai:gpt-5.4",
+      "provider": "openai",
+      "family": "gpt-5",
+      "status": "candidate",
+      "tier": "standard",
+      "execution_tier": "standard",
+      "role_fit": {
+        "intent_compiler": "not_recommended",
+        "surface_agent": "primary",
+        "analysis": "secondary",
+        "coding": "primary"
+      },
+      "cost_band": "medium",
+      "latency_band": "low",
+      "structured_output_confidence": "medium",
+      "tool_use_confidence": "high",
+      "multilingual_confidence": "medium",
+      "reasoning_confidence": "medium",
+      "capability_tags": ["fast_iteration", "balanced_reasoning", "tool_use", "structured_output"],
+      "notes": "Mid-tier OpenAI option for balanced implementation and orchestration."
+    },
+    {
       "model_id": "openai:gpt-5.4-mini",
       "provider": "openai",
       "family": "gpt-5",
@@ -45,6 +67,77 @@
       "reasoning_confidence": "medium",
       "capability_tags": ["fast_iteration", "tool_first_execution", "surface_reply"],
       "notes": "Candidate for low-latency surfaces and lightweight delegation."
+    },
+    {
+      "model_id": "anthropic:claude-opus-4-8",
+      "provider": "anthropic",
+      "family": "claude-opus",
+      "status": "candidate",
+      "tier": "large",
+      "execution_tier": "deep",
+      "role_fit": {
+        "intent_compiler": "not_recommended",
+        "surface_agent": "secondary",
+        "analysis": "primary",
+        "coding": "primary"
+      },
+      "cost_band": "high",
+      "latency_band": "medium",
+      "structured_output_confidence": "high",
+      "tool_use_confidence": "high",
+      "multilingual_confidence": "high",
+      "reasoning_confidence": "high",
+      "capability_tags": [
+        "long_context_analysis",
+        "strategy_review",
+        "artifact_planning",
+        "multi_step_reasoning"
+      ],
+      "notes": "Large Anthropic option for deep analysis and review-heavy flows."
+    },
+    {
+      "model_id": "anthropic:claude-sonnet-4-6",
+      "provider": "anthropic",
+      "family": "claude-sonnet",
+      "status": "candidate",
+      "tier": "standard",
+      "execution_tier": "standard",
+      "role_fit": {
+        "intent_compiler": "not_recommended",
+        "surface_agent": "secondary",
+        "analysis": "primary",
+        "coding": "secondary"
+      },
+      "cost_band": "medium",
+      "latency_band": "medium",
+      "structured_output_confidence": "medium",
+      "tool_use_confidence": "medium",
+      "multilingual_confidence": "high",
+      "reasoning_confidence": "high",
+      "capability_tags": ["long_context_analysis", "strategy_review", "structured_output"],
+      "notes": "Standard Anthropic option for balanced reasoning and analysis."
+    },
+    {
+      "model_id": "gemini:gemini-3.5-flash",
+      "provider": "gemini",
+      "family": "gemini-3",
+      "status": "candidate",
+      "tier": "small",
+      "execution_tier": "fast",
+      "role_fit": {
+        "intent_compiler": "not_recommended",
+        "surface_agent": "primary",
+        "analysis": "secondary",
+        "coding": "secondary"
+      },
+      "cost_band": "low",
+      "latency_band": "low",
+      "structured_output_confidence": "medium",
+      "tool_use_confidence": "medium",
+      "multilingual_confidence": "high",
+      "reasoning_confidence": "medium",
+      "capability_tags": ["fast_iteration", "surface_reply", "tool_first_execution"],
+      "notes": "Gemini fast-path option for lightweight replies and delegation."
     },
     {
       "model_id": "anthropic:claude-sonnet-4.5",
