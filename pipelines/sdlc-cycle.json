@@ -1,0 +1,96 @@
+{
+  "action": "pipeline",
+  "name": "sdlc-cycle",
+  "version": "1.0.0",
+  "description": "E2E-05 Task 4: one-shot SDLC intake — intent → requirements draft → design spec → task plan → NEXT_TASKS.json (worker contract) → test plan. After this run the orchestration worker (+E2E-03 collaboration) drives implementation.",
+  "context": {
+    "mission_id": "",
+    "project_name": "",
+    "intent_text": "",
+    "language": "ja",
+    "requirements_source_path": "active/missions/{{mission_id}}/evidence/sdlc-intent.md"
+  },
+  "steps": [
+    {
+      "id": "open_log",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "🔁 SDLC cycle start for mission {{mission_id}} ({{project_name}})."
+      }
+    },
+    {
+      "id": "write_intent",
+      "role": "sink",
+      "op": "system:write_artifact",
+      "params": {
+        "path": "active/missions/{{mission_id}}/evidence/sdlc-intent.md",
+        "content": "{{intent_text}}"
+      }
+    },
+    {
+      "id": "extract_requirements",
+      "role": "transform",
+      "op": "wisdom:extract_requirements",
+      "produces": { "channel": "requirements_result", "type": "RequirementsDraftRef" },
+      "params": {
+        "mission_id": "{{mission_id}}",
+        "project_name": "{{project_name}}",
+        "source_path": "{{requirements_source_path}}",
+        "source_type": "mixed",
+        "language": "{{language}}"
+      }
+    },
+    {
+      "id": "extract_design_spec",
+      "role": "transform",
+      "op": "wisdom:extract_design_spec",
+      "consumes": "requirements_result",
+      "produces": { "channel": "design_result", "type": "DesignSpecRef" },
+      "params": {
+        "mission_id": "{{mission_id}}",
+        "project_name": "{{project_name}}"
+      }
+    },
+    {
+      "id": "decompose_into_tasks",
+      "role": "transform",
+      "op": "wisdom:decompose_into_tasks",
+      "consumes": "design_result",
+      "produces": { "channel": "task_plan_result", "type": "TaskPlanRef" },
+      "params": {
+        "mission_id": "{{mission_id}}",
+        "project_name": "{{project_name}}"
+      }
+    },
+    {
+      "id": "task_plan_to_next_tasks",
+      "role": "transform",
+      "op": "wisdom:task_plan_to_next_tasks",
+      "consumes": "task_plan_result",
+      "produces": { "channel": "next_tasks_result", "type": "NextTasksRef" },
+      "params": {
+        "mission_id": "{{mission_id}}"
+      }
+    },
+    {
+      "id": "extract_test_plan",
+      "role": "transform",
+      "op": "wisdom:extract_test_plan",
+      "consumes": "next_tasks_result",
+      "produces": { "channel": "test_plan_result", "type": "TestPlanRef" },
+      "params": {
+        "mission_id": "{{mission_id}}",
+        "project_name": "{{project_name}}"
+      }
+    },
+    {
+      "id": "close_log",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "✅ SDLC cycle artifacts ready for {{mission_id}}: requirements-draft / design-spec / task-plan / NEXT_TASKS / test-plan. Next: mission start → orchestration worker dispatch."
+      }
+    }
+  ]
+}

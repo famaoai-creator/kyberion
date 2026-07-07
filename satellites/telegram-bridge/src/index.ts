@@ -15,6 +15,8 @@ import {
   postBridgeError,
   resolveCustomerBinding,
   runCustomerConversation,
+  listSurfaceOutboxMessages,
+  clearSurfaceOutboxMessage,
 } from '@agent/core';
 
 export interface TelegramUser {
@@ -539,6 +541,23 @@ async function main(): Promise<void> {
   server.listen(port, '127.0.0.1', () => {
     logger.success(`📨 [TelegramBridge] listening on http://127.0.0.1:${port}`);
   });
+
+  // E2E-04 Task 2: drain the telegram surface outbox (operator notifications
+  // enqueued by core, e.g. notifyOperator) — same shape as the Slack bridge.
+  const drainOutbox = async () => {
+    for (const message of listSurfaceOutboxMessages('telegram')) {
+      try {
+        await sendTelegramMessage({ chatId: message.channel, text: message.text }, options);
+        clearSurfaceOutboxMessage('telegram', message.message_id);
+      } catch (err: any) {
+        logger.error(
+          `❌ [TelegramBridge] Outbox delivery failed for ${message.message_id}: ${err?.message || err}`
+        );
+      }
+    }
+  };
+  setInterval(() => void drainOutbox(), 15_000).unref();
+  void drainOutbox();
 }
 
 const directEntry = process.argv[1]

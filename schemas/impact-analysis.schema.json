@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ImpactAnalysis",
+  "description": "E2E-06 Task 6: explicit statement of how a change request affects existing assets. Produced by code-actuator impact_analysis; the size feeds price-book estimate_rules.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind", "generated_at", "repo_path", "summary", "files", "risks", "size"],
+  "properties": {
+    "kind": { "const": "impact-analysis" },
+    "generated_at": { "type": "string" },
+    "repo_path": { "type": "string" },
+    "summary": { "type": "string" },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "change"],
+        "properties": {
+          "path": { "type": "string" },
+          "change": { "type": "string" }
+        }
+      }
+    },
+    "risks": { "type": "array", "items": { "type": "string" } },
+    "size": { "enum": ["S", "M", "L"] }
+  }
+}

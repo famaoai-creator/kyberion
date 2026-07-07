@@ -36,9 +36,6 @@ overrides:
 importers:
   .:
     dependencies:
-      '@actuator/service':
-        specifier: workspace:*
-        version: link:libs/actuators/service-actuator
       '@agent/core':
         specifier: workspace:*
         version: link:libs/core
@@ -307,6 +304,15 @@ importers:
       chalk:
         specifier: ^5.3.0
         version: 5.6.2
+      yargs:
+        specifier: ^17.7.2
+        version: 17.7.2
+
+  libs/actuators/build-actuator:
+    dependencies:
+      '@agent/core':
+        specifier: workspace:*
+        version: link:../../core
       yargs:
         specifier: ^17.7.2
         version: 17.7.2

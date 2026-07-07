@@ -1,5 +1,10 @@
 #!/usr/bin/env node
 import { formatNextAction, getGovernanceControlSummary } from '@agent/core';
+import {
+  loadNotificationPreferences,
+  saveNotificationPreferences,
+  type NotificationChannelTarget,
+} from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { collectOperatorHomeSummary } from '@agent/core';
 import { collectDoctorReport } from './run_doctor.js';
@@ -17,10 +22,38 @@ const COMMANDS = [
   ['help', 'Show command guidance'],
 ] as const;
 
+// E2E-04 Task 2: `pnpm kyberion notify --set slack:C012345` writes the
+// operator's default notification channel (surface:target).
+function handleNotifySubcommand(setValue: string): void {
+  const [surface, ...rest] = setValue.split(':');
+  const target = rest.join(':');
+  const allowed = ['slack', 'imessage', 'telegram', 'discord'];
+  if (!allowed.includes(surface) || !target) {
+    console.error(`Usage: pnpm kyberion notify --set <${allowed.join('|')}>:<channel-id>`);
+    process.exitCode = 1;
+    return;
+  }
+  const prefs = loadNotificationPreferences();
+  prefs.default_channel = { surface, target } as NotificationChannelTarget;
+  const filePath = saveNotificationPreferences(prefs);
+  console.log(`Default notification channel set to ${surface}:${target} (${filePath})`);
+}
+
 async function main(): Promise<void> {
   const argv = await createStandardYargs()
     .option('json', { type: 'boolean', default: false })
+    .option('set', { type: 'string', description: 'notify: set default channel surface:target' })
     .parseSync();
+
+  const subcommand = String(argv._[0] || '');
+  if (subcommand === 'notify') {
+    if (argv.set) {
+      handleNotifySubcommand(String(argv.set));
+    } else {
+      console.log(JSON.stringify(loadNotificationPreferences(), null, 2));
+    }
+    return;
+  }
 
   const doctor = await collectDoctorReport({});
   const governance = getGovernanceControlSummary();

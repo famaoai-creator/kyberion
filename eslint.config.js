@@ -7,6 +7,7 @@ export default [
     ignores: [
       '.tmp-mulmoclaude/**',
       '.pnpm-store/**',
+      '.worktrees/**',
       'node_modules/**',
       '**/node_modules/**',
       '.venv/**',

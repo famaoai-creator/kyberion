@@ -135,7 +135,7 @@ async function processSlackOutbox(client: any) {
     try {
       const response = await client.chat.postMessage({
         channel: message.channel,
-        thread_ts: message.thread_ts,
+        thread_ts: message.thread_ts || undefined,
         text: message.text,
       });
       recordSlackDelivery(

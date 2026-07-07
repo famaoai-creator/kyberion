@@ -33,6 +33,11 @@
         }
       }
     },
-    { "op": "reconcile", "platforms": ["darwin", "linux", "win32"] }
+    { "op": "reconcile", "platforms": ["darwin", "linux", "win32"] },
+    {
+      "op": "impact_analysis",
+      "schema_ref": "schemas/impact-analysis.schema.json",
+      "platforms": ["darwin", "linux", "win32"]
+    }
   ]
 }

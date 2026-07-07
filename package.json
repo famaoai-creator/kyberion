@@ -86,6 +86,7 @@
     "eval:japanese-contextual-intent": "node --import ./scripts/ts-loader.mjs scripts/eval_japanese_contextual_intent.ts",
     "check:first-win-smoke": "node dist/scripts/check_first_win_smoke.js",
     "meeting:preflight": "node --import ./scripts/ts-loader.mjs scripts/meeting_preflight.ts",
+    "app:preflight": "node --import ./scripts/ts-loader.mjs scripts/app_preflight.ts",
     "find:dead-code": "node dist/scripts/find_dead_code.js",
     "dev:watch": "pnpm vitest watch libs/core/",
     "check:tier-hygiene": "node dist/scripts/check_tier_hygiene.js",
@@ -145,7 +146,6 @@
     "diagnose": "node dist/scripts/run_pipeline.js --input pipelines/system-diagnostics.json",
     "onboard": "node --input-type=module -e \"import { existsSync } from 'node:fs'; if (!existsSync('dist/scripts/onboarding_wizard.js')) { console.error('Run \\`pnpm build\\` first before onboarding.'); process.exit(1); } await import('./dist/scripts/onboarding_wizard.js');\"",
     "onboard:apply": "node --input-type=module -e \"import { existsSync } from 'node:fs'; if (!existsSync('dist/scripts/onboarding_apply.js')) { console.error('Run \\`pnpm build\\` first before onboarding apply.'); process.exit(1); } await import('./dist/scripts/onboarding_apply.js');\"",
-    "onboard:reset": "node --input-type=module -e \"import { existsSync } from 'node:fs'; if (!existsSync('dist/scripts/onboarding_reset.js')) { console.error('Run \\`pnpm build\\` first before onboarding reset.'); process.exit(1); } await import('./dist/scripts/onboarding_reset.js');\"",
     "mission:journal": "node dist/scripts/mission_journal.js",
     "dashboard": "node dist/scripts/sovereign_dashboard.js",
     "dashboard:onboarding": "node dist/scripts/sovereign_dashboard.js --once --focus onboarding",
@@ -200,6 +200,7 @@
     "pipeline": "node dist/scripts/run_pipeline.js",
     "pipeline:super": "node dist/scripts/run_super_pipeline.js",
     "intent:run": "node dist/scripts/run_intent.js",
+    "intent": "node --import ./scripts/ts-loader.mjs scripts/intent.ts",
     "release:notes": "node dist/scripts/extract_changelog_section.js",
     "migration:run": "pnpm exec tsx scripts/run_migrations.ts",
     "migration:rollback": "pnpm exec tsx scripts/run_migrations.ts --rollback",
@@ -233,7 +234,6 @@
     ]
   },
   "dependencies": {
-    "@actuator/service": "workspace:*",
     "@agent/core": "workspace:*",
     "@agent/shared-media": "workspace:*",
     "@agent/shared-nerve": "workspace:*",

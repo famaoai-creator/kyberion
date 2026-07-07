@@ -1,0 +1,16 @@
+{
+  "name": "@actuator/build",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Build Actuator — iOS/Android build, test, archive and app scaffolding for the AI-DLC/SDLC loop (E2E-05)",
+  "main": "../../../dist/libs/actuators/build-actuator/src/index.js",
+  "types": "../../../dist/libs/actuators/build-actuator/src/index.d.ts",
+  "scripts": {
+    "build": "tsc -p ../../../tsconfig.actuators.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@agent/core": "workspace:*",
+    "yargs": "^17.7.2"
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "BuildPipelineInput",
+  "description": "E2E-05 Task 2: input contract for build-actuator ops (mobile build/test/archive + scaffolding).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["op"],
+  "properties": {
+    "op": {
+      "enum": [
+        "scaffold_app",
+        "ios_generate_project",
+        "ios_build",
+        "ios_test",
+        "ios_archive",
+        "android_build",
+        "android_test",
+        "android_bundle"
+      ]
+    },
+    "project_dir": {
+      "type": "string",
+      "description": "App project root (required except scaffold_app)"
+    },
+    "scheme": {
+      "type": "string",
+      "description": "Xcode scheme (default: app_name or first scheme)"
+    },
+    "simulator": {
+      "type": "string",
+      "description": "iOS simulator name for ios_test (default: iPhone 15)"
+    },
+    "connected": {
+      "type": "boolean",
+      "description": "android_test: also run connectedDebugAndroidTest (default false)"
+    },
+    "platform": { "enum": ["ios", "android"], "description": "scaffold_app only" },
+    "app_name": { "type": "string" },
+    "bundle_id": { "type": "string" },
+    "dest_dir": { "type": "string", "description": "scaffold_app destination directory" },
+    "mission_id": {
+      "type": "string",
+      "description": "When set, logs land under the mission evidence dir"
+    },
+    "timeout_ms": { "type": "number", "minimum": 1000 }
+  }
+}

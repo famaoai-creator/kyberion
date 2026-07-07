@@ -103,6 +103,8 @@ export * from './campaign-suite.js';
 export * from './customer-channel-binding.js';
 export * from './deal-store.js';
 export * from './customer-conversation.js';
+export * from './operator-notifications.js';
+export * from './deal-documents.js';
 
 // Utils
 export * from './fs-utils.js';
@@ -780,6 +782,8 @@ export type {
   DeploymentAdapter,
   ShellDeploymentAdapterOptions,
 } from './deployment-adapter.js';
+export { MobileBetaDeploymentAdapter } from './deployment-adapters/mobile-beta.js';
+export type { MobileBetaAdapterOptions } from './deployment-adapters/mobile-beta.js';
 export {
   ChainAuditForwarder,
   getAuditForwarder,
@@ -1511,6 +1515,7 @@ export * from './surface-artifact-store.js';
 export * from './surface-mission-proposals.js';
 export * from './slack-approval-ui.js';
 export * from './slack-onboarding.js';
+export * from './agent-activity-board.js';
 // Surface-level type definitions (importable without pulling in channel-surface implementation)
 export type * from './channel-surface-types.js';
 

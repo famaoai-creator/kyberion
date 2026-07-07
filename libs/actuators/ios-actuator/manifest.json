@@ -16,6 +16,17 @@
     "retryable_categories": ["resource_unavailable", "timeout", "network"]
   },
   "capabilities": [
-    { "op": "pipeline", "schema_ref": "schemas/mobile-device-pipeline.schema.json", "platforms": ["darwin"] }
+    {
+      "op": "pipeline",
+      "schema_ref": "schemas/mobile-device-pipeline.schema.json",
+      "platforms": ["darwin"],
+      "prerequisites": {
+        "binaries": ["xcrun", "xcodebuild"],
+        "platforms": ["darwin"],
+        "install": {
+          "darwin": "Xcode を App Store から導入し、`sudo xcode-select -s /Applications/Xcode.app` を実行"
+        }
+      }
+    }
   ]
 }

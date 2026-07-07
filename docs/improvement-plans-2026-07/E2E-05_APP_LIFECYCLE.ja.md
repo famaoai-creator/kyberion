@@ -125,3 +125,21 @@
 
 Task 1(preflight)→ Task 2(build)→ Task 3(scaffold)→ Task 7(E2E: build 迄)→ Task 4(SDLC 連結)→ Task 5(device test)→ Task 6(配布)。
 **Task 1〜3 + 7 で「Kyberion がアプリをビルドできる」が成立**(最大の物理欠落の解消)。Task 4 で知的工程が繋がり、5〜6 で検証と出荷が閉じる。
+
+## 7. 実装状況(2026-07-07)
+
+Task 1〜7 実装済み(実機ツールチェーン実走の記録のみ未取得)。
+
+- **Task 1**: `pnpm app:preflight`(`scripts/app_preflight.ts` + unit test)。ios/android manifest に AC-01 prerequisites を宣言。
+- **Task 2**: `libs/actuators/build-actuator/` 新設(8 ops: scaffold_app / ios_generate_project / ios_build / ios_test / ios_archive / android_build / android_test / android_bundle)。`schemas/build-pipeline.schema.json`。ログは `evidence/build/<op>-<ts>.log` 全量、返却は `{ok, duration_ms, log_path, artifact_paths, error_summary(最大10行)}`。shell-command-policy に `mobile-toolchain` allowlist を追加。**逸脱**: 長時間ジョブは terminal-actuator spawn/poll ではなく `safeExecResult` の timeout 上書き(既定45分)で実装 — 同じ効果で決定論的・テスト容易。
+- **Task 3**: `knowledge/product/scaffolds/{ios-swiftui-minimal,android-compose-minimal}/`(プレースホルダ置換、XcodeGen project.yml 方式)。**逸脱**: gradle-wrapper の jar(バイナリ)はコミットせず — `./gradlew` 不在時は build-actuator が `gradle` にフォールバック(scaffold README に明記)。
+- **Task 4**: `pipelines/sdlc-cycle.json`(intent → extract_requirements → extract_design_spec → decompose_into_tasks → **task_plan_to_next_tasks**(新規 wisdom op、worker 契約へ決定論変換 — reviewer/tester の role 尊重、依存無し reviewer は implementer に降格)→ extract_test_plan)。`tests/sdlc-cycle-contract.test.ts`。
+- **Task 5**: modeling-actuator `test_inventory_to_device_pipeline` op(`compileTestInventoryToDevicePipeline`)。android: find/tap/input + wait_for_ui_text + 各 case スクリーンショット。ios: deep link + capture_screen のみ(**残余: iOS の UI 操作 op 拡充** — tap 系 op が薄いため)。
+- **Task 6**: `libs/core/deployment-adapters/mobile-beta.ts`(fastlane 委譲のみ、Fastfile はアプリ repo 責務、secret は名前参照のみ)。deployment-adapter-config schema に `adapter: 'mobile-beta'` を追加し AC-03 の config 駆動で選択可能。unit test 4件。
+- **Task 7**: `tests/app-lifecycle-e2e.test.ts`(モック契約分は常時実行、実走は `KYBERION_MOBILE_TOOLCHAIN=1` で opt-in)。OPERATOR_UX_GUIDE §11 に手順を追記。
+
+### 残余
+
+- iOS UI 操作 op(tap/input)の拡充(Task 5 の注記どおり)。
+- ローカル実機ツールチェーンでの実走記録(`KYBERION_MOBILE_TOOLCHAIN=1`)。
+- android scaffold の実ビルド検証(gradle 環境が必要)。

@@ -7,7 +7,7 @@
 ## 0.1 実装ステータス(2026-07-05 時点)
 
 - 実装済み: Task 1(上流成果の自動注入)、Task 2(チームスナップショット注入)、Task 3(review 契約のスキーマ強制)、Task 4(指摘→修正→再レビューの往復)、Task 7(協調 E2E テスト)
-- 未実装: Task 5(best-of-2 + judge)、Task 6(code_change ミッションの PR 協調)
+- 実装済み (2026-07-07): Task 5(best-of-2 + judge — `obtainBestOfTaskResultResponse`、敗者は `evidence/alternatives/`、`KYBERION_BEST_OF_N=0` で無効、`tests/best-of-n-judge.test.ts`)、Task 6(code_change の PR 協調 — 完了時に micro-repo へ commit + `task/<id>` ブランチ + `evidence/prs/<id>/{diff.patch,PR.md}`、review プロンプトへ diff 注入(2,000行超は先頭+ファイル一覧)、review タスク無しの code_change 計画は planner 契約違反で blocked、`tests/code-change-pr-collaboration.test.ts`)。全タスク完了
 - 補足: review タスクは `review_target` とその依存を両方満たす必要があるように、スキーマ検証を追加済み
 
 ## 0. 実装エージェントへ(E2E-01/02 と同じ規約)

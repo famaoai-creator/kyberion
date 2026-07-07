@@ -51,13 +51,26 @@ vi.mock('../libs/core/ops-alert.js', () => ({ sendOpsAlert: opsAlerts }));
 const gate = vi.hoisted(() => vi.fn());
 vi.mock('../libs/core/approval-gate.js', () => ({ enforceApprovalGate: gate }));
 
+const notify = vi.hoisted(() => vi.fn().mockResolvedValue(true));
+vi.mock('../libs/core/operator-notifications.js', () => ({ notifyOperator: notify }));
+
+const memoryQueue = vi.hoisted(() => ({
+  create: vi.fn((input: Record<string, unknown>) => ({ candidate_id: 'MEM-TEST-1', ...input })),
+  enqueue: vi.fn(() => 'queued'),
+}));
+vi.mock('../libs/core/memory-promotion-queue.js', () => ({
+  createMemoryPromotionCandidate: memoryQueue.create,
+  enqueueMemoryPromotionCandidate: memoryQueue.enqueue,
+}));
+
 const SLUG = 'e2e06-fixture-tenant';
 const CHANNEL = 'C_E2E06_FIXTURE';
 
 let tmpRoot: string;
 let core: typeof import('../libs/core/customer-conversation.js') &
   typeof import('../libs/core/customer-channel-binding.js') &
-  typeof import('../libs/core/deal-store.js');
+  typeof import('../libs/core/deal-store.js') &
+  typeof import('../libs/core/deal-documents.js');
 
 describe('customer dialogue (E2E-06)', () => {
   beforeAll(async () => {
@@ -129,10 +142,49 @@ describe('customer dialogue (E2E-06)', () => {
       })
     );
 
+    // second tenant with confidential sales notes for the isolation assert
+    const otherNotes = path.join(
+      tmpRoot,
+      'knowledge',
+      'confidential',
+      'other-tenant',
+      'sales',
+      'notes.md'
+    );
+    fs.mkdirSync(path.dirname(otherNotes), { recursive: true });
+    fs.writeFileSync(otherNotes, 'OTHER-TENANT-SECRET-PRICING-MEMO');
+    const otherBindings = path.join(
+      tmpRoot,
+      'customer',
+      'other-tenant',
+      'connections',
+      'channel-bindings.json'
+    );
+    fs.mkdirSync(path.dirname(otherBindings), { recursive: true });
+    fs.writeFileSync(
+      otherBindings,
+      JSON.stringify({ bindings: [{ surface: 'slack', channel_id: 'C_OTHER', active: true }] })
+    );
+    // contract template fixture
+    const templatePath = path.join(
+      tmpRoot,
+      'knowledge',
+      'product',
+      'sales',
+      'contract-templates',
+      'basic-service-agreement.md'
+    );
+    fs.mkdirSync(path.dirname(templatePath), { recursive: true });
+    fs.writeFileSync(
+      templatePath,
+      '# 契約書 {{DATE}}\n範囲:\n{{SCOPE}}\n金額: {{AMOUNT}} {{CURRENCY}}\n検収: {{SUCCESS_CONDITION}}\n見積: {{QUOTE_REF}}\n'
+    );
+
     const conversation = await import('../libs/core/customer-conversation.js');
     const bindingMod = await import('../libs/core/customer-channel-binding.js');
     const dealMod = await import('../libs/core/deal-store.js');
-    core = { ...conversation, ...bindingMod, ...dealMod } as typeof core;
+    const docsMod = await import('../libs/core/deal-documents.js');
+    core = { ...conversation, ...bindingMod, ...dealMod, ...docsMod } as typeof core;
   });
 
   afterAll(() => {
@@ -145,6 +197,9 @@ describe('customer dialogue (E2E-06)', () => {
     backendPrompt.mockReset();
     opsAlerts.mockReset();
     gate.mockReset();
+    notify.mockClear();
+    memoryQueue.create.mockClear();
+    memoryQueue.enqueue.mockClear();
   });
 
   it('resolves bound channels, ignores inactive bindings and unbound channels', () => {
@@ -312,6 +367,166 @@ describe('customer dialogue (E2E-06)', () => {
       deliver: vi.fn().mockRejectedValue(new Error('slack down')),
     });
     expect(failed.status).toBe('delivery_failed');
+  });
+
+  it('never leaks another tenant into the grounding prompt (会話面の tier-guard)', async () => {
+    backendPrompt.mockResolvedValue('カタログの範囲でお答えします。');
+    const binding = core.resolveCustomerBinding('slack', CHANNEL)!;
+    await core.runCustomerConversation({ binding, text: '価格を教えてください' });
+    const prompt = backendPrompt.mock.calls[0][0] as string;
+    expect(prompt).not.toContain('OTHER-TENANT-SECRET-PRICING-MEMO');
+    expect(prompt).not.toContain('other-tenant');
+  });
+
+  it('generates a versioned quote from the price book and notifies for approval', () => {
+    const deal = core.openDeal({
+      tenantSlug: SLUG,
+      surface: 'slack',
+      channelId: 'C_QUOTE_DOC',
+      summary: '機能追加の見積依頼',
+    });
+    const result = core.generateQuoteForDeal({
+      tenantSlug: SLUG,
+      dealId: deal.deal_id,
+      requests: [{ task_kind: 'feature_addition', size: 'M', description: '機能追加' }],
+    });
+    expect(result.ok).toBe(true);
+    expect(result.quote!.total).toBe(24 * 15000);
+    expect(result.deal!.stage).toBe('quote');
+    expect(result.deal!.quote_ref).toContain(`${deal.deal_id}/quote-v1.md`);
+    const md = fs.readFileSync(path.join(tmpRoot, result.quote_ref!), 'utf8');
+    expect(md).toContain('360,000');
+    const approvalNotify = notify.mock.calls.find((call) => call[0] === 'approval_required');
+    expect(approvalNotify).toBeTruthy();
+
+    // unquotable work goes to the operator and never advances the stage
+    const bad = core.generateQuoteForDeal({
+      tenantSlug: SLUG,
+      dealId: deal.deal_id,
+      requests: [{ task_kind: 'quantum_reactor' }],
+    });
+    expect(bad.ok).toBe(false);
+    expect(notify.mock.calls.some((call) => call[0] === 'question')).toBe(true);
+    expect(core.getDeal(SLUG, deal.deal_id)!.stage).toBe('quote');
+  });
+
+  it('contracts require agreement to draft and an approved review to send (防御層③)', async () => {
+    const deal = core.openDeal({
+      tenantSlug: SLUG,
+      surface: 'slack',
+      channelId: 'C_CONTRACT_DOC',
+      summary: '契約フローテスト',
+    });
+    expect(() => core.draftContractForDeal({ tenantSlug: SLUG, dealId: deal.deal_id })).toThrow(
+      /contract_requires_agreement/
+    );
+
+    core.advanceDealStage({
+      tenantSlug: SLUG,
+      dealId: deal.deal_id,
+      stage: 'quote',
+      agreed: {
+        scope: ['ログイン機能の追加'],
+        amount: { value: 360000, currency: 'JPY' },
+        success_condition: 'ログインできること',
+      },
+    });
+    const drafted = core.draftContractForDeal({ tenantSlug: SLUG, dealId: deal.deal_id });
+    expect(drafted.deal.stage).toBe('contract');
+    const contractMd = fs.readFileSync(path.join(tmpRoot, drafted.contract_ref), 'utf8');
+    expect(contractMd).toContain('ログイン機能の追加');
+    expect(contractMd).toContain('360,000 JPY');
+
+    const binding = core.resolveCustomerBinding('slack', CHANNEL)!;
+    const deliver = vi.fn().mockResolvedValue(undefined);
+    gate.mockReturnValue({ allowed: true, status: 'approved' });
+
+    // no review record → structurally blocked, gate never reached
+    const blocked = await core.sendDealDocumentToCustomer({
+      binding,
+      dealId: deal.deal_id,
+      kind: 'contract',
+      version: drafted.version,
+      deliver,
+    });
+    expect(blocked.status).toBe('blocked');
+    expect((blocked as { reason?: string }).reason).toBe('contract_review_required');
+    expect(deliver).not.toHaveBeenCalled();
+
+    core.recordContractReview({
+      tenantSlug: SLUG,
+      dealId: deal.deal_id,
+      version: drafted.version,
+      verdict: 'approve',
+      reviewer: 'operator',
+    });
+    const sent = await core.sendDealDocumentToCustomer({
+      binding,
+      dealId: deal.deal_id,
+      kind: 'contract',
+      version: drafted.version,
+      deliver,
+    });
+    expect(sent.status).toBe('sent');
+    expect(deliver).toHaveBeenCalledTimes(1);
+  });
+
+  it('won hands off to the SDLC with the customer words as the mission goal', () => {
+    const deal = core.openDeal({
+      tenantSlug: SLUG,
+      surface: 'slack',
+      channelId: 'C_SDLC_HANDOFF',
+      summary: '顧客: 検索機能を追加してほしい',
+    });
+    core.advanceDealStage({
+      tenantSlug: SLUG,
+      dealId: deal.deal_id,
+      stage: 'contract',
+      agreed: { scope: ['検索機能の追加'], amount: { value: 360000, currency: 'JPY' } },
+    });
+    const handoff = core.handoffWonDealToSdlc({
+      tenantSlug: SLUG,
+      dealId: deal.deal_id,
+      missionId: 'MSN-DEAL-1',
+    });
+    expect(handoff.sdlc_pipeline).toBe('pipelines/sdlc-cycle.json');
+    expect(handoff.deal.stage).toBe('won');
+    expect(handoff.deal.mission_ids).toContain('MSN-DEAL-1');
+    const payload = JSON.parse(fs.readFileSync(handoff.handoff_path, 'utf8'));
+    expect(payload.goal.summary).toBe('検索機能の追加');
+    expect(payload.source_text).toContain('検索機能を追加してほしい');
+  });
+
+  it('won snapshots the agreement; delivered queues a distill candidate (還流)', () => {
+    const deal = core.openDeal({
+      tenantSlug: SLUG,
+      surface: 'slack',
+      channelId: 'C_DISTILL',
+      summary: '納品まで完了した商談',
+    });
+    core.advanceDealStage({
+      tenantSlug: SLUG,
+      dealId: deal.deal_id,
+      stage: 'won',
+      agreed: { scope: ['成果物A'], amount: { value: 100000, currency: 'JPY' } },
+    });
+    const snapshot = path.join(
+      tmpRoot,
+      'customer',
+      SLUG,
+      'deals',
+      deal.deal_id,
+      'agreement-v1.json'
+    );
+    expect(fs.existsSync(snapshot)).toBe(true);
+    expect(JSON.parse(fs.readFileSync(snapshot, 'utf8')).agreed.scope).toEqual(['成果物A']);
+
+    core.advanceDealStage({ tenantSlug: SLUG, dealId: deal.deal_id, stage: 'delivering' });
+    core.advanceDealStage({ tenantSlug: SLUG, dealId: deal.deal_id, stage: 'delivered' });
+    expect(memoryQueue.enqueue).toHaveBeenCalledTimes(1);
+    const candidate = memoryQueue.create.mock.calls[0][0];
+    expect(candidate.sourceRef).toBe(`deal:${SLUG}/${deal.deal_id}`);
+    expect(candidate.sensitivityTier).toBe('confidential');
   });
 
   it('repo approval policy marks customer:outbound as approval-required', () => {
