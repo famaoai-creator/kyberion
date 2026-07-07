@@ -1,52 +1,9 @@
 {
-  "generated": "2026-07-07T14:02:34.785Z",
   "files": [
     {
       "path": "Ecosystem_Map.md",
       "tier": "public",
       "size": 2842,
-      "type": "md"
-    },
-    {
-      "path": "evolution/distill_board-protocol-commonization-2026-04-30_2026_04_29.md",
-      "tier": "public",
-      "size": 1231,
-      "type": "md"
-    },
-    {
-      "path": "evolution/distill_browser-direct-reply-commonization-2026-04-29_2026_04_29.md",
-      "tier": "public",
-      "size": 951,
-      "type": "md"
-    },
-    {
-      "path": "evolution/distill_msn-executive-pipelines_2026_05_02.md",
-      "tier": "public",
-      "size": 1995,
-      "type": "md"
-    },
-    {
-      "path": "evolution/distill_production-evidence-local-artifact-refs_2026_05_15.md",
-      "tier": "public",
-      "size": 1253,
-      "type": "md"
-    },
-    {
-      "path": "evolution/distill_production-evidence-register-text-nonblank_2026_05_15.md",
-      "tier": "public",
-      "size": 1255,
-      "type": "md"
-    },
-    {
-      "path": "evolution/distill_production-receipt-malformed-timestamps_2026_05_15.md",
-      "tier": "public",
-      "size": 1348,
-      "type": "md"
-    },
-    {
-      "path": "evolution/distill_resilience-actuators-v1_2026_05_11.md",
-      "tier": "public",
-      "size": 1337,
       "type": "md"
     },
     {
@@ -268,7 +225,7 @@
     {
       "path": "product/architecture/component-lifecycle-inventory.md",
       "tier": "public",
-      "size": 6337,
+      "size": 6336,
       "type": "md"
     },
     {
@@ -1138,7 +1095,7 @@
     {
       "path": "product/governance/active-surfaces.json",
       "tier": "public",
-      "size": 7238,
+      "size": 7235,
       "type": "json"
     },
     {
@@ -1192,7 +1149,7 @@
     {
       "path": "product/governance/authority-role-index.json",
       "tier": "public",
-      "size": 7970,
+      "size": 7524,
       "type": "json"
     },
     {
@@ -1205,6 +1162,12 @@
       "path": "product/governance/authority-roles/chronos_localadmin.json",
       "tier": "public",
       "size": 752,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/authority-roles/chronos_mirror_v2.json",
+      "tier": "public",
+      "size": 419,
       "type": "json"
     },
     {
@@ -1486,7 +1449,7 @@
     {
       "path": "product/governance/HINTS.md",
       "tier": "public",
-      "size": 2559,
+      "size": 0,
       "type": "md"
     },
     {
@@ -1702,7 +1665,7 @@
     {
       "path": "product/governance/mission-classification-policy.json",
       "tier": "public",
-      "size": 25280,
+      "size": 25211,
       "type": "json"
     },
     {
@@ -1750,7 +1713,7 @@
     {
       "path": "product/governance/mission-task-classification-scenarios.json",
       "tier": "public",
-      "size": 21473,
+      "size": 21588,
       "type": "json"
     },
     {
@@ -1762,7 +1725,7 @@
     {
       "path": "product/governance/mission-workflow-catalog.json",
       "tier": "public",
-      "size": 125160,
+      "size": 142979,
       "type": "json"
     },
     {
@@ -1786,7 +1749,7 @@
     {
       "path": "product/governance/model-registry.json",
       "tier": "public",
-      "size": 2372,
+      "size": 5539,
       "type": "json"
     },
     {
@@ -1918,7 +1881,7 @@
     {
       "path": "product/governance/path-scope-policy.json",
       "tier": "public",
-      "size": 2773,
+      "size": 2677,
       "type": "json"
     },
     {
@@ -2086,7 +2049,7 @@
     {
       "path": "product/governance/provider-config.json",
       "tier": "public",
-      "size": 1132,
+      "size": 1157,
       "type": "json"
     },
     {
@@ -2152,7 +2115,7 @@
     {
       "path": "product/governance/role-write-access.json",
       "tier": "public",
-      "size": 3022,
+      "size": 3292,
       "type": "json"
     },
     {
@@ -2170,7 +2133,7 @@
     {
       "path": "product/governance/security-policy.json",
       "tier": "public",
-      "size": 17414,
+      "size": 17966,
       "type": "json"
     },
     {
@@ -2212,7 +2175,7 @@
     {
       "path": "product/governance/shell-command-policy.json",
       "tier": "public",
-      "size": 2732,
+      "size": 2644,
       "type": "json"
     },
     {
@@ -2326,7 +2289,7 @@
     {
       "path": "product/governance/surface-provider-manifests.json",
       "tier": "public",
-      "size": 20902,
+      "size": 30901,
       "type": "json"
     },
     {
@@ -2416,7 +2379,7 @@
     {
       "path": "product/governance/surfaces/terminal-bridge.json",
       "tier": "public",
-      "size": 579,
+      "size": 545,
       "type": "json"
     },
     {
@@ -2470,7 +2433,7 @@
     {
       "path": "product/governance/tool-runtime-registry.json",
       "tier": "public",
-      "size": 7239,
+      "size": 8540,
       "type": "json"
     },
     {
@@ -3088,55 +3051,55 @@
     {
       "path": "product/orchestration/agent-profile-index.json",
       "tier": "public",
-      "size": 5869,
+      "size": 4652,
       "type": "json"
     },
     {
       "path": "product/orchestration/agent-profiles/attacker.json",
       "tier": "public",
-      "size": 464,
+      "size": 389,
       "type": "json"
     },
     {
       "path": "product/orchestration/agent-profiles/chronos-mirror.json",
       "tier": "public",
-      "size": 603,
+      "size": 480,
       "type": "json"
     },
     {
       "path": "product/orchestration/agent-profiles/defender.json",
       "tier": "public",
-      "size": 464,
+      "size": 389,
       "type": "json"
     },
     {
       "path": "product/orchestration/agent-profiles/implementation-architect.json",
       "tier": "public",
-      "size": 679,
+      "size": 532,
       "type": "json"
     },
     {
       "path": "product/orchestration/agent-profiles/nerve-agent.json",
       "tier": "public",
-      "size": 606,
+      "size": 475,
       "type": "json"
     },
     {
       "path": "product/orchestration/agent-profiles/onboarding-surface-agent.json",
       "tier": "public",
-      "size": 574,
+      "size": 467,
       "type": "json"
     },
     {
       "path": "product/orchestration/agent-profiles/planner-agent.json",
       "tier": "public",
-      "size": 496,
+      "size": 413,
       "type": "json"
     },
     {
       "path": "product/orchestration/agent-profiles/presence-surface-agent.json",
       "tier": "public",
-      "size": 598,
+      "size": 483,
       "type": "json"
     },
     {
@@ -3148,19 +3111,19 @@
     {
       "path": "product/orchestration/agent-profiles/slack-surface-agent.json",
       "tier": "public",
-      "size": 594,
+      "size": 479,
       "type": "json"
     },
     {
       "path": "product/orchestration/agent-profiles/sovereign-brain.json",
       "tier": "public",
-      "size": 649,
+      "size": 510,
       "type": "json"
     },
     {
       "path": "product/orchestration/agent-profiles/telegram-surface-agent.json",
       "tier": "public",
-      "size": 572,
+      "size": 465,
       "type": "json"
     },
     {
@@ -3328,7 +3291,7 @@
     {
       "path": "product/orchestration/global_actuator_index.json",
       "tier": "public",
-      "size": 16136,
+      "size": 15384,
       "type": "json"
     },
     {
@@ -3371,6 +3334,12 @@
       "path": "product/orchestration/knowledge-protocol.md",
       "tier": "public",
       "size": 1971,
+      "type": "md"
+    },
+    {
+      "path": "product/orchestration/kyberion-development-workflow.md",
+      "tier": "public",
+      "size": 5594,
       "type": "md"
     },
     {
@@ -3754,13 +3723,13 @@
     {
       "path": "product/orchestration/provider-capabilities.fallback.json",
       "tier": "public",
-      "size": 8018,
+      "size": 8196,
       "type": "json"
     },
     {
       "path": "product/orchestration/provider-capabilities.json",
       "tier": "public",
-      "size": 5887,
+      "size": 8015,
       "type": "json"
     },
     {
@@ -3778,7 +3747,7 @@
     {
       "path": "product/orchestration/README.md",
       "tier": "public",
-      "size": 7252,
+      "size": 7320,
       "type": "md"
     },
     {
@@ -3838,7 +3807,7 @@
     {
       "path": "product/orchestration/service-endpoints.json",
       "tier": "public",
-      "size": 5797,
+      "size": 5671,
       "type": "json"
     },
     {
@@ -3989,6 +3958,12 @@
       "path": "product/orchestration/service-endpoints/telegram.json",
       "tier": "public",
       "size": 235,
+      "type": "json"
+    },
+    {
+      "path": "product/orchestration/service-endpoints/video-analysis.json",
+      "tier": "public",
+      "size": 297,
       "type": "json"
     },
     {
@@ -4169,6 +4144,12 @@
       "path": "product/orchestration/service-presets/telegram.json",
       "tier": "public",
       "size": 724,
+      "type": "json"
+    },
+    {
+      "path": "product/orchestration/service-presets/video-analysis.json",
+      "tier": "public",
+      "size": 522,
       "type": "json"
     },
     {
@@ -4504,7 +4485,7 @@
     {
       "path": "product/orchestration/work-coordination-platform.md",
       "tier": "public",
-      "size": 4402,
+      "size": 4553,
       "type": "md"
     },
     {
@@ -5866,7 +5847,7 @@
     {
       "path": "product/schemas/deployment-adapter-config.schema.json",
       "tier": "public",
-      "size": 1040,
+      "size": 1050,
       "type": "json"
     },
     {
@@ -6364,7 +6345,7 @@
     {
       "path": "product/schemas/mission-workflow-catalog.schema.json",
       "tier": "public",
-      "size": 4719,
+      "size": 6601,
       "type": "json"
     },
     {
@@ -6760,7 +6741,7 @@
     {
       "path": "product/schemas/provider-config.schema.json",
       "tier": "public",
-      "size": 2829,
+      "size": 3492,
       "type": "json"
     },
     {
@@ -7060,7 +7041,7 @@
     {
       "path": "product/schemas/surface-provider-manifests.schema.json",
       "tier": "public",
-      "size": 7603,
+      "size": 9135,
       "type": "json"
     },
     {
@@ -7558,7 +7539,7 @@
     {
       "path": "public/common/project_standards.json",
       "tier": "public",
-      "size": 495,
+      "size": 582,
       "type": "json"
     },
     {
@@ -9749,6 +9730,12 @@
       "path": "public/templates/my-identity.schema.json",
       "tier": "public",
       "size": 1456,
+      "type": "json"
+    },
+    {
+      "path": "public/templates/onboarding/identity.example.json",
+      "tier": "public",
+      "size": 588,
       "type": "json"
     },
     {

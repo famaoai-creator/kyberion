@@ -12,9 +12,16 @@ describe('runtime supervisor lifecycle', () => {
     const setIntervalSpy = vi.spyOn(global, 'setInterval').mockReturnValue(clearToken);
 
     const { runtimeSupervisor } = await import('@agent/core/runtime-supervisor');
+    // Other modules in the import graph may arm their own timers (kill-switch
+    // monitor, deferred auto-sweep) — reset so we assert startSweep alone.
+    runtimeSupervisor.stopSweep();
+    setIntervalSpy.mockClear();
+    unref.mockClear();
+
     runtimeSupervisor.startSweep(1234);
 
     expect(setIntervalSpy).toHaveBeenCalledOnce();
+    expect(setIntervalSpy).toHaveBeenLastCalledWith(expect.any(Function), 1234);
     expect(unref).toHaveBeenCalledOnce();
 
     runtimeSupervisor.stopSweep();

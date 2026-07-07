@@ -70,6 +70,23 @@ N/A.
 - [ ] PR title and commit titles follow [Conventional Commits](https://www.conventionalcommits.org/)
 - [ ] Read [`docs/developer/EXTENSION_POINTS.md`](../docs/developer/EXTENSION_POINTS.md) if touching public surfaces
 
+## Governed data / snapshots (check when `knowledge/` or governance JSON changed)
+
+<!-- Contract tests compare directories against committed snapshots; changing one side without the other breaks tests/ for everyone. -->
+
+- [ ] `pnpm generate:knowledge-index && pnpm check:catalogs` is green (index/manifest regenerated)
+- [ ] Actuator manifests changed → `pnpm sync:component-inventory` run (CAPABILITIES_GUIDE / global_actuator_index)
+- [ ] `agent-profiles/` changed → `agent-profile-index.json` regenerated to match
+- [ ] `surfaces/*.json` changed → `active-surfaces.json` snapshot matches (aggregate of per-surface files)
+- [ ] `service-endpoints.json` changed → matching per-service file exists under `service-endpoints/`
+- [ ] Snapshot contract tests pass: `pnpm vitest run tests/`
+
+## Hygiene
+
+- [ ] No compiled `.js` / `.d.ts` staged next to `.ts` sources (pre-commit hook enforces; build output belongs in `dist/`)
+- [ ] `docs/improvement-plans-2026-07/` plan touched → its 実装状況 section and `docs/ROADMAP_COMPLETION_LEDGER.md` updated
+- [ ] Template fixtures (`knowledge/product/scaffolds/`) use `__VAR__` placeholders — never `{{VAR}}` (formatters mangle it)
+
 ## Issue link
 
 <!-- e.g., closes #123 -->
