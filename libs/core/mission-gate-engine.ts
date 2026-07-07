@@ -4,8 +4,13 @@ import {
   type StructuredOutputSchemaName,
   resolveStructuredOutputSchema,
 } from './structured-output-contracts.js';
-import { safeExistsSync, safeExec } from './secure-io.js';
+import { safeExistsSync, safeExec, safeReadFile } from './secure-io.js';
 import { safeWriteFile, safeMkdir } from './secure-io.js';
+import {
+  evaluateDeliverableQuality,
+  inferDeliverableKind,
+  qualityScoreFromReport,
+} from './deliverable-quality.js';
 
 export type MissionGateCheckKind =
   | 'evidence_exists'
@@ -13,6 +18,7 @@ export type MissionGateCheckKind =
   | 'command_succeeds'
   | 'reviewer_approved'
   | 'human_override'
+  | 'deliverable_quality'
   | 'custom';
 
 export interface MissionGateCheck {
@@ -58,6 +64,7 @@ export interface MissionGateOverrideInput {
 }
 
 function toStringList(value: unknown): string[] {
+  if (typeof value === 'string') return value.trim() ? [value.trim()] : [];
   if (!Array.isArray(value)) return [];
   return value.map((entry) => String(entry).trim()).filter(Boolean);
 }
@@ -207,6 +214,47 @@ async function evaluateGateCheck(check: MissionGateCheck): Promise<{
         : {
             passed: false,
             reason: firstString(params.reason, params.message) ?? 'Human override denied.',
+          };
+    }
+    case 'deliverable_quality': {
+      // Deterministic per-kind rubric gate (MO-01/MO-07 seam): reads the
+      // deliverable from disk and scores it via evaluateDeliverableQuality.
+      // `min_score` is on a 0..1 scale (ok=1.0, warn=0.5, poor=0).
+      const params = check.params || {};
+      const artifactPath = firstString(params.path, params.artifact_path, params.deliverable);
+      if (!artifactPath) {
+        return { passed: false, reason: 'No deliverable path was provided.' };
+      }
+      if (!safeExistsSync(artifactPath)) {
+        return { passed: false, reason: `Deliverable not found: ${artifactPath}` };
+      }
+      const raw = safeReadFile(artifactPath, { encoding: 'utf8' }) as string;
+      let artifact: unknown = raw;
+      try {
+        artifact = JSON.parse(raw);
+      } catch {
+        // Non-JSON deliverables (markdown, text) are evaluated as raw text.
+      }
+      const extension = artifactPath.split('.').pop() ?? '';
+      const kind =
+        firstString(params.kind, params.deliverable_kind) ?? inferDeliverableKind(extension);
+      if (!kind) {
+        return {
+          passed: false,
+          reason: `Could not determine deliverable kind for ${artifactPath}.`,
+        };
+      }
+      const report = evaluateDeliverableQuality(kind, artifact);
+      const score = qualityScoreFromReport(report) / 100;
+      const minScore =
+        typeof params.min_score === 'number' && Number.isFinite(params.min_score)
+          ? params.min_score
+          : 0.5;
+      return score >= minScore
+        ? { passed: true }
+        : {
+            passed: false,
+            reason: `Deliverable quality ${score.toFixed(2)} below ${minScore} — ${report.reason}`,
           };
     }
     case 'custom': {

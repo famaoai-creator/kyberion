@@ -26,7 +26,21 @@
 - **完了(受入3)**: `code-change-aidlc` は AI-DLC の相構造をフェーズ列で表現: `intake → classification → alignment → planning → contract_authoring → execution → test → self_review → verification → delivery → retrospective`(circuit-breaker/ゲート実効化は MO-02)。
 - **完了(受入4)**: 選択結果は `state.json`(`classification` / `process_template`)、TASK_BOARD.md ヘッダ(Class/Process 行)、`mission_controller status`(Class/Process 表示)に出る。
 - **テスト**: `mission-workflow-catalog.test.ts` に「code_change → code-change-aidlc(AI-DLC フェーズ含有)」「クラス3種で異なるテンプレートが選ばれる」を固定。
-- **残余(後続 IP へ)**: worker のイベント連鎖を `process_template.phases` で駆動する差し替え(Task 4-1)は MO-02 のゲート評価と一体で実施するのが安全なため MO-02 に委譲。低確信度分類の operator 確認導線(Task 3-2)は分類器に confidence シグナルが未実装のため未対応(matched_rules 不在=既定フォールバックの検出は可能、MO-02 で扱う)。
+
+## 実装状況 追記 (2026-07-06) — フェーズの実タスク展開まで完了
+
+プロセステンプレートが「フェーズ名ラベル」止まりだった残余を解消し、**フェーズ → 具体タスク/ゲートへの決定的展開**まで実装した。当初案の `schemas/mission-process-template.schema.json` + `mission-process-templates/` ディレクトリは**正式に廃案**とし、mission-workflow-catalog の phases を `string | phaseSpec` の oneOf に拡張する方式で確定(既存テンプレートは無変更で後方互換)。
+
+- **スキーマ**: `mission-workflow-catalog.schema.json` v1.1.0 — phaseSpec = `{ id, title?, kind?, pipeline_ref?, brief_ref?, entry_gate?, exit_gate?, default_tasks[] }`。gate check 語彙は mission-gate-engine と同一 + `deliverable_quality`。
+- **展開エンジン**: `libs/core/mission-process-task-expansion.ts` — `expandProcessTemplateTasks()` が phase specs を依存連鎖つき `NEXT_TASKS.json`(`origin: process_template` マーカー付き)へ決定的展開。reviewer 不変条件(review_target / REVIEW-\*.md)を展開時に自己検査。
+- **接続**: `createMission` で default_tasks があれば自動展開 + TASK_BOARD.md にフェーズ別チェックリスト描画。既存ミッションは `mission_controller plan-tasks <ID> [--force]`。ゲート定義は `missions/<id>/gates/definitions/` に永続化。
+- **ゲート実効化(MO-02 の先行分)**: `gate-pass`/`gate-fail` が保存済み定義を `evaluateMissionGate` で機械評価(pass で `current_phase` 前進、fail でフェーズタスクを rework 化)。workitem dispatch は entry_gate 未通過フェーズのタスクを `deferred`。`deliverable_quality` check(`evaluateDeliverableQuality` ルーブリック、MO-07 の接続点)を gate-engine に追加。
+- **プロセステンプレート(3系統 + 文書)**: `presentation-deck-production`(顧客層定義 → ストーリー設計 → コンテンツ執筆 → デザイン選定 → レビュー → 成果物作成。production は `pipelines/fragments/pptx-produce-from-brief.json` を参照)、`document-authoring`、`incident-analysis-postmortem`(triage → evidence_collection → timeline_reconstruction → root_cause_analysis → review → report_delivery)、既存 `code-change-aidlc` に各フェーズの pipeline_ref + default_tasks + ゲートを付与(フェーズ id 不変)。
+- **worker 統合**: `persistPlanningPacket` は `origin: process_template` タスクを保護マージ(プランナーは追加のみ可)。planner kickoff プロンプトにフェーズ骨子と固定タスク一覧を注入。
+- **分類ルーティング**: `mission-classification-policy.json` に `presentation_production`/`document_production` → `content_and_media`、`incident_analysis` → `operations_and_release` のヒント/インテント/発話ルールを追加(`mission create <ID> --mission-type presentation_production` だけで専用プロセスに載る)。`resolveMissionWorkflowDesign` にも同ヒントの intent 既定値を追加。
+- **検証**: `pnpm check:workflow-catalog-refs`(`scripts/check_workflow_catalog_refs.ts`、validate チェーンに追加)が pipeline_ref/brief_ref の実在と全テンプレートの展開可否を静的検査。stub バックエンドでの E2E(create → gate-pass fail/pass → current_phase 前進)を手動確認済み。
+- **残余(後続 IP へ)**: worker イベント連鎖のフェーズ駆動化の残り(MO-02)、`crossCritique`/best-of-N のレビュー接続(MO-07)、成果物インボックス UI(SU-03)。
+- **2026-07-06 拡充**: カタログ v1.2.0 でプロセスライブラリを全 16 業務プロセスに拡大 — CO-05 の 7 ビジネステンプレートに phaseSpec を付与し、新規 7 テンプレート(research-report / data-analysis-report / marketing-campaign-production / contract-review-approval / customer-onboarding-engagement / training-material-authoring / event-planning-operations)を追加。分類ポリシーに各パターンの hint/intent/日本語発話ルールを追加(詳細は CO-05 実装メモ)。
 
 ## 実装タスク
 

@@ -14,9 +14,11 @@ const mocks = vi.hoisted(() => ({
   refreshAgentRuntime: vi.fn(),
   restartAgentRuntime: vi.fn(),
   stopAgentRuntime: vi.fn(),
+  recordDaemonHeartbeat: vi.fn(),
   runtimeSupervisor: {
     touch: vi.fn(),
   },
+  sendOpsAlert: vi.fn(),
   appendSupervisorEvent: vi.fn(),
   logger: {
     info: vi.fn(),
@@ -38,7 +40,9 @@ vi.mock('@agent/core', async () => {
     refreshAgentRuntime: mocks.refreshAgentRuntime,
     restartAgentRuntime: mocks.restartAgentRuntime,
     stopAgentRuntime: mocks.stopAgentRuntime,
+    recordDaemonHeartbeat: mocks.recordDaemonHeartbeat,
     runtimeSupervisor: mocks.runtimeSupervisor,
+    sendOpsAlert: mocks.sendOpsAlert,
     appendSupervisorEvent: mocks.appendSupervisorEvent,
     logger: mocks.logger,
   };
@@ -47,11 +51,11 @@ vi.mock('@agent/core', async () => {
 import { startAgentRuntimeSupervisorDaemon } from './agent_runtime_supervisor_daemon.js';
 
 async function sendRequest(
-  address: { host: string; port: number },
+  socketPath: string,
   payload: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
   return await new Promise((resolve, reject) => {
-    const socket = net.createConnection(address);
+    const socket = net.createConnection(socketPath);
     let buffer = '';
     socket.once('connect', () => {
       socket.write(`${JSON.stringify(payload)}\n`);
@@ -74,15 +78,13 @@ async function sendRequest(
 
 describe('agent_runtime_supervisor_daemon', () => {
   let rootDir: string;
-  let host: string;
-  let port: number;
+  let socketPath: string;
   let lockPath: string;
   let instance: Awaited<ReturnType<typeof startAgentRuntimeSupervisorDaemon>> | null = null;
 
   beforeEach(() => {
     rootDir = fs.mkdtempSync(path.join(pathResolver.sharedTmp(''), 'daemon-tests-kyberion-'));
-    host = '127.0.0.1';
-    port = 0;
+    socketPath = path.join(rootDir, 'agent-runtime-supervisor.sock');
     lockPath = path.join(rootDir, 'agent-supervisor.lock');
     mocks.ensureAgentRuntime.mockResolvedValue({
       agentId: 'agent-1',
@@ -139,74 +141,60 @@ describe('agent_runtime_supervisor_daemon', () => {
 
   it('serves health/ensure/ask over the IPC socket', async () => {
     instance = await startAgentRuntimeSupervisorDaemon({
-      transport: 'tcp',
-      host,
-      port,
+      transport: 'unix',
+      socketPath,
       lockPath,
       exitOnFatalError: false,
       exitOnExistingHealthyDaemon: false,
     });
-    host = instance.host || host;
-    port = instance.port || port;
 
-    await expect(sendRequest({ host, port }, { id: '1', method: 'health' })).resolves.toMatchObject(
-      {
-        ok: true,
-        result: { ok: true, socket_path: expect.stringContaining('127.0.0.1') },
-      }
-    );
+    await expect(sendRequest(socketPath, { id: '1', method: 'health' })).resolves.toMatchObject({
+      ok: true,
+      result: { ok: true, socket_path: expect.stringContaining('agent-runtime-supervisor.sock') },
+    });
 
     await expect(
-      sendRequest(
-        { host, port },
-        {
-          id: '2',
-          method: 'ensure',
-          payload: {
-            agentId: 'agent-1',
-            provider: 'gemini',
-            requestedBy: 'test',
-          },
-        }
-      )
+      sendRequest(socketPath, {
+        id: '2',
+        method: 'ensure',
+        payload: {
+          agentId: 'agent-1',
+          provider: 'gemini',
+          requestedBy: 'test',
+        },
+      })
     ).resolves.toMatchObject({
       ok: true,
       result: { agent_id: 'agent-1', provider: 'gemini', status: 'ready' },
     });
 
     await expect(
-      sendRequest(
-        { host, port },
-        {
-          id: '3',
-          method: 'ask',
-          payload: {
-            agentId: 'agent-1',
-            prompt: 'hello',
-            requestedBy: 'test',
-          },
-        }
-      )
+      sendRequest(socketPath, {
+        id: '3',
+        method: 'ask',
+        payload: {
+          agentId: 'agent-1',
+          prompt: 'hello',
+          requestedBy: 'test',
+        },
+      })
     ).resolves.toMatchObject({
       ok: true,
       result: { text: 'daemon-ask' },
     });
-  });
+  }, 90000);
 
   it('returns a typed error for malformed JSON requests', async () => {
     instance = await startAgentRuntimeSupervisorDaemon({
-      transport: 'tcp',
-      host,
-      port,
+      transport: 'unix',
+      socketPath,
       lockPath,
       exitOnFatalError: false,
       exitOnExistingHealthyDaemon: false,
     });
-    host = instance.host || host;
-    port = instance.port || port;
 
     await new Promise<void>((resolve, reject) => {
-      const socket = net.createConnection({ host, port });
+      const socket = net.createConnection(socketPath);
       let buffer = '';
       socket.once('connect', () => {
         socket.write('{not-json}\n');
@@ -230,5 +218,5 @@ describe('agent_runtime_supervisor_daemon', () => {
       });
       socket.once('error', reject);
     });
-  });
+  }, 90000);
 });

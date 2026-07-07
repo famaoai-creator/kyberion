@@ -1,0 +1,26 @@
+{
+  "version": "1.0.0",
+  "organization_id": "financial-services-backoffice",
+  "templates": {
+    "operations": {
+      "required_roles": ["owner", "operator"],
+      "optional_roles": ["planner", "reviewer", "scribe", "tracker"],
+      "lifecycle": {
+        "max_parallel_members": 4,
+        "max_members": 6,
+        "max_messages_per_run": 60,
+        "max_wall_clock_minutes": 240,
+        "max_member_turns": 8,
+        "shutdown_policy": "graceful_handoff",
+        "resume_policy": "checkpoint_resume",
+        "cooldown_minutes": 15
+      }
+    },
+    "incident": {
+      "optional_roles": ["planner", "reviewer", "surface_liaison"]
+    },
+    "default": {
+      "optional_roles": ["reviewer", "scribe"]
+    }
+  }
+}
