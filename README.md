@@ -41,9 +41,26 @@ Kyberion turns intent into governed execution. You ask `今週の進捗レポー
 
 Kyberion's first visible result comes in three short paths:
 
-- 30 seconds: run `pnpm doctor` and see Kyberion's readiness/value boundary
+- 30 seconds: run `pnpm doctor` and see Kyberion's readiness boundary
 - 5 minutes: run the clean browser smoke and get `active/shared/tmp/first-win-session.png`
 - 15 minutes: read the Quickstart structure map, then inspect the pipeline and actuator entrypoints
+
+If you want the shortest startup path first, run this:
+
+```bash
+pnpm install
+pnpm prereq:check
+pnpm build
+pnpm setup:report --persona first-time-user
+```
+
+If a browser, voice, or media actuator is missing a local dependency, inspect it directly with the on-demand pull resolver:
+
+```bash
+pnpm deps:check --actuator browser
+pnpm deps:check --actuator voice
+pnpm deps:check --actuator media-generation
+```
 
 Requires Node.js 24+ (`.nvmrc` / `package.json` engines) and pnpm.
 

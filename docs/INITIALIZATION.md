@@ -8,6 +8,12 @@
 
 システムをゼロから立ち上げるための標準的なコマンド列です。
 
+最短経路だけ先に知りたい場合は、次の 1 本から始められます。
+
+```bash
+pnpm install && pnpm prereq:check && pnpm build && pnpm setup:report --persona first-time-user
+```
+
 前提:
 
 - Node.js `24+`（`package.json` の `engines` が正。`.nvmrc` も `24`。`nvm use` で揃えられます）
@@ -24,6 +30,12 @@ pnpm prereq:check
 #     未導入でも起動はできますが、ブラウザ経路(スクリーンショット first-win 等)は
 #     テキストへフォールバックします。postinstall では自動ダウンロードしません。
 pnpm exec playwright install chromium
+
+# 2c. (必要時のみ) アクチュエータ単位の on-demand pull
+#     browser / voice / media-generation のように、起動前に個別依存だけ確認したい場合に使います。
+pnpm deps:check --actuator browser
+pnpm deps:check --actuator voice
+pnpm deps:check --actuator media-generation
 
 # 3. システムの具現化 (ビルド)
 pnpm build
