@@ -157,7 +157,6 @@ function writeJsonArtifacts(current: CurrentIndexRecord[], legacy: LegacyRecord[
       {
         v: '2.0.0',
         t: current.length,
-        u: new Date().toISOString(),
         actuators: current,
       },
       null,
@@ -171,7 +170,6 @@ function writeJsonArtifacts(current: CurrentIndexRecord[], legacy: LegacyRecord[
       {
         v: '1.0.0',
         t: legacy.length,
-        u: new Date().toISOString(),
         components: legacy,
       },
       null,
@@ -185,7 +183,6 @@ function writeJsonArtifacts(current: CurrentIndexRecord[], legacy: LegacyRecord[
       {
         v: '3.0.0',
         t: current.length,
-        u: new Date().toISOString(),
         s: current.map((entry) => ({
           n: entry.n,
           path: entry.path,
@@ -281,7 +278,6 @@ function buildReport(current: CurrentIndexRecord[], legacy: LegacyRecord[]): str
   lines.push('tags: [architecture, actuators, cleanup, governance]');
   lines.push('importance: 8');
   lines.push('author: Ecosystem Architect');
-  lines.push(`last_updated: ${new Date().toISOString().slice(0, 10)}`);
   lines.push('---');
   lines.push('');
   lines.push('# Component Lifecycle Inventory');
