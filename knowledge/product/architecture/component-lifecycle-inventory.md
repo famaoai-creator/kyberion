@@ -4,7 +4,6 @@ category: Architecture
 tags: [architecture, actuators, cleanup, governance]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-07-07
 ---
 
 # Component Lifecycle Inventory

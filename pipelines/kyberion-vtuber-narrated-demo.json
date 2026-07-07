@@ -23,7 +23,9 @@
       "id": "log_start",
       "role": "sink",
       "op": "system:log",
-      "params": { "message": "🎬 [KYBERION-VTUBER] Starting narrated 60s demo for mission {{mission_id}}" }
+      "params": {
+        "message": "🎬 [KYBERION-VTUBER] Starting narrated 60s demo for mission {{mission_id}}"
+      }
     },
     {
       "id": "preflight",
@@ -37,7 +39,28 @@
       "op": "system:write_file",
       "params": {
         "path": "{{mission_evidence_dir}}/kyberion-vtuber-voice.json",
-        "content": { "action": "generate_voice", "request_id": "kyberion-vtuber-video-audio", "text": "{{voice_script}}", "profile_ref": { "profile_id": "{{profile_id}}" }, "engine": { "engine_id": "local_say" }, "rendering": { "language": "ja", "chunking": { "max_chunk_chars": 4000, "crossfade_ms": 50, "preserve_paralinguistic_tags": true } }, "delivery": { "mode": "artifact", "format": "aiff", "artifact_path": "{{narration_path}}", "emit_progress_packets": true }, "routing": { "personal_voice_mode": "allow_fallback" } },
+        "content": {
+          "action": "generate_voice",
+          "request_id": "kyberion-vtuber-video-audio",
+          "text": "{{voice_script}}",
+          "profile_ref": { "profile_id": "{{profile_id}}" },
+          "engine": { "engine_id": "local_say" },
+          "rendering": {
+            "language": "ja",
+            "chunking": {
+              "max_chunk_chars": 4000,
+              "crossfade_ms": 50,
+              "preserve_paralinguistic_tags": true
+            }
+          },
+          "delivery": {
+            "mode": "artifact",
+            "format": "aiff",
+            "artifact_path": "{{narration_path}}",
+            "emit_progress_packets": true
+          },
+          "routing": { "personal_voice_mode": "allow_fallback" }
+        },
         "format": "json"
       }
     },
@@ -99,13 +122,13 @@
             "layout_family": "vtuber-stage",
             "motion_profile": "on-air",
             "fps": 15,
-            "hero_path": "/Users/famao/kyberion/active/shared/assets/kyberion_vtuber_avatar.jpg",
+            "hero_path": "active/shared/assets/kyberion_vtuber_avatar.jpg",
             "avatar_assets": {
-              "focus-center": "/Users/famao/kyberion/active/shared/assets/kyberion_vtuber_avatar.jpg",
-              "split-left": "/Users/famao/kyberion/active/shared/assets/kyberion_vtuber_avatar_explain.jpg",
-              "fullscreen-demo": "/Users/famao/kyberion/active/shared/assets/kyberion_vtuber_avatar_explain.jpg",
-              "split-right": "/Users/famao/kyberion/active/shared/assets/kyberion_vtuber_avatar_smile.jpg",
-              "default": "/Users/famao/kyberion/active/shared/assets/kyberion_vtuber_avatar.jpg"
+              "focus-center": "active/shared/assets/kyberion_vtuber_avatar.jpg",
+              "split-left": "active/shared/assets/kyberion_vtuber_avatar_explain.jpg",
+              "fullscreen-demo": "active/shared/assets/kyberion_vtuber_avatar_explain.jpg",
+              "split-right": "active/shared/assets/kyberion_vtuber_avatar_smile.jpg",
+              "default": "active/shared/assets/kyberion_vtuber_avatar.jpg"
             }
           }
         },
@@ -163,13 +186,13 @@
                 "layout_family": "vtuber-stage",
                 "motion_profile": "on-air",
                 "fps": 15,
-                "hero_path": "/Users/famao/kyberion/active/shared/assets/kyberion_vtuber_avatar.jpg",
+                "hero_path": "active/shared/assets/kyberion_vtuber_avatar.jpg",
                 "avatar_assets": {
-                  "focus-center": "/Users/famao/kyberion/active/shared/assets/kyberion_vtuber_avatar.jpg",
-                  "split-left": "/Users/famao/kyberion/active/shared/assets/kyberion_vtuber_avatar_explain.jpg",
-                  "fullscreen-demo": "/Users/famao/kyberion/active/shared/assets/kyberion_vtuber_avatar_explain.jpg",
-                  "split-right": "/Users/famao/kyberion/active/shared/assets/kyberion_vtuber_avatar_smile.jpg",
-                  "default": "/Users/famao/kyberion/active/shared/assets/kyberion_vtuber_avatar.jpg"
+                  "focus-center": "active/shared/assets/kyberion_vtuber_avatar.jpg",
+                  "split-left": "active/shared/assets/kyberion_vtuber_avatar_explain.jpg",
+                  "fullscreen-demo": "active/shared/assets/kyberion_vtuber_avatar_explain.jpg",
+                  "split-right": "active/shared/assets/kyberion_vtuber_avatar_smile.jpg",
+                  "default": "active/shared/assets/kyberion_vtuber_avatar.jpg"
                 }
               }
             },
@@ -203,7 +226,9 @@
       "role": "source",
       "op": "system:shell",
       "produces": { "channel": "fallback_video_result", "type": "ShellResult" },
-      "params": { "cmd": "if test -f {{video_output_path}}; then echo 'video already rendered'; else ffmpeg -y -f lavfi -i color=c=0x090814:s=640x360 -frames:v 1 -update 1 {{mission_evidence_dir}}/kyberion-cover.png && ffmpeg -y -loop 1 -framerate 25 -i {{mission_evidence_dir}}/kyberion-cover.png -t 6 -c:v libx264 -preset ultrafast -crf 35 -pix_fmt yuv420p {{mission_evidence_dir}}/kyberion-vtuber-silent.mp4 && ffmpeg -y -i {{mission_evidence_dir}}/kyberion-vtuber-silent.mp4 -i {{narration_path}} -c:v copy -c:a aac -t 6 -movflags +faststart {{video_output_path}}; fi" }
+      "params": {
+        "cmd": "if test -f {{video_output_path}}; then echo 'video already rendered'; else ffmpeg -y -f lavfi -i color=c=0x090814:s=640x360 -frames:v 1 -update 1 {{mission_evidence_dir}}/kyberion-cover.png && ffmpeg -y -loop 1 -framerate 25 -i {{mission_evidence_dir}}/kyberion-cover.png -t 6 -c:v libx264 -preset ultrafast -crf 35 -pix_fmt yuv420p {{mission_evidence_dir}}/kyberion-vtuber-silent.mp4 && ffmpeg -y -i {{mission_evidence_dir}}/kyberion-vtuber-silent.mp4 -i {{narration_path}} -c:v copy -c:a aac -t 6 -movflags +faststart {{video_output_path}}; fi"
+      }
     },
     {
       "id": "validate",
@@ -215,7 +240,15 @@
       "id": "write_completion_note",
       "role": "sink",
       "op": "system:write_file",
-      "consumes": ["preflight_result", "voice_result", "video_result", "verify_result", "frame_extract_result", "blackframe_result", "duration_alignment_result"],
+      "consumes": [
+        "preflight_result",
+        "voice_result",
+        "video_result",
+        "verify_result",
+        "frame_extract_result",
+        "blackframe_result",
+        "duration_alignment_result"
+      ],
       "params": {
         "path": "{{mission_evidence_dir}}/kyberion-vtuber-summary.md",
         "content": "# Kyberion VTuber Narrated Demo\n\n## Scenario flow\n1. Receive a fixed live-demo brief with persona, chat, and workflow already decided.\n2. Convert the brief into a vtuber-oriented content brief and storyboard.\n3. Generate narration and compose the scene bundle.\n4. Render, verify, extract key frames, and reject black-frame output.\n\n## Output artifacts\n- Content brief: `{{content_brief_path}}`\n- Narration: `{{narration_path}}`\n- Video: `{{video_output_path}}`\n- Bundle: `{{video_bundle_dir}}`\n- Key frames: `{{mission_evidence_dir}}/kyberion-vtuber-frames/`\n\n## Validation\n- `{{preflight_result}}`\n- `{{voice_result}}`\n- `{{video_result}}`\n- `{{verify_result}}`\n- `{{frame_extract_result}}`\n- `{{blackframe_result}}`\n- `{{duration_alignment_result}}`\n\n## Next command\n- `pnpm pipeline --input pipelines/kyberion-vtuber-narrated-demo.json`\n",
@@ -227,7 +260,9 @@
       "role": "sink",
       "op": "system:log",
       "consumes": ["voice_result", "video_result", "verify_result"],
-      "params": { "message": "🏁 [KYBERION-VTUBER] Narrated demo complete. Voice: {{voice_result}} Video: {{video_result}} Verify: {{verify_result}}" }
+      "params": {
+        "message": "🏁 [KYBERION-VTUBER] Narrated demo complete. Voice: {{voice_result}} Video: {{video_result}} Verify: {{verify_result}}"
+      }
     }
   ]
 }

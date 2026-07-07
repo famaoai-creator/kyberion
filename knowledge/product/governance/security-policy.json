@@ -386,6 +386,18 @@
       "allow_read": ["active/shared/observability/", "active/shared/runtime/"],
       "allow_write": []
     },
+    "chronos_mirror_v2": {
+      "allow_read": [
+        "active/shared/coordination/chronos/",
+        "active/shared/observability/chronos/",
+        "active/audit/"
+      ],
+      "allow_write": [
+        "active/shared/coordination/chronos/",
+        "active/shared/observability/chronos/",
+        "active/audit/"
+      ]
+    },
     "chronos_localadmin": {
       "allow_read": [
         "active/shared/coordination/channels/",
@@ -413,6 +425,8 @@
         "active/shared/coordination/channels/imessage/",
         "active/shared/coordination/channels/discord/",
         "active/shared/coordination/channels/telegram/",
+        "active/shared/coordination/agent-runtime/",
+        "active/shared/observability/mission-control/",
         "presence/bridge/runtime/",
         "active/audit/"
       ],
@@ -424,6 +438,8 @@
         "active/shared/coordination/channels/imessage/",
         "active/shared/coordination/channels/discord/",
         "active/shared/coordination/channels/telegram/",
+        "active/shared/coordination/agent-runtime/",
+        "active/shared/observability/mission-control/",
         "presence/bridge/runtime/",
         "active/audit/"
       ]

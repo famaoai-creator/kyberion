@@ -1,0 +1,23 @@
+{
+  "service_id": "video-analysis",
+  "name": "Kyberion Video Keyframe and Narrative Analysis Service",
+  "operations": {
+    "analyze_video": {
+      "type": "cli",
+      "command": "uv",
+      "args": [
+        "run",
+        "python3",
+        "-m",
+        "claude_real_video",
+        "{{source}}",
+        "-o",
+        "{{out}}",
+        "--grid",
+        "--viewer",
+        "{{extra_args}}"
+      ],
+      "description": "Run local video analysis using the claude-real-video (crv) package via uv run"
+    }
+  }
+}

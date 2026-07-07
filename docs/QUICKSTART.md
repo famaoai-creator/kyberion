@@ -27,6 +27,12 @@ Prerequisites:
 - Node.js `24+` (matches `package.json` engines and `.nvmrc`)
 - `pnpm`
 
+If you want the shortest setup path first, you can use the same one-liner the initialization guide documents:
+
+```bash
+pnpm install && pnpm prereq:check && pnpm build && pnpm setup:report --persona first-time-user
+```
+
 ```bash
 git clone https://github.com/famaoai-creator/kyberion.git
 cd kyberion
@@ -56,6 +62,7 @@ The first-win path is intentionally staged:
 - 60 seconds: `pnpm setup:report --persona first-time-user` tells you which surface to use next and whether auth/setup is still blocking it
 - 5 minutes: `pnpm pipeline --input pipelines/verify-session.json` writes `active/shared/tmp/first-win-session.png`
 - optional voice path: `pnpm pipeline --input pipelines/voice-hello.json`
+- on-demand pull: `pnpm deps:check --actuator browser|voice|media-generation` checks actuator-level dependencies before you start that surface
 - 15 minutes: skim sections 4-10, then open `pipelines/verify-session.json`, `CAPABILITIES_GUIDE.md`, and `docs/developer/EXTENSION_POINTS.md` to understand the structure
 
 ```bash

@@ -2,29 +2,15 @@
   "version": "1.0.0",
   "agents": {
     "presence-surface-agent": {
-      "authority_roles": [
-        "surface_runtime",
-        "chronos_operator"
-      ],
-      "team_roles": [
-        "surface_liaison"
-      ],
-      "capabilities": [
-        "presence",
-        "surface",
-        "conversation",
-        "realtime"
-      ],
+      "authority_roles": ["surface_runtime", "chronos_operator"],
+      "team_roles": ["surface_liaison"],
+      "capabilities": ["presence", "surface", "conversation", "realtime"],
       "selection_hints": {
-        "preferred_provider": "gemini",
+        "preferred_provider": "agy",
         "preferred_modelId": "gemini-2.5-flash"
       },
       "provider_strategy": "adaptive",
-      "fallback_providers": [
-        "claude",
-        "copilot",
-        "codex"
-      ]
+      "fallback_providers": ["claude", "copilot", "codex"]
     }
   }
 }

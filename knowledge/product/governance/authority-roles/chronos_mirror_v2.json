@@ -1,0 +1,9 @@
+{
+  "role": "chronos_mirror_v2",
+  "description": "Chronos UI mirror authority for interacting with the orchestration system and observability logs.",
+  "default_persona": "worker",
+  "write_scopes": ["active/shared/coordination/chronos/", "active/shared/observability/chronos/"],
+  "scope_classes": ["communication_surface"],
+  "allowed_actuators": ["presence-actuator"],
+  "tier_access": ["public", "confidential"]
+}
