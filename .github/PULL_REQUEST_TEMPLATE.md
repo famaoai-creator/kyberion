@@ -4,6 +4,16 @@
 
 <!-- 1–3 sentences. What changed and why. -->
 
+## Coordination
+
+<!-- Fill these in when the change is part of a mission/workitem flow. -->
+
+- Mission ID:
+- Workitem IDs:
+- Evidence paths:
+- Trace IDs:
+- Related workflow doc:
+
 ## Type
 
 <!-- Pick one or more. -->
@@ -52,6 +62,8 @@ N/A.
 
 ## Checklist
 
+- [ ] Mission / workitem references are included when applicable
+- [ ] Evidence paths or trace IDs are included when applicable
 - [ ] `pnpm validate` is green locally
 - [ ] Tests added (or existing tests updated)
 - [ ] CHANGELOG.md updated under `[Unreleased]` (for user-visible changes)
