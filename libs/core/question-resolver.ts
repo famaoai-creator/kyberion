@@ -9,6 +9,7 @@ import {
   type ContextualClarificationExecutionShape,
 } from './contextual-intent-clarification-policy.js';
 import { getMeetingBriefQuestions } from './meeting-operations-profile.js';
+import { notifyOperator } from './operator-notifications.js';
 import { getNarratedVideoBriefQuestions } from './narrated-video-preference-profile.js';
 import { getPresentationPreferenceProfile } from './presentation-preference-registry.js';
 import { getPresentationBriefQuestions } from './presentation-preference-profile.js';
@@ -561,6 +562,16 @@ export function resolveQuestionInteractionPacket(
   const locale = resolveQuestionLocale(input.locale);
   const result = resolveQuestionResolution(input);
   if (!result.should_clarify || result.questions.length === 0) return undefined;
+  // E2E-04 Task 2: push the clarification to the operator's channel so the
+  // question does not sit unnoticed in a surface (rate-limited per intent).
+  void notifyOperator('question', {
+    title: result.questions[0]?.question || 'Kyberion has a question',
+    body: result.questions
+      .slice(0, 3)
+      .map((question) => `- ${question.question}`)
+      .join('\n'),
+    correlation_id: input.intentId || result.questions[0]?.question,
+  });
   return buildOperatorInteractionPacket(
     result,
     headline || localizedQuestionText(locale, 'headline'),

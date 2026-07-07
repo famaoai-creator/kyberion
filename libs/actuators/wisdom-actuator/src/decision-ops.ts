@@ -1,5 +1,6 @@
 import {
   logger,
+  missionDir,
   safeReadFile,
   safeWriteFile,
   safeMkdir,
@@ -431,6 +432,66 @@ export async function decomposeIntoTasksOp(input: DecomposeIntoTasksOpInput): Pr
     draft_path: `active/missions/${input.mission_id}/evidence/task-plan.json`,
     task_count: saved.tasks.length,
     task_plan_ready: gate,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// E2E-05 Task 4: task-plan → NEXT_TASKS.json (deterministic transform).
+// Converts the SDLC task plan into the orchestration worker's task contract
+// so "合意 → 分解 → ミッション着手" becomes one pipeline run. Roles from the
+// plan are respected (tester → qa); reviewer tasks get the worker's mandatory
+// review_target / REVIEW-<target>.md deliverable derived from depends_on.
+// ---------------------------------------------------------------------------
+
+export function taskPlanToNextTasksOp(input: { mission_id: string }): {
+  mission_id: string;
+  next_tasks_path: string;
+  task_count: number;
+} {
+  if (!input.mission_id) throw new Error('[task_plan_to_next_tasks] requires mission_id');
+  const plan = readTaskPlan(input.mission_id);
+  if (!plan || !Array.isArray(plan.tasks) || plan.tasks.length === 0) {
+    throw new Error('[task_plan_to_next_tasks] task plan not found or empty');
+  }
+  const scopeOf = (estimate?: string): 'S' | 'M' | 'L' =>
+    estimate === 'L' || estimate === 'XL' ? 'L' : estimate === 'M' ? 'M' : 'S';
+  const nextTasks = plan.tasks.map((task) => {
+    const dependencies = Array.isArray(task.depends_on) ? task.depends_on : [];
+    let role =
+      task.assigned_role === 'tester'
+        ? 'qa'
+        : task.assigned_role === 'reviewer'
+          ? 'reviewer'
+          : 'implementer';
+    // The worker contract requires reviewer/qa tasks to carry review_target +
+    // a REVIEW-<target>.md deliverable; without a dependency there is nothing
+    // to review, so the task degrades to implementer instead of violating it.
+    const reviewTarget = role === 'reviewer' || role === 'qa' ? dependencies[0] : undefined;
+    if ((role === 'reviewer' || role === 'qa') && !reviewTarget) role = 'implementer';
+    const scope = scopeOf(task.estimate);
+    return {
+      task_id: task.task_id,
+      status: 'planned',
+      assigned_to: { role },
+      description: `${task.title} — ${task.summary}`,
+      deliverable: reviewTarget
+        ? `deliverables/REVIEW-${reviewTarget}.md`
+        : task.deliverables?.[0] || `deliverables/${task.task_id}.md`,
+      dependencies,
+      acceptance_criteria: Array.isArray(task.test_criteria) ? task.test_criteria : [],
+      estimated_scope: scope,
+      risk: scope === 'L' ? 'high' : scope === 'M' ? 'medium' : 'low',
+      ...(reviewTarget ? { review_target: reviewTarget } : {}),
+    };
+  });
+  // Same path convention the orchestration worker reads from
+  // (missionDir honors mission-management-config tier directories).
+  const nextTasksPath = `${missionDir(input.mission_id, 'public')}/NEXT_TASKS.json`;
+  safeWriteFile(nextTasksPath, JSON.stringify(nextTasks, null, 2));
+  return {
+    mission_id: input.mission_id,
+    next_tasks_path: nextTasksPath,
+    task_count: nextTasks.length,
   };
 }
 
@@ -2755,6 +2816,11 @@ export async function dispatchDecisionOp(
 
     case 'evaluate_task_plan_ready': {
       const result = evaluateTaskPlanReadyGate(resolved('mission_id'));
+      return { handled: true, ctx: assign(result) };
+    }
+
+    case 'task_plan_to_next_tasks': {
+      const result = taskPlanToNextTasksOp({ mission_id: resolved('mission_id') });
       return { handled: true, ctx: assign(result) };
     }
 

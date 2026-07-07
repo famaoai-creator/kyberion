@@ -26,6 +26,17 @@
         "^pnpm\\s+exec\\s+vitest(?:\\s|$)"
       ],
       "reason": "Test and lint commands are allowed."
+    },
+    {
+      "id": "mobile-toolchain",
+      "command_regex": [
+        "^xcodebuild(?:\\s|$)",
+        "^xcrun\\s+simctl(?:\\s|$)",
+        "^xcodegen(?:\\s|$)",
+        "^(?:\\./)?gradlew?\\s+(?:assembleDebug|testDebugUnitTest|connectedDebugAndroidTest|bundleRelease|wrapper)(?:\\s|$)",
+        "^adb\\s+(?:devices|install|shell\\s+am\\s+start|uninstall)(?:\\s|$)"
+      ],
+      "reason": "Mobile AI-DLC/SDLC toolchain (E2E-05): build/test/device ops are allowed; deploy/signing stays approval-gated via the deployment adapter."
     }
   ],
   "denylist": [

@@ -1,6 +1,6 @@
 # Ecosystem Knowledge Base Index
 
-_SSoT Index Version: 2.0.0 | Last Updated: 2026-07-07T12:51:48.851Z_
+_SSoT Index Version: 2.0.0 | Last Updated: 2026-07-07T14:02:34.786Z_
 
 > **Volatile / Working-Memory faces** (session, mission, project, personal, daily, weekly) are **not listed here** — they are ephemeral and not SSoT. See the generated volatile index: [`active/INDEX.volatile.md`](../active/INDEX.volatile.md) (non-SSoT, refreshed by `pnpm pipeline --input pipelines/volatile-index.json`). Schema: `schemas/volatile-knowledge.schema.json`.
 
@@ -632,6 +632,14 @@ _SSoT Index Version: 2.0.0 | Last Updated: 2026-07-07T12:51:48.851Z_
 
 - [Role Procedure: Cultural Weaver (Talent & Culture)](./product/roles/talent_culture/PROCEDURE.md) (public | Unknown)
 - [Talent & Culture (採用 & 組織文化) ミッション声明](./product/roles/talent_culture/mission.md) (public | Ecosystem Architect)
+
+## 📁 product/sales/contract-templates
+
+- [業務委託基本契約書(ドラフト)](./product/sales/contract-templates/basic-service-agreement.md) (public | Unknown)
+
+## 📁 product/scaffolds/android-compose-minimal
+
+- [android-compose-minimal scaffold](./product/scaffolds/android-compose-minimal/README.md) (public | Unknown)
 
 ## 📁 product/schemas
 

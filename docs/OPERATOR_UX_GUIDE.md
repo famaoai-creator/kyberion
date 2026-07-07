@@ -570,3 +570,39 @@ This split matters because it keeps:
 - conversation smooth
 - operations inspectable
 - executive attention high-signal
+
+## 11. アプリ開発ライフサイクルの回し方(E2E-05)
+
+iOS/Android アプリの AI-DLC/SDLC を回す標準手順(コピペ可):
+
+```bash
+# 0. 前提チェック(配布まで見るなら --full)
+pnpm app:preflight --platform android        # or ios / all
+
+# 1. code_change ミッションを作成(レビュー必須クラス)
+pnpm mission create --type code_change --goal "FixtureApp にログイン機能を追加"
+
+# 2. SDLC 取り込み: 意図 → 要件 → 設計 → タスク分解 → NEXT_TASKS → テスト計画
+pnpm pipeline --input pipelines/sdlc-cycle.json \
+  --context '{"mission_id":"MSN-XXXX","project_name":"FixtureApp","intent_text":"ログイン機能を追加したい。..."}'
+
+# 3. 実装(orchestration worker が E2E-03 の協調 — PR 協調・review 往復 — で回す)
+pnpm mission start MSN-XXXX
+
+# 4. 新規アプリなら scaffold(fixture 方式、外部ツール不要)
+echo '{"op":"scaffold_app","platform":"android","app_name":"FixtureApp","bundle_id":"dev.example.fixture","dest_dir":"active/shared/tmp/fixture-app"}' > /tmp/build-input.json
+node dist/libs/actuators/build-actuator/src/index.js --input /tmp/build-input.json
+
+# 5. ビルド / テスト(ログは evidence/build/ に全量)
+echo '{"op":"android_build","project_dir":"active/shared/tmp/fixture-app","mission_id":"MSN-XXXX"}' > /tmp/build-input.json
+node dist/libs/actuators/build-actuator/src/index.js --input /tmp/build-input.json
+
+# 6. デバイステスト: test-plan(test-case-adf)→ device pipeline へコンパイル
+#    modeling-actuator op: test_inventory_to_device_pipeline (platform: android|ios)
+
+# 7. ベータ配布(fastlane 委譲・approval-gate 必須)
+#    knowledge/personal/deployments/<project>.json に:
+#    {"adapter":"mobile-beta","platform":"android","project_dir":"active/shared/tmp/fixture-app"}
+```
+
+補足: iOS は `ios_generate_project`(xcodegen)→ `ios_build`。実機/シミュレータ検証は `KYBERION_MOBILE_TOOLCHAIN=1 pnpm vitest run tests/app-lifecycle-e2e.test.ts`。
