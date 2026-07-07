@@ -5,12 +5,8 @@
       "id": "terminal-bridge",
       "kind": "service",
       "description": "Background terminal bridge service for runtime sessions",
-      "command": "pnpm",
-      "args": [
-        "--dir",
-        "presence/bridge/terminal",
-        "start"
-      ],
+      "command": "node",
+      "args": ["dist/presence/bridge/terminal/server.js"],
       "env": {
         "KYBERION_PERSONA": "sovereign",
         "MISSION_ROLE": "infrastructure_sentinel"
