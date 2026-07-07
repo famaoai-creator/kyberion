@@ -94,6 +94,7 @@
     "vuln:scan": "node --import ./scripts/ts-loader.mjs scripts/scan_dependency_vulns.ts",
     "daemon:watchdog": "node --import ./scripts/ts-loader.mjs scripts/daemon_watchdog.ts",
     "mesh:deliver": "node --import ./scripts/ts-loader.mjs scripts/mesh_delivery_driver.ts",
+    "campaign:suite": "node --import ./scripts/ts-loader.mjs scripts/campaign_suite.ts",
     "audit:verify": "node --import ./scripts/ts-loader.mjs scripts/audit_verify.ts",
     "generate:knowledge-index": "node --import ./scripts/ts-loader.mjs scripts/generate_knowledge_index.ts",
     "mesh-hub:inspect": "node --import ./scripts/ts-loader.mjs scripts/mesh_hub_inspect.ts",

@@ -23,6 +23,59 @@ describe('video content brief contract', () => {
     safeRmSync(tenantRoot, { recursive: true, force: true });
   });
 
+  it('applies tenant css vars via design_profile.tenant_slug (VDS-07 / E2E-02)', () => {
+    const slug = 'e2e02-video-fixture';
+    const designDir = pathResolver.knowledge(`confidential/${slug}/design`);
+    const prevPersona = process.env.KYBERION_PERSONA;
+    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    safeMkdir(designDir, { recursive: true });
+    safeWriteFile(
+      path.join(designDir, 'tenant-override.json'),
+      JSON.stringify({ tenant_id: slug, branding: { brand_name: 'E2E02 Corp' } })
+    );
+    safeWriteFile(
+      path.join(designDir, 'theme.json'),
+      JSON.stringify({
+        theme: {
+          name: slug,
+          colors: { primary: '#123456', accent: '#abcdef', background: '#111111', text: '#eeeeee' },
+          fonts: { heading: 'E2E Sans', body: 'E2E Sans' },
+        },
+      })
+    );
+
+    try {
+      const storyboard = compileVideoContentBriefToStoryboard({
+        kind: 'video-content-brief',
+        version: '1.0.0',
+        title: 'Tenant branded video',
+        audience: 'customers',
+        objective: 'prove tenant branding reaches video',
+        distribution_channel: 'demo',
+        content_type: 'howto',
+        presentation_mode: 'howto',
+        promise: 'branded output',
+        desired_takeaway: 'tenant colors applied',
+        constraints: [],
+        proof_points: ['branding'],
+        content_requirements: ['show intro'],
+        tone: 'practical',
+        language: 'ja',
+        duration_sec: 10,
+        design_profile: { tenant_slug: slug },
+        design_system_ref: { system_id: 'tenant-demo' },
+      });
+
+      expect(storyboard.design_system_ref.background_color).toBe('#111111');
+      expect(storyboard.design_system_ref.css_vars?.['--kb-accent']).toBe('#abcdef');
+      expect(storyboard.design_system_ref.css_vars?.['--kb-primary']).toBe('#123456');
+    } finally {
+      safeRmSync(pathResolver.knowledge(`confidential/${slug}`), { recursive: true, force: true });
+      if (prevPersona === undefined) delete process.env.KYBERION_PERSONA;
+      else process.env.KYBERION_PERSONA = prevPersona;
+    }
+  });
+
   it('compiles a how-to brief into a storyboard and narrated brief', () => {
     const storyboard = compileVideoContentBriefToStoryboard({
       kind: 'video-content-brief',

@@ -1,4 +1,5 @@
 import type { VideoStoryboard } from './video-content-brief-contract.js';
+import { resolveCreativeDesign } from './creative-design-resolver.js';
 import type {
   VideoCompositionADF,
   VideoCompositionAssetRef,
@@ -21,8 +22,14 @@ export interface NarratedVideoBrief {
   narration: {
     artifact_ref: string;
   };
+  /** Optional BGM track muxed alongside (or instead of) narration (E2E-02 MV). */
+  music?: {
+    artifact_ref?: string;
+  };
   design_system: {
     brand_name: string;
+    /** VDS-07 / E2E-02: direct tenant selection via creative-design-resolver. */
+    tenant_slug?: string;
     theme_tokens?: {
       background_color?: string;
       css_vars?: Record<string, string>;
@@ -46,9 +53,36 @@ export interface NarratedVideoBrief {
   };
 }
 
+/**
+ * VDS-07 (E2E-02): when the brief names a tenant, fill theme tokens from the
+ * single creative-design resolver. Explicit brief values always win.
+ */
+function applyTenantDesignToNarratedBrief(brief: NarratedVideoBrief): NarratedVideoBrief {
+  const tenantSlug = brief.design_system.tenant_slug;
+  if (!tenantSlug) return brief;
+  const resolved = resolveCreativeDesign({ surface: 'video', tenantSlug });
+  if (resolved.source !== 'tenant-override' || resolved.projection.surface !== 'video') {
+    return brief;
+  }
+  const tenantVars = resolved.projection.css_vars;
+  const explicit = brief.design_system.theme_tokens;
+  return {
+    ...brief,
+    design_system: {
+      ...brief.design_system,
+      theme_tokens: {
+        ...explicit,
+        background_color: explicit?.background_color || tenantVars['--kb-bg-main'],
+        css_vars: { ...tenantVars, ...(explicit?.css_vars || {}) },
+      },
+    },
+  };
+}
+
 export function compileNarratedVideoBriefToCompositionADF(
-  brief: NarratedVideoBrief
+  input: NarratedVideoBrief
 ): VideoCompositionADF {
+  const brief = applyTenantDesignToNarratedBrief(input);
   const storyboard = brief.storyboard;
   const totalDuration = clampDuration(
     brief.timing?.duration_sec || (storyboard ? sumStoryboardDuration(storyboard) : 9)
@@ -81,6 +115,7 @@ export function compileNarratedVideoBriefToCompositionADF(
     },
     audio: {
       narration_ref: brief.narration.artifact_ref,
+      ...(brief.music?.artifact_ref ? { music_ref: brief.music.artifact_ref } : {}),
     },
     scenes,
     output: {

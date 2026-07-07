@@ -1,0 +1,39 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CampaignBrief",
+  "description": "E2E-02 Task 6: one brief that drives deck/doc/video/web/mv generation under a single resolved design.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind", "title", "audience", "deliverables", "key_messages"],
+  "properties": {
+    "kind": { "const": "campaign-brief" },
+    "version": { "type": "string" },
+    "title": { "type": "string", "minLength": 1 },
+    "audience": { "type": "string", "minLength": 1 },
+    "tenant_slug": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" },
+    "tone": { "type": "string" },
+    "language": { "type": "string" },
+    "deliverables": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "enum": ["deck", "doc", "intro_video", "web_lp", "mv"] }
+    },
+    "key_messages": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string" }
+    },
+    "sections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["heading"],
+        "properties": {
+          "heading": { "type": "string" },
+          "body": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    }
+  }
+}

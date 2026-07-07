@@ -5,6 +5,7 @@ import {
   safeLstat,
   safeMkdir,
   safeReaddir,
+  safeReadFile,
   safeWriteFile,
 } from '@agent/core';
 import { withExecutionContext } from '@agent/core/governance';
@@ -99,24 +100,6 @@ function listOps(manifest: CapabilityManifest): string[] {
     )
   ).sort();
 }
-
-function loadSystemActuatorOps(constName: string): string[] {
-  const source = safeReadFile(
-    pathResolver.rootResolve('libs/actuators/system-actuator/src/index.ts'),
-    { encoding: 'utf8' }
-  ) as string;
-  const pattern = new RegExp(`export const ${constName} = \\[(.*?)\\] as const;`, 's');
-  const match = source.match(pattern);
-  if (!match) {
-    throw new Error(`Unable to extract ${constName} from system-actuator source`);
-  }
-  return Array.from(match[1].matchAll(/'([^']+)'/g), (result) => result[1]);
-}
-
-const SYSTEM_ACTUATOR_CAPTURE_OPS = loadSystemActuatorOps('SYSTEM_ACTUATOR_CAPTURE_OPS');
-const SYSTEM_ACTUATOR_TRANSFORM_OPS = loadSystemActuatorOps('SYSTEM_ACTUATOR_TRANSFORM_OPS');
-const SYSTEM_ACTUATOR_APPLY_OPS = loadSystemActuatorOps('SYSTEM_ACTUATOR_APPLY_OPS');
-const SYSTEM_ACTUATOR_CONTROL_OPS = loadSystemActuatorOps('SYSTEM_ACTUATOR_CONTROL_OPS');
 
 function loadManifest(manifestPath: string): CapabilityManifest {
   return JSON.parse(

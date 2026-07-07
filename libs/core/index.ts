@@ -98,6 +98,8 @@ export {
   rootResolve,
 } from './path-resolver.js';
 export { resolveTenantDesign } from './tenant-design-resolver.js';
+export * from './creative-design-resolver.js';
+export * from './campaign-suite.js';
 
 // Utils
 export * from './fs-utils.js';

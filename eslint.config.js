@@ -5,6 +5,8 @@ import tseslint from 'typescript-eslint';
 export default [
   {
     ignores: [
+      '.tmp-mulmoclaude/**',
+      '.pnpm-store/**',
       'node_modules/**',
       '**/node_modules/**',
       '.venv/**',
