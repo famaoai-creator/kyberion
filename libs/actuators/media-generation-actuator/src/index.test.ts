@@ -41,6 +41,64 @@ vi.mock('@agent/core', async () => {
   };
 });
 
+describe('prompt style pack injection (E2E-02 Task 4)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.resetModules();
+  });
+
+  async function prepare(action: string, params: Record<string, unknown>) {
+    const helpers = await import('./media-generation-helpers.js');
+    return helpers.preparePromptBasedGeneration(action, params);
+  }
+
+  it('appends palette/tone/avoid to prompt-based generation', async () => {
+    const prepared = await prepare('generate_image', {
+      prompt: 'a clean product hero shot',
+      workflow: { nodes: [] },
+    });
+
+    expect(prepared.params.prompt).toContain('a clean product hero shot');
+    expect(prepared.params.prompt).toContain('Style: palette=');
+    expect(prepared.params.prompt).toContain('Avoid:');
+  });
+
+  it('adds a music mood line for generate_music', async () => {
+    mocks.compileMusicGenerationADF.mockReturnValue({ workflow: { nodes: [] }, resolved: {} });
+    const prepared = await prepare('generate_music', {
+      prompt: 'uplifting corporate track',
+      music_adf: { prompt: 'uplifting corporate track', output: {} },
+    });
+
+    expect(prepared.params.prompt).toContain('Music mood:');
+    expect((prepared.params.music_adf as { prompt: string }).prompt).toContain('Style: palette=');
+  });
+
+  it('respects the no_style_pack opt-out', async () => {
+    const prepared = await prepare('generate_image', {
+      prompt: 'raw prompt',
+      workflow: { nodes: [] },
+      no_style_pack: true,
+    });
+
+    expect(prepared.params.prompt).toBe('raw prompt');
+  });
+
+  it('does not double-inject when the block is already present', async () => {
+    const first = await prepare('generate_image', {
+      prompt: 'hero shot',
+      workflow: { nodes: [] },
+    });
+    const second = await prepare('generate_image', {
+      prompt: first.params.prompt,
+      workflow: { nodes: [] },
+    });
+
+    const occurrences = String(second.params.prompt).split('Style: palette=').length - 1;
+    expect(occurrences).toBe(1);
+  });
+});
+
 describe('media-generation-actuator', () => {
   beforeEach(() => {
     vi.clearAllMocks();

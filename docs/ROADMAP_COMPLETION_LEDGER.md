@@ -107,6 +107,7 @@
 - [x] **IL-01**: Goal Threading (`IL-01_GOAL_THREADING.ja.md`) — E2E 実走検証は IL-04 と併せて
 - [x] **IP-07**: Critical Path Tests (`IP-07_CRITICAL_PATH_TESTS.ja.md`) — orchestrator 追加特性化は IP-10 前に
 - [x] **AA-02**: Mesh Hub Delivery Driver (`AA-02_MESH_HUB_DELIVERY_DRIVER.ja.md`) — 2プロセス実HTTP E2E は E3 パイロットで
+- [x] **E2E-02**: Creative Suite (`E2E-02_CREATIVE_SUITE.ja.md`) — 単一 resolver・VDS-07・style pack 注入・campaign-suite。歌詞字幕同期のみ残余
 
 ## 2. 使い方
 
