@@ -11,12 +11,15 @@ import {
 } from '@agent/core';
 import type { MissionState } from './mission-types.js';
 import {
+  activateMissionOnGateProgress,
   applyProcessTemplatePlan,
   evaluatePhaseEntryGate,
   evaluateStoredMissionGate,
+  markPhaseTasksCompleted,
   markPhaseTasksForRework,
   planProcessTemplateTasks,
 } from './mission-process-planning.js';
+import { assertValidMissionId } from './mission-creation.js';
 
 const missionId = 'MSN-PROCESS-PLAN-001';
 const missionPath = pathResolver.missionDir(missionId, 'public');
@@ -244,6 +247,59 @@ describe('mission process planning', () => {
     ) as Array<Record<string, unknown>>;
     const reviewTask = tasks.find((task) => task.phase === 'review');
     expect(reviewTask?.status).toBe('rework');
+  });
+
+  it('marks phase tasks completed and activates planned missions on gate progress', async () => {
+    applyProcessTemplatePlan({ missionId, missionDir: missionPath, design: presentationDesign() });
+
+    const completed = markPhaseTasksCompleted(missionId, 'audience_definition');
+    expect(completed).toBe(1);
+    const tasks = JSON.parse(
+      safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }) as string
+    ) as Array<Record<string, unknown>>;
+    expect(tasks.find((task) => task.phase === 'audience_definition')?.status).toBe('completed');
+
+    expect(await activateMissionOnGateProgress(missionId)).toBe(true);
+    const state = JSON.parse(
+      safeReadFile(`${missionPath}/mission-state.json`, { encoding: 'utf8' }) as string
+    ) as Record<string, any>;
+    expect(state.status).toBe('active');
+    // Second call is a no-op (already active).
+    expect(await activateMissionOnGateProgress(missionId)).toBe(false);
+  });
+
+  it('rejects mission ids with whitespace or shell-split accidents', () => {
+    expect(() => assertValidMissionId('MSN-OK-001')).not.toThrow();
+    expect(() => assertValidMissionId('MSN-BAD 001')).toThrow(/invalid mission id/);
+    expect(() => assertValidMissionId('MSN-BAD-001 RESEARCH_REPORT')).toThrow(/no spaces/);
+    expect(() => assertValidMissionId('a')).toThrow(/invalid mission id/);
+  });
+
+  it('refresh-catalog re-resolves specs from the catalog and preserves task progress', async () => {
+    // Persist STALE specs (old role name) into mission-state, plus progress.
+    const stale = presentationDesign();
+    const staleSpecs = JSON.parse(JSON.stringify(stale.phase_specs));
+    staleSpecs[0].default_tasks[0].team_role = 'worker';
+    const state = JSON.parse(
+      safeReadFile(`${missionPath}/mission-state.json`, { encoding: 'utf8' }) as string
+    );
+    state.process_template.phase_specs = staleSpecs;
+    safeWriteFile(`${missionPath}/mission-state.json`, JSON.stringify(state, null, 2));
+
+    await planProcessTemplateTasks({ id: missionId });
+    expect(markPhaseTasksCompleted(missionId, 'audience_definition')).toBe(1);
+    let tasks = JSON.parse(
+      safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }) as string
+    ) as Array<Record<string, any>>;
+    expect(tasks[0].assigned_to.role).toBe('worker'); // stale spec used
+
+    // Without refresh: stays stale. With refresh: catalog wins, progress kept.
+    await planProcessTemplateTasks({ id: missionId, force: true, refreshCatalog: true });
+    tasks = JSON.parse(
+      safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }) as string
+    ) as Array<Record<string, any>>;
+    expect(tasks[0].assigned_to.role).toBe('planner'); // current catalog value
+    expect(tasks[0].status).toBe('completed'); // progress carried over
   });
 
   it('plan-tasks command expands from the persisted process template', async () => {

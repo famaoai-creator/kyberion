@@ -28,6 +28,7 @@ import {
 } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { createChronosWebDesignSystem } from '@agent/core/web-design-system';
+import { AgentOpsBoards } from '../components/AgentOpsBoards';
 import {
   A2UIRenderer,
   KbArtifactTile,
@@ -682,6 +683,7 @@ export default function ChronosMirrorV2() {
   }, []);
 
   const [a2uiActionNotice, setA2uiActionNotice] = useState<string | null>(null);
+  const [showOpsBoards, setShowOpsBoards] = useState(false);
 
   // SU-02: operator clicks on actionable A2UI components move things forward.
   const handleA2UIComponentAction = useCallback(async (action: any) => {
@@ -1066,6 +1068,13 @@ export default function ChronosMirrorV2() {
                 >
                   管制塔 — 実行状態の監視と介入
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setShowOpsBoards((current) => !current)}
+                  className={`ml-2 rounded-full border px-3 py-1 text-[11px] transition ${showOpsBoards ? 'border-cyan-400/60 bg-cyan-400/20 text-cyan-100' : 'border-white/15 bg-white/5 text-white/60 hover:bg-white/10'}`}
+                >
+                  エージェント/看板
+                </button>
               </div>
               {tenantLabel ? (
                 <div className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-100/80">
@@ -2476,6 +2485,8 @@ export default function ChronosMirrorV2() {
                       focusedMissionId={missionIntelligenceFocusedMissionId}
                     />
                   )
+                ) : showOpsBoards ? (
+                  <AgentOpsBoards />
                 ) : (
                   <div className="flex flex-col gap-6">
                     {a2uiActionNotice ? (
