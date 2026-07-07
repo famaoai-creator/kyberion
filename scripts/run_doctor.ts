@@ -153,6 +153,18 @@ function isReasoningBackendSummary(summary: DoctorRunReport['summaries'][number]
   );
 }
 
+function runtimeToDependencyActuator(runtime?: string): string | null {
+  switch (runtime) {
+    case 'meeting':
+    case 'browser':
+      return 'browser';
+    case 'voice':
+      return 'voice';
+    default:
+      return null;
+  }
+}
+
 function formatMissingCapabilityNextStep(
   firstMissingSummary: DoctorRunReport['summaries'][number]
 ): { message: string; title: string; reason: string; command: string } {
@@ -274,6 +286,9 @@ async function main(): Promise<void> {
       'Tip: pass `--runtime meeting --mission <id>` to include browser, voice, audio, and mission-scoped consent checks.'
     );
   }
+  const onDemandActuator = runtimeToDependencyActuator(
+    argv.runtime ? String(argv.runtime) : undefined
+  );
   const needsMeetingHint =
     argv.mission ||
     (argv.runtime && ['meeting', 'voice', 'browser'].includes(String(argv.runtime)));
@@ -290,6 +305,11 @@ async function main(): Promise<void> {
     console.log(
       'Need to decide which surface to use after bootstrap? Run `pnpm setup:report --persona first-time-user`.'
     );
+    if (onDemandActuator) {
+      console.log(
+        `For actuator-level pulls, run \`pnpm deps:check --actuator ${onDemandActuator}\` before starting that surface.`
+      );
+    }
     const nextAction = buildNextAction({
       title: nextStep.title,
       reason: nextStep.reason,
@@ -306,6 +326,11 @@ async function main(): Promise<void> {
     console.log(
       'Need to decide which surface to use after bootstrap? Run `pnpm setup:report --persona first-time-user`.'
     );
+    if (onDemandActuator) {
+      console.log(
+        `For actuator-level pulls, run \`pnpm deps:check --actuator ${onDemandActuator}\` before starting that surface.`
+      );
+    }
   }
   process.exit(1);
 }
