@@ -896,6 +896,71 @@ describe('mission-orchestration-worker', () => {
     ]);
   });
 
+  it('preserves process-template-seeded tasks when persisting a planner packet', async () => {
+    const { missionDir } = await import('./path-resolver.js');
+    const { safeReadFile, safeWriteFile } = await import('./secure-io.js');
+    const { persistPlanningPacket } = await import('./mission-orchestration-worker.js');
+
+    const missionPath = missionDir('MSN-FOLLOWUP', 'public');
+    const seededTask = {
+      task_id: 'audience_definition-audience-brief',
+      status: 'planned',
+      assigned_to: { role: 'planner' },
+      description: 'Define the audience brief.',
+      deliverable: 'evidence/audience-brief.json',
+      dependencies: [],
+      acceptance_criteria: ['audience defined'],
+      risk: 'low',
+      expected_output_format: 'structured',
+      estimated_scope: 'S',
+      phase: 'audience_definition',
+      phase_kind: 'implement',
+      origin: 'process_template',
+    };
+    safeWriteFile(`${missionPath}/NEXT_TASKS.json`, JSON.stringify([seededTask], null, 2));
+
+    persistPlanningPacket('MSN-FOLLOWUP', {
+      mission_id: 'MSN-FOLLOWUP',
+      summary: 'Plan around the seeded skeleton',
+      plan_markdown: '# PLAN\n\n## Objective\nPlan around the seeded skeleton\n',
+      next_tasks: [
+        {
+          // Collides with the seeded task id — must be dropped, not clobber it.
+          task_id: 'audience_definition-audience-brief',
+          team_role: 'operator',
+          description: 'Planner attempt to restructure the seeded task',
+        },
+        {
+          task_id: 'extra-research',
+          team_role: 'operator',
+          description: 'Collect supplementary market research',
+          deliverable: 'artifacts/research.md',
+        },
+      ],
+    });
+
+    const nextTasks = JSON.parse(
+      safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }) as string
+    ) as Array<Record<string, unknown>>;
+
+    expect(nextTasks[0]).toMatchObject({
+      task_id: 'audience_definition-audience-brief',
+      origin: 'process_template',
+      description: 'Define the audience brief.',
+    });
+    expect(nextTasks.some((task) => task.task_id === 'extra-research')).toBe(true);
+    expect(nextTasks).toHaveLength(2);
+    expect(mocks.record).toHaveBeenCalledWith(
+      'MISSION_PLAN_MERGED_WITH_PROCESS_TEMPLATE',
+      expect.objectContaining({
+        mission_id: 'MSN-FOLLOWUP',
+        seeded_task_count: 1,
+        planner_addition_count: 1,
+        dropped_planner_task_count: 1,
+      })
+    );
+  });
+
   it('re-prompts the planner once when the initial planning packet fails validation', async () => {
     const { resolveMissionPlanningPacket } = await import('./mission-orchestration-worker.js');
     const { safeExistsSync, safeReaddir, safeReadFile } = await import('./secure-io.js');

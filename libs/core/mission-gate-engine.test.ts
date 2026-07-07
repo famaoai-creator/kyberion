@@ -68,6 +68,76 @@ describe('mission-gate-engine', () => {
     expect(gate.reasons.join(' ')).toContain('override denied');
   });
 
+  it('passes deliverable_quality when the deck brief meets the rubric threshold', async () => {
+    safeMkdir(`${missionPath}/evidence`, { recursive: true });
+    safeWriteFile(
+      `${missionPath}/evidence/deck-brief.json`,
+      JSON.stringify({
+        kind: 'proposal-brief',
+        slides: [
+          { id: 's1', title: 'Hero' },
+          { id: 's2', title: 'Summary' },
+          { id: 's3', title: 'Problem' },
+          { id: 's4', title: 'Solution' },
+        ],
+      })
+    );
+
+    const gate = await evaluateMissionGate({
+      missionId,
+      gate: {
+        id: 'deck-quality-gate',
+        checks: [
+          {
+            kind: 'deliverable_quality',
+            params: {
+              path: `${missionPath}/evidence/deck-brief.json`,
+              kind: 'deck',
+              min_score: 0.7,
+            },
+          },
+        ],
+      },
+      evidenceDir: `${missionPath}/gates`,
+    });
+
+    expect(gate.verdict).toBe('pass');
+  });
+
+  it('fails deliverable_quality for a missing or poor deliverable', async () => {
+    safeMkdir(`${missionPath}/evidence`, { recursive: true });
+    safeWriteFile(
+      `${missionPath}/evidence/empty-brief.json`,
+      JSON.stringify({ kind: 'proposal-brief', slides: [] })
+    );
+
+    const gate = await evaluateMissionGate({
+      missionId,
+      gate: {
+        id: 'deck-quality-gate',
+        checks: [
+          {
+            kind: 'deliverable_quality',
+            params: {
+              path: `${missionPath}/evidence/empty-brief.json`,
+              kind: 'deck',
+              min_score: 0.7,
+            },
+          },
+          {
+            kind: 'deliverable_quality',
+            params: { path: `${missionPath}/evidence/nonexistent.json`, kind: 'deck' },
+          },
+        ],
+      },
+      evidenceDir: `${missionPath}/gates`,
+    });
+
+    expect(gate.verdict).toBe('fail');
+    expect(gate.reasons.join(' ')).toContain('quality');
+    expect(gate.reasons.join(' ')).toContain('Deliverable not found');
+  });
+
   it('records manual overrides as gate records', () => {
     const recordPath = recordMissionGateOverride({
       missionId,

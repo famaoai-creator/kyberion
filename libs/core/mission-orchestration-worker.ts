@@ -2006,7 +2006,37 @@ export function persistPlanningPacket(missionId: string, packet: PlanningPacket)
   const nextTasks = validation.value.next_tasks.map((task, index) => ({
     ...derivedTasks[index],
   }));
-  safeWriteFile(`${missionPath}/NEXT_TASKS.json`, JSON.stringify(nextTasks, null, 2));
+  // MO-01: process-template-seeded tasks are the mission's fixed skeleton —
+  // the planner may add tasks around them but never drop or restructure them.
+  const nextTasksPath = `${missionPath}/NEXT_TASKS.json`;
+  const seededTasks = readProcessTemplateSeededTasks(nextTasksPath);
+  if (seededTasks.length > 0) {
+    const seededIds = new Set(seededTasks.map((task) => String(task.task_id)));
+    const additions = nextTasks.filter((task) => !seededIds.has(task.task_id));
+    safeWriteFile(nextTasksPath, JSON.stringify([...seededTasks, ...additions], null, 2));
+    ledger.record('MISSION_PLAN_MERGED_WITH_PROCESS_TEMPLATE', {
+      mission_id: missionId,
+      seeded_task_count: seededTasks.length,
+      planner_addition_count: additions.length,
+      dropped_planner_task_count: nextTasks.length - additions.length,
+    });
+    return;
+  }
+  safeWriteFile(nextTasksPath, JSON.stringify(nextTasks, null, 2));
+}
+
+function readProcessTemplateSeededTasks(nextTasksPath: string): Array<Record<string, unknown>> {
+  if (!safeExistsSync(nextTasksPath)) return [];
+  try {
+    const parsed = JSON.parse(safeReadFile(nextTasksPath, { encoding: 'utf8' }) as string);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (task): task is Record<string, unknown> =>
+        Boolean(task) && typeof task === 'object' && task.origin === 'process_template'
+    );
+  } catch {
+    return [];
+  }
 }
 
 function loadPlannedNextTasks(missionId: string): PlannedNextTask[] {
@@ -2459,6 +2489,41 @@ function emitSlackMissionEvent(
   });
 }
 
+/**
+ * Renders the mission's process-template skeleton (MO-01) into the planner
+ * kickoff prompt: the phase sequence plus the seeded fixed tasks the planner
+ * must plan around, never restructure.
+ */
+function renderProcessTemplateSkeleton(missionId: string): string {
+  const missionPath = missionDir(missionId, 'public');
+  const statePath = `${missionPath}/mission-state.json`;
+  if (!safeExistsSync(statePath)) return '';
+  let processTemplate: { workflow_id?: string; phases?: string[] } | undefined;
+  try {
+    const state = JSON.parse(safeReadFile(statePath, { encoding: 'utf8' }) as string) as {
+      process_template?: { workflow_id?: string; phases?: string[] };
+    };
+    processTemplate = state.process_template;
+  } catch {
+    return '';
+  }
+  if (!processTemplate?.workflow_id) return '';
+
+  const lines = [
+    `Process template: ${processTemplate.workflow_id} — phases: ${(processTemplate.phases || []).join(' → ')}.`,
+  ];
+  const seeded = readProcessTemplateSeededTasks(`${missionPath}/NEXT_TASKS.json`);
+  if (seeded.length > 0) {
+    lines.push(
+      'The following tasks were seeded from the process template and are FIXED — do not drop, rename, or restructure them. Plan additional tasks around them and reference their task_ids in dependencies where appropriate:'
+    );
+    for (const task of seeded) {
+      lines.push(`- ${String(task.task_id)} (phase: ${String(task.phase || 'n/a')})`);
+    }
+  }
+  return lines.join('\n');
+}
+
 function buildPlannerKickoffPrompt(
   missionId: string,
   plan: ReturnType<typeof resolveMissionTeamPlan>,
@@ -2471,6 +2536,7 @@ function buildPlannerKickoffPrompt(
     `Mission type: ${plan.mission_type}.`,
     `Original source request: ${payload.sourceText || ''}`,
     'Create the initial plan, define deliverables, and prepare the next delegated tasks.',
+    renderProcessTemplateSkeleton(missionId),
     'Return exactly one ```planning_packet``` block and no other structured block for the plan.',
     'The planning packet must match this contract:',
     renderStructuredOutputSchemaPrompt('planning_packet'),
