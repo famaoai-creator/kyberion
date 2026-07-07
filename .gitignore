@@ -90,3 +90,9 @@ evidence/lifecycle-smoke-summary.md
 
 # Native messaging host: machine-local pinned node path (written by install.sh)
 tools/adf-replay-extension/native-host/.node-path
+
+# Parallel-session / external-tool debris (never scan, never commit)
+.worktrees/
+.tmp-mulmoclaude/
+.tmp-agency-agents/
+.pnpm-store/

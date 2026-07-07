@@ -207,6 +207,21 @@ export function evaluateIntentDriftGate(
     };
   }
 
+  // Drift is measured against USER intent. A mission started without one
+  // (bare CLI start, fixtures) only accumulates machine-generated
+  // 'mission_state' placeholders whose wording differs per stage — comparing
+  // those produces phantom drift and bricks verify. No user intent → no drift.
+  const hasUserIntent = snapshots.some((snapshot) => snapshot.source !== 'mission_state');
+  if (!hasUserIntent) {
+    return {
+      passed: true,
+      verdict: 'no_history',
+      driftScore: 0,
+      delta: null,
+      message: 'only machine-generated lifecycle snapshots — no user intent recorded to drift from',
+    };
+  }
+
   const originSnapshots = snapshots.filter((snapshot) => snapshot.kind === 'origin');
   const from =
     originSnapshots.length > 0 ? originSnapshots[originSnapshots.length - 1] : snapshots[0];

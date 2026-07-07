@@ -6,33 +6,59 @@
   "additionalProperties": false,
   "required": ["version", "providers"],
   "properties": {
-    "version": { "type": "string" },
+    "version": {
+      "type": "string"
+    },
     "providers": {
       "type": "object",
       "additionalProperties": false,
       "required": ["slack", "chronos", "presence", "imessage", "discord", "telegram"],
       "properties": {
-        "slack": { "$ref": "#/$defs/providerManifest" },
-        "chronos": { "$ref": "#/$defs/providerManifest" },
-        "presence": { "$ref": "#/$defs/providerManifest" },
-        "imessage": { "$ref": "#/$defs/providerManifest" },
-        "discord": { "$ref": "#/$defs/providerManifest" },
-        "telegram": { "$ref": "#/$defs/providerManifest" },
-        "cowork": { "$ref": "#/$defs/coworkProviderManifest" }
+        "slack": {
+          "$ref": "#/$defs/providerManifest"
+        },
+        "chronos": {
+          "$ref": "#/$defs/providerManifest"
+        },
+        "presence": {
+          "$ref": "#/$defs/providerManifest"
+        },
+        "imessage": {
+          "$ref": "#/$defs/providerManifest"
+        },
+        "discord": {
+          "$ref": "#/$defs/providerManifest"
+        },
+        "telegram": {
+          "$ref": "#/$defs/providerManifest"
+        },
+        "cowork": {
+          "$ref": "#/$defs/coworkProviderManifest"
+        },
+        "cli": {
+          "$ref": "#/$defs/providerManifest"
+        }
       }
     }
   },
   "$defs": {
     "textMatchRule": {
       "oneOf": [
-        { "type": "string" },
+        {
+          "type": "string"
+        },
         {
           "type": "object",
           "additionalProperties": false,
           "required": ["type", "value"],
           "properties": {
-            "type": { "type": "string", "enum": ["contains", "regex", "equals", "starts_with", "ends_with"] },
-            "value": { "type": "string" }
+            "type": {
+              "type": "string",
+              "enum": ["contains", "regex", "equals", "starts_with", "ends_with"]
+            },
+            "value": {
+              "type": "string"
+            }
           }
         }
       ]
@@ -42,11 +68,18 @@
       "additionalProperties": false,
       "required": ["receiver", "patterns"],
       "properties": {
-        "id": { "type": "string" },
-        "receiver": { "type": "string", "enum": ["chronos-mirror", "nerve-agent"] },
+        "id": {
+          "type": "string"
+        },
+        "receiver": {
+          "type": "string",
+          "enum": ["chronos-mirror", "nerve-agent"]
+        },
         "patterns": {
           "type": "array",
-          "items": { "$ref": "#/$defs/textMatchRule" }
+          "items": {
+            "$ref": "#/$defs/textMatchRule"
+          }
         }
       }
     },
@@ -55,19 +88,30 @@
       "additionalProperties": false,
       "required": ["receiver"],
       "properties": {
-        "id": { "type": "string" },
-        "receiver": { "type": "string", "enum": ["chronos-mirror", "nerve-agent"] },
+        "id": {
+          "type": "string"
+        },
+        "receiver": {
+          "type": "string",
+          "enum": ["chronos-mirror", "nerve-agent"]
+        },
         "execution_shapes": {
           "type": "array",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         },
         "conversation_agents": {
           "type": "array",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         },
         "task_types": {
           "type": "array",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         }
       }
     },
@@ -83,17 +127,23 @@
           "properties": {
             "greeting_patterns": {
               "type": "array",
-              "items": { "$ref": "#/$defs/textMatchRule" }
+              "items": {
+                "$ref": "#/$defs/textMatchRule"
+              }
             },
             "receiver_rules": {
               "type": "array",
-              "items": { "$ref": "#/$defs/receiverRule" }
+              "items": {
+                "$ref": "#/$defs/receiverRule"
+              }
             }
           }
         },
         "compiled_flow_rules": {
           "type": "array",
-          "items": { "$ref": "#/$defs/compiledFlowRule" }
+          "items": {
+            "$ref": "#/$defs/compiledFlowRule"
+          }
         }
       }
     },
@@ -102,12 +152,24 @@
       "additionalProperties": false,
       "required": ["reply", "edit", "react", "notify", "asyncRequest", "responding"],
       "properties": {
-        "reply": { "type": "boolean" },
-        "edit": { "type": "boolean" },
-        "react": { "type": "boolean" },
-        "notify": { "type": "boolean" },
-        "asyncRequest": { "type": "boolean" },
-        "responding": { "type": "boolean" }
+        "reply": {
+          "type": "boolean"
+        },
+        "edit": {
+          "type": "boolean"
+        },
+        "react": {
+          "type": "boolean"
+        },
+        "notify": {
+          "type": "boolean"
+        },
+        "asyncRequest": {
+          "type": "boolean"
+        },
+        "responding": {
+          "type": "boolean"
+        }
       }
     },
     "delivery": {
@@ -115,9 +177,16 @@
       "additionalProperties": false,
       "required": ["directReply", "supportsOutbox", "supportsNotifications"],
       "properties": {
-        "directReply": { "type": "string", "enum": ["outbox", "notification", "none"] },
-        "supportsOutbox": { "type": "boolean" },
-        "supportsNotifications": { "type": "boolean" }
+        "directReply": {
+          "type": "string",
+          "enum": ["outbox", "notification", "none"]
+        },
+        "supportsOutbox": {
+          "type": "boolean"
+        },
+        "supportsNotifications": {
+          "type": "boolean"
+        }
       }
     },
     "intentRules": {
@@ -132,16 +201,24 @@
             "additionalProperties": false,
             "required": ["label", "patterns"],
             "properties": {
-              "id": { "type": "string" },
-              "label": { "type": "string" },
+              "id": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
               "patterns": {
                 "type": "array",
-                "items": { "$ref": "#/$defs/textMatchRule" }
+                "items": {
+                  "$ref": "#/$defs/textMatchRule"
+                }
               }
             }
           }
         },
-        "default_label": { "type": "string" }
+        "default_label": {
+          "type": "string"
+        }
       }
     },
     "mcpBinding": {
@@ -149,41 +226,106 @@
       "additionalProperties": false,
       "required": ["transport", "server_script"],
       "properties": {
-        "transport": { "type": "string", "enum": ["stdio"] },
-        "server_script": { "type": "string" },
-        "description": { "type": "string" }
+        "transport": {
+          "type": "string",
+          "enum": ["stdio"]
+        },
+        "server_script": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        }
       }
     },
     "coworkProviderManifest": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "displayName", "agentId", "channel", "interactionMode", "capabilities", "delivery", "mcp"],
+      "required": [
+        "id",
+        "displayName",
+        "agentId",
+        "channel",
+        "interactionMode",
+        "capabilities",
+        "delivery",
+        "mcp"
+      ],
       "properties": {
-        "id": { "type": "string", "enum": ["cowork"] },
-        "displayName": { "type": "string" },
-        "agentId": { "type": "string" },
-        "channel": { "type": "string" },
-        "interactionMode": { "type": "string", "enum": ["threaded", "session", "live"] },
-        "capabilities": { "$ref": "#/$defs/capabilities" },
-        "delivery": { "$ref": "#/$defs/delivery" },
-        "mcp": { "$ref": "#/$defs/mcpBinding" },
-        "intent_rules": { "$ref": "#/$defs/intentRules" }
+        "id": {
+          "type": "string",
+          "enum": ["cowork"]
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "agentId": {
+          "type": "string"
+        },
+        "channel": {
+          "type": "string"
+        },
+        "interactionMode": {
+          "type": "string",
+          "enum": ["threaded", "session", "live"]
+        },
+        "capabilities": {
+          "$ref": "#/$defs/capabilities"
+        },
+        "delivery": {
+          "$ref": "#/$defs/delivery"
+        },
+        "mcp": {
+          "$ref": "#/$defs/mcpBinding"
+        },
+        "intent_rules": {
+          "$ref": "#/$defs/intentRules"
+        }
       }
     },
     "providerManifest": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "displayName", "agentId", "channel", "interactionMode", "capabilities", "delivery", "routing"],
+      "required": [
+        "id",
+        "displayName",
+        "agentId",
+        "channel",
+        "interactionMode",
+        "capabilities",
+        "delivery",
+        "routing"
+      ],
       "properties": {
-        "id": { "type": "string", "enum": ["slack", "chronos", "presence", "imessage", "discord", "telegram"] },
-        "displayName": { "type": "string" },
-        "agentId": { "type": "string" },
-        "channel": { "type": "string" },
-        "interactionMode": { "type": "string", "enum": ["threaded", "session", "live"] },
-        "capabilities": { "$ref": "#/$defs/capabilities" },
-        "delivery": { "$ref": "#/$defs/delivery" },
-        "routing": { "$ref": "#/$defs/routingPolicy" },
-        "intent_rules": { "$ref": "#/$defs/intentRules" },
+        "id": {
+          "type": "string",
+          "enum": ["slack", "chronos", "presence", "imessage", "discord", "telegram", "cli"]
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "agentId": {
+          "type": "string"
+        },
+        "channel": {
+          "type": "string"
+        },
+        "interactionMode": {
+          "type": "string",
+          "enum": ["threaded", "session", "live"]
+        },
+        "capabilities": {
+          "$ref": "#/$defs/capabilities"
+        },
+        "delivery": {
+          "$ref": "#/$defs/delivery"
+        },
+        "routing": {
+          "$ref": "#/$defs/routingPolicy"
+        },
+        "intent_rules": {
+          "$ref": "#/$defs/intentRules"
+        },
         "surface_rules": {
           "type": "object",
           "additionalProperties": false,
@@ -195,11 +337,15 @@
               "properties": {
                 "feasibility_patterns": {
                   "type": "array",
-                  "items": { "$ref": "#/$defs/textMatchRule" }
+                  "items": {
+                    "$ref": "#/$defs/textMatchRule"
+                  }
                 },
                 "durable_task_patterns": {
                   "type": "array",
-                  "items": { "$ref": "#/$defs/textMatchRule" }
+                  "items": {
+                    "$ref": "#/$defs/textMatchRule"
+                  }
                 }
               }
             },
@@ -210,7 +356,9 @@
               "properties": {
                 "lightweight_patterns": {
                   "type": "array",
-                  "items": { "$ref": "#/$defs/textMatchRule" }
+                  "items": {
+                    "$ref": "#/$defs/textMatchRule"
+                  }
                 }
               }
             }

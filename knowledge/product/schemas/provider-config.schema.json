@@ -12,21 +12,46 @@
     "lifecycle"
   ],
   "properties": {
-    "version": { "type": "string", "minLength": 1 },
-    "description": { "type": "string", "minLength": 1 },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
     "default_priority": {
       "type": "array",
-      "items": { "type": "string", "minLength": 1 },
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
       "minItems": 1
     },
     "default_models": {
       "type": "object",
       "required": ["gemini", "claude", "codex", "copilot"],
       "properties": {
-        "gemini": { "type": "string", "minLength": 1 },
-        "claude": { "type": "string", "minLength": 1 },
-        "codex": { "type": "string", "minLength": 1 },
-        "copilot": { "type": "string", "minLength": 1 }
+        "gemini": {
+          "type": "string",
+          "minLength": 1
+        },
+        "claude": {
+          "type": "string",
+          "minLength": 1
+        },
+        "codex": {
+          "type": "string",
+          "minLength": 1
+        },
+        "copilot": {
+          "type": "string",
+          "minLength": 1
+        },
+        "agy": {
+          "type": "string",
+          "minLength": 1
+        }
       },
       "additionalProperties": false
     },
@@ -42,13 +67,34 @@
         "copilot-default"
       ],
       "properties": {
-        "anthropic-default": { "type": "string", "minLength": 1 },
-        "anthropic-fast": { "type": "string", "minLength": 1 },
-        "gemini-default": { "type": "string", "minLength": 1 },
-        "gemini-fast": { "type": "string", "minLength": 1 },
-        "openai-vision": { "type": "string", "minLength": 1 },
-        "codex-default": { "type": "string", "minLength": 1 },
-        "copilot-default": { "type": "string", "minLength": 1 }
+        "anthropic-default": {
+          "type": "string",
+          "minLength": 1
+        },
+        "anthropic-fast": {
+          "type": "string",
+          "minLength": 1
+        },
+        "gemini-default": {
+          "type": "string",
+          "minLength": 1
+        },
+        "gemini-fast": {
+          "type": "string",
+          "minLength": 1
+        },
+        "openai-vision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "codex-default": {
+          "type": "string",
+          "minLength": 1
+        },
+        "copilot-default": {
+          "type": "string",
+          "minLength": 1
+        }
       },
       "additionalProperties": false
     },
@@ -59,12 +105,20 @@
           "type": "object",
           "required": ["boot_command", "boot_args", "default_model"],
           "properties": {
-            "boot_command": { "type": "string", "minLength": 1 },
+            "boot_command": {
+              "type": "string",
+              "minLength": 1
+            },
             "boot_args": {
               "type": "array",
-              "items": { "type": "string" }
+              "items": {
+                "type": "string"
+              }
             },
-            "default_model": { "type": "string", "minLength": 1 }
+            "default_model": {
+              "type": "string",
+              "minLength": 1
+            }
           },
           "additionalProperties": false
         },
@@ -72,12 +126,20 @@
           "type": "object",
           "required": ["boot_command", "boot_args", "default_model"],
           "properties": {
-            "boot_command": { "type": "string", "minLength": 1 },
+            "boot_command": {
+              "type": "string",
+              "minLength": 1
+            },
             "boot_args": {
               "type": "array",
-              "items": { "type": "string" }
+              "items": {
+                "type": "string"
+              }
             },
-            "default_model": { "type": "string", "minLength": 1 }
+            "default_model": {
+              "type": "string",
+              "minLength": 1
+            }
           },
           "additionalProperties": false
         }

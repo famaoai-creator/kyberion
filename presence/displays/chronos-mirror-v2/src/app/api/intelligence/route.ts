@@ -12,11 +12,8 @@ import {
   summarizeApprovalAuditDrilldown,
   summarizeApprovalAuditTrail,
   type ApprovalAuditDrilldownSummary,
-} from '../../../../../../../libs/core/approval-audit.js';
-import {
-  resolveFinanceControllerDecision,
-  type FinanceControllerDecision,
-} from '../../../../../../../libs/core/finance-controller.js';
+} from '@agent/core';
+import { resolveFinanceControllerDecision, type FinanceControllerDecision } from '@agent/core';
 import { activeCustomer } from '@agent/core/customer-resolver';
 import {
   collectA2AHandoffs,

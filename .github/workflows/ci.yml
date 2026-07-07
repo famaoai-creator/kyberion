@@ -54,6 +54,13 @@ jobs:
       - name: Check contract schemas
         run: pnpm run check:contract-schemas
 
+      # Knowledge snapshots drift when governed data changes without
+      # regeneration (2026-07-08: agent-profile-index / service-endpoints /
+      # capabilities guide all drifted). check:catalogs includes the
+      # knowledge-index freshness check.
+      - name: Check knowledge catalogs & index freshness
+        run: pnpm run check:catalogs
+
       - name: Validate capability discovery
         run: node dist/scripts/capability_discovery.js > /dev/null
 
@@ -62,9 +69,25 @@ jobs:
 
       - name: Verify no build artifacts in source control
         run: |
-          STALE=$(git diff --name-only -- 'libs/core/' | grep -E '\.(js|js\.map|d\.ts|d\.ts\.map)$' | head -5)
+          STALE=$(git diff --name-only -- 'libs/' 'presence/displays/' 'satellites/' | grep -E '\.(js|js\.map|d\.ts|d\.ts\.map)$' | head -5)
           if [ -n "$STALE" ]; then
-            echo "::error::Build artifacts detected in source tree"
+            echo "::error::Build artifacts detected in source tree: $STALE"
+            exit 1
+          fi
+          # Compiled shadows committed next to .ts sources shadow the module
+          # at runtime and pollute boundary baselines (2026-07-08 incident).
+          SHADOWS=$(git ls-files '*.js' '*.js.map' '*.d.ts' | grep -Ev '^(dist|docs|tools|knowledge|plugins)/' | while read -r f; do
+            base="$f"
+            case "$f" in
+              *.d.ts.map) base="${f%.d.ts.map}" ;;
+              *.d.ts) base="${f%.d.ts}" ;;
+              *.js.map) base="${f%.js.map}" ;;
+              *.js) base="${f%.js}" ;;
+            esac
+            if [ -f "${base}.ts" ] || [ -f "${base}.tsx" ]; then echo "$f"; fi
+          done | head -10)
+          if [ -n "$SHADOWS" ]; then
+            echo "::error::Compiled artifacts shadow TypeScript sources: $SHADOWS"
             exit 1
           fi
 

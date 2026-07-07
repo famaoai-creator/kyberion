@@ -49,9 +49,11 @@ describe('actuator-op-registry', () => {
     expect(determineActuatorStepType('codex', 'exec')).toBe('apply');
   });
 
-  it('returns unknown for unmapped ops instead of falling through to apply', () => {
-    expect(determineActuatorStepType('file', 'stat')).toBe('unknown');
-    expect(determineActuatorStepType('file', 'does_not_exist')).toBe('unknown');
+  it('rejects unmapped ops with an actionable UNKNOWN_OP error', () => {
+    // 'stat' is a real file capture op; a truly unmapped op must throw with
+    // suggestions instead of silently falling through to apply.
+    expect(determineActuatorStepType('file', 'stat')).toBe('capture');
+    expect(() => determineActuatorStepType('file', 'does_not_exist')).toThrow(/\[UNKNOWN_OP\]/);
   });
 
   it('exposes registered ops for a domain', () => {

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 function createRequest(headers: Record<string, string> = {}) {
   const normalized = new Headers(headers);
@@ -18,10 +18,10 @@ function createRequest(headers: Record<string, string> = {}) {
 
 async function loadGuardModule() {
   vi.resetModules();
-  return import("../presence/displays/chronos-mirror-v2/src/lib/api-guard");
+  return import('../presence/displays/chronos-mirror-v2/src/lib/api-guard');
 }
 
-describe("Chronos API guard", () => {
+describe('Chronos API guard', () => {
   afterEach(() => {
     delete process.env.KYBERION_API_TOKEN;
     delete process.env.KYBERION_LOCALADMIN_TOKEN;
@@ -30,46 +30,51 @@ describe("Chronos API guard", () => {
     vi.resetModules();
   });
 
-  it("keeps localhost readonly by default", async () => {
+  it('grants localhost localadmin by default and readonly when autoadmin is opted out', async () => {
+    // Contract updated with the operator-surface redesign: the local operator
+    // can intervene from the 管制塔 without a token; remote stays token-gated.
     const guard = await loadGuardModule();
     const req = createRequest({
-      "x-forwarded-for": "127.0.0.1",
+      'x-forwarded-for': '127.0.0.1',
     });
+    expect(guard.resolveChronosAccessRole(req)).toBe('localadmin');
 
-    expect(guard.resolveChronosAccessRole(req)).toBe("readonly");
+    process.env.KYBERION_LOCALHOST_AUTOADMIN = 'false';
+    const hardened = await loadGuardModule();
+    expect(hardened.resolveChronosAccessRole(req)).toBe('readonly');
   });
 
-  it("promotes localhost to localadmin only when opt-in flag is enabled", async () => {
-    process.env.KYBERION_LOCALHOST_AUTOADMIN = "true";
+  it('promotes localhost to localadmin only when opt-in flag is enabled', async () => {
+    process.env.KYBERION_LOCALHOST_AUTOADMIN = 'true';
     const guard = await loadGuardModule();
     const req = createRequest({
-      "x-forwarded-for": "127.0.0.1",
+      'x-forwarded-for': '127.0.0.1',
     });
 
-    expect(guard.resolveChronosAccessRole(req)).toBe("localadmin");
+    expect(guard.resolveChronosAccessRole(req)).toBe('localadmin');
   });
 
-  it("still honors explicit readonly token over localhost auto-admin", async () => {
-    process.env.KYBERION_LOCALHOST_AUTOADMIN = "true";
-    process.env.KYBERION_API_TOKEN = "readonly-token";
+  it('still honors explicit readonly token over localhost auto-admin', async () => {
+    process.env.KYBERION_LOCALHOST_AUTOADMIN = 'true';
+    process.env.KYBERION_API_TOKEN = 'readonly-token';
     const guard = await loadGuardModule();
     const req = createRequest({
-      "x-forwarded-for": "127.0.0.1",
-      authorization: "Bearer readonly-token",
+      'x-forwarded-for': '127.0.0.1',
+      authorization: 'Bearer readonly-token',
     });
 
-    expect(guard.resolveChronosAccessRole(req)).toBe("readonly");
+    expect(guard.resolveChronosAccessRole(req)).toBe('readonly');
   });
 
-  it("still honors explicit localadmin token over localhost auto-admin", async () => {
-    process.env.KYBERION_LOCALHOST_AUTOADMIN = "true";
-    process.env.KYBERION_LOCALADMIN_TOKEN = "localadmin-token";
+  it('still honors explicit localadmin token over localhost auto-admin', async () => {
+    process.env.KYBERION_LOCALHOST_AUTOADMIN = 'true';
+    process.env.KYBERION_LOCALADMIN_TOKEN = 'localadmin-token';
     const guard = await loadGuardModule();
     const req = createRequest({
-      "x-forwarded-for": "127.0.0.1",
-      authorization: "Bearer localadmin-token",
+      'x-forwarded-for': '127.0.0.1',
+      authorization: 'Bearer localadmin-token',
     });
 
-    expect(guard.resolveChronosAccessRole(req)).toBe("localadmin");
+    expect(guard.resolveChronosAccessRole(req)).toBe('localadmin');
   });
 });

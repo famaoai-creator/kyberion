@@ -516,12 +516,7 @@
     {
       "id": "class-research-absorption-intent-extended",
       "match": {
-        "intent_ids": [
-          "knowledge-query",
-          "operator-profile-learning",
-          "distill-mission-knowledge",
-          "contract-review"
-        ]
+        "intent_ids": ["knowledge-query", "operator-profile-learning", "distill-mission-knowledge"]
       },
       "mission_class": "research_and_absorption"
     },

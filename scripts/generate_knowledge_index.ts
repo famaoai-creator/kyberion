@@ -103,6 +103,11 @@ function generateIndexInner(checkOnly: boolean): boolean {
   const manifestEntries: ManifestEntry[] = [];
   const indexEntries: IndexEntry[] = [];
 
+  // Auto-generated files that churn at runtime (hint distillation) would make
+  // the committed manifest permanently stale — list them, but pin size to 0
+  // so their updates never invalidate the index (check:catalogs stability).
+  const VOLATILE_KNOWLEDGE_PATHS = new Set(['product/governance/HINTS.md']);
+
   for (const file of allFiles) {
     if (file === '_index.md' || file === '_manifest.json') continue;
     const fullPath = path.join(kbRoot, file);
@@ -113,7 +118,7 @@ function generateIndexInner(checkOnly: boolean): boolean {
     manifestEntries.push({
       path: file,
       tier,
-      size: stat.size,
+      size: VOLATILE_KNOWLEDGE_PATHS.has(file) ? 0 : stat.size,
       type: ext || 'unknown',
     });
 

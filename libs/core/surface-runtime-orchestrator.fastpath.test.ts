@@ -475,9 +475,14 @@ describe('surface-runtime-orchestrator fast-path', () => {
       threadContext: 'User: 今夜のお店は予定表に入れています。',
       senderAgentId: 'kyberion:imessage-bridge',
     } as any);
+    // Since the simple-conversation bypass (d4169ad1) the thread context is
+    // threaded structurally via runtimeContext instead of inlined into text.
     expect(mocks.compileUserIntentFlow).toHaveBeenCalledWith(
       expect.objectContaining({
-        text: expect.stringContaining('Current incoming message:'),
+        text: 'では夕方にー！',
+        runtimeContext: expect.objectContaining({
+          thread_context: expect.stringContaining('今夜のお店は予定表に入れています'),
+        }),
       })
     );
   });
