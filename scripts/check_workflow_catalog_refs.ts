@@ -15,10 +15,13 @@
  */
 
 import * as path from 'node:path';
-import { normalizeWorkflowPhases } from '../libs/core/mission-workflow-catalog.js';
-import { pathResolver } from '../libs/core/path-resolver.js';
-import { safeExistsSync, safeReadFile } from '../libs/core/secure-io.js';
-import { expandProcessTemplateTasks } from '../libs/core/mission-process-task-expansion.js';
+import {
+  expandProcessTemplateTasks,
+  normalizeWorkflowPhases,
+  pathResolver,
+  safeExistsSync,
+  safeReadFile,
+} from '@agent/core';
 
 const CATALOG_PATH = pathResolver.knowledge('product/governance/mission-workflow-catalog.json');
 

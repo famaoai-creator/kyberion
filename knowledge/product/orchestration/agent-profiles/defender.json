@@ -2,20 +2,11 @@
   "version": "1.0.0",
   "agents": {
     "defender": {
-      "authority_roles": [
-        "mission_controller",
-        "ecosystem_architect"
-      ],
-      "team_roles": [
-        "defender"
-      ],
-      "capabilities": [
-        "reasoning",
-        "security",
-        "critique"
-      ],
+      "authority_roles": ["mission_controller", "ecosystem_architect"],
+      "team_roles": ["defender"],
+      "capabilities": ["reasoning", "security", "critique"],
       "selection_hints": {
-        "preferred_provider": "gemini",
+        "preferred_provider": "agy",
         "preferred_modelId": "auto-gemini-3"
       },
       "provider_strategy": "strict"
