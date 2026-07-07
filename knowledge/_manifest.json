@@ -1,10 +1,52 @@
 {
-  "generated": "2026-07-06T19:47:59.878Z",
+  "generated": "2026-07-07T03:49:30.791Z",
   "files": [
     {
       "path": "Ecosystem_Map.md",
       "tier": "public",
       "size": 2842,
+      "type": "md"
+    },
+    {
+      "path": "evolution/distill_board-protocol-commonization-2026-04-30_2026_04_29.md",
+      "tier": "public",
+      "size": 1231,
+      "type": "md"
+    },
+    {
+      "path": "evolution/distill_browser-direct-reply-commonization-2026-04-29_2026_04_29.md",
+      "tier": "public",
+      "size": 951,
+      "type": "md"
+    },
+    {
+      "path": "evolution/distill_msn-executive-pipelines_2026_05_02.md",
+      "tier": "public",
+      "size": 1995,
+      "type": "md"
+    },
+    {
+      "path": "evolution/distill_production-evidence-local-artifact-refs_2026_05_15.md",
+      "tier": "public",
+      "size": 1253,
+      "type": "md"
+    },
+    {
+      "path": "evolution/distill_production-evidence-register-text-nonblank_2026_05_15.md",
+      "tier": "public",
+      "size": 1255,
+      "type": "md"
+    },
+    {
+      "path": "evolution/distill_production-receipt-malformed-timestamps_2026_05_15.md",
+      "tier": "public",
+      "size": 1348,
+      "type": "md"
+    },
+    {
+      "path": "evolution/distill_resilience-actuators-v1_2026_05_11.md",
+      "tier": "public",
+      "size": 1337,
       "type": "md"
     },
     {
@@ -226,7 +268,7 @@
     {
       "path": "product/architecture/component-lifecycle-inventory.md",
       "tier": "public",
-      "size": 6153,
+      "size": 6154,
       "type": "md"
     },
     {
@@ -700,7 +742,7 @@
     {
       "path": "product/architecture/surface-responsibility-model.md",
       "tier": "public",
-      "size": 6238,
+      "size": 7328,
       "type": "md"
     },
     {
@@ -1096,7 +1138,7 @@
     {
       "path": "product/governance/active-surfaces.json",
       "tier": "public",
-      "size": 7494,
+      "size": 7238,
       "type": "json"
     },
     {
@@ -1660,7 +1702,7 @@
     {
       "path": "product/governance/mission-classification-policy.json",
       "tier": "public",
-      "size": 27480,
+      "size": 25280,
       "type": "json"
     },
     {
@@ -1720,7 +1762,7 @@
     {
       "path": "product/governance/mission-workflow-catalog.json",
       "tier": "public",
-      "size": 130266,
+      "size": 125160,
       "type": "json"
     },
     {
@@ -2309,6 +2351,12 @@
       "path": "product/governance/surfaces/computer-surface.json",
       "tier": "public",
       "size": 527,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/surfaces/concierge.json",
+      "tier": "public",
+      "size": 579,
       "type": "json"
     },
     {
@@ -2962,7 +3010,7 @@
     {
       "path": "product/orchestration/actuator-discovery-registry.md",
       "tier": "public",
-      "size": 2030,
+      "size": 2090,
       "type": "md"
     },
     {
@@ -3280,7 +3328,7 @@
     {
       "path": "product/orchestration/global_actuator_index.json",
       "tier": "public",
-      "size": 10603,
+      "size": 15328,
       "type": "json"
     },
     {
@@ -6292,7 +6340,7 @@
     {
       "path": "product/schemas/mission-workflow-catalog.schema.json",
       "tier": "public",
-      "size": 4767,
+      "size": 4719,
       "type": "json"
     },
     {
@@ -7889,12 +7937,6 @@
       "path": "public/design-patterns/media-templates/themes/design-md-imports.json",
       "tier": "public",
       "size": 504089,
-      "type": "json"
-    },
-    {
-      "path": "public/design-patterns/media-templates/themes/themes-core.json",
-      "tier": "public",
-      "size": 2192,
       "type": "json"
     },
     {

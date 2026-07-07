@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-imports -- long-lived OAuth callback server; IP-08 で managed-process 経由へ移行予定 (docs/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 import { spawn } from 'node:child_process';
 import * as readline from 'node:readline';
 import {
@@ -137,7 +138,9 @@ async function main(): Promise<void> {
     server.once('exit', () => resolve());
   });
 
-  console.log(`OAuth connection setup complete. Tokens should be stored in knowledge/personal/connections/${serviceId}.json`);
+  console.log(
+    `OAuth connection setup complete. Tokens should be stored in knowledge/personal/connections/${serviceId}.json`
+  );
 }
 
 main().catch((error: unknown) => {

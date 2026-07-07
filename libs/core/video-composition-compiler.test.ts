@@ -66,6 +66,51 @@ describe('video composition compiler', () => {
     );
   });
 
+  it('threads tenant design_system_vars into rendered scene css (DS-04 / E2E-02)', () => {
+    const bundleDir = pathResolver.sharedTmp('video-composition-bundle-tests/tenant-branding');
+    const adf: VideoCompositionADF = {
+      kind: 'video-composition-adf',
+      version: '1.0.0',
+      intent: 'Tenant branded',
+      title: 'Tenant branded',
+      composition: {
+        duration_sec: 3,
+        fps: 24,
+        width: 1280,
+        height: 720,
+        background_color: '#081225',
+      },
+      scenes: [
+        {
+          scene_id: 'hook',
+          role: 'hook',
+          start_sec: 0,
+          duration_sec: 3,
+          template_ref: { template_id: 'basic-title-card' },
+          content: {
+            headline: 'Branded hook',
+            design_system_vars: {
+              '--kb-accent': '#ff00aa',
+              '--kb-accent-blue': '#ff00aa',
+              '--kb-bg-main': '#101010',
+            },
+          },
+        },
+      ],
+      output: { format: 'mp4', bundle_dir: bundleDir },
+    };
+
+    writeVideoCompositionBundle(adf);
+    const html = safeReadFile(`${bundleDir}/compositions/hook.html`, {
+      encoding: 'utf8',
+    }) as string;
+
+    // Tenant overrides land on :root, and tokenized scene styles resolve to them.
+    expect(html).toContain('--kb-accent: #ff00aa');
+    expect(html).toContain('--kb-bg-main: #101010');
+    expect(html).toContain('var(--kb-accent-blue');
+  });
+
   it('slugifies the composition id from the intent when present', () => {
     const plan = compileVideoCompositionADF({
       kind: 'video-composition-adf',

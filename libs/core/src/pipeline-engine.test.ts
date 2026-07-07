@@ -17,7 +17,7 @@ vi.mock('../core.js', () => ({
   },
 }));
 
-import { resolveRef, handleStepError } from './pipeline-engine.js';
+import { resolveRef, handleStepError, executeAdfSteps } from './pipeline-engine.js';
 
 const TMP_FILE = '/tmp/test-sub-pipeline.json';
 
@@ -43,12 +43,7 @@ describe('pipeline-engine', () => {
       };
       fs.writeFileSync(TMP_FILE, JSON.stringify(subPipeline));
 
-      const result = await resolveRef(
-        TMP_FILE,
-        {},
-        { _refDepth: 0 },
-        (val: any) => val,
-      );
+      const result = await resolveRef(TMP_FILE, {}, { _refDepth: 0 }, (val: any) => val);
 
       expect(result.steps).toHaveLength(1);
       expect(result.steps[0].id).toBe('step1');
@@ -67,7 +62,7 @@ describe('pipeline-engine', () => {
         TMP_FILE,
         { injected: '{{parent_val}}' },
         { _refDepth: 0 },
-        (val: any) => (val === '{{parent_val}}' ? 'resolved_value' : val),
+        (val: any) => (val === '{{parent_val}}' ? 'resolved_value' : val)
       );
 
       expect(result.mergedCtx.injected).toBe('resolved_value');
@@ -77,14 +72,14 @@ describe('pipeline-engine', () => {
     it('throws on circular ref (depth > 10)', async () => {
       fs.writeFileSync(TMP_FILE, JSON.stringify({ steps: [] }));
 
-      await expect(
-        resolveRef(TMP_FILE, {}, { _refDepth: 10 }, (v: any) => v),
-      ).rejects.toThrow('Circular ref or depth exceeded');
+      await expect(resolveRef(TMP_FILE, {}, { _refDepth: 10 }, (v: any) => v)).rejects.toThrow(
+        'Circular ref or depth exceeded'
+      );
     });
 
     it('throws on missing file', async () => {
       await expect(
-        resolveRef('/tmp/nonexistent-pipeline-xyz.json', {}, { _refDepth: 0 }, (v: any) => v),
+        resolveRef('/tmp/nonexistent-pipeline-xyz.json', {}, { _refDepth: 0 }, (v: any) => v)
       ).rejects.toThrow();
     });
   });
@@ -102,7 +97,7 @@ describe('pipeline-engine', () => {
         { strategy: 'skip' },
         testCtx,
         vi.fn(),
-        resolveVarsFn,
+        resolveVarsFn
       );
 
       expect(result.recovered).toBe(true);
@@ -112,14 +107,7 @@ describe('pipeline-engine', () => {
 
     it('with strategy abort re-throws', async () => {
       await expect(
-        handleStepError(
-          testError,
-          testStep,
-          { strategy: 'abort' },
-          testCtx,
-          vi.fn(),
-          resolveVarsFn,
-        ),
+        handleStepError(testError, testStep, { strategy: 'abort' }, testCtx, vi.fn(), resolveVarsFn)
       ).rejects.toThrow('step failed');
     });
 
@@ -133,14 +121,62 @@ describe('pipeline-engine', () => {
         { strategy: 'fallback', fallback: fallbackSteps },
         testCtx,
         executeSubPipeline,
-        resolveVarsFn,
+        resolveVarsFn
       );
 
       expect(result.recovered).toBe(true);
       expect(executeSubPipeline).toHaveBeenCalledWith(
         fallbackSteps,
-        expect.objectContaining({ _error: expect.any(Object) }),
+        expect.objectContaining({ _error: expect.any(Object) })
       );
+    });
+  });
+
+  describe('executeAdfSteps', () => {
+    it('runs capture and nested control steps with shared context resolution', async () => {
+      const result = await executeAdfSteps(
+        [
+          { type: 'capture', op: 'capture_name', params: { value: '{{name}}' } },
+          {
+            type: 'control',
+            op: 'if',
+            params: {
+              steps: [{ type: 'apply', op: 'apply_suffix', params: { suffix: 'done' } }],
+            },
+          },
+        ],
+        { name: 'world' },
+        {
+          resolveVars: (value, ctx) => {
+            if (value === '{{name}}') return ctx.name;
+            return value;
+          },
+        },
+        {
+          capture: async (_op, params, ctx, resolve) => ({
+            ...ctx,
+            capture_name: resolve(params.value),
+          }),
+          transform: async (_op, params, ctx, resolve) => ({
+            ...ctx,
+            transformed: resolve(params.value),
+          }),
+          apply: async (_op, params, ctx, resolve) => ({
+            ...ctx,
+            apply_suffix: resolve(params.suffix),
+          }),
+          control: async (_op, params, ctx, runNestedSteps) => {
+            const nested = await runNestedSteps(params.steps, ctx);
+            return { ...nested.context, control_seen: true };
+          },
+        }
+      );
+
+      expect(result.status).toBe('succeeded');
+      expect(result.total_steps).toBe(3);
+      expect(result.context.capture_name).toBe('world');
+      expect(result.context.apply_suffix).toBe('done');
+      expect(result.context.control_seen).toBe(true);
     });
   });
 });

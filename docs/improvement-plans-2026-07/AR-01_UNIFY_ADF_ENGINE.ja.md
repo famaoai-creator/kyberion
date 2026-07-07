@@ -2,6 +2,7 @@
 
 > 優先度: **P0**(AR 系の土台) / 規模: L(段階分割必須) / 依存: なし / 関連: IP-05(CLI runner)、MO-03/HN-03(並列 op)、IP-12(実行モード)
 > **検証(2026-07-03, Fable)**: 3エンジンの実在を確認 — `scripts/run_pipeline.ts`(`runSteps`)、`libs/actuators/orchestrator-actuator/src/super-nerve/index.ts`(`handleCoreAction`)、`libs/actuators/*/…-pipeline-helpers.ts`(`executePipeline`)。
+> **進捗(2026-07-07)**: `libs/core/src/pipeline-engine.ts` に汎用 `executeAdfSteps` を追加し、`file-actuator` と `network-actuator` の pipeline ループをそこへ委譲し始めた。共通 runner のパイロットとして nested control と context 解決の回帰テストを追加済み。
 
 ## 背景と課題
 

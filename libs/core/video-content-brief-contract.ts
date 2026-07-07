@@ -2,6 +2,7 @@ import type { NarratedVideoBrief } from './narrated-video-brief-compiler.js';
 import type { VideoCompositionSceneRole } from './video-composition-contract.js';
 import { buildVideoDesignCssVars, resolveVideoModeDefaults } from './video-design-system.js';
 import { resolveTenantDesign } from './tenant-design-resolver.js';
+import { resolveCreativeDesign } from './creative-design-resolver.js';
 import { webThemePackToCssVars, type WebThemePack } from './web-design-system.js';
 
 export type VideoPresentationMode = 'howto' | 'promo' | 'vtuber';
@@ -35,6 +36,8 @@ export interface VideoContentBrief {
     customer_id?: string;
     brand_name?: string;
     design_system_id?: string;
+    /** VDS-07 / E2E-02: direct tenant selection via creative-design-resolver. */
+    tenant_slug?: string;
   };
   tone?: string;
   language?: string;
@@ -142,10 +145,21 @@ export function compileVideoContentBriefToStoryboard(brief: VideoContentBrief): 
   const tenantThemePack = tenantDesign?.themePack;
   const brandName =
     brief.design_system_ref.brand_name || tenantDesign?.tokens.brand_name || 'Kyberion';
+  // VDS-07 (E2E-02): tenant_slug selects the theme pack directly through the
+  // single creative-design resolver; explicit brief css_vars still win below.
+  const creativeTenantVars = (() => {
+    const tenantSlug = brief.design_profile?.tenant_slug;
+    if (!tenantSlug) return {};
+    const resolved = resolveCreativeDesign({ surface: 'video', tenantSlug });
+    return resolved.source === 'tenant-override' && resolved.projection.surface === 'video'
+      ? resolved.projection.css_vars
+      : {};
+  })();
   const modeDefaults = resolveVideoModeDefaults(presentationMode);
   const background =
     brief.design_system_ref.background_color ||
     (isWebThemePack(tenantThemePack) ? tenantThemePack.theme.colors.background : undefined) ||
+    creativeTenantVars['--kb-bg-main'] ||
     modeDefaults.background_color;
   const layoutFamily = brief.design_system_ref.layout_family || modeDefaults.layout_family;
   const motionProfile = brief.design_system_ref.motion_profile || modeDefaults.motion_profile;
@@ -220,6 +234,7 @@ export function compileVideoContentBriefToStoryboard(brief: VideoContentBrief): 
           logo_path: logoPath,
           css_vars: {
             ...tenantCssVars,
+            ...creativeTenantVars,
             ...brief.design_system_ref.css_vars,
           },
         },

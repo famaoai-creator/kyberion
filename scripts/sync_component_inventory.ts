@@ -5,6 +5,7 @@ import {
   safeLstat,
   safeMkdir,
   safeReaddir,
+  safeReadFile,
   safeWriteFile,
 } from '@agent/core';
 import { withExecutionContext } from '@agent/core/governance';
@@ -42,6 +43,7 @@ interface CurrentIndexRecord {
   s: 'implemented';
   version: string;
   capability_count: number;
+  ops: string[];
   contract_schema?: string;
   prerequisites_summary: string;
 }
@@ -91,8 +93,18 @@ function summarizePrerequisites(manifest: CapabilityManifest): string {
   return parts.size > 0 ? Array.from(parts).sort().join(', ') : '-';
 }
 
+function listOps(manifest: CapabilityManifest): string[] {
+  return Array.from(
+    new Set(
+      (manifest.capabilities || []).map((capability) => String(capability.op || '')).filter(Boolean)
+    )
+  ).sort();
+}
+
 function loadManifest(manifestPath: string): CapabilityManifest {
-  return readJsonFile<CapabilityManifest>(manifestPath);
+  return JSON.parse(
+    safeReadFile(manifestPath, { encoding: 'utf8' }) as string
+  ) as CapabilityManifest;
 }
 
 function collectComponentInventory() {
@@ -117,6 +129,7 @@ function collectComponentInventory() {
         s: 'implemented',
         version: manifest.version,
         capability_count: manifest.capabilities.length,
+        ops: listOps(manifest),
         contract_schema: manifest.contract_schema,
         prerequisites_summary: summarizePrerequisites(manifest),
       });
@@ -203,11 +216,13 @@ function buildCapabilitiesGuide(current: CurrentIndexRecord[]): string {
     'Legacy or conceptual capability names are intentionally excluded here. If a component is not manifest-backed, it is not part of the current runtime catalog.'
   );
   lines.push('');
-  lines.push('| Actuator | Description | Version | Ops | Prerequisites | Contract Schema | Path |');
-  lines.push('| :--- | :--- | :--- | :---: | :--- | :--- | :--- |');
+  lines.push(
+    '| Actuator | Description | Version | Ops Count | Ops | Prerequisites | Contract Schema | Path |'
+  );
+  lines.push('| :--- | :--- | :--- | :---: | :--- | :--- | :--- | :--- |');
   for (const actuator of current) {
     lines.push(
-      `| \`${actuator.n}\` | ${actuator.d} | ${actuator.version} | ${actuator.capability_count} | \`${actuator.prerequisites_summary}\` | \`${actuator.contract_schema || '-'}\` | \`${actuator.path}\` |`
+      `| \`${actuator.n}\` | ${actuator.d} | ${actuator.version} | ${actuator.capability_count} | \`${actuator.ops.join(', ') || '-'}\` | \`${actuator.prerequisites_summary}\` | \`${actuator.contract_schema || '-'}\` | \`${actuator.path}\` |`
     );
   }
   lines.push('');
@@ -255,7 +270,6 @@ function buildCapabilitiesGuide(current: CurrentIndexRecord[]): string {
   lines.push(
     `- [component-lifecycle-inventory.md](${path.relative(pathResolver.rootDir(), REPORT_PATH)})`
   );
-  lines.push('');
   return `${lines.join('\n')}\n`;
 }
 
@@ -318,7 +332,6 @@ function buildReport(current: CurrentIndexRecord[], legacy: LegacyRecord[]): str
   lines.push(
     '- Do not use `CAPABILITIES_GUIDE.md` as the source of truth for runtime discovery; it is broader and currently includes historical capability names that do not map 1:1 to actuator packages.'
   );
-  lines.push('');
   return `${lines.join('\n')}\n`;
 }
 
@@ -328,7 +341,7 @@ function main() {
     () => {
       const knowledgeDir = path.dirname(REPORT_PATH);
       if (!safeExistsSync(knowledgeDir)) {
-        safeMkdir(knowledgeDir, { recursive: true });
+        safeMkdir(knowledgeDir);
       }
 
       const { current, legacy } = collectComponentInventory();
