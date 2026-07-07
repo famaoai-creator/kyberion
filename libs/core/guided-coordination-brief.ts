@@ -65,7 +65,8 @@ function sanitizeQuestion(value: unknown, fallbackId: string): GuidedCoordinatio
         ? question.reason
         : 'The request cannot be coordinated safely without this input.',
     default_assumption:
-      typeof question.default_assumption === 'string' && question.default_assumption.trim().length > 0
+      typeof question.default_assumption === 'string' &&
+      question.default_assumption.trim().length > 0
         ? question.default_assumption
         : undefined,
     impact:
@@ -79,10 +80,16 @@ function normalizeText(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
-function inferCoordinationKind(seed: GuidedCoordinationBriefSeed): GuidedCoordinationBrief['coordination_kind'] {
+function inferCoordinationKind(
+  seed: GuidedCoordinationBriefSeed
+): GuidedCoordinationBrief['coordination_kind'] {
   if (seed.coordinationKind) return seed.coordinationKind;
   const text = seed.requestText;
-  if (/会議|ミーティング|打ち合わせ|Teams|Zoom|Meet|meeting|call|facilitate|進行|議事録|アクションアイテム|代理参加/i.test(text)) {
+  if (
+    /会議|ミーティング|打ち合わせ|Teams|Zoom|Meet|meeting|call|facilitate|進行|議事録|アクションアイテム|代理参加/i.test(
+      text
+    )
+  ) {
     return 'meeting';
   }
   if (/パワーポイント|powerpoint|ppt|スライド|deck|briefing pack|presentation|提案書/i.test(text)) {
@@ -91,18 +98,25 @@ function inferCoordinationKind(seed: GuidedCoordinationBriefSeed): GuidedCoordin
   if (/動画|video|movie|ナレーション|narrated/i.test(text)) return 'narrated_video';
   if (/予約|booking|reservation|purchase|order|appointment|apply/i.test(text)) return 'booking';
   if (/旅行|travel|trip|tour|宿泊|hotel|flight/i.test(text)) return 'travel';
-  if (/スケジュール|予定|日程|リスケ|resched|reschedule|calendar|調整|変更|空き時間|availability/i.test(text)) {
+  if (
+    /スケジュール|予定|日程|リスケ|resched|reschedule|calendar|調整|変更|空き時間|availability/i.test(
+      text
+    )
+  ) {
     return 'schedule';
   }
   if (/オンボーディング|onboarding|初回設定|初期設定|setup/i.test(text)) return 'onboarding';
-  if (/proposal|提案|ストーリー|storyline|稟議|decision support|意思決定/i.test(text)) return 'proposal';
+  if (/proposal|提案|ストーリー|storyline|稟議|decision support|意思決定/i.test(text))
+    return 'proposal';
   if (/比較|compare|strategy|優先順位|priorit/i.test(text)) return 'decision_support';
   if (/service|運用|operation|diagnos|inspec/i.test(text)) return 'service_operation';
   return 'general';
 }
 
 function inferObjective(seed: GuidedCoordinationBriefSeed): string {
-  return normalizeText(seed.goalSummary) || normalizeText(seed.summaryHint) || seed.requestText.trim();
+  return (
+    normalizeText(seed.goalSummary) || normalizeText(seed.summaryHint) || seed.requestText.trim()
+  );
 }
 
 function inferDomainOverlayId(kind: GuidedCoordinationBrief['coordination_kind']): string {
@@ -127,7 +141,9 @@ function inferExpectedOutputs(kind: GuidedCoordinationBrief['coordination_kind']
   return outputsByKind[kind] || outputsByKind.general;
 }
 
-function inferSuggestedTargetActuators(kind: GuidedCoordinationBrief['coordination_kind']): string[] {
+function inferSuggestedTargetActuators(
+  kind: GuidedCoordinationBrief['coordination_kind']
+): string[] {
   const byKind: Record<GuidedCoordinationBrief['coordination_kind'], string[]> = {
     meeting: ['meeting-actuator', 'meeting-browser-driver'],
     presentation: ['orchestrator-actuator', 'media-actuator'],
@@ -175,7 +191,7 @@ function inferMissingInputs(kind: GuidedCoordinationBrief['coordination_kind']):
     proposal: ['decision_goal', 'audience', 'source_materials'],
     decision_support: ['decision_question', 'alternatives', 'success_criteria'],
     service_operation: ['service_scope', 'approval_boundary', 'environment_constraints'],
-    general: ['objective', 'approval_boundary'],
+    general: [],
   };
 
   return byKind[kind] || byKind.general;
@@ -233,13 +249,13 @@ function inferPreferenceProfileRefs(kind: GuidedCoordinationBrief['coordination_
     case 'travel':
       return ['booking-preference-profile'];
     default:
-  return [];
-}
+      return [];
+  }
 
-function inferServiceBindingRefs(seed: GuidedCoordinationBriefSeed): string[] {
-  return Array.isArray(seed.serviceBindings)
-    ? Array.from(new Set(seed.serviceBindings.map((value) => value.trim()).filter(Boolean)))
-    : [];
+  function inferServiceBindingRefs(seed: GuidedCoordinationBriefSeed): string[] {
+    return Array.isArray(seed.serviceBindings)
+      ? Array.from(new Set(seed.serviceBindings.map((value) => value.trim()).filter(Boolean)))
+      : [];
   }
 }
 
@@ -249,7 +265,10 @@ function inferServiceBindingRefs(seed: GuidedCoordinationBriefSeed): string[] {
     : [];
 }
 
-function inferAssumptions(kind: GuidedCoordinationBrief['coordination_kind'], seed: GuidedCoordinationBriefSeed): string[] {
+function inferAssumptions(
+  kind: GuidedCoordinationBrief['coordination_kind'],
+  seed: GuidedCoordinationBriefSeed
+): string[] {
   const assumptions = [`Treat the request as a governed ${kind} coordination flow.`];
   if (seed.tier) assumptions.push(`Operate within the ${seed.tier} knowledge tier.`);
   if (seed.locale) assumptions.push(`Prefer ${seed.locale} for operator-facing outputs.`);
@@ -262,7 +281,9 @@ function inferRecommendedNextStep(missingInputs: string[]): string {
     : 'Compile the specialized brief and execution contract.';
 }
 
-export function buildGuidedCoordinationBrief(seed: GuidedCoordinationBriefSeed): GuidedCoordinationBrief {
+export function buildGuidedCoordinationBrief(
+  seed: GuidedCoordinationBriefSeed
+): GuidedCoordinationBrief {
   const coordination_kind = inferCoordinationKind(seed);
   const missing_inputs = inferMissingInputs(coordination_kind);
   return {
@@ -277,7 +298,9 @@ export function buildGuidedCoordinationBrief(seed: GuidedCoordinationBriefSeed):
     expected_outputs: inferExpectedOutputs(coordination_kind),
     suggested_target_actuators: inferSuggestedTargetActuators(coordination_kind),
     suggested_deliverables: inferSuggestedDeliverables(coordination_kind),
-    preference_profile_refs: seed.preferenceProfileRefs?.length ? seed.preferenceProfileRefs : inferPreferenceProfileRefs(coordination_kind),
+    preference_profile_refs: seed.preferenceProfileRefs?.length
+      ? seed.preferenceProfileRefs
+      : inferPreferenceProfileRefs(coordination_kind),
     service_binding_refs: inferServiceBindingRefs(seed),
     assumptions: inferAssumptions(coordination_kind, seed),
     clarification_questions: buildClarificationQuestions(missing_inputs),
@@ -337,7 +360,8 @@ export function normalizeGuidedCoordinationBrief(
         ? raw.domain_overlay_id
         : fallback.domain_overlay_id,
     audience_or_counterpart:
-      typeof raw.audience_or_counterpart === 'string' && raw.audience_or_counterpart.trim().length > 0
+      typeof raw.audience_or_counterpart === 'string' &&
+      raw.audience_or_counterpart.trim().length > 0
         ? raw.audience_or_counterpart
         : fallback.audience_or_counterpart,
     approval_boundary:
@@ -371,7 +395,10 @@ export function normalizeGuidedCoordinationBrief(
     clarification_questions:
       Array.isArray(raw.clarification_questions) && raw.clarification_questions.length > 0
         ? raw.clarification_questions.map((question, index) =>
-            sanitizeQuestion(question, fallback.missing_inputs[index] || `missing_input_${index + 1}`)
+            sanitizeQuestion(
+              question,
+              fallback.missing_inputs[index] || `missing_input_${index + 1}`
+            )
           )
         : fallback.clarification_questions,
     recommended_next_step:

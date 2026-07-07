@@ -42,10 +42,7 @@ import {
   getActiveTaskSession,
 } from './task-session.js';
 import type { TaskSession } from './task-session.js';
-import {
-  loadPendingIntent,
-  savePendingIntent,
-} from './pending-intent-store.js';
+import { loadPendingIntent, savePendingIntent } from './pending-intent-store.js';
 import { executeCapturePhotoTaskSession } from './capture-photo-task-session-executor.js';
 import { executeApprovedClaudeTaskSession } from './claude-task-session-executor.js';
 import { truncateTextWithCount } from './text-truncation.js';
@@ -462,12 +459,17 @@ async function handleTaskSessionRoute(
   if (!intent) {
     if (correctionDetected) {
       const completedSession = context.input.correlationId
-        ? getLatestCompletedTaskSession(context.input.surface || 'presence', context.input.correlationId)
+        ? getLatestCompletedTaskSession(
+            context.input.surface || 'presence',
+            context.input.correlationId
+          )
         : null;
       if (completedSession) {
         const reopened = reopenTaskSession(completedSession.session_id, {
           reason: `correction utterance: ${queryText}`,
-          status: completedSession.requirements?.missing?.length ? 'collecting_requirements' : 'planning',
+          status: completedSession.requirements?.missing?.length
+            ? 'collecting_requirements'
+            : 'planning',
         });
         if (reopened) {
           return emptySurfaceResult(
@@ -1999,6 +2001,7 @@ export async function runSurfaceConversation(
     `Current incoming message:\n${routedSurfaceInput.text}`,
   ].filter((part): part is string => typeof part === 'string' && part.trim().length > 0);
   const routingText = routingTextParts.join('\n\n');
+  const originalText = (input.surfaceText || input.query || '').trim();
   const ruleBasedReceiver = forcedReceiver || deriveSurfaceDelegationReceiver(routingText, surface);
   const compiledFlow: UserIntentFlow | null = shouldCompileSurfaceIntent(
     input,
@@ -2006,7 +2009,7 @@ export async function runSurfaceConversation(
     ruleBasedReceiver
   )
     ? await compileUserIntentFlow({
-        text: routingText,
+        text: originalText,
         channel: surface || 'surface',
         correlationId: input.correlationId,
         runtimeContext: buildPendingRuntimeContext(pendingIntent, input),
@@ -2022,9 +2025,13 @@ export async function runSurfaceConversation(
     if (input.correlationId) {
       savePendingIntent({
         correlation_id: input.correlationId,
-        intent_id: compiledFlow.intentContract?.intent_id || compiledFlow.executionBrief?.archetype_id,
-        source_text: routingText,
-        required_inputs: compiledFlow.intentContract?.required_inputs || compiledFlow.executionBrief?.missing_inputs || [],
+        intent_id:
+          compiledFlow.intentContract?.intent_id || compiledFlow.executionBrief?.archetype_id,
+        source_text: originalText,
+        required_inputs:
+          compiledFlow.intentContract?.required_inputs ||
+          compiledFlow.executionBrief?.missing_inputs ||
+          [],
         source_surface: surface,
         thread_context: input.threadContext,
         clarification_packet: compiledFlow.clarificationPacket,
@@ -2086,7 +2093,7 @@ export async function runSurfaceConversation(
   const routeContext: SurfaceRuntimeRouteContext = {
     input,
     compiledFlow,
-    resolvedIntent: resolveSurfaceIntent(routingText),
+    resolvedIntent: resolveSurfaceIntent(originalText),
     computedReceiver,
     structuredQuery,
     parsedSlackPrompt,
