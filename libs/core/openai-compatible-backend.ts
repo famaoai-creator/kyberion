@@ -23,6 +23,8 @@ import type {
   ExtractedTestPlan,
   DecomposeIntoTasksInput,
   DecomposedTaskPlan,
+  ToolDefinition,
+  GenerateWithToolsResult,
 } from './reasoning-backend.js';
 import { runStructuredReasoningOp, structuredReasoningSpecs } from './structured-reasoning.js';
 
@@ -529,6 +531,79 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
 
   async delegateTask(instruction: string, context?: string): Promise<string> {
     return this.prompt(`Task: ${instruction}\nContext: ${context ?? 'none'}`);
+  }
+
+  async generateWithTools(
+    prompt: string,
+    tools: ToolDefinition[]
+  ): Promise<GenerateWithToolsResult> {
+    const headers: Record<string, string> = {
+      'content-type': 'application/json',
+    };
+    if (this.apiKey && this.apiKey !== 'not-needed') {
+      headers.authorization = `Bearer ${this.apiKey}`;
+    }
+
+    const openaiTools: ChatCompletionRequest['tools'] = tools.map((t) => ({
+      type: 'function' as const,
+      function: {
+        name: t.name,
+        description: t.description,
+        parameters: t.inputSchema as Record<string, unknown>,
+      },
+    }));
+
+    const isNemotron = this.model.startsWith('nvidia/') || this.baseURL.includes('api.nvidia.com');
+
+    const body: ChatCompletionRequest = {
+      model: this.model,
+      messages: [{ role: 'user', content: prompt }],
+      tools: openaiTools,
+      tool_choice: 'auto',
+    };
+
+    // Nemotron thinking mode — keep enabled even for tool calls
+    if (isNemotron) {
+      body.chat_template_kwargs = { enable_thinking: true };
+      body.reasoning_budget = 8192;
+      body.max_tokens = 8192;
+    }
+
+    const response = await fetch(joinEndpoint(this.baseURL, 'chat/completions'), {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+      signal: buildAbortSignal(this.timeoutMs),
+    });
+
+    const text = await response.text();
+    const parsed = safeJsonParse(text) as ChatCompletionResponse | null;
+    if (!response.ok) {
+      const message = parsed?.error?.message || text || `HTTP ${response.status}`;
+      throw new Error(`[openai-compatible:generateWithTools] failed: ${message}`);
+    }
+    if (!parsed || !parsed.choices || parsed.choices.length === 0) {
+      throw new Error(
+        `[openai-compatible:generateWithTools] invalid response: ${text.slice(0, 500)}`
+      );
+    }
+
+    const message = parsed.choices[0].message;
+
+    if (message.reasoning_content) {
+      logger.info(`[NEMOTRON THINKING (tools)]:\n${message.reasoning_content}\n`);
+    }
+
+    const resultText = extractTextContent(message.content) || undefined;
+    const toolCalls = (message.tool_calls ?? []).map((tc) => ({
+      name: tc.function.name,
+      input: (safeJsonParse(tc.function.arguments) as Record<string, unknown>) ?? {},
+    }));
+
+    return {
+      ...(resultText ? { text: resultText } : {}),
+      ...(toolCalls.length > 0 ? { toolCalls } : {}),
+    };
   }
 }
 
