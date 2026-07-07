@@ -76,7 +76,6 @@ If you do not know which surface to use next, `pnpm setup:report --persona first
 Chronos API routes still accept `KYBERION_API_TOKEN` or `KYBERION_LOCALADMIN_TOKEN` for local access. Replacing that token gate with a proper IdP-backed user session is a follow-up item, so treat the current token requirement as a known limitation.
 
 For a concise map of entry points and their intended use, read [`docs/SURFACES.md`](./docs/SURFACES.md).
-
 For the full canonical setup, see [`docs/INITIALIZATION.md`](./docs/INITIALIZATION.md) (structure map: [`docs/QUICKSTART.md`](./docs/QUICKSTART.md)). For deployment to a server / customer environment, see [`docs/operator/DEPLOYMENT.md`](./docs/operator/DEPLOYMENT.md).
 
 ---
