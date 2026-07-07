@@ -33,6 +33,7 @@ export type WorkflowPhaseGateCheckKind =
   | 'reviewer_approved'
   | 'human_override'
   | 'deliverable_quality'
+  | 'llm_review'
   | 'custom';
 
 export interface WorkflowPhaseGateCheck {

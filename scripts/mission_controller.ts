@@ -20,6 +20,7 @@ import {
   auditChain,
   discoverProviders,
   getInstalledReasoningMode,
+  installReasoningBackends,
   customerResolver,
   listMemoryPromotionCandidates,
   listOrganizationMissionTeamTemplateCatalogSummariesForOrganization,
@@ -88,8 +89,10 @@ import {
 import { buildMissionStatusView, listMissionSummaries } from './refactor/mission-read-model.js';
 import { missionSystem } from './refactor/mission-system.js';
 import {
+  activateMissionOnGateProgress,
   advanceCurrentPhase,
   evaluateStoredMissionGate,
+  markPhaseTasksCompleted,
   markPhaseTasksForRework,
   planProcessTemplateTasks,
 } from './refactor/mission-process-planning.js';
@@ -1298,7 +1301,8 @@ Visibility Commands:
   classify <ID> [intent] [task]  Classify mission context into class/delivery/risk/stage
   workflow-select <ID> [intent] [task]
                                  Resolve workflow template from mission classification
-  plan-tasks <ID> [--force]      Expand the mission's process template phases into NEXT_TASKS.json + gate definitions
+  plan-tasks <ID> [--force] [--refresh-catalog]
+                                 Expand process template phases into NEXT_TASKS.json + gates (--refresh-catalog re-resolves from the current catalog)
   review-worker-output <ID> [verified|rejected] [note]
                                  Record worker-output review result via mission verification
   handoff <ID> <persona> [note]  Transfer mission persona ownership with audit history
@@ -1611,6 +1615,13 @@ async function gatePass(missionId: string, gateFile?: string, note?: string): Pr
       if (stored.evaluation.verdict === 'pass') {
         if (stored.position === 'exit' && stored.phase) {
           await advanceCurrentPhase(upperId, stored.phase);
+          const completed = markPhaseTasksCompleted(upperId, stored.phase);
+          if (completed > 0) {
+            logger.info(`   ${completed} task(s) in phase ${stored.phase} marked completed.`);
+          }
+        }
+        if (await activateMissionOnGateProgress(upperId)) {
+          logger.info('   Mission status: planned → active (first gate passed).');
         }
         logger.success(`✅ [GATE] ${gateFile} → passed (mission: ${upperId})`);
       } else {
@@ -1739,6 +1750,9 @@ export async function main() {
   if (!process.env.MISSION_ROLE) {
     process.env.MISSION_ROLE = 'mission_controller';
   }
+  // Register reasoning backends so dispatch-workitems delegation reaches a
+  // real backend (claude-cli/anthropic) instead of silently using the stub.
+  installReasoningBackends();
   killSwitch.startMonitor(Number(process.env.KYBERION_KILL_SWITCH_INTERVAL_MS || 10000));
 
   const positionalArgs = extractMissionControllerPositionalArgs(process.argv);

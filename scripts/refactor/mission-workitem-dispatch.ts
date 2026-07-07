@@ -1320,11 +1320,24 @@ async function routeToAgentOrSubagent(input: {
     : undefined;
 
   const notes: string[] = [];
+  // ①モデル振り分け: the per-task model hint (tier/effort from phase_kind,
+  // risk, scope) rides into the backend call instead of a global env choice.
+  const routingOptions = {
+    ...(input.taskModelHint?.effort ? { effort: input.taskModelHint.effort } : {}),
+    ...(input.taskModelHint?.execution_tier
+      ? { model_tier: input.taskModelHint.execution_tier }
+      : {}),
+  };
+  if (Object.keys(routingOptions).length > 0) {
+    notes.push(
+      `model routing: tier=${input.taskModelHint?.execution_tier ?? 'default'} effort=${input.taskModelHint?.effort ?? 'default'}`
+    );
+  }
   if (input.mode === 'subagent' || (!input.assigneePeerId && input.mode === 'auto')) {
     const backend = getReasoningBackend();
     const responseText = input.adapters.delegateTask
       ? await input.adapters.delegateTask(prompt, `workitem:${input.item.item_id}`)
-      : await backend.delegateTask(prompt, `workitem:${input.item.item_id}`);
+      : await backend.delegateTask(prompt, `workitem:${input.item.item_id}`, routingOptions);
     return { executionMode: 'subagent', responseText, notes };
   }
 
@@ -1333,7 +1346,7 @@ async function routeToAgentOrSubagent(input: {
     const backend = getReasoningBackend();
     const responseText = input.adapters.delegateTask
       ? await input.adapters.delegateTask(prompt, `workitem:${input.item.item_id}`)
-      : await backend.delegateTask(prompt, `workitem:${input.item.item_id}`);
+      : await backend.delegateTask(prompt, `workitem:${input.item.item_id}`, routingOptions);
     return { executionMode: 'subagent', responseText, notes };
   }
 

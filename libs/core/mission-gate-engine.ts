@@ -19,6 +19,7 @@ export type MissionGateCheckKind =
   | 'reviewer_approved'
   | 'human_override'
   | 'deliverable_quality'
+  | 'llm_review'
   | 'custom';
 
 export interface MissionGateCheck {
@@ -256,6 +257,73 @@ async function evaluateGateCheck(check: MissionGateCheck): Promise<{
             passed: false,
             reason: `Deliverable quality ${score.toFixed(2)} below ${minScore} — ${report.reason}`,
           };
+    }
+    case 'llm_review': {
+      // ②LLMゲート: semantic quality judgment on top of the mechanical
+      // checks. Reads the deliverable and asks the reasoning backend to
+      // verdict it against the criteria. Fails closed on a stub backend
+      // unless `allow_stub: true` (then it records an advisory skip).
+      const params = check.params || {};
+      const artifactPath = firstString(params.path, params.artifact_path, params.deliverable);
+      if (!artifactPath) {
+        return { passed: false, reason: 'llm_review: no deliverable path was provided.' };
+      }
+      if (!safeExistsSync(artifactPath)) {
+        return { passed: false, reason: `llm_review: deliverable not found: ${artifactPath}` };
+      }
+      const criteria = toStringList(params.criteria);
+      const { getReasoningBackend } = await import('./reasoning-backend.js');
+      const backend = getReasoningBackend();
+      if (backend.name === 'stub') {
+        if (params.allow_stub === true) {
+          return { passed: true, reason: 'llm_review skipped (stub backend, advisory mode).' };
+        }
+        return {
+          passed: false,
+          reason: 'llm_review requires a real reasoning backend (stub active).',
+        };
+      }
+      const content = String(safeReadFile(artifactPath, { encoding: 'utf8' })).slice(0, 24_000);
+      const prompt = [
+        'あなたは品質ゲートの審査員です。以下の成果物を判定基準に照らして審査してください。',
+        '出力は次のJSONのみ(コードフェンス可): {"pass": true|false, "reasons": ["..."], "improvements": ["..."]}',
+        '',
+        `## 判定基準`,
+        ...(criteria.length > 0
+          ? criteria.map((criterion, index) => `${index + 1}. ${criterion}`)
+          : ['1. 成果物として一貫しており、明らかな誤り・未完箇所・根拠欠落がないこと']),
+        '',
+        '## 成果物',
+        content,
+      ].join('\n');
+      try {
+        const response = await backend.prompt(prompt, {
+          model_tier:
+            params.model_tier === 'fast' || params.model_tier === 'deep'
+              ? params.model_tier
+              : 'standard',
+        });
+        const jsonMatch = response.match(/\{[\s\S]*\}/u);
+        if (!jsonMatch) {
+          return { passed: false, reason: `llm_review: unparsable verdict: ${response.slice(0, 200)}` };
+        }
+        const verdict = JSON.parse(jsonMatch[0]) as {
+          pass?: boolean;
+          reasons?: string[];
+          improvements?: string[];
+        };
+        const reasons = [
+          ...(verdict.reasons ?? []),
+          ...(verdict.improvements ?? []).map((improvement) => `改善提案: ${improvement}`),
+        ]
+          .filter(Boolean)
+          .join(' / ');
+        return verdict.pass === true
+          ? { passed: true, ...(reasons ? { reason: reasons } : {}) }
+          : { passed: false, reason: `llm_review rejected: ${reasons || 'no reasons given'}` };
+      } catch (error: any) {
+        return { passed: false, reason: `llm_review failed: ${error?.message ?? String(error)}` };
+      }
     }
     case 'custom': {
       const params = check.params || {};

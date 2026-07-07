@@ -70,11 +70,11 @@ export function applyProcessTemplatePlan(input: {
     };
   }
 
-  if (safeExistsSync(nextTasksPath) && !input.force) {
-    const existing = readTasksSafe(nextTasksPath);
-    const templateAuthored =
-      existing.length > 0 &&
-      existing.every((task) => task?.origin === PROCESS_TEMPLATE_TASK_ORIGIN);
+  const existing = safeExistsSync(nextTasksPath) ? readTasksSafe(nextTasksPath) : [];
+  if (existing.length > 0 && !input.force) {
+    const templateAuthored = existing.every(
+      (task) => task?.origin === PROCESS_TEMPLATE_TASK_ORIGIN
+    );
     if (!templateAuthored) {
       return {
         tasks: [],
@@ -83,6 +83,21 @@ export function applyProcessTemplatePlan(input: {
         taskBoardUpdated: false,
         skipped: 'existing_next_tasks',
       };
+    }
+  }
+
+  // Re-planning must not lose progress: carry over the status of tasks whose
+  // task_id survives the re-expansion (e.g. --refresh-catalog after a
+  // catalog fix on a partially completed mission).
+  const previousStatus = new Map(
+    existing
+      .filter((task) => typeof task.task_id === 'string' && typeof task.status === 'string')
+      .map((task) => [task.task_id as string, task.status as string])
+  );
+  for (const task of tasks) {
+    const carried = previousStatus.get(task.task_id);
+    if (carried && carried !== 'planned') {
+      (task as unknown as Record<string, unknown>).status = carried;
     }
   }
 
@@ -160,6 +175,8 @@ function renderPhaseChecklist(
 export async function planProcessTemplateTasks(args: {
   id: string;
   force?: boolean;
+  /** Re-resolve from the current catalog, ignoring persisted phase_specs. */
+  refreshCatalog?: boolean;
 }): Promise<void> {
   const missionId = args.id.toUpperCase();
   const state = loadState(missionId);
@@ -173,7 +190,9 @@ export async function planProcessTemplateTasks(args: {
     return;
   }
 
-  const design = resolveDesignForState(missionId, state);
+  const design = resolveDesignForState(missionId, state, {
+    refreshCatalog: args.refreshCatalog,
+  });
   if (!design) {
     logger.error(
       `Mission ${missionId} has no classification/process template; run classify or workflow-select first.`
@@ -344,11 +363,7 @@ export async function evaluatePhaseEntryGate(args: {
   return undefined;
 }
 
-/**
- * Flips a phase's process-template tasks back to `rework` after a gate-fail
- * so dependency-first dispatch re-executes them.
- */
-export function markPhaseTasksForRework(missionId: string, phase: string): number {
+function markPhaseTasksStatus(missionId: string, phase: string, status: string): number {
   const missionDir = findMissionPath(missionId.toUpperCase());
   if (!missionDir) return 0;
   const nextTasksPath = path.join(missionDir, 'NEXT_TASKS.json');
@@ -357,12 +372,48 @@ export function markPhaseTasksForRework(missionId: string, phase: string): numbe
   let changed = 0;
   for (const task of tasks) {
     if (task.phase === phase && task.origin === PROCESS_TEMPLATE_TASK_ORIGIN) {
-      task.status = 'rework';
+      task.status = status;
       changed += 1;
     }
   }
   if (changed > 0) safeWriteFile(nextTasksPath, JSON.stringify(tasks, null, 2));
   return changed;
+}
+
+/**
+ * Flips a phase's process-template tasks back to `rework` after a gate-fail
+ * so dependency-first dispatch re-executes them.
+ */
+export function markPhaseTasksForRework(missionId: string, phase: string): number {
+  return markPhaseTasksStatus(missionId, phase, 'rework');
+}
+
+/**
+ * Marks a phase's process-template tasks completed after its exit gate
+ * passes — the gate IS the phase's acceptance, so the task board must agree.
+ */
+export function markPhaseTasksCompleted(missionId: string, phase: string): number {
+  return markPhaseTasksStatus(missionId, phase, 'completed');
+}
+
+/**
+ * A passed gate means the mission is actually running: promote a still
+ * `planned` mission to `active` so lifecycle status and gate progression
+ * stay in sync.
+ */
+export async function activateMissionOnGateProgress(missionId: string): Promise<boolean> {
+  const upperId = missionId.toUpperCase();
+  const state = loadState(upperId);
+  if (!state || state.status !== 'planned') return false;
+  state.status = 'active';
+  state.history = state.history || [];
+  state.history.push({
+    ts: new Date().toISOString(),
+    event: 'GATE_ACTIVATE',
+    note: 'Mission activated automatically on first passed process gate.',
+  });
+  await saveState(upperId, state);
+  return true;
 }
 
 /**
@@ -383,10 +434,11 @@ export async function advanceCurrentPhase(missionId: string, passedPhase: string
 
 function resolveDesignForState(
   missionId: string,
-  state: MissionState
+  state: MissionState,
+  options: { refreshCatalog?: boolean } = {}
 ): MissionWorkflowDesign | undefined {
   const persisted = state.process_template;
-  if (persisted?.phase_specs?.length) {
+  if (!options.refreshCatalog && persisted?.phase_specs?.length) {
     return {
       workflow_id: persisted.workflow_id,
       pattern: persisted.pattern,
@@ -398,9 +450,12 @@ function resolveDesignForState(
   }
   const classification = state.classification;
   if (!classification && !state.mission_type) return undefined;
+  // Leave class/shape empty when unclassified so the mission_type hint can
+  // supply them (otherwise a default 'code_change' would shadow the hint and
+  // reroute e.g. presentation missions onto the aidlc template).
   return resolveMissionWorkflowDesign({
-    missionClass: classification?.mission_class ?? ('code_change' as MissionClass),
-    deliveryShape: classification?.delivery_shape ?? ('single_artifact' as MissionDeliveryShape),
+    missionClass: (classification?.mission_class ?? '') as MissionClass,
+    deliveryShape: (classification?.delivery_shape ?? '') as MissionDeliveryShape,
     riskProfile: classification?.risk_profile ?? ('review_required' as MissionRiskProfile),
     stage: classification?.stage ?? ('planning' as MissionStage),
     executionShape: 'mission',

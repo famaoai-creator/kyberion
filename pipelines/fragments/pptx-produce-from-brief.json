@@ -15,30 +15,27 @@
     {
       "id": "read_deck_brief",
       "role": "source",
-      "op": "system:read_file",
-      "produces": { "channel": "deck_brief_text", "type": "DeckBriefText" },
+      "op": "system:read_json",
+      "produces": {
+        "channel": "deck_brief_raw",
+        "type": "DeckBriefRaw"
+      },
       "params": {
-        "path": "{{deck_brief_path}}"
+        "path": "{{deck_brief_path}}",
+        "export_as": "deck_brief_raw"
       }
     },
     {
       "id": "parse_brief",
       "role": "transform",
       "op": "core:transform",
-      "consumes": "deck_brief_text",
-      "produces": { "channel": "deck_brief", "type": "DeckBrief" },
+      "consumes": "deck_brief_raw",
+      "produces": {
+        "channel": "deck_brief",
+        "type": "DeckBrief"
+      },
       "params": {
-        "script": "const raw = ctx.deck_brief_text; if (!raw) throw new Error('deck_brief_text is missing from context'); const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw; return {...parsed, kind: 'proposal-brief', tenant_id: ctx.tenant_slug || parsed.tenant_slug};"
-      }
-    },
-    {
-      "id": "build_storyline",
-      "role": "transform",
-      "op": "media:proposal_storyline_from_brief",
-      "consumes": "deck_brief",
-      "produces": { "channel": "proposal_storyline", "type": "ProposalStoryline" },
-      "params": {
-        "from": "deck_brief"
+        "script": "const parsed = ctx.deck_brief_raw; if (!parsed || typeof parsed !== 'object') throw new Error('deck_brief_raw is missing from context'); return {...parsed, kind: 'proposal-brief', tenant_id: ctx.tenant_slug || parsed.tenant_slug};"
       }
     },
     {
@@ -46,7 +43,10 @@
       "role": "transform",
       "op": "media:brief_to_design_protocol",
       "consumes": "deck_brief",
-      "produces": { "channel": "pptx_design", "type": "PptxDesign" },
+      "produces": {
+        "channel": "pptx_design",
+        "type": "PptxDesign"
+      },
       "params": {
         "from": "deck_brief"
       }
@@ -56,7 +56,10 @@
       "role": "sink",
       "op": "media:pptx_render",
       "consumes": "pptx_design",
-      "produces": { "channel": "pptx_output_path", "type": "FilePath" },
+      "produces": {
+        "channel": "pptx_output_path",
+        "type": "FilePath"
+      },
       "params": {
         "design_from": "pptx_design",
         "path": "{{mission_evidence_dir}}/{{output_filename}}"
@@ -74,7 +77,10 @@
           "status": "pending_operator_confirmation",
           "deck_title": "{{deck_title}}",
           "tenant": "{{tenant_slug}}",
-          "artifacts": ["{{deck_brief_path}}", "{{mission_evidence_dir}}/{{output_filename}}"],
+          "artifacts": [
+            "{{deck_brief_path}}",
+            "{{mission_evidence_dir}}/{{output_filename}}"
+          ],
           "instructions": "生成された PPTX を確認し、顧客に提示可能なレベルであれば status を 'passed' に更新してください。修正が必要な場合は rejection_reason に記載し 'rejected' に更新してください。",
           "created_at": "{{$now}}"
         }

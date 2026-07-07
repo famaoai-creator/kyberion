@@ -23,7 +23,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <div className="concierge-tagline">CEO秘書 — 依頼・承認・成果・例外</div>
             </div>
           </div>
-          <div className="concierge-header-note">Kyberion Concierge · port 3050</div>
+          <div className="concierge-header-note">
+            <a href="/" style={{ marginRight: 12 }}>ホーム</a>
+            <a href="/setup">セットアップ</a>
+          </div>
         </header>
         <main className="concierge-main">{children}</main>
       </body>
