@@ -21,6 +21,7 @@ protocols, catalogs, and indexes used by Kyberion.
 - [Supported Actuators](supported-actuators.md)
 - [Voice Interface Protocol](voice-interface-protocol.md)
 - [Mission Team Templates](mission-team-templates.json)
+- [Kyberion Development Workflow](kyberion-development-workflow.md)
 
 The organization discovery reports are the machine-readable contracts for
 inventorying organization profiles and selected template catalogs.
