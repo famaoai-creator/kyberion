@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { pathResolver } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
 import { safeReadFile } from '@agent/core/secure-io';
 
 export function resolveCliInputPath(inputPath: string): string {
