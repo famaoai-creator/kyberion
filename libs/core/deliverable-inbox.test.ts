@@ -70,4 +70,31 @@ describe('deliverable inbox', () => {
     expect(acceptedList).toHaveLength(1);
     expect(acceptedList[0]?.entry_id).toBe(entry.entry_id);
   });
+
+  it('records review verdicts with a note and reviewer (SU-03)', async () => {
+    const { addInboxEntry, listInboxEntries, markInboxEntry } =
+      await import('./deliverable-inbox.js');
+
+    fs.mkdirSync(path.join(tmpRoot, 'active/shared/inbox'), { recursive: true });
+    const entry = addInboxEntry({
+      missionId: 'MSN-2',
+      title: 'Draft deck',
+      artifactPaths: ['active/missions/public/MSN-2/evidence/deck.pptx'],
+    });
+
+    const changesRequested = markInboxEntry(entry.entry_id, 'changes_requested', {
+      verdictNote: 'スライド3の数字を最新に更新してください',
+      reviewedBy: 'chronos-localadmin',
+    });
+    expect(changesRequested?.status).toBe('changes_requested');
+    expect(changesRequested?.verdict_note).toBe('スライド3の数字を最新に更新してください');
+    expect(changesRequested?.reviewed_by).toBe('chronos-localadmin');
+
+    const rejected = markInboxEntry(entry.entry_id, 'rejected', { verdictNote: '要件不一致' });
+    expect(rejected?.status).toBe('rejected');
+
+    const filtered = listInboxEntries({ status: ['rejected', 'changes_requested'] });
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0]?.entry_id).toBe(entry.entry_id);
+  });
 });

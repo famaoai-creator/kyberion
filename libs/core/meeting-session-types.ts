@@ -8,7 +8,7 @@
  * driver implementation only has to satisfy these shapes.
  */
 
-export type MeetingPlatform = 'zoom' | 'teams' | 'meet' | 'auto';
+export type MeetingPlatform = 'zoom' | 'teams' | 'meet' | 'in_room' | 'auto';
 
 export interface MeetingTarget {
   /** Public meeting URL (must match the platform's allow-listed host). */
