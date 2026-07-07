@@ -1,0 +1,11 @@
+{
+  "slug": "{COMPANY_SLUG}",
+  "display_name": "{COMPANY_NAME}",
+  "engagement_type": "fde",
+  "primary_contact": {
+    "name": "TBD",
+    "email": "tbd@example.com"
+  },
+  "engagement_started_at": "YYYY-MM-DD",
+  "notes": "IT運用・マネージドサービス(MSP)の業態テンプレートから生成。company:bootstrap 後に実情報へ更新すること。"
+}

@@ -26,11 +26,60 @@ export interface MissionWorkflowSelectionInput {
   taskType?: string;
 }
 
+export type WorkflowPhaseGateCheckKind =
+  | 'evidence_exists'
+  | 'schema_valid'
+  | 'command_succeeds'
+  | 'reviewer_approved'
+  | 'human_override'
+  | 'deliverable_quality'
+  | 'custom';
+
+export interface WorkflowPhaseGateCheck {
+  kind: WorkflowPhaseGateCheckKind;
+  params?: Record<string, unknown>;
+}
+
+export interface WorkflowPhaseGate {
+  id: string;
+  title?: string;
+  checks: WorkflowPhaseGateCheck[];
+}
+
+export interface WorkflowPhaseTaskSpec {
+  task_id_suffix: string;
+  description: string;
+  team_role?: string;
+  phase_kind?: 'implement' | 'review';
+  deliverable?: string;
+  acceptance_criteria?: string[];
+  risk?: 'low' | 'medium' | 'high' | 'approval_required' | 'high_stakes';
+  estimated_scope?: 'S' | 'M' | 'L';
+  expected_output_format?: 'text' | 'files' | 'structured';
+  review_target_suffix?: string;
+  deliverable_kind?: 'doc' | 'deck' | 'code' | 'media';
+  pipeline_ref?: string;
+}
+
+export interface WorkflowPhaseSpec {
+  id: string;
+  title?: string;
+  kind?: 'judgment' | 'deterministic' | 'review' | 'approval';
+  pipeline_ref?: string;
+  brief_ref?: string;
+  entry_gate?: WorkflowPhaseGate;
+  exit_gate?: WorkflowPhaseGate;
+  default_tasks?: WorkflowPhaseTaskSpec[];
+}
+
+export type WorkflowPhase = string | WorkflowPhaseSpec;
+
 export interface MissionWorkflowDesign {
   workflow_id: string;
   pattern: string;
   stage: MissionStage;
   phases: string[];
+  phase_specs?: WorkflowPhaseSpec[];
   rationale: string;
 }
 
@@ -48,7 +97,7 @@ type WorkflowTemplate = {
   pattern: string;
   description?: string;
   match?: WorkflowMatch;
-  phases: string[];
+  phases: WorkflowPhase[];
 };
 
 type WorkflowCatalogFile = {
@@ -126,6 +175,27 @@ function templateMatches(
   );
 }
 
+export function normalizeWorkflowPhases(phases: WorkflowPhase[]): {
+  ids: string[];
+  specs: WorkflowPhaseSpec[];
+  hasSpecEntries: boolean;
+} {
+  const ids: string[] = [];
+  const specs: WorkflowPhaseSpec[] = [];
+  let hasSpecEntries = false;
+  for (const phase of phases) {
+    if (typeof phase === 'string') {
+      ids.push(phase);
+      specs.push({ id: phase });
+      continue;
+    }
+    hasSpecEntries = true;
+    ids.push(phase.id);
+    specs.push(phase);
+  }
+  return { ids, specs, hasSpecEntries };
+}
+
 function loadWorkflowCatalog(): WorkflowCatalogFile {
   const parsed = JSON.parse(
     safeReadFile(WORKFLOW_CATALOG_PATH, { encoding: 'utf8' }) as string
@@ -149,17 +219,81 @@ export function resolveMissionWorkflowDesign(
   );
   const missionTypeHint = normalize(input.missionTypeHint);
   const meetingFacilitationHint = missionTypeHint === 'meeting_facilitation';
+  // Mission-type hints route type-first creations (`mission create <tier>
+  // <tenant> <type>`) onto their dedicated process templates when the intent
+  // id is not supplied explicitly.
+  const hintDefaults: Record<
+    string,
+    { missionClass?: string; deliveryShape?: string; intentId?: string; taskType?: string }
+  > = {
+    meeting_facilitation: {
+      deliveryShape: 'multi_artifact_pipeline',
+      intentId: 'meeting-operations',
+      taskType: 'meeting_operations',
+    },
+    presentation_production: {
+      missionClass: 'content_and_media',
+      intentId: 'presentation-deck',
+      taskType: 'presentation_production',
+    },
+    document_production: {
+      missionClass: 'content_and_media',
+      intentId: 'document-authoring',
+      taskType: 'document_production',
+    },
+    incident_analysis: {
+      missionClass: 'operations_and_release',
+      intentId: 'incident-analysis',
+      taskType: 'incident_analysis',
+    },
+    research_report: {
+      missionClass: 'research_and_absorption',
+      intentId: 'research-report',
+      taskType: 'research_report',
+    },
+    data_analysis: {
+      missionClass: 'decision_support',
+      intentId: 'data-analysis',
+      taskType: 'data_analysis',
+    },
+    marketing_campaign: {
+      missionClass: 'content_and_media',
+      intentId: 'marketing-campaign',
+      taskType: 'marketing_campaign',
+    },
+    contract_review: {
+      missionClass: 'decision_support',
+      intentId: 'contract-review',
+      taskType: 'contract_review',
+    },
+    customer_onboarding: {
+      missionClass: 'customer_engagement',
+      intentId: 'customer-onboarding',
+      taskType: 'customer_onboarding',
+    },
+    training_material: {
+      missionClass: 'content_and_media',
+      intentId: 'training-material',
+      taskType: 'training_material',
+    },
+    event_planning: {
+      missionClass: 'operations_and_release',
+      deliveryShape: 'multi_artifact_pipeline',
+      intentId: 'event-planning',
+      taskType: 'event_planning',
+    },
+  };
+  const hint = missionTypeHint ? hintDefaults[missionTypeHint] : undefined;
   const normalizedInput = {
-    missionClass: normalize(input.missionClass) || 'code_change',
+    missionClass: normalize(input.missionClass) || hint?.missionClass || 'code_change',
     deliveryShape:
       normalize(input.deliveryShape) ||
+      hint?.deliveryShape ||
       (meetingFacilitationHint ? 'multi_artifact_pipeline' : 'single_artifact'),
     riskProfile: normalize(input.riskProfile) || 'review_required',
     executionShape: projectedExecutionShape,
-    intentId:
-      normalize(input.intentId) || (meetingFacilitationHint ? 'meeting-operations' : undefined),
-    taskType:
-      normalize(input.taskType) || (meetingFacilitationHint ? 'meeting_operations' : undefined),
+    intentId: normalize(input.intentId) || hint?.intentId,
+    taskType: normalize(input.taskType) || hint?.taskType,
   };
 
   const selected =
@@ -170,11 +304,13 @@ export function resolveMissionWorkflowDesign(
     throw new Error(`Missing default workflow template: ${catalog.defaults.workflow_id}`);
   }
 
+  const { ids, specs, hasSpecEntries } = normalizeWorkflowPhases(selected.phases);
   return {
     workflow_id: selected.id,
     pattern: selected.pattern,
     stage: input.stage,
-    phases: selected.phases,
+    phases: ids,
+    ...(hasSpecEntries ? { phase_specs: specs } : {}),
     rationale:
       selected.description ||
       `Selected workflow ${selected.id} by mission classification and execution shape.`,

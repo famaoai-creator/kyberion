@@ -349,6 +349,32 @@
         width: 100%;
         min-width: 0;
       }
+      .capability-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+        gap: 12px;
+      }
+      .capability-card {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 14px;
+        border-radius: 16px;
+        border: 1px solid var(--panel-border);
+        background: var(--kb-panel-bg, rgba(15, 23, 42, 0.04));
+      }
+      .capability-title {
+        font-weight: 700;
+        font-size: 14px;
+      }
+      .capability-desc {
+        font-size: 12px;
+        color: var(--kb-text-secondary, rgba(15, 23, 42, 0.62));
+        flex: 1;
+      }
+      .capability-card .button {
+        width: 100%;
+      }
       .panel {
         background: var(--panel);
         border: 1px solid var(--panel-border);
@@ -702,12 +728,13 @@
       }
     </style>
     <link rel="stylesheet" href="./design-system.css" />
+    <link rel="stylesheet" href="/api/design-tokens.css" />
   </head>
   <body>
     <div class="shell">
       <div class="header">
         <div>
-          <div class="eyebrow">Kyberion Design System</div>
+          <div class="eyebrow">相棒 — いっしょに作業するワークベンチ</div>
           <h1 id="title">Presence Studio</h1>
         </div>
         <div class="header-meta">
@@ -737,11 +764,33 @@
         <button id="first-run-close" class="first-run-close" aria-label="Dismiss first run banner">×</button>
       </div>
       <div class="panel quick-actions" style="margin-top: 18px;">
-        <div class="label">Shortcuts</div>
-        <div class="quick-actions-grid">
-          <button class="button" id="quick-action-minutes" type="button">Minutes</button>
-          <button class="button" id="quick-action-email" type="button">Draft</button>
-          <button class="button" id="quick-action-browser" type="button">Browser</button>
+        <div class="label">できること</div>
+        <div class="capability-grid">
+          <div class="capability-card">
+            <div class="capability-title">📝 議事録</div>
+            <div class="capability-desc">口述やマイク録音から議事録とアクションアイテムを作ります。</div>
+            <button class="button" id="quick-action-minutes" type="button">議事録をつくる</button>
+          </div>
+          <div class="capability-card">
+            <div class="capability-title">✉️ メール</div>
+            <div class="capability-desc">受信メールのトリアージと返信ドラフト、送信まで。</div>
+            <button class="button" id="quick-action-email" type="button">ドラフトする</button>
+          </div>
+          <div class="capability-card">
+            <div class="capability-title">🌐 ブラウザ</div>
+            <div class="capability-desc">調べもの・予約・フォーム入力をブラウザで代行します。</div>
+            <button class="button" id="quick-action-browser" type="button">ブラウザで進める</button>
+          </div>
+          <div class="capability-card">
+            <div class="capability-title">✅ 承認</div>
+            <div class="capability-desc">承認待ちの案件をその場で判断できます。</div>
+            <button class="button" type="button" onclick="document.getElementById('approval-panel')?.scrollIntoView({behavior:'smooth'})">承認キューへ</button>
+          </div>
+          <div class="capability-card">
+            <div class="capability-title">🧰 タスク</div>
+            <div class="capability-desc">依頼中の作業の進捗と成果物を確認できます。</div>
+            <button class="button" type="button" onclick="document.getElementById('requested-work-panel')?.scrollIntoView({behavior:'smooth'})">作業状況へ</button>
+          </div>
         </div>
       </div>
       <div class="grid" style="margin-top: 22px;">
@@ -777,6 +826,16 @@
         </section>
       </div>
       <div class="grid" style="margin-top: 18px;">
+        <section class="panel" id="minutes-record-panel">
+          <div class="label">会議を記録（マイク → 自動議事録）</div>
+          <div class="controls" style="margin-top: 8px;">
+            <input class="text-input" id="minutes-record-mission" type="text" placeholder="ミッションID（例: MSN-MTG-001）" />
+            <button class="button" id="minutes-record-start" type="button">🎙️ 会議を記録</button>
+            <button class="button button-ghost" id="minutes-record-stop" type="button" disabled>⏹ 停止して議事録化</button>
+          </div>
+          <div id="minutes-live-transcript" class="artifact-view" style="margin-top: 12px; max-height: 180px; overflow-y: auto;" aria-live="polite"></div>
+          <div class="hint" id="minutes-record-hint">録音には voice consent（pnpm meeting:consent grant --mission &lt;ID&gt;）が必要です。停止すると minutes.md とアクションアイテムを自動生成します。</div>
+        </section>
         <section class="panel" id="minutes-panel">
           <div class="label">Dictation Notes</div>
           <textarea id="dictation-notes" class="notes-area" spellcheck="false" placeholder="Use Notes Capture with the browser mic, or paste text here before generating minutes."></textarea>
@@ -3160,6 +3219,36 @@
           // Ignore malformed speech-state events.
         }
       });
+      source.addEventListener("minutes-transcript", (event) => {
+        try {
+          const chunk = JSON.parse(event.data);
+          const view = document.getElementById("minutes-live-transcript");
+          if (view && chunk?.text) {
+            const line = document.createElement("div");
+            line.textContent = `[${chunk.segment}] ${chunk.text}`;
+            view.appendChild(line);
+            view.scrollTop = view.scrollHeight;
+          }
+        } catch (_) {
+          // ignore
+        }
+      });
+      source.addEventListener("minutes-session", (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          const hint = document.getElementById("minutes-record-hint");
+          if (!hint) return;
+          if (payload?.status === "recording") {
+            hint.textContent = `録音中（${payload.missionId}）… Stop を押すと議事録を生成します。`;
+          } else if (payload?.status === "completed") {
+            hint.textContent = payload.minutesPath
+              ? `議事録を生成しました: ${payload.minutesPath}（セグメント${payload.segments}件）`
+              : `録音を終了しました（音声が短すぎたため議事録は未生成です）。`;
+          }
+        } catch (_) {
+          // ignore
+        }
+      });
       setInterval(() => {
         const statePromise = latestState
           ? Promise.resolve(latestState)
@@ -3254,6 +3343,49 @@
         }
       });
       quickActionMinutesEl?.addEventListener("click", () => focusSection(minutesPanelEl, minutesTitleEl));
+      const minutesRecordMissionEl = document.getElementById("minutes-record-mission");
+      const minutesRecordStartEl = document.getElementById("minutes-record-start");
+      const minutesRecordStopEl = document.getElementById("minutes-record-stop");
+      const minutesRecordHintEl = document.getElementById("minutes-record-hint");
+      minutesRecordStartEl?.addEventListener("click", async () => {
+        const missionId = (minutesRecordMissionEl?.value || "").trim();
+        if (!missionId) {
+          minutesRecordHintEl.textContent = "ミッションIDを入力してください（録音の保存先になります）。";
+          return;
+        }
+        minutesRecordStartEl.disabled = true;
+        try {
+          const res = await fetch("/api/minutes/session/start", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ missionId }),
+          });
+          const body = await res.json();
+          if (!res.ok || !body.ok) throw new Error(body.error || "録音を開始できませんでした");
+          document.getElementById("minutes-live-transcript").textContent = "";
+          minutesRecordStopEl.disabled = false;
+          minutesRecordHintEl.textContent = `録音中（${body.missionId} / ${body.backend}）… 発話が文字起こしされ次第ここに表示されます。`;
+        } catch (err) {
+          minutesRecordStartEl.disabled = false;
+          minutesRecordHintEl.textContent = String(err && err.message ? err.message : err);
+        }
+      });
+      minutesRecordStopEl?.addEventListener("click", async () => {
+        minutesRecordStopEl.disabled = true;
+        minutesRecordHintEl.textContent = "録音を終了し、議事録を生成しています…";
+        try {
+          const res = await fetch("/api/minutes/session/stop", { method: "POST" });
+          const body = await res.json();
+          if (!res.ok || !body.ok) throw new Error(body.error || "議事録の生成に失敗しました");
+          minutesRecordHintEl.textContent = body.minutesPath
+            ? `議事録を生成しました: ${body.minutesPath}（セグメント${body.segments}件）`
+            : "録音を終了しました（音声が短すぎたため議事録は未生成です）。";
+        } catch (err) {
+          minutesRecordHintEl.textContent = String(err && err.message ? err.message : err);
+        } finally {
+          minutesRecordStartEl.disabled = false;
+        }
+      });
       quickActionEmailEl?.addEventListener("click", () => focusSection(emailPanelEl, emailDraftToEl));
       quickActionBrowserEl?.addEventListener("click", () => focusSection(browserPanelEl, browserSessionSelectEl));
       firstRunVoiceBtn?.addEventListener("click", () => focusSection(voicePanelEl, pttToggleEl));

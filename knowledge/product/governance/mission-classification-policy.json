@@ -26,6 +26,230 @@
       "mission_class": "environment_and_recovery"
     },
     {
+      "id": "class-content-media-presentation-hint",
+      "match": {
+        "mission_type_hints": ["presentation_production", "document_production"]
+      },
+      "mission_class": "content_and_media"
+    },
+    {
+      "id": "class-content-media-presentation-intent",
+      "match": {
+        "intent_ids": [
+          "presentation-deck",
+          "proposal-deck",
+          "generate-presentation-deck",
+          "presentation-production",
+          "document-authoring",
+          "authoring-document",
+          "write-report",
+          "write-document"
+        ]
+      },
+      "mission_class": "content_and_media"
+    },
+    {
+      "id": "class-content-media-presentation-utterance",
+      "match": {
+        "utterance_patterns": [
+          "プレゼン",
+          "スライド",
+          "提案書",
+          "資料作成",
+          "パワーポイント",
+          "pptx"
+        ]
+      },
+      "mission_class": "content_and_media"
+    },
+    {
+      "id": "class-operations-incident-analysis-hint",
+      "match": {
+        "mission_type_hints": ["incident_analysis"]
+      },
+      "mission_class": "operations_and_release"
+    },
+    {
+      "id": "class-operations-incident-analysis-intent",
+      "match": {
+        "intent_ids": [
+          "incident-analysis",
+          "post-mortem",
+          "incident-post-mortem",
+          "incident-investigation"
+        ]
+      },
+      "mission_class": "operations_and_release"
+    },
+    {
+      "id": "class-research-report-hint",
+      "match": {
+        "mission_type_hints": ["research_report"]
+      },
+      "mission_class": "research_and_absorption"
+    },
+    {
+      "id": "class-research-report-intent",
+      "match": {
+        "intent_ids": [
+          "research-report",
+          "market-research",
+          "competitive-research",
+          "deep-research",
+          "research-investigation"
+        ]
+      },
+      "mission_class": "research_and_absorption"
+    },
+    {
+      "id": "class-research-report-utterance",
+      "match": {
+        "utterance_patterns": ["市場調査", "競合調査", "調査レポート", "リサーチレポート"]
+      },
+      "mission_class": "research_and_absorption"
+    },
+    {
+      "id": "class-data-analysis-hint",
+      "match": {
+        "mission_type_hints": ["data_analysis"]
+      },
+      "mission_class": "decision_support"
+    },
+    {
+      "id": "class-data-analysis-intent",
+      "match": {
+        "intent_ids": ["data-analysis", "data-analysis-report", "analyze-data", "kpi-analysis"]
+      },
+      "mission_class": "decision_support"
+    },
+    {
+      "id": "class-data-analysis-utterance",
+      "match": {
+        "utterance_patterns": ["データ分析", "KPI分析", "データを分析"]
+      },
+      "mission_class": "decision_support"
+    },
+    {
+      "id": "class-marketing-hint",
+      "match": {
+        "mission_type_hints": ["marketing_campaign"]
+      },
+      "mission_class": "content_and_media"
+    },
+    {
+      "id": "class-marketing-intent",
+      "match": {
+        "intent_ids": [
+          "marketing-campaign",
+          "campaign-launch",
+          "marketing-content",
+          "marketing-strategy"
+        ]
+      },
+      "mission_class": "content_and_media"
+    },
+    {
+      "id": "class-marketing-utterance",
+      "match": {
+        "utterance_patterns": ["キャンペーン", "マーケティング施策"]
+      },
+      "mission_class": "content_and_media"
+    },
+    {
+      "id": "class-contract-review-hint",
+      "match": {
+        "mission_type_hints": ["contract_review"]
+      },
+      "mission_class": "decision_support"
+    },
+    {
+      "id": "class-contract-review-intent",
+      "match": {
+        "intent_ids": [
+          "contract-review",
+          "legal-review",
+          "contract-negotiation",
+          "review-agreement"
+        ]
+      },
+      "mission_class": "decision_support"
+    },
+    {
+      "id": "class-contract-review-utterance",
+      "match": {
+        "utterance_patterns": ["契約レビュー", "契約書の確認", "契約書をレビュー"]
+      },
+      "mission_class": "decision_support"
+    },
+    {
+      "id": "class-customer-onboarding-hint",
+      "match": {
+        "mission_type_hints": ["customer_onboarding"]
+      },
+      "mission_class": "customer_engagement"
+    },
+    {
+      "id": "class-customer-onboarding-intent",
+      "match": {
+        "intent_ids": ["customer-onboarding", "onboarding-plan", "client-onboarding"]
+      },
+      "mission_class": "customer_engagement"
+    },
+    {
+      "id": "class-customer-onboarding-utterance",
+      "match": {
+        "utterance_patterns": ["顧客オンボーディング", "オンボーディング計画"]
+      },
+      "mission_class": "customer_engagement"
+    },
+    {
+      "id": "class-training-material-hint",
+      "match": {
+        "mission_type_hints": ["training_material"]
+      },
+      "mission_class": "content_and_media"
+    },
+    {
+      "id": "class-training-material-intent",
+      "match": {
+        "intent_ids": [
+          "training-material",
+          "course-authoring",
+          "workshop-material",
+          "education-content"
+        ]
+      },
+      "mission_class": "content_and_media"
+    },
+    {
+      "id": "class-training-material-utterance",
+      "match": {
+        "utterance_patterns": ["研修資料", "教材作成", "トレーニング資料"]
+      },
+      "mission_class": "content_and_media"
+    },
+    {
+      "id": "class-event-planning-hint",
+      "match": {
+        "mission_type_hints": ["event_planning"]
+      },
+      "mission_class": "operations_and_release"
+    },
+    {
+      "id": "class-event-planning-intent",
+      "match": {
+        "intent_ids": ["event-planning", "event-operations", "seminar-planning", "webinar-planning"]
+      },
+      "mission_class": "operations_and_release"
+    },
+    {
+      "id": "class-event-planning-utterance",
+      "match": {
+        "utterance_patterns": ["イベント企画", "セミナー開催", "ウェビナー"]
+      },
+      "mission_class": "operations_and_release"
+    },
+    {
       "id": "class-environment-recovery-utterance",
       "match": {
         "utterance_patterns": ["recover", "recovery", "resume", "復旧", "再開"]
@@ -349,6 +573,20 @@
     }
   ],
   "delivery_shape_rules": [
+    {
+      "id": "delivery-event-planning-multi",
+      "match": {
+        "mission_type_hints": ["event_planning"]
+      },
+      "delivery_shape": "multi_artifact_pipeline"
+    },
+    {
+      "id": "delivery-event-planning-intent",
+      "match": {
+        "intent_ids": ["event-planning", "event-operations", "seminar-planning", "webinar-planning"]
+      },
+      "delivery_shape": "multi_artifact_pipeline"
+    },
     {
       "id": "delivery-interactive-exploration",
       "match": {

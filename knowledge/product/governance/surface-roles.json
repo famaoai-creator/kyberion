@@ -1,0 +1,66 @@
+{
+  "version": "1.0.0",
+  "description": "UI サーフェスの役割定義。各サーフェスは1つの明確な役割を持ち、ヘッダに tagline_ja を表示する。surface-responsibility-model.md / docs/SURFACES.md と対応。",
+  "roles": [
+    {
+      "id": "concierge",
+      "name_ja": "秘書室",
+      "name_en": "Concierge",
+      "role_ja": "CEO秘書",
+      "tagline_ja": "CEO秘書 — 依頼・承認・成果・例外",
+      "metaphor": "executive secretary",
+      "dir": "presence/displays/concierge",
+      "port": 3050,
+      "writes": "scoped",
+      "enabled": true
+    },
+    {
+      "id": "presence-studio",
+      "name_ja": "スタジオ",
+      "name_en": "Presence Studio",
+      "role_ja": "相棒",
+      "tagline_ja": "相棒 — いっしょに作業するワークベンチ",
+      "metaphor": "companion (Doraemon / R2-D2)",
+      "dir": "presence/displays/presence-studio",
+      "port": 3031,
+      "writes": "full",
+      "enabled": true
+    },
+    {
+      "id": "chronos-mirror-v2",
+      "name_ja": "管制塔",
+      "name_en": "Chronos Mirror",
+      "role_ja": "管制塔",
+      "tagline_ja": "管制塔 — 実行状態の監視と介入",
+      "metaphor": "control tower",
+      "dir": "presence/displays/chronos-mirror-v2",
+      "port": 3000,
+      "writes": "scoped",
+      "enabled": true
+    },
+    {
+      "id": "operator-surface",
+      "name_ja": "監査モニタ",
+      "name_en": "Operator Surface",
+      "role_ja": "監査モニタ",
+      "tagline_ja": "監査モニタ（読み取り専用）",
+      "metaphor": "audit monitor",
+      "dir": "presence/displays/operator-surface",
+      "port": 3331,
+      "writes": "none",
+      "enabled": true
+    },
+    {
+      "id": "computer-surface",
+      "name_ja": "手元ミラー",
+      "name_en": "Computer Surface",
+      "role_ja": "作業の手元ミラー",
+      "tagline_ja": "作業の手元ミラー — ブラウザ/ターミナルの現在の手元",
+      "metaphor": "hands mirror",
+      "dir": "presence/displays/computer-surface",
+      "port": 3040,
+      "writes": "none",
+      "enabled": true
+    }
+  ]
+}
