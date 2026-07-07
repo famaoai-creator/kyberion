@@ -25,6 +25,7 @@ import {
   checkActuatorCapabilities,
   killSwitch,
   validateOpInput,
+  resolveIdentityContext,
 } from '@agent/core';
 import { tryRepairJson } from '@agent/core/json-repair';
 import { installPythonVoiceBridgeIfAvailable } from '@agent/core/python-voice-bridge';
@@ -1415,6 +1416,15 @@ Once finished, provide a brief summary of the changes you applied to fix the pip
   }
 }
 export async function main() {
+  // Propagate resolved identity to process.env so spawned subprocesses inherit them.
+  const identity = resolveIdentityContext();
+  if (identity.role && !process.env.MISSION_ROLE) {
+    process.env.MISSION_ROLE = identity.role;
+  }
+  if (identity.persona && !process.env.KYBERION_PERSONA) {
+    process.env.KYBERION_PERSONA = identity.persona;
+  }
+
   // Bootstrap reasoning + voice backends before any actuator dispatch.
   installReasoningBackends();
   installPythonVoiceBridgeIfAvailable();

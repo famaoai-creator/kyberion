@@ -9,9 +9,7 @@
       "base_url": "https://{{space}}.backlog.com/api/v2",
       "preset_path": "knowledge/product/orchestration/service-presets/backlog.json",
       "credential_suffixes": {
-        "accessToken": [
-          "API_KEY"
-        ]
+        "accessToken": ["API_KEY"]
       }
     },
     "brave-search": {
@@ -61,24 +59,15 @@
     "m365": {
       "preset_path": "knowledge/product/orchestration/service-presets/m365.json",
       "allow_unsafe_cli": true,
-      "intent_aliases": [
-        "outlook_calendar"
-      ]
+      "intent_aliases": ["outlook_calendar"]
     },
     "media-generation": {
       "preset_path": "knowledge/product/orchestration/service-presets/media-generation.json",
-      "intent_aliases": [
-        "generate-video",
-        "generate-image",
-        "generate-music"
-      ]
+      "intent_aliases": ["generate-video", "generate-image", "generate-music"]
     },
     "meeting": {
       "preset_path": "knowledge/product/orchestration/service-presets/meeting.json",
-      "intent_aliases": [
-        "meeting-operations",
-        "live-voice"
-      ]
+      "intent_aliases": ["meeting-operations", "live-voice"]
     },
     "moltbook": {
       "base_url": "https://www.moltbook.com/api/v1"
@@ -91,9 +80,7 @@
       "base_url": "{{paper2any_base_url}}",
       "preset_path": "knowledge/product/orchestration/service-presets/paper2any.json",
       "credential_suffixes": {
-        "baseUrl": [
-          "PAPER2ANY_BASE_URL"
-        ]
+        "baseUrl": ["PAPER2ANY_BASE_URL"]
       }
     },
     "slack": {
@@ -101,14 +88,8 @@
       "preset_path": "knowledge/product/orchestration/service-presets/slack.json",
       "allow_stream_ingress": false,
       "credential_suffixes": {
-        "accessToken": [
-          "ACCESS_TOKEN",
-          "BOT_TOKEN",
-          "TOKEN"
-        ],
-        "appToken": [
-          "APP_TOKEN"
-        ]
+        "accessToken": ["ACCESS_TOKEN", "BOT_TOKEN", "TOKEN"],
+        "appToken": ["APP_TOKEN"]
       }
     },
     "smoke-test": {
@@ -135,44 +116,24 @@
     },
     "voice": {
       "preset_path": "knowledge/product/orchestration/service-presets/voice.json",
-      "intent_aliases": [
-        "speak-with-my-voice",
-        "live-voice"
-      ]
+      "intent_aliases": ["speak-with-my-voice", "live-voice"]
     },
     "whisper": {
       "preset_path": "knowledge/product/orchestration/service-presets/whisper.json",
-      "intent_aliases": [
-        "transcribe-audio",
-        "live-voice"
-      ]
+      "intent_aliases": ["transcribe-audio", "live-voice"]
     },
     "x-docs": {
       "preset_path": "knowledge/product/orchestration/service-presets/x-docs.json",
-      "intent_aliases": [
-        "x-documentation",
-        "x-api-docs",
-        "x-mcp-docs"
-      ]
+      "intent_aliases": ["x-documentation", "x-api-docs", "x-mcp-docs"]
     },
     "xapi": {
       "preset_path": "knowledge/product/orchestration/service-presets/xapi.json",
       "allow_unsafe_cli": true,
-      "intent_aliases": [
-        "social-post-search",
-        "x-search",
-        "twitter-search"
-      ],
+      "intent_aliases": ["social-post-search", "x-search", "twitter-search"],
       "credential_suffixes": {
-        "clientId": [
-          "CLIENT_ID"
-        ],
-        "clientSecret": [
-          "CLIENT_SECRET"
-        ],
-        "redirectUri": [
-          "REDIRECT_URI"
-        ]
+        "clientId": ["CLIENT_ID"],
+        "clientSecret": ["CLIENT_SECRET"],
+        "redirectUri": ["REDIRECT_URI"]
       }
     },
     "youtube": {
@@ -181,6 +142,11 @@
     "zendesk": {
       "base_url": "https://{{subdomain}}.zendesk.com/api/v2",
       "preset_path": "knowledge/product/orchestration/service-presets/zendesk.json"
+    },
+    "video-analysis": {
+      "preset_path": "knowledge/product/orchestration/service-presets/video-analysis.json",
+      "allow_unsafe_cli": true,
+      "intent_aliases": ["analyze-video", "extract-keyframes"]
     }
   }
 }

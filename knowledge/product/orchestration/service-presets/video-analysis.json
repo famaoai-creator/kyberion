@@ -1,0 +1,24 @@
+{
+  "service_id": "video-analysis",
+  "name": "Kyberion Video Keyframe and Narrative Analysis Service",
+  "operations": {
+    "analyze_video": {
+      "type": "cli",
+      "command": "python3",
+      "args": [
+        "-m",
+        "claude_real_video",
+        "{{source}}",
+        "-o",
+        "{{out}}",
+        "--grid",
+        "--viewer",
+        "{{extra_args}}"
+      ],
+      "env": {
+        "PYTHONPATH": "/Users/famao/forcheck/claude-real-video/src"
+      },
+      "description": "Run local video analysis using the claude-real-video (crv) package"
+    }
+  }
+}
