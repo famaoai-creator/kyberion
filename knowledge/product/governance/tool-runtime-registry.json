@@ -234,6 +234,34 @@
       },
       "managed_env_subpath": "tool-runtimes/claude-real-video",
       "notes": "Video analysis tool for keyframe and transcription extraction. Installed locally via uv pip from the sibling directory."
+    },
+    {
+      "tool_id": "kling",
+      "display_name": "Kling AI CLI",
+      "ecosystem": "system",
+      "status": "active",
+      "platforms": ["any"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "trial_backend": {
+        "kind": "system",
+        "command": "kling",
+        "args": ["who_am_i"],
+        "description": "Probe Kling CLI availability without Mutation"
+      },
+      "install_backend": {
+        "kind": "npm",
+        "command": "npm",
+        "args": ["install", "-g", "@klingai/cli-global", "--registry=https://registry.npmjs.org"],
+        "description": "Install global Kling AI CLI via npm"
+      },
+      "installed_backend": {
+        "kind": "system",
+        "command": "kling",
+        "args": ["who_am_i"],
+        "description": "Probe installed Kling CLI"
+      },
+      "managed_env_subpath": "tool-runtimes/kling",
+      "notes": "Official Kling AI CLI for image/video generation. Handled globally via npm global install."
     }
   ]
 }

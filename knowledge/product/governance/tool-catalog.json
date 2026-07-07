@@ -1,0 +1,132 @@
+{
+  "version": "1.0.0",
+  "tools": {
+    "read_file": {
+      "name": "read_file",
+      "description": "Read the contents of a file within the Kyberion workspace.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": { "type": "string", "description": "Relative path from project root" }
+        },
+        "required": ["path"]
+      }
+    },
+    "write_file": {
+      "name": "write_file",
+      "description": "Write or overwrite a file in the Kyberion workspace.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": { "type": "string", "description": "Relative path from project root" },
+          "content": { "type": "string", "description": "String content to write" }
+        },
+        "required": ["path", "content"]
+      }
+    },
+    "list_directory": {
+      "name": "list_directory",
+      "description": "List the contents of a directory within the Kyberion workspace.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": { "type": "string", "description": "Relative path from project root" }
+        },
+        "required": ["path"]
+      }
+    },
+    "shell_exec": {
+      "name": "shell_exec",
+      "description": "Execute a shell command within the governed workspace.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "command": { "type": "string", "description": "Shell command to execute" }
+        },
+        "required": ["command"]
+      }
+    },
+    "get_project_status": {
+      "name": "get_project_status",
+      "description": "Get the current status and metadata for a Kyberion project.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_id": { "type": "string", "description": "The project identifier" }
+        },
+        "required": ["project_id"]
+      }
+    },
+    "get_mission_context": {
+      "name": "get_mission_context",
+      "description": "Retrieve the full context and current state of a mission, including its current phase, outcomes, and active tasks.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mission_id": { "type": "string", "description": "The mission identifier" }
+        },
+        "required": ["mission_id"]
+      }
+    },
+    "list_active_missions": {
+      "name": "list_active_missions",
+      "description": "List all currently active missions for an organization or project.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_id": { "type": "string", "description": "Filter by project ID (optional)" },
+          "limit": { "type": "number", "description": "Maximum number of missions to return" }
+        },
+        "required": []
+      }
+    },
+    "get_outcome_status": {
+      "name": "get_outcome_status",
+      "description": "Get the current status of a specific outcome within a mission.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mission_id": { "type": "string", "description": "The mission identifier" },
+          "outcome_id": { "type": "string", "description": "The outcome identifier" }
+        },
+        "required": ["mission_id", "outcome_id"]
+      }
+    },
+    "create_artifact": {
+      "name": "create_artifact",
+      "description": "Create a new artifact document within a mission's evidence store.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mission_id": { "type": "string", "description": "The mission identifier" },
+          "artifact_type": {
+            "type": "string",
+            "description": "Type of artifact (e.g. report, analysis, draft)"
+          },
+          "content": { "type": "string", "description": "Artifact content as a string" },
+          "filename": {
+            "type": "string",
+            "description": "Target filename under the mission evidence directory"
+          }
+        },
+        "required": ["mission_id", "artifact_type", "content", "filename"]
+      }
+    },
+    "search_knowledge": {
+      "name": "search_knowledge",
+      "description": "Search across the Kyberion knowledge base for relevant documents, policies, or past decisions.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": { "type": "string", "description": "Search query" },
+          "scope": {
+            "type": "string",
+            "enum": ["product", "personal", "all"],
+            "description": "Which knowledge scope to search"
+          }
+        },
+        "required": ["query"]
+      }
+    }
+  }
+}

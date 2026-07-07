@@ -30,6 +30,9 @@
       "base_url": "https://discord.com/api/v10",
       "preset_path": "knowledge/product/orchestration/service-presets/discord.json"
     },
+    "kling": {
+      "preset_path": "knowledge/product/orchestration/service-presets/kling.json"
+    },
     "github": {
       "base_url": "https://api.github.com",
       "preset_path": "knowledge/product/orchestration/service-presets/github.json"
@@ -142,11 +145,6 @@
     "zendesk": {
       "base_url": "https://{{subdomain}}.zendesk.com/api/v2",
       "preset_path": "knowledge/product/orchestration/service-presets/zendesk.json"
-    },
-    "video-analysis": {
-      "preset_path": "knowledge/product/orchestration/service-presets/video-analysis.json",
-      "allow_unsafe_cli": true,
-      "intent_aliases": ["analyze-video", "extract-keyframes"]
     }
   }
 }

@@ -1,0 +1,72 @@
+{
+  "service_id": "kling",
+  "name": "Kling AI CLI Service Presets",
+  "operations": {
+    "generate_video": {
+      "type": "cli",
+      "command": "kling",
+      "args": [
+        "text_to_video",
+        "{{prompt}}",
+        "--model",
+        "{{model}}",
+        "--poll",
+        "300",
+        "{{extra_args}}"
+      ],
+      "description": "Generate a video from text using local kling CLI"
+    },
+    "image_to_video": {
+      "type": "cli",
+      "command": "kling",
+      "args": [
+        "image_to_video",
+        "--image",
+        "{{image}}",
+        "{{prompt}}",
+        "--model",
+        "{{model}}",
+        "--poll",
+        "300",
+        "{{extra_args}}"
+      ],
+      "description": "Generate a video from an image using local kling CLI"
+    },
+    "generate_image": {
+      "type": "cli",
+      "command": "kling",
+      "args": [
+        "text_to_image",
+        "{{prompt}}",
+        "--model",
+        "{{model}}",
+        "--poll",
+        "120",
+        "{{extra_args}}"
+      ],
+      "description": "Generate an image from text using local kling CLI"
+    },
+    "image_to_image": {
+      "type": "cli",
+      "command": "kling",
+      "args": [
+        "image_to_image",
+        "--image",
+        "{{image}}",
+        "{{prompt}}",
+        "--model",
+        "{{model}}",
+        "--poll",
+        "120",
+        "{{extra_args}}"
+      ],
+      "description": "Generate an image from an image using local kling CLI"
+    },
+    "who_am_i": {
+      "type": "cli",
+      "command": "kling",
+      "args": ["who_am_i"],
+      "description": "Get Kling user information and available models"
+    }
+  }
+}

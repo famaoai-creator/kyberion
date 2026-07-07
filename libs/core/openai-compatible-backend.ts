@@ -23,6 +23,8 @@ import type {
   ExtractedTestPlan,
   DecomposeIntoTasksInput,
   DecomposedTaskPlan,
+  ToolDefinition,
+  GenerateWithToolsResult,
 } from './reasoning-backend.js';
 import { runStructuredReasoningOp, structuredReasoningSpecs } from './structured-reasoning.js';
 
@@ -52,6 +54,7 @@ type ChatRole = 'system' | 'user' | 'assistant' | 'tool';
 interface ChatMessage {
   role: ChatRole;
   content?: string | null;
+  reasoning_content?: string;
   tool_call_id?: string;
   tool_calls?: Array<{
     id: string;
@@ -75,6 +78,10 @@ interface ChatCompletionRequest {
     };
   }>;
   tool_choice?: 'auto' | 'none';
+  chat_template_kwargs?: Record<string, any>;
+  reasoning_budget?: number;
+  max_tokens?: number;
+  [key: string]: any;
 }
 
 interface ChatCompletionResponse {
@@ -94,7 +101,12 @@ function normalizeBaseUrl(baseURL: string): string {
 
 function isLocalHost(hostname: string): boolean {
   const normalized = hostname.toLowerCase();
-  if (normalized === 'localhost' || normalized === '0.0.0.0' || normalized === '::' || normalized === '::1') {
+  if (
+    normalized === 'localhost' ||
+    normalized === '0.0.0.0' ||
+    normalized === '::' ||
+    normalized === '::1'
+  ) {
     return true;
   }
   if (/^127\.\d+\.\d+\.\d+$/.test(normalized)) return true;
@@ -111,7 +123,9 @@ function assertLocalCompatibleEndpoint(baseURL: string): URL {
     throw new Error(`Unsupported local LLM protocol: ${url.protocol}`);
   }
   if (!isLocalHost(url.hostname)) {
-    throw new Error(`Local LLM endpoint must resolve to localhost or a private address: ${url.hostname}`);
+    throw new Error(
+      `Local LLM endpoint must resolve to localhost or a private address: ${url.hostname}`
+    );
   }
   return url;
 }
@@ -222,7 +236,7 @@ function firstConfiguredEnv(env: NodeJS.ProcessEnv, keys: string[]): string | un
 
 function buildBackendFromEnvNames(
   env: NodeJS.ProcessEnv,
-  names: OpenAiCompatibleBackendEnvNames,
+  names: OpenAiCompatibleBackendEnvNames
 ): OpenAiCompatibleBackend | null {
   const baseURL = firstConfiguredEnv(env, names.baseURL);
   if (!baseURL) return null;
@@ -234,7 +248,7 @@ function buildBackendFromEnvNames(
 async function probeBackendAvailabilityFromEnvNames(
   env: NodeJS.ProcessEnv,
   names: OpenAiCompatibleBackendEnvNames,
-  options: { allowPublicEndpoint: boolean },
+  options: { allowPublicEndpoint: boolean }
 ): Promise<OpenAiCompatibleBackendAvailability> {
   const baseURL = firstConfiguredEnv(env, names.baseURL);
   if (!baseURL) {
@@ -245,7 +259,9 @@ async function probeBackendAvailabilityFromEnvNames(
   }
 
   try {
-    const url = options.allowPublicEndpoint ? assertHttpEndpoint(baseURL) : assertLocalCompatibleEndpoint(baseURL);
+    const url = options.allowPublicEndpoint
+      ? assertHttpEndpoint(baseURL)
+      : assertLocalCompatibleEndpoint(baseURL);
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 4_000);
     try {
@@ -260,7 +276,10 @@ async function probeBackendAvailabilityFromEnvNames(
         headers,
       });
       if (!response.ok) {
-        return { available: false, reason: `${names.probeLabel} probe returned HTTP ${response.status}` };
+        return {
+          available: false,
+          reason: `${names.probeLabel} probe returned HTTP ${response.status}`,
+        };
       }
       return { available: true };
     } finally {
@@ -287,7 +306,7 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
 
   private async fetchChatCompletion(
     messages: ChatMessage[],
-    opts: { useTools?: boolean } = {},
+    opts: { useTools?: boolean } = {}
   ): Promise<ChatCompletionResponse> {
     const headers: Record<string, string> = {
       'content-type': 'application/json',
@@ -296,11 +315,18 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
       headers.authorization = `Bearer ${this.apiKey}`;
     }
 
+    const isNemotron = this.model.startsWith('nvidia/') || this.baseURL.includes('api.nvidia.com');
     const body: ChatCompletionRequest = {
       model: this.model,
       messages: redactSensitiveObject(messages),
-      ...(opts.useTools ?? true ? { tools: createToolDefinitions(), tool_choice: 'auto' } : {}),
+      ...((opts.useTools ?? true) ? { tools: createToolDefinitions(), tool_choice: 'auto' } : {}),
     };
+
+    if (isNemotron) {
+      body.chat_template_kwargs = { enable_thinking: true };
+      body.reasoning_budget = 16384;
+      body.max_tokens = 16384;
+    }
 
     const response = await fetch(joinEndpoint(this.baseURL, 'chat/completions'), {
       method: 'POST',
@@ -316,8 +342,16 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
       throw new Error(`[openai-compatible] chat completion failed: ${message}`);
     }
     if (!parsed || !parsed.choices || parsed.choices.length === 0) {
-      throw new Error(`[openai-compatible] invalid chat completion response: ${text.slice(0, 500)}`);
+      throw new Error(
+        `[openai-compatible] invalid chat completion response: ${text.slice(0, 500)}`
+      );
     }
+
+    const firstMessage = parsed.choices[0].message;
+    if (firstMessage && firstMessage.reasoning_content) {
+      logger.info(`[NEMOTRON THINKING]:\n${firstMessage.reasoning_content}\n`);
+    }
+
     return parsed;
   }
 
@@ -330,12 +364,17 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
         case 'read_file':
           return String(safeReadFile(String(args.path ?? '')));
         case 'write_file':
-          safeWriteFile(String(args.path ?? ''), String(args.content ?? ''), { mkdir: true, encoding: 'utf8' });
+          safeWriteFile(String(args.path ?? ''), String(args.content ?? ''), {
+            mkdir: true,
+            encoding: 'utf8',
+          });
           return 'Success: File written.';
         case 'list_directory':
           return JSON.stringify(safeReaddir(String(args.path ?? '')));
         case 'shell_exec':
-          return safeExec('bash', ['-lc', String(args.command ?? '')], { cwd: pathResolver.rootDir() });
+          return safeExec('bash', ['-lc', String(args.command ?? '')], {
+            cwd: pathResolver.rootDir(),
+          });
         default:
           return `Error: Unknown tool ${name}`;
       }
@@ -355,7 +394,12 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
       },
       {
         role: 'user',
-        content: [prompt, redactedContext ? `Context:\n${typeof redactedContext === 'string' ? redactedContext : JSON.stringify(redactedContext, null, 2)}` : '']
+        content: [
+          prompt,
+          redactedContext
+            ? `Context:\n${typeof redactedContext === 'string' ? redactedContext : JSON.stringify(redactedContext, null, 2)}`
+            : '',
+        ]
           .filter(Boolean)
           .join('\n\n'),
       },
@@ -372,19 +416,19 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
         tool_calls: message.tool_calls,
       });
       for (const toolCall of message.tool_calls) {
-        const guardrailDecision = advanceToolLoopGuardrail(
-          guardrailState,
-          {
-            name: toolCall.function.name,
-            arguments: toolCall.function.arguments,
-          },
-        );
+        const guardrailDecision = advanceToolLoopGuardrail(guardrailState, {
+          name: toolCall.function.name,
+          arguments: toolCall.function.arguments,
+        });
         guardrailState = guardrailDecision.state;
         if (guardrailDecision.shouldStop) {
           logger.warn(`[LOCAL_LLM] Tool loop guardrail triggered: ${guardrailDecision.reason}`);
           return `${extractTextContent(message.content)}\n\n${guardrailDecision.reason}`.trim();
         }
-        const result = await this.handleToolCall(toolCall.function.name, toolCall.function.arguments);
+        const result = await this.handleToolCall(
+          toolCall.function.name,
+          toolCall.function.arguments
+        );
         messages.push({
           role: 'tool',
           tool_call_id: toolCall.id,
@@ -405,7 +449,7 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
       ],
-      { useTools: false },
+      { useTools: false }
     );
     return extractTextContent(response.choices[0].message.content);
   }
@@ -414,43 +458,152 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
     this.completeStructured(systemPrompt, userPrompt);
 
   async divergePersonas(input: DivergeHypothesisInput): Promise<HypothesisSketch[]> {
-    return runStructuredReasoningOp(structuredReasoningSpecs.divergePersonas, input, this.runStructured);
+    return runStructuredReasoningOp(
+      structuredReasoningSpecs.divergePersonas,
+      input,
+      this.runStructured
+    );
   }
 
   async crossCritique(input: CritiqueInput): Promise<CritiqueResult> {
-    return runStructuredReasoningOp(structuredReasoningSpecs.crossCritique, input, this.runStructured);
+    return runStructuredReasoningOp(
+      structuredReasoningSpecs.crossCritique,
+      input,
+      this.runStructured
+    );
   }
 
   async synthesizePersona(input: PersonaSynthesisInput): Promise<SynthesizedPersona> {
-    return runStructuredReasoningOp(structuredReasoningSpecs.synthesizePersona, input, this.runStructured);
+    return runStructuredReasoningOp(
+      structuredReasoningSpecs.synthesizePersona,
+      input,
+      this.runStructured
+    );
   }
 
   async forkBranches(input: BranchForkInput): Promise<ForkedBranch[]> {
-    return runStructuredReasoningOp(structuredReasoningSpecs.forkBranches, input, this.runStructured);
+    return runStructuredReasoningOp(
+      structuredReasoningSpecs.forkBranches,
+      input,
+      this.runStructured
+    );
   }
 
   async simulateBranches(input: SimulationInput): Promise<SimulationResult> {
-    return runStructuredReasoningOp(structuredReasoningSpecs.simulateBranches, input, this.runStructured);
+    return runStructuredReasoningOp(
+      structuredReasoningSpecs.simulateBranches,
+      input,
+      this.runStructured
+    );
   }
 
   async extractRequirements(input: ExtractRequirementsInput): Promise<ExtractedRequirements> {
-    return runStructuredReasoningOp(structuredReasoningSpecs.extractRequirements, input, this.runStructured);
+    return runStructuredReasoningOp(
+      structuredReasoningSpecs.extractRequirements,
+      input,
+      this.runStructured
+    );
   }
 
   async extractDesignSpec(input: ExtractDesignSpecInput): Promise<ExtractedDesignSpec> {
-    return runStructuredReasoningOp(structuredReasoningSpecs.extractDesignSpec, input, this.runStructured);
+    return runStructuredReasoningOp(
+      structuredReasoningSpecs.extractDesignSpec,
+      input,
+      this.runStructured
+    );
   }
 
   async extractTestPlan(input: ExtractTestPlanInput): Promise<ExtractedTestPlan> {
-    return runStructuredReasoningOp(structuredReasoningSpecs.extractTestPlan, input, this.runStructured);
+    return runStructuredReasoningOp(
+      structuredReasoningSpecs.extractTestPlan,
+      input,
+      this.runStructured
+    );
   }
 
   async decomposeIntoTasks(input: DecomposeIntoTasksInput): Promise<DecomposedTaskPlan> {
-    return runStructuredReasoningOp(structuredReasoningSpecs.decomposeIntoTasks, input, this.runStructured);
+    return runStructuredReasoningOp(
+      structuredReasoningSpecs.decomposeIntoTasks,
+      input,
+      this.runStructured
+    );
   }
 
   async delegateTask(instruction: string, context?: string): Promise<string> {
     return this.prompt(`Task: ${instruction}\nContext: ${context ?? 'none'}`);
+  }
+
+  async generateWithTools(
+    prompt: string,
+    tools: ToolDefinition[]
+  ): Promise<GenerateWithToolsResult> {
+    const headers: Record<string, string> = {
+      'content-type': 'application/json',
+    };
+    if (this.apiKey && this.apiKey !== 'not-needed') {
+      headers.authorization = `Bearer ${this.apiKey}`;
+    }
+
+    const openaiTools: ChatCompletionRequest['tools'] = tools.map((t) => ({
+      type: 'function' as const,
+      function: {
+        name: t.name,
+        description: t.description,
+        parameters: t.inputSchema as Record<string, unknown>,
+      },
+    }));
+
+    const isNemotron = this.model.startsWith('nvidia/') || this.baseURL.includes('api.nvidia.com');
+
+    const body: ChatCompletionRequest = {
+      model: this.model,
+      messages: [{ role: 'user', content: prompt }],
+      tools: openaiTools,
+      tool_choice: 'auto',
+    };
+
+    // Nemotron thinking mode — keep enabled even for tool calls
+    if (isNemotron) {
+      body.chat_template_kwargs = { enable_thinking: true };
+      body.reasoning_budget = 8192;
+      body.max_tokens = 8192;
+    }
+
+    const response = await fetch(joinEndpoint(this.baseURL, 'chat/completions'), {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+      signal: buildAbortSignal(this.timeoutMs),
+    });
+
+    const text = await response.text();
+    const parsed = safeJsonParse(text) as ChatCompletionResponse | null;
+    if (!response.ok) {
+      const message = parsed?.error?.message || text || `HTTP ${response.status}`;
+      throw new Error(`[openai-compatible:generateWithTools] failed: ${message}`);
+    }
+    if (!parsed || !parsed.choices || parsed.choices.length === 0) {
+      throw new Error(
+        `[openai-compatible:generateWithTools] invalid response: ${text.slice(0, 500)}`
+      );
+    }
+
+    const message = parsed.choices[0].message;
+
+    if (message.reasoning_content) {
+      logger.info(`[NEMOTRON THINKING (tools)]:\n${message.reasoning_content}\n`);
+    }
+
+    const resultText = extractTextContent(message.content) || undefined;
+    const toolCalls = (message.tool_calls ?? []).map((tc) => ({
+      name: tc.function.name,
+      input: (safeJsonParse(tc.function.arguments) as Record<string, unknown>) ?? {},
+    }));
+
+    return {
+      ...(resultText ? { text: resultText } : {}),
+      ...(toolCalls.length > 0 ? { toolCalls } : {}),
+    };
   }
 }
 
@@ -473,19 +626,19 @@ const NEMOTRON_OPENAI_COMPATIBLE_ENV: OpenAiCompatibleBackendEnvNames = {
 };
 
 export function buildOpenAiCompatibleBackendFromEnv(
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = process.env
 ): OpenAiCompatibleBackend | null {
   return buildBackendFromEnvNames(env, LOCAL_OPENAI_COMPATIBLE_ENV);
 }
 
 export function buildNemotronBackendFromEnv(
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = process.env
 ): OpenAiCompatibleBackend | null {
   return buildBackendFromEnvNames(env, NEMOTRON_OPENAI_COMPATIBLE_ENV);
 }
 
 export async function probeOpenAiCompatibleBackendAvailability(
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = process.env
 ): Promise<OpenAiCompatibleBackendAvailability> {
   return probeBackendAvailabilityFromEnvNames(env, LOCAL_OPENAI_COMPATIBLE_ENV, {
     allowPublicEndpoint: false,
@@ -493,7 +646,7 @@ export async function probeOpenAiCompatibleBackendAvailability(
 }
 
 export async function probeNemotronBackendAvailability(
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = process.env
 ): Promise<OpenAiCompatibleBackendAvailability> {
   return probeBackendAvailabilityFromEnvNames(env, NEMOTRON_OPENAI_COMPATIBLE_ENV, {
     allowPublicEndpoint: true,

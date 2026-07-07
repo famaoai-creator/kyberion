@@ -1,0 +1,42 @@
+{
+  "version": "1.0.0",
+  "description": "Maps reasoning context types to tool sets from tool-catalog.json. The resolver picks the most specific matching context. 'ask' receives no tools (plain prompt). Extend by adding new context keys and referencing tool IDs from tool-catalog.json.",
+  "contexts": {
+    "ask": {
+      "description": "Simple interactive question from a user. No workspace mutation needed.",
+      "tools": []
+    },
+    "task_session": {
+      "description": "A task assigned within a mission task-session. Full workspace read/write and shell access.",
+      "tools": [
+        "read_file",
+        "write_file",
+        "list_directory",
+        "shell_exec",
+        "get_mission_context",
+        "get_outcome_status",
+        "create_artifact"
+      ]
+    },
+    "mission": {
+      "description": "Top-level mission orchestration context. Includes project/mission introspection tools.",
+      "tools": [
+        "read_file",
+        "list_directory",
+        "get_project_status",
+        "get_mission_context",
+        "list_active_missions",
+        "get_outcome_status",
+        "search_knowledge"
+      ]
+    },
+    "research": {
+      "description": "Research and knowledge gathering context. Read-only access plus knowledge search.",
+      "tools": ["read_file", "list_directory", "search_knowledge"]
+    },
+    "analysis": {
+      "description": "Data analysis or code analysis. Read-only workspace access plus shell for running scripts.",
+      "tools": ["read_file", "list_directory", "shell_exec", "search_knowledge"]
+    }
+  }
+}
