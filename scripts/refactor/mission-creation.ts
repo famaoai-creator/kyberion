@@ -163,6 +163,7 @@ export async function createMission(args: {
   );
 
   const upperId = id.toUpperCase();
+  assertValidMissionId(upperId);
   const isEphemeral = process.argv.includes('--ephemeral');
   // IL-01: the surface passes the interpreted intent (utterance + agreed goal)
   // via a governed tmp handoff file; consume (read + delete) it here so the
@@ -386,6 +387,21 @@ export async function createMission(args: {
   logger.success(
     `🚀 Mission ${upperId} initialized in ${finalTier} tier from template "${template.name}" (ADF-driven${isEphemeral ? ', Ephemeral' : ''}).`
   );
+}
+
+const MISSION_ID_PATTERN = /^[A-Z0-9][A-Z0-9_-]{2,63}$/;
+
+/**
+ * Mission ids become directory names, git branch material, and task-id
+ * prefixes — whitespace or shell-split accidents must fail at creation, not
+ * surface later as broken mission dirs.
+ */
+export function assertValidMissionId(missionId: string): void {
+  if (!MISSION_ID_PATTERN.test(missionId)) {
+    throw new Error(
+      `[mission-creation] invalid mission id '${missionId}'; must match ${MISSION_ID_PATTERN.source} (no spaces — check shell quoting)`
+    );
+  }
 }
 
 export async function startMission(args: {

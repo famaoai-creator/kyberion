@@ -349,6 +349,12 @@ export interface ReasoningCallBudget {
 export interface ReasoningCallOptions {
   effort?: 'low' | 'medium' | 'high';
   budget?: ReasoningCallBudget;
+  /**
+   * Task-weight routing hint (from resolveTaskModelHint / cognitive routing):
+   * backends map this to a concrete model — e.g. the claude-cli backend maps
+   * fast→haiku, standard→sonnet, deep→opus. Absent = backend default.
+   */
+  model_tier?: 'fast' | 'standard' | 'deep';
 }
 
 export interface StructuredDelegationOptions {
