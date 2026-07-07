@@ -29,6 +29,8 @@ import {
   dispatchPresenceFrame,
   buildBridgeEmptyReplyText,
   postBridgeError,
+  resolveCustomerBinding,
+  runCustomerConversation,
 } from '@agent/core';
 
 /**
@@ -66,7 +68,13 @@ function recordSlackConversationOutcome(params: {
   });
 }
 
-async function postOnboardingReply(client: any, channel: string, threadTs: string, text: string, completed: boolean) {
+async function postOnboardingReply(
+  client: any,
+  channel: string,
+  threadTs: string,
+  text: string,
+  completed: boolean
+) {
   const blocks = completed ? undefined : buildSlackOnboardingBlocks(channel, threadTs);
   return client.chat.postMessage({
     channel,
@@ -76,19 +84,22 @@ async function postOnboardingReply(client: any, channel: string, threadTs: strin
   });
 }
 
-async function postApprovalRequest(client: any, params: {
-  channel: string;
-  threadTs: string;
-  correlationId: string;
-  requestedBy: string;
-  draft: {
-    title: string;
-    summary: string;
-    details?: string;
-    severity?: 'low' | 'medium' | 'high';
-  };
-  sourceText?: string;
-}) {
+async function postApprovalRequest(
+  client: any,
+  params: {
+    channel: string;
+    threadTs: string;
+    correlationId: string;
+    requestedBy: string;
+    draft: {
+      title: string;
+      summary: string;
+      details?: string;
+      severity?: 'low' | 'medium' | 'high';
+    };
+    sourceText?: string;
+  }
+) {
   const record = createSlackApprovalRequest(params);
   return client.chat.postMessage({
     channel: params.channel,
@@ -132,11 +143,13 @@ async function processSlackOutbox(client: any) {
         message.channel,
         message.thread_ts,
         response.ts,
-        message.source,
+        message.source
       );
       clearSlackOutboxMessage(message.message_id);
     } catch (err: any) {
-      logger.error(`❌ [SlackBridge] Outbox delivery failed for ${message.message_id}: ${err.message}`);
+      logger.error(
+        `❌ [SlackBridge] Outbox delivery failed for ${message.message_id}: ${err.message}`
+      );
     }
   }
 }
@@ -156,7 +169,7 @@ async function start() {
     token: botToken,
     appToken: appToken,
     socketMode: true,
-    logLevel: LogLevel.INFO
+    logLevel: LogLevel.INFO,
   });
 
   const outboxTimer = setInterval(() => {
@@ -171,9 +184,15 @@ async function start() {
     // Only process text messages (ignore edits, deletes, etc. for now)
     if (!('text' in message) || !message.text) return;
     if (message.subtype) return; // Ignore bot messages or other subtypes
-    const threadTs = 'thread_ts' in message && typeof message.thread_ts === 'string' ? message.thread_ts : message.ts;
+    const threadTs =
+      'thread_ts' in message && typeof message.thread_ts === 'string'
+        ? message.thread_ts
+        : message.ts;
     const team = 'team' in message && typeof message.team === 'string' ? message.team : undefined;
-    const channelType = 'channel_type' in message && typeof message.channel_type === 'string' ? message.channel_type : undefined;
+    const channelType =
+      'channel_type' in message && typeof message.channel_type === 'string'
+        ? message.channel_type
+        : undefined;
     const artifact = prepareSlackSurfaceArtifact({
       user: message.user,
       text: message.text,
@@ -184,9 +203,45 @@ async function start() {
       channelType,
     });
 
+    // E2E-06: bound customer channels run in customer mode BEFORE any operator
+    // processing — customers must never reach the operator brain.
+    const customerBinding = resolveCustomerBinding('slack', message.channel);
+    if (customerBinding) {
+      try {
+        const conversation = await runCustomerConversation({
+          binding: customerBinding,
+          text: message.text,
+          actorId: message.user,
+          threadTs,
+          correlationId: `slack-${message.ts}`,
+        });
+        if (conversation.text) {
+          await client.chat.postMessage({
+            channel: message.channel,
+            thread_ts: threadTs,
+            text: conversation.text,
+          });
+        }
+      } catch (err) {
+        const detail = err instanceof Error ? err.message : String(err);
+        logger.error(`❌ [SlackBridge] Customer conversation failed: ${detail}`);
+        await postBridgeError({
+          conversationKey: `slack-customer:${message.channel}:${threadTs}`,
+          err,
+          surface: 'slack',
+          locale: customerBinding.binding.language || 'ja',
+          post: (text) =>
+            client.chat.postMessage({ channel: message.channel, thread_ts: threadTs, text }),
+        });
+      }
+      return;
+    }
+
     // 3. Physical Ingestion (Evidence-as-State)
     try {
-      logger.info(`📥 [SlackBridge] Ingesting stimulus ${artifact.stimulus.id} from ${message.user}`);
+      logger.info(
+        `📥 [SlackBridge] Ingesting stimulus ${artifact.stimulus.id} from ${message.user}`
+      );
       recordSlackSurfaceArtifact(artifact);
       safeAppendFileSync(STIMULI_PATH, JSON.stringify(artifact.stimulus) + '\n', 'utf8');
 
@@ -196,7 +251,9 @@ async function start() {
         await client.chat.postMessage({
           channel: message.channel,
           thread_ts: threadTs,
-          text: initialized ? artifact.ackText : 'Received. This workspace is not initialized yet, so I will switch to onboarding mode.',
+          text: initialized
+            ? artifact.ackText
+            : 'Received. This workspace is not initialized yet, so I will switch to onboarding mode.',
         });
       }
 
@@ -214,7 +271,13 @@ async function start() {
           onboarding.replyText,
           onboarding.completed
         );
-        recordSlackDelivery(artifact.correlationId, message.channel, threadTs, response.ts, 'system');
+        recordSlackDelivery(
+          artifact.correlationId,
+          message.channel,
+          threadTs,
+          response.ts,
+          'system'
+        );
         return;
       }
 
@@ -242,9 +305,17 @@ async function start() {
             issued.orchestrationStatus === 'queued'
               ? 'Background orchestration has been queued.'
               : 'Background orchestration could not be queued.',
-          ].filter(Boolean).join('\n'),
+          ]
+            .filter(Boolean)
+            .join('\n'),
         });
-        recordSlackDelivery(artifact.correlationId, message.channel, threadTs, response.ts, 'system');
+        recordSlackDelivery(
+          artifact.correlationId,
+          message.channel,
+          threadTs,
+          response.ts,
+          'system'
+        );
         return;
       }
 
@@ -281,7 +352,12 @@ async function start() {
           status: 'thinking',
           expression: 'listening',
           subtitle: 'Slack Surface is waiting for approval.',
-          transcript: [{ speaker: 'Slack Surface', text: conversation.text || 'Approval is required before continuing.' }],
+          transcript: [
+            {
+              speaker: 'Slack Surface',
+              text: conversation.text || 'Approval is required before continuing.',
+            },
+          ],
         });
         recordSlackConversationOutcome({
           correlationId: artifact.correlationId,
@@ -312,7 +388,12 @@ async function start() {
           status: 'speaking',
           expression: 'thinking',
           subtitle: conversation.text || 'Slack Surface prepared a mission proposal.',
-          transcript: [{ speaker: 'Slack Surface', text: conversation.text || 'I can turn this into a mission.' }],
+          transcript: [
+            {
+              speaker: 'Slack Surface',
+              text: conversation.text || 'I can turn this into a mission.',
+            },
+          ],
         });
         recordSlackConversationOutcome({
           correlationId: artifact.correlationId,
@@ -338,15 +419,11 @@ async function start() {
             conversation.text || 'I can turn this into a mission.',
             '',
             'If you want me to proceed, reply with `はい` or `お願いします` in this thread.',
-          ].join('\n').trim(),
+          ]
+            .join('\n')
+            .trim(),
         });
-        recordSlackDelivery(
-          artifact.correlationId,
-          message.channel,
-          threadTs,
-          response.ts,
-          route,
-        );
+        recordSlackDelivery(artifact.correlationId, message.channel, threadTs, response.ts, route);
         return;
       }
 
@@ -372,13 +449,7 @@ async function start() {
           thread_ts: threadTs,
           text: conversation.text,
         });
-        recordSlackDelivery(
-          artifact.correlationId,
-          message.channel,
-          threadTs,
-          response.ts,
-          route,
-        );
+        recordSlackDelivery(artifact.correlationId, message.channel, threadTs, response.ts, route);
         return;
       }
 
@@ -503,7 +574,7 @@ async function start() {
   logger.info('🛡️ Slack Sensory Satellite is online (Socket Mode). Listening for stimuli...');
 }
 
-start().catch(err => {
+start().catch((err) => {
   logger.error(`SlackBridge crashed: ${err.message}`);
   process.exit(1);
 });

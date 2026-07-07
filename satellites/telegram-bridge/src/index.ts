@@ -13,6 +13,8 @@ import {
   safeReadFile,
   buildBridgeEmptyReplyText,
   postBridgeError,
+  resolveCustomerBinding,
+  runCustomerConversation,
 } from '@agent/core';
 
 export interface TelegramUser {
@@ -272,6 +274,46 @@ export async function handleTelegramUpdate(
   }
 
   // Config-driven allowlist (was a hardcoded personal user id). Comma-separated
+  // E2E-06: bound customer chats run in customer mode BEFORE the operator
+  // allowlist — a customer is not an operator and must not be silently denied.
+  const customerChatId = String(message.chat.id);
+  const customerBinding = resolveCustomerBinding('telegram', customerChatId);
+  if (customerBinding) {
+    const text = pickText(message);
+    if (!text) return { ok: true, ignored: true, reason: 'no_text' };
+    try {
+      const conversation = await runCustomerConversation({
+        binding: customerBinding,
+        text,
+        actorId: String(message.from?.id || customerChatId),
+        threadTs: resolveTelegramThreadTs(message),
+        correlationId: `telegram-${message.message_id}`,
+      });
+      const reply = conversation.text
+        ? await sendTelegramMessage({ chatId: customerChatId, text: conversation.text }, options)
+        : undefined;
+      return {
+        ok: true,
+        chatId: customerChatId,
+        messageId: String(message.message_id),
+        text: conversation.text,
+        reply,
+      };
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      logger.error(`❌ [TelegramBridge] Customer conversation failed: ${detail}`);
+      await postBridgeError({
+        conversationKey: `telegram-customer:${customerChatId}`,
+        err,
+        surface: 'telegram',
+        locale: customerBinding.binding.language || 'ja',
+        post: (errorText) =>
+          sendTelegramMessage({ chatId: customerChatId, text: errorText }, options),
+      });
+      return { ok: false, chatId: customerChatId, reason: 'customer_conversation_failed' };
+    }
+  }
+
   // TELEGRAM_ALLOWED_USER_IDS. Default-deny when unset: refuse all senders with a
   // clear configuration hint rather than silently locking to one baked-in id.
   const allowedUserIds = (process.env.TELEGRAM_ALLOWED_USER_IDS || '')

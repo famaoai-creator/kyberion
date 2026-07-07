@@ -94,7 +94,7 @@ function extractDecisionRightsContext(
           Number.isFinite(Number(amountValue))
         ? Number(amountValue)
         : undefined;
-  const riskLevel = firstString(payload.risk_level, payload.riskLevel, payload.risk);
+  const riskLevel = firstString(payloadData.risk_level, payloadData.riskLevel, payloadData.risk);
   return {
     tenantSlug,
     decisionType,

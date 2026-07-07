@@ -174,3 +174,28 @@
 
 Task 1(バインディング)→ Task 2(ガードレール)→ Task 3(カタログ)→ Task 4(deal)→ Task 8 前半(対話系 E2E)→ Task 5(見積/契約)→ Task 6(要件→SDLC)→ Task 7(還流)→ Task 8 後半。
 **Task 1〜4 で「顧客と安全に会話が続く」が成立**(ここまでが土台で、以降は商流の自動化)。Task 5〜7 が「説明→見積→契約→納品→学習」の閉ループ。
+
+## 7. 実装状況(2026-07-07)
+
+**Task 1〜4 + Task 5 の決定論部分 + Task 8 前半が完了。** 「顧客と安全に会話が続く」土台は成立。
+
+### 完了
+
+- **Task 1 — チャネルバインディング**: `schemas/customer-channel-binding.schema.json`、`customer/_template/connections/channel-bindings.json`、`libs/core/customer-channel-binding.ts`(`resolveCustomerBinding` — inactive は不一致、`_`/`.` プレフィックスのディレクトリは走査除外)。Slack ブリッジは operator 処理より前、Telegram ブリッジは **allowlist 判定より前**に顧客判定を挿入(顧客は operator ではないので default-deny で無言拒否しない)。
+- **Task 2 — 顧客モードガードレール**: `libs/core/customer-conversation.ts`。**計画からの意図的な逸脱**: operator 会話パスに `audience: 'customer'` を通すのではなく、**完全に独立したハンドラ** `runCustomerConversation` を実装。顧客は構造上ミッション状態・pipelines・他テナント文脈に到達できない(denial by architecture)。接地は solution catalog + price book + `knowledge/confidential/<slug>/sales/notes.md` + deal 履歴のみ。範囲外は `[NEEDS_OPERATOR]` マーカー → マーカー除去済み保留返信 + エスカレーション。backend 障害時も即エスカレーション(即興回答しない)。能動送信は `sendToCustomer()` のみで、`intentId: 'customer:outbound'` を **approval-policy に requires_approval ルールとして追加**(既定 fallback が `requires_approval: false` のため、ルール無しでは素通りだった)。
+- **Task 3 — 接地の正本**: `schemas/solution-catalog.schema.json`(limitations 必須)、`schemas/price-book.schema.json`(CO-03 移行メモ入り)、`knowledge/public/sales/solution-catalog.json`、`knowledge/product/sales/price-book.json`。
+- **Task 4 — deal 状態機械**: `libs/core/deal-store.ts`。`customer/<slug>/deals/DEAL-XXXX.json` + `deal-log.jsonl`。前進のみ(`lost` は任意段階から可)、巻き戻しは `operator: true` 必須。`getActiveDealForChannel` で「昨日の続き」が成立。
+- **Task 5(決定論部分)— 見積計算**: `buildQuoteFromPriceBook`(deal-store.ts 内)。price book の estimate_rules のみで算出、未知の task_kind は unquotable として operator へ。LLM は演算しない。
+- **Task 8(前半)— E2E テスト**: `tests/customer-dialogue-e2e.test.ts`(8 テスト)。バインディング解決 / 接地回答+deal 継続 / 範囲外エスカレーション(マーカー非漏洩)/ backend 障害 / 見積決定論 / ステージ前進・巻き戻しガード / 送付の承認ブロック→承認→配信失敗 / approval-policy ルール存在。
+
+### エスカレーション先の注記
+
+E2E-04 の `notifyOperator` が未実装のため、エスカレーションは `sendOpsAlert`(dedupe_key 付き)に送っている。notifyOperator 実装後にルーティングを差し替えること。
+
+### 残余(未実装)
+
+- **Task 5 後半**: 見積書/契約書の**文書生成 pipeline**(`quote-and-contract.json`)と自動 contract-review 挿入(防御層③)。現状は見積の数値計算と送付ゲートまで。
+- **Task 6**: 要件吸収 → `impact_analysis` op → sdlc-cycle handoff。
+- **Task 7**: 合意記録の distill 還流(`knowledge/confidential/<slug>/agreements/`)。
+- **Task 8 後半**: Task 6/7 実装後の商流 E2E(requirements→impact→won→sdlc 起動、delivered→distill 候補)と他テナント混入なしアサート。
+- binding 追加時の `pnpm kyberion` 警告表示(誤バインディング対策)。
