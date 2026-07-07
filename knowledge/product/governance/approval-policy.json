@@ -56,6 +56,12 @@
       "intent_ids": ["browser:extension_execute"],
       "requires_approval": true,
       "missing_requirements": ["approval_confirmation"]
+    },
+    {
+      "id": "customer-outbound-send",
+      "intent_ids": ["customer:outbound"],
+      "requires_approval": true,
+      "missing_requirements": ["approval_confirmation"]
     }
   ],
   "defaults": {
