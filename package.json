@@ -145,6 +145,7 @@
     "diagnose": "node dist/scripts/run_pipeline.js --input pipelines/system-diagnostics.json",
     "onboard": "node --input-type=module -e \"import { existsSync } from 'node:fs'; if (!existsSync('dist/scripts/onboarding_wizard.js')) { console.error('Run \\`pnpm build\\` first before onboarding.'); process.exit(1); } await import('./dist/scripts/onboarding_wizard.js');\"",
     "onboard:apply": "node --input-type=module -e \"import { existsSync } from 'node:fs'; if (!existsSync('dist/scripts/onboarding_apply.js')) { console.error('Run \\`pnpm build\\` first before onboarding apply.'); process.exit(1); } await import('./dist/scripts/onboarding_apply.js');\"",
+    "onboard:reset": "node --input-type=module -e \"import { existsSync } from 'node:fs'; if (!existsSync('dist/scripts/onboarding_reset.js')) { console.error('Run \\`pnpm build\\` first before onboarding reset.'); process.exit(1); } await import('./dist/scripts/onboarding_reset.js');\"",
     "mission:journal": "node dist/scripts/mission_journal.js",
     "dashboard": "node dist/scripts/sovereign_dashboard.js",
     "dashboard:onboarding": "node dist/scripts/sovereign_dashboard.js --once --focus onboarding",
