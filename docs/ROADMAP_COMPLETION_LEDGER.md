@@ -108,6 +108,7 @@
 - [x] **IP-07**: Critical Path Tests (`IP-07_CRITICAL_PATH_TESTS.ja.md`) — orchestrator 追加特性化は IP-10 前に
 - [x] **AA-02**: Mesh Hub Delivery Driver (`AA-02_MESH_HUB_DELIVERY_DRIVER.ja.md`) — 2プロセス実HTTP E2E は E3 パイロットで
 - [x] **E2E-02**: Creative Suite (`E2E-02_CREATIVE_SUITE.ja.md`) — 単一 resolver・VDS-07・style pack 注入・campaign-suite。歌詞字幕同期のみ残余
+- [x] **E2E-06**: Customer Dialogue (`E2E-06_CUSTOMER_DIALOGUE.ja.md`) — Task 1〜4+見積決定論+対話系 E2E 完了(会話土台成立)。契約書 pipeline・要件→SDLC・distill 還流は残余(原文 §7)
 
 ## 2. 使い方
 

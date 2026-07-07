@@ -1,0 +1,39 @@
+{
+  "version": "1.0.0",
+  "currency": "JPY",
+  "items": [
+    {
+      "sku": "ENG-HOUR",
+      "name": "エンジニアリング作業",
+      "unit": "hour",
+      "unit_price": 15000,
+      "notes": "開発・検証・ドキュメント作成を含む標準レート"
+    },
+    {
+      "sku": "CREATIVE-HOUR",
+      "name": "クリエイティブ制作",
+      "unit": "hour",
+      "unit_price": 12000
+    },
+    {
+      "sku": "PLATFORM-MONTH",
+      "name": "プラットフォーム利用",
+      "unit": "month",
+      "unit_price": 100000
+    }
+  ],
+  "estimate_rules": [
+    {
+      "task_kind": "feature_addition",
+      "base_hours": 24,
+      "rate_sku": "ENG-HOUR",
+      "size_multipliers": { "S": 0.5, "M": 1, "L": 2.5 }
+    },
+    {
+      "task_kind": "document_production",
+      "base_hours": 8,
+      "rate_sku": "CREATIVE-HOUR",
+      "size_multipliers": { "S": 0.5, "M": 1, "L": 2 }
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CustomerChannelBindings",
+  "description": "E2E-06 Task 1: binds a surface channel/counterpart to a customer tenant so inbound messages run in customer mode.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["bindings"],
+  "properties": {
+    "bindings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["surface", "channel_id"],
+        "properties": {
+          "surface": { "enum": ["slack", "telegram", "email", "imessage", "discord"] },
+          "channel_id": { "type": "string", "minLength": 1 },
+          "counterpart": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": { "type": "string" },
+              "org": { "type": "string" }
+            }
+          },
+          "language": { "type": "string" },
+          "disclosure_level": { "enum": ["public_catalog_only"] },
+          "active": { "type": "boolean" }
+        }
+      }
+    }
+  }
+}
