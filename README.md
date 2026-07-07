@@ -76,6 +76,14 @@ pnpm doctor
 pnpm setup:report --persona first-time-user
 ```
 
+If you already have onboarding JSON, use Path B instead of the wizard:
+
+```bash
+pnpm onboard:apply --identity knowledge/public/templates/onboarding/identity.example.json --dry-run
+```
+
+Copy that template, edit it for your identity, then rerun without `--dry-run` to write the onboarding artifacts.
+
 Then pick a smoke path:
 
 ```bash
