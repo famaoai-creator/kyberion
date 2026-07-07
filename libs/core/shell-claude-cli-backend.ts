@@ -43,6 +43,20 @@ import type {
   DecomposedTaskPlan,
 } from './reasoning-backend.js';
 
+/**
+ * Task-weight → claude model mapping (①モデル振り分け): fast tasks run on
+ * haiku, standard on sonnet, deep on the backend's configured heavy model.
+ */
+export function resolveClaudeModelForTier(
+  tier: 'fast' | 'standard' | 'deep' | undefined,
+  defaultModel: string
+): string {
+  if (tier === 'fast') return 'haiku';
+  if (tier === 'standard') return 'sonnet';
+  if (tier === 'deep') return defaultModel || 'opus';
+  return defaultModel;
+}
+
 export interface ShellClaudeCliBackendOptions {
   /** CLI binary. Defaults to `claude` (resolved via PATH). */
   bin?: string;
@@ -356,13 +370,27 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
     })) as DecomposedTaskPlan;
   }
 
-  async delegateTask(instruction: string, context?: string): Promise<string> {
-    const args = ['-p', `${instruction}\n\nContext: ${context ?? 'none'}`, ...this.extraArgs];
+  async delegateTask(
+    instruction: string,
+    context?: string,
+    options?: { model_tier?: 'fast' | 'standard' | 'deep' }
+  ): Promise<string> {
+    const model = resolveClaudeModelForTier(options?.model_tier, this.model);
+    const args = [
+      '-p',
+      `${instruction}\n\nContext: ${context ?? 'none'}`,
+      '--model',
+      model,
+      ...this.extraArgs,
+    ];
     return this.spawnCli(args, '');
   }
 
-  async prompt(prompt: string): Promise<string> {
-    return this.delegateTask(prompt);
+  async prompt(
+    prompt: string,
+    options?: { model_tier?: 'fast' | 'standard' | 'deep' }
+  ): Promise<string> {
+    return this.delegateTask(prompt, undefined, options);
   }
 
   /**
