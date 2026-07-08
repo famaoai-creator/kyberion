@@ -338,6 +338,10 @@ const CJK_FONT_CANDIDATES = [
   '/System/Library/Fonts/Supplemental/Hiragino Sans W4.ttc',
   '/System/Library/Fonts/Supplemental/Yu Gothic Medium.otf',
   '/System/Library/Fonts/Supplemental/Yu Gothic.ttf',
+  // Linux (fonts-noto-cjk package; paths vary by distro release)
+  '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',
+  '/usr/share/fonts/opentype/noto/NotoSansCJKjp-Regular.otf',
+  '/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc',
 ];
 
 function toUtf16BeHex(codePoint: number): string {
