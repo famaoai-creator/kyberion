@@ -9,12 +9,16 @@
 //   afm prompt [--instructions <text>] [--timeout <seconds>]
 //     → reads the prompt from stdin, writes the raw response text to stdout,
 //       exit 0. On failure writes ERROR: <detail> to stderr, exit 1.
+//   afm vision --image <path>
+//     → single-line JSON {"text":"<recognized text>","labels":[{"label":..,"confidence":..}]}
+//       (Vision framework OCR + classification; no LLM involved).
 //
 // Keep this file dependency-free (no SwiftPM) so it compiles with a single
 // `swiftc -O afm.swift -o afm` and stays trivially auditable.
 
 import Foundation
 import FoundationModels
+import Vision
 
 func printAvailability() {
     let model = SystemLanguageModel.default
@@ -76,6 +80,53 @@ func runPrompt(instructions: String?, timeoutSeconds: Double) {
     print(output ?? "")
 }
 
+func jsonEscape(_ value: String) -> String {
+    var out = ""
+    for ch in value.unicodeScalars {
+        switch ch {
+        case "\\": out += "\\\\"
+        case "\"": out += "\\\""
+        case "\n": out += "\\n"
+        case "\r": out += "\\r"
+        case "\t": out += "\\t"
+        default:
+            if ch.value < 0x20 {
+                out += String(format: "\\u%04x", ch.value)
+            } else {
+                out.unicodeScalars.append(ch)
+            }
+        }
+    }
+    return out
+}
+
+func runVision(imagePath: String) {
+    let url = URL(fileURLWithPath: imagePath)
+    guard FileManager.default.fileExists(atPath: imagePath) else {
+        FileHandle.standardError.write("ERROR: image not found: \(imagePath)\n".data(using: .utf8)!)
+        exit(1)
+    }
+    let handler = VNImageRequestHandler(url: url)
+    let textRequest = VNRecognizeTextRequest()
+    textRequest.recognitionLevel = .accurate
+    textRequest.recognitionLanguages = ["ja-JP", "en-US"]
+    let classifyRequest = VNClassifyImageRequest()
+    do {
+        try handler.perform([textRequest, classifyRequest])
+    } catch {
+        FileHandle.standardError.write("ERROR: vision failed: \(error)\n".data(using: .utf8)!)
+        exit(1)
+    }
+    let lines: [String] = (textRequest.results ?? []).compactMap { observation in
+        observation.topCandidates(1).first?.string
+    }
+    let labels: [String] = (classifyRequest.results ?? [])
+        .filter { $0.confidence > 0.3 }
+        .prefix(8)
+        .map { "{\"label\":\"\(jsonEscape($0.identifier))\",\"confidence\":\(String(format: "%.2f", $0.confidence))}" }
+    print("{\"text\":\"\(jsonEscape(lines.joined(separator: "\n")))\",\"labels\":[\(labels.joined(separator: ","))]}")
+}
+
 // ---- arg parsing ----
 
 var args = Array(CommandLine.arguments.dropFirst())
@@ -87,6 +138,7 @@ args.removeFirst()
 
 var instructions: String? = nil
 var timeoutSeconds = 60.0
+var imagePath: String? = nil
 var index = 0
 while index < args.count {
     switch args[index] {
@@ -94,6 +146,8 @@ while index < args.count {
         if index + 1 < args.count { instructions = args[index + 1]; index += 1 }
     case "--timeout":
         if index + 1 < args.count { timeoutSeconds = Double(args[index + 1]) ?? timeoutSeconds; index += 1 }
+    case "--image":
+        if index + 1 < args.count { imagePath = args[index + 1]; index += 1 }
     default:
         break
     }
@@ -105,6 +159,12 @@ case "availability":
     printAvailability()
 case "prompt":
     runPrompt(instructions: instructions, timeoutSeconds: timeoutSeconds)
+case "vision":
+    guard let imagePath else {
+        FileHandle.standardError.write("ERROR: vision requires --image <path>\n".data(using: .utf8)!)
+        exit(2)
+    }
+    runVision(imagePath: imagePath)
 default:
     FileHandle.standardError.write("ERROR: unknown command \(command)\n".data(using: .utf8)!)
     exit(2)

@@ -8,6 +8,7 @@ import {
   appleFmPrompt,
   classifyLocallyWithAppleFm,
   probeAppleIntelligence,
+  recognizeImageLocallyWithAppleVision,
   resetAppleIntelligenceAvailabilityCache,
   setAfmRunnerForTests,
   summarizeLocallyWithAppleFm,
@@ -74,6 +75,26 @@ describe('apple intelligence bridge', () => {
     expect(promptCall.args[0]).toBe('prompt');
     expect(promptCall.args).toContain('--instructions');
     expect(promptCall.stdin).toBe('要約して');
+  });
+
+  it('vision parses the last JSON line, tolerating OS loader noise on stdout', async () => {
+    if (process.platform !== 'darwin') return;
+    installRunner((command, args) => {
+      if (command === 'swiftc') return { ok: true, stdout: '', stderr: '' };
+      if (args[0] === 'vision') {
+        return {
+          ok: true,
+          stdout:
+            'Unable to find a valid E5 in provided path ...\n' +
+            '{"text":"KYBERION\\nheadline","labels":[{"label":"document","confidence":0.44}]}\n',
+          stderr: '',
+        };
+      }
+      return { ok: true, stdout: '{"available":true}', stderr: '' };
+    });
+    const result = await recognizeImageLocallyWithAppleVision('/tmp/x.png');
+    expect(result?.text).toContain('KYBERION');
+    expect(result?.labels[0]).toEqual({ label: 'document', confidence: 0.44 });
   });
 
   it('classification embeds the task in the prompt and validates the category', async () => {
