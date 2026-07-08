@@ -294,6 +294,33 @@ export async function recognizeImageLocallyWithAppleVision(
   return null;
 }
 
+export interface RenderedTextVerification {
+  ok: boolean;
+  missing: string[];
+  /** Recognized text, for the reviewer's evidence trail. */
+  recognized_text: string;
+}
+
+/**
+ * Deterministic artifact QA: does the RENDERED image actually show the
+ * expected strings? (designer principle: judge the render, not the source).
+ * Whitespace-insensitive containment; returns null when Vision is
+ * unavailable so callers fall back to manual review.
+ */
+export async function verifyRenderedTextWithAppleVision(
+  imagePath: string,
+  expectedStrings: string[],
+  options: { timeoutMs?: number } = {}
+): Promise<RenderedTextVerification | null> {
+  const vision = await recognizeImageLocallyWithAppleVision(imagePath, options);
+  if (!vision) return null;
+  const haystack = vision.text.replace(/\s+/g, '').toLowerCase();
+  const missing = expectedStrings.filter(
+    (expected) => !haystack.includes(expected.replace(/\s+/g, '').toLowerCase())
+  );
+  return { ok: missing.length === 0, missing, recognized_text: vision.text };
+}
+
 /** Local one-to-few sentence summary (mission/work-item digests, UI strings). */
 export async function summarizeLocallyWithAppleFm(
   text: string,
