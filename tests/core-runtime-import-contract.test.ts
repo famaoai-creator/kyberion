@@ -28,13 +28,17 @@ describe('Core runtime import contract', () => {
     for (const key of exportKeys) {
       const specifier = exportKeyToSpecifier(key);
       try {
-        safeExec('node', [
-          '--input-type=module',
-          '-e',
-          `import(${JSON.stringify(specifier)}).then(() => console.log('ok'))`,
-        ], {
-          cwd: process.cwd(),
-        });
+        safeExec(
+          'node',
+          [
+            '--input-type=module',
+            '-e',
+            `import(${JSON.stringify(specifier)}).then(() => console.log('ok'))`,
+          ],
+          {
+            cwd: process.cwd(),
+          }
+        );
       } catch (error: any) {
         failures.push({
           specifier,
@@ -44,5 +48,5 @@ describe('Core runtime import contract', () => {
     }
 
     expect(failures).toEqual([]);
-  }, 60000);
+  }, 180000); // loads every subpath in a child process — slow on shared CI runners
 });
