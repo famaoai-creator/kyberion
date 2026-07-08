@@ -204,3 +204,13 @@ E2E-04 Task 2 の `notifyOperator` 実装(2026-07-07)に伴い、顧客エスカ
 - 見積書/契約書の帳票整形(xlsx/pdf、media-actuator 連結)と contract-review パイプラインの自動チェーン。
 - `feature-request-intake.json`(会話ログ→要件吸収→不足質問ルート)。
 - binding 追加時の `pnpm kyberion` 警告表示(誤バインディング対策)。
+
+## 追記(2026-07-08)— 対話モード(営業/サポート/要件ヒアリング)
+
+- `libs/core/customer-conversation-modes.ts`: deal stage からモードを導出(`binding.mode` で上書き可)。inquiry〜contract=sales / discovery=requirements_hearing / won 以降=support。開示ポリシーはモード非依存で不変。
+- **sales**: need→決裁→時期→予算の順で最初のギャップを埋める。カタログ実在ソリューションのみ提案。
+- **support**: `knowledge/confidential/<tenant>/support/known-issues.md` を接地し、記載のワークアラウンドをそのまま案内。障害/データ消失/セキュリティは即エスカレーション。
+- **requirements_hearing**: カバレッジチェックリスト(ゴール→利用者→機能→非機能→制約→スコープ外)に沿って、最もブロッキングな open question を1問ずつ。各ターン後に `extractRequirements` で деal 単位の構造化ドラフト(`customer/<tenant>/deals/<id>/requirements.json`)へ増分キャプチャ(fire-and-forget、失敗しても返信は壊さない)。
+- 全モード共通の会話原則(復唱→回答、next step を毎回1つ、質問は1ターン1問、未回答放置禁止)。
+- オペレーター確認: `pnpm kyberion deals` / `--requirements <deal-id>`。
+- 修正: deals ディレクトリの不正 JSON が `getActiveDealForChannel` を落とすバグ(capture ファイル同居で顕在化)→ サブディレクトリ方式+防御で解消。
