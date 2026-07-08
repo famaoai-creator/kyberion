@@ -8,7 +8,9 @@ import {
   appleFmPrompt,
   classifyLocallyWithAppleFm,
   probeAppleIntelligence,
+  generateImageLocallyWithApplePlayground,
   recognizeImageLocallyWithAppleVision,
+  transcribeAudioLocallyWithAppleSpeech,
   verifyRenderedTextWithAppleVision,
   resetAppleIntelligenceAvailabilityCache,
   setAfmRunnerForTests,
@@ -117,6 +119,44 @@ describe('apple intelligence bridge', () => {
     ]);
     expect(verdict?.ok).toBe(false);
     expect(verdict?.missing).toEqual(['見えない文字列']);
+  });
+
+  it('transcribe passes locale/timeout args and parses the JSON line', async () => {
+    if (process.platform !== 'darwin') return;
+    installRunner((command, args) => {
+      if (command === 'swiftc') return { ok: true, stdout: '', stderr: '' };
+      if (args[0] === 'transcribe') {
+        return { ok: true, stdout: 'loader noise\n{"text":"会議の文字起こし"}\n', stderr: '' };
+      }
+      return { ok: true, stdout: '{"available":true}', stderr: '' };
+    });
+    const text = await transcribeAudioLocallyWithAppleSpeech('/tmp/a.aiff', { locale: 'en-US' });
+    expect(text).toBe('会議の文字起こし');
+    const call = calls.at(-1)!;
+    expect(call.args).toContain('--locale');
+    expect(call.args).toContain('en-US');
+  });
+
+  it('imagine degrades to null on notSupported and returns path/style on success', async () => {
+    if (process.platform !== 'darwin') return;
+    installRunner((command, args) => {
+      if (command === 'swiftc') return { ok: true, stdout: '', stderr: '' };
+      if (args[0] === 'imagine') return { ok: false, stdout: '', stderr: 'ERROR: notSupported' };
+      return { ok: true, stdout: '{"available":true}', stderr: '' };
+    });
+    expect(await generateImageLocallyWithApplePlayground('x', '/tmp/x.png')).toBeNull();
+
+    installRunner((command, args) => {
+      if (args[0] === 'imagine') {
+        return { ok: true, stdout: '{"path":"/tmp/x.png","style":"illustration"}\n', stderr: '' };
+      }
+      return { ok: true, stdout: '{"available":true}', stderr: '' };
+    });
+    const generated = await generateImageLocallyWithApplePlayground('x', '/tmp/x.png', {
+      style: 'illustration',
+    });
+    expect(generated).toEqual({ path: '/tmp/x.png', style: 'illustration' });
+    expect(calls.at(-1)!.args).toContain('--style');
   });
 
   it('classification embeds the task in the prompt and validates the category', async () => {
