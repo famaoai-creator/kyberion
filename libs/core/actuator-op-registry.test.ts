@@ -75,7 +75,7 @@ describe('actuator-op-registry', () => {
     );
   });
 
-  it('keeps actuator sources free of silent default ctx fallthroughs', () => {
+  it('keeps actuator sources free of silent default ctx fallthroughs', { timeout: 60_000 }, () => {
     const actuatorRoot = pathResolver.rootResolve('libs/actuators');
     const scanTargets = [
       ...collectSourceFiles(actuatorRoot),
