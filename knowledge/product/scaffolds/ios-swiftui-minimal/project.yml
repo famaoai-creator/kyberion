@@ -10,6 +10,9 @@ targets:
     sources: [Sources]
     settings:
       base:
+        SDKROOT: iphoneos
+        SUPPORTED_PLATFORMS: iphonesimulator iphoneos
+        TARGETED_DEVICE_FAMILY: 1
         PRODUCT_BUNDLE_IDENTIFIER: __BUNDLE_ID__
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES

@@ -368,6 +368,57 @@ describe('mission work item dispatch', () => {
     expect(reply.notes.join('\n')).toContain('acceptance criteria not met');
   });
 
+  it('auto-rounds: retries blocked items in a later round and stops on no progress', async () => {
+    createWorkItem({
+      title: `${missionId}: Round-trip work`,
+      description: 'Complete the work; the first round returns empty (transient failure).',
+      status: 'ready',
+      source: 'local',
+      sourceRef: `mission:${missionId}:task-rounds`,
+      projectId: missionId,
+      assigneePeerId: 'sovereign-brain',
+      labels: [`mission:${missionId}`, 'team_role:product_strategist', 'ticket:workitem'],
+      metadata: {
+        mission_id: missionId,
+        team_role: 'product_strategist',
+        deliverable: 'deliverables/rounds.md',
+        target_path: 'deliverables/rounds.md',
+        risk: 'low',
+        estimated_scope: 'S',
+      },
+    });
+
+    const delegateTask = vi
+      .fn()
+      // round 1: empty twice (initial + the empty-response retry) → blocked
+      .mockResolvedValueOnce('')
+      .mockResolvedValueOnce('')
+      // round 2 succeeds
+      .mockResolvedValue(
+        makeTaskResultText({
+          summary: 'Completed on the second dispatch round.',
+          artifacts: [],
+          verification_done: ['done'],
+          gaps: [],
+          needs: [],
+        })
+      );
+
+    const manifest = await dispatchMissionWorkItems(
+      makeMissionState(),
+      { mode: 'subagent', finalStatus: 'done', rounds: 3 },
+      { delegateTask }
+    );
+
+    // round1 (2 calls incl. retry) + round2 (1 call) — round3 skipped (no items left)
+    expect(delegateTask.mock.calls.length).toBeGreaterThanOrEqual(3);
+    expect(manifest.records[0]).toMatchObject({
+      task_result: expect.objectContaining({
+        summary: 'Completed on the second dispatch round.',
+      }),
+    });
+  });
+
   it('re-requests task_result once when the initial response is unstructured', async () => {
     createWorkItem({
       title: `${missionId}: Structure the task result`,

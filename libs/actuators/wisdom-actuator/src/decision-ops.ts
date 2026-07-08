@@ -453,6 +453,18 @@ export function taskPlanToNextTasksOp(input: { mission_id: string }): {
   if (!plan || !Array.isArray(plan.tasks) || plan.tasks.length === 0) {
     throw new Error('[task_plan_to_next_tasks] task plan not found or empty');
   }
+  // A stub-backend placeholder plan must never become real worker tasks —
+  // that is a 字面成功 (the pipeline "passes" while the mission gets a fake
+  // plan). Fail loudly so the operator re-runs with a real backend.
+  const stubTasks = plan.tasks.filter(
+    (task) =>
+      /\[STUB\]/.test(String(task.title || '')) || /^T-STUB/i.test(String(task.task_id || ''))
+  );
+  if (stubTasks.length > 0) {
+    throw new Error(
+      `[task_plan_to_next_tasks] task plan contains ${stubTasks.length} stub placeholder task(s) — regenerate with a real reasoning backend (KYBERION_REASONING_BACKEND)`
+    );
+  }
   const scopeOf = (estimate?: string): 'S' | 'M' | 'L' =>
     estimate === 'L' || estimate === 'XL' ? 'L' : estimate === 'M' ? 'M' : 'S';
   const nextTasks = plan.tasks.map((task) => {

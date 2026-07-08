@@ -15,7 +15,8 @@ vi.mock('@agent/core', async () => {
     ...actual,
     customerResolver: {
       ...actual.customerResolver,
-      customerRoot: (subPath = '') => (subPath ? path.join(CUSTOMER_OVERLAY_ROOT, subPath) : CUSTOMER_OVERLAY_ROOT),
+      customerRoot: (subPath = '') =>
+        subPath ? path.join(CUSTOMER_OVERLAY_ROOT, subPath) : CUSTOMER_OVERLAY_ROOT,
     },
     resolveActiveProfileRoot: () => CUSTOMER_OVERLAY_ROOT,
   };
@@ -47,25 +48,27 @@ describe('vital_check', () => {
     safeWriteFile(path.join(FIXTURE_ROOT, 'dir-only', '.keep'), 'ok', { encoding: 'utf8' });
 
     expect(
-      fileCheck('fixture-file', 'Fixture File', path.join(FIXTURE_ROOT, 'file.txt'), 'file'),
+      fileCheck('fixture-file', 'Fixture File', path.join(FIXTURE_ROOT, 'file.txt'), 'file')
     ).toMatchObject({ status: 'ok' });
     expect(
-      fileCheck('fixture-dir', 'Fixture Dir', path.join(FIXTURE_ROOT, 'dir-only'), 'dir'),
+      fileCheck('fixture-dir', 'Fixture Dir', path.join(FIXTURE_ROOT, 'dir-only'), 'dir')
     ).toMatchObject({ status: 'ok' });
   });
 
-  it('counts active missions across both mission roots', () => {
+  // Global mutable state: other suites may DELETE fixture missions between
+  // the two counts — retry so transient churn settles.
+  it('counts active missions across both mission roots', { retry: 2 }, () => {
     const before = activeMissionCount();
 
     safeWriteFile(
       path.join(ACTIVE_MISSION, 'mission-state.json'),
       JSON.stringify({ status: 'active' }, null, 2),
-      { encoding: 'utf8' },
+      { encoding: 'utf8' }
     );
     safeWriteFile(
       path.join(PERSONAL_MISSION, 'mission-state.json'),
       JSON.stringify({ status: 'active' }, null, 2),
-      { encoding: 'utf8' },
+      { encoding: 'utf8' }
     );
 
     // a2a-lifecycle tests run concurrently and may create active missions in
@@ -74,7 +77,9 @@ describe('vital_check', () => {
     expect(activeMissionCount()).toBeGreaterThanOrEqual(before + 2);
   });
 
-  it('builds a report that mirrors the mission count helper', () => {
+  // Mission counts are global mutable state; parallel suites create/remove
+  // fixture missions mid-run — retry so the snapshot and helper agree.
+  it('builds a report that mirrors the mission count helper', { retry: 2 }, () => {
     const report = buildVitalReport();
     expect(report.summary.total).toBe(10);
     expect(report.active_mission_count).toBe(activeMissionCount());
@@ -84,22 +89,22 @@ describe('vital_check', () => {
     safeWriteFile(
       path.join(CUSTOMER_OVERLAY_ROOT, 'my-identity.json'),
       JSON.stringify({ name: 'Customer Sovereign' }, null, 2),
-      { encoding: 'utf8' },
+      { encoding: 'utf8' }
     );
     safeWriteFile(
       path.join(CUSTOMER_OVERLAY_ROOT, 'my-vision.md'),
       '# Customer Vision\n\nBuild for the customer overlay.\n',
-      { encoding: 'utf8' },
+      { encoding: 'utf8' }
     );
     safeWriteFile(
       path.join(CUSTOMER_OVERLAY_ROOT, 'agent-identity.json'),
       JSON.stringify({ agent_id: 'CUSTOMER-PRIME' }, null, 2),
-      { encoding: 'utf8' },
+      { encoding: 'utf8' }
     );
     safeWriteFile(
       path.join(CUSTOMER_OVERLAY_ROOT, 'onboarding/onboarding-summary.md'),
       '# Customer Onboarding Summary\n',
-      { encoding: 'utf8' },
+      { encoding: 'utf8' }
     );
 
     const report = buildVitalReport();
@@ -109,8 +114,12 @@ describe('vital_check', () => {
     const summary = report.checks.find((check) => check.id === 'onboarding_summary');
 
     expect(identity?.detail).toContain(path.join(CUSTOMER_OVERLAY_ROOT, 'my-identity.json'));
-    expect(agentIdentity?.detail).toContain(path.join(CUSTOMER_OVERLAY_ROOT, 'agent-identity.json'));
+    expect(agentIdentity?.detail).toContain(
+      path.join(CUSTOMER_OVERLAY_ROOT, 'agent-identity.json')
+    );
     expect(vision?.detail).toContain(path.join(CUSTOMER_OVERLAY_ROOT, 'my-vision.md'));
-    expect(summary?.detail).toContain(path.join(CUSTOMER_OVERLAY_ROOT, 'onboarding/onboarding-summary.md'));
+    expect(summary?.detail).toContain(
+      path.join(CUSTOMER_OVERLAY_ROOT, 'onboarding/onboarding-summary.md')
+    );
   });
 });
