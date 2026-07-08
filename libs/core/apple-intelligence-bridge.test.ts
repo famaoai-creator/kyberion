@@ -9,6 +9,7 @@ import {
   classifyLocallyWithAppleFm,
   probeAppleIntelligence,
   recognizeImageLocallyWithAppleVision,
+  verifyRenderedTextWithAppleVision,
   resetAppleIntelligenceAvailabilityCache,
   setAfmRunnerForTests,
   summarizeLocallyWithAppleFm,
@@ -95,6 +96,27 @@ describe('apple intelligence bridge', () => {
     const result = await recognizeImageLocallyWithAppleVision('/tmp/x.png');
     expect(result?.text).toContain('KYBERION');
     expect(result?.labels[0]).toEqual({ label: 'document', confidence: 0.44 });
+  });
+
+  it('rendered-text verification is whitespace-insensitive and reports misses', async () => {
+    if (process.platform !== 'darwin') return;
+    installRunner((command, args) => {
+      if (command === 'swiftc') return { ok: true, stdout: '', stderr: '' };
+      if (args[0] === 'vision') {
+        return {
+          ok: true,
+          stdout: '{"text":"KYBERION\\nThe organization work loop engine","labels":[]}\n',
+          stderr: '',
+        };
+      }
+      return { ok: true, stdout: '{"available":true}', stderr: '' };
+    });
+    const verdict = await verifyRenderedTextWithAppleVision('/tmp/x.png', [
+      'THE ORGANIZATION work loop',
+      '見えない文字列',
+    ]);
+    expect(verdict?.ok).toBe(false);
+    expect(verdict?.missing).toEqual(['見えない文字列']);
   });
 
   it('classification embeds the task in the prompt and validates the category', async () => {
