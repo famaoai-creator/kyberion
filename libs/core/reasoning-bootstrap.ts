@@ -79,6 +79,7 @@ import {
   registerVoiceBridge,
 } from './voice-bridge.js';
 import { installShellSpeechToTextBridgeIfAvailable } from './speech-to-text-bridge.js';
+import { installAppleSpeechToTextBridgeIfAvailable } from './apple-intelligence-bridge.js';
 import {
   installShellDeploymentAdapterFromConfigIfAvailable,
   installShellDeploymentAdapterIfAvailable,
@@ -465,7 +466,13 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
   const mode = consultCapabilityBrokerForMode(resolveMode(options));
 
   // Common infrastructure (order matters: voice bridge runs after reasoning backend)
-  installShellSpeechToTextBridgeIfAvailable();
+  const shellSttInstalled = installShellSpeechToTextBridgeIfAvailable();
+  if (!shellSttInstalled) {
+    // Fire-and-forget: on Apple Silicon macOS this upgrades the stub to
+    // on-device transcription; elsewhere the probe declines instantly.
+    // An explicit KYBERION_STT_COMMAND always wins (checked above).
+    void installAppleSpeechToTextBridgeIfAvailable().catch(() => {});
+  }
   const deployInstalled = installShellDeploymentAdapterIfAvailable();
   if (!deployInstalled) {
     installShellDeploymentAdapterFromConfigIfAvailable();
@@ -505,11 +512,15 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
   registerReasoningBackend(
     buildFailoverReasoningBackend(chain.map((candidate) => candidate.backend))
   );
-  const intentCandidates = chain.flatMap((candidate) => (candidate.intentExtractor ? [candidate.intentExtractor] : []));
+  const intentCandidates = chain.flatMap((candidate) =>
+    candidate.intentExtractor ? [candidate.intentExtractor] : []
+  );
   if (intentCandidates.length > 0) {
     registerIntentExtractor(buildFailoverIntentExtractor(intentCandidates));
   }
-  const voiceCandidates = chain.flatMap((candidate) => (candidate.voiceBridge ? [candidate.voiceBridge] : []));
+  const voiceCandidates = chain.flatMap((candidate) =>
+    candidate.voiceBridge ? [candidate.voiceBridge] : []
+  );
   if (voiceCandidates.length > 0) {
     registerVoiceBridge(buildFailoverVoiceBridge(voiceCandidates));
   }
