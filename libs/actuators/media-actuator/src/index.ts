@@ -51,6 +51,7 @@ import {
   isLegacyMediaOp,
   retry,
 } from '@agent/core';
+import { validateThemeContrast } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import {
   distillPdfDesign,
@@ -2010,6 +2011,26 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
   }
 }
 
+// Warn once per palette: runtime/personal/tenant themes bypass the CI
+// contrast gate, so the renderer is the last line of defense. Rendering is
+// never blocked — the defect lands in the log/trace for the designer review.
+const auditedThemePalettes = new Set<string>();
+function auditThemeContrast(colors: Record<string, string>): void {
+  const signature = JSON.stringify(colors);
+  if (auditedThemePalettes.has(signature)) return;
+  auditedThemePalettes.add(signature);
+  try {
+    const issues = validateThemeContrast(colors);
+    for (const issue of issues.filter((entry) => entry.severity === 'must_fix')) {
+      logger.warn(
+        `[THEME_CONTRAST] ${issue.pair} ${issue.ratio}:1 < ${issue.required}:1 (${issue.foreground} on ${issue.background}) — ${issue.note}`
+      );
+    }
+  } catch {
+    // contrast auditing must never break rendering
+  }
+}
+
 function resolveThemeColors(theme: any): Record<string, string> {
   const cssVars = {
     ...(theme?.css_vars || {}),
@@ -2026,13 +2047,15 @@ function resolveThemeColors(theme: any): Record<string, string> {
     accent: cssVarHex(cssVars['--kb-accent']),
     text: cssVarHex(cssVars['--kb-text-primary']),
   };
-  return Object.entries(mappedFromCssVars).reduce<Record<string, string>>(
+  const resolved = Object.entries(mappedFromCssVars).reduce<Record<string, string>>(
     (acc, [key, value]) => {
       if (value) acc[key] = value;
       return acc;
     },
     { ...colors }
   );
+  auditThemeContrast(resolved);
+  return resolved;
 }
 
 function cssVarHex(value: unknown): string | undefined {
