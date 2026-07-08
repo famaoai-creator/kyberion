@@ -108,6 +108,7 @@ export * from './operator-notifications.js';
 export * from './deal-documents.js';
 export * from './mission-retrospective.js';
 export * from './working-principles.js';
+export * from './design-qa.js';
 
 // Utils
 export * from './fs-utils.js';

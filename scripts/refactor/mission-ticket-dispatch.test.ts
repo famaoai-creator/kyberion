@@ -74,6 +74,39 @@ afterEach(() => {
 });
 
 describe('mission ticket dispatch', () => {
+  it('escalates a preflight rejection to an ops alert (PIP-DBCAA4A2)', async () => {
+    const state = makeMissionState();
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify(
+        [
+          {
+            task_id: 'task-unstaffed',
+            status: 'planned',
+            // no agent_id and the mission has no team staffing for the role
+            assigned_to: { role: 'implementer' },
+            description: 'Implement something without an assignee',
+            deliverable: 'deliverables/out.md',
+            risk: 'low',
+            estimated_scope: 'S',
+          },
+        ],
+        null,
+        2
+      )
+    );
+
+    const manifest = await dispatchMissionTickets(state, { targets: ['workitem'] });
+    expect(manifest.records[0].status).toBe('failed');
+    expect(manifest.records[0].notes.join('\n')).toContain('missing assigned_to.agent_id');
+    // no broken ticket is committed
+    expect(listWorkItems({ projectId })).toHaveLength(0);
+
+    const alertsPath = pathResolver.pathResolver.shared('observability/ops-alerts.jsonl');
+    const alerts = String(safeReadFile(alertsPath, { encoding: 'utf8' }));
+    expect(alerts).toContain(`ticket-preflight:${missionId}:task-unstaffed`);
+  });
+
   it('registers NEXT_TASKS as local work items and exports ticket payloads', async () => {
     const state = makeMissionState();
     safeWriteFile(
