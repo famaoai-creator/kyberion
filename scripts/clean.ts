@@ -1,6 +1,11 @@
 #!/usr/bin/env node
-import { withExecutionContext } from '@agent/core/governance';
-import { safeRmSync, pathResolver, getAllFiles } from '@agent/core';
+// Source imports on purpose: clean runs BEFORE build on a fresh checkout, so
+// @agent/core's dist entry points do not exist yet (CI chicken-and-egg).
+// Keep ALL imports source-side here — never mix source and dist registries.
+import { withExecutionContext } from '../libs/core/authority.js';
+import { safeRmSync } from '../libs/core/secure-io.js';
+import { pathResolver } from '../libs/core/path-resolver.js';
+import { getAllFiles } from '../libs/core/fs-utils.js';
 
 function removeIfExists(targetPath: string): void {
   safeRmSync(targetPath, { recursive: true, force: true });
