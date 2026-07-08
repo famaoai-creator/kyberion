@@ -20,6 +20,8 @@ export interface CustomerChannelBinding {
   counterpart?: { name?: string; org?: string };
   language?: string;
   disclosure_level?: 'public_catalog_only';
+  /** Conversation-mode override; default derives from the deal stage. */
+  mode?: 'sales' | 'support' | 'requirements_hearing';
   active?: boolean;
 }
 

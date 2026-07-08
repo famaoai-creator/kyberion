@@ -163,11 +163,41 @@ function main(): void {
       bg_main: brandTokens.tokens.colors.dark.bg_main,
       panel_bg: brandTokens.tokens.colors.dark.bg_main,
     }),
-    ...Object.entries(themes.themes).flatMap(([themeId, theme]) =>
-      checkPalette(`theme.${themeId}`, theme.colors, [
+    ...Object.entries(themes.themes).flatMap(([themeId, theme]) => {
+      const colors = theme.colors;
+      const pairsForTheme: ContrastPair[] = [
         { label: 'theme body', background: 'background', foreground: 'text', minRatio: 4.5 },
-      ])
-    ),
+        // accent-colored text must be readable: accent_text when provided,
+        // otherwise the raw accent is assumed to be used for text.
+        {
+          label: 'theme accent text',
+          background: 'background',
+          foreground: colors.accent_text ? 'accent_text' : 'accent',
+          minRatio: colors.accent_text ? 4.5 : 3,
+        },
+        ...(colors.surface
+          ? [
+              {
+                label: 'theme surface body',
+                background: 'surface',
+                foreground: 'text',
+                minRatio: 4.5,
+              },
+            ]
+          : []),
+        ...(colors.muted_text
+          ? [
+              {
+                label: 'theme muted text',
+                background: 'background',
+                foreground: 'muted_text',
+                minRatio: 4.5,
+              },
+            ]
+          : []),
+      ];
+      return checkPalette(`theme.${themeId}`, colors, pairsForTheme);
+    }),
   ];
 
   if (violations.length > 0) {

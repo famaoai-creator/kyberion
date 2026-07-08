@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" role="img" aria-labelledby="title desc">
+  <title id="title">Kyberion — the organization work loop engine</title>
+  <desc id="desc">Dark hero banner: orbit emblem, wordmark, tagline, and the intent-to-learning loop.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#020617"/>
+      <stop offset="55%" stop-color="#08111a"/>
+      <stop offset="100%" stop-color="#10263b"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#67e8f9"/>
+      <stop offset="50%" stop-color="#7dd3fc"/>
+      <stop offset="100%" stop-color="#f5d0fe"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0%" stop-color="#00F2FF" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#00F2FF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="orb" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fef3c7"/>
+      <stop offset="100%" stop-color="#7dd3fc"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1280" height="640" fill="url(#bg)"/>
+
+  <!-- ambient glow behind the emblem -->
+  <circle cx="1010" cy="320" r="260" fill="url(#glow)"/>
+
+  <!-- orbit emblem -->
+  <g transform="translate(1010 320)">
+    <circle r="150" fill="none" stroke="#1e3a5f" stroke-width="1.5"/>
+    <ellipse rx="205" ry="82" fill="none" stroke="url(#accent)" stroke-width="2.5" transform="rotate(-18)"/>
+    <ellipse rx="205" ry="82" fill="none" stroke="#31415B" stroke-width="1.5" transform="rotate(38)"/>
+    <circle r="58" fill="#0A192F" stroke="url(#accent)" stroke-width="3"/>
+    <circle r="26" fill="url(#orb)"/>
+    <!-- orbiting nodes: the agent team -->
+    <circle cx="195" cy="-63" r="10" fill="#00F2FF" transform="rotate(-18)"/>
+    <circle cx="-205" cy="0" r="7" fill="#f5d0fe" transform="rotate(-18)"/>
+    <circle cx="120" cy="66" r="6" fill="#7dd3fc" transform="rotate(38)"/>
+  </g>
+
+  <!-- wordmark -->
+  <g font-family="Inter, 'Helvetica Neue', Arial, sans-serif">
+    <text x="90" y="250" font-size="92" font-weight="800" letter-spacing="4" fill="#F8FAFC">KYBERION</text>
+    <rect x="94" y="278" width="330" height="6" rx="3" fill="url(#accent)"/>
+
+    <text x="90" y="352" font-size="38" font-weight="600" fill="#F8FAFC">The organization work loop engine</text>
+    <text x="90" y="404" font-size="27" fill="#94a3b8">You phrase outcomes. An agent team plans, runs,</text>
+    <text x="90" y="440" font-size="27" fill="#94a3b8">proves the result — and gets better every mission.</text>
+
+    <!-- the loop -->
+    <g font-size="22" font-weight="600">
+      <text x="90"  y="530" fill="#00F2FF">INTENT</text>
+      <text x="204" y="530" fill="#475569">→</text>
+      <text x="240" y="530" fill="#7dd3fc">PLAN</text>
+      <text x="322" y="530" fill="#475569">→</text>
+      <text x="358" y="530" fill="#a5b4fc">EXECUTE</text>
+      <text x="486" y="530" fill="#475569">→</text>
+      <text x="522" y="530" fill="#f0abfc">EVIDENCE</text>
+      <text x="664" y="530" fill="#475569">→</text>
+      <text x="700" y="530" fill="#f5d0fe">LEARN</text>
+      <text x="806" y="530" fill="#475569">↺</text>
+    </g>
+
+    <text x="90" y="586" font-size="20" fill="#64748b">OSS · self-hosted · evidence-gated · MIT</text>
+  </g>
+</svg>

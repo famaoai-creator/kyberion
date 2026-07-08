@@ -41,8 +41,13 @@ vi.mock('../libs/core/core.js', () => ({
 }));
 
 const backendPrompt = vi.hoisted(() => vi.fn());
+const backendExtractRequirements = vi.hoisted(() => vi.fn());
 vi.mock('../libs/core/reasoning-backend.js', () => ({
-  getReasoningBackend: () => ({ prompt: backendPrompt }),
+  getReasoningBackend: () => ({
+    name: 'claude-agent',
+    prompt: backendPrompt,
+    extractRequirements: backendExtractRequirements,
+  }),
 }));
 
 const opsAlerts = vi.hoisted(() => vi.fn());
@@ -195,6 +200,7 @@ describe('customer dialogue (E2E-06)', () => {
 
   beforeEach(() => {
     backendPrompt.mockReset();
+    backendExtractRequirements.mockReset();
     opsAlerts.mockReset();
     gate.mockReset();
     notify.mockClear();
@@ -527,6 +533,83 @@ describe('customer dialogue (E2E-06)', () => {
     const candidate = memoryQueue.create.mock.calls[0][0];
     expect(candidate.sourceRef).toBe(`deal:${SLUG}/${deal.deal_id}`);
     expect(candidate.sensitivityTier).toBe('confidential');
+  });
+
+  it('discovery stage switches to requirements-hearing mode and captures a structured draft', async () => {
+    const modes = await import('../libs/core/customer-conversation-modes.js');
+    backendPrompt.mockResolvedValue('承知しました。まず成功条件を伺えますか?');
+    backendExtractRequirements.mockResolvedValue({
+      functional_requirements: [
+        { id: 'FR-1', description: '日次レポート自動生成', priority: 'must' },
+      ],
+      non_functional_requirements: [],
+      constraints: [],
+      assumptions: [],
+      open_questions: [{ question: '対象データソースは?', blocking: true, status: 'open' }],
+    });
+
+    const binding = core.resolveCustomerBinding('slack', CHANNEL)!;
+    const first = await core.runCustomerConversation({ binding, text: '要件の相談をしたい' });
+    core.advanceDealStage({ tenantSlug: SLUG, dealId: first.deal.deal_id, stage: 'qualified' });
+    core.advanceDealStage({ tenantSlug: SLUG, dealId: first.deal.deal_id, stage: 'discovery' });
+
+    const result = await core.runCustomerConversation({
+      binding,
+      text: 'レポート業務を自動化したい',
+    });
+    expect(result.mode).toBe('requirements_hearing');
+    const prompt = backendPrompt.mock.calls.at(-1)![0] as string;
+    expect(prompt).toContain('MODE: requirements hearing');
+    expect(prompt).toContain('OPEN QUESTIONS');
+    // disclosure policy survives mode switching
+    expect(prompt).toContain('DISCLOSURE POLICY');
+
+    await vi.waitFor(() => {
+      const capture = modes.readDealRequirementsCapture(SLUG, result.deal.deal_id);
+      expect(capture).toBeTruthy();
+      expect(capture!.requirements.functional_requirements[0].id).toBe('FR-1');
+    });
+
+    // next hearing turn feeds prior draft + surfaces the blocking open question
+    backendPrompt.mockResolvedValue('対象データソースを伺えますか?');
+    await core.runCustomerConversation({ binding, text: '毎朝9時に欲しい' });
+    const nextPrompt = backendPrompt.mock.calls.at(-1)![0] as string;
+    expect(nextPrompt).toContain('[blocking] 対象データソースは?');
+    await vi.waitFor(() => {
+      expect(backendExtractRequirements.mock.calls.at(-1)![0].priorDraft).toBeTruthy();
+    });
+  });
+
+  it('binding mode override forces support mode and grounds replies in known issues', async () => {
+    const knownIssuesPath = path.join(
+      tmpRoot,
+      'knowledge',
+      'confidential',
+      SLUG,
+      'support',
+      'known-issues.md'
+    );
+    fs.mkdirSync(path.dirname(knownIssuesPath), { recursive: true });
+    fs.writeFileSync(knownIssuesPath, '## KI-1: エクスポートが失敗する → 回避策: 再ログイン');
+
+    backendPrompt.mockResolvedValue('既知の事象です。再ログインをお試しください。');
+    const binding = core.resolveCustomerBinding('slack', CHANNEL)!;
+    const overridden = {
+      ...binding,
+      binding: { ...binding.binding, mode: 'support' as const },
+    };
+    const result = await core.runCustomerConversation({
+      binding: overridden,
+      text: 'エクスポートができません',
+    });
+    expect(result.mode).toBe('support');
+    expect(result.grounded_sources).toContain('known-issues');
+    const prompt = backendPrompt.mock.calls.at(-1)![0] as string;
+    expect(prompt).toContain('MODE: customer support');
+    expect(prompt).toContain('KNOWN ISSUES');
+    expect(prompt).toContain('再ログイン');
+    // support mode never runs requirements capture
+    expect(backendExtractRequirements).not.toHaveBeenCalled();
   });
 
   it('repo approval policy marks customer:outbound as approval-required', () => {

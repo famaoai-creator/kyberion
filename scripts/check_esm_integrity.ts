@@ -1,11 +1,6 @@
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core';
-import {
-  safeExistsSync,
-  safeLstat,
-  safeReadFile,
-  safeReaddir,
-} from '@agent/core/secure-io';
+import { safeExistsSync, safeLstat, safeReadFile, safeReaddir } from '@agent/core/secure-io';
 import { readJsonFile, readTextFile } from './refactor/cli-input.js';
 
 const ROOT = pathResolver.rootDir();
@@ -16,10 +11,12 @@ const ALLOWED_CJS_FILES = new Set([
   'scripts/refactor/standardize-yargs.js',
   'templates/skill-template-cjs/scripts/main.cjs',
 ]);
-const ALLOWED_NON_MODULE_PACKAGES = new Set([
-  'templates/skill-template-cjs/package.json',
+const ALLOWED_NON_MODULE_PACKAGES = new Set(['templates/skill-template-cjs/package.json']);
+const ALLOWED_WORKSPACE_SOURCE_IMPORT_FILES = new Set<string>([
+  // Bootstrap exception: clean.ts runs BEFORE build on a fresh checkout, so
+  // @agent/core's dist entry points do not exist yet. It must import source.
+  'scripts/clean.ts',
 ]);
-const ALLOWED_WORKSPACE_SOURCE_IMPORT_FILES = new Set<string>([]);
 const ALLOWED_CORE_LEGACY_JS = new Set<string>([]);
 const LEGACY_JS_GUARDED_PREFIXES = [
   'libs/core/',
@@ -30,13 +27,7 @@ const LEGACY_JS_GUARDED_PREFIXES = [
   'libs/shared-vision/',
   'libs/actuators/',
 ];
-const PACKAGE_SCAN_ROOTS = [
-  'libs',
-  'presence',
-  'satellites',
-  'templates',
-  'package.json',
-];
+const PACKAGE_SCAN_ROOTS = ['libs', 'presence', 'satellites', 'templates', 'package.json'];
 const NODE_SOURCE_SCAN_ROOTS = [
   'libs',
   'presence/bridge',
@@ -45,18 +36,13 @@ const NODE_SOURCE_SCAN_ROOTS = [
   'scripts',
   'templates',
 ];
-const SKIP_DIRS = new Set([
-  '.git',
-  'node_modules',
-  'dist',
-  'coverage',
-  '.next',
-]);
+const SKIP_DIRS = new Set(['.git', 'node_modules', 'dist', 'coverage', '.next']);
 const IMPORT_EXTENSIONLESS_RE =
   /\b(?:import|export)\b[\s\S]{0,200}from\s+['"](\.{1,2}\/[^'"]+)['"]/g;
 const FORBIDDEN_WORKSPACE_SOURCE_IMPORT_RE =
   /\b(?:import|export)\b[\s\S]{0,200}from\s+['"]([^'"]*(?:libs\/core\/|libs\/shared-[^/]+\/src\/)[^'"]+)['"]/g;
-const CJS_RE = /\bmodule\.exports\b|\bexports\.[A-Za-z_$]|\brequire\.main\s*===\s*module\b|\b__dirname\b|\b__filename\b/;
+const CJS_RE =
+  /\bmodule\.exports\b|\bexports\.[A-Za-z_$]|\brequire\.main\s*===\s*module\b|\b__dirname\b|\b__filename\b/;
 
 function toPosix(relativePath: string): string {
   return relativePath.split(path.sep).join('/');
@@ -100,18 +86,14 @@ function checkSourceFile(filePath: string, violations: string[]) {
   }
 
   const isNodeSource =
-    filePath.endsWith('.ts') ||
-    filePath.endsWith('.mts') ||
-    filePath.endsWith('.mjs');
+    filePath.endsWith('.ts') || filePath.endsWith('.mts') || filePath.endsWith('.mjs');
   const usesCjsPattern = CJS_RE.test(content);
   if (usesCjsPattern && !ALLOWED_CJS_FILES.has(relativePath) && !isCjsFile && isNodeSource) {
     violations.push(`${relativePath}: CommonJS-only pattern detected`);
   }
 
   const isTypedSource =
-    filePath.endsWith('.ts') ||
-    filePath.endsWith('.mts') ||
-    filePath.endsWith('.d.ts');
+    filePath.endsWith('.ts') || filePath.endsWith('.mts') || filePath.endsWith('.d.ts');
   if (!isTypedSource) return;
 
   for (const match of content.matchAll(IMPORT_EXTENSIONLESS_RE)) {
@@ -124,7 +106,9 @@ function checkSourceFile(filePath: string, violations: string[]) {
     ) {
       continue;
     }
-    violations.push(`${relativePath}: relative import/export must include extension (${specifier})`);
+    violations.push(
+      `${relativePath}: relative import/export must include extension (${specifier})`
+    );
   }
 
   for (const match of content.matchAll(FORBIDDEN_WORKSPACE_SOURCE_IMPORT_RE)) {
@@ -133,7 +117,7 @@ function checkSourceFile(filePath: string, violations: string[]) {
       continue;
     }
     violations.push(
-      `${relativePath}: import exported workspace packages via package name, not source path (${specifier})`,
+      `${relativePath}: import exported workspace packages via package name, not source path (${specifier})`
     );
   }
 }
@@ -148,7 +132,9 @@ function checkLegacyJsShadow(filePath: string, violations: string[]) {
     return;
   }
 
-  const guardedPrefix = LEGACY_JS_GUARDED_PREFIXES.find((prefix) => relativePath.startsWith(prefix));
+  const guardedPrefix = LEGACY_JS_GUARDED_PREFIXES.find((prefix) =>
+    relativePath.startsWith(prefix)
+  );
   if (!guardedPrefix) {
     return;
   }
@@ -157,7 +143,7 @@ function checkLegacyJsShadow(filePath: string, violations: string[]) {
   const dtsSibling = filePath.slice(0, -3) + '.d.ts';
   if (!safeExistsSync(tsSibling) && !safeExistsSync(dtsSibling)) {
     violations.push(
-      `${relativePath}: legacy JavaScript shadow in source tree must be migrated or explicitly allowlisted`,
+      `${relativePath}: legacy JavaScript shadow in source tree must be migrated or explicitly allowlisted`
     );
   }
 }

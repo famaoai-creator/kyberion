@@ -113,6 +113,12 @@
 - [x] **E2E-03**: Agent Collaboration (`E2E-03_AGENT_COLLABORATION.ja.md`) — 全 Task 完了(best-of-2+judge、code_change PR 協調を追加)
 - [x] **E2E-04**: Operator Interface (`E2E-04_OPERATOR_INTERFACE.ja.md`) — Task 2(notifyOperator 通知ルーティング)を追加実装し発火点(承認・質問・完了/失敗・inbox)を配線。CLI 統一(Task 6)は残余
 - [x] **E2E-05**: App Lifecycle (`E2E-05_APP_LIFECYCLE.ja.md`) — Task 1〜7 完了(app:preflight・build-actuator・scaffold・sdlc-cycle・device compiler・mobile-beta)。実機実走記録のみ未取得(原文 §7)
+- [x] **PHIL-01**: Working Philosophy Pack(2026-07-08/09 セッション)— フロンティアモデルの作業規律を機械的ルール化(`knowledge/product/governance/working-philosophy.md`)し、`libs/core/working-principles.ts` 経由で全ワーカープロンプト(task 実行・workitem dispatch・独立レビュー)へロール別に自動注入
+- [x] **E2E-06 追補**: 顧客対話モード — sales / support / requirements_hearing を deal stage から自動導出、要件ヒアリングは deal 単位の構造化ドラフトを増分収集(`pnpm kyberion deals --requirements`)。既知問題接地のサポートモード
+- [x] **DS-01 追補**: セマンティックカラートークン(accent_text/surface/muted_text 等)+ WCAG コントラストの多面ゲート(CI `check:design-contrast` 拡張、ランタイム `design-qa.ts`、media-actuator レンダリング時 warn 監査)
+- [x] **CI-CROSSPLAT**: main の CI 全滅を根治 — clean.ts の dist 依存(鶏卵)、knowledge index の localeCompare 非決定性(ICU 差)、Linux CJK フォント欠如、遅ランナーのタイムアウト
+- [x] **AI-BRIDGE-01**: Apple Intelligence ローカル補助レーン(2026-07-09)— FoundationModels ブリッジ(afm CLI + apple-intelligence-bridge.ts、probe-and-degrade)。テキスト補助(要約/分類/整形)+ Vision レーン(OCR/ラベル/`verifyRenderedTextWithAppleVision` レンダリング QA)。`pnpm check:apple-fm` で実機実証済み
+- [x] **PIP-DBCAA4A2**: retrospective 発の初ワークオーダーを実装まで完遂 — ticket preflight 失敗の即時 ops alert 化(自己改善ループ一周の実証)
 
 ## 2. 使い方
 

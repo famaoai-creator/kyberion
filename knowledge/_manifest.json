@@ -7,6 +7,12 @@
       "type": "md"
     },
     {
+      "path": "README.md",
+      "tier": "public",
+      "size": 2023,
+      "type": "md"
+    },
+    {
       "path": "product/agents/chronos-mirror.agent.md",
       "tier": "public",
       "size": 6866,
@@ -160,6 +166,12 @@
       "path": "product/architecture/analysis-sensory-alignment-20260305.md",
       "tier": "public",
       "size": 2875,
+      "type": "md"
+    },
+    {
+      "path": "product/architecture/apple-intelligence-native-capability-bridge.md",
+      "tier": "public",
+      "size": 5473,
       "type": "md"
     },
     {
@@ -621,7 +633,7 @@
     {
       "path": "product/architecture/provider-native-capability-bridge.md",
       "tier": "public",
-      "size": 7137,
+      "size": 7816,
       "type": "md"
     },
     {
@@ -751,6 +763,12 @@
       "type": "md"
     },
     {
+      "path": "product/capability-assets/README.md",
+      "tier": "public",
+      "size": 981,
+      "type": "md"
+    },
+    {
       "path": "product/capability-assets/api-doc-generator/patterns.json",
       "tier": "public",
       "size": 223,
@@ -781,6 +799,12 @@
       "type": "json"
     },
     {
+      "path": "product/capability-assets/diagram-renderer/README.md",
+      "tier": "public",
+      "size": 1223,
+      "type": "md"
+    },
+    {
       "path": "product/capability-assets/diagram-renderer/design-rules.json",
       "tier": "public",
       "size": 1717,
@@ -797,12 +821,6 @@
       "tier": "public",
       "size": 2018,
       "type": "json"
-    },
-    {
-      "path": "product/capability-assets/diagram-renderer/README.md",
-      "tier": "public",
-      "size": 1223,
-      "type": "md"
     },
     {
       "path": "product/capability-assets/diagram-renderer/theme-registry.json",
@@ -835,12 +853,6 @@
       "type": "json"
     },
     {
-      "path": "product/capability-assets/README.md",
-      "tier": "public",
-      "size": 981,
-      "type": "md"
-    },
-    {
       "path": "product/capability-assets/security-scanner/compliance-mapping.json",
       "tier": "public",
       "size": 370,
@@ -871,6 +883,12 @@
       "type": "md"
     },
     {
+      "path": "product/classifiers/README.md",
+      "tier": "public",
+      "size": 228,
+      "type": "md"
+    },
+    {
       "path": "product/classifiers/doc-type-rules.yml",
       "tier": "public",
       "size": 758,
@@ -889,9 +907,9 @@
       "type": "yml"
     },
     {
-      "path": "product/classifiers/README.md",
+      "path": "product/config-missions/README.md",
       "tier": "public",
-      "size": 228,
+      "size": 1554,
       "type": "md"
     },
     {
@@ -899,12 +917,6 @@
       "tier": "public",
       "size": 1644,
       "type": "json"
-    },
-    {
-      "path": "product/config-missions/README.md",
-      "tier": "public",
-      "size": 1554,
-      "type": "md"
     },
     {
       "path": "product/config-missions/surface-registration.json",
@@ -923,6 +935,18 @@
       "tier": "public",
       "size": 1697,
       "type": "json"
+    },
+    {
+      "path": "product/governance/AUTHORITY_MODEL.md",
+      "tier": "public",
+      "size": 6631,
+      "type": "md"
+    },
+    {
+      "path": "product/governance/HINTS.md",
+      "tier": "public",
+      "size": 0,
+      "type": "md"
     },
     {
       "path": "product/governance/active-inquiry-protocol.md",
@@ -985,16 +1009,16 @@
       "type": "json"
     },
     {
-      "path": "product/governance/AUTHORITY_MODEL.md",
-      "tier": "public",
-      "size": 6631,
-      "type": "md"
-    },
-    {
       "path": "product/governance/authority-role-index.json",
       "tier": "public",
       "size": 7524,
       "type": "json"
+    },
+    {
+      "path": "product/governance/authority-roles/README.md",
+      "tier": "public",
+      "size": 249,
+      "type": "md"
     },
     {
       "path": "product/governance/authority-roles/chronos_gateway.json",
@@ -1037,12 +1061,6 @@
       "tier": "public",
       "size": 814,
       "type": "json"
-    },
-    {
-      "path": "product/governance/authority-roles/README.md",
-      "tier": "public",
-      "size": 249,
-      "type": "md"
     },
     {
       "path": "product/governance/authority-roles/slack_bridge.json",
@@ -1289,12 +1307,6 @@
       "tier": "public",
       "size": 32519,
       "type": "json"
-    },
-    {
-      "path": "product/governance/HINTS.md",
-      "tier": "public",
-      "size": 0,
-      "type": "md"
     },
     {
       "path": "product/governance/independent-validation-evidence-package.md",
@@ -1651,6 +1663,12 @@
       "type": "json"
     },
     {
+      "path": "product/governance/organization-team-template-catalogs/README.md",
+      "tier": "public",
+      "size": 2106,
+      "type": "md"
+    },
+    {
       "path": "product/governance/organization-team-template-catalogs/consulting-firm.json",
       "tier": "public",
       "size": 675,
@@ -1691,12 +1709,6 @@
       "tier": "public",
       "size": 973,
       "type": "json"
-    },
-    {
-      "path": "product/governance/organization-team-template-catalogs/README.md",
-      "tier": "public",
-      "size": 2106,
-      "type": "md"
     },
     {
       "path": "product/governance/organization-team-template-catalogs/saas-product-company.json",
@@ -1977,7 +1989,7 @@
     {
       "path": "product/governance/security-policy.json",
       "tier": "public",
-      "size": 17966,
+      "size": 17882,
       "type": "json"
     },
     {
@@ -2083,6 +2095,12 @@
       "type": "json"
     },
     {
+      "path": "product/governance/surface-provider-manifest-catalogs/README.md",
+      "tier": "public",
+      "size": 481,
+      "type": "md"
+    },
+    {
       "path": "product/governance/surface-provider-manifest-catalogs/chronos.json",
       "tier": "public",
       "size": 358,
@@ -2113,12 +2131,6 @@
       "type": "json"
     },
     {
-      "path": "product/governance/surface-provider-manifest-catalogs/README.md",
-      "tier": "public",
-      "size": 481,
-      "type": "md"
-    },
-    {
       "path": "product/governance/surface-provider-manifest-catalogs/slack.json",
       "tier": "public",
       "size": 352,
@@ -2147,6 +2159,12 @@
       "tier": "public",
       "size": 2143,
       "type": "json"
+    },
+    {
+      "path": "product/governance/surfaces/README.md",
+      "tier": "public",
+      "size": 327,
+      "type": "md"
     },
     {
       "path": "product/governance/surfaces/chronos-mirror-v2.json",
@@ -2201,12 +2219,6 @@
       "tier": "public",
       "size": 536,
       "type": "json"
-    },
-    {
-      "path": "product/governance/surfaces/README.md",
-      "tier": "public",
-      "size": 327,
-      "type": "md"
     },
     {
       "path": "product/governance/surfaces/slack-bridge.json",
@@ -2323,6 +2335,12 @@
       "type": "json"
     },
     {
+      "path": "product/governance/voice-engines/README.md",
+      "tier": "public",
+      "size": 372,
+      "type": "md"
+    },
+    {
       "path": "product/governance/voice-engines/espeak_ng.json",
       "tier": "public",
       "size": 592,
@@ -2353,16 +2371,16 @@
       "type": "json"
     },
     {
-      "path": "product/governance/voice-engines/README.md",
-      "tier": "public",
-      "size": 372,
-      "type": "md"
-    },
-    {
       "path": "product/governance/voice-profile-registry.json",
       "tier": "public",
       "size": 2272,
       "type": "json"
+    },
+    {
+      "path": "product/governance/voice-profiles/README.md",
+      "tier": "public",
+      "size": 714,
+      "type": "md"
     },
     {
       "path": "product/governance/voice-profiles/my-voice-v1.json",
@@ -2387,12 +2405,6 @@
       "tier": "public",
       "size": 428,
       "type": "json"
-    },
-    {
-      "path": "product/governance/voice-profiles/README.md",
-      "tier": "public",
-      "size": 714,
-      "type": "md"
     },
     {
       "path": "product/governance/voice-profiles/shadow-multilingual-clone.json",
@@ -2453,6 +2465,12 @@
       "tier": "public",
       "size": 1730,
       "type": "json"
+    },
+    {
+      "path": "product/governance/working-philosophy.md",
+      "tier": "public",
+      "size": 8862,
+      "type": "md"
     },
     {
       "path": "product/hints/browser-approval-workflow.json",
@@ -2737,15 +2755,15 @@
       "type": "md"
     },
     {
-      "path": "product/operations/incident_knowledge_loop.md",
-      "tier": "public",
-      "size": 1143,
-      "type": "md"
-    },
-    {
       "path": "product/operations/incident-management-excellence.md",
       "tier": "public",
       "size": 3321,
+      "type": "md"
+    },
+    {
+      "path": "product/operations/incident_knowledge_loop.md",
+      "tier": "public",
+      "size": 1143,
       "type": "md"
     },
     {
@@ -2758,12 +2776,6 @@
       "path": "product/operations/modern_sre_best_practices.md",
       "tier": "public",
       "size": 3653,
-      "type": "md"
-    },
-    {
-      "path": "product/operations/monitoring_best_practices.md",
-      "tier": "public",
-      "size": 3202,
       "type": "md"
     },
     {
@@ -2782,6 +2794,12 @@
       "path": "product/operations/monitoring/newrelic_best_practices.md",
       "tier": "public",
       "size": 1238,
+      "type": "md"
+    },
+    {
+      "path": "product/operations/monitoring_best_practices.md",
+      "tier": "public",
+      "size": 3202,
       "type": "md"
     },
     {
@@ -2806,6 +2824,12 @@
       "path": "product/operations/slo_dashboard_best_practices.md",
       "tier": "public",
       "size": 2964,
+      "type": "md"
+    },
+    {
+      "path": "product/orchestration/README.md",
+      "tier": "public",
+      "size": 7320,
       "type": "md"
     },
     {
@@ -2899,6 +2923,12 @@
       "type": "json"
     },
     {
+      "path": "product/orchestration/agent-profiles/README.md",
+      "tier": "public",
+      "size": 516,
+      "type": "md"
+    },
+    {
       "path": "product/orchestration/agent-profiles/attacker.json",
       "tier": "public",
       "size": 389,
@@ -2945,12 +2975,6 @@
       "tier": "public",
       "size": 483,
       "type": "json"
-    },
-    {
-      "path": "product/orchestration/agent-profiles/README.md",
-      "tier": "public",
-      "size": 516,
-      "type": "md"
     },
     {
       "path": "product/orchestration/agent-profiles/slack-surface-agent.json",
@@ -3283,6 +3307,12 @@
       "type": "md"
     },
     {
+      "path": "product/orchestration/mobile-app-profiles/README.md",
+      "tier": "public",
+      "size": 890,
+      "type": "md"
+    },
+    {
       "path": "product/orchestration/mobile-app-profiles/example-ios-login-passkey.json",
       "tier": "public",
       "size": 1242,
@@ -3299,12 +3329,6 @@
       "tier": "public",
       "size": 888,
       "type": "json"
-    },
-    {
-      "path": "product/orchestration/mobile-app-profiles/README.md",
-      "tier": "public",
-      "size": 890,
-      "type": "md"
     },
     {
       "path": "product/orchestration/narrated-video-production-playbook.md",
@@ -3589,12 +3613,6 @@
       "type": "md"
     },
     {
-      "path": "product/orchestration/README.md",
-      "tier": "public",
-      "size": 7320,
-      "type": "md"
-    },
-    {
       "path": "product/orchestration/real-time-coaching-protocol.md",
       "tier": "public",
       "size": 2916,
@@ -3653,6 +3671,12 @@
       "tier": "public",
       "size": 5671,
       "type": "json"
+    },
+    {
+      "path": "product/orchestration/service-endpoints/README.md",
+      "tier": "public",
+      "size": 1520,
+      "type": "md"
     },
     {
       "path": "product/orchestration/service-endpoints/aws-ce.json",
@@ -3773,12 +3797,6 @@
       "tier": "public",
       "size": 317,
       "type": "json"
-    },
-    {
-      "path": "product/orchestration/service-endpoints/README.md",
-      "tier": "public",
-      "size": 1520,
-      "type": "md"
     },
     {
       "path": "product/orchestration/service-endpoints/slack.json",
@@ -4063,6 +4081,12 @@
       "type": "json"
     },
     {
+      "path": "product/orchestration/specialists/README.md",
+      "tier": "public",
+      "size": 371,
+      "type": "md"
+    },
+    {
       "path": "product/orchestration/specialists/browser-operator.json",
       "tier": "public",
       "size": 389,
@@ -4091,12 +4115,6 @@
       "tier": "public",
       "size": 421,
       "type": "json"
-    },
-    {
-      "path": "product/orchestration/specialists/README.md",
-      "tier": "public",
-      "size": 371,
-      "type": "md"
     },
     {
       "path": "product/orchestration/specialists/service-operator.json",
@@ -4139,6 +4157,12 @@
       "tier": "public",
       "size": 15015,
       "type": "json"
+    },
+    {
+      "path": "product/orchestration/team-roles/README.md",
+      "tier": "public",
+      "size": 242,
+      "type": "md"
     },
     {
       "path": "product/orchestration/team-roles/attacker.json",
@@ -4205,12 +4229,6 @@
       "tier": "public",
       "size": 781,
       "type": "json"
-    },
-    {
-      "path": "product/orchestration/team-roles/README.md",
-      "tier": "public",
-      "size": 242,
-      "type": "md"
     },
     {
       "path": "product/orchestration/team-roles/relationship_curator.json",
@@ -4291,6 +4309,12 @@
       "type": "md"
     },
     {
+      "path": "product/orchestration/web-app-profiles/README.md",
+      "tier": "public",
+      "size": 594,
+      "type": "md"
+    },
+    {
       "path": "product/orchestration/web-app-profiles/example-web-login-guarded.json",
       "tier": "public",
       "size": 957,
@@ -4301,12 +4325,6 @@
       "tier": "public",
       "size": 459,
       "type": "json"
-    },
-    {
-      "path": "product/orchestration/web-app-profiles/README.md",
-      "tier": "public",
-      "size": 594,
-      "type": "md"
     },
     {
       "path": "product/orchestration/work-coordination-examples/personal-todo.json",
@@ -4343,6 +4361,12 @@
       "tier": "public",
       "size": 9736,
       "type": "json"
+    },
+    {
+      "path": "product/pipeline-templates/README.md",
+      "tier": "public",
+      "size": 1100,
+      "type": "md"
     },
     {
       "path": "product/pipeline-templates/account-expansion-workflow.json",
@@ -4867,12 +4891,6 @@
       "type": "json"
     },
     {
-      "path": "product/pipeline-templates/README.md",
-      "tier": "public",
-      "size": 1100,
-      "type": "md"
-    },
-    {
       "path": "product/pipeline-templates/release-package.json",
       "tier": "public",
       "size": 2227,
@@ -5047,15 +5065,21 @@
       "type": "md"
     },
     {
+      "path": "product/roles/business_owner/PROCEDURE.md",
+      "tier": "public",
+      "size": 758,
+      "type": "md"
+    },
+    {
       "path": "product/roles/business_owner/mission.md",
       "tier": "public",
       "size": 1099,
       "type": "md"
     },
     {
-      "path": "product/roles/business_owner/PROCEDURE.md",
+      "path": "product/roles/ceo/PROCEDURE.md",
       "tier": "public",
-      "size": 758,
+      "size": 985,
       "type": "md"
     },
     {
@@ -5089,9 +5113,9 @@
       "type": "md"
     },
     {
-      "path": "product/roles/ceo/PROCEDURE.md",
+      "path": "product/roles/customer_success/PROCEDURE.md",
       "tier": "public",
-      "size": 985,
+      "size": 769,
       "type": "md"
     },
     {
@@ -5101,9 +5125,9 @@
       "type": "md"
     },
     {
-      "path": "product/roles/customer_success/PROCEDURE.md",
+      "path": "product/roles/cyber_security/PROCEDURE.md",
       "tier": "public",
-      "size": 769,
+      "size": 902,
       "type": "md"
     },
     {
@@ -5113,9 +5137,9 @@
       "type": "md"
     },
     {
-      "path": "product/roles/cyber_security/PROCEDURE.md",
+      "path": "product/roles/designer/PROCEDURE.md",
       "tier": "public",
-      "size": 902,
+      "size": 885,
       "type": "md"
     },
     {
@@ -5125,9 +5149,9 @@
       "type": "md"
     },
     {
-      "path": "product/roles/designer/PROCEDURE.md",
+      "path": "product/roles/ecosystem_architect/PROCEDURE.md",
       "tier": "public",
-      "size": 885,
+      "size": 1800,
       "type": "md"
     },
     {
@@ -5137,9 +5161,9 @@
       "type": "md"
     },
     {
-      "path": "product/roles/ecosystem_architect/PROCEDURE.md",
+      "path": "product/roles/executive_assistant/PROCEDURE.md",
       "tier": "public",
-      "size": 1800,
+      "size": 776,
       "type": "md"
     },
     {
@@ -5149,9 +5173,9 @@
       "type": "md"
     },
     {
-      "path": "product/roles/executive_assistant/PROCEDURE.md",
+      "path": "product/roles/finance_controller/PROCEDURE.md",
       "tier": "public",
-      "size": 776,
+      "size": 695,
       "type": "md"
     },
     {
@@ -5161,9 +5185,9 @@
       "type": "md"
     },
     {
-      "path": "product/roles/finance_controller/PROCEDURE.md",
+      "path": "product/roles/incident_commander/PROCEDURE.md",
       "tier": "public",
-      "size": 695,
+      "size": 808,
       "type": "md"
     },
     {
@@ -5173,21 +5197,9 @@
       "type": "md"
     },
     {
-      "path": "product/roles/incident_commander/PROCEDURE.md",
-      "tier": "public",
-      "size": 808,
-      "type": "md"
-    },
-    {
       "path": "product/roles/infrastructure_sentinel/PROCEDURE.md",
       "tier": "public",
       "size": 1481,
-      "type": "md"
-    },
-    {
-      "path": "product/roles/integration_steward/mission.md",
-      "tier": "public",
-      "size": 1299,
       "type": "md"
     },
     {
@@ -5197,9 +5209,9 @@
       "type": "md"
     },
     {
-      "path": "product/roles/knowledge_steward/mission.md",
+      "path": "product/roles/integration_steward/mission.md",
       "tier": "public",
-      "size": 1844,
+      "size": 1299,
       "type": "md"
     },
     {
@@ -5209,9 +5221,9 @@
       "type": "md"
     },
     {
-      "path": "product/roles/legal_strategist/mission.md",
+      "path": "product/roles/knowledge_steward/mission.md",
       "tier": "public",
-      "size": 1069,
+      "size": 1844,
       "type": "md"
     },
     {
@@ -5221,9 +5233,9 @@
       "type": "md"
     },
     {
-      "path": "product/roles/line_manager/mission.md",
+      "path": "product/roles/legal_strategist/mission.md",
       "tier": "public",
-      "size": 1733,
+      "size": 1069,
       "type": "md"
     },
     {
@@ -5233,9 +5245,9 @@
       "type": "md"
     },
     {
-      "path": "product/roles/marketing_growth/mission.md",
+      "path": "product/roles/line_manager/mission.md",
       "tier": "public",
-      "size": 1127,
+      "size": 1733,
       "type": "md"
     },
     {
@@ -5245,9 +5257,21 @@
       "type": "md"
     },
     {
+      "path": "product/roles/marketing_growth/mission.md",
+      "tier": "public",
+      "size": 1127,
+      "type": "md"
+    },
+    {
       "path": "product/roles/mission_controller/PROCEDURE.md",
       "tier": "public",
       "size": 1291,
+      "type": "md"
+    },
+    {
+      "path": "product/roles/performance_engineer/PROCEDURE.md",
+      "tier": "public",
+      "size": 940,
       "type": "md"
     },
     {
@@ -5263,9 +5287,9 @@
       "type": "md"
     },
     {
-      "path": "product/roles/performance_engineer/PROCEDURE.md",
+      "path": "product/roles/pmo_governance/PROCEDURE.md",
       "tier": "public",
-      "size": 940,
+      "size": 752,
       "type": "md"
     },
     {
@@ -5275,21 +5299,9 @@
       "type": "md"
     },
     {
-      "path": "product/roles/pmo_governance/PROCEDURE.md",
-      "tier": "public",
-      "size": 752,
-      "type": "md"
-    },
-    {
       "path": "product/roles/pmo_governance/quality_gates.md",
       "tier": "public",
       "size": 1022,
-      "type": "md"
-    },
-    {
-      "path": "product/roles/product_manager/mission.md",
-      "tier": "public",
-      "size": 1587,
       "type": "md"
     },
     {
@@ -5299,9 +5311,9 @@
       "type": "md"
     },
     {
-      "path": "product/roles/qa_lead/mission.md",
+      "path": "product/roles/product_manager/mission.md",
       "tier": "public",
-      "size": 1062,
+      "size": 1587,
       "type": "md"
     },
     {
@@ -5311,15 +5323,15 @@
       "type": "md"
     },
     {
-      "path": "product/roles/qa_lead/qa_checkpoints.md",
+      "path": "product/roles/qa_lead/mission.md",
       "tier": "public",
-      "size": 1572,
+      "size": 1062,
       "type": "md"
     },
     {
-      "path": "product/roles/reliability_engineer/mission.md",
+      "path": "product/roles/qa_lead/qa_checkpoints.md",
       "tier": "public",
-      "size": 1103,
+      "size": 1572,
       "type": "md"
     },
     {
@@ -5329,15 +5341,15 @@
       "type": "md"
     },
     {
-      "path": "product/roles/ruthless_auditor/PROCEDURE.md",
+      "path": "product/roles/reliability_engineer/mission.md",
       "tier": "public",
-      "size": 1066,
+      "size": 1103,
       "type": "md"
     },
     {
-      "path": "product/roles/software_developer/mission.md",
+      "path": "product/roles/ruthless_auditor/PROCEDURE.md",
       "tier": "public",
-      "size": 1592,
+      "size": 1066,
       "type": "md"
     },
     {
@@ -5347,9 +5359,9 @@
       "type": "md"
     },
     {
-      "path": "product/roles/solution_architect/mission.md",
+      "path": "product/roles/software_developer/mission.md",
       "tier": "public",
-      "size": 1150,
+      "size": 1592,
       "type": "md"
     },
     {
@@ -5359,15 +5371,15 @@
       "type": "md"
     },
     {
-      "path": "product/roles/sovereign_concierge/PROCEDURE.md",
+      "path": "product/roles/solution_architect/mission.md",
       "tier": "public",
-      "size": 964,
+      "size": 1150,
       "type": "md"
     },
     {
-      "path": "product/roles/strategic_sales/mission.md",
+      "path": "product/roles/sovereign_concierge/PROCEDURE.md",
       "tier": "public",
-      "size": 1193,
+      "size": 964,
       "type": "md"
     },
     {
@@ -5377,15 +5389,21 @@
       "type": "md"
     },
     {
-      "path": "product/roles/talent_culture/mission.md",
+      "path": "product/roles/strategic_sales/mission.md",
       "tier": "public",
-      "size": 1098,
+      "size": 1193,
       "type": "md"
     },
     {
       "path": "product/roles/talent_culture/PROCEDURE.md",
       "tier": "public",
       "size": 839,
+      "type": "md"
+    },
+    {
+      "path": "product/roles/talent_culture/mission.md",
+      "tier": "public",
+      "size": 1098,
       "type": "md"
     },
     {
@@ -5417,6 +5435,150 @@
       "tier": "public",
       "size": 2577,
       "type": "yaml"
+    },
+    {
+      "path": "product/schemas/README-architecture-adf.md",
+      "tier": "public",
+      "size": 565,
+      "type": "md"
+    },
+    {
+      "path": "product/schemas/README-booking-preference-profile.md",
+      "tier": "public",
+      "size": 1762,
+      "type": "md"
+    },
+    {
+      "path": "product/schemas/README-document-brief.md",
+      "tier": "public",
+      "size": 2181,
+      "type": "md"
+    },
+    {
+      "path": "product/schemas/README-guided-coordination-brief.md",
+      "tier": "public",
+      "size": 845,
+      "type": "md"
+    },
+    {
+      "path": "product/schemas/README-intent-resolution-packet.md",
+      "tier": "public",
+      "size": 778,
+      "type": "md"
+    },
+    {
+      "path": "product/schemas/README-meeting-operations-brief.md",
+      "tier": "public",
+      "size": 1010,
+      "type": "md"
+    },
+    {
+      "path": "product/schemas/README-meeting-operations-profile.md",
+      "tier": "public",
+      "size": 1579,
+      "type": "md"
+    },
+    {
+      "path": "product/schemas/README-mobile-app-profile-index.md",
+      "tier": "public",
+      "size": 606,
+      "type": "md"
+    },
+    {
+      "path": "product/schemas/README-mobile-app-profile.md",
+      "tier": "public",
+      "size": 658,
+      "type": "md"
+    },
+    {
+      "path": "product/schemas/README-narrated-video-preference-profile.md",
+      "tier": "public",
+      "size": 1143,
+      "type": "md"
+    },
+    {
+      "path": "product/schemas/README-narrated-video-publish-plan.md",
+      "tier": "public",
+      "size": 896,
+      "type": "md"
+    },
+    {
+      "path": "product/schemas/README-narrated-video-upload-package.md",
+      "tier": "public",
+      "size": 745,
+      "type": "md"
+    },
+    {
+      "path": "product/schemas/README-points-portal-clickout-usecase.md",
+      "tier": "public",
+      "size": 1392,
+      "type": "md"
+    },
+    {
+      "path": "product/schemas/README-pptx-theme-pack.md",
+      "tier": "public",
+      "size": 999,
+      "type": "md"
+    },
+    {
+      "path": "product/schemas/README-presentation-preference-profile.md",
+      "tier": "public",
+      "size": 1197,
+      "type": "md"
+    },
+    {
+      "path": "product/schemas/README-proposal-brief.md",
+      "tier": "public",
+      "size": 304,
+      "type": "md"
+    },
+    {
+      "path": "product/schemas/README-proposal-storyline-adf.md",
+      "tier": "public",
+      "size": 513,
+      "type": "md"
+    },
+    {
+      "path": "product/schemas/README-task-session.md",
+      "tier": "public",
+      "size": 879,
+      "type": "md"
+    },
+    {
+      "path": "product/schemas/README-test-case-adf.md",
+      "tier": "public",
+      "size": 426,
+      "type": "md"
+    },
+    {
+      "path": "product/schemas/README-travel-planning-brief.md",
+      "tier": "public",
+      "size": 1259,
+      "type": "md"
+    },
+    {
+      "path": "product/schemas/README-ui-flow-adf.md",
+      "tier": "public",
+      "size": 399,
+      "type": "md"
+    },
+    {
+      "path": "product/schemas/README-web-app-profile.md",
+      "tier": "public",
+      "size": 658,
+      "type": "md"
+    },
+    {
+      "path": "product/schemas/README-web-theme-pack.md",
+      "tier": "public",
+      "size": 1159,
+      "type": "md"
+    },
+    {
+      "path": "product/schemas/README-webview-session-handoff.md",
+      "tier": "public",
+      "size": 563,
+      "type": "md"
     },
     {
       "path": "product/schemas/a2a-task-contract.schema.json",
@@ -6595,150 +6757,6 @@
       "type": "json"
     },
     {
-      "path": "product/schemas/README-architecture-adf.md",
-      "tier": "public",
-      "size": 565,
-      "type": "md"
-    },
-    {
-      "path": "product/schemas/README-booking-preference-profile.md",
-      "tier": "public",
-      "size": 1762,
-      "type": "md"
-    },
-    {
-      "path": "product/schemas/README-document-brief.md",
-      "tier": "public",
-      "size": 2181,
-      "type": "md"
-    },
-    {
-      "path": "product/schemas/README-guided-coordination-brief.md",
-      "tier": "public",
-      "size": 845,
-      "type": "md"
-    },
-    {
-      "path": "product/schemas/README-intent-resolution-packet.md",
-      "tier": "public",
-      "size": 778,
-      "type": "md"
-    },
-    {
-      "path": "product/schemas/README-meeting-operations-brief.md",
-      "tier": "public",
-      "size": 1010,
-      "type": "md"
-    },
-    {
-      "path": "product/schemas/README-meeting-operations-profile.md",
-      "tier": "public",
-      "size": 1579,
-      "type": "md"
-    },
-    {
-      "path": "product/schemas/README-mobile-app-profile-index.md",
-      "tier": "public",
-      "size": 606,
-      "type": "md"
-    },
-    {
-      "path": "product/schemas/README-mobile-app-profile.md",
-      "tier": "public",
-      "size": 658,
-      "type": "md"
-    },
-    {
-      "path": "product/schemas/README-narrated-video-preference-profile.md",
-      "tier": "public",
-      "size": 1143,
-      "type": "md"
-    },
-    {
-      "path": "product/schemas/README-narrated-video-publish-plan.md",
-      "tier": "public",
-      "size": 896,
-      "type": "md"
-    },
-    {
-      "path": "product/schemas/README-narrated-video-upload-package.md",
-      "tier": "public",
-      "size": 745,
-      "type": "md"
-    },
-    {
-      "path": "product/schemas/README-points-portal-clickout-usecase.md",
-      "tier": "public",
-      "size": 1392,
-      "type": "md"
-    },
-    {
-      "path": "product/schemas/README-pptx-theme-pack.md",
-      "tier": "public",
-      "size": 999,
-      "type": "md"
-    },
-    {
-      "path": "product/schemas/README-presentation-preference-profile.md",
-      "tier": "public",
-      "size": 1197,
-      "type": "md"
-    },
-    {
-      "path": "product/schemas/README-proposal-brief.md",
-      "tier": "public",
-      "size": 304,
-      "type": "md"
-    },
-    {
-      "path": "product/schemas/README-proposal-storyline-adf.md",
-      "tier": "public",
-      "size": 513,
-      "type": "md"
-    },
-    {
-      "path": "product/schemas/README-task-session.md",
-      "tier": "public",
-      "size": 879,
-      "type": "md"
-    },
-    {
-      "path": "product/schemas/README-test-case-adf.md",
-      "tier": "public",
-      "size": 426,
-      "type": "md"
-    },
-    {
-      "path": "product/schemas/README-travel-planning-brief.md",
-      "tier": "public",
-      "size": 1259,
-      "type": "md"
-    },
-    {
-      "path": "product/schemas/README-ui-flow-adf.md",
-      "tier": "public",
-      "size": 399,
-      "type": "md"
-    },
-    {
-      "path": "product/schemas/README-web-app-profile.md",
-      "tier": "public",
-      "size": 658,
-      "type": "md"
-    },
-    {
-      "path": "product/schemas/README-web-theme-pack.md",
-      "tier": "public",
-      "size": 1159,
-      "type": "md"
-    },
-    {
-      "path": "product/schemas/README-webview-session-handoff.md",
-      "tier": "public",
-      "size": 563,
-      "type": "md"
-    },
-    {
       "path": "product/schemas/reasoning-backend-policy.schema.json",
       "tier": "public",
       "size": 1947,
@@ -7291,16 +7309,16 @@
       "type": "md"
     },
     {
-      "path": "public/browser-scenarios/example.spec.js",
-      "tier": "public",
-      "size": 368,
-      "type": "js"
-    },
-    {
       "path": "public/browser-scenarios/README.md",
       "tier": "public",
       "size": 275,
       "type": "md"
+    },
+    {
+      "path": "public/browser-scenarios/example.spec.js",
+      "tier": "public",
+      "size": 368,
+      "type": "js"
     },
     {
       "path": "public/ceo/ai-business-engineering.md",
@@ -7411,9 +7429,15 @@
       "type": "md"
     },
     {
+      "path": "public/design-patterns/README.md",
+      "tier": "public",
+      "size": 7345,
+      "type": "md"
+    },
+    {
       "path": "public/design-patterns/brand-tokens/kyberion.json",
       "tier": "public",
-      "size": 830,
+      "size": 1200,
       "type": "json"
     },
     {
@@ -7427,6 +7451,12 @@
       "tier": "public",
       "size": 664,
       "type": "json"
+    },
+    {
+      "path": "public/design-patterns/media-templates/artifact-library/README.md",
+      "tier": "public",
+      "size": 5435,
+      "type": "md"
     },
     {
       "path": "public/design-patterns/media-templates/artifact-library/ai-governance-high-fidelity.json",
@@ -7567,12 +7597,6 @@
       "type": "json"
     },
     {
-      "path": "public/design-patterns/media-templates/artifact-library/README.md",
-      "tier": "public",
-      "size": 5435,
-      "type": "md"
-    },
-    {
       "path": "public/design-patterns/media-templates/artifact-library/release-ops-high-fidelity.json",
       "tier": "public",
       "size": 3994,
@@ -7609,16 +7633,16 @@
       "type": "json"
     },
     {
-      "path": "public/design-patterns/media-templates/design-md-catalog/index.json",
-      "tier": "public",
-      "size": 85555,
-      "type": "json"
-    },
-    {
       "path": "public/design-patterns/media-templates/design-md-catalog/README.md",
       "tier": "public",
       "size": 1973,
       "type": "md"
+    },
+    {
+      "path": "public/design-patterns/media-templates/design-md-catalog/index.json",
+      "tier": "public",
+      "size": 85555,
+      "type": "json"
     },
     {
       "path": "public/design-patterns/media-templates/document-composition-presets.json",
@@ -7773,7 +7797,7 @@
     {
       "path": "public/design-patterns/media-templates/themes.json",
       "tier": "public",
-      "size": 3098,
+      "size": 4818,
       "type": "json"
     },
     {
@@ -7791,7 +7815,7 @@
     {
       "path": "public/design-patterns/media-templates/themes/themes.json",
       "tier": "public",
-      "size": 3036,
+      "size": 4756,
       "type": "json"
     },
     {
@@ -7879,12 +7903,6 @@
       "type": "json"
     },
     {
-      "path": "public/design-patterns/README.md",
-      "tier": "public",
-      "size": 7345,
-      "type": "md"
-    },
-    {
       "path": "public/design-patterns/report/performance-analysis.json",
       "tier": "public",
       "size": 648,
@@ -7927,16 +7945,16 @@
       "type": "json"
     },
     {
-      "path": "public/design-patterns/web/chronos-web-theme-pack.json",
-      "tier": "public",
-      "size": 1416,
-      "type": "json"
-    },
-    {
       "path": "public/design-patterns/web/README.md",
       "tier": "public",
       "size": 314,
       "type": "md"
+    },
+    {
+      "path": "public/design-patterns/web/chronos-web-theme-pack.json",
+      "tier": "public",
+      "size": 1416,
+      "type": "json"
     },
     {
       "path": "public/economics/compounding-agent-value.md",
@@ -7963,15 +7981,15 @@
       "type": "md"
     },
     {
-      "path": "public/ethics/ai_bias_mitigation.md",
-      "tier": "public",
-      "size": 1289,
-      "type": "md"
-    },
-    {
       "path": "public/ethics/ai-rights-and-physicality.md",
       "tier": "public",
       "size": 1642,
+      "type": "md"
+    },
+    {
+      "path": "public/ethics/ai_bias_mitigation.md",
+      "tier": "public",
+      "size": 1289,
       "type": "md"
     },
     {
@@ -8062,6 +8080,12 @@
       "path": "public/external-wisdom/everything-claude/agents/tdd-guide.md",
       "tier": "public",
       "size": 7204,
+      "type": "md"
+    },
+    {
+      "path": "public/external-wisdom/everything-claude/rules/README.md",
+      "tier": "public",
+      "size": 2412,
       "type": "md"
     },
     {
@@ -8173,12 +8197,6 @@
       "type": "md"
     },
     {
-      "path": "public/external-wisdom/everything-claude/rules/README.md",
-      "tier": "public",
-      "size": 2412,
-      "type": "md"
-    },
-    {
       "path": "public/external-wisdom/everything-claude/rules/typescript/coding-style.md",
       "tier": "public",
       "size": 1352,
@@ -8251,15 +8269,15 @@
       "type": "md"
     },
     {
-      "path": "public/frameworks/conceptual-frameworks.md",
-      "tier": "public",
-      "size": 10385,
-      "type": "md"
-    },
-    {
       "path": "public/frameworks/README.md",
       "tier": "public",
       "size": 1377,
+      "type": "md"
+    },
+    {
+      "path": "public/frameworks/conceptual-frameworks.md",
+      "tier": "public",
+      "size": 10385,
       "type": "md"
     },
     {
@@ -8721,7 +8739,7 @@
     {
       "path": "public/procedures/media/theme-and-design-system-reference.md",
       "tier": "public",
-      "size": 10023,
+      "size": 13819,
       "type": "md"
     },
     {
@@ -8935,16 +8953,16 @@
       "type": "md"
     },
     {
-      "path": "public/project-health/checks.yaml",
-      "tier": "public",
-      "size": 4925,
-      "type": "yaml"
-    },
-    {
       "path": "public/project-health/README.md",
       "tier": "public",
       "size": 173,
       "type": "md"
+    },
+    {
+      "path": "public/project-health/checks.yaml",
+      "tier": "public",
+      "size": 4925,
+      "type": "yaml"
     },
     {
       "path": "public/quality-management/metrics_standards.md",
@@ -9535,6 +9553,12 @@
       "type": "md"
     },
     {
+      "path": "public/templates/mobile-sample-apps/README.md",
+      "tier": "public",
+      "size": 752,
+      "type": "md"
+    },
+    {
       "path": "public/templates/mobile-sample-apps/android-webview-handoff-skeleton/README.md",
       "tier": "public",
       "size": 2300,
@@ -9547,9 +9571,9 @@
       "type": "md"
     },
     {
-      "path": "public/templates/mobile-sample-apps/README.md",
+      "path": "public/templates/mobile-webview-handoff/README.md",
       "tier": "public",
-      "size": 752,
+      "size": 2007,
       "type": "md"
     },
     {
@@ -9562,12 +9586,6 @@
       "path": "public/templates/mobile-webview-handoff/ios-reference.md",
       "tier": "public",
       "size": 1808,
-      "type": "md"
-    },
-    {
-      "path": "public/templates/mobile-webview-handoff/README.md",
-      "tier": "public",
-      "size": 2007,
       "type": "md"
     },
     {
@@ -9673,16 +9691,16 @@
       "type": "md"
     },
     {
-      "path": "public/templates/web-sample-apps/web-session-handoff-skeleton/package.json",
-      "tier": "public",
-      "size": 269,
-      "type": "json"
-    },
-    {
       "path": "public/templates/web-sample-apps/web-session-handoff-skeleton/README.md",
       "tier": "public",
       "size": 1629,
       "type": "md"
+    },
+    {
+      "path": "public/templates/web-sample-apps/web-session-handoff-skeleton/package.json",
+      "tier": "public",
+      "size": 269,
+      "type": "json"
     },
     {
       "path": "public/templates/web-sample-apps/web-session-handoff-skeleton/src/auth/sessionStore.ts",
@@ -9715,21 +9733,15 @@
       "type": "ts"
     },
     {
-      "path": "public/terraform/diagram-config.yaml",
-      "tier": "public",
-      "size": 3152,
-      "type": "yaml"
-    },
-    {
       "path": "public/terraform/README.md",
       "tier": "public",
       "size": 194,
       "type": "md"
     },
     {
-      "path": "public/test-runners/detection.yaml",
+      "path": "public/terraform/diagram-config.yaml",
       "tier": "public",
-      "size": 3521,
+      "size": 3152,
       "type": "yaml"
     },
     {
@@ -9739,15 +9751,15 @@
       "type": "md"
     },
     {
+      "path": "public/test-runners/detection.yaml",
+      "tier": "public",
+      "size": 3521,
+      "type": "yaml"
+    },
+    {
       "path": "public/voice-of-customer/README.md",
       "tier": "public",
       "size": 594,
-      "type": "md"
-    },
-    {
-      "path": "README.md",
-      "tier": "public",
-      "size": 2023,
       "type": "md"
     }
   ]

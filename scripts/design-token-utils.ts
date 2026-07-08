@@ -22,6 +22,13 @@ export interface KyberionColorTokens {
   warning: string;
   text_primary: string;
   text_secondary: string;
+  /** Semantic extensions (v1.1.0) — optional so older token files still parse. */
+  accent_text?: string;
+  surface?: string;
+  muted_text?: string;
+  border?: string;
+  success?: string;
+  danger?: string;
 }
 
 export interface KyberionFontTokens {
@@ -37,6 +44,13 @@ export interface KyberionThemeEntry {
     accent: string;
     background: string;
     text: string;
+    accent_text?: string;
+    surface?: string;
+    muted_text?: string;
+    border?: string;
+    success?: string;
+    warning?: string;
+    danger?: string;
   };
   fonts: {
     heading: string;
@@ -52,7 +66,9 @@ const BRAND_TOKENS_PATH = pathResolver.rootResolve(
 );
 
 export function readKyberionDesignTokens(): KyberionDesignTokens {
-  return JSON.parse(safeReadFile(BRAND_TOKENS_PATH, { encoding: 'utf8' }) as string) as KyberionDesignTokens;
+  return JSON.parse(
+    safeReadFile(BRAND_TOKENS_PATH, { encoding: 'utf8' }) as string
+  ) as KyberionDesignTokens;
 }
 
 export function renderKyberionDesignTokenBlock(tokens: KyberionDesignTokens): string {
@@ -110,7 +126,21 @@ export function renderKyberionTailwindColorsBlock(): string {
   ].join('\n');
 }
 
-export function buildKyberionThemeEntries(tokens: KyberionDesignTokens): Record<string, KyberionThemeEntry> {
+function semanticColorEntries(palette: KyberionColorTokens): Partial<KyberionThemeEntry['colors']> {
+  return {
+    ...(palette.accent_text ? { accent_text: palette.accent_text } : {}),
+    ...(palette.surface ? { surface: palette.surface } : {}),
+    ...(palette.muted_text ? { muted_text: palette.muted_text } : {}),
+    ...(palette.border ? { border: palette.border } : {}),
+    ...(palette.success ? { success: palette.success } : {}),
+    ...(palette.warning ? { warning: palette.warning } : {}),
+    ...(palette.danger ? { danger: palette.danger } : {}),
+  };
+}
+
+export function buildKyberionThemeEntries(
+  tokens: KyberionDesignTokens
+): Record<string, KyberionThemeEntry> {
   const light = tokens.tokens.colors.light;
   const dark = tokens.tokens.colors.dark;
   const fonts = tokens.tokens.fonts;
@@ -128,6 +158,7 @@ export function buildKyberionThemeEntries(tokens: KyberionDesignTokens): Record<
         accent: light.accent,
         background: light.bg_main,
         text: light.text_primary,
+        ...semanticColorEntries(light),
       },
       fonts: sharedFonts,
       assets: {
@@ -142,6 +173,7 @@ export function buildKyberionThemeEntries(tokens: KyberionDesignTokens): Record<
         accent: dark.accent,
         background: dark.bg_main,
         text: dark.text_primary,
+        ...semanticColorEntries(dark),
       },
       fonts: sharedFonts,
     },
@@ -156,7 +188,9 @@ export function updateThemesJson(
   const data = JSON.parse(rawText) as Record<string, unknown>;
   const themes = buildKyberionThemeEntries(tokens);
   data.themes = {
-    ...(typeof data.themes === 'object' && data.themes ? (data.themes as Record<string, unknown>) : {}),
+    ...(typeof data.themes === 'object' && data.themes
+      ? (data.themes as Record<string, unknown>)
+      : {}),
     ...themes,
   };
   if (options?.includeDefaultTheme && !data.default_theme) {
@@ -165,7 +199,9 @@ export function updateThemesJson(
   return `${JSON.stringify(data, null, 2)}\n`;
 }
 
-export function expectedKyberionThemeEntries(tokens: KyberionDesignTokens): Record<string, KyberionThemeEntry> {
+export function expectedKyberionThemeEntries(
+  tokens: KyberionDesignTokens
+): Record<string, KyberionThemeEntry> {
   return buildKyberionThemeEntries(tokens);
 }
 

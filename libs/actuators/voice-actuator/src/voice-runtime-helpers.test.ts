@@ -173,60 +173,68 @@ describe('voice runtime helpers', () => {
     });
   });
 
-  it('falls back to a configured engine when say produces a zero-length artifact', async () => {
-    const { renderNativeArtifact } = await import('./voice-runtime-helpers.js');
+  // darwin-only: exercises the macOS say → espeak fallback chain; the engine
+  // records themselves declare mlx/say as darwin platforms.
+  it.skipIf(process.platform !== 'darwin')(
+    'falls back to a configured engine when say produces a zero-length artifact',
+    async () => {
+      const { renderNativeArtifact } = await import('./voice-runtime-helpers.js');
 
-    const outputPath = '/tmp/kyberion-fallback-narration.aiff';
-    const artifactPath = await renderNativeArtifact('Kyberion は運用の意図を成果物に変えます。', {
-      requestId: 'fallback-test',
-      voice: 'Kyoko',
-      rate: 170,
-      language: 'ja',
-      format: 'aiff',
-      engineId: 'local_say',
-      supportsFormats: ['wav', 'aiff'],
-      outputPath,
-    });
-
-    expect(artifactPath).toBe(outputPath);
-    expect(mocks.safeExec.mock.calls.some(([command]) => command === 'say')).toBe(true);
-    expect(mocks.safeExecResult).toHaveBeenCalled();
-    expect(mocks.logger.warn).toHaveBeenCalledWith(
-      expect.stringContaining('configured engine local_say failed')
-    );
-  });
-
-  it('does not fall back to non-clone engines when learned voice is required', async () => {
-    const { renderNativeArtifact } = await import('./voice-runtime-helpers.js');
-
-    mocks.safeExecResult.mockReturnValueOnce({
-      status: 1,
-      stdout: '',
-      stderr: 'mlx failed',
-      error: null,
-    });
-
-    await expect(
-      renderNativeArtifact('学習済み音声だけを使います。', {
-        requestId: 'strict-clone-test',
+      const outputPath = '/tmp/kyberion-fallback-narration.aiff';
+      const artifactPath = await renderNativeArtifact('Kyberion は運用の意図を成果物に変えます。', {
+        requestId: 'fallback-test',
         voice: 'Kyoko',
         rate: 170,
         language: 'ja',
-        format: 'wav',
-        engineId: 'mlx_audio_qwen3',
-        supportsFormats: ['wav'],
-        outputPath: '/tmp/strict-clone-test.wav',
-        requireVoiceClone: true,
-        profile: {
-          profile_id: 'my-voice-v2',
-          sample_refs: ['/tmp/ref.wav'],
-        },
-      })
-    ).rejects.toThrow('mlx_audio_tts_bridge.py failed');
+        format: 'aiff',
+        engineId: 'local_say',
+        supportsFormats: ['wav', 'aiff'],
+        outputPath,
+      });
 
-    expect(mocks.safeExec).not.toHaveBeenCalledWith(
-      'say',
-      expect.arrayContaining(['学習済み音声だけを使います。'])
-    );
-  });
+      expect(artifactPath).toBe(outputPath);
+      expect(mocks.safeExec.mock.calls.some(([command]) => command === 'say')).toBe(true);
+      expect(mocks.safeExecResult).toHaveBeenCalled();
+      expect(mocks.logger.warn).toHaveBeenCalledWith(
+        expect.stringContaining('configured engine local_say failed')
+      );
+    }
+  );
+
+  it.skipIf(process.platform !== 'darwin')(
+    'does not fall back to non-clone engines when learned voice is required',
+    async () => {
+      const { renderNativeArtifact } = await import('./voice-runtime-helpers.js');
+
+      mocks.safeExecResult.mockReturnValueOnce({
+        status: 1,
+        stdout: '',
+        stderr: 'mlx failed',
+        error: null,
+      });
+
+      await expect(
+        renderNativeArtifact('学習済み音声だけを使います。', {
+          requestId: 'strict-clone-test',
+          voice: 'Kyoko',
+          rate: 170,
+          language: 'ja',
+          format: 'wav',
+          engineId: 'mlx_audio_qwen3',
+          supportsFormats: ['wav'],
+          outputPath: '/tmp/strict-clone-test.wav',
+          requireVoiceClone: true,
+          profile: {
+            profile_id: 'my-voice-v2',
+            sample_refs: ['/tmp/ref.wav'],
+          },
+        })
+      ).rejects.toThrow('mlx_audio_tts_bridge.py failed');
+
+      expect(mocks.safeExec).not.toHaveBeenCalledWith(
+        'say',
+        expect.arrayContaining(['学習済み音声だけを使います。'])
+      );
+    }
+  );
 });
