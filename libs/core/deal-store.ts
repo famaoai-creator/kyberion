@@ -165,6 +165,7 @@ export function getActiveDealForChannel(binding: ResolvedCustomerBinding): DealR
   const candidates = listDeals(binding.tenantSlug)
     .filter(
       (deal) =>
+        deal.channel &&
         deal.channel.surface === binding.binding.surface &&
         deal.channel.channel_id === binding.binding.channel_id &&
         !terminal.has(deal.stage)
