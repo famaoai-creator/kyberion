@@ -6,6 +6,9 @@ import { getAllFiles } from '@agent/core/fs-utils';
 const rootDir = process.cwd();
 const allowedManagedProcessConsumers = [
   'libs/actuators/process-actuator/src/process-actuator-helpers.ts',
+  // Apple Intelligence bridge: short-lived afm CLI calls, supervised so a
+  // hung on-device inference can never outlive its timeout.
+  'libs/core/apple-intelligence-bridge.ts',
   'libs/actuators/service-actuator/src/reconcile-integration.test.ts',
   'libs/actuators/service-actuator/src/service-actuator-helpers.ts',
   'libs/core/acp-mediator.ts',
