@@ -105,6 +105,7 @@
 - [x] **ONB-02**: Canonical Coldstart (`ONB-02_CANONICAL_COLDSTART.ja.md`) — クリーンクローン実走検証のみ未実施
 - [x] **SA-02**: ADF/Shell Guardrails (`SA-02_ADF_SHELL_GUARDRAILS.ja.md`) — 承認ルーティングの対話接続は SA-05 側で
 - [x] **IL-01**: Goal Threading (`IL-01_GOAL_THREADING.ja.md`) — E2E 実走検証は IL-04 と併せて
+- [x] **IL-04**: Completion Intent Reconciliation (`IL-04_COMPLETION_INTENT_RECONCILIATION.ja.md`) — Goal Satisfaction Loop 完成: finish が突合に gate され、未達 gap は implementer+reviewer タスクとして自動還流(上限2周→operator エスカレーション)。worker プロンプトに mission goal を常時注入
 - [x] **IP-07**: Critical Path Tests (`IP-07_CRITICAL_PATH_TESTS.ja.md`) — orchestrator 追加特性化は IP-10 前に
 - [x] **AA-02**: Mesh Hub Delivery Driver (`AA-02_MESH_HUB_DELIVERY_DRIVER.ja.md`) — 2プロセス実HTTP E2E は E3 パイロットで
 - [x] **E2E-02**: Creative Suite (`E2E-02_CREATIVE_SUITE.ja.md`) — 単一 resolver・VDS-07・style pack 注入・campaign-suite。歌詞字幕同期のみ残余

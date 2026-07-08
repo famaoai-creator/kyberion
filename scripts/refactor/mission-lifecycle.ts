@@ -7,6 +7,7 @@ import * as path from 'node:path';
 import {
   addInboxEntry,
   notifyOperator,
+  runMissionRetrospective,
   findMissionPath,
   customerResolver,
   grantAccess,
@@ -290,6 +291,65 @@ function readMissionNextTasks(missionDir: string): Array<Record<string, unknown>
 function writeMissionNextTasks(missionDir: string, tasks: Array<Record<string, unknown>>): void {
   const nextTasksPath = path.join(missionDir, 'NEXT_TASKS.json');
   safeWriteFile(nextTasksPath, JSON.stringify(tasks, null, 2));
+}
+
+/**
+ * Goal Satisfaction Loop: when finish-time reconciliation says the mission
+ * does NOT yet satisfy the user's actual goal, convert the concrete gaps into
+ * implementer+reviewer tasks and hand the mission back to the orchestration
+ * worker — the ⑤→④ back-edge that turns "report the gap" into "close the
+ * gap". Bounded by KYBERION_GOAL_LOOP_MAX_ROUNDS (default 2); exhaustion
+ * escalates to the operator through the standard finish-gate failure path.
+ */
+function upsertGoalGapTasks(input: {
+  missionDir: string;
+  round: number;
+  gaps: string[];
+  goal: { summary: string; success_condition: string };
+}): string[] {
+  const tasks = readMissionNextTasks(input.missionDir);
+  const created: string[] = [];
+  const upserted: Record<string, unknown>[] = [];
+  input.gaps.slice(0, 3).forEach((gap, index) => {
+    const gapText = String(gap || '').trim() || 'unresolved goal gap';
+    const taskId = `goal-gap-r${input.round}-${index + 1}`;
+    const reviewTaskId = `${taskId}-review`;
+    upserted.push({
+      task_id: taskId,
+      status: 'planned',
+      assigned_to: { role: 'implementer' },
+      description: `Close this gap between the delivered evidence and the user's goal: ${gapText}`,
+      deliverable: `evidence/${taskId}.md`,
+      target_path: `evidence/${taskId}.md`,
+      dependencies: [],
+      acceptance_criteria: [
+        gapText,
+        `Advances the mission goal: ${input.goal.summary}`,
+        `Success condition: ${input.goal.success_condition}`,
+      ],
+      risk: 'medium',
+      expected_output_format: 'files',
+      estimated_scope: 'M',
+    });
+    upserted.push({
+      task_id: reviewTaskId,
+      status: 'planned',
+      assigned_to: { role: 'reviewer' },
+      description: `Review whether ${taskId} actually closes the goal gap (not just addresses the wording): ${gapText}`,
+      deliverable: `evidence/REVIEW-${taskId}.md`,
+      dependencies: [taskId],
+      review_target: taskId,
+      acceptance_criteria: [`The gap is verifiably closed with evidence: ${gapText}`],
+      risk: 'medium',
+      expected_output_format: 'files',
+      estimated_scope: 'S',
+    });
+    created.push(taskId, reviewTaskId);
+  });
+  const createdIds = new Set(created);
+  const filtered = tasks.filter((task) => !createdIds.has(String(task.task_id || '')));
+  writeMissionNextTasks(input.missionDir, [...filtered, ...upserted]);
+  return created;
 }
 
 function upsertMissionGateRepairTask(input: {
@@ -882,6 +942,95 @@ export async function finishMission(
     goal: completionGoal,
     reconciliation: completionReconciliation,
   });
+
+  // Goal Satisfaction Loop (E2E series follow-up): "completed" must mean the
+  // USER'S goal is satisfied, not that all planned tasks ran. Unsatisfied
+  // reconciliation feeds its gaps back into the team as work — the mission
+  // only finishes when the outcome contract holds or the operator decides.
+  const goalLoopMaxRounds = Number(process.env.KYBERION_GOAL_LOOP_MAX_ROUNDS ?? 2);
+  if (
+    goalLoopMaxRounds > 0 &&
+    !completionReconciliation.satisfied &&
+    completionReconciliation.gaps.length > 0
+  ) {
+    const currentRound = Number(state.context?.goal_reconciliation_round || 0);
+    const gapSummary = completionReconciliation.gaps.slice(0, 3).join(' / ');
+    if (currentRound < goalLoopMaxRounds) {
+      const nextRound = currentRound + 1;
+      const gapTaskIds = upsertGoalGapTasks({
+        missionDir,
+        round: nextRound,
+        gaps: completionReconciliation.gaps,
+        goal: completionGoal,
+      });
+      state.context = {
+        ...(state.context || {}),
+        goal_reconciliation_round: nextRound,
+        goal_reconciliation_last_gaps: completionReconciliation.gaps.slice(0, 5),
+      };
+      state.status = 'active';
+      state.history.push({
+        ts: new Date().toISOString(),
+        event: 'GOAL_GAP_REALIGN',
+        note: `Goal not yet satisfied (round ${nextRound}/${goalLoopMaxRounds}). Gap tasks dispatched: ${gapTaskIds.join(', ')} — ${gapSummary}`,
+      });
+      writeMissionGateRecord({
+        missionId: upperId,
+        gateId: 'goal-satisfaction',
+        evidenceDir: path.join(missionDir, 'gates'),
+        payload: {
+          verdict: 'fail',
+          checked_at: new Date().toISOString(),
+          reason: `goal gaps remain (round ${nextRound}/${goalLoopMaxRounds}): ${gapSummary}`,
+        },
+      });
+      recordAgentRuntimeEvent(args.agentRuntimeEventPath, {
+        event: 'MISSION_GOAL_GAP_REALIGN',
+        mission_id: upperId,
+        round: nextRound,
+        max_rounds: goalLoopMaxRounds,
+        gaps: completionReconciliation.gaps.slice(0, 5),
+        gap_task_ids: gapTaskIds,
+      });
+      await saveState(upperId, state);
+      logger.warn(
+        `🔁 [GOAL_LOOP] Mission ${upperId} not yet satisfying its goal — dispatched ${gapTaskIds.length} gap task(s) (round ${nextRound}/${goalLoopMaxRounds}). Re-run the orchestration worker, then finish again.`
+      );
+      return;
+    }
+    // Rounds exhausted: the team could not close the gap autonomously —
+    // block finish and put the decision in front of the operator.
+    void notifyOperator('mission_failed', {
+      title: `Mission ${upperId} blocked: goal unsatisfied after ${goalLoopMaxRounds} gap rounds`,
+      body: gapSummary,
+      link_hint: `pnpm mission status ${upperId}`,
+      correlation_id: `${upperId}:goal-satisfaction`,
+    });
+    recordMissionFinishGateFailure({
+      missionId: upperId,
+      state,
+      missionDir,
+      gateId: 'goal-satisfaction',
+      reason: `goal not satisfied after ${goalLoopMaxRounds} gap-closing rounds: ${gapSummary}`,
+      agentRuntimeEventPath: args.agentRuntimeEventPath,
+      pendingTasks: [],
+    });
+    await saveState(upperId, state);
+    return;
+  }
+  writeMissionGateRecord({
+    missionId: upperId,
+    gateId: 'goal-satisfaction',
+    evidenceDir: path.join(missionDir, 'gates'),
+    payload: {
+      verdict: 'pass',
+      checked_at: new Date().toISOString(),
+      reason: completionReconciliation.satisfied
+        ? `goal satisfied (confidence=${completionReconciliation.confidence})`
+        : 'goal loop disabled or no actionable gaps — completing with reported next action',
+    },
+  });
+
   const traceCtx = createActuatorTrace('mission-controller', 'finish', {
     pipelineId: upperId,
     missionId: upperId,
@@ -954,6 +1103,15 @@ export async function finishMission(
       `⚠️ [NOTIFY] Completion notification failed for ${upperId}: ${err?.message || err}`
     );
   }
+
+  // Retrospective Loop (⑤ Review の自動化): measure how the team worked and
+  // queue process/team improvement proposals for operator ratification.
+  // Fire-and-forget — the retrospective must never block delivery.
+  runMissionRetrospective(upperId).catch((err: unknown) => {
+    logger.warn(
+      `⚠️ [RETROSPECTIVE] skipped for ${upperId}: ${err instanceof Error ? err.message : String(err)}`
+    );
+  });
 
   traceCtx.startSpan('mission:customer-delivery');
   try {

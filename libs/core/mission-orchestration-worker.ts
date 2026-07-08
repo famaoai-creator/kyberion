@@ -708,6 +708,34 @@ function summarizeTaskResultObservability(input: {
   };
 }
 
+/**
+ * The mission's interpreted goal (why the work exists — not the task wording).
+ * Without this section every worker optimizes for its task's 字面 and the
+ * team drifts from the user's actual purpose (IL-01/E2E-03 follow-up).
+ */
+function buildMissionGoalLines(missionState: Record<string, unknown>): string[] {
+  const intent = (missionState?.intent || {}) as {
+    goal_summary?: string;
+    success_condition?: string;
+  };
+  const outcome = (missionState?.outcome_contract || {}) as {
+    requested_result?: string;
+    success_criteria?: string[];
+  };
+  const goalSummary = String(intent.goal_summary || outcome.requested_result || '').trim();
+  const successCondition = String(
+    intent.success_condition || (outcome.success_criteria || []).join('; ') || ''
+  ).trim();
+  if (!goalSummary && !successCondition) return [];
+  return [
+    '## Mission goal (the user purpose this task serves — optimize for THIS, not just the task wording)',
+    ...(goalSummary ? [`- Goal: ${goalSummary}`] : []),
+    ...(successCondition ? [`- Success condition: ${successCondition}`] : []),
+    '- If your task as written conflicts with or cannot advance this goal, say so in gaps/needs instead of completing it literally.',
+    '',
+  ];
+}
+
 function buildTaskExecutionPrompt(input: {
   missionId: string;
   task: PlannedNextTask;
@@ -715,6 +743,7 @@ function buildTaskExecutionPrompt(input: {
   agentId: string;
   taskModelHint?: { model_id?: string; tier?: string; effort?: string };
   missionContextPack: string;
+  missionGoalLines: string[];
   upstreamResultLines: string[];
   teamSnapshotLines: string[];
   reviewFindingsLines: string[];
@@ -734,6 +763,7 @@ function buildTaskExecutionPrompt(input: {
       : '',
     input.targetPath ? `Target path: ${input.targetPath}` : '',
     '',
+    ...input.missionGoalLines,
     '## Upstream results (inputs you MUST build on)',
     ...input.upstreamResultLines,
     '',
@@ -1009,6 +1039,7 @@ async function buildTaskDispatchContext(input: {
     agentId: input.agentId,
     taskModelHint: input.taskModelHint,
     missionContextPack: missionContextPackText,
+    missionGoalLines: buildMissionGoalLines(missionState),
     upstreamResultLines,
     teamSnapshotLines,
     reviewFindingsLines,

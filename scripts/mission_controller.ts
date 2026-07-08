@@ -1268,6 +1268,7 @@ Lifecycle Commands:
   dispatch-workitems <ID>        Execute registered work items via agent/subagent routing
                                  --dispatch-mode auto|agent|subagent
                                  --dispatch-statuses ready,backlog
+                                 --dispatch-rounds N (auto-retry blocked items, bounded)
                                  --dispatch-sources local,github,jira
                                  --dispatch-final-status review|done
 
