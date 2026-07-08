@@ -7,8 +7,10 @@
 import {
   classifyLocallyWithAppleFm,
   probeAppleIntelligence,
+  recognizeImageLocallyWithAppleVision,
   summarizeLocallyWithAppleFm,
 } from '@agent/core';
+import { safeExistsSync } from '@agent/core';
 
 async function main(): Promise<void> {
   const availability = await probeAppleIntelligence();
@@ -30,6 +32,14 @@ async function main(): Promise<void> {
     'ミッションでLP作成・デッキ作成・iOSアプリ検証を完了。レビュー1件が rework 指定。次はデザイン修正を行う。'
   );
   console.log(`[check:apple-fm] sample summary: ${summary}`);
+
+  const sampleImage = 'docs/assets/kyberion-social-preview.png';
+  if (safeExistsSync(sampleImage)) {
+    const vision = await recognizeImageLocallyWithAppleVision(sampleImage);
+    console.log(
+      `[check:apple-fm] sample vision OCR: ${vision ? JSON.stringify(vision.text.split('\n')[0]) : 'null'}`
+    );
+  }
 }
 
 main().catch((error) => {
