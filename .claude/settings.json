@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm vitest run *)",
+      "Bash(pnpm typecheck)",
+      "Bash(pnpm typecheck *)",
+      "Bash(npx vitest run *)",
+      "Bash(pnpm lint)",
+      "Bash(pnpm lint *)",
+      "Bash(node dist/scripts/check_catalog_integrity.js)",
+      "Bash(pnpm check:catalogs)",
+      "Bash(npx tsc --noEmit *)"
+    ]
+  }
+}

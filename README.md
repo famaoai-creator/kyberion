@@ -35,6 +35,21 @@ Kyberion turns intent into governed execution. You ask `今週の進捗レポー
 
 ---
 
+## What Makes It Different
+
+<p align="center">
+  <img src="./docs/assets/kyberion-loop.svg" alt="The Kyberion work loop: intent → plan → execute → evidence → learn, with learning feeding the next mission's team" width="920" />
+</p>
+
+Most agent frameworks stop at "execute". Kyberion closes the loop:
+
+- **No evidence, no "done".** Finishing a mission runs a goal-satisfaction gate: every success criterion is reconciled against actual artifacts and verifications. Unsatisfied gaps automatically dispatch gap-closing tasks — the letter of a task never substitutes for its purpose.
+- **The agent org improves itself.** Every finished mission runs a retrospective: deterministic execution stats ground LLM improvement proposals (human-ratified, never auto-applied), and measured agent×role outcomes feed the _next_ mission's team staffing. Your instance gets measurably better the more you use it.
+- **Frontier-model discipline on any model.** The working philosophy — read before write, one change one verification, no retry without a new hypothesis, evidence-based completion — is codified as mechanical rules ([working-philosophy](./knowledge/product/governance/working-philosophy.md)) and injected into every worker prompt, so fast/small models inherit the habits that make frontier models reliable.
+- **Governance by architecture, not by prompt.** Three-tier knowledge isolation is enforced at the file-IO boundary. Customer conversations are physically separated from mission state. Outbound sends always pass an approval gate. An append-only audit chain records everything.
+
+---
+
 ## Quick Start
 
 > **Canonical cold-start source: [`docs/INITIALIZATION.md`](./docs/INITIALIZATION.md).** The commands below are a summary; if anything conflicts, INITIALIZATION.md wins.
