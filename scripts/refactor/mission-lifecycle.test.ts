@@ -113,7 +113,13 @@ describe('mission lifecycle finish gate', () => {
       syncProjectLedgerIfLinked: async () => undefined,
     };
 
-    await verifyMission(missionId, 'verified', 'Scope drift detected during verification.', args.transitionStatus, args.syncProjectLedgerIfLinked);
+    await verifyMission(
+      missionId,
+      'verified',
+      'Scope drift detected during verification.',
+      args.transitionStatus,
+      args.syncProjectLedgerIfLinked
+    );
 
     const state = JSON.parse(
       safeReadFile(`${missionPath}/mission-state.json`, { encoding: 'utf8' }) as string
@@ -243,6 +249,70 @@ describe('mission lifecycle finish gate', () => {
     });
   });
 
+  it('goal satisfaction loop: dispatches gap tasks instead of completing, and escalates after max rounds', async () => {
+    prepareMissionState('completed', undefined, undefined, {
+      requested_result: 'Deliver the launch summary report',
+      success_criteria: ['launch summary report saved as evidence'],
+      deliverable_kind: 'markdown',
+      evidence_required: true,
+      expected_artifacts: [{ kind: 'markdown', storage_class: 'mission' }],
+      verification_method: 'self_check',
+    });
+    // evidence exists but does NOT satisfy the success criteria (字面は完了、目的は未達)
+    seedMissionEvidence('notes.md', '# Unrelated working notes');
+    safeWriteFile(`${missionPath}/NEXT_TASKS.json`, JSON.stringify([], null, 2));
+
+    const args = {
+      archiveDir: pathResolver.rootResolve('active/shared/tmp/mission-archives'),
+      agentRuntimeEventPath: `${missionPath}/runtime-events.jsonl`,
+      getGitHash: (cwd: string) => safeExec('git', ['rev-parse', 'HEAD'], { cwd }).trim(),
+      sealMission: async () => undefined,
+      syncProjectLedgerIfLinked: async () => undefined,
+      transitionStatus,
+    };
+
+    await finishMission(missionId, false, args);
+
+    let state = JSON.parse(
+      safeReadFile(`${missionPath}/mission-state.json`, { encoding: 'utf8' }) as string
+    );
+    // NOT completed: handed back to the team with concrete gap tasks
+    expect(state.status).toBe('active');
+    expect(state.context.goal_reconciliation_round).toBe(1);
+    expect(state.history.some((entry: any) => entry.event === 'GOAL_GAP_REALIGN')).toBe(true);
+    const nextTasks = JSON.parse(
+      safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }) as string
+    );
+    const gapTask = nextTasks.find((task: any) => task.task_id === 'goal-gap-r1-1');
+    expect(gapTask).toBeTruthy();
+    expect(gapTask.assigned_to.role).toBe('implementer');
+    expect(gapTask.acceptance_criteria.join(' ')).toContain('Deliver the launch summary report');
+    const reviewTask = nextTasks.find((task: any) => task.task_id === 'goal-gap-r1-1-review');
+    expect(reviewTask).toBeTruthy();
+    expect(reviewTask.review_target).toBe('goal-gap-r1-1');
+    const gateFiles = safeReaddir(`${missionPath}/gates`);
+    expect(gateFiles.some((entry: string) => entry.includes('goal-satisfaction'))).toBe(true);
+
+    // Exhausted rounds: the loop stops looping and escalates to the operator.
+    state.context.goal_reconciliation_round = 2;
+    state.status = 'completed';
+    safeWriteFile(`${missionPath}/mission-state.json`, JSON.stringify(state, null, 2));
+    safeWriteFile(`${missionPath}/NEXT_TASKS.json`, JSON.stringify([], null, 2));
+
+    await finishMission(missionId, false, args);
+    state = JSON.parse(
+      safeReadFile(`${missionPath}/mission-state.json`, { encoding: 'utf8' }) as string
+    );
+    expect(state.status).toBe('validating');
+    expect(state.context.mission_finish_gate_last_reason).toContain(
+      'goal not satisfied after 2 gap-closing rounds'
+    );
+    const repairTasks = JSON.parse(
+      safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }) as string
+    );
+    expect(repairTasks.some((task: any) => task.task_id === 'repair-goal-satisfaction')).toBe(true);
+  });
+
   it('creates a repair task when finish quality validation fails', async () => {
     prepareMissionState('completed', undefined, undefined, {
       requested_result: 'Mission closeout complete.',
@@ -335,6 +405,12 @@ describe('mission lifecycle finish gate', () => {
       seedMissionEvidence(
         'meeting-followup-pack.json',
         JSON.stringify({ kind: 'meeting-followup-delivery-pack', mission_id: missionId }, null, 2)
+      );
+      // The goal-satisfaction gate requires the evidence to actually state
+      // that the success criteria hold — as a real delivery log would.
+      seedMissionEvidence(
+        'delivery-log.md',
+        '# Delivery\n\nMinutes and action items are delivered to customer demo.\n'
       );
       safeWriteFile(
         `${missionPath}/NEXT_TASKS.json`,

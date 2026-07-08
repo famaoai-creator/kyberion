@@ -32,6 +32,16 @@ import {
 } from './provider-health-registry.js';
 import { z } from 'zod';
 
+// Auth/eligibility failures (dead credentials, retired tiers) do not heal in
+// seconds — keep retrying them per call and every operation pays the latency.
+const AUTH_FAILURE_PATTERN =
+  /IneligibleTier|authenticat|unauthorized|invalid api key|login required|credential|permission denied/i;
+const AUTH_FAILURE_DEMOTION_MS = 6 * 60 * 60 * 1000;
+
+function resolveDemotionRetryAfterMs(message: string): number | undefined {
+  return AUTH_FAILURE_PATTERN.test(message) ? AUTH_FAILURE_DEMOTION_MS : undefined;
+}
+
 export type PersonaLabel = string;
 
 export interface DivergeHypothesisInput {
@@ -474,6 +484,7 @@ export class FailoverReasoningBackend implements ReasoningBackend {
         if (provider) {
           reportProviderTemporarilyUnhealthy(provider, {
             reason: `${operation}:${message}`,
+            retryAfterMs: resolveDemotionRetryAfterMs(message),
           });
         }
       }
@@ -595,6 +606,7 @@ export class FailoverReasoningBackend implements ReasoningBackend {
         if (provider) {
           reportProviderTemporarilyUnhealthy(provider, {
             reason: `generateWithTools:${message}`,
+            retryAfterMs: resolveDemotionRetryAfterMs(message),
           });
         }
       }

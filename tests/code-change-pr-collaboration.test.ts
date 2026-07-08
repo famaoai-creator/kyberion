@@ -75,6 +75,11 @@ async function seedMission(options: { withReviewTask: boolean }): Promise<string
       tier: 'public',
       status: 'active',
       classification: { mission_class: 'code_change', risk_profile: 'standard' },
+      outcome_contract: {
+        outcome_id: 'outcome-1',
+        requested_result: 'Ship the login change safely',
+        success_criteria: ['review approves the change'],
+      },
       git: { branch: 'main', start_commit: '', latest_commit: '', checkpoints: [] },
       history: [],
       relationships: {},
@@ -193,6 +198,12 @@ describe.sequential('code_change PR collaboration (E2E-03 Task 6)', () => {
       .find((prompt) => prompt.includes('Diff under review'));
     expect(reviewPrompt).toBeTruthy();
     expect(reviewPrompt).toContain('change v2 with fix');
+
+    // every dispatch prompt carries the mission goal (本来の目的), not just the task wording
+    const firstPrompt = String((mocks.route.mock.calls[0][0] as any)?.payload?.text || '');
+    expect(firstPrompt).toContain('## Mission goal');
+    expect(firstPrompt).toContain('Ship the login change safely');
+    expect(firstPrompt).toContain('review approves the change');
   });
 
   it('blocks a code_change plan without a review task as a planner contract violation', async () => {

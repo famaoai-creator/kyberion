@@ -63,9 +63,12 @@ export default defineConfig({
       '**/knowledge/**',
       '**/.pnpm-store/**',
     ],
-    threads: true,
-    maxThreads: 4,
-    minThreads: 1,
+    // Process-isolated workers: many suites mutate process.env
+    // (KYBERION_ROOT tmp roots, MISSION_ROLE, personas). worker_threads share
+    // env across concurrently running files, which caused an entire class of
+    // combined-run flakes (writes landing in another suite's tmp root).
+    pool: 'forks',
+    maxWorkers: 4,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'json-summary'],

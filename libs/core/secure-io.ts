@@ -224,26 +224,46 @@ export function safeWriteFile(
     fs.mkdirSync(dir, { recursive: true });
   }
 
-  const ns = process.hrtime.bigint().toString();
-  const tempPath = `${resolved}.tmp.${ns}.${Math.random().toString(36).substring(2)}`;
+  // One retry: janitor/tmp sweeps can race the atomic write and remove the
+  // temp file (or its dir) between write and rename — ENOENT here is
+  // recoverable by re-materializing the temp file once.
+  const writeAtomically = (): void => {
+    const ns = process.hrtime.bigint().toString();
+    const tempPath = `${resolved}.tmp.${ns}.${Math.random().toString(36).substring(2)}`;
+    let fd: number | null = null;
+    try {
+      fd = fs.openSync(tempPath, 'w');
+      fs.writeFileSync(fd, data, options as any);
+      fs.fsyncSync(fd);
+      fs.closeSync(fd);
+      fd = null;
+      fs.renameSync(tempPath, resolved);
+    } catch (atomicErr) {
+      if (fd !== null)
+        try {
+          fs.closeSync(fd);
+        } catch (_) {}
+      if (fs.existsSync(tempPath))
+        try {
+          fs.unlinkSync(tempPath);
+        } catch (_) {}
+      throw atomicErr;
+    }
+  };
 
-  let fd: number | null = null;
   try {
-    fd = fs.openSync(tempPath, 'w');
-    fs.writeFileSync(fd, data, options as any);
-    fs.fsyncSync(fd);
-    fs.closeSync(fd);
-    fd = null;
-    fs.renameSync(tempPath, resolved);
+    try {
+      writeAtomically();
+    } catch (firstErr: any) {
+      if (firstErr?.code !== 'ENOENT') throw firstErr;
+      // Respect the caller's mkdir option: only re-create the directory when
+      // directory creation was requested in the first place.
+      if (mkdir && !fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      if (!fs.existsSync(dir)) throw firstErr;
+      writeAtomically();
+    }
+    return;
   } catch (err) {
-    if (fd !== null)
-      try {
-        fs.closeSync(fd);
-      } catch (_) {}
-    if (fs.existsSync(tempPath))
-      try {
-        fs.unlinkSync(tempPath);
-      } catch (_) {}
     throw err;
   }
 }

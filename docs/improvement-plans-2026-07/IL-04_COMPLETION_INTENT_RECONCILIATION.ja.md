@@ -64,3 +64,17 @@
 - 突合ゲートは**完了を止め得る**。誤って「未充足」と判定して完了をブロックすると体験が悪化する。まず warn(gap を提示するが完了は通す)で観測 → gap 抽出精度を確認 → enforce。重大度でゲート強度を分け、軽微 gap は completed + 注記に留める。
 - 非 stub 突合は LLM コストを足す。完了時 1 回のみ(ステップごとでない)に限定し、goal が明確なミッションのみフル突合、軽量パスは構造チェック中心。
 - 「satisfied」の過信は禁物。confidence を必ず添え、low の場合はユーザーに「自動確認は低信頼です。ご確認ください」と正直に出す(UX-01 の正直さ原則)。
+
+## 実装状況 追記(2026-07-08)— Goal Satisfaction Loop(Task 2 mission 側完了)
+
+受入条件 2 の mission 側「完了が突合に gate される」を、単なるブロックではなく**自律クローズループ**として実装:
+
+- `finishMission`(`scripts/refactor/mission-lifecycle.ts`)に **goal-satisfaction ゲート**を追加。`reconcileCompletion` が未充足(gaps あり)なら completed にせず:
+  - **gap を差分タスク化**: gap ごとに implementer タスク+reviewer タスク(`goal-gap-r<round>-<n>` / `-review`、review_target 付き)を NEXT_TASKS に upsert。acceptance_criteria に gap 本文+goal summary+success condition を明記するため、成果 evidence が gap 文言を含む形になり**次回突合で構造的に収束**する。
+  - mission を `active` に戻し(`GOAL_GAP_REALIGN`)、orchestration worker(E2E-03 の review 往復・best-of-N)がそのまま回す。
+  - 上限 `KYBERION_GOAL_LOOP_MAX_ROUNDS`(既定 2、0 で無効)。超過時は標準 finish-gate 失敗経路(`repair-goal-satisfaction` タスク+validating)+ `notifyOperator('mission_failed')` で**人間の判断に載せる**。
+  - 充足時は `goal-satisfaction` gate record(pass)を evidence に残す。
+- **字面→目的の貫通(worker 側)**: `dispatchPlannedMissionTask` の全プロンプトに `## Mission goal` セクション(goal summary / success condition / 「タスクの字面がゴールと矛盾するなら literal に完了せず gaps/needs で言え」)を注入(`buildMissionGoalLines`)。これまで worker はタスク description しか見ていなかった。
+- テスト: `mission-lifecycle.test.ts`(gap タスク投入→active 復帰、上限超過→validating+repair タスク)、`code-change-pr-collaboration.test.ts`(プロンプトへの goal 注入)。
+
+これで「依頼受領 → 解釈された goal(IL-01)→ 実行(E2E-03 協調)→ 完了突合(IL-04)→ **未達なら gap を自動で作業に還流** → 充足で完了 or 上限で operator」のループが閉じた。

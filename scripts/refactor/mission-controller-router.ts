@@ -166,7 +166,11 @@ export interface MissionControllerRoutingContext {
   ) => Awaitable<void>;
   classifyMission: (id: string, intentId?: string, taskType?: string) => Awaitable<void>;
   selectMissionWorkflow: (id: string, intentId?: string, taskType?: string) => Awaitable<void>;
-  planProcessTemplateTasks: (args: { id: string; force?: boolean; refreshCatalog?: boolean }) => Awaitable<void>;
+  planProcessTemplateTasks: (args: {
+    id: string;
+    force?: boolean;
+    refreshCatalog?: boolean;
+  }) => Awaitable<void>;
   reviewWorkerOutput: (
     id: string,
     result?: 'verified' | 'rejected',
@@ -476,6 +480,54 @@ export async function runMissionControllerAction(
     case 'dispatch-workitems':
       await context.dispatchMissionWorkItems(arg1!);
       break;
+    case 'improvements': {
+      const {
+        listProcessImprovementProposals,
+        decideProcessImprovementProposal,
+        applyProcessImprovementProposal,
+      } = await import('@agent/core');
+      const approveId = getValue('--approve', context.argv);
+      const rejectId = getValue('--reject', context.argv);
+      const applyId = getValue('--apply', context.argv);
+      if (approveId) {
+        console.log(
+          JSON.stringify(decideProcessImprovementProposal(approveId, 'approved'), null, 2)
+        );
+      } else if (rejectId) {
+        console.log(
+          JSON.stringify(decideProcessImprovementProposal(rejectId, 'rejected'), null, 2)
+        );
+      } else if (applyId) {
+        console.log(JSON.stringify(applyProcessImprovementProposal(applyId), null, 2));
+      } else {
+        const proposals = listProcessImprovementProposals();
+        if (proposals.length === 0) {
+          console.log('プロセス改善提案はありません。');
+        }
+        for (const proposal of proposals) {
+          console.log(
+            `[${proposal.status}] ${proposal.proposal_id} (${proposal.kind}) ${proposal.target} — ${proposal.proposal.slice(0, 100)}`
+          );
+        }
+      }
+      break;
+    }
+    case 'retrospective': {
+      const { runMissionRetrospective } = await import('@agent/core');
+      const result = await runMissionRetrospective(arg1!);
+      console.log(
+        JSON.stringify(
+          {
+            report_path: result.report_path,
+            proposals: result.proposals.length,
+            stats: result.stats,
+          },
+          null,
+          2
+        )
+      );
+      break;
+    }
     case 'seal':
       await context.sealMission(arg1!);
       break;

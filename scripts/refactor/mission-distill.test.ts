@@ -49,6 +49,11 @@ import { distillMission } from './mission-distill.js';
 import { promoteMemoryCandidateToKnowledge } from '@agent/core';
 import { safeExec } from '@agent/core';
 
+// Namespace the promotion queue so parallel test files never clobber the
+// real shared queue (root cause of combined-run flakes).
+process.env.KYBERION_MEMORY_QUEUE_PATH =
+  'active/shared/tmp/test-memory-queue-mission-distill.jsonl';
+
 describe('mission-distill end-to-end promotion flow', () => {
   const missionId = 'MSN-DISTILL-E2E-001';
   missionPath = pathResolver.shared('tmp/mission-distill-e2e');

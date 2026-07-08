@@ -142,3 +142,20 @@ planner が DAG を作る(依存つき)
 
 Task 1(上流注入)→ Task 2(snapshot)→ Task 3(review 契約)→ Task 4(往復)→ Task 7(E2E)→ Task 5(best-of)→ Task 6(PR 協調)。
 **Task 1+2 だけで「個別対処」の体感は大きく変わる**(reviewer が対象を知り、implementer が仲間の成果を知る)。Task 4 で協調が閉ループになり、Task 5/6 は品質と外形の仕上げ。
+
+## 追記(2026-07-08)— Mission Retrospective Loop(プロセス/チーム体制の自律改善)
+
+Goal Satisfaction Loop が「成果」を閉じるのに対し、**「働き方」を閉じる後方エッジ**を追加:
+
+- `libs/core/mission-retrospective.ts` — finish 時に自動実行(fire-and-forget)+ `mission_controller retrospective <ID>` で手動再実行可。
+  - **計測は決定論**: NEXT_TASKS のロール分布、チケット化失敗(未配員ロール等)、空応答ブロック、rework 回数、best-of 判定回数、goal-loop 周回数、finish gate 失敗、clarification 数を mission の実記録から収集。
+  - **提案は LLM**(stats に接地、stats に無い提案は禁止): team_composition / workflow_rule / process_step / tooling の4種を構造化 JSON で生成。
+  - **反映はガバナンス付き**: 提案は自動適用せず `active/shared/coordination/process-improvements/queue.jsonl` に `proposed` で積み、notifyOperator で操作者へ。承認されたものだけが team-blueprint / workflow catalog へ反映される(memory-promotion の ratification パターンと同型)。
+  - 成果物: `evidence/retrospective.md`(人間可読)+ `retrospective.json`。
+- あわせて dog-food 実走の発見を修正: 未配員ロール(qa)のタスクがチケット化で黙って落ちる → qa→reviewer→implementer の staffing フォールバック(`mission-ticket-dispatch.ts`)。ファイル成果タスクの agentic tools 自動有効化+空応答1回リトライ(`mission-workitem-dispatch.ts`)。dispatch 結果と NEXT_TASKS status の自動同期(done→completed / review→reviewed / blocked→blocked)。auth 失効 backend の6時間降格(failover)。ios_build 前の xcodegen 自動再生成。
+
+## 追記(2026-07-08 その2)— 自律改善3点の実装
+
+1. **agent×role 性能フィードバック**: retrospective が work item 成果(done/review/blocked)を `agent-role-outcomes.jsonl` に蓄積し `agent-performance.json` へ集計(`libs/core/agent-performance-index.ts`)。チーム編成の候補スコアリング(`team-role-assignment-selection.ts`)が **±8 の bounded 補正**として参照(最低5サンプル、operator の preferred_agents=+20 が常に優先)。
+2. **dispatch 自動ラウンド**: `dispatchMissionWorkItems` に `rounds`(CLI `--dispatch-rounds N` / env `KYBERION_DISPATCH_MAX_ROUNDS`)。各ラウンド後に ready/backlog/blocked を再選択し、残ゼロ or 無進捗で停止。blocked の手動再投入が不要に。
+3. **提案の承認→反映一気通貫**: `mission_controller improvements`(一覧)/ `--approve` / `--reject` / `--apply <id>`。apply は承認済み提案をワークオーダー md 化+inbox/notify(構造的自動パッチは意図的に除外 — 変更はレビューを通す)。実データで PIP-DBCAA4A2(T-TEST-1 失敗由来の preflight 検証提案)を approve→apply まで実演済み。

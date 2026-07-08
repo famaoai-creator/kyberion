@@ -16,13 +16,21 @@
  * model: Kyberion never calls the API itself, a sub-agent does.
  */
 
-import { query, type CanUseTool, type McpServerConfig, type Options } from '@anthropic-ai/claude-agent-sdk';
+import {
+  query,
+  type CanUseTool,
+  type McpServerConfig,
+  type Options,
+} from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod';
 import { metrics } from './metrics.js';
 
 /** Pull billable token counts from a result message's `usage` block (defensive). */
-function extractUsageTokens(message: unknown): { prompt_tokens: number; completion_tokens: number } {
-  const usage = ((message as { usage?: Record<string, number> })?.usage) ?? {};
+function extractUsageTokens(message: unknown): {
+  prompt_tokens: number;
+  completion_tokens: number;
+} {
+  const usage = (message as { usage?: Record<string, number> })?.usage ?? {};
   return {
     prompt_tokens: (usage.input_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0),
     completion_tokens: usage.output_tokens ?? 0,
@@ -40,7 +48,7 @@ function recordClaudeAgentMetrics(
   durationMs: number,
   status: 'success' | 'error',
   message: unknown,
-  totalCostUsd: number,
+  totalCostUsd: number
 ): void {
   try {
     metrics.record(label, durationMs, status, {
@@ -84,7 +92,7 @@ export class ClaudeAgentQueryError extends Error {
   constructor(
     message: string,
     readonly code: 'no_result' | 'parse_failed' | 'agent_error',
-    readonly detail?: unknown,
+    readonly detail?: unknown
   ) {
     super(message);
     this.name = 'ClaudeAgentQueryError';
@@ -98,7 +106,7 @@ export class ClaudeAgentQueryError extends Error {
  * rejects with ClaudeAgentQueryError on schema-mismatch or agent failure.
  */
 export async function runClaudeAgentQuery<T>(
-  params: ClaudeAgentQueryParams<T>,
+  params: ClaudeAgentQueryParams<T>
 ): Promise<ClaudeAgentQueryResult<T>> {
   const jsonSchema = z.toJSONSchema(params.schema) as Record<string, unknown>;
   // The Agent SDK's json_schema output format expects a raw JSON Schema
@@ -109,7 +117,10 @@ export async function runClaudeAgentQuery<T>(
     systemPrompt: params.systemPrompt,
     model: params.model ?? 'opus',
     tools: [],
-    maxTurns: 1,
+    // Structured output is delivered via a StructuredOutput TOOL call, which
+    // consumes a turn — maxTurns:1 made every structured query die with
+    // error_max_turns (stop_reason=tool_use) before the result turn.
+    maxTurns: 3,
     permissionMode: 'dontAsk',
     outputFormat: { type: 'json_schema', schema: jsonSchema },
     abortController: params.abortController,
@@ -150,21 +161,21 @@ export async function runClaudeAgentQuery<T>(
     Date.now() - startedAt,
     lastError ? 'error' : 'success',
     resultMessage,
-    totalCostUsd,
+    totalCostUsd
   );
 
   if (lastError) {
     throw new ClaudeAgentQueryError(
       `[claude-agent-query] sub-agent returned error`,
       'agent_error',
-      lastError,
+      lastError
     );
   }
 
   if (structured === undefined) {
     throw new ClaudeAgentQueryError(
       `[claude-agent-query] sub-agent did not emit structured_output`,
-      'no_result',
+      'no_result'
     );
   }
 
@@ -173,7 +184,7 @@ export async function runClaudeAgentQuery<T>(
     throw new ClaudeAgentQueryError(
       `[claude-agent-query] schema validation failed: ${parseResult.error.message}`,
       'parse_failed',
-      { structured, issues: parseResult.error.issues },
+      { structured, issues: parseResult.error.issues }
     );
   }
 
@@ -217,7 +228,9 @@ export interface ClaudeAgentTaskResult {
  * this path enables tools — intended to be driven by Kyberion governance
  * (`mcpServers` + `canUseTool` from `claude-agent-governance.ts`).
  */
-export async function runClaudeAgentTask(params: ClaudeAgentTaskParams): Promise<ClaudeAgentTaskResult> {
+export async function runClaudeAgentTask(
+  params: ClaudeAgentTaskParams
+): Promise<ClaudeAgentTaskResult> {
   const options: Options = {
     systemPrompt: params.systemPrompt,
     model: params.model ?? 'opus',
@@ -264,11 +277,15 @@ export async function runClaudeAgentTask(params: ClaudeAgentTaskParams): Promise
     Date.now() - startedAt,
     lastError ? 'error' : 'success',
     resultMessage,
-    totalCostUsd,
+    totalCostUsd
   );
 
   if (lastError) {
-    throw new ClaudeAgentQueryError('[claude-agent-query] agentic sub-agent returned error', 'agent_error', lastError);
+    throw new ClaudeAgentQueryError(
+      '[claude-agent-query] agentic sub-agent returned error',
+      'agent_error',
+      lastError
+    );
   }
 
   return { text, sessionId, totalCostUsd, numTurns };

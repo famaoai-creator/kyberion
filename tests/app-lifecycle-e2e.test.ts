@@ -24,8 +24,12 @@ describe('build-actuator command contracts (E2E-05 Task 2)', () => {
       scheme: 'MyApp',
     });
     expect(build.command).toBe('xcodebuild');
-    expect(build.args).toContain('-scheme');
-    expect(build.args).toContain('generic/platform=iOS Simulator');
+    // -target + -sdk iphonesimulator: scheme destination resolution requires
+    // device platform components even for simulator builds on recent Xcode —
+    // verified against real Xcode 26 in the E2E-05 dog-food run.
+    expect(build.args).toContain('-target');
+    expect(build.args).toContain('iphonesimulator');
+    expect(build.args).toContain('CODE_SIGNING_ALLOWED=NO');
 
     const test = buildCommandForOp({
       op: 'ios_test',

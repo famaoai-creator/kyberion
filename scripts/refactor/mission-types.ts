@@ -219,6 +219,9 @@ export interface MissionState {
     };
     cancelled?: boolean;
     cancel_reason?: string;
+    /** Goal Satisfaction Loop: how many gap-closing rounds have run. */
+    goal_reconciliation_round?: number;
+    goal_reconciliation_last_gaps?: string[];
   };
   history: Array<{
     ts: string;

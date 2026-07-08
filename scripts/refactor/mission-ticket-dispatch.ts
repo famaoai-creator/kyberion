@@ -270,9 +270,25 @@ export async function dispatchMissionTickets(
     const existing = existingRecords.get(task.task_id);
     const workItemSourceRef = `mission:${missionId}:${task.task_id}`;
     let workItemId = existing?.work_item_id;
-    const resolvedAssignment = teamRole
-      ? resolveMissionTeamReceiver({ missionId, teamRole })
-      : null;
+    // An unstaffed role must not silently drop the task (dog-food finding:
+    // the qa task was rejected because the team blueprint staffed no qa) —
+    // fall back along the review chain before giving up.
+    const roleStaffingFallbacks: Record<string, string[]> = {
+      qa: ['reviewer', 'implementer'],
+      reviewer: ['implementer'],
+    };
+    let resolvedAssignment = teamRole ? resolveMissionTeamReceiver({ missionId, teamRole }) : null;
+    if (!resolvedAssignment && teamRole) {
+      for (const fallbackRole of roleStaffingFallbacks[teamRole] || []) {
+        resolvedAssignment = resolveMissionTeamReceiver({ missionId, teamRole: fallbackRole });
+        if (resolvedAssignment) {
+          notes.push(
+            `role ${teamRole} unstaffed; using ${fallbackRole} staffing (${resolvedAssignment.agent_id})`
+          );
+          break;
+        }
+      }
+    }
     const resolvedAgentId = task.assigned_to?.agent_id || resolvedAssignment?.agent_id || undefined;
     const validation = validateMissionTicketTask(task, resolvedAgentId);
     if (!validation.ok) {
