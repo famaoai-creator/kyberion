@@ -87,7 +87,9 @@ vi.mock('./mission-task-events.js', () => ({
   emitMissionTaskEvent: mocks.emitMissionTaskEvent,
 }));
 
-describe('mission-orchestration-worker', () => {
+// Full dispatch flows through real module wiring — comfortably fast locally
+// but regularly past the 10s default on shared CI runners.
+describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
   beforeEach(async () => {
     vi.resetModules();
     vi.resetAllMocks();
