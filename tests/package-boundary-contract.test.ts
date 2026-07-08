@@ -83,6 +83,7 @@ const ALLOWED_TEST_SOURCE_IMPORTS = new Map<string, string[]>([
       '../libs/core/core.js',
       '../libs/core/customer-channel-binding.js',
       '../libs/core/customer-conversation.js',
+      '../libs/core/customer-conversation-modes.js',
       '../libs/core/deal-documents.js',
       '../libs/core/deal-store.js',
       '../libs/core/memory-promotion-queue.js',
