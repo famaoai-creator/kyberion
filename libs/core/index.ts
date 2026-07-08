@@ -109,6 +109,7 @@ export * from './deal-documents.js';
 export * from './mission-retrospective.js';
 export * from './working-principles.js';
 export * from './design-qa.js';
+export * from './apple-intelligence-bridge.js';
 
 // Utils
 export * from './fs-utils.js';

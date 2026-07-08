@@ -131,3 +131,26 @@ If Kyberion adopts this next, the order should be:
 4. more advanced computer-use style assistance
 
 That keeps the first slice useful without overcommitting to speculative automation.
+
+## Implementation status (2026-07-09)
+
+**v1 landed — text assist lane.**
+
+- `tools/apple-intelligence-bridge/afm.swift` — dependency-free Swift CLI over
+  FoundationModels (`availability` / `prompt`), compiled on demand with a
+  single `swiftc` into `active/shared/runtime/apple-intelligence/afm`.
+- `libs/core/apple-intelligence-bridge.ts` — governed Node entry
+  (managed-process spawn, availability probe with 10-min cache,
+  `KYBERION_APPLE_FM=0` opt-out). Helpers: `appleFmPrompt`,
+  `classifyLocallyWithAppleFm`, `summarizeLocallyWithAppleFm`. Every helper
+  returns `null` on any failure — callers keep their existing path.
+- Deliberately NOT a ReasoningBackend: the ~3B on-device model serves the
+  light assist lane (summaries, formatting, pre-classification, short UI
+  text), never mission planning or structured extraction.
+- Verified live on macOS 27 / Apple Silicon: availability probe, Japanese
+  intent classification, and one-sentence summarization
+  (`pnpm check:apple-fm`).
+
+Next lanes per this document: Vision (image understanding), Speech
+(SpeechAnalyzer input / AVSpeech output), Image Playground, App Intents —
+each behind the same probe-and-degrade pattern.
