@@ -92,14 +92,18 @@ export function buildCommandForOp(input: BuildActuatorInput): {
     case 'ios_generate_project':
       return { command: 'xcodegen', args: ['generate'], cwd: projectDir };
     case 'ios_build':
+      // -target + -sdk iphonesimulator: scheme destination resolution requires
+      // the *device* platform components to be installed even for simulator
+      // builds on recent Xcode — target/sdk builds work with just the SDK.
       return {
         command: 'xcodebuild',
         args: [
           ...detectXcodeContainer(projectDir),
-          ...(input.scheme ? ['-scheme', input.scheme] : []),
-          '-destination',
-          'generic/platform=iOS Simulator',
+          ...(input.scheme ? ['-target', input.scheme] : []),
+          '-sdk',
+          'iphonesimulator',
           'build',
+          'CODE_SIGNING_ALLOWED=NO',
         ],
         cwd: projectDir,
       };
@@ -171,6 +175,21 @@ function collectArtifacts(op: BuildOp, projectDir: string): string[] {
 function runBuildCommand(input: BuildActuatorInput): BuildActuatorResult {
   const { command, args, cwd } = buildCommandForOp(input);
   const startedAt = Date.now();
+  // XcodeGen projects go stale the moment agents add new Sources files —
+  // regenerate before building so ios_build always sees the current tree
+  // (dog-food finding: agent-written files were "not in scope" until regen).
+  let regenNote = '';
+  if (input.op.startsWith('ios_') && input.op !== 'ios_generate_project') {
+    if (safeExistsSync(path.join(cwd, 'project.yml'))) {
+      const regen = safeExecResult('xcodegen', ['generate'], { cwd, timeoutMs: 120_000 });
+      regenNote = `$ xcodegen generate (exit ${regen.status})\n`;
+      if (regen.status !== 0) {
+        logger.warn(
+          `[build-actuator] xcodegen regenerate failed before ${input.op}: ${String(regen.stderr || '').slice(0, 200)}`
+        );
+      }
+    }
+  }
   const result = safeExecResult(command, args, {
     cwd,
     timeoutMs: input.timeout_ms || DEFAULT_BUILD_TIMEOUT_MS,
@@ -178,7 +197,7 @@ function runBuildCommand(input: BuildActuatorInput): BuildActuatorResult {
   });
   const durationMs = Date.now() - startedAt;
   const logText = [
-    `$ ${command} ${args.join(' ')}`,
+    regenNote + `$ ${command} ${args.join(' ')}`,
     `cwd: ${cwd}`,
     `exit: ${result.status}`,
     '--- stdout ---',

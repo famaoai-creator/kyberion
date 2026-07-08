@@ -8,15 +8,6 @@
 - [Ecosystem Architecture & Knowledge Map](./Ecosystem_Map.md) (public | Kyberion Sovereign Entity)
 - [Kyberion Knowledge Base: Rights & Usage](./README.md) (public | Unknown)
 
-## 📁 evolution
-- [Adaptive Resilience and Backlog Recovery for Service Actuators](./evolution/distill_resilience-actuators-v1_2026_05_11.md) (public | Kyberion Wisdom Distiller)
-- [Executive ADF Pipelines with Environment-Resilient Validation](./evolution/distill_msn-executive-pipelines_2026_05_02.md) (public | Kyberion Wisdom Distiller)
-- [Fail-Closed Validation for Receipt Timestamps](./evolution/distill_production-receipt-malformed-timestamps_2026_05_15.md) (public | Kyberion Wisdom Distiller)
-- [Hardening Schema Validation for Non-Blank Text Fields](./evolution/distill_production-evidence-register-text-nonblank_2026_05_15.md) (public | Kyberion Wisdom Distiller)
-- [Mission BOARD-PROTOCOL-COMMONIZATION-2026-04-30 Completion Summary](./evolution/distill_board-protocol-commonization-2026-04-30_2026_04_29.md) (public | Kyberion Wisdom Distiller)
-- [Mission BROWSER-DIRECT-REPLY-COMMONIZATION-2026-04-29 Completion Summary](./evolution/distill_browser-direct-reply-commonization-2026-04-29_2026_04_29.md) (public | Kyberion Wisdom Distiller)
-- [Production Evidence Integrity: Local Artifact Validation](./evolution/distill_production-evidence-local-artifact-refs_2026_05_15.md) (public | Kyberion Wisdom Distiller)
-
 ## 📁 product/agents
 - [chronos-mirror.agent](./product/agents/chronos-mirror.agent.md) (public | Unknown)
 - [discord-surface-agent.agent](./product/agents/discord-surface-agent.agent.md) (public | Unknown)
@@ -140,8 +131,8 @@
 - [Voice Generation Absorption Plan](./product/architecture/voice-generation-absorption-plan.md) (public | Ecosystem Architect)
 - [Wisdom: Excel Design Distillation & AI-Native Replication](./product/architecture/excel-design-distillation-pattern.md) (public | Ecosystem Architect)
 - [Wisdom: PowerPoint Design Distillation & Heritage Sync](./product/architecture/pptx-design-distillation-pattern.md) (public | Ecosystem Architect)
-- [検討報告：マルチテナント・ナレッジガバナンスの最適化案](./product/architecture/analysis-multi-tenant-governance-20260304.md) (public | Ecosystem Architect)
 - [分散システム ＆ アーキテクチャパターン](./product/architecture/distributed-systems.md) (public | Ecosystem Architect)
+- [検討報告：マルチテナント・ナレッジガバナンスの最適化案](./product/architecture/analysis-multi-tenant-governance-20260304.md) (public | Ecosystem Architect)
 
 ## 📁 product/architecture/decisions
 - [Constrain Mesh Hub v1 to a Same-Tenant Single-Writer Control Plane](./product/architecture/decisions/2026-06-24-mesh-hub-v1-boundaries.md) (public | Ecosystem Architect)
@@ -161,33 +152,6 @@
 
 ## 📁 product/config-missions
 - [Config Mission Presets](./product/config-missions/README.md) (public | Unknown)
-
-## 📁 product/evolution
-- [🧠 Autonomous Wisdom Distillation - 2026-03-01](./product/evolution/wisdom_2026_03_01.md) (public | Ecosystem Architect)
-- [Agent Mission Runtime Lifecycle Stabilization](./product/evolution/distill_msn-agent-runtime-map-001_2026_06_04.md) (public | Kyberion Wisdom Distiller)
-- [Autonomous Multimodal Documentation Pipeline](./product/evolution/distill_msn-kyberion-code-to-manual-video_2026_05_31.md) (public | Kyberion Wisdom Distiller)
-- [Biometric & Mood Data Privacy Protocol](./product/evolution/biometric_privacy.md) (public | Ecosystem Architect)
-- [Mission ADF-PIPELINE-CONTRACT-CONSOLIDATION Completion Summary](./product/evolution/distill_adf-pipeline-contract-consolidation_2026_03_15.md) (public | Kyberion Wisdom Distiller)
-- [Mission AGENT-MISSION-CONTROL-CONCEPT Completion Summary](./product/evolution/distill_agent-mission-control-concept_2026_03_15.md) (public | Kyberion Wisdom Distiller)
-- [Mission CHANNEL-PORT-SURFACE-CONSOLIDATION Completion Summary](./product/evolution/distill_channel-port-surface-consolidation_2026_03_15.md) (public | Kyberion Wisdom Distiller)
-- [Mission CODEX-STABILITY-HARDENING Completion Summary](./product/evolution/distill_codex-stability-hardening_2026_03_15.md) (public | Kyberion Wisdom Distiller)
-- [Mission CORE-CONCEPT-MESH-ROADMAP Completion Summary](./product/evolution/distill_core-concept-mesh-roadmap_2026_06_24.md) (public | Kyberion Wisdom Distiller)
-- [Mission KNOWLEDGE-TAXONOMY-REORGANIZATION Completion Summary](./product/evolution/distill_knowledge-taxonomy-reorganization_2026_03_15.md) (public | Kyberion Wisdom Distiller)
-- [Mission MSN-KYBERION-VIDEO-MODES Completion Summary](./product/evolution/distill_msn-kyberion-video-modes_2026_05_31.md) (public | Kyberion Wisdom Distiller)
-- [Mission MSN-SLIDE-PATTERN-DESIGN-20260627 Completion Summary](./product/evolution/distill_msn-slide-pattern-design-20260627_2026_06_27.md) (public | Kyberion Wisdom Distiller)
-- [Mission OPERATIONS-RELIABILITY-HARDENING Completion Summary](./product/evolution/distill_operations-reliability-hardening_2026_03_15.md) (public | Kyberion Wisdom Distiller)
-- [Mission PROCESS-ACTUATOR-CONSOLIDATION Completion Summary](./product/evolution/distill_process-actuator-consolidation_2026_03_15.md) (public | Kyberion Wisdom Distiller)
-- [Mission PROCESS-BOUNDARY-GOVERNANCE Completion Summary](./product/evolution/distill_process-boundary-governance_2026_03_15.md) (public | Kyberion Wisdom Distiller)
-- [Mission RUNTIME-LIFECYCLE-CONSOLIDATION Completion Summary](./product/evolution/distill_runtime-lifecycle-consolidation_2026_03_15.md) (public | Kyberion Wisdom Distiller)
-- [Mission RUNTIME-SUPERVISOR-HARDENING Completion Summary](./product/evolution/distill_runtime-supervisor-hardening_2026_03_15.md) (public | Kyberion Wisdom Distiller)
-- [Mission RUNTIME-SURFACE-LIFECYCLE-CONSOLIDATION Completion Summary](./product/evolution/distill_runtime-surface-lifecycle-consolidation_2026_03_15.md) (public | Kyberion Wisdom Distiller)
-- [Mission SBIJSM-DESIGN-IMPORT Completion Summary](./product/evolution/distill_sbijsm-design-import_2026_06_24.md) (public | Kyberion Wisdom Distiller)
-- [Mission SLACK-CHRONOS-CONTROL-CONSOLIDATION Completion Summary](./product/evolution/distill_slack-chronos-control-consolidation_2026_03_15.md) (public | Kyberion Wisdom Distiller)
-- [Mission WORKSPACE-BUILD-CONTRACT-HARDENING Completion Summary](./product/evolution/distill_workspace-build-contract-hardening_2026_03_15.md) (public | Kyberion Wisdom Distiller)
-- [Product UX Evaluation & Roadmap Alignment Audit](./product/evolution/distill_product-ux-roadmap-audit-20260529_2026_05_28.md) (public | Kyberion Wisdom Distiller)
-- [Reconstruction Learnings: The Great De-monolithization (2026-03-07)](./product/evolution/reconstruction-learnings-2026-03-07.md) (public | Unknown)
-- [Standardized Refactor-Regression Verification and Multi-Target Ticket Dispatch](./product/evolution/distill_msn-refac-verify-001_2026_06_04.md) (public | Kyberion Wisdom Distiller)
-- [Structured Customer Discovery via Persona-Based Critique and Validation Gates](./product/evolution/distill_msn-customer-discovery-001_2026_05_29.md) (public | Kyberion Wisdom Distiller)
 
 ## 📁 product/governance
 - [Active Inquiry Protocol: The Power of Questioning](./product/governance/active-inquiry-protocol.md) (public | Ecosystem Architect)
@@ -305,10 +269,10 @@
 - [ADF Pipeline Quickstart](./product/orchestration/adf-pipeline-quickstart.md) (public | Unknown)
 - [ADF Pipeline Template](./product/orchestration/adf-pipeline-template.md) (public | Kyberion)
 - [ADF Pipeline Validation & Design Patterns Report](./product/orchestration/adf-pipeline-validation-report.md) (public | Unknown)
-- [ADF パイプライン簡素化ミッション計画](./product/orchestration/adf-pipeline-simplification-mission-plan.md) (public | Unknown)
-- [ADF パイプライン検証計画](./product/orchestration/adf-pipeline-validation-plan.md) (public | Unknown)
 - [ADF パイプライン全体評価レポート](./product/orchestration/adf-pipeline-strategy-report.md) (public | Unknown)
 - [ADF パイプライン分類レポート](./product/orchestration/adf-pipeline-classification-report.md) (public | Unknown)
+- [ADF パイプライン検証計画](./product/orchestration/adf-pipeline-validation-plan.md) (public | Unknown)
+- [ADF パイプライン簡素化ミッション計画](./product/orchestration/adf-pipeline-simplification-mission-plan.md) (public | Unknown)
 - [AIDLC Integration Process](./product/orchestration/aidlc-integration-process.md) (public | Kyberion)
 - [Autonomous Sentinel Operations](./product/orchestration/sentinel-operations.md) (public | Ecosystem Architect)
 - [Blog Authoring Playbook](./product/orchestration/blog-authoring-playbook.md) (public | Unknown)
@@ -377,10 +341,10 @@
 - [ハイブリッド型AIネイティブ開発フロー (Hybrid AI-Native Flow)](./product/orchestration/hybrid-development-flow.md) (public | Ecosystem Architect)
 - [ミッション実行規程 (Mission Execution Protocol v2.0)](./product/orchestration/mission-execution-protocol.md) (public | Kyberion Sovereign Entity)
 - [企業内ネットワーク環境セットアップガイド](./product/orchestration/corporate-env-guide.md) (public | Ecosystem Architect)
-- [高度な自律開発標準ワークフロー (Advanced Development Flow)](./product/orchestration/advanced-development-flow.md) (public | Ecosystem Architect)
 - [自律型シナジー標準基準 (Autonomous Synergy Standards)](./product/orchestration/optimization-standards.md) (public | Ecosystem Architect)
 - [自律型デバッグ・ループ (Autonomous Debug Loop)](./product/orchestration/autonomous-debug-loop.md) (public | Ecosystem Architect)
 - [自律的 Git ブランチ・PR 運用基準 (Git Flow Standards)](./product/orchestration/git-flow-standards.md) (public | Ecosystem Architect)
+- [高度な自律開発標準ワークフロー (Advanced Development Flow)](./product/orchestration/advanced-development-flow.md) (public | Ecosystem Architect)
 
 ## 📁 product/orchestration/agent-profiles
 - [Agent Profile Directory](./product/orchestration/agent-profiles/README.md) (public | Unknown)

@@ -13,7 +13,9 @@ import {
   logger,
   pathResolver,
   safeExecResult,
+  safeExistsSync,
   safeMkdir,
+  safeReaddir,
   safeReadFile,
   safeWriteFile,
   sharedTmp,
@@ -40,6 +42,19 @@ function executeEntry(entry: CampaignPlanEntry): { ok: boolean; detail?: string 
       .slice(-5)
       .join(' | ');
     return { ok: false, detail: stderrTail || `exit ${result.status}` };
+  }
+  // Actuator CLIs exit 0 even when the pipeline reports failed steps —
+  // trusting the exit code alone produced "succeeded" manifests with empty
+  // output dirs (字面成功). Check the reported status AND the actual outcome.
+  const stdout = String(result.stdout || '');
+  const failedMatch = stdout.match(/"status":\s*"failed"[\s\S]*?"error":\s*"([^"]+)"/);
+  if (failedMatch) {
+    return { ok: false, detail: failedMatch[1] };
+  }
+  const outputDirAbs = pathResolver.rootResolve(entry.output_dir);
+  const produced = safeExistsSync(outputDirAbs) ? safeReaddir(outputDirAbs) : [];
+  if (produced.length === 0) {
+    return { ok: false, detail: 'no artifacts produced in output_dir' };
   }
   return { ok: true };
 }

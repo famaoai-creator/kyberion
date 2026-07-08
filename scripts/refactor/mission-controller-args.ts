@@ -5,9 +5,17 @@ import {
   pathResolver,
   validateWritePermission,
 } from '@agent/core';
-import { extractMissionControllerPositionalArgs, extractMissionStartCreateOptionsFromArgv, getOptionValue, parseCsvOption } from './mission-cli-args.js';
+import {
+  extractMissionControllerPositionalArgs,
+  extractMissionStartCreateOptionsFromArgv,
+  getOptionValue,
+  parseCsvOption,
+} from './mission-cli-args.js';
 import { normalizeRelationships } from './mission-state.js';
-import { resolveProjectLedgerJsonPath, resolveProjectLedgerPath } from './mission-project-ledger.js';
+import {
+  resolveProjectLedgerJsonPath,
+  resolveProjectLedgerPath,
+} from './mission-project-ledger.js';
 import type { MissionRelationships } from './mission-types.js';
 
 export interface ResolvedMissionCliInput {
@@ -69,7 +77,9 @@ export function resolveMissionStartCreateInputFromArgv(
     tier: namedStartCreateOptions.tier || (arg2 as any),
     tenantId: namedStartCreateOptions.tenantId || arg3,
     organizationId: namedStartCreateOptions.organizationId,
-    ...(namedStartCreateOptions.tenantSlug ? { tenantSlug: namedStartCreateOptions.tenantSlug } : {}),
+    ...(namedStartCreateOptions.tenantSlug
+      ? { tenantSlug: namedStartCreateOptions.tenantSlug }
+      : {}),
     missionType: namedStartCreateOptions.missionType || arg4,
     visionRef: namedStartCreateOptions.visionRef || arg5,
     persona: namedStartCreateOptions.persona || arg6,
@@ -77,7 +87,7 @@ export function resolveMissionStartCreateInputFromArgv(
     relationships,
     ledgerTargets: projectPath
       ? {
-        markdown: resolveProjectLedgerPath(projectPath),
+          markdown: resolveProjectLedgerPath(projectPath),
           json: resolveProjectLedgerJsonPath(projectPath),
         }
       : undefined,
@@ -119,9 +129,7 @@ export function validateMissionStartCreateInput(
   return input;
 }
 
-export function resolveMissionTicketDispatchOptionsFromArgv(
-  argv: string[] = process.argv,
-): {
+export function resolveMissionTicketDispatchOptionsFromArgv(argv: string[] = process.argv): {
   targets: Array<'workitem' | 'github' | 'jira'>;
   liveTargets: Array<'workitem' | 'github' | 'jira'>;
   github?: { owner?: string; repo?: string };
@@ -138,29 +146,35 @@ export function resolveMissionTicketDispatchOptionsFromArgv(
     targets: (targets.length > 0 ? targets : ['workitem']) as Array<'workitem' | 'github' | 'jira'>,
     liveTargets: liveTargets as Array<'workitem' | 'github' | 'jira'>,
     github: githubOwner || githubRepo ? { owner: githubOwner, repo: githubRepo } : undefined,
-    jira: jiraDomain || jiraProjectKey ? { domain: jiraDomain, projectKey: jiraProjectKey } : undefined,
+    jira:
+      jiraDomain || jiraProjectKey ? { domain: jiraDomain, projectKey: jiraProjectKey } : undefined,
   };
 }
 
-export function resolveMissionWorkItemDispatchOptionsFromArgv(
-  argv: string[] = process.argv,
-): {
+export function resolveMissionWorkItemDispatchOptionsFromArgv(argv: string[] = process.argv): {
   mode: 'auto' | 'agent' | 'subagent';
   limit?: number;
   statuses: Array<'backlog' | 'ready' | 'in_progress' | 'blocked' | 'review' | 'done' | 'archived'>;
   sources: Array<'local' | 'github' | 'jira' | 'peer'>;
   finalStatus: 'review' | 'done';
+  rounds?: number;
 } {
   const mode = (getOptionValue('--dispatch-mode', argv) || 'auto') as 'auto' | 'agent' | 'subagent';
   const limitRaw = getOptionValue('--dispatch-limit', argv);
   const statusesRaw = parseCsvOption('--dispatch-statuses', argv) || ['ready'];
   const sourcesRaw = parseCsvOption('--dispatch-sources', argv) || ['local'];
-  const finalStatus = (getOptionValue('--dispatch-final-status', argv) || 'review') as 'review' | 'done';
+  const finalStatus = (getOptionValue('--dispatch-final-status', argv) || 'review') as
+    | 'review'
+    | 'done';
+  const roundsRaw = getOptionValue('--dispatch-rounds', argv);
 
   return {
     mode,
+    ...(roundsRaw ? { rounds: Number(roundsRaw) } : {}),
     ...(limitRaw ? { limit: Number(limitRaw) } : {}),
-    statuses: statusesRaw as Array<'backlog' | 'ready' | 'in_progress' | 'blocked' | 'review' | 'done' | 'archived'>,
+    statuses: statusesRaw as Array<
+      'backlog' | 'ready' | 'in_progress' | 'blocked' | 'review' | 'done' | 'archived'
+    >,
     sources: sourcesRaw as Array<'local' | 'github' | 'jira' | 'peer'>,
     finalStatus,
   };

@@ -7,8 +7,7 @@
     "mission_id": "",
     "project_name": "",
     "intent_text": "",
-    "language": "ja",
-    "requirements_source_path": "active/missions/{{mission_id}}/evidence/sdlc-intent.md"
+    "language": "ja"
   },
   "steps": [
     {
@@ -32,11 +31,14 @@
       "id": "extract_requirements",
       "role": "transform",
       "op": "wisdom:extract_requirements",
-      "produces": { "channel": "requirements_result", "type": "RequirementsDraftRef" },
+      "produces": {
+        "channel": "requirements_result",
+        "type": "RequirementsDraftRef"
+      },
       "params": {
         "mission_id": "{{mission_id}}",
         "project_name": "{{project_name}}",
-        "source_path": "{{requirements_source_path}}",
+        "source_path": "active/missions/{{mission_id}}/evidence/sdlc-intent.md",
         "source_type": "mixed",
         "language": "{{language}}"
       }
@@ -46,7 +48,10 @@
       "role": "transform",
       "op": "wisdom:extract_design_spec",
       "consumes": "requirements_result",
-      "produces": { "channel": "design_result", "type": "DesignSpecRef" },
+      "produces": {
+        "channel": "design_result",
+        "type": "DesignSpecRef"
+      },
       "params": {
         "mission_id": "{{mission_id}}",
         "project_name": "{{project_name}}"
@@ -57,7 +62,10 @@
       "role": "transform",
       "op": "wisdom:decompose_into_tasks",
       "consumes": "design_result",
-      "produces": { "channel": "task_plan_result", "type": "TaskPlanRef" },
+      "produces": {
+        "channel": "task_plan_result",
+        "type": "TaskPlanRef"
+      },
       "params": {
         "mission_id": "{{mission_id}}",
         "project_name": "{{project_name}}"
@@ -68,7 +76,10 @@
       "role": "transform",
       "op": "wisdom:task_plan_to_next_tasks",
       "consumes": "task_plan_result",
-      "produces": { "channel": "next_tasks_result", "type": "NextTasksRef" },
+      "produces": {
+        "channel": "next_tasks_result",
+        "type": "NextTasksRef"
+      },
       "params": {
         "mission_id": "{{mission_id}}"
       }
@@ -78,7 +89,10 @@
       "role": "transform",
       "op": "wisdom:extract_test_plan",
       "consumes": "next_tasks_result",
-      "produces": { "channel": "test_plan_result", "type": "TestPlanRef" },
+      "produces": {
+        "channel": "test_plan_result",
+        "type": "TestPlanRef"
+      },
       "params": {
         "mission_id": "{{mission_id}}",
         "project_name": "{{project_name}}"

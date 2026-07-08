@@ -105,6 +105,7 @@ export * from './deal-store.js';
 export * from './customer-conversation.js';
 export * from './operator-notifications.js';
 export * from './deal-documents.js';
+export * from './mission-retrospective.js';
 
 // Utils
 export * from './fs-utils.js';
