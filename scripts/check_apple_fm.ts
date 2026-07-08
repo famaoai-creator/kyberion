@@ -6,9 +6,11 @@
  */
 import {
   classifyLocallyWithAppleFm,
+  generateImageLocallyWithApplePlayground,
   probeAppleIntelligence,
   recognizeImageLocallyWithAppleVision,
   summarizeLocallyWithAppleFm,
+  transcribeAudioLocallyWithAppleSpeech,
 } from '@agent/core';
 import { safeExistsSync } from '@agent/core';
 
@@ -40,6 +42,24 @@ async function main(): Promise<void> {
       `[check:apple-fm] sample vision OCR: ${vision ? JSON.stringify(vision.text.split('\n')[0]) : 'null'}`
     );
   }
+
+  const sampleAudio = process.env.KYBERION_APPLE_FM_SAMPLE_AUDIO;
+  if (sampleAudio && safeExistsSync(sampleAudio)) {
+    const transcript = await transcribeAudioLocallyWithAppleSpeech(sampleAudio);
+    console.log(`[check:apple-fm] sample transcription: ${transcript}`);
+  } else {
+    console.log(
+      '[check:apple-fm] transcription: set KYBERION_APPLE_FM_SAMPLE_AUDIO=<path> to demo (e.g. say -o /tmp/s.aiff "テスト")'
+    );
+  }
+
+  const imagined = await generateImageLocallyWithApplePlayground(
+    'abstract orbit emblem on a dark background',
+    'active/shared/tmp/apple-fm-imagine-sample.png'
+  );
+  console.log(
+    `[check:apple-fm] image generation: ${imagined ? `${imagined.path} (${imagined.style})` : 'unavailable on this device (Image Playground not enabled) — helpers degrade to null'}`
+  );
 }
 
 main().catch((error) => {

@@ -321,6 +321,100 @@ export async function verifyRenderedTextWithAppleVision(
   return { ok: missing.length === 0, missing, recognized_text: vision.text };
 }
 
+/**
+ * On-device speech-to-text via the SpeechAnalyzer/SpeechTranscriber stack
+ * (macOS 26+). Meeting audio, voice memos, requirements-hearing recordings —
+ * transcribed locally, nothing leaves the machine. Returns null when the
+ * stack, locale model, or bridge is unavailable.
+ */
+export async function transcribeAudioLocallyWithAppleSpeech(
+  audioPath: string,
+  options: { locale?: string; timeoutMs?: number } = {}
+): Promise<string | null> {
+  if (bridgeDisabledByEnv()) return null;
+  if (process.platform !== 'darwin' || os.arch() !== 'arm64') return null;
+  const binary = await ensureAfmBinary();
+  if (!binary) return null;
+  const timeoutMs = options.timeoutMs ?? 300_000;
+  const result = await runner(
+    binary,
+    [
+      'transcribe',
+      '--audio',
+      audioPath,
+      '--locale',
+      options.locale ?? 'ja-JP',
+      '--timeout',
+      String(Math.ceil(timeoutMs / 1000)),
+    ],
+    { timeoutMs: timeoutMs + 10_000 }
+  );
+  if (!result.ok) {
+    logger.warn(`[apple-fm] transcribe failed: ${result.stderr.slice(0, 200)}`);
+    return null;
+  }
+  const parsed = parseLastJsonLine<{ text?: string }>(result.stdout, '{"text"');
+  const text = String(parsed?.text || '').trim();
+  return text.length > 0 ? text : null;
+}
+
+export interface AppleImageGenerationResult {
+  path: string;
+  style: string;
+}
+
+/**
+ * On-device image generation via Image Playground (ImageCreator). Requires
+ * Image Playground to be enabled on the device — commonly notSupported even
+ * where the text model works, so callers MUST treat null as the normal case
+ * and keep their existing asset path (SVG authoring, media actuator).
+ */
+export async function generateImageLocallyWithApplePlayground(
+  prompt: string,
+  outPath: string,
+  options: { style?: string; timeoutMs?: number } = {}
+): Promise<AppleImageGenerationResult | null> {
+  if (bridgeDisabledByEnv()) return null;
+  if (process.platform !== 'darwin' || os.arch() !== 'arm64') return null;
+  const binary = await ensureAfmBinary();
+  if (!binary) return null;
+  const timeoutMs = options.timeoutMs ?? 300_000;
+  const args = [
+    'imagine',
+    '--prompt',
+    prompt,
+    '--out',
+    outPath,
+    '--timeout',
+    String(Math.ceil(timeoutMs / 1000)),
+  ];
+  if (options.style) args.push('--style', options.style);
+  const result = await runner(binary, args, { timeoutMs: timeoutMs + 10_000 });
+  if (!result.ok) {
+    logger.warn(`[apple-fm] imagine failed: ${result.stderr.slice(0, 200)}`);
+    return null;
+  }
+  const parsed = parseLastJsonLine<AppleImageGenerationResult>(result.stdout, '{"path"');
+  if (!parsed?.path) return null;
+  return { path: parsed.path, style: String(parsed.style || '') };
+}
+
+/** macOS frameworks print loader noise to stdout; scan for the last JSON line. */
+function parseLastJsonLine<T>(stdout: string, marker: string): T | null {
+  const lines = stdout.split('\n');
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const line = lines[index].trim();
+    const start = line.indexOf(marker);
+    if (start === -1) continue;
+    try {
+      return JSON.parse(line.slice(start)) as T;
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}
+
 /** Local one-to-few sentence summary (mission/work-item digests, UI strings). */
 export async function summarizeLocallyWithAppleFm(
   text: string,
