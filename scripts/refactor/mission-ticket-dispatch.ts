@@ -15,6 +15,7 @@ import {
   type TaskModelHint,
 } from '@agent/core';
 import { importExternalWorkItem } from '@agent/core';
+import { sendOpsAlert } from '@agent/core';
 import { findMissionPath } from '@agent/core';
 import type { MissionState } from './mission-types.js';
 import {
@@ -294,6 +295,22 @@ export async function dispatchMissionTickets(
     if (!validation.ok) {
       status = 'failed';
       notes.push(...validation.notes);
+      // PIP-DBCAA4A2: a preflight rejection buried in the manifest is how
+      // T-TEST-1 rotted until the retrospective found it — surface it to the
+      // operator at failure time instead.
+      sendOpsAlert({
+        severity: 'warning',
+        title: `Task contract preflight failed (${missionId} / ${task.task_id})`,
+        context: {
+          mission_id: missionId,
+          task_id: task.task_id,
+          team_role: teamRole || null,
+          violations: validation.notes,
+        },
+        recommendation:
+          'Fix the task contract in NEXT_TASKS.json (assigned_to.role/agent_id, description, deliverable or target_path), or staff the missing role in the mission team, then re-run ticket dispatch.',
+        dedupe_key: `ticket-preflight:${missionId}:${task.task_id}`,
+      });
     }
 
     if (status !== 'failed' && targets.includes('workitem')) {
