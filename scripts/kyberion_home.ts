@@ -12,9 +12,11 @@ import {
   decideApprovalRequest,
   listApprovalRequests,
   listCustomerChannelBindings,
+  listDeals,
   listInboxEntries,
   loadNotificationPreferences,
   markInboxEntry,
+  readDealRequirementsCapture,
   runSurfaceMessageConversation,
   saveNotificationPreferences,
   type NotificationChannelTarget,
@@ -29,6 +31,7 @@ const COMMANDS: ReadonlyArray<readonly [string, string]> = [
   ['pnpm kyberion inbox [--read <id>|--accept <id>]', '成果物 inbox の確認と受領'],
   ['pnpm kyberion approvals [--approve <id>|--deny <id>]', '承認キューの確認と裁可'],
   ['pnpm kyberion notify [--set slack:<channel>]', '通知先の確認・設定'],
+  ['pnpm kyberion deals [--requirements <deal-id>]', '商談一覧と要件ヒアリング内容の確認'],
   ['pnpm mission create', 'ミッションの作成'],
   ['pnpm app:preflight', 'アプリ開発の前提チェック'],
   ['pnpm doctor', '健全性と次の一手の診断'],
@@ -245,6 +248,70 @@ async function showHome(json: boolean): Promise<void> {
   printCommands();
 }
 
+// Customer-path operator view: which deals are live, at what stage, and what
+// the requirements hearing has captured so far (E2E-06 follow-up).
+function handleDealsSubcommand(argv: { requirements?: string; json?: boolean }): void {
+  const bindings = listCustomerChannelBindings();
+  const tenants = Array.from(new Set(bindings.map((binding) => binding.tenantSlug)));
+  const deals = tenants.flatMap((tenantSlug) =>
+    listDeals(tenantSlug).map((deal) => ({ tenantSlug, deal }))
+  );
+
+  if (argv.requirements) {
+    const match = deals.find((entry) => entry.deal.deal_id === argv.requirements);
+    if (!match) {
+      console.error(`deal not found: ${argv.requirements}`);
+      process.exitCode = 1;
+      return;
+    }
+    const capture = readDealRequirementsCapture(match.tenantSlug, match.deal.deal_id);
+    if (!capture) {
+      console.log(
+        `要件キャプチャはまだありません (${match.deal.deal_id} / stage: ${match.deal.stage})。` +
+          ' discovery ステージの顧客対話で自動収集されます。'
+      );
+      return;
+    }
+    if (argv.json) {
+      console.log(JSON.stringify(capture, null, 2));
+      return;
+    }
+    const req = capture.requirements;
+    console.log(
+      `要件ドラフト ${match.deal.deal_id} (${capture.turns_captured} ターン / 更新 ${capture.updated_at})`
+    );
+    for (const fr of req.functional_requirements || []) {
+      console.log(`  [${fr.priority}] ${fr.id}: ${fr.description}`);
+    }
+    for (const nfr of req.non_functional_requirements || []) {
+      console.log(`  [nfr:${nfr.category}] ${nfr.description}`);
+    }
+    const open = (req.open_questions || []).filter((q) => (q.status || 'open') === 'open');
+    if (open.length > 0) {
+      console.log('  未解決の質問:');
+      for (const q of open) console.log(`    - ${q.blocking ? '[blocking] ' : ''}${q.question}`);
+    }
+    return;
+  }
+
+  if (argv.json) {
+    console.log(JSON.stringify(deals, null, 2));
+    return;
+  }
+  if (deals.length === 0) {
+    console.log('商談はありません。顧客チャネルの binding から自動で開始されます。');
+    return;
+  }
+  console.log(`商談 (${deals.length} 件):`);
+  for (const { tenantSlug, deal } of deals) {
+    console.log(
+      `  [${deal.deal_id}] ${tenantSlug} / ${deal.stage.padEnd(10)} ${deal.summary.slice(0, 60)}`
+    );
+  }
+  console.log('');
+  console.log('要件ヒアリング内容: pnpm kyberion deals --requirements <deal-id>');
+}
+
 async function main(): Promise<void> {
   // The home CLI acts with the operator's own authority — same role the
   // mission controller CLI assumes (inbox/approvals live under active/shared).
@@ -265,6 +332,10 @@ async function main(): Promise<void> {
     .option('approve', { type: 'string', description: 'approvals: approve request id' })
     .option('deny', { type: 'string', description: 'approvals: reject request id' })
     .option('note', { type: 'string', description: 'approvals: decision note' })
+    .option('requirements', {
+      type: 'string',
+      description: 'deals: show captured requirements for a deal id',
+    })
     .parseSync();
 
   const subcommand = String(argv._[0] || '');
@@ -280,6 +351,9 @@ async function main(): Promise<void> {
       handleApprovalsSubcommand(
         argv as { approve?: string; deny?: string; note?: string; json?: boolean }
       );
+      return;
+    case 'deals':
+      handleDealsSubcommand(argv as { requirements?: string; json?: boolean });
       return;
     case 'ask':
       await handleAskSubcommand(argv._.slice(1).map(String).join(' '), Boolean(argv.json));
