@@ -26,6 +26,7 @@ Concepts are intentionally not explained here — follow the `→` links when yo
 - **Mission-gate substantive work.** If a request meets **≥2 of**: (1) 5+ artifacts; (2) external/regulatory audience; (3) re-execution or variants likely; (4) same pattern expected ≥5×; (5) multiple legitimate viewpoints — create a mission + `pipelines/` pipeline instead of going straight to Write/Edit. Customer-facing governance evidence is **always** mission/pipeline (dog-food rule).
 - **Reasoning backend**: prefer `KYBERION_REASONING_BACKEND=claude-cli` (local `claude` CLI, no API key) → `anthropic` (`ANTHROPIC_API_KEY`) → `stub` (offline/deterministic tests). Divergent-thinking `wisdom:*` ops need a non-stub backend.
 - **Apply the working philosophy.** Read before write; one change, one verification; never retry unchanged without a new hypothesis; "done" requires evidence. Full rules: [working-philosophy](./knowledge/product/governance/working-philosophy.md) (auto-injected into worker prompts via `libs/core/working-principles.ts`).
+- **Changing this repo? Follow the development practices.** Registration ceremonies (boundary-test allowlists), cross-platform determinism, hermetic tests, build order: [kyberion-development-practices](./knowledge/product/governance/kyberion-development-practices.md).
 
 → Concepts: [GLOSSARY](./docs/GLOSSARY.md) · [PRODUCTIZATION_ROADMAP](./docs/PRODUCTIZATION_ROADMAP.md) (dog-food rationale)
 

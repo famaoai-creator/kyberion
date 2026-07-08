@@ -151,6 +151,17 @@ That keeps the first slice useful without overcommitting to speculative automati
   intent classification, and one-sentence summarization
   (`pnpm check:apple-fm`).
 
-Next lanes per this document: Vision (image understanding), Speech
-(SpeechAnalyzer input / AVSpeech output), Image Playground, App Intents —
-each behind the same probe-and-degrade pattern.
+Lane status (2026-07-09):
+
+- **Text assist** — landed (`prompt`, classify/summarize helpers).
+- **Vision** — landed (`vision`: OCR + scene labels;
+  `verifyRenderedTextWithAppleVision` render-QA primitive).
+- **Speech (STT)** — landed (`transcribe` via SpeechAnalyzer/
+  SpeechTranscriber, ja-JP installed on the dev machine; verified with a
+  say→transcribe round trip). Voice OUTPUT stays with the existing
+  voice-actuator engines (`local_say` etc.) — no duplication.
+- **Image Playground** — landed with probe-and-degrade
+  (`imagine` → ImageCreator). Currently `notSupported` on the dev machine
+  (Image Playground model not enabled); helpers return null and callers
+  keep the SVG-authoring / media-actuator path.
+- **App Intents** — future lane; must go through the approval gate.
