@@ -33,6 +33,7 @@ import {
   updateWorkItem,
 } from './work-coordination.js';
 import { logger } from './core.js';
+import { buildWorkingPrinciplesLines } from './working-principles.js';
 import { buildExecutionEnv } from './authority.js';
 import { missionDir, missionEvidenceDir } from './path-resolver.js';
 import { pathResolver } from './path-resolver.js';
@@ -764,6 +765,7 @@ function buildTaskExecutionPrompt(input: {
     input.targetPath ? `Target path: ${input.targetPath}` : '',
     '',
     ...input.missionGoalLines,
+    ...buildWorkingPrinciplesLines(input.teamRole),
     '## Upstream results (inputs you MUST build on)',
     ...input.upstreamResultLines,
     '',
