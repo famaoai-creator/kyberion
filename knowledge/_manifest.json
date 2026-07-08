@@ -1977,7 +1977,7 @@
     {
       "path": "product/governance/security-policy.json",
       "tier": "public",
-      "size": 17966,
+      "size": 18810,
       "type": "json"
     },
     {
@@ -2453,6 +2453,12 @@
       "tier": "public",
       "size": 1730,
       "type": "json"
+    },
+    {
+      "path": "product/governance/working-philosophy.md",
+      "tier": "public",
+      "size": 8862,
+      "type": "md"
     },
     {
       "path": "product/hints/browser-approval-workflow.json",
@@ -7413,7 +7419,7 @@
     {
       "path": "public/design-patterns/brand-tokens/kyberion.json",
       "tier": "public",
-      "size": 830,
+      "size": 1200,
       "type": "json"
     },
     {
@@ -7773,7 +7779,7 @@
     {
       "path": "public/design-patterns/media-templates/themes.json",
       "tier": "public",
-      "size": 3098,
+      "size": 4818,
       "type": "json"
     },
     {
@@ -7791,7 +7797,7 @@
     {
       "path": "public/design-patterns/media-templates/themes/themes.json",
       "tier": "public",
-      "size": 3036,
+      "size": 4756,
       "type": "json"
     },
     {
@@ -8721,7 +8727,7 @@
     {
       "path": "public/procedures/media/theme-and-design-system-reference.md",
       "tier": "public",
-      "size": 10023,
+      "size": 11768,
       "type": "md"
     },
     {

@@ -103,9 +103,11 @@ export * from './campaign-suite.js';
 export * from './customer-channel-binding.js';
 export * from './deal-store.js';
 export * from './customer-conversation.js';
+export * from './customer-conversation-modes.js';
 export * from './operator-notifications.js';
 export * from './deal-documents.js';
 export * from './mission-retrospective.js';
+export * from './working-principles.js';
 
 // Utils
 export * from './fs-utils.js';

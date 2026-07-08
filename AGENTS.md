@@ -1,7 +1,7 @@
 # Kyberion Operating Guide
 
 Binding rules and lifecycle for AI agents working in this repository. **Read this first, every session.**
-Concepts are intentionally not explained here — follow the `→` links when you need the *why*.
+Concepts are intentionally not explained here — follow the `→` links when you need the _why_.
 
 > **Canonical file**: `AGENTS.md`. `CLAUDE.md`, `CODEX.md`, `GEMINI.md` are symlinks — edit here only.
 > **Language**: rules in English; phase & onboarding docs in Japanese ([policy](./docs/DOCUMENTATION_LOCALIZATION_POLICY.md)).
@@ -25,6 +25,7 @@ Concepts are intentionally not explained here — follow the `→` links when yo
 - **Treat sandbox-sensitive tools as approval-first.** For any tool or CLI that depends on network access, GitHub API calls, external auth, IPC, GUI automation, or permission escalation, assume sandbox friction first and request approval before retrying. This applies beyond `gh` and `tsx`.
 - **Mission-gate substantive work.** If a request meets **≥2 of**: (1) 5+ artifacts; (2) external/regulatory audience; (3) re-execution or variants likely; (4) same pattern expected ≥5×; (5) multiple legitimate viewpoints — create a mission + `pipelines/` pipeline instead of going straight to Write/Edit. Customer-facing governance evidence is **always** mission/pipeline (dog-food rule).
 - **Reasoning backend**: prefer `KYBERION_REASONING_BACKEND=claude-cli` (local `claude` CLI, no API key) → `anthropic` (`ANTHROPIC_API_KEY`) → `stub` (offline/deterministic tests). Divergent-thinking `wisdom:*` ops need a non-stub backend.
+- **Apply the working philosophy.** Read before write; one change, one verification; never retry unchanged without a new hypothesis; "done" requires evidence. Full rules: [working-philosophy](./knowledge/product/governance/working-philosophy.md) (auto-injected into worker prompts via `libs/core/working-principles.ts`).
 
 → Concepts: [GLOSSARY](./docs/GLOSSARY.md) · [PRODUCTIZATION_ROADMAP](./docs/PRODUCTIZATION_ROADMAP.md) (dog-food rationale)
 
@@ -34,13 +35,13 @@ The work loop is: **capture intent → agree on the goal before changing anythin
 
 **On session start**, run `pnpm pipeline --input pipelines/baseline-check.json` and branch on the report's `status`:
 
-| status | action |
-|---|---|
-| `needs_recovery` | → ② Recovery |
-| `needs_onboarding` | → ① Onboarding |
-| `needs_attention` | → ③ Alignment, but surface the failed layer to the user first |
-| `all_clear` | → ③ Alignment |
-| `fatal_error` | Pipeline itself failed — report to the user and halt; enter no phase until resolved |
+| status             | action                                                                              |
+| ------------------ | ----------------------------------------------------------------------------------- |
+| `needs_recovery`   | → ② Recovery                                                                        |
+| `needs_onboarding` | → ① Onboarding                                                                      |
+| `needs_attention`  | → ③ Alignment, but surface the failed layer to the user first                       |
+| `all_clear`        | → ③ Alignment                                                                       |
+| `fatal_error`      | Pipeline itself failed — report to the user and halt; enter no phase until resolved |
 
 1. **Onboarding** — set up environment & identity: `pnpm install → build → surfaces:reconcile → onboard`. → [onboarding.md](./knowledge/product/governance/phases/onboarding.md)
 2. **Recovery** — restore prior state, resume from the suspension point. → [recovery.md](./knowledge/product/governance/phases/recovery.md)
@@ -52,14 +53,14 @@ The work loop is: **capture intent → agree on the goal before changing anythin
 
 ## 4. References
 
-| Document | Content |
-|---|---|
-| [docs/INITIALIZATION.md](./docs/INITIALIZATION.md) | First-time setup walkthrough |
-| [docs/GLOSSARY.md](./docs/GLOSSARY.md) | Key terms |
-| [docs/COMPONENT_MAP.md](./docs/COMPONENT_MAP.md) | Directory structure |
-| [docs/QUICKSTART.md](./docs/QUICKSTART.md) | Quick start |
-| [CAPABILITIES_GUIDE.md](./CAPABILITIES_GUIDE.md) | Actuator catalog |
-| [docs/OPERATOR_UX_GUIDE.md](./docs/OPERATOR_UX_GUIDE.md) | Daily operations |
-| [pipelines/README.md](./pipelines/README.md) | Pipeline catalog |
-| [phases/](./knowledge/product/governance/phases/) | Per-phase runbooks |
-| [architecture/agent-mission-control-model.md](./knowledge/product/architecture/agent-mission-control-model.md) | Mission control model |
+| Document                                                                                                       | Content                      |
+| -------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| [docs/INITIALIZATION.md](./docs/INITIALIZATION.md)                                                             | First-time setup walkthrough |
+| [docs/GLOSSARY.md](./docs/GLOSSARY.md)                                                                         | Key terms                    |
+| [docs/COMPONENT_MAP.md](./docs/COMPONENT_MAP.md)                                                               | Directory structure          |
+| [docs/QUICKSTART.md](./docs/QUICKSTART.md)                                                                     | Quick start                  |
+| [CAPABILITIES_GUIDE.md](./CAPABILITIES_GUIDE.md)                                                               | Actuator catalog             |
+| [docs/OPERATOR_UX_GUIDE.md](./docs/OPERATOR_UX_GUIDE.md)                                                       | Daily operations             |
+| [pipelines/README.md](./pipelines/README.md)                                                                   | Pipeline catalog             |
+| [phases/](./knowledge/product/governance/phases/)                                                              | Per-phase runbooks           |
+| [architecture/agent-mission-control-model.md](./knowledge/product/architecture/agent-mission-control-model.md) | Mission control model        |
