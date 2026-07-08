@@ -42,6 +42,7 @@
     "generate:op-registry": "node --import ./scripts/ts-loader.mjs scripts/generate_op_registry.ts",
     "check:op-registry": "node --import ./scripts/ts-loader.mjs scripts/generate_op_registry.ts --check",
     "check:design-contrast": "node --import ./scripts/ts-loader.mjs scripts/check_design_contrast.ts",
+    "check:apple-fm": "node --import ./scripts/ts-loader.mjs scripts/check_apple_fm.ts",
     "sync:intent-contract-memory": "node dist/scripts/sync_intent_contract_memory.js",
     "sync:component-inventory": "node dist/scripts/sync_component_inventory.js",
     "sync:service-endpoints": "node --import ./scripts/ts-loader.mjs scripts/sync_service_endpoints.ts",
