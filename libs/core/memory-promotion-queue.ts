@@ -44,7 +44,13 @@ export interface MemoryCandidate {
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 const SCHEMA_PATH = pathResolver.rootResolve('schemas/memory-candidate.schema.json');
-const QUEUE_PATH = pathResolver.shared('runtime/memory/promotion-queue.jsonl');
+// Tests namespace the queue via KYBERION_MEMORY_QUEUE_PATH so parallel suites
+// never clobber each other's real queue file (resolved lazily per call).
+function resolveQueuePath(): string {
+  const override = process.env.KYBERION_MEMORY_QUEUE_PATH?.trim();
+  if (override) return pathResolver.rootResolve(override);
+  return pathResolver.shared('runtime/memory/promotion-queue.jsonl');
+}
 
 let validateFn: ValidateFunction | null = null;
 
@@ -203,8 +209,8 @@ export function enqueueMemoryPromotionCandidate(candidate: MemoryCandidate): str
       );
     }
     rows[existingIndex] = next;
-    safeWriteFile(QUEUE_PATH, `${rows.map((row) => JSON.stringify(row)).join('\n')}\n`);
-    return QUEUE_PATH;
+    safeWriteFile(resolveQueuePath(), `${rows.map((row) => JSON.stringify(row)).join('\n')}\n`);
+    return resolveQueuePath();
   }
   const nextCandidate: MemoryCandidate = {
     ...candidate,
@@ -216,13 +222,13 @@ export function enqueueMemoryPromotionCandidate(candidate: MemoryCandidate): str
   if (!nextValidation.valid) {
     throw new Error(`Invalid memory promotion candidate: ${nextValidation.errors.join('; ')}`);
   }
-  safeAppendFileSync(QUEUE_PATH, `${JSON.stringify(nextCandidate)}\n`);
-  return QUEUE_PATH;
+  safeAppendFileSync(resolveQueuePath(), `${JSON.stringify(nextCandidate)}\n`);
+  return resolveQueuePath();
 }
 
 export function listMemoryPromotionCandidates(): MemoryCandidate[] {
-  if (!safeExistsSync(QUEUE_PATH)) return [];
-  const raw = safeReadFile(QUEUE_PATH, { encoding: 'utf8' }) as string;
+  if (!safeExistsSync(resolveQueuePath())) return [];
+  const raw = safeReadFile(resolveQueuePath(), { encoding: 'utf8' }) as string;
   return parseJsonl(raw);
 }
 
@@ -238,7 +244,7 @@ export function updateMemoryPromotionCandidateStatus(input: {
   ratificationNote?: string;
   promotedRef?: string;
 }): MemoryCandidate | null {
-  if (!safeExistsSync(QUEUE_PATH)) return null;
+  if (!safeExistsSync(resolveQueuePath())) return null;
   const rows = listMemoryPromotionCandidates();
   const index = rows.findIndex((row) => row.candidate_id === input.candidateId);
   if (index < 0) return null;
@@ -258,7 +264,7 @@ export function updateMemoryPromotionCandidateStatus(input: {
   }
   rows[index] = next;
   ensureQueueDir();
-  safeWriteFile(QUEUE_PATH, `${rows.map((row) => JSON.stringify(row)).join('\n')}\n`);
+  safeWriteFile(resolveQueuePath(), `${rows.map((row) => JSON.stringify(row)).join('\n')}\n`);
   return next;
 }
 
@@ -292,5 +298,5 @@ export function queueMissionMemoryPromotionCandidate(input: {
 }
 
 export function memoryPromotionQueuePath(): string {
-  return QUEUE_PATH;
+  return resolveQueuePath();
 }
