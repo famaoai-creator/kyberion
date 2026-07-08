@@ -245,6 +245,55 @@ export async function classifyLocallyWithAppleFm(
   return categories.find((category) => normalized.includes(category.toLowerCase())) || null;
 }
 
+export interface AppleVisionResult {
+  /** OCR text (line-joined). */
+  text: string;
+  labels: Array<{ label: string; confidence: number }>;
+}
+
+/**
+ * On-device image understanding via the Vision framework (OCR + scene
+ * labels; no LLM). Ideal for verifying rendered artifacts — "does the
+ * screenshot actually show the headline?" — per the designer principle of
+ * judging the rendered result. Returns null when unavailable or on failure.
+ *
+ * Note: macOS Vision emits loader warnings on stdout before the JSON line,
+ * so we parse the LAST parseable JSON line rather than the whole stream.
+ */
+export async function recognizeImageLocallyWithAppleVision(
+  imagePath: string,
+  options: { timeoutMs?: number } = {}
+): Promise<AppleVisionResult | null> {
+  if (bridgeDisabledByEnv()) return null;
+  if (process.platform !== 'darwin' || os.arch() !== 'arm64') return null;
+  const binary = await ensureAfmBinary();
+  if (!binary) return null;
+  const result = await runner(binary, ['vision', '--image', imagePath], {
+    timeoutMs: options.timeoutMs ?? 60_000,
+  });
+  if (!result.ok) {
+    logger.warn(`[apple-fm] vision failed: ${result.stderr.slice(0, 200)}`);
+    return null;
+  }
+  const lines = result.stdout.split('\n');
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const line = lines[index].trim();
+    const start = line.indexOf('{"text"');
+    if (start === -1) continue;
+    try {
+      const parsed = JSON.parse(line.slice(start)) as AppleVisionResult;
+      return {
+        text: String(parsed.text || ''),
+        labels: Array.isArray(parsed.labels) ? parsed.labels : [],
+      };
+    } catch {
+      continue;
+    }
+  }
+  logger.warn(`[apple-fm] vision output unparseable: ${result.stdout.slice(0, 120)}`);
+  return null;
+}
+
 /** Local one-to-few sentence summary (mission/work-item digests, UI strings). */
 export async function summarizeLocallyWithAppleFm(
   text: string,
