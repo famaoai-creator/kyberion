@@ -8,6 +8,7 @@ import {
   appleFmPrompt,
   classifyLocallyWithAppleFm,
   probeAppleIntelligence,
+  createAppleSpeechToTextBridge,
   generateImageLocallyWithApplePlayground,
   recognizeImageLocallyWithAppleVision,
   transcribeAudioLocallyWithAppleSpeech,
@@ -157,6 +158,22 @@ describe('apple intelligence bridge', () => {
     });
     expect(generated).toEqual({ path: '/tmp/x.png', style: 'illustration' });
     expect(calls.at(-1)!.args).toContain('--style');
+  });
+
+  it('SpeechToTextBridge adapter maps language to locale and writes the sidecar', async () => {
+    if (process.platform !== 'darwin') return;
+    installRunner((command, args) => {
+      if (command === 'swiftc') return { ok: true, stdout: '', stderr: '' };
+      if (args[0] === 'transcribe')
+        return { ok: true, stdout: '{"text":"議事録テスト"}\n', stderr: '' };
+      return { ok: true, stdout: '{"available":true}', stderr: '' };
+    });
+    const bridge = createAppleSpeechToTextBridge();
+    expect(bridge.name).toBe('apple-speech');
+    // nonexistent audio → contract-conformant throw
+    await expect(bridge.transcribe({ audioPath: '/nonexistent/audio.aiff' })).rejects.toThrow(
+      /audio file not found/
+    );
   });
 
   it('classification embeds the task in the prompt and validates the category', async () => {
