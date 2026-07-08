@@ -93,6 +93,11 @@ describe('meeting-to-value e2e', () => {
   });
 
   it('runs the meeting follow-up flow and reminder sweep end to end', async () => {
+    // Freeze Date for the WHOLE flow: the fixture uses absolute due dates
+    // (2026-07-07 / 2026-07-10), so extraction against real time starts
+    // reclassifying items as overdue once the calendar catches up.
+    vi.useFakeTimers({ now: new Date('2026-07-05T09:00:00.000Z'), toFake: ['Date'] });
+
     const respond = async (prompt: string): Promise<string> => {
       if (
         prompt.includes(
@@ -196,8 +201,6 @@ describe('meeting-to-value e2e', () => {
     expect(actionItems).toHaveLength(3);
     expect(listOthersPending(MISSION_ID)).toHaveLength(2);
 
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-07-05T09:00:00.000Z'));
     const reminderReport = await runActionItemReminderSweep({
       mission_ids: [MISSION_ID],
       tone: 'friendly',
