@@ -158,8 +158,13 @@ Lane status (2026-07-09):
   `verifyRenderedTextWithAppleVision` render-QA primitive).
 - **Speech (STT)** — landed (`transcribe` via SpeechAnalyzer/
   SpeechTranscriber, ja-JP installed on the dev machine; verified with a
-  say→transcribe round trip). Voice OUTPUT stays with the existing
-  voice-actuator engines (`local_say` etc.) — no duplication.
+  say→transcribe round trip). Wired into the repo-wide
+  `SpeechToTextBridge` contract: reasoning-bootstrap registers
+  `apple-speech` automatically when no `KYBERION_STT_COMMAND` is set, so
+  in-room minutes recording and requirements-audio pipelines transcribe
+  locally with zero configuration (E2E verified through
+  `getSpeechToTextBridge().transcribe`). Voice OUTPUT stays with the
+  existing voice-actuator engines (`local_say` etc.) — no duplication.
 - **Image Playground** — landed with probe-and-degrade
   (`imagine` → ImageCreator). Currently `notSupported` on the dev machine
   (Image Playground model not enabled); helpers return null and callers
