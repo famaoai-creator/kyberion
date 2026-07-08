@@ -165,6 +165,7 @@
 - [Gateway Onboarding Protocol](./product/governance/gateway-onboarding-protocol.md) (public | Kyberion Ecosystem Architect)
 - [Governance: Tiered Consensus & Experimental Branches](./product/governance/tiered-consensus-and-experimental-branches.md) (public | Unknown)
 - [Independent Validation Evidence Package](./product/governance/independent-validation-evidence-package.md) (public | Unknown)
+- [Kyberion Development Practices — Hard-Won Rules for Changing This Repo](./product/governance/kyberion-development-practices.md) (public | Unknown)
 - [Kyberion Sovereign Consensus Protocol](./product/governance/consensus-protocol.md) (public | Ecosystem Architect)
 - [Mission Distillation Prompt](./product/governance/distill-prompt.md) (public | Unknown)
 - [Operational Hints](./product/governance/HINTS.md) (public | Unknown)
