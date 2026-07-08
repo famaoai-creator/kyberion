@@ -479,6 +479,19 @@ pnpm capabilities
 pnpm dashboard:onboarding
 ```
 
+### Customer engagement (deals)
+
+```bash
+pnpm kyberion deals                          # 商談一覧(全テナント、stage 付き)
+pnpm kyberion deals --requirements DEAL-XXXX # 要件ヒアリングで収集済みの構造化ドラフト
+```
+
+顧客チャネル(`customer/<tenant>/connections/channel-bindings.json`)に紐づく会話は
+deal stage に応じて自動でモードが切り替わる: 営業(inquiry〜contract)/
+要件ヒアリング(discovery — 構造化ドラフトを増分収集)/ サポート(won 以降 —
+`knowledge/confidential/<tenant>/support/known-issues.md` を接地)。binding の
+`"mode"` で固定も可能。能動送信は常に承認ゲート経由。
+
 ### Surface lifecycle
 
 ```bash
