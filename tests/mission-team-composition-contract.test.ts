@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import Ajv from 'ajv';
 import * as path from 'node:path';
 import {
@@ -7,9 +7,12 @@ import {
   loadAgentProfileIndex,
   loadAuthorityRoleIndex,
   loadTeamRoleIndex,
+  pathResolver,
   safeExistsSync,
+  safeMkdir,
   safeReaddir,
   safeReadFile,
+  safeWriteFile,
 } from '@agent/core';
 
 const rootDir = process.cwd();
@@ -43,6 +46,35 @@ function loadTeamRoleDirectoryPayloads() {
 }
 
 describe('Mission team composition contract', () => {
+  beforeAll(() => {
+    // Provider selection consults discoverProviders(), which probes REAL
+    // CLIs — green on a dev box with gemini/codex installed, red on CI.
+    // Seed the discovery disk cache so the contract is hermetic.
+    const cachePath = pathResolver.rootResolve('active/shared/runtime/provider-cache.json');
+    if (!safeExistsSync(path.dirname(cachePath))) {
+      safeMkdir(path.dirname(cachePath), { recursive: true });
+    }
+    const provider = (name: string) => ({
+      provider: name,
+      installed: true,
+      version: '0.0.0-test',
+      protocol: 'exec',
+      models: [],
+      healthy: true,
+    });
+    safeWriteFile(
+      cachePath,
+      JSON.stringify({
+        ts: Date.now(),
+        providers: [provider('gemini'), provider('claude'), provider('codex'), provider('agy')],
+      })
+    );
+    // No refresh call here: refreshProviderDiscoveryCache() force-probes the
+    // REAL environment and would overwrite this fixture. A fresh test process
+    // has no in-memory cache, so the next discoverProviders() reads the disk
+    // cache seeded above.
+  });
+
   it('validates authority/team/agent indexes against schemas', () => {
     const ajv = new Ajv({ allErrors: true });
     const fixtures: Array<[string, string]> = [

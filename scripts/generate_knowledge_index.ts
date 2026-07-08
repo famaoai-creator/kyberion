@@ -142,7 +142,9 @@ function generateIndexInner(checkOnly: boolean): boolean {
     }
   }
 
-  manifestEntries.sort((a, b) => a.path.localeCompare(b.path));
+  // Codepoint comparison on purpose: localeCompare collation differs between
+  // ICU builds (macOS vs Linux CI), making the generated index non-reproducible.
+  manifestEntries.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
   const manifestData = {
     files: manifestEntries,
   };
@@ -163,7 +165,7 @@ function generateIndexInner(checkOnly: boolean): boolean {
 
   for (const dir of dirs) {
     md += `## 📁 ${dir}\n`;
-    grouped[dir].sort((a, b) => a.title.localeCompare(b.title));
+    grouped[dir].sort((a, b) => (a.title < b.title ? -1 : a.title > b.title ? 1 : 0));
     for (const entry of grouped[dir]) {
       md += `- [${entry.title}](${entry.path}) (${entry.tier} | ${entry.author})\n`;
     }

@@ -1,5 +1,5 @@
 {
-  "version": "1.0.0",
+  "version": "1.1.0",
   "brand_name": "Kyberion",
   "tokens": {
     "colors": {
@@ -11,7 +11,13 @@
         "accent": "#0066cc",
         "warning": "#eab308",
         "text_primary": "#0f172a",
-        "text_secondary": "rgba(15, 23, 42, 0.62)"
+        "text_secondary": "rgba(15, 23, 42, 0.62)",
+        "accent_text": "#0066cc",
+        "surface": "#f1f5f9",
+        "muted_text": "#475569",
+        "border": "#e2e8f0",
+        "success": "#15803d",
+        "danger": "#b91c1c"
       },
       "dark": {
         "bg_main": "#020617",
@@ -21,7 +27,13 @@
         "accent": "#00F2FF",
         "warning": "#f59e0b",
         "text_primary": "#F8FAFC",
-        "text_secondary": "rgba(248, 250, 252, 0.62)"
+        "text_secondary": "rgba(248, 250, 252, 0.62)",
+        "accent_text": "#00F2FF",
+        "surface": "#0f172a",
+        "muted_text": "#94a3b8",
+        "border": "#1e293b",
+        "success": "#4ade80",
+        "danger": "#f87171"
       }
     },
     "fonts": {

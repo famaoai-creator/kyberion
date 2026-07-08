@@ -15,6 +15,7 @@ This bridge is especially relevant for:
 
 - Codex app sessions
 - Codex computer-use style loops
+- Apple Intelligence on supported macOS devices
 - provider CLI feature discovery
 - browser-interactive host surfaces
 - future Gemini-side equivalents
@@ -71,6 +72,17 @@ The short version is:
 3. introduce durable kanban-style collaboration where transient delegation is not enough
 4. keep control-plane policy separate from harness execution
 5. route provider-native browser and desktop surfaces through registry-backed adapters only
+
+Apple Intelligence is a good fit for the same bridge when Kyberion wants a local, privacy-preserving front door for:
+
+- image understanding and edit assistance
+- voice input, output, and low-latency conversational handoff
+- OS-backed action execution through App Intents or Shortcuts
+- visual computer-use style observation when the user is already on a Mac
+
+The key constraint is that it should stay a governed native surface, not become a hidden provider-specific branch inside ADF.
+
+The Apple-specific shape is documented in [`apple-intelligence-native-capability-bridge.md`](./apple-intelligence-native-capability-bridge.md).
 
 ## Why This Is Needed
 

@@ -37,6 +37,7 @@ import {
   type OperatorInteractionPacket,
 } from '@agent/core';
 import { findMissionPath } from '@agent/core';
+import { buildWorkingPrinciplesLines } from '@agent/core';
 import type { MissionState } from './mission-types.js';
 import {
   countWords as countWordsFromDispatchIO,
@@ -303,6 +304,7 @@ function buildIndependentReviewerPrompt(input: {
       : '',
     ...buildFastTierPromptAddendum(input.taskModelHint).map((line) => `Reviewer note: ${line}`),
     '',
+    ...buildWorkingPrinciplesLines('reviewer'),
     'Mission context:',
     input.contextPackSummary,
     '',
@@ -1189,6 +1191,7 @@ function buildWorkItemPromptBody(input: {
       : '',
     ...buildFastTierPromptAddendum(input.taskModelHint),
     '',
+    ...buildWorkingPrinciplesLines(input.teamRole),
     'Return exactly one ```task_result``` block and nothing else structured.',
     'Task result schema: {"summary":"3 sentences max","artifacts":[{"path":"...","kind":"..."}],"verification_done":["..."],"gaps":["..."],"needs":["..."]}',
     'Do not paste file contents. Include only conclusions, artifact paths, verification steps, gaps, and needs.',
