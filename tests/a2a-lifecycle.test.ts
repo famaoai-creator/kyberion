@@ -19,6 +19,17 @@ function ensurePersonalFixtures() {
     IDENTITY_PATH,
     JSON.stringify({ sovereign: 'test', initialized_at: new Date().toISOString() }, null, 2)
   );
+  // mission_controller start gates on the FULL sovereign profile
+  // (my-identity.json + my-vision.md + agent-identity.json) — a dev box has
+  // them from onboarding, a fresh CI checkout does not.
+  fs.writeFileSync(
+    path.join(path.dirname(IDENTITY_PATH), 'my-vision.md'),
+    '# Sovereign Vision\n\nTest fixture vision.\n'
+  );
+  fs.writeFileSync(
+    path.join(path.dirname(IDENTITY_PATH), 'agent-identity.json'),
+    JSON.stringify({ agent_id: 'test-agent', version: '1.0.0', trust_tier: 'sovereign' }, null, 2)
+  );
   if (!safeExistsSync(LEDGER_PATH)) fs.writeFileSync(LEDGER_PATH, JSON.stringify({}, null, 2));
 }
 

@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as net from 'node:net';
+import * as os from 'node:os';
 import * as path from 'node:path';
-import { pathResolver } from '@agent/core';
 
 const mocks = vi.hoisted(() => ({
   ensureAgentRuntime: vi.fn(),
@@ -83,9 +83,13 @@ describe('agent_runtime_supervisor_daemon', () => {
   let instance: Awaited<ReturnType<typeof startAgentRuntimeSupervisorDaemon>> | null = null;
 
   beforeEach(() => {
-    rootDir = fs.mkdtempSync(path.join(pathResolver.sharedTmp(''), 'daemon-tests-kyberion-'));
-    socketPath = path.join(rootDir, 'agent-runtime-supervisor.sock');
-    lockPath = path.join(rootDir, 'agent-supervisor.lock');
+    // os.tmpdir() on purpose: Unix domain socket paths are capped (~104
+    // macOS / 108 Linux). active/shared/tmp under a CI checkout
+    // (/home/runner/work/...) pushes the socket path past the limit and the
+    // daemon can never listen.
+    rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kyb-daemon-'));
+    socketPath = path.join(rootDir, 's.sock');
+    lockPath = path.join(rootDir, 'lock');
     mocks.ensureAgentRuntime.mockResolvedValue({
       agentId: 'agent-1',
       ask: async () => 'ok',
@@ -150,7 +154,7 @@ describe('agent_runtime_supervisor_daemon', () => {
 
     await expect(sendRequest(socketPath, { id: '1', method: 'health' })).resolves.toMatchObject({
       ok: true,
-      result: { ok: true, socket_path: expect.stringContaining('agent-runtime-supervisor.sock') },
+      result: { ok: true, socket_path: socketPath },
     });
 
     await expect(

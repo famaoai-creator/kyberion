@@ -117,6 +117,7 @@
 - [x] **E2E-06 追補**: 顧客対話モード — sales / support / requirements_hearing を deal stage から自動導出、要件ヒアリングは deal 単位の構造化ドラフトを増分収集(`pnpm kyberion deals --requirements`)。既知問題接地のサポートモード
 - [x] **DS-01 追補**: セマンティックカラートークン(accent_text/surface/muted_text 等)+ WCAG コントラストの多面ゲート(CI `check:design-contrast` 拡張、ランタイム `design-qa.ts`、media-actuator レンダリング時 warn 監査)
 - [x] **CI-CROSSPLAT**: main の CI 全滅を根治 — clean.ts の dist 依存(鶏卵)、knowledge index の localeCompare 非決定性(ICU 差)、Linux CJK フォント欠如、遅ランナーのタイムアウト
+- [x] **AI-BRIDGE-01**: Apple Intelligence ローカル補助レーン(2026-07-09)— FoundationModels ブリッジ(afm CLI + apple-intelligence-bridge.ts、probe-and-degrade)。テキスト補助(要約/分類/整形)+ Vision レーン(OCR/ラベル/`verifyRenderedTextWithAppleVision` レンダリング QA)。`pnpm check:apple-fm` で実機実証済み
 - [x] **PIP-DBCAA4A2**: retrospective 発の初ワークオーダーを実装まで完遂 — ticket preflight 失敗の即時 ops alert 化(自己改善ループ一周の実証)
 
 ## 2. 使い方
