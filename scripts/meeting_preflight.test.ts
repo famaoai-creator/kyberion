@@ -201,7 +201,10 @@ describe('meeting_preflight', () => {
     expect(logSpy).toHaveBeenCalledWith(
       expect.stringContaining('pnpm exec playwright install chromium')
     );
-    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('brew install blackhole-2ch'));
+    if (process.platform === 'darwin') {
+      // BlackHole remediation is macOS-only; linux prints a warn with no fix.
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('brew install blackhole-2ch'));
+    }
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('uv pip install mlx-audio'));
     expect(logSpy).toHaveBeenCalledWith(
       expect.stringContaining('Run Task 2: pnpm pipeline --input pipelines/voice-onboarding.json')

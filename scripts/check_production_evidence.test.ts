@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import {
   checkProductionEvidenceRegister,
   isValidEvidenceRef,
@@ -6,6 +6,7 @@ import {
   REQUIRED_PRODUCTION_EVIDENCE_IDS,
   type ProductionEvidenceRegister,
 } from './check_production_evidence.js';
+import { pathResolver, safeMkdir } from '@agent/core';
 
 function verifiedRegister(): ProductionEvidenceRegister {
   const register = loadProductionEvidenceRegister();
@@ -46,6 +47,13 @@ function verifiedEvidenceRefsFor(id: string): string[] {
 }
 
 describe('production evidence checker', () => {
+  beforeAll(() => {
+    // The fixture cites active/shared/logs/traces/ as an evidence ref, and
+    // isExistingLocalEvidenceRef checks the path on disk. The dir always
+    // exists on an operated instance but not on a fresh CI checkout.
+    safeMkdir(pathResolver.rootResolve('active/shared/logs/traces'), { recursive: true });
+  });
+
   it('passes the default register check while reporting pending external evidence', () => {
     const register = loadProductionEvidenceRegister();
     const summary = checkProductionEvidenceRegister(register);
@@ -135,9 +143,7 @@ describe('production evidence checker', () => {
     register.items[0] = {
       ...register.items[0],
       id: '   ',
-      ref_requirements: [
-        ...register.items[0].ref_requirements,
-      ],
+      ref_requirements: [...register.items[0].ref_requirements],
     };
 
     const summary = checkProductionEvidenceRegister(register);
@@ -163,7 +169,9 @@ describe('production evidence checker', () => {
     const summary = checkProductionEvidenceRegister(register);
 
     expect(summary.ok).toBe(false);
-    expect(summary.invalid).toContain('register.release_decision cannot be verified while evidence items are pending');
+    expect(summary.invalid).toContain(
+      'register.release_decision cannot be verified while evidence items are pending'
+    );
   });
 
   it('rejects a pending release decision once every evidence item is verified', () => {
@@ -175,7 +183,9 @@ describe('production evidence checker', () => {
     const summary = checkProductionEvidenceRegister(register);
 
     expect(summary.ok).toBe(false);
-    expect(summary.invalid).toContain('register.release_decision must be verified when all evidence items are verified');
+    expect(summary.invalid).toContain(
+      'register.release_decision must be verified when all evidence items are verified'
+    );
   });
 
   it('allows promotion when all evidence items are reviewed and verified', () => {
@@ -196,7 +206,9 @@ describe('production evidence checker', () => {
     const malformedSummary = checkProductionEvidenceRegister(malformed, { requireComplete: true });
 
     expect(malformedSummary.ok).toBe(false);
-    expect(malformedSummary.invalid).toContain('EV-30DAY-OPS.reviewed_at must be an ISO date that is not in the future');
+    expect(malformedSummary.invalid).toContain(
+      'EV-30DAY-OPS.reviewed_at must be an ISO date that is not in the future'
+    );
 
     const impossible = verifiedRegister();
     impossible.items[0] = {
@@ -204,10 +216,14 @@ describe('production evidence checker', () => {
       reviewed_at: '2026-00-00',
     };
 
-    const impossibleSummary = checkProductionEvidenceRegister(impossible, { requireComplete: true });
+    const impossibleSummary = checkProductionEvidenceRegister(impossible, {
+      requireComplete: true,
+    });
 
     expect(impossibleSummary.ok).toBe(false);
-    expect(impossibleSummary.invalid).toContain('EV-30DAY-OPS.reviewed_at must be an ISO date that is not in the future');
+    expect(impossibleSummary.invalid).toContain(
+      'EV-30DAY-OPS.reviewed_at must be an ISO date that is not in the future'
+    );
 
     const future = verifiedRegister();
     future.items[0] = {
@@ -218,7 +234,9 @@ describe('production evidence checker', () => {
     const futureSummary = checkProductionEvidenceRegister(future, { requireComplete: true });
 
     expect(futureSummary.ok).toBe(false);
-    expect(futureSummary.invalid).toContain('EV-30DAY-OPS.reviewed_at must be an ISO date that is not in the future');
+    expect(futureSummary.invalid).toContain(
+      'EV-30DAY-OPS.reviewed_at must be an ISO date that is not in the future'
+    );
   });
 
   it('rejects verified evidence that points at missing local artifacts', () => {
@@ -236,7 +254,7 @@ describe('production evidence checker', () => {
 
     expect(summary.ok).toBe(false);
     expect(summary.invalid).toContain(
-      'EV-30DAY-OPS.evidence_refs missing existing local artifact: active/shared/tmp/does-not-exist.txt',
+      'EV-30DAY-OPS.evidence_refs missing existing local artifact: active/shared/tmp/does-not-exist.txt'
     );
   });
 
@@ -260,7 +278,9 @@ describe('production evidence checker', () => {
     const malformedSummary = checkProductionEvidenceRegister(malformed);
 
     expect(malformedSummary.ok).toBe(false);
-    expect(malformedSummary.invalid).toContain('register.last_updated must be an ISO date that is not in the future');
+    expect(malformedSummary.invalid).toContain(
+      'register.last_updated must be an ISO date that is not in the future'
+    );
 
     const impossible = loadProductionEvidenceRegister();
     impossible.last_updated = '2026-02-31';
@@ -268,7 +288,9 @@ describe('production evidence checker', () => {
     const impossibleSummary = checkProductionEvidenceRegister(impossible);
 
     expect(impossibleSummary.ok).toBe(false);
-    expect(impossibleSummary.invalid).toContain('register.last_updated must be an ISO date that is not in the future');
+    expect(impossibleSummary.invalid).toContain(
+      'register.last_updated must be an ISO date that is not in the future'
+    );
 
     const future = loadProductionEvidenceRegister();
     future.last_updated = '2999-01-01';
@@ -276,7 +298,9 @@ describe('production evidence checker', () => {
     const futureSummary = checkProductionEvidenceRegister(future);
 
     expect(futureSummary.ok).toBe(false);
-    expect(futureSummary.invalid).toContain('register.last_updated must be an ISO date that is not in the future');
+    expect(futureSummary.invalid).toContain(
+      'register.last_updated must be an ISO date that is not in the future'
+    );
   });
 
   it('rejects verified evidence refs that are neither URLs nor existing repo-local artifacts', () => {
@@ -323,7 +347,9 @@ describe('production evidence checker', () => {
     const summary = checkProductionEvidenceRegister(register, { requireComplete: true });
 
     expect(summary.ok).toBe(false);
-    expect(summary.invalid).toContain('EV-FDE-DEPLOY.evidence_refs must include at least 4 artifacts when verified');
+    expect(summary.invalid).toContain(
+      'EV-FDE-DEPLOY.evidence_refs must include at least 4 artifacts when verified'
+    );
   });
 
   it('rejects duplicate verified evidence refs', () => {
@@ -342,7 +368,9 @@ describe('production evidence checker', () => {
     const summary = checkProductionEvidenceRegister(register, { requireComplete: true });
 
     expect(summary.ok).toBe(false);
-    expect(summary.invalid).toContain('EV-FDE-DEPLOY.evidence_refs contains duplicate artifact: migration/README.md');
+    expect(summary.invalid).toContain(
+      'EV-FDE-DEPLOY.evidence_refs contains duplicate artifact: migration/README.md'
+    );
   });
 
   it('requires verified evidence refs to satisfy each item category', () => {
@@ -359,8 +387,12 @@ describe('production evidence checker', () => {
     const summary = checkProductionEvidenceRegister(register, { requireComplete: true });
 
     expect(summary.ok).toBe(false);
-    expect(summary.invalid).toContain('EV-EXT-CONTRIB.evidence_refs missing required category: issue_url');
-    expect(summary.invalid).toContain('EV-EXT-CONTRIB.evidence_refs missing required category: pr_url');
+    expect(summary.invalid).toContain(
+      'EV-EXT-CONTRIB.evidence_refs missing required category: issue_url'
+    );
+    expect(summary.invalid).toContain(
+      'EV-EXT-CONTRIB.evidence_refs missing required category: pr_url'
+    );
   });
 
   it('requires verified evidence categories to use distinct artifacts', () => {
@@ -377,7 +409,9 @@ describe('production evidence checker', () => {
     const summary = checkProductionEvidenceRegister(register, { requireComplete: true });
 
     expect(summary.ok).toBe(false);
-    expect(summary.invalid).toContain('EV-30DAY-OPS.evidence_refs missing distinct required category: incident_summary');
+    expect(summary.invalid).toContain(
+      'EV-30DAY-OPS.evidence_refs missing distinct required category: incident_summary'
+    );
   });
 
   it('distinguishes external contribution issue URLs from PR URLs', () => {
@@ -394,7 +428,9 @@ describe('production evidence checker', () => {
     const onlyIssueSummary = checkProductionEvidenceRegister(onlyIssue, { requireComplete: true });
 
     expect(onlyIssueSummary.ok).toBe(false);
-    expect(onlyIssueSummary.invalid).toContain('EV-EXT-CONTRIB.evidence_refs missing required category: pr_url');
+    expect(onlyIssueSummary.invalid).toContain(
+      'EV-EXT-CONTRIB.evidence_refs missing required category: pr_url'
+    );
 
     const onlyPr = verifiedRegister();
     onlyPr.items[1] = {
@@ -409,7 +445,9 @@ describe('production evidence checker', () => {
     const onlyPrSummary = checkProductionEvidenceRegister(onlyPr, { requireComplete: true });
 
     expect(onlyPrSummary.ok).toBe(false);
-    expect(onlyPrSummary.invalid).toContain('EV-EXT-CONTRIB.evidence_refs missing required category: issue_url');
+    expect(onlyPrSummary.invalid).toContain(
+      'EV-EXT-CONTRIB.evidence_refs missing required category: issue_url'
+    );
   });
 
   it('requires ref requirements to be present and unique', () => {
@@ -425,20 +463,26 @@ describe('production evidence checker', () => {
     const summary = checkProductionEvidenceRegister(register);
 
     expect(summary.ok).toBe(false);
-    expect(summary.invalid).toContain('EV-30DAY-OPS.ref_requirements contains duplicate id: run_summary');
+    expect(summary.invalid).toContain(
+      'EV-30DAY-OPS.ref_requirements contains duplicate id: run_summary'
+    );
   });
 
   it('requires each evidence item to keep its canonical ref requirement categories', () => {
     const missing = loadProductionEvidenceRegister();
     missing.items[0] = {
       ...missing.items[0],
-      ref_requirements: missing.items[0].ref_requirements.filter((requirement) => requirement.id !== 'incident_summary'),
+      ref_requirements: missing.items[0].ref_requirements.filter(
+        (requirement) => requirement.id !== 'incident_summary'
+      ),
     };
 
     const missingSummary = checkProductionEvidenceRegister(missing);
 
     expect(missingSummary.ok).toBe(false);
-    expect(missingSummary.invalid).toContain('EV-30DAY-OPS.ref_requirements missing required category id: incident_summary');
+    expect(missingSummary.invalid).toContain(
+      'EV-30DAY-OPS.ref_requirements missing required category id: incident_summary'
+    );
 
     const unknown = loadProductionEvidenceRegister();
     unknown.items[1] = {
@@ -456,7 +500,9 @@ describe('production evidence checker', () => {
     const unknownSummary = checkProductionEvidenceRegister(unknown);
 
     expect(unknownSummary.ok).toBe(false);
-    expect(unknownSummary.invalid).toContain('EV-EXT-CONTRIB.ref_requirements contains unknown category id: misc_url');
+    expect(unknownSummary.invalid).toContain(
+      'EV-EXT-CONTRIB.ref_requirements contains unknown category id: misc_url'
+    );
   });
 
   it('requires each canonical ref requirement to keep its accepted ref patterns', () => {
@@ -476,7 +522,9 @@ describe('production evidence checker', () => {
     const summary = checkProductionEvidenceRegister(register);
 
     expect(summary.ok).toBe(false);
-    expect(summary.invalid).toContain('EV-EXT-CONTRIB.issue_url.accepted_ref_patterns must be /issues/');
+    expect(summary.invalid).toContain(
+      'EV-EXT-CONTRIB.issue_url.accepted_ref_patterns must be /issues/'
+    );
   });
 
   it('requires accepted ref patterns to be nonblank strings', () => {
@@ -496,7 +544,9 @@ describe('production evidence checker', () => {
     const summary = checkProductionEvidenceRegister(register);
 
     expect(summary.ok).toBe(false);
-    expect(summary.invalid).toContain('EV-30DAY-OPS.run_summary.accepted_ref_patterns contains an empty pattern');
+    expect(summary.invalid).toContain(
+      'EV-30DAY-OPS.run_summary.accepted_ref_patterns contains an empty pattern'
+    );
   });
 
   it('requires ref requirement descriptions to be nonblank strings', () => {
@@ -529,7 +579,9 @@ describe('production evidence checker', () => {
     const summary = checkProductionEvidenceRegister(register);
 
     expect(summary.ok).toBe(false);
-    expect(summary.invalid).toContain('EV-30DAY-OPS.template_ref must point to an existing repo-local template');
+    expect(summary.invalid).toContain(
+      'EV-30DAY-OPS.template_ref must point to an existing repo-local template'
+    );
   });
 
   it('requires template refs to be nonblank', () => {
@@ -570,7 +622,9 @@ describe('production evidence checker', () => {
     const summary = checkProductionEvidenceRegister(register);
 
     expect(summary.ok).toBe(false);
-    expect(summary.invalid).toContain('EV-30DAY-OPS.acceptance_criteria must include at least one criterion');
+    expect(summary.invalid).toContain(
+      'EV-30DAY-OPS.acceptance_criteria must include at least one criterion'
+    );
   });
 
   it('requires the canonical production evidence id set', () => {
@@ -580,7 +634,9 @@ describe('production evidence checker', () => {
     const missingSummary = checkProductionEvidenceRegister(missing);
 
     expect(missingSummary.ok).toBe(false);
-    expect(missingSummary.invalid).toContain('register.items missing required evidence id: EV-FDE-DEPLOY');
+    expect(missingSummary.invalid).toContain(
+      'register.items missing required evidence id: EV-FDE-DEPLOY'
+    );
 
     const unknown = loadProductionEvidenceRegister();
     unknown.items = [
@@ -594,7 +650,9 @@ describe('production evidence checker', () => {
     const unknownSummary = checkProductionEvidenceRegister(unknown);
 
     expect(unknownSummary.ok).toBe(false);
-    expect(unknownSummary.invalid).toContain('register.items contains unknown evidence id: EV-UNTRACKED');
+    expect(unknownSummary.invalid).toContain(
+      'register.items contains unknown evidence id: EV-UNTRACKED'
+    );
   });
 
   it('accepts https URLs and existing repo-local evidence refs', () => {

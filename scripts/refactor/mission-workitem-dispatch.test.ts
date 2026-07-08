@@ -899,6 +899,21 @@ describe('mission work item dispatch', () => {
     const linkedMissionPath = pathResolver.missionDir(linkedMissionId, 'public');
     if (!safeExistsSync(linkedMissionPath)) safeMkdir(linkedMissionPath, { recursive: true });
 
+    // Seed the project-scoped artifact hint explicitly — relying on whatever
+    // active/ happens to contain makes the assertion machine-local (green on
+    // a dev box with history, red on a fresh CI checkout).
+    appendArtifactOwnershipRecord(
+      createArtifactOwnershipRecord({
+        artifact_id: 'ART-LINKED-PROJECT-WEB',
+        project_id: linkedProjectId,
+        mission_id: 'MSN-LINKED-SEED',
+        kind: 'markdown',
+        storage_class: 'artifact_store',
+        path: 'active/shared/artifacts/linked-project-web.md',
+        created_at: '2026-06-05T00:00:00.000Z',
+      })
+    );
+
     safeWriteFile(
       `${linkedMissionPath}/NEXT_TASKS.json`,
       JSON.stringify(
