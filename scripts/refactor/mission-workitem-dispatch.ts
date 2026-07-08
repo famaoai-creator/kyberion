@@ -56,6 +56,13 @@ export interface MissionWorkItemDispatchOptions {
   statuses?: WorkItemStatus[];
   sources?: WorkItemSource[];
   finalStatus?: MissionWorkItemDispatchFinalStatus;
+  /**
+   * Bounded auto-rounds: after a round, re-select still-actionable items
+   * (ready/backlog/blocked) and dispatch again until nothing remains, no
+   * progress is made, or the round budget is spent. Default 1 (single round)
+   * unless KYBERION_DISPATCH_MAX_ROUNDS overrides it.
+   */
+  rounds?: number;
 }
 
 export interface MissionWorkItemDispatchRecord {
@@ -404,6 +411,61 @@ async function runIndependentReviewerReview(input: {
   };
 }
 
+/**
+ * Dog-food fixes (2026-07-08):
+ *  - File-producing tasks need the governed agentic tool path; the text-only
+ *    default made implementers CLAIM file edits without writing anything.
+ *    Auto-enable KYBERION_CLAUDE_AGENT_TOOLS for the call when the work item
+ *    expects file output (explicit '0' still wins as an operator opt-out).
+ *  - Transient CLI hiccups returned empty responses that went straight to
+ *    blocked; retry once before giving up.
+ */
+function workItemExpectsFiles(item: WorkItem): boolean {
+  const metadata = (item.metadata || {}) as Record<string, unknown>;
+  return Boolean(
+    metadata.deliverable ||
+    metadata.target_path ||
+    String(metadata.expected_output_format || '') === 'files'
+  );
+}
+
+async function delegateSubagentTask(input: {
+  item: WorkItem;
+  prompt: string;
+  routingOptions: Record<string, unknown>;
+  adapters: WorkItemDispatchAdapters;
+  notes: string[];
+}): Promise<string> {
+  const run = async (): Promise<string> => {
+    if (input.adapters.delegateTask) {
+      return input.adapters.delegateTask(input.prompt, `workitem:${input.item.item_id}`);
+    }
+    return getReasoningBackend().delegateTask(
+      input.prompt,
+      `workitem:${input.item.item_id}`,
+      input.routingOptions
+    );
+  };
+  const wantsFiles = workItemExpectsFiles(input.item);
+  const previousTools = process.env.KYBERION_CLAUDE_AGENT_TOOLS;
+  if (wantsFiles && previousTools === undefined) {
+    process.env.KYBERION_CLAUDE_AGENT_TOOLS = '1';
+    input.notes.push('agentic tools auto-enabled (work item expects file output)');
+  }
+  try {
+    let responseText = await run();
+    if (!responseText || !responseText.trim()) {
+      input.notes.push('empty subagent response; retrying once');
+      responseText = await run();
+    }
+    return responseText;
+  } finally {
+    if (wantsFiles && previousTools === undefined) {
+      delete process.env.KYBERION_CLAUDE_AGENT_TOOLS;
+    }
+  }
+}
+
 function getWorkItemTaskId(item: WorkItem): string | undefined {
   const metadata = (item.metadata || {}) as Record<string, unknown>;
   const taskId = metadata.task_id;
@@ -553,10 +615,31 @@ function updateTicketManifest(
   writeJsonFileFromDispatchIO(manifestFile, manifest);
 }
 
+const TICKET_STATE_TO_TASK_STATUS: Record<string, string> = {
+  // Keep NEXT_TASKS (what the finish exit gate reads) in lockstep with the
+  // ticket outcome — the dog-food run required hand-syncing statuses before
+  // finish because dispatch only annotated ticket_dispatch metadata.
+  done: 'completed',
+  review: 'reviewed',
+  blocked: 'blocked',
+};
+
+const TASK_STATUS_RANK: Record<string, number> = {
+  planned: 0,
+  rework: 1,
+  blocked: 2,
+  review: 3,
+  reviewed: 3,
+  done: 4,
+  completed: 4,
+  accepted: 5,
+};
+
 function updateNextTasksReflection(
   missionPath: string,
   taskId: string,
-  payload: Record<string, unknown>
+  payload: Record<string, unknown>,
+  ticketState?: string
 ): void {
   const nextTasksFile = missionNextTasksPath(missionPath);
   const tasks = readJsonFileFromDispatchIO<Array<Record<string, unknown>>>(nextTasksFile);
@@ -564,8 +647,14 @@ function updateNextTasksReflection(
   const index = tasks.findIndex((task) => String(task.task_id || '') === taskId);
   if (index < 0) return;
   const current = tasks[index];
+  const mappedStatus = ticketState ? TICKET_STATE_TO_TASK_STATUS[ticketState] : undefined;
+  const currentStatus = String(current.status || 'planned').toLowerCase();
+  const shouldAdvance =
+    mappedStatus !== undefined &&
+    (TASK_STATUS_RANK[mappedStatus] ?? 0) > (TASK_STATUS_RANK[currentStatus] ?? 0);
   tasks[index] = {
     ...current,
+    ...(shouldAdvance ? { status: mappedStatus } : {}),
     ticket_dispatch: {
       ...(current.ticket_dispatch as Record<string, unknown> | undefined),
       ...payload,
@@ -731,29 +820,34 @@ async function reflectTicketOutcome(input: {
     ticketState
   );
 
-  updateNextTasksReflection(input.missionPath, taskId, {
-    reflected_at: new Date().toISOString(),
-    ticket_state: ticketState,
-    ticket_reply_path: reflectionPath,
-    response_path: input.responsePath,
-    response_excerpt: input.responseExcerpt,
-    context_pack_id: input.contextPackId,
-    context_pack_path: input.contextPackPath,
-    cognitive_route: cognitiveRouteSummary,
-    drift_watchdog_summary: input.driftWatchdogSummary,
-    acceptance_criteria: acceptanceCriteria,
-    acceptance_criteria_satisfied: acceptanceCheck.satisfied,
-    acceptance_criteria_missing: acceptanceCheck.missing,
-    reviewer_status: input.reviewerStatus,
-    reviewer_path: input.reviewerPath,
-    reviewer_excerpt: input.reviewerExcerpt,
-    clarification_packet_path: input.clarificationPacketPath,
-    needs_input: Boolean(input.clarificationPacket),
-    result_status: ticketState,
-    review_required: ticketState === 'review',
-    blocked: ticketState === 'blocked',
-    work_item_status_after: input.finalStatus,
-  });
+  updateNextTasksReflection(
+    input.missionPath,
+    taskId,
+    {
+      reflected_at: new Date().toISOString(),
+      ticket_state: ticketState,
+      ticket_reply_path: reflectionPath,
+      response_path: input.responsePath,
+      response_excerpt: input.responseExcerpt,
+      context_pack_id: input.contextPackId,
+      context_pack_path: input.contextPackPath,
+      cognitive_route: cognitiveRouteSummary,
+      drift_watchdog_summary: input.driftWatchdogSummary,
+      acceptance_criteria: acceptanceCriteria,
+      acceptance_criteria_satisfied: acceptanceCheck.satisfied,
+      acceptance_criteria_missing: acceptanceCheck.missing,
+      reviewer_status: input.reviewerStatus,
+      reviewer_path: input.reviewerPath,
+      reviewer_excerpt: input.reviewerExcerpt,
+      clarification_packet_path: input.clarificationPacketPath,
+      needs_input: Boolean(input.clarificationPacket),
+      result_status: ticketState,
+      review_required: ticketState === 'review',
+      blocked: ticketState === 'blocked',
+      work_item_status_after: input.finalStatus,
+    },
+    ticketState
+  );
 
   const githubPath = nodePath.join(ticketRoot(input.missionPath), 'github', `${taskId}.json`);
   if (safeExistsSync(githubPath)) {
@@ -1334,19 +1428,25 @@ async function routeToAgentOrSubagent(input: {
     );
   }
   if (input.mode === 'subagent' || (!input.assigneePeerId && input.mode === 'auto')) {
-    const backend = getReasoningBackend();
-    const responseText = input.adapters.delegateTask
-      ? await input.adapters.delegateTask(prompt, `workitem:${input.item.item_id}`)
-      : await backend.delegateTask(prompt, `workitem:${input.item.item_id}`, routingOptions);
+    const responseText = await delegateSubagentTask({
+      item: input.item,
+      prompt,
+      routingOptions,
+      adapters: input.adapters,
+      notes,
+    });
     return { executionMode: 'subagent', responseText, notes };
   }
 
   if (!input.assigneePeerId) {
     notes.push('missing assignee_peer_id; falling back to subagent');
-    const backend = getReasoningBackend();
-    const responseText = input.adapters.delegateTask
-      ? await input.adapters.delegateTask(prompt, `workitem:${input.item.item_id}`)
-      : await backend.delegateTask(prompt, `workitem:${input.item.item_id}`, routingOptions);
+    const responseText = await delegateSubagentTask({
+      item: input.item,
+      prompt,
+      routingOptions,
+      adapters: input.adapters,
+      notes,
+    });
     return { executionMode: 'subagent', responseText, notes };
   }
 
@@ -1523,6 +1623,42 @@ async function obtainTaskResultResponse(input: {
 }
 
 export async function dispatchMissionWorkItems(
+  state: MissionState,
+  options: MissionWorkItemDispatchOptions = {},
+  adapters: WorkItemDispatchAdapters = {}
+): Promise<MissionWorkItemDispatchManifest> {
+  const maxRounds = Math.max(
+    1,
+    Number(options.rounds ?? process.env.KYBERION_DISPATCH_MAX_ROUNDS ?? 1)
+  );
+  let manifest = await dispatchMissionWorkItemsRound(state, options, adapters);
+  let previousRemaining = Number.POSITIVE_INFINITY;
+  for (let round = 2; round <= maxRounds; round += 1) {
+    const retryStatuses: WorkItemStatus[] = Array.from(
+      new Set<WorkItemStatus>([...(options.statuses || ['ready', 'backlog']), 'blocked'])
+    );
+    const remaining = selectWorkItems(state, { ...options, statuses: retryStatuses });
+    if (remaining.length === 0) break;
+    if (remaining.length >= previousRemaining) {
+      logger.warn(
+        `[workitem-dispatch] round ${round}: no progress (${remaining.length} item(s) still actionable) — stopping auto-rounds.`
+      );
+      break;
+    }
+    previousRemaining = remaining.length;
+    logger.info(
+      `[workitem-dispatch] auto-round ${round}/${maxRounds}: retrying ${remaining.length} actionable item(s).`
+    );
+    manifest = await dispatchMissionWorkItemsRound(
+      state,
+      { ...options, statuses: retryStatuses },
+      adapters
+    );
+  }
+  return manifest;
+}
+
+async function dispatchMissionWorkItemsRound(
   state: MissionState,
   options: MissionWorkItemDispatchOptions = {},
   adapters: WorkItemDispatchAdapters = {}

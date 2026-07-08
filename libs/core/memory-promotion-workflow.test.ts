@@ -18,6 +18,11 @@ import {
 } from './reasoning-backend.js';
 import { buildScopedIndex, queryKnowledgeHybrid } from './src/knowledge-index.js';
 
+// Namespace the promotion queue so parallel test files never clobber the
+// real shared queue (root cause of combined-run flakes).
+process.env.KYBERION_MEMORY_QUEUE_PATH =
+  'active/shared/tmp/test-memory-queue-memory-promotion-workflow.jsonl';
+
 vi.mock('./src/knowledge-index.js', () => ({
   buildScopedIndex: vi.fn(async () => ({ hints: [] })),
   queryKnowledgeHybrid: vi.fn(),

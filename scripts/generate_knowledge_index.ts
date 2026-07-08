@@ -64,9 +64,14 @@ function walk(dir: string, baseDir: string, files: string[] = []): string[] {
     // Tier invariant: the root index/manifest are public-tier artifacts, so
     // higher-tier paths and titles must never be listed there (AGENTS.md §1).
     if (dir === baseDir && (entry === 'personal' || entry === 'confidential')) continue;
+    // Evolution dirs receive runtime distill output; indexing them would make
+    // the committed manifest stale after every learning cycle (same volatility
+    // class as HINTS.md).
+    if (dir === baseDir && entry === 'evolution') continue;
     const fullPath = path.join(dir, entry);
     const stat = safeLstat(fullPath);
     if (stat.isDirectory()) {
+      if (path.relative(baseDir, fullPath).replace(/\\/g, '/') === 'product/evolution') continue;
       walk(fullPath, baseDir, files);
     } else if (stat.isFile()) {
       const ext = path.extname(entry).toLowerCase();

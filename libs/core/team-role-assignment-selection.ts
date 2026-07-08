@@ -1,3 +1,4 @@
+import { performanceScoreAdjustment } from './agent-performance-index.js';
 import {
   resolveAgentProviderTarget,
   type ResolvedAgentProviderTarget,
@@ -125,12 +126,16 @@ export function selectAgentForTeamRole(
         ? 5
         : 0;
       const providerBonus = selectionProvider === resolvedTarget.provider ? 2 : 0;
+      // Retrospective feedback: measured agent×role outcomes adjust the
+      // score within ±8 (operator preferred_agents bonus of 20 still wins).
+      const performanceBonus = performanceScoreAdjustment(agentId, teamRole);
       const score =
         capabilityHits * 10 -
         capabilityPenalty +
         preferredAgentBonus +
         preferredModelBonus +
-        providerBonus;
+        providerBonus +
+        performanceBonus;
 
       const requiredScopes = new Set(teamRoleRecord.required_scope_classes || []);
       const compatibleAuthorityRoles = profile.authority_roles.filter((role) =>

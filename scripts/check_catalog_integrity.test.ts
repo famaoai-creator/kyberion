@@ -1,10 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import {
-  pathResolver,
-  safeReadFile,
-  safeWriteFile,
-  withExecutionContext,
-} from '@agent/core';
+import { pathResolver, safeReadFile, safeWriteFile, withExecutionContext } from '@agent/core';
 import { afterEach, describe, expect, it } from 'vitest';
 
 const ROOT = pathResolver.rootDir();
@@ -48,7 +43,9 @@ describe.sequential('check_catalog_integrity', () => {
     originalThemesJson = '';
   });
 
-  it('passes on the current repository state', () => {
+  // Asserts GLOBAL repo state; parallel suites legitimately mutate knowledge/
+  // and mission dirs mid-run, so retry to let transient churn settle.
+  it('passes on the current repository state', { retry: 2 }, () => {
     const result = runCheckCatalogIntegrity();
 
     expect(result.status).toBe(0);
@@ -83,4 +80,3 @@ describe.sequential('check_catalog_integrity', () => {
     expect(result.stderr).toContain('kyberion-standard drift');
   });
 });
-
