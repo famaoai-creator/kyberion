@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 300" role="img" aria-labelledby="title desc">
+  <title id="title">The Kyberion work loop</title>
+  <desc id="desc">Intent flows to plan, execution, evidence, and learning, which feeds the next mission's team.</desc>
+  <defs>
+    <linearGradient id="lp-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#020617"/>
+      <stop offset="100%" stop-color="#0e2237"/>
+    </linearGradient>
+    <linearGradient id="lp-accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#67e8f9"/>
+      <stop offset="100%" stop-color="#f5d0fe"/>
+    </linearGradient>
+    <marker id="lp-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#7dd3fc"/>
+    </marker>
+  </defs>
+
+  <rect width="1080" height="300" rx="18" fill="url(#lp-bg)"/>
+
+  <g font-family="Inter, 'Helvetica Neue', Arial, sans-serif">
+    <!-- stages -->
+    <g text-anchor="middle" font-size="21" font-weight="700">
+      <g>
+        <rect x="50" y="90" width="160" height="64" rx="12" fill="#0A192F" stroke="#00F2FF" stroke-width="2"/>
+        <text x="130" y="118" fill="#F8FAFC">INTENT</text>
+        <text x="130" y="141" font-size="14" font-weight="400" fill="#94a3b8">"作って" one line</text>
+      </g>
+      <g>
+        <rect x="260" y="90" width="160" height="64" rx="12" fill="#0A192F" stroke="#7dd3fc" stroke-width="2"/>
+        <text x="340" y="118" fill="#F8FAFC">PLAN</text>
+        <text x="340" y="141" font-size="14" font-weight="400" fill="#94a3b8">mission + team</text>
+      </g>
+      <g>
+        <rect x="470" y="90" width="160" height="64" rx="12" fill="#0A192F" stroke="#a5b4fc" stroke-width="2"/>
+        <text x="550" y="118" fill="#F8FAFC">EXECUTE</text>
+        <text x="550" y="141" font-size="14" font-weight="400" fill="#94a3b8">agents + actuators</text>
+      </g>
+      <g>
+        <rect x="680" y="90" width="160" height="64" rx="12" fill="#0A192F" stroke="#f0abfc" stroke-width="2"/>
+        <text x="760" y="118" fill="#F8FAFC">EVIDENCE</text>
+        <text x="760" y="141" font-size="14" font-weight="400" fill="#94a3b8">goal-gated done</text>
+      </g>
+      <g>
+        <rect x="890" y="90" width="160" height="64" rx="12" fill="#0A192F" stroke="url(#lp-accent)" stroke-width="2"/>
+        <text x="970" y="118" fill="#F8FAFC">LEARN</text>
+        <text x="970" y="141" font-size="14" font-weight="400" fill="#94a3b8">retrospective</text>
+      </g>
+    </g>
+
+    <!-- forward arrows -->
+    <g stroke="#7dd3fc" stroke-width="2.5" fill="none" marker-end="url(#lp-arrow)">
+      <line x1="212" y1="122" x2="256" y2="122"/>
+      <line x1="422" y1="122" x2="466" y2="122"/>
+      <line x1="632" y1="122" x2="676" y2="122"/>
+      <line x1="842" y1="122" x2="886" y2="122"/>
+    </g>
+
+    <!-- feedback loop: learn → next plan -->
+    <path d="M 970 158 C 970 235, 340 235, 340 162" stroke="url(#lp-accent)" stroke-width="2.5" fill="none" marker-end="url(#lp-arrow)" stroke-dasharray="1 0"/>
+    <text x="655" y="252" text-anchor="middle" font-size="16" fill="#cbd5e1">measured agent×role outcomes staff the next mission's team</text>
+
+    <!-- gate note -->
+    <path d="M 760 86 C 760 45, 545 45, 552 84" stroke="#f0abfc" stroke-width="1.8" fill="none" marker-end="url(#lp-arrow)" opacity="0.85"/>
+    <text x="655" y="38" text-anchor="middle" font-size="15" fill="#cbd5e1">unsatisfied goals dispatch gap-closing tasks — no evidence, no "done"</text>
+  </g>
+</svg>
