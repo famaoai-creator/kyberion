@@ -65,18 +65,18 @@ Some themes also define:
 
 This is the practical checklist for creating or reviewing a theme.
 
-| Concern | Current home | Defined today | Notes |
-| :--- | :--- | :--- | :--- |
-| Brand colors | `themes.json` | Yes | Core palette is present for every native theme. |
-| Typography | `themes.json` | Yes | Each native theme defines heading and body fonts. |
-| Company logo | `themes.json` `assets.logo_url` | Partially | Present for `kyberion-standard` and tenant theme `client-a`; external ADF contracts can carry richer asset sets. |
-| Spacing scale | `slide-layout-presets`, `semantic-render-tokens`, imported DESIGN.md systems | Partially | Not modeled as a dedicated theme field; spacing is encoded in layout/semantic catalogs and imported reference systems. |
-| Layout structure | `slide-layout-presets` | Yes | Section and slide placement live outside the base theme. |
-| Semantic rules | `semantic-render-tokens` | Yes | Meaning-driven spacing, emphasis, and render behavior live here. |
-| Profile-to-theme routing | `document-composition-presets`, `media-design-systems` | Yes | These control which theme is used for which artifact profile. |
-| External reference style | `themes/design-md-imports.json`, `media-design-systems/design-md-imports.json`, `design-md-catalog` | Yes | Imported systems are explicit reference styles, not implicit defaults. |
-| Full design contract | `knowledge/product/schemas/corporate-design-adf.schema.json` | Yes | This is the richer renderer-neutral contract when you need logos, extra assets, slide size, and layout arrays. |
-| Web theme pack | `knowledge/product/schemas/web-theme-pack.schema.json` | Yes | Stores palette, typography, hero, spacing, grid, breakpoints, and reusable HTML layout hints. |
+| Concern                  | Current home                                                                                        | Defined today | Notes                                                                                                                  |
+| :----------------------- | :-------------------------------------------------------------------------------------------------- | :------------ | :--------------------------------------------------------------------------------------------------------------------- |
+| Brand colors             | `themes.json`                                                                                       | Yes           | Core palette is present for every native theme.                                                                        |
+| Typography               | `themes.json`                                                                                       | Yes           | Each native theme defines heading and body fonts.                                                                      |
+| Company logo             | `themes.json` `assets.logo_url`                                                                     | Partially     | Present for `kyberion-standard` and tenant theme `client-a`; external ADF contracts can carry richer asset sets.       |
+| Spacing scale            | `slide-layout-presets`, `semantic-render-tokens`, imported DESIGN.md systems                        | Partially     | Not modeled as a dedicated theme field; spacing is encoded in layout/semantic catalogs and imported reference systems. |
+| Layout structure         | `slide-layout-presets`                                                                              | Yes           | Section and slide placement live outside the base theme.                                                               |
+| Semantic rules           | `semantic-render-tokens`                                                                            | Yes           | Meaning-driven spacing, emphasis, and render behavior live here.                                                       |
+| Profile-to-theme routing | `document-composition-presets`, `media-design-systems`                                              | Yes           | These control which theme is used for which artifact profile.                                                          |
+| External reference style | `themes/design-md-imports.json`, `media-design-systems/design-md-imports.json`, `design-md-catalog` | Yes           | Imported systems are explicit reference styles, not implicit defaults.                                                 |
+| Full design contract     | `knowledge/product/schemas/corporate-design-adf.schema.json`                                        | Yes           | This is the richer renderer-neutral contract when you need logos, extra assets, slide size, and layout arrays.         |
+| Web theme pack           | `knowledge/product/schemas/web-theme-pack.schema.json`                                              | Yes           | Stores palette, typography, hero, spacing, grid, breakpoints, and reusable HTML layout hints.                          |
 
 ## Knowledge Tier Placement
 
@@ -241,3 +241,40 @@ For web registration specifically, use a confidential `theme.json` pack that car
 - Use `web-theme-pack.schema.json` and its example when you are registering a website-derived theme pack.
 - Use `media-design-systems` when you need profile-aware behavior.
 - Use `pptx_extract` when you need the source deck's actual design evidence.
+
+## Semantic color tokens (v1.1.0 additions)
+
+Every theme in `media-templates/themes.json` may now carry, in addition to the
+base five (`primary`/`secondary`/`accent`/`background`/`text`):
+
+| Token                            | Role                                      | Contrast requirement                           |
+| -------------------------------- | ----------------------------------------- | ---------------------------------------------- |
+| `accent_text`                    | accent-colored **text** (links, emphasis) | ≥ 4.5:1 on `background` (must fix)             |
+| `surface`                        | cards, panels, callouts                   | `text` on it ≥ 4.5:1 (must fix)                |
+| `muted_text`                     | secondary text                            | ≥ 4.5:1 on `background`                        |
+| `border`                         | hairlines, dividers                       | —                                              |
+| `success` / `warning` / `danger` | status colors                             | use `*_text`-grade tones when rendered as text |
+
+Rules:
+
+- The brand `accent` may be decorative (e.g. amber, lime). When it cannot pass
+  3:1 on the background, the theme MUST provide `accent_text` — a darker,
+  AA-safe tone used whenever accent-colored text is rendered.
+- `kyberion-standard` / `kyberion-sovereign` entries are **generated** from
+  `design-patterns/brand-tokens/kyberion.json` via
+  `scripts/generate_design_tokens.ts` — edit the brand tokens, not the theme
+  entries.
+
+## Deterministic design QA
+
+Contrast is computed, never eyeballed (working-philosophy rule 7):
+
+- **CI gate**: `pnpm check:design-contrast` (part of `pnpm validate`) fails on
+  AA violations in brand tokens and every theme — body text, accent text,
+  surface text, muted text.
+- **Runtime library**: `libs/core/design-qa.ts` (`contrastRatio`,
+  `validateThemeContrast`, `validateThemeCatalog`) for actuator preflight and
+  reviews of generated artifacts.
+- **Reviewer checklist**: the designer role addendum in
+  `knowledge/product/governance/working-philosophy.md` — contrast → hierarchy
+  → spacing before aesthetics; judge the rendered artifact, in light AND dark.

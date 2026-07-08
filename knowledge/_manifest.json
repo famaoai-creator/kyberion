@@ -1977,7 +1977,7 @@
     {
       "path": "product/governance/security-policy.json",
       "tier": "public",
-      "size": 18810,
+      "size": 17882,
       "type": "json"
     },
     {
@@ -8727,7 +8727,7 @@
     {
       "path": "public/procedures/media/theme-and-design-system-reference.md",
       "tier": "public",
-      "size": 11768,
+      "size": 13819,
       "type": "md"
     },
     {
