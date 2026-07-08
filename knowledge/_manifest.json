@@ -1411,6 +1411,12 @@
       "type": "json"
     },
     {
+      "path": "product/governance/kyberion-development-practices.md",
+      "tier": "public",
+      "size": 8572,
+      "type": "md"
+    },
+    {
       "path": "product/governance/legacy-media-ops.json",
       "tier": "public",
       "size": 169,
