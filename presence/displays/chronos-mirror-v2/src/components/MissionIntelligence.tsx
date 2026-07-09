@@ -1254,6 +1254,13 @@ export function MissionIntelligence({
   const [selectedReferencePath, setSelectedReferencePath] = useState<string | null>(null);
   const [referenceDetail, setReferenceDetail] = useState<ReferenceDetail | null>(null);
   const missionThreadPanelRef = useRef<HTMLDivElement | null>(null);
+  // Render-computed view state for the hoisted mission-control effects. The
+  // effects must sit ABOVE the error/mounted/data early returns (hook count
+  // must not change between renders), so they read the latest values here.
+  const missionControlViewRef = useRef<{
+    filteredMissions: MissionSummary[];
+    effectiveMissionId: string | null;
+  }>({ filteredMissions: [], effectiveMissionId: null });
 
   useEffect(() => {
     setMounted(true);
@@ -1975,6 +1982,38 @@ export function MissionIntelligence({
     window.history.replaceState({}, '', url.toString());
   }, [selectedMissionId, selectedProjectId, selectedTrackId]);
 
+  useEffect(() => {
+    if (focusedView !== 'mission-control-plane') return;
+    const missionId = resolveMissionControlFocusId(
+      missionControlViewRef.current.filteredMissions,
+      selectedMissionId,
+      focusedMissionId
+    );
+    if (!missionId || missionId === selectedMissionId) return;
+    setSelectedMissionId(missionId);
+    setMessageMissionFilter(missionId);
+  }, [data, focusedMissionId, focusedView, selectedMissionId]);
+
+  useEffect(() => {
+    if (focusedView !== 'mission-control-plane') return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
+      if (isEditableHotkeyTarget(event.target)) return;
+      const action = resolveMissionThreadHotkeyAction(event.key);
+      const effectiveMissionId = missionControlViewRef.current.effectiveMissionId;
+      if (!action || !effectiveMissionId) return;
+      event.preventDefault();
+      if (action === 'thread') {
+        focusMissionThread(effectiveMissionId);
+        return;
+      }
+      focusMissionCard(effectiveMissionId);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [focusedView]);
+
   const missionPinStatusLabel = selectedMissionId ? 'mission pinned' : 'pin mission thread';
 
   if (error) {
@@ -2149,40 +2188,10 @@ export function MissionIntelligence({
     effectiveMissionId && (!selectedProject || selectedProjectMissionIds.has(effectiveMissionId))
       ? buildMissionThread(effectiveMissionId, data.agentMessages, data.a2aHandoffs)
       : [];
+  missionControlViewRef.current = { filteredMissions, effectiveMissionId };
   const missionExceptions = filteredMissions.filter(
     (mission) => mission.controlTone === 'attention' || mission.controlTone === 'pending'
   );
-
-  useEffect(() => {
-    if (focusedView !== 'mission-control-plane') return;
-    const missionId = resolveMissionControlFocusId(
-      filteredMissions,
-      selectedMissionId,
-      focusedMissionId
-    );
-    if (!missionId || missionId === selectedMissionId) return;
-    setSelectedMissionId(missionId);
-    setMessageMissionFilter(missionId);
-  }, [filteredMissions, focusedMissionId, focusedView, selectedMissionId]);
-
-  useEffect(() => {
-    if (focusedView !== 'mission-control-plane') return;
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
-      if (isEditableHotkeyTarget(event.target)) return;
-      const action = resolveMissionThreadHotkeyAction(event.key);
-      if (!action || !effectiveMissionId) return;
-      event.preventDefault();
-      if (action === 'thread') {
-        focusMissionThread(effectiveMissionId);
-        return;
-      }
-      focusMissionCard(effectiveMissionId);
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [effectiveMissionId, focusedView]);
 
   const surfaceExceptions = data.surfaces.filter(
     (surface) => surface.controlTone === 'attention' || surface.health === 'unhealthy'
