@@ -479,6 +479,19 @@ pnpm capabilities
 pnpm dashboard:onboarding
 ```
 
+### Mission hygiene(未開始ミッションの整理)
+
+```bash
+pnpm mission-controller hygiene            # planned 滞留の一覧+ミッション別の推奨コマンド
+pnpm mission-controller hygiene --notify   # 要対応分を ops alert + inbox に通知
+```
+
+`planned` は「作成済み・未開始」の正規状態(start か gate 通過で active 化)。
+hygiene は滞留理由を分類する: design_missing(タスク未展開)/
+ready_not_started(タスクあり・未ディスパッチ)/ awaiting_gate(gate 未通過)。
+状態は一切変更しない — 開始(start / dispatch-workitems)か整理(cancel)は
+常にオペレーターの判断。`pnpm doctor` にも滞留サマリが1行出る。
+
 ### Virtual Office(エージェント稼働の可視化)
 
 ```bash

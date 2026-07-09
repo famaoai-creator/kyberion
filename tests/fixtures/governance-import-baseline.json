@@ -19,6 +19,7 @@
     "libs/core/meeting-participation-coordinator.test.ts",
     "libs/core/metrics.test.ts",
     "libs/core/mission-evidence-doc.test.ts",
+    "libs/core/mission-hygiene.test.ts",
     "libs/core/mission-retrospective.test.ts",
     "libs/core/operator-home-summary.test.ts",
     "libs/core/operator-notifications.test.ts",
