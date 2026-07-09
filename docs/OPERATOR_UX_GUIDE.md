@@ -484,6 +484,7 @@ pnpm dashboard:onboarding
 ```bash
 pnpm kyberion deals                          # 商談一覧(全テナント、stage 付き)
 pnpm kyberion deals --requirements DEAL-XXXX # 要件ヒアリングで収集済みの構造化ドラフト
+pnpm kyberion deals --ingest-audio DEAL-XXXX --audio 録音.aiff # 通話録音→要件ドラフト取り込み
 ```
 
 顧客チャネル(`customer/<tenant>/connections/channel-bindings.json`)に紐づく会話は
@@ -491,6 +492,10 @@ deal stage に応じて自動でモードが切り替わる: 営業(inquiry〜co
 要件ヒアリング(discovery — 構造化ドラフトを増分収集)/ サポート(won 以降 —
 `knowledge/confidential/<tenant>/support/known-issues.md` を接地)。binding の
 `"mode"` で固定も可能。能動送信は常に承認ゲート経由。
+
+録音の文字起こしは対応 Mac ならオンデバイス(設定ゼロ、外部送信なし)。受注
+(won)ハンドオフ時に、収集済み要件ドラフトはミッションの requirements draft へ
+自動昇格し、completeness / signoff ゲートに接続される。
 
 ### Surface lifecycle
 

@@ -477,7 +477,7 @@ describe('customer dialogue (E2E-06)', () => {
     expect(deliver).toHaveBeenCalledTimes(1);
   });
 
-  it('won hands off to the SDLC with the customer words as the mission goal', () => {
+  it('won hands off to the SDLC with the customer words as the mission goal', async () => {
     const deal = core.openDeal({
       tenantSlug: SLUG,
       surface: 'slack',
@@ -490,11 +490,38 @@ describe('customer dialogue (E2E-06)', () => {
       stage: 'contract',
       agreed: { scope: ['検索機能の追加'], amount: { value: 360000, currency: 'JPY' } },
     });
+
+    // the discovery hearing captured structured requirements on the deal
+    const modes = await import('../libs/core/customer-conversation-modes.js');
+    modes.saveDealRequirementsCapture({
+      tenantSlug: SLUG,
+      dealId: deal.deal_id,
+      requirements: {
+        functional_requirements: [{ id: 'FR-SEARCH-1', description: '全文検索', priority: 'must' }],
+        non_functional_requirements: [],
+        constraints: [],
+        assumptions: [],
+        open_questions: [],
+      },
+    });
+    // the mission's evidence dir must exist for the requirements draft
+    // flat legacy layout: without a mission-management-config the resolver
+    // only searches active/missions/<id>
+    const missionEvidence = path.join(tmpRoot, 'active', 'missions', 'MSN-DEAL-1', 'evidence');
+    fs.mkdirSync(missionEvidence, { recursive: true });
+
     const handoff = core.handoffWonDealToSdlc({
       tenantSlug: SLUG,
       dealId: deal.deal_id,
       missionId: 'MSN-DEAL-1',
     });
+
+    // hearing requirements survive the deal boundary into the mission draft
+    expect(handoff.requirements_draft_version).toBe('v1');
+    const draftStore = await import('../libs/core/requirements-draft-store.js');
+    const draft = draftStore.readRequirementsDraft('MSN-DEAL-1');
+    expect(draft?.functional_requirements[0]?.id).toBe('FR-SEARCH-1');
+    expect(draft?.elicitation_source?.refs).toContain(`deal:${deal.deal_id}`);
     expect(handoff.sdlc_pipeline).toBe('pipelines/sdlc-cycle.json');
     expect(handoff.deal.stage).toBe('won');
     expect(handoff.deal.mission_ids).toContain('MSN-DEAL-1');
