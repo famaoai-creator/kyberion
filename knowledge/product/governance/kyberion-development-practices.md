@@ -70,6 +70,10 @@ leftovers. A test may not depend on:
 - **`/tmp` leftovers** — if a flow validates a file it claims to produce,
   the test must create it (or mock the validation), never assume a prior
   run left one;
+- **the real operator inbox/channels** — notifyOperator is hard-gated
+  under vitest (`KYBERION_ALLOW_TEST_NOTIFICATIONS=1` opts a delivery
+  suite back in); 82 phantom inbox entries from un-mocked finishMission
+  flows taught us this;
 - **the calendar** — absolute dates in fixtures rot; freeze
   `vi.useFakeTimers({ now, toFake: ['Date'] })` for the WHOLE flow, not
   just the assertion phase.

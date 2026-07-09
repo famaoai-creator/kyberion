@@ -30,6 +30,7 @@ const COMMANDS: ReadonlyArray<readonly [string, string]> = [
   ['pnpm kyberion', 'ホーム: 状態ダイジェストと次の一手'],
   ['pnpm kyberion ask "<依頼>"', 'Kyberion に話しかける(Slack と同じ脳)'],
   ['pnpm kyberion inbox [--read <id>|--accept <id>]', '成果物 inbox の確認と受領'],
+  ['pnpm kyberion inbox --read-all [--match <文字列>]', '未読の一括既読化(タイトル/要約で絞込可)'],
   ['pnpm kyberion approvals [--approve <id>|--deny <id>]', '承認キューの確認と裁可'],
   ['pnpm kyberion notify [--set slack:<channel>]', '通知先の確認・設定'],
   ['pnpm kyberion deals [--requirements <deal-id>]', '商談一覧と要件ヒアリング内容の確認'],
@@ -68,7 +69,27 @@ function handleNotifySubcommand(setValue: string): void {
   console.log(`Default notification channel set to ${surface}:${target} (${filePath})`);
 }
 
-function handleInboxSubcommand(argv: { read?: string; accept?: string; json?: boolean }): void {
+function handleInboxSubcommand(argv: {
+  read?: string;
+  accept?: string;
+  readAll?: boolean;
+  match?: string;
+  json?: boolean;
+}): void {
+  if (argv.readAll) {
+    const entries = listInboxEntries({ limit: 500 }).filter(
+      (entry) =>
+        entry.status === 'unread' &&
+        (!argv.match || entry.title.includes(argv.match) || entry.summary.includes(argv.match))
+    );
+    for (const entry of entries) {
+      markInboxEntry(entry.entry_id, 'read', { reviewedBy: 'operator' });
+    }
+    console.log(
+      `✓ ${entries.length} 件を既読化しました${argv.match ? `(match: ${argv.match})` : ''}`
+    );
+    return;
+  }
   if (argv.read || argv.accept) {
     const entryId = String(argv.read || argv.accept);
     const status = argv.read ? 'read' : 'accepted';
@@ -371,6 +392,8 @@ async function main(): Promise<void> {
     .option('json', { type: 'boolean', default: false })
     .option('set', { type: 'string', description: 'notify: set default channel surface:target' })
     .option('read', { type: 'string', description: 'inbox: mark entry as read' })
+    .option('read-all', { type: 'boolean', description: 'inbox: mark all unread as read' })
+    .option('match', { type: 'string', description: 'inbox: filter --read-all by title/summary' })
     .option('accept', { type: 'string', description: 'inbox: mark entry as accepted' })
     .option('approve', { type: 'string', description: 'approvals: approve request id' })
     .option('deny', { type: 'string', description: 'approvals: reject request id' })
@@ -393,7 +416,10 @@ async function main(): Promise<void> {
       else console.log(JSON.stringify(loadNotificationPreferences(), null, 2));
       return;
     case 'inbox':
-      handleInboxSubcommand(argv as { read?: string; accept?: string; json?: boolean });
+      handleInboxSubcommand({
+        ...(argv as { read?: string; accept?: string; json?: boolean; match?: string }),
+        readAll: Boolean(argv['read-all']),
+      });
       return;
     case 'approvals':
       handleApprovalsSubcommand(
