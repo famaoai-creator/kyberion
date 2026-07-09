@@ -10,6 +10,8 @@ import {
 import { logger } from './core.js';
 import { notifyOperator } from './operator-notifications.js';
 import { writeIntentGoalHandoff } from './intent-handoff.js';
+import { readDealRequirementsCapture } from './customer-conversation-modes.js';
+import { saveRequirementsDraft } from './requirements-draft-store.js';
 import type { ResolvedCustomerBinding } from './customer-channel-binding.js';
 import {
   advanceDealStage,
@@ -299,7 +301,12 @@ export function handoffWonDealToSdlc(input: {
   tenantSlug: string;
   dealId: string;
   missionId: string;
-}): { handoff_path: string; sdlc_pipeline: string; deal: DealRecord } {
+}): {
+  handoff_path: string;
+  sdlc_pipeline: string;
+  deal: DealRecord;
+  requirements_draft_version?: string;
+} {
   const deal = getDeal(input.tenantSlug, input.dealId);
   if (!deal) throw new Error(`deal_not_found:${input.dealId}`);
   if (!deal.agreed?.scope?.length) {
@@ -322,5 +329,37 @@ export function handoffWonDealToSdlc(input: {
     evidence: handoffPath,
     missionId: input.missionId,
   });
-  return { handoff_path: handoffPath, sdlc_pipeline: 'pipelines/sdlc-cycle.json', deal: advanced };
+
+  // Promote the hearing's structured requirements into the mission's draft:
+  // without this, everything the discovery phase captured (via conversation
+  // turns or audio ingestion) dies at the deal boundary and the SDLC mission
+  // starts from just the one-line scope.
+  let requirementsDraftVersion: string | undefined;
+  const capture = readDealRequirementsCapture(input.tenantSlug, input.dealId);
+  if (capture) {
+    try {
+      const draft = saveRequirementsDraft({
+        missionId: input.missionId,
+        projectName: deal.summary.slice(0, 80),
+        extracted: capture.requirements,
+        elicitationSource: {
+          type: 'chat_log',
+          refs: [`deal:${deal.deal_id}`],
+        },
+        generatedBy: 'deal-requirements-capture',
+      });
+      requirementsDraftVersion = draft.version;
+    } catch (err) {
+      logger.warn(
+        `[deal-documents] requirements promotion failed for ${deal.deal_id}: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+  }
+
+  return {
+    handoff_path: handoffPath,
+    sdlc_pipeline: 'pipelines/sdlc-cycle.json',
+    deal: advanced,
+    ...(requirementsDraftVersion ? { requirements_draft_version: requirementsDraftVersion } : {}),
+  };
 }
