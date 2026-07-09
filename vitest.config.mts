@@ -106,8 +106,12 @@ export default defineConfig({
         statements: 65,
       },
     },
-    testTimeout: 10000,
-    hookTimeout: 10000,
+    // Shared CI runners are 3-8x slower than a dev Mac; the 10s default
+    // produced a steady drip of per-suite timeout whack-a-mole (see
+    // kyberion-development-practices §2). Locally the tight bound stays so
+    // slow tests are still noticed where they are written.
+    testTimeout: process.env.CI ? 30000 : 10000,
+    hookTimeout: process.env.CI ? 30000 : 10000,
     alias: [
       { find: /^@agent\/core\/(.*)$/, replacement: path.resolve(rootDir, './libs/core/$1') },
       { find: '@agent/core', replacement: path.resolve(rootDir, './libs/core/index.ts') },

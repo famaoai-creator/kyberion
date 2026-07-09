@@ -61,6 +61,7 @@
     "scripts/customer_switch.test.ts",
     "scripts/org.test.ts",
     "scripts/ts-loader.mjs",
+    "scripts/virtual_office.test.ts",
     "scripts/voice_consent.test.ts",
     "tests/a2a-lifecycle.test.ts",
     "tests/browser-bridge-a11y.test.ts",
