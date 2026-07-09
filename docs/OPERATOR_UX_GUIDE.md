@@ -479,6 +479,18 @@ pnpm capabilities
 pnpm dashboard:onboarding
 ```
 
+### Virtual Office(エージェント稼働の可視化)
+
+```bash
+pnpm office                 # 自己完結 HTML を生成(active/shared/exports/virtual-office/office.html)
+pnpm office -- --watch 30   # 30秒ごとに再生成(ページは自動リロード)
+```
+
+オフィスメタファーの統計ダッシュボード: 部屋=ミッション(進捗バー+デスクの
+エージェントチップ)、休憩室=待機エージェント、応接=商談、掲示板=アラート/
+改善提案キュー、統計翼=agent×role 成功率(retrospective 実績)・タスク状態分布。
+すべてディスク上の実データから決定論的に描画(LLM 不使用)。
+
 ### Customer engagement (deals)
 
 ```bash
