@@ -748,6 +748,25 @@ export default function ChronosMirrorV2() {
     }
   }, []);
 
+  const openDeliverableAsset = useCallback(
+    (item: { missionId?: string; path?: string; externalRef?: string }) => {
+      if (item.externalRef && /^https?:/.test(item.externalRef)) {
+        window.open(item.externalRef, '_blank', 'noreferrer');
+        return;
+      }
+      if (!item.path) return;
+      // repo-relative artifact mode covers exports/tmp/missions uniformly;
+      // mission mode remains for mission-relative records.
+      const url = item.path.startsWith('active/')
+        ? `/api/mission-asset?path=${encodeURIComponent(item.path)}`
+        : item.missionId
+          ? `/api/mission-asset?missionId=${encodeURIComponent(item.missionId)}&path=${encodeURIComponent(item.path)}`
+          : `/api/mission-asset?path=${encodeURIComponent(item.path)}`;
+      window.open(url, '_blank', 'noreferrer');
+    },
+    []
+  );
+
   const runPlanPreview = useCallback(async () => {
     if (!planRequestText.trim()) {
       setPlanPreviewError('依頼文を入力してください');
@@ -1959,6 +1978,9 @@ export default function ChronosMirrorV2() {
                       key={item.artifactId}
                       type={item.kind}
                       path={item.path || item.externalRef || item.artifactId}
+                      missionId={item.missionId}
+                      updatedAt={item.updatedAt}
+                      missing={item.missing}
                       previewContent={[
                         item.previewText || item.kind,
                         item.reviewVerdict ? `review: ${item.reviewVerdict}` : '',
@@ -1970,24 +1992,8 @@ export default function ChronosMirrorV2() {
                         setSelectedDeliverableId(item.artifactId);
                         setDeliverableReviewError(null);
                       }}
-                      onOpen={() => {
-                        if (item.missionId && item.path) {
-                          window.open(
-                            `/api/mission-asset?missionId=${encodeURIComponent(item.missionId)}&path=${encodeURIComponent(item.path)}`,
-                            '_blank',
-                            'noreferrer'
-                          );
-                        }
-                      }}
-                      onPreview={() => {
-                        if (item.missionId && item.path) {
-                          window.open(
-                            `/api/mission-asset?missionId=${encodeURIComponent(item.missionId)}&path=${encodeURIComponent(item.path)}`,
-                            '_blank',
-                            'noreferrer'
-                          );
-                        }
-                      }}
+                      onOpen={() => openDeliverableAsset(item)}
+                      onPreview={() => openDeliverableAsset(item)}
                     />
                   ))
                 )}
@@ -2545,13 +2551,19 @@ function TenantDesignBridge({
   onResolve: (cssVars: Record<string, string>, label: string | null) => void;
 }) {
   const searchParams = useSearchParams();
+  // The parent passes a fresh inline onResolve on every render; keeping it in
+  // the effect deps made resolve → setState → re-render → new onResolve →
+  // resolve an infinite loop. Track the latest callback in a ref and re-run
+  // only when the actual inputs (query params) change.
+  const onResolveRef = useRef(onResolve);
+  onResolveRef.current = onResolve;
 
   useEffect(() => {
     const customerId = searchParams.get('customerId') || searchParams.get('customer') || '';
     const brandName = searchParams.get('brandName') || '';
     const designSystemId = searchParams.get('designSystemId') || '';
     if (!customerId && !brandName && !designSystemId) {
-      onResolve({}, null);
+      onResolveRef.current({}, null);
       return;
     }
     const params = new URLSearchParams();
@@ -2570,11 +2582,11 @@ function TenantDesignBridge({
       })
       .then((payload) => {
         if (!payload) return;
-        onResolve(payload.css_vars || {}, payload.brand_name || payload.source || null);
+        onResolveRef.current(payload.css_vars || {}, payload.brand_name || payload.source || null);
       })
       .catch(() => {});
     return () => controller.abort();
-  }, [onResolve, searchParams]);
+  }, [searchParams]);
 
   return null;
 }

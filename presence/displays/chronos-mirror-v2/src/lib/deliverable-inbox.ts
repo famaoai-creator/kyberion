@@ -6,6 +6,8 @@ import { loadDeliverableReviewState } from './deliverable-review';
 
 export interface DeliverableInboxItem {
   artifactId: string;
+  /** True when the record points at a local file that no longer exists. */
+  missing?: boolean;
   missionId?: string;
   projectId?: string;
   trackId?: string;
@@ -80,15 +82,29 @@ export function collectDeliverableInbox(input: DeliverableInboxQuery = {}): Deli
     .map((record) => {
       const recordPath = resolveArtifactRecordPath(record.artifact_id);
       const stats = safeExistsSync(recordPath) ? safeStat(recordPath) : null;
+      // Paths in artifact records mix absolute and repo-relative; the UI and
+      // the asset route both speak repo-relative.
+      const root = pathResolver.rootDir().replace(/\\/g, '/').replace(/\/$/, '');
+      const normalizedPath = record.path
+        ? record.path.replace(/\\/g, '/').startsWith(`${root}/`)
+          ? record.path.replace(/\\/g, '/').slice(root.length + 1)
+          : record.path.replace(/\\/g, '/')
+        : undefined;
+      // The DELIVERABLE file itself (not the record json): tmp sweeps and
+      // mission archival routinely delete these — surface it honestly.
+      const targetMissing = normalizedPath
+        ? !safeExistsSync(path.join(root, normalizedPath))
+        : false;
       return {
         artifactId: record.artifact_id,
+        missing: targetMissing,
         missionId: record.mission_id,
         projectId: record.project_id,
         trackId: record.track_id,
         trackName: record.track_name,
         kind: record.kind,
         storageClass: record.storage_class,
-        path: record.path,
+        path: normalizedPath,
         externalRef: record.external_ref,
         previewText: record.preview_text,
         missionStatus: readMissionStatus(record.mission_id),
