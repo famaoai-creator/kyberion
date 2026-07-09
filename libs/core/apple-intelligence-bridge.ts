@@ -4,6 +4,14 @@ import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeMkdir, safeStat } from './secure-io.js';
 import { spawnManagedProcess } from './managed-process.js';
+import {
+  registerSpeechToTextBridge,
+  type SpeechToTextBridge,
+  type TranscribeInput,
+  type TranscribeResult,
+} from './speech-to-text-bridge.js';
+import { rootResolve } from './path-resolver.js';
+import { safeWriteFile } from './secure-io.js';
 
 /**
  * Apple Intelligence bridge — on-device Foundation Models (macOS 26+) as a
@@ -397,6 +405,57 @@ export async function generateImageLocallyWithApplePlayground(
   const parsed = parseLastJsonLine<AppleImageGenerationResult>(result.stdout, '{"path"');
   if (!parsed?.path) return null;
   return { path: parsed.path, style: String(parsed.style || '') };
+}
+
+// ----- SpeechToTextBridge adapter (meeting minutes / requirements audio) -----
+
+/**
+ * Adapts the on-device STT lane to the repo-wide SpeechToTextBridge
+ * contract, so in-room minutes recording and requirements-elicitation
+ * pipelines transcribe locally with zero configuration. BCP-47 language
+ * maps straight to the SpeechTranscriber locale (default ja-JP).
+ */
+export function createAppleSpeechToTextBridge(): SpeechToTextBridge {
+  return {
+    name: 'apple-speech',
+    async transcribe(input: TranscribeInput): Promise<TranscribeResult> {
+      const audioAbs = rootResolve(input.audioPath);
+      if (!safeExistsSync(audioAbs)) {
+        throw new Error(`[stt-bridge:apple-speech] audio file not found: ${input.audioPath}`);
+      }
+      const language = input.language?.trim() || 'ja-JP';
+      const text = await transcribeAudioLocallyWithAppleSpeech(audioAbs, { locale: language });
+      if (text === null) {
+        throw new Error(
+          '[stt-bridge:apple-speech] on-device transcription failed or became unavailable'
+        );
+      }
+      const parsed = path.parse(audioAbs);
+      const outputPath = input.outputPath
+        ? rootResolve(input.outputPath)
+        : path.join(parsed.dir, `${parsed.name}.transcript.txt`);
+      safeWriteFile(outputPath, `${text}\n`, { encoding: 'utf8', mkdir: true });
+      return {
+        text,
+        language,
+        written_to: outputPath,
+        backend: 'apple-speech',
+      };
+    },
+  };
+}
+
+/**
+ * Bootstrap helper: register the Apple STT bridge when the device supports
+ * it. Call AFTER installShellSpeechToTextBridgeIfAvailable — an explicit
+ * KYBERION_STT_COMMAND always wins over the implicit local capability.
+ */
+export async function installAppleSpeechToTextBridgeIfAvailable(): Promise<boolean> {
+  const availability = await probeAppleIntelligence();
+  if (!availability.available) return false;
+  registerSpeechToTextBridge(createAppleSpeechToTextBridge());
+  logger.info('[stt-bridge] installed AppleSpeechToTextBridge (on-device SpeechAnalyzer)');
+  return true;
 }
 
 /** macOS frameworks print loader noise to stdout; scan for the last JSON line. */

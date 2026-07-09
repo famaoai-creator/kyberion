@@ -612,6 +612,50 @@ describe('customer dialogue (E2E-06)', () => {
     expect(backendExtractRequirements).not.toHaveBeenCalled();
   });
 
+  it('ingests a call recording into the deal requirements draft via the STT bridge', async () => {
+    const modes = await import('../libs/core/customer-conversation-modes.js');
+    const stt = await import('../libs/core/speech-to-text-bridge.js');
+    stt.registerSpeechToTextBridge({
+      name: 'test-stt',
+      async transcribe() {
+        return {
+          text: '毎朝9時に売上レポートが欲しい。データソースはBigQuery。',
+          backend: 'test-stt',
+        };
+      },
+    });
+    backendExtractRequirements.mockResolvedValue({
+      functional_requirements: [
+        { id: 'FR-AUDIO-1', description: '毎朝9時の売上レポート自動生成', priority: 'must' },
+      ],
+      non_functional_requirements: [],
+      constraints: [],
+      assumptions: [],
+      open_questions: [],
+    });
+
+    backendPrompt.mockResolvedValue('承知しました。');
+    const binding = core.resolveCustomerBinding('slack', CHANNEL)!;
+    const opened = await core.runCustomerConversation({ binding, text: '録音を送ります' });
+
+    const result = await modes.ingestAudioIntoDealRequirements({
+      tenantSlug: SLUG,
+      dealId: opened.deal.deal_id,
+      audioPath: 'active/shared/tmp/call.aiff',
+    });
+    expect(result).toBeTruthy();
+    expect(result!.capture.requirements.functional_requirements[0].id).toBe('FR-AUDIO-1');
+    // prior draft threading: second ingestion passes the first as priorDraft
+    await modes.ingestAudioIntoDealRequirements({
+      tenantSlug: SLUG,
+      dealId: opened.deal.deal_id,
+      audioPath: 'active/shared/tmp/call2.aiff',
+    });
+    expect(backendExtractRequirements.mock.calls.at(-1)![0].priorDraft).toBeTruthy();
+    expect(backendExtractRequirements.mock.calls.at(-1)![0].sourceText).toContain('BigQuery');
+    stt.resetSpeechToTextBridge();
+  });
+
   it('repo approval policy marks customer:outbound as approval-required', () => {
     const policyPath = path.resolve(
       __dirname,

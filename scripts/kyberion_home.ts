@@ -10,6 +10,7 @@
 import { formatNextAction, getGovernanceControlSummary } from '@agent/core';
 import {
   decideApprovalRequest,
+  ingestAudioIntoDealRequirements,
   listApprovalRequests,
   listCustomerChannelBindings,
   listDeals,
@@ -32,6 +33,10 @@ const COMMANDS: ReadonlyArray<readonly [string, string]> = [
   ['pnpm kyberion approvals [--approve <id>|--deny <id>]', '承認キューの確認と裁可'],
   ['pnpm kyberion notify [--set slack:<channel>]', '通知先の確認・設定'],
   ['pnpm kyberion deals [--requirements <deal-id>]', '商談一覧と要件ヒアリング内容の確認'],
+  [
+    'pnpm kyberion deals --ingest-audio <deal-id> --audio <path>',
+    '通話録音を要件ドラフトへ取り込み',
+  ],
   ['pnpm mission create', 'ミッションの作成'],
   ['pnpm app:preflight', 'アプリ開発の前提チェック'],
   ['pnpm doctor', '健全性と次の一手の診断'],
@@ -250,6 +255,43 @@ async function showHome(json: boolean): Promise<void> {
 
 // Customer-path operator view: which deals are live, at what stage, and what
 // the requirements hearing has captured so far (E2E-06 follow-up).
+async function handleDealsIngestAudio(argv: {
+  ingestAudio?: string;
+  audio?: string;
+}): Promise<void> {
+  const bindings = listCustomerChannelBindings();
+  const tenants = Array.from(new Set(bindings.map((binding) => binding.tenantSlug)));
+  const match = tenants
+    .flatMap((tenantSlug) => listDeals(tenantSlug).map((deal) => ({ tenantSlug, deal })))
+    .find((entry) => entry.deal.deal_id === argv.ingestAudio);
+  if (!match) {
+    console.error(`deal not found: ${argv.ingestAudio}`);
+    process.exitCode = 1;
+    return;
+  }
+  if (!argv.audio) {
+    console.error('Usage: pnpm kyberion deals --ingest-audio <deal-id> --audio <path>');
+    process.exitCode = 1;
+    return;
+  }
+  const result = await ingestAudioIntoDealRequirements({
+    tenantSlug: match.tenantSlug,
+    dealId: match.deal.deal_id,
+    audioPath: argv.audio,
+    projectName: match.deal.summary?.slice(0, 80),
+  });
+  if (!result) {
+    console.error(
+      '取り込みに失敗しました(文字起こし不可、または reasoning backend が stub)。ログを確認してください。'
+    );
+    process.exitCode = 1;
+    return;
+  }
+  console.log(`✓ 要件ドラフト更新 (${result.capture.turns_captured} 回目の取り込み)`);
+  if (result.transcript_path) console.log(`  文字起こし: ${result.transcript_path}`);
+  console.log(`  確認: pnpm kyberion deals --requirements ${match.deal.deal_id}`);
+}
+
 function handleDealsSubcommand(argv: { requirements?: string; json?: boolean }): void {
   const bindings = listCustomerChannelBindings();
   const tenants = Array.from(new Set(bindings.map((binding) => binding.tenantSlug)));
@@ -336,6 +378,11 @@ async function main(): Promise<void> {
       type: 'string',
       description: 'deals: show captured requirements for a deal id',
     })
+    .option('ingest-audio', {
+      type: 'string',
+      description: 'deals: transcribe a call recording into the requirements draft',
+    })
+    .option('audio', { type: 'string', description: 'deals: audio file path for --ingest-audio' })
     .parseSync();
 
   const subcommand = String(argv._[0] || '');
@@ -353,6 +400,13 @@ async function main(): Promise<void> {
       );
       return;
     case 'deals':
+      if (argv['ingest-audio']) {
+        await handleDealsIngestAudio({
+          ingestAudio: String(argv['ingest-audio']),
+          audio: argv.audio ? String(argv.audio) : undefined,
+        });
+        return;
+      }
       handleDealsSubcommand(argv as { requirements?: string; json?: boolean });
       return;
     case 'ask':
