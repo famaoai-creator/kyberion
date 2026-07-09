@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import { Crown } from "lucide-react";
+import { useEffect, useState } from 'react';
+import { Crown } from 'lucide-react';
 
 interface IdentityResponse {
   status: string;
@@ -24,7 +24,7 @@ export function IdentityBadge() {
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/identity")
+    fetch('/api/identity')
       .then((r) => r.json())
       .then((j) => {
         if (!cancelled) setData(j);
@@ -40,28 +40,28 @@ export function IdentityBadge() {
   if (error || !data) return null;
   if (!data.onboarded) {
     return (
-      <div className="flex items-center gap-2 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-amber-300/90">
+      <div className="flex items-center gap-2 rounded-lg border border-[color:var(--kb-warning)]/30 bg-amber-400/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-[color:var(--kb-warning)]">
         <Crown size={12} />
         <span>Onboarding required</span>
       </div>
     );
   }
 
-  const name = data.sovereign?.name || "Sovereign";
-  const agentId = data.agent?.agent_id || "agent";
-  const tier = data.agent?.trust_tier || "—";
+  const name = data.sovereign?.name || 'Sovereign';
+  const agentId = data.agent?.agent_id || 'agent';
+  const tier = data.agent?.trust_tier || '—';
 
   return (
     <div
-      className="flex items-center gap-2 rounded-lg border border-cyan-400/30 bg-cyan-400/5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-white/75"
+      className="flex items-center gap-2 rounded-lg border border-[color:var(--kb-accent)]/30 bg-[color:var(--kb-panel-bg)] px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-[color:var(--kb-text-primary)]"
       title={data.vision || undefined}
     >
-      <Crown size={12} className="text-cyan-300" />
-      <span className="text-white/85">{name}</span>
-      <span className="text-white/30">·</span>
-      <span className="text-cyan-300/85">{agentId}</span>
-      <span className="text-white/30">·</span>
-      <span className="text-white/55">{tier}</span>
+      <Crown size={12} className="text-[color:var(--kb-accent)]" />
+      <span className="text-[color:var(--kb-text-primary)]">{name}</span>
+      <span className="text-[color:var(--kb-text-secondary)]">·</span>
+      <span className="text-[color:var(--kb-accent)]">{agentId}</span>
+      <span className="text-[color:var(--kb-text-secondary)]">·</span>
+      <span className="text-[color:var(--kb-text-secondary)]">{tier}</span>
     </div>
   );
 }

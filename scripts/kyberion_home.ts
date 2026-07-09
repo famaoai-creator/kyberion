@@ -41,6 +41,7 @@ const COMMANDS: ReadonlyArray<readonly [string, string]> = [
   ['pnpm app:preflight', 'アプリ開発の前提チェック'],
   ['pnpm doctor', '健全性と次の一手の診断'],
   ['pnpm dashboard', 'ダッシュボード表示'],
+  ['pnpm office [-- --watch 30]', 'バーチャルオフィス(エージェント稼働の可視化)'],
 ] as const;
 
 function printCommands(): void {
