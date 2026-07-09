@@ -5,6 +5,8 @@ import { logger } from './core.js';
 import type { ResolvedCustomerBinding } from './customer-channel-binding.js';
 import type { DealRecord, DealStage } from './deal-store.js';
 import type { ExtractedRequirements } from './reasoning-backend.js';
+import { getReasoningBackend } from './reasoning-backend.js';
+import { getSpeechToTextBridge } from './speech-to-text-bridge.js';
 
 /**
  * Customer conversation modes — the direct-to-customer paths (sales,
@@ -169,6 +171,55 @@ export function saveDealRequirementsCapture(input: {
   safeMkdir(path.dirname(filePath), { recursive: true });
   safeWriteFile(filePath, JSON.stringify(capture, null, 2));
   return capture;
+}
+
+/**
+ * Audio-first elicitation: transcribe a customer call recording on-device
+ * (SpeechToTextBridge — zero-config Apple STT on supported Macs) and fold
+ * the transcript into the deal's structured requirements draft. The path
+ * for 「打ち合わせ録音を渡すだけで要件ドラフトが育つ」.
+ */
+export async function ingestAudioIntoDealRequirements(input: {
+  tenantSlug: string;
+  dealId: string;
+  audioPath: string;
+  language?: string;
+  projectName?: string;
+}): Promise<{ transcript_path?: string; capture: DealRequirementsCapture } | null> {
+  const backend = getReasoningBackend();
+  if (backend.name === 'stub') {
+    logger.warn('[deal-requirements] stub reasoning backend — audio ingestion skipped');
+    return null;
+  }
+  const stt = getSpeechToTextBridge();
+  let transcript;
+  try {
+    transcript = await stt.transcribe({
+      audioPath: input.audioPath,
+      language: input.language || 'ja-JP',
+    });
+  } catch (err) {
+    logger.warn(
+      `[deal-requirements] transcription failed for ${input.audioPath}: ${err instanceof Error ? err.message : String(err)}`
+    );
+    return null;
+  }
+  const previous = readDealRequirementsCapture(input.tenantSlug, input.dealId);
+  const requirements = await backend.extractRequirements({
+    sourceText: transcript.text,
+    projectName: input.projectName,
+    priorDraft: previous?.requirements,
+    language: input.language || 'ja',
+  });
+  const capture = saveDealRequirementsCapture({
+    tenantSlug: input.tenantSlug,
+    dealId: input.dealId,
+    requirements,
+  });
+  return {
+    ...(transcript.written_to ? { transcript_path: transcript.written_to } : {}),
+    capture,
+  };
 }
 
 /** Compact open-question list for the hearing prompt (top blockers first). */
