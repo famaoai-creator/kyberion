@@ -12,6 +12,7 @@ import {
   inspectMeshHub,
 } from '@agent/core';
 import { buildNextAction, formatNextAction } from '@agent/core';
+import { probeAppleIntelligence } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { summarizeBackupStatus } from './backup.js';
 import { formatDoctorSummary, summarizeManifestDoctor } from './environment-doctor.js';
@@ -43,6 +44,7 @@ export interface DoctorRunReport {
   governanceLines: string[];
   backupLines: string[];
   meshDeliveryLines: string[];
+  localCapabilityLines: string[];
 }
 
 export function collectPipelineScheduleDoctorLines(): string[] {
@@ -231,7 +233,31 @@ export async function collectDoctorReport(argv: {
     governanceLines,
     backupLines: collectBackupDoctorLines(),
     meshDeliveryLines: await collectMeshDeliveryDoctorLines(),
+    localCapabilityLines: await collectLocalCapabilityDoctorLines(),
   };
+}
+
+/**
+ * On-device capability visibility: what runs locally on THIS machine with
+ * zero configuration (Apple Intelligence lanes). Purely informational —
+ * absence is normal on non-Apple hosts and never counts as missing.
+ */
+async function collectLocalCapabilityDoctorLines(): Promise<string[]> {
+  try {
+    const availability = await probeAppleIntelligence();
+    if (!availability.available) {
+      return [
+        `Apple Intelligence: unavailable (${availability.reason || 'unknown'}) — cloud/configured backends handle all lanes`,
+      ];
+    }
+    return [
+      'Apple Intelligence: AVAILABLE — local lanes: text assist (classify/summarize), vision OCR, speech-to-text (zero-config bridge). Demo: pnpm check:apple-fm',
+    ];
+  } catch (err) {
+    return [
+      `Apple Intelligence: probe failed (${err instanceof Error ? err.message : String(err)})`,
+    ];
+  }
 }
 
 async function main(): Promise<void> {
@@ -263,6 +289,9 @@ async function main(): Promise<void> {
     console.log(line);
   }
   for (const line of report.backupLines) {
+    console.log(line);
+  }
+  for (const line of report.localCapabilityLines) {
     console.log(line);
   }
   for (const line of report.meshDeliveryLines) {
