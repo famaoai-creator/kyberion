@@ -1625,6 +1625,9 @@ export async function GET(req: NextRequest) {
   try {
     const denied = guardRequest(req);
     if (denied) return denied;
+    const accessDenied = requireChronosAccess(req, 'readonly');
+    if (accessDenied) return accessDenied;
+    const accessRole = getChronosAccessRoleOrThrow(req);
     const runtimeSupervisorClient = await import('@agent/core/agent-runtime-supervisor-client');
     const runtime = listAgentRuntimeSnapshots();
     const rawActiveMissions = collectActiveMissions();
