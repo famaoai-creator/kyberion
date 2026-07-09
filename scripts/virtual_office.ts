@@ -870,9 +870,11 @@ async function main(): Promise<void> {
   if (watchSeconds) {
     console.log(`[virtual-office] watching — regenerating every ${watchSeconds}s (Ctrl-C to stop)`);
     setInterval(() => {
-      void generateOnce(String(argv.out), watchSeconds).catch((error) =>
-        console.error(`[virtual-office] regeneration failed: ${error}`)
-      );
+      void generateOnce(String(argv.out), watchSeconds)
+        .then((writtenPath) => {
+          console.log(`[virtual-office] refreshed ${writtenPath} @ ${new Date().toISOString()}`);
+        })
+        .catch((error) => console.error(`[virtual-office] regeneration failed: ${error}`));
     }, watchSeconds * 1000);
   }
 }
