@@ -14,6 +14,7 @@ const allowedCoreFsImports = [
   'libs/core/operator-home-summary.test.ts',
   'libs/core/operator-notifications.test.ts',
   'libs/core/mission-retrospective.test.ts',
+  'libs/core/mission-hygiene.test.ts',
   'libs/core/src/pipeline-scheduler.test.ts',
   'libs/core/environment-capability.test.ts',
   'libs/core/evidence-chain.test.ts',
