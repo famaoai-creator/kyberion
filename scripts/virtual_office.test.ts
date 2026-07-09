@@ -18,11 +18,9 @@ describe('virtual office surface', () => {
     fs.cpSync(repoSchemas, path.join(tmpRoot, 'schemas'), { recursive: true });
     fs.mkdirSync(path.join(tmpRoot, 'knowledge', 'product'), { recursive: true });
     fs.cpSync(
-      path.join(process.cwd(), 'knowledge', 'product', 'schemas'),
+      fileURLToPath(new URL('../knowledge/product/schemas', import.meta.url)),
       path.join(tmpRoot, 'knowledge', 'product', 'schemas'),
-      {
-        recursive: true,
-      }
+      { recursive: true }
     );
     process.env.KYBERION_ROOT = tmpRoot;
 
