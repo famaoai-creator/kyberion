@@ -214,3 +214,11 @@ E2E-04 Task 2 の `notifyOperator` 実装(2026-07-07)に伴い、顧客エスカ
 - 全モード共通の会話原則(復唱→回答、next step を毎回1つ、質問は1ターン1問、未回答放置禁止)。
 - オペレーター確認: `pnpm kyberion deals` / `--requirements <deal-id>`。
 - 修正: deals ディレクトリの不正 JSON が `getActiveDealForChannel` を落とすバグ(capture ファイル同居で顕在化)→ サブディレクトリ方式+防御で解消。
+
+## 追記(2026-07-10)— 要件の deal 境界越え
+
+`handoffWonDealToSdlc` が deal の要件キャプチャ(会話ターン/音声取り込みで蓄積)を
+ミッションの `requirements-draft-store` へ自動昇格するようになった
+(`elicitation_source.refs = deal:<id>`、戻り値に `requirements_draft_version`)。
+これで 音声→要件ドラフト→受注→SDLC ミッション の全区間で要件が構造のまま流れ、
+既存の completeness / signoff ゲートにそのまま接続される。
