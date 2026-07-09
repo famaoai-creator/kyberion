@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { randomUUID } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 let tmpRoot: string;
@@ -13,9 +14,8 @@ describe('virtual office surface', () => {
     fs.mkdirSync(tmpRoot, { recursive: true });
     fs.writeFileSync(path.join(tmpRoot, 'package.json'), '{}');
     // the @agent/core barrel eagerly compiles schemas at import time
-    fs.cpSync(path.join(process.cwd(), 'schemas'), path.join(tmpRoot, 'schemas'), {
-      recursive: true,
-    });
+    const repoSchemas = fileURLToPath(new URL('../schemas', import.meta.url));
+    fs.cpSync(repoSchemas, path.join(tmpRoot, 'schemas'), { recursive: true });
     fs.mkdirSync(path.join(tmpRoot, 'knowledge', 'product'), { recursive: true });
     fs.cpSync(
       path.join(process.cwd(), 'knowledge', 'product', 'schemas'),
