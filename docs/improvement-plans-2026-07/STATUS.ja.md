@@ -8,8 +8,8 @@
 
 | 判定    | 件数 |
 | ------- | ---- |
-| DONE    | 41   |
-| PARTIAL | 50   |
+| DONE    | 42   |
+| PARTIAL | 49   |
 | TODO    | 0    |
 
 ## P0 残作業(プロダクション化のクリティカルパス)
@@ -38,7 +38,7 @@
 | IP-01 | DONE    |                                                                                                                                                                                                                |
 | IP-02 | DONE    |                                                                                                                                                                                                                |
 | IP-03 | DONE    |                                                                                                                                                                                                                |
-| IP-04 | PARTIAL | schemas/ 直下 \*-pipeline.schema.json 11本の二重定義整理                                                                                                                                                       |
+| IP-04 | DONE    | 2026-07-12 完了: 再監査で「参照ゼロ6本」は陳腐化(大半は manifest の contract_schema 正規参照)。真の未参照2本(ingestion/super-nerve)のみ削除、契約チェック緑。同名別契約の browser-pipeline は二重定義に非ず    |
 | IP-05 | DONE    |                                                                                                                                                                                                                |
 | IP-06 | DONE    |                                                                                                                                                                                                                |
 | IP-07 | PARTIAL | 2026-07-11 突合: backend/orchestrator/operator-learning のテストは実在し緑。残: 受入条件全体との網羅精査                                                                                                       |
