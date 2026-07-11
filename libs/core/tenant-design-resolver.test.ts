@@ -119,3 +119,61 @@ describe('tenant-design-resolver', () => {
     expect(result.logoPath).toBeNull();
   });
 });
+
+// DS-02 acceptance 4: tier isolation — confidential branding must never
+// resolve without an explicit tenant context, and non-matching contexts
+// must not fall through to another tenant's confidential values.
+describe('tenant-design-resolver tier isolation (DS-02)', () => {
+  const rootDir = pathResolver.shared('tmp/tenant-design-isolation-fixture');
+
+  const seedConfidentialTenant = () => {
+    const designDir = path.join(rootDir, 'knowledge/confidential/secret-corp/design');
+    safeMkdir(designDir, { recursive: true });
+    safeWriteFile(
+      path.join(designDir, 'tenant-override.json'),
+      JSON.stringify({
+        tenant_id: 'secret-corp',
+        brand_name: 'Secret Corp',
+        matchers: ['secret corp'],
+        design_system_id: 'secret-corp',
+        branding: { brand_name: 'Secret Corp' },
+      })
+    );
+    safeWriteFile(
+      path.join(designDir, 'theme.json'),
+      JSON.stringify({
+        brand_name: 'Secret Corp',
+        theme: { name: 'secret', colors: { primary: '#c0ffee' } },
+      })
+    );
+  };
+
+  afterEach(() => {
+    safeRmSync(rootDir, { recursive: true, force: true });
+  });
+
+  it('returns default (no confidential values) when no tenant context is given', () => {
+    seedConfidentialTenant();
+    const resolution = resolveTenantDesign({ rootDir });
+    expect(resolution.source).toBe('default');
+    expect(resolution.tenantOverride).toBeNull();
+    expect(resolution.themePack).toBeNull();
+    expect(JSON.stringify(resolution)).not.toContain('Secret Corp');
+    expect(JSON.stringify(resolution)).not.toContain('#c0ffee');
+  });
+
+  it('does not leak one tenant into a different tenant context', () => {
+    seedConfidentialTenant();
+    const resolution = resolveTenantDesign({ rootDir, brandName: 'Some Other Brand' });
+    expect(resolution.source).toBe('default');
+    expect(JSON.stringify(resolution)).not.toContain('Secret Corp');
+  });
+
+  it('serves confidential branding only inside the matching tenant context', () => {
+    seedConfidentialTenant();
+    const resolution = resolveTenantDesign({ rootDir, brandName: 'Secret Corp' });
+    expect(resolution.source).toBe('tenant');
+    expect(resolution.tokens.brand_name).toBe('Secret Corp');
+    expect(resolution.tokens.theme_primary).toBe('#c0ffee');
+  });
+});
