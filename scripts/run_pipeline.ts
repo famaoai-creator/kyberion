@@ -1,5 +1,6 @@
 import {
   attemptAutonomousRepair,
+  recordGovernanceAction,
   handleStepError,
   TraceContext,
   finalizeAndPersist,
@@ -438,6 +439,13 @@ async function loadActuatorDispatch(domain: string): Promise<DispatchFunc> {
     await import('@agent/core/provider-bridge');
 
   dispatchCache[domain] = async (op, params, ctx, type, trace?) => {
+    // SA-05 Task 1: actuator dispatch feeds kill-switch anomaly tracking.
+    recordGovernanceAction(
+      process.env.KYBERION_PERSONA || 'unknown',
+      'actuator_dispatch',
+      `${domain}:${op}`,
+      false
+    );
     const resolvedId = resolveProviderCapabilityId(domain, op);
     if (resolvedId) {
       const result = await invokeProviderCapability({
