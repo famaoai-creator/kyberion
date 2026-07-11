@@ -1285,6 +1285,14 @@
       "documented": false
     },
     {
+      "name": "KYBERION_PHASE_GATE_MODE",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_PIPELINE_FALLBACK_ACTIVE",
       "category": "runtime",
       "type": "string",
