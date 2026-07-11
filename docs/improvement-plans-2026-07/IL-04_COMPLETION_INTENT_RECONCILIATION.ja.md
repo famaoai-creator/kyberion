@@ -78,3 +78,8 @@
 - テスト: `mission-lifecycle.test.ts`(gap タスク投入→active 復帰、上限超過→validating+repair タスク)、`code-change-pr-collaboration.test.ts`(プロンプトへの goal 注入)。
 
 これで「依頼受領 → 解釈された goal(IL-01)→ 実行(E2E-03 協調)→ 完了突合(IL-04)→ **未達なら gap を自動で作業に還流** → 充足で完了 or 上限で operator」のループが閉じた。
+
+## 実装状況 追記 (2026-07-12)
+
+**再突合: 受入条件5点すべて実装・テスト済みを確認 — IL-04 は DONE。**
+突合エンジン(intent-reconciliation.ts + テスト)/ 完了ゲート(task-session 保存時 + mission finish)/ クロージング提示(mission finish サマリ・task_session・direct_reply の全 shape、buildCompletionNextAction / buildDirectReplyCompletionAction)/ 学習記録(completion_summary → recordIntentContractOutcome → intent-contract-memory)。関連テスト 21 本緑。
