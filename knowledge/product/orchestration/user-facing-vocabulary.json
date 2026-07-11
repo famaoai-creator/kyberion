@@ -642,6 +642,62 @@
       "cli_detail": {
         "en": "detail",
         "ja": "詳細"
+      },
+      "chronos_chat_cancel": {
+        "en": "Cancel",
+        "ja": "キャンセル"
+      },
+      "chronos_chat_cancelled": {
+        "en": "Request cancelled.",
+        "ja": "リクエストをキャンセルしました。"
+      },
+      "chronos_chat_phase_sending": {
+        "en": "Sending request…",
+        "ja": "リクエスト送信中…"
+      },
+      "chronos_chat_phase_thinking": {
+        "en": "Sovereign is thinking…",
+        "ja": "Sovereign が考えています…"
+      },
+      "chronos_chat_phase_long_running": {
+        "en": "Still working — long tasks can take a while.",
+        "ja": "処理を継続中です — 時間がかかる場合があります。"
+      },
+      "chronos_chat_guided_prompts": {
+        "en": "Guided prompts",
+        "ja": "ガイド付きプロンプト"
+      },
+      "chronos_chat_prompt_health_label": {
+        "en": "Health",
+        "ja": "健全性"
+      },
+      "chronos_chat_prompt_health_query": {
+        "en": "Summarize system health and current blockers.",
+        "ja": "システムの健全性と現在のブロッカーを要約してください。"
+      },
+      "chronos_chat_prompt_missions_label": {
+        "en": "Missions",
+        "ja": "ミッション"
+      },
+      "chronos_chat_prompt_missions_query": {
+        "en": "List the active missions and what needs attention.",
+        "ja": "アクティブなミッションと要注意点を一覧にしてください。"
+      },
+      "chronos_chat_prompt_traces_label": {
+        "en": "Traces",
+        "ja": "トレース"
+      },
+      "chronos_chat_prompt_traces_query": {
+        "en": "Show the latest trace issues and what failed.",
+        "ja": "最新のトレースの問題と失敗箇所を見せてください。"
+      },
+      "chronos_chat_prompt_next_step_label": {
+        "en": "Next step",
+        "ja": "次の一手"
+      },
+      "chronos_chat_prompt_next_step_query": {
+        "en": "What should I do next to unblock delivery?",
+        "ja": "デリバリーを前に進めるために次に何をすべきですか?"
       }
     }
   }
