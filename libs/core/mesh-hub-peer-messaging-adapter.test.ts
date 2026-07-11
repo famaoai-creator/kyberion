@@ -9,7 +9,12 @@ import {
   buildPeerMessageEnvelope,
 } from './peer-messaging.js';
 import { pathResolver, safeReadFile, safeRmSync } from './index.js';
-import { clearMeshHubPeerMessagingAdapterNamespace, createMeshHubPeerMessagingAdapter } from './mesh-hub-peer-messaging-adapter.js';
+import {
+  clearMeshHubPeerMessagingAdapterNamespace,
+  createMeshHubPeerMessagingAdapter,
+  decideMeshHubRecipientProposal,
+  listMeshHubRecipientProposals,
+} from './mesh-hub-peer-messaging-adapter.js';
 import type { MeshRequest } from './mesh-hub-contract.js';
 
 const ROOT = pathResolver.rootDir();
@@ -19,7 +24,7 @@ const TEST_RUNTIME_ROOT_ABS = path.join(ROOT, TEST_RUNTIME_ROOT);
 function buildRequest(
   requestId: string,
   requestKind: MeshRequest['request_kind'],
-  selector: MeshRequest['target']['selector'],
+  selector: MeshRequest['target']['selector']
 ): MeshRequest {
   return {
     kind: 'mesh-request',
@@ -51,7 +56,10 @@ function buildRequest(
 describe('mesh-hub-peer-messaging-adapter', () => {
   beforeEach(() => {
     process.env.KYBERION_MESH_HUB_RUNTIME_ROOT = TEST_RUNTIME_ROOT;
-    process.env.KYBERION_MESH_HUB_OBSERVABILITY_ROOT = TEST_RUNTIME_ROOT.replace('runtime', 'observability');
+    process.env.KYBERION_MESH_HUB_OBSERVABILITY_ROOT = TEST_RUNTIME_ROOT.replace(
+      'runtime',
+      'observability'
+    );
     safeRmSync(TEST_RUNTIME_ROOT_ABS, { recursive: true, force: true });
     clearMeshHubPeerMessagingAdapterNamespace();
     clearPeerRuntime('peer-recipient');
@@ -99,14 +107,10 @@ describe('mesh-hub-peer-messaging-adapter', () => {
         shared_secret: 'recipient-secret',
         allow_local_network: true,
       },
-      request: buildRequest(
-        'meshreq-review',
-        'review.request',
-        {
-          kind: 'peer',
-          peer_id: 'peer-recipient',
-        },
-      ),
+      request: buildRequest('meshreq-review', 'review.request', {
+        kind: 'peer',
+        peer_id: 'peer-recipient',
+      }),
     });
 
     expect(receipt.ok).toBe(true);
@@ -138,14 +142,10 @@ describe('mesh-hub-peer-messaging-adapter', () => {
       recipientPeerId: 'peer-recipient',
       subject: 'mesh.review.request',
       type: 'request',
-      payload: buildRequest(
-        'meshreq-review',
-        'review.request',
-        {
-          kind: 'peer',
-          peer_id: 'peer-recipient',
-        },
-      ),
+      payload: buildRequest('meshreq-review', 'review.request', {
+        kind: 'peer',
+        peer_id: 'peer-recipient',
+      }),
       sharedSecret: 'recipient-secret',
       conversationId: 'corr-meshreq-review',
       correlationId: 'corr-meshreq-review',
@@ -170,7 +170,14 @@ describe('mesh-hub-peer-messaging-adapter', () => {
     const inbox = listPeerInboxRecords('peer-recipient');
     expect(inbox).toHaveLength(1);
 
-    const proposalsPath = path.join(ROOT, TEST_RUNTIME_ROOT, 'mesh-hub-adapter-tests', 'adapters', 'peer-recipient', 'proposals.jsonl');
+    const proposalsPath = path.join(
+      ROOT,
+      TEST_RUNTIME_ROOT,
+      'mesh-hub-adapter-tests',
+      'adapters',
+      'peer-recipient',
+      'proposals.jsonl'
+    );
     const proposals = String(safeReadFile(proposalsPath, { encoding: 'utf8' }) || '')
       .split(/\r?\n/u)
       .map((line) => line.trim())
@@ -201,14 +208,10 @@ describe('mesh-hub-peer-messaging-adapter', () => {
       recipientPeerId: 'peer-recipient',
       subject: 'mesh.workitem.claim',
       type: 'request',
-      payload: buildRequest(
-        'meshreq-workitem',
-        'workitem.claim',
-        {
-          kind: 'peer',
-          peer_id: 'peer-recipient',
-        },
-      ),
+      payload: buildRequest('meshreq-workitem', 'workitem.claim', {
+        kind: 'peer',
+        peer_id: 'peer-recipient',
+      }),
       sharedSecret: 'recipient-secret',
       conversationId: 'corr-meshreq-workitem',
       correlationId: 'corr-meshreq-workitem',
@@ -230,5 +233,78 @@ describe('mesh-hub-peer-messaging-adapter', () => {
       },
     });
     expect(JSON.stringify(result.body)).not.toContain('dist/scripts/mission_controller.js');
+  });
+
+  it('creates a pending conversation proposal and records exactly one local acceptance decision', async () => {
+    const namespace = 'mesh-hub-adapter-tests';
+    const adapter = createMeshHubPeerMessagingAdapter({
+      peerId: 'peer-recipient',
+      sharedSecret: 'recipient-secret',
+      namespace,
+    });
+    const request = buildRequest('meshreq-conversation-handoff', 'workitem.handoff', {
+      kind: 'peer',
+      peer_id: 'peer-recipient',
+    });
+    request.created_at = new Date().toISOString();
+
+    const proposal = adapter.proposeLocalRequest(request, 'peer-message-conversation-1');
+    const duplicate = adapter.proposeLocalRequest(request, 'peer-message-conversation-retry');
+    expect(duplicate.proposal_id).toBe(proposal.proposal_id);
+    expect(listMeshHubRecipientProposals('peer-recipient', { namespace })).toMatchObject([
+      {
+        proposal_id: proposal.proposal_id,
+        request_id: request.request_id,
+        status: 'pending',
+        mission_controller_mutation: 'deny',
+      },
+    ]);
+
+    const decision = await decideMeshHubRecipientProposal({
+      peerId: 'peer-recipient',
+      proposalId: proposal.proposal_id,
+      decision: 'accepted',
+      actorId: 'operator-local',
+      reason: 'Validated same-host collaboration handoff',
+      namespace,
+    });
+    expect(decision).toMatchObject({
+      proposal_id: proposal.proposal_id,
+      decision: 'accepted',
+      actor_id: 'operator-local',
+    });
+    expect(listMeshHubRecipientProposals('peer-recipient', { namespace })).toMatchObject([
+      { proposal_id: proposal.proposal_id, status: 'accepted' },
+    ]);
+    await expect(
+      decideMeshHubRecipientProposal({
+        peerId: 'peer-recipient',
+        proposalId: proposal.proposal_id,
+        decision: 'rejected',
+        actorId: 'operator-local',
+        reason: 'A second decision must not overwrite the first',
+        namespace,
+      })
+    ).rejects.toThrow(/proposal_already_decided/);
+  });
+
+  it('rejects expired local collaboration requests before proposal persistence', () => {
+    const namespace = 'mesh-hub-adapter-tests';
+    const adapter = createMeshHubPeerMessagingAdapter({
+      peerId: 'peer-recipient',
+      sharedSecret: 'recipient-secret',
+      namespace,
+    });
+    const request = buildRequest('meshreq-expired-conversation', 'review.request', {
+      kind: 'peer',
+      peer_id: 'peer-recipient',
+    });
+    request.created_at = '2020-01-01T00:00:00.000Z';
+    request.ttl_ms = 1;
+
+    expect(() => adapter.proposeLocalRequest(request, 'peer-message-expired')).toThrow(
+      /mesh_hub_request_expired/
+    );
+    expect(listMeshHubRecipientProposals('peer-recipient', { namespace })).toHaveLength(0);
   });
 });
