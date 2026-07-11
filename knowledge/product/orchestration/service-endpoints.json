@@ -5,6 +5,10 @@
       "base_url": "https://ce.us-east-1.amazonaws.com",
       "preset_path": "knowledge/product/orchestration/service-presets/aws-ce.json"
     },
+    "asana": {
+      "base_url": "https://app.asana.com/api/1.0",
+      "preset_path": "knowledge/product/orchestration/service-presets/asana.json"
+    },
     "backlog": {
       "base_url": "https://{{space}}.backlog.com/api/v2",
       "preset_path": "knowledge/product/orchestration/service-presets/backlog.json",
@@ -19,6 +23,10 @@
       "base_url": "https://api.canva.com/rest/v1",
       "preset_path": "knowledge/product/orchestration/service-presets/canva.json"
     },
+    "cloudflare": {
+      "base_url": "https://api.cloudflare.com/client/v4",
+      "preset_path": "knowledge/product/orchestration/service-presets/cloudflare.json"
+    },
     "comfyui": {
       "preset_path": "knowledge/product/orchestration/service-presets/comfyui.json"
     },
@@ -29,6 +37,10 @@
     "discord": {
       "base_url": "https://discord.com/api/v10",
       "preset_path": "knowledge/product/orchestration/service-presets/discord.json"
+    },
+    "figma": {
+      "base_url": "https://api.figma.com/v1",
+      "preset_path": "knowledge/product/orchestration/service-presets/figma.json"
     },
     "github": {
       "base_url": "https://api.github.com",
@@ -98,6 +110,10 @@
     },
     "sqlite": {
       "preset_path": "knowledge/product/orchestration/service-presets/sqlite.json"
+    },
+    "stripe": {
+      "base_url": "https://api.stripe.com/v1",
+      "preset_path": "knowledge/product/orchestration/service-presets/stripe.json"
     },
     "telegram": {
       "base_url": "https://api.telegram.org",
