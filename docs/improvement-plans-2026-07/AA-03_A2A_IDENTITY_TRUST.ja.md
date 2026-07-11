@@ -61,3 +61,11 @@
 - peer inbox/outbox GET に `HMAC-SHA256(sharedSecret, method + path)` の request signature を必須化し、比較を `timingSafeEqual` に統一した。
 - POST body は `Content-Length` と実受信量の両方で1 MiBを上限とし、超過時は内部エラーでなく `413 request_body_too_large` を返す。
 - unauthenticated health response は `{ ok: true }` のみに縮小した。鍵ローテーション・失効は本計画の残作業として維持する。
+
+## 実装状況 追記 (2026-07-12)
+
+- **Task 1 完了**: `libs/core/a2a-envelope-signature.ts` 新設 — 鍵解決順 env → `active/shared/runtime/agent-supervisor/a2a-secret`(初回生成・0600 永続化)→ プロセスローカル(永続化失敗時のみ、警告付き)。**プロセス毎使い捨て乱数は廃止**され、ホスト内全プロセスが同一鍵で署名/検証可能に。`sig_alg: 'hmac-sha256'` を envelope に付与(E4 の ed25519 が並置できる形)。a2a-bridge は薄い委譲に。
+- **Task 2 完了(warn 段階)**: `KYBERION_A2A_SIGNATURE=warn|enforce`(既定 warn)。無署名メッセージは audit chain に `a2a_signature_missing` を記録(enforce では拒否)。未知送信者(registry/manifest 不在、kyberion: 名前空間外)は `a2a_unknown_sender` を記録(enforce では拒否)。**署名不正は従来どおり常に拒否**。enforce 切替は audit chain の観測(無署名/未知送信者ゼロ確認)後に単独コミットで実施。
+- **Task 3**: trust 尺度ハードコードは解消済みを確認(`resolveAgentTrustScore` 参照化済み)。
+- **Task 4 完了**: `docs/developer/A2A_SIGNING.md`(鍵の場所・ローテーション・enforce 手順・same-host 限界の明記)。
+- テスト: 署名モジュール5本(クロスプロセス相当・鍵不一致・改竄・欠落/不正形式・mode 既定)+ bridge 既存13本緑。
