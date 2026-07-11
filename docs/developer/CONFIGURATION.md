@@ -96,20 +96,21 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_VOICE_RUNTIME_POLICY_PATH`                             | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_VOICE_SAMPLE_INGESTION_POLICY_PATH`                    | path | no       | _undocumented_                                                                                                                |
 
-## flag (10)
+## flag (11)
 
-| Variable                                           | Type    | Required | Description                                                                                                 |
-| -------------------------------------------------- | ------- | -------- | ----------------------------------------------------------------------------------------------------------- |
-| `KYBERION_ALLOW_FILE_SECRETS`                      | boolean | no       | Acknowledge the plaintext file-secret fallback when the OS keychain is unavailable (warn-phase; see AC-05). |
-| `KYBERION_ALLOW_LOCAL_NETWORK`                     | boolean | no       | _undocumented_                                                                                              |
-| `KYBERION_ALLOW_TEST_NOTIFICATIONS`                | boolean | no       | _undocumented_                                                                                              |
-| `KYBERION_ALLOW_UNAUTH_REMOTE`                     | boolean | no       | _undocumented_                                                                                              |
-| `KYBERION_ALLOW_UNSAFE_CLI`                        | boolean | no       | _undocumented_                                                                                              |
-| `KYBERION_ALLOW_UNSAFE_JS`                         | boolean | no       | _undocumented_                                                                                              |
-| `KYBERION_ALLOW_UNSAFE_SHELL`                      | boolean | no       | _undocumented_                                                                                              |
-| `KYBERION_DISABLE_AGENT_RUNTIME_SUPERVISOR_DAEMON` | boolean | no       | _undocumented_                                                                                              |
-| `KYBERION_DISABLE_EMBEDDINGS`                      | boolean | no       | _undocumented_                                                                                              |
-| `KYBERION_ENABLE_SERVICE_ACTUATE_TOOL`             | boolean | no       | _undocumented_                                                                                              |
+| Variable                                           | Type                   | Required | Description                                                                                                                                                                                                                   |
+| -------------------------------------------------- | ---------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `KYBERION_ALLOW_FILE_SECRETS`                      | boolean                | no       | Acknowledge the plaintext file-secret fallback when the OS keychain is unavailable (warn-phase; see AC-05).                                                                                                                   |
+| `KYBERION_ALLOW_LOCAL_NETWORK`                     | boolean                | no       | _undocumented_                                                                                                                                                                                                                |
+| `KYBERION_ALLOW_TEST_NOTIFICATIONS`                | boolean                | no       | _undocumented_                                                                                                                                                                                                                |
+| `KYBERION_ALLOW_UNAUTH_REMOTE`                     | boolean                | no       | _undocumented_                                                                                                                                                                                                                |
+| `KYBERION_ALLOW_UNSAFE_CLI`                        | boolean                | no       | _undocumented_                                                                                                                                                                                                                |
+| `KYBERION_ALLOW_UNSAFE_JS`                         | boolean                | no       | _undocumented_                                                                                                                                                                                                                |
+| `KYBERION_ALLOW_UNSAFE_SHELL`                      | boolean                | no       | _undocumented_                                                                                                                                                                                                                |
+| `KYBERION_DISABLE_AGENT_RUNTIME_SUPERVISOR_DAEMON` | boolean                | no       | _undocumented_                                                                                                                                                                                                                |
+| `KYBERION_DISABLE_EMBEDDINGS`                      | boolean                | no       | _undocumented_                                                                                                                                                                                                                |
+| `KYBERION_ENABLE_SERVICE_ACTUATE_TOOL`             | boolean                | no       | _undocumented_                                                                                                                                                                                                                |
+| `KYBERION_SECRET_ENCRYPTION`                       | enum: none \| keychain | no       | At-rest encryption mode for connection documents (AC-05). none=plaintext (default, compatible); keychain=AES-256-GCM with a macOS-keychain-held key. Migrate with pnpm secrets:encrypt (--decrypt exports back to plaintext). |
 
 ## tuning (27)
 
