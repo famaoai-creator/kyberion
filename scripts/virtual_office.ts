@@ -20,14 +20,18 @@
 import * as path from 'node:path';
 import {
   createStandardYargs,
+  customerResolver,
   listApprovalRequests,
   listCustomerChannelBindings,
   listDeals,
   listInboxEntries,
   listProcessImprovementProposals,
   listAgentRuntimeSnapshots,
+  loadOrganizationProfile,
   listTaskSessions,
   loadAgentProfileIndex,
+  resolveOrganizationOrgChart,
+  summarizeOrganizationOrgChart,
   pathResolver,
   safeExistsSync,
   safeReaddir,
@@ -55,6 +59,29 @@ interface OfficeRoom {
 
 interface OfficeSnapshot {
   generated_at: string;
+  tenant_slug: string | null;
+  organization: {
+    organization_id: string;
+    name: string;
+    default_team_template?: string;
+    team_template_catalog_id?: string;
+  } | null;
+  organization_chart: {
+    organization_id: string;
+    name: string;
+    source_kind: string;
+    domain_count: number;
+    position_count: number;
+    top_level_roles: string[];
+    domains: Array<{ domain_id: string; name: string; role_ids: string[] }>;
+    positions: Array<{
+      role_id: string;
+      reports_to: string | null;
+      held_by: string;
+      responsibility_scope: string;
+      authority_role_ref: string | null;
+    }>;
+  } | null;
   rooms: OfficeRoom[];
   archived_recent: string[];
   agents: Array<{
@@ -232,15 +259,49 @@ function summarizeRuntimePrompt(snapshot: {
   return trimText(latest, 72);
 }
 
+function normalizeTenantSlug(value: string | null | undefined): string | null {
+  const slug = String(value || '')
+    .trim()
+    .toLowerCase();
+  return slug || null;
+}
+
+function missionTenantSlug(state: {
+  tenant_slug?: string;
+  tenant_id?: string;
+  tier?: string;
+}): string | null {
+  return normalizeTenantSlug(state.tenant_slug || state.tenant_id || null);
+}
+
+function missionMatchesTenant(
+  state: { tenant_slug?: string; tenant_id?: string; tier?: string },
+  tenantSlug: string | null
+): boolean {
+  if (!tenantSlug) return true;
+  const missionTenant = missionTenantSlug(state);
+  if (!missionTenant) return true;
+  return missionTenant === tenantSlug;
+}
+
 export function collectOfficeSnapshot(): OfficeSnapshot {
+  const tenantSlug = customerResolver.activeCustomer();
+  const organizationProfile = loadOrganizationProfile();
+  const organizationChartData = resolveOrganizationOrgChart(tenantSlug, pathResolver.rootDir());
+  const organizationChart = summarizeOrganizationOrgChart(organizationChartData);
   const rooms: OfficeRoom[] = [];
   const archivedRecent: Array<{ id: string; mtime: number }> = [];
 
   for (const { missionPath, tier } of listMissionDirs()) {
-    const state = readJson<{ mission_id?: string; status?: string; mission_type?: string }>(
-      path.join(missionPath, 'mission-state.json')
-    );
+    const state = readJson<{
+      mission_id?: string;
+      status?: string;
+      mission_type?: string;
+      tenant_slug?: string;
+      tenant_id?: string;
+    }>(path.join(missionPath, 'mission-state.json'));
     if (!state?.mission_id) continue;
+    if (!missionMatchesTenant({ ...state, tier }, tenantSlug)) continue;
     const status = String(state.status || 'unknown');
     if (['archived', 'completed', 'closed'].includes(status)) {
       archivedRecent.push({ id: state.mission_id, mtime: 0 });
@@ -277,6 +338,14 @@ export function collectOfficeSnapshot(): OfficeSnapshot {
   const taskSessions = listTaskSessions();
   const activeSessions = taskSessions
     .filter((session) => SESSION_ACTIVE_STATUSES.has(session.status))
+    .filter((session) => {
+      if (!tenantSlug) return true;
+      const sessionTenant = missionTenantSlug({
+        tenant_slug: (session.payload?.tenant_slug as string | undefined) || undefined,
+        tenant_id: (session.payload?.tenant_id as string | undefined) || undefined,
+      });
+      return !sessionTenant || sessionTenant === tenantSlug;
+    })
     .slice(0, 24)
     .map((session) => summarizeSession(session));
   const sessionByAgent = new Map<string, ReturnType<typeof summarizeSession>>();
@@ -373,7 +442,9 @@ export function collectOfficeSnapshot(): OfficeSnapshot {
     .slice(0, 10);
 
   // customer front desk
-  const tenants = Array.from(new Set(listCustomerChannelBindings().map((b) => b.tenantSlug)));
+  const tenants = tenantSlug
+    ? [tenantSlug]
+    : Array.from(new Set(listCustomerChannelBindings().map((b) => b.tenantSlug)));
   const deals = tenants
     .flatMap((tenant) =>
       listDeals(tenant).map((deal) => ({
@@ -386,9 +457,10 @@ export function collectOfficeSnapshot(): OfficeSnapshot {
     .slice(0, 12);
 
   // mail room
-  const inboxUnread = listInboxEntries({ limit: 100 }).filter(
-    (entry) => entry.status === 'unread'
-  ).length;
+  const inboxUnread = listInboxEntries({
+    limit: 100,
+    ...(tenantSlug ? { tenant: tenantSlug } : {}),
+  }).filter((entry) => entry.status === 'unread').length;
   const approvalsPending = listApprovalRequests({ status: 'pending' }).length;
 
   // bulletin board
@@ -430,6 +502,29 @@ export function collectOfficeSnapshot(): OfficeSnapshot {
 
   return {
     generated_at: new Date().toISOString(),
+    tenant_slug: tenantSlug,
+    organization: organizationProfile
+      ? {
+          organization_id: organizationProfile.organization_id,
+          name: organizationProfile.name,
+          default_team_template:
+            organizationProfile.mission_defaults?.default_team_template ||
+            organizationProfile.team_defaults?.default_team_template,
+          team_template_catalog_id: organizationProfile.team_defaults?.team_template_catalog_id,
+        }
+      : null,
+    organization_chart: organizationChart
+      ? {
+          organization_id: organizationChart.organization_id,
+          name: organizationChart.name,
+          source_kind: organizationChart.source_kind,
+          domain_count: organizationChart.domain_count,
+          position_count: organizationChart.position_count,
+          top_level_roles: organizationChart.top_level_roles,
+          domains: organizationChartData.domains,
+          positions: organizationChartData.positions,
+        }
+      : null,
     rooms: rooms.sort((a, b) => b.tasks.length - a.tasks.length),
     archived_recent: archivedRecent.slice(-6).map((entry) => entry.id),
     agents: agents.sort((a, b) => b.open_tasks - a.open_tasks),
@@ -683,6 +778,52 @@ export function renderOfficeHtml(data: OfficeSnapshot, refreshSeconds?: number):
 
   const workingCount = data.agents.filter((a) => a.state === 'working').length;
   const blockedCount = data.agents.filter((a) => a.state === 'blocked').length;
+  const orgChartHtml = data.organization_chart
+    ? `<div class="org-card">
+        <div class="org-head">
+          <strong>${esc(data.organization_chart.name)}</strong>
+          <span class="pill">${esc(data.organization_chart.source_kind)}</span>
+        </div>
+        <div class="org-meta">${esc(data.organization_chart.organization_id)} · ${data.organization_chart.domain_count} domains · ${data.organization_chart.position_count} positions</div>
+        <div class="org-top">Top roles: ${
+          data.organization_chart.top_level_roles.length
+            ? data.organization_chart.top_level_roles
+                .map((role) => `<span class="pill">${esc(role)}</span>`)
+                .join(' ')
+            : '<span class="empty">-</span>'
+        }</div>
+        <div class="org-domains">
+          ${data.organization_chart.domains
+            .map(
+              (domain) =>
+                `<div class="org-domain"><div class="org-domain-name">${esc(domain.name)}</div><div class="org-domain-roles">${
+                  domain.role_ids
+                    .map((role) => `<span class="pill">${esc(role)}</span>`)
+                    .join(' ') || '<span class="empty">-</span>'
+                }</div></div>`
+            )
+            .join('')}
+        </div>
+        <div class="org-positions">
+          ${data.organization_chart.positions
+            .slice(0, 12)
+            .map(
+              (position) =>
+                `<div class="org-position">
+                  <div class="org-role">${esc(position.role_id)}</div>
+                  <div class="org-rowline"><span class="muted">reports_to</span> ${esc(position.reports_to || 'root')} · <span class="muted">held_by</span> ${esc(position.held_by)}</div>
+                  <div class="org-rowline"><span class="muted">scope</span> ${esc(position.responsibility_scope)}</div>
+                </div>`
+            )
+            .join('')}
+        </div>
+      </div>`
+    : '<div class="empty">組織図なし</div>';
+  const tenantSummary = data.tenant_slug
+    ? `tenant ${esc(data.tenant_slug)}${data.organization ? ` · ${esc(data.organization.name)}` : ''}`
+    : data.organization
+      ? esc(data.organization.name)
+      : 'tenant-agnostic';
 
   // Now Working — plain-language answer to 「いま誰が何をしているの?」
   const nowWorkingRows = data.agents
@@ -728,6 +869,7 @@ header{display:flex;align-items:baseline;gap:18px;margin-bottom:14px;flex-wrap:w
 .kpi{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:6px 14px;font-size:13px}
 .kpi b{color:var(--accent);font-size:16px;margin-right:6px}
 .stamp{color:var(--muted);font-size:12px;margin-left:auto}
+.scope{color:var(--muted);font-size:12px}
 main{display:grid;grid-template-columns:minmax(0,2.2fr) minmax(280px,1fr);gap:20px}
 section{margin-bottom:22px}
 .floor{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px}
@@ -767,6 +909,17 @@ section{margin-bottom:22px}
 .stat-val{width:80px;text-align:right;flex-shrink:0}
 .stat-val i{color:var(--muted);font-style:normal;font-size:10px}
 .empty{color:var(--muted);font-size:12px;padding:6px 0}
+.org-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;box-shadow:0 0 24px rgba(0,242,255,.04)}
+.org-head{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:6px}
+.org-meta,.org-rowline{font-size:11px;color:var(--muted);line-height:1.6}
+.org-top{margin:8px 0 4px;font-size:12px;color:var(--text)}
+.org-domains{display:grid;gap:8px;margin-top:10px}
+.org-domain{padding:8px 0;border-top:1px solid rgba(30,41,59,.5)}
+.org-domain-name{font-size:12px;font-weight:700;margin-bottom:4px}
+.org-domain-roles{display:flex;flex-wrap:wrap;gap:6px}
+.org-positions{margin-top:10px}
+.org-position{padding:8px 0;border-top:1px solid rgba(30,41,59,.6)}
+.org-role{font-size:12px;font-weight:700;margin-bottom:2px}
 .archive{color:var(--muted);font-size:11px;line-height:1.9}
 /* ---- character life ---- */
 .char.working .body-wrap{animation:type .5s ease-in-out infinite}
@@ -802,6 +955,7 @@ section{margin-bottom:22px}
     <span class="kpi"><b>${data.inbox_unread}</b>未読 inbox</span>
     <span class="kpi"><b>${data.approvals_pending}</b>承認待ち</span>
   </div>
+  <span class="scope">${tenantSummary}</span>
   <span class="stamp">generated ${esc(data.generated_at)}${refreshSeconds ? ` · auto-refresh ${refreshSeconds}s` : ''}</span>
 </header>
 ${legend}
@@ -819,6 +973,9 @@ ${legend}
   </section>
 </div>
 <div>
+  <section><h2>Organization Chart — 組織図</h2>
+    ${orgChartHtml}
+  </section>
   <section><h2>成功率 — agent × role(実績)</h2>
     <div class="panel">${perfHtml}</div>
   </section>
