@@ -452,7 +452,29 @@ export class ACPMediator {
             return { outcome: 'approved' as const };
           }
 
-          logger.warn(`[ACP_PERMISSION] Approval required: ${title}`);
+          // SA-05 Task 3.3: single approval decision source — file a pending
+          // request the operator can approve; deny (fail-closed) until then.
+          try {
+            const { requireApprovalForOp } = await import('./risky-op-registry.js');
+            const approval = requireApprovalForOp({
+              opId: 'acp:tool',
+              agentId: process.env.KYBERION_PERSONA || 'acp-session',
+              payload: { title },
+              draft: {
+                title: 'ACP tool approval required',
+                summary: `${shellDecision.reason || 'Unclassified tool call.'} Tool: ${title}`,
+                severity: 'medium',
+              },
+            });
+            if (approval.allowed) {
+              return { outcome: 'approved' as const };
+            }
+          } catch (approvalErr: any) {
+            logger.warn(
+              `[ACP_PERMISSION] approval routing failed: ${approvalErr?.message || approvalErr}`
+            );
+          }
+          logger.warn(`[ACP_PERMISSION] Approval required (pending): ${title}`);
           return { outcome: 'denied' as const };
         },
         async readTextFile(params) {

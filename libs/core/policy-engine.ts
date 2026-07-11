@@ -57,6 +57,7 @@ export interface PolicyContext {
 
 class PolicyEngineImpl {
   private policies: Policy[] = [];
+  private declaredPolicyCount = 0;
   private rateLimitCounters: Map<string, { count: number; windowStart: number }> = new Map();
 
   loadFromFile(filePath?: string): void {
@@ -83,6 +84,7 @@ class PolicyEngineImpl {
     }
 
     if (parsed?.policies && Array.isArray(parsed.policies)) {
+      this.declaredPolicyCount = parsed.policies.length;
       this.policies = parsed.policies.filter(
         (policy: any) =>
           policy &&
@@ -99,6 +101,12 @@ class PolicyEngineImpl {
       }
       logger.info(`[POLICY_ENGINE] Loaded ${this.policies.length} policies`);
     }
+  }
+
+  /** SA-05 Task 4: declared vs loaded so silent shrink is visible to doctor. */
+  getPolicyCounts(): { loaded: number; declared: number } {
+    if (this.policies.length === 0) this.loadFromFile();
+    return { loaded: this.policies.length, declared: this.declaredPolicyCount };
   }
 
   evaluate(context: PolicyContext): PolicyDecision {

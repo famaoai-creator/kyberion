@@ -97,10 +97,31 @@ export function createKyberionCanUseTool(): CanUseTool {
     if (toolName === 'Bash') {
       const command = extractShellCommand(input);
       const decision = evaluateShellCommandPolicy(command);
-      if (decision.verdict !== 'allow') {
+      if (decision.verdict === 'deny') {
         return deny(
           `${decision.reason} ${command ? `Command: ${command}` : 'Bash command was not provided.'}`
         );
+      }
+      if (decision.verdict === 'require_approval') {
+        // SA-05 Task 3.3: the approval gate is the single decision source —
+        // a pending request is created for the operator; retry passes once
+        // it is approved. Until then the call stays denied (fail-closed).
+        const { requireApprovalForOp } = await import('./risky-op-registry.js');
+        const approval = requireApprovalForOp({
+          opId: 'subagent:bash',
+          agentId: process.env.KYBERION_PERSONA || 'sub-agent',
+          payload: { command },
+          draft: {
+            title: 'Sub-agent Bash approval required',
+            summary: `${decision.reason} Command: ${command}`,
+            severity: 'medium',
+          },
+        });
+        if (!approval.allowed) {
+          return deny(
+            `${decision.reason} Approval pending (${approval.message || 'operator approval required'}). Command: ${command}`
+          );
+        }
       }
       auditAgentTool(toolName, input);
       return allow(input);

@@ -13,6 +13,14 @@ vi.mock('./tier-guard.js', () => ({
       : { allowed: true },
 }));
 vi.mock('./audit-chain.js', () => ({ auditChain: { record: vi.fn(() => ({ id: 'AUD-1' })) } }));
+// SA-05 Task 3.3: require_approval routes through the approval gate; keep
+// unit tests hermetic — the pending path (allowed: false) is the default.
+vi.mock('./risky-op-registry.js', () => ({
+  requireApprovalForOp: vi.fn(() => ({
+    allowed: false,
+    message: 'operator approval required',
+  })),
+}));
 vi.mock('./shell-command-policy.js', () => ({
   evaluateShellCommandPolicy: (command: string) =>
     command.includes('pnpm install')

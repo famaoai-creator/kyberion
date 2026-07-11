@@ -1,6 +1,7 @@
 import {
   attemptAutonomousRepair,
   classifyError,
+  recordGovernanceAction,
   determineActuatorStepType,
   evaluateCondition,
   executeAdfSteps,
@@ -280,6 +281,13 @@ async function dispatchToActuator(domain: string, action: string, params: any, c
   // a performance sink and a divergence from run_pipeline's in-process
   // dispatch. Import the built entry once (cached) and call its pipeline
   // handler directly; the handler returns { status, results, context }.
+  // SA-05 Task 1: actuator dispatch feeds kill-switch anomaly tracking.
+  recordGovernanceAction(
+    process.env.KYBERION_PERSONA || 'unknown',
+    'actuator_dispatch',
+    `${domain}:${action}`,
+    false
+  );
   const mod = await actuatorModuleLoader.load(builtActuatorPath);
   if (typeof mod.handleAction !== 'function') {
     throw new Error(`Actuator ${actuatorId} does not expose handleAction (${builtActuatorPath})`);
