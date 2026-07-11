@@ -139,6 +139,22 @@ export async function secureFetch<T = any>(options: SecureFetchOptions): Promise
       `${hostname}:warn`,
       false
     );
+    // SA-04/SA-05: the kill-switch action log is in-memory only, so warn
+    // verdicts vanished on process exit and the warn observation period
+    // produced no durable evidence for the warn→enforce decision. Mirror
+    // the deny path into the audit chain (pnpm egress:report aggregates it).
+    auditChain.record({
+      agentId: process.env.KYBERION_PERSONA || 'unknown',
+      action: 'egress_request',
+      operation: 'secure_fetch',
+      result: 'allowed',
+      reason: egressDecision.reason,
+      metadata: {
+        hostname,
+        mode: egressDecision.mode,
+        verdict: 'warn',
+      },
+    });
   }
 
   // 2. Automatically scrub outbound payload UNLESS explicitly authenticated

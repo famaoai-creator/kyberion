@@ -100,6 +100,7 @@
     "manifests:sign": "node --import ./scripts/ts-loader.mjs scripts/sign_environment_manifests.ts",
     "secrets:encrypt": "node --import ./scripts/ts-loader.mjs scripts/encrypt_connection_documents.ts",
     "cost:report": "node --import ./scripts/ts-loader.mjs scripts/cost_report.ts",
+    "egress:report": "node --import ./scripts/ts-loader.mjs scripts/egress_warn_report.ts",
     "daemon:watchdog": "node --import ./scripts/ts-loader.mjs scripts/daemon_watchdog.ts",
     "mesh:deliver": "node --import ./scripts/ts-loader.mjs scripts/mesh_delivery_driver.ts",
     "campaign:suite": "node --import ./scripts/ts-loader.mjs scripts/campaign_suite.ts",
