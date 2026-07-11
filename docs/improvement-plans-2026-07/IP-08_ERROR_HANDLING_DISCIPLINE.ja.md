@@ -64,3 +64,9 @@
 ## 実装メモ
 
 - `scripts/run_super_pipeline.ts` のトップレベル `main().catch(...)` にエラーメッセージの正規化を入れ、`trace.addEvent('super_pipeline.failed', ...)` も `err.message` 依存のまま落ちないようにした。
+
+## 実装状況 追記 (2026-07-12)
+
+- **再突合**: Task 1 は概ね解消済みを確認 — secure-io の fail-open は SA-05 で fail-closed 化(本 IP の「警告して通す」を超える処置)、run_baseline_check は parse 失敗警告 + `config_degraded` フラグ実装済み、run_super_pipeline の main catch も実装メモどおり処置済み。voice-hub の浮遊 Promise(Task 6.1)も全 `.then` チェーンに `.catch` 付与済みを確認。
+- **Task 6.2 完了(今回)**: `libs/core/process-guards.ts` を新設(`installProcessGuards(name)` — unhandledRejection / uncaughtException を記録、プロセスは落とさない・冪等)。**9つの長寿命プロセス**へ配線: voice-hub / slack・discord・imessage・telegram の4ブリッジ / terminal-bridge / presence-studio / nexus-daemon / agent-runtime-supervisor daemon。テスト2本。
+- 残: 空 catch 137 箇所の triage 台帳(Task 2/3)と console→logger 移行(Task 4)、process.exit 除去(Task 5)— いずれも機械的横展開のため別スライス。

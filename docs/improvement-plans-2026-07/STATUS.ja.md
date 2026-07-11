@@ -42,7 +42,7 @@
 | IP-05 | DONE    |                                                                                                                                                                                                                |
 | IP-06 | DONE    |                                                                                                                                                                                                                |
 | IP-07 | PARTIAL | 2026-07-11 突合: backend/orchestrator/operator-learning のテストは実在し緑。残: 受入条件全体との網羅精査                                                                                                       |
-| IP-08 | PARTIAL | installProcessGuards 全デーモン適用、空 catch 解消、no-empty/process.exit lint、console→logger                                                                                                                 |
+| IP-08 | PARTIAL | 2026-07-12: installProcessGuards 新設し9長寿命プロセスへ適用(Task 6 完了)。Task 1/6.1 は解消済み確認。残: 空 catch triage 台帳、console→logger、process.exit 除去(機械的横展開)                                |
 | IP-09 | PARTIAL | slugify ローカル定義5箇所の正本 import 化、再発防止 lint                                                                                                                                                       |
 | IP-10 | PARTIAL | 2026-07-11: check_contract_schemas から policy/manifest 系46チェック(1,170行)を \_policy_checks へ抽出(4,684→3,527行、check:contract-schemas 実走で同一動作を確認)。残: 同ファイルの継続分割と他の巨大ファイル |
 | IP-11 | PARTIAL | strict 系フラグ有効化、@ts-ignore 残6、media-actuator any 半減                                                                                                                                                 |
