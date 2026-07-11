@@ -829,6 +829,61 @@ const pathResolver = {
   ),
 };
 
+// Contract-faithful mini engine for the fake core (AR-01): sequential
+// steps, safety budgets, per-step try/catch with break-on-failure, control
+// handler receiving runSteps.
+const executeAdfSteps = async (
+  steps: any[],
+  initialCtx: any,
+  options: any,
+  handlers: any
+): Promise<any> => {
+  const state = { stepCount: 0, startTime: Date.now() };
+  const run = async (nested: any[], seedCtx: any): Promise<any> => {
+    let ctx = { ...seedCtx };
+    const results: any[] = [];
+    const resolve = (value: any) => resolveVars(value, ctx);
+    for (const step of nested) {
+      state.stepCount += 1;
+      if (state.stepCount > (options.maxSteps ?? 1000)) {
+        throw new Error(
+          `[SAFETY_LIMIT] Exceeded maximum pipeline steps (${options.maxSteps ?? 1000})`
+        );
+      }
+      if (Date.now() - state.startTime > (options.timeoutMs ?? 60000)) {
+        throw new Error(
+          `[SAFETY_LIMIT] Pipeline execution timed out (${options.timeoutMs ?? 60000}ms)`
+        );
+      }
+      try {
+        if (step.type === 'control') {
+          ctx = await handlers.control(step.op, step.params, ctx, run, resolve);
+        } else if (step.type === 'capture') {
+          ctx = await handlers.capture(step.op, step.params, ctx, resolve);
+        } else if (step.type === 'transform') {
+          ctx = await handlers.transform(step.op, step.params, ctx, resolve);
+        } else if (step.type === 'apply') {
+          const next = await handlers.apply(step.op, step.params, ctx, resolve);
+          if (next !== undefined) ctx = next;
+        } else {
+          throw new Error(`Unknown step type: ${step.type}`);
+        }
+        results.push({ op: step.op, status: 'success' });
+      } catch (err: any) {
+        results.push({ op: step.op, status: 'failed', error: err?.message ?? String(err) });
+        break;
+      }
+    }
+    return {
+      status: derivePipelineStatus(results),
+      results,
+      context: ctx,
+      total_steps: state.stepCount,
+    };
+  };
+  return run(steps, initialCtx);
+};
+
 vi.mock('@agent/core', () => ({
   logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
   safeReadFile,
@@ -841,6 +896,7 @@ vi.mock('@agent/core', () => ({
   DEFAULT_PIPELINE_TIMEOUT_MS,
   DEFAULT_MAX_LOOP_ITERATIONS,
   derivePipelineStatus,
+  executeAdfSteps,
   resolveVars,
   evaluateCondition,
   getPathValue,

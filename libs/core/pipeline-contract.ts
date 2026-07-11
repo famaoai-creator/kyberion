@@ -4,7 +4,7 @@ import { pathResolver } from './path-resolver.js';
 
 export interface PipelineStepResult {
   op: string;
-  status: 'success' | 'failed' | 'skipped';
+  status: 'success' | 'failed' | 'skipped' | 'recovered';
   error?: string;
 }
 
