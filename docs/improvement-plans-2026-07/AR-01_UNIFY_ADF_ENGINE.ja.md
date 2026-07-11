@@ -58,6 +58,7 @@
   - **step フック(`beforeStep`/`afterStep`)**: browser の per-step trace span・screenshot artifact・action-trail イベント、media の span 命名(`media:<type>:<op>`)をフックで注入。フックはネスト step(control 配下・on_error fallback)にも発火するため、従来トップレベルのみだった span がネストにも付く(改善として意図的)。
   - 意図的な意味論変更(media): 旧ループは step budget を受け取るだけで未執行だった → エンジンで実際に執行(メディア処理は長時間になり得るため timeout デフォルトは 60s でなく 10 分)。未知の control op は静かに無視 → throw に統一。`'sink'` type と `media:` op prefix は正規化アダプタで吸収(`on_error.fallback` 配列へも再帰適用。`on_error.ref` 経由の fallback に sink step が含まれるケースのみ未対応の既知エッジ)。
   - 残フェーズ: `run_pipeline.ts` の委譲、golden 回帰(`check:golden`)、自動修復の統一。
+- **重複エンジンの一本化(2026-07-12、CI が検出)**: `libs/core/index.ts` が旧パイロット版 `executeAdfSteps`(`src/pipeline-engine.ts`)を**明示 re-export** しており、明示 export は `export *`(adf-engine)より優先されるため、移行済みアクチュエータは実は旧版で動いていた(hooks 引数は型不一致)。旧版を削除し、旧版のみの機能(`label` / `resolveVars` オプション)は正準エンジンへ吸収。**教訓2点**: (1) 同名 export の重複は明示 export が勝ち、静かに実装がすり替わる — 正準化では旧シンボルを必ず削除する。(2) root `tsconfig.json` は `scripts/presence/satellites` のみで `libs/actuators` を含まない — アクチュエータ変更の型検証は `npx tsc --noEmit` でなく **`pnpm run build:actuators`** で行う(ローカル全緑・CI 赤の原因)。
 
 ## リスクと注意
 
