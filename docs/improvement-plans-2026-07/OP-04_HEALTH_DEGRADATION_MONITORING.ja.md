@@ -57,3 +57,11 @@
 - 監視自体がリソースを食う/誤報でアラート疲れを起こす。評価間隔は分〜十分単位、閾値は保守的に始め、warn を観測してから通知を厳しくする。
 - health エンドポイントは攻撃面になり得る(内部状態の露出)。healthz は最小情報、status は認証必須を厳守。
 - 完全な APM(OpenTelemetry + 外部バックエンド)は architecture_recommendations の大きな提案であり本計画のスコープ外。ここは「自己完結の劣化検知 + health 表示 + 予兆通知」までとし、OTel 移行は将来計画として本文書に「次の一手」で記す。
+
+## 実装状況 追記 (2026-07-12)
+
+**RSS/restart 履歴の拡張を実装 — 残は soak 実証(運用)のみ。**
+
+- `libs/core/runtime-health-history.ts`: 長寿命プロセスの RSS/heap(+ per-agent 累積 restart 数)を `active/shared/runtime/health/runtime-health.jsonl` に毎時サンプル(5000行で自動プルーニング)。supervisor daemon が起動時 + 毎時サンプル。
+- トレンド評価を `evaluateDegradation` に統合: 24h 窓の **RSS 成長率**(1.5x warn / 2.5x red)と **restart 頻度**(3 warn / 10 red)。閾値は health-thresholds.json に外出し(既存の観測→引き締め方針)。hourly の degradation watch が自動的に履歴を読む。
+- テスト4本(成長 warn/red・安定時静穏・restart 集計・verdict 統合)。soak 実証は数日の実運用データ蓄積後に確認。
