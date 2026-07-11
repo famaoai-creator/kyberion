@@ -377,6 +377,24 @@ export interface BestOfDelegationOptions extends StructuredDelegationOptions {
   judgeInstructions?: string;
 }
 
+export interface PeerAdviceInput {
+  question: string;
+  context?: string;
+  tone?: 'concise' | 'careful' | 'adversarial';
+  preferred_provider?: string;
+  preferred_label?: string;
+}
+
+export interface PeerAdviceResult {
+  advisor_label: string;
+  advisor_provider?: string;
+  recommendation: string;
+  risks: string[];
+  follow_up_questions: string[];
+  confidence: 'low' | 'medium' | 'high';
+  peer_used: boolean;
+}
+
 export interface ReasoningBackend {
   name: string;
   /** Divergence — produce independent hypotheses per persona. */
@@ -459,6 +477,33 @@ export class FailoverReasoningBackend implements ReasoningBackend {
   constructor(candidates: ReasoningBackendCandidate[]) {
     this.candidates = candidates.filter((candidate) => Boolean(candidate.backend));
     this.name = this.candidates[0]?.backend.name || 'failover';
+  }
+
+  selectConsultationCandidate(
+    input: {
+      preferredProvider?: string;
+      preferredLabel?: string;
+    } = {}
+  ): ReasoningBackendCandidate | null {
+    const primary = this.candidates[0];
+    if (!primary) return null;
+    const primaryKey = candidateLabel(primary);
+    const preferredProvider = normalizeProviderName(input.preferredProvider);
+    const preferredLabel = String(input.preferredLabel || '')
+      .trim()
+      .toLowerCase();
+    const peers = this.candidates.slice(1);
+    const matches = peers.filter((candidate) => {
+      const candidateProvider = normalizeProviderName(candidate.provider);
+      const candidateKey = candidateLabel(candidate).toLowerCase();
+      if (candidateKey === primaryKey.toLowerCase()) return false;
+      if (preferredProvider && candidateProvider && candidateProvider !== preferredProvider) {
+        return false;
+      }
+      if (preferredLabel && candidateKey !== preferredLabel) return false;
+      return true;
+    });
+    return matches[0] || peers[0] || null;
   }
 
   private async runWithFailover<T>(
@@ -785,6 +830,51 @@ ${params.untrustedData}
 </untrusted_input>`;
 
   return backend.delegateTask(prompt, options?.context, options);
+}
+
+const PEER_ADVICE_SCHEMA = z.object({
+  advisor_label: z.string().min(1),
+  advisor_provider: z.string().optional(),
+  recommendation: z.string().min(1),
+  risks: z.array(z.string()).default([]),
+  follow_up_questions: z.array(z.string()).default([]),
+  confidence: z.enum(['low', 'medium', 'high']),
+});
+
+export async function requestPeerAdvice(
+  backend: ReasoningBackend,
+  input: PeerAdviceInput,
+  options: ReasoningCallOptions & StructuredDelegationOptions = {}
+): Promise<PeerAdviceResult> {
+  const selectedCandidate =
+    backend instanceof FailoverReasoningBackend
+      ? backend.selectConsultationCandidate({
+          preferredProvider: input.preferred_provider,
+          preferredLabel: input.preferred_label,
+        })
+      : null;
+  const selectedBackend = selectedCandidate?.backend ?? backend;
+  const prompt = [
+    'You are acting as a peer reviewer and advisor for a sub-agent.',
+    'Provide a direct second opinion, not a rewrite of the original task.',
+    'Be concrete about risks and the next question to ask if the recommendation is uncertain.',
+    `Tone: ${input.tone || 'careful'}`,
+    `Question: ${input.question}`,
+    input.context ? `Context:\n${input.context}` : '',
+    'Return JSON only.',
+  ]
+    .filter(Boolean)
+    .join('\n');
+  const advice = await delegateStructured(selectedBackend, prompt, PEER_ADVICE_SCHEMA, {
+    context: options.context || 'peer_advice',
+    maxRetries: options.maxRetries ?? 1,
+  });
+  return {
+    ...advice,
+    advisor_label: advice.advisor_label || selectedCandidate?.label || selectedBackend.name,
+    advisor_provider: advice.advisor_provider || selectedCandidate?.provider || undefined,
+    peer_used: selectedBackend !== backend,
+  };
 }
 
 let registered: ReasoningBackend | null = null;
