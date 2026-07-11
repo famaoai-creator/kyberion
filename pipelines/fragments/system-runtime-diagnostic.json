@@ -1,0 +1,96 @@
+{
+  "action": "pipeline",
+  "name": "system-runtime-diagnostic-fragment",
+  "version": "1.0.0",
+  "description": "Reusable fragment: collect a compact system/runtime diagnostic for local operator readiness.",
+  "context": {
+    "requested_mode": "trial",
+    "mission_id": "MSN-EXAMPLE"
+  },
+  "steps": [
+    {
+      "id": "check_node",
+      "role": "source",
+      "op": "system:cli_health_check",
+      "produces": {
+        "channel": "node_health",
+        "type": "HealthResult"
+      },
+      "params": {
+        "command": "node"
+      }
+    },
+    {
+      "id": "check_pnpm",
+      "role": "source",
+      "op": "system:cli_health_check",
+      "produces": {
+        "channel": "pnpm_health",
+        "type": "HealthResult"
+      },
+      "params": {
+        "command": "pnpm"
+      }
+    },
+    {
+      "id": "list_tool_runtimes",
+      "role": "source",
+      "op": "system:list_tool_runtimes",
+      "produces": {
+        "channel": "tool_runtimes",
+        "type": "RuntimeInventory"
+      },
+      "params": {
+        "requested_mode": "{{requested_mode}}"
+      }
+    },
+    {
+      "id": "list_service_runtimes",
+      "role": "source",
+      "op": "system:list_service_runtimes",
+      "produces": {
+        "channel": "service_runtimes",
+        "type": "RuntimeInventory"
+      },
+      "params": {}
+    },
+    {
+      "id": "list_displays",
+      "role": "source",
+      "op": "system:list_displays",
+      "produces": {
+        "channel": "display_inventory",
+        "type": "DisplayInventory"
+      },
+      "params": {}
+    },
+    {
+      "id": "list_inputs",
+      "role": "source",
+      "op": "system:list_input_devices",
+      "produces": {
+        "channel": "input_devices",
+        "type": "DeviceInventory"
+      },
+      "params": {}
+    },
+    {
+      "id": "list_media",
+      "role": "source",
+      "op": "system:list_media_devices",
+      "produces": {
+        "channel": "media_devices",
+        "type": "DeviceInventory"
+      },
+      "params": {}
+    },
+    {
+      "id": "log_diagnostic",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "System runtime diagnostic collected for mission {{mission_id}}."
+      }
+    }
+  ]
+}

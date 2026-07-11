@@ -10,6 +10,7 @@ import chalk from 'chalk';
 
 const DEFAULT_METRICS_DIR = pathResolver.resolve('work/metrics');
 const DEFAULT_METRICS_FILE = 'execution-metrics.jsonl';
+const DEFAULT_RESOURCE_USAGE_FILE = 'resource-usage.jsonl';
 const DEFAULT_MEMORY_BUDGET_MB = 200;
 
 interface CostRate {
@@ -123,6 +124,28 @@ export interface MetricsOptions {
   metricsFile?: string;
   persist?: boolean;
   memoryBudgetMB?: number;
+  resourceUsageFile?: string;
+}
+
+export type ResourceUsageKind = 'llm' | 'api' | 'compute' | 'saas' | 'human_time' | 'other';
+export type ResourceUsageStatus = 'actual' | 'estimated' | 'committed';
+
+export interface ResourceUsageRecord {
+  type: 'resource_usage';
+  usage_id: string;
+  timestamp: string;
+  resource_kind: ResourceUsageKind;
+  actor_id?: string;
+  mission_id?: string;
+  customer_id?: string;
+  cost_center?: string;
+  quantity: number;
+  unit: string;
+  unit_cost_usd?: number;
+  cost_usd: number;
+  status: ResourceUsageStatus;
+  source: string;
+  metadata?: Record<string, unknown>;
 }
 
 export class MetricsCollector {
@@ -130,6 +153,7 @@ export class MetricsCollector {
   private _metricsFile: string;
   private _persist: boolean;
   private _memoryBudgetMB: number;
+  private _resourceUsageFile: string;
   private _aggregates: Map<string, any>;
 
   constructor(options: MetricsOptions = {}) {
@@ -137,7 +161,51 @@ export class MetricsCollector {
     this._metricsFile = options.metricsFile || DEFAULT_METRICS_FILE;
     this._persist = options.persist !== false;
     this._memoryBudgetMB = options.memoryBudgetMB || DEFAULT_MEMORY_BUDGET_MB;
+    this._resourceUsageFile = options.resourceUsageFile || DEFAULT_RESOURCE_USAGE_FILE;
     this._aggregates = new Map();
+  }
+
+  /** Append a normalized, actor-neutral resource usage ledger entry. */
+  recordResourceUsage(
+    input: Omit<ResourceUsageRecord, 'type' | 'usage_id' | 'timestamp' | 'cost_usd'> & {
+      usage_id?: string;
+      timestamp?: string;
+      cost_usd?: number;
+    }
+  ): ResourceUsageRecord {
+    const quantity = Number(input.quantity);
+    if (!Number.isFinite(quantity) || quantity < 0) {
+      throw new Error('resource usage quantity must be a finite non-negative number');
+    }
+    const unitCost = input.unit_cost_usd === undefined ? undefined : Number(input.unit_cost_usd);
+    if (unitCost !== undefined && (!Number.isFinite(unitCost) || unitCost < 0)) {
+      throw new Error('resource usage unit_cost_usd must be a finite non-negative number');
+    }
+    const explicitCost = input.cost_usd === undefined ? undefined : Number(input.cost_usd);
+    const cost = explicitCost ?? (unitCost === undefined ? 0 : quantity * unitCost);
+    if (!Number.isFinite(cost) || cost < 0) {
+      throw new Error('resource usage cost_usd must be a finite non-negative number');
+    }
+    const record: ResourceUsageRecord = {
+      type: 'resource_usage',
+      usage_id:
+        input.usage_id || `${input.resource_kind}:${input.actor_id || 'unknown'}:${Date.now()}`,
+      timestamp: input.timestamp || new Date().toISOString(),
+      resource_kind: input.resource_kind,
+      actor_id: input.actor_id,
+      mission_id: input.mission_id,
+      customer_id: input.customer_id,
+      cost_center: input.cost_center,
+      quantity,
+      unit: input.unit,
+      unit_cost_usd: unitCost,
+      cost_usd: Math.round(cost * 100000) / 100000,
+      status: input.status,
+      source: input.source,
+      metadata: input.metadata,
+    };
+    if (this._persist) this._appendResourceUsage(record);
+    return record;
   }
 
   record(componentName: string, durationMs: number, status: 'success' | 'error', extra: any = {}) {
@@ -307,6 +375,21 @@ export class MetricsCollector {
     }
   }
 
+  loadResourceUsageHistory(): ResourceUsageRecord[] {
+    const filePath = path.join(this._metricsDir, this._resourceUsageFile);
+    if (!safeExistsSync(filePath)) return [];
+    try {
+      const content = safeReadFile(filePath, { encoding: 'utf8' }) as string;
+      return content
+        .trim()
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => JSON.parse(line) as ResourceUsageRecord);
+    } catch {
+      return [];
+    }
+  }
+
   reportFromHistory() {
     const entries = this.loadHistory();
     const bySkill: Record<string, any> = {};
@@ -442,6 +525,18 @@ export class MetricsCollector {
       const filePath = path.join(this._metricsDir, this._metricsFile);
       safeAppendFileSync(filePath, JSON.stringify(entry) + '\n');
     } catch (_) {}
+  }
+
+  private _appendResourceUsage(entry: ResourceUsageRecord) {
+    try {
+      if (!safeExistsSync(this._metricsDir)) safeMkdir(this._metricsDir, { recursive: true });
+      safeAppendFileSync(
+        path.join(this._metricsDir, this._resourceUsageFile),
+        `${JSON.stringify(entry)}\n`
+      );
+    } catch (_) {
+      /* metrics are best-effort and must not block the operation */
+    }
   }
 }
 

@@ -9,6 +9,7 @@
  */
 import { formatNextAction, getGovernanceControlSummary } from '@agent/core';
 import {
+  acceptInboxEntryWithHumanReceipt,
   decideApprovalRequest,
   ingestAudioIntoDealRequirements,
   listApprovalRequests,
@@ -92,8 +93,16 @@ function handleInboxSubcommand(argv: {
   }
   if (argv.read || argv.accept) {
     const entryId = String(argv.read || argv.accept);
-    const status = argv.read ? 'read' : 'accepted';
-    const updated = markInboxEntry(entryId, status, { reviewedBy: 'operator' });
+    const updated = argv.read
+      ? markInboxEntry(entryId, 'read', { reviewedBy: 'operator' })
+      : acceptInboxEntryWithHumanReceipt({
+          entryId,
+          actorId: 'human:operator',
+          authenticated: true,
+          authMethod: 'surface_session',
+          responsibilityStatement:
+            'I accept this deliverable and retain responsibility for its use.',
+        });
     if (!updated) {
       console.error(`inbox entry not found: ${entryId}`);
       process.exitCode = 1;
@@ -150,6 +159,10 @@ function handleApprovalsSubcommand(argv: {
       decidedBy: 'sovereign-user',
       decidedByRole: 'sovereign',
       authMethod: 'manual',
+      decidedByType: 'human',
+      authenticated: true,
+      payloadHash: request.accountability?.payloadHash,
+      effectBinding: request.accountability?.effectBinding,
       note: argv.note || 'decided via pnpm kyberion approvals',
     });
     console.log(`✓ ${decided.id} → ${decided.status}: ${decided.title}`);

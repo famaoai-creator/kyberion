@@ -1,0 +1,79 @@
+{
+  "action": "pipeline",
+  "name": "media-pptx-roundtrip-pack-fragment",
+  "version": "1.0.0",
+  "description": "Reusable fragment: extract a PPTX design, derive a digest, render a roundtrip deck, and persist a summary.",
+  "context": {
+    "mission_id": "MSN-EXAMPLE",
+    "source_pptx_path": "active/shared/tmp/input.pptx",
+    "roundtrip_pptx_path": "active/shared/tmp/pptx-roundtrip-output.pptx",
+    "digest_path": "active/shared/tmp/pptx-roundtrip-summary.json"
+  },
+  "steps": [
+    {
+      "id": "extract_pptx_design",
+      "role": "source",
+      "op": "media:pptx_extract",
+      "produces": {
+        "channel": "source_pptx_design",
+        "type": "PptxDesign"
+      },
+      "params": {
+        "path": "{{source_pptx_path}}",
+        "export_as": "source_pptx_design"
+      }
+    },
+    {
+      "id": "digest_pptx",
+      "role": "source",
+      "op": "media:document_digest",
+      "consumes": "source_pptx_design",
+      "produces": {
+        "channel": "source_pptx_digest",
+        "type": "DocumentDigest"
+      },
+      "params": {
+        "from": "source_pptx_design",
+        "export_as": "source_pptx_digest"
+      }
+    },
+    {
+      "id": "render_roundtrip_pptx",
+      "role": "sink",
+      "op": "media:pptx_render",
+      "consumes": "source_pptx_design",
+      "produces": {
+        "channel": "roundtrip_pptx_path",
+        "type": "FilePath"
+      },
+      "params": {
+        "design_from": "source_pptx_design",
+        "path": "{{roundtrip_pptx_path}}"
+      }
+    },
+    {
+      "id": "persist_digest_summary",
+      "role": "sink",
+      "op": "system:write_file",
+      "consumes": "source_pptx_digest",
+      "params": {
+        "path": "{{digest_path}}",
+        "format": "json",
+        "content": {
+          "mission_id": "{{mission_id}}",
+          "source_pptx_path": "{{source_pptx_path}}",
+          "roundtrip_pptx_path": "{{roundtrip_pptx_path}}",
+          "digest": "{{source_pptx_digest}}"
+        }
+      }
+    },
+    {
+      "id": "log_media_pack",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "Media PPTX roundtrip pack completed for {{source_pptx_path}}."
+      }
+    }
+  ]
+}

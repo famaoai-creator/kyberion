@@ -8,13 +8,26 @@
     "mission_id": { "type": "string" },
     "owner_agent_id": { "type": "string" },
     "worker_agent_id": { "type": "string" },
+    "owner_resource_id": { "type": "string" },
+    "worker_resource_id": { "type": "string" },
+    "responsible_actor_id": { "type": "string" },
+    "accountable_owner_id": { "type": "string" },
+    "resource": { "$ref": "#/definitions/workforce_resource_ref" },
     "requested_role": {
       "type": "string",
       "enum": ["owner", "worker", "observer"]
     },
     "status": {
       "type": "string",
-      "enum": ["planned", "claimed", "in_progress", "submitted", "accepted", "rejected", "cancelled"]
+      "enum": [
+        "planned",
+        "claimed",
+        "in_progress",
+        "submitted",
+        "accepted",
+        "rejected",
+        "cancelled"
+      ]
     },
     "objective": { "type": "string" },
     "inputs": { "type": "object" },
@@ -36,5 +49,48 @@
     },
     "correlation_id": { "type": "string" }
   },
-  "additionalProperties": true
+  "additionalProperties": true,
+  "definitions": {
+    "workforce_resource_ref": {
+      "type": "object",
+      "required": [
+        "resource_id",
+        "resource_type",
+        "display_name",
+        "authority_roles",
+        "capabilities",
+        "availability",
+        "cost_profile",
+        "status",
+        "accountable_human_id"
+      ],
+      "properties": {
+        "resource_id": { "type": "string", "minLength": 1 },
+        "resource_type": { "type": "string", "enum": ["human", "agent", "service"] },
+        "display_name": { "type": "string", "minLength": 1 },
+        "authority_roles": { "type": "array", "items": { "type": "string" } },
+        "capabilities": { "type": "array", "items": { "type": "string" } },
+        "availability": { "type": "object", "additionalProperties": true },
+        "cost_profile": { "type": "object", "additionalProperties": true },
+        "status": { "type": "string", "enum": ["active", "suspended", "revoked"] },
+        "accountable_human_id": { "type": ["string", "null"] },
+        "provider": { "type": ["string", "null"] },
+        "model_id": { "type": ["string", "null"] },
+        "runtime_identity": { "type": ["string", "null"] }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "resource_type": { "enum": ["agent", "service"] } }
+          },
+          "then": {
+            "properties": {
+              "accountable_human_id": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      ],
+      "additionalProperties": false
+    }
+  }
 }

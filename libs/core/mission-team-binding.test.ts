@@ -1,13 +1,17 @@
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import * as pathResolver from './path-resolver.js';
-import { safeExistsSync, safeReadFile, safeRmSync } from './secure-io.js';
+import { safeExistsSync, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 import {
   appendMissionExecutionLedgerEntry,
   buildMissionStaffingAssignments,
   buildMissionTeamBlueprint,
   initializeMissionTeamBindings,
+  loadMissionStaffingAssignments,
 } from './mission-team-binding.js';
-import type { MissionTeamOrganizationProfileSummary, MissionTeamPlan } from './mission-team-plan-composer.js';
+import type {
+  MissionTeamOrganizationProfileSummary,
+  MissionTeamPlan,
+} from './mission-team-plan-composer.js';
 
 const MISSION_ID = 'MSN-BINDING-TEST-001';
 const TEST_MISSION_DIR = pathResolver.sharedTmp(`mission-team-binding-tests/${MISSION_ID}`);
@@ -99,6 +103,79 @@ describe('mission-team-binding', () => {
     expect(staffing.assignments.length).toBe(1);
     expect(staffing.assignments[0]?.actor_id).toBe('nerve-agent');
     expect(staffing.assignments[0]?.status).toBe('active');
+    expect(staffing.assignments[0]?.resource.resource_type).toBe('agent');
+    expect(staffing.assignments[0]?.resource.resource_id).toBe('nerve-agent');
+  });
+
+  it('binds human and service resources alongside agents', () => {
+    const plan: MissionTeamPlan = {
+      ...SAMPLE_PLAN,
+      assignments: [
+        {
+          ...SAMPLE_PLAN.assignments[0],
+          agent_id: null,
+          actor_type: 'human',
+          resource: {
+            resource_id: 'human:founder',
+            resource_type: 'human',
+            display_name: 'Founder',
+            authority_roles: ['mission_controller'],
+            capabilities: ['approval'],
+            availability: { status: 'available' },
+            cost_profile: { currency: 'JPY', hourly_rate: 0 },
+            status: 'active',
+            accountable_human_id: null,
+          },
+        },
+        {
+          ...SAMPLE_PLAN.assignments[0],
+          team_role: 'service_runtime',
+          agent_id: null,
+          actor_type: 'service',
+          resource: {
+            resource_id: 'service:stripe',
+            resource_type: 'service',
+            display_name: 'Stripe',
+            authority_roles: ['service_operator'],
+            capabilities: ['payments'],
+            availability: { status: 'available' },
+            cost_profile: { currency: 'JPY', per_call: 10 },
+            status: 'active',
+            accountable_human_id: 'human:founder',
+            runtime_identity: 'stripe-prod',
+          },
+        },
+      ],
+    };
+
+    const staffing = buildMissionStaffingAssignments(plan);
+    expect(staffing.assignments.map((entry) => entry.actor_type)).toEqual(['human', 'service']);
+    expect(staffing.assignments[1]?.accountable_human_id).toBeUndefined();
+    expect(staffing.assignments[1]?.resource.accountable_human_id).toBe('human:founder');
+  });
+
+  it('rejects a new agent or service resource without human accountability', () => {
+    const plan: MissionTeamPlan = {
+      ...SAMPLE_PLAN,
+      assignments: [
+        {
+          ...SAMPLE_PLAN.assignments[0],
+          resource: {
+            resource_id: 'agent:unowned',
+            resource_type: 'agent',
+            display_name: 'Unowned Agent',
+            authority_roles: [],
+            capabilities: [],
+            availability: {},
+            cost_profile: {},
+            status: 'active',
+            accountable_human_id: null,
+          },
+        },
+      ],
+    };
+
+    expect(() => buildMissionStaffingAssignments(plan)).toThrow(/accountable_human_id/);
   });
 
   it('initializes binding artifacts and appends execution ledger entries', () => {
@@ -123,9 +200,44 @@ describe('mission-team-binding', () => {
       .split('\n')
       .filter(Boolean);
     expect(lines.length).toBe(1);
-    const parsed = JSON.parse(lines[0] || '{}') as { mission_id?: string; actor_id?: string; team_role?: string };
+    const parsed = JSON.parse(lines[0] || '{}') as {
+      mission_id?: string;
+      actor_id?: string;
+      team_role?: string;
+    };
     expect(parsed.mission_id).toBe(MISSION_ID);
     expect(parsed.actor_id).toBe('nerve-agent');
     expect(parsed.team_role).toBe('owner');
+  });
+
+  it('normalizes legacy staffing artifacts when loading them', () => {
+    const paths = initializeMissionTeamBindings(TEST_MISSION_DIR, SAMPLE_PLAN);
+    const legacy = {
+      version: '1.0.0',
+      mission_id: MISSION_ID,
+      generated_at: '2026-04-19T00:00:00.000Z',
+      assignments: [
+        {
+          assignment_id: 'legacy-owner',
+          mission_id: MISSION_ID,
+          team_role: 'owner',
+          actor_id: 'legacy-agent',
+          actor_type: 'agent',
+          authority_role: null,
+          provider: 'stub',
+          model_id: 'legacy-model',
+          assigned_at: '2026-04-19T00:00:00.000Z',
+          released_at: null,
+          status: 'active',
+          source: 'team_composition',
+        },
+      ],
+    };
+    safeWriteFile(paths.staffingAssignmentsPath, JSON.stringify(legacy));
+
+    const loaded = loadMissionStaffingAssignments(MISSION_ID, TEST_MISSION_DIR);
+    expect(loaded?.assignments[0]?.resource.resource_id).toBe('legacy-agent');
+    expect(loaded?.assignments[0]?.resource.resource_type).toBe('agent');
+    expect(loaded?.assignments[0]?.resource.model_id).toBe('legacy-model');
   });
 });

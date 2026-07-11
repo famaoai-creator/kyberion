@@ -125,6 +125,10 @@ export function decideApprovalFromCowork(params: {
     requestId: params.requestId,
     decision: params.decision,
     decidedBy: params.decidedBy,
+    decidedByType: 'human',
+    authenticated: true,
+    payloadHash: target.accountability?.payloadHash,
+    effectBinding: target.accountability?.effectBinding,
     note: params.note,
   });
 

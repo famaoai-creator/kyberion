@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
@@ -6,6 +6,8 @@ import {
   buildSafeExecEnv,
   ensureDir,
   loadJson,
+  safeExec,
+  safeExecResult,
   safeReadFile,
   safeWriteFile,
   sanitizePath,
@@ -82,6 +84,36 @@ describe('secure-io core', () => {
         process.umask(previousUmask);
       }
       expect(fs.statSync(testFile).mode & 0o777).toBe(0o600);
+    });
+
+    it('gates execute_command through the policy engine (ring3 read-only)', async () => {
+      const savedRing = process.env.KYBERION_AGENT_RING;
+      process.env.KYBERION_AGENT_RING = '3';
+      try {
+        expect(() => safeExec('echo', ['hello'])).toThrow('[POLICY_BLOCKED]');
+        expect(() => safeExecResult('echo', ['hello'])).toThrow('[POLICY_BLOCKED]');
+      } finally {
+        if (savedRing === undefined) delete process.env.KYBERION_AGENT_RING;
+        else process.env.KYBERION_AGENT_RING = savedRing;
+      }
+    });
+
+    it('allows execute_command for unrestricted rings', () => {
+      expect(safeExec('echo', ['-n', 'ok'])).toBe('ok');
+    });
+
+    it('fails closed when policy evaluation itself throws (SA-05)', async () => {
+      const { policyEngine } = await import('./policy-engine.js');
+      const spy = vi.spyOn(policyEngine, 'evaluate').mockImplementation(() => {
+        throw new Error('policy file parse failure');
+      });
+      try {
+        const testFile = path.join(tmpDir, 'fail-closed.txt');
+        expect(() => safeWriteFile(testFile, 'data')).toThrow('Policy engine unavailable');
+        expect(fs.existsSync(testFile)).toBe(false);
+      } finally {
+        spy.mockRestore();
+      }
     });
 
     it('refuses to replace a symbolic link', () => {

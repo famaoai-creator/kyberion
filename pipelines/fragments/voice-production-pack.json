@@ -1,0 +1,83 @@
+{
+  "action": "pipeline",
+  "name": "voice-production-pack-fragment",
+  "version": "1.0.0",
+  "description": "Reusable fragment: validate the voice runtime, inspect available voices, and generate a small governed voice artifact.",
+  "context": {
+    "requested_mode": "trial",
+    "profile_id": "operator-ja-default",
+    "text": "Kyberion voice pipeline fragment",
+    "language": "ja",
+    "output_path": "active/shared/tmp/voice-production-pack.wav"
+  },
+  "steps": [
+    {
+      "id": "check_voice_health",
+      "role": "source",
+      "op": "voice:health",
+      "produces": {
+        "channel": "voice_health",
+        "type": "VoiceHealthResult"
+      },
+      "params": {
+        "requested_mode": "{{requested_mode}}"
+      }
+    },
+    {
+      "id": "list_voices",
+      "role": "source",
+      "op": "voice:list_voices",
+      "produces": {
+        "channel": "voice_catalog",
+        "type": "VoiceCatalogResult"
+      },
+      "params": {}
+    },
+    {
+      "id": "generate_voice",
+      "role": "source",
+      "op": "voice:generate_voice",
+      "produces": {
+        "channel": "voice_artifact",
+        "type": "VoiceResult"
+      },
+      "params": {
+        "request_id": "voice-pack-generate-{{profile_id}}",
+        "text": "{{text}}",
+        "profile_ref": {
+          "profile_id": "{{profile_id}}"
+        },
+        "engine": {
+          "engine_id": "local_say"
+        },
+        "rendering": {
+          "language": "{{language}}"
+        },
+        "delivery": {
+          "mode": "artifact",
+          "format": "wav",
+          "artifact_path": "{{output_path}}"
+        }
+      }
+    },
+    {
+      "id": "speak_local",
+      "role": "sink",
+      "op": "voice:speak_local",
+      "consumes": "voice_artifact",
+      "params": {
+        "text": "{{text}}",
+        "voice": "{{profile_id}}"
+      }
+    },
+    {
+      "id": "log_voice_pack",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "voice_artifact",
+      "params": {
+        "message": "Voice production pack completed for {{profile_id}}. Artifact: {{output_path}}"
+      }
+    }
+  ]
+}
