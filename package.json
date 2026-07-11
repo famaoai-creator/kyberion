@@ -97,6 +97,7 @@
     "watch:tenant-drift": "node dist/scripts/watch_tenant_drift.js",
     "vuln:scan": "node --import ./scripts/ts-loader.mjs scripts/scan_dependency_vulns.ts",
     "patch:dependency": "node --import ./scripts/ts-loader.mjs scripts/apply_dependency_patch.ts",
+    "manifests:sign": "node --import ./scripts/ts-loader.mjs scripts/sign_environment_manifests.ts",
     "daemon:watchdog": "node --import ./scripts/ts-loader.mjs scripts/daemon_watchdog.ts",
     "mesh:deliver": "node --import ./scripts/ts-loader.mjs scripts/mesh_delivery_driver.ts",
     "campaign:suite": "node --import ./scripts/ts-loader.mjs scripts/campaign_suite.ts",

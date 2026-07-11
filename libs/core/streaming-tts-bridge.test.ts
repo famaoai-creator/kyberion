@@ -1,5 +1,8 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import { GeminiStreamingTextToSpeechBridge, getStreamingTtsBridge } from './streaming-tts-bridge.js';
+import {
+  GeminiStreamingTextToSpeechBridge,
+  getStreamingTtsBridge,
+} from './streaming-tts-bridge.js';
 
 const mocks = vi.hoisted(() => ({
   executeServicePreset: vi.fn(),
@@ -28,10 +31,13 @@ describe('GeminiStreamingTextToSpeechBridge', () => {
     });
 
     const bridge = new GeminiStreamingTextToSpeechBridge({ voice: 'Kore' });
-    const chunks = bridge.synthesizeStream((async function* () {
-      yield 'Hello ';
-      yield 'world';
-    })(), 'voice-profile');
+    const chunks = bridge.synthesizeStream(
+      (async function* () {
+        yield 'Hello ';
+        yield 'world';
+      })(),
+      'voice-profile'
+    );
 
     const yielded = [];
     for await (const chunk of chunks) yielded.push(chunk);
@@ -46,7 +52,7 @@ describe('GeminiStreamingTextToSpeechBridge', () => {
         text: 'Hello world',
         voice: 'Kore',
       }),
-      'secret-guard',
+      'secret-guard'
     );
   });
 

@@ -5,9 +5,7 @@
       "base_url": "https://generativelanguage.googleapis.com/v1beta",
       "preset_path": "knowledge/product/orchestration/service-presets/gemini.json",
       "credential_suffixes": {
-        "accessToken": [
-          "API_KEY"
-        ]
+        "accessToken": ["API_KEY"]
       }
     }
   }
