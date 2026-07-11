@@ -194,11 +194,12 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_TERMINAL_HOST`                  | string | no       | _undocumented_                                                                                                                                                                           |
 | `KYBERION_TTS_COMMAND`                    | string | no       | _undocumented_                                                                                                                                                                           |
 
-## runtime (90)
+## runtime (91)
 
 | Variable                                      | Type   | Required | Description                                                                                             |
 | --------------------------------------------- | ------ | -------- | ------------------------------------------------------------------------------------------------------- |
 | `KYBERION_A`                                  | string | no       | _undocumented_                                                                                          |
+| `KYBERION_A2A_SIGNATURE`                      | string | no       | _undocumented_                                                                                          |
 | `KYBERION_AGENT_RING`                         | string | no       | _undocumented_                                                                                          |
 | `KYBERION_AGENT_RUNTIME_SUPERVISOR_TRANSPORT` | string | no       | _undocumented_                                                                                          |
 | `KYBERION_AGENT_TIER`                         | string | no       | _undocumented_                                                                                          |
