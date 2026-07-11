@@ -1,20 +1,24 @@
 import express from 'express';
+import { installProcessGuards } from '@agent/core';
 import { createServer } from 'node:http';
 import { WebSocketServer, WebSocket } from 'ws';
 import * as path from 'node:path';
+
+// IP-08 Task 6: record unhandled rejections/exceptions in this long-lived process.
+installProcessGuards('terminal-bridge');
 import {
   ReflexTerminal,
-  logger, 
-  pathResolver, 
+  logger,
+  pathResolver,
   runtimeSupervisor,
-  safeReadFile, 
-  safeWriteFile, 
-  safeMkdir, 
+  safeReadFile,
+  safeWriteFile,
+  safeMkdir,
   safeRmSync,
-  safeExistsSync, 
-  safeUnlinkSync, 
+  safeExistsSync,
+  safeUnlinkSync,
   safeReaddir,
-  safeAppendFileSync
+  safeAppendFileSync,
 } from '@agent/core';
 import {
   buildSessionPaths,
@@ -40,9 +44,13 @@ const GLOBAL_STIMULI_PATH = path.join(ROOT_DIR, 'presence/bridge/runtime/stimuli
 const RUNTIME_BASE = path.join(ROOT_DIR, 'active/shared/runtime/terminal');
 const TERMINAL_TOKEN = process.env.KYBERION_TERMINAL_TOKEN || process.env.KYBERION_API_TOKEN;
 const ALLOW_REMOTE = process.env.KYBERION_TERMINAL_ALLOW_REMOTE === 'true';
-const DISCONNECT_TIMEOUT_MS = Number(process.env.KYBERION_TERMINAL_DISCONNECT_TIMEOUT_MS || 5 * 60 * 1000);
+const DISCONNECT_TIMEOUT_MS = Number(
+  process.env.KYBERION_TERMINAL_DISCONNECT_TIMEOUT_MS || 5 * 60 * 1000
+);
 const RESTORE_RUNTIME_ON_BOOT = process.env.KYBERION_TERMINAL_RESTORE_RUNTIME === 'true';
-const SESSION_RETENTION_MS = Number(process.env.KYBERION_TERMINAL_SESSION_RETENTION_MS || 7 * 24 * 60 * 60 * 1000);
+const SESSION_RETENTION_MS = Number(
+  process.env.KYBERION_TERMINAL_SESSION_RETENTION_MS || 7 * 24 * 60 * 60 * 1000
+);
 
 interface Session {
   id: string;
@@ -59,7 +67,7 @@ interface Session {
   syncPending?: boolean;
   current_stimulus_id?: string;
   createdAt: string;
-  paths: { base: string; in: string; out: string; state: string; };
+  paths: { base: string; in: string; out: string; state: string };
 }
 
 const sessions = new Map<string, Session>();
@@ -96,12 +104,21 @@ function authorizeRequest(req: any): { ok: boolean; status: number; reason: stri
 
   if (!TERMINAL_TOKEN) {
     if (ALLOW_REMOTE) return { ok: true, status: 200, reason: 'remote_allowed' };
-    return { ok: false, status: 403, reason: 'Remote access disabled. Set KYBERION_TERMINAL_ALLOW_REMOTE=true or provide KYBERION_TERMINAL_TOKEN.' };
+    return {
+      ok: false,
+      status: 403,
+      reason:
+        'Remote access disabled. Set KYBERION_TERMINAL_ALLOW_REMOTE=true or provide KYBERION_TERMINAL_TOKEN.',
+    };
   }
 
   const token = extractToken(req);
   if (token === TERMINAL_TOKEN) return { ok: true, status: 200, reason: 'token' };
-  return { ok: false, status: 401, reason: 'Unauthorized. Provide Authorization: Bearer <token> or ?token=' };
+  return {
+    ok: false,
+    status: 401,
+    reason: 'Unauthorized. Provide Authorization: Bearer <token> or ?token=',
+  };
 }
 
 app.use((req, res, next) => {
@@ -115,51 +132,67 @@ app.use((req, res, next) => {
 app.use(express.static(path.join(ROOT_DIR, 'presence/bridge/terminal/static')));
 
 function cleanTerminalOutput(text: string): string {
-  if (!text) return "";
-  let scrubbed = "";
+  if (!text) return '';
+  let scrubbed = '';
   for (let i = 0; i < text.length; i++) {
     const code = text.charCodeAt(i);
-    if (code === 0x09 || code === 0x0a || code === 0x0d || (code >= 0x20 && code !== 0x1b && code !== 0x7f)) {
+    if (
+      code === 0x09 ||
+      code === 0x0a ||
+      code === 0x0d ||
+      (code >= 0x20 && code !== 0x1b && code !== 0x7f)
+    ) {
       scrubbed += text[i];
     }
   }
   return scrubbed
-    .replace(/\[[0-9;]*[a-zA-Z]/g, '') 
+    .replace(/\[[0-9;]*[a-zA-Z]/g, '')
     .replace(/\][0-9;]*.*?\x07/g, '')
-    .replace(/\r\n/g, '\n').replace(/\r/g, '\n')
-    .replace(/[─│╭╮╰╯─━┃┏┓┗┛]/g, '') 
-    .replace(/\n{3,}/g, '\n\n').trim();
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .replace(/[─│╭╮╰╯─━┃┏┓┗┛]/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 function updateSmartBuffer(currentBuffer: string, newData: string): string {
   const cleanNew = cleanTerminalOutput(newData);
   if (!cleanNew) return currentBuffer;
 
-  const oldLines = currentBuffer.split('\n').map(l => l.trim());
-  const newLines = cleanNew.split('\n').map(l => l.trim());
-  
+  const oldLines = currentBuffer.split('\n').map((l) => l.trim());
+  const newLines = cleanNew.split('\n').map((l) => l.trim());
+
   let combined = [...oldLines];
   for (const line of newLines) {
     if (combined.length === 0 || combined[combined.length - 1] !== line) {
       combined.push(line);
     }
   }
-  
-  const structured = combined.filter(l => l.length === 0 || l.length > 2);
+
+  const structured = combined.filter((l) => l.length === 0 || l.length > 2);
   return structured.slice(-20).join('\n');
 }
 
 function saveSessionState(session: Session, active = Boolean(session.rt)) {
   try {
-    safeWriteFile(session.paths.state, JSON.stringify({
-      id: session.id, pid: session.rt?.getPid(), ts: new Date().toISOString(),
-      active,
-      active_brain: session.active_brain || 'none',
-      name: session.name,
-      lastActive: session.lastActive,
-      createdAt: session.createdAt,
-      connected: Boolean(session.ws && session.ws.readyState === WebSocket.OPEN),
-    }, null, 2));
+    safeWriteFile(
+      session.paths.state,
+      JSON.stringify(
+        {
+          id: session.id,
+          pid: session.rt?.getPid(),
+          ts: new Date().toISOString(),
+          active,
+          active_brain: session.active_brain || 'none',
+          name: session.name,
+          lastActive: session.lastActive,
+          createdAt: session.createdAt,
+          connected: Boolean(session.ws && session.ws.readyState === WebSocket.OPEN),
+        },
+        null,
+        2
+      )
+    );
   } catch (_) {}
 }
 
@@ -170,17 +203,30 @@ function persistSessionFeedback(session: Session, text: string, skipBroadcast = 
 
     const responseFile = path.join(session.paths.out, `res-${Date.now()}.json`);
     const envelope = {
-      sessionId: session.id, status: 'success', data: { message: cleanText },
-      metadata: { timestamp: new Date().toISOString() }
+      sessionId: session.id,
+      status: 'success',
+      data: { message: cleanText },
+      metadata: { timestamp: new Date().toISOString() },
     };
-    
+
     safeWriteFile(responseFile, JSON.stringify(envelope, null, 2));
-    safeWriteFile(path.join(session.paths.out, 'latest_response.json'), JSON.stringify(envelope, null, 2));
-    
+    safeWriteFile(
+      path.join(session.paths.out, 'latest_response.json'),
+      JSON.stringify(envelope, null, 2)
+    );
+
     if (session.current_stimulus_id) {
-      safeWriteFile(path.join(session.paths.out, 'latest_metadata.json'), JSON.stringify({
-        stimulus_id: session.current_stimulus_id, ts: new Date().toISOString()
-      }, null, 2));
+      safeWriteFile(
+        path.join(session.paths.out, 'latest_metadata.json'),
+        JSON.stringify(
+          {
+            stimulus_id: session.current_stimulus_id,
+            ts: new Date().toISOString(),
+          },
+          null,
+          2
+        )
+      );
     }
 
     if (!skipBroadcast) emitGlobalStimulus(cleanText, session);
@@ -192,21 +238,23 @@ function emitGlobalStimulus(text: string, session: Session) {
   try {
     const cleanText = cleanTerminalOutput(text);
     if (!cleanText || cleanText.length < 5) return;
-    
+
     const isExecutionFinished = /[%$#]>?\s*$/.test(cleanText.trim());
-    
+
     const stimulus = {
-      id: `term-${Date.now()}`, ts: new Date().toISOString(), ttl: 60,
+      id: `term-${Date.now()}`,
+      ts: new Date().toISOString(),
+      ttl: 60,
       origin: { channel: 'terminal', source_id: session.id },
-      signal: { 
-        intent: isExecutionFinished ? 'EXECUTION_FINISHED' : 'LOG_STREAM', 
-        priority: 5, 
-        payload: cleanText 
+      signal: {
+        intent: isExecutionFinished ? 'EXECUTION_FINISHED' : 'LOG_STREAM',
+        priority: 5,
+        payload: cleanText,
       },
-      control: { status: 'processed', feedback: 'silent', evidence: [] }
+      control: { status: 'processed', feedback: 'silent', evidence: [] },
     };
     const stimuliFile = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');
-    safeAppendFileSync(stimuliFile, JSON.stringify(stimulus) + "\n");
+    safeAppendFileSync(stimuliFile, JSON.stringify(stimulus) + '\n');
   } catch (_) {}
 }
 
@@ -219,17 +267,17 @@ async function typeLine(session: Session, text: string, useSync = true) {
     } else {
       session.rt.write(char);
     }
-    await new Promise(r => setTimeout(r, 15));
+    await new Promise((r) => setTimeout(r, 15));
   }
-  
-  await new Promise(r => setTimeout(r, 100));
+
+  await new Promise((r) => setTimeout(r, 100));
   session.rt.write('\r');
-  await new Promise(r => setTimeout(r, 50));
+  await new Promise((r) => setTimeout(r, 50));
   session.rt.write('\r');
 
   if (useSync) {
     session.syncPending = true;
-    session.rt.write('\x1b[6n'); 
+    session.rt.write('\x1b[6n');
   }
 }
 
@@ -242,19 +290,21 @@ async function setupSessionWatcher(session: Session) {
     try {
       const content = safeReadFile(filePath, { encoding: 'utf8' }) as string;
       const request = JSON.parse(content);
-      if (request.text) { 
-        typeLine(session, request.text); 
+      if (request.text) {
+        typeLine(session, request.text);
       } else if (request.stimulus_id) {
         session.current_stimulus_id = request.stimulus_id;
         const requestedBrain = request.brain_profile || 'default';
-        
+
         let bootCommand = 'gemini -y';
         try {
           const registryPath = pathResolver.resolve('knowledge/orchestration/brain-profiles.json');
           if (safeExistsSync(registryPath)) {
             const registry = JSON.parse(safeReadFile(registryPath, { encoding: 'utf8' }) as string);
-            const profileKey = requestedBrain === 'default' ? registry.default_profile : requestedBrain;
-            const profile = registry.profiles[profileKey] || registry.profiles[registry.default_profile];
+            const profileKey =
+              requestedBrain === 'default' ? registry.default_profile : requestedBrain;
+            const profile =
+              registry.profiles[profileKey] || registry.profiles[registry.default_profile];
             if (profile) bootCommand = `${profile.cmd} ${profile.args.join(' ')}`;
           }
         } catch (_) {}
@@ -318,7 +368,10 @@ function attachRuntime(session: Session, cols = 80, rows = 30) {
   if (session.rt) return;
 
   const rt = new ReflexTerminal({
-    shell: process.env.SHELL || '/bin/zsh', cols, rows, cwd: ROOT_DIR,
+    shell: process.env.SHELL || '/bin/zsh',
+    cols,
+    rows,
+    cwd: ROOT_DIR,
     onOutput: (data) => {
       session.backlog.push(data);
       if (session.backlog.length > 5000) session.backlog = session.backlog.slice(-5000);
@@ -326,7 +379,10 @@ function attachRuntime(session: Session, cols = 80, rows = 30) {
 
       const plainText = cleanTerminalOutput(data);
 
-      if (plainText.includes('Action Required') && (plainText.includes('Allow once') || data.includes('1.'))) {
+      if (
+        plainText.includes('Action Required') &&
+        (plainText.includes('Allow once') || data.includes('1.'))
+      ) {
         logger.info(`🛡️ [AutoPilot] Approving action in ${session.id}...`);
         session.rt?.write('1\r');
         return;
@@ -370,7 +426,7 @@ function attachRuntime(session: Session, cols = 80, rows = 30) {
       }
 
       emitGlobalStimulus(data, session);
-    }
+    },
   });
 
   session.rt = rt;
@@ -382,7 +438,7 @@ function hydratePersistedSession(id: string, requestedName?: string): Session {
   const paths = buildSessionPaths(RUNTIME_BASE, id);
   const persisted = readPersistedSessionState(paths.state);
 
-  [paths.in, paths.out].forEach(d => {
+  [paths.in, paths.out].forEach((d) => {
     if (!safeExistsSync(d)) safeMkdir(d, { recursive: true });
   });
 
@@ -396,13 +452,13 @@ function hydratePersistedSession(id: string, requestedName?: string): Session {
     backlog: [],
     active_brain: persisted?.active_brain || 'none',
     createdAt: persisted?.createdAt || new Date().toISOString(),
-    paths
+    paths,
   };
 }
 
 function listSessionSummaries() {
   const persisted = listPersistedSessionStates(RUNTIME_BASE);
-  const runtime = Array.from(sessions.values()).map(session => ({
+  const runtime = Array.from(sessions.values()).map((session) => ({
     id: session.id,
     name: session.name,
     active_brain: session.active_brain || 'none',
@@ -446,23 +502,23 @@ wss.on('connection', (ws, req) => {
       const p = JSON.parse(msg.toString());
       if (p.type === 'init') {
         const id = p.sessionId || `s-${Date.now()}`;
-         activeSession = getOrCreateSession(id, p.cols, p.rows, p.name);
-         if (activeSession.disconnectTimer) clearTimeout(activeSession.disconnectTimer);
-         activeSession.disconnectTimer = undefined;
-         activeSession.ws = ws;
-         activeSession.lastActive = Date.now();
-         saveSessionState(activeSession);
-         ws.send(JSON.stringify({ type: 'session_ready', sessionId: id, name: activeSession.name }));
-         ws.send(activeSession.backlog.join(''));
-       } else if (p.type === 'input' && activeSession) {
-         if (!activeSession.rt) attachRuntime(activeSession);
-         activeSession.rt?.write(p.data);
-         activeSession.lastActive = Date.now();
-         saveSessionState(activeSession);
-       } else if (p.type === 'resize' && activeSession) {
-         if (!activeSession.rt) attachRuntime(activeSession, p.cols, p.rows);
-         activeSession.rt?.resize(p.cols, p.rows);
-       }
+        activeSession = getOrCreateSession(id, p.cols, p.rows, p.name);
+        if (activeSession.disconnectTimer) clearTimeout(activeSession.disconnectTimer);
+        activeSession.disconnectTimer = undefined;
+        activeSession.ws = ws;
+        activeSession.lastActive = Date.now();
+        saveSessionState(activeSession);
+        ws.send(JSON.stringify({ type: 'session_ready', sessionId: id, name: activeSession.name }));
+        ws.send(activeSession.backlog.join(''));
+      } else if (p.type === 'input' && activeSession) {
+        if (!activeSession.rt) attachRuntime(activeSession);
+        activeSession.rt?.write(p.data);
+        activeSession.lastActive = Date.now();
+        saveSessionState(activeSession);
+      } else if (p.type === 'resize' && activeSession) {
+        if (!activeSession.rt) attachRuntime(activeSession, p.cols, p.rows);
+        activeSession.rt?.resize(p.cols, p.rows);
+      }
     } catch (_) {
       if (activeSession) {
         if (!activeSession.rt) attachRuntime(activeSession);
@@ -481,8 +537,8 @@ wss.on('connection', (ws, req) => {
   });
 });
 
-app.get('/sessions', (req, res) => { 
-  res.json(listSessionSummaries()); 
+app.get('/sessions', (req, res) => {
+  res.json(listSessionSummaries());
 });
 
 app.get('/health', (req, res) => {
@@ -494,7 +550,7 @@ app.get('/health', (req, res) => {
 
   res.json({
     ok: true,
-    liveSessions: Array.from(sessions.values()).filter(session => Boolean(session.rt)).length,
+    liveSessions: Array.from(sessions.values()).filter((session) => Boolean(session.rt)).length,
     persistedSessions: listPersistedSessionStates(RUNTIME_BASE).length,
     runtimeResources: runtimeResources.length,
     runtimeByKind,
@@ -536,8 +592,8 @@ app.post('/sessions', (req, res) => {
 
 const PORT = Number(process.env.TERMINAL_PORT || 4000);
 const HOST = process.env.KYBERION_TERMINAL_HOST || '127.0.0.1';
-server.listen(PORT, HOST, () => { 
-  logger.info(`🌌 Terminal Hub v6.2 standardized on port ${PORT}`); 
+server.listen(PORT, HOST, () => {
+  logger.info(`🌌 Terminal Hub v6.2 standardized on port ${PORT}`);
 
   if (safeExistsSync(RUNTIME_BASE)) {
     prunePersistedSessionState();

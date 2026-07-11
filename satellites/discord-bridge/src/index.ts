@@ -1,6 +1,10 @@
 import * as path from 'node:path';
+import { installProcessGuards } from '@agent/core';
 
 import { Client, GatewayIntentBits, Events, Message } from 'discord.js';
+
+// IP-08 Task 6: record unhandled rejections/exceptions in this long-lived process.
+installProcessGuards('discord-bridge');
 import {
   createStandardYargs,
   logger,
