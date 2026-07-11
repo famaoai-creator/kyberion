@@ -1,7 +1,6 @@
 {
   "v": "2.0.0",
   "t": 30,
-  "u": "2026-07-07T14:02:10.934Z",
   "actuators": [
     {
       "n": "agent-actuator",
@@ -371,7 +370,7 @@
       "d": "Knowledge-tier search, injection, import/export, and decision-support operations",
       "s": "implemented",
       "version": "1.2.1",
-      "capability_count": 33,
+      "capability_count": 34,
       "ops": [
         "a2a_fanout",
         "a2a_roleplay",
@@ -399,6 +398,7 @@
         "knowledge_import",
         "knowledge_inject",
         "knowledge_search",
+        "peer_advice",
         "pptx_diff",
         "recommend",
         "register_presentation_preference_profile",
