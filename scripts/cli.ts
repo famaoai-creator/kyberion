@@ -1341,6 +1341,10 @@ function applyApprovalDecision(
     decidedBy: 'sovereign-user',
     decidedByRole: 'sovereign',
     authMethod: 'manual',
+    decidedByType: 'human',
+    authenticated: true,
+    payloadHash: request.accountability?.payloadHash,
+    effectBinding: request.accountability?.effectBinding,
     note: `decision submitted from terminal via npm run cli -- ${command}`,
   });
 

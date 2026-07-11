@@ -5,7 +5,11 @@ export {
   materializeTrackArtifactSkeleton,
 } from '@agent/core/sdlc-gate-readiness';
 export { createNextActionContract } from '@agent/core/next-action-contract';
-export { decideApprovalRequest, listApprovalRequests } from '@agent/core/approval-store';
+export {
+  decideApprovalRequest,
+  listApprovalRequests,
+  loadApprovalRequest,
+} from '@agent/core/approval-store';
 export {
   clearSurfaceOutboxMessage,
   enqueueSurfaceNotification,

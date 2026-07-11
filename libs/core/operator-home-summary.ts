@@ -6,6 +6,7 @@ import { buildNextAction, type NextAction } from './next-action.js';
 import { listInboxEntries, type DeliverableInboxEntry } from './deliverable-inbox.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile, safeReaddir } from './secure-io.js';
+import { loadMissionStaffingAssignments } from './mission-team-binding.js';
 
 export interface OperatorHomeMissionItem {
   missionId: string;
@@ -43,6 +44,24 @@ export interface OperatorHomeCostSummary {
   }>;
 }
 
+export interface OperatorHomeWorkforceSummary {
+  activeAssignments: number;
+  humanResources: number;
+  agentResources: number;
+  serviceResources: number;
+  accountableOwners: string[];
+}
+
+export interface OperatorHomeActionItem {
+  actionId: string;
+  kind: 'mission' | 'approval' | 'deliverable';
+  title: string;
+  missionId?: string;
+  status: string;
+  priority: number;
+  nextAction: string;
+}
+
 export type OperatorHomeApprovalItem = ReturnType<typeof listApprovalRequests>[number];
 
 export interface OperatorHomeSummary {
@@ -65,6 +84,8 @@ export interface OperatorHomeSummary {
   pendingApprovals: OperatorHomeApprovalItem[];
   inboxEntries: DeliverableInboxEntry[];
   costSummary: OperatorHomeCostSummary;
+  workforceSummary?: OperatorHomeWorkforceSummary;
+  actionQueue?: OperatorHomeActionItem[];
   nextAction: NextAction;
 }
 
@@ -241,6 +262,80 @@ function collectCostSummary(
   };
 }
 
+function collectWorkforceSummary(
+  missions: OperatorHomeMissionItem[]
+): OperatorHomeWorkforceSummary {
+  const resources = new Map<string, 'human' | 'agent' | 'service'>();
+  const owners = new Set<string>();
+  let activeAssignments = 0;
+  for (const mission of missions) {
+    const staffing = loadMissionStaffingAssignments(mission.missionId);
+    for (const assignment of staffing?.assignments || []) {
+      if (assignment.status !== 'active') continue;
+      activeAssignments += 1;
+      resources.set(assignment.resource.resource_id, assignment.resource.resource_type);
+      if (assignment.resource.accountable_human_id)
+        owners.add(assignment.resource.accountable_human_id);
+    }
+  }
+  return {
+    activeAssignments,
+    humanResources: [...resources.values()].filter((type) => type === 'human').length,
+    agentResources: [...resources.values()].filter((type) => type === 'agent').length,
+    serviceResources: [...resources.values()].filter((type) => type === 'service').length,
+    accountableOwners: [...owners].sort(),
+  };
+}
+
+function collectActionQueue(
+  missions: OperatorHomeMissionItem[],
+  approvals: OperatorHomeApprovalItem[],
+  inboxEntries: DeliverableInboxEntry[]
+): OperatorHomeActionItem[] {
+  const items: OperatorHomeActionItem[] = [];
+  for (const mission of missions.filter(
+    (item) => item.status === 'paused' || item.status === 'failed'
+  )) {
+    items.push({
+      actionId: `mission:${mission.missionId}`,
+      kind: 'mission',
+      title: mission.goalSummary || mission.missionId,
+      missionId: mission.missionId,
+      status: mission.status,
+      priority: 100,
+      nextAction: 'Inspect and recover the mission',
+    });
+  }
+  for (const approval of approvals) {
+    items.push({
+      actionId: `approval:${approval.id}`,
+      kind: 'approval',
+      title: approval.title,
+      missionId: approval.requestedByContext?.missionId,
+      status: approval.status,
+      priority: approval.severity === 'high' ? 95 : 80,
+      nextAction: 'Review and decide',
+    });
+  }
+  for (const entry of inboxEntries.filter(
+    (item) => item.status === 'unread' || item.status === 'changes_requested'
+  )) {
+    items.push({
+      actionId: `deliverable:${entry.entry_id}`,
+      kind: 'deliverable',
+      title: entry.title,
+      missionId: entry.mission_id,
+      status: entry.status,
+      priority: entry.status === 'changes_requested' ? 85 : 60,
+      nextAction:
+        entry.status === 'changes_requested' ? 'Review requested changes' : 'Review deliverable',
+    });
+  }
+  return items.sort(
+    (left, right) => right.priority - left.priority || left.actionId.localeCompare(right.actionId)
+  );
+}
+
 export function collectOperatorHomeSummary(
   input: {
     budgetUsd?: number;
@@ -261,6 +356,8 @@ export function collectOperatorHomeSummary(
     budgetUsd: input.budgetUsd,
     since: input.since,
   });
+  const workforceSummary = collectWorkforceSummary(missionItems);
+  const actionQueue = collectActionQueue(missionItems, pendingApprovals, inboxEntries);
   const status =
     blockedMissions.length > 0
       ? 'blocked'
@@ -326,6 +423,8 @@ export function collectOperatorHomeSummary(
     pendingApprovals,
     inboxEntries,
     costSummary,
+    workforceSummary,
+    actionQueue,
     nextAction,
   };
 }

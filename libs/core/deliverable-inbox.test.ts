@@ -45,7 +45,7 @@ describe('deliverable inbox', () => {
   });
 
   it('adds, lists, and marks inbox entries', async () => {
-    const { addInboxEntry, listInboxEntries, markInboxEntry } =
+    const { acceptInboxEntryWithHumanReceipt, addInboxEntry, listInboxEntries, markInboxEntry } =
       await import('./deliverable-inbox.js');
 
     fs.mkdirSync(path.join(tmpRoot, 'active/shared/inbox'), { recursive: true });
@@ -63,7 +63,13 @@ describe('deliverable inbox', () => {
     expect(unread).toHaveLength(1);
     expect(unread[0]?.entry_id).toBe(entry.entry_id);
 
-    const accepted = markInboxEntry(entry.entry_id, 'accepted');
+    const accepted = acceptInboxEntryWithHumanReceipt({
+      entryId: entry.entry_id,
+      actorId: 'human:operator',
+      authenticated: true,
+      authMethod: 'passkey',
+      responsibilityStatement: 'I accept this deliverable.',
+    });
     expect(accepted?.status).toBe('accepted');
 
     const acceptedList = listInboxEntries({ status: 'accepted' });
@@ -96,5 +102,50 @@ describe('deliverable inbox', () => {
     const filtered = listInboxEntries({ status: ['rejected', 'changes_requested'] });
     expect(filtered).toHaveLength(1);
     expect(filtered[0]?.entry_id).toBe(entry.entry_id);
+  });
+
+  it('requires an authenticated human receipt for final acceptance', async () => {
+    const { acceptInboxEntryWithHumanReceipt, addInboxEntry, finalizeAcceptedDeliverable } =
+      await import('./deliverable-inbox.js');
+
+    fs.mkdirSync(path.join(tmpRoot, 'active/shared/inbox'), { recursive: true });
+    const entry = addInboxEntry({
+      missionId: 'MSN-3',
+      title: 'Accepted report',
+      artifactPaths: ['active/missions/public/MSN-3/evidence/report.md'],
+    });
+
+    expect(() =>
+      acceptInboxEntryWithHumanReceipt({
+        entryId: entry.entry_id,
+        actorId: 'human:operator',
+        authenticated: false,
+        authMethod: 'passkey',
+        responsibilityStatement: 'I accept this report.',
+      })
+    ).toThrow(/authenticated human/);
+
+    const accepted = acceptInboxEntryWithHumanReceipt({
+      entryId: entry.entry_id,
+      actorId: 'human:operator',
+      authenticated: true,
+      authMethod: 'passkey',
+      responsibilityStatement: 'I accept this report and retain responsibility for its use.',
+    });
+    expect(accepted?.status).toBe('accepted');
+    expect(accepted?.acceptance_receipt?.actor_type).toBe('human');
+    expect(accepted?.acceptance_receipt?.artifact_digest).toMatch(/^[a-f0-9]{64}$/);
+
+    const delivered = finalizeAcceptedDeliverable({
+      entryId: entry.entry_id,
+      actorId: 'human:operator',
+      authenticated: true,
+      authMethod: 'passkey',
+      destination: 'customer:acme',
+    });
+    expect(delivered?.delivery_receipt?.destination).toBe('customer:acme');
+    expect(delivered?.delivery_receipt?.artifact_digest).toBe(
+      delivered?.acceptance_receipt?.artifact_digest
+    );
   });
 });
