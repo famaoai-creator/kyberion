@@ -26,6 +26,7 @@ const allowedCoreFsImports = [
   'libs/core/meeting-participation-coordinator.test.ts',
   'libs/core/metrics.test.ts',
   'libs/core/mission-evidence-doc.test.ts',
+  'libs/core/mission-phase-exit-gates.test.ts',
   'libs/core/process-logger.test.ts',
   'libs/core/promoted-memory.test.ts',
   'libs/core/python-voice-bridge.test.ts',
