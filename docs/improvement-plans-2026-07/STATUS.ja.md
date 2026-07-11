@@ -66,7 +66,7 @@
 | ID    | 状態    | 残作業                                                                                                                                                                                                            |
 | ----- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | AC-01 | DONE    |                                                                                                                                                                                                                   |
-| AC-02 | PARTIAL | browser fill フォールバック、4系統 reconciled 化の E2E                                                                                                                                                            |
+| AC-02 | PARTIAL | 2026-07-12: browser fill 多段フォールバック(label/placeholder/name + 候補一覧エラー)実装。残: 4系統 reconciled 化の E2E のみ                                                                                      |
 | AC-03 | DONE    |                                                                                                                                                                                                                   |
 | AC-04 | PARTIAL | gws/backend 抽象層(非 macOS 対応)、gws セッションプローブ                                                                                                                                                         |
 | AC-05 | PARTIAL | 2026-07-11: 保存時暗号化を実装(KYBERION_SECRET_ENCRYPTION=keychain、AES-256-GCM+keychain KEK、読込自動判別、pnpm secrets:encrypt/--decrypt、テスト付き)。残: OAuth プリセット拡大、kintone パイロット、age モード |
