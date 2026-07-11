@@ -47,12 +47,12 @@
 
 ### 運用
 
-| 優先度 | 改善                                              | 根拠                                            | 計画                                                                                    |
-| ------ | ------------------------------------------------- | ----------------------------------------------- | --------------------------------------------------------------------------------------- |
-| P0     | fallback を同一 trace の recovered 結果として確定 | primary failure を persist 後に fallback を実行 | OP-04、UX-02                                                                            |
-| P1     | Windows capability 宣言を CI matrix と一致させる  | win32 宣言に対し ubuntu/macOS のみ検証          | IP-06、IP-03                                                                            |
-| P1     | env registry と起動時 validation                  | env 参照が分散し誤設定の検出が遅い              | OP-05、2026-07-11 基盤実装(228変数レジストリ・drift check・warn-only 検証・doctor 配線) |
-| P1     | dependency/CVE 台帳と patch judgment loop         | 継続的な脆弱性管理経路が未実装                  | AO-02                                                                                   |
+| 優先度 | 改善                                              | 根拠                                            | 計画                                                                                                                                                 |
+| ------ | ------------------------------------------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P0     | fallback を同一 trace の recovered 結果として確定 | primary failure を persist 後に fallback を実行 | OP-04、UX-02                                                                                                                                         |
+| P1     | Windows capability 宣言を CI matrix と一致させる  | win32 宣言に対し ubuntu/macOS のみ検証          | IP-06、IP-03、2026-07-11 warn 観測開始(cross-os に non-blocking windows-latest job。green 継続で matrix 昇格 / 継続 red なら win32 宣言を実態に縮小) |
+| P1     | env registry と起動時 validation                  | env 参照が分散し誤設定の検出が遅い              | OP-05、2026-07-11 基盤実装(228変数レジストリ・drift check・warn-only 検証・doctor 配線)                                                              |
+| P1     | dependency/CVE 台帳と patch judgment loop         | 継続的な脆弱性管理経路が未実装                  | AO-02                                                                                                                                                |
 
 ## 推奨実施順序
 
