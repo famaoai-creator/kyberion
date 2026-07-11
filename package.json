@@ -2,6 +2,9 @@
   "name": "kyberion",
   "version": "1.0.0",
   "private": true,
+  "bin": {
+    "kyberion": "dist/scripts/cli.js"
+  },
   "type": "module",
   "description": "Monorepo for Kyberion Ecosystem",
   "engines": {
