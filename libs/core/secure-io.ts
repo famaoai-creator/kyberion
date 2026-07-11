@@ -224,6 +224,10 @@ export function safeWriteFile(
     fs.mkdirSync(dir, { recursive: true });
   }
 
+  if (fs.existsSync(resolved) && fs.lstatSync(resolved).isSymbolicLink()) {
+    throw new Error(`[SECURITY] Refusing to replace symbolic link: ${resolved}`);
+  }
+
   // One retry: janitor/tmp sweeps can race the atomic write and remove the
   // temp file (or its dir) between write and rename — ENOENT here is
   // recoverable by re-materializing the temp file once.
@@ -232,8 +236,10 @@ export function safeWriteFile(
     const tempPath = `${resolved}.tmp.${ns}.${Math.random().toString(36).substring(2)}`;
     let fd: number | null = null;
     try {
-      fd = fs.openSync(tempPath, 'w');
-      fs.writeFileSync(fd, data, options as any);
+      // Apply the requested mode at creation time. Applying it only through
+      // writeFileSync(fd, ...) has no effect because the descriptor is already open.
+      fd = fs.openSync(tempPath, 'wx', options.mode ?? 0o666);
+      fs.writeFileSync(fd, data, { encoding: options.encoding });
       fs.fsyncSync(fd);
       fs.closeSync(fd);
       fd = null;

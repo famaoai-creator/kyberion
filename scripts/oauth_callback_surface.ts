@@ -26,6 +26,20 @@ function ensureRuntimeDir() {
   }
 }
 
+function escapeHtml(value: string) {
+  return value.replace(
+    /[&<>"']/g,
+    (character) =>
+      ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+      })[character]!
+  );
+}
+
 function renderHtml(title: string, body: string, tone: 'success' | 'error' = 'success') {
   const accent = tone === 'success' ? '#18603b' : '#8a1c1c';
   const border = tone === 'success' ? '#7fc59b' : '#e3a4a4';
@@ -35,7 +49,7 @@ function renderHtml(title: string, body: string, tone: 'success' | 'error' = 'su
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>${title}</title>
+  <title>${escapeHtml(title)}</title>
   <style>
     body { font-family: Georgia, "Times New Roman", serif; background: linear-gradient(160deg, #f8f2e8 0%, #f2f7fb 100%); color: #1f2933; padding: 48px 20px; }
     .card { max-width: 640px; margin: 0 auto; background: ${background}; border: 1px solid ${border}; border-radius: 18px; padding: 28px; box-shadow: 0 18px 48px rgba(31,41,51,.08); }
@@ -46,12 +60,21 @@ function renderHtml(title: string, body: string, tone: 'success' | 'error' = 'su
 </head>
 <body>
   <div class="card">
-    <h1>${title}</h1>
+    <h1>${escapeHtml(title)}</h1>
     <p>${body}</p>
   </div>
 </body>
 </html>`;
 }
+
+app.use((_req, res, next) => {
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'"
+  );
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  next();
+});
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', service: 'oauth-callback-surface', callback_path: CALLBACK_PATH });
@@ -63,45 +86,72 @@ app.get(CALLBACK_PATH, async (req, res) => {
     const code = typeof req.query.code === 'string' ? req.query.code : undefined;
     const state = typeof req.query.state === 'string' ? req.query.state : undefined;
     const error = typeof req.query.error === 'string' ? req.query.error : undefined;
-    const errorDescription = typeof req.query.error_description === 'string' ? req.query.error_description : undefined;
+    const errorDescription =
+      typeof req.query.error_description === 'string' ? req.query.error_description : undefined;
 
     const result = await completeOAuthCallback({ serviceId, code, state, error, errorDescription });
     ensureRuntimeDir();
-    safeWriteFile(LATEST_RESULT_PATH, JSON.stringify({
-      ts: new Date().toISOString(),
-      callback_path: CALLBACK_PATH,
-      ...result,
-    }, null, 2) + '\n');
+    safeWriteFile(
+      LATEST_RESULT_PATH,
+      JSON.stringify(
+        {
+          ts: new Date().toISOString(),
+          callback_path: CALLBACK_PATH,
+          ...result,
+        },
+        null,
+        2
+      ) + '\n'
+    );
 
     if (!result.ok) {
-      logger.warn(`[oauth-callback-surface] OAuth callback returned provider error for ${result.serviceId || 'unknown'}: ${result.error}`);
-      return res.status(400).send(renderHtml(
-        'Authorization Failed',
-        `The provider returned <code>${result.error}</code>${result.errorDescription ? `: ${result.errorDescription}` : ''}. You can close this window and retry from Kyberion.`,
-        'error',
-      ));
+      logger.warn(
+        `[oauth-callback-surface] OAuth callback returned provider error for ${result.serviceId || 'unknown'}: ${result.error}`
+      );
+      return res
+        .status(400)
+        .send(
+          renderHtml(
+            'Authorization Failed',
+            `The provider returned <code>${escapeHtml(result.error)}</code>${result.errorDescription ? `: ${escapeHtml(result.errorDescription)}` : ''}. You can close this window and retry from Kyberion.`,
+            'error'
+          )
+        );
     }
 
     logger.info(`[oauth-callback-surface] OAuth callback completed for ${result.serviceId}`);
-    return res.send(renderHtml(
-      'Authorization Complete',
-      `The ${result.serviceId} connection is now stored in the Personal tier. You can close this window and return to Kyberion.`,
-      'success',
-    ));
+    return res.send(
+      renderHtml(
+        'Authorization Complete',
+        `The ${escapeHtml(result.serviceId)} connection is now stored in the Personal tier. You can close this window and return to Kyberion.`,
+        'success'
+      )
+    );
   } catch (error: any) {
     logger.error(`[oauth-callback-surface] ${error.message}`);
     ensureRuntimeDir();
-    safeWriteFile(LATEST_RESULT_PATH, JSON.stringify({
-      ts: new Date().toISOString(),
-      callback_path: CALLBACK_PATH,
-      ok: false,
-      error: error.message,
-    }, null, 2) + '\n');
-    return res.status(500).send(renderHtml(
-      'Callback Error',
-      `Kyberion could not complete the OAuth callback: <code>${error.message}</code>.`,
-      'error',
-    ));
+    safeWriteFile(
+      LATEST_RESULT_PATH,
+      JSON.stringify(
+        {
+          ts: new Date().toISOString(),
+          callback_path: CALLBACK_PATH,
+          ok: false,
+          error: error.message,
+        },
+        null,
+        2
+      ) + '\n'
+    );
+    return res
+      .status(500)
+      .send(
+        renderHtml(
+          'Callback Error',
+          'Kyberion could not complete the OAuth callback. You can close this window and retry from Kyberion.',
+          'error'
+        )
+      );
   }
 });
 
@@ -112,6 +162,8 @@ withExecutionContext('surface_runtime', () => {
 });
 
 server.on('error', (error: NodeJS.ErrnoException) => {
-  logger.error(`[oauth-callback-surface] failed to listen on http://${HOST}:${PORT}${CALLBACK_PATH}: ${error.message}`);
+  logger.error(
+    `[oauth-callback-surface] failed to listen on http://${HOST}:${PORT}${CALLBACK_PATH}: ${error.message}`
+  );
   process.exitCode = 1;
 });

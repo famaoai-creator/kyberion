@@ -91,6 +91,42 @@ describe('probeManifest', () => {
     expect(probes[0].satisfied).toBe(true);
     expect(probes[0].not_applicable).toBe(true);
   });
+
+  it('does not execute command or module probes from an untrusted raw manifest', async () => {
+    const marker = path.join(ROOT, 'active/shared/tmp/environment-capability-untrusted-probe');
+    fs.rmSync(marker, { force: true });
+    const manifest: EnvironmentManifest = {
+      manifest_id: 'unit-test-untrusted-executable-probes',
+      version: 'test',
+      capabilities: [
+        {
+          capability_id: 'cap.command',
+          kind: 'binary',
+          description: 'must not execute',
+          required_for: ['demo'],
+          probe: { kind: 'command', command: 'touch', args: [marker] },
+        },
+        {
+          capability_id: 'cap.module',
+          kind: 'npm-package',
+          description: 'must not import',
+          required_for: ['demo'],
+          probe: {
+            kind: 'module',
+            specifier: `data:text/javascript,process.env.UNTRUSTED_MODULE_RAN='1'`,
+          },
+        },
+      ],
+    };
+    delete process.env.UNTRUSTED_MODULE_RAN;
+    const statuses = await probeManifest(manifest);
+    expect(statuses.every((status) => !status.satisfied)).toBe(true);
+    expect(statuses.every((status) => status.reason?.includes('governed manifest directory'))).toBe(
+      true
+    );
+    expect(fs.existsSync(marker)).toBe(false);
+    expect(process.env.UNTRUSTED_MODULE_RAN).toBeUndefined();
+  });
 });
 
 describe('bootstrapManifest dry-run', () => {
@@ -148,7 +184,7 @@ describe('verifyReady', () => {
         mission_id: FIX_MISSION,
         tier: 'confidential',
         assigned_persona: 'ecosystem_architect',
-      }),
+      })
     );
   });
 
@@ -308,7 +344,11 @@ describe('verifyReady', () => {
     const report = verifyReady(manifest, { mission_id: FIX_MISSION });
     expect(report.ready).toBe(false);
     expect(report.missing.map((m) => m.capability_id)).toEqual(
-      expect.arrayContaining(['__receipt_generated_at__', '__receipt_expires_at__', '__receipt_age__']),
+      expect.arrayContaining([
+        '__receipt_generated_at__',
+        '__receipt_expires_at__',
+        '__receipt_age__',
+      ])
     );
     delete process.env.PROBE_VERIFY_READY;
   });
@@ -342,7 +382,7 @@ describe('verifyReady', () => {
         '__receipt_satisfied__',
         '__receipt_unsatisfied__',
         '__receipt_installs_performed__',
-      ]),
+      ])
     );
     delete process.env.PROBE_VERIFY_READY;
   });
@@ -392,6 +432,24 @@ describe('loadEnvironmentManifest', () => {
 
   it('throws on unknown manifest id', () => {
     expect(() => loadEnvironmentManifest('does-not-exist-anywhere')).toThrow();
+  });
+
+  it('rejects path traversal instead of loading an arbitrary JSON file', () => {
+    expect(() => loadEnvironmentManifest('../../package')).toThrow('referenced by id');
+  });
+
+  it('rejects symlinked manifests in the governed directory', () => {
+    const dir = path.join(ROOT, 'knowledge/product/governance/environment-manifests');
+    const link = path.join(dir, 'unit-test-symlink.json');
+    fs.rmSync(link, { force: true });
+    fs.symlinkSync(path.join(dir, 'reasoning-backend.json'), link);
+    try {
+      expect(() => loadEnvironmentManifest('unit-test-symlink')).toThrow(
+        'must not contain symlinks'
+      );
+    } finally {
+      fs.rmSync(link, { force: true });
+    }
   });
 });
 
