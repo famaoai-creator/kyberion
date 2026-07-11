@@ -19,6 +19,14 @@
       "documented": false
     },
     {
+      "name": "KYBERION_A2A_SIGNATURE",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_A2UI_BRIDGE_URL",
       "category": "provider",
       "type": "string",
