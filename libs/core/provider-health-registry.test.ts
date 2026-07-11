@@ -1,10 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+// Isolate the persisted state file so tests never touch the real runtime
+// state (set before any registry call; the registry loads lazily).
+process.env.KYBERION_PROVIDER_HEALTH_STATE_PATH =
+  'active/shared/tmp/tests/provider-health-registry.test.json';
+
 import {
   clearProviderHealth,
   healthyInstances,
   instancesForProvider,
   isInstanceDemoted,
   listDemotedProviders,
+  reloadProviderHealthFromDisk,
   reportProviderHealthy,
   reportProviderRateLimited,
   reportProviderTemporarilyUnhealthy,
@@ -12,8 +19,14 @@ import {
   selectHealthyInstance,
 } from './provider-health-registry.js';
 import type { ProviderInfo } from './provider-discovery.js';
+import * as pathResolver from './path-resolver.js';
+import { safeWriteFile } from './secure-io.js';
 
-function provider(providerId: string, models: string[], modelCapabilities: Record<string, string[]> = {}): ProviderInfo {
+function provider(
+  providerId: string,
+  models: string[],
+  modelCapabilities: Record<string, string[]> = {}
+): ProviderInfo {
   return {
     provider: providerId,
     installed: true,
@@ -88,7 +101,7 @@ describe('provider-health-registry', () => {
     const resolved = resolveCapabilityTargetWithHealth(
       { requiredCapabilities: ['patch', 'terminal'], preferredProvider: 'codex' },
       [claude, codex],
-      T0 + 1000,
+      T0 + 1000
     );
     expect(resolved.provider).toBe('codex');
     expect(resolved.instance).toBe('personal');
@@ -100,7 +113,7 @@ describe('provider-health-registry', () => {
     const resolved = resolveCapabilityTargetWithHealth(
       { requiredCapabilities: ['code'], preferredProvider: 'codex' },
       [claude, codex],
-      T0 + 1000,
+      T0 + 1000
     );
     expect(resolved.provider).toBe('claude');
   });
@@ -110,5 +123,36 @@ describe('provider-health-registry', () => {
     expect(isInstanceDemoted('codex', 'default', T0 + 1000)).toBe(true);
     reportProviderHealthy('codex');
     expect(isInstanceDemoted('codex', 'default', T0 + 1000)).toBe(false);
+  });
+
+  describe('persistence across restarts (OP-04 Task 3)', () => {
+    it('demotions survive a reload from disk', () => {
+      reportProviderRateLimited('codex', { retryAfterMs: 60_000, now: T0 });
+      reloadProviderHealthFromDisk(T0 + 1000); // simulated restart
+      expect(isInstanceDemoted('codex', 'default', T0 + 1000)).toBe(true);
+    });
+
+    it('expired demotions recover naturally on reload (TTL)', () => {
+      reportProviderRateLimited('codex', { retryAfterMs: 5000, now: T0 });
+      reloadProviderHealthFromDisk(T0 + 60_000);
+      expect(isInstanceDemoted('codex', 'default', T0 + 60_000)).toBe(false);
+    });
+
+    it('an early healthy report is also persisted', () => {
+      reportProviderRateLimited('codex', { retryAfterMs: 60_000, now: T0 });
+      reportProviderHealthy('codex');
+      reloadProviderHealthFromDisk(T0 + 1000);
+      expect(isInstanceDemoted('codex', 'default', T0 + 1000)).toBe(false);
+    });
+
+    it('a corrupt state file falls back to an empty registry', () => {
+      reportProviderRateLimited('codex', { retryAfterMs: 60_000, now: T0 });
+      safeWriteFile(
+        pathResolver.rootResolve(String(process.env.KYBERION_PROVIDER_HEALTH_STATE_PATH)),
+        '{not json'
+      );
+      reloadProviderHealthFromDisk(T0 + 1000);
+      expect(isInstanceDemoted('codex', 'default', T0 + 1000)).toBe(false);
+    });
   });
 });
