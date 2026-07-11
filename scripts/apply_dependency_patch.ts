@@ -50,6 +50,12 @@ export interface DependencyPatchOptions {
   packageName: string;
   targetVersion: string;
   apply: boolean;
+  /**
+   * Patch a transitive dependency through pnpm.overrides. Off by default:
+   * overrides pin every occurrence in the graph, so they need an explicit
+   * operator opt-in instead of silently widening the blast radius.
+   */
+  allowOverride?: boolean;
   rootDir?: string;
   ledgerPath?: string;
   backupRoot?: string;
@@ -72,6 +78,7 @@ export interface DependencyPatchOutcome {
 interface RootPackageJson {
   dependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;
+  pnpm?: { overrides?: Record<string, string>; [key: string]: unknown };
   [key: string]: unknown;
 }
 
@@ -118,6 +125,38 @@ export function bumpDependencySpec(
   return null;
 }
 
+export type PatchPlan =
+  | { kind: 'direct'; section: 'dependencies' | 'devDependencies'; previous: string; next: string }
+  | { kind: 'override'; previous: string | null; next: string };
+
+export function planDependencyPatch(
+  pkg: RootPackageJson,
+  packageName: string,
+  targetVersion: string,
+  allowOverride: boolean
+): PatchPlan | null {
+  const direct = bumpDependencySpec(pkg, packageName, targetVersion);
+  if (direct) return { kind: 'direct', ...direct };
+  if (!allowOverride) return null;
+  // Transitive: pin every graph occurrence via pnpm.overrides (exact version).
+  return {
+    kind: 'override',
+    previous: pkg.pnpm?.overrides?.[packageName] ?? null,
+    next: targetVersion,
+  };
+}
+
+function applyPlanToPackage(pkg: RootPackageJson, packageName: string, plan: PatchPlan): void {
+  if (plan.kind === 'direct') {
+    pkg[plan.section] = { ...pkg[plan.section], [packageName]: plan.next };
+    return;
+  }
+  pkg.pnpm = {
+    ...pkg.pnpm,
+    overrides: { ...pkg.pnpm?.overrides, [packageName]: plan.next },
+  };
+}
+
 function appendLedger(ledgerPath: string, record: Record<string, unknown>): void {
   safeMkdir(path.dirname(ledgerPath), { recursive: true });
   safeAppendFileSync(ledgerPath, `${JSON.stringify(record)}\n`);
@@ -149,27 +188,35 @@ export function applyDependencyPatch(options: DependencyPatchOptions): Dependenc
     safeReadFile(packageJsonPath, { encoding: 'utf8' }) as string,
     'root package.json'
   );
-  const bump = bumpDependencySpec(pkg, options.packageName, options.targetVersion);
+  const plan = planDependencyPatch(
+    pkg,
+    options.packageName,
+    options.targetVersion,
+    Boolean(options.allowOverride)
+  );
 
-  if (!bump) {
+  if (!plan) {
     const outcome: DependencyPatchOutcome = {
       status: 'refused',
       package_name: options.packageName,
       gates: [],
       reason:
-        'Not a direct dependency of the root package — transitive patches need a pnpm override and go through approval (AO-02 §3.4 handoff).',
+        'Not a direct dependency of the root package — rerun with --override to pin it via pnpm.overrides, or hand off to approval (AO-02 §3.4).',
     };
     appendLedger(ledgerPath, { kind: 'patch_apply', timestamp, mode: 'refused', ...outcome });
     return outcome;
   }
 
+  const section = plan.kind === 'direct' ? plan.section : 'pnpm.overrides';
+  const previousSpec = plan.previous ?? '(none)';
+
   if (!options.apply) {
     const outcome: DependencyPatchOutcome = {
       status: 'proposed',
       package_name: options.packageName,
-      previous_spec: bump.previous,
-      next_spec: bump.next,
-      section: bump.section,
+      previous_spec: previousSpec,
+      next_spec: plan.next,
+      section,
       gates: [],
       reason: 'Proposal only (run with --apply to execute the §3.4 flow).',
     };
@@ -186,9 +233,9 @@ export function applyDependencyPatch(options: DependencyPatchOptions): Dependenc
   const packageJsonRaw = safeReadFile(packageJsonPath, { encoding: 'utf8' }) as string;
   safeWriteFile(path.join(backupDir, 'package.json'), packageJsonRaw);
 
-  // 2. Apply the version bump.
+  // 2. Apply the version bump (direct section or pnpm.overrides).
   const nextPkg: RootPackageJson = safeJsonParse(packageJsonRaw, 'root package.json');
-  nextPkg[bump.section] = { ...nextPkg[bump.section], [options.packageName]: bump.next };
+  applyPlanToPackage(nextPkg, options.packageName, plan);
   safeWriteFile(packageJsonPath, `${JSON.stringify(nextPkg, null, 2)}\n`);
 
   const gateResults: Array<{ name: string; passed: boolean }> = [];
@@ -198,9 +245,9 @@ export function applyDependencyPatch(options: DependencyPatchOptions): Dependenc
     const outcome: DependencyPatchOutcome = {
       status: 'rolled_back',
       package_name: options.packageName,
-      previous_spec: bump.previous,
-      next_spec: bump.next,
-      section: bump.section,
+      previous_spec: previousSpec,
+      next_spec: plan.next,
+      section,
       gates: gateResults,
       backup_dir: backupDir,
       reason:
@@ -238,9 +285,9 @@ export function applyDependencyPatch(options: DependencyPatchOptions): Dependenc
   const outcome: DependencyPatchOutcome = {
     status: 'patched',
     package_name: options.packageName,
-    previous_spec: bump.previous,
-    next_spec: bump.next,
-    section: bump.section,
+    previous_spec: previousSpec,
+    next_spec: plan.next,
+    section,
     gates: gateResults,
     backup_dir: backupDir,
     reason: 'All gates green; patch confirmed.',
@@ -262,6 +309,11 @@ async function main(): Promise<number> {
       default: false,
       describe: 'Execute the flow (default proposes only)',
     })
+    .option('override', {
+      type: 'boolean',
+      default: false,
+      describe: 'Allow patching a transitive dependency via pnpm.overrides',
+    })
     .parseSync();
 
   const outcome = withExecutionContext('ecosystem_architect', () =>
@@ -269,6 +321,7 @@ async function main(): Promise<number> {
       packageName: String(argv.package),
       targetVersion: String(argv.to),
       apply: Boolean(argv.apply),
+      allowOverride: Boolean(argv.override),
     })
   );
 
