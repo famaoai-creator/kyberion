@@ -63,3 +63,8 @@
 - **完了**: `scripts/run_pipeline.ts` の `system:shell` が JSON stdout を structured context に反映するようになり、シェル由来の reconcile 結果を次ステップで扱える。
 - **完了**: `pipelines/reconcile-unhandled-intents.json` は summary-only logging に整理され、`knowledge/product/governance/phases/review.md` と `pipelines/weekly-review.json` に review フローとして接続された。
 - **検証済み**: `pnpm exec vitest run scripts/run_pipeline.test.ts`、`pnpm pipeline --input pipelines/reconcile-unhandled-intents.json`、`pnpm run build:repo`、`pnpm run typecheck`、`pnpm lint`、`git diff --check`。
+
+## 実装状況 追記 (2026-07-12)
+
+- **browser fill フォールバック完了**: `fillWithFallback`(±100行の計画スコープ内)— セレクタ直 → label(`params.field` ヒント or セレクタが平文の場合はそれ自体)→ placeholder → name 属性の多段解決。全滅時は**ページ上の入力欄候補一覧付きエラー**(修復エージェント/操作者がページを開き直さず修正可能)。フォールバック成功時は `fallback_strategy` を action trail に記録。テスト4本(直/label/平文ヒント/候補一覧エラー)。
+- 残: 4系統 reconciled 化の E2E(意図オントロジー側)。
