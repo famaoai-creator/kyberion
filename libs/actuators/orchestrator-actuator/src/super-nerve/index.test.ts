@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { executeSuperPipeline } from './index.js';
+import { actuatorModuleLoader, executeSuperPipeline } from './index.js';
 
 vi.mock('@agent/core', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@agent/core')>();
@@ -32,6 +32,27 @@ describe('super-nerve engine', () => {
         ? JSON.stringify({ steps: [{ op: 'system:log', params: { message: 'from macro' } }] })
         : ''
     );
+    // Hermetic in-process dispatch: stub the loader so no built actuator
+    // module is imported from dist during unit tests.
+    vi.spyOn(actuatorModuleLoader, 'load')
+      .mockClear()
+      .mockImplementation(async () => ({
+        handleAction: async (input: { steps: Array<{ op: string }>; context: any }) => {
+          const op = input.steps?.[0]?.op;
+          if (op === 'does_not_exist') {
+            return {
+              status: 'failed',
+              results: [{ op, status: 'failed', error: `Unknown op: ${op}` }],
+              context: input.context,
+            };
+          }
+          return {
+            status: 'succeeded',
+            results: [{ op, status: 'success' }],
+            context: { ...input.context, probed: true, context_path: 'should/be/stripped.json' },
+          };
+        },
+      }));
   });
 
   it('runs core control flow through the shared adf engine', async () => {
@@ -91,6 +112,20 @@ describe('super-nerve engine', () => {
       op: 'if',
       status: 'failed',
     });
+  });
+
+  it('dispatches actuator ops in-process and merges the returned context', async () => {
+    const result = await executeSuperPipeline(
+      [{ op: 'network:fetch', params: { url: 'https://example.com' } }],
+      { seed: 1 }
+    );
+
+    expect(result.status).toBe('succeeded');
+    expect(result.context.probed).toBe(true);
+    expect(result.context.seed).toBe(1);
+    // actuator-internal bookkeeping must not leak into the parent context
+    expect(result.context.context_path).toBeUndefined();
+    expect(actuatorModuleLoader.load).toHaveBeenCalledTimes(1);
   });
 
   it('resolves core call/include through the canonical resolver', async () => {
