@@ -17,10 +17,18 @@ import { sendOpsAlert } from './ops-alert.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 
+export interface SpendPolicyOverride {
+  posture?: 'warn' | 'block';
+  daily_cap_usd?: number;
+  mission_cap_usd?: number;
+}
+
 export interface SpendPolicy {
   posture: 'warn' | 'block';
   daily_cap_usd: number;
   mission_cap_usd: number;
+  /** Per-tenant cap overrides keyed by tenant id (KYBERION_TENANT). */
+  tenant_overrides?: Record<string, SpendPolicyOverride>;
 }
 
 export interface SpendGuardResult {
@@ -58,6 +66,15 @@ export function loadSpendPolicy(): SpendPolicy {
     const parsed = JSON.parse(
       String(safeReadFile(POLICY_PATH, { encoding: 'utf8' }) || '{}')
     ) as Partial<SpendPolicy>;
+    const tenantOverrides: Record<string, SpendPolicyOverride> = {};
+    for (const [tenant, raw] of Object.entries(parsed.tenant_overrides ?? {})) {
+      if (!raw || typeof raw !== 'object') continue;
+      const override: SpendPolicyOverride = {};
+      if (raw.posture === 'block' || raw.posture === 'warn') override.posture = raw.posture;
+      if (Number(raw.daily_cap_usd) > 0) override.daily_cap_usd = Number(raw.daily_cap_usd);
+      if (Number(raw.mission_cap_usd) > 0) override.mission_cap_usd = Number(raw.mission_cap_usd);
+      if (Object.keys(override).length > 0) tenantOverrides[tenant] = override;
+    }
     return {
       posture: parsed.posture === 'block' ? 'block' : 'warn',
       daily_cap_usd:
@@ -68,11 +85,28 @@ export function loadSpendPolicy(): SpendPolicy {
         Number(parsed.mission_cap_usd) > 0
           ? Number(parsed.mission_cap_usd)
           : DEFAULT_POLICY.mission_cap_usd,
+      ...(Object.keys(tenantOverrides).length > 0 ? { tenant_overrides: tenantOverrides } : {}),
     };
   } catch {
     // A broken policy file must not silently disable the guard.
     return DEFAULT_POLICY;
   }
+}
+
+/**
+ * OP-01 Task 3: tenant override. The effective policy for a tenant is the
+ * base policy with that tenant's overrides applied; unknown tenants (or no
+ * tenant) keep the base policy.
+ */
+export function resolveSpendPolicyForTenant(policy: SpendPolicy, tenantId?: string): SpendPolicy {
+  const id = tenantId ?? process.env.KYBERION_TENANT;
+  const override = id ? policy.tenant_overrides?.[id] : undefined;
+  if (!override) return policy;
+  return {
+    posture: override.posture ?? policy.posture,
+    daily_cap_usd: override.daily_cap_usd ?? policy.daily_cap_usd,
+    mission_cap_usd: override.mission_cap_usd ?? policy.mission_cap_usd,
+  };
 }
 
 interface UsageEntry {
@@ -125,11 +159,13 @@ export function checkSpendGuard(
     now?: number;
     entries?: UsageEntry[];
     policy?: SpendPolicy;
+    tenantId?: string;
     alert?: typeof sendOpsAlert;
   } = {}
 ): SpendGuardResult {
   const now = options.now ?? Date.now();
-  const policy = options.policy ?? loadSpendPolicy();
+  const tenantId = options.tenantId ?? process.env.KYBERION_TENANT;
+  const policy = resolveSpendPolicyForTenant(options.policy ?? loadSpendPolicy(), tenantId);
   const startOfUtcDay = new Date(now).setUTCHours(0, 0, 0, 0);
   const missionId = options.missionId || process.env.MISSION_ID || undefined;
   const entries = options.entries ?? loadUsageEntries(now);
@@ -154,7 +190,7 @@ export function checkSpendGuard(
   };
 
   if (breached.length > 0) {
-    const dedupeKey = `spend-guard:${breached.join('+')}:${new Date(startOfUtcDay).toISOString().slice(0, 10)}`;
+    const dedupeKey = `spend-guard:${tenantId || 'default'}:${breached.join('+')}:${new Date(startOfUtcDay).toISOString().slice(0, 10)}`;
     if (!alertedBreaches.has(dedupeKey)) {
       alertedBreaches.add(dedupeKey);
       const send = options.alert ?? sendOpsAlert;
