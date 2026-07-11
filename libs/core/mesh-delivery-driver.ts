@@ -30,6 +30,18 @@ export interface MeshDeliveryDispatcher {
   dispatchToPeer(input: MeshHubDispatchInput): Promise<unknown>;
 }
 
+/** Ledger operations the pass needs; defaults to the shared-namespace broker. */
+export interface MeshDeliveryBrokerOps {
+  expireMeshDeliveries(now: string): Promise<MeshDeliveryRecord[]>;
+  claimDueMeshDeliveries(now: string, limit?: number): Promise<MeshDeliveryRecord[]>;
+  acknowledgeMeshDelivery(deliveryId: string, receipt: Record<string, unknown>): Promise<unknown>;
+  retryMeshDelivery(
+    deliveryId: string,
+    now: string,
+    retryPolicy?: Partial<MeshRetryPolicy>
+  ): Promise<{ status: string }>;
+}
+
 export interface MeshDeliveryPassOptions {
   /** This host's peer id (sender_peer_id on reconstructed requests). */
   senderPeerId: string;
@@ -48,6 +60,8 @@ export interface MeshDeliveryPassOptions {
   writerLockId?: string;
   /** How long to wait for the writer lock before skipping the pass. */
   writerLockTimeoutMs?: number;
+  /** Ledger backend override — a namespaced broker instance (tests / shards). */
+  broker?: MeshDeliveryBrokerOps;
 }
 
 export interface MeshDeliveryPassReport {
@@ -133,6 +147,12 @@ async function runMeshDeliveryPassUnfenced(
   options: MeshDeliveryPassOptions
 ): Promise<MeshDeliveryPassReport> {
   const now = options.now || new Date().toISOString();
+  const broker: MeshDeliveryBrokerOps = options.broker ?? {
+    expireMeshDeliveries,
+    claimDueMeshDeliveries,
+    acknowledgeMeshDelivery,
+    retryMeshDelivery,
+  };
   const dispatcher =
     options.dispatcher ||
     createMeshHubPeerMessagingAdapter({
@@ -151,9 +171,12 @@ async function runMeshDeliveryPassUnfenced(
     failures: [],
   };
 
-  report.expired = (await expireMeshDeliveries(now)).length;
+  report.expired = (await broker.expireMeshDeliveries(now)).length;
 
-  const claimed = await claimDueMeshDeliveries(now, options.batchLimit ?? DEFAULT_BATCH_LIMIT);
+  const claimed = await broker.claimDueMeshDeliveries(
+    now,
+    options.batchLimit ?? DEFAULT_BATCH_LIMIT
+  );
   report.claimed = claimed.length;
 
   for (const delivery of claimed) {
@@ -176,7 +199,7 @@ async function runMeshDeliveryPassUnfenced(
         request: reconstructMeshRequest(delivery, options.senderPeerId),
         timeoutMs: options.dispatchTimeoutMs,
       });
-      await acknowledgeMeshDelivery(delivery.delivery_id, {});
+      await broker.acknowledgeMeshDelivery(delivery.delivery_id, {});
       report.delivered += 1;
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
@@ -191,7 +214,7 @@ async function runMeshDeliveryPassUnfenced(
   ): Promise<void> {
     target.failures.push({ delivery_id: delivery.delivery_id, reason });
     try {
-      const next = await retryMeshDelivery(delivery.delivery_id, now, options.retryPolicy);
+      const next = await broker.retryMeshDelivery(delivery.delivery_id, now, options.retryPolicy);
       if (next.status === 'dead_lettered' || next.status === 'expired') {
         target.dead_lettered += 1;
       } else {
