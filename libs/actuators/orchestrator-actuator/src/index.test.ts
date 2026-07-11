@@ -13,6 +13,16 @@ const mocks = vi.hoisted(() => ({
   evaluateCondition: vi.fn(),
   retry: vi.fn(async (fn: any) => fn()),
   derivePipelineStatus: vi.fn(() => 'succeeded'),
+  buildCostReportFromHistory: vi.fn(() => ({
+    since: null,
+    until: null,
+    total_usd: 0,
+    estimated_usd: 0,
+    calls: 0,
+    by_mission: [],
+    by_model: [],
+    by_day: [],
+  })),
 }));
 
 vi.mock('@agent/core', async () => {
@@ -30,6 +40,7 @@ vi.mock('@agent/core', async () => {
     evaluateCondition: mocks.evaluateCondition,
     retry: mocks.retry,
     derivePipelineStatus: mocks.derivePipelineStatus,
+    buildCostReportFromHistory: mocks.buildCostReportFromHistory,
   };
 });
 
@@ -821,6 +832,62 @@ describe('orchestrator-actuator', () => {
     expect(result.context.response_preview.reasoning_mode).toBe('model');
     expect(result.context.response_preview.text).toContain('Test headline');
     expect(result.context.response_preview.text).toContain('Reasoning mode: model');
+  });
+
+  it('surfaces the weekly LLM cost in the status report (OP-01)', async () => {
+    mocks.buildCostReportFromHistory.mockReturnValueOnce({
+      since: null,
+      until: null,
+      total_usd: 12.345,
+      estimated_usd: 1.5,
+      calls: 42,
+      by_mission: [
+        {
+          key: 'MSN-A',
+          cost_usd: 8,
+          estimated_cost_usd: 0,
+          calls: 20,
+          prompt_tokens: 0,
+          completion_tokens: 0,
+        },
+        {
+          key: 'MSN-B',
+          cost_usd: 4,
+          estimated_cost_usd: 0,
+          calls: 22,
+          prompt_tokens: 0,
+          completion_tokens: 0,
+        },
+      ],
+      by_model: [],
+      by_day: [],
+    });
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'pipeline',
+      context: {
+        system_status_snapshot: {
+          kind: 'system-status-snapshot',
+          scope: 'system',
+          surface_status: { surfaces: {} },
+        },
+      },
+      steps: [
+        {
+          type: 'transform',
+          op: 'status_snapshot_to_report',
+          params: { from: 'system_status_snapshot', export_as: 'system_status_report' },
+        },
+      ],
+    } as any);
+
+    const report = (result.context as any).system_status_report;
+    const costFinding = report.findings.find((f: any) => f.id === 'weekly-cost');
+    expect(costFinding).toBeDefined();
+    expect(costFinding.message).toContain('$12.35');
+    expect(costFinding.detail).toContain('MSN-A: $8.00');
+    expect(costFinding.detail).toContain('estimated portion $1.50');
+    expect(report.metrics.weekly_cost_usd).toBe(12.35);
   });
 
   it('handles status_report_to_operator_packet transform', async () => {
