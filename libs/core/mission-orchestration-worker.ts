@@ -1064,6 +1064,70 @@ async function buildTaskDispatchContext(input: {
   };
 }
 
+// MO-03 Task 2.3: per-task wall-clock budget derived from estimated_scope.
+// A hung dispatch must not stall the whole wave silently — on timeout the
+// task is marked blocked(timeout) and downstream dependents cascade to
+// blocked(dependency) instead of waiting forever.
+const TASK_DISPATCH_TIMEOUT_MS: Record<'S' | 'M' | 'L', number> = {
+  S: 10 * 60 * 1000,
+  M: 30 * 60 * 1000,
+  L: 60 * 60 * 1000,
+};
+
+export function resolveTaskDispatchTimeoutMs(task: {
+  estimated_scope?: 'S' | 'M' | 'L';
+  timeout_ms?: number;
+}): number {
+  const explicit = Number((task as Record<string, unknown>).timeout_ms);
+  if (Number.isFinite(explicit) && explicit > 0) return explicit;
+  return TASK_DISPATCH_TIMEOUT_MS[task.estimated_scope ?? 'M'] ?? TASK_DISPATCH_TIMEOUT_MS.M;
+}
+
+async function withTaskDispatchTimeout(
+  task: PlannedNextTask,
+  run: Promise<DispatchMissionTaskOutcome | null>
+): Promise<DispatchMissionTaskOutcome | null | 'timeout'> {
+  const timeoutMs = resolveTaskDispatchTimeoutMs(task);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<'timeout'>((resolve) => {
+    timer = setTimeout(() => resolve('timeout'), timeoutMs);
+    timer.unref?.();
+  });
+  try {
+    return await Promise.race([run, timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+/**
+ * MO-03 Task 2.3: cascade blocked status to transitive dependents so a
+ * blocked/timed-out upstream never leaves its dependents silently planned.
+ * Exported for tests.
+ */
+export function cascadeBlockedDependents(tasks: PlannedNextTask[]): string[] {
+  const blockedIds = new Set(
+    tasks.filter((task) => String(task.status || '') === 'blocked').map((task) => task.task_id)
+  );
+  const cascaded: string[] = [];
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const task of tasks) {
+      const status = String(task.status || 'planned');
+      if (status !== 'planned' && status !== 'rework') continue;
+      const hit = (task.dependencies || []).find((dependency) => blockedIds.has(dependency));
+      if (hit) {
+        task.status = 'blocked';
+        blockedIds.add(task.task_id);
+        cascaded.push(task.task_id);
+        changed = true;
+      }
+    }
+  }
+  return cascaded;
+}
+
 async function dispatchPlannedMissionTask(input: {
   missionId: string;
   task: PlannedNextTask;
@@ -2901,19 +2965,44 @@ export async function dispatchMissionNextTasks(
       }
 
       batch.push(
-        dispatchPlannedMissionTask({
-          missionId,
-          task,
-          teamRole,
-          assignment,
-          allTasks,
-        })
+        (async () => {
+          const outcome = await withTaskDispatchTimeout(
+            task,
+            dispatchPlannedMissionTask({
+              missionId,
+              task,
+              teamRole,
+              assignment,
+              allTasks,
+            })
+          );
+          if (outcome === 'timeout') {
+            task.status = 'blocked';
+            const summary = `Task ${task.task_id} exceeded its dispatch budget (${resolveTaskDispatchTimeoutMs(task)}ms) — blocked(timeout).`;
+            logger.warn(`[worker] ${summary}`);
+            recordMissionContextTask(missionId, `Blocked work item ${task.task_id}`, {
+              summary,
+              next_step: 'investigate the hung worker, then set the task back to rework',
+              work_item_id: task.task_id,
+              team_role: teamRole,
+              reason: 'blocked(timeout)',
+            });
+            return null;
+          }
+          return outcome;
+        })()
       );
     }
 
     if (batch.length === 0) continue;
 
     const results = await Promise.all(batch);
+    const cascadedIds = cascadeBlockedDependents(plannedTasks);
+    if (cascadedIds.length > 0) {
+      logger.warn(
+        `[worker] blocked dependency cascade for ${missionId}: ${cascadedIds.join(', ')}`
+      );
+    }
     for (const result of results) {
       if (result) {
         if (!result.allowSameInvocationRedispatch) {
