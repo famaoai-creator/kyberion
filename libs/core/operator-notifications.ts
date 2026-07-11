@@ -186,6 +186,12 @@ export async function notifyOperator(
   event: OperatorEvent,
   payload: OperatorNotificationPayload
 ): Promise<boolean> {
+  // Tests exercising real mission flows must not pollute the operator's
+  // real inbox/channels (81 phantom entries taught us this). Suites that
+  // genuinely test delivery mock this module or set the override.
+  if (process.env.VITEST && process.env.KYBERION_ALLOW_TEST_NOTIFICATIONS !== '1') {
+    return false;
+  }
   try {
     const prefs = loadNotificationPreferences();
     const route = resolveRoute(event, prefs);

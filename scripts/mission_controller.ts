@@ -1271,6 +1271,8 @@ Lifecycle Commands:
                                  --dispatch-rounds N (auto-retry blocked items, bounded)
                                  --dispatch-sources local,github,jira
                                  --dispatch-final-status review|done
+  hygiene [--notify]             List stuck planned missions with per-mission remediation
+                                 --stale-days N (default 2) --abandoned-days N (default 14)
 
 Delegation Commands:
   delegate <ID> <agent_id> <a2a_message_id>
