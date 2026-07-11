@@ -26,10 +26,19 @@ import {
   stopAgentRuntime,
 } from '@agent/core';
 import type { TaskModelHint } from '@agent/core/reasoning-model-routing';
-import { installProcessGuards } from '@agent/core';
+import { installProcessGuards, recordRuntimeHealthSample } from '@agent/core';
 
 // IP-08 Task 6: record unhandled rejections/exceptions in this long-lived process.
 installProcessGuards('agent-runtime-supervisor');
+
+// OP-04: hourly RSS/heap samples feed the degradation watch's trend
+// evaluation (leak / restart-storm detection over a 24h window).
+recordRuntimeHealthSample({ processName: 'agent-runtime-supervisor' });
+const runtimeHealthSampler = setInterval(
+  () => recordRuntimeHealthSample({ processName: 'agent-runtime-supervisor' }),
+  60 * 60 * 1000
+);
+runtimeHealthSampler.unref?.();
 
 type SupervisorMethod =
   | 'health'
