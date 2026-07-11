@@ -3555,7 +3555,7 @@
     {
       "path": "product/orchestration/peer-network.md",
       "tier": "public",
-      "size": 2560,
+      "size": 4020,
       "type": "md"
     },
     {
@@ -4509,7 +4509,7 @@
     {
       "path": "product/pipeline-templates/automate-browser-workflow.json",
       "tier": "public",
-      "size": 2219,
+      "size": 2396,
       "type": "json"
     },
     {
@@ -4522,6 +4522,12 @@
       "path": "product/pipeline-templates/board-meeting-prep.json",
       "tier": "public",
       "size": 3188,
+      "type": "json"
+    },
+    {
+      "path": "product/pipeline-templates/browser-authenticated-snapshot.json",
+      "tier": "public",
+      "size": 2038,
       "type": "json"
     },
     {
@@ -4857,7 +4863,7 @@
     {
       "path": "product/pipeline-templates/meeting-proxy-workflow.json",
       "tier": "public",
-      "size": 3100,
+      "size": 3267,
       "type": "json"
     },
     {
@@ -5037,7 +5043,7 @@
     {
       "path": "product/pipeline-templates/speak-with-my-voice.json",
       "tier": "public",
-      "size": 1509,
+      "size": 1773,
       "type": "json"
     },
     {
