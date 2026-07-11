@@ -3,11 +3,13 @@ import * as fs from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   bootstrapManifest,
+  computeManifestSignature,
   loadEnvironmentManifest,
   pathResolver,
   probeManifest,
   registerEnvironmentCapabilityProbe,
   resetEnvironmentCapabilityProbeRegistry,
+  verifyManifestSignature,
   verifyReady,
   type EnvironmentManifest,
 } from './index.js';
@@ -449,6 +451,66 @@ describe('loadEnvironmentManifest', () => {
       );
     } finally {
       fs.rmSync(link, { force: true });
+    }
+  });
+});
+
+describe('manifest signing (SA-02)', () => {
+  const baseManifest: EnvironmentManifest = {
+    manifest_id: 'signing-test',
+    version: '1.0.0',
+    description: 'signing fixture',
+    capabilities: [],
+  };
+  const KEY = 'unit-test-signing-key';
+
+  it('signs and verifies a manifest, and rejects tampering', () => {
+    const signature = computeManifestSignature(baseManifest, KEY);
+    expect(signature).toMatch(/^[0-9a-f]{64}$/);
+    expect(verifyManifestSignature({ ...baseManifest, signature }, KEY)).toBe(true);
+    expect(
+      verifyManifestSignature({ ...baseManifest, description: 'tampered', signature }, KEY)
+    ).toBe(false);
+    expect(verifyManifestSignature({ ...baseManifest, signature }, 'wrong-key')).toBe(false);
+    expect(verifyManifestSignature({ ...baseManifest, signature: 'zz' }, KEY)).toBe(false);
+    expect(verifyManifestSignature(baseManifest, KEY)).toBe(false);
+  });
+
+  it('canonicalization is key-order independent and excludes the signature field', () => {
+    const reordered = {
+      capabilities: [],
+      description: 'signing fixture',
+      version: '1.0.0',
+      manifest_id: 'signing-test',
+      signature: 'ignored',
+    } as EnvironmentManifest;
+    expect(computeManifestSignature(reordered, KEY)).toBe(
+      computeManifestSignature(baseManifest, KEY)
+    );
+  });
+
+  it('fail-closed: loading an unsigned governed manifest throws when a signing key is set', () => {
+    const previous = process.env.KYBERION_MANIFEST_SIGNING_KEY;
+    process.env.KYBERION_MANIFEST_SIGNING_KEY = KEY;
+    try {
+      expect(() => loadEnvironmentManifest('meeting-participation-runtime')).toThrow(
+        /missing or invalid signature/
+      );
+    } finally {
+      if (previous === undefined) delete process.env.KYBERION_MANIFEST_SIGNING_KEY;
+      else process.env.KYBERION_MANIFEST_SIGNING_KEY = previous;
+    }
+  });
+
+  it('warn phase: unsigned manifests still load when no signing key is configured', () => {
+    const previous = process.env.KYBERION_MANIFEST_SIGNING_KEY;
+    delete process.env.KYBERION_MANIFEST_SIGNING_KEY;
+    try {
+      const manifest = loadEnvironmentManifest('meeting-participation-runtime');
+      expect(manifest.manifest_id).toBe('meeting-participation-runtime');
+    } finally {
+      if (previous === undefined) delete process.env.KYBERION_MANIFEST_SIGNING_KEY;
+      else process.env.KYBERION_MANIFEST_SIGNING_KEY = previous;
     }
   });
 });

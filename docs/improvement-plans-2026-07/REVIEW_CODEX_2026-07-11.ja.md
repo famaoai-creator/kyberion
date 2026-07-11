@@ -43,7 +43,7 @@
 | High     | peer inbox/outbox の認証と body 上限                  | GET 無認証、chunk 蓄積に上限なし          | AA-03、SA-04、今回修正                                                                                                                                                                 |
 | High     | OAuth callback の HTML escape と CSP                  | provider error を HTML へ直接埋め込み     | SA-03、今回修正                                                                                                                                                                        |
 | High     | file secret fallback の opt-in・暗号化・0600          | 平文 JSON、生成 mode の保証不足           | AC-05、SA-05、2026-07-11 一部実装(0600/700・symlink 拒否に加え、未承認 fallback の warn フェーズ + KYBERION_ALLOW_FILE_SECRETS 承認 env を導入。fail-closed 化と暗号化は AC-05 Task 2) |
-| High     | environment manifest の署名・schema・command registry | manifest が任意 command/module を指定可能 | SA-02、SA-05                                                                                                                                                                           |
+| High     | environment manifest の署名・schema・command registry | manifest が任意 command/module を指定可能 | SA-02、SA-05、2026-07-11 一部実装(HMAC-SHA256 署名: 鍵設定時 fail-closed・未設定時 warn、pnpm manifests:sign。構造検証は既存。command registry は残)                                   |
 
 ### 運用
 
