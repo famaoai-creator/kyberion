@@ -27,6 +27,7 @@ import { logger } from './core.js';
 import * as pathResolver from './path-resolver.js';
 import {
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeReaddir,
   safeReadFile,
@@ -130,6 +131,7 @@ export interface ReadinessReport {
 }
 
 const DEFAULT_RECEIPT_TTL_MINUTES = 60 * 24 * 7;
+const _trustedExecutableManifests = new WeakSet<EnvironmentManifest>();
 
 /* ------------------------------------------------------------------ *
  * Probe registry — for `probe.kind === 'probe'` plug-ins so audio
@@ -197,10 +199,18 @@ function parseIsoDate(value: unknown): { ok: true; ms: number } | { ok: false } 
 
 async function runProbe(
   probe: CapabilityProbe,
-  missionId?: string
+  missionId?: string,
+  allowExecutableProbe = false
 ): Promise<{ available: boolean; reason?: string }> {
   switch (probe.kind) {
     case 'command': {
+      if (!allowExecutableProbe) {
+        return {
+          available: false,
+          reason:
+            'command probe denied: manifest was not loaded from the governed manifest directory',
+        };
+      }
       const result = spawnSync(probe.command, [...(probe.args ?? [])], { stdio: 'ignore' });
       if (result.error) {
         return { available: false, reason: `${probe.command}: ${result.error.message}` };
@@ -210,6 +220,13 @@ async function runProbe(
         : { available: false, reason: `${probe.command} exited with code ${result.status}` };
     }
     case 'module': {
+      if (!allowExecutableProbe) {
+        return {
+          available: false,
+          reason:
+            'module probe denied: manifest was not loaded from the governed manifest directory',
+        };
+      }
       try {
         await import(probe.specifier);
         return { available: true };
@@ -287,12 +304,13 @@ export async function probeManifest(
   opts: { mission_id?: string } = {}
 ): Promise<CapabilityStatus[]> {
   const out: CapabilityStatus[] = [];
+  const allowExecutableProbe = _trustedExecutableManifests.has(manifest);
   for (const cap of manifest.capabilities) {
     if (!appliesToHost(cap)) {
       out.push({ capability_id: cap.capability_id, satisfied: true, not_applicable: true });
       continue;
     }
-    const result = await runProbe(cap.probe, opts.mission_id);
+    const result = await runProbe(cap.probe, opts.mission_id, allowExecutableProbe);
     out.push({
       capability_id: cap.capability_id,
       satisfied: result.available,
@@ -316,6 +334,7 @@ export async function bootstrapManifest(
   manifest: EnvironmentManifest,
   opts: BootstrapOptions
 ): Promise<SetupReceipt> {
+  const allowExecutableManifest = _trustedExecutableManifests.has(manifest);
   const probes = await probeManifest(manifest, opts);
   const satisfied: CapabilityStatus[] = [];
   const unsatisfied: CapabilityStatus[] = [];
@@ -355,6 +374,13 @@ export async function bootstrapManifest(
       });
       continue;
     }
+    if (!allowExecutableManifest) {
+      unsatisfied.push({
+        ...status,
+        reason: `${status.reason ?? 'unsatisfied'} (install command denied: manifest was not loaded from the governed manifest directory)`,
+      });
+      continue;
+    }
     const installResult = spawnSync(cap.install.command, [...(cap.install.args ?? [])], {
       stdio: 'inherit',
     });
@@ -377,7 +403,7 @@ export async function bootstrapManifest(
       continue;
     }
     if (cap.install.retry_after_install !== false) {
-      const recheck = await runProbe(cap.probe, opts.mission_id);
+      const recheck = await runProbe(cap.probe, opts.mission_id, allowExecutableManifest);
       if (recheck.available) {
         satisfied.push({ capability_id: cap.capability_id, satisfied: true });
       } else {
@@ -578,14 +604,81 @@ function readReceipt(manifestId: string, missionId?: string): SetupReceipt | nul
 
 const DEFAULT_MANIFEST_DIR = 'knowledge/product/governance/environment-manifests';
 
+function governedManifestDir(): string {
+  const dir = pathResolver.rootResolve(DEFAULT_MANIFEST_DIR);
+  if (safeExistsSync(dir) && safeLstat(dir).isSymbolicLink()) {
+    throw new Error('[environment-capability] governed manifest directory must not be a symlink');
+  }
+  return dir;
+}
+
+function assertNoSymlinkPath(file: string, governedDir: string): void {
+  const relative = path.relative(governedDir, file);
+  if (relative.startsWith('..') || path.isAbsolute(relative)) {
+    throw new Error(
+      '[environment-capability] manifest must be inside the governed manifest directory'
+    );
+  }
+  let current = governedDir;
+  for (const segment of relative.split(path.sep).filter(Boolean)) {
+    current = path.join(current, segment);
+    if (safeLstat(current).isSymbolicLink()) {
+      throw new Error(
+        `[environment-capability] manifest path must not contain symlinks: ${current}`
+      );
+    }
+  }
+}
+
+function parseEnvironmentManifest(raw: string, expectedId: string): EnvironmentManifest {
+  const value: unknown = JSON.parse(raw);
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('[environment-capability] manifest must be a JSON object');
+  }
+  const candidate = value as Record<string, unknown>;
+  if (candidate.manifest_id !== expectedId || typeof candidate.version !== 'string') {
+    throw new Error('[environment-capability] manifest id/version is invalid');
+  }
+  if (!Array.isArray(candidate.capabilities)) {
+    throw new Error('[environment-capability] manifest capabilities must be an array');
+  }
+  for (const [index, capability] of candidate.capabilities.entries()) {
+    if (!capability || typeof capability !== 'object' || Array.isArray(capability)) {
+      throw new Error(`[environment-capability] capability ${index} must be an object`);
+    }
+    const cap = capability as Record<string, unknown>;
+    if (
+      typeof cap.capability_id !== 'string' ||
+      typeof cap.kind !== 'string' ||
+      typeof cap.description !== 'string' ||
+      !Array.isArray(cap.required_for) ||
+      !cap.required_for.every((item) => typeof item === 'string') ||
+      !cap.probe ||
+      typeof cap.probe !== 'object' ||
+      Array.isArray(cap.probe)
+    ) {
+      throw new Error(`[environment-capability] capability ${index} has an invalid schema`);
+    }
+    const probe = cap.probe as Record<string, unknown>;
+    if (!['command', 'module', 'env', 'mission-evidence', 'probe'].includes(String(probe.kind))) {
+      throw new Error(`[environment-capability] capability ${index} has an invalid probe kind`);
+    }
+    if (probe.kind === 'command' && typeof probe.command !== 'string') {
+      throw new Error(`[environment-capability] capability ${index} command probe is invalid`);
+    }
+    if (probe.kind === 'module' && typeof probe.specifier !== 'string') {
+      throw new Error(`[environment-capability] capability ${index} module probe is invalid`);
+    }
+  }
+  return value as EnvironmentManifest;
+}
+
 /**
  * Enumerate the manifest ids present under the canonical manifest
  * directory. The bootstrap CLI uses this for `--list` and `--all`.
  */
 export function listEnvironmentManifestIds(): string[] {
-  const dir = pathResolver.rootResolve(
-    process.env.KYBERION_ENVIRONMENT_MANIFEST_DIR ?? DEFAULT_MANIFEST_DIR
-  );
+  const dir = governedManifestDir();
   if (!safeExistsSync(dir)) return [];
   const ids: string[] = [];
   try {
@@ -599,19 +692,22 @@ export function listEnvironmentManifestIds(): string[] {
 }
 
 export function loadEnvironmentManifest(manifestIdOrPath: string): EnvironmentManifest {
-  const candidates = manifestIdOrPath.endsWith('.json')
-    ? [manifestIdOrPath]
-    : [
-        path.join(
-          process.env.KYBERION_ENVIRONMENT_MANIFEST_DIR ?? DEFAULT_MANIFEST_DIR,
-          `${manifestIdOrPath}.json`
-        ),
-        path.join(DEFAULT_MANIFEST_DIR, `${manifestIdOrPath}.json`),
-      ];
-  for (const rel of candidates) {
-    const abs = pathResolver.rootResolve(rel);
-    if (!safeExistsSync(abs)) continue;
-    return JSON.parse(safeReadFile(abs, { encoding: 'utf8' }) as string) as EnvironmentManifest;
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(manifestIdOrPath)) {
+    throw new Error('[environment-capability] manifest must be referenced by id, not by path');
+  }
+  const manifestId = manifestIdOrPath.endsWith('.json')
+    ? manifestIdOrPath.slice(0, -'.json'.length)
+    : manifestIdOrPath;
+  const dir = governedManifestDir();
+  const abs = path.join(dir, `${manifestId}.json`);
+  if (safeExistsSync(abs)) {
+    assertNoSymlinkPath(abs, dir);
+    const manifest = parseEnvironmentManifest(
+      safeReadFile(abs, { encoding: 'utf8' }) as string,
+      manifestId
+    );
+    _trustedExecutableManifests.add(manifest);
+    return manifest;
   }
   throw new Error(`[environment-capability] manifest not found: ${manifestIdOrPath}`);
 }

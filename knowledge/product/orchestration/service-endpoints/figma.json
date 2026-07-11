@@ -1,0 +1,9 @@
+{
+  "default_pattern": "https://api.{service_id}.com/v1",
+  "services": {
+    "figma": {
+      "base_url": "https://api.figma.com/v1",
+      "preset_path": "knowledge/product/orchestration/service-presets/figma.json"
+    }
+  }
+}

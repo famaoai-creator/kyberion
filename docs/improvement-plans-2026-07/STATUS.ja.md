@@ -24,7 +24,7 @@
 | SA-05 | PARTIAL | policyEngine の操作種別拡張、secure-io parse失敗 fail-open 解消、-y 破壊操作除外                                                                                                 |
 | OP-01 | PARTIAL | usage 計測の全経路接続、cost report、spend-guard、KPI 接続                                                                                                                       |
 | AR-01 | PARTIAL | adf-engine.ts 抽出、file-actuator/super-nerve アダプタ化、3エンジン統合、golden 回帰                                                                                             |
-| AR-02 | PARTIAL | describeOps、generate_op_registry、op-discovery に input_schema 反映、未知 op の apply 既定撤廃                                                                                  |
+| AR-02 | PARTIAL | describeOps、op-discovery に input_schema 反映、未知 op の apply 既定撤廃(check:op-registry は 2026-07-11 に修復し validate/CI へ接続済み)                                       |
 | AO-02 | TODO    | CVE スキャン/台帳、パッチ判断ルーブリック、適用フロー                                                                                                                            |
 | IL-01 | TODO    | goal/source_text/outcome_ids の昇格 seam 貫通、outcome-contract の goal 優先化                                                                                                   |
 | IL-04 | PARTIAL | intent-reconciliation エンジン、完了ゲート、学習記録                                                                                                                             |
@@ -52,14 +52,14 @@
 
 ### UX(ユーザー接点)
 
-| ID    | 状態    | 残作業                                                                      |
-| ----- | ------- | --------------------------------------------------------------------------- |
-| UX-01 | DONE    |                                                                             |
-| UX-02 | PARTIAL | 4ブリッジ typing 表示、chronos チャットのキャンセル+フェーズ表示            |
-| UX-03 | PARTIAL | locale-resolver 一元化、onboarding/cli help の ja/en 化、chronos 言語トグル |
-| UX-04 | PARTIAL | CLI 承認動詞統一、魔法語の選択肢化、decidedBy を identity から取得          |
-| UX-05 | PARTIAL | 契約スナップショットテスト+CI ゲート、dashboard の renderStatus 経由化      |
-| UX-06 | DONE    | (軽微: 3面バナーの版数統一)                                                 |
+| ID    | 状態    | 残作業                                                                                                                                         |
+| ----- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| UX-01 | DONE    |                                                                                                                                                |
+| UX-02 | PARTIAL | 4ブリッジ typing 表示(chronos チャットのキャンセル+フェーズ表示は 2026-07-11 実装済み)                                                         |
+| UX-03 | PARTIAL | locale-resolver 一元化、onboarding/cli help の ja/en 化(wizard の identity/reasoning は 2026-07-11 に選択言語へ即時追従化)、chronos 言語トグル |
+| UX-04 | PARTIAL | CLI 承認動詞統一、魔法語の選択肢化、decidedBy を identity から取得                                                                             |
+| UX-05 | PARTIAL | 契約スナップショットテスト+CI ゲート、dashboard の renderStatus 経由化                                                                         |
+| UX-06 | DONE    | (軽微: 3面バナーの版数統一)                                                                                                                    |
 
 ### AC(アクチュエータ能力)
 
@@ -118,7 +118,7 @@
 | ID    | 状態    | 残作業                                                                                                                                                                                    |
 | ----- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | AR-01 | PARTIAL | adf-engine.ts 抽出、file-actuator/super-nerve アダプタ化、3エンジン統合、golden 回帰                                                                                                      |
-| AR-02 | PARTIAL | describeOps、generate_op_registry、op-discovery に input_schema 反映、未知 op の apply 既定撤廃                                                                                           |
+| AR-02 | PARTIAL | describeOps、op-discovery に input_schema 反映、未知 op の apply 既定撤廃(check:op-registry は 2026-07-11 に修復し validate/CI へ接続済み)                                                |
 | AR-03 | PARTIAL | write_artifact/path 前倒し検証、notify/read_file/read_json/open_file 含む op_input_contracts、generate_op_registry/discovery 反映、browser/file/system の契約 coverage 検査、主要 op 検証 |
 | AR-04 | PARTIAL | canonical op family 定義、browser alias 共通化、browser/system の正規化と警告                                                                                                             |
 | AR-05 | PARTIAL | system file I/O の file-actuator forward、観察/変更・ドメイン境界の分割準備                                                                                                               |
@@ -136,13 +136,13 @@
 
 ### OP(運用・配布)
 
-| ID    | 状態    | 残作業                                                   |
-| ----- | ------- | -------------------------------------------------------- |
-| OP-01 | TODO    | usage 計測、cost report、spend-guard                     |
-| OP-02 | DONE    | (残: 外部ボリューム定期運用の実績)                       |
-| OP-03 | PARTIAL | bin フィールド+CLI、docker deploy サービス               |
-| OP-04 | TODO    | 劣化検知ループ、healthz/status、provider-health 永続化   |
-| OP-05 | TODO    | env-registry、起動時検証、CONFIGURATION.md、.env.example |
+| ID    | 状態    | 残作業                                                                                                                                                                                                                             |
+| ----- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| OP-01 | TODO    | usage 計測、cost report、spend-guard                                                                                                                                                                                               |
+| OP-02 | DONE    | (残: 外部ボリューム定期運用の実績)                                                                                                                                                                                                 |
+| OP-03 | PARTIAL | bin フィールド+CLI、docker deploy サービス                                                                                                                                                                                         |
+| OP-04 | TODO    | 劣化検知ループ、healthz/status、provider-health 永続化                                                                                                                                                                             |
+| OP-05 | PARTIAL | 2026-07-11: env-registry(228変数)+ check:env-registry(validate/CI)+ env-validator + doctor 配線 + env.example/CONFIGURATION.md 生成。残: 棚卸しの継続キュレーション(documented=false 211件)、baseline-check 接続、集中ローダー移行 |
 
 ### AO(自律運用・保守)
 

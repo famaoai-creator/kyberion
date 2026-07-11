@@ -156,3 +156,57 @@ source_ref: MEM-MRDRNU0A-8AB616D7
 evidence_refs:
 
 - active/missions/MSN-TEST-AUTOPROMOTE/evidence/ledger.jsonl
+
+## MEM-MRFYRHS6-1135FEA7 (2026-07-11)
+
+Reusable weekly review note for the mission closure checklist.
+
+source_ref: MEM-MRFYRHS6-1135FEA7
+evidence_refs:
+
+- active/missions/MSN-TEST-AUTOPROMOTE/evidence/ledger.jsonl
+
+## MEM-MRFYSEF0-57C10E15 (2026-07-11)
+
+Reusable weekly review note for the mission closure checklist.
+
+source_ref: MEM-MRFYSEF0-57C10E15
+evidence_refs:
+
+- active/missions/MSN-TEST-AUTOPROMOTE/evidence/ledger.jsonl
+
+## MEM-MRFYVROD-27F5997D (2026-07-11)
+
+Reusable weekly review note for the mission closure checklist.
+
+source_ref: MEM-MRFYVROD-27F5997D
+evidence_refs:
+
+- active/missions/MSN-TEST-AUTOPROMOTE/evidence/ledger.jsonl
+
+## MEM-MRFZNE8N-DF0744A0 (2026-07-11)
+
+Reusable weekly review note for the mission closure checklist.
+
+source_ref: MEM-MRFZNE8N-DF0744A0
+evidence_refs:
+
+- active/missions/MSN-TEST-AUTOPROMOTE/evidence/ledger.jsonl
+
+## MEM-MRFZO7GX-53A4144F (2026-07-11)
+
+Reusable weekly review note for the mission closure checklist.
+
+source_ref: MEM-MRFZO7GX-53A4144F
+evidence_refs:
+
+- active/missions/MSN-TEST-AUTOPROMOTE/evidence/ledger.jsonl
+
+## MEM-MRG06YVK-7E69DAB9 (2026-07-11)
+
+Reusable weekly review note for the mission closure checklist.
+
+source_ref: MEM-MRG06YVK-7E69DAB9
+evidence_refs:
+
+- active/missions/MSN-TEST-AUTOPROMOTE/evidence/ledger.jsonl

@@ -7,6 +7,7 @@ import {
   pathResolver,
   safeExistsSync,
   registerReasoningBackend,
+  buildFailoverReasoningBackend,
   resetReasoningBackend,
   resetVoiceBridge,
   stubReasoningBackend,
@@ -604,6 +605,71 @@ describe("dispatchDecisionOp 'distill' (memory-distillation op)", () => {
     expect(result.handled).toBe(true);
     expect(typeof result.ctx.lessons_learned).toBe('string');
     expect((result.ctx.lessons_learned as string).length).toBeGreaterThan(0);
+  });
+});
+
+describe("dispatchDecisionOp 'peer_advice'", () => {
+  it('uses a peer backend when a failover candidate is available', async () => {
+    const calls: string[] = [];
+    registerReasoningBackend(
+      buildFailoverReasoningBackend([
+        {
+          label: 'primary',
+          provider: 'codex',
+          backend: {
+            ...stubReasoningBackend,
+            delegateTask: async () => {
+              calls.push('primary');
+              return JSON.stringify({
+                advisor_label: 'primary',
+                recommendation: 'stay on course',
+                risks: [],
+                follow_up_questions: [],
+                confidence: 'low',
+              });
+            },
+          },
+        },
+        {
+          label: 'peer',
+          provider: 'gemini',
+          backend: {
+            ...stubReasoningBackend,
+            delegateTask: async (instruction: string) => {
+              calls.push('peer');
+              expect(instruction).toContain('Question:');
+              return JSON.stringify({
+                advisor_label: 'peer',
+                advisor_provider: 'gemini',
+                recommendation: 'ask for an explicit trade-off',
+                risks: ['scope creep'],
+                follow_up_questions: ['what is the smallest useful answer?'],
+                confidence: 'high',
+              });
+            },
+          },
+        },
+      ])
+    );
+
+    const result = await dispatchDecisionOp(
+      'peer_advice',
+      {
+        question: 'Should we split the task?',
+        context: 'The task is high risk and ambiguous.',
+        export_as: 'advice',
+      },
+      {}
+    );
+
+    expect(result.handled).toBe(true);
+    expect(calls).toEqual(['peer']);
+    expect(result.ctx.advice).toMatchObject({
+      advisor_label: 'peer',
+      advisor_provider: 'gemini',
+      recommendation: 'ask for an explicit trade-off',
+      peer_used: true,
+    });
   });
 });
 

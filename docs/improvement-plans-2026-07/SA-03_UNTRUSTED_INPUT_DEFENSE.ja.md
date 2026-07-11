@@ -83,3 +83,9 @@
    Taintフラグ（汚染状態）をミッション全体のグローバルから、特定のスコープ（入力データ単位やタスク単位）に限定して管理・伝播できるようになりました。影響範囲を最小化し、自動化率の低下（False PositiveによるUX低下）を防ぎます。未指定の場合はすべてのスコープ（フェイルセーフ）として扱われます。
 3. **LLM自動回復・無害化パイプライン (`sanitizeUntrustedContentAsync`)**
    インジェクションの疑いが検知された場合でも、処理を完全に止めるのではなく、LLMを用いて安全な意図や要約のみを抽出（無害化）し、後続のパイプラインを安全に継続させる自己回復機能を追加しました。
+
+### OAuth callback output encoding slice — 2026-07-11
+
+- provider の `error` / `error_description` と成功時 `serviceId` を HTML escape し、callback HTML への script/attribute injection を防止した。
+- callback surface 全応答へ CSP と `X-Content-Type-Options: nosniff` を追加し、500画面には内部例外を表示しない。
+- provider error callback の state 必須化は既存 broker 互換性を壊すため見送り、state/PKCE 契約の統一は後続課題とする。

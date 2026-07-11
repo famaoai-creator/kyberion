@@ -4,6 +4,7 @@ import {
   delegateBestOf,
   delegateStructured,
   getReasoningBackend,
+  requestPeerAdvice,
   registerReasoningBackend,
   resetReasoningBackend,
   stubReasoningBackend,
@@ -141,14 +142,9 @@ describe('reasoning-backend', () => {
       },
     };
 
-    const result = await delegateStructured(
-      backend,
-      'Return task contract',
-      'a2a_task_contract',
-      {
-        maxRetries: 0,
-      }
-    );
+    const result = await delegateStructured(backend, 'Return task contract', 'a2a_task_contract', {
+      maxRetries: 0,
+    });
 
     expect(result.intent).toBe('request_mission_work');
     expect(result.context.team_role).toBe('mission-controller');
@@ -161,9 +157,7 @@ describe('reasoning-backend', () => {
       delegateTask: async (instruction: string) => {
         calls.push(instruction);
         return JSON.stringify({
-          candidates: [
-            { procedure_id: 'demo', confidence: 0.9, reason: 'best' },
-          ],
+          candidates: [{ procedure_id: 'demo', confidence: 0.9, reason: 'best' }],
         });
       },
     };
@@ -206,6 +200,64 @@ describe('reasoning-backend', () => {
     expect(result.candidates).toHaveLength(2);
     expect(result.judge.winner_index).toBe(1);
     expect(calls).toHaveLength(3);
+  });
+
+  it('requests peer advice from a different failover backend when available', async () => {
+    const calls: string[] = [];
+    const backend = buildFailoverReasoningBackend([
+      {
+        label: 'primary',
+        provider: 'codex',
+        backend: {
+          ...stubReasoningBackend,
+          delegateTask: async () => {
+            calls.push('primary');
+            return JSON.stringify({
+              advisor_label: 'primary',
+              recommendation: 'stay put',
+              risks: [],
+              follow_up_questions: [],
+              confidence: 'low',
+            });
+          },
+        },
+      },
+      {
+        label: 'peer',
+        provider: 'gemini',
+        backend: {
+          ...stubReasoningBackend,
+          delegateTask: async (instruction: string) => {
+            calls.push('peer');
+            expect(instruction).toContain('Question:');
+            expect(instruction).toContain('Context:');
+            return JSON.stringify({
+              advisor_label: 'peer',
+              recommendation: 'add a cache and validate it',
+              risks: ['stale data'],
+              follow_up_questions: ['what is the invalidation rule?'],
+              confidence: 'high',
+            });
+          },
+        },
+      },
+    ]);
+
+    const advice = await requestPeerAdvice(backend, {
+      question: 'Should we add caching?',
+      context: 'The task is latency-sensitive.',
+    });
+
+    expect(calls).toEqual(['peer']);
+    expect(advice).toMatchObject({
+      advisor_label: 'peer',
+      advisor_provider: 'gemini',
+      recommendation: 'add a cache and validate it',
+      peer_used: true,
+      confidence: 'high',
+    });
+    expect(advice.risks).toEqual(['stale data']);
+    expect(advice.follow_up_questions).toEqual(['what is the invalidation rule?']);
   });
 
   describe('stub backend', () => {
