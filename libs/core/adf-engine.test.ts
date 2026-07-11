@@ -138,6 +138,30 @@ describe('executeAdfSteps', () => {
     ]);
   });
 
+  it('honors the resolveVars override and label option', async () => {
+    const result = await executeAdfSteps(
+      [{ type: 'capture', op: 'capture_name', params: { value: '{{name}}' } }],
+      { name: 'world' },
+      {
+        maxSteps: 10,
+        timeoutMs: 10_000,
+        label: '[CUSTOM]',
+        resolveVars: (value, ctx) => (value === '{{name}}' ? ctx.name : value),
+      },
+      {
+        capture: async (_op, params, ctx, resolve) => ({
+          ...ctx,
+          capture_name: resolve(params.value),
+        }),
+        transform: async (_op, _params, ctx) => ctx,
+        apply: async (_op, _params, ctx) => ctx,
+      }
+    );
+
+    expect(result.status).toBe('succeeded');
+    expect(result.context.capture_name).toBe('world');
+  });
+
   it('recovers failed steps via on_error: skip', async () => {
     const result = await executeAdfSteps(
       [

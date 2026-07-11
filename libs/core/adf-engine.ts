@@ -18,6 +18,10 @@ export interface AdfEngineContext {
 export interface AdfRunOptions {
   maxSteps?: number;
   timeoutMs?: number;
+  /** Log prefix for step progress lines (default '[ADF]'). */
+  label?: string;
+  /** Override the template resolver (default: shared resolveVars). */
+  resolveVars?: (value: any, ctx: Record<string, any>) => any;
 }
 
 export interface AdfSkippedStep {
@@ -97,10 +101,12 @@ async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineC
 ): Promise<AdfRunResult<Ctx>> {
   const maxSteps = options.maxSteps ?? 1000;
   const timeoutMs = options.timeoutMs ?? 60_000;
+  const label = options.label || '[ADF]';
   let ctx = { ...initialCtx } as Ctx;
   const results: PipelineStepResult[] = [];
 
-  const resolve = (value: any) => resolveVars(value, ctx);
+  const resolve = (value: any) =>
+    options.resolveVars ? options.resolveVars(value, ctx) : resolveVars(value, ctx);
   const runNestedSteps = async (
     nestedSteps: AdfStep[],
     seedCtx: Ctx = ctx
@@ -118,7 +124,7 @@ async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineC
 
     hooks?.beforeStep?.(step, state.stepCount, ctx);
     try {
-      logger.info(`  [ADF] [Step ${state.stepCount}] ${step.type}:${step.op}...`);
+      logger.info(`  ${label} [Step ${state.stepCount}] ${step.type}:${step.op}...`);
       if (step.type === 'control') {
         if (!handlers.control) {
           throw new Error(`[UNKNOWN_TYPE] Unknown control step op: ${step.op}`);
@@ -133,7 +139,7 @@ async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineC
         if (isSkippedStep(controlResult)) {
           ctx = controlResult.context as Ctx;
           results.push({ op: step.op, status: 'skipped' });
-          logger.info(`  [ADF] Step skipped (${step.op}): ${controlResult.reason}`);
+          logger.info(`  ${label} Step skipped (${step.op}): ${controlResult.reason}`);
           hooks?.afterStep?.(step, state.stepCount, ctx, { status: 'skipped' });
           continue;
         }
@@ -190,7 +196,7 @@ async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineC
           /* recovery itself failed — fall through to the failure path */
         }
       }
-      logger.error(`  [ADF] Step failed (${step.op}): ${err.message}`);
+      logger.error(`  ${label} Step failed (${step.op}): ${err.message}`);
       results.push({ op: step.op, status: 'failed', error: err.message });
       hooks?.afterStep?.(step, state.stepCount, ctx, { status: 'failed', error: err.message });
       break;
