@@ -75,6 +75,7 @@
     "check:pipeline-shell-independence": "node dist/scripts/check_pipeline_shell_independence.js",
     "check:workflow-catalog-refs": "node dist/scripts/check_workflow_catalog_refs.js",
     "company:bootstrap": "node --import ./scripts/ts-loader.mjs scripts/company_bootstrap.ts",
+    "company:onboard": "node --import ./scripts/ts-loader.mjs scripts/company_onboarding.ts",
     "minutes:record": "node --import ./scripts/ts-loader.mjs scripts/minutes_record.ts",
     "check:reference-drift": "vitest run tests/reference-drift-contract.test.ts",
     "check:production-evidence": "vitest run tests/production-evidence-register-contract.test.ts",

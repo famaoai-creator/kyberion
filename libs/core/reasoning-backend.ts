@@ -16,6 +16,7 @@
  */
 
 import { logger } from './core.js';
+import { assertOperationPolicy, currentDelegationDepth } from './operation-policy-gate.js';
 import type { A2ATaskContract, PlanningPacket, TaskResultBlock } from './channel-surface-types.js';
 import { slugify } from './text-utils.js';
 import { parseStructuredJson } from './structured-reasoning.js';
@@ -515,6 +516,14 @@ export class FailoverReasoningBackend implements ReasoningBackend {
     // logs/alerts and proceeds; block posture throws SpendCapExceededError
     // before any provider is invoked.
     enforceSpendGuardForReasoning();
+    // SA-05: delegation policy — the hop being created is depth+1, so the
+    // delegation-depth-limit rule can actually fire on runaway chains.
+    if (operation === 'delegateTask') {
+      assertOperationPolicy({
+        operation: 'reasoning_delegation',
+        context: { delegation_depth: currentDelegationDepth() + 1 },
+      });
+    }
     const skippedProviders = new Set(listDemotedProviders());
     const errors: string[] = [];
 

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import * as fs from 'node:fs';
+import * as path from 'node:path';
 
 vi.mock('../secure-io.js', () => ({
   safeReadFile: (p: string, opts: any) => fs.readFileSync(p, opts.encoding),
@@ -176,6 +177,20 @@ describe('pipeline-preview', () => {
       expect(result.steps[0].description).toContain('effort=high');
       expect(result.steps[0].description).toContain('cost cap 1200 tokens');
       expect(result.steps[0].description).toContain('approval required on overrun');
+    });
+
+    it('keeps the fragment template structurally valid', () => {
+      const templatePath = path.join(process.cwd(), 'pipelines/fragments/_template.json');
+      const pipeline = JSON.parse(fs.readFileSync(templatePath, 'utf8'));
+
+      const result = previewPipeline(pipeline);
+
+      expect(result.valid).toBe(true);
+      expect(result.steps).toHaveLength(3);
+      expect(result.errors).toHaveLength(0);
+      expect(result.steps[0].resolvedParams.message).toContain('Fragment scaffold');
+      expect(result.steps[1].resolvedParams.message).toContain('Required inputs');
+      expect(result.steps[2].resolvedParams.message).toContain('preview it with');
     });
   });
 

@@ -1,0 +1,47 @@
+{
+  "action": "pipeline",
+  "name": "fragment-template",
+  "version": "2.0.0",
+  "description": "Reusable pipeline fragment scaffold. Replace the placeholder contract fields and step bodies with a real reusable flow.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). Keep this file as the canonical fragment starter.",
+  "context": {
+    "fragment_slug": "new-fragment",
+    "purpose": "Describe what this fragment does in one sentence.",
+    "required_inputs": "List the variables or bindings the fragment expects.",
+    "produced_channels": "List the channels or artifacts the fragment emits.",
+    "failure_modes": "List the common failure states the caller should handle.",
+    "verification_command": "pnpm cli preview pipelines/fragments/_template.json"
+  },
+  "steps": [
+    {
+      "id": "announce_fragment_contract",
+      "role": "source",
+      "op": "system:log",
+      "produces": {
+        "channel": "fragment_contract",
+        "type": "TextResult"
+      },
+      "params": {
+        "message": "Fragment scaffold '{{fragment_slug}}' loaded. Purpose: {{purpose}}"
+      }
+    },
+    {
+      "id": "summarize_fragment_inputs",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "fragment_contract",
+      "params": {
+        "message": "Required inputs: {{required_inputs}} | Produced channels: {{produced_channels}} | Failure modes: {{failure_modes}}"
+      }
+    },
+    {
+      "id": "publish_fragment_checklist",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "fragment_contract",
+      "params": {
+        "message": "Before reusing this fragment, preview it with: {{verification_command}}"
+      }
+    }
+  ]
+}

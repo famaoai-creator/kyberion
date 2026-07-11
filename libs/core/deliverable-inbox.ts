@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import {
@@ -32,6 +32,30 @@ export interface DeliverableInboxEntry {
   verdict_note?: string;
   /** SU-03: who recorded the latest verdict. */
   reviewed_by?: string;
+  acceptance_receipt?: HumanAcceptanceReceipt;
+  delivery_receipt?: HumanDeliveryReceipt;
+}
+
+export interface HumanAcceptanceReceipt {
+  receipt_id: string;
+  actor_id: string;
+  actor_type: 'human';
+  authenticated: true;
+  auth_method: 'surface_session' | 'totp' | 'passkey';
+  artifact_digest: string;
+  responsibility_statement: string;
+  accepted_at: string;
+}
+
+export interface HumanDeliveryReceipt {
+  receipt_id: string;
+  actor_id: string;
+  actor_type: 'human';
+  authenticated: true;
+  auth_method: HumanAcceptanceReceipt['auth_method'];
+  artifact_digest: string;
+  destination: string;
+  delivered_at: string;
 }
 
 export interface DeliverableInboxQuery {
@@ -247,6 +271,11 @@ export function markInboxEntry(
 ): DeliverableInboxEntry | null {
   const normalizedId = String(entryId || '').trim();
   if (!normalizedId) return null;
+  if (status === 'accepted') {
+    throw new Error(
+      '[POLICY_VIOLATION] Use acceptInboxEntryWithHumanReceipt for final deliverable acceptance'
+    );
+  }
   return withInboxLock(() => {
     const entries = readInboxEntries();
     const index = entries.findIndex((entry) => entry.entry_id === normalizedId);
@@ -262,5 +291,115 @@ export function markInboxEntry(
     };
     writeInboxEntries(entries);
     return entries[index];
+  });
+}
+
+function digestDeliverable(entry: DeliverableInboxEntry): string {
+  const payload = JSON.stringify({
+    entry_id: entry.entry_id,
+    mission_id: entry.mission_id || null,
+    title: entry.title,
+    summary: entry.summary,
+    artifact_paths: [...entry.artifact_paths].sort(),
+  });
+  return createHash('sha256').update(payload).digest('hex');
+}
+
+/**
+ * Record final acceptance only from an authenticated human principal. A plain
+ * status update remains available for non-final review states, but accepted
+ * deliverables must carry an immutable receipt that binds the reviewer to the
+ * exact artifact set presented at acceptance time.
+ */
+export function acceptInboxEntryWithHumanReceipt(input: {
+  entryId: string;
+  actorId: string;
+  authenticated: boolean;
+  authMethod: HumanAcceptanceReceipt['auth_method'];
+  responsibilityStatement: string;
+}): DeliverableInboxEntry | null {
+  if (!input.authenticated) {
+    throw new Error('[POLICY_VIOLATION] Deliverable acceptance requires an authenticated human');
+  }
+  if (!input.actorId.trim()) {
+    throw new Error('[POLICY_VIOLATION] Deliverable acceptance requires a human actor id');
+  }
+  if (!input.responsibilityStatement.trim()) {
+    throw new Error(
+      '[POLICY_VIOLATION] Deliverable acceptance requires a responsibility statement'
+    );
+  }
+  return withInboxLock(() => {
+    const entries = readInboxEntries();
+    const index = entries.findIndex((entry) => entry.entry_id === input.entryId.trim());
+    if (index < 0) return null;
+    const entry = entries[index];
+    const now = new Date().toISOString();
+    const updated: DeliverableInboxEntry = {
+      ...entry,
+      status: 'accepted',
+      updated_at: now,
+      reviewed_by: input.actorId.trim(),
+      acceptance_receipt: {
+        receipt_id: `ACCEPT-${randomUUID().slice(0, 12).toUpperCase()}`,
+        actor_id: input.actorId.trim(),
+        actor_type: 'human',
+        authenticated: true,
+        auth_method: input.authMethod,
+        artifact_digest: digestDeliverable(entry),
+        responsibility_statement: input.responsibilityStatement.trim(),
+        accepted_at: now,
+      },
+    };
+    entries[index] = updated;
+    writeInboxEntries(entries);
+    return updated;
+  });
+}
+
+/** Finalize an accepted artifact for an external or durable destination. */
+export function finalizeAcceptedDeliverable(input: {
+  entryId: string;
+  actorId: string;
+  authenticated: boolean;
+  authMethod: HumanDeliveryReceipt['auth_method'];
+  destination: string;
+}): DeliverableInboxEntry | null {
+  if (!input.authenticated || !input.actorId.trim()) {
+    throw new Error('[POLICY_VIOLATION] Deliverable delivery requires an authenticated human');
+  }
+  if (!input.destination.trim()) {
+    throw new Error('[POLICY_VIOLATION] Deliverable delivery requires a destination');
+  }
+  return withInboxLock(() => {
+    const entries = readInboxEntries();
+    const index = entries.findIndex((entry) => entry.entry_id === input.entryId.trim());
+    if (index < 0) return null;
+    const entry = entries[index];
+    if (entry.status !== 'accepted' || !entry.acceptance_receipt) {
+      throw new Error('[POLICY_VIOLATION] Deliverable must have a human acceptance receipt first');
+    }
+    const digest = digestDeliverable(entry);
+    if (digest !== entry.acceptance_receipt.artifact_digest) {
+      throw new Error('[POLICY_VIOLATION] Deliverable changed after human acceptance');
+    }
+    const now = new Date().toISOString();
+    const updated: DeliverableInboxEntry = {
+      ...entry,
+      updated_at: now,
+      delivery_receipt: {
+        receipt_id: `DELIVER-${randomUUID().slice(0, 12).toUpperCase()}`,
+        actor_id: input.actorId.trim(),
+        actor_type: 'human',
+        authenticated: true,
+        auth_method: input.authMethod,
+        artifact_digest: digest,
+        destination: input.destination.trim(),
+        delivered_at: now,
+      },
+    };
+    entries[index] = updated;
+    writeInboxEntries(entries);
+    return updated;
   });
 }

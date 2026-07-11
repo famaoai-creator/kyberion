@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { listInboxEntries, markInboxEntry } from '@agent/core';
+import { acceptInboxEntryWithHumanReceipt, listInboxEntries, markInboxEntry } from '@agent/core';
 import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
 import { reviewDeliverable } from '../../../lib/deliverable-review';
 
@@ -30,12 +30,20 @@ function syncInboxWithVerdict(input: {
   });
   let updated = 0;
   for (const entry of candidates) {
-    if (
-      markInboxEntry(entry.entry_id, status, {
-        verdictNote: input.comment,
-        reviewedBy: 'chronos-localadmin',
-      })
-    ) {
+    const updatedEntry =
+      status === 'accepted'
+        ? acceptInboxEntryWithHumanReceipt({
+            entryId: entry.entry_id,
+            actorId: 'human:chronos-localadmin',
+            authenticated: true,
+            authMethod: 'surface_session',
+            responsibilityStatement: 'I accept this deliverable on behalf of the operator.',
+          })
+        : markInboxEntry(entry.entry_id, status, {
+            verdictNote: input.comment,
+            reviewedBy: 'chronos-localadmin',
+          });
+    if (updatedEntry) {
       updated += 1;
     }
   }

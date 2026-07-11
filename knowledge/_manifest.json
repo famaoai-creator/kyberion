@@ -987,7 +987,7 @@
     {
       "path": "product/governance/agent-policies.yaml",
       "tier": "public",
-      "size": 2791,
+      "size": 2803,
       "type": "yaml"
     },
     {
@@ -1155,7 +1155,7 @@
     {
       "path": "product/governance/decision-rights.json",
       "tier": "public",
-      "size": 1032,
+      "size": 1275,
       "type": "json"
     },
     {
@@ -1215,7 +1215,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 48006,
+      "size": 48549,
       "type": "json"
     },
     {
@@ -1677,7 +1677,7 @@
     {
       "path": "product/governance/organization-profile.json",
       "tier": "public",
-      "size": 1151,
+      "size": 1204,
       "type": "json"
     },
     {
@@ -5931,7 +5931,7 @@
     {
       "path": "product/schemas/decision-rights.schema.json",
       "tier": "public",
-      "size": 1793,
+      "size": 1986,
       "type": "json"
     },
     {
@@ -6429,7 +6429,7 @@
     {
       "path": "product/schemas/mission-team-plan.schema.json",
       "tier": "public",
-      "size": 3902,
+      "size": 5784,
       "type": "json"
     },
     {
@@ -6639,7 +6639,7 @@
     {
       "path": "product/schemas/organization-profile.schema.json",
       "tier": "public",
-      "size": 2735,
+      "size": 3454,
       "type": "json"
     },
     {
@@ -6859,6 +6859,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/resource-usage.schema.json",
+      "tier": "public",
+      "size": 1326,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/review-gate-result.schema.json",
       "tier": "public",
       "size": 757,
@@ -7023,7 +7029,7 @@
     {
       "path": "product/schemas/task-contract.schema.json",
       "tier": "public",
-      "size": 1164,
+      "size": 3026,
       "type": "json"
     },
     {
@@ -7360,6 +7366,12 @@
       "path": "product/schemas/work-scope-policy.schema.json",
       "tier": "public",
       "size": 2790,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/workforce-resource-ref.schema.json",
+      "tier": "public",
+      "size": 1618,
       "type": "json"
     },
     {

@@ -44,6 +44,21 @@ pnpm surfaces:reconcile
 pnpm onboard          # customer/{slug}/ preferred when KYBERION_CUSTOMER is set
 ```
 
+### Start an AI company in one governed step
+
+For a solo founder whose main workforce is AI, run the company onboarding flow after the build:
+
+```bash
+pnpm company:onboard --vertical saas-product-company --slug acme-ai \
+  --name "ACME AI" --owner-id human:founder \
+  --goal "Define the first customer outcome and launch plan" --dry-run
+pnpm company:onboard --vertical saas-product-company --slug acme-ai \
+  --name "ACME AI" --owner-id human:founder \
+  --goal "Define the first customer outcome and launch plan"
+```
+
+The dry-run shows the write scope and next commands without changing files. The applied flow creates the customer overlay, binds the accountable human, registers the initial AI worker and approval boundaries, and writes a first-work plan that remains paused until human review.
+
 If you already have an onboarding payload, use Path B instead of the wizard:
 
 ```bash

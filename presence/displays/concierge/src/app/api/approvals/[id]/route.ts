@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { decideApprovalRequest } from '@agent/core';
+import { decideApprovalRequest, loadApprovalRequest } from '@agent/core';
 import { requireConciergeMutationAccess } from '../../../../lib/api-guard';
 
 export const dynamic = 'force-dynamic';
@@ -24,6 +24,13 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
         { status: 400 }
       );
     }
+    const record = loadApprovalRequest(storageChannel, id);
+    if (!record) {
+      return NextResponse.json(
+        { ok: false, error: `approval request not found: ${id}` },
+        { status: 404 }
+      );
+    }
     const updated = decideApprovalRequest('sovereign_concierge', {
       channel,
       storageChannel,
@@ -32,6 +39,10 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
       decidedBy: 'concierge',
       decidedByRole: 'sovereign',
       authMethod: 'surface_session',
+      decidedByType: 'human',
+      authenticated: true,
+      payloadHash: record.accountability?.payloadHash,
+      effectBinding: record.accountability?.effectBinding,
       note:
         typeof body?.reason === 'string' && body.reason.trim()
           ? body.reason.trim()

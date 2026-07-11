@@ -10,6 +10,7 @@ import { evaluateDecisionRights, resolveDecisionRightsMatrix } from './decision-
 import { resolveGoldenRulePriorityOrder, resolveVision } from './vision-resolver.js';
 import {
   createApprovalRequest,
+  computeApprovalPayloadHash,
   listApprovalRequests,
   type ApprovalRequestRecord,
 } from './approval-store.js';
@@ -274,7 +275,15 @@ export function enforceApprovalGate(
       Number.isFinite(Date.parse(matched.expiresAt)) &&
       Date.parse(matched.expiresAt) <= Date.now();
 
-    if (matched.status === 'approved' && !approvalExpired) {
+    const expectedPayloadHash = computeApprovalPayloadHash(payload);
+    const bindingMismatch =
+      matched.accountability?.finalDecision === 'human_only' &&
+      ((matched.accountability.payloadHash &&
+        matched.accountability.payloadHash !== expectedPayloadHash) ||
+        (matched.accountability.effectBinding &&
+          matched.accountability.effectBinding !== operationId));
+
+    if (matched.status === 'approved' && !approvalExpired && !bindingMismatch) {
       auditChain.record({
         agentId,
         action: 'approval_gate',
@@ -293,7 +302,11 @@ export function enforceApprovalGate(
     }
 
     // Pending, expired, rejected, or approved-but-expired — block execution.
-    const effectiveStatus = approvalExpired ? 'expired' : matched.status;
+    const effectiveStatus = bindingMismatch
+      ? 'effect_mismatch'
+      : approvalExpired
+        ? 'expired'
+        : matched.status;
     auditChain.record({
       agentId,
       action: 'approval_gate',
@@ -321,6 +334,11 @@ export function enforceApprovalGate(
     correlationId,
     requestedBy: agentId,
     draft,
+    accountability: {
+      finalDecision: 'human_only',
+      payloadHash: computeApprovalPayloadHash(payload),
+      effectBinding: operationId,
+    },
   });
 
   auditChain.record({

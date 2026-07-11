@@ -1,6 +1,6 @@
 # 改善計画 実装状況正本(STATUS)
 
-> **監査日**: 2026-07-05(全93計画を実コードと突き合わせて検証)/ 2026-07-06 MO-01 を DONE に更新 / 2026-07-11 IP-07・AA-02 行の陳腐化を再突合で訂正 / 同日 TODO 全18行を機械突合し 11 ID(SA-03/OP-01/IL-01/02/03/05/AO-04/AA-04/CO-01〜04)を PARTIAL へ訂正(実装+緑テストを確認。KM-02/DS-04/HO-02/CO-05/AC-05/IP-10 は真に未了と再確認)
+> **監査日**: 2026-07-05(全93計画を実コードと突き合わせて検証)/ 2026-07-06 MO-01 を DONE に更新 / 2026-07-11 IP-07・AA-02 行の陳腐化を再突合で訂正 / 同日 TODO 全18行を機械突合し 11 ID(SA-03/OP-01/IL-01/02/03/05/AO-04/AA-04/CO-01〜04)を PARTIAL へ訂正(実装+緑テストを確認。KM-02/DS-04/HO-02/CO-05/AC-05/IP-10 は真に未了と再確認)/ 2026-07-12 SA-02 行の陳腐化を再突合で訂正(残とされた3点は実装済み・19テスト緑を確認)
 > **更新規約**: 計画の実装・レビュー完了時に本表を更新する。各計画文書内の「実装状況」節と矛盾する場合は本表を正とし、文書側を追従させる。
 > **判定基準**: DONE = 受入条件を実コードで検証済 / PARTIAL = 一部充足 / TODO = 実質未着手。
 
@@ -8,8 +8,8 @@
 
 | 判定    | 件数 |
 | ------- | ---- |
-| DONE    | 37   |
-| PARTIAL | 52   |
+| DONE    | 38   |
+| PARTIAL | 53   |
 | TODO    | 0    |
 
 ## P0 残作業(プロダクション化のクリティカルパス)
@@ -20,8 +20,8 @@
 | MO-01 | DONE    | 2026-07-06 完了: phaseSpec スキーマ(catalog v1.1.0)+タスク展開(plan-tasks/createMission)+3プロセステンプレート追加。worker イベント連鎖のフェーズ駆動化は計画どおり MO-02 に委譲                                                                                                                                                                                                                                                                                                                          |
 | MO-02 | PARTIAL | mission-gate-engine、新設ゲート共通化、planning/受入ゲート記録、受入 rework/owner 通知、exit/quality の修復ループ                                                                                                                                                                                                                                                                                                                                                                                         |
 | AA-02 | DONE    | 2026-07-11 完了: driver/dispatchToPeer/writer fencing に加え、2-peer E2E(実 HTTP+HMAC、正常配送・復帰再配送・dead-letter・dedup)を実装。物理2プロセス実証のみ E3 パイロットへ                                                                                                                                                                                                                                                                                                                             |
-| SA-02 | PARTIAL | execution-bounds.ts 抽出、SECURITY.md、warn→enforce 到達(environment manifest の HMAC 署名は 2026-07-11 実装: KYBERION_MANIFEST_SIGNING_KEY 設定で fail-closed)                                                                                                                                                                                                                                                                                                                                           |
-| SA-05 | PARTIAL | policyEngine の操作種別拡張、secure-io parse失敗 fail-open 解消、-y 破壊操作除外                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| SA-02 | DONE    | 2026-07-12 再突合: 「残」とされた3点は実装済みだった — execution-bounds.ts(system-actuator 移行済み)/ SECURITY.md「Shell & ADF Execution Guardrails」節 / enforce は全経路で既定(warn 段階を経ず fail-closed、KYBERION_SHELL_POLICY 変数は不要と判断され不存在)。受入条件5点をコード+19テスト緑で確認。HMAC 署名は 2026-07-11 実装済み                                                                                                                                                                    |
+| SA-05 | PARTIAL | 2026-07-12 Task 2 完了 + **重大発見2件を修正**: 自作 YAML パーサ不全で全16ポリシーの rules が空(エンジンは一度も執行していなかった)→ js-yaml 化 + parse 失敗 fail-closed + 縮退警告。`(?i)` 非対応で injection ルールも不発 → i フラグ変換。発火文脈接続: execute_command / network_request / reasoning_delegation(depth 追跡 KYBERION_DELEGATION_DEPTH、ring/tier env)。残: Task 1(kill-switch 配線)、3.3(承認要否の単一判定源)、Task 4(統制可視化)                                                      |
 | OP-01 | DONE    | 2026-07-12 完了: 全経路計測・cost report・spend-guard(テナント override 含む)・operator packet 週次コスト表示・KPI 正本(docs/KPI_TRACKING.md)                                                                                                                                                                                                                                                                                                                                                             |
 | AR-01 | PARTIAL | 2026-07-12: ループ全廃 + エンジン一本化 + Task 3/4 完了 + run_pipeline 意味論パリティ(budget 執行・step on_error)。golden 緑。残: run_pipeline ループの機械的委譲(意味論分岐は解消済み、性能/保守リファクタ扱い)                                                                                                                                                                                                                                                                                          |
 | AR-02 | PARTIAL | describeOps、op-discovery に input_schema 反映、未知 op の apply 既定撤廃(check:op-registry は 2026-07-11 に修復し validate/CI へ接続済み)                                                                                                                                                                                                                                                                                                                                                                |
@@ -129,10 +129,10 @@
 | ID    | 状態    | 残作業                                                                                                                                                                                                                                                        |
 | ----- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | SA-01 | DONE    | (残: audit-continuity の --warn-only → enforce)                                                                                                                                                                                                               |
-| SA-02 | PARTIAL | execution-bounds.ts 抽出、SECURITY.md、warn→enforce                                                                                                                                                                                                           |
+| SA-02 | DONE    | 2026-07-12 再突合で DONE(execution-bounds / SECURITY.md / enforce 既定を実コード+テストで確認)                                                                                                                                                                |
 | SA-03 | PARTIAL | 2026-07-11 突合: untrusted-content.ts + テスト実在(injection 検知含む、緑)。残: 汚染文脈ゲートの適用範囲精査                                                                                                                                                  |
 | SA-04 | PARTIAL | 2026-07-11: warn 判定の永続化(audit chain へ記録 — 従来は in-memory のみで観測期間のデータが消失していた)+ pnpm egress:report(hostname 別集計と enforce 到達判定)。データ蓄積後に mode: enforce へ。残: tier 文脈付き egress ゲート、DNS リバインディング対策 |
-| SA-05 | PARTIAL | policyEngine 操作種別拡張、secure-io fail-open 解消、-y 破壊操作除外                                                                                                                                                                                          |
+| SA-05 | PARTIAL | 残: kill-switch 配線(Task 1)、承認単一判定源(3.3)、統制可視化(Task 4)。Task 2 は 2026-07-12 完了(YAML パーサ不全と (?i) 不発の2重 dormant enforcement を修正、発火文脈接続)                                                                                   |
 
 ### OP(運用・配布)
 
@@ -165,11 +165,12 @@
 
 ### ONB(初回オンボーディング)
 
-| ID     | 状態    | 残作業                                                                                |
-| ------ | ------- | ------------------------------------------------------------------------------------- |
-| ONB-01 | DONE    |                                                                                       |
-| ONB-02 | DONE    | (2026-07-05 完了: Node 24 統一・floor probe・Playwright 非致命警告・正本リンク統一)   |
-| ONB-03 | PARTIAL | onboard:reset を追加。残: express、identity.example.json、vital-check の overlay 対応 |
+| ID     | 状態    | 残作業                                                                                                                                                                                         |
+| ------ | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ONB-01 | DONE    |                                                                                                                                                                                                |
+| ONB-02 | DONE    | (2026-07-05 完了: Node 24 統一・floor probe・Playwright 非致命警告・正本リンク統一)                                                                                                            |
+| ONB-03 | PARTIAL | onboard:reset を追加。残: express、identity.example.json、vital-check の overlay 対応                                                                                                          |
+| ONB-04 | PARTIAL | 2026-07-12 新設: `pnpm company:onboard`(dry-run / readiness / human owner / 初期 AI worker / 承認・予算境界 / first-work plan / CLI ドキュメント)実装済み。残: E2E-04 連結と受入条件の網羅突合 |
 
 ### SU(Surface UI)
 
@@ -197,10 +198,11 @@
 
 ### CO(Company OS)
 
-| ID    | 状態    | 残作業                                                                                                                                                |
-| ----- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| CO-01 | PARTIAL | 2026-07-11 突合: company.ts と vision-resolver.ts は実装・テスト済み。残: getGoldenRule のテナント対応精査                                            |
-| CO-02 | PARTIAL | 2026-07-11 突合: org-chart.ts + テスト実在・緑。残: カスタムロール作成フロー精査                                                                      |
-| CO-03 | PARTIAL | 2026-07-11 突合: financial-model.ts / okr-tracker.ts + テスト実在・緑。残: 経営判断への接続精査                                                       |
-| CO-04 | PARTIAL | 2026-07-11 突合: decision-rights.ts + テスト実在・緑。残: 承認ゲート統合精査                                                                          |
-| CO-05 | PARTIAL | 2026-07-11 突合: カタログに35テンプレート(採用/決算/調達/取締役会/資金調達を完備)+専用契約テスト緑(#490 の負検証はキー名誤り)。残: 受入条件の粒度精査 |
+| ID    | 状態    | 残作業                                                                                                                                                                                                                                                                      |
+| ----- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CO-01 | PARTIAL | 2026-07-11 突合: company.ts と vision-resolver.ts は実装・テスト済み。残: getGoldenRule のテナント対応精査                                                                                                                                                                  |
+| CO-02 | PARTIAL | 2026-07-11 突合: org-chart.ts + テスト実在・緑。残: カスタムロール作成フロー精査                                                                                                                                                                                            |
+| CO-03 | PARTIAL | 2026-07-11 突合: financial-model.ts / okr-tracker.ts + テスト実在・緑。残: 経営判断への接続精査                                                                                                                                                                             |
+| CO-04 | PARTIAL | 2026-07-11 突合: decision-rights.ts + テスト実在・緑。残: 承認ゲート統合精査                                                                                                                                                                                                |
+| CO-05 | PARTIAL | 2026-07-11 突合: カタログに35テンプレート(採用/決算/調達/取締役会/資金調達を完備)+専用契約テスト緑(#490 の負検証はキー名誤り)。残: 受入条件の粒度精査                                                                                                                       |
+| CO-06 | PARTIAL | 2026-07-12 新設・W0〜W5 実装済み(actor-neutral resource / human accountable owner / human-only approval / decision-rights human-final / usage ledger / workforce projection / acceptance→memory promotion guard)。残: 受入条件・成功指標(§8)との網羅突合と warning 期間運用 |

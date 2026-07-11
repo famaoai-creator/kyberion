@@ -1,8 +1,17 @@
 import * as path from 'node:path';
 import { findMissionPath, missionDir } from './path-resolver.js';
 import type { MissionTeamPlan } from './mission-team-plan-composer.js';
-import { safeAppendFileSync, safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
-import type { MissionTeamGovernance, MissionTeamOrganizationProfileSummary } from './mission-team-plan-composer.js';
+import {
+  safeAppendFileSync,
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeWriteFile,
+} from './secure-io.js';
+import type {
+  MissionTeamGovernance,
+  MissionTeamOrganizationProfileSummary,
+} from './mission-team-plan-composer.js';
 
 export interface TeamBlueprintRole {
   team_role: string;
@@ -26,6 +35,21 @@ export interface MissionTeamBlueprint {
 
 export type MissionActorType = 'agent' | 'human' | 'service';
 
+export interface WorkforceResourceRef {
+  resource_id: string;
+  resource_type: MissionActorType;
+  display_name: string;
+  authority_roles: string[];
+  capabilities: string[];
+  availability: Record<string, unknown>;
+  cost_profile: Record<string, unknown>;
+  status: 'active' | 'suspended' | 'revoked';
+  accountable_human_id: string | null;
+  provider?: string | null;
+  model_id?: string | null;
+  runtime_identity?: string | null;
+}
+
 export interface MissionStaffingAssignment {
   assignment_id: string;
   mission_id: string;
@@ -39,6 +63,8 @@ export interface MissionStaffingAssignment {
   released_at: string | null;
   status: 'active' | 'released';
   source: 'team_composition';
+  /** Actor-neutral resource contract. Legacy agent_id fields remain for readers during migration. */
+  resource: WorkforceResourceRef;
 }
 
 export interface MissionStaffingAssignments {
@@ -63,7 +89,10 @@ export interface MissionExecutionLedgerEntry {
   payload?: Record<string, unknown>;
 }
 
-export interface AppendMissionExecutionLedgerEntryInput extends Omit<MissionExecutionLedgerEntry, 'ts' | 'mission_id'> {
+export interface AppendMissionExecutionLedgerEntryInput extends Omit<
+  MissionExecutionLedgerEntry,
+  'ts' | 'mission_id'
+> {
   mission_id: string;
   mission_path_hint?: string;
 }
@@ -79,9 +108,15 @@ function normalizeMissionId(missionId: string): string {
   return missionId.trim().toUpperCase();
 }
 
-function resolveMissionBindingPaths(missionId: string, missionPathHint?: string): MissionBindingPaths {
+function resolveMissionBindingPaths(
+  missionId: string,
+  missionPathHint?: string
+): MissionBindingPaths {
   const normalizedMissionId = normalizeMissionId(missionId);
-  const missionPath = missionPathHint || findMissionPath(normalizedMissionId) || missionDir(normalizedMissionId, 'public');
+  const missionPath =
+    missionPathHint ||
+    findMissionPath(normalizedMissionId) ||
+    missionDir(normalizedMissionId, 'public');
   return {
     missionPath,
     teamBlueprintPath: path.join(missionPath, 'team-blueprint.json'),
@@ -92,6 +127,44 @@ function resolveMissionBindingPaths(missionId: string, missionPathHint?: string)
 
 function buildAssignmentId(missionId: string, teamRole: string, actorId: string): string {
   return `${missionId}:${teamRole}:${actorId}`.toLowerCase().replace(/[^a-z0-9:_-]+/g, '-');
+}
+
+function resourceFromLegacyAssignment(
+  assignment: MissionTeamPlan['assignments'][number]
+): WorkforceResourceRef | null {
+  const actorId = assignment.agent_id?.trim();
+  if (!actorId) return null;
+  return {
+    resource_id: actorId,
+    resource_type: assignment.actor_type || 'agent',
+    display_name: actorId,
+    authority_roles: assignment.authority_role ? [assignment.authority_role] : [],
+    capabilities: assignment.required_capabilities || [],
+    availability: { status: 'available' },
+    cost_profile: {},
+    status: 'active',
+    // Legacy fixtures predate accountable ownership. New resource refs enforce this at input time.
+    accountable_human_id: assignment.accountable_human_id || null,
+    provider: assignment.provider,
+    model_id: assignment.modelId,
+    runtime_identity: assignment.runtime_identity || null,
+  };
+}
+
+function resolveAssignmentResource(
+  assignment: MissionTeamPlan['assignments'][number]
+): WorkforceResourceRef | null {
+  const resource = assignment.resource;
+  if (resource) {
+    if (resource.status !== 'active') return null;
+    if (resource.resource_type !== 'human' && !resource.accountable_human_id) {
+      throw new Error(
+        `Workforce resource ${resource.resource_id} requires accountable_human_id for ${resource.resource_type}`
+      );
+    }
+    return resource;
+  }
+  return resourceFromLegacyAssignment(assignment);
 }
 
 export function buildMissionTeamBlueprint(plan: MissionTeamPlan): MissionTeamBlueprint {
@@ -107,8 +180,10 @@ export function buildMissionTeamBlueprint(plan: MissionTeamPlan): MissionTeamBlu
       team_role: assignment.team_role,
       required: assignment.required,
       ownership_scope: assignment.delegation_contract?.ownership_scope || '',
-      allowed_delegate_team_roles: assignment.delegation_contract?.allowed_delegate_team_roles || [],
-      escalation_parent_team_role: assignment.delegation_contract?.escalation_parent_team_role || null,
+      allowed_delegate_team_roles:
+        assignment.delegation_contract?.allowed_delegate_team_roles || [],
+      escalation_parent_team_role:
+        assignment.delegation_contract?.escalation_parent_team_role || null,
       required_scope_classes: assignment.delegation_contract?.required_scope_classes || [],
     })),
   };
@@ -116,21 +191,29 @@ export function buildMissionTeamBlueprint(plan: MissionTeamPlan): MissionTeamBlu
 
 export function buildMissionStaffingAssignments(plan: MissionTeamPlan): MissionStaffingAssignments {
   const assignments: MissionStaffingAssignment[] = plan.assignments
-    .filter((assignment) => assignment.status === 'assigned' && assignment.agent_id)
-    .map((assignment) => ({
-      assignment_id: buildAssignmentId(plan.mission_id, assignment.team_role, assignment.agent_id || ''),
-      mission_id: plan.mission_id,
-      team_role: assignment.team_role,
-      actor_id: assignment.agent_id || '',
-      actor_type: 'agent',
-      authority_role: assignment.authority_role,
-      provider: assignment.provider,
-      model_id: assignment.modelId,
-      assigned_at: plan.generated_at,
-      released_at: null,
-      status: 'active',
-      source: 'team_composition',
-    }));
+    .filter((assignment) => assignment.status === 'assigned')
+    .flatMap((assignment) => {
+      const resource = resolveAssignmentResource(assignment);
+      if (!resource) return [];
+      const actorId = resource.resource_id;
+      return [
+        {
+          assignment_id: buildAssignmentId(plan.mission_id, assignment.team_role, actorId),
+          mission_id: plan.mission_id,
+          team_role: assignment.team_role,
+          actor_id: actorId,
+          actor_type: resource.resource_type,
+          authority_role: assignment.authority_role,
+          provider: resource.provider ?? assignment.provider,
+          model_id: resource.model_id ?? assignment.modelId,
+          assigned_at: plan.generated_at,
+          released_at: null,
+          status: 'active',
+          source: 'team_composition',
+          resource,
+        },
+      ];
+    });
 
   return {
     version: '1.0.0',
@@ -141,7 +224,10 @@ export function buildMissionStaffingAssignments(plan: MissionTeamPlan): MissionS
   };
 }
 
-export function initializeMissionTeamBindings(missionPath: string, plan: MissionTeamPlan): MissionBindingPaths {
+export function initializeMissionTeamBindings(
+  missionPath: string,
+  plan: MissionTeamPlan
+): MissionBindingPaths {
   const paths: MissionBindingPaths = {
     missionPath,
     teamBlueprintPath: path.join(missionPath, 'team-blueprint.json'),
@@ -160,13 +246,49 @@ export function initializeMissionTeamBindings(missionPath: string, plan: Mission
   return paths;
 }
 
-export function loadMissionStaffingAssignments(missionId: string): MissionStaffingAssignments | null {
-  const paths = resolveMissionBindingPaths(missionId);
+export function loadMissionStaffingAssignments(
+  missionId: string,
+  missionPathHint?: string
+): MissionStaffingAssignments | null {
+  const paths = resolveMissionBindingPaths(missionId, missionPathHint);
   if (!safeExistsSync(paths.staffingAssignmentsPath)) return null;
-  return JSON.parse(safeReadFile(paths.staffingAssignmentsPath, { encoding: 'utf8' }) as string) as MissionStaffingAssignments;
+  const parsed = JSON.parse(
+    safeReadFile(paths.staffingAssignmentsPath, { encoding: 'utf8' }) as string
+  ) as Omit<MissionStaffingAssignments, 'assignments'> & {
+    assignments?: Array<Partial<MissionStaffingAssignment>>;
+  };
+  const assignments = (parsed.assignments || []).flatMap((assignment) => {
+    const actorId = String(assignment.actor_id || '').trim();
+    if (!actorId) return [];
+    const resource: WorkforceResourceRef = assignment.resource || {
+      resource_id: actorId,
+      resource_type: assignment.actor_type || 'agent',
+      display_name: actorId,
+      authority_roles: assignment.authority_role ? [assignment.authority_role] : [],
+      capabilities: [],
+      availability: { status: 'available' },
+      cost_profile: {},
+      status: assignment.status === 'released' ? 'suspended' : 'active',
+      accountable_human_id: null,
+      provider: assignment.provider ?? null,
+      model_id: assignment.model_id ?? null,
+      runtime_identity: null,
+    };
+    return [
+      {
+        ...assignment,
+        actor_id: actorId,
+        actor_type: resource.resource_type,
+        resource,
+      } as MissionStaffingAssignment,
+    ];
+  });
+  return { ...parsed, assignments } as MissionStaffingAssignments;
 }
 
-export function appendMissionExecutionLedgerEntry(input: AppendMissionExecutionLedgerEntryInput): string {
+export function appendMissionExecutionLedgerEntry(
+  input: AppendMissionExecutionLedgerEntryInput
+): string {
   const missionId = normalizeMissionId(input.mission_id);
   const missionPathHint = input.mission_path_hint;
   const entryPayload: Omit<MissionExecutionLedgerEntry, 'ts' | 'mission_id'> = {

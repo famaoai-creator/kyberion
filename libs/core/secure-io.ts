@@ -184,6 +184,10 @@ export function safeWriteFile(
         agentId: process.env.KYBERION_PERSONA || 'unknown',
         operation: 'file_write',
         target_tier: detectTier(resolved),
+        // Root operator processes are sovereign-tier by default; subagent
+        // spawns can downgrade via KYBERION_AGENT_TIER so sovereign-shield
+        // (personal-tier isolation) has real firing context.
+        agent_tier: process.env.KYBERION_AGENT_TIER || 'sovereign',
         message: `Write to ${resolved}`,
       });
       if (!policyDecision.allowed) {
@@ -210,8 +214,11 @@ export function safeWriteFile(
     } catch (err: any) {
       // Only re-throw if it's an actual policy block, not a load/parse failure
       if (err?.message?.includes('[POLICY_BLOCKED]')) throw err;
+      // SA-05: a broken/missing policy file must not silently disable the
+      // gate — fail closed. (An earlier revision logged "allowing by
+      // default" while already throwing; the message now matches reality.)
       logger.warn(
-        `[secure-io] policy evaluation failed, allowing by default: path=${resolved} error=${err?.message || String(err)}`
+        `[secure-io] policy evaluation failed — failing closed: path=${resolved} error=${err?.message || String(err)}`
       );
       throw new Error(`Policy engine unavailable for ${resolved}: ${err?.message || err}`);
     } finally {
@@ -479,6 +486,35 @@ export function safeExistsSync(filePath: string): boolean {
   return fs.existsSync(resolved);
 }
 
+// SA-05: gate command execution through the declarative policy engine so
+// operation-type rules (ring3-read-only's execute_command, rate limits)
+// actually fire. The message carries only the executable name — free-text
+// command scanning is shell-command-policy's job (SA-02), and duplicating
+// it here would double-regulate and false-positive on argument content.
+function assertExecPolicy(command: string): void {
+  const ringRaw = process.env.KYBERION_AGENT_RING;
+  const ring = ringRaw !== undefined && ringRaw !== '' ? Number(ringRaw) : Number.NaN;
+  const decision = policyEngine.evaluate({
+    agentId: process.env.KYBERION_PERSONA || 'unknown',
+    operation: 'execute_command',
+    message: `Execute ${command}`,
+    ...(Number.isFinite(ring) ? { agent_ring: ring } : {}),
+  });
+  if (!decision.allowed) {
+    auditChain.record({
+      agentId: process.env.KYBERION_PERSONA || 'unknown',
+      action: 'policy_violation',
+      operation: 'execute_command',
+      result: 'failed',
+      reason: decision.message || 'policy violation',
+      metadata: { command },
+    });
+    throw new Error(
+      `[POLICY_BLOCKED] execute_command denied (${command}): ${decision.message || 'policy violation'}`
+    );
+  }
+}
+
 /**
  * Execute a command safely and return the full result (stdout, stderr, exit code).
  * Unlike safeExec, this does NOT throw on non-zero exit codes.
@@ -502,6 +538,7 @@ export function safeExecResult(
     input,
   } = options;
 
+  assertExecPolicy(command);
   try {
     const result = spawnSync(command, args, {
       encoding,
@@ -542,6 +579,7 @@ export function safeExec(command: string, args: string[] = [], options: any = {}
     input,
   } = options;
 
+  assertExecPolicy(command);
   return execFileSync(command, args, {
     encoding,
     cwd,
