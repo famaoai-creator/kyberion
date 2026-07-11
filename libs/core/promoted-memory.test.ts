@@ -36,10 +36,19 @@ describe('promoted-memory', () => {
   const hintsPath = pathResolver.knowledge('product/governance/HINTS.md');
   let originalHintsRaw: string | null = null;
 
+  const scratchHintsDir = pathResolver.shared('tmp/tests/promoted-memory-hints');
+  const scratchHintsPath = `${scratchHintsDir}/HINTS.md`;
+
   beforeAll(() => {
     if (fs.existsSync(hintsPath)) {
       originalHintsRaw = safeReadFile(hintsPath, { encoding: 'utf8' }) as string;
     }
+    // Isolate rotation to a scratch copy so parallel suites never observe a
+    // mid-test dirty knowledge tree (see mission-distill.test.ts).
+    fs.mkdirSync(scratchHintsDir, { recursive: true });
+    fs.writeFileSync(scratchHintsPath, originalHintsRaw ?? '');
+    process.env.KYBERION_HINTS_PATH = scratchHintsPath;
+    process.env.KYBERION_HINTS_ARCHIVE_DIR = `${scratchHintsDir}/archive`;
   });
 
   afterEach(() => {
@@ -62,10 +71,15 @@ describe('promoted-memory', () => {
   });
 
   afterAll(() => {
+    delete process.env.KYBERION_HINTS_PATH;
+    delete process.env.KYBERION_HINTS_ARCHIVE_DIR;
+    fs.rmSync(scratchHintsDir, { recursive: true, force: true });
     if (originalHintsRaw !== null) {
-      withExecutionContext('ecosystem_architect', () => {
-        safeWriteFile(hintsPath, originalHintsRaw);
-      });
+      if (!fs.existsSync(hintsPath)) {
+        withExecutionContext('ecosystem_architect', () => {
+          safeWriteFile(hintsPath, originalHintsRaw);
+        });
+      }
       return;
     }
     if (fs.existsSync(hintsPath)) {
@@ -251,7 +265,7 @@ describe('promoted-memory', () => {
     const saved = savePromotedMemoryRecord(candidate, { executionRole: 'mission_controller' });
     rememberWrite(pathResolver.resolve(saved.logicalPath));
 
-    const hints = safeReadFile(hintsPath, { encoding: 'utf8' }) as string;
+    const hints = safeReadFile(scratchHintsPath, { encoding: 'utf8' }) as string;
     expect(hints).toContain(
       'Use the browser bridge when a workflow depends on deterministic site navigation.'
     );
@@ -287,7 +301,7 @@ describe('promoted-memory', () => {
     ].join('\n');
 
     withExecutionContext('ecosystem_architect', () => {
-      safeWriteFile(hintsPath, fixture);
+      safeWriteFile(scratchHintsPath, fixture);
     });
 
     const candidate = createDistillCandidateRecord({
@@ -310,12 +324,12 @@ describe('promoted-memory', () => {
     const saved = savePromotedMemoryRecord(candidate, { executionRole: 'mission_controller' });
     rememberWrite(pathResolver.resolve(saved.logicalPath));
 
-    const archivePath = pathResolver.knowledge(
-      `product/hints/archive/${saved.record.created_at.replace(/[:.]/gu, '-')}-${saved.record.record_id}.md`
+    const archivePath = pathResolver.resolve(
+      `${scratchHintsDir}/archive/${saved.record.created_at.replace(/[:.]/gu, '-')}-${saved.record.record_id}.md`
     );
     rememberArchive(archivePath);
 
-    const hints = safeReadFile(hintsPath, { encoding: 'utf8' }) as string;
+    const hints = safeReadFile(scratchHintsPath, { encoding: 'utf8' }) as string;
     const liveSections = hints.match(/^## /gm) || [];
     expect(liveSections).toHaveLength(50);
     expect(hints).toContain('## LIVE-02 (2026-07-03)');
