@@ -34,6 +34,7 @@ import {
   safeReadFile,
   safeWriteFile,
 } from '@agent/core';
+import { runDegradationWatch, type DegradationReport } from '@agent/core';
 import { withExecutionContext } from '@agent/core/governance';
 
 export interface PatchCommandResult {
@@ -62,6 +63,12 @@ export interface DependencyPatchOptions {
   runner?: PatchExecRunner;
   /** Gate commands run in order after the version bump. */
   gates?: Array<{ name: string; command: string; args: string[] }>;
+  /**
+   * Post-confirmation canary (AO-02 §3.4 / OP-04). Runs after a patch is
+   * confirmed; a non-green verdict is recorded (and the watch itself sends
+   * the ops-alert) but does not auto-rollback — observation posture.
+   */
+  canary?: () => { report: DegradationReport };
 }
 
 export interface DependencyPatchOutcome {
@@ -73,6 +80,8 @@ export interface DependencyPatchOutcome {
   gates: Array<{ name: string; passed: boolean }>;
   backup_dir?: string;
   reason: string;
+  /** Degradation-watch verdict taken right after a confirmed patch. */
+  canary_verdict?: 'green' | 'yellow' | 'red' | 'unavailable';
 }
 
 interface RootPackageJson {
@@ -281,7 +290,16 @@ export function applyDependencyPatch(options: DependencyPatchOptions): Dependenc
     return rollback('vuln_rescan', 'Package still reported by pnpm audit after the bump.');
   }
 
-  // 5. Confirm.
+  // 5. Confirm, then take a canary reading (degradation watch alerts on its
+  // own when the verdict is non-green; the patch is not auto-rolled-back).
+  let canaryVerdict: DependencyPatchOutcome['canary_verdict'];
+  try {
+    const canary = options.canary ?? (() => runDegradationWatch());
+    canaryVerdict = canary().report.verdict;
+  } catch {
+    canaryVerdict = 'unavailable';
+  }
+
   const outcome: DependencyPatchOutcome = {
     status: 'patched',
     package_name: options.packageName,
@@ -291,6 +309,7 @@ export function applyDependencyPatch(options: DependencyPatchOptions): Dependenc
     gates: gateResults,
     backup_dir: backupDir,
     reason: 'All gates green; patch confirmed.',
+    canary_verdict: canaryVerdict,
   };
   appendLedger(ledgerPath, { kind: 'patch_apply', timestamp, mode: 'apply', ...outcome });
   return outcome;
