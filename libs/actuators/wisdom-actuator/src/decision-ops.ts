@@ -47,6 +47,7 @@ import {
   type MeetingFacilitatorPolicy,
   type PresentationPreferenceProfile,
   delegateBestOf,
+  requestPeerAdvice,
 } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
 import * as path from 'node:path';
@@ -2220,6 +2221,7 @@ const RATE_LIMITED_OPS = new Set([
   'extract_design_spec',
   'extract_test_plan',
   'decompose_into_tasks',
+  'peer_advice',
   'reasoning',
   'tool_use',
   'react_loop',
@@ -2930,6 +2932,44 @@ export async function dispatchDecisionOp(
         ? await backend.delegateTask(instruction, contextRaw)
         : await backend.prompt(fullPrompt);
       return { handled: true, ctx: assign(response) };
+    }
+
+    case 'peer_advice': {
+      const backend = getReasoningBackend();
+      const question =
+        typeof params.question === 'string'
+          ? resolveVars(params.question, ctx)
+          : typeof params.instruction === 'string'
+            ? resolveVars(params.instruction, ctx)
+            : '';
+      const contextRaw =
+        typeof params.context === 'string'
+          ? resolveVars(params.context, ctx)
+          : JSON.stringify(params.context ?? ctx);
+      const result = await requestPeerAdvice(
+        backend,
+        {
+          question,
+          context: contextRaw,
+          tone:
+            params.tone === 'concise' || params.tone === 'adversarial' ? params.tone : 'careful',
+          preferred_provider:
+            typeof params.preferred_provider === 'string'
+              ? resolveVars(params.preferred_provider, ctx)
+              : undefined,
+          preferred_label:
+            typeof params.preferred_label === 'string'
+              ? resolveVars(params.preferred_label, ctx)
+              : undefined,
+        },
+        {
+          context: String(params.context_label || 'wisdom:peer_advice'),
+          model_tier: params.model_tier,
+        }
+      );
+      const outputPath = resolved('output_path');
+      if (outputPath) writeJSON(outputPath, result);
+      return { handled: true, ctx: assign(result) };
     }
 
     // ── Mixture of Experts: wisdom:tool_use ──────────────────────────────
