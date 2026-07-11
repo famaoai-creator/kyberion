@@ -11,11 +11,9 @@ import {
   safeExistsSync,
   safeExec,
   safeReadFile,
-  safeUnlinkSync,
-  safeWriteFile,
   suggestClosestStrings,
 } from '@agent/core';
-import * as path from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 /**
  * Super-Nerve Engine v2.2.1 [FLOW REPAIRED]
@@ -308,38 +306,51 @@ async function dispatchToActuator(domain: string, action: string, params: any, c
     }
   }
 
-  const tempAdfPath = pathResolver.sharedTmp(
-    `actuators/orchestrator-actuator/nerve-dispatch-${Date.now()}-${Math.random().toString(36).substring(7)}.json`
-  );
-  const outCtxPath = tempAdfPath.replace('.json', '-out.json');
-
-  const adf = {
-    action: 'pipeline',
-    context: { ...ctx, context_path: path.relative(rootDir, outCtxPath) },
-    steps: [{ type: determineActuatorStepType(domain, action), op: action, params: params }],
-  };
-
-  safeWriteFile(tempAdfPath, JSON.stringify(adf));
-
-  try {
-    safeExec('node', [builtActuatorPath, '--input', tempAdfPath]);
-
-    if (safeExistsSync(outCtxPath)) {
-      const resultData = JSON.parse(safeReadFile(outCtxPath, { encoding: 'utf8' }) as string);
-
-      if (resultData.results && resultData.results.some((r: any) => r.status === 'failed')) {
-        const failedStep = resultData.results.find((r: any) => r.status === 'failed');
-        throw new Error(
-          `Actuator Execution Failed (${domain}:${action}): ${failedStep.error || 'Unknown error'}`
-        );
-      }
-
-      const { context_path, results, status, total_steps, ...dataToMerge } = resultData;
-      return { ...ctx, ...dataToMerge };
-    }
-    return ctx;
-  } finally {
-    if (safeExistsSync(tempAdfPath)) safeUnlinkSync(tempAdfPath);
-    if (safeExistsSync(outCtxPath)) safeUnlinkSync(outCtxPath);
+  // AR-01 Task 3: dispatch in-process. The old path spawned `node <entry>
+  // --input tmp.json` per op and round-tripped context through a temp file —
+  // a performance sink and a divergence from run_pipeline's in-process
+  // dispatch. Import the built entry once (cached) and call its pipeline
+  // handler directly; the handler returns { status, results, context }.
+  const mod = await actuatorModuleLoader.load(builtActuatorPath);
+  if (typeof mod.handleAction !== 'function') {
+    throw new Error(`Actuator ${actuatorId} does not expose handleAction (${builtActuatorPath})`);
   }
+  const resultData = await mod.handleAction({
+    action: 'pipeline',
+    context: { ...ctx },
+    steps: [{ type: determineActuatorStepType(domain, action), op: action, params: params }],
+  });
+
+  if (
+    resultData?.results &&
+    Array.isArray(resultData.results) &&
+    resultData.results.some((r: any) => r.status === 'failed')
+  ) {
+    const failedStep = resultData.results.find((r: any) => r.status === 'failed');
+    throw new Error(
+      `Actuator Execution Failed (${domain}:${action}): ${failedStep.error || 'Unknown error'}`
+    );
+  }
+
+  const finalCtx =
+    resultData &&
+    typeof resultData === 'object' &&
+    resultData.context &&
+    typeof resultData.context === 'object'
+      ? (resultData.context as Record<string, any>)
+      : {};
+  const { context_path: _contextPath, ...dataToMerge } = finalCtx;
+  return { ...ctx, ...dataToMerge };
 }
+
+// Seam for tests and future loaders: resolves a built actuator entry to its
+// module. Cached per entry path so repeated ops don't re-import.
+export const actuatorModuleLoader = {
+  cache: {} as Record<string, any>,
+  async load(entryPath: string): Promise<any> {
+    if (!this.cache[entryPath]) {
+      this.cache[entryPath] = await import(pathToFileURL(entryPath).href);
+    }
+    return this.cache[entryPath];
+  },
+};
