@@ -4,6 +4,7 @@ import { pathToFileURL } from 'node:url';
 
 import {
   createStandardYargs,
+  startBridgeTypingLoop,
   logger,
   pathResolver,
   safeAppendFileSync,
@@ -263,6 +264,24 @@ export async function sendTelegramMessage(
   };
 }
 
+/**
+ * UX-02: fire-and-forget typing action. Dry-run / missing-token setups
+ * no-op (same contract as sendTelegramMessage).
+ */
+export async function sendTelegramTypingAction(
+  chatId: string,
+  options: TelegramBridgeOptions = {}
+): Promise<void> {
+  const token = resolveToken(options.token);
+  if (options.dryRun || !token) return;
+  const apiBaseUrl = (options.apiBaseUrl || 'https://api.telegram.org').replace(/\/+$/, '');
+  await fetch(`${apiBaseUrl}/bot${token}/sendChatAction`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ chat_id: chatId, action: 'typing' }),
+  });
+}
+
 export async function handleTelegramUpdate(
   update: TelegramUpdate,
   options: TelegramBridgeOptions = {}
@@ -362,6 +381,12 @@ export async function handleTelegramUpdate(
   });
 
   let conversation: Awaited<ReturnType<typeof runSurfaceMessageConversation>>;
+  // UX-02: keep Telegram's typing state alive while we think.
+  const typing = startBridgeTypingLoop(
+    'telegram-bridge',
+    () => sendTelegramTypingAction(chatId, options),
+    4000
+  );
   try {
     conversation = await runSurfaceMessageConversation({
       surface: 'telegram',
@@ -377,7 +402,9 @@ export async function handleTelegramUpdate(
       delegationSummaryInstruction:
         'Produce a concise Telegram reply. Use markdown if useful. Do not use A2A blocks.',
     } as any);
+    typing.stop();
   } catch (err) {
+    typing.stop();
     const detail = err instanceof Error ? err.message : String(err);
     logger.error(`❌ [TelegramBridge] Conversation failed for ${chatId}: ${detail}`);
     // UX-01: the user must not be left in silence (rate-limited per thread).
