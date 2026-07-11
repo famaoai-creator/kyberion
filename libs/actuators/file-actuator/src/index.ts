@@ -24,3 +24,5 @@ if (entrypoint && modulePath === entrypoint) {
 }
 
 export { handleAction };
+
+export { describeOps } from './op-catalog.js';

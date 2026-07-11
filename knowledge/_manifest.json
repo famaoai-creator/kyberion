@@ -975,7 +975,7 @@
     {
       "path": "product/governance/actuator-op-registry.json",
       "tier": "public",
-      "size": 5625,
+      "size": 8583,
       "type": "json"
     },
     {
@@ -1215,7 +1215,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 48549,
+      "size": 48904,
       "type": "json"
     },
     {
@@ -2883,7 +2883,7 @@
     {
       "path": "product/orchestration/actuator-op-discovery.json",
       "tier": "public",
-      "size": 36256,
+      "size": 46804,
       "type": "json"
     },
     {
