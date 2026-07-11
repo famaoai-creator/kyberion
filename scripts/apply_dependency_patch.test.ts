@@ -221,7 +221,56 @@ describe('applyDependencyPatch', () => {
     });
 
     expect(outcome.status).toBe('refused');
+    expect(outcome.reason).toContain('--override');
     expect(runner.calls).toHaveLength(0);
     expect(readLedgerRecords().at(-1)).toMatchObject({ mode: 'refused' });
+  });
+
+  it('patches a transitive dependency via pnpm.overrides when --override is set', () => {
+    const runner = new FakeRunner((command, args) => (args[0] === 'audit' ? cleanAudit : ok));
+    const outcome = applyDependencyPatch({
+      packageName: 'deep-transitive-dep',
+      targetVersion: '2.0.0',
+      apply: true,
+      allowOverride: true,
+      rootDir: testRoot,
+      ledgerPath,
+      backupRoot,
+      runner,
+      gates: GATES,
+    });
+
+    expect(outcome.status).toBe('patched');
+    expect(outcome.section).toBe('pnpm.overrides');
+    expect(outcome.previous_spec).toBe('(none)');
+    expect(readRootPackage().pnpm.overrides['deep-transitive-dep']).toBe('2.0.0');
+    // Direct deps stay untouched.
+    expect(readRootPackage().dependencies.leftpad).toBe('^1.0.0');
+  });
+
+  it('rolls back an override patch when a gate fails', () => {
+    const runner = new FakeRunner((command, args) =>
+      args[1] === 'test' || command === 'pnpm'
+        ? args[0] === 'test'
+          ? { status: 1, stdout: 'smoke failed', stderr: '' }
+          : args[0] === 'audit'
+            ? cleanAudit
+            : ok
+        : ok
+    );
+    const outcome = applyDependencyPatch({
+      packageName: 'deep-transitive-dep',
+      targetVersion: '2.0.0',
+      apply: true,
+      allowOverride: true,
+      rootDir: testRoot,
+      ledgerPath,
+      backupRoot,
+      runner,
+      gates: GATES,
+    });
+
+    expect(outcome.status).toBe('rolled_back');
+    expect(readRootPackage().pnpm).toBeUndefined();
   });
 });
