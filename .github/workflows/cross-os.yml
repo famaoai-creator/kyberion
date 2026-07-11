@@ -117,8 +117,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build
-        run: pnpm run build
+      # Non-UI build only: win32 capability declarations cover actuators/core,
+      # not the Next.js surface. First observation run (2026-07-11) showed the
+      # UI build failing on a Windows junction scandir (EPERM on
+      # "Application Data") while the TS builds passed — the UI is out of
+      # scope for this signal.
+      - name: Build (packages, actuators, repo)
+        run: pnpm run clean && pnpm run build:packages && pnpm run build:actuators && pnpm run build:repo
 
       - name: Type check
         run: pnpm run typecheck
