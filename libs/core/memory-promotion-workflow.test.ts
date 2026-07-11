@@ -1,5 +1,13 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { safeExistsSync, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
+import {
+  safeExistsSync,
+  safeReaddir,
+  safeReadFile,
+  safeRmSync,
+  safeWriteFile,
+} from './secure-io.js';
+import { pathResolver } from './path-resolver.js';
+import { withExecutionContext } from './authority.js';
 import {
   createMemoryPromotionCandidate,
   enqueueMemoryPromotionCandidate,
@@ -36,18 +44,66 @@ describe('memory-promotion-workflow', () => {
   let originalQueueRaw: string | null = null;
   const originalAutopromote = process.env.KYBERION_MEMORY_AUTOPROMOTE;
 
+  // Promotion writes through to the real governed HINTS.md and creates
+  // distill/promoted-memory artifacts; snapshot and clean so test runs never
+  // pollute committed knowledge files (KM-04 hygiene).
+  const hintsPath = pathResolver.knowledge('product/governance/HINTS.md');
+  const distillDir = pathResolver.shared('runtime/distill-candidates');
+  let originalHintsRaw: string | null = null;
+  let distillEntriesBefore = new Set<string>();
+
+  function cleanupPromotionArtifacts(): void {
+    withExecutionContext('ecosystem_architect', () => {
+      const entriesNow = safeExistsSync(distillDir) ? safeReaddir(distillDir) : [];
+      for (const entry of entriesNow) {
+        if (distillEntriesBefore.has(entry)) continue;
+        const recordPath = `${distillDir}/${entry}`;
+        try {
+          const record = JSON.parse(safeReadFile(recordPath, { encoding: 'utf8' }) as string) as {
+            promoted_ref?: string;
+          };
+          const promotedRef = String(record.promoted_ref || '');
+          if (promotedRef) {
+            for (const artifact of [promotedRef, promotedRef.replace(/\.md$/, '.json')]) {
+              const absArtifact = pathResolver.resolve(artifact);
+              if (safeExistsSync(absArtifact)) safeRmSync(absArtifact);
+            }
+          }
+        } catch {
+          /* best-effort — still remove the record below */
+        }
+        safeRmSync(recordPath);
+      }
+    });
+  }
+
   beforeAll(() => {
     if (safeExistsSync(queuePath)) {
       originalQueueRaw = safeReadFile(queuePath, { encoding: 'utf8' }) as string;
+    }
+    if (safeExistsSync(hintsPath)) {
+      originalHintsRaw = safeReadFile(hintsPath, { encoding: 'utf8' }) as string;
     }
   });
 
   beforeEach(() => {
     if (safeExistsSync(queuePath)) safeRmSync(queuePath);
+    distillEntriesBefore = new Set(safeExistsSync(distillDir) ? safeReaddir(distillDir) : []);
+  });
+
+  afterEach(() => {
+    cleanupPromotionArtifacts();
   });
 
   afterAll(() => {
     resetReasoningBackend();
+    withExecutionContext('ecosystem_architect', () => {
+      if (originalHintsRaw !== null) {
+        safeWriteFile(hintsPath, originalHintsRaw);
+      } else if (safeExistsSync(hintsPath)) {
+        safeRmSync(hintsPath);
+      }
+    });
     if (originalQueueRaw !== null) {
       safeWriteFile(queuePath, originalQueueRaw);
       return;
