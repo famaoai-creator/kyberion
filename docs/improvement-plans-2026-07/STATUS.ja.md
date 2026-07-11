@@ -126,13 +126,13 @@
 
 ### SA(セキュリティ・監査)
 
-| ID    | 状態    | 残作業                                                                                                       |
-| ----- | ------- | ------------------------------------------------------------------------------------------------------------ |
-| SA-01 | DONE    | (残: audit-continuity の --warn-only → enforce)                                                              |
-| SA-02 | PARTIAL | execution-bounds.ts 抽出、SECURITY.md、warn→enforce                                                          |
-| SA-03 | PARTIAL | 2026-07-11 突合: untrusted-content.ts + テスト実在(injection 検知含む、緑)。残: 汚染文脈ゲートの適用範囲精査 |
-| SA-04 | PARTIAL | tier 文脈付き egress ゲート、DNS リバインディング対策                                                        |
-| SA-05 | PARTIAL | policyEngine 操作種別拡張、secure-io fail-open 解消、-y 破壊操作除外                                         |
+| ID    | 状態    | 残作業                                                                                                                                                                                                                                                        |
+| ----- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| SA-01 | DONE    | (残: audit-continuity の --warn-only → enforce)                                                                                                                                                                                                               |
+| SA-02 | PARTIAL | execution-bounds.ts 抽出、SECURITY.md、warn→enforce                                                                                                                                                                                                           |
+| SA-03 | PARTIAL | 2026-07-11 突合: untrusted-content.ts + テスト実在(injection 検知含む、緑)。残: 汚染文脈ゲートの適用範囲精査                                                                                                                                                  |
+| SA-04 | PARTIAL | 2026-07-11: warn 判定の永続化(audit chain へ記録 — 従来は in-memory のみで観測期間のデータが消失していた)+ pnpm egress:report(hostname 別集計と enforce 到達判定)。データ蓄積後に mode: enforce へ。残: tier 文脈付き egress ゲート、DNS リバインディング対策 |
+| SA-05 | PARTIAL | policyEngine 操作種別拡張、secure-io fail-open 解消、-y 破壊操作除外                                                                                                                                                                                          |
 
 ### OP(運用・配布)
 
