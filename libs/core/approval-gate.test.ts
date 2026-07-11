@@ -18,6 +18,8 @@ vi.mock('./decision-rights.js', () => ({
 vi.mock('./approval-store.js', () => ({
   createApprovalRequest: vi.fn(),
   listApprovalRequests: vi.fn(),
+  computeApprovalPayloadHash: (payload: Record<string, unknown> | undefined) =>
+    JSON.stringify(payload || {}),
 }));
 
 vi.mock('./audit-chain.js', () => ({
@@ -185,11 +187,45 @@ describe('enforceApprovalGate', () => {
     expect(result.status).toBe('pending');
     expect(result.requestId).toBe('req-new');
     expect(mockCreateRequest).toHaveBeenCalledTimes(1);
+    expect(mockCreateRequest).toHaveBeenCalledWith(
+      'mission_controller',
+      expect.objectContaining({
+        accountability: expect.objectContaining({
+          finalDecision: 'human_only',
+          effectBinding: 'secret:set',
+          payloadHash: expect.any(String),
+        }),
+      })
+    );
     expect(mockAuditRecord).toHaveBeenCalledWith(
       expect.objectContaining({
         reason: 'New approval request created; awaiting decision',
       })
     );
+  });
+
+  it('does not reuse a human-only approval for a changed effect payload', () => {
+    mockResolvePolicy.mockReturnValue({ requiresApproval: true, missingRequirements: [] });
+    mockResolveDecisionRightsMatrix.mockReturnValue(null);
+    mockEvaluateDecisionRights.mockReturnValue(null);
+    mockListRequests.mockReturnValue([
+      {
+        id: 'req-bound',
+        correlationId: 'corr-123',
+        status: 'approved',
+        decidedBy: 'operator-1',
+        accountability: {
+          finalDecision: 'human_only',
+          payloadHash: 'not-the-current-payload',
+          effectBinding: 'secret:set',
+        },
+      } as any,
+    ]);
+
+    const result = enforceApprovalGate({ ...baseParams, payload: { secret: 'changed' } });
+
+    expect(result.allowed).toBe(false);
+    expect(result.message).toContain('effect_mismatch');
   });
 
   it('uses custom draft when provided', () => {

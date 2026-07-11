@@ -67,6 +67,13 @@ function makeHomeSummary(): OperatorHomeSummary {
       overBudget: false,
       missionBreakdown: [],
     },
+    workforceSummary: {
+      activeAssignments: 3,
+      humanResources: 1,
+      agentResources: 2,
+      serviceResources: 0,
+      accountableOwners: ['human:operator'],
+    },
     nextAction: {
       title: '承認キューを確認してください',
       reason: '1件の承認が保留中です',
@@ -120,6 +127,8 @@ describe('ceo-surface-summary', () => {
     // Only attention-class notifications become exceptions.
     expect(summary.exception_feed).toHaveLength(1);
     expect(summary.exception_feed[0]).toMatchObject({ id: 'NTF-1', title: 'ゲート失敗' });
+    expect(summary.workforce).toMatchObject({ activeAssignments: 3, agentResources: 2 });
+    expect(summary.runway).toMatchObject({ total_usd: 0, over_budget: false });
 
     expect(summary.briefing.counts).toEqual({
       active_missions: 2,

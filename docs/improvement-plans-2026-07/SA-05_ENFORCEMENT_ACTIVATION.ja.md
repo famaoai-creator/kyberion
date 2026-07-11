@@ -49,3 +49,12 @@
 - **fail-open → fail-closed は運用を止め得る最大リスク**。IP-08 の方針(まず可視化)を踏襲し、各ゲートは `warn`(違反をログ・通知するが通す)で観測期間を設けてから `enforce` に切り替える。ただし本 IP の完了条件は enforce 到達とする。
 - kill-switch の自動 kill は誤検知で正常な作業を殺す。**自動は warn/isolate まで、kill は人間確認必須**を既定にし、閾値は観測データで調整する。
 - 複数の SA 計画(02/04)とポリシー/承認判定を共有するため、判定の単一源(shell-command-policy / egress-policy / approval-policy)を先に確定し、本 IP はそれらを配線・fail-closed 化する統合レイヤーと位置づける。実施順は SA-02/SA-04 の判定エンジン → SA-05 の配線。
+
+## 実装状況 (2026-07-12)
+
+**Task 2(ポリシーエンジン拡張と fail-closed 化)完了。Task 3 は 3.1/3.2 完了済みを再確認。残: Task 1(kill-switch 配線)、3.3(承認要否の単一判定源化)、Task 4(統制状態の可視化)。**
+
+- **重大発見2件(dormant enforcement)**: (1) 自作簡易 YAML パーサがネスト配列を解析できず、**全16ポリシーの rules が空配列 = ポリシーエンジンは稼働以来一度も何も執行していなかった**(evaluate は常に未マッチ→default allow)。js-yaml に置換し、parse 失敗時は 0 件ロード→evaluate が fail-closed で全拒否。rules 欠落ポリシーのドロップは警告(Task 2.3 のサイレント縮退防止)。(2) `matches` ルールの PCRE 形式 `(?i)` を JS RegExp が受理せず **injection 系ルールも全て不発だった** → `i` フラグへ変換。回帰テスト新設(全ポリシーの rules 非空・sovereign-shield・injection guard・ring3)。
+- **Task 2.1 完了**: 発火文脈の接続 — `execute_command`(secure-io の safeExec/safeExecResult、message は実行ファイル名のみ: コマンド内容走査は SA-02 shell-command-policy の責務で二重規制を回避)/ `network_request`(secureFetch、hostname 付き)/ `reasoning_delegation`(runWithFailover 前段、`delegation_depth = 現在深度+1`)。新設 `libs/core/operation-policy-gate.ts`(`assertOperationPolicy` / `currentDelegationDepth` / `childDelegationEnv`)。深度は `KYBERION_DELEGATION_DEPTH` で追跡し、shell-claude-cli の spawn env で +1 伝搬。ring は `KYBERION_AGENT_RING`、tier は `KYBERION_AGENT_TIER`(root 既定 sovereign)。未マッチ操作は default allow のままなので、配線自体は挙動中立(ルールが狙った時だけ発火)。
+- **Task 2.2**: 2026-07-04 解消済み(fail-closed)を確認。「allowing by default」の虚偽ログを修正し回帰テストで固定。
+- **ルール整合**: ring3-read-only の op 名 `write_file` と実装の `file_write` の不一致を発見 → 両方をルールに併記。

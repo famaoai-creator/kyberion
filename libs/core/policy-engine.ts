@@ -1,3 +1,4 @@
+import yaml from 'js-yaml';
 import { logger } from './core.js';
 import { safeReadFile, safeExistsSync } from './secure-io.js';
 import * as path from 'node:path';
@@ -69,10 +70,33 @@ class PolicyEngineImpl {
     }
 
     const content = safeReadFile(policyPath, { encoding: 'utf8' }) as string;
-    const parsed = parseSimpleYaml(content);
+    // SA-05: a hand-rolled "simple YAML" parser silently produced empty
+    // rules arrays for every policy (nested lists were unsupported), so the
+    // engine never enforced anything. Parse with js-yaml; a parse failure
+    // leaves zero policies loaded, and evaluate() fails closed on that.
+    let parsed: any;
+    try {
+      parsed = yaml.load(content);
+    } catch (err: any) {
+      logger.error(`[POLICY_ENGINE] Failed to parse ${policyPath}: ${err?.message || err}`);
+      return;
+    }
 
-    if (parsed.policies && Array.isArray(parsed.policies)) {
-      this.policies = parsed.policies;
+    if (parsed?.policies && Array.isArray(parsed.policies)) {
+      this.policies = parsed.policies.filter(
+        (policy: any) =>
+          policy &&
+          typeof policy === 'object' &&
+          Array.isArray(policy.rules) &&
+          policy.rules.length > 0
+      );
+      const dropped = parsed.policies.length - this.policies.length;
+      if (dropped > 0) {
+        // Task 2.3: never run silently on fewer rules than the file declares.
+        logger.warn(
+          `[POLICY_ENGINE] ${dropped} policy(ies) dropped (no parseable rules) — check ${policyPath}`
+        );
+      }
       logger.info(`[POLICY_ENGINE] Loaded ${this.policies.length} policies`);
     }
   }
@@ -181,13 +205,22 @@ class PolicyEngineImpl {
         return typeof fieldValue === 'string' && fieldValue.includes(String(ruleValue));
       case 'matches': {
         try {
-          const pattern = String(ruleValue);
+          let pattern = String(ruleValue);
           // ReDoS protection: reject overly complex patterns
           if (pattern.length > 200 || /(\+\+|\*\*|\{\d{3,}\})/.test(pattern)) {
             logger.warn(`[POLICY_ENGINE] Rejected complex regex: ${pattern.slice(0, 50)}...`);
             return false;
           }
-          return new RegExp(pattern).test(String(fieldValue || ''));
+          // SA-05: the policy file uses PCRE-style '(?i)' which JS RegExp
+          // rejects — every 'matches' rule using it silently never fired
+          // (the constructor threw into the catch below). Map it to the
+          // 'i' flag instead.
+          let flags = '';
+          if (pattern.startsWith('(?i)')) {
+            flags = 'i';
+            pattern = pattern.slice(4);
+          }
+          return new RegExp(pattern, flags).test(String(fieldValue || ''));
         } catch {
           return false;
         }
@@ -215,92 +248,6 @@ class PolicyEngineImpl {
 }
 
 /** Minimal YAML parser for our policy format */
-function parseSimpleYaml(content: string): any {
-  const result: any = {};
-  const lines = content.split('\n');
-  const stack: { indent: number; obj: any; key: string }[] = [{ indent: -1, obj: result, key: '' }];
-  let currentArray: any[] | null = null;
-  let currentArrayKey = '';
-  let currentArrayIndent = 0;
-  let currentItem: any = null;
-
-  for (const line of lines) {
-    if (line.trim().startsWith('#') || line.trim() === '') continue;
-
-    const indent = line.search(/\S/);
-    const trimmed = line.trim();
-
-    // Array item
-    if (trimmed.startsWith('- ')) {
-      const itemContent = trimmed.slice(2).trim();
-      const kv = itemContent.match(/^(\w+):\s*(.*)$/);
-
-      if (kv) {
-        if (currentItem) {
-          if (currentArray) currentArray.push(currentItem);
-        }
-        currentItem = {};
-        currentItem[kv[1]] = parseYamlValue(kv[2]);
-      } else {
-        if (currentArray) currentArray.push(parseYamlValue(itemContent));
-      }
-      continue;
-    }
-
-    // Key-value
-    const kv = trimmed.match(/^(\w[\w_]*):\s*(.*)$/);
-    if (kv) {
-      const [, key, rawVal] = kv;
-      const val = rawVal.trim();
-
-      if (currentItem && indent > currentArrayIndent + 2) {
-        currentItem[key] = parseYamlValue(val);
-        continue;
-      }
-
-      if (currentItem) {
-        if (currentArray) currentArray.push(currentItem);
-        currentItem = null;
-      }
-
-      if (val === '' || val === undefined) {
-        // This is a parent key — next lines are children
-        if (indent === 0) {
-          result[key] = [];
-          currentArray = result[key];
-          currentArrayKey = key;
-          currentArrayIndent = indent;
-        }
-      } else {
-        result[key] = parseYamlValue(val);
-      }
-    }
-  }
-
-  if (currentItem && currentArray) {
-    currentArray.push(currentItem);
-  }
-
-  return result;
-}
-
-function parseYamlValue(raw: string): any {
-  if (!raw || raw === '""' || raw === "''") return '';
-  if (raw === 'true') return true;
-  if (raw === 'false') return false;
-  if (!isNaN(Number(raw)) && raw !== '') return Number(raw);
-  if (raw.startsWith('[') && raw.endsWith(']')) {
-    return raw
-      .slice(1, -1)
-      .split(',')
-      .map((s) => s.trim().replace(/^["']|["']$/g, ''))
-      .filter(Boolean);
-  }
-  if (raw.startsWith('"') && raw.endsWith('"')) return raw.slice(1, -1);
-  if (raw.startsWith("'") && raw.endsWith("'")) return raw.slice(1, -1);
-  return raw;
-}
-
 const GLOBAL_KEY = Symbol.for('@kyberion/policy-engine');
 if (!(globalThis as any)[GLOBAL_KEY]) {
   (globalThis as any)[GLOBAL_KEY] = new PolicyEngineImpl();

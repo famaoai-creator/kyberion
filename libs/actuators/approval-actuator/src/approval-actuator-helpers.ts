@@ -79,6 +79,10 @@ export interface ApprovalAction {
     decidedBy?: string;
     decidedByRole?: string;
     authMethod?: 'surface_session' | 'totp' | 'passkey' | 'manual';
+    decidedByType?: 'human' | 'ai_agent' | 'service';
+    authenticated?: boolean;
+    payloadHash?: string;
+    effectBinding?: string;
     note?: string;
     requestKind?: 'channel-approval' | 'secret_mutation';
     expiresAt?: string;
@@ -140,6 +144,10 @@ export async function handleApprovalAction(input: ApprovalAction) {
           decidedBy: params.decidedBy,
           decidedByRole: params.decidedByRole,
           authMethod: params.authMethod,
+          decidedByType: params.decidedByType,
+          authenticated: params.authenticated,
+          payloadHash: params.payloadHash,
+          effectBinding: params.effectBinding,
           note: params.note,
         }),
       };

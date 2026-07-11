@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { markInboxEntry, type DeliverableInboxStatus } from '@agent/core';
+import {
+  acceptInboxEntryWithHumanReceipt,
+  markInboxEntry,
+  type DeliverableInboxStatus,
+} from '@agent/core';
 import { requireConciergeMutationAccess } from '../../../../lib/api-guard';
 
 export const dynamic = 'force-dynamic';
@@ -27,10 +31,19 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
         { status: 400 }
       );
     }
-    const updated = markInboxEntry(id, status, {
-      verdictNote: typeof body?.note === 'string' ? body.note : undefined,
-      reviewedBy: 'concierge',
-    });
+    const updated =
+      status === 'accepted'
+        ? acceptInboxEntryWithHumanReceipt({
+            entryId: id,
+            actorId: 'human:concierge',
+            authenticated: true,
+            authMethod: 'surface_session',
+            responsibilityStatement: 'I accept this deliverable on behalf of the operator.',
+          })
+        : markInboxEntry(id, status, {
+            verdictNote: typeof body?.note === 'string' ? body.note : undefined,
+            reviewedBy: 'concierge',
+          });
     if (!updated) {
       return NextResponse.json(
         { ok: false, error: '該当する成果物が見つかりません' },

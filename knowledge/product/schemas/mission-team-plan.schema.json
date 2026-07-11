@@ -47,7 +47,12 @@
         },
         "composition": {
           "type": "object",
-          "required": ["required_roles", "optional_roles", "assigned_roles", "unfilled_required_roles"],
+          "required": [
+            "required_roles",
+            "optional_roles",
+            "assigned_roles",
+            "unfilled_required_roles"
+          ],
           "properties": {
             "required_roles": { "type": "array", "items": { "type": "string" } },
             "optional_roles": { "type": "array", "items": { "type": "string" } },
@@ -67,6 +72,10 @@
           "required": { "type": "boolean" },
           "status": { "enum": ["assigned", "unfilled"] },
           "agent_id": { "type": ["string", "null"] },
+          "actor_type": { "type": "string", "enum": ["human", "agent", "service"] },
+          "resource": { "$ref": "#/definitions/workforce_resource_ref" },
+          "accountable_human_id": { "type": ["string", "null"] },
+          "runtime_identity": { "type": ["string", "null"] },
           "authority_role": { "type": ["string", "null"] },
           "delegation_contract": {
             "type": ["object", "null"],
@@ -93,6 +102,49 @@
           "notes": { "type": "string" }
         }
       }
+    }
+  },
+  "definitions": {
+    "workforce_resource_ref": {
+      "type": "object",
+      "required": [
+        "resource_id",
+        "resource_type",
+        "display_name",
+        "authority_roles",
+        "capabilities",
+        "availability",
+        "cost_profile",
+        "status",
+        "accountable_human_id"
+      ],
+      "properties": {
+        "resource_id": { "type": "string", "minLength": 1 },
+        "resource_type": { "type": "string", "enum": ["human", "agent", "service"] },
+        "display_name": { "type": "string", "minLength": 1 },
+        "authority_roles": { "type": "array", "items": { "type": "string" } },
+        "capabilities": { "type": "array", "items": { "type": "string" } },
+        "availability": { "type": "object", "additionalProperties": true },
+        "cost_profile": { "type": "object", "additionalProperties": true },
+        "status": { "type": "string", "enum": ["active", "suspended", "revoked"] },
+        "accountable_human_id": { "type": ["string", "null"] },
+        "provider": { "type": ["string", "null"] },
+        "model_id": { "type": ["string", "null"] },
+        "runtime_identity": { "type": ["string", "null"] }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "resource_type": { "enum": ["agent", "service"] } }
+          },
+          "then": {
+            "properties": {
+              "accountable_human_id": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      ],
+      "additionalProperties": false
     }
   }
 }
