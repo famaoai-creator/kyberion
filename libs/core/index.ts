@@ -133,6 +133,7 @@ export * from './op-suggestions.js';
 export * from './adf-engine.js';
 export * from './autonomous-repair.js';
 export * from './operation-policy-gate.js';
+export * from './bridge-typing.js';
 export * from './guided-coordination-brief.js';
 export * from './email-workflow.js';
 export * from './calendar-workflow.js';

@@ -4,6 +4,7 @@ import { Client, GatewayIntentBits, Events, Message } from 'discord.js';
 import {
   createStandardYargs,
   logger,
+  startBridgeTypingLoop,
   pathResolver,
   safeAppendFileSync,
   safeExistsSync,
@@ -33,7 +34,9 @@ function sanitizePathSegment(value: string): string {
 }
 
 function resolveDiscordThreadHistoryPath(threadTs: string): string {
-  return pathResolver.resolve(`${DISCORD_THREAD_HISTORY_ROOT}/${sanitizePathSegment(threadTs)}.jsonl`);
+  return pathResolver.resolve(
+    `${DISCORD_THREAD_HISTORY_ROOT}/${sanitizePathSegment(threadTs)}.jsonl`
+  );
 }
 
 function readDiscordThreadHistory(threadTs: string): DiscordThreadHistoryEntry[] {
@@ -66,21 +69,19 @@ function appendDiscordThreadHistory(entry: DiscordThreadHistoryEntry): void {
 }
 
 export function buildDiscordThreadContextFromEntries(
-  entries: DiscordThreadHistoryEntry[],
+  entries: DiscordThreadHistoryEntry[]
 ): string | undefined {
-  const recent = entries
-    .filter((entry) => entry.text.trim().length > 0)
-    .slice(-6);
+  const recent = entries.filter((entry) => entry.text.trim().length > 0).slice(-6);
 
   if (!recent.length) return undefined;
 
   return [
     'Recent Discord thread context:',
-    ...recent.map((entry) => (
+    ...recent.map((entry) =>
       entry.role === 'assistant'
         ? `Assistant: ${entry.text}`
         : `User (${entry.authorLabel}): ${entry.text}`
-    )),
+    ),
   ].join('\n');
 }
 
@@ -91,17 +92,23 @@ async function collectDiscordThreadContext(message: Message): Promise<string | u
   if (channel?.messages?.fetch) {
     try {
       const fetched = await channel.messages.fetch({ limit: 8, before: message.id });
-      for (const entry of (Array.from(fetched.values()) as any[]).sort((a, b) => Number(a?.createdTimestamp || 0) - Number(b?.createdTimestamp || 0))) {
+      for (const entry of (Array.from(fetched.values()) as any[]).sort(
+        (a, b) => Number(a?.createdTimestamp || 0) - Number(b?.createdTimestamp || 0)
+      )) {
         const content = String(entry?.content || '').trim();
         if (!content) continue;
         historyEntries.push({
           role: entry?.author?.bot ? 'assistant' : 'user',
-          authorLabel: String(entry?.author?.tag || entry?.author?.username || entry?.author?.id || 'unknown'),
+          authorLabel: String(
+            entry?.author?.tag || entry?.author?.username || entry?.author?.id || 'unknown'
+          ),
           text: content,
           messageId: String(entry?.id || ''),
           threadTs: message.channelId,
           channelId: message.channelId,
-          receivedAt: entry?.createdAt ? new Date(entry.createdAt).toISOString() : new Date().toISOString(),
+          receivedAt: entry?.createdAt
+            ? new Date(entry.createdAt).toISOString()
+            : new Date().toISOString(),
         });
       }
     } catch (error: any) {
@@ -132,6 +139,12 @@ async function handleDiscordMessage(message: Message) {
     receivedAt: message.createdAt.toISOString(),
   });
 
+  // UX-02: keep the channel's typing indicator alive while we think.
+  const typing = startBridgeTypingLoop(
+    'discord-bridge',
+    () => (message.channel as { sendTyping?: () => Promise<void> }).sendTyping?.(),
+    8000
+  );
   try {
     const result = await runSurfaceMessageConversation({
       surface: 'discord',
@@ -144,8 +157,8 @@ async function handleDiscordMessage(message: Message) {
       senderAgentId: 'kyberion:discord-bridge',
       agentId: DISCORD_SURFACE_AGENT_ID,
       threadContext: threadContext || undefined,
-      delegationSummaryInstruction: 
-        'Produce a concise Discord reply. Use markdown if appropriate. Do not use A2A blocks.'
+      delegationSummaryInstruction:
+        'Produce a concise Discord reply. Use markdown if appropriate. Do not use A2A blocks.',
     } as any);
 
     if (result.text) {
@@ -179,6 +192,8 @@ async function handleDiscordMessage(message: Message) {
       locale: 'ja',
       post: (errorText) => message.reply(errorText),
     });
+  } finally {
+    typing.stop();
   }
 }
 

@@ -319,6 +319,34 @@ async function start() {
         return;
       }
 
+      // UX-02: Slack has no bot typing API — show 👀 on the user's message
+      // while we work and swap it for ✅ when the reply lands. Reaction
+      // failures are cosmetic and must never block the reply.
+      const typingReaction = { added: false };
+      try {
+        await client.reactions.add({
+          channel: message.channel,
+          timestamp: message.ts,
+          name: 'eyes',
+        });
+        typingReaction.added = true;
+      } catch (reactionErr: any) {
+        logger.warn(`[SlackBridge] typing reaction failed: ${reactionErr?.message || reactionErr}`);
+      }
+      const clearTypingReaction = async () => {
+        if (!typingReaction.added) return;
+        typingReaction.added = false;
+        try {
+          await client.reactions.remove({
+            channel: message.channel,
+            timestamp: message.ts,
+            name: 'eyes',
+          });
+        } catch {
+          /* reaction may already be gone — cosmetic */
+        }
+      };
+
       const forcedReceiver = deriveSlackDelegationReceiver(message.text);
       await reflectSlackPresence({
         status: 'thinking',
@@ -345,6 +373,7 @@ async function start() {
           channelType,
         },
       });
+      await clearTypingReaction();
       const route = forcedReceiver === 'nerve-agent' ? 'nerve' : 'surface';
 
       if (conversation.approvalRequests.length > 0) {
