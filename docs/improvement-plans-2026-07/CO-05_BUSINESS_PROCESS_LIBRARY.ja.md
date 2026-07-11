@@ -16,6 +16,11 @@
 3. 既存の欠落 role(talent_culture, line_manager)に裏付けプロセスが付く。
 4. テンプレートが MO-01 のプロセステンプレート(相・ゲート)形式に従い、mission として実行可能。
 
+## 実装状況 (2026-07-11 突合)
+
+- mission-workflow-catalog.json に **35 テンプレート**が登録済みで、本計画の対象(採用 hiring-workflow / 月次決算 financial-close-monthly / 調達 procurement-vendor / 取締役会 board-meeting-prep / 資金調達 fundraising-prep、加えて budget-review / performance-review 等)を含む。`tests/co-business-process-library-contract.test.ts` が契約として固定(緑)。STATUS の TODO 表記は陳腐化していた。
+- 残: 受入条件との全項目突合(テンプレートの phase 構成が計画の要求粒度を満たすかの精査)。
+
 ## 実装タスク
 
 ### Task 1: 基幹プロセスの棚卸しと優先順位 — `claude-sonnet-4`

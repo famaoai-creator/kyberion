@@ -22,6 +22,7 @@ import {
   type EnvValidationReport,
   type LatencyRegression,
 } from '@agent/core';
+import { getEmbeddingBackend, installEmbeddingBackendIfAvailable } from '@agent/core';
 import { probeAppleIntelligence } from '@agent/core';
 import { collectMissionHygieneReport, formatMissionHygieneLine } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
@@ -110,6 +111,25 @@ export function collectHealthRollupLines(
     `System health: ${icon} ${verdict}`,
     ...reasons.slice(0, 3).map((reason) => `  - ${reason}`),
   ];
+}
+
+/**
+ * KM-02 Task 2 — make the hash-embedding fallback visible: on non-Apple
+ * hosts "semantic" search is a hash-bucket approximation, and operators
+ * should not mistake it for real embeddings.
+ */
+export function collectSemanticSearchDoctorLine(): string {
+  try {
+    installEmbeddingBackendIfAvailable();
+    const backend = getEmbeddingBackend();
+    if (!backend) return 'Semantic search: disabled (KYBERION_DISABLE_EMBEDDINGS)';
+    if (backend.name === 'local-hash-embedding') {
+      return 'Semantic search: ⚠ DEGRADED — hash-bucket approximation (local-hash-embedding), not real embeddings';
+    }
+    return `Semantic search: ${backend.name}`;
+  } catch (err) {
+    return `Semantic search: status unavailable (${err})`;
+  }
 }
 
 export function collectPipelineScheduleDoctorLines(): string[] {
@@ -290,6 +310,7 @@ export async function collectDoctorReport(argv: {
   const governanceLines = [
     `Governance controls: kill_switch=${governance.kill_switch_monitoring ? 'armed' : 'idle'}; pending_approvals=${governance.pending_approvals}; approval_rules=${governance.approval_rules}; shell_rules=${governance.shell_allow_rules}/${governance.shell_deny_rules}; egress_mode=${governance.egress_mode}; egress_domains=${governance.egress_allowlist_domains}`,
     ...formatEnvValidationReport(envReport),
+    collectSemanticSearchDoctorLine(),
   ];
 
   return {
