@@ -176,7 +176,7 @@ export type {
 export { renderStatus, renderVocabularyText, resolveVocabularyLocale } from './ux-vocabulary.js';
 export type { UxStatusDomain, UxVocabularyLocale } from './ux-vocabulary.js';
 export * from './operator-home-summary.js';
-export { resolveActiveProfileRoot } from './profile-root.js';
+export { resolveActiveProfileRoot, resolveOperatorDisplayName } from './profile-root.js';
 export * from './company.js';
 export * from './financial-model.js';
 export * from './finance-controller.js';
