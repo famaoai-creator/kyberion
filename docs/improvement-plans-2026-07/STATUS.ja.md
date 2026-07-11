@@ -14,20 +14,20 @@
 
 ## P0 残作業(プロダクション化のクリティカルパス)
 
-| ID    | 状態    | 残作業の要点                                                                                                                                                                     |
-| ----- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| IP-07 | PARTIAL | claude-agent-reasoning-backend テスト、surface-runtime-orchestrator 特性化テスト                                                                                                 |
-| MO-01 | DONE    | 2026-07-06 完了: phaseSpec スキーマ(catalog v1.1.0)+タスク展開(plan-tasks/createMission)+3プロセステンプレート追加。worker イベント連鎖のフェーズ駆動化は計画どおり MO-02 に委譲 |
-| MO-02 | PARTIAL | mission-gate-engine、新設ゲート共通化、planning/受入ゲート記録、受入 rework/owner 通知、exit/quality の修復ループ                                                                |
-| AA-02 | TODO    | mesh_delivery_driver 新設、broker⇔dispatchToPeer 配線、writer fencing、E2E                                                                                                       |
-| SA-02 | PARTIAL | execution-bounds.ts 抽出、SECURITY.md、warn→enforce 到達(environment manifest の HMAC 署名は 2026-07-11 実装: KYBERION_MANIFEST_SIGNING_KEY 設定で fail-closed)                  |
-| SA-05 | PARTIAL | policyEngine の操作種別拡張、secure-io parse失敗 fail-open 解消、-y 破壊操作除外                                                                                                 |
-| OP-01 | PARTIAL | usage 計測の全経路接続、cost report、spend-guard、KPI 接続                                                                                                                       |
-| AR-01 | PARTIAL | adf-engine.ts 抽出、file-actuator/super-nerve アダプタ化、3エンジン統合、golden 回帰                                                                                             |
-| AR-02 | PARTIAL | describeOps、op-discovery に input_schema 反映、未知 op の apply 既定撤廃(check:op-registry は 2026-07-11 に修復し validate/CI へ接続済み)                                       |
-| AO-02 | TODO    | CVE スキャン/台帳、パッチ判断ルーブリック、適用フロー                                                                                                                            |
-| IL-01 | TODO    | goal/source_text/outcome_ids の昇格 seam 貫通、outcome-contract の goal 優先化                                                                                                   |
-| IL-04 | PARTIAL | intent-reconciliation エンジン、完了ゲート、学習記録                                                                                                                             |
+| ID    | 状態    | 残作業の要点                                                                                                                                                                                                                                                                                                                                                                                                              |
+| ----- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| IP-07 | PARTIAL | claude-agent-reasoning-backend テスト、surface-runtime-orchestrator 特性化テスト                                                                                                                                                                                                                                                                                                                                          |
+| MO-01 | DONE    | 2026-07-06 完了: phaseSpec スキーマ(catalog v1.1.0)+タスク展開(plan-tasks/createMission)+3プロセステンプレート追加。worker イベント連鎖のフェーズ駆動化は計画どおり MO-02 に委譲                                                                                                                                                                                                                                          |
+| MO-02 | PARTIAL | mission-gate-engine、新設ゲート共通化、planning/受入ゲート記録、受入 rework/owner 通知、exit/quality の修復ループ                                                                                                                                                                                                                                                                                                         |
+| AA-02 | TODO    | mesh_delivery_driver 新設、broker⇔dispatchToPeer 配線、writer fencing、E2E                                                                                                                                                                                                                                                                                                                                                |
+| SA-02 | PARTIAL | execution-bounds.ts 抽出、SECURITY.md、warn→enforce 到達(environment manifest の HMAC 署名は 2026-07-11 実装: KYBERION_MANIFEST_SIGNING_KEY 設定で fail-closed)                                                                                                                                                                                                                                                           |
+| SA-05 | PARTIAL | policyEngine の操作種別拡張、secure-io parse失敗 fail-open 解消、-y 破壊操作除外                                                                                                                                                                                                                                                                                                                                          |
+| OP-01 | PARTIAL | usage 計測の全経路接続、cost report、spend-guard、KPI 接続                                                                                                                                                                                                                                                                                                                                                                |
+| AR-01 | PARTIAL | adf-engine.ts 抽出、file-actuator/super-nerve アダプタ化、3エンジン統合、golden 回帰                                                                                                                                                                                                                                                                                                                                      |
+| AR-02 | PARTIAL | describeOps、op-discovery に input_schema 反映、未知 op の apply 既定撤廃(check:op-registry は 2026-07-11 に修復し validate/CI へ接続済み)                                                                                                                                                                                                                                                                                |
+| AO-02 | PARTIAL | 2026-07-11: scan/台帳/ルーブリック実装済み + §3.3 unit test + 適用フロー(propose 既定・--apply で backup→bump→install/typecheck/smoke→再スキャン→確定/ロールバック)。残: カナリア監視(OP-04)。透過依存は 2026-07-11 に --override(pnpm.overrides 経由、明示オプトイン)で対応済み。日次スキャンは pipelines/dependency-vuln-scan.json の cron(JST 5:00)で配線済み・実走確認済み。Task 4 defer 再評価は 2026-07-11 実装済み |
+| IL-01 | TODO    | goal/source_text/outcome_ids の昇格 seam 貫通、outcome-contract の goal 優先化                                                                                                                                                                                                                                                                                                                                            |
+| IL-04 | PARTIAL | intent-reconciliation エンジン、完了ゲート、学習記録                                                                                                                                                                                                                                                                                                                                                                      |
 
 ## 全計画一覧
 
@@ -146,12 +146,12 @@
 
 ### AO(自律運用・保守)
 
-| ID    | 状態    | 残作業                                                                              |
-| ----- | ------- | ----------------------------------------------------------------------------------- |
-| AO-01 | PARTIAL | scheduler run-lock/missed-run catch-up、autonomous-ops-policy/gate、auto-checkpoint |
-| AO-02 | TODO    | CVE スキャン/台帳、パッチルーブリック、適用フロー                                   |
-| AO-03 | DONE    |                                                                                     |
-| AO-04 | TODO    | soak ハーネス、リーク検出、再起動 e2e                                               |
+| ID    | 状態    | 残作業                                                                                                                                                                                                                                                            |
+| ----- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AO-01 | PARTIAL | scheduler run-lock/missed-run catch-up、autonomous-ops-policy/gate、auto-checkpoint                                                                                                                                                                               |
+| AO-02 | PARTIAL | 2026-07-11: scan/台帳/ルーブリック実装済み + §3.3 unit test + 適用フロー(propose 既定・--apply で backup→bump→install/typecheck/smoke→再スキャン→確定/ロールバック)。残: 定期スケジュール接続(AO-01)、defer 再評価ループ(Task 4)、透過依存 override、カナリア監視 |
+| AO-03 | DONE    |                                                                                                                                                                                                                                                                   |
+| AO-04 | TODO    | soak ハーネス、リーク検出、再起動 e2e                                                                                                                                                                                                                             |
 
 ### IL(インテントライフサイクル)
 

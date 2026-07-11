@@ -1,0 +1,20 @@
+{
+  "version": "1.0.0",
+  "default_engine_id": "local_say",
+  "engines": [
+    {
+      "engine_id": "gemini_tts",
+      "display_name": "Google AI Studio Gemini TTS",
+      "kind": "voice_clone_service",
+      "provider": "gemini_api",
+      "status": "active",
+      "platforms": ["any"],
+      "supports": {
+        "list_voices": false,
+        "playback": true,
+        "artifact_formats": ["wav"]
+      },
+      "notes": "Gemini 3.1 Flash TTS preview through Google AI Studio / Gemini API using GEMINI_API_KEY."
+    }
+  ]
+}
