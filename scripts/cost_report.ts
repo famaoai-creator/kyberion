@@ -15,11 +15,19 @@ function main(): number {
   const argv = createStandardYargs()
     .option('since', { type: 'string', describe: 'Window start (ISO date/time)' })
     .option('until', { type: 'string', describe: 'Window end (ISO date/time)' })
+    .option('last-days', { type: 'number', describe: 'Shorthand: window = now minus N days' })
     .option('json', { type: 'boolean', default: false })
     .parseSync();
 
+  const lastDays = Number(argv['last-days']);
+  const since =
+    argv.since !== undefined
+      ? String(argv.since)
+      : Number.isFinite(lastDays) && lastDays > 0
+        ? new Date(Date.now() - lastDays * 24 * 60 * 60 * 1000).toISOString()
+        : undefined;
   const report = buildCostReportFromHistory({
-    since: argv.since ? String(argv.since) : undefined,
+    since,
     until: argv.until ? String(argv.until) : undefined,
   });
 
