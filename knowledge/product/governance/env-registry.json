@@ -1426,6 +1426,16 @@
       "documented": false
     },
     {
+      "name": "KYBERION_SECRET_ENCRYPTION",
+      "category": "flag",
+      "type": "enum",
+      "required": false,
+      "description": "At-rest encryption mode for connection documents (AC-05). none=plaintext (default, compatible); keychain=AES-256-GCM with a macOS-keychain-held key. Migrate with pnpm secrets:encrypt (--decrypt exports back to plaintext).",
+      "documented": true,
+      "enum": ["none", "keychain"],
+      "subsystem": "secrets"
+    },
+    {
       "name": "KYBERION_SECRET_RESOLVER_COMMAND",
       "category": "secret",
       "type": "string",
