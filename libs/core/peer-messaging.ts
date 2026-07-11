@@ -6,7 +6,14 @@ import { logger } from './core.js';
 import { withExecutionContext } from './authority.js';
 import { pathResolver } from './path-resolver.js';
 import { appendGovernedArtifactJsonl, type GovernedArtifactRole } from './artifact-store.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile, validateUrl } from './secure-io.js';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeWriteFile,
+  validateUrl,
+} from './secure-io.js';
 
 export type PeerMessageType =
   | 'request'
@@ -90,7 +97,9 @@ export interface PeerMessageResponderContext {
   envelope: PeerMessageEnvelope;
 }
 
-export type PeerMessageResponder = (context: PeerMessageResponderContext) => Promise<unknown> | unknown;
+export type PeerMessageResponder = (
+  context: PeerMessageResponderContext
+) => Promise<unknown> | unknown;
 
 export interface PeerMessagingServerOptions {
   peerId: string;
@@ -109,6 +118,8 @@ const DEFAULT_RUNTIME_ROOT = 'active/shared/runtime/peer-messaging';
 const DEFAULT_OBSERVABILITY_ROOT = 'active/shared/observability/peer-messaging';
 const DEFAULT_INBOX_ROLE: GovernedArtifactRole = 'surface_runtime';
 const DEFAULT_EVENT_ROLE: GovernedArtifactRole = 'infrastructure_sentinel';
+const MAX_REQUEST_BODY_BYTES = 1024 * 1024;
+const REQUEST_SIGNATURE_HEADER = 'x-kyberion-peer-signature';
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -118,7 +129,9 @@ function randomId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36).toUpperCase()}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
 }
 
-function normalizeEnvelope<TPayload>(envelope: PeerMessageEnvelope<TPayload>): PeerMessageEnvelope<TPayload> {
+function normalizeEnvelope<TPayload>(
+  envelope: PeerMessageEnvelope<TPayload>
+): PeerMessageEnvelope<TPayload> {
   return {
     version: envelope.version || '1',
     message_id: envelope.message_id,
@@ -138,7 +151,9 @@ function normalizeEnvelope<TPayload>(envelope: PeerMessageEnvelope<TPayload>): P
   };
 }
 
-function signaturePayload<TPayload>(envelope: PeerMessageEnvelope<TPayload>): Record<string, unknown> {
+function signaturePayload<TPayload>(
+  envelope: PeerMessageEnvelope<TPayload>
+): Record<string, unknown> {
   return {
     version: envelope.version || '1',
     message_id: envelope.message_id,
@@ -159,7 +174,7 @@ function signaturePayload<TPayload>(envelope: PeerMessageEnvelope<TPayload>): Re
 
 export function signPeerMessage<TPayload>(
   envelope: PeerMessageEnvelope<TPayload>,
-  sharedSecret: string,
+  sharedSecret: string
 ): string {
   return crypto
     .createHmac('sha256', sharedSecret)
@@ -169,16 +184,19 @@ export function signPeerMessage<TPayload>(
 
 export function verifyPeerMessage<TPayload>(
   envelope: PeerMessageEnvelope<TPayload>,
-  sharedSecret: string,
+  sharedSecret: string
 ): boolean {
   if (!envelope.signature) return false;
   const expected = signPeerMessage(envelope, sharedSecret);
   if (expected.length !== envelope.signature.length) return false;
-  return crypto.timingSafeEqual(Buffer.from(expected, 'hex'), Buffer.from(envelope.signature, 'hex'));
+  return crypto.timingSafeEqual(
+    Buffer.from(expected, 'hex'),
+    Buffer.from(envelope.signature, 'hex')
+  );
 }
 
 export function buildPeerMessageEnvelope<TPayload>(
-  input: BuildPeerMessageInput<TPayload>,
+  input: BuildPeerMessageInput<TPayload>
 ): PeerMessageEnvelope<TPayload> {
   const envelope: PeerMessageEnvelope<TPayload> = {
     version: '1',
@@ -192,7 +210,9 @@ export function buildPeerMessageEnvelope<TPayload>(
     created_at: nowIso(),
     ...(input.replyToMessageId ? { reply_to_message_id: input.replyToMessageId } : {}),
     ...(input.correlationId ? { correlation_id: input.correlationId } : {}),
-    ...(typeof input.ttlMs === 'number' ? { ttl_ms: input.ttlMs, expires_at: new Date(Date.now() + input.ttlMs).toISOString() } : {}),
+    ...(typeof input.ttlMs === 'number'
+      ? { ttl_ms: input.ttlMs, expires_at: new Date(Date.now() + input.ttlMs).toISOString() }
+      : {}),
     transport: 'http',
   };
   envelope.signature = signPeerMessage(envelope, input.sharedSecret);
@@ -200,9 +220,10 @@ export function buildPeerMessageEnvelope<TPayload>(
 }
 
 export function loadPeerNetworkCatalog(
-  options: PeerMessagingCatalogOptions = {},
+  options: PeerMessagingCatalogOptions = {}
 ): PeerNetworkCatalog | null {
-  const catalogPath = options.catalogPath || process.env.KYBERION_PEER_NETWORK_CATALOG || DEFAULT_CATALOG_PATH;
+  const catalogPath =
+    options.catalogPath || process.env.KYBERION_PEER_NETWORK_CATALOG || DEFAULT_CATALOG_PATH;
   try {
     if (!safeExistsSync(catalogPath)) return null;
     const raw = safeReadFile(catalogPath, { encoding: 'utf8' }) as string;
@@ -211,14 +232,16 @@ export function loadPeerNetworkCatalog(
       return parsed;
     }
   } catch (error: any) {
-    logger.warn(`[peer-messaging] failed to load catalog ${catalogPath}: ${error?.message || error}`);
+    logger.warn(
+      `[peer-messaging] failed to load catalog ${catalogPath}: ${error?.message || error}`
+    );
   }
   return null;
 }
 
 export function resolvePeerRecord(
   peerId: string,
-  catalog: PeerNetworkCatalog | null = loadPeerNetworkCatalog(),
+  catalog: PeerNetworkCatalog | null = loadPeerNetworkCatalog()
 ): PeerNetworkPeerRecord | null {
   const normalizedPeerId = String(peerId || '').trim();
   if (!normalizedPeerId) return null;
@@ -228,7 +251,7 @@ export function resolvePeerRecord(
 
 export function resolvePeerDispatchTarget(
   peerId: string,
-  catalog: PeerNetworkCatalog | null = loadPeerNetworkCatalog(),
+  catalog: PeerNetworkCatalog | null = loadPeerNetworkCatalog()
 ): ResolvedPeerDispatchTarget {
   const peer = resolvePeerRecord(peerId, catalog);
   if (!peer) {
@@ -256,11 +279,21 @@ function observabilityLogicalPath(peerId: string, segment: string): string {
   return `${DEFAULT_OBSERVABILITY_ROOT}/${peerId}/${segment}`;
 }
 
-function appendRuntimeJsonl(role: GovernedArtifactRole, peerId: string, segment: string, record: unknown): string {
+function appendRuntimeJsonl(
+  role: GovernedArtifactRole,
+  peerId: string,
+  segment: string,
+  record: unknown
+): string {
   return appendGovernedArtifactJsonl(role, runtimeLogicalPath(peerId, segment), record);
 }
 
-function appendObservabilityJsonl(role: GovernedArtifactRole, peerId: string, segment: string, record: unknown): string {
+function appendObservabilityJsonl(
+  role: GovernedArtifactRole,
+  peerId: string,
+  segment: string,
+  record: unknown
+): string {
   return appendGovernedArtifactJsonl(role, observabilityLogicalPath(peerId, segment), record);
 }
 
@@ -284,7 +317,9 @@ export function listPeerOutboxRecords(peerId: string): Array<Record<string, unkn
 }
 
 export function listPeerEvents(peerId: string): Array<Record<string, unknown>> {
-  return readJsonlRecords<Record<string, unknown>>(observabilityLogicalPath(peerId, 'events.jsonl'));
+  return readJsonlRecords<Record<string, unknown>>(
+    observabilityLogicalPath(peerId, 'events.jsonl')
+  );
 }
 
 export function clearPeerRuntime(peerId: string): void {
@@ -292,14 +327,15 @@ export function clearPeerRuntime(peerId: string): void {
   const observabilityDir = pathResolver.resolve(`${DEFAULT_OBSERVABILITY_ROOT}/${peerId}`);
   withExecutionContext('infrastructure_sentinel', () => {
     if (safeExistsSync(runtimeDir)) safeRmSync(runtimeDir, { recursive: true, force: true });
-    if (safeExistsSync(observabilityDir)) safeRmSync(observabilityDir, { recursive: true, force: true });
+    if (safeExistsSync(observabilityDir))
+      safeRmSync(observabilityDir, { recursive: true, force: true });
   });
 }
 
 function recordPeerEvent(
   peerId: string,
   event: Record<string, unknown>,
-  role: GovernedArtifactRole = DEFAULT_EVENT_ROLE,
+  role: GovernedArtifactRole = DEFAULT_EVENT_ROLE
 ): string {
   return appendObservabilityJsonl(role, peerId, 'events.jsonl', {
     ts: nowIso(),
@@ -311,7 +347,7 @@ function recordPeerEvent(
 function recordInbox(
   peerId: string,
   envelope: PeerMessageEnvelope,
-  role: GovernedArtifactRole = DEFAULT_INBOX_ROLE,
+  role: GovernedArtifactRole = DEFAULT_INBOX_ROLE
 ): string {
   return appendRuntimeJsonl(role, peerId, 'inbox.jsonl', {
     received_at: nowIso(),
@@ -326,7 +362,7 @@ function recordOutbox(
   status: 'sent' | 'failed',
   response?: unknown,
   error?: string,
-  role: GovernedArtifactRole = DEFAULT_INBOX_ROLE,
+  role: GovernedArtifactRole = DEFAULT_INBOX_ROLE
 ): string {
   return appendRuntimeJsonl(role, peerId, 'outbox.jsonl', {
     sent_at: nowIso(),
@@ -338,13 +374,60 @@ function recordOutbox(
   });
 }
 
-function parseRequestBody(req: http.IncomingMessage): Promise<unknown> {
+export function signPeerHttpRequest(
+  method: string,
+  requestUrl: string,
+  sharedSecret: string
+): string {
+  return crypto
+    .createHmac('sha256', sharedSecret)
+    .update(`${method.toUpperCase()}\n${requestUrl}`)
+    .digest('hex');
+}
+
+function verifyPeerHttpRequest(req: http.IncomingMessage, sharedSecret: string): boolean {
+  const signature = req.headers[REQUEST_SIGNATURE_HEADER];
+  if (typeof signature !== 'string' || !/^[a-f0-9]{64}$/i.test(signature)) return false;
+  const expected = signPeerHttpRequest(req.method || '', req.url || '', sharedSecret);
+  return crypto.timingSafeEqual(Buffer.from(expected, 'hex'), Buffer.from(signature, 'hex'));
+}
+
+class RequestBodyTooLargeError extends Error {
+  constructor() {
+    super('request_body_too_large');
+  }
+}
+
+function parseRequestBody(
+  req: http.IncomingMessage,
+  maxBytes = MAX_REQUEST_BODY_BYTES
+): Promise<unknown> {
   return new Promise((resolve, reject) => {
+    const contentLength = Number(req.headers['content-length']);
+    if (Number.isFinite(contentLength) && contentLength > maxBytes) {
+      req.resume();
+      reject(new RequestBodyTooLargeError());
+      return;
+    }
+
     const chunks: Buffer[] = [];
+    let receivedBytes = 0;
+    let settled = false;
     req.on('data', (chunk) => {
-      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      if (settled) return;
+      const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      receivedBytes += buffer.length;
+      if (receivedBytes > maxBytes) {
+        settled = true;
+        req.resume();
+        reject(new RequestBodyTooLargeError());
+        return;
+      }
+      chunks.push(buffer);
     });
     req.on('end', () => {
+      if (settled) return;
+      settled = true;
       try {
         const raw = Buffer.concat(chunks).toString('utf8').trim();
         resolve(raw ? JSON.parse(raw) : {});
@@ -352,7 +435,11 @@ function parseRequestBody(req: http.IncomingMessage): Promise<unknown> {
         reject(error);
       }
     });
-    req.on('error', reject);
+    req.on('error', (error) => {
+      if (settled) return;
+      settled = true;
+      reject(error);
+    });
   });
 }
 
@@ -370,7 +457,9 @@ export class PeerMessagingServer {
 
   constructor(private readonly options: PeerMessagingServerOptions) {}
 
-  public async processEnvelope(envelope: PeerMessageEnvelope): Promise<{ status: number; body: unknown }> {
+  public async processEnvelope(
+    envelope: PeerMessageEnvelope
+  ): Promise<{ status: number; body: unknown }> {
     const normalized = normalizeEnvelope(envelope);
     const sharedSecret = this.options.sharedSecret;
     if (!normalized || typeof normalized !== 'object') {
@@ -411,7 +500,10 @@ export class PeerMessagingServer {
     const processedAt = nowIso();
     let response: unknown = { accepted: true };
     if (this.options.responder) {
-      response = await this.options.responder({ peerId: this.options.peerId, envelope: normalized });
+      response = await this.options.responder({
+        peerId: this.options.peerId,
+        envelope: normalized,
+      });
     }
 
     recordPeerEvent(this.options.peerId, {
@@ -442,14 +534,13 @@ export class PeerMessagingServer {
     const server = http.createServer(async (req, res) => {
       try {
         if (req.method === 'GET' && req.url === '/health') {
-          return sendJson(res, 200, {
-            ok: true,
-            peer_id: this.options.peerId,
-            pid: process.pid,
-          });
+          return sendJson(res, 200, { ok: true });
         }
 
         if (req.method === 'GET' && req.url === '/v1/peer/messages/inbox') {
+          if (!verifyPeerHttpRequest(req, this.options.sharedSecret)) {
+            return sendJson(res, 401, { ok: false, error: 'invalid_request_signature' });
+          }
           return sendJson(res, 200, {
             ok: true,
             items: listPeerInboxRecords(this.options.peerId),
@@ -457,6 +548,9 @@ export class PeerMessagingServer {
         }
 
         if (req.method === 'GET' && req.url === '/v1/peer/messages/outbox') {
+          if (!verifyPeerHttpRequest(req, this.options.sharedSecret)) {
+            return sendJson(res, 401, { ok: false, error: 'invalid_request_signature' });
+          }
           return sendJson(res, 200, {
             ok: true,
             items: listPeerOutboxRecords(this.options.peerId),
@@ -471,6 +565,9 @@ export class PeerMessagingServer {
         const result = await this.processEnvelope(body as PeerMessageEnvelope);
         return sendJson(res, result.status, result.body);
       } catch (error: any) {
+        if (error instanceof RequestBodyTooLargeError) {
+          return sendJson(res, 413, { ok: false, error: error.message });
+        }
         recordPeerEvent(this.options.peerId, {
           type: 'message_error',
           reason: error?.message || String(error),
@@ -484,7 +581,9 @@ export class PeerMessagingServer {
       server.listen(port, host, () => resolve());
     });
     this.server = server;
-    logger.info(`[peer-messaging] listening for peer ${this.options.peerId} on http://${host}:${port}`);
+    logger.info(
+      `[peer-messaging] listening for peer ${this.options.peerId} on http://${host}:${port}`
+    );
     return server;
   }
 
@@ -503,9 +602,11 @@ export class PeerMessagingServer {
 
 export async function sendPeerMessage<TPayload>(
   envelope: PeerMessageEnvelope<TPayload>,
-  options: PeerMessageDispatchOptions,
+  options: PeerMessageDispatchOptions
 ): Promise<PeerMessageDispatchReceipt> {
-  const destinationUrl = validateUrl(options.destinationUrl, { allowLocalNetwork: options.allowLocalNetwork !== false });
+  const destinationUrl = validateUrl(options.destinationUrl, {
+    allowLocalNetwork: options.allowLocalNetwork !== false,
+  });
   const url = `${destinationUrl.replace(/\/$/, '')}/v1/peer/messages`;
   const request = fetch(url, {
     method: 'POST',
@@ -530,7 +631,7 @@ export async function sendPeerMessage<TPayload>(
         destinationUrl,
         'failed',
         payload,
-        payload?.error ? String(payload.error) : `http_${response.status}`,
+        payload?.error ? String(payload.error) : `http_${response.status}`
       );
     }
     return {
@@ -538,7 +639,10 @@ export async function sendPeerMessage<TPayload>(
       status: response.status,
       accepted: Boolean(payload?.accepted),
       message_id: envelope.message_id,
-      processing_mode: payload?.processing_mode === 'synchronous_on_receive' ? 'synchronous_on_receive' : undefined,
+      processing_mode:
+        payload?.processing_mode === 'synchronous_on_receive'
+          ? 'synchronous_on_receive'
+          : undefined,
       processed_at: typeof payload?.processed_at === 'string' ? payload.processed_at : undefined,
       response: payload?.response,
       error: payload?.error ? String(payload.error) : undefined,
@@ -550,7 +654,7 @@ export async function sendPeerMessage<TPayload>(
       destinationUrl,
       'failed',
       null,
-      error?.message || String(error),
+      error?.message || String(error)
     );
     throw error;
   }
@@ -562,7 +666,7 @@ export async function sendPeerMessageToPeer<TPayload>(
   options: {
     catalog?: PeerNetworkCatalog | null;
     timeoutMs?: number;
-  } = {},
+  } = {}
 ): Promise<PeerMessageDispatchReceipt> {
   const target = resolvePeerDispatchTarget(peerId, options.catalog);
   return sendPeerMessage(envelope, {
@@ -572,12 +676,14 @@ export async function sendPeerMessageToPeer<TPayload>(
   });
 }
 
-export function createPeerMessagingServer(options: PeerMessagingServerOptions): PeerMessagingServer {
+export function createPeerMessagingServer(
+  options: PeerMessagingServerOptions
+): PeerMessagingServer {
   return new PeerMessagingServer(options);
 }
 
 export function createPeerMessageRequest<TPayload = unknown>(
-  input: Omit<BuildPeerMessageInput<TPayload>, 'type'>,
+  input: Omit<BuildPeerMessageInput<TPayload>, 'type'>
 ): PeerMessageEnvelope<TPayload> {
   return buildPeerMessageEnvelope({
     ...input,
@@ -586,7 +692,7 @@ export function createPeerMessageRequest<TPayload = unknown>(
 }
 
 export function createPeerMessageNotification<TPayload = unknown>(
-  input: Omit<BuildPeerMessageInput<TPayload>, 'type'>,
+  input: Omit<BuildPeerMessageInput<TPayload>, 'type'>
 ): PeerMessageEnvelope<TPayload> {
   return buildPeerMessageEnvelope({
     ...input,
