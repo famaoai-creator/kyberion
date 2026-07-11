@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { buildChronosNextActions, summarizeMissionSeedAssessment } from './control_plane_cli.js';
 
 describe('control_plane_cli next actions', () => {
@@ -69,5 +69,40 @@ describe('control_plane_cli next actions', () => {
     expect(summary.flagged_seed_ids).toEqual(['MSD-1']);
     expect(summary.eligible_seed_ids).toEqual(['MSD-2']);
     expect(summary.promoted_seed_ids).toEqual(['MSD-2']);
+  });
+});
+
+// UX-04 Task 2: unified approval verb grammar
+import { parseChronosApprovalArgs } from './control_plane_cli.js';
+
+describe('parseChronosApprovalArgs (UX-04)', () => {
+  it('parses the named-flag form for approve and reject', () => {
+    expect(
+      parseChronosApprovalArgs(['REQ-1', '--storage', 'ops', '--channel', 'chat'], 'approved')
+    ).toEqual({ requestId: 'REQ-1', storageChannel: 'ops', channel: 'chat', decision: 'approved' });
+    expect(
+      parseChronosApprovalArgs(['REQ-2', '--channel', 'chat', '--storage', 'ops'], 'rejected')
+    ).toEqual({ requestId: 'REQ-2', storageChannel: 'ops', channel: 'chat', decision: 'rejected' });
+  });
+
+  it('accepts the legacy 4-positional form with a deprecation warning', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      expect(parseChronosApprovalArgs(['REQ-3', 'ops', 'chat', 'rejected'], 'approved')).toEqual({
+        requestId: 'REQ-3',
+        storageChannel: 'ops',
+        channel: 'chat',
+        decision: 'rejected',
+      });
+      expect(warn).toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('rejects incomplete flag forms with the new usage text', () => {
+    expect(() => parseChronosApprovalArgs(['REQ-4', '--storage', 'ops'], 'approved')).toThrow(
+      '--channel'
+    );
   });
 });
