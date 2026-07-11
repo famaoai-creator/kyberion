@@ -136,13 +136,13 @@
 
 ### OP(運用・配布)
 
-| ID    | 状態    | 残作業                                                                                                                                                                                                                             |
-| ----- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| OP-01 | PARTIAL | spend-guard は 2026-07-11 実装(spend-policy.json、warn 既定/block で SpendCapExceededError、reasoning failover 前段に配線、日次 dedupe アラート)。残: usage 計測の全経路接続、テナント override                                    |
-| OP-02 | DONE    | (残: 外部ボリューム定期運用の実績)                                                                                                                                                                                                 |
-| OP-03 | PARTIAL | bin フィールド+CLI、docker deploy サービス                                                                                                                                                                                         |
-| OP-04 | PARTIAL | 残: RSS/restart 履歴の拡張と soak 実証のみ(劣化検知ループ・hourly cron・doctor rollup・healthz/status API・provider-health 永続化は 2026-07-11 実装: runtime state ファイル + TTL 自然回復 + reload API、vitest 下は隔離必須)      |
-| OP-05 | PARTIAL | 2026-07-11: env-registry(228変数)+ check:env-registry(validate/CI)+ env-validator + doctor 配線 + env.example/CONFIGURATION.md 生成。残: 棚卸しの継続キュレーション(documented=false 211件)、baseline-check 接続、集中ローダー移行 |
+| ID    | 状態    | 残作業                                                                                                                                                                                                                                                                                               |
+| ----- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| OP-01 | PARTIAL | spend-guard は 2026-07-11 実装(spend-policy.json、warn 既定/block で SpendCapExceededError、reasoning failover 前段に配線、日次 dedupe アラート)。usage 計測も 2026-07-11 に全経路接続(anthropic SDK は実 usage、gemini/codex CLI は estimated 概算)。残: cost report CLI(Task 2)、テナント override |
+| OP-02 | DONE    | (残: 外部ボリューム定期運用の実績)                                                                                                                                                                                                                                                                   |
+| OP-03 | PARTIAL | bin フィールド+CLI、docker deploy サービス                                                                                                                                                                                                                                                           |
+| OP-04 | PARTIAL | 残: RSS/restart 履歴の拡張と soak 実証のみ(劣化検知ループ・hourly cron・doctor rollup・healthz/status API・provider-health 永続化は 2026-07-11 実装: runtime state ファイル + TTL 自然回復 + reload API、vitest 下は隔離必須)                                                                        |
+| OP-05 | PARTIAL | 2026-07-11: env-registry(228変数)+ check:env-registry(validate/CI)+ env-validator + doctor 配線 + env.example/CONFIGURATION.md 生成。残: 棚卸しの継続キュレーション(documented=false 211件)、baseline-check 接続、集中ローダー移行                                                                   |
 
 ### AO(自律運用・保守)
 
