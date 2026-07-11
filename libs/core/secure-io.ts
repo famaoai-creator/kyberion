@@ -210,8 +210,11 @@ export function safeWriteFile(
     } catch (err: any) {
       // Only re-throw if it's an actual policy block, not a load/parse failure
       if (err?.message?.includes('[POLICY_BLOCKED]')) throw err;
+      // SA-05: a broken/missing policy file must not silently disable the
+      // gate — fail closed. (An earlier revision logged "allowing by
+      // default" while already throwing; the message now matches reality.)
       logger.warn(
-        `[secure-io] policy evaluation failed, allowing by default: path=${resolved} error=${err?.message || String(err)}`
+        `[secure-io] policy evaluation failed — failing closed: path=${resolved} error=${err?.message || String(err)}`
       );
       throw new Error(`Policy engine unavailable for ${resolved}: ${err?.message || err}`);
     } finally {
