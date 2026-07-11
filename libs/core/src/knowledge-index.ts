@@ -35,6 +35,17 @@ export interface KnowledgeHint {
   tags?: string[];
   tier?: 'public' | 'confidential' | 'personal' | 'product';
   customerId?: string;
+  /**
+   * KM-02 body-chunk provenance. Internal chunk entries carry
+   * `source = "<doc>#chunkN"` plus parentSource/chunkIndex; aggregated query
+   * results are rewritten back to the resolvable document path and expose
+   * the winning chunk via matchedChunkIndex. All fields additive.
+   */
+  parentSource?: string;
+  chunkIndex?: number;
+  matchedChunkIndex?: number;
+  /** Which embedding backend ranked this result (degraded-mode visibility). */
+  embeddingBackend?: string;
 }
 
 export interface KnowledgeQueryOptions {
@@ -202,7 +213,7 @@ const TIER1_SUBDIRS = [
  */
 export async function buildScopedIndex(
   scope: KnowledgeScope = DEFAULT_SCOPE,
-  rootDir?: string,
+  rootDir?: string
 ): Promise<KnowledgeHintIndex> {
   const knowledgeBase = rootDir || pathResolver.knowledge();
   const hints: KnowledgeHint[] = [];
@@ -228,9 +239,7 @@ export async function buildScopedIndex(
 
   // Apply tag pre-filter after scanning (cheaper than per-file filter)
   const filteredHints = scope.filterTags?.length
-    ? hints.filter(h =>
-        h.tags?.some(t => scope.filterTags!.includes(t))
-      )
+    ? hints.filter((h) => h.tags?.some((t) => scope.filterTags!.includes(t)))
     : hints;
 
   const index = new KnowledgeHintIndex(filteredHints, scope);
@@ -296,11 +305,7 @@ async function _hydrateEmbedCache(index: KnowledgeHintIndex, scope: KnowledgeSco
 
 // ─── Tier scanners ────────────────────────────────────────────────────────────
 
-function _scanPublicTier(
-  knowledgeBase: string,
-  domains: string[],
-  hints: KnowledgeHint[],
-): void {
+function _scanPublicTier(knowledgeBase: string, domains: string[], hints: KnowledgeHint[]): void {
   // Structured JSON hints
   const hintsDir = path.join(knowledgeBase, 'public/procedures/hints');
   if (safeExistsSync(hintsDir)) {
@@ -316,11 +321,7 @@ function _scanPublicTier(
   }
 }
 
-function _scanProductTier(
-  knowledgeBase: string,
-  domains: string[],
-  hints: KnowledgeHint[],
-): void {
+function _scanProductTier(knowledgeBase: string, domains: string[], hints: KnowledgeHint[]): void {
   const productRoot = path.join(knowledgeBase, 'product');
   if (!safeExistsSync(productRoot)) return;
 
@@ -357,7 +358,7 @@ function _scanConfidentialTier(
   knowledgeBase: string,
   domains: string[],
   customerId: string | undefined,
-  hints: KnowledgeHint[],
+  hints: KnowledgeHint[]
 ): void {
   const confidentialRoot = path.join(knowledgeBase, 'confidential');
   if (!safeExistsSync(confidentialRoot)) return;
@@ -367,7 +368,7 @@ function _scanConfidentialTier(
     customerDirs = [customerId];
   } else {
     try {
-      customerDirs = safeReaddir(confidentialRoot).filter(e => !e.startsWith('.'));
+      customerDirs = safeReaddir(confidentialRoot).filter((e) => !e.startsWith('.'));
     } catch {
       return;
     }
@@ -400,7 +401,7 @@ function _scanPersonalTier(
   knowledgeBase: string,
   domains: string[],
   customerId: string | undefined,
-  hints: KnowledgeHint[],
+  hints: KnowledgeHint[]
 ): void {
   // Customer overlay: customer/{slug}/ takes precedence over knowledge/personal/
   const customerSlug = customerId ?? process.env.KYBERION_CUSTOMER?.trim() ?? '';
@@ -440,10 +441,14 @@ function _loadJsonHints(
   knowledgeBase: string,
   tier: 'public' | 'confidential' | 'personal' | 'product',
   customerId: string | undefined,
-  hints: KnowledgeHint[],
+  hints: KnowledgeHint[]
 ): void {
   let files: string[];
-  try { files = safeReaddir(dir); } catch { return; }
+  try {
+    files = safeReaddir(dir);
+  } catch {
+    return;
+  }
 
   for (const file of files) {
     if (!file.endsWith('.json')) continue;
@@ -485,10 +490,14 @@ function _scanMarkdownHints(
   knowledgeBase: string,
   tier: 'public' | 'confidential' | 'personal' | 'product',
   customerId: string | undefined,
-  hints: KnowledgeHint[],
+  hints: KnowledgeHint[]
 ): void {
   let entries: string[];
-  try { entries = safeReaddir(dir); } catch { return; }
+  try {
+    entries = safeReaddir(dir);
+  } catch {
+    return;
+  }
 
   for (const entry of entries) {
     const fullPath = path.join(dir, entry);
@@ -505,14 +514,28 @@ function _scanMarkdownHints(
           const excerpt = _extractFirstParagraph(content);
           hints.push({
             topic: title,
-            hint: excerpt
-              ? `${title}. ${excerpt.slice(0, 200)}`
-              : `See ${relSource} for details.`,
+            hint: excerpt ? `${title}. ${excerpt.slice(0, 200)}` : `See ${relSource} for details.`,
             source: relSource,
             confidence: 0.6,
             tags,
             tier,
             ...(customerId ? { customerId } : {}),
+          });
+          // KM-02 Task 1: index the document body as chunks so terms that
+          // only appear past the first paragraph become searchable.
+          const chunks = _chunkMarkdownBody(content);
+          chunks.forEach((chunk, index) => {
+            hints.push({
+              topic: title,
+              hint: chunk,
+              source: `${relSource}#chunk${index}`,
+              parentSource: relSource,
+              chunkIndex: index,
+              confidence: 0.55,
+              tags,
+              tier,
+              ...(customerId ? { customerId } : {}),
+            });
           });
         }
       } catch {
@@ -548,13 +571,16 @@ function _extractFrontmatterTags(content: string): string[] | undefined {
 
   const tagsMatch = fmMatch[1].match(/tags:\s*\[([^\]]*)\]/);
   if (tagsMatch) {
-    return tagsMatch[1].split(',').map(t => t.trim().replace(/["']/g, '')).filter(Boolean);
+    return tagsMatch[1]
+      .split(',')
+      .map((t) => t.trim().replace(/["']/g, ''))
+      .filter(Boolean);
   }
   const listTagsMatch = fmMatch[1].match(/tags:\s*\n((?:\s*-\s*.+\n?)*)/);
   if (listTagsMatch) {
     return listTagsMatch[1]
       .split('\n')
-      .map(line => line.replace(/^\s*-\s*/, '').trim())
+      .map((line) => line.replace(/^\s*-\s*/, '').trim())
       .filter(Boolean);
   }
   return undefined;
@@ -570,10 +596,93 @@ function _extractFirstParagraph(content: string): string {
   return '';
 }
 
+// ─── Body chunking (KM-02 Task 1) ────────────────────────────────────────────
+
+const CHUNK_TARGET_CHARS = 1000;
+const CHUNK_OVERLAP_CHARS = 100;
+const CHUNK_MIN_BODY_CHARS = 600;
+const CHUNK_MAX_PER_DOC = 12;
+
+/**
+ * Split a markdown body into ~800–1200 char chunks, preferring heading
+ * boundaries, with a small overlap. Short bodies (already covered by the
+ * first-paragraph excerpt) produce no chunks.
+ */
+export function _chunkMarkdownBody(content: string): string[] {
+  const bodyStart = content.startsWith('---\n') ? content.indexOf('\n---\n', 4) + 5 : 0;
+  const body = content.slice(bodyStart).trim();
+  if (body.length < CHUNK_MIN_BODY_CHARS) return [];
+
+  // Prefer heading boundaries; fall back to paragraph packing.
+  const sections = body.split(/\n(?=#{1,6}\s)/);
+  const chunks: string[] = [];
+  let current = '';
+
+  const flush = () => {
+    const trimmed = current.trim();
+    if (trimmed.length > 0) chunks.push(trimmed.replace(/\s+/g, ' '));
+    current = '';
+  };
+
+  for (const section of sections) {
+    for (const paragraph of section.split('\n\n')) {
+      const piece = paragraph.trim();
+      if (!piece) continue;
+      if (current.length > 0 && current.length + piece.length > CHUNK_TARGET_CHARS) {
+        const overlap = current.slice(-CHUNK_OVERLAP_CHARS);
+        flush();
+        current = `${overlap} ${piece}`;
+      } else {
+        current = current ? `${current}\n\n${piece}` : piece;
+      }
+      // Hard cap for pathological single paragraphs.
+      while (current.length > CHUNK_TARGET_CHARS * 1.5 && chunks.length < CHUNK_MAX_PER_DOC) {
+        const head = current.slice(0, CHUNK_TARGET_CHARS);
+        const rest = current.slice(CHUNK_TARGET_CHARS - CHUNK_OVERLAP_CHARS);
+        current = head;
+        flush();
+        current = rest;
+      }
+      if (chunks.length >= CHUNK_MAX_PER_DOC) return chunks.slice(0, CHUNK_MAX_PER_DOC);
+    }
+  }
+  flush();
+  return chunks.slice(0, CHUNK_MAX_PER_DOC);
+}
+
 // ─── Corpus text helper ───────────────────────────────────────────────────────
 
 function _corpusText(hint: KnowledgeHint): string {
-  return [hint.topic, ...(hint.tags ?? []), hint.hint.slice(0, 300)].filter(Boolean).join(' ');
+  // Chunk entries embed their full body slice; document entries keep the
+  // original compact form so existing cache vectors stay valid.
+  const bodyBudget = hint.chunkIndex !== undefined ? 1200 : 300;
+  return [hint.topic, ...(hint.tags ?? []), hint.hint.slice(0, bodyBudget)]
+    .filter(Boolean)
+    .join(' ');
+}
+
+// ─── Document-level aggregation (KM-02 Task 1.3) ─────────────────────────────
+
+/**
+ * Collapse ranked hints to one entry per document: the best-ranked chunk (or
+ * the document entry itself) wins. Chunk winners are rewritten back to the
+ * resolvable document path, exposing the position via matchedChunkIndex.
+ */
+function _aggregateByDocument(ranked: KnowledgeHint[]): KnowledgeHint[] {
+  const seen = new Set<string>();
+  const out: KnowledgeHint[] = [];
+  for (const hint of ranked) {
+    const docKey = hint.parentSource ?? hint.source;
+    if (seen.has(docKey)) continue;
+    seen.add(docKey);
+    if (hint.parentSource !== undefined) {
+      const { parentSource: _parent, chunkIndex, ...rest } = hint;
+      out.push({ ...rest, source: docKey, matchedChunkIndex: chunkIndex });
+    } else {
+      out.push(hint);
+    }
+  }
+  return out;
 }
 
 // ─── Query (lexical) ─────────────────────────────────────────────────────────
@@ -581,10 +690,13 @@ function _corpusText(hint: KnowledgeHint): string {
 export function queryKnowledge(
   index: KnowledgeHintIndex,
   topic: string,
-  options: KnowledgeQueryOptions = {},
+  options: KnowledgeQueryOptions = {}
 ): KnowledgeHint[] {
   const maxResults = options.maxResults ?? 5;
-  const queryWords = topic.toLowerCase().split(/\s+/).filter(w => w.length > 1);
+  const queryWords = topic
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((w) => w.length > 1);
 
   if (queryWords.length === 0) return [];
 
@@ -608,7 +720,7 @@ export function queryKnowledge(
   }
 
   scored.sort((a, b) => b.score - a.score);
-  return scored.slice(0, maxResults).map(s => s.hint);
+  return _aggregateByDocument(scored.map((s) => s.hint)).slice(0, maxResults);
 }
 
 // ─── Query (hybrid — lexical + semantic via RRF) ──────────────────────────────
@@ -626,10 +738,13 @@ export function queryKnowledge(
 export async function queryKnowledgeHybrid(
   index: KnowledgeHintIndex,
   topic: string,
-  options: KnowledgeQueryOptions = {},
+  options: KnowledgeQueryOptions = {}
 ): Promise<KnowledgeHint[]> {
   const maxResults = options.maxResults ?? 5;
-  const queryWords = topic.toLowerCase().split(/\s+/).filter(w => w.length > 1);
+  const queryWords = topic
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((w) => w.length > 1);
 
   if (queryWords.length === 0) return [];
 
@@ -652,7 +767,7 @@ export async function queryKnowledgeHybrid(
     }
   }
   lexicalScored.sort((a, b) => b.score - a.score);
-  const lexicalRanked = lexicalScored.map(s => s.hint);
+  const lexicalRanked = lexicalScored.map((s) => s.hint);
 
   const backend = getEmbeddingBackend();
   if (!backend) return queryKnowledge(index, topic, options);
@@ -669,7 +784,7 @@ export async function queryKnowledgeHybrid(
   const cache = index.embedCache;
 
   // Embed any hints not yet in the per-index cache
-  const unembed = pool.filter(h => !cache.has(h.source));
+  const unembed = pool.filter((h) => !cache.has(h.source));
   if (unembed.length > 0) {
     try {
       const vectors = await backend.embedBatch(unembed.map(_corpusText));
@@ -680,37 +795,45 @@ export async function queryKnowledgeHybrid(
   }
 
   const semanticRanked = pool
-    .map(h => {
+    .map((h) => {
       const vec = cache.get(h.source);
       return { hint: h, sim: vec ? cosineSimilarity(queryVec!, vec) : 0 };
     })
-    .filter(x => x.sim > 0)
+    .filter((x) => x.sim > 0)
     .sort((a, b) => b.sim - a.sim)
-    .map(x => x.hint);
+    .map((x) => x.hint);
 
   // ── RRF fusion ──────────────────────────────────────────────────────────
   const rrfScores = reciprocalRankFusion([
-    lexicalRanked.map(h => ({ ...h, path: h.source })),
-    semanticRanked.map(h => ({ ...h, path: h.source })),
+    lexicalRanked.map((h) => ({ ...h, path: h.source })),
+    semanticRanked.map((h) => ({ ...h, path: h.source })),
   ]);
 
-  const results = pool
-    .filter(h => rrfScores.has(h.source))
-    .sort((a, b) => (rrfScores.get(b.source) ?? 0) - (rrfScores.get(a.source) ?? 0))
-    .slice(0, maxResults);
+  const fused = pool
+    .filter((h) => rrfScores.has(h.source))
+    .sort((a, b) => (rrfScores.get(b.source) ?? 0) - (rrfScores.get(a.source) ?? 0));
+
+  // Degraded-mode visibility (KM-02 Task 2): callers can tell whether the
+  // "semantic" leg was real (mlx) or the hash-bucket approximation.
+  const results = _aggregateByDocument(fused)
+    .slice(0, maxResults)
+    .map((h) => ({ ...h, embeddingBackend: backend.name }));
 
   return results.length > 0 ? results : queryKnowledge(index, topic, options);
 }
 
 // ─── Internal helpers ────────────────────────────────────────────────────────
 
-function _filteredHints(index: KnowledgeHintIndex, options: KnowledgeQueryOptions): KnowledgeHint[] {
-  return index.hints.filter(hint => {
+function _filteredHints(
+  index: KnowledgeHintIndex,
+  options: KnowledgeQueryOptions
+): KnowledgeHint[] {
+  return index.hints.filter((hint) => {
     if (options.actuator && hint.tags) {
-      if (!hint.tags.some(t => t.toLowerCase() === options.actuator!.toLowerCase())) return false;
+      if (!hint.tags.some((t) => t.toLowerCase() === options.actuator!.toLowerCase())) return false;
     }
     if (options.op && hint.tags) {
-      if (!hint.tags.some(t => t.toLowerCase() === options.op!.toLowerCase())) return false;
+      if (!hint.tags.some((t) => t.toLowerCase() === options.op!.toLowerCase())) return false;
     }
     return true;
   });
