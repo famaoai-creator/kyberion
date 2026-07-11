@@ -4,6 +4,7 @@ import { installProcessGuards } from '@agent/core';
 // IP-08 Task 6: record unhandled rejections/exceptions in this long-lived process.
 installProcessGuards('imessage-bridge');
 import {
+  scheduleBridgeProcessingNote,
   createStandardYargs,
   logger,
   pathResolver,
@@ -78,6 +79,14 @@ async function pollIMessages() {
       logger.info(`📥 [iMessageBridge] Message from ${msg.sender}: ${msg.text}`);
       const threadContext = buildThreadContext(msg);
 
+      // UX-02: iMessage has no typing API — send a one-time working note
+      // only if processing outlives 5s (quick replies stay clean).
+      const processingNote = scheduleBridgeProcessingNote('imessage-bridge', () =>
+        sendIMessage({
+          recipient: msg.sender,
+          text: '処理中です。少々お待ちください…',
+        })
+      );
       try {
         const conversation = await runSurfaceMessageConversation({
           surface: 'imessage',
@@ -118,6 +127,8 @@ async function pollIMessages() {
           locale: 'ja',
           post: async (errorText) => sendIMessage({ recipient: msg.sender, text: errorText }),
         });
+      } finally {
+        processingNote.cancel();
       }
     }
   } catch (err: any) {

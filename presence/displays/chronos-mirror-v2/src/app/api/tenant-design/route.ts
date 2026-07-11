@@ -1,8 +1,13 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 import { resolveTenantDesign } from '@agent/core/tenant-design-resolver';
 import { webThemePackToCssVars } from '@agent/core/web-design-system';
+import { guardRequest } from '../../../lib/api-guard';
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
+  // DS-02 acceptance 4: confidential tenant branding must not be readable
+  // by unauthenticated callers — same guard as every other chronos API.
+  const denied = guardRequest(request);
+  if (denied) return denied;
   const url = new URL(request.url);
   const customerId = url.searchParams.get('customerId') || undefined;
   const brandName = url.searchParams.get('brandName') || undefined;
