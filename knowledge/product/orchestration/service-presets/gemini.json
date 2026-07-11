@@ -1,0 +1,59 @@
+{
+  "service_id": "gemini",
+  "name": "Google AI Studio Gemini API presets",
+  "notes": "Routes Gemini image generation and TTS through Google AI Studio / Gemini API with GEMINI_API_KEY authentication.",
+  "recovery_policy": {
+    "fallback_strategy": "service_then_cli",
+    "retry": {
+      "maxRetries": 2,
+      "initialDelayMs": 500,
+      "maxDelayMs": 10000,
+      "factor": 2,
+      "jitter": true
+    },
+    "retryable_categories": ["network", "rate_limit", "timeout", "resource_unavailable"]
+  },
+  "auth_strategy": "api_key_query",
+  "auth_params": {
+    "key": "key",
+    "value": "{{accessToken}}"
+  },
+  "operations": {
+    "generate_image": {
+      "type": "api",
+      "path": "models/imagen-3.0-generate-002:generateImages",
+      "method": "POST",
+      "payload_template": {
+        "numberOfImages": 1,
+        "prompt": "{{prompt}}",
+        "aspectRatio": "{{aspect_ratio}}",
+        "outputMimeType": "image/jpeg"
+      },
+      "output_mapping": {
+        "imageBytes": "generatedImages.0.image.imageBytes"
+      }
+    },
+    "generate_tts": {
+      "type": "api",
+      "path": "interactions",
+      "method": "POST",
+      "payload_template": {
+        "model": "gemini-3.1-flash-tts-preview",
+        "input": "{{text}}",
+        "response_format": {
+          "type": "audio"
+        },
+        "generation_config": {
+          "speech_config": [
+            {
+              "voice": "{{voice}}"
+            }
+          ]
+        }
+      },
+      "output_mapping": {
+        "audioData": "output_audio.data"
+      }
+    }
+  }
+}

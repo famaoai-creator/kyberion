@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import {
   AdaptivePolicyRouter,
   ComfyUiImageGenerationProvider,
+  GeminiServiceImageGenerationProvider,
   LocalFluxImageGenerationProvider,
   LlmApiImageGenerationProvider
 } from './image-generation-bridge.js';
@@ -138,6 +139,50 @@ describe('ComfyUiImageGenerationProvider', () => {
     const provider = new ComfyUiImageGenerationProvider();
     await expect(provider.isAvailable()).resolves.toBe(true);
     expect(mocks.probeServiceRuntime).toHaveBeenCalledWith('comfyui', 'trial');
+  });
+});
+
+describe('GeminiServiceImageGenerationProvider', () => {
+  const originalEnv = { ...process.env };
+
+  beforeEach(() => {
+    process.env = { ...originalEnv };
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
+  it('calls the gemini service preset and writes the returned image bytes', async () => {
+    process.env.GEMINI_API_KEY = 'mock-gemini-key';
+    mocks.executeServicePreset.mockResolvedValue({
+      imageBytes: 'bW9jay1nZW1pbmktYnl0ZXM=',
+    });
+
+    const provider = new GeminiServiceImageGenerationProvider();
+    const result = await provider.generate({
+      prompt: 'a glowing fox in a glass city',
+      aspectRatio: '16:9',
+    });
+
+    expect(result.status).toBe('succeeded');
+    expect(result.provider).toBe('gemini_service');
+    expect(mocks.executeServicePreset).toHaveBeenCalledWith(
+      'gemini',
+      'generate_image',
+      expect.objectContaining({
+        prompt: 'a glowing fox in a glass city',
+        aspect_ratio: '16:9',
+      }),
+      'secret-guard',
+    );
+  });
+
+  it('does not advertise Gemini service availability from GOOGLE_API_KEY alone', async () => {
+    process.env.GOOGLE_API_KEY = 'mock-google-key';
+
+    const provider = new GeminiServiceImageGenerationProvider();
+    await expect(provider.isAvailable()).resolves.toBe(false);
   });
 });
 
@@ -286,6 +331,40 @@ describe('LocalFluxImageGenerationProvider', () => {
         maxOutputMB: 50,
       }),
     );
+  });
+});
+
+describe('AdaptivePolicyRouter with Gemini service', () => {
+  it('can resolve gemini_service when explicitly preferred', async () => {
+    const router = new AdaptivePolicyRouter([
+      {
+        id: 'gemini_service',
+        isAvailable: vi.fn().mockResolvedValue(true),
+        generate: vi.fn(),
+      },
+      {
+        id: 'comfyui',
+        isAvailable: vi.fn().mockResolvedValue(true),
+        generate: vi.fn(),
+      },
+      {
+        id: 'local_flux',
+        isAvailable: vi.fn().mockResolvedValue(true),
+        generate: vi.fn(),
+      },
+      {
+        id: 'llm_api',
+        isAvailable: vi.fn().mockResolvedValue(true),
+        generate: vi.fn(),
+      },
+    ]);
+
+    const provider = await router.selectProvider({
+      prompt: 'a cat',
+      providerPreference: ['gemini_service'],
+    });
+
+    expect(provider.id).toBe('gemini_service');
   });
 });
 
