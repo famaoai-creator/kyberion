@@ -8,8 +8,8 @@
 
 | 判定    | 件数 |
 | ------- | ---- |
-| DONE    | 41   |
-| PARTIAL | 50   |
+| DONE    | 42   |
+| PARTIAL | 49   |
 | TODO    | 0    |
 
 ## P0 残作業(プロダクション化のクリティカルパス)
@@ -38,7 +38,7 @@
 | IP-01 | DONE    |                                                                                                                                                                                                                |
 | IP-02 | DONE    |                                                                                                                                                                                                                |
 | IP-03 | DONE    |                                                                                                                                                                                                                |
-| IP-04 | PARTIAL | schemas/ 直下 \*-pipeline.schema.json 11本の二重定義整理                                                                                                                                                       |
+| IP-04 | DONE    | 2026-07-12 完了: 再監査で「参照ゼロ6本」は陳腐化(大半は manifest の contract_schema 正規参照)。真の未参照2本(ingestion/super-nerve)のみ削除、契約チェック緑。同名別契約の browser-pipeline は二重定義に非ず    |
 | IP-05 | DONE    |                                                                                                                                                                                                                |
 | IP-06 | DONE    |                                                                                                                                                                                                                |
 | IP-07 | PARTIAL | 2026-07-11 突合: backend/orchestrator/operator-learning のテストは実在し緑。残: 受入条件全体との網羅精査                                                                                                       |
@@ -83,15 +83,15 @@
 
 ### MO(ミッション・オーケストレーション)
 
-| ID    | 状態    | 残作業                                                                                                                                                       |
-| ----- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| MO-01 | DONE    | (worker イベント連鎖のフェーズ駆動化は MO-02 側で実施。gate-pass 機械評価・entry_gate deferral・deliverable_quality check は MO-01 側で先行実装済み)         |
-| MO-02 | PARTIAL | 残: フェーズ exit ゲートの warn→enforce 昇格、human_override 署名強制、realign 自動再計画(exit ゲート実行時評価は 2026-07-12 実装、他は再突合で実装済み確認) |
-| MO-03 | PARTIAL | mission-task-contract.schema.json + planner 出力検証+循環検出                                                                                                |
-| MO-04 | DONE    |                                                                                                                                                              |
-| MO-05 | DONE    | (軽微: 集計スクリプト)                                                                                                                                       |
-| MO-06 | DONE    |                                                                                                                                                              |
-| MO-07 | PARTIAL | tier 昇格連動の再実行、media draft→refine                                                                                                                    |
+| ID    | 状態    | 残作業                                                                                                                                                          |
+| ----- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| MO-01 | DONE    | (worker イベント連鎖のフェーズ駆動化は MO-02 側で実施。gate-pass 機械評価・entry_gate deferral・deliverable_quality check は MO-01 側で先行実装済み)            |
+| MO-02 | PARTIAL | 残: フェーズ exit ゲートの warn→enforce 昇格、human_override 署名強制、realign 自動再計画(exit ゲート実行時評価は 2026-07-12 実装、他は再突合で実装済み確認)    |
+| MO-03 | DONE    | 2026-07-12 完了: スキーマ/検証/循環検出/並列 wave/リースは実装済みを再突合確認、Task 2.3(scope 由来 dispatch 予算 + blocked(timeout) + 依存 blocked 連鎖)を実装 |
+| MO-04 | DONE    |                                                                                                                                                                 |
+| MO-05 | DONE    | (軽微: 集計スクリプト)                                                                                                                                          |
+| MO-06 | DONE    |                                                                                                                                                                 |
+| MO-07 | PARTIAL | tier 昇格連動の再実行、media draft→refine                                                                                                                       |
 
 ### DS(デザインシステム)
 
