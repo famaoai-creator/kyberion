@@ -1,5 +1,10 @@
 import { logger } from './core.js';
 import { agentRegistry, AgentProvider } from './agent-registry.js';
+import {
+  resolveA2ASignatureMode,
+  signA2AContent,
+  verifyA2AContent,
+} from './a2a-envelope-signature.js';
 import { type AgentHandle } from './agent-lifecycle.js';
 import {
   getAgentManifest,
@@ -58,28 +63,26 @@ export interface A2AMessage {
     performative: 'request' | 'propose' | 'inform' | 'accept' | 'reject' | 'query' | 'result';
     timestamp?: string;
     signature?: string;
+    sig_alg?: string;
   };
   payload: any;
 }
 
-// Shared secret for HMAC signing (set via env or generated per-session)
-const A2A_SECRET = process.env.KYBERION_A2A_SECRET || crypto.randomBytes(32).toString('hex');
-
-export function signA2AMessage(message: A2AMessage): string {
-  const content = JSON.stringify({
-    header: { ...message.header, signature: undefined },
+// AA-03: signing/verification delegate to the shared envelope-signature
+// module (persistent host-local secret; per-process throwaway keys are gone).
+function envelopeContent(message: A2AMessage): string {
+  return JSON.stringify({
+    header: { ...message.header, signature: undefined, sig_alg: undefined },
     payload: message.payload,
   });
-  return crypto.createHmac('sha256', A2A_SECRET).update(content).digest('hex');
+}
+
+export function signA2AMessage(message: A2AMessage): string {
+  return signA2AContent(envelopeContent(message)).signature;
 }
 
 export function verifyA2ASignature(message: A2AMessage): boolean {
-  if (!message.header.signature) return false;
-  const expected = signA2AMessage(message);
-  return crypto.timingSafeEqual(
-    Buffer.from(message.header.signature, 'hex'),
-    Buffer.from(expected, 'hex')
-  );
+  return verifyA2AContent(envelopeContent(message), message.header.signature).valid;
 }
 
 export class AgentBusyError extends Error {
@@ -124,6 +127,25 @@ class A2ABridgeImpl {
 
     // Security: Validate sender is a known agent (registered or has manifest)
     this.validateSender(envelope.header.sender);
+
+    // AA-03 Task 2: staged signature requirement. warn (default) records
+    // unsigned internal traffic in the audit chain; enforce rejects it.
+    if (!envelope.header.signature) {
+      const mode = resolveA2ASignatureMode();
+      auditChain.record({
+        agentId: envelope.header.sender,
+        action: 'a2a_signature_missing',
+        operation: 'route',
+        result: mode === 'enforce' ? 'denied' : 'allowed',
+        reason: `Unsigned A2A message ${envelope.header.msg_id} (mode: ${mode})`,
+      });
+      if (mode === 'enforce') {
+        recordGovernanceAction(envelope.header.sender, 'a2a_signature_missing', 'system', true);
+        throw new Error(
+          'A2A message rejected: unsigned messages are not accepted (KYBERION_A2A_SIGNATURE=enforce)'
+        );
+      }
+    }
 
     // Security: Validate signature if present (internal messages are signed)
     if (envelope.header.signature) {
@@ -378,6 +400,7 @@ class A2ABridgeImpl {
       },
     };
     response.header.signature = signA2AMessage(response);
+    response.header.sig_alg = 'hmac-sha256';
 
     if (conversationId) {
       const providerSessionId =
@@ -541,8 +564,24 @@ class A2ABridgeImpl {
     // Allow internal senders (chronos-mirror, etc.)
     if (sender.startsWith('kyberion:')) return;
 
-    logger.warn(`[A2A_BRIDGE] Unknown sender: ${sender}`);
-    // Don't throw — allow but log (external senders via gateway are valid)
+    // AA-03 Task 2.3: unknown senders are recorded (warn) or rejected
+    // (enforce). External gateway senders should be present in the manifest
+    // catalog or the kyberion: namespace; anything else is suspicious.
+    const mode = resolveA2ASignatureMode();
+    logger.warn(`[A2A_BRIDGE] Unknown sender: ${sender} (mode: ${mode})`);
+    auditChain.record({
+      agentId: sender,
+      action: 'a2a_unknown_sender',
+      operation: 'route',
+      result: mode === 'enforce' ? 'denied' : 'allowed',
+      reason: `Sender ${sender} has no registry entry or manifest`,
+    });
+    if (mode === 'enforce') {
+      recordGovernanceAction(sender, 'a2a_unknown_sender', 'system', true);
+      throw new Error(
+        `A2A message rejected: unknown sender ${sender} (KYBERION_A2A_SIGNATURE=enforce)`
+      );
+    }
   }
 
   private parseReceiver(receiver: string): { agentId: string; provider?: AgentProvider } {
