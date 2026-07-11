@@ -34,8 +34,12 @@
     {
       "n": "browser-actuator",
       "path": "libs/actuators/browser-actuator",
-      "source": "registry",
+      "source": "describeOps",
       "ops": [
+        {
+          "op": "console",
+          "kind": "capture"
+        },
         {
           "op": "content",
           "kind": "capture",
@@ -66,6 +70,10 @@
           "kind": "capture"
         },
         {
+          "op": "export_session_handoff",
+          "kind": "capture"
+        },
+        {
           "op": "goto",
           "kind": "capture",
           "input_schema": {
@@ -84,6 +92,22 @@
               "url": "https://example.com"
             }
           ]
+        },
+        {
+          "op": "network",
+          "kind": "capture"
+        },
+        {
+          "op": "passkey_credentials",
+          "kind": "capture"
+        },
+        {
+          "op": "passkey_events",
+          "kind": "capture"
+        },
+        {
+          "op": "query_elements",
+          "kind": "capture"
         },
         {
           "op": "screenshot",
@@ -112,6 +136,42 @@
               "title": "Example Domain"
             }
           ]
+        },
+        {
+          "op": "tabs",
+          "kind": "capture"
+        },
+        {
+          "op": "title",
+          "kind": "capture"
+        },
+        {
+          "op": "url",
+          "kind": "capture"
+        },
+        {
+          "op": "export_adf",
+          "kind": "transform"
+        },
+        {
+          "op": "export_playwright",
+          "kind": "transform"
+        },
+        {
+          "op": "json_query",
+          "kind": "transform"
+        },
+        {
+          "op": "regex_extract",
+          "kind": "transform"
+        },
+        {
+          "op": "authenticate_passkey",
+          "kind": "apply"
+        },
+        {
+          "op": "clear_passkey_credentials",
+          "kind": "apply"
         },
         {
           "op": "click",
@@ -151,6 +211,18 @@
           ]
         },
         {
+          "op": "click_first_match",
+          "kind": "apply"
+        },
+        {
+          "op": "click_ref",
+          "kind": "apply"
+        },
+        {
+          "op": "delete_passkey",
+          "kind": "apply"
+        },
+        {
           "op": "extension_session",
           "kind": "apply"
         },
@@ -188,6 +260,18 @@
               "text": "user@example.com"
             }
           ]
+        },
+        {
+          "op": "fill_ref",
+          "kind": "apply"
+        },
+        {
+          "op": "import_session_handoff",
+          "kind": "apply"
+        },
+        {
+          "op": "list_profiles",
+          "kind": "apply"
         },
         {
           "op": "log",
@@ -230,6 +314,22 @@
           ]
         },
         {
+          "op": "press_ref",
+          "kind": "apply"
+        },
+        {
+          "op": "register_passkey",
+          "kind": "apply"
+        },
+        {
+          "op": "set_passkey_presence",
+          "kind": "apply"
+        },
+        {
+          "op": "set_passkey_user_verified",
+          "kind": "apply"
+        },
+        {
           "op": "wait",
           "kind": "apply",
           "input_schema": {
@@ -259,6 +359,66 @@
               "selector": "#ready-state"
             }
           ]
+        },
+        {
+          "op": "wait_ref",
+          "kind": "apply"
+        },
+        {
+          "op": "close_session",
+          "kind": "control"
+        },
+        {
+          "op": "if",
+          "kind": "control"
+        },
+        {
+          "op": "open_tab",
+          "kind": "control",
+          "input_schema": {
+            "type": "object",
+            "required": ["url"],
+            "properties": {
+              "url": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "url": "https://example.com"
+            }
+          ]
+        },
+        {
+          "op": "pause_for_operator",
+          "kind": "control"
+        },
+        {
+          "op": "ref",
+          "kind": "control"
+        },
+        {
+          "op": "remove_passkey_authenticator",
+          "kind": "control"
+        },
+        {
+          "op": "select_tab",
+          "kind": "control"
+        },
+        {
+          "op": "select_tab_matching",
+          "kind": "control"
+        },
+        {
+          "op": "setup_passkey_authenticator",
+          "kind": "control"
+        },
+        {
+          "op": "while",
+          "kind": "control"
         }
       ]
     },
@@ -277,18 +437,18 @@
     {
       "n": "code-actuator",
       "path": "libs/actuators/code-actuator",
-      "source": "registry",
+      "source": "describeOps",
       "ops": [
         {
+          "op": "discover_capabilities",
+          "kind": "capture"
+        },
+        {
+          "op": "discover_skills",
+          "kind": "capture"
+        },
+        {
           "op": "glob_files",
-          "kind": "capture"
-        },
-        {
-          "op": "list",
-          "kind": "capture"
-        },
-        {
-          "op": "read",
           "kind": "capture"
         },
         {
@@ -296,40 +456,48 @@
           "kind": "capture"
         },
         {
-          "op": "apply_pattern",
+          "op": "semgrep_scan",
+          "kind": "capture"
+        },
+        {
+          "op": "shell",
+          "kind": "capture"
+        },
+        {
+          "op": "impact_analysis",
           "kind": "transform"
         },
         {
-          "op": "merge_content",
+          "op": "json_update",
           "kind": "transform"
         },
         {
-          "op": "set",
+          "op": "regex_replace",
           "kind": "transform"
         },
         {
-          "op": "append",
-          "kind": "apply"
-        },
-        {
-          "op": "copy",
-          "kind": "apply"
+          "op": "run_js",
+          "kind": "transform"
         },
         {
           "op": "log",
           "kind": "apply"
         },
         {
-          "op": "move",
-          "kind": "apply"
-        },
-        {
-          "op": "write",
+          "op": "write_artifact",
           "kind": "apply"
         },
         {
           "op": "write_file",
           "kind": "apply"
+        },
+        {
+          "op": "if",
+          "kind": "control"
+        },
+        {
+          "op": "while",
+          "kind": "control"
         }
       ]
     },
@@ -342,7 +510,7 @@
     {
       "n": "file-actuator",
       "path": "libs/actuators/file-actuator",
-      "source": "registry",
+      "source": "describeOps",
       "ops": [
         {
           "op": "exists",
@@ -363,10 +531,6 @@
               "path": "knowledge/product/README.md"
             }
           ]
-        },
-        {
-          "op": "glob_files",
-          "kind": "capture"
         },
         {
           "op": "list",
@@ -518,11 +682,11 @@
           "kind": "transform"
         },
         {
-          "op": "json_query",
+          "op": "path_join",
           "kind": "transform"
         },
         {
-          "op": "path_join",
+          "op": "regex_replace",
           "kind": "transform"
         },
         {
@@ -645,10 +809,6 @@
           ]
         },
         {
-          "op": "symlink",
-          "kind": "apply"
-        },
-        {
           "op": "write",
           "kind": "apply",
           "input_schema": {
@@ -744,6 +904,14 @@
               "content": "hello"
             }
           ]
+        },
+        {
+          "op": "if",
+          "kind": "control"
+        },
+        {
+          "op": "while",
+          "kind": "control"
         }
       ]
     },
@@ -849,25 +1017,130 @@
     {
       "n": "modeling-actuator",
       "path": "libs/actuators/modeling-actuator",
-      "source": "registry",
-      "ops": []
+      "source": "describeOps",
+      "ops": [
+        {
+          "op": "glob_files",
+          "kind": "capture"
+        },
+        {
+          "op": "read_file",
+          "kind": "capture"
+        },
+        {
+          "op": "read_json",
+          "kind": "capture"
+        },
+        {
+          "op": "shell",
+          "kind": "capture"
+        },
+        {
+          "op": "ajv_validate",
+          "kind": "transform"
+        },
+        {
+          "op": "json_query",
+          "kind": "transform"
+        },
+        {
+          "op": "mermaid_gen",
+          "kind": "transform"
+        },
+        {
+          "op": "terraform_to_architecture_adf",
+          "kind": "transform"
+        },
+        {
+          "op": "terraform_to_topology_ir",
+          "kind": "transform"
+        },
+        {
+          "op": "test_inventory_to_browser_pipeline",
+          "kind": "transform"
+        },
+        {
+          "op": "test_inventory_to_device_pipeline",
+          "kind": "transform"
+        },
+        {
+          "op": "ui_flow_to_test_inventory",
+          "kind": "transform"
+        },
+        {
+          "op": "web_profile_to_ui_flow_adf",
+          "kind": "transform"
+        },
+        {
+          "op": "log",
+          "kind": "apply"
+        },
+        {
+          "op": "write_artifact",
+          "kind": "apply"
+        },
+        {
+          "op": "write_file",
+          "kind": "apply"
+        },
+        {
+          "op": "if",
+          "kind": "control"
+        },
+        {
+          "op": "while",
+          "kind": "control"
+        }
+      ]
     },
     {
       "n": "network-actuator",
       "path": "libs/actuators/network-actuator",
-      "source": "registry",
+      "source": "describeOps",
       "ops": [
+        {
+          "op": "a2a_poll",
+          "kind": "capture"
+        },
         {
           "op": "fetch",
           "kind": "capture"
         },
         {
-          "op": "read",
+          "op": "shell",
           "kind": "capture"
+        },
+        {
+          "op": "json_query",
+          "kind": "transform"
+        },
+        {
+          "op": "regex_extract",
+          "kind": "transform"
+        },
+        {
+          "op": "a2a_send",
+          "kind": "apply"
         },
         {
           "op": "log",
           "kind": "apply"
+        },
+        {
+          "op": "write_artifact",
+          "kind": "apply"
+        },
+        {
+          "op": "write_file",
+          "kind": "apply"
+        },
+        {
+          "op": "if",
+          "kind": "control"
+        },
+        {
+          "op": "while",
+          "kind": "control"
         }
       ]
     },
@@ -1530,10 +1803,18 @@
     {
       "n": "wisdom-actuator",
       "path": "libs/actuators/wisdom-actuator",
-      "source": "registry",
+      "source": "describeOps",
       "ops": [
         {
-          "op": "read",
+          "op": "glob_files",
+          "kind": "capture"
+        },
+        {
+          "op": "knowledge_search",
+          "kind": "capture"
+        },
+        {
+          "op": "query",
           "kind": "capture"
         },
         {
@@ -1541,11 +1822,15 @@
           "kind": "capture"
         },
         {
-          "op": "search",
+          "op": "read_json",
           "kind": "capture"
         },
         {
-          "op": "json_parse",
+          "op": "shell",
+          "kind": "capture"
+        },
+        {
+          "op": "array_count",
           "kind": "transform"
         },
         {
@@ -1565,12 +1850,228 @@
           "kind": "transform"
         },
         {
+          "op": "a2a_fanout",
+          "kind": "apply"
+        },
+        {
+          "op": "a2a_roleplay",
+          "kind": "apply"
+        },
+        {
+          "op": "adjust_proposal",
+          "kind": "apply"
+        },
+        {
+          "op": "audit_speaker_fairness",
+          "kind": "apply"
+        },
+        {
+          "op": "capture_intuition",
+          "kind": "apply"
+        },
+        {
+          "op": "compute_readiness_matrix",
+          "kind": "apply"
+        },
+        {
+          "op": "conduct_1on1",
+          "kind": "apply"
+        },
+        {
+          "op": "cross_critique",
+          "kind": "apply"
+        },
+        {
+          "op": "decompose_into_tasks",
+          "kind": "apply"
+        },
+        {
+          "op": "deploy_release",
+          "kind": "apply"
+        },
+        {
+          "op": "distill",
+          "kind": "apply"
+        },
+        {
+          "op": "emit_dissent_log",
+          "kind": "apply"
+        },
+        {
+          "op": "escalate_for_review",
+          "kind": "apply"
+        },
+        {
+          "op": "evaluate_architecture_ready",
+          "kind": "apply"
+        },
+        {
+          "op": "evaluate_customer_signoff",
+          "kind": "apply"
+        },
+        {
+          "op": "evaluate_ensemble_convergence",
+          "kind": "apply"
+        },
+        {
+          "op": "evaluate_qa_ready",
+          "kind": "apply"
+        },
+        {
+          "op": "evaluate_requirements_completeness",
+          "kind": "apply"
+        },
+        {
+          "op": "evaluate_simulation_quality",
+          "kind": "apply"
+        },
+        {
+          "op": "evaluate_task_plan_ready",
+          "kind": "apply"
+        },
+        {
+          "op": "execute_self_action_items",
+          "kind": "apply"
+        },
+        {
+          "op": "execute_task_plan",
+          "kind": "apply"
+        },
+        {
+          "op": "extract_action_items",
+          "kind": "apply"
+        },
+        {
+          "op": "extract_design_spec",
+          "kind": "apply"
+        },
+        {
+          "op": "extract_dissent_signals",
+          "kind": "apply"
+        },
+        {
+          "op": "extract_requirements",
+          "kind": "apply"
+        },
+        {
+          "op": "extract_test_plan",
+          "kind": "apply"
+        },
+        {
+          "op": "find_slides_by_owner",
+          "kind": "apply"
+        },
+        {
+          "op": "fork_branches",
+          "kind": "apply"
+        },
+        {
+          "op": "generate_facilitation_script",
+          "kind": "apply"
+        },
+        {
+          "op": "generate_reminder_message",
+          "kind": "apply"
+        },
+        {
+          "op": "inject_prior_knowledge",
+          "kind": "apply"
+        },
+        {
+          "op": "knowledge_export",
+          "kind": "apply"
+        },
+        {
+          "op": "knowledge_import",
+          "kind": "apply"
+        },
+        {
+          "op": "knowledge_inject",
+          "kind": "apply"
+        },
+        {
           "op": "log",
+          "kind": "apply"
+        },
+        {
+          "op": "peer_advice",
+          "kind": "apply"
+        },
+        {
+          "op": "pptx_diff",
+          "kind": "apply"
+        },
+        {
+          "op": "react_loop",
+          "kind": "apply"
+        },
+        {
+          "op": "reasoning",
+          "kind": "apply"
+        },
+        {
+          "op": "recommend",
           "kind": "apply"
         },
         {
           "op": "register_presentation_preference_profile",
           "kind": "apply"
+        },
+        {
+          "op": "render_hypothesis_report",
+          "kind": "apply"
+        },
+        {
+          "op": "simulate_all",
+          "kind": "apply"
+        },
+        {
+          "op": "simulate_all_ensemble",
+          "kind": "apply"
+        },
+        {
+          "op": "stakeholder_grid_sort",
+          "kind": "apply"
+        },
+        {
+          "op": "synthesize_counterparty_persona",
+          "kind": "apply"
+        },
+        {
+          "op": "task_plan_to_next_tasks",
+          "kind": "apply"
+        },
+        {
+          "op": "tool_use",
+          "kind": "apply"
+        },
+        {
+          "op": "track_pending_action_items",
+          "kind": "apply"
+        },
+        {
+          "op": "transcribe_audio",
+          "kind": "apply"
+        },
+        {
+          "op": "uncertainty_gate",
+          "kind": "apply"
+        },
+        {
+          "op": "write_artifact",
+          "kind": "apply"
+        },
+        {
+          "op": "write_file",
+          "kind": "apply"
+        },
+        {
+          "op": "if",
+          "kind": "control"
+        },
+        {
+          "op": "while",
+          "kind": "control"
         }
       ]
     },

@@ -73,14 +73,56 @@
   ],
   "domains": {
     "browser": {
-      "capture": ["content", "evaluate", "goto", "screenshot", "snapshot"],
-      "transform": [],
-      "apply": ["click", "extension_session", "fill", "log", "press", "wait"]
+      "capture": [
+        "console",
+        "content",
+        "evaluate",
+        "export_session_handoff",
+        "goto",
+        "network",
+        "passkey_credentials",
+        "passkey_events",
+        "query_elements",
+        "screenshot",
+        "snapshot",
+        "tabs",
+        "title",
+        "url"
+      ],
+      "transform": ["export_adf", "export_playwright", "json_query", "regex_extract"],
+      "apply": [
+        "authenticate_passkey",
+        "clear_passkey_credentials",
+        "click",
+        "click_first_match",
+        "click_ref",
+        "delete_passkey",
+        "extension_session",
+        "fill",
+        "fill_ref",
+        "import_session_handoff",
+        "list_profiles",
+        "log",
+        "press",
+        "press_ref",
+        "register_passkey",
+        "set_passkey_presence",
+        "set_passkey_user_verified",
+        "wait",
+        "wait_ref"
+      ]
     },
     "code": {
-      "capture": ["glob_files", "list", "read", "read_file"],
-      "transform": ["apply_pattern", "merge_content", "set"],
-      "apply": ["append", "copy", "log", "move", "write", "write_file"]
+      "capture": [
+        "discover_capabilities",
+        "discover_skills",
+        "glob_files",
+        "read_file",
+        "semgrep_scan",
+        "shell"
+      ],
+      "transform": ["impact_analysis", "json_update", "regex_replace", "run_js"],
+      "apply": ["log", "write_artifact", "write_file"]
     },
     "codex": {
       "capture": ["app-server", "cloud", "features", "mcp", "review"],
@@ -88,25 +130,14 @@
       "apply": ["exec", "plugin"]
     },
     "file": {
-      "capture": [
-        "exists",
-        "glob_files",
-        "list",
-        "read",
-        "read_file",
-        "read_json",
-        "search",
-        "stat",
-        "tail"
-      ],
-      "transform": ["json_parse", "json_query", "path_join"],
+      "capture": ["exists", "list", "read", "read_file", "read_json", "search", "stat", "tail"],
+      "transform": ["json_parse", "path_join", "regex_replace"],
       "apply": [
         "append",
         "copy",
         "delete",
         "mkdir",
         "move",
-        "symlink",
         "write",
         "write_artifact",
         "write_file"
@@ -142,10 +173,25 @@
         "xlsx_render"
       ]
     },
+    "modeling": {
+      "capture": ["glob_files", "read_file", "read_json", "shell"],
+      "transform": [
+        "ajv_validate",
+        "json_query",
+        "mermaid_gen",
+        "terraform_to_architecture_adf",
+        "terraform_to_topology_ir",
+        "test_inventory_to_browser_pipeline",
+        "test_inventory_to_device_pipeline",
+        "ui_flow_to_test_inventory",
+        "web_profile_to_ui_flow_adf"
+      ],
+      "apply": ["log", "write_artifact", "write_file"]
+    },
     "network": {
-      "capture": ["fetch", "read"],
-      "transform": [],
-      "apply": ["log"]
+      "capture": ["a2a_poll", "fetch", "shell"],
+      "transform": ["json_query", "regex_extract"],
+      "apply": ["a2a_send", "log", "write_artifact", "write_file"]
     },
     "orchestrator": {
       "capture": ["discover_capabilities", "discover_skills"],
@@ -224,9 +270,64 @@
       ]
     },
     "wisdom": {
-      "capture": ["read", "read_file", "search"],
-      "transform": ["json_parse", "json_query", "regex_extract", "regex_replace", "yaml_update"],
-      "apply": ["log", "register_presentation_preference_profile"]
+      "capture": ["glob_files", "knowledge_search", "query", "read_file", "read_json", "shell"],
+      "transform": ["array_count", "json_query", "regex_extract", "regex_replace", "yaml_update"],
+      "apply": [
+        "a2a_fanout",
+        "a2a_roleplay",
+        "adjust_proposal",
+        "audit_speaker_fairness",
+        "capture_intuition",
+        "compute_readiness_matrix",
+        "conduct_1on1",
+        "cross_critique",
+        "decompose_into_tasks",
+        "deploy_release",
+        "distill",
+        "emit_dissent_log",
+        "escalate_for_review",
+        "evaluate_architecture_ready",
+        "evaluate_customer_signoff",
+        "evaluate_ensemble_convergence",
+        "evaluate_qa_ready",
+        "evaluate_requirements_completeness",
+        "evaluate_simulation_quality",
+        "evaluate_task_plan_ready",
+        "execute_self_action_items",
+        "execute_task_plan",
+        "extract_action_items",
+        "extract_design_spec",
+        "extract_dissent_signals",
+        "extract_requirements",
+        "extract_test_plan",
+        "find_slides_by_owner",
+        "fork_branches",
+        "generate_facilitation_script",
+        "generate_reminder_message",
+        "inject_prior_knowledge",
+        "knowledge_export",
+        "knowledge_import",
+        "knowledge_inject",
+        "log",
+        "peer_advice",
+        "pptx_diff",
+        "react_loop",
+        "reasoning",
+        "recommend",
+        "register_presentation_preference_profile",
+        "render_hypothesis_report",
+        "simulate_all",
+        "simulate_all_ensemble",
+        "stakeholder_grid_sort",
+        "synthesize_counterparty_persona",
+        "task_plan_to_next_tasks",
+        "tool_use",
+        "track_pending_action_items",
+        "transcribe_audio",
+        "uncertainty_gate",
+        "write_artifact",
+        "write_file"
+      ]
     }
   }
 }
