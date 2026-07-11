@@ -48,3 +48,9 @@
 - npm 公開は**製品人格の判断(構想評価 §3-1)と OSS 公開範囲**に関わる経営マターなので、本計画は「公開可能にする構造 + ローカル bin」まで。公開の実行はしない。
 - Docker のマルチステージ化でビルドが壊れやすい。既存の `pnpm build` 成果物をそのまま COPY する形にし、イメージ内ビルドを段階的に外す。
 - 音声/ブラウザ依存の分離で既存の音声 first-win(ロードマップの目玉)を壊さないよう、macOS ネイティブ経路は Docker と別物として維持する。
+
+## 実装状況 追記 (2026-07-12)
+
+- **Task 2 完了(bin フィールドとローカル CLI)**: `package.json` に `bin: { "kyberion": "dist/scripts/cli.js" }` を追加し、`scripts/cli.ts` に shebang を付与(tsc がビルド出力へ保持することを確認)。`private: true` は維持 — `pnpm link --global` で `kyberion` コマンドが張れる。`node dist/scripts/cli.js help` の起動確認済み。
+- npx 公開の是非は計画どおり**経営判断事項として未実装**(論点: 製品人格・サポート体制・secret 同梱リスク。公開時は files allowlist と postinstall 検査が前提)。
+- 残: Task 3(動く Docker イメージ / deploy サービス)。
