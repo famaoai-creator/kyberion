@@ -194,7 +194,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_TERMINAL_HOST`                  | string | no       | _undocumented_                                                                                                                                                                           |
 | `KYBERION_TTS_COMMAND`                    | string | no       | _undocumented_                                                                                                                                                                           |
 
-## runtime (91)
+## runtime (92)
 
 | Variable                                      | Type   | Required | Description                                                                                             |
 | --------------------------------------------- | ------ | -------- | ------------------------------------------------------------------------------------------------------- |
@@ -238,6 +238,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_INJECTION_SUSPECTED`                | string | no       | _undocumented_                                                                                          |
 | `KYBERION_KEPT`                               | string | no       | _undocumented_                                                                                          |
 | `KYBERION_LLM_CONCURRENCY`                    | string | no       | _undocumented_                                                                                          |
+| `KYBERION_LOCALE`                             | string | no       | _undocumented_                                                                                          |
 | `KYBERION_LOCALHOST_AUTOADMIN`                | string | no       | _undocumented_                                                                                          |
 | `KYBERION_MEMORY_AUTOPROMOTE`                 | string | no       | _undocumented_                                                                                          |
 | `KYBERION_MESH_PEER_ID`                       | string | no       | _undocumented_                                                                                          |

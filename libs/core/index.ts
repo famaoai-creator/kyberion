@@ -182,7 +182,7 @@ export { renderStatus, renderVocabularyText, resolveVocabularyLocale } from './u
 export type { UxStatusDomain, UxVocabularyLocale } from './ux-vocabulary.js';
 export * from './operator-home-summary.js';
 export { resolveActiveProfileRoot } from './profile-root.js';
-export { resolveOperatorDisplayName } from './operator-identity.js';
+export { resolveOperatorDisplayName, resolveOperatorLocale } from './operator-identity.js';
 export * from './company.js';
 export * from './financial-model.js';
 export * from './finance-controller.js';
