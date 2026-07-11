@@ -63,6 +63,12 @@ const GATES = [
   { name: 'smoke', command: 'pnpm', args: ['test'] },
 ];
 
+function canaryStub(verdict: 'green' | 'yellow' | 'red') {
+  return () => ({
+    report: { generated_at: new Date(0).toISOString(), verdict, findings: [] },
+  });
+}
+
 beforeEach(() => {
   safeMkdir(TMP_ROOT, { recursive: true });
   testRoot = path.join(
@@ -133,9 +139,11 @@ describe('applyDependencyPatch', () => {
       backupRoot,
       runner,
       gates: GATES,
+      canary: canaryStub('green'),
     });
 
     expect(outcome.status).toBe('patched');
+    expect(outcome.canary_verdict).toBe('green');
     expect(readRootPackage().dependencies.leftpad).toBe('^1.0.1');
     expect(runner.calls.map((call) => call.args[0] ?? call.command)).toEqual([
       'install',
@@ -207,6 +215,46 @@ describe('applyDependencyPatch', () => {
     expect(readRootPackage().dependencies.leftpad).toBe('^1.0.0');
   });
 
+  it('records a non-green canary verdict without rolling the patch back', () => {
+    const runner = new FakeRunner((command, args) => (args[0] === 'audit' ? cleanAudit : ok));
+    const outcome = applyDependencyPatch({
+      packageName: 'leftpad',
+      targetVersion: '1.0.1',
+      apply: true,
+      rootDir: testRoot,
+      ledgerPath,
+      backupRoot,
+      runner,
+      gates: GATES,
+      canary: canaryStub('red'),
+    });
+
+    expect(outcome.status).toBe('patched');
+    expect(outcome.canary_verdict).toBe('red');
+    expect(readRootPackage().dependencies.leftpad).toBe('^1.0.1');
+    expect(readLedgerRecords().at(-1)).toMatchObject({ canary_verdict: 'red' });
+  });
+
+  it('marks the canary unavailable when the watch itself throws', () => {
+    const runner = new FakeRunner((command, args) => (args[0] === 'audit' ? cleanAudit : ok));
+    const outcome = applyDependencyPatch({
+      packageName: 'leftpad',
+      targetVersion: '1.0.1',
+      apply: true,
+      rootDir: testRoot,
+      ledgerPath,
+      backupRoot,
+      runner,
+      gates: GATES,
+      canary: () => {
+        throw new Error('metrics store offline');
+      },
+    });
+
+    expect(outcome.status).toBe('patched');
+    expect(outcome.canary_verdict).toBe('unavailable');
+  });
+
   it('refuses transitive-only dependencies and escalates to approval', () => {
     const runner = new FakeRunner(() => ok);
     const outcome = applyDependencyPatch({
@@ -238,6 +286,7 @@ describe('applyDependencyPatch', () => {
       backupRoot,
       runner,
       gates: GATES,
+      canary: canaryStub('green'),
     });
 
     expect(outcome.status).toBe('patched');
