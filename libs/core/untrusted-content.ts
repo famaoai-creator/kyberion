@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
 import { auditChain } from './audit-chain.js';
+import { sendOpsAlert } from './ops-alert.js';
 import { logger } from './core.js';
 import { getReasoningBackend, delegateTaskWithUntrustedData } from './reasoning-backend.js';
 
@@ -285,6 +286,25 @@ export function processUntrustedContent(
     logger.warn(
       `[SA-03] Prompt injection suspected from source "${source}". Indicators: ${scan.indicators.join(', ')}`
     );
+
+    // SA-03 acceptance 2: the operator gets an actionable notice, not just a
+    // log line. Deduped per source per day so a scraped page cannot flood.
+    try {
+      sendOpsAlert({
+        severity: 'warning',
+        title: `Prompt injection suspected: ${source}`,
+        context: {
+          source,
+          score: scan.score,
+          indicators: scan.indicators.join(', '),
+        },
+        recommendation:
+          'External content from this source tripped injection indicators. Mutating operations from this context now require approval (SA-02/SA-03). Review the content before trusting outputs derived from it.',
+        dedupe_key: `sa03-injection:${source}:${new Date().toISOString().slice(0, 10)}`,
+      });
+    } catch {
+      /* alert emission must not block content processing */
+    }
   }
 
   const wrapped = wrapUntrusted(content, source);
