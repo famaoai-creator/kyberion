@@ -1,6 +1,6 @@
 # 改善計画 実装状況正本(STATUS)
 
-> **監査日**: 2026-07-05(全93計画を実コードと突き合わせて検証)/ 2026-07-06 MO-01 を DONE に更新 / 2026-07-11 IP-07・AA-02 行の陳腐化を再突合で訂正(既存テスト・実装を「未着手」と誤記していた)
+> **監査日**: 2026-07-05(全93計画を実コードと突き合わせて検証)/ 2026-07-06 MO-01 を DONE に更新 / 2026-07-11 IP-07・AA-02 行の陳腐化を再突合で訂正 / 同日 TODO 全18行を機械突合し 11 ID(SA-03/OP-01/IL-01/02/03/05/AO-04/AA-04/CO-01〜04)を PARTIAL へ訂正(実装+緑テストを確認。KM-02/DS-04/HO-02/CO-05/AC-05/IP-10 は真に未了と再確認)
 > **更新規約**: 計画の実装・レビュー完了時に本表を更新する。各計画文書内の「実装状況」節と矛盾する場合は本表を正とし、文書側を追従させる。
 > **判定基準**: DONE = 受入条件を実コードで検証済 / PARTIAL = 一部充足 / TODO = 実質未着手。
 
@@ -8,9 +8,9 @@
 
 | 判定    | 件数 |
 | ------- | ---- |
-| DONE    | 38   |
-| PARTIAL | 39   |
-| TODO    | 18   |
+| DONE    | 35   |
+| PARTIAL | 48   |
+| TODO    | 6    |
 
 ## P0 残作業(プロダクション化のクリティカルパス)
 
@@ -26,29 +26,29 @@
 | AR-01 | PARTIAL | adf-engine.ts 抽出、file-actuator/super-nerve アダプタ化、3エンジン統合、golden 回帰                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | AR-02 | PARTIAL | describeOps、op-discovery に input_schema 反映、未知 op の apply 既定撤廃(check:op-registry は 2026-07-11 に修復し validate/CI へ接続済み)                                                                                                                                                                                                                                                                                                                                                                |
 | AO-02 | PARTIAL | 2026-07-11: scan/台帳/ルーブリック実装済み + §3.3 unit test + 適用フロー(propose 既定・--apply で backup→bump→install/typecheck/smoke→再スキャン→確定/ロールバック)。カナリアも 2026-07-11 接続済み(確定後に runDegradationWatch、台帳へ verdict 記録)→ AO-02 は全タスク完了。透過依存は 2026-07-11 に --override(pnpm.overrides 経由、明示オプトイン)で対応済み。日次スキャンは pipelines/dependency-vuln-scan.json の cron(JST 5:00)で配線済み・実走確認済み。Task 4 defer 再評価は 2026-07-11 実装済み |
-| IL-01 | TODO    | goal/source_text/outcome_ids の昇格 seam 貫通、outcome-contract の goal 優先化                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| IL-01 | PARTIAL | 2026-07-11 突合: outcome-contract.ts に intentGoal 貫通が実装済み(IL-01 注記付き、テスト緑)。残: 全 seam の網羅精査                                                                                                                                                                                                                                                                                                                                                                                       |
 | IL-04 | PARTIAL | intent-reconciliation エンジン、完了ゲート、学習記録                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 
 ## 全計画一覧
 
 ### IP(コード品質)
 
-| ID    | 状態    | 残作業(PARTIAL/TODO のみ)                                                                                |
-| ----- | ------- | -------------------------------------------------------------------------------------------------------- |
-| IP-01 | DONE    |                                                                                                          |
-| IP-02 | DONE    |                                                                                                          |
-| IP-03 | DONE    |                                                                                                          |
-| IP-04 | PARTIAL | schemas/ 直下 \*-pipeline.schema.json 11本の二重定義整理                                                 |
-| IP-05 | DONE    |                                                                                                          |
-| IP-06 | DONE    |                                                                                                          |
-| IP-07 | PARTIAL | 2026-07-11 突合: backend/orchestrator/operator-learning のテストは実在し緑。残: 受入条件全体との網羅精査 |
-| IP-08 | PARTIAL | installProcessGuards 全デーモン適用、空 catch 解消、no-empty/process.exit lint、console→logger           |
-| IP-09 | PARTIAL | slugify ローカル定義5箇所の正本 import 化、再発防止 lint                                                 |
-| IP-10 | TODO    | 巨大5+2ファイルの分割(check_contract_schemas 5191行、MissionIntelligence 5526行 ほか)                    |
-| IP-11 | PARTIAL | strict 系フラグ有効化、@ts-ignore 残6、media-actuator any 半減                                           |
-| IP-12 | DONE    |                                                                                                          |
-| IP-13 | DONE    |                                                                                                          |
-| IP-14 | DONE    |                                                                                                          |
+| ID    | 状態    | 残作業(PARTIAL/TODO のみ)                                                                                 |
+| ----- | ------- | --------------------------------------------------------------------------------------------------------- |
+| IP-01 | DONE    |                                                                                                           |
+| IP-02 | DONE    |                                                                                                           |
+| IP-03 | DONE    |                                                                                                           |
+| IP-04 | PARTIAL | schemas/ 直下 \*-pipeline.schema.json 11本の二重定義整理                                                  |
+| IP-05 | DONE    |                                                                                                           |
+| IP-06 | DONE    |                                                                                                           |
+| IP-07 | PARTIAL | 2026-07-11 突合: backend/orchestrator/operator-learning のテストは実在し緑。残: 受入条件全体との網羅精査  |
+| IP-08 | PARTIAL | installProcessGuards 全デーモン適用、空 catch 解消、no-empty/process.exit lint、console→logger            |
+| IP-09 | PARTIAL | slugify ローカル定義5箇所の正本 import 化、再発防止 lint                                                  |
+| IP-10 | TODO    | 巨大ファイル分割(check_contract_schemas は 2026-07-11 時点 4,684 行 — 一部モジュール抽出済みだが依然巨大) |
+| IP-11 | PARTIAL | strict 系フラグ有効化、@ts-ignore 残6、media-actuator any 半減                                            |
+| IP-12 | DONE    |                                                                                                           |
+| IP-13 | DONE    |                                                                                                           |
+| IP-14 | DONE    |                                                                                                           |
 
 ### UX(ユーザー接点)
 
@@ -105,13 +105,13 @@
 
 ### AA(エージェント間通信)
 
-| ID    | 状態    | 残作業                                                                                     |
-| ----- | ------- | ------------------------------------------------------------------------------------------ |
-| AA-01 | DONE    |                                                                                            |
-| AA-02 | PARTIAL | 残: writer fencing、2-peer E2E(driver/dispatchToPeer は実装・テスト済み — 2026-07-11 突合) |
-| AA-03 | PARTIAL | 署名モジュール+秘密永続化、warn→enforce、鍵運用文書                                        |
-| AA-04 | TODO    | 会話ストア、rehydrate、inflight admission                                                  |
-| AA-05 | PARTIAL | mission flow コマンド、file 版 transport の quarantine 化                                  |
+| ID    | 状態    | 残作業                                                                                             |
+| ----- | ------- | -------------------------------------------------------------------------------------------------- |
+| AA-01 | DONE    |                                                                                                    |
+| AA-02 | PARTIAL | 残: writer fencing、2-peer E2E(driver/dispatchToPeer は実装・テスト済み — 2026-07-11 突合)         |
+| AA-03 | PARTIAL | 署名モジュール+秘密永続化、warn→enforce、鍵運用文書                                                |
+| AA-04 | PARTIAL | 2026-07-11 突合: a2a-conversation-store.ts(rehydrate 含む)+ テスト実在・緑。残: inflight admission |
+| AA-05 | PARTIAL | mission flow コマンド、file 版 transport の quarantine 化                                          |
 
 ### AR(アクチュエータリファクタリング/使いやすさ)
 
@@ -126,19 +126,19 @@
 
 ### SA(セキュリティ・監査)
 
-| ID    | 状態    | 残作業                                                               |
-| ----- | ------- | -------------------------------------------------------------------- |
-| SA-01 | DONE    | (残: audit-continuity の --warn-only → enforce)                      |
-| SA-02 | PARTIAL | execution-bounds.ts 抽出、SECURITY.md、warn→enforce                  |
-| SA-03 | TODO    | untrusted-content.ts、インジェクション検知、汚染文脈ゲート           |
-| SA-04 | PARTIAL | tier 文脈付き egress ゲート、DNS リバインディング対策                |
-| SA-05 | PARTIAL | policyEngine 操作種別拡張、secure-io fail-open 解消、-y 破壊操作除外 |
+| ID    | 状態    | 残作業                                                                                                       |
+| ----- | ------- | ------------------------------------------------------------------------------------------------------------ |
+| SA-01 | DONE    | (残: audit-continuity の --warn-only → enforce)                                                              |
+| SA-02 | PARTIAL | execution-bounds.ts 抽出、SECURITY.md、warn→enforce                                                          |
+| SA-03 | PARTIAL | 2026-07-11 突合: untrusted-content.ts + テスト実在(injection 検知含む、緑)。残: 汚染文脈ゲートの適用範囲精査 |
+| SA-04 | PARTIAL | tier 文脈付き egress ゲート、DNS リバインディング対策                                                        |
+| SA-05 | PARTIAL | policyEngine 操作種別拡張、secure-io fail-open 解消、-y 破壊操作除外                                         |
 
 ### OP(運用・配布)
 
 | ID    | 状態    | 残作業                                                                                                                                                                                                                             |
 | ----- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| OP-01 | TODO    | usage 計測、cost report、spend-guard                                                                                                                                                                                               |
+| OP-01 | PARTIAL | 2026-07-11 突合: chronos /api/cost とモデルコストレジストリ(ops-alert.ts)は実在。残: usage 計測の全経路接続、spend-guard                                                                                                           |
 | OP-02 | DONE    | (残: 外部ボリューム定期運用の実績)                                                                                                                                                                                                 |
 | OP-03 | PARTIAL | bin フィールド+CLI、docker deploy サービス                                                                                                                                                                                         |
 | OP-04 | PARTIAL | 残: RSS/restart 履歴の拡張と soak 実証のみ(劣化検知ループ・hourly cron・doctor rollup・healthz/status API・provider-health 永続化は 2026-07-11 実装: runtime state ファイル + TTL 自然回復 + reload API、vitest 下は隔離必須)      |
@@ -151,17 +151,17 @@
 | AO-01 | PARTIAL | scheduler run-lock/missed-run catch-up、autonomous-ops-policy/gate、auto-checkpoint                                                                                                                                                            |
 | AO-02 | PARTIAL | 2026-07-11: scan/台帳/ルーブリック実装済み + §3.3 unit test + 適用フロー(propose 既定・--apply で backup→bump→install/typecheck/smoke→再スキャン→確定/ロールバック)。適用フロー・--override・defer 再評価まで実装済み。残: カナリア監視(OP-04) |
 | AO-03 | DONE    |                                                                                                                                                                                                                                                |
-| AO-04 | TODO    | soak ハーネス、リーク検出、再起動 e2e                                                                                                                                                                                                          |
+| AO-04 | PARTIAL | 2026-07-11 突合: scripts/soak_restart_e2e.ts と pipelines/soak-endurance.json は実在。残: リーク検出、30日エビデンス                                                                                                                           |
 
 ### IL(インテントライフサイクル)
 
-| ID    | 状態    | 残作業                                                 |
-| ----- | ------- | ------------------------------------------------------ |
-| IL-01 | TODO    | goal の昇格 seam 貫通、outcome-contract の goal 優先化 |
-| IL-02 | TODO    | 相関 ID 貫通、intent trace コマンド                    |
-| IL-03 | TODO    | origin baseline、実行中ドリフトゲート                  |
-| IL-04 | PARTIAL | intent-reconciliation エンジン、完了ゲート、学習記録   |
-| IL-05 | TODO    | pending-intent-store、修正検知、completed 再オープン   |
+| ID    | 状態    | 残作業                                                                                              |
+| ----- | ------- | --------------------------------------------------------------------------------------------------- |
+| IL-01 | PARTIAL | outcome-contract の goal 貫通は実装済み(2026-07-11 突合)。残: 全 seam 網羅精査                      |
+| IL-02 | PARTIAL | 2026-07-11 突合: scripts/intent_trace.ts(pnpm intent:trace)実在。残: 相関 ID の全経路貫通精査       |
+| IL-03 | PARTIAL | 2026-07-11 突合: intent-delta.ts(goalSimilarity 起点比較)+ テスト実在・緑。残: 実行中ドリフトゲート |
+| IL-04 | PARTIAL | intent-reconciliation エンジン、完了ゲート、学習記録                                                |
+| IL-05 | PARTIAL | 2026-07-11 突合: pending-intent-store.ts + テスト実在・緑。残: 修正検知/completed 再オープンの精査  |
 
 ### ONB(初回オンボーディング)
 
@@ -197,10 +197,10 @@
 
 ### CO(Company OS)
 
-| ID    | 状態 | 残作業                                                               |
-| ----- | ---- | -------------------------------------------------------------------- |
-| CO-01 | TODO | company schema/entity、vision-resolver、getGoldenRule のテナント対応 |
-| CO-02 | TODO | org-chart、カスタムロール作成フロー                                  |
-| CO-03 | TODO | financial-model、okr-tracker                                         |
-| CO-04 | TODO | decision-rights、承認ゲート統合                                      |
-| CO-05 | TODO | 基幹業務テンプレート(決算/取締役会/採用/調達 等)                     |
+| ID    | 状態    | 残作業                                                                                                     |
+| ----- | ------- | ---------------------------------------------------------------------------------------------------------- |
+| CO-01 | PARTIAL | 2026-07-11 突合: company.ts と vision-resolver.ts は実装・テスト済み。残: getGoldenRule のテナント対応精査 |
+| CO-02 | PARTIAL | 2026-07-11 突合: org-chart.ts + テスト実在・緑。残: カスタムロール作成フロー精査                           |
+| CO-03 | PARTIAL | 2026-07-11 突合: financial-model.ts / okr-tracker.ts + テスト実在・緑。残: 経営判断への接続精査            |
+| CO-04 | PARTIAL | 2026-07-11 突合: decision-rights.ts + テスト実在・緑。残: 承認ゲート統合精査                               |
+| CO-05 | TODO    | 基幹業務テンプレート(決算/取締役会/採用/調達 等)                                                           |
