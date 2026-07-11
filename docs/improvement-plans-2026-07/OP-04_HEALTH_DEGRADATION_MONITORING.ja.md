@@ -12,6 +12,10 @@
 - **健全性シグナルが多数の JSONL に分散**し rollup が無い。「システムは健全か」の単一指標が `pnpm doctor` の手動再実行以外に無い。
 - telemetry(`telemetry.ts`)はメモリ内スタブで未永続(`:14-21`)。
 
+## 実装状況 (2026-07-11)
+
+- **完了済み(Task 3)**: `provider-health-registry.ts` の demotion 状態を `active/shared/runtime/provider-health.json` にミラーし、起動時ロード(絶対時刻 `until` により TTL は再起動をまたいで自然回復)+ `reloadProviderHealthFromDisk()` を追加。永続化は best-effort(壊れた state file は空で継続)。vitest 下では `KYBERION_PROVIDER_HEALTH_STATE_PATH` を明示したテスト以外は永続化無効(worker 間の state 共有によるテスト汚染防止、operator-notifications と同パターン)。
+
 ## ゴール(受入条件)
 
 1. **劣化検知**: メモリ増加傾向・クラッシュ/restart 頻度・推論レイテンシ悪化・エラー率上昇・provider demotion 多発を継続監視し、閾値超過で「壊れる前に」operator へ通知。`detectRegressions()` が実際に定期実行される。**単一オーナー(2026-07-03 レビュー): `metrics.ts` の `detectRegressions()` 配線は本計画が所有**(OP-01 は cost 集計、AO-01 は保守ループの起動に集中し、regression 配線は本計画に委ねる)。通知は AO-03 の `ops-alert.ts` sink を利用。

@@ -1,9 +1,13 @@
+import * as path from 'node:path';
 import {
   resolveCapabilityTarget,
   type CapabilityResolution,
   type CapabilityResolveOptions,
 } from './agent-provider-resolution.js';
 import { discoverProviders, type ProviderInfo } from './provider-discovery.js';
+import { logger } from './core.js';
+import * as pathResolver from './path-resolver.js';
+import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 
 /**
  * Provider Health Registry v1.0
@@ -24,8 +28,14 @@ import { discoverProviders, type ProviderInfo } from './provider-discovery.js';
  * different provider. A provider is only excluded from capability resolution once *every* one of
  * its instances is demoted.
  *
- * State is in-memory and per-process by design: demotions are short-lived and should not survive
- * a restart. Functions accept an optional `now` for deterministic testing.
+ * Persistence (OP-04 Task 3)
+ * --------------------------
+ * Demotion state is mirrored to a small JSON file under the runtime root so
+ * failover history survives the restarts that are unavoidable in 30-day
+ * operation. Entries carry an absolute `until` timestamp, so expired
+ * demotions recover naturally on load. Persistence is best-effort: a broken
+ * state file never blocks the in-memory registry. Functions accept an
+ * optional `now` for deterministic testing.
  */
 
 export interface Demotion {
@@ -39,6 +49,68 @@ const DEFAULT_DEMOTION_MS = 60_000;
 const DEFAULT_INSTANCE = 'default';
 
 const demotions = new Map<string, Demotion>();
+
+const STATE_PATH_ENV = 'KYBERION_PROVIDER_HEALTH_STATE_PATH';
+let loadedFromPath: string | null = null;
+
+// Under vitest, disable persistence unless a test opts in with an explicit
+// state path: worker processes would otherwise share the real state file and
+// leak demotions across unrelated test files (same pattern as
+// operator-notifications' VITEST guard).
+function persistenceEnabled(): boolean {
+  return !process.env.VITEST || Boolean(process.env[STATE_PATH_ENV]);
+}
+
+function stateFilePath(): string {
+  const override = process.env[STATE_PATH_ENV];
+  if (override) return pathResolver.rootResolve(override);
+  return pathResolver.active('shared/runtime/provider-health.json');
+}
+
+function ensureLoaded(now: number = Date.now()): void {
+  if (!persistenceEnabled()) return;
+  const filePath = stateFilePath();
+  if (loadedFromPath === filePath) return;
+  loadedFromPath = filePath;
+  demotions.clear();
+  if (!safeExistsSync(filePath)) return;
+  try {
+    const parsed = JSON.parse(String(safeReadFile(filePath, { encoding: 'utf8' }) || '{}')) as {
+      demotions?: Demotion[];
+    };
+    for (const entry of parsed.demotions || []) {
+      if (!entry?.provider || !entry.instance || !Number.isFinite(entry.until)) continue;
+      if (entry.until <= now) continue; // TTL recovery across restarts
+      demotions.set(keyFor(entry.provider, entry.instance), entry);
+    }
+  } catch (err) {
+    logger.warn(`[provider-health] failed to load persisted state, starting empty: ${err}`);
+  }
+}
+
+function persist(): void {
+  if (!persistenceEnabled()) return;
+  const filePath = stateFilePath();
+  try {
+    safeMkdir(path.dirname(filePath), { recursive: true });
+    safeWriteFile(
+      filePath,
+      JSON.stringify({ version: '1.0', demotions: [...demotions.values()] }, null, 2)
+    );
+  } catch (err) {
+    // Best-effort: in-memory failover keeps working even if persistence fails.
+    logger.warn(`[provider-health] failed to persist state: ${err}`);
+  }
+}
+
+/**
+ * Drop the in-memory view and reload from the persisted state file. Simulates
+ * a process restart; also useful after external edits to the state file.
+ */
+export function reloadProviderHealthFromDisk(now: number = Date.now()): void {
+  loadedFromPath = null;
+  ensureLoaded(now);
+}
 
 export function getProviderHealthDemotionTtlMs(): number {
   const configured = Number(process.env.KYBERION_PROVIDER_DEMOTION_TTL_MS || '');
@@ -70,7 +142,7 @@ export function instancesForProvider(provider: string): string[] {
  */
 export function reportProviderRateLimited(
   provider: string,
-  opts: { instance?: string; retryAfterMs?: number; reason?: string; now?: number } = {},
+  opts: { instance?: string; retryAfterMs?: number; reason?: string; now?: number } = {}
 ): void {
   reportProviderTemporarilyUnhealthy(provider, {
     instance: opts.instance,
@@ -88,27 +160,40 @@ export function reportProviderRateLimited(
  */
 export function reportProviderTemporarilyUnhealthy(
   provider: string,
-  opts: { instance?: string; retryAfterMs?: number; reason?: string; now?: number } = {},
+  opts: { instance?: string; retryAfterMs?: number; reason?: string; now?: number } = {}
 ): void {
   const instance = opts.instance || DEFAULT_INSTANCE;
   const now = opts.now ?? Date.now();
-  const ttl = opts.retryAfterMs && opts.retryAfterMs > 0 ? opts.retryAfterMs : getProviderHealthDemotionTtlMs();
+  ensureLoaded(now);
+  const ttl =
+    opts.retryAfterMs && opts.retryAfterMs > 0
+      ? opts.retryAfterMs
+      : getProviderHealthDemotionTtlMs();
   demotions.set(keyFor(provider, instance), {
     provider,
     instance,
     until: now + ttl,
     reason: opts.reason || 'temporarily_unhealthy',
   });
+  persist();
 }
 
 /**
  * Clear a demotion early (e.g. after a successful call).
  */
 export function reportProviderHealthy(provider: string, instance: string = DEFAULT_INSTANCE): void {
-  demotions.delete(keyFor(provider, instance));
+  ensureLoaded();
+  if (demotions.delete(keyFor(provider, instance))) {
+    persist();
+  }
 }
 
-export function isInstanceDemoted(provider: string, instance: string = DEFAULT_INSTANCE, now: number = Date.now()): boolean {
+export function isInstanceDemoted(
+  provider: string,
+  instance: string = DEFAULT_INSTANCE,
+  now: number = Date.now()
+): boolean {
+  ensureLoaded(now);
   const entry = demotions.get(keyFor(provider, instance));
   if (!entry) return false;
   if (entry.until <= now) {
@@ -122,7 +207,9 @@ export function isInstanceDemoted(provider: string, instance: string = DEFAULT_I
  * Healthy (non-demoted) instances of a provider, in configured order.
  */
 export function healthyInstances(provider: string, now: number = Date.now()): string[] {
-  return instancesForProvider(provider).filter((instance) => !isInstanceDemoted(provider, instance, now));
+  return instancesForProvider(provider).filter(
+    (instance) => !isInstanceDemoted(provider, instance, now)
+  );
 }
 
 /**
@@ -135,7 +222,10 @@ export function selectHealthyInstance(provider: string, now: number = Date.now()
 /**
  * Providers whose *every* instance is currently demoted — these should be excluded from resolution.
  */
-export function listDemotedProviders(providers: ProviderInfo[] = discoverProviders(), now: number = Date.now()): string[] {
+export function listDemotedProviders(
+  providers: ProviderInfo[] = discoverProviders(),
+  now: number = Date.now()
+): string[] {
   return providers
     .filter((entry) => entry.installed)
     .filter((entry) => healthyInstances(entry.provider, now).length === 0)
@@ -143,10 +233,18 @@ export function listDemotedProviders(providers: ProviderInfo[] = discoverProvide
 }
 
 /**
- * Reset all health state. Intended for tests and process re-init.
+ * Reset all health state, including the persisted file. Intended for tests
+ * and process re-init.
  */
 export function clearProviderHealth(): void {
   demotions.clear();
+  if (!persistenceEnabled()) return;
+  loadedFromPath = stateFilePath();
+  try {
+    if (safeExistsSync(stateFilePath())) safeRmSync(stateFilePath());
+  } catch (err) {
+    logger.warn(`[provider-health] failed to remove persisted state: ${err}`);
+  }
 }
 
 export interface HealthAwareResolution extends CapabilityResolution {
@@ -161,15 +259,17 @@ export interface HealthAwareResolution extends CapabilityResolution {
 export function resolveCapabilityTargetWithHealth(
   options: CapabilityResolveOptions,
   discoveredProviders: ProviderInfo[] = discoverProviders(),
-  now: number = Date.now(),
+  now: number = Date.now()
 ): HealthAwareResolution {
   const demotedProviders = listDemotedProviders(discoveredProviders, now);
   const resolution = resolveCapabilityTarget(
     {
       ...options,
-      excludeProviders: Array.from(new Set([...(options.excludeProviders || []), ...demotedProviders])),
+      excludeProviders: Array.from(
+        new Set([...(options.excludeProviders || []), ...demotedProviders])
+      ),
     },
-    discoveredProviders,
+    discoveredProviders
   );
   return {
     ...resolution,

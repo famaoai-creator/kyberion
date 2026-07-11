@@ -1309,6 +1309,15 @@
       "documented": false
     },
     {
+      "name": "KYBERION_PROVIDER_HEALTH_STATE_PATH",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Override for the persisted provider-health state file (default active/shared/runtime/provider-health.json). Mainly for tests.",
+      "documented": true,
+      "subsystem": "reasoning"
+    },
+    {
       "name": "KYBERION_PROVIDER_PRIORITY",
       "category": "runtime",
       "type": "string",

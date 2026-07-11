@@ -141,17 +141,17 @@
 | OP-01 | TODO    | usage 計測、cost report、spend-guard                                                                                                                                                                                               |
 | OP-02 | DONE    | (残: 外部ボリューム定期運用の実績)                                                                                                                                                                                                 |
 | OP-03 | PARTIAL | bin フィールド+CLI、docker deploy サービス                                                                                                                                                                                         |
-| OP-04 | TODO    | 劣化検知ループ、healthz/status、provider-health 永続化                                                                                                                                                                             |
+| OP-04 | PARTIAL | 劣化検知ループ、healthz/status(provider-health 永続化は 2026-07-11 実装: runtime state ファイル + TTL 自然回復 + reload API、vitest 下は隔離必須)                                                                                  |
 | OP-05 | PARTIAL | 2026-07-11: env-registry(228変数)+ check:env-registry(validate/CI)+ env-validator + doctor 配線 + env.example/CONFIGURATION.md 生成。残: 棚卸しの継続キュレーション(documented=false 211件)、baseline-check 接続、集中ローダー移行 |
 
 ### AO(自律運用・保守)
 
-| ID    | 状態    | 残作業                                                                                                                                                                                                                                                            |
-| ----- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| AO-01 | PARTIAL | scheduler run-lock/missed-run catch-up、autonomous-ops-policy/gate、auto-checkpoint                                                                                                                                                                               |
-| AO-02 | PARTIAL | 2026-07-11: scan/台帳/ルーブリック実装済み + §3.3 unit test + 適用フロー(propose 既定・--apply で backup→bump→install/typecheck/smoke→再スキャン→確定/ロールバック)。残: 定期スケジュール接続(AO-01)、defer 再評価ループ(Task 4)、透過依存 override、カナリア監視 |
-| AO-03 | DONE    |                                                                                                                                                                                                                                                                   |
-| AO-04 | TODO    | soak ハーネス、リーク検出、再起動 e2e                                                                                                                                                                                                                             |
+| ID    | 状態    | 残作業                                                                                                                                                                                                                                         |
+| ----- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AO-01 | PARTIAL | scheduler run-lock/missed-run catch-up、autonomous-ops-policy/gate、auto-checkpoint                                                                                                                                                            |
+| AO-02 | PARTIAL | 2026-07-11: scan/台帳/ルーブリック実装済み + §3.3 unit test + 適用フロー(propose 既定・--apply で backup→bump→install/typecheck/smoke→再スキャン→確定/ロールバック)。適用フロー・--override・defer 再評価まで実装済み。残: カナリア監視(OP-04) |
+| AO-03 | DONE    |                                                                                                                                                                                                                                                |
+| AO-04 | TODO    | soak ハーネス、リーク検出、再起動 e2e                                                                                                                                                                                                          |
 
 ### IL(インテントライフサイクル)
 
