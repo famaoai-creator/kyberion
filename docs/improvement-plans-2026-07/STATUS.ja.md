@@ -8,8 +8,8 @@
 
 | 判定    | 件数 |
 | ------- | ---- |
-| DONE    | 35   |
-| PARTIAL | 54   |
+| DONE    | 36   |
+| PARTIAL | 53   |
 | TODO    | 0    |
 
 ## P0 残作業(プロダクション化のクリティカルパス)
@@ -19,7 +19,7 @@
 | IP-07 | PARTIAL | 2026-07-11 突合: claude-agent-reasoning-backend.test.ts(6件緑)と orchestrator の delegation/fastpath テストは実在し緑 — 旧記載の残作業は解消済み。残: 受入条件全体との網羅精査                                                                                                                                                                                                                                                                                                                            |
 | MO-01 | DONE    | 2026-07-06 完了: phaseSpec スキーマ(catalog v1.1.0)+タスク展開(plan-tasks/createMission)+3プロセステンプレート追加。worker イベント連鎖のフェーズ駆動化は計画どおり MO-02 に委譲                                                                                                                                                                                                                                                                                                                          |
 | MO-02 | PARTIAL | mission-gate-engine、新設ゲート共通化、planning/受入ゲート記録、受入 rework/owner 通知、exit/quality の修復ループ                                                                                                                                                                                                                                                                                                                                                                                         |
-| AA-02 | PARTIAL | writer fencing は 2026-07-11 実装(配送パス全体を PID stale-takeover 付き排他ロックで防護、保持中は skip、PID 検査付き解放)。残: 2-peer E2E                                                                                                                                                                                                                                                                                                                                                                |
+| AA-02 | DONE    | 2026-07-11 完了: driver/dispatchToPeer/writer fencing に加え、2-peer E2E(実 HTTP+HMAC、正常配送・復帰再配送・dead-letter・dedup)を実装。物理2プロセス実証のみ E3 パイロットへ                                                                                                                                                                                                                                                                                                                             |
 | SA-02 | PARTIAL | execution-bounds.ts 抽出、SECURITY.md、warn→enforce 到達(environment manifest の HMAC 署名は 2026-07-11 実装: KYBERION_MANIFEST_SIGNING_KEY 設定で fail-closed)                                                                                                                                                                                                                                                                                                                                           |
 | SA-05 | PARTIAL | policyEngine の操作種別拡張、secure-io parse失敗 fail-open 解消、-y 破壊操作除外                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | OP-01 | PARTIAL | usage 計測の全経路接続、cost report、spend-guard、KPI 接続                                                                                                                                                                                                                                                                                                                                                                                                                                                |
@@ -108,7 +108,7 @@
 | ID    | 状態    | 残作業                                                                                             |
 | ----- | ------- | -------------------------------------------------------------------------------------------------- |
 | AA-01 | DONE    |                                                                                                    |
-| AA-02 | PARTIAL | 残: 2-peer E2E(driver/dispatchToPeer/writer fencing は実装・テスト済み — 2026-07-11)               |
+| AA-02 | DONE    | 2026-07-11 完了(2-peer E2E 含む。物理2プロセス実証は E3 パイロットへ)                              |
 | AA-03 | PARTIAL | 署名モジュール+秘密永続化、warn→enforce、鍵運用文書                                                |
 | AA-04 | PARTIAL | 2026-07-11 突合: a2a-conversation-store.ts(rehydrate 含む)+ テスト実在・緑。残: inflight admission |
 | AA-05 | PARTIAL | mission flow コマンド、file 版 transport の quarantine 化                                          |
