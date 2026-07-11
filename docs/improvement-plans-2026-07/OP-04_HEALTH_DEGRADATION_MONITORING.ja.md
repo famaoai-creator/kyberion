@@ -14,6 +14,8 @@
 
 ## 実装状況 (2026-07-11)
 
+- **完了済み(Task 1 v1)**: `libs/core/health-degradation.ts` — 休眠していた `MetricsCollector.detectRegressions()` を実際に呼ぶ評価ループ。レイテンシ回帰 + provider demotion を `knowledge/product/governance/health-thresholds.json` の閾値で green/yellow/red 判定し、非 green は AO-03 の `sendOpsAlert`(yellow=warning / red=critical、dedupe 付き)へエスカレーション。`pipelines/health-degradation-watch.json` の hourly cron(JST 毎時30分)で無人実行。RSS 推移・restart 頻度は履歴面ができ次第の拡張点。
+- **完了済み(Task 4)**: `pnpm doctor` の先頭に「System health: 🟢/🟡/🔴 + 根拠(3行以内)」rollup を追加(劣化評価 + env 検証 + capability 欠落を統合。アラート送信は hourly watch の責務で doctor は評価のみ)。
 - **完了済み(Task 2 v1)**: chronos-mirror-v2 に `/api/healthz`(無認証 liveness、最小情報のみ)と `/api/status`(既存 surface 認証必須。uptime・永続化された provider demotion・直近1時間の trace エラー率・🟢/🟡/🔴 rollup + 根拠)を追加。集約ロジックは `src/lib/system-status.ts` に分離しテスト済み。mesh backlog(AA-02)/バックアップ時刻(OP-02)/当日コスト(OP-01)は各 runtime 面の安定後に collectSystemStatus へ追加する拡張点としてコメントに明記。
 
 - **完了済み(Task 3)**: `provider-health-registry.ts` の demotion 状態を `active/shared/runtime/provider-health.json` にミラーし、起動時ロード(絶対時刻 `until` により TTL は再起動をまたいで自然回復)+ `reloadProviderHealthFromDisk()` を追加。永続化は best-effort(壊れた state file は空で継続)。vitest 下では `KYBERION_PROVIDER_HEALTH_STATE_PATH` を明示したテスト以外は永続化無効(worker 間の state 共有によるテスト汚染防止、operator-notifications と同パターン)。
