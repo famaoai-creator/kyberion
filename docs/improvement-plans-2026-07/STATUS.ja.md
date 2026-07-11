@@ -52,14 +52,14 @@
 
 ### UX(ユーザー接点)
 
-| ID    | 状態    | 残作業                                                                                                                                         |
-| ----- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| UX-01 | DONE    |                                                                                                                                                |
-| UX-02 | PARTIAL | 4ブリッジ typing 表示(chronos チャットのキャンセル+フェーズ表示は 2026-07-11 実装済み)                                                         |
-| UX-03 | PARTIAL | locale-resolver 一元化、onboarding/cli help の ja/en 化(wizard の identity/reasoning は 2026-07-11 に選択言語へ即時追従化)、chronos 言語トグル |
-| UX-04 | PARTIAL | CLI 承認動詞統一、魔法語の選択肢化、decidedBy を identity から取得                                                                             |
-| UX-05 | PARTIAL | 契約スナップショットテスト+CI ゲート、dashboard の renderStatus 経由化                                                                         |
-| UX-06 | DONE    | (軽微: 3面バナーの版数統一)                                                                                                                    |
+| ID    | 状態    | 残作業                                                                                                                                                                                           |
+| ----- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| UX-01 | DONE    |                                                                                                                                                                                                  |
+| UX-02 | PARTIAL | 4ブリッジ typing 表示(chronos チャットのキャンセル+フェーズ表示は 2026-07-11 実装済み)                                                                                                           |
+| UX-03 | PARTIAL | locale-resolver 一元化、onboarding/cli help の ja/en 化(wizard の identity/reasoning は 2026-07-11 に選択言語へ即時追従化)、chronos 言語トグル                                                   |
+| UX-04 | PARTIAL | 2026-07-12: CLI 承認動詞統一(approve/reject + 名前付きフラグ、旧形式は警告エイリアス)・decidedBy の identity 化・chronos 番号選択+拒否経路を実装。残: slack-bridge 提案の Block Kit ボタン化のみ |
+| UX-05 | PARTIAL | 契約スナップショットテスト+CI ゲート、dashboard の renderStatus 経由化                                                                                                                           |
+| UX-06 | DONE    | (軽微: 3面バナーの版数統一)                                                                                                                                                                      |
 
 ### AC(アクチュエータ能力)
 
