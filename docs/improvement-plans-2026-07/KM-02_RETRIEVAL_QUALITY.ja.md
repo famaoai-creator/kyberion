@@ -11,6 +11,12 @@
 - **ランカーが2系統併存**: `scripts/context_ranker.ts`(406行、frontmatter メタデータ+substring スコア)と `knowledge-index.ts`(718行、スコープ対応ハイブリッド)。コーパスもスコアも別物で、片方の改善がもう片方に効かない。
 - 良い点(維持する): スコープハッシュでキャッシュを tier 分離(`knowledge-index.ts:122-140`)、RRF フュージョン(`:626-703`)、embedding 無し時の lexical 縮退。
 
+## 実装状況 (2026-07-11)
+
+- **完了済み(Task 1 コア)**: `knowledge-index.ts` に本文チャンク化(目安1,000字・見出し境界優先・overlap 100字・文書あたり最大12チャンク、600字未満はスキップ)を追加。チャンクは `doc#chunkN` として親メタを継承し、検索結果は文書単位に集約(最良チャンク勝ち、`matchedChunkIndex` で位置を露出、`source` は解決可能な文書パスへ復元)。戻り型はフィールド追加のみで互換。チャンクの埋め込みコーパスは本文1,200字(文書エントリは従来の300字のままでキャッシュ互換維持)。
+- **完了済み(Task 2)**: `queryKnowledgeHybrid` の結果に `embeddingBackend` を付与し、doctor に「Semantic search: DEGRADED(hash)」表示を追加。
+- 残: キャッシュの contentHash 差分更新と LRU(Task 1.2)、before/after 命中率 fixture(Task 1.4)、非 Mac 実埋め込み経路の選定(Task 3)、ランカー統合(Task 4)。
+
 ## ゴール(受入条件)
 
 1. ナレッジ文書の**本文**がチャンク分割されて埋め込み/索引され、本文にしか無い語・概念での検索が当たる(before/after の検索品質比較で確認)。
