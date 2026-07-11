@@ -55,6 +55,7 @@ async function loadChronosCore() {
     dispatchPresenceFrame: presenceBridge.dispatchPresenceFrame,
     listSurfaceOutboxMessages: channelSurface.listSurfaceOutboxMessages,
     isSlackMissionConfirmation: channelSurface.isSlackMissionConfirmation,
+    isSlackMissionRejection: channelSurface.isSlackMissionRejection,
     ensureAgentRuntime: runtimeSupervisor.ensureAgentRuntime,
     getAgentRuntimeHandle: runtimeSupervisor.getAgentRuntimeHandle,
     listAgentRuntimeSnapshots: runtimeSupervisor.listAgentRuntimeSnapshots,
@@ -1192,6 +1193,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (pendingMissionProposal && core.isSlackMissionRejection?.(query)) {
+      clearChronosMissionProposalState(sessionId, core);
+      return NextResponse.json({
+        status: 'ok',
+        response: l(
+          locale,
+          'Understood — the mission proposal has been discarded. Nothing was created.',
+          '了解しました。ミッション提案は破棄しました(何も作成していません)。'
+        ),
+        timestamp: new Date().toISOString(),
+      });
+    }
+
     if (pendingMissionProposal && isSlackMissionConfirmation(query)) {
       const issued = await issueChronosMissionFromProposal(
         {
@@ -1329,7 +1343,7 @@ export async function POST(req: NextRequest) {
       const confirmationText = [
         conversation.text || 'I can turn this into a mission.',
         '',
-        'If you want me to proceed, reply with `はい` or `お願いします` in this session.',
+        '1) 作成する 2) やめる — 番号か `はい` / `yes` で返信してください。',
       ]
         .join('\n')
         .trim();
@@ -1372,7 +1386,8 @@ export async function POST(req: NextRequest) {
                   props: {
                     severity: 'info',
                     title: 'Reply with confirmation',
-                    message: 'Send `はい` or `お願いします` in this session to start the mission.',
+                    message:
+                      '1) 作成する 2) やめる — 番号か `はい` / `yes` を送るとミッションを開始します。',
                   },
                 },
               ],
