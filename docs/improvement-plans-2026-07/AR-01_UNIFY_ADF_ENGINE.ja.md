@@ -52,6 +52,7 @@
 ## 実装状況 (2026-07-06)
 
 - **進行中(Task 2/3 の土台)**: `libs/core/adf-engine.ts` を新設し、capture / transform / apply / control の共通 step runner を切り出した。`file-actuator` と `super-nerve` はこの runner を使う薄いアダプタへ寄せ、制御フロー・step budget・自動修復の共通化を進めた。残りは `run_pipeline.ts` と golden 回帰の確認。
+- **横展開1件目(2026-07-11)**: `network-actuator` の私製ループを `executeAdfSteps` へ移行(file-actuator パターン踏襲)。意味論統一に伴う意図的変更1点: 旧ループはネスト制御(`if`/`while` 配下)の失敗を握りつぶして `res.context` を採用していたが、正準化で fail-propagate に統一(AR-06 の no-silent-failure 準拠)。actuators 全46ファイル/553テスト緑。**残りの私製ループ**: code(traceCtx 対応要)/ modeling / system / wisdom / browser の5アクチュエータ — 同パターンで1件ずつ横展開。
 
 ## リスクと注意
 
