@@ -192,12 +192,14 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_TERMINAL_HOST`                  | string | no       | _undocumented_                                                                                                                                                                           |
 | `KYBERION_TTS_COMMAND`                    | string | no       | _undocumented_                                                                                                                                                                           |
 
-## runtime (86)
+## runtime (89)
 
 | Variable                                      | Type   | Required | Description                                                                                             |
 | --------------------------------------------- | ------ | -------- | ------------------------------------------------------------------------------------------------------- |
 | `KYBERION_A`                                  | string | no       | _undocumented_                                                                                          |
+| `KYBERION_AGENT_RING`                         | string | no       | _undocumented_                                                                                          |
 | `KYBERION_AGENT_RUNTIME_SUPERVISOR_TRANSPORT` | string | no       | _undocumented_                                                                                          |
+| `KYBERION_AGENT_TIER`                         | string | no       | _undocumented_                                                                                          |
 | `KYBERION_AGY_SANDBOX`                        | string | no       | _undocumented_                                                                                          |
 | `KYBERION_APPLE_FM`                           | string | no       | _undocumented_                                                                                          |
 | `KYBERION_APPLE_FM_SAMPLE_AUDIO`              | string | no       | _undocumented_                                                                                          |
@@ -218,6 +220,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_CODEX_MODE`                         | string | no       | _undocumented_                                                                                          |
 | `KYBERION_CUSTOMER`                           | string | no       | Active customer profile slug used to resolve the profile root.                                          |
 | `KYBERION_DEFAULT_LOCALE`                     | string | no       | _undocumented_                                                                                          |
+| `KYBERION_DELEGATION_DEPTH`                   | string | no       | _undocumented_                                                                                          |
 | `KYBERION_DEPLOY_PROJECT`                     | string | no       | _undocumented_                                                                                          |
 | `KYBERION_DEPLOYMENT_PROJECT`                 | string | no       | _undocumented_                                                                                          |
 | `KYBERION_DISPATCH_MAX_ROUNDS`                | string | no       | _undocumented_                                                                                          |
