@@ -150,6 +150,8 @@
         "satellites/",
         "plugins/",
         "docs/developer/",
+        "package.json",
+        "pnpm-lock.yaml",
         "README.md",
         "CAPABILITIES_GUIDE.md",
         "CONTRIBUTING.md",

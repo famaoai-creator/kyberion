@@ -11,16 +11,16 @@ Kyberion がデータに対して何をして、何をしないか。
 
 ## 1. ローカルに保存されるもの
 
-| パス | 内容 |
-|---|---|
-| `knowledge/personal/` | identity, vision, connections, voice プロファイル。**gitignored** |
-| `customer/{slug}/` | FDE 顧客設定（`KYBERION_CUSTOMER` 設定時）。**gitignored**（`_template/` 除く） |
-| `active/missions/{id}/` | mission ごとの git repo・state・evidence。**gitignored** |
-| `active/shared/logs/traces/` | 構造化実行 trace (JSONL)。**gitignored** |
-| `active/shared/runtime/` | runtime state, ロック, surface metadata。**gitignored** |
-| `active/audit/*.jsonl` | 監査台帳エントリ。**gitignored** |
-| `knowledge/confidential/{project}/` | プロジェクトスコープ confidential ナレッジ。**gitignored** |
-| `knowledge/public/` | 公開再利用可能ナレッジ。**committed**（意図的に共有） |
+| パス                                | 内容                                                                            |
+| ----------------------------------- | ------------------------------------------------------------------------------- |
+| `knowledge/personal/`               | identity, vision, connections, voice プロファイル。**gitignored**               |
+| `customer/{slug}/`                  | FDE 顧客設定（`KYBERION_CUSTOMER` 設定時）。**gitignored**（`_template/` 除く） |
+| `active/missions/{id}/`             | mission ごとの git repo・state・evidence。**gitignored**                        |
+| `active/shared/logs/traces/`        | 構造化実行 trace (JSONL)。**gitignored**                                        |
+| `active/shared/runtime/`            | runtime state, ロック, surface metadata。**gitignored**                         |
+| `active/audit/*.jsonl`              | 監査台帳エントリ。**gitignored**                                                |
+| `knowledge/confidential/{project}/` | プロジェクトスコープ confidential ナレッジ。**gitignored**                      |
+| `knowledge/public/`                 | 公開再利用可能ナレッジ。**committed**（意図的に共有）                           |
 
 `.gitignore` ポリシーは強制される。canonical list は同ファイルを参照。
 
@@ -36,17 +36,18 @@ Kyberion がデータに対して何をして、何をしないか。
 
 設定すると、Kyberion は **そのプロバイダに直接** データを送る（Kyberion 経由ではない）:
 
-| サービス | 送信内容 | タイミング |
-|---|---|---|
-| Anthropic / Claude | 会話 context + tool 呼び出し | `anthropic` reasoning backend を選んだとき |
-| OpenAI / Codex | 同上 | `codex-cli` backend を選んだとき |
-| Google Gemini CLI | 同上 | `gemini-cli` backend を選んだとき |
-| NVIDIA Nemotron API | 同上 | `nemotron-api` backend を選んだとき |
-| Local Claude CLI | 同上、ただしローカル CLI 経由 | `claude-cli` を選んだとき |
-| Local OpenAI-compatible LLM | 同上、ただし自分で用意した endpoint 経由 | `local` を選んだとき |
-| Style-Bert-VITS2 (local) | TTS テキスト → ローカルサーバ、外部送信なし | ローカル voice (Phase 2) を opt-in したとき |
-| Whisper (local) | STT 音声 → ローカルサーバ、外部送信なし | 同上 |
-| Slack / Google Workspace / Notion | 接続が読み書きするよう設定したもの | 接続を作成したとき |
+| サービス                          | 送信内容                                          | タイミング                                                     |
+| --------------------------------- | ------------------------------------------------- | -------------------------------------------------------------- |
+| Anthropic / Claude                | 会話 context + tool 呼び出し                      | `anthropic` reasoning backend を選んだとき                     |
+| OpenAI / Codex                    | 同上                                              | `codex-cli` backend を選んだとき                               |
+| Google Gemini CLI                 | 同上                                              | `gemini-cli` backend を選んだとき                              |
+| Google Gemini API / AI Studio     | 画像生成・音声生成の入力 prompt / text + 生成結果 | `gemini` service preset / Gemini image-TTS bridge を選んだとき |
+| NVIDIA Nemotron API               | 同上                                              | `nemotron-api` backend を選んだとき                            |
+| Local Claude CLI                  | 同上、ただしローカル CLI 経由                     | `claude-cli` を選んだとき                                      |
+| Local OpenAI-compatible LLM       | 同上、ただし自分で用意した endpoint 経由          | `local` を選んだとき                                           |
+| Style-Bert-VITS2 (local)          | TTS テキスト → ローカルサーバ、外部送信なし       | ローカル voice (Phase 2) を opt-in したとき                    |
+| Whisper (local)                   | STT 音声 → ローカルサーバ、外部送信なし           | 同上                                                           |
+| Slack / Google Workspace / Notion | 接続が読み書きするよう設定したもの                | 接続を作成したとき                                             |
 
 どの backend が active かは常に分かる — `pnpm doctor` や CLI ログが起動時に出力する。
 
