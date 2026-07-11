@@ -1,4 +1,5 @@
 import {
+  buildCostReportFromHistory,
   logger,
   safeReadFile,
   safeWriteFile,
@@ -595,6 +596,33 @@ async function opTransform(op: string, params: any, ctx: any) {
           detail: `linked missions=${snapshot.project_status.target.linked_missions || 0}, active=${snapshot.project_status.target.active_missions || 0}`,
         });
       }
+      // OP-01 Task 2.3: surface this week's LLM cost in the operator packet.
+      // Cost visibility must never break status reporting, so failures are
+      // swallowed and simply omit the finding.
+      let weeklyCostUsd: number | undefined;
+      try {
+        const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+        const costReport = buildCostReportFromHistory({ since: weekAgo });
+        if (costReport.calls > 0) {
+          weeklyCostUsd = Math.round(costReport.total_usd * 100) / 100;
+          const topMissions = costReport.by_mission
+            .slice(0, 3)
+            .map((bucket: any) => `${bucket.key}: $${bucket.cost_usd.toFixed(2)}`)
+            .join(', ');
+          findings.push({
+            id: 'weekly-cost',
+            severity: 'info',
+            message: `This week's LLM cost: $${weeklyCostUsd.toFixed(2)} (${costReport.calls} calls)`,
+            detail:
+              `top missions — ${topMissions || '(none)'}` +
+              (costReport.estimated_usd > 0
+                ? `; estimated portion $${costReport.estimated_usd.toFixed(2)}`
+                : ''),
+          });
+        }
+      } catch (_) {
+        /* no cost ledger yet — omit the finding */
+      }
       const surfaceCount = Object.keys(snapshot.surface_status?.surfaces || {}).length;
       const headline = findings.some((item) => item.severity === 'error')
         ? 'System requires attention'
@@ -622,6 +650,7 @@ async function opTransform(op: string, params: any, ctx: any) {
             linked_missions: projectMetrics.linked_missions || 0,
             esm_ok: Boolean(snapshot.esm_integrity?.ok),
             catalogs_ok: Boolean(snapshot.catalog_integrity?.ok),
+            ...(weeklyCostUsd !== undefined ? { weekly_cost_usd: weeklyCostUsd } : {}),
           },
           sources: [
             'dist/scripts/surface_runtime.js --action status',
