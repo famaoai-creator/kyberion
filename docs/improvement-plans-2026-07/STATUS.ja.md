@@ -1,6 +1,6 @@
 # 改善計画 実装状況正本(STATUS)
 
-> **監査日**: 2026-07-05(全93計画を実コードと突き合わせて検証)/ 2026-07-06 MO-01 を DONE に更新
+> **監査日**: 2026-07-05(全93計画を実コードと突き合わせて検証)/ 2026-07-06 MO-01 を DONE に更新 / 2026-07-11 IP-07・AA-02 行の陳腐化を再突合で訂正(既存テスト・実装を「未着手」と誤記していた)
 > **更新規約**: 計画の実装・レビュー完了時に本表を更新する。各計画文書内の「実装状況」節と矛盾する場合は本表を正とし、文書側を追従させる。
 > **判定基準**: DONE = 受入条件を実コードで検証済 / PARTIAL = 一部充足 / TODO = 実質未着手。
 
@@ -9,17 +9,17 @@
 | 判定    | 件数 |
 | ------- | ---- |
 | DONE    | 38   |
-| PARTIAL | 38   |
-| TODO    | 19   |
+| PARTIAL | 39   |
+| TODO    | 18   |
 
 ## P0 残作業(プロダクション化のクリティカルパス)
 
 | ID    | 状態    | 残作業の要点                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | ----- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| IP-07 | PARTIAL | claude-agent-reasoning-backend テスト、surface-runtime-orchestrator 特性化テスト                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| IP-07 | PARTIAL | 2026-07-11 突合: claude-agent-reasoning-backend.test.ts(6件緑)と orchestrator の delegation/fastpath テストは実在し緑 — 旧記載の残作業は解消済み。残: 受入条件全体との網羅精査                                                                                                                                                                                                                                                                                                                            |
 | MO-01 | DONE    | 2026-07-06 完了: phaseSpec スキーマ(catalog v1.1.0)+タスク展開(plan-tasks/createMission)+3プロセステンプレート追加。worker イベント連鎖のフェーズ駆動化は計画どおり MO-02 に委譲                                                                                                                                                                                                                                                                                                                          |
 | MO-02 | PARTIAL | mission-gate-engine、新設ゲート共通化、planning/受入ゲート記録、受入 rework/owner 通知、exit/quality の修復ループ                                                                                                                                                                                                                                                                                                                                                                                         |
-| AA-02 | TODO    | mesh_delivery_driver 新設、broker⇔dispatchToPeer 配線、writer fencing、E2E                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| AA-02 | PARTIAL | 2026-07-11 突合: mesh-delivery-driver と mesh-hub-peer-messaging-adapter.dispatchToPeer は実装・テスト済み(旧 TODO 表記は陳腐化)。残: writer fencing、2-peer E2E                                                                                                                                                                                                                                                                                                                                          |
 | SA-02 | PARTIAL | execution-bounds.ts 抽出、SECURITY.md、warn→enforce 到達(environment manifest の HMAC 署名は 2026-07-11 実装: KYBERION_MANIFEST_SIGNING_KEY 設定で fail-closed)                                                                                                                                                                                                                                                                                                                                           |
 | SA-05 | PARTIAL | policyEngine の操作種別拡張、secure-io parse失敗 fail-open 解消、-y 破壊操作除外                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | OP-01 | PARTIAL | usage 計測の全経路接続、cost report、spend-guard、KPI 接続                                                                                                                                                                                                                                                                                                                                                                                                                                                |
@@ -33,22 +33,22 @@
 
 ### IP(コード品質)
 
-| ID    | 状態    | 残作業(PARTIAL/TODO のみ)                                                                      |
-| ----- | ------- | ---------------------------------------------------------------------------------------------- |
-| IP-01 | DONE    |                                                                                                |
-| IP-02 | DONE    |                                                                                                |
-| IP-03 | DONE    |                                                                                                |
-| IP-04 | PARTIAL | schemas/ 直下 \*-pipeline.schema.json 11本の二重定義整理                                       |
-| IP-05 | DONE    |                                                                                                |
-| IP-06 | DONE    |                                                                                                |
-| IP-07 | PARTIAL | claude-agent-reasoning-backend テスト、orchestrator 特性化、operator-learning テスト           |
-| IP-08 | PARTIAL | installProcessGuards 全デーモン適用、空 catch 解消、no-empty/process.exit lint、console→logger |
-| IP-09 | PARTIAL | slugify ローカル定義5箇所の正本 import 化、再発防止 lint                                       |
-| IP-10 | TODO    | 巨大5+2ファイルの分割(check_contract_schemas 5191行、MissionIntelligence 5526行 ほか)          |
-| IP-11 | PARTIAL | strict 系フラグ有効化、@ts-ignore 残6、media-actuator any 半減                                 |
-| IP-12 | DONE    |                                                                                                |
-| IP-13 | DONE    |                                                                                                |
-| IP-14 | DONE    |                                                                                                |
+| ID    | 状態    | 残作業(PARTIAL/TODO のみ)                                                                                |
+| ----- | ------- | -------------------------------------------------------------------------------------------------------- |
+| IP-01 | DONE    |                                                                                                          |
+| IP-02 | DONE    |                                                                                                          |
+| IP-03 | DONE    |                                                                                                          |
+| IP-04 | PARTIAL | schemas/ 直下 \*-pipeline.schema.json 11本の二重定義整理                                                 |
+| IP-05 | DONE    |                                                                                                          |
+| IP-06 | DONE    |                                                                                                          |
+| IP-07 | PARTIAL | 2026-07-11 突合: backend/orchestrator/operator-learning のテストは実在し緑。残: 受入条件全体との網羅精査 |
+| IP-08 | PARTIAL | installProcessGuards 全デーモン適用、空 catch 解消、no-empty/process.exit lint、console→logger           |
+| IP-09 | PARTIAL | slugify ローカル定義5箇所の正本 import 化、再発防止 lint                                                 |
+| IP-10 | TODO    | 巨大5+2ファイルの分割(check_contract_schemas 5191行、MissionIntelligence 5526行 ほか)                    |
+| IP-11 | PARTIAL | strict 系フラグ有効化、@ts-ignore 残6、media-actuator any 半減                                           |
+| IP-12 | DONE    |                                                                                                          |
+| IP-13 | DONE    |                                                                                                          |
+| IP-14 | DONE    |                                                                                                          |
 
 ### UX(ユーザー接点)
 
@@ -105,13 +105,13 @@
 
 ### AA(エージェント間通信)
 
-| ID    | 状態    | 残作業                                                    |
-| ----- | ------- | --------------------------------------------------------- |
-| AA-01 | DONE    |                                                           |
-| AA-02 | TODO    | mesh_delivery_driver、writer fencing、2-peer E2E          |
-| AA-03 | PARTIAL | 署名モジュール+秘密永続化、warn→enforce、鍵運用文書       |
-| AA-04 | TODO    | 会話ストア、rehydrate、inflight admission                 |
-| AA-05 | PARTIAL | mission flow コマンド、file 版 transport の quarantine 化 |
+| ID    | 状態    | 残作業                                                                                     |
+| ----- | ------- | ------------------------------------------------------------------------------------------ |
+| AA-01 | DONE    |                                                                                            |
+| AA-02 | PARTIAL | 残: writer fencing、2-peer E2E(driver/dispatchToPeer は実装・テスト済み — 2026-07-11 突合) |
+| AA-03 | PARTIAL | 署名モジュール+秘密永続化、warn→enforce、鍵運用文書                                        |
+| AA-04 | TODO    | 会話ストア、rehydrate、inflight admission                                                  |
+| AA-05 | PARTIAL | mission flow コマンド、file 版 transport の quarantine 化                                  |
 
 ### AR(アクチュエータリファクタリング/使いやすさ)
 
