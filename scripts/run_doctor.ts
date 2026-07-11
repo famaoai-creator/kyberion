@@ -308,7 +308,7 @@ export async function collectDoctorReport(argv: {
   const governance = getGovernanceControlSummary();
   const envReport = validateEnv();
   const governanceLines = [
-    `Governance controls: kill_switch=${governance.kill_switch_monitoring ? 'armed' : 'idle'}; pending_approvals=${governance.pending_approvals}; approval_rules=${governance.approval_rules}; shell_rules=${governance.shell_allow_rules}/${governance.shell_deny_rules}; egress_mode=${governance.egress_mode}; egress_domains=${governance.egress_allowlist_domains}`,
+    `Governance controls: kill_switch=${governance.kill_switch_monitoring ? 'armed' : 'idle'}; policies=${governance.policy_engine_loaded}/${governance.policy_engine_declared}${governance.policy_engine_declared > governance.policy_engine_loaded ? ' (DROPPED — check agent-policies.yaml)' : ''}; pending_approvals=${governance.pending_approvals}; approval_rules=${governance.approval_rules}; shell_rules=${governance.shell_allow_rules}/${governance.shell_deny_rules}; egress_mode=${governance.egress_mode}; egress_domains=${governance.egress_allowlist_domains}; anomalies=${governance.anomaly_agents.length}`,
     ...formatEnvValidationReport(envReport),
     collectSemanticSearchDoctorLine(),
   ];
