@@ -1,5 +1,6 @@
 import {
   attemptAutonomousRepair,
+  handleStepError,
   TraceContext,
   finalizeAndPersist,
   persistTrace,
@@ -62,7 +63,11 @@ function resolveExportKey(step: PipelineAdfStep, defaultKey: string): string {
   return String(step.params?.export_as ?? defaultKey);
 }
 
-type RunStepResult = { op: string; status: 'success' | 'failed' | 'skipped'; error?: string };
+type RunStepResult = {
+  op: string;
+  status: 'success' | 'failed' | 'skipped' | 'recovered';
+  error?: string;
+};
 
 function runTsFallbackPipeline(fallbackPath: string): ReturnType<typeof safeExecResult> {
   const fallbackEntry = pathResolver.rootResolve('scripts/run_pipeline.ts');
@@ -338,6 +343,8 @@ const moduleCache: Record<string, any> = {};
 
 interface RunStepsOptions {
   trace?: TraceContext;
+  /** Shared across nested runSteps calls so budgets count flattened steps. */
+  _budgetState?: { stepCount: number; startTime: number };
   _includeStack?: ReadonlySet<string>;
   pipelinePath?: string;
   _retryCount?: number;
@@ -682,7 +689,36 @@ export async function runSteps(
   const results: RunStepResult[] = [];
   const shellBin = 'bash';
   const rootDir = pathResolver.rootDir();
+  // AR-01: options.max_steps / timeout_ms were accepted by the schema but
+  // never enforced here. Enforce them (canonical-engine semantics) when the
+  // pipeline sets them explicitly; long-running pipelines without explicit
+  // budgets keep their unbounded behavior.
+  const budgetState =
+    opts._budgetState ?? (opts._budgetState = { stepCount: 0, startTime: Date.now() });
   for (const step of steps) {
+    budgetState.stepCount += 1;
+    const pipelineOptions = (ctx.__pipeline_options ?? {}) as {
+      max_steps?: unknown;
+      timeout_ms?: unknown;
+    };
+    const budgetMaxSteps = Number(pipelineOptions.max_steps);
+    const budgetTimeoutMs = Number(pipelineOptions.timeout_ms);
+    const budgetError =
+      Number.isFinite(budgetMaxSteps) &&
+      budgetMaxSteps > 0 &&
+      budgetState.stepCount > budgetMaxSteps
+        ? `[SAFETY_LIMIT] Exceeded maximum pipeline steps (${budgetMaxSteps})`
+        : Number.isFinite(budgetTimeoutMs) &&
+            budgetTimeoutMs > 0 &&
+            Date.now() - budgetState.startTime > budgetTimeoutMs
+          ? `[SAFETY_LIMIT] Pipeline execution timed out (${budgetTimeoutMs}ms)`
+          : undefined;
+    if (budgetError) {
+      logger.error(`  [SYS_PIPELINE] ${budgetError}`);
+      results.push({ op: step.op, status: 'failed', error: budgetError });
+      opts.trace?.addEvent('step.failed', { op: step.op, status: 'failed', error: budgetError });
+      return { status: 'failed', results, context: ctx };
+    }
     const stepNumber = results.length + 1;
     const stepStartedAtMs = Date.now();
     const stepPolicy = normalizeReasoningPolicy(step);
@@ -711,7 +747,7 @@ export async function runSteps(
     let currentNormalizedOp = step.op;
     const finishStepTrace = (
       eventName: string,
-      status: 'success' | 'failed' | 'skipped',
+      status: 'success' | 'failed' | 'skipped' | 'recovered',
       attributes: Record<string, string | number | boolean> = {}
     ): void => {
       opts.trace?.addEvent(eventName, {
@@ -1314,6 +1350,49 @@ export async function runSteps(
         stepSucceeded = true;
       } catch (err: any) {
         lastError = err;
+
+        // AR-01: step-level on_error (skip / abort / fallback) — same
+        // semantics as the canonical engine's native recovery path. Explicit
+        // author intent takes precedence over autonomous repair.
+        const stepOnError = (step as any).on_error;
+        if (stepOnError) {
+          try {
+            const recovery = await handleStepError(
+              err,
+              step,
+              stepOnError,
+              ctx,
+              async (fallbackSteps: any[], errCtx: any) => {
+                const nested = await runSteps(
+                  fallbackSteps as PipelineAdfStep[],
+                  errCtx as Record<string, unknown>,
+                  opts
+                );
+                results.push(...nested.results);
+                if (nested.status === 'failed') {
+                  throw new Error(
+                    nested.results.find((r) => r.status === 'failed')?.error ||
+                      'on_error fallback pipeline failed'
+                  );
+                }
+                return nested.context;
+              },
+              (val: any) => resolveVars(val, ctx)
+            );
+            if (recovery.recovered) {
+              ctx = recovery.ctx as Record<string, unknown>;
+              results.push({ op: currentNormalizedOp, status: 'recovered' });
+              finishStepTrace('step.recovered', 'recovered', { error: err.message });
+              opts.trace?.endSpan('error', err.message);
+              stepSucceeded = true;
+              stepSkipped = true;
+              break;
+            }
+          } catch (_recoveryErr) {
+            /* on_error recovery failed — fall through to autonomous repair */
+          }
+        }
+
         const failure = classifyError(err);
 
         // Don't repair if we already tried and the error message didn't change (prevents loops)
