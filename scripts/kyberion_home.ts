@@ -7,7 +7,11 @@
  * (inbox / approvals) is actionable in place; `ask` talks to the same brain
  * every other surface uses.
  */
-import { formatNextAction, getGovernanceControlSummary } from '@agent/core';
+import {
+  formatNextAction,
+  getGovernanceControlSummary,
+  resolveOperatorDisplayName,
+} from '@agent/core';
 import {
   acceptInboxEntryWithHumanReceipt,
   decideApprovalRequest,
@@ -156,7 +160,7 @@ function handleApprovalsSubcommand(argv: {
       storageChannel: request.storageChannel,
       requestId: request.id,
       decision: argv.approve ? 'approved' : 'rejected',
-      decidedBy: 'sovereign-user',
+      decidedBy: resolveOperatorDisplayName(),
       decidedByRole: 'sovereign',
       authMethod: 'manual',
       decidedByType: 'human',
