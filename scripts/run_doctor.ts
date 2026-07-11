@@ -13,6 +13,15 @@ import {
 } from '@agent/core';
 import { buildNextAction, formatNextAction } from '@agent/core';
 import { formatEnvValidationReport, validateEnv } from '@agent/core';
+import {
+  discoverProviders,
+  evaluateDegradation,
+  listDemotedProviders,
+  loadHealthThresholds,
+  metrics,
+  type EnvValidationReport,
+  type LatencyRegression,
+} from '@agent/core';
 import { probeAppleIntelligence } from '@agent/core';
 import { collectMissionHygieneReport, formatMissionHygieneLine } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
@@ -36,6 +45,7 @@ const JANITOR_MAINTENANCE_TTL_MS = 24 * 60 * 60 * 1000;
 
 export interface DoctorRunReport {
   totalMissing: number;
+  rollupLines: string[];
   summaries: Array<{
     manifestId: string;
     lines: string[];
@@ -47,6 +57,59 @@ export interface DoctorRunReport {
   backupLines: string[];
   meshDeliveryLines: string[];
   localCapabilityLines: string[];
+}
+
+/**
+ * OP-04 Task 4 — single 🟢/🟡/🔴 health rollup with at most three reasons.
+ * Combines the degradation evaluation (Task 1, evaluation only — the hourly
+ * watch owns alerting), manifest gaps, and env validation.
+ */
+export function collectHealthRollupLines(
+  totalMissing: number,
+  envReport: EnvValidationReport
+): string[] {
+  const reasons: string[] = [];
+  let verdict: 'green' | 'yellow' | 'red' = 'green';
+  const promote = (level: 'yellow' | 'red') => {
+    if (level === 'red' || verdict === 'red') verdict = level === 'red' ? 'red' : verdict;
+    else verdict = 'yellow';
+  };
+
+  try {
+    const thresholds = loadHealthThresholds();
+    const degradation = evaluateDegradation({
+      regressions: metrics.detectRegressions(
+        thresholds.regression_multiplier
+      ) as LatencyRegression[],
+      demotedProviders: listDemotedProviders(discoverProviders()),
+      thresholds,
+    });
+    if (degradation.verdict !== 'green') {
+      promote(degradation.verdict);
+      reasons.push(degradation.findings[0]?.detail ?? 'degradation findings present');
+    }
+  } catch (err) {
+    promote('yellow');
+    reasons.push(`degradation evaluation failed: ${err}`);
+  }
+
+  if (envReport.errors.length > 0) {
+    promote('red');
+    reasons.push(`${envReport.errors.length} required env variable(s) missing`);
+  }
+  if (totalMissing > 0) {
+    promote('yellow');
+    reasons.push(`${totalMissing} required capability(ies) missing`);
+  }
+
+  const icon = verdict === 'green' ? '🟢' : verdict === 'yellow' ? '🟡' : '🔴';
+  if (reasons.length === 0) {
+    return [`System health: ${icon} green — no degradation, env, or capability findings`];
+  }
+  return [
+    `System health: ${icon} ${verdict}`,
+    ...reasons.slice(0, 3).map((reason) => `  - ${reason}`),
+  ];
 }
 
 export function collectPipelineScheduleDoctorLines(): string[] {
@@ -223,13 +286,15 @@ export async function collectDoctorReport(argv: {
   }
 
   const governance = getGovernanceControlSummary();
+  const envReport = validateEnv();
   const governanceLines = [
     `Governance controls: kill_switch=${governance.kill_switch_monitoring ? 'armed' : 'idle'}; pending_approvals=${governance.pending_approvals}; approval_rules=${governance.approval_rules}; shell_rules=${governance.shell_allow_rules}/${governance.shell_deny_rules}; egress_mode=${governance.egress_mode}; egress_domains=${governance.egress_allowlist_domains}`,
-    ...formatEnvValidationReport(validateEnv()),
+    ...formatEnvValidationReport(envReport),
   ];
 
   return {
     totalMissing,
+    rollupLines: collectHealthRollupLines(totalMissing, envReport),
     summaries,
     scheduleLines: collectPipelineScheduleDoctorLines(),
     maintenanceLines: collectMaintenanceDoctorLines(),
@@ -278,6 +343,10 @@ async function main(): Promise<void> {
 
   const report = await collectDoctorReport(argv);
 
+  for (const line of report.rollupLines) {
+    console.log(line);
+  }
+  console.log('');
   for (const summary of report.summaries) {
     for (const line of summary.lines) {
       console.log(line);

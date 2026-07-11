@@ -1,0 +1,7 @@
+{
+  "version": "1.0.0",
+  "description": "OP-04 Task 1 degradation thresholds. Conservative starting values per the plan (observe warnings before tightening).",
+  "regression_multiplier": 1.5,
+  "red_regressions": 3,
+  "red_demoted_providers": 2
+}

@@ -1,0 +1,32 @@
+{
+  "action": "pipeline",
+  "name": "health-degradation-watch",
+  "version": "1.0.0",
+  "description": "Hourly degradation watch: latency regressions and provider demotions vs governed thresholds; escalates via ops-alert (OP-04 Task 1).",
+  "_refs": {
+    "plan": "docs/improvement-plans-2026-07/OP-04_HEALTH_DEGRADATION_MONITORING.ja.md",
+    "implementation": "scripts/health_degradation_watch.ts"
+  },
+  "schedule": {
+    "id": "health-degradation-watch-hourly",
+    "cron": "30 * * * *",
+    "timezone": "Asia/Tokyo",
+    "enabled": true
+  },
+  "steps": [
+    {
+      "id": "health_degradation_watch",
+      "role": "source",
+      "op": "system:exec",
+      "produces": {
+        "channel": "health_degradation_report",
+        "type": "CommandResult"
+      },
+      "params": {
+        "command": "node",
+        "args": ["--import", "./scripts/ts-loader.mjs", "scripts/health_degradation_watch.ts"],
+        "timeout_ms": 120000
+      }
+    }
+  ]
+}
