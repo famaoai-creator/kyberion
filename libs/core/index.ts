@@ -532,6 +532,7 @@ export * from './shell-command-policy.js';
 export * from './adf-guardrails.js';
 export * from './execution-bounds.js';
 export * from './intent-handoff.js';
+export * from './mesh-message-broker.js';
 export * from './mesh-delivery-driver.js';
 export * from './egress-policy.js';
 export * from './governance-status.js';
