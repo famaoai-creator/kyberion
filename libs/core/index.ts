@@ -184,6 +184,7 @@ export * from './approval-audit.js';
 export * from './org-chart.js';
 export * from './daemon-heartbeat.js';
 export * from './ops-alert.js';
+export * from './health-degradation.js';
 export * from './chain-integrity.js';
 
 // Classification & Knowledge
