@@ -9,7 +9,7 @@
 | 判定    | 件数 |
 | ------- | ---- |
 | DONE    | 38   |
-| PARTIAL | 51   |
+| PARTIAL | 53   |
 | TODO    | 0    |
 
 ## P0 残作業(プロダクション化のクリティカルパス)
@@ -165,11 +165,12 @@
 
 ### ONB(初回オンボーディング)
 
-| ID     | 状態    | 残作業                                                                                |
-| ------ | ------- | ------------------------------------------------------------------------------------- |
-| ONB-01 | DONE    |                                                                                       |
-| ONB-02 | DONE    | (2026-07-05 完了: Node 24 統一・floor probe・Playwright 非致命警告・正本リンク統一)   |
-| ONB-03 | PARTIAL | onboard:reset を追加。残: express、identity.example.json、vital-check の overlay 対応 |
+| ID     | 状態    | 残作業                                                                                                                                                                                         |
+| ------ | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ONB-01 | DONE    |                                                                                                                                                                                                |
+| ONB-02 | DONE    | (2026-07-05 完了: Node 24 統一・floor probe・Playwright 非致命警告・正本リンク統一)                                                                                                            |
+| ONB-03 | PARTIAL | onboard:reset を追加。残: express、identity.example.json、vital-check の overlay 対応                                                                                                          |
+| ONB-04 | PARTIAL | 2026-07-12 新設: `pnpm company:onboard`(dry-run / readiness / human owner / 初期 AI worker / 承認・予算境界 / first-work plan / CLI ドキュメント)実装済み。残: E2E-04 連結と受入条件の網羅突合 |
 
 ### SU(Surface UI)
 
@@ -197,10 +198,11 @@
 
 ### CO(Company OS)
 
-| ID    | 状態    | 残作業                                                                                                                                                |
-| ----- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| CO-01 | PARTIAL | 2026-07-11 突合: company.ts と vision-resolver.ts は実装・テスト済み。残: getGoldenRule のテナント対応精査                                            |
-| CO-02 | PARTIAL | 2026-07-11 突合: org-chart.ts + テスト実在・緑。残: カスタムロール作成フロー精査                                                                      |
-| CO-03 | PARTIAL | 2026-07-11 突合: financial-model.ts / okr-tracker.ts + テスト実在・緑。残: 経営判断への接続精査                                                       |
-| CO-04 | PARTIAL | 2026-07-11 突合: decision-rights.ts + テスト実在・緑。残: 承認ゲート統合精査                                                                          |
-| CO-05 | PARTIAL | 2026-07-11 突合: カタログに35テンプレート(採用/決算/調達/取締役会/資金調達を完備)+専用契約テスト緑(#490 の負検証はキー名誤り)。残: 受入条件の粒度精査 |
+| ID    | 状態    | 残作業                                                                                                                                                                                                                                                                      |
+| ----- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CO-01 | PARTIAL | 2026-07-11 突合: company.ts と vision-resolver.ts は実装・テスト済み。残: getGoldenRule のテナント対応精査                                                                                                                                                                  |
+| CO-02 | PARTIAL | 2026-07-11 突合: org-chart.ts + テスト実在・緑。残: カスタムロール作成フロー精査                                                                                                                                                                                            |
+| CO-03 | PARTIAL | 2026-07-11 突合: financial-model.ts / okr-tracker.ts + テスト実在・緑。残: 経営判断への接続精査                                                                                                                                                                             |
+| CO-04 | PARTIAL | 2026-07-11 突合: decision-rights.ts + テスト実在・緑。残: 承認ゲート統合精査                                                                                                                                                                                                |
+| CO-05 | PARTIAL | 2026-07-11 突合: カタログに35テンプレート(採用/決算/調達/取締役会/資金調達を完備)+専用契約テスト緑(#490 の負検証はキー名誤り)。残: 受入条件の粒度精査                                                                                                                       |
+| CO-06 | PARTIAL | 2026-07-12 新設・W0〜W5 実装済み(actor-neutral resource / human accountable owner / human-only approval / decision-rights human-final / usage ledger / workforce projection / acceptance→memory promotion guard)。残: 受入条件・成功指標(§8)との網羅突合と warning 期間運用 |

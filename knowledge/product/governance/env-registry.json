@@ -51,6 +51,14 @@
       "documented": false
     },
     {
+      "name": "KYBERION_AGENT_RING",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_AGENT_RUNTIME_SUPERVISOR_HOST",
       "category": "provider",
       "type": "string",
@@ -84,6 +92,14 @@
     },
     {
       "name": "KYBERION_AGENT_RUNTIME_SUPERVISOR_TRANSPORT",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_AGENT_TIER",
       "category": "runtime",
       "type": "string",
       "required": false,
@@ -560,6 +576,14 @@
     },
     {
       "name": "KYBERION_DEFAULT_LOCALE",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_DELEGATION_DEPTH",
       "category": "runtime",
       "type": "string",
       "required": false,
