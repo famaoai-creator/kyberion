@@ -54,6 +54,23 @@ export interface DependencyVulnerabilityScanResult {
   timestamp: string;
   scanned_packages: number;
   findings: DependencyVulnerabilityFinding[];
+  reevaluations: DeferReevaluation[];
+  unresolved_summary: UnresolvedSummary;
+}
+
+/** AO-02 Task 4 — a previously deferred finding whose conditions changed. */
+export interface DeferReevaluation {
+  package_name: string;
+  previous_decision: PatchDecision;
+  new_decision: PatchDecision;
+  trigger: 'decision_changed' | 'new_version_available' | 'severity_changed';
+  detail: string;
+}
+
+export interface UnresolvedSummary {
+  open: number;
+  deferred: number;
+  patched: number;
 }
 
 const DEFAULT_LEDGER_PATH = pathResolver.active('shared/runtime/vuln-ledger.jsonl');
@@ -203,6 +220,93 @@ function parseAuditJson(raw: string): AuditJson {
   return readJson<AuditJson>(raw, 'pnpm audit json');
 }
 
+interface PreviousLedgerState {
+  /** Latest scan finding per package (most recent scan snapshot wins). */
+  findings: Map<string, DependencyVulnerabilityFinding>;
+  /** Packages whose most recent patch_apply record confirmed a patch. */
+  patched: Set<string>;
+}
+
+export function readPreviousLedgerState(ledgerPath: string): PreviousLedgerState {
+  const state: PreviousLedgerState = { findings: new Map(), patched: new Set() };
+  if (!safeExistsSync(ledgerPath)) return state;
+  const lines = String(safeReadFile(ledgerPath, { encoding: 'utf8' }) || '')
+    .split('\n')
+    .filter((line) => line.trim().length > 0);
+  for (const line of lines) {
+    let record: Record<string, unknown>;
+    try {
+      record = JSON.parse(line) as Record<string, unknown>;
+    } catch {
+      continue;
+    }
+    if (Array.isArray(record.findings)) {
+      for (const finding of record.findings as DependencyVulnerabilityFinding[]) {
+        if (finding?.package_name) state.findings.set(finding.package_name, finding);
+      }
+      continue;
+    }
+    if (record.kind === 'patch_apply' && typeof record.package_name === 'string') {
+      if (record.status === 'patched') state.patched.add(record.package_name);
+      else state.patched.delete(record.package_name);
+    }
+  }
+  return state;
+}
+
+export function computeDeferReevaluations(
+  previous: PreviousLedgerState,
+  currentFindings: DependencyVulnerabilityFinding[]
+): DeferReevaluation[] {
+  const reevaluations: DeferReevaluation[] = [];
+  for (const finding of currentFindings) {
+    const before = previous.findings.get(finding.package_name);
+    if (!before || before.decision !== 'defer') continue;
+    if (finding.decision !== 'defer') {
+      reevaluations.push({
+        package_name: finding.package_name,
+        previous_decision: before.decision,
+        new_decision: finding.decision,
+        trigger: 'decision_changed',
+        detail: `Rubric decision moved from defer to ${finding.decision}`,
+      });
+    } else if (
+      finding.latest_version &&
+      before.latest_version &&
+      finding.latest_version !== before.latest_version
+    ) {
+      reevaluations.push({
+        package_name: finding.package_name,
+        previous_decision: before.decision,
+        new_decision: finding.decision,
+        trigger: 'new_version_available',
+        detail: `Fix candidate moved ${before.latest_version} → ${finding.latest_version}`,
+      });
+    } else if (finding.severity !== before.severity) {
+      reevaluations.push({
+        package_name: finding.package_name,
+        previous_decision: before.decision,
+        new_decision: finding.decision,
+        trigger: 'severity_changed',
+        detail: `Severity moved ${before.severity} → ${finding.severity}`,
+      });
+    }
+  }
+  return reevaluations;
+}
+
+function summarizeUnresolved(
+  findings: DependencyVulnerabilityFinding[],
+  previous: PreviousLedgerState
+): UnresolvedSummary {
+  const deferred = findings.filter((finding) => finding.decision === 'defer').length;
+  return {
+    open: findings.length - deferred,
+    deferred,
+    patched: previous.patched.size,
+  };
+}
+
 function parseOutdatedJson(raw: string): OutdatedJson {
   return readJson<OutdatedJson>(raw, 'pnpm outdated json');
 }
@@ -253,13 +357,21 @@ export function scanDependencyVulnerabilitiesFromInputs(input: {
     });
   }
 
+  const ledgerPath = input.ledgerPath || DEFAULT_LEDGER_PATH;
+  // Task 4: read the pre-scan state so deferred findings whose conditions
+  // changed (new fix version, severity move, rubric flip) surface instead of
+  // rotting silently in the ledger.
+  const previousState = readPreviousLedgerState(ledgerPath);
+  const reevaluations = computeDeferReevaluations(previousState, findings);
+
   const result: DependencyVulnerabilityScanResult = {
     timestamp: new Date().toISOString(),
     scanned_packages: Object.keys(audit.vulnerabilities || {}).length,
     findings,
+    reevaluations,
+    unresolved_summary: summarizeUnresolved(findings, previousState),
   };
 
-  const ledgerPath = input.ledgerPath || DEFAULT_LEDGER_PATH;
   safeMkdir(path.dirname(ledgerPath), { recursive: true });
   safeAppendFileSync(ledgerPath, `${JSON.stringify(result)}\n`);
   return result;
@@ -277,8 +389,19 @@ async function runScan(): Promise<number> {
   logger.info(
     `[vuln-scan] scanned ${result.scanned_packages} package(s), findings=${result.findings.length}`
   );
+  logger.info(
+    `[vuln-scan] unresolved: ${result.unresolved_summary.open} open, ` +
+      `${result.unresolved_summary.deferred} deferred, ` +
+      `${result.unresolved_summary.patched} patched to date`
+  );
   if (result.findings.length > 0) {
     logger.warn('[vuln-scan] findings appended to vuln ledger');
+  }
+  for (const reevaluation of result.reevaluations) {
+    logger.warn(
+      `[vuln-scan] deferred finding needs re-review: ${reevaluation.package_name} — ` +
+        `${reevaluation.trigger} (${reevaluation.detail})`
+    );
   }
   console.log(JSON.stringify(result, null, 2));
   return 0;

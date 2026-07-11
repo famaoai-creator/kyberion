@@ -57,6 +57,13 @@ describe('voice engine registry', () => {
     expect(engine.supports.artifact_formats).toEqual(['wav']);
   });
 
+  it('exposes the Gemini TTS engine metadata', () => {
+    const engine = getVoiceEngineRecord('gemini_tts');
+    expect(engine.engine_id).toBe('gemini_tts');
+    expect(engine.provider).toBe('gemini_api');
+    expect(engine.supports.artifact_formats).toEqual(['wav']);
+  });
+
   it('falls back to default when unknown engine id is requested', () => {
     const engine = resolveVoiceEngineForPlatform('unknown-engine', 'linux');
     expect(engine.engine_id).toBe('local_say');
@@ -86,7 +93,7 @@ describe('voice engine registry', () => {
             },
           },
         ],
-      }),
+      })
     );
     safeWriteFile(
       path.join(dir, 'open_voice_clone.json'),
@@ -109,7 +116,7 @@ describe('voice engine registry', () => {
             fallback_engine_id: 'local_say',
           },
         ],
-      }),
+      })
     );
 
     process.env.KYBERION_VOICE_ENGINE_REGISTRY_DIR = dir;
@@ -117,6 +124,9 @@ describe('voice engine registry', () => {
 
     const registry = getVoiceEngineRegistry();
     expect(registry.default_engine_id).toBe('local_say');
-    expect(registry.engines.map((engine) => engine.engine_id)).toEqual(['local_say', 'open_voice_clone']);
+    expect(registry.engines.map((engine) => engine.engine_id)).toEqual([
+      'local_say',
+      'open_voice_clone',
+    ]);
   });
 });
