@@ -12,6 +12,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { z } from 'zod';
 import { llmSemaphore } from './semaphore.js';
+import { metrics } from './metrics.js';
 import { resolveRuntimeModelId } from './runtime-model-defaults.js';
 import type {
   BranchForkInput,
@@ -336,20 +337,75 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
     this.effort = options.effort;
   }
 
+  /**
+   * OP-01 Task 1: the direct-SDK path was the biggest cost blind spot — it
+   * never recorded usage, so spend was invisible to the cost report and the
+   * spend guard. Every parse/create response now lands in metrics with
+   * tokens + model + mission attribution. Best-effort: metering must never
+   * fail the reasoning call.
+   */
+  private recordSdkUsage(
+    started: number,
+    status: 'success' | 'error',
+    model: unknown,
+    message?: {
+      usage?: {
+        input_tokens?: number;
+        output_tokens?: number;
+        cache_creation_input_tokens?: number;
+      };
+    }
+  ): void {
+    try {
+      const usage = message?.usage;
+      metrics.record('anthropic-sdk', Date.now() - started, status, {
+        model: String(model || this.model),
+        agent: 'anthropic-sdk',
+        mission_id: process.env.MISSION_ID || undefined,
+        ...(usage
+          ? {
+              usage: {
+                prompt_tokens: (usage.input_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0),
+                completion_tokens: usage.output_tokens ?? 0,
+              },
+            }
+          : {}),
+      });
+    } catch {
+      /* metering must never break reasoning */
+    }
+  }
+
   /** Semaphore-guarded wrapper around messages.parse — prevents concurrent 429s. */
-  private callParse(
+  private async callParse(
     params: Parameters<typeof this.client.messages.parse>[0]
-  ): ReturnType<typeof this.client.messages.parse> {
-    return llmSemaphore.run(() => this.client.messages.parse(params));
+  ): Promise<Awaited<ReturnType<typeof this.client.messages.parse>>> {
+    const started = Date.now();
+    try {
+      const result = await llmSemaphore.run(() => this.client.messages.parse(params));
+      this.recordSdkUsage(started, 'success', params.model, result);
+      return result;
+    } catch (err) {
+      this.recordSdkUsage(started, 'error', params.model);
+      throw err;
+    }
   }
 
   /** Semaphore-guarded wrapper around messages.create (non-streaming). */
-  private callCreate(
+  private async callCreate(
     params: Parameters<typeof this.client.messages.create>[0] & { stream?: false }
   ): Promise<Anthropic.Message> {
-    return llmSemaphore.run(
-      () => this.client.messages.create(params) as Promise<Anthropic.Message>
-    );
+    const started = Date.now();
+    try {
+      const result = await llmSemaphore.run(
+        () => this.client.messages.create(params) as Promise<Anthropic.Message>
+      );
+      this.recordSdkUsage(started, 'success', params.model, result);
+      return result;
+    } catch (err) {
+      this.recordSdkUsage(started, 'error', params.model);
+      throw err;
+    }
   }
 
   private thinkingConfig(effort?: AnthropicReasoningBackendOptions['effort']) {

@@ -8,8 +8,8 @@
 
 | 判定    | 件数 |
 | ------- | ---- |
-| DONE    | 35   |
-| PARTIAL | 54   |
+| DONE    | 36   |
+| PARTIAL | 53   |
 | TODO    | 0    |
 
 ## P0 残作業(プロダクション化のクリティカルパス)
@@ -19,7 +19,7 @@
 | IP-07 | PARTIAL | 2026-07-11 突合: claude-agent-reasoning-backend.test.ts(6件緑)と orchestrator の delegation/fastpath テストは実在し緑 — 旧記載の残作業は解消済み。残: 受入条件全体との網羅精査                                                                                                                                                                                                                                                                                                                            |
 | MO-01 | DONE    | 2026-07-06 完了: phaseSpec スキーマ(catalog v1.1.0)+タスク展開(plan-tasks/createMission)+3プロセステンプレート追加。worker イベント連鎖のフェーズ駆動化は計画どおり MO-02 に委譲                                                                                                                                                                                                                                                                                                                          |
 | MO-02 | PARTIAL | mission-gate-engine、新設ゲート共通化、planning/受入ゲート記録、受入 rework/owner 通知、exit/quality の修復ループ                                                                                                                                                                                                                                                                                                                                                                                         |
-| AA-02 | PARTIAL | 2026-07-11 突合: mesh-delivery-driver と mesh-hub-peer-messaging-adapter.dispatchToPeer は実装・テスト済み(旧 TODO 表記は陳腐化)。残: writer fencing、2-peer E2E                                                                                                                                                                                                                                                                                                                                          |
+| AA-02 | DONE    | 2026-07-11 完了: driver/dispatchToPeer/writer fencing に加え、2-peer E2E(実 HTTP+HMAC、正常配送・復帰再配送・dead-letter・dedup)を実装。物理2プロセス実証のみ E3 パイロットへ                                                                                                                                                                                                                                                                                                                             |
 | SA-02 | PARTIAL | execution-bounds.ts 抽出、SECURITY.md、warn→enforce 到達(environment manifest の HMAC 署名は 2026-07-11 実装: KYBERION_MANIFEST_SIGNING_KEY 設定で fail-closed)                                                                                                                                                                                                                                                                                                                                           |
 | SA-05 | PARTIAL | policyEngine の操作種別拡張、secure-io parse失敗 fail-open 解消、-y 破壊操作除外                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | OP-01 | PARTIAL | usage 計測の全経路接続、cost report、spend-guard、KPI 接続                                                                                                                                                                                                                                                                                                                                                                                                                                                |
@@ -108,7 +108,7 @@
 | ID    | 状態    | 残作業                                                                                             |
 | ----- | ------- | -------------------------------------------------------------------------------------------------- |
 | AA-01 | DONE    |                                                                                                    |
-| AA-02 | PARTIAL | 残: writer fencing、2-peer E2E(driver/dispatchToPeer は実装・テスト済み — 2026-07-11 突合)         |
+| AA-02 | DONE    | 2026-07-11 完了(2-peer E2E 含む。物理2プロセス実証は E3 パイロットへ)                              |
 | AA-03 | PARTIAL | 署名モジュール+秘密永続化、warn→enforce、鍵運用文書                                                |
 | AA-04 | PARTIAL | 2026-07-11 突合: a2a-conversation-store.ts(rehydrate 含む)+ テスト実在・緑。残: inflight admission |
 | AA-05 | PARTIAL | mission flow コマンド、file 版 transport の quarantine 化                                          |
@@ -126,23 +126,23 @@
 
 ### SA(セキュリティ・監査)
 
-| ID    | 状態    | 残作業                                                                                                       |
-| ----- | ------- | ------------------------------------------------------------------------------------------------------------ |
-| SA-01 | DONE    | (残: audit-continuity の --warn-only → enforce)                                                              |
-| SA-02 | PARTIAL | execution-bounds.ts 抽出、SECURITY.md、warn→enforce                                                          |
-| SA-03 | PARTIAL | 2026-07-11 突合: untrusted-content.ts + テスト実在(injection 検知含む、緑)。残: 汚染文脈ゲートの適用範囲精査 |
-| SA-04 | PARTIAL | tier 文脈付き egress ゲート、DNS リバインディング対策                                                        |
-| SA-05 | PARTIAL | policyEngine 操作種別拡張、secure-io fail-open 解消、-y 破壊操作除外                                         |
+| ID    | 状態    | 残作業                                                                                                                                                                                                                                                        |
+| ----- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| SA-01 | DONE    | (残: audit-continuity の --warn-only → enforce)                                                                                                                                                                                                               |
+| SA-02 | PARTIAL | execution-bounds.ts 抽出、SECURITY.md、warn→enforce                                                                                                                                                                                                           |
+| SA-03 | PARTIAL | 2026-07-11 突合: untrusted-content.ts + テスト実在(injection 検知含む、緑)。残: 汚染文脈ゲートの適用範囲精査                                                                                                                                                  |
+| SA-04 | PARTIAL | 2026-07-11: warn 判定の永続化(audit chain へ記録 — 従来は in-memory のみで観測期間のデータが消失していた)+ pnpm egress:report(hostname 別集計と enforce 到達判定)。データ蓄積後に mode: enforce へ。残: tier 文脈付き egress ゲート、DNS リバインディング対策 |
+| SA-05 | PARTIAL | policyEngine 操作種別拡張、secure-io fail-open 解消、-y 破壊操作除外                                                                                                                                                                                          |
 
 ### OP(運用・配布)
 
-| ID    | 状態    | 残作業                                                                                                                                                                                                                             |
-| ----- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| OP-01 | PARTIAL | 2026-07-11 突合: chronos /api/cost とモデルコストレジストリ(ops-alert.ts)は実在。残: usage 計測の全経路接続、spend-guard                                                                                                           |
-| OP-02 | DONE    | (残: 外部ボリューム定期運用の実績)                                                                                                                                                                                                 |
-| OP-03 | PARTIAL | bin フィールド+CLI、docker deploy サービス                                                                                                                                                                                         |
-| OP-04 | PARTIAL | 残: RSS/restart 履歴の拡張と soak 実証のみ(劣化検知ループ・hourly cron・doctor rollup・healthz/status API・provider-health 永続化は 2026-07-11 実装: runtime state ファイル + TTL 自然回復 + reload API、vitest 下は隔離必須)      |
-| OP-05 | PARTIAL | 2026-07-11: env-registry(228変数)+ check:env-registry(validate/CI)+ env-validator + doctor 配線 + env.example/CONFIGURATION.md 生成。残: 棚卸しの継続キュレーション(documented=false 211件)、baseline-check 接続、集中ローダー移行 |
+| ID    | 状態    | 残作業                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ----- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| OP-01 | PARTIAL | spend-guard は 2026-07-11 実装(spend-policy.json、warn 既定/block で SpendCapExceededError、reasoning failover 前段に配線、日次 dedupe アラート)。usage 計測も 2026-07-11 に全経路接続(anthropic SDK は実 usage、gemini/codex CLI は estimated 概算)。cost report CLI も 2026-07-11 実装(pnpm cost:report、mission/model/日別、sdk 実コスト優先、estimated 分離表示 — 実履歴で確認)。週次サマリ接続も 2026-07-11 実装(weekly-review pipeline に cost_report --last-days 7 ステップ、実走確認)。残: operator packet 表示、テナント override |
+| OP-02 | DONE    | (残: 外部ボリューム定期運用の実績)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| OP-03 | PARTIAL | bin フィールド+CLI、docker deploy サービス                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| OP-04 | PARTIAL | 残: RSS/restart 履歴の拡張と soak 実証のみ(劣化検知ループ・hourly cron・doctor rollup・healthz/status API・provider-health 永続化は 2026-07-11 実装: runtime state ファイル + TTL 自然回復 + reload API、vitest 下は隔離必須)                                                                                                                                                                                                                                                                                                              |
+| OP-05 | PARTIAL | 2026-07-11: env-registry(228変数)+ check:env-registry(validate/CI)+ env-validator + doctor 配線 + env.example/CONFIGURATION.md 生成。残: 棚卸しの継続キュレーション(documented=false 211件)、baseline-check 接続、集中ローダー移行                                                                                                                                                                                                                                                                                                         |
 
 ### AO(自律運用・保守)
 
