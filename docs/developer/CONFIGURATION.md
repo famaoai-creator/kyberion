@@ -1,0 +1,279 @@
+# Kyberion Configuration Surface
+
+> Generated from `knowledge/product/governance/env-registry.json` by `pnpm generate:env-registry` — do not edit by hand.
+> `pnpm check:env-registry` (part of `pnpm validate`) fails when code references an unregistered `KYBERION_*` variable.
+
+## What belongs where
+
+- **Environment variables**: secrets, environment-specific endpoints/paths, and feature flags. Validated at startup by `libs/core/env-validator.ts` (warn by default; missing required values are errors).
+- **Config files (`knowledge/product/**`)\*\*: policy thresholds (SA plans), model IDs (IP-13), catalogs and vocabularies. These need review, diffing, and schema validation — not per-host overrides.
+
+Copy [`env.example`](./env.example) to `.env` at the repo root for local overrides (the example is generated here because root dotfiles are write-protected by the policy engine).
+
+## secret (15)
+
+| Variable                              | Type   | Required | Description                                              |
+| ------------------------------------- | ------ | -------- | -------------------------------------------------------- |
+| `KYBERION_A2A_SECRET`                 | string | no       | _undocumented_                                           |
+| `KYBERION_API_TOKEN`                  | string | no       | Bearer token for authenticated surface/API requests.     |
+| `KYBERION_AUDIT_CHAIN_KEY`            | string | no       | _undocumented_                                           |
+| `KYBERION_LOCAL_LLM_KEY`              | string | no       | API key for the local LLM endpoint.                      |
+| `KYBERION_LOCALADMIN_TOKEN`           | string | no       | Bearer token for the chronos localadmin control surface. |
+| `KYBERION_MESH_SHARED_SECRET`         | string | no       | _undocumented_                                           |
+| `KYBERION_NEMOTRON_KEY`               | string | no       | _undocumented_                                           |
+| `KYBERION_OPENROUTER_KEY`             | string | no       | _undocumented_                                           |
+| `KYBERION_PEER_SHARED_SECRET`         | string | no       | _undocumented_                                           |
+| `KYBERION_REQUIRED_TOKEN`             | string | no       | _undocumented_                                           |
+| `KYBERION_SECRET_RESOLVER_COMMAND`    | string | no       | _undocumented_                                           |
+| `KYBERION_SECRET_RESOLVER_TIMEOUT_MS` | string | no       | _undocumented_                                           |
+| `KYBERION_SOVEREIGN_SECRET`           | string | no       | _undocumented_                                           |
+| `KYBERION_SUDO_KEY`                   | string | no       | _undocumented_                                           |
+| `KYBERION_TERMINAL_TOKEN`             | string | no       | _undocumented_                                           |
+
+## path (59)
+
+| Variable                                                         | Type | Required | Description                                                                        |
+| ---------------------------------------------------------------- | ---- | -------- | ---------------------------------------------------------------------------------- |
+| `KYBERION_AGENT_RUNTIME_SUPERVISOR_LOCK_PATH`                    | path | no       | _undocumented_                                                                     |
+| `KYBERION_AGENT_RUNTIME_SUPERVISOR_SOCKET_PATH`                  | path | no       | _undocumented_                                                                     |
+| `KYBERION_AGY_CLI_BIN`                                           | path | no       | _undocumented_                                                                     |
+| `KYBERION_AGY_CLI_LOG_FILE`                                      | path | no       | _undocumented_                                                                     |
+| `KYBERION_ANTIGRAVITY_CLI_BIN`                                   | path | no       | _undocumented_                                                                     |
+| `KYBERION_AUTONOMOUS_OPS_POLICY_PATH`                            | path | no       | _undocumented_                                                                     |
+| `KYBERION_CLAUDE_CLI_BIN`                                        | path | no       | Path override for the claude CLI binary.                                           |
+| `KYBERION_CODEX_CLI_BIN`                                         | path | no       | _undocumented_                                                                     |
+| `KYBERION_COMFY_OUTPUT_DIR`                                      | path | no       | _undocumented_                                                                     |
+| `KYBERION_CONFIDENTIAL_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH` | path | no       | _undocumented_                                                                     |
+| `KYBERION_CONTEXTUAL_INTENT_LEARNING_PATH`                       | path | no       | _undocumented_                                                                     |
+| `KYBERION_CONTEXTUAL_INTENT_MEMORY_PATH`                         | path | no       | _undocumented_                                                                     |
+| `KYBERION_DEPLOY_CONFIG_PATH`                                    | path | no       | _undocumented_                                                                     |
+| `KYBERION_EGRESS_POLICY_PATH`                                    | path | no       | _undocumented_                                                                     |
+| `KYBERION_GEMINI_CLI_BIN`                                        | path | no       | _undocumented_                                                                     |
+| `KYBERION_INTENT_CONTRACT_MEMORY_EXPORT_DIR`                     | path | no       | _undocumented_                                                                     |
+| `KYBERION_INTENT_CONTRACT_MEMORY_REPORT_PATH`                    | path | no       | _undocumented_                                                                     |
+| `KYBERION_INTENT_CONTRACT_MEMORY_RUNTIME_PATH`                   | path | no       | _undocumented_                                                                     |
+| `KYBERION_INTENT_CONTRACT_MEMORY_SCHEMA_PATH`                    | path | no       | _undocumented_                                                                     |
+| `KYBERION_INTENT_CONTRACT_MEMORY_SEED_PATH`                      | path | no       | _undocumented_                                                                     |
+| `KYBERION_KNOWLEDGE_ROOT`                                        | path | no       | _undocumented_                                                                     |
+| `KYBERION_MEDIA_BACKEND_REGISTRY_PATH`                           | path | no       | _undocumented_                                                                     |
+| `KYBERION_MEMORY_QUEUE_PATH`                                     | path | no       | _undocumented_                                                                     |
+| `KYBERION_MESH_HUB_OBSERVABILITY_ROOT`                           | path | no       | _undocumented_                                                                     |
+| `KYBERION_MESH_HUB_RUNTIME_ROOT`                                 | path | no       | _undocumented_                                                                     |
+| `KYBERION_OAUTH_CALLBACK_PATH`                                   | path | no       | _undocumented_                                                                     |
+| `KYBERION_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH`              | path | no       | _undocumented_                                                                     |
+| `KYBERION_PERSONAL_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH`     | path | no       | _undocumented_                                                                     |
+| `KYBERION_PERSONAL_PRESENTATION_PREFERENCE_REGISTRY_PATH`        | path | no       | _undocumented_                                                                     |
+| `KYBERION_PERSONAL_SURFACE_QUERY_CONFIG_PATH`                    | path | no       | _undocumented_                                                                     |
+| `KYBERION_PERSONAL_VOICE_PROFILE_REGISTRY_PATH`                  | path | no       | _undocumented_                                                                     |
+| `KYBERION_PRESENCE_AVATAR_PROFILES_PATH`                         | path | no       | _undocumented_                                                                     |
+| `KYBERION_PRESENTATION_PREFERENCE_REGISTRY_PATH`                 | path | no       | _undocumented_                                                                     |
+| `KYBERION_PYTHON`                                                | path | no       | Python interpreter override for python-backed bridges.                             |
+| `KYBERION_PYTHON_BIN`                                            | path | no       | Python interpreter path override (legacy alias of KYBERION_PYTHON call sites).     |
+| `KYBERION_ROOT`                                                  | path | no       | Repository root override for path resolution (defaults to the detected repo root). |
+| `KYBERION_SERVICE_ENDPOINTS_DIR`                                 | path | no       | _undocumented_                                                                     |
+| `KYBERION_SERVICE_ENDPOINTS_PATH`                                | path | no       | _undocumented_                                                                     |
+| `KYBERION_SERVICE_PRESETS_DIR`                                   | path | no       | _undocumented_                                                                     |
+| `KYBERION_SERVICE_RUNTIME_POLICY_PATH`                           | path | no       | _undocumented_                                                                     |
+| `KYBERION_SERVICE_RUNTIME_REGISTRY_PATH`                         | path | no       | _undocumented_                                                                     |
+| `KYBERION_SHELL_COMMAND_POLICY_PATH`                             | path | no       | _undocumented_                                                                     |
+| `KYBERION_SURFACE_QUERY_CONFIG_PATH`                             | path | no       | _undocumented_                                                                     |
+| `KYBERION_TASK_SCENARIO_DIR`                                     | path | no       | _undocumented_                                                                     |
+| `KYBERION_TENANT_DESIGN_ROOT`                                    | path | no       | _undocumented_                                                                     |
+| `KYBERION_TOOL_ACTUATOR_ROUTING_POLICY_PATH`                     | path | no       | _undocumented_                                                                     |
+| `KYBERION_TOOL_RUNTIME_POLICY_PATH`                              | path | no       | _undocumented_                                                                     |
+| `KYBERION_TOOL_RUNTIME_REGISTRY_PATH`                            | path | no       | _undocumented_                                                                     |
+| `KYBERION_VIDEO_COMPOSITION_TEMPLATE_REGISTRY_PATH`              | path | no       | _undocumented_                                                                     |
+| `KYBERION_VIDEO_RENDER_RUNTIME_POLICY_PATH`                      | path | no       | _undocumented_                                                                     |
+| `KYBERION_VOICE_BRIDGE_PATH`                                     | path | no       | _undocumented_                                                                     |
+| `KYBERION_VOICE_ENGINE_REGISTRY_DIR`                             | path | no       | _undocumented_                                                                     |
+| `KYBERION_VOICE_ENGINE_REGISTRY_PATH`                            | path | no       | _undocumented_                                                                     |
+| `KYBERION_VOICE_HUB_TTS_CONFIG_PATH`                             | path | no       | _undocumented_                                                                     |
+| `KYBERION_VOICE_OUTPUT_DIR`                                      | path | no       | _undocumented_                                                                     |
+| `KYBERION_VOICE_PROFILE_REGISTRY_DIR`                            | path | no       | _undocumented_                                                                     |
+| `KYBERION_VOICE_PROFILE_REGISTRY_PATH`                           | path | no       | _undocumented_                                                                     |
+| `KYBERION_VOICE_RUNTIME_POLICY_PATH`                             | path | no       | _undocumented_                                                                     |
+| `KYBERION_VOICE_SAMPLE_INGESTION_POLICY_PATH`                    | path | no       | _undocumented_                                                                     |
+
+## flag (10)
+
+| Variable                                           | Type    | Required | Description                                                                                                 |
+| -------------------------------------------------- | ------- | -------- | ----------------------------------------------------------------------------------------------------------- |
+| `KYBERION_ALLOW_FILE_SECRETS`                      | boolean | no       | Acknowledge the plaintext file-secret fallback when the OS keychain is unavailable (warn-phase; see AC-05). |
+| `KYBERION_ALLOW_LOCAL_NETWORK`                     | boolean | no       | _undocumented_                                                                                              |
+| `KYBERION_ALLOW_TEST_NOTIFICATIONS`                | boolean | no       | _undocumented_                                                                                              |
+| `KYBERION_ALLOW_UNAUTH_REMOTE`                     | boolean | no       | _undocumented_                                                                                              |
+| `KYBERION_ALLOW_UNSAFE_CLI`                        | boolean | no       | _undocumented_                                                                                              |
+| `KYBERION_ALLOW_UNSAFE_JS`                         | boolean | no       | _undocumented_                                                                                              |
+| `KYBERION_ALLOW_UNSAFE_SHELL`                      | boolean | no       | _undocumented_                                                                                              |
+| `KYBERION_DISABLE_AGENT_RUNTIME_SUPERVISOR_DAEMON` | boolean | no       | _undocumented_                                                                                              |
+| `KYBERION_DISABLE_EMBEDDINGS`                      | boolean | no       | _undocumented_                                                                                              |
+| `KYBERION_ENABLE_SERVICE_ACTUATE_TOOL`             | boolean | no       | _undocumented_                                                                                              |
+
+## tuning (27)
+
+| Variable                                   | Type   | Required | Description    |
+| ------------------------------------------ | ------ | -------- | -------------- |
+| `KYBERION_AGENT_BOOT_READY_TIMEOUT_MS`     | number | no       | _undocumented_ |
+| `KYBERION_AGENT_IDLE_TIMEOUT_MS`           | number | no       | _undocumented_ |
+| `KYBERION_AGENT_INFLIGHT_LIMIT`            | number | no       | _undocumented_ |
+| `KYBERION_AGENT_RUNTIME_SUPERVISOR_PORT`   | number | no       | _undocumented_ |
+| `KYBERION_AGENT_TURN_TIMEOUT_MS`           | number | no       | _undocumented_ |
+| `KYBERION_AGY_CLI_TIMEOUT_MS`              | number | no       | _undocumented_ |
+| `KYBERION_AUDIT_FORWARDER_TIMEOUT_MS`      | number | no       | _undocumented_ |
+| `KYBERION_CHRONOS_IDLE_TIMEOUT_MS`         | number | no       | _undocumented_ |
+| `KYBERION_CLAUDE_CLI_TIMEOUT_MS`           | number | no       | _undocumented_ |
+| `KYBERION_CODEX_CLI_TIMEOUT_MS`            | number | no       | _undocumented_ |
+| `KYBERION_DEPLOY_TIMEOUT_MS`               | number | no       | _undocumented_ |
+| `KYBERION_GEMINI_CLI_TIMEOUT`              | number | no       | _undocumented_ |
+| `KYBERION_GENERATION_SCHEDULE_INTERVAL_MS` | number | no       | _undocumented_ |
+| `KYBERION_GLOBAL_INFLIGHT_LIMIT`           | number | no       | _undocumented_ |
+| `KYBERION_KILL_SWITCH_INTERVAL_MS`         | number | no       | _undocumented_ |
+| `KYBERION_MFLUX_TIMEOUT_MS`                | number | no       | _undocumented_ |
+| `KYBERION_NEW_TIMEOUT_MS`                  | number | no       | _undocumented_ |
+| `KYBERION_OAUTH_CALLBACK_PORT`             | number | no       | _undocumented_ |
+| `KYBERION_PEER_PORT`                       | number | no       | _undocumented_ |
+| `KYBERION_PROVIDER_DEMOTION_TTL_MS`        | number | no       | _undocumented_ |
+| `KYBERION_PTY_IDLE_TIMEOUT_MS`             | number | no       | _undocumented_ |
+| `KYBERION_RUNTIME_SWEEP_INTERVAL_MS`       | number | no       | _undocumented_ |
+| `KYBERION_SMTP_PORT`                       | number | no       | _undocumented_ |
+| `KYBERION_STT_TIMEOUT_MS`                  | number | no       | _undocumented_ |
+| `KYBERION_TERMINAL_DISCONNECT_TIMEOUT_MS`  | number | no       | _undocumented_ |
+| `KYBERION_TERMINAL_SESSION_RETENTION_MS`   | number | no       | _undocumented_ |
+| `KYBERION_TIMEOUT_MS`                      | number | no       | _undocumented_ |
+
+## provider (42)
+
+| Variable                                  | Type   | Required | Description                                                                                                                                                                              |
+| ----------------------------------------- | ------ | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `KYBERION_A2UI_BRIDGE_URL`                | string | no       | _undocumented_                                                                                                                                                                           |
+| `KYBERION_AGENT_RUNTIME_SUPERVISOR_HOST`  | string | no       | _undocumented_                                                                                                                                                                           |
+| `KYBERION_AGY_CLI_MODEL`                  | string | no       | _undocumented_                                                                                                                                                                           |
+| `KYBERION_ANTHROPIC_FAST_MODEL`           | string | no       | _undocumented_                                                                                                                                                                           |
+| `KYBERION_ANTHROPIC_MODEL`                | string | no       | _undocumented_                                                                                                                                                                           |
+| `KYBERION_AUDIO_RECORD_COMMAND`           | string | no       | _undocumented_                                                                                                                                                                           |
+| `KYBERION_AUDIT_FORWARDER_COMMAND`        | string | no       | _undocumented_                                                                                                                                                                           |
+| `KYBERION_AUDIT_FORWARDER_URL`            | string | no       | _undocumented_                                                                                                                                                                           |
+| `KYBERION_CLAUDE_CLI_MODEL`               | string | no       | _undocumented_                                                                                                                                                                           |
+| `KYBERION_CLAUDE_FAST_MODEL`              | string | no       | _undocumented_                                                                                                                                                                           |
+| `KYBERION_CLAUDE_MODEL`                   | string | no       | _undocumented_                                                                                                                                                                           |
+| `KYBERION_CODEX_CLI_MODEL`                | string | no       | _undocumented_                                                                                                                                                                           |
+| `KYBERION_CODEX_MODEL`                    | string | no       | _undocumented_                                                                                                                                                                           |
+| `KYBERION_CODEX_MODEL_PROVIDER`           | string | no       | _undocumented_                                                                                                                                                                           |
+| `KYBERION_COMFY_BASE_URL`                 | string | no       | _undocumented_                                                                                                                                                                           |
+| `KYBERION_COPILOT_MODEL`                  | string | no       | _undocumented_                                                                                                                                                                           |
+| `KYBERION_DEPLOY_COMMAND`                 | string | no       | _undocumented_                                                                                                                                                                           |
+| `KYBERION_GEMINI_CLI_MODEL`               | string | no       | _undocumented_                                                                                                                                                                           |
+| `KYBERION_GEMINI_FAST_MODEL`              | string | no       | _undocumented_                                                                                                                                                                           |
+| `KYBERION_GEMINI_MODEL`                   | string | no       | _undocumented_                                                                                                                                                                           |
+| `KYBERION_INTENT_COMPILER_MODEL`          | string | no       | _undocumented_                                                                                                                                                                           |
+| `KYBERION_INTENT_COMPILER_MODEL_PROVIDER` | string | no       | _undocumented_                                                                                                                                                                           |
+| `KYBERION_INTENT_COMPILER_PROVIDER`       | string | no       | _undocumented_                                                                                                                                                                           |
+| `KYBERION_LOCAL_LLM_MODEL`                | string | no       | Model id for the local LLM endpoint.                                                                                                                                                     |
+| `KYBERION_LOCAL_LLM_URL`                  | string | no       | Base URL of a local OpenAI-compatible LLM endpoint.                                                                                                                                      |
+| `KYBERION_MFLUX_MODEL`                    | string | no       | _undocumented_                                                                                                                                                                           |
+| `KYBERION_MLX_EMBED_MODEL`                | string | no       | _undocumented_                                                                                                                                                                           |
+| `KYBERION_NEMOTRON_MODEL`                 | string | no       | _undocumented_                                                                                                                                                                           |
+| `KYBERION_NEMOTRON_URL`                   | string | no       | _undocumented_                                                                                                                                                                           |
+| `KYBERION_OAUTH_CALLBACK_HOST`            | string | no       | _undocumented_                                                                                                                                                                           |
+| `KYBERION_OPENAI_MODEL`                   | string | no       | _undocumented_                                                                                                                                                                           |
+| `KYBERION_OPENAI_VISION_MODEL`            | string | no       | _undocumented_                                                                                                                                                                           |
+| `KYBERION_OPENROUTER_MODEL`               | string | no       | _undocumented_                                                                                                                                                                           |
+| `KYBERION_OPENROUTER_URL`                 | string | no       | _undocumented_                                                                                                                                                                           |
+| `KYBERION_OPS_ALERT_WEBHOOK_URL`          | string | no       | _undocumented_                                                                                                                                                                           |
+| `KYBERION_PEER_HOST`                      | string | no       | _undocumented_                                                                                                                                                                           |
+| `KYBERION_REASONING_BACKEND`              | string | no       | Reasoning backend selector. Common values: claude-cli (local claude CLI, no API key), anthropic (ANTHROPIC_API_KEY), codex-cli, gemini-cli, agy-cli, stub (offline/deterministic tests). |
+| `KYBERION_REASONING_MODEL`                | string | no       | _undocumented_                                                                                                                                                                           |
+| `KYBERION_SMTP_HOST`                      | string | no       | _undocumented_                                                                                                                                                                           |
+| `KYBERION_STT_COMMAND`                    | string | no       | Speech-to-text bridge command override.                                                                                                                                                  |
+| `KYBERION_TERMINAL_HOST`                  | string | no       | _undocumented_                                                                                                                                                                           |
+| `KYBERION_TTS_COMMAND`                    | string | no       | _undocumented_                                                                                                                                                                           |
+
+## runtime (85)
+
+| Variable                                      | Type   | Required | Description                                                                                             |
+| --------------------------------------------- | ------ | -------- | ------------------------------------------------------------------------------------------------------- |
+| `KYBERION_A`                                  | string | no       | _undocumented_                                                                                          |
+| `KYBERION_AGENT_RUNTIME_SUPERVISOR_TRANSPORT` | string | no       | _undocumented_                                                                                          |
+| `KYBERION_AGY_SANDBOX`                        | string | no       | _undocumented_                                                                                          |
+| `KYBERION_APPLE_FM`                           | string | no       | _undocumented_                                                                                          |
+| `KYBERION_APPLE_FM_SAMPLE_AUDIO`              | string | no       | _undocumented_                                                                                          |
+| `KYBERION_AUDIO_BUS`                          | string | no       | _undocumented_                                                                                          |
+| `KYBERION_AUDIT_CONTINUITY_ENFORCE`           | string | no       | _undocumented_                                                                                          |
+| `KYBERION_AUDIT_FORWARDER`                    | string | no       | _undocumented_                                                                                          |
+| `KYBERION_AUDIT_FORWARDER_HEADERS`            | string | no       | _undocumented_                                                                                          |
+| `KYBERION_BACKUP_PASSPHRASE`                  | string | no       | _undocumented_                                                                                          |
+| `KYBERION_BEST_OF_N`                          | string | no       | _undocumented_                                                                                          |
+| `KYBERION_BLACKHOLE_SCRIPT`                   | string | no       | _undocumented_                                                                                          |
+| `KYBERION_BRAND_FONT_STACK`                   | string | no       | _undocumented_                                                                                          |
+| `KYBERION_BRAND_MONO_STACK`                   | string | no       | _undocumented_                                                                                          |
+| `KYBERION_CLAUDE_AGENT_TOOLS`                 | string | no       | _undocumented_                                                                                          |
+| `KYBERION_CLAUDE_CLI_EXTRA_ARGS`              | string | no       | _undocumented_                                                                                          |
+| `KYBERION_CODEX_APPROVAL`                     | string | no       | _undocumented_                                                                                          |
+| `KYBERION_CODEX_CLI_EXTRA_ARGS`               | string | no       | _undocumented_                                                                                          |
+| `KYBERION_CODEX_INSTANCES`                    | string | no       | _undocumented_                                                                                          |
+| `KYBERION_CODEX_MODE`                         | string | no       | _undocumented_                                                                                          |
+| `KYBERION_CUSTOMER`                           | string | no       | Active customer profile slug used to resolve the profile root.                                          |
+| `KYBERION_DEFAULT_LOCALE`                     | string | no       | _undocumented_                                                                                          |
+| `KYBERION_DEPLOY_PROJECT`                     | string | no       | _undocumented_                                                                                          |
+| `KYBERION_DEPLOYMENT_PROJECT`                 | string | no       | _undocumented_                                                                                          |
+| `KYBERION_DISPATCH_MAX_ROUNDS`                | string | no       | _undocumented_                                                                                          |
+| `KYBERION_EGRESS_POLICY`                      | string | no       | _undocumented_                                                                                          |
+| `KYBERION_EMAIL_FROM`                         | string | no       | _undocumented_                                                                                          |
+| `KYBERION_FLAG`                               | string | no       | _undocumented_                                                                                          |
+| `KYBERION_FORMAT`                             | string | no       | _undocumented_                                                                                          |
+| `KYBERION_GOAL_LOOP_MAX_ROUNDS`               | string | no       | _undocumented_                                                                                          |
+| `KYBERION_IN_SESSION_SUBAGENT`                | string | no       | _undocumented_                                                                                          |
+| `KYBERION_INJECTION_SCOPE`                    | string | no       | _undocumented_                                                                                          |
+| `KYBERION_INJECTION_SUSPECTED`                | string | no       | _undocumented_                                                                                          |
+| `KYBERION_KEPT`                               | string | no       | _undocumented_                                                                                          |
+| `KYBERION_LLM_CONCURRENCY`                    | string | no       | _undocumented_                                                                                          |
+| `KYBERION_LOCALHOST_AUTOADMIN`                | string | no       | _undocumented_                                                                                          |
+| `KYBERION_MEMORY_AUTOPROMOTE`                 | string | no       | _undocumented_                                                                                          |
+| `KYBERION_MESH_PEER_ID`                       | string | no       | _undocumented_                                                                                          |
+| `KYBERION_MFLUX_PACKAGE`                      | string | no       | _undocumented_                                                                                          |
+| `KYBERION_MFLUX_QUANTIZE`                     | string | no       | _undocumented_                                                                                          |
+| `KYBERION_MFLUX_SEED`                         | string | no       | _undocumented_                                                                                          |
+| `KYBERION_MFLUX_STEPS`                        | string | no       | _undocumented_                                                                                          |
+| `KYBERION_MOBILE_TOOLCHAIN`                   | string | no       | _undocumented_                                                                                          |
+| `KYBERION_MODE`                               | string | no       | _undocumented_                                                                                          |
+| `KYBERION_MYSTERY`                            | string | no       | _undocumented_                                                                                          |
+| `KYBERION_OAUTH_SERVICE_ID`                   | string | no       | _undocumented_                                                                                          |
+| `KYBERION_ONBOARDING_NON_INTERACTIVE_OK`      | string | no       | _undocumented_                                                                                          |
+| `KYBERION_PEER_NETWORK_CATALOG`               | string | no       | _undocumented_                                                                                          |
+| `KYBERION_PERSONA`                            | string | no       | Active persona for the policy engine (set by withExecutionContext; rarely set manually).                |
+| `KYBERION_PIPELINE_FALLBACK_ACTIVE`           | string | no       | _undocumented_                                                                                          |
+| `KYBERION_PROJECT_NAME`                       | string | no       | _undocumented_                                                                                          |
+| `KYBERION_PROVIDER_DISCOVERY_REFRESH`         | string | no       | _undocumented_                                                                                          |
+| `KYBERION_PROVIDER_PRIORITY`                  | string | no       | _undocumented_                                                                                          |
+| `KYBERION_REMINDER_CC_AFTER_N`                | string | no       | _undocumented_                                                                                          |
+| `KYBERION_REMOVED`                            | string | no       | _undocumented_                                                                                          |
+| `KYBERION_RESTRICTED_ACTIONS_POLICY`          | string | no       | _undocumented_                                                                                          |
+| `KYBERION_RESTRICTED_APPROVED_ITEMS`          | string | no       | _undocumented_                                                                                          |
+| `KYBERION_SMTP_PASS`                          | string | no       | _undocumented_                                                                                          |
+| `KYBERION_SMTP_USER`                          | string | no       | _undocumented_                                                                                          |
+| `KYBERION_SOMETHING_ELSE`                     | string | no       | _undocumented_                                                                                          |
+| `KYBERION_SPEAKER_FAIRNESS_MUST_THRESHOLD`    | string | no       | _undocumented_                                                                                          |
+| `KYBERION_SPEAKER_FAIRNESS_TOTAL_THRESHOLD`   | string | no       | _undocumented_                                                                                          |
+| `KYBERION_STREAMING_STT_BRIDGE`               | string | no       | _undocumented_                                                                                          |
+| `KYBERION_STREAMING_TTS_BRIDGE`               | string | no       | _undocumented_                                                                                          |
+| `KYBERION_STT_ARGS`                           | string | no       | _undocumented_                                                                                          |
+| `KYBERION_SUDO`                               | string | no       | Authority escalation switch consumed by the policy engine; use only for explicitly approved operations. |
+| `KYBERION_SUDO_SCOPE`                         | string | no       | Path scope restriction for KYBERION_SUDO escalation.                                                    |
+| `KYBERION_SURFACE_QUERY_PHASE`                | string | no       | _undocumented_                                                                                          |
+| `KYBERION_SURFACE_QUERY_ROLE`                 | string | no       | _undocumented_                                                                                          |
+| `KYBERION_TASK_MODEL_ROUTING`                 | string | no       | _undocumented_                                                                                          |
+| `KYBERION_TELEMETRY`                          | string | no       | _undocumented_                                                                                          |
+| `KYBERION_TENANT`                             | string | no       | Active tenant slug for tenant-scoped writes and branding.                                               |
+| `KYBERION_TERMINAL_ALLOW_REMOTE`              | string | no       | _undocumented_                                                                                          |
+| `KYBERION_TERMINAL_RESTORE_RUNTIME`           | string | no       | _undocumented_                                                                                          |
+| `KYBERION_TEST_MISSING_ENV`                   | string | no       | _undocumented_                                                                                          |
+| `KYBERION_TTS_ARGS`                           | string | no       | _undocumented_                                                                                          |
+| `KYBERION_UI_LOCALE`                          | string | no       | _undocumented_                                                                                          |
+| `KYBERION_VIDEO_RENDER_RUN_MODE`              | string | no       | _undocumented_                                                                                          |
+| `KYBERION_VOICE_LANGUAGE`                     | string | no       | _undocumented_                                                                                          |
+| `KYBERION_VOICE_PLAY_BLACKHOLE`               | string | no       | _undocumented_                                                                                          |
+| `KYBERION_VOICE_PROFILE_ID`                   | string | no       | _undocumented_                                                                                          |
+| `KYBERION_VOICE_TIER`                         | string | no       | _undocumented_                                                                                          |
+| `KYBERION_VOICE_UPGRADE_ALIAS`                | string | no       | _undocumented_                                                                                          |
+| `KYBERION_WISDOM_LLM_PROFILE`                 | string | no       | _undocumented_                                                                                          |
+| `KYBERION_WORK_COORDINATION_NAMESPACE`        | string | no       | _undocumented_                                                                                          |
