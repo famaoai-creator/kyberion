@@ -194,7 +194,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_TERMINAL_HOST`                  | string | no       | _undocumented_                                                                                                                                                                           |
 | `KYBERION_TTS_COMMAND`                    | string | no       | _undocumented_                                                                                                                                                                           |
 
-## runtime (89)
+## runtime (90)
 
 | Variable                                      | Type   | Required | Description                                                                                             |
 | --------------------------------------------- | ------ | -------- | ------------------------------------------------------------------------------------------------------- |
@@ -251,6 +251,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_ONBOARDING_NON_INTERACTIVE_OK`      | string | no       | _undocumented_                                                                                          |
 | `KYBERION_PEER_NETWORK_CATALOG`               | string | no       | _undocumented_                                                                                          |
 | `KYBERION_PERSONA`                            | string | no       | Active persona for the policy engine (set by withExecutionContext; rarely set manually).                |
+| `KYBERION_PHASE_GATE_MODE`                    | string | no       | _undocumented_                                                                                          |
 | `KYBERION_PIPELINE_FALLBACK_ACTIVE`           | string | no       | _undocumented_                                                                                          |
 | `KYBERION_PROJECT_NAME`                       | string | no       | _undocumented_                                                                                          |
 | `KYBERION_PROVIDER_DISCOVERY_REFRESH`         | string | no       | _undocumented_                                                                                          |

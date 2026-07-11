@@ -18,7 +18,7 @@
 | ----- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | IP-07 | PARTIAL | 2026-07-11 突合: claude-agent-reasoning-backend.test.ts(6件緑)と orchestrator の delegation/fastpath テストは実在し緑 — 旧記載の残作業は解消済み。残: 受入条件全体との網羅精査                                                                                                                                                                                                                                                                                                                            |
 | MO-01 | DONE    | 2026-07-06 完了: phaseSpec スキーマ(catalog v1.1.0)+タスク展開(plan-tasks/createMission)+3プロセステンプレート追加。worker イベント連鎖のフェーズ駆動化は計画どおり MO-02 に委譲                                                                                                                                                                                                                                                                                                                          |
-| MO-02 | PARTIAL | mission-gate-engine、新設ゲート共通化、planning/受入ゲート記録、受入 rework/owner 通知、exit/quality の修復ループ                                                                                                                                                                                                                                                                                                                                                                                         |
+| MO-02 | PARTIAL | 2026-07-12 再突合+実装: gate-engine/計画・受入ゲート/finish 修復ループ/override 記録は実装済みだった。フェーズ exit ゲートの実行時評価を新設(completion 前、既定 warn → KYBERION_PHASE_GATE_MODE=enforce でブロック、3回失敗で circuit breaker 通知)。残: warn 観測→enforce 昇格、human_override の署名強制、realign 自動再計画                                                                                                                                                                           |
 | AA-02 | DONE    | 2026-07-11 完了: driver/dispatchToPeer/writer fencing に加え、2-peer E2E(実 HTTP+HMAC、正常配送・復帰再配送・dead-letter・dedup)を実装。物理2プロセス実証のみ E3 パイロットへ                                                                                                                                                                                                                                                                                                                             |
 | SA-02 | DONE    | 2026-07-12 再突合: 「残」とされた3点は実装済みだった — execution-bounds.ts(system-actuator 移行済み)/ SECURITY.md「Shell & ADF Execution Guardrails」節 / enforce は全経路で既定(warn 段階を経ず fail-closed、KYBERION_SHELL_POLICY 変数は不要と判断され不存在)。受入条件5点をコード+19テスト緑で確認。HMAC 署名は 2026-07-11 実装済み                                                                                                                                                                    |
 | SA-05 | DONE    | 2026-07-12 完了: Task 2(dormant enforcement 2重バグ根治: YAML パーサ不全で全ポリシー無効 + `(?i)` 不発、発火文脈接続)/ Task 1(policy violation・actuator dispatch の kill-switch 供給。monitor 起動・graduated response・閾値外出しは実装済みを確認)/ Task 3.3(require_approval を requireApprovalForOp へ統一 — pending 承認リクエスト作成、承認後に再試行可)/ Task 4(統制サマリへ policies declared/loaded と anomalies 追加)。rapid-fire 閾値の実運用調整のみ trust-policy.json で運用対応             |
@@ -83,15 +83,15 @@
 
 ### MO(ミッション・オーケストレーション)
 
-| ID    | 状態    | 残作業                                                                                                                                               |
-| ----- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| MO-01 | DONE    | (worker イベント連鎖のフェーズ駆動化は MO-02 側で実施。gate-pass 機械評価・entry_gate deferral・deliverable_quality check は MO-01 側で先行実装済み) |
-| MO-02 | PARTIAL | mission-gate-engine、新設ゲート共通化、planning/受入ゲート記録、受入 rework/owner 通知、exit/quality の修復ループ                                    |
-| MO-03 | PARTIAL | mission-task-contract.schema.json + planner 出力検証+循環検出                                                                                        |
-| MO-04 | DONE    |                                                                                                                                                      |
-| MO-05 | DONE    | (軽微: 集計スクリプト)                                                                                                                               |
-| MO-06 | DONE    |                                                                                                                                                      |
-| MO-07 | PARTIAL | tier 昇格連動の再実行、media draft→refine                                                                                                            |
+| ID    | 状態    | 残作業                                                                                                                                                       |
+| ----- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| MO-01 | DONE    | (worker イベント連鎖のフェーズ駆動化は MO-02 側で実施。gate-pass 機械評価・entry_gate deferral・deliverable_quality check は MO-01 側で先行実装済み)         |
+| MO-02 | PARTIAL | 残: フェーズ exit ゲートの warn→enforce 昇格、human_override 署名強制、realign 自動再計画(exit ゲート実行時評価は 2026-07-12 実装、他は再突合で実装済み確認) |
+| MO-03 | PARTIAL | mission-task-contract.schema.json + planner 出力検証+循環検出                                                                                                |
+| MO-04 | DONE    |                                                                                                                                                              |
+| MO-05 | DONE    | (軽微: 集計スクリプト)                                                                                                                                       |
+| MO-06 | DONE    |                                                                                                                                                              |
+| MO-07 | PARTIAL | tier 昇格連動の再実行、media draft→refine                                                                                                                    |
 
 ### DS(デザインシステム)
 
