@@ -1,5 +1,11 @@
 # Kyberion Capabilities Guide
 
+> **Finding ops (AR-02)**: the authoritative op list is generated from each
+> actuator's `describeOps()` — browse `knowledge/product/orchestration/actuator-op-discovery.json`
+> for every op with kind and input schema, or `knowledge/product/governance/actuator-op-registry.json`
+> for the classification registry. `pnpm generate:op-registry` regenerates both;
+> `pnpm check:op-registry` fails CI on drift.
+
 Total Actuators: 30
 Last updated: 2026-07-11
 
