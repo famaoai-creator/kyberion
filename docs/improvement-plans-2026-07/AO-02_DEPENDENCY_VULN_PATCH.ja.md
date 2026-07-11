@@ -16,6 +16,9 @@
 - **完了済み(Task 1)**: `scripts/scan_dependency_vulns.ts` を新設し、`pnpm audit --json` / `pnpm outdated --json` の出力から CVE 候補を抽出して `active/shared/runtime/vuln-ledger.jsonl` に追記する経路を実装した。
 - **完了済み(Task 2)**: `libs/core/patch-decision.ts` を新設し、§3 の判断ルーブリックを `auto_apply | urgent_approval | scheduled | defer | approval` に落とし込んだ。
 - **進行中(Task 3)**: `pipelines/dependency-vuln-scan.json` と `pnpm vuln:scan` を追加し、定期スキャンを配線した。適用フローは未了。
+- **完了済み(Task 2 test, 2026-07-11)**: `libs/core/patch-decision.test.ts` を追加し、§3.3 の各象限(auto_apply / urgent_approval / defer / scheduled / approval fallback)と clamp 挙動、「apply risk が低域を超えたら auto_apply しない」性質を固定した。
+- **完了済み(Task 3 コア, 2026-07-11)**: `scripts/apply_dependency_patch.ts`(`pnpm patch:dependency`)を新設。既定は propose(warn 観測)で台帳記録のみ、`--apply` で §3.4 順(package.json バックアップ → 直接依存の bump → install/typecheck/smoke ゲート → audit 再スキャン → 緑で確定・赤でロールバック+approval エスカレーション)を実行する。透過依存は既定 refuse(approval へ)だが、明示 `--override` で pnpm.overrides 経由の同一フロー(backup→gate→再スキャン→確定/ロールバック)を実行できる(2026-07-11)。lockfile の書込は pnpm サブプロセスに限定し、ロールバックは package.json 復元 + 再 install。runner 注入によりモックで全経路をテスト済み(6件)。root `package.json` の書込は security-policy の ecosystem_architect persona に登録。残: カナリア(OP-04)。日次スケジュールは `pipelines/dependency-vuln-scan.json` の `schedule.cron`(JST 5:00)で配線済み(2026-07-11 手動実走で確認)。
+- **完了済み(Task 4, 2026-07-11)**: スキャン毎に台帳から前回状態を導出し、defer 済み項目の条件変化(ルーブリック判定の変化・新 fix バージョン・severity 変化)を `reevaluations` として検出・警告する。`unresolved_summary`(open/deferred/patched)を毎スキャン出力し、無音放置を防ぐ。
 
 ## ゴール(受入条件)
 
