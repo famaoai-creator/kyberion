@@ -1,12 +1,24 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback, PointerEvent as ReactPointerEvent } from 'react';
+import {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useMemo,
+  PointerEvent as ReactPointerEvent,
+} from 'react';
 import { Send, Loader2, MessageSquare, Mic, MicOff, GripHorizontal } from 'lucide-react';
 import { chronosSpeechLocale, uxText } from '../lib/ux-vocabulary';
 import { buildUserFacingError } from '../lib/user-facing-error';
 import { useChronosLocale } from '../lib/hooks';
 
 const AGENT_URL = '/api/agent';
+
+type ChatPhase = 'idle' | 'sending' | 'thinking' | 'long_running';
+
+const PHASE_THINKING_AFTER_MS = 1500;
+const PHASE_LONG_RUNNING_AFTER_MS = 12000;
 
 interface ChatMessage {
   id: string;
@@ -16,24 +28,44 @@ interface ChatMessage {
   status?: 'pending' | 'complete' | 'error';
 }
 
-const GUIDED_PROMPTS = [
-  {
-    label: 'Health',
-    query: 'Summarize system health and current blockers.',
-  },
-  {
-    label: 'Missions',
-    query: 'List the active missions and what needs attention.',
-  },
-  {
-    label: 'Traces',
-    query: 'Show the latest trace issues and what failed.',
-  },
-  {
-    label: 'Next step',
-    query: 'What should I do next to unblock delivery?',
-  },
-];
+const PANEL_VIEWPORT_MARGIN = 16;
+
+function buildGuidedPrompts(locale: Parameters<typeof uxText>[2]) {
+  return [
+    {
+      label: uxText('chronos_chat_prompt_health_label', 'Health', locale),
+      query: uxText(
+        'chronos_chat_prompt_health_query',
+        'Summarize system health and current blockers.',
+        locale
+      ),
+    },
+    {
+      label: uxText('chronos_chat_prompt_missions_label', 'Missions', locale),
+      query: uxText(
+        'chronos_chat_prompt_missions_query',
+        'List the active missions and what needs attention.',
+        locale
+      ),
+    },
+    {
+      label: uxText('chronos_chat_prompt_traces_label', 'Traces', locale),
+      query: uxText(
+        'chronos_chat_prompt_traces_query',
+        'Show the latest trace issues and what failed.',
+        locale
+      ),
+    },
+    {
+      label: uxText('chronos_chat_prompt_next_step_label', 'Next step', locale),
+      query: uxText(
+        'chronos_chat_prompt_next_step_query',
+        'What should I do next to unblock delivery?',
+        locale
+      ),
+    },
+  ];
+}
 
 export function SovereignChat({
   onA2UIMessage,
@@ -43,22 +75,66 @@ export function SovereignChat({
   onReady?: (sendFn: (query: string) => void) => void;
 }) {
   const locale = useChronosLocale();
+  const guidedPrompts = useMemo(() => buildGuidedPrompts(locale), [locale]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [phase, setPhase] = useState<ChatPhase>('idle');
   const [isOpen, setIsOpen] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [pos, setPos] = useState({ x: 0, y: 0 }); // offset from default bottom-right
+  const panelRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const phaseTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(
     null
   );
+
+  const clearPhaseTimers = useCallback(() => {
+    for (const timer of phaseTimersRef.current) clearTimeout(timer);
+    phaseTimersRef.current = [];
+  }, []);
+
+  // Abort the in-flight request when the component unmounts.
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+      for (const timer of phaseTimersRef.current) clearTimeout(timer);
+    };
+  }, []);
 
   const [isMounted, setIsMounted] = useState(false);
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  // Keep the panel fully inside the viewport: the panel is anchored at
+  // `bottom: 24 - pos.y` / `right: 24 - pos.x`, so the drag offset is clamped
+  // against the current window and panel size.
+  const clampOffset = useCallback((offset: { x: number; y: number }) => {
+    if (typeof window === 'undefined') return offset;
+    const width = panelRef.current?.offsetWidth ?? 420;
+    const height = panelRef.current?.offsetHeight ?? 520;
+    const minX = 24 - (window.innerWidth - PANEL_VIEWPORT_MARGIN - width);
+    const maxX = 24 - PANEL_VIEWPORT_MARGIN;
+    const minY = 24 - (window.innerHeight - PANEL_VIEWPORT_MARGIN - height);
+    const maxY = 24 - PANEL_VIEWPORT_MARGIN;
+    return {
+      x: Math.min(Math.max(offset.x, Math.min(minX, maxX)), maxX),
+      y: Math.min(Math.max(offset.y, Math.min(minY, maxY)), maxY),
+    };
+  }, []);
+
+  // Re-clamp when the window resizes (e.g. rotation) and when the panel opens.
+  useEffect(() => {
+    if (!isOpen) return;
+    const reclamp = () => setPos((prev) => clampOffset(prev));
+    reclamp();
+    window.addEventListener('resize', reclamp);
+    return () => window.removeEventListener('resize', reclamp);
+  }, [isOpen, clampOffset]);
 
   // --- Drag to move ---
   const onDragStart = useCallback(
@@ -69,12 +145,15 @@ export function SovereignChat({
     [pos]
   );
 
-  const onDragMove = useCallback((e: ReactPointerEvent) => {
-    if (!dragRef.current) return;
-    const dx = e.clientX - dragRef.current.startX;
-    const dy = e.clientY - dragRef.current.startY;
-    setPos({ x: dragRef.current.origX + dx, y: dragRef.current.origY + dy });
-  }, []);
+  const onDragMove = useCallback(
+    (e: ReactPointerEvent) => {
+      if (!dragRef.current) return;
+      const dx = e.clientX - dragRef.current.startX;
+      const dy = e.clientY - dragRef.current.startY;
+      setPos(clampOffset({ x: dragRef.current.origX + dx, y: dragRef.current.origY + dy }));
+    },
+    [clampOffset]
+  );
 
   const onDragEnd = useCallback(() => {
     dragRef.current = null;
@@ -99,12 +178,21 @@ export function SovereignChat({
       setInput('');
       setIsLoading(true);
       setIsOpen(true);
+      setPhase('sending');
+      clearPhaseTimers();
+      phaseTimersRef.current = [
+        setTimeout(() => setPhase('thinking'), PHASE_THINKING_AFTER_MS),
+        setTimeout(() => setPhase('long_running'), PHASE_LONG_RUNNING_AFTER_MS),
+      ];
+      const controller = new AbortController();
+      abortRef.current = controller;
 
       try {
         const res = await fetch(AGENT_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ query, locale }),
+          signal: controller.signal,
         });
         const data = await res.json();
         const envelope = buildUserFacingError(
@@ -131,23 +219,43 @@ export function SovereignChat({
           }
         }
       } catch (err: any) {
-        const envelope = buildUserFacingError(err, { locale, surface: 'chronos' });
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: `err-${Date.now()}`,
-            role: 'agent',
-            content: `${envelope.title}: ${envelope.body} ${envelope.nextAction}`,
-            timestamp: new Date().toISOString(),
-            status: 'error',
-          },
-        ]);
+        if (err?.name === 'AbortError') {
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `cancelled-${Date.now()}`,
+              role: 'agent',
+              content: uxText('chronos_chat_cancelled', 'Request cancelled.', locale),
+              timestamp: new Date().toISOString(),
+              status: 'complete',
+            },
+          ]);
+        } else {
+          const envelope = buildUserFacingError(err, { locale, surface: 'chronos' });
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `err-${Date.now()}`,
+              role: 'agent',
+              content: `${envelope.title}: ${envelope.body} ${envelope.nextAction}`,
+              timestamp: new Date().toISOString(),
+              status: 'error',
+            },
+          ]);
+        }
       }
 
+      abortRef.current = null;
+      clearPhaseTimers();
+      setPhase('idle');
       setIsLoading(false);
     },
-    [isLoading, onA2UIMessage]
+    [isLoading, locale, onA2UIMessage, clearPhaseTimers]
   );
+
+  const cancelQuery = useCallback(() => {
+    abortRef.current?.abort();
+  }, []);
 
   // Expose sendQuery to parent via onReady
   useEffect(() => {
@@ -212,7 +320,8 @@ export function SovereignChat({
 
   return (
     <div
-      className="fixed w-[420px] h-[520px] kyberion-glass rounded-2xl border border-kyberion-warning/20 flex flex-col overflow-hidden z-50"
+      ref={panelRef}
+      className="fixed w-[min(420px,calc(100vw-2rem))] h-[min(520px,calc(100dvh-2rem))] kyberion-glass rounded-2xl border border-kyberion-warning/20 flex flex-col overflow-hidden z-50"
       style={{ bottom: `${24 - pos.y}px`, right: `${24 - pos.x}px` }}
     >
       {/* Header — drag handle */}
@@ -260,10 +369,10 @@ export function SovereignChat({
 
             <div className="space-y-3">
               <div className="px-2 text-[9px] uppercase tracking-widest text-white/30">
-                Guided prompts
+                {uxText('chronos_chat_guided_prompts', 'Guided prompts', locale)}
               </div>
               <div className="grid gap-2 sm:grid-cols-2">
-                {GUIDED_PROMPTS.map((hint) => (
+                {guidedPrompts.map((hint) => (
                   <button
                     key={hint.label}
                     type="button"
@@ -304,8 +413,28 @@ export function SovereignChat({
         ))}
         {isLoading && (
           <div className="flex justify-start">
-            <div className="px-3 py-2 bg-white/5 border border-white/5 rounded-xl">
+            <div className="flex items-center gap-2 px-3 py-2 bg-white/5 border border-white/5 rounded-xl">
               <Loader2 className="w-4 h-4 animate-spin opacity-40" />
+              <span className="text-[10px] text-white/45" role="status">
+                {phase === 'sending' &&
+                  uxText('chronos_chat_phase_sending', 'Sending request…', locale)}
+                {phase === 'thinking' &&
+                  uxText('chronos_chat_phase_thinking', 'Sovereign is thinking…', locale)}
+                {phase === 'long_running' &&
+                  uxText(
+                    'chronos_chat_phase_long_running',
+                    'Still working — long tasks can take a while.',
+                    locale
+                  )}
+              </span>
+              <button
+                type="button"
+                onClick={cancelQuery}
+                aria-label={uxText('chronos_chat_cancel', 'Cancel', locale)}
+                className="ml-1 text-[9px] uppercase tracking-widest text-white/40 hover:text-red-300 border border-white/10 hover:border-red-400/30 rounded px-1.5 py-0.5 transition"
+              >
+                {uxText('chronos_chat_cancel', 'Cancel', locale)}
+              </button>
             </div>
           </div>
         )}
