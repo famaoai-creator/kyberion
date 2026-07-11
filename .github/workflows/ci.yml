@@ -32,12 +32,15 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build project
+        run: pnpm run build
+
+      # After build: the checker imports @agent/core, which resolves to the
+      # package dist. Running it pre-build broke every main push since the
+      # step was introduced (ERR_MODULE_NOT_FOUND).
       - name: Check commit subject
         if: github.event_name == 'push'
         run: pnpm run check:commit-subject
-
-      - name: Build project
-        run: pnpm run build
 
       - name: Lint check
         run: pnpm run lint
