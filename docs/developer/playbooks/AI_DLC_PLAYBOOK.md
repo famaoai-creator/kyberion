@@ -67,11 +67,23 @@ _When things go wrong. If an unexpected error occurs during execution, trigger a
 
 ## 🛠 Skill Quick Reference
 
-| Skill                | Usage                                         | Purpose                          |
-| -------------------- | --------------------------------------------- | -------------------------------- |
-| **Codebase Mapper**  | `npm run cli -- run codebase-mapper`          | Visualize directory structure.   |
-| **Schema Inspector** | `npm run cli -- run schema-inspector`         | Read SQL/OpenAPI/Prisma schemas. |
-| **Test Genie**       | `npm run cli -- run test-genie`               | Run tests and capture output.    |
-| **Local Reviewer**   | `npm run cli -- run local-reviewer`           | Analyze staged git changes.      |
-| **Log Analyst**      | `npm run cli -- run log-analyst`              | Read last N lines of a log file. |
-| **Doc-to-Text**      | `npm run cli -- run doc-to-text`              | Read specs/docs (PDF/Office).    |
+| Skill                | Usage                                 | Purpose                          |
+| -------------------- | ------------------------------------- | -------------------------------- |
+| **Codebase Mapper**  | `npm run cli -- run codebase-mapper`  | Visualize directory structure.   |
+| **Schema Inspector** | `npm run cli -- run schema-inspector` | Read SQL/OpenAPI/Prisma schemas. |
+| **Test Genie**       | `npm run cli -- run test-genie`       | Run tests and capture output.    |
+| **Local Reviewer**   | `npm run cli -- run local-reviewer`   | Analyze staged git changes.      |
+| **Log Analyst**      | `npm run cli -- run log-analyst`      | Read last N lines of a log file. |
+| **Doc-to-Text**      | `npm run cli -- run doc-to-text`      | Read specs/docs (PDF/Office).    |
+
+## Automation Mapping (MO-01 / MO-02)
+
+This playbook's phase discipline is automated by the mission process templates and phase gates:
+
+| Playbook concept              | Automated by                                                                                                                                               |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Phase plan approval           | planning gate — `planning_packet` schema validation + independent plan review (mission-orchestration-worker)                                               |
+| "Run it before claiming done" | task acceptance gate — evidence existence + acceptance criteria + `task_result` schema                                                                     |
+| Adversarial verification      | reviewer tasks (`reviewer_approved` checks) resolved from NEXT_TASKS.json outcomes                                                                         |
+| Phase 4 circuit breaker       | phase exit gates before mission completion — `KYBERION_PHASE_GATE_MODE` (`warn` default → `enforce`); repeated failures raise a realignment recommendation |
+| Manual gate verdicts          | `gate-pass` / `gate-fail` mission-controller verbs, recorded as overrides under `missions/<id>/gates/`                                                     |
