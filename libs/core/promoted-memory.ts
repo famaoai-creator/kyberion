@@ -70,8 +70,21 @@ export type PromotedMemoryRecord =
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 const validatorCache = new Map<string, ValidateFunction>();
-const HINTS_PATH = pathResolver.knowledge('product/governance/HINTS.md');
-const HINTS_ARCHIVE_DIR = pathResolver.knowledge('product/hints/archive');
+// Test isolation (env override): the distill E2E rewrites HINTS.md, and a
+// parallel catalog-integrity test can observe the mid-test dirty state.
+// Overriding the paths lets tests run against a scratch copy.
+function resolveHintsPath(): string {
+  const override = process.env.KYBERION_HINTS_PATH;
+  return override
+    ? pathResolver.rootResolve(override)
+    : pathResolver.knowledge('product/governance/HINTS.md');
+}
+function resolveHintsArchiveDir(): string {
+  const override = process.env.KYBERION_HINTS_ARCHIVE_DIR;
+  return override
+    ? pathResolver.rootResolve(override)
+    : pathResolver.knowledge('product/hints/archive');
+}
 const HINTS_MARKER =
   '<!-- Distillation pipeline will append structured hint blocks below this line -->';
 const HINTS_MAX_SECTIONS = 50;
@@ -283,18 +296,19 @@ function splitHintsBlocks(raw: string): string[] {
 
 function buildHintsArchivePath(record: PromotedKnowledgeHintRecord): string {
   const stamp = record.created_at.replace(/[:.]/gu, '-');
-  return pathResolver.knowledge(`product/hints/archive/${stamp}-${record.record_id}.md`);
+  return `${resolveHintsArchiveDir()}/${stamp}-${record.record_id}.md`;
 }
 
 function archiveGovernanceHintBlocks(blocks: string[], record: PromotedKnowledgeHintRecord): void {
   if (blocks.length === 0) return;
   const archivePath = buildHintsArchivePath(record);
-  if (!safeExistsSync(HINTS_ARCHIVE_DIR)) safeMkdir(HINTS_ARCHIVE_DIR, { recursive: true });
+  if (!safeExistsSync(resolveHintsArchiveDir()))
+    safeMkdir(resolveHintsArchiveDir(), { recursive: true });
   const content = [
     '# Archived Operational Hints',
     '',
     `archived_at: ${record.created_at}`,
-    `source: ${HINTS_PATH}`,
+    `source: ${resolveHintsPath()}`,
     `archived_sections: ${blocks.length}`,
     '',
     ...blocks,
@@ -325,8 +339,8 @@ function buildLiveHintsDocument(existing: string, retainedBlocks: string[]): str
 
 function appendGovernanceHintRecord(record: PromotedKnowledgeHintRecord): void {
   const block = buildHintsBlock(record);
-  const existing = safeExistsSync(HINTS_PATH)
-    ? (safeReadFile(HINTS_PATH, { encoding: 'utf8' }) as string)
+  const existing = safeExistsSync(resolveHintsPath())
+    ? (safeReadFile(resolveHintsPath(), { encoding: 'utf8' }) as string)
     : [
         '# Operational Hints',
         '',
@@ -347,7 +361,7 @@ function appendGovernanceHintRecord(record: PromotedKnowledgeHintRecord): void {
   const retainedBlocks = overflowCount > 0 ? blocks.slice(overflowCount) : blocks;
 
   archiveGovernanceHintBlocks(overflowBlocks, record);
-  safeWriteFile(HINTS_PATH, buildLiveHintsDocument(existing, retainedBlocks));
+  safeWriteFile(resolveHintsPath(), buildLiveHintsDocument(existing, retainedBlocks));
 }
 
 function resolvePromotedRecordPath(ref: string): string | null {
