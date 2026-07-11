@@ -235,11 +235,25 @@ describe('surface-runtime-orchestrator fast-path', () => {
     });
     expect(result.text).toContain('Executed pipeline: baseline-check');
     expect(result.text).toContain('"kind": "execution-receipt"');
+    // IL-01: the interpreted goal rides along as a --context payload when
+    // the surface utterance is available.
     expect(mocks.safeExec).toHaveBeenCalledWith(
       'node',
-      ['dist/scripts/run_pipeline.js', '--input', 'pipelines/baseline-check.json'],
+      expect.arrayContaining([
+        'dist/scripts/run_pipeline.js',
+        '--input',
+        'pipelines/baseline-check.json',
+      ]),
       expect.any(Object)
     );
+    const pipelineArgs = mocks.safeExec.mock.calls.find(
+      (call: unknown[]) =>
+        Array.isArray(call[1]) && (call[1] as string[]).includes('dist/scripts/run_pipeline.js')
+    )?.[1] as string[];
+    const contextIndex = pipelineArgs.indexOf('--context');
+    if (contextIndex >= 0) {
+      expect(JSON.parse(pipelineArgs[contextIndex + 1]).intent_goal).toBeDefined();
+    }
   });
 
   it('executes mission action hint and emits execution-receipt', async () => {
