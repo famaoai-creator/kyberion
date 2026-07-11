@@ -2,8 +2,9 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import {
   AdaptivePolicyRouter,
   ComfyUiImageGenerationProvider,
+  GeminiServiceImageGenerationProvider,
   LocalFluxImageGenerationProvider,
-  LlmApiImageGenerationProvider
+  LlmApiImageGenerationProvider,
 } from './image-generation-bridge.js';
 import { resolveLocalFluxGenerationPolicy } from './image-generation-policy.js';
 import { ImageGenerationProvider } from './image-generation-types.js';
@@ -15,7 +16,14 @@ const mocks = vi.hoisted(() => {
   const safeMkdir = vi.fn();
   const probeToolRuntime = vi.fn();
   const probeServiceRuntime = vi.fn();
-  return { executeServicePreset, safeExecResult, safeExistsSync, safeMkdir, probeToolRuntime, probeServiceRuntime };
+  return {
+    executeServicePreset,
+    safeExecResult,
+    safeExistsSync,
+    safeMkdir,
+    probeToolRuntime,
+    probeServiceRuntime,
+  };
 });
 
 vi.mock('./service-engine.js', () => ({
@@ -31,7 +39,7 @@ vi.mock('./service-runtime-registry.js', () => ({
 }));
 
 vi.mock('./secure-io.js', async () => {
-  const actual = await vi.importActual('./secure-io.js') as any;
+  const actual = (await vi.importActual('./secure-io.js')) as any;
   return {
     ...actual,
     safeWriteFile: vi.fn(),
@@ -73,7 +81,12 @@ describe('AdaptivePolicyRouter', () => {
   });
 
   it('selects the preferred provider if it is available', async () => {
-    const router = new AdaptivePolicyRouter([mockComfyUI, mockLocalDiffusion, mockLocalFlux, mockLlmApi]);
+    const router = new AdaptivePolicyRouter([
+      mockComfyUI,
+      mockLocalDiffusion,
+      mockLocalFlux,
+      mockLlmApi,
+    ]);
     const provider = await router.selectProvider({
       prompt: 'a cat',
       providerPreference: ['llm_api'],
@@ -82,7 +95,12 @@ describe('AdaptivePolicyRouter', () => {
   });
 
   it('routes to local_flux by default in balanced mode', async () => {
-    const router = new AdaptivePolicyRouter([mockComfyUI, mockLocalDiffusion, mockLocalFlux, mockLlmApi]);
+    const router = new AdaptivePolicyRouter([
+      mockComfyUI,
+      mockLocalDiffusion,
+      mockLocalFlux,
+      mockLlmApi,
+    ]);
     const provider = await router.selectProvider({
       prompt: 'a cat',
     });
@@ -90,7 +108,12 @@ describe('AdaptivePolicyRouter', () => {
   });
 
   it('routes to local_flux first in privacy_first mode', async () => {
-    const router = new AdaptivePolicyRouter([mockComfyUI, mockLocalDiffusion, mockLocalFlux, mockLlmApi]);
+    const router = new AdaptivePolicyRouter([
+      mockComfyUI,
+      mockLocalDiffusion,
+      mockLocalFlux,
+      mockLlmApi,
+    ]);
     const provider = await router.selectProvider({
       prompt: 'a cat',
       mode: 'privacy_first',
@@ -138,6 +161,50 @@ describe('ComfyUiImageGenerationProvider', () => {
     const provider = new ComfyUiImageGenerationProvider();
     await expect(provider.isAvailable()).resolves.toBe(true);
     expect(mocks.probeServiceRuntime).toHaveBeenCalledWith('comfyui', 'trial');
+  });
+});
+
+describe('GeminiServiceImageGenerationProvider', () => {
+  const originalEnv = { ...process.env };
+
+  beforeEach(() => {
+    process.env = { ...originalEnv };
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
+  it('calls the gemini service preset and writes the returned image bytes', async () => {
+    process.env.GEMINI_API_KEY = 'mock-gemini-key';
+    mocks.executeServicePreset.mockResolvedValue({
+      imageBytes: 'bW9jay1nZW1pbmktYnl0ZXM=',
+    });
+
+    const provider = new GeminiServiceImageGenerationProvider();
+    const result = await provider.generate({
+      prompt: 'a glowing fox in a glass city',
+      aspectRatio: '16:9',
+    });
+
+    expect(result.status).toBe('succeeded');
+    expect(result.provider).toBe('gemini_service');
+    expect(mocks.executeServicePreset).toHaveBeenCalledWith(
+      'gemini',
+      'generate_image',
+      expect.objectContaining({
+        prompt: 'a glowing fox in a glass city',
+        aspect_ratio: '16:9',
+      }),
+      'secret-guard'
+    );
+  });
+
+  it('does not advertise Gemini service availability from GOOGLE_API_KEY alone', async () => {
+    process.env.GOOGLE_API_KEY = 'mock-google-key';
+
+    const provider = new GeminiServiceImageGenerationProvider();
+    await expect(provider.isAvailable()).resolves.toBe(false);
   });
 });
 
@@ -206,7 +273,7 @@ describe('LlmApiImageGenerationProvider', () => {
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({
-          'Authorization': 'Bearer mock-dalle-key',
+          Authorization: 'Bearer mock-dalle-key',
         }),
         body: expect.stringContaining('1792x1024'), // DALL-E 16:9 mapping size
       })
@@ -284,8 +351,42 @@ describe('LocalFluxImageGenerationProvider', () => {
       expect.objectContaining({
         timeoutMs: expect.any(Number),
         maxOutputMB: 50,
-      }),
+      })
     );
+  });
+});
+
+describe('AdaptivePolicyRouter with Gemini service', () => {
+  it('can resolve gemini_service when explicitly preferred', async () => {
+    const router = new AdaptivePolicyRouter([
+      {
+        id: 'gemini_service',
+        isAvailable: vi.fn().mockResolvedValue(true),
+        generate: vi.fn(),
+      },
+      {
+        id: 'comfyui',
+        isAvailable: vi.fn().mockResolvedValue(true),
+        generate: vi.fn(),
+      },
+      {
+        id: 'local_flux',
+        isAvailable: vi.fn().mockResolvedValue(true),
+        generate: vi.fn(),
+      },
+      {
+        id: 'llm_api',
+        isAvailable: vi.fn().mockResolvedValue(true),
+        generate: vi.fn(),
+      },
+    ]);
+
+    const provider = await router.selectProvider({
+      prompt: 'a cat',
+      providerPreference: ['gemini_service'],
+    });
+
+    expect(provider.id).toBe('gemini_service');
   });
 });
 
