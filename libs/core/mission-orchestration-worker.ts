@@ -20,7 +20,7 @@ import {
   PlanningReviewVerdictSchema,
   renderStructuredOutputSchemaPrompt,
 } from './structured-output-contracts.js';
-import { evaluateMissionGate } from './mission-gate-engine.js';
+import { evaluateMissionGate, type MissionGateDefinition } from './mission-gate-engine.js';
 import {
   ensureMissionTeamRuntimeViaSupervisor,
   shutdownAllAgentRuntimes,
@@ -2254,6 +2254,126 @@ function summarizeMissionGateState(missionId: string): { lines: string[]; rework
   return { lines, reworkCount };
 }
 
+// ── MO-02 Task 4: phase exit gates ─────────────────────────────────────────
+// Process templates declare entry/exit gates per phase; planning persists
+// them to gates/definitions/. Until now nothing evaluated them at runtime.
+// Exit gates are evaluated before the completion event fires. Rollout is
+// staged per the repo's warn→enforce rule: default mode 'warn' records and
+// notifies without blocking; KYBERION_PHASE_GATE_MODE=enforce blocks the
+// completion event and, after repeated failures, recommends realignment
+// (circuit breaker). 'off' disables evaluation entirely.
+
+export interface PersistedPhaseGateDefinition {
+  phase: string;
+  position: 'entry' | 'exit';
+  gate: MissionGateDefinition;
+}
+
+export function resolvePhaseGateMode(): 'off' | 'warn' | 'enforce' {
+  const raw = String(process.env.KYBERION_PHASE_GATE_MODE || 'warn').toLowerCase();
+  if (raw === 'enforce') return 'enforce';
+  if (raw === 'off') return 'off';
+  return 'warn';
+}
+
+export function loadMissionPhaseGateDefinitions(missionId: string): PersistedPhaseGateDefinition[] {
+  const defsDir = `${missionDir(missionId, 'public')}/gates/definitions`;
+  if (!safeExistsSync(defsDir)) return [];
+  return safeReaddir(defsDir)
+    .filter((entry) => entry.endsWith('.json'))
+    .map((entry) => {
+      try {
+        const parsed = JSON.parse(
+          safeReadFile(`${defsDir}/${entry}`, { encoding: 'utf8' }) as string
+        );
+        if (!parsed || typeof parsed !== 'object') return null;
+        const gate = (parsed as Record<string, unknown>).gate;
+        if (!gate || typeof gate !== 'object') return null;
+        return {
+          phase: String((parsed as Record<string, unknown>).phase || ''),
+          position: (parsed as Record<string, unknown>).position === 'entry' ? 'entry' : 'exit',
+          gate: gate as MissionGateDefinition,
+        } satisfies PersistedPhaseGateDefinition;
+      } catch {
+        return null;
+      }
+    })
+    .filter((entry): entry is PersistedPhaseGateDefinition => Boolean(entry));
+}
+
+// reviewer_approved template checks carry only { task_id } — the runtime
+// outcome lives in NEXT_TASKS.json. Resolve it here so the gate engine sees
+// the review verdict instead of failing on missing params.
+function enrichGateWithTaskOutcomes(
+  missionId: string,
+  gate: MissionGateDefinition
+): MissionGateDefinition {
+  const nextTasksPath = `${missionDir(missionId, 'public')}/NEXT_TASKS.json`;
+  let tasks: Array<Record<string, unknown>> = [];
+  try {
+    const parsed = JSON.parse(safeReadFile(nextTasksPath, { encoding: 'utf8' }) as string);
+    if (Array.isArray(parsed)) tasks = parsed as Array<Record<string, unknown>>;
+  } catch {
+    /* no task board — checks keep their declared params */
+  }
+  const checks = (gate.checks || []).map((check) => {
+    if (check.kind !== 'reviewer_approved') return check;
+    const params = { ...(check.params || {}) } as Record<string, unknown>;
+    if (params.approved !== undefined || params.verdict !== undefined) return check;
+    const taskId = String(params.task_id || params.taskId || '');
+    if (!taskId) return check;
+    const task = tasks.find((entry) => String(entry.task_id || '') === taskId);
+    const status = String(task?.status || '');
+    return {
+      ...check,
+      params: {
+        ...params,
+        approved: status === 'completed' || status === 'accepted',
+        reason:
+          status === ''
+            ? `Review task ${taskId} not found in NEXT_TASKS.json`
+            : `Review task ${taskId} status: ${status}`,
+      },
+    };
+  });
+  return { ...gate, checks };
+}
+
+export interface PhaseExitGateOutcome {
+  passed: boolean;
+  evaluated: number;
+  failures: Array<{ gate_id: string; phase: string; reasons: string[]; prior_failures: number }>;
+}
+
+export async function evaluateMissionPhaseExitGates(
+  missionId: string
+): Promise<PhaseExitGateOutcome> {
+  const definitions = loadMissionPhaseGateDefinitions(missionId).filter(
+    (definition) => definition.position === 'exit'
+  );
+  const priorRecords = loadMissionGateRecords(missionId);
+  const failures: PhaseExitGateOutcome['failures'] = [];
+  for (const definition of definitions) {
+    const priorFailures = priorRecords.filter(
+      (record) => record.gate_id === definition.gate.id && record.verdict === 'fail'
+    ).length;
+    const evaluation = await evaluateMissionGate({
+      missionId,
+      gate: enrichGateWithTaskOutcomes(missionId, definition.gate),
+      evidenceDir: `${missionDir(missionId, 'public')}/gates`,
+    });
+    if (evaluation.verdict !== 'pass') {
+      failures.push({
+        gate_id: definition.gate.id,
+        phase: definition.phase,
+        reasons: evaluation.reasons,
+        prior_failures: priorFailures,
+      });
+    }
+  }
+  return { passed: failures.length === 0, evaluated: definitions.length, failures };
+}
+
 function syncPlanningArtifacts(missionId: string): void {
   const missionPath = missionDir(missionId, 'public');
   const planPath = `${missionPath}/PLAN.md`;
@@ -3654,6 +3774,33 @@ async function handleMissionDistillationRequested(event: MissionOrchestrationEve
       'mission_distillation_failed',
       `Distillation failed: ${error.message}. Manual review recommended.`
     );
+  }
+
+  // MO-02: phase exit gates guard the completion event.
+  const gateMode = resolvePhaseGateMode();
+  if (gateMode !== 'off') {
+    const exitGates = await evaluateMissionPhaseExitGates(missionId);
+    if (!exitGates.passed) {
+      const circuitBreak = exitGates.failures.some((failure) => failure.prior_failures >= 2);
+      const failureLines = exitGates.failures
+        .map((failure) => `${failure.gate_id} (${failure.phase}): ${failure.reasons.join('; ')}`)
+        .join(' | ');
+      emitSlackMissionEvent(
+        payload,
+        missionId,
+        circuitBreak ? 'mission_phase_gate_circuit_breaker' : 'mission_phase_gate_failed',
+        circuitBreak
+          ? `Phase exit gates failed repeatedly (${failureLines}). Realignment recommended: review the plan with the owner before completing.`
+          : `Phase exit gates not satisfied (${failureLines}).${gateMode === 'enforce' ? ' Completion is blocked until the gates pass or an operator overrides via gate-pass.' : ' (warn mode: completion continues; set KYBERION_PHASE_GATE_MODE=enforce to block)'}`
+      );
+      if (gateMode === 'enforce') {
+        logger.warn(
+          `[worker] completion blocked for ${missionId}: ${exitGates.failures.length} exit gate(s) failing`
+        );
+        await shutdownAllAgentRuntimes('mission_orchestration_worker');
+        return;
+      }
+    }
   }
 
   // Continue to completion
