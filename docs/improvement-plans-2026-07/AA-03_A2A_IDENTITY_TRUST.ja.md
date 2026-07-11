@@ -55,3 +55,9 @@
 
 - `agent-registry` を trust score の参照元として明示し、`agent-lifecycle` の spawn gate と `agent-runtime-supervisor-client` の supervisor-backed handle が 5 固定の初期値ではなく trust engine の現在値を見るようにした。
 - `libs/core/agent-lifecycle.model-routing.test.ts` に trust score の参照テストを追加した。
+
+### Peer HTTP read boundary slice — 2026-07-11
+
+- peer inbox/outbox GET に `HMAC-SHA256(sharedSecret, method + path)` の request signature を必須化し、比較を `timingSafeEqual` に統一した。
+- POST body は `Content-Length` と実受信量の両方で1 MiBを上限とし、超過時は内部エラーでなく `413 request_body_too_large` を返す。
+- unauthenticated health response は `{ ok: true }` のみに縮小した。鍵ローテーション・失効は本計画の残作業として維持する。

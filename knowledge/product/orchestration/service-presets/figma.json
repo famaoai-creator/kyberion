@@ -1,0 +1,44 @@
+{
+  "service_id": "figma",
+  "name": "Figma API Presets",
+  "base_url": "https://api.figma.com/v1",
+  "auth_strategy": "Bearer",
+  "operations": {
+    "get_file": {
+      "type": "api",
+      "path": "files/{{file_key}}",
+      "method": "GET",
+      "description": "Fetches a Figma file.",
+      "parameters": {
+        "file_key": { "required": true, "type": "string" }
+      }
+    },
+    "get_comments": {
+      "type": "api",
+      "path": "files/{{file_key}}/comments",
+      "method": "GET",
+      "description": "Lists comments for a Figma file.",
+      "parameters": {
+        "file_key": { "required": true, "type": "string" }
+      }
+    },
+    "get_team_projects": {
+      "type": "api",
+      "path": "teams/{{team_id}}/projects",
+      "method": "GET",
+      "description": "Lists projects for a Figma team.",
+      "parameters": {
+        "team_id": { "required": true, "type": "string" }
+      }
+    },
+    "get_components": {
+      "type": "api",
+      "path": "files/{{file_key}}/components",
+      "method": "GET",
+      "description": "Lists reusable components for a Figma file.",
+      "parameters": {
+        "file_key": { "required": true, "type": "string" }
+      }
+    }
+  }
+}

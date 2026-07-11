@@ -3,7 +3,14 @@ import { spawn } from 'node:child_process';
 import * as path from 'node:path';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile, safeWriteFile, safeMkdir } from './secure-io.js';
+import {
+  safeChmodSync,
+  safeExistsSync,
+  safeLstat,
+  safeReadFile,
+  safeWriteFile,
+  safeMkdir,
+} from './secure-io.js';
 import { SecretProvider, RegistryEntry, SecretResult } from './secret-types.js';
 
 const KEYCHAIN_REGISTRY_PATH = pathResolver.vault('secrets/keychain-registry.json');
@@ -124,23 +131,42 @@ export class MacKeychainSecretProvider implements SecretProvider {
 export class FileSecretProvider implements SecretProvider {
   readonly id = 'file_secrets';
 
+  constructor(private readonly secretsPath = FILE_SECRETS_PATH) {}
+
   async isAvailable(): Promise<boolean> {
     return true;
   }
 
   private readSecretsFile(): Record<string, Record<string, string>> {
-    if (!safeExistsSync(FILE_SECRETS_PATH)) return {};
+    if (!safeExistsSync(this.secretsPath)) return {};
+    this.assertNotSymlink(this.secretsPath, 'secret file');
     try {
-      return JSON.parse(safeReadFile(FILE_SECRETS_PATH, { encoding: 'utf8' }) as string);
+      return JSON.parse(safeReadFile(this.secretsPath, { encoding: 'utf8' }) as string);
     } catch {
       return {};
     }
   }
 
   private writeSecretsFile(secrets: Record<string, Record<string, string>>): void {
-    const dir = path.dirname(FILE_SECRETS_PATH);
-    if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-    safeWriteFile(FILE_SECRETS_PATH, JSON.stringify(secrets, null, 2));
+    const dir = path.dirname(this.secretsPath);
+    if (safeExistsSync(dir)) {
+      this.assertNotSymlink(dir, 'secret directory');
+    } else {
+      safeMkdir(dir, { recursive: true, mode: 0o700 });
+    }
+    safeChmodSync(dir, 0o700);
+    if (safeExistsSync(this.secretsPath)) {
+      this.assertNotSymlink(this.secretsPath, 'secret file');
+    }
+    safeWriteFile(this.secretsPath, JSON.stringify(secrets, null, 2), { mode: 0o600 });
+    // Also repair permissions of files created by older versions.
+    safeChmodSync(this.secretsPath, 0o600);
+  }
+
+  private assertNotSymlink(targetPath: string, label: string): void {
+    if (safeLstat(targetPath).isSymbolicLink()) {
+      throw new Error(`[SECURITY] Refusing ${label} symbolic link: ${targetPath}`);
+    }
   }
 
   async get(service: string, account: string): Promise<string | null> {
@@ -200,6 +226,8 @@ export class EnvSecretProvider implements SecretProvider {
 }
 
 // Adaptive policy router
+let warnedFileSecretFallback = false;
+
 export class SecretPolicyRouter {
   private providers: Map<string, SecretProvider> = new Map();
 
@@ -215,6 +243,19 @@ export class SecretPolicyRouter {
     for (const id of chain) {
       const provider = this.providers.get(id);
       if (provider && (await provider.isAvailable())) {
+        if (id === 'file_secrets' && !process.env.KYBERION_ALLOW_FILE_SECRETS) {
+          // Warn-phase (REVIEW_CODEX_2026-07-11 / AC-05): plaintext-JSON file
+          // secrets engage silently when the keychain is unavailable. TODO:
+          // after the warn observation period and AC-05 Task 2 (encryption
+          // option), make unacknowledged fallback fail-closed.
+          if (!warnedFileSecretFallback) {
+            warnedFileSecretFallback = true;
+            logger.warn(
+              '[SECRET_BRIDGE] Falling back to plaintext file secrets (keychain unavailable). ' +
+                'Set KYBERION_ALLOW_FILE_SECRETS=1 to acknowledge, or configure the OS keychain.'
+            );
+          }
+        }
         return provider;
       }
     }

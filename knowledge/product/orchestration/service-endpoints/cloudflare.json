@@ -1,0 +1,9 @@
+{
+  "default_pattern": "https://api.{service_id}.com/v1",
+  "services": {
+    "cloudflare": {
+      "base_url": "https://api.cloudflare.com/client/v4",
+      "preset_path": "knowledge/product/orchestration/service-presets/cloudflare.json"
+    }
+  }
+}

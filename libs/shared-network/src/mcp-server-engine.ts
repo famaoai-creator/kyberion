@@ -7,6 +7,7 @@
  * Tools implemented in this facade:
  *   kyberion.pipeline.list          — enumerate pipelines/
  *   kyberion.pipeline.run           — execute a pipeline via run_pipeline.js
+ *   kyberion.pipeline.job_status    — poll a background pipeline job
  *   kyberion.knowledge.search       — search public knowledge tier
  *   kyberion.mission.create         — create a new mission
  *   kyberion.mission.status         — query mission status
@@ -32,10 +33,16 @@ import {
   safeExistsSync,
   safeExec,
   pathResolver,
+  spawnManagedProcess,
+  stopManagedProcess,
 } from '@agent/core';
 import { buildKnowledgeIndex, queryKnowledge, executeServicePreset } from '@agent/core';
 import { deliverToCowork, listCoworkOutbox } from '@agent/core/cowork-surface.js';
-import { listPendingApprovalsForCowork, decideApprovalFromCowork, recordAuditExportRequest } from '@agent/core/approval-cowork-adapter.js';
+import {
+  listPendingApprovalsForCowork,
+  decideApprovalFromCowork,
+  recordAuditExportRequest,
+} from '@agent/core/approval-cowork-adapter.js';
 import { runCoworkKnowledgeSync } from '@agent/core/cowork-knowledge-bridge.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -47,16 +54,19 @@ const SERVER_VERSION = '0.1.0';
 const REPO_ROOT = pathResolver.rootDir();
 
 /** Path to the MCP tool catalog (allowlist). */
-const CATALOG_PATH = nodePath.join(
-  REPO_ROOT,
-  'knowledge/product/governance/mcp-tool-catalog.json',
-);
+const CATALOG_PATH = nodePath.join(REPO_ROOT, 'knowledge/product/governance/mcp-tool-catalog.json');
 
 /** Path to the compiled pipeline runner script. */
 const PIPELINE_RUNNER = nodePath.join(REPO_ROOT, 'dist/scripts/run_pipeline.js');
 
-/** Maximum execution time for a pipeline run via MCP (60 seconds). */
+/** Maximum execution time for a synchronous pipeline run via MCP (60 seconds). */
 const PIPELINE_TIMEOUT_MS = 60_000;
+
+/** Maximum execution time for a background pipeline job (30 minutes). */
+const PIPELINE_JOB_TIMEOUT_MS = 30 * 60_000;
+
+/** Cap on the retained tail of a background job's combined stdout/stderr. */
+const PIPELINE_JOB_OUTPUT_TAIL_LIMIT = 64_000;
 
 /** Path to the compiled audit export script. */
 const AUDIT_EXPORT_SCRIPT = nodePath.join(REPO_ROOT, 'dist/scripts/export_audit.js');
@@ -78,42 +88,149 @@ function loadCatalog(): ToolCatalog {
 
 function isPipelineAllowed(inputPath: string, catalog: ToolCatalog): boolean {
   const normalised = inputPath.replace(/\\/g, '/').replace(/^\.\//, '');
-  return catalog.pipeline_run_allowlist.some(
-    (p) => p.replace(/^\.\//, '') === normalised,
-  );
+  return catalog.pipeline_run_allowlist.some((p) => p.replace(/^\.\//, '') === normalised);
 }
 
 // ─── Tool implementations ─────────────────────────────────────────────────────
 
-function listPipelines(): { name: string; path: string; description: string }[] {
+interface PipelineListEntry {
+  name: string;
+  path: string;
+  description: string;
+  /** Same predicate pipeline.run enforces: entries with false are visible but not runnable via MCP. */
+  runnable_via_mcp: boolean;
+}
+
+function listPipelines(catalog: ToolCatalog): PipelineListEntry[] {
   const pipelinesDir = nodePath.join(REPO_ROOT, 'pipelines');
   if (!safeExistsSync(pipelinesDir)) return [];
 
   const entries = safeReaddir(pipelinesDir);
-  const results: { name: string; path: string; description: string }[] = [];
+  const results: PipelineListEntry[] = [];
 
   for (const entry of entries) {
     if (!entry.endsWith('.json')) continue;
     const fullPath = nodePath.join(pipelinesDir, entry);
+    const relPath = `pipelines/${entry}`;
+    const runnable = isPipelineAllowed(relPath, catalog);
     try {
       const raw = safeReadFile(fullPath, { encoding: 'utf8' }) as string;
       const parsed = JSON.parse(raw);
       results.push({
         name: parsed.pipeline_id ?? entry.replace('.json', ''),
-        path: `pipelines/${entry}`,
+        path: relPath,
         description: parsed.description ?? '',
+        runnable_via_mcp: runnable,
       });
     } catch {
-      results.push({ name: entry.replace('.json', ''), path: `pipelines/${entry}`, description: '' });
+      results.push({
+        name: entry.replace('.json', ''),
+        path: relPath,
+        description: '',
+        runnable_via_mcp: runnable,
+      });
     }
   }
 
   return results;
 }
 
+// ─── Background pipeline jobs ─────────────────────────────────────────────────
+//
+// Long pipelines exceed the 60s synchronous window, so pipeline.run can start
+// them as supervised background jobs instead. Jobs are children of this MCP
+// server process (runtime-supervisor cleanup kills them if the server exits),
+// and their records live in memory for the server's lifetime.
+
+interface PipelineJob {
+  job_id: string;
+  input: string;
+  status: 'running' | 'succeeded' | 'failed' | 'timed_out';
+  started_at: string;
+  finished_at?: string;
+  exit_code?: number | null;
+  pid?: number;
+  output_tail: string;
+}
+
+const pipelineJobs = new Map<string, PipelineJob>();
+
+function startPipelineJob(input: string, absInput: string, extraArgs: string[]): PipelineJob {
+  const jobId = `plj-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  const resourceId = `mcp-pipeline-job:${jobId}`;
+  const job: PipelineJob = {
+    job_id: jobId,
+    input,
+    status: 'running',
+    started_at: new Date().toISOString(),
+    output_tail: '',
+  };
+  pipelineJobs.set(jobId, job);
+
+  const appendOutput = (chunk: unknown) => {
+    job.output_tail = (job.output_tail + String(chunk)).slice(-PIPELINE_JOB_OUTPUT_TAIL_LIMIT);
+  };
+
+  const { child } = spawnManagedProcess({
+    resourceId,
+    kind: 'service',
+    ownerId: SERVER_NAME,
+    ownerType: 'mcp-server',
+    command: 'node',
+    args: [PIPELINE_RUNNER, '--input', absInput, ...extraArgs],
+    spawnOptions: { cwd: REPO_ROOT, stdio: ['ignore', 'pipe', 'pipe'] },
+    metadata: { job_id: jobId, pipeline_input: input },
+  });
+  job.pid = child.pid;
+  child.stdout?.on('data', appendOutput);
+  child.stderr?.on('data', appendOutput);
+
+  const timeout = setTimeout(() => {
+    if (job.status === 'running') {
+      job.status = 'timed_out';
+      job.finished_at = new Date().toISOString();
+      stopManagedProcess(resourceId, child);
+    }
+  }, PIPELINE_JOB_TIMEOUT_MS);
+  timeout.unref?.();
+
+  child.on('error', (err) => {
+    clearTimeout(timeout);
+    if (job.status === 'running') {
+      job.status = 'failed';
+      job.finished_at = new Date().toISOString();
+      appendOutput(`\n[job] spawn error: ${err}`);
+    }
+    stopManagedProcess(resourceId, null);
+  });
+  child.on('exit', (code) => {
+    clearTimeout(timeout);
+    if (job.status === 'running') {
+      job.exit_code = code;
+      job.status = code === 0 ? 'succeeded' : 'failed';
+      job.finished_at = new Date().toISOString();
+    }
+    stopManagedProcess(resourceId, null);
+  });
+
+  return job;
+}
+
+function describePipelineJob(job: PipelineJob): Record<string, unknown> {
+  return {
+    job_id: job.job_id,
+    input: job.input,
+    status: job.status,
+    started_at: job.started_at,
+    finished_at: job.finished_at ?? null,
+    exit_code: job.exit_code ?? null,
+    output_tail: job.output_tail,
+  };
+}
+
 async function searchKnowledge(
   query: string,
-  maxResults: number,
+  maxResults: number
 ): Promise<{ topic: string; hint: string; source: string; confidence: number }[]> {
   const index = await buildKnowledgeIndex();
   const results = await queryKnowledge(index, query, { maxResults });
@@ -157,39 +274,51 @@ function listCapabilities(): { actuator: string; ops: string[] }[] {
 }
 
 function getMissionStatus(missionId: string): string {
-  return safeExec('node', [
-    nodePath.join(REPO_ROOT, 'dist/scripts/mission_controller.js'),
-    'status',
-    '--mission-id', missionId,
-  ], {
-    cwd: REPO_ROOT,
-    timeoutMs: 15_000,
-    maxOutputMB: 2,
-  });
+  return safeExec(
+    'node',
+    [
+      nodePath.join(REPO_ROOT, 'dist/scripts/mission_controller.js'),
+      'status',
+      '--mission-id',
+      missionId,
+    ],
+    {
+      cwd: REPO_ROOT,
+      timeoutMs: 15_000,
+      maxOutputMB: 2,
+    }
+  );
 }
 
 function getMissionJournal(missionId: string): string {
-  return safeExec('node', [
-    nodePath.join(REPO_ROOT, 'dist/scripts/mission_journal.js'),
-    '--mission-id', missionId,
-  ], {
-    cwd: REPO_ROOT,
-    timeoutMs: 15_000,
-    maxOutputMB: 2,
-  });
+  return safeExec(
+    'node',
+    [nodePath.join(REPO_ROOT, 'dist/scripts/mission_journal.js'), '--mission-id', missionId],
+    {
+      cwd: REPO_ROOT,
+      timeoutMs: 15_000,
+      maxOutputMB: 2,
+    }
+  );
 }
 
 function createMission(brief: string, title: string): string {
-  return safeExec('node', [
-    nodePath.join(REPO_ROOT, 'dist/scripts/mission_controller.js'),
-    'create',
-    '--brief', brief,
-    '--title', title,
-  ], {
-    cwd: REPO_ROOT,
-    timeoutMs: 30_000,
-    maxOutputMB: 2,
-  });
+  return safeExec(
+    'node',
+    [
+      nodePath.join(REPO_ROOT, 'dist/scripts/mission_controller.js'),
+      'create',
+      '--brief',
+      brief,
+      '--title',
+      title,
+    ],
+    {
+      cwd: REPO_ROOT,
+      timeoutMs: 30_000,
+      maxOutputMB: 2,
+    }
+  );
 }
 
 // ─── Server factory ───────────────────────────────────────────────────────────
@@ -207,22 +336,25 @@ export function createKyberionMcpServer(): McpServer {
         'Kyberion security model (3-tier knowledge isolation, audit chain).',
         'Use kyberion.pipeline.list to discover available pipelines before running one.',
       ].join(' '),
-    },
+    }
   );
 
   // ── kyberion.pipeline.list ────────────────────────────────────────────────
   server.tool(
     'kyberion.pipeline.list',
-    'List available Kyberion pipeline definitions.',
+    'List Kyberion pipeline definitions. Each entry carries `runnable_via_mcp`; ' +
+      'only entries with `runnable_via_mcp: true` can be executed with kyberion.pipeline.run.',
     {},
     async () => {
       try {
-        const pipelines = listPipelines();
+        const pipelines = listPipelines(catalog);
         return {
-          content: [{
-            type: 'text' as const,
-            text: JSON.stringify(pipelines, null, 2),
-          }],
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify(pipelines, null, 2),
+            },
+          ],
         };
       } catch (err) {
         return {
@@ -230,25 +362,41 @@ export function createKyberionMcpServer(): McpServer {
           isError: true,
         };
       }
-    },
+    }
   );
 
   // ── kyberion.pipeline.run ─────────────────────────────────────────────────
   server.tool(
     'kyberion.pipeline.run',
-    'Execute a Kyberion pipeline. Only allowlisted pipelines may be run via MCP.',
+    'Execute a Kyberion pipeline. Only allowlisted pipelines may be run via MCP. ' +
+      'Synchronous runs are killed after 60s; pass background: true for long pipelines ' +
+      'and poll kyberion.pipeline.job_status with the returned job_id.',
     {
-      input: z.string().describe('Relative path to the pipeline JSON, e.g. "pipelines/vital-check.json"'),
-      vars: z.record(z.string(), z.string()).optional().describe('Optional template variable overrides'),
+      input: z
+        .string()
+        .describe('Relative path to the pipeline JSON, e.g. "pipelines/vital-check.json"'),
+      vars: z
+        .record(z.string(), z.string())
+        .optional()
+        .describe('Optional template variable overrides'),
+      background: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe('Run as a background job (for pipelines longer than the 60s sync window)'),
     },
-    async ({ input, vars }) => {
+    async ({ input, vars, background }) => {
       if (!isPipelineAllowed(input, catalog)) {
         return {
-          content: [{
-            type: 'text' as const,
-            text: `Pipeline '${input}' is not on the MCP allowlist. ` +
-              'Check knowledge/product/governance/mcp-tool-catalog.json for the list.',
-          }],
+          content: [
+            {
+              type: 'text' as const,
+              text:
+                `Pipeline '${input}' is not on the MCP allowlist. ` +
+                'Use kyberion.pipeline.list and pick an entry with runnable_via_mcp: true ' +
+                '(allowlist source: knowledge/product/governance/mcp-tool-catalog.json).',
+            },
+          ],
           isError: true,
         };
       }
@@ -266,8 +414,29 @@ export function createKyberionMcpServer(): McpServer {
         }
         if (!safeExistsSync(PIPELINE_RUNNER)) {
           return {
-            content: [{ type: 'text' as const, text: 'Pipeline runner not built. Run pnpm build first.' }],
+            content: [
+              { type: 'text' as const, text: 'Pipeline runner not built. Run pnpm build first.' },
+            ],
             isError: true,
+          };
+        }
+        if (background) {
+          const job = startPipelineJob(input, absInput, extraArgs);
+          return {
+            content: [
+              {
+                type: 'text' as const,
+                text: JSON.stringify(
+                  {
+                    job_id: job.job_id,
+                    status: job.status,
+                    poll_with: 'kyberion.pipeline.job_status',
+                  },
+                  null,
+                  2
+                ),
+              },
+            ],
           };
         }
         const output = safeExec('node', [PIPELINE_RUNNER, '--input', absInput, ...extraArgs], {
@@ -282,7 +451,40 @@ export function createKyberionMcpServer(): McpServer {
           isError: true,
         };
       }
+    }
+  );
+
+  // ── kyberion.pipeline.job_status ──────────────────────────────────────────
+  server.tool(
+    'kyberion.pipeline.job_status',
+    'Check a background pipeline job started with kyberion.pipeline.run background: true. ' +
+      'Returns status, exit code, and the tail of the combined output.',
+    {
+      job_id: z.string().describe('Job id returned by kyberion.pipeline.run'),
     },
+    async ({ job_id }) => {
+      const job = pipelineJobs.get(job_id);
+      if (!job) {
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: `Unknown pipeline job '${job_id}'. Jobs live for this MCP server session only.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: JSON.stringify(describePipelineJob(job), null, 2),
+          },
+        ],
+        ...(job.status === 'failed' || job.status === 'timed_out' ? { isError: true } : {}),
+      };
+    }
   );
 
   // ── kyberion.knowledge.search ─────────────────────────────────────────────
@@ -291,7 +493,13 @@ export function createKyberionMcpServer(): McpServer {
     'Search the Kyberion knowledge base (public tier). Returns ranked hints.',
     {
       query: z.string().describe('Search query'),
-      max_results: z.number().int().min(1).max(20).optional().default(5)
+      max_results: z
+        .number()
+        .int()
+        .min(1)
+        .max(20)
+        .optional()
+        .default(5)
         .describe('Maximum number of results to return (default: 5)'),
     },
     async ({ query, max_results }) => {
@@ -304,7 +512,7 @@ export function createKyberionMcpServer(): McpServer {
           isError: true,
         };
       }
-    },
+    }
   );
 
   // ── kyberion.capability.list ──────────────────────────────────────────────
@@ -315,14 +523,16 @@ export function createKyberionMcpServer(): McpServer {
     async () => {
       try {
         const capabilities = listCapabilities();
-        return { content: [{ type: 'text' as const, text: JSON.stringify(capabilities, null, 2) }] };
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(capabilities, null, 2) }],
+        };
       } catch (err) {
         return {
           content: [{ type: 'text' as const, text: `Failed to list capabilities: ${err}` }],
           isError: true,
         };
       }
-    },
+    }
   );
 
   // ── kyberion.service.actuate ──────────────────────────────────────────────
@@ -332,7 +542,10 @@ export function createKyberionMcpServer(): McpServer {
     {
       service_id: z.string().describe('The ID of the service (e.g. "notion")'),
       action: z.string().describe('The operation to execute (e.g. "search", "retrieve_page")'),
-      params: z.record(z.string(), z.any()).optional().describe('Parameters for the operation (payload/query string)'),
+      params: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Parameters for the operation (payload/query string)'),
     },
     async ({ service_id, action, params }) => {
       try {
@@ -355,7 +568,7 @@ export function createKyberionMcpServer(): McpServer {
           isError: true,
         };
       }
-    },
+    }
   );
 
   // ── kyberion.mission.create ───────────────────────────────────────────────
@@ -376,7 +589,7 @@ export function createKyberionMcpServer(): McpServer {
           isError: true,
         };
       }
-    },
+    }
   );
 
   // ── kyberion.mission.status ───────────────────────────────────────────────
@@ -396,7 +609,7 @@ export function createKyberionMcpServer(): McpServer {
           isError: true,
         };
       }
-    },
+    }
   );
 
   // ── kyberion.mission.journal ──────────────────────────────────────────────
@@ -416,7 +629,7 @@ export function createKyberionMcpServer(): McpServer {
           isError: true,
         };
       }
-    },
+    }
   );
 
   // ── kyberion.surface.cowork.deliver ──────────────────────────────────────
@@ -427,7 +640,11 @@ export function createKyberionMcpServer(): McpServer {
       title: z.string().describe('Title of the result'),
       summary: z.string().describe('Short summary of what was produced (shown in Cowork)'),
       content: z.string().describe('Full artifact content'),
-      content_type: z.string().optional().default('text/plain').describe('MIME type of the content'),
+      content_type: z
+        .string()
+        .optional()
+        .default('text/plain')
+        .describe('MIME type of the content'),
       mission_id: z.string().optional().describe('Mission ID that produced this artifact'),
       trace_id: z.string().optional().describe('Pipeline trace ID'),
       next_action: z.string().optional().describe('Suggested next action for the operator'),
@@ -436,13 +653,15 @@ export function createKyberionMcpServer(): McpServer {
       try {
         const deliveryId = deliverToCowork(
           [{ content, content_type: content_type ?? 'text/plain', description: title }],
-          { title, summary, missionId: mission_id, traceId: trace_id, nextAction: next_action },
+          { title, summary, missionId: mission_id, traceId: trace_id, nextAction: next_action }
         );
         return {
-          content: [{
-            type: 'text' as const,
-            text: JSON.stringify({ delivery_id: deliveryId, status: 'delivered' }),
-          }],
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify({ delivery_id: deliveryId, status: 'delivered' }),
+            },
+          ],
         };
       } catch (err) {
         return {
@@ -450,7 +669,7 @@ export function createKyberionMcpServer(): McpServer {
           isError: true,
         };
       }
-    },
+    }
   );
 
   // ── kyberion.surface.cowork.list ──────────────────────────────────────────
@@ -468,7 +687,7 @@ export function createKyberionMcpServer(): McpServer {
           isError: true,
         };
       }
-    },
+    }
   );
 
   // ── kyberion.knowledge.cowork_sync ───────────────────────────────────────
@@ -481,13 +700,23 @@ export function createKyberionMcpServer(): McpServer {
       'direction=both (default): run both directions.',
     ].join(' '),
     {
-      direction: z.enum(['cowork-to-kyberion', 'kyberion-to-cowork', 'both'])
+      direction: z
+        .enum(['cowork-to-kyberion', 'kyberion-to-cowork', 'both'])
         .optional()
         .default('both')
         .describe('Sync direction'),
-      cowork_artifact_paths: z.array(z.string()).optional().default([])
+      cowork_artifact_paths: z
+        .array(z.string())
+        .optional()
+        .default([])
         .describe('Paths to Cowork artifacts to ingest (for cowork-to-kyberion direction)'),
-      max_hints: z.number().int().min(1).max(200).optional().default(50)
+      max_hints: z
+        .number()
+        .int()
+        .min(1)
+        .max(200)
+        .optional()
+        .default(50)
         .describe('Max number of knowledge hints to supply to Cowork (default: 50)'),
     },
     async ({ direction, cowork_artifact_paths, max_hints }) => {
@@ -504,7 +733,7 @@ export function createKyberionMcpServer(): McpServer {
           isError: true,
         };
       }
-    },
+    }
   );
 
   // ── kyberion.approval.list_pending ────────────────────────────────────────
@@ -522,7 +751,7 @@ export function createKyberionMcpServer(): McpServer {
           isError: true,
         };
       }
-    },
+    }
   );
 
   // ── kyberion.approval.decide ──────────────────────────────────────────────
@@ -534,7 +763,9 @@ export function createKyberionMcpServer(): McpServer {
       'This is a two-step operation — blind approval without listing first will be rejected.',
     ].join(' '),
     {
-      request_id: z.string().describe('The request_id obtained from kyberion.approval.list_pending'),
+      request_id: z
+        .string()
+        .describe('The request_id obtained from kyberion.approval.list_pending'),
       decision: z.enum(['approved', 'rejected']).describe('The decision to apply'),
       decided_by: z.string().describe('Identity of the operator submitting the decision'),
       note: z.string().optional().describe('Optional rationale or note for the decision'),
@@ -554,7 +785,7 @@ export function createKyberionMcpServer(): McpServer {
           isError: true,
         };
       }
-    },
+    }
   );
 
   // ── kyberion.audit.export ─────────────────────────────────────────────────
@@ -565,19 +796,40 @@ export function createKyberionMcpServer(): McpServer {
       from: z.string().optional().describe('Start date filter YYYY-MM-DD'),
       to: z.string().optional().describe('End date filter YYYY-MM-DD'),
       tenant: z.string().optional().describe('Filter by tenant slug'),
-      requested_by: z.string().optional().default('cowork-operator').describe('Identity requesting the export'),
+      requested_by: z
+        .string()
+        .optional()
+        .default('cowork-operator')
+        .describe('Identity requesting the export'),
     },
     async ({ from, to, tenant, requested_by }) => {
       try {
-        recordAuditExportRequest({ requestedBy: requested_by ?? 'cowork-operator', from, to, verifyOnly: false });
+        recordAuditExportRequest({
+          requestedBy: requested_by ?? 'cowork-operator',
+          from,
+          to,
+          verifyOnly: false,
+        });
         if (!safeExistsSync(AUDIT_EXPORT_SCRIPT)) {
-          return { content: [{ type: 'text' as const, text: 'Audit export script not built. Run pnpm build first.' }], isError: true };
+          return {
+            content: [
+              {
+                type: 'text' as const,
+                text: 'Audit export script not built. Run pnpm build first.',
+              },
+            ],
+            isError: true,
+          };
         }
         const args = [AUDIT_EXPORT_SCRIPT];
         if (from) args.push('--from', from);
         if (to) args.push('--to', to);
         if (tenant) args.push('--tenant', tenant);
-        const output = safeExec('node', args, { cwd: REPO_ROOT, timeoutMs: 30_000, maxOutputMB: 10 });
+        const output = safeExec('node', args, {
+          cwd: REPO_ROOT,
+          timeoutMs: 30_000,
+          maxOutputMB: 10,
+        });
         return { content: [{ type: 'text' as const, text: output }] };
       } catch (err) {
         return {
@@ -585,7 +837,7 @@ export function createKyberionMcpServer(): McpServer {
           isError: true,
         };
       }
-    },
+    }
   );
 
   // ── kyberion.audit.verify ─────────────────────────────────────────────────
@@ -594,17 +846,36 @@ export function createKyberionMcpServer(): McpServer {
     'Verify the integrity of the Kyberion audit chain (hash chain validation). Returns pass/fail.',
     {
       tenant: z.string().optional().describe('Scope verification to a specific tenant slug'),
-      requested_by: z.string().optional().default('cowork-operator').describe('Identity requesting verification'),
+      requested_by: z
+        .string()
+        .optional()
+        .default('cowork-operator')
+        .describe('Identity requesting verification'),
     },
     async ({ tenant, requested_by }) => {
       try {
-        recordAuditExportRequest({ requestedBy: requested_by ?? 'cowork-operator', verifyOnly: true });
+        recordAuditExportRequest({
+          requestedBy: requested_by ?? 'cowork-operator',
+          verifyOnly: true,
+        });
         if (!safeExistsSync(AUDIT_EXPORT_SCRIPT)) {
-          return { content: [{ type: 'text' as const, text: 'Audit export script not built. Run pnpm build first.' }], isError: true };
+          return {
+            content: [
+              {
+                type: 'text' as const,
+                text: 'Audit export script not built. Run pnpm build first.',
+              },
+            ],
+            isError: true,
+          };
         }
         const args = [AUDIT_EXPORT_SCRIPT, '--verify-only'];
         if (tenant) args.push('--tenant', tenant);
-        const output = safeExec('node', args, { cwd: REPO_ROOT, timeoutMs: 30_000, maxOutputMB: 5 });
+        const output = safeExec('node', args, {
+          cwd: REPO_ROOT,
+          timeoutMs: 30_000,
+          maxOutputMB: 5,
+        });
         return { content: [{ type: 'text' as const, text: output }] };
       } catch (err) {
         return {
@@ -612,7 +883,7 @@ export function createKyberionMcpServer(): McpServer {
           isError: true,
         };
       }
-    },
+    }
   );
 
   return server;
