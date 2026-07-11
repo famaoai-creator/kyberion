@@ -85,6 +85,13 @@ Kyberion enforces layered guardrails around agent-initiated execution:
 
 These guardrails are one layer of defense in depth against naive-to-moderate dangerous commands — they are **not** a sandbox. Full isolation (containers/eBPF) is tracked as future work in `docs/improvement-plans-2026-07/SA-02_ADF_SHELL_GUARDRAILS.ja.md`.
 
+## Declarative Policy Engine & Kill Switch (SA-05)
+
+- **Policy engine** (`libs/core/policy-engine.ts` + `knowledge/product/governance/agent-policies.yaml`): declarative rules (tier isolation, injection guards, ring restrictions, delegation depth, rate limits) evaluated at real execution junctions — `file_write` (secure-io), `execute_command` (safeExec/safeExecResult), `network_request` (secureFetch), and `reasoning_delegation` (before any provider call, with delegation depth tracked via `KYBERION_DELEGATION_DEPTH`). Parse failures load zero policies and `evaluate()` **fails closed**; policies whose rules fail to parse are dropped with a warning, and doctor reports declared-vs-loaded counts so silent shrink is visible.
+- **Approval unification**: shell-policy `require_approval` verdicts (sub-agent Bash, ACP tool calls) route through `requireApprovalForOp` — a pending approval request is filed for the operator and the call stays denied (fail-closed) until approved.
+- **Kill switch** (`libs/core/kill-switch.ts`): policy violations and actuator dispatches feed anomaly detection (thresholds in `knowledge/product/governance/trust-policy.json`); the monitor runs with run_pipeline / mission controller / the runtime supervisor. Graduated response: warn → isolate → kill, where kill always requires operator approval (no automatic kill).
+- **Visibility**: `pnpm doctor` prints the governance summary — kill-switch state, policy counts (declared/loaded), pending approvals, shell/egress rule counts, and current anomaly findings.
+
 ## Hall of Fame
 
 We credit reporters here unless they request anonymity.
