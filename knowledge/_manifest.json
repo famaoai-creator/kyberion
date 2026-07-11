@@ -1315,6 +1315,12 @@
       "type": "json"
     },
     {
+      "path": "product/governance/health-thresholds.json",
+      "tier": "public",
+      "size": 248,
+      "type": "json"
+    },
+    {
       "path": "product/governance/independent-validation-evidence-package.md",
       "tier": "public",
       "size": 6760,
