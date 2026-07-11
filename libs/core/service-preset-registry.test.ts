@@ -10,7 +10,15 @@ describe('service-preset-registry', () => {
   it('loads the canonical service presets directory', () => {
     const catalog = loadServicePresetsCatalog();
     expect(Object.keys(catalog.services)).toEqual(
-      expect.arrayContaining(['slack', 'comfyui', 'voice'])
+      expect.arrayContaining([
+        'slack',
+        'comfyui',
+        'voice',
+        'asana',
+        'figma',
+        'stripe',
+        'cloudflare',
+      ])
     );
   });
 
@@ -26,6 +34,13 @@ describe('service-preset-registry', () => {
     expect(preset?.operations).toHaveProperty('actions_list_runs');
     expect(preset?.operations).toHaveProperty('actions_get_run');
     expect(preset?.operations).toHaveProperty('actions_dispatch_workflow');
+  });
+
+  it('resolves common SaaS presets', () => {
+    expect(getServicePresetRecord('asana')?.operations).toHaveProperty('create_task');
+    expect(getServicePresetRecord('figma')?.operations).toHaveProperty('get_file');
+    expect(getServicePresetRecord('stripe')?.operations).toHaveProperty('create_payment_intent');
+    expect(getServicePresetRecord('cloudflare')?.operations).toHaveProperty('create_dns_record');
   });
 
   it('resolves a service preset path for a canonical service id', () => {
