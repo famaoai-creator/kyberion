@@ -131,6 +131,7 @@ export * from './question-resolver.js';
 export * from './op-input-contracts.js';
 export * from './op-suggestions.js';
 export * from './adf-engine.js';
+export * from './autonomous-repair.js';
 export * from './guided-coordination-brief.js';
 export * from './email-workflow.js';
 export * from './calendar-workflow.js';
