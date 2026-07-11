@@ -1,0 +1,55 @@
+{
+  "service_id": "asana",
+  "name": "Asana API Presets",
+  "base_url": "https://app.asana.com/api/1.0",
+  "auth_strategy": "Bearer",
+  "operations": {
+    "list_projects": {
+      "type": "api",
+      "path": "projects",
+      "method": "GET",
+      "description": "Lists Asana projects.",
+      "parameters": {
+        "workspace": { "required": false, "type": "string" },
+        "team": { "required": false, "type": "string" },
+        "limit": { "required": false, "type": "number" }
+      }
+    },
+    "create_task": {
+      "type": "api",
+      "path": "tasks",
+      "method": "POST",
+      "description": "Creates an Asana task.",
+      "parameters": {
+        "name": { "required": true, "type": "string" },
+        "notes": { "required": false, "type": "string" },
+        "projects": { "required": false, "type": "array" }
+      },
+      "payload_template": {
+        "name": "{{name}}",
+        "notes": "{{notes}}",
+        "projects": "{{projects}}"
+      }
+    },
+    "get_task": {
+      "type": "api",
+      "path": "tasks/{{task_gid}}",
+      "method": "GET",
+      "description": "Fetches an Asana task.",
+      "parameters": {
+        "task_gid": { "required": true, "type": "string" }
+      }
+    },
+    "search_tasks": {
+      "type": "api",
+      "path": "tasks/search",
+      "method": "GET",
+      "description": "Searches for Asana tasks by text.",
+      "parameters": {
+        "text": { "required": true, "type": "string" },
+        "workspace": { "required": false, "type": "string" },
+        "limit": { "required": false, "type": "number" }
+      }
+    }
+  }
+}

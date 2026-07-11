@@ -114,13 +114,16 @@ describe('service-binding', () => {
     delete process.env.SLACK_APP_TOKEN;
 
     expect(() => resolveServiceBinding('slack', 'secret-guard')).toThrow(
-      'Access denied: no service binding secret found for "slack"',
+      'Access denied: no service binding secret found for "slack"'
     );
   });
 
   it('emits service binding records that satisfy the schema', () => {
     const ajv = new Ajv({ allErrors: true });
-    const schemaPath = path.join(pathResolver.rootDir(), 'knowledge/product/schemas/service-binding-record.schema.json');
+    const schemaPath = path.join(
+      pathResolver.rootDir(),
+      'knowledge/product/schemas/service-binding-record.schema.json'
+    );
     const validate = compileSchemaFromPath(ajv, schemaPath);
     const binding = {
       binding_id: 'BIND-TEST-SCHEMA',
@@ -148,10 +151,18 @@ describe('service-binding', () => {
       preset_path: 'knowledge/product/orchestration/service-presets/slack.json',
       allow_stream_ingress: false,
     });
+    expect(catalog.services.asana).toMatchObject({
+      base_url: 'https://app.asana.com/api/1.0',
+      preset_path: 'knowledge/product/orchestration/service-presets/asana.json',
+    });
 
     expect(getServiceEndpointRecord('github')).toMatchObject({
       base_url: 'https://api.github.com',
       preset_path: 'knowledge/product/orchestration/service-presets/github.json',
+    });
+    expect(getServiceEndpointRecord('stripe')).toMatchObject({
+      base_url: 'https://api.stripe.com/v1',
+      preset_path: 'knowledge/product/orchestration/service-presets/stripe.json',
     });
   });
 
