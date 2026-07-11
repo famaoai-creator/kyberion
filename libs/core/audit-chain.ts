@@ -357,7 +357,17 @@ class AuditChainImpl {
 
   private listAuditFiles(): string[] {
     if (!safeExistsSync(this.auditDir)) return [];
-    return safeReaddir(this.auditDir)
+    let fileNames: string[];
+    try {
+      fileNames = safeReaddir(this.auditDir);
+    } catch (err) {
+      // The directory can vanish between the exists check and the readdir
+      // (janitor sweeps, tests mocking existsSync). A missing dir simply
+      // means no persisted chain yet.
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return [];
+      throw err;
+    }
+    return fileNames
       .filter((fileName) => AuditChainImpl.AUDIT_FILE_RE.test(fileName))
       .sort((left, right) => left.localeCompare(right));
   }
