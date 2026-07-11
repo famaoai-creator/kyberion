@@ -1,11 +1,8 @@
 import {
-  logger,
   safeWriteFile,
-  derivePipelineStatus,
+  executeAdfSteps,
   pathResolver,
   resolveRef,
-  resolveVars,
-  handleStepError,
   createActuatorTrace,
   finalizeActuatorTrace,
 } from '@agent/core';
@@ -51,9 +48,8 @@ export async function handleMediaAction(input: MediaAction, deps: MediaPipelineD
         input.steps || [],
         input.context || {},
         input.options,
-        { stepCount: 0, startTime: Date.now() },
         pt,
-        deps,
+        deps
       );
       pt.endSpan('ok');
       return result;
@@ -71,9 +67,8 @@ export async function handleMediaAction(input: MediaAction, deps: MediaPipelineD
       input.steps || [],
       input.context || {},
       input.options,
-      { stepCount: 0, startTime: Date.now() },
       traceCtx,
-      deps,
+      deps
     );
     traceCtx.endSpan('ok');
     return { ...result, ...finalizeActuatorTrace(traceCtx) };
@@ -87,91 +82,98 @@ export async function handleMediaAction(input: MediaAction, deps: MediaPipelineD
   }
 }
 
+const stripMediaOpPrefix = (op: string) => ((op || '').startsWith('media:') ? op.slice(6) : op);
+
+// The canonical engine only knows capture/transform/apply/control, so media's
+// extra surface ('media:' op prefixes, the 'sink' alias for apply) is
+// normalized up front — recursively into on_error.fallback arrays, which the
+// engine runs through the same nested-step path.
+function normalizeMediaSteps(list: MediaPipelineStep[]): any[] {
+  return (list || []).map((step) => ({
+    ...step,
+    op: stripMediaOpPrefix(step.op),
+    type: step.type === 'sink' ? 'apply' : step.type,
+    __media_step_type: step.type,
+    ...(step.on_error?.fallback
+      ? { on_error: { ...step.on_error, fallback: normalizeMediaSteps(step.on_error.fallback) } }
+      : {}),
+  }));
+}
+
+// AR-01 Task 2: hand-rolled loop replaced by the canonical engine
+// (executeAdfSteps). on_error recovery is the engine's native path now.
+// Deliberate semantic changes: nested ref failures propagate (AR-06
+// no-silent-failure), non-ref control ops throw instead of being silently
+// ignored, and the step/timeout budget is actually enforced (media renders
+// can be slow, so the default timeout is 10 minutes, not the engine's 60s).
 export async function executeMediaPipeline(
   steps: MediaPipelineStep[],
   initialCtx: any = {},
   options: any = {},
-  state: any = { stepCount: 0, startTime: Date.now() },
   traceCtx?: any,
-  deps?: MediaPipelineDeps,
+  deps?: MediaPipelineDeps
 ) {
-  const rootDir = pathResolver.rootDir();
   let ctx = { ...initialCtx, timestamp: new Date().toISOString() };
-  const resolve = (val: any) => resolveVars(val, ctx);
 
-  const results = [];
-  for (const step of steps) {
-    state.stepCount++;
-    const op = (step.op || '').startsWith('media:') ? step.op.slice(6) : step.op;
+  const hooks = {
+    beforeStep: (step: any, stepNumber: number) => {
+      traceCtx?.startSpan?.(`media:${step.__media_step_type || step.type}:${step.op}`, {
+        stepCount: stepNumber,
+      });
+    },
+    afterStep: (_step: any, _stepNumber: number, _stepCtx: any, outcome: any) => {
+      if (outcome.status === 'success' || outcome.status === 'skipped') {
+        traceCtx?.endSpan?.('ok');
+      } else {
+        traceCtx?.endSpan?.('error', outcome.error);
+      }
+    },
+  };
 
-    try {
-      traceCtx?.startSpan?.(`media:${step.type}:${op}`, { stepCount: state.stepCount });
-      logger.info(`  [MEDIA_PIPELINE] [Step ${state.stepCount}] ${step.type}:${op}...`);
-      switch (step.type) {
-        case 'capture':
-          ctx = await deps!.opCapture(op, step.params, ctx, resolve);
-          break;
-        case 'transform':
-          ctx = await deps!.opTransform(op, step.params, ctx, resolve);
-          break;
-        case 'apply':
-          ctx = await deps!.opApply(op, step.params, ctx, resolve);
-          break;
-        case 'sink':
-          ctx = await deps!.opApply(op, step.params, ctx, resolve);
-          break;
-        case 'control': {
-          if (op === 'ref') {
-            const refPath = resolve(step.params.path);
-            const bindResolved: Record<string, any> = {};
-            if (step.params.bind) {
-              for (const [k, v] of Object.entries(step.params.bind as Record<string, any>)) {
-                bindResolved[k] = resolve(v);
-              }
-            }
-            const refResult = await resolveRef(refPath, bindResolved, ctx, resolve);
-            const subResult = await executeMediaPipeline(
-              refResult.steps,
-              { ...ctx, ...refResult.mergedCtx },
-              options,
-              state,
-              traceCtx,
-              deps,
-            );
-            const { _refDepth, ...subCtxClean } = subResult.context || {};
-            ctx = { ...ctx, ...subCtxClean };
-          }
-          break;
+  const result = await executeAdfSteps(
+    normalizeMediaSteps(steps) as Parameters<typeof executeAdfSteps>[0],
+    ctx,
+    { maxSteps: options.max_steps || 1000, timeoutMs: options.timeout_ms || 600000 },
+    {
+      capture: (op, params, stepCtx, resolve) => deps!.opCapture(op, params, stepCtx, resolve),
+      transform: (op, params, stepCtx, resolve) => deps!.opTransform(op, params, stepCtx, resolve),
+      apply: (op, params, stepCtx, resolve) => deps!.opApply(op, params, stepCtx, resolve),
+      control: async (op, params, stepCtx, runSteps, resolve) => {
+        if (op !== 'ref') {
+          throw new Error(`Unsupported control operator in Media-Actuator: ${op}`);
         }
-      }
-      traceCtx?.endSpan?.('ok');
-      results.push({ op, status: 'success' });
-    } catch (err: any) {
-      traceCtx?.endSpan?.('error', err.message);
-      const stepOnError = (step as any).on_error;
-      if (stepOnError) {
-        try {
-          const recovery = await handleStepError(err, step, stepOnError, ctx,
-            async (fallbackSteps: any[], errCtx: any) => {
-              const res = await executeMediaPipeline(fallbackSteps, errCtx, options, state, traceCtx, deps);
-              return res.context;
-            }, resolve);
-          if (recovery.recovered) {
-            ctx = recovery.ctx;
-            results.push({ op: step.op, status: 'recovered' as any });
-            continue;
+        const refPath = resolve(params.path);
+        const bindResolved: Record<string, any> = {};
+        if (params.bind) {
+          for (const [k, v] of Object.entries(params.bind as Record<string, any>)) {
+            bindResolved[k] = resolve(v);
           }
-        } catch (_) { /* fallthrough to default error handling */ }
-      }
-      logger.error(`  [MEDIA_PIPELINE] Step failed (${step.op}): ${err.message}`);
-      results.push({ op: step.op, status: 'failed', error: err.message });
-      break;
-    }
-  }
+        }
+        const refResult = await resolveRef(refPath, bindResolved, stepCtx, resolve);
+        const res = await runSteps(normalizeMediaSteps(refResult.steps), {
+          ...stepCtx,
+          ...refResult.mergedCtx,
+        });
+        if (res.status === 'failed') {
+          throw new Error(
+            res.results.find((entry: any) => entry.status === 'failed')?.error ||
+              'nested pipeline failed'
+          );
+        }
+        const { _refDepth, ...subCtxClean } = res.context || {};
+        return { ...stepCtx, ...subCtxClean };
+      },
+    },
+    hooks
+  );
+  ctx = result.context;
 
   if (initialCtx.context_path) {
-    safeWriteFile(path.resolve(pathResolver.rootDir(), initialCtx.context_path), JSON.stringify(ctx, null, 2));
+    safeWriteFile(
+      path.resolve(pathResolver.rootDir(), initialCtx.context_path),
+      JSON.stringify(ctx, null, 2)
+    );
   }
 
-  return { status: derivePipelineStatus(results), results, context: ctx };
+  return { status: result.status, results: result.results, context: ctx };
 }
