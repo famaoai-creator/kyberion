@@ -19,6 +19,10 @@ const allowedManagedProcessConsumers = [
   'libs/core/mission-orchestration-events.test.ts',
   'libs/core/mission-orchestration-events.ts',
   'libs/core/mission-orchestration-worker.resume.test.ts',
+  // MCP server: background pipeline jobs outlive the 60s sync window and are
+  // supervised so they die with the server session instead of leaking.
+  'libs/shared-network/src/mcp-server-engine.ts',
+  'libs/shared-network/src/mcp-server-engine.test.ts',
   'scripts/run_baseline_check.ts',
   'scripts/soak_restart_e2e.ts',
   'scripts/surface_runtime.ts',

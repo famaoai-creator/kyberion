@@ -24,6 +24,16 @@
       "notes": "Only pipelines on the explicit allowlist may be run via MCP. Risky-op pipelines require approval gate."
     },
     {
+      "name": "kyberion.pipeline.job_status",
+      "description": "Poll a background pipeline job started via kyberion.pipeline.run (background: true).",
+      "category": "pipeline",
+      "risk_class": "low",
+      "requires_approval": false,
+      "allowed_tiers": ["public"],
+      "allowed_caller_roles": ["operator", "agent", "cowork"],
+      "notes": "Read-only status/output tail. Jobs are scoped to the MCP server session."
+    },
+    {
       "name": "kyberion.knowledge.search",
       "description": "Search Kyberion knowledge base (public tier by default).",
       "category": "knowledge",
