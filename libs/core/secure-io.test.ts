@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
@@ -82,6 +82,20 @@ describe('secure-io core', () => {
         process.umask(previousUmask);
       }
       expect(fs.statSync(testFile).mode & 0o777).toBe(0o600);
+    });
+
+    it('fails closed when policy evaluation itself throws (SA-05)', async () => {
+      const { policyEngine } = await import('./policy-engine.js');
+      const spy = vi.spyOn(policyEngine, 'evaluate').mockImplementation(() => {
+        throw new Error('policy file parse failure');
+      });
+      try {
+        const testFile = path.join(tmpDir, 'fail-closed.txt');
+        expect(() => safeWriteFile(testFile, 'data')).toThrow('Policy engine unavailable');
+        expect(fs.existsSync(testFile)).toBe(false);
+      } finally {
+        spy.mockRestore();
+      }
     });
 
     it('refuses to replace a symbolic link', () => {
