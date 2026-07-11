@@ -3,6 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { EventEmitter } from 'node:events';
 
 // ── vi.hoisted — must come before vi.mock factory references ──────────────────
 const {
@@ -10,6 +11,8 @@ const {
   mockSafeReaddir,
   mockSafeExistsSync,
   mockSafeExec,
+  mockSpawnManagedProcess,
+  mockStopManagedProcess,
   mockBuildKnowledgeIndex,
   mockQueryKnowledge,
   mockConnect,
@@ -22,12 +25,17 @@ const {
   mockRunCoworkKnowledgeSync,
   registeredTools,
 } = vi.hoisted(() => {
-  const registeredTools = new Map<string, { description: string; handler: (...args: any[]) => any }>();
+  const registeredTools = new Map<
+    string,
+    { description: string; handler: (...args: any[]) => any }
+  >();
   return {
     mockSafeReadFile: vi.fn(),
     mockSafeReaddir: vi.fn(),
     mockSafeExistsSync: vi.fn(),
     mockSafeExec: vi.fn(),
+    mockSpawnManagedProcess: vi.fn(),
+    mockStopManagedProcess: vi.fn(),
     mockBuildKnowledgeIndex: vi.fn(),
     mockQueryKnowledge: vi.fn(),
     mockConnect: vi.fn().mockResolvedValue(undefined),
@@ -51,6 +59,8 @@ vi.mock('@agent/core', async () => {
     safeReaddir: mockSafeReaddir,
     safeExistsSync: mockSafeExistsSync,
     safeExec: mockSafeExec,
+    spawnManagedProcess: mockSpawnManagedProcess,
+    stopManagedProcess: mockStopManagedProcess,
     buildKnowledgeIndex: mockBuildKnowledgeIndex,
     queryKnowledge: mockQueryKnowledge,
   };
@@ -130,8 +140,12 @@ describe('createKyberionMcpServer()', () => {
       mockSafeReaddir.mockReturnValue(['vital-check.json', 'list-capabilities.json', 'README.md']);
       mockSafeReadFile
         .mockReturnValueOnce(FAKE_CATALOG)
-        .mockReturnValueOnce(JSON.stringify({ pipeline_id: 'vital-check', description: 'Vital check pipeline' }))
-        .mockReturnValueOnce(JSON.stringify({ pipeline_id: 'list-capabilities', description: 'List capabilities' }));
+        .mockReturnValueOnce(
+          JSON.stringify({ pipeline_id: 'vital-check', description: 'Vital check pipeline' })
+        )
+        .mockReturnValueOnce(
+          JSON.stringify({ pipeline_id: 'list-capabilities', description: 'List capabilities' })
+        );
 
       createKyberionMcpServer();
       const handler = registeredTools.get('kyberion.pipeline.list')!.handler;
@@ -141,12 +155,14 @@ describe('createKyberionMcpServer()', () => {
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed).toHaveLength(2);
       expect(parsed[0].name).toBe('vital-check');
+      // list must expose the same allowlist predicate that pipeline.run enforces
+      expect(parsed[0].runnable_via_mcp).toBe(true);
+      expect(parsed[1].name).toBe('list-capabilities');
+      expect(parsed[1].runnable_via_mcp).toBe(false);
     });
 
     it('pipelines/ が存在しない場合は空配列を返す', async () => {
-      mockSafeExistsSync.mockImplementation((p: string) =>
-        !p.endsWith('pipelines'),
-      );
+      mockSafeExistsSync.mockImplementation((p: string) => !p.endsWith('pipelines'));
 
       createKyberionMcpServer();
       const handler = registeredTools.get('kyberion.pipeline.list')!.handler;
@@ -194,10 +210,103 @@ describe('createKyberionMcpServer()', () => {
     });
   });
 
+  describe('kyberion.pipeline.run background jobs', () => {
+    function makeFakeChild() {
+      const child = new EventEmitter() as any;
+      child.stdout = new EventEmitter();
+      child.stderr = new EventEmitter();
+      child.pid = 4242;
+      child.killed = false;
+      child.kill = vi.fn();
+      return child;
+    }
+
+    it('background: true でジョブを起動し job_id を返す', async () => {
+      const child = makeFakeChild();
+      mockSpawnManagedProcess.mockReturnValue({ resourceId: 'r', child });
+
+      createKyberionMcpServer();
+      const handler = registeredTools.get('kyberion.pipeline.run')!.handler;
+      const result = await handler({ input: 'pipelines/vital-check.json', background: true });
+
+      expect(result.isError).toBeFalsy();
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.job_id).toMatch(/^plj-/);
+      expect(parsed.status).toBe('running');
+      expect(parsed.poll_with).toBe('kyberion.pipeline.job_status');
+      expect(mockSpawnManagedProcess).toHaveBeenCalledOnce();
+      expect(mockSafeExec).not.toHaveBeenCalled();
+    });
+
+    it('終了後は job_status が succeeded と出力 tail を返す', async () => {
+      const child = makeFakeChild();
+      mockSpawnManagedProcess.mockReturnValue({ resourceId: 'r', child });
+
+      createKyberionMcpServer();
+      const run = registeredTools.get('kyberion.pipeline.run')!.handler;
+      const started = await run({ input: 'pipelines/vital-check.json', background: true });
+      const { job_id } = JSON.parse(started.content[0].text);
+
+      child.stdout.emit('data', 'Pipeline output line');
+      child.emit('exit', 0);
+
+      const status = registeredTools.get('kyberion.pipeline.job_status')!.handler;
+      const result = await status({ job_id });
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.status).toBe('succeeded');
+      expect(parsed.exit_code).toBe(0);
+      expect(parsed.output_tail).toContain('Pipeline output line');
+      expect(mockStopManagedProcess).toHaveBeenCalled();
+    });
+
+    it('非ゼロ exit は failed になり isError を返す', async () => {
+      const child = makeFakeChild();
+      mockSpawnManagedProcess.mockReturnValue({ resourceId: 'r', child });
+
+      createKyberionMcpServer();
+      const run = registeredTools.get('kyberion.pipeline.run')!.handler;
+      const started = await run({ input: 'pipelines/vital-check.json', background: true });
+      const { job_id } = JSON.parse(started.content[0].text);
+
+      child.stderr.emit('data', 'boom');
+      child.emit('exit', 1);
+
+      const status = registeredTools.get('kyberion.pipeline.job_status')!.handler;
+      const result = await status({ job_id });
+      expect(result.isError).toBe(true);
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.status).toBe('failed');
+      expect(parsed.output_tail).toContain('boom');
+    });
+
+    it('アローリスト外は background でも拒否される', async () => {
+      createKyberionMcpServer();
+      const handler = registeredTools.get('kyberion.pipeline.run')!.handler;
+      const result = await handler({ input: 'pipelines/dangerous.json', background: true });
+
+      expect(result.isError).toBe(true);
+      expect(mockSpawnManagedProcess).not.toHaveBeenCalled();
+    });
+
+    it('未知の job_id はエラーを返す', async () => {
+      createKyberionMcpServer();
+      const status = registeredTools.get('kyberion.pipeline.job_status')!.handler;
+      const result = await status({ job_id: 'plj-nope' });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('Unknown pipeline job');
+    });
+  });
+
   describe('kyberion.knowledge.search', () => {
     it('クエリを knowledge index に渡し結果を返す', async () => {
       const fakeHints = [
-        { topic: 'onboarding', hint: 'Run pnpm onboard', source: 'knowledge/public/procedures', confidence: 0.9 },
+        {
+          topic: 'onboarding',
+          hint: 'Run pnpm onboard',
+          source: 'knowledge/public/procedures',
+          confidence: 0.9,
+        },
       ];
       mockBuildKnowledgeIndex.mockResolvedValue({});
       mockQueryKnowledge.mockResolvedValue(fakeHints);
@@ -229,14 +338,18 @@ describe('createKyberionMcpServer()', () => {
       mockSafeReaddir.mockReturnValue(['meeting-actuator', 'file-actuator']);
       mockSafeReadFile
         .mockReturnValueOnce(FAKE_CATALOG)
-        .mockReturnValueOnce(JSON.stringify({
-          actuator_id: 'meeting-actuator',
-          capabilities: [{ op: 'join' }, { op: 'leave' }],
-        }))
-        .mockReturnValueOnce(JSON.stringify({
-          actuator_id: 'file-actuator',
-          capabilities: [{ op: 'read' }, { op: 'write' }],
-        }));
+        .mockReturnValueOnce(
+          JSON.stringify({
+            actuator_id: 'meeting-actuator',
+            capabilities: [{ op: 'join' }, { op: 'leave' }],
+          })
+        )
+        .mockReturnValueOnce(
+          JSON.stringify({
+            actuator_id: 'file-actuator',
+            capabilities: [{ op: 'read' }, { op: 'write' }],
+          })
+        );
 
       createKyberionMcpServer();
       const handler = registeredTools.get('kyberion.capability.list')!.handler;
@@ -263,7 +376,7 @@ describe('createKyberionMcpServer()', () => {
       expect(mockSafeExec).toHaveBeenCalledWith(
         'node',
         expect.arrayContaining(['status', '--mission-id', 'mission-abc']),
-        expect.any(Object),
+        expect.any(Object)
       );
     });
   });
@@ -283,7 +396,9 @@ describe('createKyberionMcpServer()', () => {
     });
 
     it('listPendingApprovalsForCowork が例外をスローした場合はエラーを返す', async () => {
-      mockListPendingApprovals.mockImplementation(() => { throw new Error('store error'); });
+      mockListPendingApprovals.mockImplementation(() => {
+        throw new Error('store error');
+      });
 
       createKyberionMcpServer();
       const handler = registeredTools.get('kyberion.approval.list_pending')!.handler;
@@ -305,7 +420,11 @@ describe('createKyberionMcpServer()', () => {
 
       createKyberionMcpServer();
       const handler = registeredTools.get('kyberion.approval.decide')!.handler;
-      const result = await handler({ request_id: 'req-001', decision: 'approved', decided_by: 'operator-1' });
+      const result = await handler({
+        request_id: 'req-001',
+        decision: 'approved',
+        decided_by: 'operator-1',
+      });
 
       expect(result.isError).toBeFalsy();
       const parsed = JSON.parse(result.content[0].text);
@@ -313,11 +432,17 @@ describe('createKyberionMcpServer()', () => {
     });
 
     it('decideApprovalFromCowork がエラーをスローした場合はエラーを返す', async () => {
-      mockDecideApproval.mockImplementation(() => { throw new Error('[APPROVAL_ERROR] Request not found'); });
+      mockDecideApproval.mockImplementation(() => {
+        throw new Error('[APPROVAL_ERROR] Request not found');
+      });
 
       createKyberionMcpServer();
       const handler = registeredTools.get('kyberion.approval.decide')!.handler;
-      const result = await handler({ request_id: 'bad-id', decision: 'approved', decided_by: 'op' });
+      const result = await handler({
+        request_id: 'bad-id',
+        decision: 'approved',
+        decided_by: 'op',
+      });
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Approval decision failed');
@@ -334,8 +459,14 @@ describe('createKyberionMcpServer()', () => {
 
       expect(result.isError).toBeFalsy();
       expect(result.content[0].text).toContain('Export written');
-      expect(mockSafeExec).toHaveBeenCalledWith('node', expect.arrayContaining(['--from', '2026-06-01']), expect.any(Object));
-      expect(mockRecordAuditExport).toHaveBeenCalledWith(expect.objectContaining({ verifyOnly: false }));
+      expect(mockSafeExec).toHaveBeenCalledWith(
+        'node',
+        expect.arrayContaining(['--from', '2026-06-01']),
+        expect.any(Object)
+      );
+      expect(mockRecordAuditExport).toHaveBeenCalledWith(
+        expect.objectContaining({ verifyOnly: false })
+      );
     });
 
     it('スクリプトが存在しない場合はエラーを返す', async () => {
@@ -360,8 +491,14 @@ describe('createKyberionMcpServer()', () => {
 
       expect(result.isError).toBeFalsy();
       expect(result.content[0].text).toContain('verified');
-      expect(mockSafeExec).toHaveBeenCalledWith('node', expect.arrayContaining(['--verify-only']), expect.any(Object));
-      expect(mockRecordAuditExport).toHaveBeenCalledWith(expect.objectContaining({ verifyOnly: true }));
+      expect(mockSafeExec).toHaveBeenCalledWith(
+        'node',
+        expect.arrayContaining(['--verify-only']),
+        expect.any(Object)
+      );
+      expect(mockRecordAuditExport).toHaveBeenCalledWith(
+        expect.objectContaining({ verifyOnly: true })
+      );
     });
   });
 
@@ -375,14 +512,24 @@ describe('createKyberionMcpServer()', () => {
       const fakeSyncResult = {
         direction: 'both',
         sync_state_path: '/repo/active/shared/runtime/cowork-sync-state.json',
-        ingest: { enqueued: 2, skipped_duplicate: 0, skipped_tier_violation: 0, candidate_ids: ['c1', 'c2'], errors: [] },
+        ingest: {
+          enqueued: 2,
+          skipped_duplicate: 0,
+          skipped_tier_violation: 0,
+          candidate_ids: ['c1', 'c2'],
+          errors: [],
+        },
         supply: { delivered: 3, skipped_unchanged: 1, delivery_id: 'COWORK-XYZ', errors: [] },
       };
       mockRunCoworkKnowledgeSync.mockReturnValue(fakeSyncResult);
 
       createKyberionMcpServer();
       const handler = registeredTools.get('kyberion.knowledge.cowork_sync')!.handler;
-      const result = await handler({ direction: 'both', cowork_artifact_paths: ['a.md'], max_hints: 10 });
+      const result = await handler({
+        direction: 'both',
+        cowork_artifact_paths: ['a.md'],
+        max_hints: 10,
+      });
 
       expect(result.isError).toBeFalsy();
       const parsed = JSON.parse(result.content[0].text);
@@ -403,7 +550,11 @@ describe('createKyberionMcpServer()', () => {
 
       createKyberionMcpServer();
       const handler = registeredTools.get('kyberion.knowledge.cowork_sync')!.handler;
-      const result = await handler({ direction: 'kyberion-to-cowork', cowork_artifact_paths: [], max_hints: 50 });
+      const result = await handler({
+        direction: 'kyberion-to-cowork',
+        cowork_artifact_paths: [],
+        max_hints: 50,
+      });
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Knowledge sync failed');
