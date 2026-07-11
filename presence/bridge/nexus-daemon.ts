@@ -5,6 +5,7 @@
  */
 
 import {
+  installProcessGuards,
   logger,
   terminalBridge,
   safeReadFile,
@@ -22,6 +23,9 @@ import {
 import { reflexEngine } from '@agent/shared-nerve';
 import { handleAction as dispatchService } from '@actuator/service';
 import * as path from 'node:path';
+
+// IP-08 Task 6: record unhandled rejections/exceptions in this long-lived process.
+installProcessGuards('nexus-daemon');
 
 const ROOT_DIR = pathResolver.rootDir();
 const STIMULI_PATH = path.join(ROOT_DIR, 'presence/bridge/runtime/stimuli.jsonl');
