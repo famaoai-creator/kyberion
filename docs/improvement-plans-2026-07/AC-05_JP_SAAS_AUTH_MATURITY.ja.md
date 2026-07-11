@@ -30,6 +30,13 @@
 2. `oauth_callback_surface.ts` を使った E2E 手順を `docs/developer/LOCAL_DEV.md` に記載し、サンドボックスアプリでの疎通を確認する(実アプリ登録が必要な部分は手順書化まで。市村さんのアプリ登録が必要な旨を報告)。
 3. `refresh_oauth_token` の自動リフレッシュ(実行時に expires_at 超過を検知して refresh してからリトライ)を `service-engine-execution.ts` の auth 解決に追加し、unit test を付ける。
 
+### 実装状況 (2026-07-11 — Task 2)
+
+- `libs/core/secret-encryption.ts`: `KYBERION_SECRET_ENCRYPTION=none|keychain`(既定 none=現行互換、未知値は fail-closed で throw)。keychain モードは macOS `security` CLI(secure-io の safeExecResult 経由)に保持した 32 バイト鍵で AES-256-GCM。読込は自動判別(平文互換)、暗号化済み文書の復号失敗は loud に throw(起動スキャンのみ warn+skip)。バックアップは raw バイト(暗号文書に平文 .bak を作らない)。
+- `pnpm secrets:encrypt`(`--decrypt` で平文エクスポート=鍵全損時の脱出経路)。migrate は各ファイルの raw .bak を先に書く。
+- テスト: モード解決(未知値拒否)、roundtrip、改竄/鍵違い拒否、migrate の encrypt→skip 冪等→decrypt 復元(計21件緑、鍵はテスト注入で keychain 非接触)。
+- 残: age モード(非 Mac)、OAuth プリセット拡大(Task 1/3)、kintone(Task 4)。
+
 ### Task 2: 保存時暗号化オプション — `claude-sonnet-4`
 
 1. `secret-guard.ts` の `storeConnectionDocument`/`loadConnectionDocument` に暗号化層を追加: `KYBERION_SECRET_ENCRYPTION=keychain|age|none`(既定 none=現行互換)。keychain は macOS `security` CLI、age は Node 実装(依存追加は 1 パッケージまで)。
