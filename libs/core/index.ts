@@ -187,6 +187,7 @@ export * from './ops-alert.js';
 export * from './health-degradation.js';
 export * from './aidlc-phase-state.js';
 export * from './secret-encryption.js';
+export * from './spend-guard.js';
 export * from './chain-integrity.js';
 
 // Classification & Knowledge
