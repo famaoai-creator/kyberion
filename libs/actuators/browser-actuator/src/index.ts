@@ -464,3 +464,5 @@ export {
   restartBrowserSession,
   waitForOperatorContinue,
 };
+
+export { describeOps } from './op-catalog.js';
