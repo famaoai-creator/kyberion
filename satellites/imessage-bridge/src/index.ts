@@ -4,6 +4,7 @@ import { installProcessGuards } from '@agent/core';
 // IP-08 Task 6: record unhandled rejections/exceptions in this long-lived process.
 installProcessGuards('imessage-bridge');
 import {
+  resolveOperatorLocale,
   scheduleBridgeProcessingNote,
   createStandardYargs,
   logger,
@@ -113,7 +114,7 @@ async function pollIMessages() {
           // UX-01: an empty agent reply must not read as silence.
           await sendIMessage({
             recipient: msg.sender,
-            text: buildBridgeEmptyReplyText({ locale: 'ja' }),
+            text: buildBridgeEmptyReplyText({ locale: resolveOperatorLocale() }),
           });
         }
       } catch (err) {
@@ -124,7 +125,7 @@ async function pollIMessages() {
           conversationKey: `imessage:${msg.chatId}`,
           err,
           surface: 'imessage',
-          locale: 'ja',
+          locale: resolveOperatorLocale(),
           post: async (errorText) => sendIMessage({ recipient: msg.sender, text: errorText }),
         });
       } finally {

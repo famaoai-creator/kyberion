@@ -5,6 +5,7 @@ import { queryKnowledge, queryKnowledgeHybrid } from './src/knowledge-index.js';
 import { pathResolver } from './path-resolver.js';
 import { secureFetch } from './network.js';
 import { safeExec, safeWriteFile } from './secure-io.js';
+import { resolveOperatorLocale } from './operator-identity.js';
 import { writeIntentGoalHandoff } from './intent-handoff.js';
 import { a2aBridge } from './a2a-bridge.js';
 import type { A2AMessage } from './a2a-bridge.js';
@@ -2074,7 +2075,9 @@ export async function runSurfaceConversation(
     }
     return attachRoutingDecision(
       {
-        text: formatClarificationPacketConcise(compiledFlow.clarificationPacket, { locale: 'ja' }),
+        text: formatClarificationPacketConcise(compiledFlow.clarificationPacket, {
+          locale: resolveOperatorLocale(),
+        }),
         a2uiMessages: [],
         a2aMessages: [],
         delegationResults: [],
