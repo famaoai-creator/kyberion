@@ -13,6 +13,7 @@ import {
 } from '@agent/core';
 import { buildNextAction, formatNextAction } from '@agent/core';
 import { probeAppleIntelligence } from '@agent/core';
+import { collectMissionHygieneReport, formatMissionHygieneLine } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { summarizeBackupStatus } from './backup.js';
 import { formatDoctorSummary, summarizeManifestDoctor } from './environment-doctor.js';
@@ -248,10 +249,12 @@ async function collectLocalCapabilityDoctorLines(): Promise<string[]> {
     if (!availability.available) {
       return [
         `Apple Intelligence: unavailable (${availability.reason || 'unknown'}) — cloud/configured backends handle all lanes`,
+        formatMissionHygieneLine(collectMissionHygieneReport()),
       ];
     }
     return [
       'Apple Intelligence: AVAILABLE — local lanes: text assist (classify/summarize), vision OCR, speech-to-text (zero-config bridge). Demo: pnpm check:apple-fm',
+      formatMissionHygieneLine(collectMissionHygieneReport()),
     ];
   } catch (err) {
     return [

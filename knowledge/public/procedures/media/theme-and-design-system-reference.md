@@ -278,3 +278,22 @@ Contrast is computed, never eyeballed (working-philosophy rule 7):
 - **Reviewer checklist**: the designer role addendum in
   `knowledge/product/governance/working-philosophy.md` — contrast → hierarchy
   → spacing before aesthetics; judge the rendered artifact, in light AND dark.
+
+## Slide layout grammar (v1.1.0 — design.md-aligned)
+
+All PPTX layout presets share ONE grid (see `slide-layout-presets.json` →
+`grid`), in the spirit of [design.md](https://getdesign.md/): layout is a
+named, versioned structure — not per-slide improvisation.
+
+- **Page**: 10 × 5.63 in (16:9), margin **0.75in** on every side, gutter 0.25in
+- **Baselines**: title at y=0.55/h=0.85; body starts at y=1.65 — identical on
+  every preset, so slides never "jump" when the layout changes
+- **Type scale**: display 30 / title 26 / section 20 / body 16 / caption 11 —
+  presets pick FROM the scale, never invent sizes
+- Presets differ only in how the content area below the title baseline is
+  split (two-column, three-point, evidence-callout, timeline…)
+
+Rules for new presets: start from the grid block, reuse the type scale, name
+the preset after its communicative job (decision-cta, risk-controls), and add
+it to BOTH `slide-layout-presets.json` and `slide-layout-presets/presets.json`
+(the directory form wins at runtime).

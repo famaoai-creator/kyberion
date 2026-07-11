@@ -1,5 +1,13 @@
 import * as path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// finishMission fires real operator notifications (deliverable_ready /
+// mission_completed); without this mock every battery run appends phantom
+// entries to the REAL inbox (dev-practices §3).
+vi.mock('@agent/core', async () => {
+  const actual = await vi.importActual<Record<string, unknown>>('@agent/core');
+  return { ...actual, notifyOperator: vi.fn().mockResolvedValue(true) };
+});
 
 import {
   customerResolver,

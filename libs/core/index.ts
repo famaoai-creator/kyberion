@@ -110,6 +110,7 @@ export * from './mission-retrospective.js';
 export * from './working-principles.js';
 export * from './design-qa.js';
 export * from './apple-intelligence-bridge.js';
+export * from './mission-hygiene.js';
 
 // Utils
 export * from './fs-utils.js';

@@ -480,6 +480,28 @@ export async function runMissionControllerAction(
     case 'dispatch-workitems':
       await context.dispatchMissionWorkItems(arg1!);
       break;
+    case 'hygiene': {
+      const { collectMissionHygieneReport, notifyMissionHygiene, formatMissionHygieneLine } =
+        await import('@agent/core');
+      const staleDaysRaw = getValue('--stale-days', context.argv);
+      const abandonedDaysRaw = getValue('--abandoned-days', context.argv);
+      const report = collectMissionHygieneReport({
+        ...(staleDaysRaw ? { staleDays: Number(staleDaysRaw) } : {}),
+        ...(abandonedDaysRaw ? { abandonedDays: Number(abandonedDaysRaw) } : {}),
+      });
+      console.log(formatMissionHygieneLine(report));
+      for (const finding of [...report.abandoned, ...report.stale]) {
+        console.log(
+          `  [${finding.age_days ?? '?'}d] ${finding.mission_id} (${finding.reason}, tasks=${finding.task_count})`
+        );
+        console.log(`      → ${finding.recommendation.replaceAll('<ID>', finding.mission_id)}`);
+      }
+      if (context.argv.includes('--notify')) {
+        const sent = await notifyMissionHygiene(report);
+        console.log(sent ? '通知を送信しました。' : '要対応のミッションはありません。');
+      }
+      break;
+    }
     case 'improvements': {
       const {
         listProcessImprovementProposals,

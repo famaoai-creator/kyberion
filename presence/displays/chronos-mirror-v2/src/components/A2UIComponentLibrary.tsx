@@ -722,10 +722,32 @@ export const KbMissionCard = ({
 };
 
 // --- kb:artifact-tile ---
+const ARTIFACT_KIND_ICON: Record<string, string> = {
+  pptx: '📊',
+  xlsx: '📈',
+  docx: '📄',
+  doc: '📄',
+  md: '📝',
+  markdown: '📝',
+  pdf: '📕',
+  html: '🌐',
+  web: '🌐',
+  png: '🖼',
+  jpg: '🖼',
+  image: '🖼',
+  json: '🧾',
+  code: '💻',
+  audio: '🎧',
+  video: '🎬',
+};
+
 export const KbArtifactTile = ({
   type,
   path,
   previewContent,
+  missionId,
+  updatedAt,
+  missing,
   onSelect,
   onOpen,
   onPreview,
@@ -733,46 +755,71 @@ export const KbArtifactTile = ({
   type: string;
   path: string;
   previewContent: string;
+  missionId?: string;
+  updatedAt?: string;
+  missing?: boolean;
   onSelect?: () => void;
   onOpen?: () => void;
   onPreview?: () => void;
-}) => (
-  <div className="bg-slate-950/40 border border-white/5 rounded-lg p-3 transition hover:bg-slate-900/60">
-    <button type="button" onClick={onSelect || onPreview || onOpen} className="w-full text-left">
-      <div className="flex items-center gap-2 mb-2">
-        <div className="w-6 h-6 rounded bg-cyan-400/10 flex items-center justify-center text-cyan-400">
-          <Clock size={12} /> {/* Placeholder for type icon */}
+}) => {
+  const fileName = path.split('/').filter(Boolean).pop() || path;
+  const icon = ARTIFACT_KIND_ICON[type.toLowerCase()] || '📦';
+  return (
+    <div className="bg-slate-950/40 border border-white/5 rounded-lg p-3 transition hover:bg-slate-900/60">
+      <button type="button" onClick={onSelect || onPreview || onOpen} className="w-full text-left">
+        <div className="flex items-center gap-2 mb-1">
+          <div className="w-7 h-7 rounded bg-cyan-400/10 flex items-center justify-center text-[14px]">
+            {icon}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-[12px] font-semibold text-white/85">{fileName}</div>
+            <div className="flex items-center gap-2 text-[9px] uppercase tracking-[0.14em] text-slate-500">
+              <span>{type}</span>
+              {missionId ? <span className="truncate">· {missionId}</span> : null}
+              {updatedAt ? <span>· {updatedAt.slice(0, 10)}</span> : null}
+            </div>
+          </div>
+          {missing ? (
+            <span className="rounded border border-amber-400/30 bg-amber-400/10 px-2 py-0.5 text-[9px] uppercase tracking-[0.14em] text-amber-200/90">
+              file missing
+            </span>
+          ) : null}
         </div>
-        <div className="text-[10px] font-mono text-slate-400 truncate flex-1">{path}</div>
-      </div>
-      <div className="bg-black/40 p-2 rounded text-[9px] font-mono text-slate-500 line-clamp-3">
-        {previewContent}
-      </div>
-    </button>
-    {(onOpen || onPreview) && (
-      <div className="mt-2 flex gap-2">
-        {onPreview && (
-          <button
-            type="button"
-            onClick={onPreview}
-            className="rounded border border-cyan-400/20 bg-cyan-400/10 px-2 py-1 text-[9px] uppercase tracking-[0.16em] text-cyan-100/80 transition hover:bg-cyan-400/16"
-          >
-            preview
-          </button>
-        )}
-        {onOpen && (
-          <button
-            type="button"
-            onClick={onOpen}
-            className="rounded border border-white/10 bg-white/5 px-2 py-1 text-[9px] uppercase tracking-[0.16em] text-white/70 transition hover:bg-white/10"
-          >
-            open
-          </button>
-        )}
-      </div>
-    )}
-  </div>
-);
+        <div className="mb-2 truncate text-[9px] font-mono text-slate-500/80">{path}</div>
+        <div className="bg-black/40 p-2 rounded text-[9px] font-mono text-slate-500 line-clamp-3">
+          {previewContent}
+        </div>
+      </button>
+      {(onOpen || onPreview) && !missing && (
+        <div className="mt-2 flex gap-2">
+          {onPreview && (
+            <button
+              type="button"
+              onClick={onPreview}
+              className="rounded border border-cyan-400/20 bg-cyan-400/10 px-2 py-1 text-[9px] uppercase tracking-[0.16em] text-cyan-100/80 transition hover:bg-cyan-400/16"
+            >
+              preview
+            </button>
+          )}
+          {onOpen && (
+            <button
+              type="button"
+              onClick={onOpen}
+              className="rounded border border-white/10 bg-white/5 px-2 py-1 text-[9px] uppercase tracking-[0.16em] text-white/70 transition hover:bg-white/10"
+            >
+              open
+            </button>
+          )}
+        </div>
+      )}
+      {missing ? (
+        <div className="mt-2 text-[9px] text-amber-200/70">
+          元ファイルは掃除済みです(記録のみ残っています)
+        </div>
+      ) : null}
+    </div>
+  );
+};
 
 // --- kb:intervention-panel ---
 export const KbInterventionPanel = ({
