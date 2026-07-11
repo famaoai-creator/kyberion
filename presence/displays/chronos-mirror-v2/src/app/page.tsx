@@ -748,6 +748,25 @@ export default function ChronosMirrorV2() {
     }
   }, []);
 
+  const openDeliverableAsset = useCallback(
+    (item: { missionId?: string; path?: string; externalRef?: string }) => {
+      if (item.externalRef && /^https?:/.test(item.externalRef)) {
+        window.open(item.externalRef, '_blank', 'noreferrer');
+        return;
+      }
+      if (!item.path) return;
+      // repo-relative artifact mode covers exports/tmp/missions uniformly;
+      // mission mode remains for mission-relative records.
+      const url = item.path.startsWith('active/')
+        ? `/api/mission-asset?path=${encodeURIComponent(item.path)}`
+        : item.missionId
+          ? `/api/mission-asset?missionId=${encodeURIComponent(item.missionId)}&path=${encodeURIComponent(item.path)}`
+          : `/api/mission-asset?path=${encodeURIComponent(item.path)}`;
+      window.open(url, '_blank', 'noreferrer');
+    },
+    []
+  );
+
   const runPlanPreview = useCallback(async () => {
     if (!planRequestText.trim()) {
       setPlanPreviewError('依頼文を入力してください');
@@ -1027,6 +1046,11 @@ export default function ChronosMirrorV2() {
 
   const webTheme = webDesignSystem.theme.theme;
   const webLayout = webDesignSystem.layout;
+  const isLightTheme = themeMode === 'light';
+  const shellTextClass = isLightTheme ? 'text-[var(--kb-text-primary)]' : 'text-white';
+  const shellMutedClass = isLightTheme ? 'text-[var(--kb-text-secondary)]' : 'text-white/40';
+  const shellSubtleClass = isLightTheme ? 'text-[var(--kb-text-secondary)]' : 'text-white/60';
+  const shellTitleClass = isLightTheme ? 'text-[var(--kb-text-primary)]' : 'text-white/90';
 
   return (
     <Suspense fallback={null}>
@@ -1037,7 +1061,7 @@ export default function ChronosMirrorV2() {
         }}
       />
       <main
-        className="min-h-screen w-screen overflow-x-hidden bg-[var(--kb-bg-main)] text-white"
+        className={`min-h-screen w-screen overflow-x-hidden bg-[var(--kb-bg-main)] ${shellTextClass}`}
         data-theme={themeMode}
         style={{ ...(webDesignSystem.css_vars as CSSProperties), ...tenantCssVars }}
       >
@@ -1057,13 +1081,17 @@ export default function ChronosMirrorV2() {
                   <Shield className="h-5 w-5 text-cyan-400" />
                 </div>
                 <div>
-                  <div className="text-[10px] uppercase tracking-[0.3em] text-white/40 font-bold">
+                  <div
+                    className={`text-[10px] uppercase tracking-[0.3em] font-bold ${shellMutedClass}`}
+                  >
                     Chronos Mirror
                   </div>
-                  <h1 className="text-lg font-bold tracking-tight text-white/90">Control Plane</h1>
+                  <h1 className={`text-lg font-bold tracking-tight ${shellTitleClass}`}>
+                    Control Plane
+                  </h1>
                 </div>
                 <div
-                  className="ml-2 rounded-full border border-cyan-400/20 bg-cyan-400/5 px-3 py-1 text-[11px] text-cyan-100/70"
+                  className={`ml-2 rounded-full border border-cyan-400/20 bg-cyan-400/5 px-3 py-1 text-[11px] ${isLightTheme ? 'text-[var(--kb-text-secondary)]' : 'text-cyan-100/70'}`}
                   title="このサーフェスの役割"
                 >
                   管制塔 — 実行状態の監視と介入
@@ -1071,7 +1099,7 @@ export default function ChronosMirrorV2() {
                 <button
                   type="button"
                   onClick={() => setShowOpsBoards((current) => !current)}
-                  className={`ml-2 rounded-full border px-3 py-1 text-[11px] transition ${showOpsBoards ? 'border-cyan-400/60 bg-cyan-400/20 text-cyan-100' : 'border-white/15 bg-white/5 text-white/60 hover:bg-white/10'}`}
+                  className={`ml-2 rounded-full border px-3 py-1 text-[11px] transition ${showOpsBoards ? 'border-cyan-400/60 bg-cyan-400/20 text-cyan-100' : isLightTheme ? 'border-[color:var(--kb-border)] bg-white/80 text-[var(--kb-text-primary)] hover:bg-white' : 'border-white/15 bg-white/5 text-white/60 hover:bg-white/10'}`}
                 >
                   エージェント/看板
                 </button>
@@ -1091,7 +1119,7 @@ export default function ChronosMirrorV2() {
                     )
                   }
                   aria-label={`Chronos theme: ${themeModePreference}`}
-                  className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-white/70 transition hover:bg-white/10 hover:text-cyan-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
+                  className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 ${isLightTheme ? 'border-[color:var(--kb-border)] bg-white/80 text-[var(--kb-text-primary)] hover:bg-white' : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10 hover:text-cyan-400'}`}
                 >
                   <Palette size={12} />
                   <span>{themeModePreference}</span>
@@ -1100,7 +1128,7 @@ export default function ChronosMirrorV2() {
                 <button
                   type="button"
                   onClick={() => setAgentPanelOpen(true)}
-                  className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-white/70 transition hover:bg-white/10 hover:text-cyan-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
+                  className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 ${isLightTheme ? 'border-[color:var(--kb-border)] bg-white/80 text-[var(--kb-text-primary)] hover:bg-white' : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10 hover:text-cyan-400'}`}
                 >
                   <Cpu size={12} />
                   <span>{uxText('chronos_agent_runtimes', 'Agent Runtimes', locale)}</span>
@@ -1111,18 +1139,22 @@ export default function ChronosMirrorV2() {
 
           <section className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr),minmax(0,0.85fr)]">
             <div className="kyberion-glass rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
-              <div className="flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-[0.28em] text-white/42">
+              <div
+                className={`flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-[0.28em] ${shellMutedClass}`}
+              >
                 <span>{webTheme.name}</span>
-                <span className="text-white/20">·</span>
+                <span className={shellMutedClass}>·</span>
                 <span>{webDesignSystem.design_system.pack_id}</span>
-                <span className="text-white/20">·</span>
+                <span className={shellMutedClass}>·</span>
                 <span>{webTheme.colors.accent}</span>
               </div>
               <div className="mt-4 max-w-3xl">
-                <h2 className="text-2xl font-semibold tracking-tight text-white/92 md:text-[2rem]">
+                <h2
+                  className={`text-2xl font-semibold tracking-tight ${shellTitleClass} md:text-[2rem]`}
+                >
                   Kyberionは、環境全体を自律的に制御し、あなたの意図（Intent）に合わせてシステムが最適に連携・動作する高度なインテリジェント・インターフェースです。
                 </h2>
-                <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-200/68">
+                <p className={`mt-3 max-w-2xl text-sm leading-7 ${shellSubtleClass}`}>
                   この surface は `web-theme-pack` で色とタイポグラフィを、`web-design-system-pack`
                   でレイアウトとセクション順を管理します。見た目の微調整ではなく、再利用可能な構造を先に固定します。
                 </p>
@@ -1131,7 +1163,7 @@ export default function ChronosMirrorV2() {
                 {webDesignSystem.section_order.map((sectionId) => (
                   <span
                     key={sectionId}
-                    className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-white/68"
+                    className={`rounded-full border px-3 py-1 text-[10px] uppercase tracking-[0.18em] ${isLightTheme ? 'border-[color:var(--kb-border)] bg-white/70 text-[var(--kb-text-primary)]' : 'border-white/10 bg-black/20 text-white/68'}`}
                   >
                     {sectionId}
                   </span>
@@ -1141,48 +1173,58 @@ export default function ChronosMirrorV2() {
 
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="kyberion-glass rounded-[24px] border border-cyan-300/15 bg-cyan-400/[0.06] p-4">
-                <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-cyan-100/60">
+                <div
+                  className={`flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] ${isLightTheme ? 'text-[var(--kb-text-secondary)]' : 'text-cyan-100/60'}`}
+                >
                   <Palette size={12} />
                   Theme
                 </div>
-                <div className="mt-2 text-sm font-semibold text-white/90">{webTheme.name}</div>
-                <div className="mt-2 text-[11px] leading-6 text-cyan-50/72">
+                <div className={`mt-2 text-sm font-semibold ${shellTitleClass}`}>
+                  {webTheme.name}
+                </div>
+                <div className={`mt-2 text-[11px] leading-6 ${shellSubtleClass}`}>
                   {webDesignSystem.theme.web.snapshot_summary}
                 </div>
               </div>
               <div className="kyberion-glass rounded-[24px] border border-white/10 bg-black/18 p-4">
-                <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-white/48">
+                <div
+                  className={`flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] ${shellMutedClass}`}
+                >
                   <LayoutGrid size={12} />
                   Layout
                 </div>
-                <div className="mt-2 text-sm font-semibold text-white/90">
+                <div className={`mt-2 text-sm font-semibold ${shellTitleClass}`}>
                   {webLayout.grid_columns}-column grid
                 </div>
-                <div className="mt-2 text-[11px] leading-6 text-slate-200/60">
+                <div className={`mt-2 text-[11px] leading-6 ${shellSubtleClass}`}>
                   Container {webLayout.container_max_width}
                 </div>
               </div>
               <div className="kyberion-glass rounded-[24px] border border-white/10 bg-black/18 p-4">
-                <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-white/48">
+                <div
+                  className={`flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] ${shellMutedClass}`}
+                >
                   <Type size={12} />
                   Typography
                 </div>
-                <div className="mt-2 text-sm font-semibold text-white/90">
+                <div className={`mt-2 text-sm font-semibold ${shellTitleClass}`}>
                   {webTheme.fonts.heading}
                 </div>
-                <div className="mt-2 text-[11px] leading-6 text-slate-200/60">
+                <div className={`mt-2 text-[11px] leading-6 ${shellSubtleClass}`}>
                   Body {webTheme.fonts.body}
                 </div>
               </div>
               <div className="kyberion-glass rounded-[24px] border border-white/10 bg-black/18 p-4">
-                <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-white/48">
+                <div
+                  className={`flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] ${shellMutedClass}`}
+                >
                   <Ruler size={12} />
                   Surface
                 </div>
-                <div className="mt-2 text-sm font-semibold text-white/90">
+                <div className={`mt-2 text-sm font-semibold ${shellTitleClass}`}>
                   {webLayout.panel_radius} / {webLayout.surface_radius}
                 </div>
-                <div className="mt-2 text-[11px] leading-6 text-slate-200/60">
+                <div className={`mt-2 text-[11px] leading-6 ${shellSubtleClass}`}>
                   {webLayout.section_gap} section gap
                 </div>
               </div>
@@ -1194,14 +1236,14 @@ export default function ChronosMirrorV2() {
           <section className="kyberion-glass rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5 md:p-6">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <div className="text-[10px] uppercase tracking-[0.28em] text-cyan-100/55">
+                <div className={`text-[10px] uppercase tracking-[0.28em] ${shellMutedClass}`}>
                   Operator Home
                 </div>
-                <h2 className="mt-1 text-lg font-semibold tracking-tight text-white/90">
+                <h2 className={`mt-1 text-lg font-semibold tracking-tight ${shellTitleClass}`}>
                   One place to see what needs attention
                 </h2>
               </div>
-              <div className="text-[10px] uppercase tracking-[0.2em] text-white/40">
+              <div className={`text-[10px] uppercase tracking-[0.2em] ${shellMutedClass}`}>
                 {operatorHomeSummary?.statusLabel || 'loading'}
               </div>
             </div>
@@ -1936,6 +1978,9 @@ export default function ChronosMirrorV2() {
                       key={item.artifactId}
                       type={item.kind}
                       path={item.path || item.externalRef || item.artifactId}
+                      missionId={item.missionId}
+                      updatedAt={item.updatedAt}
+                      missing={item.missing}
                       previewContent={[
                         item.previewText || item.kind,
                         item.reviewVerdict ? `review: ${item.reviewVerdict}` : '',
@@ -1947,24 +1992,8 @@ export default function ChronosMirrorV2() {
                         setSelectedDeliverableId(item.artifactId);
                         setDeliverableReviewError(null);
                       }}
-                      onOpen={() => {
-                        if (item.missionId && item.path) {
-                          window.open(
-                            `/api/mission-asset?missionId=${encodeURIComponent(item.missionId)}&path=${encodeURIComponent(item.path)}`,
-                            '_blank',
-                            'noreferrer'
-                          );
-                        }
-                      }}
-                      onPreview={() => {
-                        if (item.missionId && item.path) {
-                          window.open(
-                            `/api/mission-asset?missionId=${encodeURIComponent(item.missionId)}&path=${encodeURIComponent(item.path)}`,
-                            '_blank',
-                            'noreferrer'
-                          );
-                        }
-                      }}
+                      onOpen={() => openDeliverableAsset(item)}
+                      onPreview={() => openDeliverableAsset(item)}
                     />
                   ))
                 )}
@@ -2522,13 +2551,19 @@ function TenantDesignBridge({
   onResolve: (cssVars: Record<string, string>, label: string | null) => void;
 }) {
   const searchParams = useSearchParams();
+  // The parent passes a fresh inline onResolve on every render; keeping it in
+  // the effect deps made resolve → setState → re-render → new onResolve →
+  // resolve an infinite loop. Track the latest callback in a ref and re-run
+  // only when the actual inputs (query params) change.
+  const onResolveRef = useRef(onResolve);
+  onResolveRef.current = onResolve;
 
   useEffect(() => {
     const customerId = searchParams.get('customerId') || searchParams.get('customer') || '';
     const brandName = searchParams.get('brandName') || '';
     const designSystemId = searchParams.get('designSystemId') || '';
     if (!customerId && !brandName && !designSystemId) {
-      onResolve({}, null);
+      onResolveRef.current({}, null);
       return;
     }
     const params = new URLSearchParams();
@@ -2547,11 +2582,11 @@ function TenantDesignBridge({
       })
       .then((payload) => {
         if (!payload) return;
-        onResolve(payload.css_vars || {}, payload.brand_name || payload.source || null);
+        onResolveRef.current(payload.css_vars || {}, payload.brand_name || payload.source || null);
       })
       .catch(() => {});
     return () => controller.abort();
-  }, [onResolve, searchParams]);
+  }, [searchParams]);
 
   return null;
 }

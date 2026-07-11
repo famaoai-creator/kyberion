@@ -2555,8 +2555,19 @@
           outcomeInboxEl.innerHTML = `<div class="item small">${escapeHtml(uiText("No recent outcomes yet.", "最近の outcome はまだありません。"))}<br><span class="hint-text">${escapeHtml(uiText("Mission completions emit artifacts that appear here. Run pnpm mission:start … to generate the first one.", "mission 完了で生まれた artifact がここに表示されます。pnpm mission:start … が起点です。"))}</span></div>`;
           return;
         }
+        const outcomeTitle = (item) => {
+          // never dump raw markdown/content as the card title — use the file
+          // name when a path exists, else a cleaned first line
+          const fromPath = item.path ? String(item.path).split("/").filter(Boolean).pop() : "";
+          if (fromPath) return fromPath;
+          const firstLine = String(item.preview_text || "").split("\n")[0]
+            .replace(/^#+\s*/, "").trim();
+          return firstLine.length > 3 && firstLine.length <= 60
+            ? firstLine
+            : (item.kind || "outcome");
+        };
         renderList(outcomeInboxEl, items.slice(0, 8), (item) =>
-          `<div class="row"><strong>${escapeHtml(item.preview_text || item.kind || "outcome")}</strong><span class="mono">${escapeHtml(item.kind || "artifact")}</span></div>
+          `<div class="row"><strong>${escapeHtml(outcomeTitle(item))}</strong><span class="mono">${escapeHtml(item.kind || "artifact")}</span></div>
            <div class="small">${escapeHtml(uiText("project", "project"))}: <span class="mono">${escapeHtml(item.project_id || "standalone")}</span> · ${escapeHtml(uiText("track", "track"))}: <span class="mono">${escapeHtml(item.track_name || item.track_id || item.work_loop?.context?.track_name || item.work_loop?.context?.track_id || "-")}</span></div>
            <div class="small">${escapeHtml(uiText("storage", "storage"))}: <span class="mono">${escapeHtml(item.storage_class || "unknown")}</span></div>
            <div class="small">${escapeHtml(uiText("artifact", "artifact"))}: <span class="mono">${escapeHtml(item.artifact_id || "unknown")}</span></div>

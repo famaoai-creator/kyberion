@@ -1413,7 +1413,7 @@
     {
       "path": "product/governance/kyberion-development-practices.md",
       "tier": "public",
-      "size": 9164,
+      "size": 9402,
       "type": "md"
     },
     {
@@ -3675,7 +3675,7 @@
     {
       "path": "product/orchestration/service-endpoints.json",
       "tier": "public",
-      "size": 5671,
+      "size": 6301,
       "type": "json"
     },
     {
@@ -3683,6 +3683,12 @@
       "tier": "public",
       "size": 1520,
       "type": "md"
+    },
+    {
+      "path": "product/orchestration/service-endpoints/asana.json",
+      "tier": "public",
+      "size": 234,
+      "type": "json"
     },
     {
       "path": "product/orchestration/service-endpoints/aws-ce.json",
@@ -3709,6 +3715,12 @@
       "type": "json"
     },
     {
+      "path": "product/orchestration/service-endpoints/cloudflare.json",
+      "tier": "public",
+      "size": 251,
+      "type": "json"
+    },
+    {
       "path": "product/orchestration/service-endpoints/comfyui.json",
       "tier": "public",
       "size": 187,
@@ -3724,6 +3736,12 @@
       "path": "product/orchestration/service-endpoints/discord.json",
       "tier": "public",
       "size": 236,
+      "type": "json"
+    },
+    {
+      "path": "product/orchestration/service-endpoints/figma.json",
+      "tier": "public",
+      "size": 229,
       "type": "json"
     },
     {
@@ -3823,6 +3841,12 @@
       "type": "json"
     },
     {
+      "path": "product/orchestration/service-endpoints/stripe.json",
+      "tier": "public",
+      "size": 232,
+      "type": "json"
+    },
+    {
       "path": "product/orchestration/service-endpoints/telegram.json",
       "tier": "public",
       "size": 235,
@@ -3877,6 +3901,12 @@
       "type": "json"
     },
     {
+      "path": "product/orchestration/service-presets/asana.json",
+      "tier": "public",
+      "size": 1592,
+      "type": "json"
+    },
+    {
       "path": "product/orchestration/service-presets/aws-ce.json",
       "tier": "public",
       "size": 709,
@@ -3901,6 +3931,12 @@
       "type": "json"
     },
     {
+      "path": "product/orchestration/service-presets/cloudflare.json",
+      "tier": "public",
+      "size": 1818,
+      "type": "json"
+    },
+    {
       "path": "product/orchestration/service-presets/comfyui.json",
       "tier": "public",
       "size": 1310,
@@ -3916,6 +3952,12 @@
       "path": "product/orchestration/service-presets/discord.json",
       "tier": "public",
       "size": 1070,
+      "type": "json"
+    },
+    {
+      "path": "product/orchestration/service-presets/figma.json",
+      "tier": "public",
+      "size": 1202,
       "type": "json"
     },
     {
@@ -4006,6 +4048,12 @@
       "path": "product/orchestration/service-presets/sqlite.json",
       "tier": "public",
       "size": 640,
+      "type": "json"
+    },
+    {
+      "path": "product/orchestration/service-presets/stripe.json",
+      "tier": "public",
+      "size": 1824,
       "type": "json"
     },
     {
@@ -7767,7 +7815,7 @@
     {
       "path": "public/design-patterns/media-templates/slide-layout-presets.json",
       "tier": "public",
-      "size": 4865,
+      "size": 9166,
       "type": "json"
     },
     {
@@ -7779,7 +7827,7 @@
     {
       "path": "public/design-patterns/media-templates/slide-layout-presets/defaults.json",
       "tier": "public",
-      "size": 438,
+      "size": 747,
       "type": "json"
     },
     {
@@ -7791,13 +7839,13 @@
     {
       "path": "public/design-patterns/media-templates/slide-layout-presets/presets-core.json",
       "tier": "public",
-      "size": 4430,
+      "size": 7842,
       "type": "json"
     },
     {
       "path": "public/design-patterns/media-templates/slide-layout-presets/presets.json",
       "tier": "public",
-      "size": 4430,
+      "size": 7842,
       "type": "json"
     },
     {
@@ -8745,7 +8793,7 @@
     {
       "path": "public/procedures/media/theme-and-design-system-reference.md",
       "tier": "public",
-      "size": 13819,
+      "size": 14853,
       "type": "md"
     },
     {

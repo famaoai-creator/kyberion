@@ -31,6 +31,9 @@ const imessage = vi.hoisted(() => vi.fn());
 vi.mock('./imessage-bridge.js', () => ({ sendIMessage: imessage }));
 
 describe('operator notifications (E2E-04 Task 2)', () => {
+  beforeEach(() => {
+    process.env.KYBERION_ALLOW_TEST_NOTIFICATIONS = '1';
+  });
   let tmpRoot: string;
   let mod: typeof import('./operator-notifications.js');
 
@@ -47,6 +50,7 @@ describe('operator notifications (E2E-04 Task 2)', () => {
   });
 
   afterEach(() => {
+    delete process.env.KYBERION_ALLOW_TEST_NOTIFICATIONS;
     delete process.env.KYBERION_ROOT;
     fs.rmSync(tmpRoot, { recursive: true, force: true });
   });
