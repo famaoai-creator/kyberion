@@ -19,7 +19,10 @@
       "id": "open_weekly",
       "role": "source",
       "op": "working-memory:weekly-open",
-      "produces": { "channel": "weekly_face", "type": "WeeklyOpenResult" },
+      "produces": {
+        "channel": "weekly_face",
+        "type": "WeeklyOpenResult"
+      },
       "params": {
         "export_as": "weekly_face"
       }
@@ -28,7 +31,10 @@
       "id": "reconcile_unhandled_intents",
       "role": "source",
       "op": "system:shell",
-      "produces": { "channel": "reconcile_result", "type": "ShellResult" },
+      "produces": {
+        "channel": "reconcile_result",
+        "type": "ShellResult"
+      },
       "params": {
         "cmd": "node dist/scripts/reconcile_unhandled_intents.js",
         "export_as": "reconcile_result"
@@ -38,7 +44,10 @@
       "id": "log_unhandled_intents",
       "role": "source",
       "op": "system:shell",
-      "produces": { "channel": "reconcile_summary", "type": "ShellResult" },
+      "produces": {
+        "channel": "reconcile_summary",
+        "type": "ShellResult"
+      },
       "params": {
         "cmd": "cat active/shared/tmp/unhandled-intent-last-run.summary.txt",
         "export_as": "reconcile_summary"
@@ -71,7 +80,10 @@
       "id": "summarize_task_model_routing",
       "role": "source",
       "op": "system:shell",
-      "produces": { "channel": "task_model_routing_summary", "type": "ShellResult" },
+      "produces": {
+        "channel": "task_model_routing_summary",
+        "type": "ShellResult"
+      },
       "params": {
         "cmd": "node dist/scripts/summarize_task_model_routing.js --output active/shared/tmp/task-model-routing-summary.json"
       }
@@ -89,7 +101,10 @@
       "id": "summarize_memory_queue",
       "role": "source",
       "op": "system:shell",
-      "produces": { "channel": "memory_queue_summary", "type": "ShellResult" },
+      "produces": {
+        "channel": "memory_queue_summary",
+        "type": "ShellResult"
+      },
       "params": {
         "cmd": "node dist/scripts/summarize_memory_promotion_queue.js --status queued --output active/shared/tmp/memory-promotion-queue-summary.md"
       }
@@ -101,6 +116,20 @@
       "consumes": "memory_queue_summary",
       "params": {
         "message": "[WEEKLY-REVIEW] Memory promotion queue summary written to active/shared/tmp/memory-promotion-queue-summary.md."
+      }
+    },
+    {
+      "id": "cost_report_weekly",
+      "role": "source",
+      "op": "system:exec",
+      "produces": {
+        "channel": "weekly_cost_report",
+        "type": "CommandResult"
+      },
+      "params": {
+        "command": "node",
+        "args": ["dist/scripts/cost_report.js", "--last-days", "7"],
+        "timeout_ms": 60000
       }
     }
   ]
