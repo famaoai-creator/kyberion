@@ -53,3 +53,12 @@
 - spend-guard のブロックは**作業を途中で止め得る**。ミッション単位上限は寛容な既定(大きめ)から始め、warn で実測分布を見てから締める。中断時は「上限到達。承認で継続 or 上限引き上げ」の明確な導線(UX-01/UX-04)を出す。
 - コスト計測の追加で推論のホットパスにオーバーヘッドが乗らないよう、record は非同期 append(既存 metrics の仕組み)に留める。
 - 見積り(estimated)と実測を混ぜた集計は誤解を生む。レポートで estimated 分を明示分離する。
+
+## 実装状況 (2026-07-12)
+
+**全4タスク完了 — 受入条件4点を充足。**
+
+- **Task 1(全経路計測)/ Task 2.1-2(cost report・ソース単一化)/ Task 3.1-3(spend-guard 本体)**: 2026-07-11 実装済み(STATUS 参照)。
+- **Task 2.3 完了(2026-07-12)**: operator packet / status report に「今週のコスト」を追加 — `status_snapshot_to_report` が `buildCostReportFromHistory(直近7日)` を集計し、findings `weekly-cost`(合計 USD・呼び出し数・ミッション別 top3・estimated 分離)と metrics `weekly_cost_usd` を出力。コスト集計の失敗は status 報告を壊さない(swallow して省略)。KM-01 週次サマリは 2026-07-11 配線済み。
+- **Task 3 テナント override 完了(2026-07-12)**: `spend-policy.json` の `tenant_overrides`(従来はプレースホルダで未参照)を実効化 — `resolveSpendPolicyForTenant()` がテナント(引数 or `KYBERION_TENANT`)の cap/posture を base に上書き。`checkSpendGuard` に `tenantId` オプション追加、アラート dedupe キーにテナントを含める。テスト4本追加(適用・未知テナント・block 執行・base 温存)。
+- **Task 4 完了(2026-07-12)**: 評価レポートが参照していた実在しない `KPI_TRACKING.md` を実体化(`docs/KPI_TRACKING.md`)— FDE 向けコスト KPI(ミッションあたり・週次/月次スパン・日次バーン)を `pnpm cost:report` に接続して定義。
