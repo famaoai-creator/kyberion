@@ -6,7 +6,7 @@ import {
   safeExistsSync,
   safeReaddir,
   safeLstat,
-  derivePipelineStatus,
+  executeAdfSteps,
   resolveVars,
   evaluateCondition,
   resolveWriteArtifactSpec,
@@ -138,7 +138,6 @@ export async function handleAction(input: CodeAction) {
       input.steps || [],
       input.context || {},
       input.options,
-      { stepCount: 0, startTime: Date.now() },
       traceCtx
     );
     traceCtx.endSpan('ok');
@@ -153,11 +152,14 @@ export async function handleAction(input: CodeAction) {
   }
 }
 
+// AR-01 Task 2: hand-rolled loop replaced by the canonical engine. traceCtx
+// span parity is preserved by wrapping each op handler (span per step, same
+// code:<type>:<op> naming); nested control failures now propagate instead of
+// being silently absorbed (AR-06 no-silent-failure).
 export async function executePipeline(
   steps: PipelineStep[],
   initialCtx: any = {},
   options: any = {},
-  state: any = { stepCount: 0, startTime: Date.now() },
   traceCtx?: any
 ) {
   const rootDir = pathResolver.rootDir();
@@ -179,44 +181,40 @@ export async function executePipeline(
     ctx = { ...ctx, ...saved };
   }
 
-  const resolve = (val: any) => resolveVars(val, ctx);
-
-  const results = [];
-  for (const step of steps) {
-    state.stepCount++;
-    if (state.stepCount > MAX_STEPS)
-      throw new Error(`[SAFETY_LIMIT] Exceeded maximum steps (${MAX_STEPS})`);
-    if (Date.now() - state.startTime > TIMEOUT)
-      throw new Error(`[SAFETY_LIMIT] Execution timed out (${TIMEOUT}ms)`);
-
+  let spanCount = 0;
+  const traced = async <T>(type: string, op: string, run: () => Promise<T>): Promise<T> => {
+    spanCount += 1;
+    traceCtx?.startSpan?.(`code:${type}:${op}`, { stepCount: spanCount });
     try {
-      traceCtx?.startSpan?.(`code:${step.type}:${step.op}`, { stepCount: state.stepCount });
-      logger.info(`  [CODE_PIPELINE] [Step ${state.stepCount}] ${step.type}:${step.op}...`);
-
-      if (step.type === 'control') {
-        ctx = await opControl(step.op, step.params, ctx, options, state, resolve, traceCtx);
-      } else {
-        switch (step.type) {
-          case 'capture':
-            ctx = await opCapture(step.op, step.params, ctx, resolve);
-            break;
-          case 'transform':
-            ctx = await opTransform(step.op, step.params, ctx, resolve);
-            break;
-          case 'apply':
-            await opApply(step.op, step.params, ctx, resolve);
-            break;
-        }
-      }
+      const value = await run();
       traceCtx?.endSpan?.('ok');
-      results.push({ op: step.op, status: 'success' });
+      return value;
     } catch (err: any) {
-      traceCtx?.endSpan?.('error', err.message);
-      logger.error(`  [CODE_PIPELINE] Step failed (${step.op}): ${err.message}`);
-      results.push({ op: step.op, status: 'failed', error: err.message });
-      break;
+      traceCtx?.endSpan?.('error', err?.message ?? String(err));
+      throw err;
     }
-  }
+  };
+
+  const result = await executeAdfSteps(
+    steps as Parameters<typeof executeAdfSteps>[0],
+    ctx,
+    { maxSteps: MAX_STEPS, timeoutMs: TIMEOUT },
+    {
+      capture: (op, params, currentCtx, resolve) =>
+        traced('capture', op, () => opCapture(op, params, currentCtx, resolve)),
+      transform: (op, params, currentCtx, resolve) =>
+        traced('transform', op, () => opTransform(op, params, currentCtx, resolve)),
+      apply: (op, params, currentCtx, resolve) =>
+        traced('apply', op, async () => {
+          await opApply(op, params, currentCtx, resolve);
+          return currentCtx;
+        }),
+      control: (op, params, currentCtx, runSteps, resolve) =>
+        traced('control', op, () => opControl(op, params, currentCtx, runSteps, resolve)),
+    }
+  );
+
+  ctx = result.context;
 
   if (initialCtx.context_path) {
     await retry(async () => {
@@ -225,43 +223,45 @@ export async function executePipeline(
     }, buildRetryOptions());
   }
 
-  return {
-    status: derivePipelineStatus(results),
-    results,
-    context: ctx,
-    total_steps: state.stepCount,
-  };
+  return result;
 }
 
 async function opControl(
   op: string,
   params: any,
   ctx: any,
-  options: any,
-  state: any,
-  resolve: (value: any) => any,
-  traceCtx?: any
+  runSteps: (steps: any[], seedCtx?: any) => Promise<any>,
+  _resolve: (value: any) => any
 ) {
+  const runNested = async (steps: any[], seedCtx: any) => {
+    const res = await runSteps(steps, seedCtx);
+    if (res.status === 'failed') {
+      throw new Error(
+        res.results.find((entry: any) => entry.status === 'failed')?.error ||
+          'nested pipeline failed'
+      );
+    }
+    return res.context;
+  };
+
   switch (op) {
     case 'if':
       if (evaluateCondition(params.condition, ctx)) {
-        const res = await executePipeline(params.then, ctx, options, state, traceCtx);
-        return res.context;
+        return await runNested(params.then, ctx);
       } else if (params.else) {
-        const res = await executePipeline(params.else, ctx, options, state, traceCtx);
-        return res.context;
+        return await runNested(params.else, ctx);
       }
       return ctx;
 
-    case 'while':
+    case 'while': {
       let iterations = 0;
       const maxIter = params.max_iterations || 100;
       while (evaluateCondition(params.condition, ctx) && iterations < maxIter) {
-        const res = await executePipeline(params.pipeline, ctx, options, state, traceCtx);
-        ctx = res.context;
+        ctx = await runNested(params.pipeline, ctx);
         iterations++;
       }
       return ctx;
+    }
 
     default:
       throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
