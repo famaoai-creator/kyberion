@@ -1,0 +1,59 @@
+{
+  "service_id": "cloudflare",
+  "name": "Cloudflare API Presets",
+  "base_url": "https://api.cloudflare.com/client/v4",
+  "auth_strategy": "Bearer",
+  "operations": {
+    "list_zones": {
+      "type": "api",
+      "path": "zones",
+      "method": "GET",
+      "description": "Lists Cloudflare zones.",
+      "parameters": {
+        "name": { "required": false, "type": "string" },
+        "status": { "required": false, "type": "string" }
+      }
+    },
+    "get_zone": {
+      "type": "api",
+      "path": "zones/{{zone_id}}",
+      "method": "GET",
+      "description": "Fetches a Cloudflare zone.",
+      "parameters": {
+        "zone_id": { "required": true, "type": "string" }
+      }
+    },
+    "list_dns_records": {
+      "type": "api",
+      "path": "zones/{{zone_id}}/dns_records",
+      "method": "GET",
+      "description": "Lists DNS records for a zone.",
+      "parameters": {
+        "zone_id": { "required": true, "type": "string" },
+        "type": { "required": false, "type": "string" },
+        "name": { "required": false, "type": "string" }
+      }
+    },
+    "create_dns_record": {
+      "type": "api",
+      "path": "zones/{{zone_id}}/dns_records",
+      "method": "POST",
+      "description": "Creates a DNS record.",
+      "parameters": {
+        "zone_id": { "required": true, "type": "string" },
+        "type": { "required": true, "type": "string" },
+        "name": { "required": true, "type": "string" },
+        "content": { "required": true, "type": "string" },
+        "ttl": { "required": false, "type": "number" },
+        "proxied": { "required": false, "type": "boolean" }
+      },
+      "payload_template": {
+        "type": "{{type}}",
+        "name": "{{name}}",
+        "content": "{{content}}",
+        "ttl": "{{ttl}}",
+        "proxied": "{{proxied}}"
+      }
+    }
+  }
+}

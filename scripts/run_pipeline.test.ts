@@ -1,12 +1,16 @@
 import path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { TraceContext } from '@agent/core';
+import { logger } from '@agent/core';
 import { pathResolver } from '@agent/core/path-resolver';
 import { readValidatedWorkflowAdf } from './refactor/adf-input.js';
 
 const {
   normalizePipelineOp,
   runSteps,
+  runValidatedSteps,
+  recordFallbackOutcome,
+  finalizePipelineTrace,
   formatPipelineFailure,
   validateFlow,
   normalizeReasoningPolicy,
@@ -15,6 +19,59 @@ const {
 } = await import(new URL('./run_pipeline.js', import.meta.url).href);
 
 describe('run_pipeline compatibility', () => {
+  it('persists a recovered fallback as one successful causal trace', () => {
+    const trace = new TraceContext('pipeline:fallback-recovery', {
+      pipelineId: 'fallback-recovery',
+    });
+    trace.startSpan('primary');
+    trace.endSpan('error', 'permission denied');
+    const failure = formatPipelineFailure('EACCES: permission denied');
+
+    trace.addEvent('pipeline.fallback_started', {
+      fallback_pipeline: 'pipelines/fallback.json',
+      primary_error_category: failure.classification.category,
+      primary_error_rule_id: failure.classification.ruleId,
+    });
+    const recovered = recordFallbackOutcome(trace, 'pipelines/fallback.json', failure, {
+      status: 0,
+    });
+    const persisted = finalizePipelineTrace(trace, recovered, {
+      dir: pathResolver.shared('tmp/run-pipeline-fallback-trace-test'),
+    });
+
+    expect(recovered).toBe(true);
+    expect(persisted.trace.rootSpan.status).toBe('ok');
+    expect(persisted.trace.rootSpan.children[0]).toMatchObject({
+      name: 'primary',
+      status: 'error',
+      error: 'permission denied',
+    });
+    expect(persisted.trace.rootSpan.events.map((event) => event.name)).toEqual([
+      'pipeline.fallback_started',
+      'pipeline.fallback_succeeded',
+    ]);
+    expect(persisted.trace.rootSpan.events[1].attributes).toMatchObject({
+      fallback_pipeline: 'pipelines/fallback.json',
+      primary_error_category: failure.classification.category,
+      fallback_exit_status: 0,
+    });
+  });
+
+  it('uses the same one-based step number for start and completion progress', async () => {
+    const infoSpy = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
+
+    await runSteps([{ op: 'log', params: { message: 'progress test' } }]);
+
+    const progressLines = infoSpy.mock.calls
+      .map(([message]) => String(message))
+      .filter((message) => message.startsWith('[step '));
+    expect(progressLines).toEqual([
+      '[step 1/1] log …',
+      expect.stringMatching(/^\[step 1\/1\] system:log success in \d+s$/),
+    ]);
+    infoSpy.mockRestore();
+  });
+
   it('normalizes short-form system ops to namespaced ops', () => {
     expect(normalizePipelineOp('shell')).toBe('system:shell');
     expect(normalizePipelineOp('log')).toBe('system:log');
@@ -493,6 +550,51 @@ describe('validateFlow', () => {
 });
 
 describe('Typed Flow role resolution', () => {
+  it('fails validation before starting steps and records the failure in the trace', async () => {
+    const trace = new TraceContext('pipeline:invalid-flow', { pipelineId: 'invalid-flow' });
+    const sideEffects: string[] = [];
+    const steps = [
+      {
+        id: 'would-run-first',
+        op: 'core:accumulate',
+        params: { target: 'items', value: 'side-effect' },
+      },
+      {
+        id: 'invalid-consumer',
+        op: 'log',
+        role: 'sink',
+        consumes: 'missing_channel',
+        params: { template: 'unreachable' },
+      },
+    ];
+
+    const result = await runValidatedSteps(steps, { sideEffects }, { trace, quiet: true });
+    const finalized = trace.finalize();
+
+    expect(result).toMatchObject({
+      status: 'failed',
+      results: [
+        {
+          op: 'flow:validate',
+          status: 'failed',
+          error: expect.stringContaining('missing_channel'),
+        },
+      ],
+    });
+    expect(sideEffects).toEqual([]);
+    expect(finalized.rootSpan.children).toHaveLength(0);
+    expect(finalized.rootSpan.events).toContainEqual(
+      expect.objectContaining({
+        name: 'pipeline.validation_failed',
+        attributes: expect.objectContaining({
+          validation_type: 'typed_flow',
+          error_count: 1,
+          error: expect.stringContaining('missing_channel'),
+        }),
+      })
+    );
+  });
+
   it('treats role:source step output as accessible via produces channel', async () => {
     const result = await runSteps([
       {

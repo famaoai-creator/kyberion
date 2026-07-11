@@ -72,6 +72,27 @@ describe('secure-io core', () => {
       const tempFiles = files.filter((f) => f.includes('atomic.txt.tmp'));
       expect(tempFiles.length).toBe(0);
     });
+
+    it('applies the requested mode when the atomic temp file is created', () => {
+      const testFile = path.join(tmpDir, 'private.txt');
+      const previousUmask = process.umask(0);
+      try {
+        safeWriteFile(testFile, 'secret', { mode: 0o600 });
+      } finally {
+        process.umask(previousUmask);
+      }
+      expect(fs.statSync(testFile).mode & 0o777).toBe(0o600);
+    });
+
+    it('refuses to replace a symbolic link', () => {
+      const target = path.join(tmpDir, 'target.txt');
+      const link = path.join(tmpDir, 'link.txt');
+      fs.writeFileSync(target, 'original');
+      fs.symlinkSync(target, link);
+
+      expect(() => safeWriteFile(link, 'replacement')).toThrow('Refusing to replace symbolic link');
+      expect(fs.readFileSync(target, 'utf8')).toBe('original');
+    });
   });
 
   describe('loadJson', () => {

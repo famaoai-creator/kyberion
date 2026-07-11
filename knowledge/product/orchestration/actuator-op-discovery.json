@@ -263,6 +263,12 @@
       ]
     },
     {
+      "n": "build-actuator",
+      "path": "libs/actuators/build-actuator",
+      "source": "registry",
+      "ops": []
+    },
+    {
       "n": "calendar-actuator",
       "path": "libs/actuators/calendar-actuator",
       "source": "registry",

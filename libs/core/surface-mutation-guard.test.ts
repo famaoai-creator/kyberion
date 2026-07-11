@@ -19,12 +19,23 @@ afterEach(() => {
 });
 
 describe('surface-mutation-guard', () => {
-  it('allows loopback hosts', () => {
+  it('does not trust a loopback request URL without request authentication', () => {
     for (const host of ['localhost', '127.0.0.1', '[::1]']) {
       const decision = authorizeSurfaceMutation(makeRequest(`http://${host}:3050/api/x`));
-      expect(decision.ok, host).toBe(true);
-      expect(decision.reason).toBe('local');
+      expect(decision.ok, host).toBe(false);
+      expect(decision.status).toBe(403);
     }
+  });
+
+  it('rejects a spoofed loopback host without a token or same-origin proof', () => {
+    const decision = authorizeSurfaceMutation(
+      makeRequest('http://localhost:3050/api/approvals/approval-1', {
+        host: 'localhost:3050',
+        origin: 'https://evil.example.com',
+      })
+    );
+    expect(decision.ok).toBe(false);
+    expect(decision.status).toBe(403);
   });
 
   it('allows a valid bearer token on non-loopback hosts', () => {
@@ -45,6 +56,15 @@ describe('surface-mutation-guard', () => {
     );
     expect(decision.ok).toBe(false);
     expect(decision.status).toBe(403);
+  });
+
+  it('does not treat an unset configured token as a valid bearer token', () => {
+    delete process.env.KYBERION_API_TOKEN;
+    delete process.env.KYBERION_LOCALADMIN_TOKEN;
+    const decision = authorizeSurfaceMutation(
+      makeRequest('https://kyberion.example.com/api/x', { authorization: 'Bearer undefined' })
+    );
+    expect(decision.ok).toBe(false);
   });
 
   it('allows same-origin requests', () => {

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import * as http from 'node:http';
 
 import {
   buildPeerMessageEnvelope,
@@ -10,12 +11,22 @@ import {
   resolvePeerRecord,
   resolvePeerDispatchTarget,
   sendPeerMessage,
+  signPeerHttpRequest,
   verifyPeerMessage,
 } from './peer-messaging.js';
 import { safeRmSync, safeWriteFile } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 
 const SHARED_SECRET = 'peer-message-test-secret';
+
+async function listenOnEphemeralPort(
+  server: ReturnType<typeof createPeerMessagingServer>
+): Promise<number> {
+  const httpServer = await server.listen(0);
+  const address = httpServer.address();
+  if (!address || typeof address === 'string') throw new Error('missing_test_server_address');
+  return address.port;
+}
 
 afterEach(() => {
   clearPeerRuntime('peer-a-test');
@@ -39,7 +50,9 @@ describe('peer messaging', () => {
 
     expect(envelope.signature).toBeTruthy();
     expect(verifyPeerMessage(envelope, SHARED_SECRET)).toBe(true);
-    expect(verifyPeerMessage({ ...envelope, payload: { summary: 'tampered' } }, SHARED_SECRET)).toBe(false);
+    expect(
+      verifyPeerMessage({ ...envelope, payload: { summary: 'tampered' } }, SHARED_SECRET)
+    ).toBe(false);
   });
 
   it('delivers a localhost peer message and persists inbox/outbox logs', async () => {
@@ -54,16 +67,20 @@ describe('peer messaging', () => {
       }),
     });
 
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (_input: any, init?: RequestInit) => {
-      const envelope = JSON.parse(String(init?.body || '{}')) as Parameters<typeof server.processEnvelope>[0];
-      const result = await server.processEnvelope(envelope);
-      return new Response(JSON.stringify(result.body), {
-        status: result.status,
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-        },
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async (_input: any, init?: RequestInit) => {
+        const envelope = JSON.parse(String(init?.body || '{}')) as Parameters<
+          typeof server.processEnvelope
+        >[0];
+        const result = await server.processEnvelope(envelope);
+        return new Response(JSON.stringify(result.body), {
+          status: result.status,
+          headers: {
+            'Content-Type': 'application/json; charset=utf-8',
+          },
+        });
       });
-    });
 
     const envelope = buildPeerMessageEnvelope({
       senderPeerId: 'peer-a-test',
@@ -103,18 +120,25 @@ describe('peer messaging', () => {
 
   it('resolves peer catalog entries that point at LAN endpoints', () => {
     const catalogPath = pathResolver.sharedTmp('peer-network-catalog.test.json');
-    safeWriteFile(catalogPath, JSON.stringify({
-      version: '1',
-      peers: [
+    safeWriteFile(
+      catalogPath,
+      JSON.stringify(
         {
-          peer_id: 'peer-b-test',
-          base_url: 'http://192.168.1.20:4555',
-          shared_secret: SHARED_SECRET,
-          allow_local_network: true,
-          capabilities: ['handoff', 'request'],
+          version: '1',
+          peers: [
+            {
+              peer_id: 'peer-b-test',
+              base_url: 'http://192.168.1.20:4555',
+              shared_secret: SHARED_SECRET,
+              allow_local_network: true,
+              capabilities: ['handoff', 'request'],
+            },
+          ],
         },
-      ],
-    }, null, 2));
+        null,
+        2
+      )
+    );
 
     const catalog = loadPeerNetworkCatalog({ catalogPath });
     expect(catalog).not.toBeNull();
@@ -129,5 +153,99 @@ describe('peer messaging', () => {
     expect(target.destinationUrl).toBe('http://192.168.1.20:4555');
     expect(target.allowLocalNetwork).toBe(true);
     expect(target.sharedSecret).toBe(SHARED_SECRET);
+  });
+
+  it('requires a valid HMAC request signature for inbox and outbox reads', async () => {
+    const server = createPeerMessagingServer({
+      peerId: 'peer-b-test',
+      sharedSecret: SHARED_SECRET,
+    });
+    const port = await listenOnEphemeralPort(server);
+
+    try {
+      const health = await fetch(`http://127.0.0.1:${port}/health`);
+      expect(await health.json()).toEqual({ ok: true });
+
+      for (const requestPath of ['/v1/peer/messages/inbox', '/v1/peer/messages/outbox']) {
+        const unauthorized = await fetch(`http://127.0.0.1:${port}${requestPath}`);
+        expect(unauthorized.status).toBe(401);
+
+        const invalid = await fetch(`http://127.0.0.1:${port}${requestPath}`, {
+          headers: {
+            'x-kyberion-peer-signature': signPeerHttpRequest('GET', requestPath, 'wrong-secret'),
+          },
+        });
+        expect(invalid.status).toBe(401);
+
+        const authorized = await fetch(`http://127.0.0.1:${port}${requestPath}`, {
+          headers: {
+            'x-kyberion-peer-signature': signPeerHttpRequest('GET', requestPath, SHARED_SECRET),
+          },
+        });
+        expect(authorized.status).toBe(200);
+        expect(await authorized.json()).toEqual({ ok: true, items: [] });
+      }
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('rejects oversized request bodies from content-length and streamed bytes', async () => {
+    const server = createPeerMessagingServer({
+      peerId: 'peer-b-test',
+      sharedSecret: SHARED_SECRET,
+    });
+    const port = await listenOnEphemeralPort(server);
+
+    const sendRaw = (
+      headers: http.OutgoingHttpHeaders,
+      chunks: Buffer[]
+    ): Promise<{ status: number; body: string }> =>
+      new Promise((resolve, reject) => {
+        const request = http.request(
+          {
+            host: '127.0.0.1',
+            port,
+            path: '/v1/peer/messages',
+            method: 'POST',
+            headers,
+            agent: false,
+          },
+          (response) => {
+            const responseChunks: Buffer[] = [];
+            response.on('data', (chunk) => responseChunks.push(Buffer.from(chunk)));
+            response.on('end', () =>
+              resolve({
+                status: response.statusCode || 0,
+                body: Buffer.concat(responseChunks).toString('utf8'),
+              })
+            );
+          }
+        );
+        request.on('error', reject);
+        for (const chunk of chunks) request.write(chunk);
+        request.end();
+      });
+
+    try {
+      const declaredOversized = await sendRaw({ 'Content-Length': 1024 * 1024 + 1 }, []);
+      expect(declaredOversized.status).toBe(413);
+      expect(JSON.parse(declaredOversized.body)).toEqual({
+        ok: false,
+        error: 'request_body_too_large',
+      });
+
+      const streamedOversized = await sendRaw({ 'Transfer-Encoding': 'chunked' }, [
+        Buffer.alloc(700_000, 0x61),
+        Buffer.alloc(400_000, 0x62),
+      ]);
+      expect(streamedOversized.status).toBe(413);
+      expect(JSON.parse(streamedOversized.body)).toEqual({
+        ok: false,
+        error: 'request_body_too_large',
+      });
+    } finally {
+      await server.close();
+    }
   });
 });

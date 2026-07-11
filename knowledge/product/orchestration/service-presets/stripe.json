@@ -1,0 +1,61 @@
+{
+  "service_id": "stripe",
+  "name": "Stripe API Presets",
+  "base_url": "https://api.stripe.com/v1",
+  "auth_strategy": "Bearer",
+  "operations": {
+    "list_customers": {
+      "type": "api",
+      "path": "customers",
+      "method": "GET",
+      "description": "Lists Stripe customers.",
+      "parameters": {
+        "limit": { "required": false, "type": "number" },
+        "email": { "required": false, "type": "string" }
+      }
+    },
+    "create_customer": {
+      "type": "api",
+      "path": "customers",
+      "method": "POST",
+      "description": "Creates a Stripe customer.",
+      "parameters": {
+        "email": { "required": false, "type": "string" },
+        "name": { "required": false, "type": "string" },
+        "description": { "required": false, "type": "string" }
+      },
+      "payload_template": {
+        "email": "{{email}}",
+        "name": "{{name}}",
+        "description": "{{description}}"
+      }
+    },
+    "list_payment_intents": {
+      "type": "api",
+      "path": "payment_intents",
+      "method": "GET",
+      "description": "Lists recent payment intents.",
+      "parameters": {
+        "limit": { "required": false, "type": "number" }
+      }
+    },
+    "create_payment_intent": {
+      "type": "api",
+      "path": "payment_intents",
+      "method": "POST",
+      "description": "Creates a payment intent.",
+      "parameters": {
+        "amount": { "required": true, "type": "number" },
+        "currency": { "required": true, "type": "string" },
+        "customer": { "required": false, "type": "string" },
+        "description": { "required": false, "type": "string" }
+      },
+      "payload_template": {
+        "amount": "{{amount}}",
+        "currency": "{{currency}}",
+        "customer": "{{customer}}",
+        "description": "{{description}}"
+      }
+    }
+  }
+}

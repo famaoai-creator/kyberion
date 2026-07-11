@@ -1,0 +1,9 @@
+{
+  "default_pattern": "https://api.{service_id}.com/v1",
+  "services": {
+    "asana": {
+      "base_url": "https://app.asana.com/api/1.0",
+      "preset_path": "knowledge/product/orchestration/service-presets/asana.json"
+    }
+  }
+}

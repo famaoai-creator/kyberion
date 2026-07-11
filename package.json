@@ -41,6 +41,8 @@
     "check:governance-rules": "node dist/scripts/check_governance_rules.js",
     "generate:op-registry": "node --import ./scripts/ts-loader.mjs scripts/generate_op_registry.ts",
     "check:op-registry": "node --import ./scripts/ts-loader.mjs scripts/generate_op_registry.ts --check",
+    "generate:env-registry": "node --import ./scripts/ts-loader.mjs scripts/generate_env_registry.ts",
+    "check:env-registry": "node --import ./scripts/ts-loader.mjs scripts/generate_env_registry.ts --check",
     "check:design-contrast": "node --import ./scripts/ts-loader.mjs scripts/check_design_contrast.ts",
     "check:apple-fm": "node --import ./scripts/ts-loader.mjs scripts/check_apple_fm.ts",
     "sync:intent-contract-memory": "node dist/scripts/sync_intent_contract_memory.js",
@@ -110,7 +112,7 @@
     "typecheck": "tsc --noEmit",
     "typecheck:refactor": "tsc -p scripts/refactor/tsconfig.json --noEmit",
     "check:audit-continuity": "pnpm run audit:verify --days 7 --warn-only",
-    "validate": "pnpm run build && pnpm run typecheck && pnpm run check:esm && pnpm run check:catalogs && pnpm run check:governance-rules && pnpm run check:design-contrast && pnpm run check:intent-domain-coverage && pnpm run check:contract-schemas && pnpm run check:contract-semver && pnpm run check:script-integrity && pnpm run check:type-ratchet && pnpm run check:pipeline-shell-independence && pnpm run check:workflow-catalog-refs && pnpm run check:reference-drift && pnpm run check:production-evidence-status && pnpm run check:production-evidence && pnpm run check:first-win-smoke && pnpm run check:doc-examples && pnpm run check:tier-hygiene && pnpm run check:mos-no-write-api && pnpm run check:audit-continuity",
+    "validate": "pnpm run build && pnpm run typecheck && pnpm run check:esm && pnpm run check:catalogs && pnpm run check:op-registry && pnpm run check:env-registry && pnpm run check:governance-rules && pnpm run check:design-contrast && pnpm run check:intent-domain-coverage && pnpm run check:contract-schemas && pnpm run check:contract-semver && pnpm run check:script-integrity && pnpm run check:type-ratchet && pnpm run check:pipeline-shell-independence && pnpm run check:workflow-catalog-refs && pnpm run check:reference-drift && pnpm run check:production-evidence-status && pnpm run check:production-evidence && pnpm run check:first-win-smoke && pnpm run check:doc-examples && pnpm run check:tier-hygiene && pnpm run check:mos-no-write-api && pnpm run check:audit-continuity",
     "check:mos-no-write-api": "pnpm --filter @presence/operator-surface exec vitest run --config vitest.config.mjs",
     "doctor": "node dist/scripts/run_doctor.js",
     "office": "node --import ./scripts/ts-loader.mjs scripts/virtual_office.ts",
@@ -236,6 +238,7 @@
     ]
   },
   "dependencies": {
+    "@actuator/system": "workspace:*",
     "@agent/core": "workspace:*",
     "@agent/shared-media": "workspace:*",
     "@agent/shared-nerve": "workspace:*",

@@ -5,6 +5,7 @@
 > **位置づけ**: [PRODUCTIZATION_ROADMAP](../../PRODUCTIZATION_ROADMAP.md) Phase B(30日連続運用に耐える)/ Phase C'(貢献容易性)に寄与する下位計画。
 > **登録**: [docs/ROADMAP.md](../../ROADMAP.md) §1 に登録済み。
 > **実装状況の正本**: [STATUS.ja.md](./STATUS.ja.md)(2026-07-05 全計画をコード実態と突合して監査)。各計画文書内の記述と矛盾する場合は STATUS を正とする。
+> **最新の横断レビュー**: [REVIEW_CODEX_2026-07-11.ja.md](./REVIEW_CODEX_2026-07-11.ja.md)(UX・拡張性・セキュリティ・運用の再監査と優先バックログ)。
 
 ## 1. 目的
 

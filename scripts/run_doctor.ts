@@ -12,6 +12,7 @@ import {
   inspectMeshHub,
 } from '@agent/core';
 import { buildNextAction, formatNextAction } from '@agent/core';
+import { formatEnvValidationReport, validateEnv } from '@agent/core';
 import { probeAppleIntelligence } from '@agent/core';
 import { collectMissionHygieneReport, formatMissionHygieneLine } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
@@ -224,6 +225,7 @@ export async function collectDoctorReport(argv: {
   const governance = getGovernanceControlSummary();
   const governanceLines = [
     `Governance controls: kill_switch=${governance.kill_switch_monitoring ? 'armed' : 'idle'}; pending_approvals=${governance.pending_approvals}; approval_rules=${governance.approval_rules}; shell_rules=${governance.shell_allow_rules}/${governance.shell_deny_rules}; egress_mode=${governance.egress_mode}; egress_domains=${governance.egress_allowlist_domains}`,
+    ...formatEnvValidationReport(validateEnv()),
   ];
 
   return {

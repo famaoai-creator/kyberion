@@ -3,9 +3,11 @@
  *
  * Extracted from operator-surface's api-guard so every mutating surface
  * (operator-surface /api/inbox, concierge approvals/outcomes, …) shares one
- * decision: allow loopback, allow bearer token (KYBERION_API_TOKEN /
+ * decision: allow bearer token (KYBERION_API_TOKEN /
  * KYBERION_LOCALADMIN_TOKEN), allow same-origin, otherwise 403.
  */
+
+import { timingSafeEqual } from 'node:crypto';
 
 export interface SurfaceMutationRequest {
   url: string;
@@ -18,35 +20,27 @@ export interface SurfaceMutationDecision {
   reason: string;
 }
 
-function isLoopbackHost(hostname: string): boolean {
-  const normalized = hostname
-    .trim()
-    .toLowerCase()
-    .replace(/^\[(.*)\]$/, '$1');
-  return (
-    normalized === 'localhost' ||
-    normalized === '127.0.0.1' ||
-    normalized === '::1' ||
-    normalized === '::ffff:127.0.0.1' ||
-    normalized === '::ffff:7f00:1'
-  );
-}
-
 function resolveBearerToken(request: SurfaceMutationRequest): string {
   const authHeader = request.getHeader('authorization') || '';
   return authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
 }
 
+function matchesConfiguredToken(candidate: string, configured: string | undefined): boolean {
+  if (!candidate || !configured) return false;
+  const candidateBuffer = Buffer.from(candidate);
+  const configuredBuffer = Buffer.from(configured);
+  return (
+    candidateBuffer.length === configuredBuffer.length &&
+    timingSafeEqual(candidateBuffer, configuredBuffer)
+  );
+}
+
 export function authorizeSurfaceMutation(request: SurfaceMutationRequest): SurfaceMutationDecision {
   const url = new URL(request.url);
-  if (isLoopbackHost(url.hostname)) {
-    return { ok: true, status: 200, reason: 'local' };
-  }
-
   const apiToken = process.env.KYBERION_API_TOKEN;
   const localadminToken = process.env.KYBERION_LOCALADMIN_TOKEN;
   const token = resolveBearerToken(request);
-  if (token && (token === apiToken || token === localadminToken)) {
+  if (matchesConfiguredToken(token, apiToken) || matchesConfiguredToken(token, localadminToken)) {
     return { ok: true, status: 200, reason: 'token' };
   }
 

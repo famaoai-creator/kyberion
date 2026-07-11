@@ -848,6 +848,17 @@ export {
   verifyReady,
 } from './environment-capability.js';
 export { installCoreEnvironmentProbes } from './environment-capability-probes.js';
+export {
+  formatEnvValidationReport,
+  loadEnvRegistryEntries,
+  validateEnv,
+  validateEnvAgainstRegistry,
+} from './env-validator.js';
+export type {
+  EnvRegistryValidationEntry,
+  EnvValidationIssue,
+  EnvValidationReport,
+} from './env-validator.js';
 export type {
   BootstrapOptions,
   CapabilityInstall,
@@ -1098,10 +1109,12 @@ export type {
   TestPlan,
 } from './sdlc-artifact-store.js';
 export {
+  buildFailoverReasoningBackend,
   getReasoningBackend,
   delegateBestOf,
   delegateStructured,
   delegateTaskWithUntrustedData,
+  requestPeerAdvice,
   registerReasoningBackend,
   resetReasoningBackend,
   stubReasoningBackend,
@@ -1407,6 +1420,8 @@ export type {
   SimulationInput,
   SimulationResult,
   SynthesizedPersona,
+  PeerAdviceInput,
+  PeerAdviceResult,
   UntrustedDataParams,
 } from './reasoning-backend.js';
 export {
