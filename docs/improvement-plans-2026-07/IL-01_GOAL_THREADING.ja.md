@@ -57,3 +57,10 @@
 - goal を渡す経路(shell 引数 or 一時ファイル)は confidential 発話を含み得る。一時ファイルは tier-guard 保護下(`active/shared/tmp/` でなくミッション tier に応じた場所)に置き、処理後に確実に削除する。
 - outcome contract の `requested_result` 変更は、それを読む既存の完了判定・表示に波及する。まず「実 goal を格納するが判定ロジックは現行維持」で 1 コミット、次に IL-04 で判定を goal ベースにする 2 段構えにする。
 - LLM コンパイルされた goal(`compileIntentContractWithLlm`)は不確実性を含む。goal が空/低品質のときは汎用フォールバックに落ち、誤った具体ゴールを固定しない。
+
+## 実装状況 追記 (2026-07-12)
+
+**受入条件2の pipeline seam を実装し、全 seam の網羅精査を完了 — IL-01 は DONE。**
+
+- 精査結果: surface→mission 昇格(2経路、intent-handoff)/ task_session(inferTaskSessionOutcomeContract)/ mission-state.json の intent 永続化 / 汎用フォールバック(受入4)は実装済みを確認。
+- **pipeline 経路のみ goal が spawn 境界で捨てられていた** → `buildPipelineIntentContextArgs` を新設し、`run_pipeline --context '{"intent_goal": {source_text, summary, success_condition, intent_id}}'` として実行コンテキストへ貫通(失敗許容)。テスト3本 + fastpath 期待値更新。
