@@ -1252,6 +1252,35 @@ function buildIntentGoalHandoffArgs(
   }
 }
 
+/**
+ * IL-01 (acceptance 2, pipeline seam): carry the interpreted goal into the
+ * pipeline execution context so steps and completion reconciliation can see
+ * the real request. Failure-tolerant — goal threading never blocks the run.
+ */
+export function buildPipelineIntentContextArgs(context: SurfaceRuntimeRouteContext): string[] {
+  const contract = context.compiledFlow?.intentContract;
+  const sourceText = String(
+    contract?.source_text || context.input.surfaceText || context.structuredQuery || ''
+  ).trim();
+  const summary = contract?.goal?.summary?.trim();
+  if (!summary && !sourceText) return [];
+  try {
+    const intentGoal = {
+      intent_goal: {
+        ...(sourceText ? { source_text: sourceText } : {}),
+        ...(summary ? { summary } : {}),
+        ...(contract?.goal?.success_condition
+          ? { success_condition: contract.goal.success_condition }
+          : {}),
+        ...(contract?.intent_id ? { intent_id: contract.intent_id } : {}),
+      },
+    };
+    return ['--context', JSON.stringify(intentGoal)];
+  } catch {
+    return [];
+  }
+}
+
 async function handleGovernedExecutionHint(
   context: SurfaceRuntimeRouteContext
 ): Promise<SurfaceConversationResult> {
@@ -1318,11 +1347,16 @@ async function handleGovernedExecutionHint(
       ? `${resolved.pipelineId}.json`
       : `pipelines/${resolved.pipelineId}.json`;
     const command = `node dist/scripts/run_pipeline.js --input ${pipelinePath}`;
+    const intentContextArgs = buildPipelineIntentContextArgs(context);
     let output = '';
     try {
-      output = safeExec('node', ['dist/scripts/run_pipeline.js', '--input', pipelinePath], {
-        cwd: pathResolver.rootDir(),
-      });
+      output = safeExec(
+        'node',
+        ['dist/scripts/run_pipeline.js', '--input', pipelinePath, ...intentContextArgs],
+        {
+          cwd: pathResolver.rootDir(),
+        }
+      );
       if (intentId) {
         recordLearningOutcomeSafely({
           intent_id: intentId,
