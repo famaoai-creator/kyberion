@@ -255,6 +255,59 @@ describe('run_pipeline compatibility', () => {
     expect(result.results).toEqual([{ op: 'core:if', status: 'skipped' }]);
   });
 
+  it('enforces options.max_steps when the pipeline sets it explicitly (AR-01)', async () => {
+    const result = await runSteps(
+      [
+        { op: 'system:log', params: { message: 'one' } },
+        { op: 'system:log', params: { message: 'two' } },
+      ],
+      { __pipeline_options: { max_steps: 1 } }
+    );
+
+    expect(result.status).toBe('failed');
+    expect(result.results.at(-1)?.error).toContain('[SAFETY_LIMIT]');
+    expect(result.results.filter((r) => r.status === 'success')).toHaveLength(1);
+  });
+
+  it('leaves pipelines without explicit budgets unbounded', async () => {
+    const result = await runSteps([
+      { op: 'system:log', params: { message: 'one' } },
+      { op: 'system:log', params: { message: 'two' } },
+    ]);
+
+    expect(result.status).toBe('succeeded');
+  });
+
+  it('recovers a failing step via on_error: skip (AR-01 canonical semantics)', async () => {
+    const result = await runSteps([
+      { op: 'system:exec', params: {}, on_error: { strategy: 'skip' } } as any,
+      { op: 'system:log', params: { message: 'still runs' } },
+    ]);
+
+    expect(result.status).toBe('succeeded');
+    expect(result.results[0]).toMatchObject({ status: 'recovered' });
+    expect(result.results.at(-1)).toMatchObject({ status: 'success' });
+  });
+
+  it('runs on_error fallback steps and flattens their results', async () => {
+    const result = await runSteps([
+      {
+        op: 'system:exec',
+        params: {},
+        on_error: {
+          strategy: 'fallback',
+          fallback: [{ op: 'system:log', params: { message: 'salvage' } }],
+        },
+      } as any,
+    ]);
+
+    expect(result.status).toBe('succeeded');
+    const statuses = result.results.map((r) => r.status);
+    expect(statuses).toContain('success'); // fallback step, flattened
+    expect(statuses).toContain('recovered'); // the failed-then-recovered step
+    expect(result.context._error).toMatchObject({ step_op: 'system:exec' });
+  });
+
   it('rejects system ops that fail input contract validation before dispatch', async () => {
     const result = await runSteps([
       {
