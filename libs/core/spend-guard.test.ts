@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   checkSpendGuard,
   loadSpendPolicy,
+  resolveSpendPolicyForTenant,
   SpendCapExceededError,
   sumSpend,
   type SpendPolicy,
@@ -90,6 +91,55 @@ describe('checkSpendGuard', () => {
     });
     expect(result.breached).toEqual([]);
     expect(result.mission_spent_usd).toBeUndefined();
+  });
+});
+
+describe('tenant overrides (OP-01 Task 3)', () => {
+  const TENANT_POLICY: SpendPolicy = {
+    posture: 'warn',
+    daily_cap_usd: 10,
+    mission_cap_usd: 5,
+    tenant_overrides: {
+      'acme-corp': { posture: 'block', daily_cap_usd: 2 },
+    },
+  };
+
+  it('applies the tenant override on top of the base policy', () => {
+    const resolved = resolveSpendPolicyForTenant(TENANT_POLICY, 'acme-corp');
+    expect(resolved).toEqual({ posture: 'block', daily_cap_usd: 2, mission_cap_usd: 5 });
+  });
+
+  it('keeps the base policy for unknown tenants', () => {
+    expect(resolveSpendPolicyForTenant(TENANT_POLICY, 'other')).toBe(TENANT_POLICY);
+    expect(resolveSpendPolicyForTenant(TENANT_POLICY)).toBe(TENANT_POLICY);
+  });
+
+  it('checkSpendGuard enforces the tenant cap and posture', () => {
+    const alert = vi.fn();
+    const result = checkSpendGuard({
+      now: NOW,
+      policy: TENANT_POLICY,
+      tenantId: 'acme-corp',
+      entries: [entry(3, `${TODAY}01:00:00.000Z`)],
+      alert: alert as never,
+    });
+    expect(result.allowed).toBe(false); // block posture + $3 > $2 tenant cap
+    expect(result.daily_cap_usd).toBe(2);
+    expect(alert).toHaveBeenCalledTimes(1);
+    expect(alert.mock.calls[0][0].dedupe_key).toContain('acme-corp');
+  });
+
+  it('other tenants keep the generous base cap', () => {
+    const alert = vi.fn();
+    const result = checkSpendGuard({
+      now: NOW,
+      policy: TENANT_POLICY,
+      tenantId: 'other-tenant',
+      entries: [entry(3, `${TODAY}01:00:00.000Z`)],
+      alert: alert as never,
+    });
+    expect(result.allowed).toBe(true);
+    expect(result.breached).toEqual([]);
   });
 });
 
