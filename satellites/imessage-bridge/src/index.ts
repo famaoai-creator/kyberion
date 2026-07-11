@@ -1,4 +1,8 @@
 import express from 'express';
+import { installProcessGuards } from '@agent/core';
+
+// IP-08 Task 6: record unhandled rejections/exceptions in this long-lived process.
+installProcessGuards('imessage-bridge');
 import {
   createStandardYargs,
   logger,

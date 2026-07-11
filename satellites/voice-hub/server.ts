@@ -1,8 +1,12 @@
 import express from 'express';
+import { installProcessGuards } from '@agent/core';
 import { createServer } from 'node:http';
 import { createHash, randomUUID } from 'node:crypto';
 import { spawn, type ChildProcess } from 'node:child_process';
 import * as path from 'node:path';
+
+// IP-08 Task 6: record unhandled rejections/exceptions in this long-lived process.
+installProcessGuards('voice-hub');
 import {
   buildPresenceAssistantReplyTimeline,
   applyBrowserConversationCommand,
