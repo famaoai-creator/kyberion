@@ -8,8 +8,8 @@
 
 | 判定    | 件数 |
 | ------- | ---- |
-| DONE    | 38   |
-| PARTIAL | 53   |
+| DONE    | 39   |
+| PARTIAL | 52   |
 | TODO    | 0    |
 
 ## P0 残作業(プロダクション化のクリティカルパス)
@@ -21,7 +21,7 @@
 | MO-02 | PARTIAL | mission-gate-engine、新設ゲート共通化、planning/受入ゲート記録、受入 rework/owner 通知、exit/quality の修復ループ                                                                                                                                                                                                                                                                                                                                                                                         |
 | AA-02 | DONE    | 2026-07-11 完了: driver/dispatchToPeer/writer fencing に加え、2-peer E2E(実 HTTP+HMAC、正常配送・復帰再配送・dead-letter・dedup)を実装。物理2プロセス実証のみ E3 パイロットへ                                                                                                                                                                                                                                                                                                                             |
 | SA-02 | DONE    | 2026-07-12 再突合: 「残」とされた3点は実装済みだった — execution-bounds.ts(system-actuator 移行済み)/ SECURITY.md「Shell & ADF Execution Guardrails」節 / enforce は全経路で既定(warn 段階を経ず fail-closed、KYBERION_SHELL_POLICY 変数は不要と判断され不存在)。受入条件5点をコード+19テスト緑で確認。HMAC 署名は 2026-07-11 実装済み                                                                                                                                                                    |
-| SA-05 | PARTIAL | 2026-07-12 Task 2 完了 + **重大発見2件を修正**: 自作 YAML パーサ不全で全16ポリシーの rules が空(エンジンは一度も執行していなかった)→ js-yaml 化 + parse 失敗 fail-closed + 縮退警告。`(?i)` 非対応で injection ルールも不発 → i フラグ変換。発火文脈接続: execute_command / network_request / reasoning_delegation(depth 追跡 KYBERION_DELEGATION_DEPTH、ring/tier env)。残: Task 1(kill-switch 配線)、3.3(承認要否の単一判定源)、Task 4(統制可視化)                                                      |
+| SA-05 | DONE    | 2026-07-12 完了: Task 2(dormant enforcement 2重バグ根治: YAML パーサ不全で全ポリシー無効 + `(?i)` 不発、発火文脈接続)/ Task 1(policy violation・actuator dispatch の kill-switch 供給。monitor 起動・graduated response・閾値外出しは実装済みを確認)/ Task 3.3(require_approval を requireApprovalForOp へ統一 — pending 承認リクエスト作成、承認後に再試行可)/ Task 4(統制サマリへ policies declared/loaded と anomalies 追加)。rapid-fire 閾値の実運用調整のみ trust-policy.json で運用対応             |
 | OP-01 | DONE    | 2026-07-12 完了: 全経路計測・cost report・spend-guard(テナント override 含む)・operator packet 週次コスト表示・KPI 正本(docs/KPI_TRACKING.md)                                                                                                                                                                                                                                                                                                                                                             |
 | AR-01 | PARTIAL | 2026-07-12: ループ全廃 + エンジン一本化 + Task 3/4 完了 + run_pipeline 意味論パリティ(budget 執行・step on_error)。golden 緑。残: run_pipeline ループの機械的委譲(意味論分岐は解消済み、性能/保守リファクタ扱い)                                                                                                                                                                                                                                                                                          |
 | AR-02 | PARTIAL | describeOps、op-discovery に input_schema 反映、未知 op の apply 既定撤廃(check:op-registry は 2026-07-11 に修復し validate/CI へ接続済み)                                                                                                                                                                                                                                                                                                                                                                |
@@ -132,7 +132,7 @@
 | SA-02 | DONE    | 2026-07-12 再突合で DONE(execution-bounds / SECURITY.md / enforce 既定を実コード+テストで確認)                                                                                                                                                                |
 | SA-03 | PARTIAL | 2026-07-11 突合: untrusted-content.ts + テスト実在(injection 検知含む、緑)。残: 汚染文脈ゲートの適用範囲精査                                                                                                                                                  |
 | SA-04 | PARTIAL | 2026-07-11: warn 判定の永続化(audit chain へ記録 — 従来は in-memory のみで観測期間のデータが消失していた)+ pnpm egress:report(hostname 別集計と enforce 到達判定)。データ蓄積後に mode: enforce へ。残: tier 文脈付き egress ゲート、DNS リバインディング対策 |
-| SA-05 | PARTIAL | 残: kill-switch 配線(Task 1)、承認単一判定源(3.3)、統制可視化(Task 4)。Task 2 は 2026-07-12 完了(YAML パーサ不全と (?i) 不発の2重 dormant enforcement を修正、発火文脈接続)                                                                                   |
+| SA-05 | DONE    | 2026-07-12 全タスク完了(dormant enforcement 根治・kill-switch 供給・承認単一判定源・統制可視化)。rapid-fire 閾値調整は trust-policy.json の運用課題                                                                                                           |
 
 ### OP(運用・配布)
 
