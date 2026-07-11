@@ -1564,6 +1564,15 @@
       "documented": false
     },
     {
+      "name": "KYBERION_SPEND_GUARD_TEST",
+      "category": "flag",
+      "type": "boolean",
+      "required": false,
+      "description": "Test-only opt-in: lets vitest exercise the reasoning-path spend guard against real history/policy (normally disabled under VITEST).",
+      "documented": true,
+      "subsystem": "ops"
+    },
+    {
       "name": "KYBERION_STREAMING_STT_BRIDGE",
       "category": "runtime",
       "type": "string",

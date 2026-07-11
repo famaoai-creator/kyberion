@@ -96,7 +96,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_VOICE_RUNTIME_POLICY_PATH`                             | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_VOICE_SAMPLE_INGESTION_POLICY_PATH`                    | path | no       | _undocumented_                                                                                                                |
 
-## flag (11)
+## flag (12)
 
 | Variable                                           | Type                   | Required | Description                                                                                                                                                                                                                   |
 | -------------------------------------------------- | ---------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -111,6 +111,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_DISABLE_EMBEDDINGS`                      | boolean                | no       | _undocumented_                                                                                                                                                                                                                |
 | `KYBERION_ENABLE_SERVICE_ACTUATE_TOOL`             | boolean                | no       | _undocumented_                                                                                                                                                                                                                |
 | `KYBERION_SECRET_ENCRYPTION`                       | enum: none \| keychain | no       | At-rest encryption mode for connection documents (AC-05). none=plaintext (default, compatible); keychain=AES-256-GCM with a macOS-keychain-held key. Migrate with pnpm secrets:encrypt (--decrypt exports back to plaintext). |
+| `KYBERION_SPEND_GUARD_TEST`                        | boolean                | no       | Test-only opt-in: lets vitest exercise the reasoning-path spend guard against real history/policy (normally disabled under VITEST).                                                                                           |
 
 ## tuning (27)
 
