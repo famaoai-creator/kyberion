@@ -184,7 +184,7 @@ export class GeminiServiceImageGenerationProvider implements ImageGenerationProv
   readonly id = 'gemini_service';
 
   async isAvailable(): Promise<boolean> {
-    if (!process.env.GEMINI_API_KEY && !process.env.GOOGLE_API_KEY) return false;
+    if (!process.env.GEMINI_API_KEY) return false;
     try {
       resolveServiceBinding('gemini', 'secret-guard');
       return true;
