@@ -58,3 +58,11 @@
 - **Task 2.1 完了**: 発火文脈の接続 — `execute_command`(secure-io の safeExec/safeExecResult、message は実行ファイル名のみ: コマンド内容走査は SA-02 shell-command-policy の責務で二重規制を回避)/ `network_request`(secureFetch、hostname 付き)/ `reasoning_delegation`(runWithFailover 前段、`delegation_depth = 現在深度+1`)。新設 `libs/core/operation-policy-gate.ts`(`assertOperationPolicy` / `currentDelegationDepth` / `childDelegationEnv`)。深度は `KYBERION_DELEGATION_DEPTH` で追跡し、shell-claude-cli の spawn env で +1 伝搬。ring は `KYBERION_AGENT_RING`、tier は `KYBERION_AGENT_TIER`(root 既定 sovereign)。未マッチ操作は default allow のままなので、配線自体は挙動中立(ルールが狙った時だけ発火)。
 - **Task 2.2**: 2026-07-04 解消済み(fail-closed)を確認。「allowing by default」の虚偽ログを修正し回帰テストで固定。
 - **ルール整合**: ring3-read-only の op 名 `write_file` と実装の `file_write` の不一致を発見 → 両方をルールに併記。
+
+## 実装状況 追記 (2026-07-12 後半)
+
+**Task 1 / 3.3 / 4 の残りを完了 — SA-05 は受入条件ベースで実質完了(実運用の閾値調整のみ運用課題として残る)。**
+
+- **Task 1(kill-switch 供給の残り)**: startMonitor は既に run_pipeline / mission_controller / supervisor / baseline で起動済み、graduated response(warn→isolate→kill、kill は approval-gate 必須・自動 kill なし)と閾値外出し(trust-policy.json)も実装済みだったことを再確認。今回追加した供給: (1) **ポリシー違反** — operation-policy-gate と secure-io exec ゲートの deny が `recordGovernanceAction(violation=true)` を発火(anomaly の policy-violations 検知に接続)。(2) **actuator dispatch** — run_pipeline の dispatch と super-nerve の in-process dispatch が計測される。注意: rapid-fire 閾値(10 actions/5s)は対話エージェント向け設計のため、高頻度パイプラインの persona は anomaly 表示に載り得る(respond は agentRegistry 未登録 persona には no-op なので実害なし)。閾値調整は trust-policy.json で運用対応。
+- **Task 3.3(承認要否の単一判定源)**: shell-command-policy の `require_approval` verdict を、claude-agent-governance(sub-agent Bash)と acp-mediator の両方で `requireApprovalForOp`(risky-op-registry → enforceApprovalGate)へ接続。**pending の承認リクエストが作成され、オペレータが承認すれば再試行が通る**(従来は情報のない一律 deny)。未承認の間は fail-closed で deny。mediator のローカル safePatterns 直前分岐は温存(高速パス)しつつ、fallthrough を承認ゲートに統一。
+- **Task 4(統制可視化)**: 既存 `getGovernanceControlSummary`(doctor / kyberion_home で表示済み)に **policy engine の declared vs loaded**(サイレント縮退の可視化、乖離時は DROPPED 警告)と **anomaly 件数**を追加。policy-engine に `getPolicyCounts()` を新設。
