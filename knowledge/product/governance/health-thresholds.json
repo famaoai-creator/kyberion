@@ -3,5 +3,10 @@
   "description": "OP-04 Task 1 degradation thresholds. Conservative starting values per the plan (observe warnings before tightening).",
   "regression_multiplier": 1.5,
   "red_regressions": 3,
-  "red_demoted_providers": 2
+  "red_demoted_providers": 2,
+  "rss_growth_warning_ratio": 1.5,
+  "rss_growth_red_ratio": 2.5,
+  "restart_warning_count": 3,
+  "restart_red_count": 10,
+  "trend_window_ms": 86400000
 }

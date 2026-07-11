@@ -14,6 +14,11 @@
 
 import { logger } from './core.js';
 import { metrics } from './metrics.js';
+import {
+  evaluateRuntimeHealthTrends,
+  loadRuntimeHealthSamples,
+  type RuntimeHealthSample,
+} from './runtime-health-history.js';
 import { sendOpsAlert, type OpsAlertReceipt } from './ops-alert.js';
 import { pathResolver } from './path-resolver.js';
 import { discoverProviders } from './provider-discovery.js';
@@ -27,10 +32,18 @@ export interface HealthThresholds {
   red_regressions: number;
   /** Number of fully demoted providers that escalates yellow → red. */
   red_demoted_providers: number;
+  /** OP-04: RSS growth ratio (last/first in window) that warns / escalates. */
+  rss_growth_warning_ratio: number;
+  rss_growth_red_ratio: number;
+  /** OP-04: agent restarts within the window that warn / escalate. */
+  restart_warning_count: number;
+  restart_red_count: number;
+  /** OP-04: trend evaluation window in milliseconds (default 24h). */
+  trend_window_ms: number;
 }
 
 export interface DegradationFinding {
-  kind: 'latency_regression' | 'provider_demotion';
+  kind: 'latency_regression' | 'provider_demotion' | 'rss_growth' | 'restart_frequency';
   severity: 'warning' | 'critical';
   detail: string;
 }
@@ -54,7 +67,17 @@ const DEFAULT_THRESHOLDS: HealthThresholds = {
   regression_multiplier: 1.5,
   red_regressions: 3,
   red_demoted_providers: 2,
+  rss_growth_warning_ratio: 1.5,
+  rss_growth_red_ratio: 2.5,
+  restart_warning_count: 3,
+  restart_red_count: 10,
+  trend_window_ms: 24 * 60 * 60 * 1000,
 };
+
+function positiveOr(value: unknown, fallback: number, min = 0): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > min ? parsed : fallback;
+}
 
 export function loadHealthThresholds(): HealthThresholds {
   if (!safeExistsSync(THRESHOLDS_PATH)) return DEFAULT_THRESHOLDS;
@@ -75,6 +98,22 @@ export function loadHealthThresholds(): HealthThresholds {
         Number(parsed.red_demoted_providers) > 0
           ? Number(parsed.red_demoted_providers)
           : DEFAULT_THRESHOLDS.red_demoted_providers,
+      rss_growth_warning_ratio: positiveOr(
+        parsed.rss_growth_warning_ratio,
+        DEFAULT_THRESHOLDS.rss_growth_warning_ratio,
+        1
+      ),
+      rss_growth_red_ratio: positiveOr(
+        parsed.rss_growth_red_ratio,
+        DEFAULT_THRESHOLDS.rss_growth_red_ratio,
+        1
+      ),
+      restart_warning_count: positiveOr(
+        parsed.restart_warning_count,
+        DEFAULT_THRESHOLDS.restart_warning_count
+      ),
+      restart_red_count: positiveOr(parsed.restart_red_count, DEFAULT_THRESHOLDS.restart_red_count),
+      trend_window_ms: positiveOr(parsed.trend_window_ms, DEFAULT_THRESHOLDS.trend_window_ms),
     };
   } catch {
     // A broken thresholds file must not silence degradation detection.
@@ -85,11 +124,21 @@ export function loadHealthThresholds(): HealthThresholds {
 export function evaluateDegradation(input: {
   regressions: LatencyRegression[];
   demotedProviders: string[];
+  /** OP-04: RSS/restart trend samples over the window (optional). */
+  runtimeSamples?: RuntimeHealthSample[];
   thresholds?: HealthThresholds;
   now?: number;
 }): DegradationReport {
   const thresholds = input.thresholds ?? DEFAULT_THRESHOLDS;
   const findings: DegradationFinding[] = [];
+
+  for (const trend of evaluateRuntimeHealthTrends(input.runtimeSamples ?? [], thresholds)) {
+    findings.push({
+      kind: trend.kind,
+      severity: trend.severity,
+      detail: trend.detail,
+    });
+  }
 
   const regressionsCritical = input.regressions.length >= thresholds.red_regressions;
   for (const regression of input.regressions) {
@@ -127,6 +176,7 @@ export function evaluateDegradation(input: {
 export interface DegradationWatchDeps {
   regressions?: LatencyRegression[];
   demotedProviders?: string[];
+  runtimeSamples?: RuntimeHealthSample[];
   thresholds?: HealthThresholds;
   alert?: typeof sendOpsAlert;
   now?: number;
@@ -146,8 +196,11 @@ export function runDegradationWatch(deps: DegradationWatchDeps = {}): {
     deps.regressions ??
     (metrics.detectRegressions(thresholds.regression_multiplier) as LatencyRegression[]);
   const demotedProviders = deps.demotedProviders ?? listDemotedProviders(discoverProviders());
+  const runtimeSamples =
+    deps.runtimeSamples ?? loadRuntimeHealthSamples(thresholds.trend_window_ms, deps.now);
   const report = evaluateDegradation({
     regressions,
+    runtimeSamples,
     demotedProviders,
     thresholds,
     now: deps.now,
