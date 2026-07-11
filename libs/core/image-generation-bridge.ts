@@ -10,7 +10,7 @@ import { probeServiceRuntime } from './service-runtime-registry.js';
 import {
   ImageGenerationRequest,
   ImageGenerationResult,
-  ImageGenerationProvider
+  ImageGenerationProvider,
 } from './image-generation-types.js';
 
 function getFallbackTargetPath(request: ImageGenerationRequest): string {
@@ -22,7 +22,10 @@ function isAppleSiliconMac(): boolean {
   return process.platform === 'darwin' && process.arch === 'arm64';
 }
 
-function resolveLocalFluxDimensions(request: ImageGenerationRequest): { width: number; height: number } {
+function resolveLocalFluxDimensions(request: ImageGenerationRequest): {
+  width: number;
+  height: number;
+} {
   if (request.width && request.height) {
     return {
       width: Math.max(16, Math.round(request.width / 16) * 16),
@@ -30,7 +33,9 @@ function resolveLocalFluxDimensions(request: ImageGenerationRequest): { width: n
     };
   }
 
-  const ratio = String(request.aspectRatio || '1:1').replace('/', ':').trim();
+  const ratio = String(request.aspectRatio || '1:1')
+    .replace('/', ':')
+    .trim();
   switch (ratio) {
     case '16:9':
       return { width: 1344, height: 768 };
@@ -56,7 +61,7 @@ function resolveLocalFluxDimensions(request: ImageGenerationRequest): { width: n
 async function runLocalFluxGeneration(
   request: ImageGenerationRequest,
   startedAt: number,
-  providerId: string,
+  providerId: string
 ): Promise<ImageGenerationResult> {
   const outputPath = getFallbackTargetPath(request);
   const outputDir = path.dirname(outputPath);
@@ -101,7 +106,7 @@ async function runLocalFluxGeneration(
     '--steps',
     String(steps),
     '--output',
-    outputPath,
+    outputPath
   );
   if (quantize !== undefined) {
     args.push('-q', String(quantize));
@@ -121,7 +126,11 @@ async function runLocalFluxGeneration(
       status: 'failed',
       provider: providerId,
       elapsedMs: Date.now() - startedAt,
-      error: result.stderr?.trim() || result.stdout?.trim() || result.error?.message || 'mflux_generation_failed',
+      error:
+        result.stderr?.trim() ||
+        result.stdout?.trim() ||
+        result.error?.message ||
+        'mflux_generation_failed',
     };
   }
 
@@ -203,15 +212,15 @@ export class GeminiServiceImageGenerationProvider implements ImageGenerationProv
           prompt: request.prompt,
           aspect_ratio: request.aspectRatio || '1:1',
         },
-        'secret-guard',
+        'secret-guard'
       );
 
       const imageBytes =
         typeof response === 'string'
           ? response
-          : (response as any)?.imageBytes
-            || (response as any)?.generatedImages?.[0]?.image?.imageBytes
-            || (response as any)?.result?.imageBytes;
+          : (response as any)?.imageBytes ||
+            (response as any)?.generatedImages?.[0]?.image?.imageBytes ||
+            (response as any)?.result?.imageBytes;
 
       if (!imageBytes || typeof imageBytes !== 'string') {
         throw new Error('Gemini image service returned no image bytes');
@@ -268,10 +277,14 @@ export class LlmApiImageGenerationProvider implements ImageGenerationProvider {
     throw new Error('No Cloud Image Generation API key available.');
   }
 
-  private async callGeminiImagen(apiKey: string, request: ImageGenerationRequest, startedAt: number): Promise<ImageGenerationResult> {
+  private async callGeminiImagen(
+    apiKey: string,
+    request: ImageGenerationRequest,
+    startedAt: number
+  ): Promise<ImageGenerationResult> {
     // Default to Imagen 3 API
     const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:generateImages?key=${apiKey}`;
-    
+
     // aspect ratio can be '1:1', '3:4', '4:3', '9:16', or '16:9'
     let resolvedRatio = request.aspectRatio || '1:1';
     if (resolvedRatio === '16/9') resolvedRatio = '16:9';
@@ -281,7 +294,7 @@ export class LlmApiImageGenerationProvider implements ImageGenerationProvider {
       numberOfImages: 1,
       prompt: request.prompt,
       aspectRatio: resolvedRatio,
-      outputMimeType: 'image/jpeg'
+      outputMimeType: 'image/jpeg',
     };
 
     const res = await fetch(url, {
@@ -294,7 +307,7 @@ export class LlmApiImageGenerationProvider implements ImageGenerationProvider {
       throw new Error(`Gemini Imagen API error: ${res.statusText} (${res.status})`);
     }
 
-    const data = await res.json() as any;
+    const data = (await res.json()) as any;
     const base64Bytes = data.generatedImages?.[0]?.image?.imageBytes;
     if (!base64Bytes) {
       throw new Error('Gemini Imagen API returned no image bytes');
@@ -312,9 +325,13 @@ export class LlmApiImageGenerationProvider implements ImageGenerationProvider {
     };
   }
 
-  private async callOpenAIDallE(apiKey: string, request: ImageGenerationRequest, startedAt: number): Promise<ImageGenerationResult> {
+  private async callOpenAIDallE(
+    apiKey: string,
+    request: ImageGenerationRequest,
+    startedAt: number
+  ): Promise<ImageGenerationResult> {
     const url = 'https://api.openai.com/v1/images/generations';
-    
+
     // Resolve size mapping for DALL-E 3
     let size = '1024x1024';
     if (request.aspectRatio === '16:9' || request.aspectRatio === '16/9') size = '1792x1024';
@@ -325,14 +342,14 @@ export class LlmApiImageGenerationProvider implements ImageGenerationProvider {
       prompt: request.prompt,
       n: 1,
       size,
-      response_format: 'b64_json'
+      response_format: 'b64_json',
     };
 
     const res = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify(payload),
     });
@@ -341,7 +358,7 @@ export class LlmApiImageGenerationProvider implements ImageGenerationProvider {
       throw new Error(`OpenAI DALL-E API error: ${res.statusText} (${res.status})`);
     }
 
-    const data = await res.json() as any;
+    const data = (await res.json()) as any;
     const base64Bytes = data.data?.[0]?.b64_json;
     if (!base64Bytes) {
       throw new Error('OpenAI DALL-E API returned no image bytes');
@@ -435,13 +452,15 @@ function getRouter(): AdaptivePolicyRouter {
       new GeminiServiceImageGenerationProvider(),
       new LlmApiImageGenerationProvider(),
       new LocalFluxImageGenerationProvider(),
-      new LocalDiffusionImageGenerationProvider()
+      new LocalDiffusionImageGenerationProvider(),
     ]);
   }
   return globalRouter;
 }
 
-export async function generateImage(request: ImageGenerationRequest): Promise<ImageGenerationResult> {
+export async function generateImage(
+  request: ImageGenerationRequest
+): Promise<ImageGenerationResult> {
   const router = getRouter();
   const provider = await router.selectProvider(request);
   logger.info(`[image_generation_bridge] Routing generation request to provider: ${provider.id}`);
