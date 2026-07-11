@@ -52,6 +52,13 @@
 ## 実装状況 (2026-07-06)
 
 - **進行中(Task 2/3 の土台)**: `libs/core/adf-engine.ts` を新設し、capture / transform / apply / control の共通 step runner を切り出した。`file-actuator` と `super-nerve` はこの runner を使う薄いアダプタへ寄せ、制御フロー・step budget・自動修復の共通化を進めた。残りは `run_pipeline.ts` と golden 回帰の確認。
+- **横展開1件目(2026-07-11)**: `network-actuator` の私製ループを `executeAdfSteps` へ移行(file-actuator パターン踏襲)。意味論統一に伴う意図的変更1点: 旧ループはネスト制御(`if`/`while` 配下)の失敗を握りつぶして `res.context` を採用していたが、正準化で fail-propagate に統一(AR-06 の no-silent-failure 準拠)。actuators 全46ファイル/553テスト緑。**横展開2件目(同日)**: `code-actuator` も移行。traceCtx の per-step span はアダプタ側の handler ラップで維持(エンジン非改変、`code:<type>:<op>` の命名互換)。実装時の学び: capture/transform/apply handler は 4引数 `(op, params, ctx, resolve)` で runSteps を取らない(5引数で書くと resolve が undefined になり静かに壊れる — テストが検出)。**残りの私製ループ**: modeling / system / wisdom / browser の4アクチュエータ。
+- **横展開完了(2026-07-12)**: 残り4件(modeling / system / wisdom / browser)+ 棚卸しから漏れていた5件目の **media** を移行し、**アクチュエータ側の私製 step ループは全廃**。移行に必要だったエンジン拡張2点:
+  - **`on_error` 回復のエンジン内蔵**: browser / media が個別に持っていた `handleStepError`(skip / abort / fallback)呼び出しを `executeAdfSteps` の catch パスへ移設。fallback サブパイプラインも同エンジンで実行されるため、失敗は伝播し(AR-06)、step budget にも計上される。`PipelineStepResult` に `'recovered'` ステータスを追加(`derivePipelineStatus` は failed のみ見るため互換)。
+  - **step フック(`beforeStep`/`afterStep`)**: browser の per-step trace span・screenshot artifact・action-trail イベント、media の span 命名(`media:<type>:<op>`)をフックで注入。フックはネスト step(control 配下・on_error fallback)にも発火するため、従来トップレベルのみだった span がネストにも付く(改善として意図的)。
+  - 意図的な意味論変更(media): 旧ループは step budget を受け取るだけで未執行だった → エンジンで実際に執行(メディア処理は長時間になり得るため timeout デフォルトは 60s でなく 10 分)。未知の control op は静かに無視 → throw に統一。`'sink'` type と `media:` op prefix は正規化アダプタで吸収(`on_error.fallback` 配列へも再帰適用。`on_error.ref` 経由の fallback に sink step が含まれるケースのみ未対応の既知エッジ)。
+  - 残フェーズ: `run_pipeline.ts` の委譲、golden 回帰(`check:golden`)、自動修復の統一。
+- **重複エンジンの一本化(2026-07-12、CI が検出)**: `libs/core/index.ts` が旧パイロット版 `executeAdfSteps`(`src/pipeline-engine.ts`)を**明示 re-export** しており、明示 export は `export *`(adf-engine)より優先されるため、移行済みアクチュエータは実は旧版で動いていた(hooks 引数は型不一致)。旧版を削除し、旧版のみの機能(`label` / `resolveVars` オプション)は正準エンジンへ吸収。**教訓2点**: (1) 同名 export の重複は明示 export が勝ち、静かに実装がすり替わる — 正準化では旧シンボルを必ず削除する。(2) root `tsconfig.json` は `scripts/presence/satellites` のみで `libs/actuators` を含まない — アクチュエータ変更の型検証は `npx tsc --noEmit` でなく **`pnpm run build:actuators`** で行う(ローカル全緑・CI 赤の原因)。
 
 ## リスクと注意
 

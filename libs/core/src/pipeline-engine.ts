@@ -2,9 +2,7 @@ import * as path from 'node:path';
 import { safeReadFile } from '../secure-io.js';
 import { logger } from '../core.js';
 import { pathResolver } from '../path-resolver.js';
-import { derivePipelineStatus } from '../pipeline-contract.js';
-import type { PipelineAdfStep, PipelineStepResult } from '../pipeline-contract.js';
-import { resolveVars as defaultResolveVars } from './logic-utils.js';
+import type { PipelineAdfStep } from '../pipeline-contract.js';
 
 const MAX_REF_DEPTH = 10;
 
@@ -19,118 +17,6 @@ export interface RefParams {
   path: string;
   bind?: Record<string, any>;
   export_as?: string;
-}
-
-export interface AdfRunOptions {
-  maxSteps?: number;
-  timeoutMs?: number;
-  quiet?: boolean;
-  label?: string;
-  resolveVars?: (value: any, ctx: Record<string, any>) => any;
-}
-
-export interface AdfStepHandlers<Ctx extends Record<string, any> = Record<string, any>> {
-  capture: (op: string, params: any, ctx: Ctx, resolve: (value: any) => any) => Promise<Ctx>;
-  transform: (op: string, params: any, ctx: Ctx, resolve: (value: any) => any) => Promise<Ctx>;
-  apply: (op: string, params: any, ctx: Ctx, resolve: (value: any) => any) => Promise<void | Ctx>;
-  control?: (
-    op: string,
-    params: any,
-    ctx: Ctx,
-    runSteps: (steps: PipelineAdfStep[], seedCtx?: Ctx) => Promise<AdfRunResult<Ctx>>,
-    resolve: (value: any) => any
-  ) => Promise<Ctx>;
-}
-
-export interface AdfRunResult<Ctx extends Record<string, any> = Record<string, any>> {
-  status: 'succeeded' | 'failed';
-  results: PipelineStepResult[];
-  context: Ctx;
-  total_steps: number;
-}
-
-export async function executeAdfSteps<Ctx extends Record<string, any> = Record<string, any>>(
-  steps: PipelineAdfStep[],
-  initialCtx: Ctx,
-  options: AdfRunOptions,
-  handlers: AdfStepHandlers<Ctx>,
-  state: { stepCount: number; startTime: number } = { stepCount: 0, startTime: Date.now() }
-): Promise<AdfRunResult<Ctx>> {
-  const maxSteps = options.maxSteps ?? 1000;
-  const timeoutMs = options.timeoutMs ?? 60_000;
-  const label = options.label || '[ADF]';
-  let ctx = { ...initialCtx } as Ctx;
-  const results: PipelineStepResult[] = [];
-
-  const runNestedSteps = async (nestedSteps: PipelineAdfStep[], seedCtx: Ctx = ctx) =>
-    executeAdfSteps(nestedSteps, seedCtx, options, handlers, state);
-
-  for (const step of steps) {
-    state.stepCount += 1;
-    if (state.stepCount > maxSteps) {
-      throw new Error(`[SAFETY_LIMIT] Exceeded maximum pipeline steps (${maxSteps})`);
-    }
-    if (Date.now() - state.startTime > timeoutMs) {
-      throw new Error(`[SAFETY_LIMIT] Pipeline execution timed out (${timeoutMs}ms)`);
-    }
-
-    try {
-      logger.info(`  ${label} [Step ${state.stepCount}] ${step.type}:${step.op}...`);
-      // Default to the shared template resolver — an identity default made
-      // `{{mission_id}}`-style params silently land as literal paths in every
-      // caller that forgot to pass resolveVars (meeting-followup regression).
-      const resolve = (value: any) =>
-        options.resolveVars ? options.resolveVars(value, ctx) : defaultResolveVars(value, ctx);
-      if (step.type === 'control') {
-        if (!handlers.control) {
-          throw new Error(`[UNKNOWN_TYPE] Unknown control step op: ${step.op}`);
-        }
-        const controlResult = await handlers.control(
-          step.op,
-          step.params,
-          ctx,
-          runNestedSteps,
-          resolve
-        );
-        // Honor the adf-engine skip marker (skipAdfStep): a false branch is
-        // recorded as skipped — never as success, and never merged into ctx.
-        if (
-          controlResult &&
-          typeof controlResult === 'object' &&
-          (controlResult as { skipped?: boolean }).skipped === true
-        ) {
-          ctx = ((controlResult as { context?: Ctx }).context ?? ctx) as Ctx;
-          results.push({ op: step.op, status: 'skipped' });
-          logger.info(
-            `  ${label} Step skipped (${step.op}): ${(controlResult as { reason?: string }).reason || ''}`
-          );
-          continue;
-        }
-        ctx = controlResult;
-      } else if (step.type === 'capture') {
-        ctx = await handlers.capture(step.op, step.params, ctx, resolve);
-      } else if (step.type === 'transform') {
-        ctx = await handlers.transform(step.op, step.params, ctx, resolve);
-      } else if (step.type === 'apply') {
-        const nextCtx = await handlers.apply(step.op, step.params, ctx, resolve);
-        if (nextCtx) ctx = nextCtx;
-      } else {
-        throw new Error(`[UNKNOWN_TYPE] Unknown step type: ${step.type}`);
-      }
-      results.push({ op: step.op, status: 'success' });
-    } catch (error: any) {
-      logger.error(`  [ADF] Step failed (${step.op}): ${error?.message || String(error)}`);
-      results.push({ op: step.op, status: 'failed', error: error?.message || String(error) });
-      break;
-    }
-  }
-
-  return {
-    status: derivePipelineStatus(results),
-    results,
-    context: ctx,
-    total_steps: state.stepCount,
-  };
 }
 
 /**

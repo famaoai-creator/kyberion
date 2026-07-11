@@ -89,18 +89,26 @@ interface ComputerInteractionAction {
 }
 
 export function createBrowserInteractionHelpers(deps: {
-  executePipeline: (steps: PipelineStep[], sessionId: string, options: any, initialCtx?: any, state?: any) => Promise<any>;
+  executePipeline: (
+    steps: PipelineStep[],
+    sessionId: string,
+    options: any,
+    initialCtx?: any
+  ) => Promise<any>;
   emitComputerSurfacePatch: (payload: Record<string, any>) => void;
 }) {
-  function translateComputerInteractionToBrowserAction(input: ComputerInteractionAction): BrowserAction {
+  function translateComputerInteractionToBrowserAction(
+    input: ComputerInteractionAction
+  ): BrowserAction {
     const interaction = input.action || { type: 'snapshot' as const };
     const sessionId = input.session_id || input.target?.runtime_id || 'computer-session';
-    const viewport = input.observation?.viewport?.width && input.observation?.viewport?.height
-      ? {
-          width: input.observation.viewport.width,
-          height: input.observation.viewport.height,
-        }
-      : undefined;
+    const viewport =
+      input.observation?.viewport?.width && input.observation?.viewport?.height
+        ? {
+            width: input.observation.viewport.width,
+            height: input.observation.viewport.height,
+          }
+        : undefined;
 
     const steps: PipelineStep[] = [];
     const options: BrowserAction['options'] = {
@@ -110,15 +118,20 @@ export function createBrowserInteractionHelpers(deps: {
       ...(viewport ? { viewport } : {}),
     };
 
-    if (input.target?.tab_id && interaction.type !== 'open_tab' && interaction.type !== 'select_tab') {
+    if (
+      input.target?.tab_id &&
+      interaction.type !== 'open_tab' &&
+      interaction.type !== 'select_tab'
+    ) {
       steps.push({ type: 'control', op: 'select_tab', params: { tab_id: input.target.tab_id } });
     }
 
-    const requiresRefSnapshot = interaction.type === 'click_ref'
-      || interaction.type === 'fill_ref'
-      || interaction.type === 'press_ref'
-      || interaction.type === 'wait_for_ref'
-      || interaction.type === 'extract_text_ref';
+    const requiresRefSnapshot =
+      interaction.type === 'click_ref' ||
+      interaction.type === 'fill_ref' ||
+      interaction.type === 'press_ref' ||
+      interaction.type === 'wait_for_ref' ||
+      interaction.type === 'extract_text_ref';
     if (requiresRefSnapshot) {
       steps.push({ type: 'capture', op: 'snapshot', params: { export_as: 'last_snapshot' } });
     }
@@ -149,19 +162,47 @@ export function createBrowserInteractionHelpers(deps: {
         });
         break;
       case 'click_ref':
-        steps.push({ type: 'apply', op: 'click_ref', params: { ref: interaction.ref, timeout: interaction.timeout_ms } });
+        steps.push({
+          type: 'apply',
+          op: 'click_ref',
+          params: { ref: interaction.ref, timeout: interaction.timeout_ms },
+        });
         break;
       case 'fill_ref':
-        steps.push({ type: 'apply', op: 'fill_ref', params: { ref: interaction.ref, text: interaction.text || '', timeout: interaction.timeout_ms } });
+        steps.push({
+          type: 'apply',
+          op: 'fill_ref',
+          params: {
+            ref: interaction.ref,
+            text: interaction.text || '',
+            timeout: interaction.timeout_ms,
+          },
+        });
         break;
       case 'press_ref':
-        steps.push({ type: 'apply', op: 'press_ref', params: { ref: interaction.ref, key: interaction.key || 'Enter', timeout: interaction.timeout_ms } });
+        steps.push({
+          type: 'apply',
+          op: 'press_ref',
+          params: {
+            ref: interaction.ref,
+            key: interaction.key || 'Enter',
+            timeout: interaction.timeout_ms,
+          },
+        });
         break;
       case 'wait_for_ref':
-        steps.push({ type: 'apply', op: 'wait_ref', params: { ref: interaction.ref, timeout: interaction.timeout_ms } });
+        steps.push({
+          type: 'apply',
+          op: 'wait_ref',
+          params: { ref: interaction.ref, timeout: interaction.timeout_ms },
+        });
         break;
       case 'extract_text_ref':
-        steps.push({ type: 'capture', op: 'content', params: { selector: `{{ref_map.${interaction.ref}}}`, export_as: 'last_capture' } });
+        steps.push({
+          type: 'capture',
+          op: 'content',
+          params: { selector: `{{ref_map.${interaction.ref}}}`, export_as: 'last_capture' },
+        });
         break;
       case 'capture_console':
         steps.push({ type: 'capture', op: 'console', params: { export_as: 'console_events' } });
@@ -170,14 +211,26 @@ export function createBrowserInteractionHelpers(deps: {
         steps.push({ type: 'capture', op: 'network', params: { export_as: 'network_events' } });
         break;
       case 'wait':
-        steps.push({ type: 'apply', op: 'wait', params: { duration: interaction.timeout_ms || 1000 } });
+        steps.push({
+          type: 'apply',
+          op: 'wait',
+          params: { duration: interaction.timeout_ms || 1000 },
+        });
         break;
       default:
-        throw new Error(`Unsupported computer interaction action for browser-actuator: ${interaction.type}`);
+        throw new Error(
+          `Unsupported computer interaction action for browser-actuator: ${interaction.type}`
+        );
     }
 
-    const includeConsole = input.observation?.include_console === true || input.observation?.mode === 'console' || input.observation?.mode === 'mixed';
-    const includeNetwork = input.observation?.include_network === true || input.observation?.mode === 'network' || input.observation?.mode === 'mixed';
+    const includeConsole =
+      input.observation?.include_console === true ||
+      input.observation?.mode === 'console' ||
+      input.observation?.mode === 'mixed';
+    const includeNetwork =
+      input.observation?.include_network === true ||
+      input.observation?.mode === 'network' ||
+      input.observation?.mode === 'mixed';
     const includeScreenshot = input.observation?.include_screenshot === true;
 
     if (interaction.type === 'snapshot') {
@@ -217,7 +270,7 @@ export function createBrowserInteractionHelpers(deps: {
       browserAction.steps || [],
       browserAction.session_id || 'default',
       browserAction.options || {},
-      browserAction.context || {},
+      browserAction.context || {}
     );
     const ctx = (result as any).context || {};
     deps.emitComputerSurfacePatch({
@@ -238,4 +291,3 @@ export function createBrowserInteractionHelpers(deps: {
     handleComputerInteraction,
   };
 }
-

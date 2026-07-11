@@ -12,9 +12,9 @@ import {
   getPathValue,
   resolveWriteArtifactSpec,
   retry,
-  derivePipelineStatus,
   classifyError,
   buildUnknownActuatorOpError,
+  executeAdfSteps,
 } from '@agent/core';
 import * as path from 'node:path';
 import { sendA2AMessage, pollA2AInbox } from './a2a-transport.js';
@@ -135,12 +135,13 @@ export async function handleAction(input: NetworkAction) {
   return await executePipeline(input.steps || [], input.context || {}, input.options);
 }
 
-async function executePipeline(
-  steps: PipelineStep[],
-  initialCtx: any = {},
-  options: any = {},
-  state: any = { stepCount: 0, startTime: Date.now() }
-) {
+// AR-01 Task 2: the hand-rolled step loop is replaced by the canonical
+// engine (executeAdfSteps), so control-op / vars / condition semantics and
+// step budgets match every other runner. One deliberate semantic change:
+// nested control failures now propagate instead of being silently absorbed
+// (the old loop took res.context regardless of nested status — AR-06's
+// no-silent-failure rule says that was a bug, not a feature).
+async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, options: any = {}) {
   const MAX_STEPS = options.max_steps || 1000;
   const TIMEOUT = options.timeout_ms || 60000;
 
@@ -158,73 +159,65 @@ async function executePipeline(
     ctx = { ...ctx, ...saved };
   }
 
-  const results = [];
-  for (const step of steps) {
-    state.stepCount++;
-    if (state.stepCount > MAX_STEPS)
-      throw new Error(`[SAFETY_LIMIT] Exceeded maximum pipeline steps (${MAX_STEPS})`);
-    if (Date.now() - state.startTime > TIMEOUT)
-      throw new Error(`[SAFETY_LIMIT] Pipeline execution timed out (${TIMEOUT}ms)`);
-
-    try {
-      logger.info(`  [NET_PIPELINE] [Step ${state.stepCount}] ${step.type}:${step.op}...`);
-
-      if (step.type === 'control') {
-        ctx = await opControl(step.op, step.params, ctx, options, state);
-      } else {
-        switch (step.type) {
-          case 'capture':
-            ctx = await opCapture(step.op, step.params, ctx);
-            break;
-          case 'transform':
-            ctx = await opTransform(step.op, step.params, ctx);
-            break;
-          case 'apply':
-            await opApply(step.op, step.params, ctx);
-            break;
-        }
-      }
-      results.push({ op: step.op, status: 'success' });
-    } catch (err: any) {
-      logger.error(`  [NET_PIPELINE] Step failed (${step.op}): ${err.message}`);
-      results.push({ op: step.op, status: 'failed', error: err.message });
-      break;
+  const result = await executeAdfSteps(
+    steps as Parameters<typeof executeAdfSteps>[0],
+    ctx,
+    { maxSteps: MAX_STEPS, timeoutMs: TIMEOUT },
+    {
+      capture: opCapture,
+      transform: opTransform,
+      apply: async (op, params, currentCtx) => {
+        await opApply(op, params, currentCtx);
+        return currentCtx;
+      },
+      control: opControl,
     }
-  }
+  );
+  ctx = result.context;
 
   if (initialCtx.context_path) {
     safeWriteFile(pathResolver.rootResolve(initialCtx.context_path), JSON.stringify(ctx, null, 2));
   }
 
-  return {
-    status: derivePipelineStatus(results),
-    results,
-    context: ctx,
-    total_steps: state.stepCount,
-  };
+  return result;
 }
 
-async function opControl(op: string, params: any, ctx: any, options: any, state: any) {
+async function opControl(
+  op: string,
+  params: any,
+  ctx: any,
+  runSteps: (steps: any[], seedCtx?: any) => Promise<any>,
+  _resolve: (value: any) => any
+) {
+  const runNested = async (steps: any[], seedCtx: any) => {
+    const res = await runSteps(steps, seedCtx);
+    if (res.status === 'failed') {
+      throw new Error(
+        res.results.find((entry: any) => entry.status === 'failed')?.error ||
+          'nested pipeline failed'
+      );
+    }
+    return res.context;
+  };
+
   switch (op) {
     case 'if':
       if (evaluateCondition(params.condition, ctx)) {
-        const res = await executePipeline(params.then, ctx, options, state);
-        return res.context;
+        return await runNested(params.then, ctx);
       } else if (params.else) {
-        const res = await executePipeline(params.else, ctx, options, state);
-        return res.context;
+        return await runNested(params.else, ctx);
       }
       return ctx;
 
-    case 'while':
+    case 'while': {
       let iterations = 0;
       const maxIter = params.max_iterations || 100;
       while (evaluateCondition(params.condition, ctx) && iterations < maxIter) {
-        const res = await executePipeline(params.pipeline, ctx, options, state);
-        ctx = res.context;
+        ctx = await runNested(params.pipeline, ctx);
         iterations++;
       }
       return ctx;
+    }
 
     default:
       throw buildUnknownNetworkOpError(op);

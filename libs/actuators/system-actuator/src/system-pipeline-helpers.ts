@@ -7,6 +7,7 @@ import {
   safeExecResult,
   safeExistsSync,
   derivePipelineStatus,
+  executeAdfSteps,
   pathResolver,
   resolveVars,
   evaluateCondition,
@@ -354,18 +355,26 @@ async function opControl(
   op: string,
   params: any,
   ctx: any,
-  options: any,
-  state: any,
-  resolve: (value: any) => any
+  runSteps: (steps: any[], seedCtx?: any) => Promise<any>,
+  _resolve: (value: any) => any
 ) {
+  const runNested = async (steps: any[], seedCtx: any) => {
+    const res = await runSteps(steps, seedCtx);
+    if (res.status === 'failed') {
+      throw new Error(
+        res.results.find((entry: any) => entry.status === 'failed')?.error ||
+          'nested pipeline failed'
+      );
+    }
+    return res.context;
+  };
+
   switch (op) {
     case 'if':
       if (evaluateCondition(params.condition, ctx)) {
-        const res = await executePipeline(params.then, ctx, options, state);
-        return res.context;
+        return await runNested(params.then, ctx);
       } else if (params.else) {
-        const res = await executePipeline(params.else, ctx, options, state);
-        return res.context;
+        return await runNested(params.else, ctx);
       }
       return ctx;
 
@@ -374,8 +383,7 @@ async function opControl(
       const maxIter = params.max_iterations || undefined;
       while (evaluateCondition(params.condition, ctx) && withinLoopBounds(iterations, maxIter)) {
         logger.info(`    [LOOP] Iteration ${++iterations}...`);
-        const res = await executePipeline(params.pipeline, ctx, options, state);
-        ctx = res.context;
+        ctx = await runNested(params.pipeline, ctx);
       }
       if (!withinLoopBounds(iterations, maxIter))
         logger.warn(
@@ -1578,12 +1586,10 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
   return ctx;
 }
 
-async function executePipeline(
-  steps: PipelineStep[],
-  initialCtx: any = {},
-  options: any = {},
-  state: any = { stepCount: 0, startTime: Date.now() }
-) {
+// AR-01 Task 2: hand-rolled loop replaced by the canonical engine
+// (executeAdfSteps). Nested control failures now propagate instead of being
+// silently absorbed (AR-06 no-silent-failure).
+async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, options: any = {}) {
   const rootDir = pathResolver.rootDir();
   const MAX_STEPS = options.max_steps || DEFAULT_MAX_PIPELINE_STEPS;
   const TIMEOUT = options.timeout_ms || DEFAULT_PIPELINE_TIMEOUT_MS;
@@ -1597,46 +1603,24 @@ async function executePipeline(
     ctx = { ...ctx, ...saved };
   }
 
-  const resolve = (val: any) => resolveVars(val, ctx);
-
-  const results: Array<{ op: string; status: 'success' | 'failed'; error?: string }> = [];
-  for (const step of steps) {
-    state.stepCount++;
-    assertExecutionBounds(state, { maxSteps: MAX_STEPS, timeoutMs: TIMEOUT });
-
-    try {
-      logger.info(`  [SYS_PIPELINE] [Step ${state.stepCount}] ${step.type}:${step.op}...`);
-
-      if (step.type === 'control') {
-        ctx = await opControl(step.op, step.params, ctx, options, state, resolve);
-      } else if (step.type === 'capture') {
-        ctx = await opCapture(step.op, step.params, ctx, resolve);
-      } else if (step.type === 'transform') {
-        ctx = await opTransform(step.op, step.params, ctx, resolve);
-      } else if (step.type === 'apply') {
-        ctx = await opApply(step.op, step.params, ctx, resolve);
-      } else {
-        throw new Error(`Unknown step type: ${step.type}`);
-      }
-      results.push({ op: step.op, status: 'success' });
-    } catch (err: unknown) {
-      const error = err instanceof Error ? err : new Error(String(err));
-      logger.error(`  [SYS_PIPELINE] Step failed (${step.op}): ${error.message}`);
-      results.push({ op: step.op, status: 'failed', error: error.message });
-      break;
+  const result = await executeAdfSteps(
+    steps as Parameters<typeof executeAdfSteps>[0],
+    ctx,
+    { maxSteps: MAX_STEPS, timeoutMs: TIMEOUT },
+    {
+      capture: opCapture,
+      transform: opTransform,
+      apply: opApply,
+      control: opControl,
     }
-  }
+  );
+  ctx = result.context;
 
   if (initialCtx.context_path) {
     safeWriteFile(path.resolve(rootDir, initialCtx.context_path), JSON.stringify(ctx, null, 2));
   }
 
-  return {
-    status: derivePipelineStatus(results),
-    results,
-    context: ctx,
-    total_steps: state.stepCount,
-  };
+  return result;
 }
 
 export {

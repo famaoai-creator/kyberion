@@ -5,7 +5,7 @@ import {
   safeMkdir,
   safeExistsSync,
   safeReaddir,
-  derivePipelineStatus,
+  executeAdfSteps,
   TraceContext,
   persistTrace,
   pathResolver,
@@ -198,8 +198,7 @@ export async function executePipeline(
   steps: PipelineStep[],
   sessionId: string,
   options: any,
-  initialCtx: any = {},
-  state: any = { stepCount: 0, startTime: Date.now() }
+  initialCtx: any = {}
 ) {
   const MAX_STEPS = options.max_steps || 1000;
   const TIMEOUT = options.timeout_ms || 300000;
@@ -258,103 +257,71 @@ export async function executePipeline(
     pipelineId: sessionId,
   });
 
-  const resolve = (val: any): any => resolveVars(val, ctx);
-
-  const results = [];
-  let stepIndex = 0;
-  try {
-    for (const step of steps) {
-      state.stepCount++;
-      stepIndex++;
-      if (state.stepCount > MAX_STEPS)
-        throw new Error(`[SAFETY_LIMIT] Exceeded maximum pipeline steps (${MAX_STEPS})`);
-      if (Date.now() - state.startTime > TIMEOUT)
-        throw new Error(`[SAFETY_LIMIT] Pipeline execution timed out (${TIMEOUT}ms)`);
-
-      const spanId = traceCtx.startSpan(`${step.type}:${step.op}`, {
-        stepId: (step as any).id || `step-${stepIndex}`,
+  // AR-01 Task 2: hand-rolled loop replaced by the canonical engine
+  // (executeAdfSteps). on_error recovery is now the engine's native
+  // handleStepError path; spans / screenshot artifacts / action-trail events
+  // are injected via engine step hooks. Two deliberate semantic changes:
+  // nested control failures propagate (AR-06 no-silent-failure), and nested
+  // steps (control sub-pipelines, on_error fallbacks) now emit trace spans.
+  const trailDepths: number[] = [];
+  const hooks = {
+    beforeStep: (step: any, stepNumber: number, stepCtx: any) => {
+      trailDepths.push(Array.isArray(stepCtx.action_trail) ? stepCtx.action_trail.length : 0);
+      traceCtx.startSpan(`${step.type}:${step.op}`, {
+        stepId: step.id || `step-${stepNumber}`,
       });
-      const trailBefore = Array.isArray(ctx.action_trail) ? ctx.action_trail.length : 0;
-
-      try {
-        logger.info(`  [BROWSER_PIPELINE] [Step ${state.stepCount}] ${step.type}:${step.op}...`);
-
-        if (step.type === 'control') {
-          ctx = await opControl(step.op, step.params, runtime, ctx, options, state, resolve);
-        } else if (step.type === 'capture') {
-          ctx = await opCapture(step.op, step.params, runtime, ctx, resolve);
-        } else if (step.type === 'transform') {
-          ctx = await opTransform(step.op, step.params, ctx, resolve);
-        } else if (step.type === 'apply') {
-          ctx = await opApply(step.op, step.params, runtime, ctx, resolve);
-        } else {
-          throw new Error(`Unknown step type: ${step.type}`);
-        }
-
-        if (step.op === 'screenshot') {
-          const screenshotPath =
-            ctx.last_screenshot || ctx[step.params?.export_as || 'last_screenshot'];
-          if (screenshotPath) {
-            traceCtx.addArtifact('screenshot', screenshotPath, (step as any).id || 'screenshot');
-          }
-        }
-
-        // Emit each new browser action as a trace event so the trail is queryable in Chronos
-        if (Array.isArray(ctx.action_trail) && ctx.action_trail.length > trailBefore) {
-          for (const act of (ctx.action_trail as any[]).slice(trailBefore)) {
-            const attrs: Record<string, string | number | boolean> = {
-              kind: String(act.kind || ''),
-              op: String(act.op || ''),
-            };
-            if (act.tab_id) attrs.tab_id = String(act.tab_id);
-            if (act.url) attrs.url = String(act.url).slice(0, 200);
-            if (act.title) attrs.title = String(act.title).slice(0, 120);
-            if (act.selector) attrs.selector = String(act.selector).slice(0, 200);
-            traceCtx.addEvent('browser.action', attrs);
-          }
-        }
-
-        traceCtx.endSpan('ok');
-        results.push({ op: step.op, status: 'success' });
-      } catch (err: any) {
-        traceCtx.endSpan('error', err.message);
-
-        const stepOnError = (step as any).on_error;
-        if (stepOnError) {
-          try {
-            const { handleStepError } = await import('@agent/core');
-            const recovery = await handleStepError(
-              err,
-              step,
-              stepOnError,
-              ctx,
-              async (fallbackSteps: any[], errCtx: any) => {
-                const res = await executePipelineInternal(
-                  fallbackSteps,
-                  runtime,
-                  errCtx,
-                  options,
-                  state,
-                  resolve
-                );
-                return res.context;
-              },
-              resolve as (val: any) => any
-            );
-            if (recovery.recovered) {
-              ctx = recovery.ctx;
-              results.push({ op: step.op, status: 'recovered' as any });
-              continue;
-            }
-          } catch (_) {
-            /* fallthrough */
-          }
-        }
-        logger.error(`  [BROWSER_PIPELINE] Step failed (${step.op}): ${err.message}`);
-        results.push({ op: step.op, status: 'failed', error: err.message });
-        break;
+    },
+    afterStep: (step: any, _stepNumber: number, stepCtx: any, outcome: any) => {
+      const trailBefore = trailDepths.pop() ?? 0;
+      if (outcome.status === 'failed' || outcome.status === 'recovered') {
+        traceCtx.endSpan('error', outcome.error);
+        return;
       }
-    }
+
+      if (step.op === 'screenshot') {
+        const screenshotPath =
+          stepCtx.last_screenshot || stepCtx[step.params?.export_as || 'last_screenshot'];
+        if (screenshotPath) {
+          traceCtx.addArtifact('screenshot', screenshotPath, step.id || 'screenshot');
+        }
+      }
+
+      // Emit each new browser action as a trace event so the trail is queryable in Chronos
+      if (Array.isArray(stepCtx.action_trail) && stepCtx.action_trail.length > trailBefore) {
+        for (const act of (stepCtx.action_trail as any[]).slice(trailBefore)) {
+          const attrs: Record<string, string | number | boolean> = {
+            kind: String(act.kind || ''),
+            op: String(act.op || ''),
+          };
+          if (act.tab_id) attrs.tab_id = String(act.tab_id);
+          if (act.url) attrs.url = String(act.url).slice(0, 200);
+          if (act.title) attrs.title = String(act.title).slice(0, 120);
+          if (act.selector) attrs.selector = String(act.selector).slice(0, 200);
+          traceCtx.addEvent('browser.action', attrs);
+        }
+      }
+
+      traceCtx.endSpan('ok');
+    },
+  };
+
+  let engineResult!: Awaited<ReturnType<typeof executeAdfSteps>>;
+  try {
+    engineResult = await executeAdfSteps(
+      steps as Parameters<typeof executeAdfSteps>[0],
+      ctx,
+      { maxSteps: MAX_STEPS, timeoutMs: TIMEOUT },
+      {
+        capture: (op, params, stepCtx, resolveFn) =>
+          opCapture(op, params, runtime, stepCtx, resolveFn),
+        transform: (op, params, stepCtx, resolveFn) => opTransform(op, params, stepCtx, resolveFn),
+        apply: (op, params, stepCtx, resolveFn) => opApply(op, params, runtime, stepCtx, resolveFn),
+        control: (op, params, stepCtx, runSteps, resolveFn) =>
+          opControl(op, params, runtime, stepCtx, runSteps, resolveFn),
+      },
+      hooks
+    );
+    ctx = engineResult.context;
   } finally {
     const videoRecordingEnabled = options.record_video === true;
     let finalizedVideoPaths: string[] | undefined;
@@ -438,72 +405,11 @@ export async function executePipeline(
   }
 
   return {
-    status: derivePipelineStatus(results),
-    results,
+    status: engineResult.status,
+    results: engineResult.results,
     context: ctx,
-    total_steps: state.stepCount,
+    total_steps: engineResult.total_steps,
   };
-}
-
-async function executePipelineInternal(
-  steps: PipelineStep[],
-  runtime: BrowserRuntime,
-  ctx: any,
-  options: any,
-  state: any,
-  resolve: Function
-) {
-  const results = [];
-  for (const step of steps) {
-    state.stepCount++;
-    try {
-      if (step.type === 'control') {
-        ctx = await opControl(step.op, step.params, runtime, ctx, options, state, resolve);
-      } else if (step.type === 'capture') {
-        ctx = await opCapture(step.op, step.params, runtime, ctx, resolve);
-      } else if (step.type === 'transform') {
-        ctx = await opTransform(step.op, step.params, ctx, resolve);
-      } else if (step.type === 'apply') {
-        ctx = await opApply(step.op, step.params, runtime, ctx, resolve);
-      } else {
-        throw new Error(`Unknown step type: ${step.type}`);
-      }
-      results.push({ op: step.op, status: 'success' });
-    } catch (err: any) {
-      const stepOnError = (step as any).on_error;
-      if (stepOnError) {
-        try {
-          const { handleStepError } = await import('@agent/core');
-          const recovery = await handleStepError(
-            err,
-            step,
-            stepOnError,
-            ctx,
-            async (fallbackSteps: any[], errCtx: any) => {
-              const res = await executePipelineInternal(
-                fallbackSteps,
-                runtime,
-                errCtx,
-                options,
-                state,
-                resolve
-              );
-              return res.context;
-            },
-            resolve as (val: any) => any
-          );
-          if (recovery.recovered) {
-            ctx = recovery.ctx;
-            results.push({ op: step.op, status: 'recovered' as any });
-            continue;
-          }
-        } catch (_) {}
-      }
-      results.push({ op: step.op, status: 'failed', error: err.message });
-      break;
-    }
-  }
-  return { context: ctx };
 }
 
 async function opControl(
@@ -511,10 +417,20 @@ async function opControl(
   params: any,
   runtime: BrowserRuntime,
   ctx: any,
-  options: any,
-  state: any,
+  runSteps: (steps: any[], seedCtx?: any) => Promise<any>,
   resolve: Function
 ) {
+  const runNested = async (steps: any[], seedCtx: any) => {
+    const res = await runSteps(steps, seedCtx);
+    if (res.status === 'failed') {
+      throw new Error(
+        res.results.find((entry: any) => entry.status === 'failed')?.error ||
+          'nested pipeline failed'
+      );
+    }
+    return res.context;
+  };
+
   switch (op) {
     case 'open_tab': {
       const page = await runtime.context.newPage();
@@ -632,43 +548,20 @@ async function opControl(
     }
     case 'if':
       if (evaluateCondition(params.condition, ctx)) {
-        const res = await executePipelineInternal(
-          params.then,
-          runtime,
-          ctx,
-          options,
-          state,
-          resolve
-        );
-        return res.context;
+        return await runNested(params.then, ctx);
       } else if (params.else) {
-        const res = await executePipelineInternal(
-          params.else,
-          runtime,
-          ctx,
-          options,
-          state,
-          resolve
-        );
-        return res.context;
+        return await runNested(params.else, ctx);
       }
       return ctx;
-    case 'while':
+    case 'while': {
       let iterations = 0;
       const maxIter = params.max_iterations || 100;
       while (evaluateCondition(params.condition, ctx) && iterations < maxIter) {
-        const res = await executePipelineInternal(
-          params.pipeline,
-          runtime,
-          ctx,
-          options,
-          state,
-          resolve
-        );
-        ctx = res.context;
+        ctx = await runNested(params.pipeline, ctx);
         iterations++;
       }
       return ctx;
+    }
     case 'setup_passkey_authenticator': {
       const page = browserRuntimeHelpers.getActivePage(runtime);
       const setup = await setupVirtualPasskeyAuthenticator(runtime, page, {
@@ -713,18 +606,11 @@ async function opControl(
         }
       }
       const refResult = await resolveRef(refPath, bindResolved, ctx, resolve as (val: any) => any);
-      const subResult = await executePipelineInternal(
-        refResult.steps,
-        runtime,
-        { ...ctx, ...refResult.mergedCtx },
-        options,
-        state,
-        resolve
-      );
+      const subCtx = await runNested(refResult.steps, { ...ctx, ...refResult.mergedCtx });
       if (params.export_as) {
-        ctx = { ...ctx, [params.export_as]: subResult.context };
+        ctx = { ...ctx, [params.export_as]: subCtx };
       } else {
-        const { _refDepth, ...subCtxClean } = subResult.context || {};
+        const { _refDepth, ...subCtxClean } = subCtx || {};
         ctx = { ...ctx, ...subCtxClean };
       }
       return browserRuntimeHelpers.recordBrowserAction(ctx, {
