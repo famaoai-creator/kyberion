@@ -719,6 +719,14 @@
       "documented": false
     },
     {
+      "name": "KYBERION_GEMINI_TTS_VOICE",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_GENERATION_SCHEDULE_INTERVAL_MS",
       "category": "tuning",
       "type": "number",
