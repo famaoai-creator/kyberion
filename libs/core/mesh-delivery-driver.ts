@@ -12,6 +12,7 @@ import { resolvePeerRecord, type PeerNetworkPeerRecord } from './peer-messaging.
 import type { MeshDeliveryRecord, MeshRequest } from './mesh-hub-contract.js';
 import type { MeshRetryPolicy } from './mesh-message-broker.js';
 import { logger } from './core.js';
+import { acquireLock, releaseLock } from './src/lock-utils.js';
 
 /**
  * AA-02: delivery driver for the Mesh Hub at-least-once state machine.
@@ -40,6 +41,13 @@ export interface MeshDeliveryPassOptions {
   resolvePeer?: (peerId: string) => PeerNetworkPeerRecord | null;
   retryPolicy?: Partial<MeshRetryPolicy>;
   dispatchTimeoutMs?: number;
+  /**
+   * AA-02 writer fencing: lock id guarding the whole pass. Override in tests
+   * for isolation; set only when a deployment intentionally shards drivers.
+   */
+  writerLockId?: string;
+  /** How long to wait for the writer lock before skipping the pass. */
+  writerLockTimeoutMs?: number;
 }
 
 export interface MeshDeliveryPassReport {
@@ -50,10 +58,14 @@ export interface MeshDeliveryPassReport {
   dead_lettered: number;
   unroutable: number;
   failures: Array<{ delivery_id: string; reason: string }>;
+  /** True when another driver held the writer lock and this pass did nothing. */
+  skipped?: boolean;
 }
 
 const DEFAULT_BATCH_LIMIT = 10;
 const DEFAULT_REQUEST_TTL_MS = 60_000;
+const DEFAULT_WRITER_LOCK_ID = 'mesh-delivery-writer';
+const DEFAULT_WRITER_LOCK_TIMEOUT_MS = 500;
 
 /**
  * The broker persists idempotency_key / expires_at on every delivery row but
@@ -84,6 +96,40 @@ function reconstructMeshRequest(delivery: MeshDeliveryRecord, senderPeerId: stri
 }
 
 export async function runMeshDeliveryPass(
+  options: MeshDeliveryPassOptions
+): Promise<MeshDeliveryPassReport> {
+  // AA-02 writer fencing: exactly one driver mutates the delivery ledger at
+  // a time. Overlapping passes (cron tick + manual run, or a slow previous
+  // pass) skip instead of queuing — the next tick picks the work up, and
+  // skipping can never double-dispatch a claimed delivery. Crash tolerance
+  // comes from lock-utils' PID staleness takeover; release is PID-checked so
+  // a fenced-out driver cannot delete a lock someone else took over.
+  const lockId = options.writerLockId ?? DEFAULT_WRITER_LOCK_ID;
+  const acquired = await acquireLock(
+    lockId,
+    options.writerLockTimeoutMs ?? DEFAULT_WRITER_LOCK_TIMEOUT_MS
+  );
+  if (!acquired) {
+    logger.warn(`[mesh-delivery-driver] writer lock '${lockId}' held elsewhere — skipping pass`);
+    return {
+      expired: 0,
+      claimed: 0,
+      delivered: 0,
+      retried: 0,
+      dead_lettered: 0,
+      unroutable: 0,
+      failures: [],
+      skipped: true,
+    };
+  }
+  try {
+    return await runMeshDeliveryPassUnfenced(options);
+  } finally {
+    releaseLock(lockId);
+  }
+}
+
+async function runMeshDeliveryPassUnfenced(
   options: MeshDeliveryPassOptions
 ): Promise<MeshDeliveryPassReport> {
   const now = options.now || new Date().toISOString();
@@ -163,6 +209,9 @@ export async function runMeshDeliveryPass(
 }
 
 export function formatMeshDeliveryPassReport(report: MeshDeliveryPassReport): string {
+  if (report.skipped) {
+    return '[mesh-delivery] skipped (writer lock held by another driver)';
+  }
   const parts = [
     `claimed=${report.claimed}`,
     `delivered=${report.delivered}`,
