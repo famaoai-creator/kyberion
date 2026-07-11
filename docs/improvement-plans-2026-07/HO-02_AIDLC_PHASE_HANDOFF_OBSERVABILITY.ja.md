@@ -17,6 +17,11 @@
 3. **統合ハンドオフ履歴ビュー**: mission ペルソナハンドオフ + lease ハンドオフ + Cowork 配信 + 承認往復を、作業単位(相関 ID、IL-02)の 1 タイムラインに統合。
 4. 人間の回答(question-resolver の OIP への回答)が、元のブリフを保ったまま停止中の実行に自己完結的に再突入する(IL-05/MO-06 と連携、AI-DLC の Review→人間→再開でも同じ機構)。
 
+## 実装状況 (2026-07-11)
+
+- **完了済み(Task 1 最小実証)**: `libs/core/aidlc-phase-state.ts` — `AiDlcPhaseState`(task_board_ref / execution_result / test_output / review_findings / failure_context / attempts[])と順序強制付きフェーズ遷移(Alignment→Execution→Test→Self-Review→complete)。下流フェーズは上流の構造化結果をデータとして受領(diff 再導出なし)。test/review ゲート失敗は自動で circuit breaker を作動し、failure_context(何が失敗・何を試した・残課題)付きで Alignment へ差し戻す。payload は summary+artifact_refs 形(MO-04 予算原則)。mission evidence への保存/再読込付き。スタブテスト5件。
+- 残: MO-01 code_change テンプレートへの配線(Task 1.2/1.4)、統合ハンドオフ履歴ビュー(Task 2)、clean 再開(Task 3)、playbook 整合(Task 4)。
+
 ## 実装タスク
 
 ### Task 1: AI-DLC のフェーズ状態オブジェクト — `claude-sonnet-4`
