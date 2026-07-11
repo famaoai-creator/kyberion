@@ -12,6 +12,7 @@ import {
   resolveActiveProfileRoot,
   resolveOnboardingFlowPolicy,
   resolveOnboardingSummaryPolicy,
+  resolveVocabularyLocale,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
@@ -41,6 +42,19 @@ const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
 });
+
+// Wizard prompts follow the operator's selected language immediately: the
+// locale seeds from the saved identity (default Japanese) and is re-resolved
+// as soon as the language question is answered (UX-03).
+let wizardLocale: 'en' | 'ja' = 'ja';
+
+function setWizardLanguage(language: string): void {
+  wizardLocale = resolveVocabularyLocale(language);
+}
+
+function t(en: string, ja: string): string {
+  return wizardLocale === 'ja' ? ja : en;
+}
 
 type OnboardingPhase = 'identity' | 'reasoning' | 'services' | 'tenants' | 'tutorial' | 'summary';
 type OnboardingStatus = 'draft' | 'complete';
@@ -308,25 +322,48 @@ async function runIdentityPhase(state: OnboardingState): Promise<void> {
   const flowPolicy = resolveOnboardingFlowPolicy();
   console.log(`\n🧬 Phase 1 — ${flowPolicy.phase_titles.identity}\n`);
   const identity = buildIdentityFromState(state);
+  setWizardLanguage(identity.language);
 
-  identity.name = await ask(`How should I call you? [${identity.name}]: `, identity.name);
-  identity.language = await ask(`Preferred language? [${identity.language}]: `, identity.language);
+  identity.name = await ask(
+    t(`How should I call you? [${identity.name}]: `, `お名前(呼び方)は? [${identity.name}]: `),
+    identity.name
+  );
+  identity.language = await ask(
+    t(`Preferred language? [${identity.language}]: `, `希望する言語は? [${identity.language}]: `),
+    identity.language
+  );
+  setWizardLanguage(identity.language);
   const styleInput = await ask(
-    `Interaction style (Senior Partner / Concierge / Minimalist) [${identity.interaction_style}]: `,
+    t(
+      `Interaction style (Senior Partner / Concierge / Minimalist) [${identity.interaction_style}]: `,
+      `対話スタイル(Senior Partner / Concierge / Minimalist)[${identity.interaction_style}]: `
+    ),
     identity.interaction_style
   );
   identity.interaction_style = normalizeInteractionStyle(styleInput || identity.interaction_style);
   identity.primary_domain = await ask(
-    `Primary domain? [${identity.primary_domain}]: `,
+    t(
+      `Primary domain? [${identity.primary_domain}]: `,
+      `主な活動ドメインは? [${identity.primary_domain}]: `
+    ),
     identity.primary_domain
   );
   identity.vision = await ask(
-    `Core vision for this environment? [${identity.vision}]: `,
+    t(
+      `Core vision for this environment? [${identity.vision}]: `,
+      `この環境のコアビジョンは? [${identity.vision}]: `
+    ),
     identity.vision
   );
   identity.agent_id =
-    (await ask(`Agent ID? [${identity.agent_id}]: `, identity.agent_id)).trim().toUpperCase() ||
-    'KYBERION-PRIME';
+    (
+      await ask(
+        t(`Agent ID? [${identity.agent_id}]: `, `エージェント ID は? [${identity.agent_id}]: `),
+        identity.agent_id
+      )
+    )
+      .trim()
+      .toUpperCase() || 'KYBERION-PRIME';
 
   await writeJsonArtifact(
     identityPath(),
@@ -373,28 +410,64 @@ async function runReasoningPhase(state: OnboardingState): Promise<void> {
   console.log('\nReasoning Backend\n');
   let reasoning = await evaluateReasoningBackend();
   if (reasoning.available) {
-    console.log(chalk.green('Real reasoning backend detected.'));
-  } else if (reasoning.mode === 'stub_explicit') {
-    console.log(chalk.yellow('KYBERION_REASONING_BACKEND=stub is explicitly selected.'));
     console.log(
-      chalk.yellow('Real work will use deterministic placeholder responses until reconfigured.')
+      chalk.green(t('Real reasoning backend detected.', '実働する推論バックエンドを検出しました。'))
+    );
+  } else if (reasoning.mode === 'stub_explicit') {
+    console.log(
+      chalk.yellow(
+        t(
+          'KYBERION_REASONING_BACKEND=stub is explicitly selected.',
+          'KYBERION_REASONING_BACKEND=stub が明示的に選択されています。'
+        )
+      )
+    );
+    console.log(
+      chalk.yellow(
+        t(
+          'Real work will use deterministic placeholder responses until reconfigured.',
+          '再設定するまで、実作業は決定論的なプレースホルダ応答になります。'
+        )
+      )
     );
   } else {
-    console.log(chalk.red('No real reasoning backend was detected.'));
-    console.log(reasoning.reason ?? 'Run `pnpm reasoning:setup` to configure one.');
     console.log(
-      '\nRun `pnpm reasoning:setup` to configure Codex/Gemini/AGY CLI, Anthropic API, or a local backend.'
+      chalk.red(
+        t(
+          'No real reasoning backend was detected.',
+          '実働する推論バックエンドが見つかりませんでした。'
+        )
+      )
+    );
+    console.log(
+      reasoning.reason ??
+        t(
+          'Run `pnpm reasoning:setup` to configure one.',
+          '`pnpm reasoning:setup` を実行して設定してください。'
+        )
+    );
+    console.log(
+      t(
+        '\nRun `pnpm reasoning:setup` to configure Codex/Gemini/AGY CLI, Anthropic API, or a local backend.',
+        '\n`pnpm reasoning:setup` で Codex/Gemini/AGY CLI・Anthropic API・ローカルバックエンドを設定できます。'
+      )
     );
     if (interactive) {
       const continueWithStub = isAffirmative(
         await ask(
-          'Continue onboarding in stub-only mode? Real work will not be usable. (y/N): ',
+          t(
+            'Continue onboarding in stub-only mode? Real work will not be usable. (y/N): ',
+            'スタブのみのモードでオンボーディングを続けますか?実作業は使用できません。(y/N): '
+          ),
           'n'
         )
       );
       if (!continueWithStub) {
         console.log(
-          'Onboarding paused. Configure a reasoning backend, then re-run `pnpm onboard`.'
+          t(
+            'Onboarding paused. Configure a reasoning backend, then re-run `pnpm onboard`.',
+            'オンボーディングを中断しました。推論バックエンドを設定してから `pnpm onboard` を再実行してください。'
+          )
         );
         rl.close();
         process.exit(2);
@@ -760,23 +833,40 @@ async function runOnboarding() {
   }
 
   let state = loadState();
+  if (state?.identity?.language) {
+    setWizardLanguage(state.identity.language);
+  }
   if (!state) {
     state = createInitialState();
     await saveState(state);
   } else if (state.status === 'complete') {
     const overwrite = await ask(
-      'An onboarding state already exists and is complete. Restart from scratch? (y/N): ',
+      t(
+        'An onboarding state already exists and is complete. Restart from scratch? (y/N): ',
+        '完了済みのオンボーディング状態が既に存在します。最初からやり直しますか?(y/N): '
+      ),
       'n'
     );
     if (!isAffirmative(overwrite)) {
-      console.log('Onboarding cancelled. Existing state preserved.');
+      console.log(
+        t(
+          'Onboarding cancelled. Existing state preserved.',
+          'オンボーディングを中止しました。既存の状態は保持されます。'
+        )
+      );
       rl.close();
       process.exit(0);
     }
     state = createInitialState();
     await saveState(state);
   } else {
-    const resume = await ask(`Resume onboarding from phase "${state.current_phase}"? (Y/n): `, 'y');
+    const resume = await ask(
+      t(
+        `Resume onboarding from phase "${state.current_phase}"? (Y/n): `,
+        `フェーズ「${state.current_phase}」からオンボーディングを再開しますか?(Y/n): `
+      ),
+      'y'
+    );
     if (!isAffirmative(resume)) {
       state = createInitialState();
       await saveState(state);
