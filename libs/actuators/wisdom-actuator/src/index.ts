@@ -24,3 +24,5 @@ if (entrypoint && modulePath === entrypoint) {
 
 export { handleAction } from './wisdom-pipeline-helpers.js';
 export { dispatchDecisionOp } from './decision-ops.js';
+
+export { describeOps } from './op-catalog.js';

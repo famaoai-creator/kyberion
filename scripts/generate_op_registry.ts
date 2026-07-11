@@ -5,6 +5,33 @@ import { pathResolver, safeExistsSync, safeReadFile, safeWriteFile } from '@agen
 import { withExecutionContext } from '@agent/core/governance';
 import { getOpInputContract } from '@agent/core/op-input-contracts';
 import { describeOps as describeSystemOps } from '@actuator/system';
+import { describeOps as describeBrowserOps } from '../libs/actuators/browser-actuator/src/op-catalog.js';
+import { describeOps as describeCodeOps } from '../libs/actuators/code-actuator/src/op-catalog.js';
+import { describeOps as describeFileOps } from '../libs/actuators/file-actuator/src/op-catalog.js';
+import { describeOps as describeModelingOps } from '../libs/actuators/modeling-actuator/src/op-catalog.js';
+import { describeOps as describeNetworkOps } from '../libs/actuators/network-actuator/src/op-catalog.js';
+import { describeOps as describeWisdomOps } from '../libs/actuators/wisdom-actuator/src/op-catalog.js';
+
+// AR-02: actuators that self-describe their op surface. The registry and
+// discovery index are generated from these; check:op-registry fails on
+// drift between the committed files and this source of truth.
+const DESCRIBE_OPS_SOURCES: Record<
+  string,
+  () => Array<{
+    op: string;
+    kind: PipelineOpKind;
+    input_schema?: Record<string, unknown>;
+    examples?: Array<Record<string, unknown>>;
+  }>
+> = {
+  'system-actuator': describeSystemOps,
+  'file-actuator': describeFileOps,
+  'network-actuator': describeNetworkOps,
+  'code-actuator': describeCodeOps,
+  'modeling-actuator': describeModelingOps,
+  'wisdom-actuator': describeWisdomOps,
+  'browser-actuator': describeBrowserOps,
+};
 
 type PipelineOpKind = 'capture' | 'transform' | 'apply' | 'control';
 
@@ -122,8 +149,9 @@ function buildOpDiscoveryReport(
   const report: OpDiscoveryRecord[] = [];
   for (const entry of manifestCatalog) {
     const actuatorId = entry.n;
-    if (actuatorId === 'system-actuator') {
-      const ops = describeSystemOps();
+    const describe = DESCRIBE_OPS_SOURCES[actuatorId];
+    if (describe) {
+      const ops = describe();
       report.push({
         n: actuatorId,
         path: entry.path,
@@ -177,17 +205,19 @@ function buildGeneratedRegistry(): ActuatorOpRegistryFile {
   const registry = buildCurrentRegistryBase();
   const manifest = loadMediaManifest();
   const mediaOps = buildMediaOpsFromManifest(manifest);
-  const systemOps = describeSystemOps();
-
   const domains: Record<string, DomainOpRegistry> = {
     ...registry.domains,
-    system: normalizeDomainRegistry({
-      capture: systemOps.filter((item) => item.kind === 'capture').map((item) => item.op),
-      transform: systemOps.filter((item) => item.kind === 'transform').map((item) => item.op),
-      apply: systemOps.filter((item) => item.kind === 'apply').map((item) => item.op),
-    }),
     media: normalizeDomainRegistry(mediaOps),
   };
+  for (const [actuatorId, describe] of Object.entries(DESCRIBE_OPS_SOURCES)) {
+    const domainName = actuatorId.replace(/-actuator$/, '');
+    const ops = describe();
+    domains[domainName] = normalizeDomainRegistry({
+      capture: ops.filter((item) => item.kind === 'capture').map((item) => item.op),
+      transform: ops.filter((item) => item.kind === 'transform').map((item) => item.op),
+      apply: ops.filter((item) => item.kind === 'apply').map((item) => item.op),
+    });
+  }
 
   return {
     ...registry,

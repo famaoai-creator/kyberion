@@ -59,6 +59,8 @@ describe('mission-distill end-to-end promotion flow', () => {
   missionPath = pathResolver.shared('tmp/mission-distill-e2e');
   const queuePath = memoryPromotionQueuePath();
   const hintsPath = pathResolver.knowledge('product/governance/HINTS.md');
+  const scratchHintsDir = pathResolver.shared('tmp/tests/mission-distill-hints');
+  const scratchHintsPath = `${scratchHintsDir}/HINTS.md`;
   const dateSlug = new Date().toISOString().slice(0, 10).replace(/-/g, '_');
   const wisdomFileName = `distill_${missionId.toLowerCase()}_${dateSlug}.md`;
   const wisdomFilePath = pathResolver.rootResolve(`knowledge/product/evolution/${wisdomFileName}`);
@@ -111,6 +113,15 @@ describe('mission-distill end-to-end promotion flow', () => {
     if (safeExistsSync(hintsPath)) {
       originalHintsRaw = safeReadFile(hintsPath, { encoding: 'utf8' }) as string;
     }
+    // Isolate hint rotation to a scratch copy: rewriting the real HINTS.md
+    // mid-suite makes the parallel catalog-integrity test observe a dirty
+    // knowledge tree (flaky failure) and litters hints/archive.
+    withExecutionContext('ecosystem_architect', () => {
+      safeMkdir(scratchHintsDir, { recursive: true });
+      safeWriteFile(scratchHintsPath, originalHintsRaw ?? '');
+    });
+    process.env.KYBERION_HINTS_PATH = scratchHintsPath;
+    process.env.KYBERION_HINTS_ARCHIVE_DIR = `${scratchHintsDir}/archive`;
   });
 
   beforeEach(() => {
@@ -131,7 +142,10 @@ describe('mission-distill end-to-end promotion flow', () => {
       } else {
         safeRmSync(queuePath, { force: true });
       }
-      if (originalHintsRaw !== null) {
+      delete process.env.KYBERION_HINTS_PATH;
+      delete process.env.KYBERION_HINTS_ARCHIVE_DIR;
+      safeRmSync(scratchHintsDir, { recursive: true, force: true });
+      if (originalHintsRaw !== null && !safeExistsSync(hintsPath)) {
         safeWriteFile(hintsPath, originalHintsRaw);
       }
       safeRmSync(missionPath, { recursive: true, force: true });
@@ -190,7 +204,7 @@ describe('mission-distill end-to-end promotion flow', () => {
     expect(distill?.status).toBe('promoted');
     expect(loadState(missionId)?.status).toBe('completed');
 
-    const hints = safeReadFile(hintsPath, { encoding: 'utf8' }) as string;
+    const hints = safeReadFile(scratchHintsPath, { encoding: 'utf8' }) as string;
     expect(hints).toContain('Distilled wisdom from mission');
     expect(hints).toContain(`source_ref: ${queued.candidate_id}`);
     expect(hints).toContain(`knowledge/product/evolution/${wisdomFileName}`);

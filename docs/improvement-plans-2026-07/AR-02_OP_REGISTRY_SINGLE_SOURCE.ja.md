@@ -57,3 +57,5 @@ op-registry ↔ code のドリフトで、`determineActuatorStepType('file','sta
 - `describeOps()` を全アクチュエータに実装するのは横展開作業(AR-01 のアダプタ化と同時が効率的)。1件でパターン確立 → haiku 横展開。
 - 生成に切り替えると手書きの有用な注記が失われ得る。生成前後の diff を確認。
 - AC-01(能力プローブ)と生成基盤を共有する(manifest + prerequisites + op を同じ生成器で)。
+
+**進捗メモ(2026-07-12)**: `describeOps()` の横展開を完了 — file / network / code / modeling / wisdom / browser に `op-catalog.ts` を新設(dispatch switch の case と1:1、wisdom は decision-ops の48 op も apply として申告、browser の `extension_session` は index レベル特例 op として収載)。`generate_op_registry.ts` は self-describe テーブル(7アクチュエータ + media は manifest)から registry / discovery を生成し、**手書きだった registry の虚偽エントリを一掃**(例: file の `symlink` は case が存在せず UNKNOWN_OP になる宣言だった、code の `apply_pattern`/`merge_content` 等も同様)。`goto` の capture/apply 二重掲載は分類が apply に反転するため catalog 側で capture に正準化。discovery は +591 行(全 op 列挙 + input_schema)。残: 未 self-describe のロングテール アクチュエータ(agent/artifact 等、pipeline エンジン非搭載系)と CAPABILITIES op 表の生成切替。
