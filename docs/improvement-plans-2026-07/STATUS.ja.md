@@ -9,8 +9,8 @@
 | 判定    | 件数 |
 | ------- | ---- |
 | DONE    | 35   |
-| PARTIAL | 53   |
-| TODO    | 1    |
+| PARTIAL | 54   |
+| TODO    | 0    |
 
 ## P0 残作業(プロダクション化のクリティカルパス)
 
@@ -33,22 +33,22 @@
 
 ### IP(コード品質)
 
-| ID    | 状態    | 残作業(PARTIAL/TODO のみ)                                                                                 |
-| ----- | ------- | --------------------------------------------------------------------------------------------------------- |
-| IP-01 | DONE    |                                                                                                           |
-| IP-02 | DONE    |                                                                                                           |
-| IP-03 | DONE    |                                                                                                           |
-| IP-04 | PARTIAL | schemas/ 直下 \*-pipeline.schema.json 11本の二重定義整理                                                  |
-| IP-05 | DONE    |                                                                                                           |
-| IP-06 | DONE    |                                                                                                           |
-| IP-07 | PARTIAL | 2026-07-11 突合: backend/orchestrator/operator-learning のテストは実在し緑。残: 受入条件全体との網羅精査  |
-| IP-08 | PARTIAL | installProcessGuards 全デーモン適用、空 catch 解消、no-empty/process.exit lint、console→logger            |
-| IP-09 | PARTIAL | slugify ローカル定義5箇所の正本 import 化、再発防止 lint                                                  |
-| IP-10 | TODO    | 巨大ファイル分割(check_contract_schemas は 2026-07-11 時点 4,684 行 — 一部モジュール抽出済みだが依然巨大) |
-| IP-11 | PARTIAL | strict 系フラグ有効化、@ts-ignore 残6、media-actuator any 半減                                            |
-| IP-12 | DONE    |                                                                                                           |
-| IP-13 | DONE    |                                                                                                           |
-| IP-14 | DONE    |                                                                                                           |
+| ID    | 状態    | 残作業(PARTIAL/TODO のみ)                                                                                                                                                                                      |
+| ----- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| IP-01 | DONE    |                                                                                                                                                                                                                |
+| IP-02 | DONE    |                                                                                                                                                                                                                |
+| IP-03 | DONE    |                                                                                                                                                                                                                |
+| IP-04 | PARTIAL | schemas/ 直下 \*-pipeline.schema.json 11本の二重定義整理                                                                                                                                                       |
+| IP-05 | DONE    |                                                                                                                                                                                                                |
+| IP-06 | DONE    |                                                                                                                                                                                                                |
+| IP-07 | PARTIAL | 2026-07-11 突合: backend/orchestrator/operator-learning のテストは実在し緑。残: 受入条件全体との網羅精査                                                                                                       |
+| IP-08 | PARTIAL | installProcessGuards 全デーモン適用、空 catch 解消、no-empty/process.exit lint、console→logger                                                                                                                 |
+| IP-09 | PARTIAL | slugify ローカル定義5箇所の正本 import 化、再発防止 lint                                                                                                                                                       |
+| IP-10 | PARTIAL | 2026-07-11: check_contract_schemas から policy/manifest 系46チェック(1,170行)を \_policy_checks へ抽出(4,684→3,527行、check:contract-schemas 実走で同一動作を確認)。残: 同ファイルの継続分割と他の巨大ファイル |
+| IP-11 | PARTIAL | strict 系フラグ有効化、@ts-ignore 残6、media-actuator any 半減                                                                                                                                                 |
+| IP-12 | DONE    |                                                                                                                                                                                                                |
+| IP-13 | DONE    |                                                                                                                                                                                                                |
+| IP-14 | DONE    |                                                                                                                                                                                                                |
 
 ### UX(ユーザー接点)
 
