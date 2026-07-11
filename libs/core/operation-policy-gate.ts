@@ -1,4 +1,5 @@
 import { auditChain } from './audit-chain.js';
+import { recordGovernanceAction } from './kill-switch.js';
 import { policyEngine, type PolicyDecision } from './policy-engine.js';
 
 /**
@@ -39,6 +40,8 @@ export function assertOperationPolicy(input: {
   });
 
   if (!decision.allowed) {
+    // SA-05 Task 1: policy violations feed kill-switch anomaly detection.
+    recordGovernanceAction(agentId, input.operation, 'denied', true);
     auditChain.record({
       agentId,
       action: 'policy_violation',

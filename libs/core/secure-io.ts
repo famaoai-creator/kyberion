@@ -501,6 +501,12 @@ function assertExecPolicy(command: string): void {
     ...(Number.isFinite(ring) ? { agent_ring: ring } : {}),
   });
   if (!decision.allowed) {
+    recordGovernanceAction(
+      process.env.KYBERION_PERSONA || 'unknown',
+      'execute_command',
+      `${command}:denied`,
+      true
+    );
     auditChain.record({
       agentId: process.env.KYBERION_PERSONA || 'unknown',
       action: 'policy_violation',
