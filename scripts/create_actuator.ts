@@ -32,7 +32,10 @@ import {
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 function kebab(s: string): string {
-  return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  return s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
 }
 
 function pascal(s: string): string {
@@ -74,11 +77,15 @@ function buildManifest(fullName: string, description: string, name: string): str
         retryable_categories: ['network', 'timeout', 'resource_unavailable'],
       },
       capabilities: [
-        { op: 'execute', schema_ref: `schemas/${name}-action.schema.json`, platforms: ['darwin', 'linux', 'win32'] },
+        {
+          op: 'execute',
+          schema_ref: `schemas/${name}-action.schema.json`,
+          platforms: ['darwin', 'linux', 'win32'],
+        },
       ],
     },
     null,
-    2,
+    2
   );
 }
 
@@ -102,7 +109,7 @@ function buildPackage(description: string, name: string, fullName: string): stri
       },
     },
     null,
-    2,
+    2
   );
 }
 
@@ -192,7 +199,7 @@ function buildSchema(pascalName: string): string {
       additionalProperties: true,
     },
     null,
-    2,
+    2
   );
 }
 
@@ -245,11 +252,23 @@ export function createActuatorScaffold(input: ActuatorScaffoldInput): ActuatorSc
   safeMkdir(path.join(outDir, 'examples'));
   safeMkdir(path.join(outDir, 'schemas'));
 
-  safeWriteFile(path.join(outDir, 'manifest.json'), `${buildManifest(fullName, description, name)}\n`);
-  safeWriteFile(path.join(outDir, 'package.json'), `${buildPackage(description, name, fullName)}\n`);
+  safeWriteFile(
+    path.join(outDir, 'manifest.json'),
+    `${buildManifest(fullName, description, name)}\n`
+  );
+  safeWriteFile(
+    path.join(outDir, 'package.json'),
+    `${buildPackage(description, name, fullName)}\n`
+  );
   safeWriteFile(path.join(outDir, 'src', 'index.ts'), buildIndexTs(fullName, pascalName));
-  safeWriteFile(path.join(outDir, 'schemas', `${name}-action.schema.json`), `${buildSchema(pascalName)}\n`);
-  safeWriteFile(path.join(outDir, 'examples', 'README.md'), buildExamplesReadme(pascalName, name, envName));
+  safeWriteFile(
+    path.join(outDir, 'schemas', `${name}-action.schema.json`),
+    `${buildSchema(pascalName)}\n`
+  );
+  safeWriteFile(
+    path.join(outDir, 'examples', 'README.md'),
+    buildExamplesReadme(pascalName, name, envName)
+  );
 
   return {
     outDir,
@@ -296,6 +315,9 @@ async function main(): Promise<void> {
     console.log('  2. Replace the schema stub with the real contract');
     console.log('  3. Add an entry to CAPABILITIES_GUIDE.md');
     console.log('  4. Run: pnpm build');
+    console.log(
+      '  5. Run: pnpm generate:op-registry — register the ops in the op registry/discovery catalog (pnpm validate enforces this via check:op-registry)'
+    );
   } catch (err: any) {
     logger.error(formatClassification(classifyError(err)));
     process.exit(1);

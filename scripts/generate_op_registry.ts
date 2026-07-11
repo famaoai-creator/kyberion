@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { format as prettierFormat, resolveConfig as resolvePrettierConfig } from 'prettier';
 import { loadActuatorManifestCatalog } from '@agent/core';
 import { pathResolver, safeExistsSync, safeReadFile, safeWriteFile } from '@agent/core';
 import { withExecutionContext } from '@agent/core/governance';
@@ -198,13 +199,16 @@ function buildGeneratedRegistry(): ActuatorOpRegistryFile {
   };
 }
 
-function stringifyJson(value: unknown): string {
-  return `${JSON.stringify(value, null, 2)}\n`;
+// Format with the repo's prettier config: `pnpm format` rewrites these JSON
+// files, so plain JSON.stringify output would immediately re-drift.
+async function stringifyJson(value: unknown, filePath: string): Promise<string> {
+  const config = (await resolvePrettierConfig(filePath)) ?? {};
+  return prettierFormat(JSON.stringify(value, null, 2), { ...config, parser: 'json' });
 }
 
-function writeOutputs(registry: ActuatorOpRegistryFile, discovery: OpDiscoveryReport): void {
-  safeWriteFile(REGISTRY_PATH, stringifyJson(registry));
-  safeWriteFile(DISCOVERY_PATH, stringifyJson(discovery));
+function writeOutputs(registryJson: string, discoveryJson: string): void {
+  safeWriteFile(REGISTRY_PATH, registryJson);
+  safeWriteFile(DISCOVERY_PATH, discoveryJson);
 }
 
 function readCurrentFiles(): { registry: string; discovery: string | null } {
@@ -215,16 +219,21 @@ function readCurrentFiles(): { registry: string; discovery: string | null } {
   return { registry, discovery };
 }
 
-export function main(argv = process.argv.slice(2)): void {
+export async function main(argv = process.argv.slice(2)): Promise<void> {
   const shouldCheck = argv.includes('--check');
   const shouldWrite = argv.includes('--write') || !shouldCheck;
-  return withExecutionContext('ecosystem_architect', () => {
+  // withExecutionContext restores env synchronously when its callback
+  // returns, so every secure-io access stays inside a sync callback and the
+  // async prettier formatting runs between the two context sections.
+  const built = withExecutionContext('ecosystem_architect', () => {
     const manifestCatalog = loadActuatorManifestCatalog();
     const registry = buildGeneratedRegistry();
     const discovery = buildOpDiscoveryReport(manifestCatalog, registry);
-    const nextRegistry = stringifyJson(registry);
-    const nextDiscovery = stringifyJson(discovery);
-
+    return { registry, discovery };
+  });
+  const nextRegistry = await stringifyJson(built.registry, REGISTRY_PATH);
+  const nextDiscovery = await stringifyJson(built.discovery, DISCOVERY_PATH);
+  return withExecutionContext('ecosystem_architect', () => {
     if (shouldCheck) {
       const current = readCurrentFiles();
       const registryMatches = current.registry === nextRegistry;
@@ -243,7 +252,7 @@ export function main(argv = process.argv.slice(2)): void {
     }
 
     if (shouldWrite) {
-      writeOutputs(registry, discovery);
+      writeOutputs(nextRegistry, nextDiscovery);
       console.log(
         `wrote ${path.relative(pathResolver.rootDir(), REGISTRY_PATH)} and ${path.relative(pathResolver.rootDir(), DISCOVERY_PATH)}`
       );
@@ -252,5 +261,8 @@ export function main(argv = process.argv.slice(2)): void {
 }
 
 if (process.argv[1] && /generate_op_registry\.(ts|js)$/.test(process.argv[1])) {
-  main();
+  main().catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
 }
