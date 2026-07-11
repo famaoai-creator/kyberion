@@ -8,8 +8,8 @@
 
 | 判定    | 件数 |
 | ------- | ---- |
-| DONE    | 43   |
-| PARTIAL | 48   |
+| DONE    | 44   |
+| PARTIAL | 47   |
 | TODO    | 0    |
 
 ## P0 残作業(プロダクション化のクリティカルパス)
@@ -52,14 +52,14 @@
 
 ### UX(ユーザー接点)
 
-| ID    | 状態    | 残作業                                                                                                                                                                                           |
-| ----- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| UX-01 | DONE    |                                                                                                                                                                                                  |
-| UX-02 | PARTIAL | 4ブリッジ typing 表示(chronos チャットのキャンセル+フェーズ表示は 2026-07-11 実装済み)                                                                                                           |
-| UX-03 | PARTIAL | locale-resolver 一元化、onboarding/cli help の ja/en 化(wizard の identity/reasoning は 2026-07-11 に選択言語へ即時追従化)、chronos 言語トグル                                                   |
-| UX-04 | PARTIAL | 2026-07-12: CLI 承認動詞統一(approve/reject + 名前付きフラグ、旧形式は警告エイリアス)・decidedBy の identity 化・chronos 番号選択+拒否経路を実装。残: slack-bridge 提案の Block Kit ボタン化のみ |
-| UX-05 | PARTIAL | 契約スナップショットテスト+CI ゲート、dashboard の renderStatus 経由化                                                                                                                           |
-| UX-06 | DONE    | (軽微: 3面バナーの版数統一)                                                                                                                                                                      |
+| ID    | 状態    | 残作業                                                                                                                                                                                             |
+| ----- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| UX-01 | DONE    |                                                                                                                                                                                                    |
+| UX-02 | DONE    | 2026-07-12 完了: 4ブリッジ typing 表示(discord sendTyping / telegram sendChatAction / slack 👀 リアクション / imessage 先行一言)を共通ヘルパーで実装。chronos キャンセル+フェーズ表示は 07-11 済み |
+| UX-03 | PARTIAL | locale-resolver 一元化、onboarding/cli help の ja/en 化(wizard の identity/reasoning は 2026-07-11 に選択言語へ即時追従化)、chronos 言語トグル                                                     |
+| UX-04 | PARTIAL | 2026-07-12: CLI 承認動詞統一(approve/reject + 名前付きフラグ、旧形式は警告エイリアス)・decidedBy の identity 化・chronos 番号選択+拒否経路を実装。残: slack-bridge 提案の Block Kit ボタン化のみ   |
+| UX-05 | PARTIAL | 契約スナップショットテスト+CI ゲート、dashboard の renderStatus 経由化                                                                                                                             |
+| UX-06 | DONE    | (軽微: 3面バナーの版数統一)                                                                                                                                                                        |
 
 ### AC(アクチュエータ能力)
 
@@ -98,7 +98,7 @@
 | ID    | 状態    | 残作業                                                                                                                                                                        |
 | ----- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | DS-01 | PARTIAL | 生成ゲートの validate チェーン接続、operator-surface 残り約124 hex の変換                                                                                                     |
-| DS-02 | PARTIAL | tier 隔離テスト(受入4)、DESIGN_SYSTEM.md テナント節                                                                                                                           |
+| DS-02 | DONE    | 2026-07-12 完了: tier 隔離テスト3本(無文脈= default・フォールスルー無し)+ chronos /api/tenant-design の認証ガード欠落を発見・修正 + DESIGN_SYSTEM.md テナント節               |
 | DS-03 | DONE    | pptx ea 日本語フォント、PDF サブセット埋め込み、日本語ゴールデン                                                                                                              |
 | DS-04 | PARTIAL | 2026-07-11 突合: Task 1〜3 実装済み(compiler に 98 トークン、共有変数 54、テスト16件緑 — #490 の負検証は対象ディレクトリ誤り)。残: Task 4 テナント実写検証(DS-02 Task 3 依存) |
 | DS-05 | DONE    | reduced-motion、コントラストゲート、light/dark トグル、ARIA                                                                                                                   |
