@@ -14,6 +14,7 @@
  */
 
 import type { AudioChunk, AudioFormat } from './meeting-session-types.js';
+import { executeServicePreset } from './service-engine.js';
 
 export interface StreamingTextToSpeechBridge {
   readonly bridge_id: string;
@@ -57,6 +58,51 @@ export class StubStreamingTextToSpeechBridge implements StreamingTextToSpeechBri
   }
 }
 
+export class GeminiStreamingTextToSpeechBridge implements StreamingTextToSpeechBridge {
+  readonly bridge_id = 'gemini';
+  readonly format: AudioFormat = {
+    encoding: 'pcm_s16le',
+    sample_rate_hz: 24000,
+    channels: 1,
+  };
+
+  constructor(private readonly opts: { voice?: string } = {}) {}
+
+  async *synthesizeStream(
+    text: AsyncIterable<string>,
+    _voice_profile_id: string,
+  ): AsyncIterable<AudioChunk> {
+    let prompt = '';
+    for await (const segment of text) {
+      prompt += segment;
+    }
+    const voice = this.opts.voice || process.env.KYBERION_GEMINI_TTS_VOICE || 'Kore';
+    const result = await executeServicePreset(
+      'gemini',
+      'generate_tts',
+      {
+        text: prompt.trim(),
+        voice,
+      },
+      'secret-guard',
+    );
+    const audioData =
+      typeof result === 'string'
+        ? result
+        : (result as any)?.audioData
+          || (result as any)?.output_audio?.data
+          || (result as any)?.result?.audioData;
+    if (!audioData || typeof audioData !== 'string') {
+      throw new Error('Gemini TTS service returned no audio data');
+    }
+    yield {
+      format: this.format,
+      payload: new Uint8Array(Buffer.from(audioData, 'base64')),
+      ts_ms: Date.now(),
+    };
+  }
+}
+
 const _streamingTtsRegistry = new Map<string, () => StreamingTextToSpeechBridge>();
 
 export function registerStreamingTtsBridge(
@@ -70,6 +116,7 @@ export function getStreamingTtsBridge(
   id: string = process.env.KYBERION_STREAMING_TTS_BRIDGE ?? 'stub',
 ): StreamingTextToSpeechBridge {
   if (id === 'stub') return new StubStreamingTextToSpeechBridge();
+  if (id === 'gemini') return new GeminiStreamingTextToSpeechBridge();
   const factory = _streamingTtsRegistry.get(id);
   if (!factory) throw new Error(`[streaming-tts] unknown bridge id '${id}'`);
   return factory();

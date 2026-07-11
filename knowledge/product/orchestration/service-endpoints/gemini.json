@@ -1,0 +1,14 @@
+{
+  "default_pattern": "https://api.{service_id}.com/v1",
+  "services": {
+    "gemini": {
+      "base_url": "https://generativelanguage.googleapis.com/v1beta",
+      "preset_path": "knowledge/product/orchestration/service-presets/gemini.json",
+      "credential_suffixes": {
+        "accessToken": [
+          "API_KEY"
+        ]
+      }
+    }
+  }
+}
