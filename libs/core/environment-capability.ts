@@ -21,7 +21,7 @@
  */
 
 import { spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import * as path from 'node:path';
 import { logger } from './core.js';
 import * as pathResolver from './path-resolver.js';
@@ -94,6 +94,8 @@ export interface EnvironmentManifest {
   version: string;
   description?: string;
   capabilities: EnvironmentCapability[];
+  /** HMAC-SHA256 over the canonicalized manifest (without this field). */
+  signature?: string;
 }
 
 export interface CapabilityStatus {
@@ -630,6 +632,69 @@ function assertNoSymlinkPath(file: string, governedDir: string): void {
   }
 }
 
+/* ------------------------------------------------------------------ *
+ * Manifest signing (SA-02) — manifests grant command/module execution
+ * and install authority, so their integrity is enforceable via
+ * HMAC-SHA256. When KYBERION_MANIFEST_SIGNING_KEY is configured, every
+ * manifest must carry a valid signature (fail-closed). Without a key,
+ * unsigned manifests load with a one-time warning (warn phase).
+ * ------------------------------------------------------------------ */
+
+const MANIFEST_SIGNING_KEY_ENV = 'KYBERION_MANIFEST_SIGNING_KEY';
+const warnedUnsignedManifests = new Set<string>();
+
+function canonicalizeForSigning(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map(canonicalizeForSigning).join(',')}]`;
+  }
+  if (value && typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .filter(([key, entryValue]) => key !== 'signature' && entryValue !== undefined)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, entryValue]) => `${JSON.stringify(key)}:${canonicalizeForSigning(entryValue)}`);
+    return `{${entries.join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+export function computeManifestSignature(
+  manifest: Omit<EnvironmentManifest, 'signature'> & { signature?: string },
+  signingKey: string
+): string {
+  return createHmac('sha256', signingKey).update(canonicalizeForSigning(manifest)).digest('hex');
+}
+
+export function verifyManifestSignature(
+  manifest: EnvironmentManifest,
+  signingKey: string
+): boolean {
+  const provided = String(manifest.signature || '');
+  if (!/^[0-9a-f]{64}$/.test(provided)) return false;
+  const expected = computeManifestSignature(manifest, signingKey);
+  return timingSafeEqual(Buffer.from(provided, 'hex'), Buffer.from(expected, 'hex'));
+}
+
+function enforceManifestSignature(manifest: EnvironmentManifest): void {
+  const signingKey = process.env[MANIFEST_SIGNING_KEY_ENV];
+  if (signingKey) {
+    if (!verifyManifestSignature(manifest, signingKey)) {
+      throw new Error(
+        `[environment-capability] manifest '${manifest.manifest_id}' has a missing or invalid ` +
+          'signature — re-sign with pnpm manifests:sign or remove the tampered file'
+      );
+    }
+    return;
+  }
+  if (!manifest.signature && !warnedUnsignedManifests.has(manifest.manifest_id)) {
+    warnedUnsignedManifests.add(manifest.manifest_id);
+    logger.warn(
+      `[environment-capability] manifest '${manifest.manifest_id}' is unsigned and no ` +
+        `${MANIFEST_SIGNING_KEY_ENV} is configured (warn phase — set the key and run ` +
+        'pnpm manifests:sign to enforce signatures)'
+    );
+  }
+}
+
 function parseEnvironmentManifest(raw: string, expectedId: string): EnvironmentManifest {
   const value: unknown = JSON.parse(raw);
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -706,6 +771,7 @@ export function loadEnvironmentManifest(manifestIdOrPath: string): EnvironmentMa
       safeReadFile(abs, { encoding: 'utf8' }) as string,
       manifestId
     );
+    enforceManifestSignature(manifest);
     _trustedExecutableManifests.add(manifest);
     return manifest;
   }

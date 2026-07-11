@@ -26,7 +26,7 @@ export interface StreamingTextToSpeechBridge {
    */
   synthesizeStream(
     text: AsyncIterable<string>,
-    voice_profile_id: string,
+    voice_profile_id: string
   ): AsyncIterable<AudioChunk>;
 }
 
@@ -47,7 +47,7 @@ export class StubStreamingTextToSpeechBridge implements StreamingTextToSpeechBri
 
   async *synthesizeStream(
     text: AsyncIterable<string>,
-    _voice_profile_id: string,
+    _voice_profile_id: string
   ): AsyncIterable<AudioChunk> {
     let ts = 0;
     for await (const segment of text) {
@@ -70,7 +70,7 @@ export class GeminiStreamingTextToSpeechBridge implements StreamingTextToSpeechB
 
   async *synthesizeStream(
     text: AsyncIterable<string>,
-    _voice_profile_id: string,
+    _voice_profile_id: string
   ): AsyncIterable<AudioChunk> {
     let prompt = '';
     for await (const segment of text) {
@@ -84,14 +84,14 @@ export class GeminiStreamingTextToSpeechBridge implements StreamingTextToSpeechB
         text: prompt.trim(),
         voice,
       },
-      'secret-guard',
+      'secret-guard'
     );
     const audioData =
       typeof result === 'string'
         ? result
-        : (result as any)?.audioData
-          || (result as any)?.output_audio?.data
-          || (result as any)?.result?.audioData;
+        : (result as any)?.audioData ||
+          (result as any)?.output_audio?.data ||
+          (result as any)?.result?.audioData;
     if (!audioData || typeof audioData !== 'string') {
       throw new Error('Gemini TTS service returned no audio data');
     }
@@ -107,13 +107,13 @@ const _streamingTtsRegistry = new Map<string, () => StreamingTextToSpeechBridge>
 
 export function registerStreamingTtsBridge(
   id: string,
-  factory: () => StreamingTextToSpeechBridge,
+  factory: () => StreamingTextToSpeechBridge
 ): void {
   _streamingTtsRegistry.set(id, factory);
 }
 
 export function getStreamingTtsBridge(
-  id: string = process.env.KYBERION_STREAMING_TTS_BRIDGE ?? 'stub',
+  id: string = process.env.KYBERION_STREAMING_TTS_BRIDGE ?? 'stub'
 ): StreamingTextToSpeechBridge {
   if (id === 'stub') return new StubStreamingTextToSpeechBridge();
   if (id === 'gemini') return new GeminiStreamingTextToSpeechBridge();

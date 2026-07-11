@@ -1215,7 +1215,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 46283,
+      "size": 46854,
       "type": "json"
     },
     {
@@ -1449,7 +1449,7 @@
     {
       "path": "product/governance/media-backend-registry.json",
       "tier": "public",
-      "size": 2452,
+      "size": 3012,
       "type": "json"
     },
     {
@@ -2343,7 +2343,7 @@
     {
       "path": "product/governance/voice-engine-registry.json",
       "tier": "public",
-      "size": 3068,
+      "size": 3517,
       "type": "json"
     },
     {
@@ -2356,6 +2356,12 @@
       "path": "product/governance/voice-engines/espeak_ng.json",
       "tier": "public",
       "size": 592,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/voice-engines/gemini_tts.json",
+      "tier": "public",
+      "size": 529,
       "type": "json"
     },
     {
@@ -3681,7 +3687,7 @@
     {
       "path": "product/orchestration/service-endpoints.json",
       "tier": "public",
-      "size": 6301,
+      "size": 6552,
       "type": "json"
     },
     {
@@ -3748,6 +3754,12 @@
       "path": "product/orchestration/service-endpoints/figma.json",
       "tier": "public",
       "size": 229,
+      "type": "json"
+    },
+    {
+      "path": "product/orchestration/service-endpoints/gemini.json",
+      "tier": "public",
+      "size": 330,
       "type": "json"
     },
     {
@@ -3964,6 +3976,12 @@
       "path": "product/orchestration/service-presets/figma.json",
       "tier": "public",
       "size": 1202,
+      "type": "json"
+    },
+    {
+      "path": "product/orchestration/service-presets/gemini.json",
+      "tier": "public",
+      "size": 1556,
       "type": "json"
     },
     {

@@ -4,7 +4,7 @@ import {
   ComfyUiImageGenerationProvider,
   GeminiServiceImageGenerationProvider,
   LocalFluxImageGenerationProvider,
-  LlmApiImageGenerationProvider
+  LlmApiImageGenerationProvider,
 } from './image-generation-bridge.js';
 import { resolveLocalFluxGenerationPolicy } from './image-generation-policy.js';
 import { ImageGenerationProvider } from './image-generation-types.js';
@@ -16,7 +16,14 @@ const mocks = vi.hoisted(() => {
   const safeMkdir = vi.fn();
   const probeToolRuntime = vi.fn();
   const probeServiceRuntime = vi.fn();
-  return { executeServicePreset, safeExecResult, safeExistsSync, safeMkdir, probeToolRuntime, probeServiceRuntime };
+  return {
+    executeServicePreset,
+    safeExecResult,
+    safeExistsSync,
+    safeMkdir,
+    probeToolRuntime,
+    probeServiceRuntime,
+  };
 });
 
 vi.mock('./service-engine.js', () => ({
@@ -32,7 +39,7 @@ vi.mock('./service-runtime-registry.js', () => ({
 }));
 
 vi.mock('./secure-io.js', async () => {
-  const actual = await vi.importActual('./secure-io.js') as any;
+  const actual = (await vi.importActual('./secure-io.js')) as any;
   return {
     ...actual,
     safeWriteFile: vi.fn(),
@@ -74,7 +81,12 @@ describe('AdaptivePolicyRouter', () => {
   });
 
   it('selects the preferred provider if it is available', async () => {
-    const router = new AdaptivePolicyRouter([mockComfyUI, mockLocalDiffusion, mockLocalFlux, mockLlmApi]);
+    const router = new AdaptivePolicyRouter([
+      mockComfyUI,
+      mockLocalDiffusion,
+      mockLocalFlux,
+      mockLlmApi,
+    ]);
     const provider = await router.selectProvider({
       prompt: 'a cat',
       providerPreference: ['llm_api'],
@@ -83,7 +95,12 @@ describe('AdaptivePolicyRouter', () => {
   });
 
   it('routes to local_flux by default in balanced mode', async () => {
-    const router = new AdaptivePolicyRouter([mockComfyUI, mockLocalDiffusion, mockLocalFlux, mockLlmApi]);
+    const router = new AdaptivePolicyRouter([
+      mockComfyUI,
+      mockLocalDiffusion,
+      mockLocalFlux,
+      mockLlmApi,
+    ]);
     const provider = await router.selectProvider({
       prompt: 'a cat',
     });
@@ -91,7 +108,12 @@ describe('AdaptivePolicyRouter', () => {
   });
 
   it('routes to local_flux first in privacy_first mode', async () => {
-    const router = new AdaptivePolicyRouter([mockComfyUI, mockLocalDiffusion, mockLocalFlux, mockLlmApi]);
+    const router = new AdaptivePolicyRouter([
+      mockComfyUI,
+      mockLocalDiffusion,
+      mockLocalFlux,
+      mockLlmApi,
+    ]);
     const provider = await router.selectProvider({
       prompt: 'a cat',
       mode: 'privacy_first',
@@ -174,7 +196,7 @@ describe('GeminiServiceImageGenerationProvider', () => {
         prompt: 'a glowing fox in a glass city',
         aspect_ratio: '16:9',
       }),
-      'secret-guard',
+      'secret-guard'
     );
   });
 
@@ -251,7 +273,7 @@ describe('LlmApiImageGenerationProvider', () => {
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({
-          'Authorization': 'Bearer mock-dalle-key',
+          Authorization: 'Bearer mock-dalle-key',
         }),
         body: expect.stringContaining('1792x1024'), // DALL-E 16:9 mapping size
       })
@@ -329,7 +351,7 @@ describe('LocalFluxImageGenerationProvider', () => {
       expect.objectContaining({
         timeoutMs: expect.any(Number),
         maxOutputMB: 50,
-      }),
+      })
     );
   });
 });

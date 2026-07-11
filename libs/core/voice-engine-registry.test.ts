@@ -93,7 +93,7 @@ describe('voice engine registry', () => {
             },
           },
         ],
-      }),
+      })
     );
     safeWriteFile(
       path.join(dir, 'open_voice_clone.json'),
@@ -116,7 +116,7 @@ describe('voice engine registry', () => {
             fallback_engine_id: 'local_say',
           },
         ],
-      }),
+      })
     );
 
     process.env.KYBERION_VOICE_ENGINE_REGISTRY_DIR = dir;
@@ -124,6 +124,9 @@ describe('voice engine registry', () => {
 
     const registry = getVoiceEngineRegistry();
     expect(registry.default_engine_id).toBe('local_say');
-    expect(registry.engines.map((engine) => engine.engine_id)).toEqual(['local_say', 'open_voice_clone']);
+    expect(registry.engines.map((engine) => engine.engine_id)).toEqual([
+      'local_say',
+      'open_voice_clone',
+    ]);
   });
 });

@@ -10,25 +10,26 @@
 
 Copy [`env.example`](./env.example) to `.env` at the repo root for local overrides (the example is generated here because root dotfiles are write-protected by the policy engine).
 
-## secret (15)
+## secret (16)
 
-| Variable                              | Type   | Required | Description                                              |
-| ------------------------------------- | ------ | -------- | -------------------------------------------------------- |
-| `KYBERION_A2A_SECRET`                 | string | no       | _undocumented_                                           |
-| `KYBERION_API_TOKEN`                  | string | no       | Bearer token for authenticated surface/API requests.     |
-| `KYBERION_AUDIT_CHAIN_KEY`            | string | no       | _undocumented_                                           |
-| `KYBERION_LOCAL_LLM_KEY`              | string | no       | API key for the local LLM endpoint.                      |
-| `KYBERION_LOCALADMIN_TOKEN`           | string | no       | Bearer token for the chronos localadmin control surface. |
-| `KYBERION_MESH_SHARED_SECRET`         | string | no       | _undocumented_                                           |
-| `KYBERION_NEMOTRON_KEY`               | string | no       | _undocumented_                                           |
-| `KYBERION_OPENROUTER_KEY`             | string | no       | _undocumented_                                           |
-| `KYBERION_PEER_SHARED_SECRET`         | string | no       | _undocumented_                                           |
-| `KYBERION_REQUIRED_TOKEN`             | string | no       | _undocumented_                                           |
-| `KYBERION_SECRET_RESOLVER_COMMAND`    | string | no       | _undocumented_                                           |
-| `KYBERION_SECRET_RESOLVER_TIMEOUT_MS` | string | no       | _undocumented_                                           |
-| `KYBERION_SOVEREIGN_SECRET`           | string | no       | _undocumented_                                           |
-| `KYBERION_SUDO_KEY`                   | string | no       | _undocumented_                                           |
-| `KYBERION_TERMINAL_TOKEN`             | string | no       | _undocumented_                                           |
+| Variable                              | Type   | Required | Description                                                                                                                                                            |
+| ------------------------------------- | ------ | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `KYBERION_A2A_SECRET`                 | string | no       | _undocumented_                                                                                                                                                         |
+| `KYBERION_API_TOKEN`                  | string | no       | Bearer token for authenticated surface/API requests.                                                                                                                   |
+| `KYBERION_AUDIT_CHAIN_KEY`            | string | no       | _undocumented_                                                                                                                                                         |
+| `KYBERION_LOCAL_LLM_KEY`              | string | no       | API key for the local LLM endpoint.                                                                                                                                    |
+| `KYBERION_LOCALADMIN_TOKEN`           | string | no       | Bearer token for the chronos localadmin control surface.                                                                                                               |
+| `KYBERION_MANIFEST_SIGNING_KEY`       | string | no       | HMAC-SHA256 key for environment manifest signatures. When set, loadEnvironmentManifest enforces valid signatures fail-closed; sign manifests with pnpm manifests:sign. |
+| `KYBERION_MESH_SHARED_SECRET`         | string | no       | _undocumented_                                                                                                                                                         |
+| `KYBERION_NEMOTRON_KEY`               | string | no       | _undocumented_                                                                                                                                                         |
+| `KYBERION_OPENROUTER_KEY`             | string | no       | _undocumented_                                                                                                                                                         |
+| `KYBERION_PEER_SHARED_SECRET`         | string | no       | _undocumented_                                                                                                                                                         |
+| `KYBERION_REQUIRED_TOKEN`             | string | no       | _undocumented_                                                                                                                                                         |
+| `KYBERION_SECRET_RESOLVER_COMMAND`    | string | no       | _undocumented_                                                                                                                                                         |
+| `KYBERION_SECRET_RESOLVER_TIMEOUT_MS` | string | no       | _undocumented_                                                                                                                                                         |
+| `KYBERION_SOVEREIGN_SECRET`           | string | no       | _undocumented_                                                                                                                                                         |
+| `KYBERION_SUDO_KEY`                   | string | no       | _undocumented_                                                                                                                                                         |
+| `KYBERION_TERMINAL_TOKEN`             | string | no       | _undocumented_                                                                                                                                                         |
 
 ## path (59)
 
@@ -188,7 +189,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_TERMINAL_HOST`                  | string | no       | _undocumented_                                                                                                                                                                           |
 | `KYBERION_TTS_COMMAND`                    | string | no       | _undocumented_                                                                                                                                                                           |
 
-## runtime (85)
+## runtime (86)
 
 | Variable                                      | Type   | Required | Description                                                                                             |
 | --------------------------------------------- | ------ | -------- | ------------------------------------------------------------------------------------------------------- |
@@ -221,6 +222,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_EMAIL_FROM`                         | string | no       | _undocumented_                                                                                          |
 | `KYBERION_FLAG`                               | string | no       | _undocumented_                                                                                          |
 | `KYBERION_FORMAT`                             | string | no       | _undocumented_                                                                                          |
+| `KYBERION_GEMINI_TTS_VOICE`                   | string | no       | _undocumented_                                                                                          |
 | `KYBERION_GOAL_LOOP_MAX_ROUNDS`               | string | no       | _undocumented_                                                                                          |
 | `KYBERION_IN_SESSION_SUBAGENT`                | string | no       | _undocumented_                                                                                          |
 | `KYBERION_INJECTION_SCOPE`                    | string | no       | _undocumented_                                                                                          |
