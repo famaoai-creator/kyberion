@@ -138,7 +138,7 @@
 
 | ID    | 状態    | 残作業                                                                                                                                                                                                                             |
 | ----- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| OP-01 | PARTIAL | 2026-07-11 突合: chronos /api/cost とモデルコストレジストリ(ops-alert.ts)は実在。残: usage 計測の全経路接続、spend-guard                                                                                                           |
+| OP-01 | PARTIAL | spend-guard は 2026-07-11 実装(spend-policy.json、warn 既定/block で SpendCapExceededError、reasoning failover 前段に配線、日次 dedupe アラート)。残: usage 計測の全経路接続、テナント override                                    |
 | OP-02 | DONE    | (残: 外部ボリューム定期運用の実績)                                                                                                                                                                                                 |
 | OP-03 | PARTIAL | bin フィールド+CLI、docker deploy サービス                                                                                                                                                                                         |
 | OP-04 | PARTIAL | 残: RSS/restart 履歴の拡張と soak 実証のみ(劣化検知ループ・hourly cron・doctor rollup・healthz/status API・provider-health 永続化は 2026-07-11 実装: runtime state ファイル + TTL 自然回復 + reload API、vitest 下は隔離必須)      |

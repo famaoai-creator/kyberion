@@ -1215,7 +1215,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 47667,
+      "size": 48006,
       "type": "json"
     },
     {
@@ -2074,6 +2074,12 @@
       "path": "product/governance/skill-validation.json",
       "tier": "public",
       "size": 380,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/spend-policy.json",
+      "tier": "public",
+      "size": 309,
       "type": "json"
     },
     {
