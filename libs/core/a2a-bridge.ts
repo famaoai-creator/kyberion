@@ -126,7 +126,7 @@ class A2ABridgeImpl {
     }
 
     // Security: Validate sender is a known agent (registered or has manifest)
-    this.validateSender(envelope.header.sender);
+    this.validateSender(envelope.header.sender, envelope.header.correlation_id);
 
     // AA-03 Task 2: staged signature requirement. warn (default) records
     // unsigned internal traffic in the audit chain; enforce rejects it.
@@ -138,6 +138,7 @@ class A2ABridgeImpl {
         operation: 'route',
         result: mode === 'enforce' ? 'denied' : 'allowed',
         reason: `Unsigned A2A message ${envelope.header.msg_id} (mode: ${mode})`,
+        correlationId: envelope.header.correlation_id,
       });
       if (mode === 'enforce') {
         recordGovernanceAction(envelope.header.sender, 'a2a_signature_missing', 'system', true);
@@ -157,6 +158,7 @@ class A2ABridgeImpl {
             operation: 'route',
             result: 'denied',
             reason: `Invalid signature on message ${envelope.header.msg_id}`,
+            correlationId: envelope.header.correlation_id,
           });
           recordGovernanceAction(envelope.header.sender, 'a2a_signature_invalid', 'system', true);
           throw new Error('A2A message signature verification failed');
@@ -556,7 +558,7 @@ class A2ABridgeImpl {
     this.handles.set(agentId, supervisorHandle);
   }
 
-  private validateSender(sender: string): void {
+  private validateSender(sender: string, correlationId?: string): void {
     // Allow registered agents
     if (agentRegistry.get(sender)) return;
     // Allow agents with manifests
@@ -575,6 +577,7 @@ class A2ABridgeImpl {
       operation: 'route',
       result: mode === 'enforce' ? 'denied' : 'allowed',
       reason: `Sender ${sender} has no registry entry or manifest`,
+      correlationId,
     });
     if (mode === 'enforce') {
       recordGovernanceAction(sender, 'a2a_unknown_sender', 'system', true);
