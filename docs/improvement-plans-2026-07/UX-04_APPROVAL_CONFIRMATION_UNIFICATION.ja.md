@@ -66,3 +66,10 @@
 ## 実装メモ
 
 - 2026-07-04: `presence/displays/chronos-mirror-v2/src/components/MissionIntelligence.tsx` に risky action confirmation modal を追加し、runtime lease 修復・outbox clear・mission seed promote・mission/surface risky actions を確認経由に切り替えた。`buildDangerousActionPrompt()` を純関数として切り出し、ヘルパーテストで文言を固定した。
+
+## 実装状況 追記 (2026-07-12)
+
+- **Task 2 完了(CLI 動詞統一)**: control_plane_cli の presence / chronos を `approve <requestId>` / `reject <requestId>` の1流派に統一。chronos の位置引数4連は `--storage` / `--channel` の名前付きフラグへ。旧形式(presence の第2引数 decision、chronos の4連)は**警告付きエイリアスとして1リリース維持**。ヘルプ文言更新、`parseChronosApprovalArgs` テスト3本。
+- **受入5 完了(decidedBy)**: `resolveOperatorDisplayName()` を新設(profile の my-identity.json の name、未オンボード時は従来値へフォールバック)し、cli.ts / kyberion_home.ts のハードコード 'sovereign-user' を置換。
+- **Task 3 前進(chronos 魔法語)**: ミッション作成確認を「1) 作成する 2) やめる」の番号選択に変更(はい/yes も引き続き受理)。**拒否経路を新設** — `isSlackMissionRejection`(2/やめる/キャンセル/no 等)で pending 提案を破棄し明示応答(従来は無視されていた)。確認/拒否が同時成立しないことをテストで固定。
+- 残: slack-bridge のミッション提案 Block Kit ボタン化(Slack UI での実機確認が必要なため別スライス)。

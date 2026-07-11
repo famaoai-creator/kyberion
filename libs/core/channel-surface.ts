@@ -77,6 +77,7 @@ export {
   getChronosMissionProposalState,
   getSlackMissionProposalState,
   isSlackMissionConfirmation,
+  isSlackMissionRejection,
   issueChronosMissionFromProposal,
   issueSlackMissionFromProposal,
   saveChronosMissionProposalState,

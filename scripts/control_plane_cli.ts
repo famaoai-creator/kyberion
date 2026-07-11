@@ -571,13 +571,34 @@ async function handlePresence(action: string, args: string[], json: boolean): Pr
       ]);
     },
     approve: async (client, currentArgs) => {
-      const [requestId, decision] = currentArgs;
-      if (!requestId || !['approved', 'rejected'].includes(String(decision))) {
-        throw new Error('Usage: control presence approve <requestId> <approved|rejected>');
+      const { positionals } = parseApprovalFlagArgs(currentArgs);
+      const [requestId, legacyDecision] = positionals;
+      if (!requestId) {
+        throw new Error('Usage: control presence approve <requestId>');
+      }
+      let decision = 'approved';
+      if (legacyDecision) {
+        if (!['approved', 'rejected'].includes(String(legacyDecision))) {
+          throw new Error('Usage: control presence approve <requestId>');
+        }
+        warnLegacyApprovalForm('control presence approve <requestId> / reject <requestId>');
+        decision = String(legacyDecision);
       }
       const body = await client.postJson(
         `/api/approvals/${encodeURIComponent(requestId)}/decision`,
         { decision }
+      );
+      return printJson(body);
+    },
+    reject: async (client, currentArgs) => {
+      const { positionals } = parseApprovalFlagArgs(currentArgs);
+      const [requestId] = positionals;
+      if (!requestId) {
+        throw new Error('Usage: control presence reject <requestId>');
+      }
+      const body = await client.postJson(
+        `/api/approvals/${encodeURIComponent(requestId)}/decision`,
+        { decision: 'rejected' }
       );
       return printJson(body);
     },
@@ -635,6 +656,63 @@ async function handlePresence(action: string, args: string[], json: boolean): Pr
   };
 
   await executeSurfaceAction('presence', action, args, json, handlers);
+}
+
+// UX-04 Task 2: one approval verb grammar across surfaces —
+// `approve <requestId> [--flags]` / `reject <requestId> [--flags]`.
+// Legacy positional forms keep working for one release with a warning.
+function parseApprovalFlagArgs(args: string[]): {
+  positionals: string[];
+  flags: Record<string, string>;
+} {
+  const positionals: string[] = [];
+  const flags: Record<string, string> = {};
+  for (let index = 0; index < args.length; index += 1) {
+    const value = args[index];
+    if (value.startsWith('--')) {
+      flags[value.slice(2)] = args[index + 1] ?? '';
+      index += 1;
+    } else {
+      positionals.push(value);
+    }
+  }
+  return { positionals, flags };
+}
+
+function warnLegacyApprovalForm(example: string): void {
+  console.warn(
+    `[deprecated] positional approval decisions are replaced by approve/reject verbs — use: ${example}`
+  );
+}
+
+export function parseChronosApprovalArgs(
+  args: string[],
+  verbDecision: 'approved' | 'rejected'
+): { requestId: string; storageChannel: string; channel: string; decision: string } {
+  const { positionals, flags } = parseApprovalFlagArgs(args);
+  const usage =
+    verbDecision === 'approved'
+      ? 'Usage: control chronos approve <requestId> --storage <storageChannel> --channel <channel>'
+      : 'Usage: control chronos reject <requestId> --storage <storageChannel> --channel <channel>';
+
+  // Legacy: approve <id> <storage> <channel> <approved|rejected>
+  if (positionals.length === 4 && ['approved', 'rejected'].includes(positionals[3])) {
+    warnLegacyApprovalForm(usage.replace('Usage: ', ''));
+    return {
+      requestId: positionals[0],
+      storageChannel: positionals[1],
+      channel: positionals[2],
+      decision: positionals[3],
+    };
+  }
+
+  const requestId = positionals[0] || '';
+  const storageChannel = flags.storage || flags['storage-channel'] || '';
+  const channel = flags.channel || '';
+  if (!requestId || !storageChannel || !channel) {
+    throw new Error(usage);
+  }
+  return { requestId, storageChannel, channel, decision: verbDecision };
 }
 
 async function handleChronos(action: string, args: string[], json: boolean): Promise<void> {
@@ -728,23 +806,30 @@ async function handleChronos(action: string, args: string[], json: boolean): Pro
       ]);
     },
     approve: async (client, currentArgs) => {
-      const [requestId, storageChannel, channel, decision] = currentArgs;
-      if (
-        !requestId ||
-        !storageChannel ||
-        !channel ||
-        !['approved', 'rejected'].includes(String(decision))
-      ) {
-        throw new Error(
-          'Usage: control chronos approve <requestId> <storageChannel> <channel> <approved|rejected>'
-        );
-      }
+      const { requestId, storageChannel, channel, decision } = parseChronosApprovalArgs(
+        currentArgs,
+        'approved'
+      );
       const body = await client.postJson('/api/intelligence', {
         action: 'approval_decision',
         requestId,
         storageChannel,
         channel,
         decision,
+      });
+      return printJson(body);
+    },
+    reject: async (client, currentArgs) => {
+      const { requestId, storageChannel, channel } = parseChronosApprovalArgs(
+        currentArgs,
+        'rejected'
+      );
+      const body = await client.postJson('/api/intelligence', {
+        action: 'approval_decision',
+        requestId,
+        storageChannel,
+        channel,
+        decision: 'rejected',
       });
       return printJson(body);
     },
@@ -1035,7 +1120,8 @@ Usage:
   pnpm control presence projects
   pnpm control presence tracks [projectId]
   pnpm control presence approvals
-  pnpm control presence approve <requestId> <approved|rejected>
+  pnpm control presence approve <requestId>
+  pnpm control presence reject <requestId>
   pnpm control presence outcomes
   pnpm control presence tasks
   pnpm control presence task <sessionId>
@@ -1045,7 +1131,8 @@ Usage:
   pnpm control chronos overview
   pnpm control chronos tracks [projectId]
   pnpm control chronos approvals
-  pnpm control chronos approve <requestId> <storageChannel> <channel> <approved|rejected>
+  pnpm control chronos approve <requestId> --storage <storageChannel> --channel <channel>
+  pnpm control chronos reject <requestId> --storage <storageChannel> --channel <channel>
   pnpm control chronos mission-seeds
   pnpm control chronos seed-track <trackId> [artifactId]
   pnpm control chronos promote-seed <seedId>

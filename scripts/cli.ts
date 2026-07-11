@@ -1,6 +1,7 @@
 import {
   logger,
   pathResolver,
+  resolveOperatorDisplayName,
   safeExistsSync,
   safeExec,
   safeReadFile,
@@ -1338,7 +1339,7 @@ function applyApprovalDecision(
     storageChannel: request.storageChannel,
     requestId: request.id,
     decision,
-    decidedBy: 'sovereign-user',
+    decidedBy: resolveOperatorDisplayName(),
     decidedByRole: 'sovereign',
     authMethod: 'manual',
     decidedByType: 'human',
