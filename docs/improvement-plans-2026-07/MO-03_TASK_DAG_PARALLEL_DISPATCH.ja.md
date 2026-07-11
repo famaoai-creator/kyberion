@@ -58,3 +58,10 @@
 - `dispatchMissionNextTasks` は ready 集合を `max_parallel_members` で打ち切り、wave ごとに依存解決済みタスクを再計算して次の ready を同一呼び出しで流すように切り替えた。
 - `libs/core/mission-orchestration-worker.test.ts` に依存チェーンの同一呼び出し内ディスパッチと、serial / parallel で最終状態が一致することを固定するテストを追加した。
 - `libs/core/mission-orchestration-worker.test.ts` に、並列 cap 内での task_id 順序と同時 route 発行を固定するテストを追加した。
+
+## 実装状況 (2026-07-12)
+
+**再突合 + Task 2.3 実装で全タスク完了 — MO-03 は DONE。**
+
+- 再突合で実装済みを確認: タスク契約スキーマ(`knowledge/product/schemas/task-contract.schema.json`、CO-06 で workforce 拡張済み)/ planner 出力検証(`validatePlannedNextTasks`: 重複 ID・欠落依存・**DFS 循環検出**)/ 並列ディスパッチ(`max_parallel_members` 上限の wave 方式、ready 集合 task_id 昇順で決定的)/ リース(`claimWorkItem` 接続)。
+- **今回実装(Task 2.3)**: タスク単位の dispatch 予算 — `estimated_scope` から導出(S=10分/M=30分/L=60分、`timeout_ms` で明示上書き可)。超過は `blocked(timeout)` + mission context 記録。さらに **blocked 連鎖**(`cascadeBlockedDependents`)で下流依存タスクを `blocked` に伝播し、黙って待ち続ける stall を排除。テスト3本 + worker 既存23本緑。
