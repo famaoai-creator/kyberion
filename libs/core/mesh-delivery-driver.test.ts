@@ -18,7 +18,8 @@ vi.mock('./core.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
-import { runMeshDeliveryPass } from './mesh-delivery-driver.js';
+import { formatMeshDeliveryPassReport, runMeshDeliveryPass } from './mesh-delivery-driver.js';
+import { acquireLock, releaseLock } from './src/lock-utils.js';
 
 function buildDelivery(overrides: Record<string, unknown> = {}) {
   return {
@@ -165,5 +166,52 @@ describe('runMeshDeliveryPass', () => {
 
     expect(report.expired).toBe(1);
     expect(report.claimed).toBe(0);
+  });
+
+  describe('writer fencing (AA-02)', () => {
+    it('skips the pass without touching the ledger while another driver holds the lock', async () => {
+      const lockId = `mesh-delivery-writer-test-${Date.now()}`;
+      expect(await acquireLock(lockId, 1000)).toBe(true);
+      try {
+        const report = await runMeshDeliveryPass({
+          senderPeerId: 'peer-a',
+          writerLockId: lockId,
+          writerLockTimeoutMs: 150,
+          dispatcher: { dispatchToPeer: vi.fn() },
+          resolvePeer: () => PEER_B,
+        });
+
+        expect(report.skipped).toBe(true);
+        expect(mocks.expireMeshDeliveries).not.toHaveBeenCalled();
+        expect(mocks.claimDueMeshDeliveries).not.toHaveBeenCalled();
+        expect(formatMeshDeliveryPassReport(report)).toContain('skipped');
+      } finally {
+        releaseLock(lockId);
+      }
+    });
+
+    it('runs normally once the lock is free, and releases it afterwards', async () => {
+      const lockId = `mesh-delivery-writer-test-${Date.now()}-b`;
+      mocks.expireMeshDeliveries.mockResolvedValue([]);
+      mocks.claimDueMeshDeliveries.mockResolvedValue([]);
+
+      const first = await runMeshDeliveryPass({
+        senderPeerId: 'peer-a',
+        writerLockId: lockId,
+        dispatcher: { dispatchToPeer: vi.fn() },
+        resolvePeer: () => PEER_B,
+      });
+      expect(first.skipped).toBeUndefined();
+      expect(mocks.claimDueMeshDeliveries).toHaveBeenCalledOnce();
+
+      // The lock was released — a second pass must not be fenced out.
+      const second = await runMeshDeliveryPass({
+        senderPeerId: 'peer-a',
+        writerLockId: lockId,
+        dispatcher: { dispatchToPeer: vi.fn() },
+        resolvePeer: () => PEER_B,
+      });
+      expect(second.skipped).toBeUndefined();
+    });
   });
 });

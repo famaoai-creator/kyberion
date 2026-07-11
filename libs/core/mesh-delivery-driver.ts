@@ -12,6 +12,7 @@ import { resolvePeerRecord, type PeerNetworkPeerRecord } from './peer-messaging.
 import type { MeshDeliveryRecord, MeshRequest } from './mesh-hub-contract.js';
 import type { MeshRetryPolicy } from './mesh-message-broker.js';
 import { logger } from './core.js';
+import { acquireLock, releaseLock } from './src/lock-utils.js';
 
 /**
  * AA-02: delivery driver for the Mesh Hub at-least-once state machine.
@@ -29,6 +30,18 @@ export interface MeshDeliveryDispatcher {
   dispatchToPeer(input: MeshHubDispatchInput): Promise<unknown>;
 }
 
+/** Ledger operations the pass needs; defaults to the shared-namespace broker. */
+export interface MeshDeliveryBrokerOps {
+  expireMeshDeliveries(now: string): Promise<MeshDeliveryRecord[]>;
+  claimDueMeshDeliveries(now: string, limit?: number): Promise<MeshDeliveryRecord[]>;
+  acknowledgeMeshDelivery(deliveryId: string, receipt: Record<string, unknown>): Promise<unknown>;
+  retryMeshDelivery(
+    deliveryId: string,
+    now: string,
+    retryPolicy?: Partial<MeshRetryPolicy>
+  ): Promise<{ status: string }>;
+}
+
 export interface MeshDeliveryPassOptions {
   /** This host's peer id (sender_peer_id on reconstructed requests). */
   senderPeerId: string;
@@ -40,6 +53,15 @@ export interface MeshDeliveryPassOptions {
   resolvePeer?: (peerId: string) => PeerNetworkPeerRecord | null;
   retryPolicy?: Partial<MeshRetryPolicy>;
   dispatchTimeoutMs?: number;
+  /**
+   * AA-02 writer fencing: lock id guarding the whole pass. Override in tests
+   * for isolation; set only when a deployment intentionally shards drivers.
+   */
+  writerLockId?: string;
+  /** How long to wait for the writer lock before skipping the pass. */
+  writerLockTimeoutMs?: number;
+  /** Ledger backend override — a namespaced broker instance (tests / shards). */
+  broker?: MeshDeliveryBrokerOps;
 }
 
 export interface MeshDeliveryPassReport {
@@ -50,10 +72,14 @@ export interface MeshDeliveryPassReport {
   dead_lettered: number;
   unroutable: number;
   failures: Array<{ delivery_id: string; reason: string }>;
+  /** True when another driver held the writer lock and this pass did nothing. */
+  skipped?: boolean;
 }
 
 const DEFAULT_BATCH_LIMIT = 10;
 const DEFAULT_REQUEST_TTL_MS = 60_000;
+const DEFAULT_WRITER_LOCK_ID = 'mesh-delivery-writer';
+const DEFAULT_WRITER_LOCK_TIMEOUT_MS = 500;
 
 /**
  * The broker persists idempotency_key / expires_at on every delivery row but
@@ -86,7 +112,47 @@ function reconstructMeshRequest(delivery: MeshDeliveryRecord, senderPeerId: stri
 export async function runMeshDeliveryPass(
   options: MeshDeliveryPassOptions
 ): Promise<MeshDeliveryPassReport> {
+  // AA-02 writer fencing: exactly one driver mutates the delivery ledger at
+  // a time. Overlapping passes (cron tick + manual run, or a slow previous
+  // pass) skip instead of queuing — the next tick picks the work up, and
+  // skipping can never double-dispatch a claimed delivery. Crash tolerance
+  // comes from lock-utils' PID staleness takeover; release is PID-checked so
+  // a fenced-out driver cannot delete a lock someone else took over.
+  const lockId = options.writerLockId ?? DEFAULT_WRITER_LOCK_ID;
+  const acquired = await acquireLock(
+    lockId,
+    options.writerLockTimeoutMs ?? DEFAULT_WRITER_LOCK_TIMEOUT_MS
+  );
+  if (!acquired) {
+    logger.warn(`[mesh-delivery-driver] writer lock '${lockId}' held elsewhere — skipping pass`);
+    return {
+      expired: 0,
+      claimed: 0,
+      delivered: 0,
+      retried: 0,
+      dead_lettered: 0,
+      unroutable: 0,
+      failures: [],
+      skipped: true,
+    };
+  }
+  try {
+    return await runMeshDeliveryPassUnfenced(options);
+  } finally {
+    releaseLock(lockId);
+  }
+}
+
+async function runMeshDeliveryPassUnfenced(
+  options: MeshDeliveryPassOptions
+): Promise<MeshDeliveryPassReport> {
   const now = options.now || new Date().toISOString();
+  const broker: MeshDeliveryBrokerOps = options.broker ?? {
+    expireMeshDeliveries,
+    claimDueMeshDeliveries,
+    acknowledgeMeshDelivery,
+    retryMeshDelivery,
+  };
   const dispatcher =
     options.dispatcher ||
     createMeshHubPeerMessagingAdapter({
@@ -105,9 +171,12 @@ export async function runMeshDeliveryPass(
     failures: [],
   };
 
-  report.expired = (await expireMeshDeliveries(now)).length;
+  report.expired = (await broker.expireMeshDeliveries(now)).length;
 
-  const claimed = await claimDueMeshDeliveries(now, options.batchLimit ?? DEFAULT_BATCH_LIMIT);
+  const claimed = await broker.claimDueMeshDeliveries(
+    now,
+    options.batchLimit ?? DEFAULT_BATCH_LIMIT
+  );
   report.claimed = claimed.length;
 
   for (const delivery of claimed) {
@@ -130,7 +199,7 @@ export async function runMeshDeliveryPass(
         request: reconstructMeshRequest(delivery, options.senderPeerId),
         timeoutMs: options.dispatchTimeoutMs,
       });
-      await acknowledgeMeshDelivery(delivery.delivery_id, {});
+      await broker.acknowledgeMeshDelivery(delivery.delivery_id, {});
       report.delivered += 1;
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
@@ -145,7 +214,7 @@ export async function runMeshDeliveryPass(
   ): Promise<void> {
     target.failures.push({ delivery_id: delivery.delivery_id, reason });
     try {
-      const next = await retryMeshDelivery(delivery.delivery_id, now, options.retryPolicy);
+      const next = await broker.retryMeshDelivery(delivery.delivery_id, now, options.retryPolicy);
       if (next.status === 'dead_lettered' || next.status === 'expired') {
         target.dead_lettered += 1;
       } else {
@@ -163,6 +232,9 @@ export async function runMeshDeliveryPass(
 }
 
 export function formatMeshDeliveryPassReport(report: MeshDeliveryPassReport): string {
+  if (report.skipped) {
+    return '[mesh-delivery] skipped (writer lock held by another driver)';
+  }
   const parts = [
     `claimed=${report.claimed}`,
     `delivered=${report.delivered}`,

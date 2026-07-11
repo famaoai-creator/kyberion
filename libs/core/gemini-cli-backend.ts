@@ -5,6 +5,7 @@
  */
 
 import { spawn } from 'node:child_process';
+import { recordEstimatedCliUsage } from './cli-usage-metering.js';
 import { z, type ZodType } from 'zod';
 import { logger } from './core.js';
 import { buildSafeExecEnv } from './secure-io.js';
@@ -325,7 +326,27 @@ export class GeminiCliBackend implements ReasoningBackend {
     }
   }
 
-  private spawnCli(args: string[]): Promise<string> {
+  private async spawnCli(args: string[]): Promise<string> {
+    const started = Date.now();
+    const promptChars = args.join(' ').length;
+    try {
+      const stdout = await this.spawnCliRaw(args);
+      recordEstimatedCliUsage(
+        'gemini-cli',
+        this.model,
+        started,
+        'success',
+        promptChars,
+        stdout.length
+      );
+      return stdout;
+    } catch (err) {
+      recordEstimatedCliUsage('gemini-cli', this.model, started, 'error', promptChars, 0);
+      throw err;
+    }
+  }
+
+  private spawnCliRaw(args: string[]): Promise<string> {
     return new Promise((resolve, reject) => {
       const child = spawn(this.bin, args, {
         stdio: ['pipe', 'pipe', 'pipe'],
