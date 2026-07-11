@@ -177,6 +177,13 @@ describe('GeminiServiceImageGenerationProvider', () => {
       'secret-guard',
     );
   });
+
+  it('does not advertise Gemini service availability from GOOGLE_API_KEY alone', async () => {
+    process.env.GOOGLE_API_KEY = 'mock-google-key';
+
+    const provider = new GeminiServiceImageGenerationProvider();
+    await expect(provider.isAvailable()).resolves.toBe(false);
+  });
 });
 
 describe('LlmApiImageGenerationProvider', () => {
