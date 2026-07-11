@@ -4,13 +4,19 @@ import {
   safeReaddir,
   safeStat,
   safeFsyncFile,
-  safeExistsSync
+  safeExistsSync,
 } from './secure-io.js';
 import { logger } from './core.js';
 import { ledger } from './ledger.js';
 import * as pathResolver from './path-resolver.js';
 import * as path from 'node:path';
 import { resolveSecretSync } from './secret-resolver.js';
+import {
+  decryptConnectionDocument,
+  encryptConnectionDocument,
+  isEncryptedConnectionEnvelope,
+  resolveSecretEncryptionMode,
+} from './secret-encryption.js';
 
 /**
  * Sovereign Secret Guard v1.5 [AUTHORITY ENABLED]
@@ -42,14 +48,26 @@ const _loadPersonalSecrets = () => {
 
       if (stat.isDirectory()) {
         const serviceName = item.toUpperCase();
-        const subFiles = safeReaddir(fullPath).filter(f => f.endsWith('.json'));
+        const subFiles = safeReaddir(fullPath).filter((f) => f.endsWith('.json'));
         for (const subFile of subFiles) {
-          const content = JSON.parse(safeReadFile(path.join(fullPath, subFile), { encoding: 'utf8' }) as string);
+          const content = JSON.parse(
+            safeReadFile(path.join(fullPath, subFile), { encoding: 'utf8' }) as string
+          );
           _mapContentToSecrets(serviceName, content);
         }
       } else if (item.endsWith('.json')) {
         const serviceName = path.basename(item, '.json').toUpperCase();
-        const content = JSON.parse(safeReadFile(fullPath, { encoding: 'utf8' }) as string);
+        let content = JSON.parse(safeReadFile(fullPath, { encoding: 'utf8' }) as string);
+        if (isEncryptedConnectionEnvelope(content)) {
+          // Startup scan runs at module import — an undecryptable file must
+          // degrade to a warning here, not crash every importer.
+          try {
+            content = decryptConnectionDocument(content);
+          } catch (err) {
+            logger.warn(`[secret-guard] cannot decrypt ${item} during startup scan: ${err}`);
+            continue;
+          }
+        }
         _mapContentToSecrets(serviceName, content);
       }
     }
@@ -87,11 +105,19 @@ function _connectionPath(serviceId: string): string {
 function _loadConnectionDocument(serviceId: string): Record<string, any> {
   const fullPath = _connectionPath(serviceId);
   if (!safeExistsSync(fullPath)) return {};
+  let parsed: unknown;
   try {
-    return JSON.parse(safeReadFile(fullPath, { encoding: 'utf8' }) as string);
+    parsed = JSON.parse(safeReadFile(fullPath, { encoding: 'utf8' }) as string);
   } catch (_) {
     return {};
   }
+  // AC-05: auto-detect the at-rest format. An encrypted document that cannot
+  // be decrypted must fail loudly — the data exists, silently returning {}
+  // would look like a wiped connection.
+  if (isEncryptedConnectionEnvelope(parsed)) {
+    return decryptConnectionDocument(parsed) as Record<string, any>;
+  }
+  return parsed as Record<string, any>;
 }
 
 _loadPersonalSecrets();
@@ -102,11 +128,16 @@ _loadPersonalSecrets();
  * Use `grantAccessGuarded` instead for operations that must pass through
  * the approval gate (e.g. SUDO authority grants, long-TTL grants).
  */
-export const grantAccess = (missionId: string, serviceIdOrAuth: string, ttlMinutes = 15, isAuthority = false): void => {
+export const grantAccess = (
+  missionId: string,
+  serviceIdOrAuth: string,
+  ttlMinutes = 15,
+  isAuthority = false
+): void => {
   const grants = _loadGrants();
   const grant: AuthGrant = {
     missionId,
-    expiresAt: Date.now() + (ttlMinutes * 60 * 1000)
+    expiresAt: Date.now() + ttlMinutes * 60 * 1000,
   };
 
   if (isAuthority) {
@@ -139,7 +170,7 @@ export const grantAccessGuarded = async (
     agentId?: string;
     correlationId?: string;
     channel?: string;
-  } = {},
+  } = {}
 ): Promise<void> => {
   // Dynamic import to avoid circular dependency between secret-guard and
   // risky-op-registry/approval-gate (which imports governance readers that
@@ -169,7 +200,7 @@ export const grantAccessGuarded = async (
 
   if (!decision.allowed) {
     throw new Error(
-      `[secret-guard] grantAccess blocked by approval gate for ${missionId}:${serviceIdOrAuth} — ${decision.message ?? decision.status}`,
+      `[secret-guard] grantAccess blocked by approval gate for ${missionId}:${serviceIdOrAuth} — ${decision.message ?? decision.status}`
     );
   }
 
@@ -181,10 +212,8 @@ export const grantAccessGuarded = async (
  */
 export const checkAuthority = (missionId: string, authority: string): boolean => {
   const grants = _loadGrants();
-  return grants.some(g => 
-    g.missionId === missionId && 
-    g.authority === authority && 
-    g.expiresAt > Date.now()
+  return grants.some(
+    (g) => g.missionId === missionId && g.authority === authority && g.expiresAt > Date.now()
   );
 };
 
@@ -200,15 +229,18 @@ export const getSecret = (key: string, scope?: string): string | null => {
     const hasScopeIdentity = authorizedScope?.toLowerCase() === scope.toLowerCase();
 
     // 2. Check Temporal Mission Grants (For dynamic tasks)
-    const grants = _loadGrants(); 
-    const activeGrant = grants.find(g => 
-      g.missionId === currentMission && 
-      g.serviceId?.toLowerCase() === scope.toLowerCase() && 
-      g.expiresAt > Date.now()
+    const grants = _loadGrants();
+    const activeGrant = grants.find(
+      (g) =>
+        g.missionId === currentMission &&
+        g.serviceId?.toLowerCase() === scope.toLowerCase() &&
+        g.expiresAt > Date.now()
     );
 
     if (!activeGrant && !hasScopeIdentity) {
-      throw new Error(`TIBA_VIOLATION: No active temporal grant or authorized scope for service "${scope}". Access Denied.`);
+      throw new Error(
+        `TIBA_VIOLATION: No active temporal grant or authorized scope for service "${scope}". Access Denied.`
+      );
     }
   }
 
@@ -248,20 +280,30 @@ export const loadConnectionDocument = (serviceId: string): Record<string, any> =
 export const storeConnectionDocument = (
   serviceId: string,
   patch: Record<string, any>,
-  options: { backup?: boolean; missionId?: string; actor?: string } = {},
+  options: { backup?: boolean; missionId?: string; actor?: string } = {}
 ): { path: string; changedKeys: string[] } => {
   const fullPath = _connectionPath(serviceId);
   const existing = _loadConnectionDocument(serviceId);
   const next = { ...existing, ...patch };
 
   if (safeExistsSync(fullPath) && options.backup !== false) {
+    // Back up the raw previous bytes: an encrypted document must never gain
+    // a plaintext .bak sibling.
     const backupPath = `${fullPath}.bak`;
-    safeWriteFile(backupPath, JSON.stringify(existing, null, 2) + '\n');
-    try { safeFsyncFile(backupPath); } catch (_) {}
+    safeWriteFile(backupPath, safeReadFile(fullPath, { encoding: 'utf8' }) as string);
+    try {
+      safeFsyncFile(backupPath);
+    } catch (_) {}
   }
 
-  safeWriteFile(fullPath, JSON.stringify(next, null, 2) + '\n');
-  try { safeFsyncFile(fullPath); } catch (_) {}
+  const serialized =
+    resolveSecretEncryptionMode() === 'none'
+      ? JSON.stringify(next, null, 2)
+      : JSON.stringify(encryptConnectionDocument(next), null, 2);
+  safeWriteFile(fullPath, serialized + '\n');
+  try {
+    safeFsyncFile(fullPath);
+  } catch (_) {}
 
   const serviceName = _sanitizeServiceId(serviceId).toUpperCase();
   _clearServiceSecrets(serviceName);
@@ -287,13 +329,17 @@ function _loadGrants(): AuthGrant[] {
   try {
     const content = safeReadFile(GRANTS_FILE, { encoding: 'utf8' }) as string;
     return JSON.parse(content);
-  } catch (_) { return []; }
+  } catch (_) {
+    return [];
+  }
 }
 
 function _saveGrants(grants: AuthGrant[]) {
-  const freshGrants = grants.filter(g => g.expiresAt > Date.now());
+  const freshGrants = grants.filter((g) => g.expiresAt > Date.now());
   safeWriteFile(GRANTS_FILE, JSON.stringify(freshGrants, null, 2));
-  try { safeFsyncFile(GRANTS_FILE); } catch (_) {}
+  try {
+    safeFsyncFile(GRANTS_FILE);
+  } catch (_) {}
 }
 
 export const getActiveSecrets = () => Array.from(_activeSecrets);
@@ -305,8 +351,8 @@ export const isSecretPath = (filePath: string): boolean => {
     PERSONAL_CONNECTIONS_DIR,
     GRANTS_FILE,
     pathResolver.resolve('vault/secrets/'),
-    pathResolver.resolve('knowledge/personal/connections/')
-  ].some(p => resolved.startsWith(p));
+    pathResolver.resolve('knowledge/personal/connections/'),
+  ].some((p) => resolved.startsWith(p));
 };
 
 export const secretGuard = {
