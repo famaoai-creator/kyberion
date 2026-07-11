@@ -15,6 +15,8 @@ vi.mock('./path-resolver.js', () => ({
     resolve: (p: string) => p,
   },
   rootDir: () => '/repo',
+  rootResolve: (p: string) => `/repo/${p}`,
+  active: (p = '') => `/repo/active/${p}`,
   knowledge: (p = '') => `/repo/knowledge/${p}`,
 }));
 
@@ -24,13 +26,24 @@ vi.mock('./secure-io.js', () => ({
     if (!files.has(p)) throw new Error('ENOENT');
     return files.get(p)!;
   },
-  safeWriteFile: (p: string, data: string) => { files.set(p, data); },
+  safeWriteFile: (p: string, data: string) => {
+    files.set(p, data);
+  },
   safeMkdir: () => undefined,
-  safeUnlinkSync: (p: string) => { files.delete(p); },
+  safeRmSync: (p: string) => {
+    files.delete(p);
+  },
+  safeUnlinkSync: (p: string) => {
+    files.delete(p);
+  },
   safeAppendFileSync: () => undefined,
 }));
 
-function provider(providerId: string, models: string[], modelCapabilities: Record<string, string[]>): ProviderInfo {
+function provider(
+  providerId: string,
+  models: string[],
+  modelCapabilities: Record<string, string[]>
+): ProviderInfo {
   return {
     provider: providerId,
     installed: true,
@@ -48,7 +61,9 @@ const claude = provider('claude', ['opus', 'sonnet'], {
   sonnet: ['reasoning', 'code', 'managed_workflow'],
 });
 const codex = provider('codex', ['codex'], { codex: ['code', 'patch', 'terminal'] });
-const gemini = provider('gemini', ['gemini-2.5-pro'], { 'gemini-2.5-pro': ['reasoning', 'analysis'] });
+const gemini = provider('gemini', ['gemini-2.5-pro'], {
+  'gemini-2.5-pro': ['reasoning', 'analysis'],
+});
 const FLEET = [claude, codex, gemini];
 
 describe('capability-broker', () => {
@@ -64,7 +79,7 @@ describe('capability-broker', () => {
     const { resolveProviderDecision } = await import('./capability-broker.js');
     const decision = resolveProviderDecision(
       { requiredCapabilities: ['code', 'patch', 'terminal'], decisionKey: 'role-impl' },
-      FLEET,
+      FLEET
     );
     expect(decision.provider).toBe('codex');
     expect(decision.pinned).toBe(false);
@@ -80,7 +95,7 @@ describe('capability-broker', () => {
     const { resolveProviderDecision } = await import('./capability-broker.js');
     const decision = resolveProviderDecision(
       { requiredCapabilities: ['code'], orchestration: 'managed_workflow' },
-      FLEET,
+      FLEET
     );
     expect(decision.provider).toBe('claude');
     expect(decision.orchestration).toBe('managed_workflow');
@@ -88,11 +103,12 @@ describe('capability-broker', () => {
   });
 
   it('reuses a pinned decision regardless of what fresh resolution would pick', async () => {
-    const { resolveProviderDecision, pinProviderDecision, loadPinnedDecision } = await import('./capability-broker.js');
+    const { resolveProviderDecision, pinProviderDecision, loadPinnedDecision } =
+      await import('./capability-broker.js');
 
     const first = resolveProviderDecision(
       { requiredCapabilities: ['code', 'patch', 'terminal'], decisionKey: 'role-x', record: false },
-      FLEET,
+      FLEET
     );
     expect(first.provider).toBe('codex');
     pinProviderDecision('role-x', first);
@@ -101,7 +117,7 @@ describe('capability-broker', () => {
     // Different requirements that would normally pick claude — pin must win.
     const reused = resolveProviderDecision(
       { requiredCapabilities: ['deep_reasoning'], decisionKey: 'role-x', record: false },
-      FLEET,
+      FLEET
     );
     expect(reused.provider).toBe('codex');
     expect(reused.pinned).toBe(true);
@@ -112,14 +128,22 @@ describe('capability-broker', () => {
     const { resolveProviderDecision, pinProviderDecision } = await import('./capability-broker.js');
     // Pin a provider that is NOT in the fleet.
     pinProviderDecision('role-y', {
-      provider: 'agy', modelId: 'agy', instance: null, strategy: 'preferred',
-      orchestration: 'leaf', availableProviders: [], requiredCapabilities: [],
-      unmetCapabilities: [], rationale: 'stale', pinned: true, decisionKey: 'role-y',
+      provider: 'agy',
+      modelId: 'agy',
+      instance: null,
+      strategy: 'preferred',
+      orchestration: 'leaf',
+      availableProviders: [],
+      requiredCapabilities: [],
+      unmetCapabilities: [],
+      rationale: 'stale',
+      pinned: true,
+      decisionKey: 'role-y',
     });
 
     const decision = resolveProviderDecision(
       { requiredCapabilities: ['code', 'patch', 'terminal'], decisionKey: 'role-y', record: false },
-      FLEET,
+      FLEET
     );
     expect(decision.provider).toBe('codex');
     expect(decision.pinned).toBe(false);
