@@ -30,6 +30,7 @@ import {
   getProviderHealthDemotionTtlMs,
   reportProviderTemporarilyUnhealthy,
 } from './provider-health-registry.js';
+import { enforceSpendGuardForReasoning } from './spend-guard.js';
 import { z } from 'zod';
 
 // Auth/eligibility failures (dead credentials, retired tiers) do not heal in
@@ -510,6 +511,10 @@ export class FailoverReasoningBackend implements ReasoningBackend {
     operation: string,
     invoke: (backend: ReasoningBackend) => Promise<T>
   ): Promise<T> {
+    // OP-01: the spend cap is real control, not prompt text. Warn posture
+    // logs/alerts and proceeds; block posture throws SpendCapExceededError
+    // before any provider is invoked.
+    enforceSpendGuardForReasoning();
     const skippedProviders = new Set(listDemotedProviders());
     const errors: string[] = [];
 

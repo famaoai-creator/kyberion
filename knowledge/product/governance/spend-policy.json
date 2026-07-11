@@ -1,0 +1,8 @@
+{
+  "version": "1.0.0",
+  "description": "OP-01 spend guard policy. Generous starting caps in warn posture per the plan's risk note — observe the measured distribution before tightening or switching to block.",
+  "posture": "warn",
+  "daily_cap_usd": 50,
+  "mission_cap_usd": 20,
+  "tenant_overrides": {}
+}

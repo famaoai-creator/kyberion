@@ -1,5 +1,6 @@
 /* eslint-disable no-restricted-imports -- IP-08 で managed-process 経由へ移行予定 (docs/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 import { spawn } from 'node:child_process';
+import { recordEstimatedCliUsage } from './cli-usage-metering.js';
 import path from 'node:path';
 import { z, type ZodType } from 'zod';
 import { logger } from './core.js';
@@ -95,9 +96,23 @@ class CodexCliQuery {
         '-',
       ];
 
-      await this.spawnCli(args, prompt);
+      const started = Date.now();
+      try {
+        await this.spawnCli(args, prompt);
+      } catch (err) {
+        recordEstimatedCliUsage('codex-cli', this.model, started, 'error', prompt.length, 0);
+        throw err;
+      }
 
       const raw = safeReadFile(outputPath, { encoding: 'utf8' }) as string;
+      recordEstimatedCliUsage(
+        'codex-cli',
+        this.model,
+        started,
+        'success',
+        prompt.length,
+        raw.length
+      );
       const clean = extractJsonPayload(raw);
       const parsedJson = JSON.parse(clean);
       const parsed = params.schema.safeParse(parsedJson);

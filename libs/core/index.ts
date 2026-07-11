@@ -187,6 +187,8 @@ export * from './ops-alert.js';
 export * from './health-degradation.js';
 export * from './aidlc-phase-state.js';
 export * from './secret-encryption.js';
+export * from './spend-guard.js';
+export * from './cost-report.js';
 export * from './chain-integrity.js';
 
 // Classification & Knowledge
@@ -531,6 +533,7 @@ export * from './shell-command-policy.js';
 export * from './adf-guardrails.js';
 export * from './execution-bounds.js';
 export * from './intent-handoff.js';
+export * from './mesh-message-broker.js';
 export * from './mesh-delivery-driver.js';
 export * from './egress-policy.js';
 export * from './governance-status.js';
