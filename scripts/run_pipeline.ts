@@ -1,4 +1,5 @@
 import {
+  attemptAutonomousRepair,
   TraceContext,
   finalizeAndPersist,
   persistTrace,
@@ -1325,13 +1326,14 @@ export async function runSteps(
               `  [SYS_PIPELINE] 修復サブエージェント実行中(数分かかることがあります) — ${step.op}`
             );
           }
-          const repaired = await attemptAutonomousRepair(
-            step,
+          const repaired = await attemptAutonomousRepair({
+            step: { op: step.op, id: step.id, params: step.params },
             failure,
-            ctx,
-            opts.pipelinePath!,
-            stepPolicy
-          );
+            pipelinePath: opts.pipelinePath!,
+            policy: stepPolicy,
+            validate: () => readValidatedWorkflowAdf(opts.pipelinePath!),
+            logPrefix: '[SYS_PIPELINE:REPAIR]',
+          });
           if (repaired) {
             if (!opts.quiet) {
               logger.success(
@@ -1437,95 +1439,6 @@ export async function runValidatedSteps(
   };
 }
 
-async function attemptAutonomousRepair(
-  step: PipelineAdfStep,
-  failure: any,
-  ctx: any,
-  pipelinePath: string,
-  policy?: ReasoningStepPolicy
-): Promise<boolean> {
-  try {
-    const { getReasoningBackend, sendOpsAlert } = await import('@agent/core');
-    const backend = getReasoningBackend();
-
-    const repairHint =
-      failure.repairAction ||
-      'Investigate the error and the pipeline ADF structure to identify a potential fix.';
-
-    // AO-03 Task 4: classify the repair scope.
-    // Safe repairs (ADF structure, parameters) may proceed autonomously.
-    // Sensitive repairs (.env / authority / config / secrets) MUST NOT be attempted without
-    // operator approval. In unattended runs there is no approval channel, so we fail-closed.
-    const SENSITIVE_CATEGORIES = ['permission_error', 'auth_error', 'config_error', 'env_error'];
-    const requiresApproval = SENSITIVE_CATEGORIES.includes(failure.category);
-
-    if (requiresApproval) {
-      logger.warn(
-        `  [SYS_PIPELINE:REPAIR] Repair category "${failure.category}" involves .env/auth/config changes ` +
-          `— autonomous mutation of sensitive paths is prohibited (AO-03 §4). Escalating to operator.`
-      );
-      // Escalate via ops-alert so the operator is notified even in unattended runs.
-      if (typeof sendOpsAlert === 'function') {
-        sendOpsAlert({
-          severity: 'critical',
-          title: `Pipeline repair blocked: ${step.op}`,
-          context: {
-            step_op: step.op,
-            error_category: failure.category,
-            error_detail: failure.detail,
-            pipeline_path: pipelinePath,
-          },
-          recommendation:
-            'Manual operator intervention required. Review the error, update .env / authority roles as appropriate, then re-run the pipeline.',
-          dedupe_key: `pipeline-repair-blocked:${step.op}:${failure.category}`,
-        });
-      }
-      return false;
-    }
-
-    const instruction = `
-The following pipeline step failed in Kyberion:
-Step Operation: ${step.op}
-Step Params: ${JSON.stringify(step.params)}
-Error Category: ${failure.category}
-Error Detail: ${failure.detail}
-
-Repair Hint: ${repairHint}
-${policy ? `Step Policy: ${JSON.stringify(policy)}` : ''}
-
-Repair Action Goal:
-1. ANALYZE the error and parameters.
-2. FIX the pipeline ADF structure at ${pipelinePath} if it is a structural or parameter error.
-3. DO NOT modify .env files, authority roles, config secrets, or any file outside the pipeline ADF.
-   If the error requires such changes, output a description of what needs to be changed but do NOT apply it.
-4. Ensure the resulting ADF follows the required schema.
-
-Assume the persona of a "Sovereign System Recovery Agent".
-Once finished, provide a brief summary of the changes you applied to fix the pipeline.
-`.trim();
-
-    const report = await backend.delegateTask(
-      instruction,
-      `Self-Healing Mission for ${step.op}`,
-      policy ? { effort: policy.effort, budget: policy.budget } : undefined
-    );
-    logger.info(`  [SYS_PIPELINE:REPAIR] Sub-agent report: ${report}`);
-
-    // Confirm the ADF is actually valid after the repair attempt before signalling success.
-    try {
-      await readValidatedWorkflowAdf(pipelinePath);
-    } catch (validationErr: any) {
-      logger.warn(
-        `  [SYS_PIPELINE:REPAIR] Sub-agent finished but ADF is still invalid: ${validationErr.message}`
-      );
-      return false;
-    }
-    return true;
-  } catch (err: any) {
-    logger.error(`  [SYS_PIPELINE:REPAIR] Failed to perform repair: ${err.message}`);
-    return false;
-  }
-}
 export async function main() {
   // Propagate resolved identity to process.env so spawned subprocesses inherit them.
   const identity = resolveIdentityContext();

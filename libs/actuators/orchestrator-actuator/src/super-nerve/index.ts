@@ -1,9 +1,9 @@
 import {
+  attemptAutonomousRepair,
   classifyError,
   determineActuatorStepType,
   evaluateCondition,
   executeAdfSteps,
-  getReasoningBackend,
   logger,
   pathResolver,
   resolveVars,
@@ -112,12 +112,13 @@ export async function executeSuperPipeline(
     const failure = classifyError(new Error(failed.error || `Step failed: ${failed.op}`));
     if (attempt === 0 && failure.repairAction) {
       logger.warn(`  [NERVE] Step failed: ${failure.label}. Attempting autonomous repair...`);
-      const repaired = await attemptAutonomousRepair(
-        normalizedSteps.find((step) => step.op === failed.op) ||
-          steps[0] || { op: failed.op, params: {} },
+      const failedStep = normalizedSteps.find((step) => step.op === failed.op) ||
+        steps[0] || { op: failed.op, params: {} };
+      const repaired = await attemptAutonomousRepair({
+        step: { op: failedStep.op, params: failedStep.params },
         failure,
-        result.context
-      );
+        logPrefix: '[NERVE:REPAIR]',
+      });
       if (repaired) {
         logger.success(`  [NERVE] Repair successful. Retrying pipeline...`);
         continue;
@@ -142,38 +143,6 @@ function normalizeNestedSteps(
   steps: any[]
 ): Array<{ type: 'capture' | 'transform' | 'apply' | 'control'; op: string; params: any }> {
   return Array.isArray(steps) ? steps.map((step) => normalizeStep(step)) : [];
-}
-
-async function attemptAutonomousRepair(
-  step: SuperPipelineStep,
-  failure: any,
-  ctx: any
-): Promise<boolean> {
-  try {
-    const backend = getReasoningBackend();
-    const instruction = `
-The following pipeline step failed in Kyberion:
-Step Operation: ${step.op}
-Step Params: ${JSON.stringify(step.params)}
-Error Category: ${failure.category}
-Error Detail: ${failure.detail}
-
-Repair Action Hint: ${failure.repairAction}
-
-Your Task:
-Perform the necessary actions (file edits, config updates, etc.) to repair this failure so the step can be retried successfully.
-Assume the persona of a "Self-Healing SRE Agent".
-Once finished, provide a brief summary of what you fixed.
-`.trim();
-
-    const report = await backend.delegateTask(instruction, `Self-Healing Mission for ${step.op}`);
-    logger.info(`  [NERVE:REPAIR] Sub-agent report: ${report}`);
-    return true;
-  } catch (err: unknown) {
-    const error = err instanceof Error ? err : new Error(String(err));
-    logger.error(`  [NERVE:REPAIR] Failed to perform repair: ${error.message}`);
-    return false;
-  }
 }
 
 async function handleCoreAction(
