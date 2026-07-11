@@ -23,6 +23,7 @@ describe('virtual office surface', () => {
       { recursive: true }
     );
     process.env.KYBERION_ROOT = tmpRoot;
+    process.env.KYBERION_CUSTOMER = 'acme';
 
     // one active mission with mixed task states
     const missionDir = path.join(tmpRoot, 'active', 'missions', 'MSN-OFFICE-1');
@@ -49,12 +50,100 @@ describe('virtual office surface', () => {
         { task_id: 'T-3', status: 'completed', assigned_to: { role: 'reviewer' } },
       ])
     );
+    const otherMissionDir = path.join(tmpRoot, 'active', 'missions', 'MSN-OFFICE-2');
+    fs.mkdirSync(otherMissionDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(otherMissionDir, 'mission-state.json'),
+      JSON.stringify({
+        mission_id: 'MSN-OFFICE-2',
+        status: 'active',
+        mission_type: 'operations',
+        tenant_slug: 'beta',
+      })
+    );
+    fs.writeFileSync(
+      path.join(otherMissionDir, 'NEXT_TASKS.json'),
+      JSON.stringify([
+        {
+          task_id: 'T-9',
+          status: 'in_progress',
+          assigned_to: { role: 'operator', agent_id: 'nerve-agent' },
+          description: 'should stay hidden from acme',
+        },
+      ])
+    );
     // one archived mission (must land on the shelf, not the floor)
     const archivedDir = path.join(tmpRoot, 'active', 'missions', 'MSN-OFFICE-OLD');
     fs.mkdirSync(archivedDir, { recursive: true });
     fs.writeFileSync(
       path.join(archivedDir, 'mission-state.json'),
-      JSON.stringify({ mission_id: 'MSN-OFFICE-OLD', status: 'archived' })
+      JSON.stringify({ mission_id: 'MSN-OFFICE-OLD', status: 'archived', tenant_slug: 'acme' })
+    );
+    const customerRoot = path.join(tmpRoot, 'customer', 'acme');
+    fs.mkdirSync(customerRoot, { recursive: true });
+    fs.writeFileSync(
+      path.join(customerRoot, 'organization-profile.json'),
+      JSON.stringify(
+        {
+          $schema: 'https://kyberion.local/schemas/organization-profile.schema.json',
+          version: '1.0.0',
+          organization_id: 'acme',
+          name: 'Acme Org',
+          mission_defaults: {
+            default_mission_class: 'operations_and_release',
+            default_team_template: 'default',
+            default_agent_profile: 'implementation-architect',
+          },
+          team_defaults: {
+            default_team_template: 'default',
+            team_template_catalog_id: 'default',
+            default_lifecycle_template: 'default',
+            max_parallel_missions: 4,
+          },
+          llm: {
+            default_profile: 'standard',
+          },
+        },
+        null,
+        2
+      )
+    );
+    fs.writeFileSync(
+      path.join(customerRoot, 'org-chart.json'),
+      JSON.stringify(
+        {
+          version: '1.0.0',
+          organization_id: 'acme',
+          name: 'Acme Org Chart',
+          source_kind: 'customer',
+          source_path: 'customer/acme/org-chart.json',
+          domains: [
+            {
+              domain_id: 'delivery',
+              name: 'Delivery',
+              role_ids: ['planner', 'implementer'],
+            },
+          ],
+          positions: [
+            {
+              role_id: 'planner',
+              reports_to: null,
+              held_by: 'implementation-architect',
+              responsibility_scope: 'mission intake and sequencing',
+              authority_role_ref: 'ecosystem_architect',
+            },
+            {
+              role_id: 'implementer',
+              reports_to: 'planner',
+              held_by: 'implementation-architect',
+              responsibility_scope: 'build execution',
+              authority_role_ref: 'software_developer',
+            },
+          ],
+        },
+        null,
+        2
+      )
     );
     // performance index
     const perfDir = path.join(tmpRoot, 'active', 'shared', 'observability', 'retrospectives');
@@ -192,14 +281,19 @@ describe('virtual office surface', () => {
 
   afterAll(() => {
     delete process.env.KYBERION_ROOT;
+    delete process.env.KYBERION_CUSTOMER;
     fs.rmSync(tmpRoot, { recursive: true, force: true });
   });
 
   it('collects rooms, agent states, performance, and archive shelf from disk', () => {
     const snapshot = mod.collectOfficeSnapshot();
+    expect(snapshot.tenant_slug).toBe('acme');
+    expect(snapshot.organization?.organization_id).toBe('acme');
+    expect(snapshot.organization_chart?.name).toBe('Acme Org Chart');
     const room = snapshot.rooms.find((entry) => entry.mission_id === 'MSN-OFFICE-1');
     expect(room).toBeTruthy();
     expect(room!.tasks).toHaveLength(3);
+    expect(snapshot.rooms.map((entry) => entry.mission_id)).not.toContain('MSN-OFFICE-2');
     expect(snapshot.archived_recent).toContain('MSN-OFFICE-OLD');
     expect(snapshot.task_status_counts.in_progress).toBe(1);
     expect(snapshot.task_status_counts.blocked).toBe(1);
@@ -224,8 +318,11 @@ describe('virtual office surface', () => {
     const snapshot = mod.collectOfficeSnapshot();
     const html = mod.renderOfficeHtml(snapshot, 30);
     expect(html).toContain('KYBERION VIRTUAL OFFICE');
+    expect(html).toContain('tenant acme');
+    expect(html).toContain('Acme Org Chart');
     expect(html).toContain('MSN-OFFICE-1');
     expect(html).toContain('implementation-architect');
+    expect(html).toContain('planner');
     expect(html).toContain('Now Working');
     expect(html).toContain('新しい virtual office の見せ方を整える');
     expect(html).toContain('http-equiv="refresh" content="30"');
