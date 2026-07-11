@@ -912,6 +912,88 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
   }
 }
 
+/**
+ * AC-02: page.fill timeouts were opaque ("locator not found" after 5s with
+ * no clue what WAS on the page). Resolution ladder: the literal selector,
+ * then label text, placeholder, and name attribute (using the optional
+ * params.field hint or the selector itself when it looks like plain text).
+ * Total failure throws an error that lists the visible input candidates so
+ * the operator/repair agent can correct the step without reopening the page.
+ */
+export async function fillWithFallback(
+  page: Page,
+  input: { selector: string; text: string; timeoutMs: number; fieldHint?: string }
+): Promise<{ strategy: string }> {
+  const attempts: string[] = [];
+  const hint =
+    input.fieldHint ||
+    (/^[\w\s@.\-぀-ヿ一-鿿]+$/u.test(input.selector) && !input.selector.includes('=')
+      ? input.selector
+      : undefined);
+
+  const tryStrategy = async (
+    strategy: string,
+    run: () => Promise<void>
+  ): Promise<{ strategy: string } | null> => {
+    try {
+      await run();
+      return { strategy };
+    } catch (err: any) {
+      attempts.push(`${strategy}: ${String(err?.message || err).split('\n')[0]}`);
+      return null;
+    }
+  };
+
+  const direct = await tryStrategy('selector', () =>
+    page.fill(input.selector, input.text, { timeout: input.timeoutMs })
+  );
+  if (direct) return direct;
+
+  if (hint) {
+    const byLabel = await tryStrategy('label', () =>
+      page.getByLabel(hint, { exact: false }).first().fill(input.text, { timeout: input.timeoutMs })
+    );
+    if (byLabel) return byLabel;
+
+    const byPlaceholder = await tryStrategy('placeholder', () =>
+      page.getByPlaceholder(hint).first().fill(input.text, { timeout: input.timeoutMs })
+    );
+    if (byPlaceholder) return byPlaceholder;
+
+    const byName = await tryStrategy('name', () =>
+      page.locator(`[name="${hint}"]`).first().fill(input.text, { timeout: input.timeoutMs })
+    );
+    if (byName) return byName;
+  }
+
+  let candidates = '';
+  try {
+    const found = await page.evaluate(() =>
+      Array.from(document.querySelectorAll('input, textarea, select, [contenteditable="true"]'))
+        .slice(0, 10)
+        .map((el) => {
+          const node = el as HTMLInputElement;
+          return [
+            node.tagName.toLowerCase(),
+            node.type ? `type=${node.type}` : '',
+            node.name ? `name=${node.name}` : '',
+            node.id ? `id=${node.id}` : '',
+            node.placeholder ? `placeholder=${node.placeholder}` : '',
+          ]
+            .filter(Boolean)
+            .join(' ');
+        })
+    );
+    candidates = found.length > 0 ? ` Visible input candidates: ${found.join(' | ')}` : '';
+  } catch {
+    /* candidate enumeration is best-effort context for the error */
+  }
+
+  throw new Error(
+    `fill failed for selector "${input.selector}" after ${attempts.length} strategies (${attempts.join('; ')}).${candidates}`
+  );
+}
+
 async function opApply(
   op: string,
   params: any,
@@ -985,19 +1067,26 @@ async function opApply(
         }
       );
     }
-    case 'fill':
-      await retry(async () => {
-        await page.fill(resolve(params.selector), resolve(params.text), {
-          timeout: params.timeout || 5000,
-        });
-      }, buildRetryOptions(params));
+    case 'fill': {
+      const fillResult = await retry(
+        async () =>
+          fillWithFallback(page, {
+            selector: resolve(params.selector),
+            text: resolve(params.text),
+            timeoutMs: params.timeout || 5000,
+            fieldHint: params.field ? resolve(params.field) : undefined,
+          }),
+        buildRetryOptions(params)
+      );
       return browserRuntimeHelpers.recordBrowserAction(ctx, {
         kind: 'apply',
         op: 'fill',
         tab_id: runtime.activeTabId,
         selector: resolve(params.selector),
         text: resolve(params.text),
+        ...(fillResult.strategy !== 'selector' ? { fallback_strategy: fillResult.strategy } : {}),
       });
+    }
     case 'press':
       await retry(async () => {
         await page.press(resolve(params.selector), resolve(params.key), {
