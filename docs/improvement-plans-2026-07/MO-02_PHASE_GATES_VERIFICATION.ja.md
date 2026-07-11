@@ -66,3 +66,11 @@
 - ゲートはレイテンシとトークンを消費する。**リスク軸で強度を段階化**(low: スキーマのみ / review_required: 受入評価 / approval_required+: 独立レビュー)し、全ミッション一律の重装備にしない。
 - 敵対的レビューは false positive(正しい成果物への言いがかり)を出す。レビュー結果は自動棄却でなく rework 理由として実装者に渡し、2 者で収束しない場合のみ人間へ(自動の無限ループを作らない — rework 上限 1 回を守る)。
 - stub reasoning backend ではレビューが形骸化するため、ゲートの E2E テストはレビュー応答を fixture で注入する。
+
+## 実装状況 (2026-07-12)
+
+**受入条件1/2/4/5 は実装済みを再突合で確認、3(フェーズ exit ゲート)を今回実装 — MO-02 の主要ギャップは解消。**
+
+- **再突合(実装済みだった項目)**: 計画ゲート(planning_packet スキーマ + 独立レビュー、gates/ 記録)/ タスク受入ゲート(evidence + acceptance_criteria + task_result スキーマの gate 化、rework_packet / reviewer ロール検証)/ finish 不合格時の validating 維持 + 修復タスク + 2回失敗で realign(mission-lifecycle)/ gate-pass・gate-fail の override 記録 / TASK_BOARD・サマリへの Gate Status 表示。
+- **今回実装(受入条件3)**: process template の `exit_gate` は planning 時に `gates/definitions/` へ永続化されるだけで**評価する消費者が存在しなかった**。worker に `evaluateMissionPhaseExitGates` を新設し、completion イベント発行前に全 exit gate を評価・記録。`reviewer_approved` チェックは NEXT_TASKS.json のタスク結果から enrichment(template の params は task_id のみのため)。共通作業規約4 に従い **既定 warn**(記録・通知のみ)、`KYBERION_PHASE_GATE_MODE=enforce` で completion をブロック、同一ゲート 3 回目の失敗で circuit breaker イベント(realign 推奨)を通知。テスト5本(warn/enforce/off、定義ロード、evidence 合否、prior_failures 計数、reviewer enrichment)。
+- **既知の限界**: `human_override` チェックは現状 params 無指定で pass(署名強制は未実装 — enforce 昇格時に要再設計)。enforce への切替は warn 観測でゲート失敗分布を確認してから(egress と同じ運用)。realign の完全自動化(planner 再計画の自動起動)は circuit breaker 通知に留めた。
