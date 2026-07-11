@@ -8,8 +8,8 @@
 
 | 判定    | 件数 |
 | ------- | ---- |
-| DONE    | 44   |
-| PARTIAL | 47   |
+| DONE    | 46   |
+| PARTIAL | 45   |
 | TODO    | 0    |
 
 ## P0 残作業(プロダクション化のクリティカルパス)
@@ -140,8 +140,8 @@
 | ----- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | OP-01 | DONE    | spend-guard は 2026-07-11 実装(spend-policy.json、warn 既定/block で SpendCapExceededError、reasoning failover 前段に配線、日次 dedupe アラート)。usage 計測も 2026-07-11 に全経路接続(anthropic SDK は実 usage、gemini/codex CLI は estimated 概算)。cost report CLI も 2026-07-11 実装(pnpm cost:report、mission/model/日別、sdk 実コスト優先、estimated 分離表示 — 実履歴で確認)。週次サマリ接続も 2026-07-11 実装(weekly-review pipeline に cost_report --last-days 7 ステップ、実走確認)。operator packet 週次コスト表示(status report findings `weekly-cost` + metrics `weekly_cost_usd`)とテナント override(`tenant_overrides` 実効化、`KYBERION_TENANT`)は 2026-07-12 完了。KPI 正本 docs/KPI_TRACKING.md 新設 → **DONE** |
 | OP-02 | DONE    | (残: 外部ボリューム定期運用の実績)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| OP-04 | PARTIAL | 残: soak 実証のみ(RSS/restart 履歴 + 24h トレンド評価は 2026-07-12 実装、supervisor 毎時サンプル + degradation watch 統合。劣化ループ・cron・doctor・healthz は実装済み)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | OP-03 | PARTIAL | 2026-07-12: bin フィールド + shebang(pnpm link --global で kyberion CLI)実装。残: docker deploy サービスのみ                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| OP-04 | PARTIAL | 残: RSS/restart 履歴の拡張と soak 実証のみ(劣化検知ループ・hourly cron・doctor rollup・healthz/status API・provider-health 永続化は 2026-07-11 実装: runtime state ファイル + TTL 自然回復 + reload API、vitest 下は隔離必須)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | OP-05 | PARTIAL | 2026-07-11: env-registry(228変数)+ check:env-registry(validate/CI)+ env-validator + doctor 配線 + env.example/CONFIGURATION.md 生成。残: 棚卸しの継続キュレーション(documented=false 211件)、baseline-check 接続、集中ローダー移行                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 
 ### AO(自律運用・保守)
@@ -155,13 +155,13 @@
 
 ### IL(インテントライフサイクル)
 
-| ID    | 状態    | 残作業                                                                                              |
-| ----- | ------- | --------------------------------------------------------------------------------------------------- |
-| IL-01 | DONE    | 2026-07-12 完了(pipeline seam 実装で全 seam 貫通)                                                   |
-| IL-02 | PARTIAL | 2026-07-11 突合: scripts/intent_trace.ts(pnpm intent:trace)実在。残: 相関 ID の全経路貫通精査       |
-| IL-03 | PARTIAL | 2026-07-11 突合: intent-delta.ts(goalSimilarity 起点比較)+ テスト実在・緑。残: 実行中ドリフトゲート |
-| IL-04 | DONE    | 2026-07-12 再突合で DONE(全受入条件が実装・テスト済みだった)                                        |
-| IL-05 | PARTIAL | 2026-07-11 突合: pending-intent-store.ts + テスト実在・緑。残: 修正検知/completed 再オープンの精査  |
+| ID    | 状態    | 残作業                                                                                                                                                               |
+| ----- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| IL-01 | DONE    | 2026-07-12 完了(pipeline seam 実装で全 seam 貫通)                                                                                                                    |
+| IL-02 | DONE    | 2026-07-12 精査完了: 全経路(ブリッジ→orchestrator→mission→task→a2a→audit→intent:trace)貫通を確認。唯一のギャップ(a2a セキュリティ監査3種の correlationId 欠落)を修正 |
+| IL-03 | PARTIAL | 2026-07-11 突合: intent-delta.ts(goalSimilarity 起点比較)+ テスト実在・緑。残: 実行中ドリフトゲート                                                                  |
+| IL-04 | DONE    | 2026-07-12 再突合で DONE(全受入条件が実装・テスト済みだった)                                                                                                         |
+| IL-05 | PARTIAL | 2026-07-11 突合: pending-intent-store.ts + テスト実在・緑。残: 修正検知/completed 再オープンの精査                                                                   |
 
 ### ONB(初回オンボーディング)
 
