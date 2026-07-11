@@ -8,6 +8,7 @@ installProcessGuards('discord-bridge');
 import {
   createStandardYargs,
   logger,
+  startBridgeTypingLoop,
   pathResolver,
   safeAppendFileSync,
   safeExistsSync,
@@ -142,6 +143,12 @@ async function handleDiscordMessage(message: Message) {
     receivedAt: message.createdAt.toISOString(),
   });
 
+  // UX-02: keep the channel's typing indicator alive while we think.
+  const typing = startBridgeTypingLoop(
+    'discord-bridge',
+    () => (message.channel as { sendTyping?: () => Promise<void> }).sendTyping?.(),
+    8000
+  );
   try {
     const result = await runSurfaceMessageConversation({
       surface: 'discord',
@@ -189,6 +196,8 @@ async function handleDiscordMessage(message: Message) {
       locale: 'ja',
       post: (errorText) => message.reply(errorText),
     });
+  } finally {
+    typing.stop();
   }
 }
 
