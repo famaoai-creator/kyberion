@@ -61,6 +61,17 @@ jobs:
       - name: Check knowledge catalogs & index freshness
         run: pnpm run check:catalogs
 
+      # Actuator op registry / discovery catalog must be regenerated when
+      # actuator manifests or dispatch ops change (REVIEW_CODEX_2026-07-11:
+      # scaffold-to-registry drift was previously unchecked).
+      - name: Check actuator op registry drift
+        run: pnpm run check:op-registry
+
+      # KYBERION_* env references must stay registered in the env registry
+      # (OP-05: unregistered vars are invisible to startup validation).
+      - name: Check env registry drift
+        run: pnpm run check:env-registry
+
       - name: Validate capability discovery
         run: node dist/scripts/capability_discovery.js > /dev/null
 
