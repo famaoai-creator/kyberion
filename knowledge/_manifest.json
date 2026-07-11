@@ -1317,7 +1317,7 @@
     {
       "path": "product/governance/health-thresholds.json",
       "tier": "public",
-      "size": 248,
+      "size": 402,
       "type": "json"
     },
     {
