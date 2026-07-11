@@ -31,69 +31,70 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_SUDO_KEY`                   | string | no       | _undocumented_                                                                                                                                                         |
 | `KYBERION_TERMINAL_TOKEN`             | string | no       | _undocumented_                                                                                                                                                         |
 
-## path (59)
+## path (60)
 
-| Variable                                                         | Type | Required | Description                                                                        |
-| ---------------------------------------------------------------- | ---- | -------- | ---------------------------------------------------------------------------------- |
-| `KYBERION_AGENT_RUNTIME_SUPERVISOR_LOCK_PATH`                    | path | no       | _undocumented_                                                                     |
-| `KYBERION_AGENT_RUNTIME_SUPERVISOR_SOCKET_PATH`                  | path | no       | _undocumented_                                                                     |
-| `KYBERION_AGY_CLI_BIN`                                           | path | no       | _undocumented_                                                                     |
-| `KYBERION_AGY_CLI_LOG_FILE`                                      | path | no       | _undocumented_                                                                     |
-| `KYBERION_ANTIGRAVITY_CLI_BIN`                                   | path | no       | _undocumented_                                                                     |
-| `KYBERION_AUTONOMOUS_OPS_POLICY_PATH`                            | path | no       | _undocumented_                                                                     |
-| `KYBERION_CLAUDE_CLI_BIN`                                        | path | no       | Path override for the claude CLI binary.                                           |
-| `KYBERION_CODEX_CLI_BIN`                                         | path | no       | _undocumented_                                                                     |
-| `KYBERION_COMFY_OUTPUT_DIR`                                      | path | no       | _undocumented_                                                                     |
-| `KYBERION_CONFIDENTIAL_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH` | path | no       | _undocumented_                                                                     |
-| `KYBERION_CONTEXTUAL_INTENT_LEARNING_PATH`                       | path | no       | _undocumented_                                                                     |
-| `KYBERION_CONTEXTUAL_INTENT_MEMORY_PATH`                         | path | no       | _undocumented_                                                                     |
-| `KYBERION_DEPLOY_CONFIG_PATH`                                    | path | no       | _undocumented_                                                                     |
-| `KYBERION_EGRESS_POLICY_PATH`                                    | path | no       | _undocumented_                                                                     |
-| `KYBERION_GEMINI_CLI_BIN`                                        | path | no       | _undocumented_                                                                     |
-| `KYBERION_INTENT_CONTRACT_MEMORY_EXPORT_DIR`                     | path | no       | _undocumented_                                                                     |
-| `KYBERION_INTENT_CONTRACT_MEMORY_REPORT_PATH`                    | path | no       | _undocumented_                                                                     |
-| `KYBERION_INTENT_CONTRACT_MEMORY_RUNTIME_PATH`                   | path | no       | _undocumented_                                                                     |
-| `KYBERION_INTENT_CONTRACT_MEMORY_SCHEMA_PATH`                    | path | no       | _undocumented_                                                                     |
-| `KYBERION_INTENT_CONTRACT_MEMORY_SEED_PATH`                      | path | no       | _undocumented_                                                                     |
-| `KYBERION_KNOWLEDGE_ROOT`                                        | path | no       | _undocumented_                                                                     |
-| `KYBERION_MEDIA_BACKEND_REGISTRY_PATH`                           | path | no       | _undocumented_                                                                     |
-| `KYBERION_MEMORY_QUEUE_PATH`                                     | path | no       | _undocumented_                                                                     |
-| `KYBERION_MESH_HUB_OBSERVABILITY_ROOT`                           | path | no       | _undocumented_                                                                     |
-| `KYBERION_MESH_HUB_RUNTIME_ROOT`                                 | path | no       | _undocumented_                                                                     |
-| `KYBERION_OAUTH_CALLBACK_PATH`                                   | path | no       | _undocumented_                                                                     |
-| `KYBERION_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH`              | path | no       | _undocumented_                                                                     |
-| `KYBERION_PERSONAL_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH`     | path | no       | _undocumented_                                                                     |
-| `KYBERION_PERSONAL_PRESENTATION_PREFERENCE_REGISTRY_PATH`        | path | no       | _undocumented_                                                                     |
-| `KYBERION_PERSONAL_SURFACE_QUERY_CONFIG_PATH`                    | path | no       | _undocumented_                                                                     |
-| `KYBERION_PERSONAL_VOICE_PROFILE_REGISTRY_PATH`                  | path | no       | _undocumented_                                                                     |
-| `KYBERION_PRESENCE_AVATAR_PROFILES_PATH`                         | path | no       | _undocumented_                                                                     |
-| `KYBERION_PRESENTATION_PREFERENCE_REGISTRY_PATH`                 | path | no       | _undocumented_                                                                     |
-| `KYBERION_PYTHON`                                                | path | no       | Python interpreter override for python-backed bridges.                             |
-| `KYBERION_PYTHON_BIN`                                            | path | no       | Python interpreter path override (legacy alias of KYBERION_PYTHON call sites).     |
-| `KYBERION_ROOT`                                                  | path | no       | Repository root override for path resolution (defaults to the detected repo root). |
-| `KYBERION_SERVICE_ENDPOINTS_DIR`                                 | path | no       | _undocumented_                                                                     |
-| `KYBERION_SERVICE_ENDPOINTS_PATH`                                | path | no       | _undocumented_                                                                     |
-| `KYBERION_SERVICE_PRESETS_DIR`                                   | path | no       | _undocumented_                                                                     |
-| `KYBERION_SERVICE_RUNTIME_POLICY_PATH`                           | path | no       | _undocumented_                                                                     |
-| `KYBERION_SERVICE_RUNTIME_REGISTRY_PATH`                         | path | no       | _undocumented_                                                                     |
-| `KYBERION_SHELL_COMMAND_POLICY_PATH`                             | path | no       | _undocumented_                                                                     |
-| `KYBERION_SURFACE_QUERY_CONFIG_PATH`                             | path | no       | _undocumented_                                                                     |
-| `KYBERION_TASK_SCENARIO_DIR`                                     | path | no       | _undocumented_                                                                     |
-| `KYBERION_TENANT_DESIGN_ROOT`                                    | path | no       | _undocumented_                                                                     |
-| `KYBERION_TOOL_ACTUATOR_ROUTING_POLICY_PATH`                     | path | no       | _undocumented_                                                                     |
-| `KYBERION_TOOL_RUNTIME_POLICY_PATH`                              | path | no       | _undocumented_                                                                     |
-| `KYBERION_TOOL_RUNTIME_REGISTRY_PATH`                            | path | no       | _undocumented_                                                                     |
-| `KYBERION_VIDEO_COMPOSITION_TEMPLATE_REGISTRY_PATH`              | path | no       | _undocumented_                                                                     |
-| `KYBERION_VIDEO_RENDER_RUNTIME_POLICY_PATH`                      | path | no       | _undocumented_                                                                     |
-| `KYBERION_VOICE_BRIDGE_PATH`                                     | path | no       | _undocumented_                                                                     |
-| `KYBERION_VOICE_ENGINE_REGISTRY_DIR`                             | path | no       | _undocumented_                                                                     |
-| `KYBERION_VOICE_ENGINE_REGISTRY_PATH`                            | path | no       | _undocumented_                                                                     |
-| `KYBERION_VOICE_HUB_TTS_CONFIG_PATH`                             | path | no       | _undocumented_                                                                     |
-| `KYBERION_VOICE_OUTPUT_DIR`                                      | path | no       | _undocumented_                                                                     |
-| `KYBERION_VOICE_PROFILE_REGISTRY_DIR`                            | path | no       | _undocumented_                                                                     |
-| `KYBERION_VOICE_PROFILE_REGISTRY_PATH`                           | path | no       | _undocumented_                                                                     |
-| `KYBERION_VOICE_RUNTIME_POLICY_PATH`                             | path | no       | _undocumented_                                                                     |
-| `KYBERION_VOICE_SAMPLE_INGESTION_POLICY_PATH`                    | path | no       | _undocumented_                                                                     |
+| Variable                                                         | Type | Required | Description                                                                                                                   |
+| ---------------------------------------------------------------- | ---- | -------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `KYBERION_AGENT_RUNTIME_SUPERVISOR_LOCK_PATH`                    | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_AGENT_RUNTIME_SUPERVISOR_SOCKET_PATH`                  | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_AGY_CLI_BIN`                                           | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_AGY_CLI_LOG_FILE`                                      | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_ANTIGRAVITY_CLI_BIN`                                   | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_AUTONOMOUS_OPS_POLICY_PATH`                            | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_CLAUDE_CLI_BIN`                                        | path | no       | Path override for the claude CLI binary.                                                                                      |
+| `KYBERION_CODEX_CLI_BIN`                                         | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_COMFY_OUTPUT_DIR`                                      | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_CONFIDENTIAL_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH` | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_CONTEXTUAL_INTENT_LEARNING_PATH`                       | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_CONTEXTUAL_INTENT_MEMORY_PATH`                         | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_DEPLOY_CONFIG_PATH`                                    | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_EGRESS_POLICY_PATH`                                    | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_GEMINI_CLI_BIN`                                        | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_INTENT_CONTRACT_MEMORY_EXPORT_DIR`                     | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_INTENT_CONTRACT_MEMORY_REPORT_PATH`                    | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_INTENT_CONTRACT_MEMORY_RUNTIME_PATH`                   | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_INTENT_CONTRACT_MEMORY_SCHEMA_PATH`                    | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_INTENT_CONTRACT_MEMORY_SEED_PATH`                      | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_KNOWLEDGE_ROOT`                                        | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_MEDIA_BACKEND_REGISTRY_PATH`                           | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_MEMORY_QUEUE_PATH`                                     | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_MESH_HUB_OBSERVABILITY_ROOT`                           | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_MESH_HUB_RUNTIME_ROOT`                                 | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_OAUTH_CALLBACK_PATH`                                   | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH`              | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_PERSONAL_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH`     | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_PERSONAL_PRESENTATION_PREFERENCE_REGISTRY_PATH`        | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_PERSONAL_SURFACE_QUERY_CONFIG_PATH`                    | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_PERSONAL_VOICE_PROFILE_REGISTRY_PATH`                  | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_PRESENCE_AVATAR_PROFILES_PATH`                         | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_PRESENTATION_PREFERENCE_REGISTRY_PATH`                 | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_PROVIDER_HEALTH_STATE_PATH`                            | path | no       | Override for the persisted provider-health state file (default active/shared/runtime/provider-health.json). Mainly for tests. |
+| `KYBERION_PYTHON`                                                | path | no       | Python interpreter override for python-backed bridges.                                                                        |
+| `KYBERION_PYTHON_BIN`                                            | path | no       | Python interpreter path override (legacy alias of KYBERION_PYTHON call sites).                                                |
+| `KYBERION_ROOT`                                                  | path | no       | Repository root override for path resolution (defaults to the detected repo root).                                            |
+| `KYBERION_SERVICE_ENDPOINTS_DIR`                                 | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_SERVICE_ENDPOINTS_PATH`                                | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_SERVICE_PRESETS_DIR`                                   | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_SERVICE_RUNTIME_POLICY_PATH`                           | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_SERVICE_RUNTIME_REGISTRY_PATH`                         | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_SHELL_COMMAND_POLICY_PATH`                             | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_SURFACE_QUERY_CONFIG_PATH`                             | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_TASK_SCENARIO_DIR`                                     | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_TENANT_DESIGN_ROOT`                                    | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_TOOL_ACTUATOR_ROUTING_POLICY_PATH`                     | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_TOOL_RUNTIME_POLICY_PATH`                              | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_TOOL_RUNTIME_REGISTRY_PATH`                            | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_VIDEO_COMPOSITION_TEMPLATE_REGISTRY_PATH`              | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_VIDEO_RENDER_RUNTIME_POLICY_PATH`                      | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_VOICE_BRIDGE_PATH`                                     | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_VOICE_ENGINE_REGISTRY_DIR`                             | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_VOICE_ENGINE_REGISTRY_PATH`                            | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_VOICE_HUB_TTS_CONFIG_PATH`                             | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_VOICE_OUTPUT_DIR`                                      | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_VOICE_PROFILE_REGISTRY_DIR`                            | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_VOICE_PROFILE_REGISTRY_PATH`                           | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_VOICE_RUNTIME_POLICY_PATH`                             | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_VOICE_SAMPLE_INGESTION_POLICY_PATH`                    | path | no       | _undocumented_                                                                                                                |
 
 ## flag (10)
 
