@@ -8,8 +8,8 @@
 
 | 判定    | 件数 |
 | ------- | ---- |
-| DONE    | 44   |
-| PARTIAL | 47   |
+| DONE    | 45   |
+| PARTIAL | 46   |
 | TODO    | 0    |
 
 ## P0 残作業(プロダクション化のクリティカルパス)
@@ -130,7 +130,7 @@
 | ----- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | SA-01 | DONE    | (残: audit-continuity の --warn-only → enforce)                                                                                                                                                                                                               |
 | SA-02 | DONE    | 2026-07-12 再突合で DONE(execution-bounds / SECURITY.md / enforce 既定を実コード+テストで確認)                                                                                                                                                                |
-| SA-03 | PARTIAL | 2026-07-11 突合: untrusted-content.ts + テスト実在(injection 検知含む、緑)。残: 汚染文脈ゲートの適用範囲精査                                                                                                                                                  |
+| SA-03 | DONE    | 2026-07-12 精査完了: 4取り込み経路(browser content/email/slack/file)のラップ・injection 承認必須化を確認、検知時 ops-alert(dedupe 付き)を補完                                                                                                                 |
 | SA-04 | PARTIAL | 2026-07-11: warn 判定の永続化(audit chain へ記録 — 従来は in-memory のみで観測期間のデータが消失していた)+ pnpm egress:report(hostname 別集計と enforce 到達判定)。データ蓄積後に mode: enforce へ。残: tier 文脈付き egress ゲート、DNS リバインディング対策 |
 | SA-05 | DONE    | 2026-07-12 全タスク完了(dormant enforcement 根治・kill-switch 供給・承認単一判定源・統制可視化)。rapid-fire 閾値調整は trust-policy.json の運用課題                                                                                                           |
 

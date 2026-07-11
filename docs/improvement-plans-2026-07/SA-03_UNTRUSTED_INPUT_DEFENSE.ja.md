@@ -89,3 +89,11 @@
 - provider の `error` / `error_description` と成功時 `serviceId` を HTML escape し、callback HTML への script/attribute injection を防止した。
 - callback surface 全応答へ CSP と `X-Content-Type-Options: nosniff` を追加し、500画面には内部例外を表示しない。
 - provider error callback の state 必須化は既存 broker 互換性を壊すため見送り、state/PKCE 契約の統一は後続課題とする。
+
+## 実装状況 追記 (2026-07-12)
+
+**適用範囲精査を完了 — SA-03 は DONE。**
+
+- 精査結果(受入4): 主要4取り込み経路すべてが `processUntrustedContent` の枠を通ることを確認 — browser `content` 抽出(`web:<url>`)/ email 本文(email-triage)/ Slack メッセージ(channel-surface)/ file 読取(`file:<path>`)。snapshot / evaluate は機械消費(ref クリック等)のため意図的に非ラップ。
+- 受入1(provenance ラップ)/ 受入3(injection フラグ時の承認必須化 — resolveApprovalPolicy の injection-suspected override)実装済みを確認。
+- **受入2の補完(今回)**: 検知時の operator 注意喚起が logger.warn 止まりだった → dedupe 付き ops-alert(source × 日毎)を追加。audit 記録・警告ログは従来どおり。
