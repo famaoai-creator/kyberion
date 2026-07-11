@@ -39,3 +39,5 @@ if (entrypoint && modulePath === entrypoint) {
     process.exit(1);
   });
 }
+
+export { describeOps } from './op-catalog.js';
