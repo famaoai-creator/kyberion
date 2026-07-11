@@ -19,7 +19,7 @@ pnpm install && pnpm prereq:check && pnpm build && pnpm setup:report --persona f
 - Node.js `24+`（`package.json` の `engines` が正。`.nvmrc` も `24`。`nvm use` で揃えられます）
 - `pnpm`
 
-```bash
+````bash
 # 1. 物理的基盤の確立 (依存関係のインストール)
 pnpm install
 
@@ -59,7 +59,20 @@ pnpm surfaces:reconcile
 pnpm onboard
 
 `pnpm onboard` は `dist/` が必要です。`pnpm build` を先に実行してから起動してください。
-```
+
+### AI会社として開始する場合
+
+ソロプレナーがAI workforceを主な労働力として会社を始める場合は、個人オンボードの後に会社オンボードを実行します。
+
+```bash
+pnpm company:onboard --vertical saas-product-company --slug <company-slug> \
+  --name "<会社名>" --owner-id human:founder \
+  --goal "最初に達成する顧客成果" --dry-run
+````
+
+dry-runで書き込み範囲を確認してから同じコマンドを実行してください。適用後は `customer/<company-slug>/onboarding/ai-company-readiness.json` と `first-work-plan.md` を確認します。AI workerは作業を準備・実行できますが、契約、支払、外部公開、権限変更などの最終判断は `--owner-id` の人間が保持します。
+
+````
 
 ---
 
@@ -204,7 +217,7 @@ pnpm onboard
 
 ```bash
 pnpm vital
-```
+````
 
 **期待される出力例**:
 

@@ -10,6 +10,7 @@
     "Agent profiles describe capability and authority, not the organization itself.",
     "User overrides take precedence over organization defaults."
   ],
+  "accountable_human_resource_id": "human:operator",
   "mission_defaults": {
     "default_mission_class": "operations_and_release",
     "default_team_template": "default",

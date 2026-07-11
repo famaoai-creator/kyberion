@@ -46,6 +46,10 @@ export interface MissionTeamAssignment {
   required: boolean;
   status: 'assigned' | 'unfilled';
   agent_id: string | null;
+  actor_type?: 'agent' | 'human' | 'service';
+  resource?: import('./mission-team-binding.js').WorkforceResourceRef;
+  accountable_human_id?: string | null;
+  runtime_identity?: string | null;
   authority_role: string | null;
   delegation_contract: {
     ownership_scope: string;

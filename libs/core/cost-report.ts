@@ -1,4 +1,4 @@
-import { metrics } from './metrics.js';
+import { metrics, type ResourceUsageStatus } from './metrics.js';
 
 /**
  * cost-report.ts — OP-01 Task 2: aggregate the usage ledger into
@@ -20,6 +20,11 @@ export interface CostLedgerEntry {
   sdk_cost_usd?: number;
   estimated?: boolean;
   usage?: { prompt_tokens?: number; completion_tokens?: number };
+  type?: string;
+  actor_id?: string;
+  customer_id?: string;
+  cost_center?: string;
+  status?: ResourceUsageStatus;
 }
 
 export interface CostBucket {
@@ -40,6 +45,13 @@ export interface CostReport {
   by_mission: CostBucket[];
   by_model: CostBucket[];
   by_day: CostBucket[];
+  actual_usd: number;
+  committed_usd: number;
+  resource_usage_entries: number;
+  resource_usage_cost_usd: number;
+  by_actor: CostBucket[];
+  by_customer: CostBucket[];
+  by_cost_center: CostBucket[];
 }
 
 export function effectiveCostUsd(entry: CostLedgerEntry): number {
@@ -51,6 +63,10 @@ export function effectiveCostUsd(entry: CostLedgerEntry): number {
 
 function round(value: number): number {
   return Math.round(value * 100000) / 100000;
+}
+
+function statusOf(entry: CostLedgerEntry): ResourceUsageStatus {
+  return entry.status || (entry.estimated ? 'estimated' : 'actual');
 }
 
 function bucketize(
@@ -73,7 +89,7 @@ function bucketize(
       buckets.set(key, bucket);
     }
     bucket.cost_usd += cost;
-    if (entry.estimated) bucket.estimated_cost_usd += cost;
+    if (statusOf(entry) === 'estimated') bucket.estimated_cost_usd += cost;
     bucket.calls += 1;
     bucket.prompt_tokens += entry.usage?.prompt_tokens ?? 0;
     bucket.completion_tokens += entry.usage?.completion_tokens ?? 0;
@@ -95,16 +111,33 @@ export function buildCostReport(
   const untilMs = options.until ? Date.parse(options.until) : Number.POSITIVE_INFINITY;
 
   const costed: Array<{ entry: CostLedgerEntry; cost: number }> = [];
+  const resourceUsageEntries: CostLedgerEntry[] = [];
   for (const entry of entries) {
-    const cost = effectiveCostUsd(entry);
-    if (cost <= 0) continue;
     const at = Date.parse(String(entry.timestamp || ''));
     if (!Number.isFinite(at) || at < sinceMs || at > untilMs) continue;
+    if (entry.type === 'resource_usage') resourceUsageEntries.push(entry);
+    const cost = effectiveCostUsd(entry);
+    if (cost <= 0) continue;
     costed.push({ entry, cost });
   }
 
   const total = costed.reduce((sum, item) => sum + item.cost, 0);
-  const estimated = costed.reduce((sum, item) => sum + (item.entry.estimated ? item.cost : 0), 0);
+  const estimated = costed.reduce(
+    (sum, item) => sum + (statusOf(item.entry) === 'estimated' ? item.cost : 0),
+    0
+  );
+  const actual = costed.reduce(
+    (sum, item) => sum + (statusOf(item.entry) === 'actual' ? item.cost : 0),
+    0
+  );
+  const committed = costed.reduce(
+    (sum, item) => sum + (statusOf(item.entry) === 'committed' ? item.cost : 0),
+    0
+  );
+  const resourceUsageCost = resourceUsageEntries.reduce(
+    (sum, entry) => sum + effectiveCostUsd(entry),
+    0
+  );
 
   return {
     since: options.since ?? null,
@@ -117,13 +150,26 @@ export function buildCostReport(
     by_day: bucketize(costed, (entry) => String(entry.timestamp).slice(0, 10)).sort((a, b) =>
       a.key.localeCompare(b.key)
     ),
+    actual_usd: round(actual),
+    committed_usd: round(committed),
+    resource_usage_entries: resourceUsageEntries.length,
+    resource_usage_cost_usd: round(resourceUsageCost),
+    by_actor: bucketize(costed, (entry) => entry.actor_id || '(no actor)'),
+    by_customer: bucketize(costed, (entry) => entry.customer_id || '(no customer)'),
+    by_cost_center: bucketize(costed, (entry) => entry.cost_center || '(no cost center)'),
   };
 }
 
 export function buildCostReportFromHistory(
   options: { since?: string; until?: string } = {}
 ): CostReport {
-  return buildCostReport(metrics.loadHistory() as CostLedgerEntry[], options);
+  return buildCostReport(
+    [
+      ...(metrics.loadHistory() as CostLedgerEntry[]),
+      ...(metrics.loadResourceUsageHistory() as CostLedgerEntry[]),
+    ],
+    options
+  );
 }
 
 export function formatCostReport(report: CostReport, topN = 5): string[] {

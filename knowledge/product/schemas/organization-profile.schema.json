@@ -24,12 +24,21 @@
     "description": {
       "type": "string"
     },
+    "accountable_human_resource_id": {
+      "type": "string",
+      "minLength": 1
+    },
     "operating_principles": {
       "type": "array",
       "items": {
         "type": "string",
         "minLength": 1
       }
+    },
+    "accountable_human_resource_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Authenticated human resource that retains final accountability for delegated work. AI and service resources cannot be used here."
     },
     "mission_defaults": {
       "type": "object",
@@ -68,6 +77,18 @@
         "max_parallel_missions": {
           "type": "integer",
           "minimum": 1
+        }
+      }
+    },
+    "workforce": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "accountable_owner_id": { "type": "string", "minLength": 1 },
+        "resource_catalog_id": { "type": "string", "minLength": 1 },
+        "default_resource_status": {
+          "type": "string",
+          "enum": ["active", "suspended", "revoked"]
         }
       }
     },

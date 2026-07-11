@@ -6,6 +6,7 @@ import { safeExistsSync, safeReadFile, validateUrl } from './secure-io.js';
 import { evaluateEgressPolicy } from './egress-policy.js';
 import { auditChain } from './audit-chain.js';
 import { recordGovernanceAction } from './kill-switch.js';
+import { assertOperationPolicy } from './operation-policy-gate.js';
 
 /**
  * Standardized network utilities for Kyberion Components.
@@ -107,6 +108,14 @@ export async function secureFetch<T = any>(options: SecureFetchOptions): Promise
   const url = options.url || '';
   validateUrl(url, { allowLocalNetwork: kyberion_allow_local_network === true });
   const hostname = new URL(url).hostname;
+
+  // SA-05: operation-type policy gate (behavior-neutral until a rule
+  // targets network_request; throws [POLICY_BLOCKED] + audits on match).
+  assertOperationPolicy({
+    operation: 'network_request',
+    message: `Fetch ${hostname}`,
+    context: { hostname },
+  });
 
   // 1. Verify Endpoint Integrity for all requests.
   const egressDecision = evaluateEgressPolicy(url);

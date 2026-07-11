@@ -26,6 +26,7 @@ import {
 } from './promoted-memory.js';
 import { logger } from './core.js';
 import { assessMissionMemoryCandidate } from './mission-assessment.js';
+import { listInboxEntries } from './deliverable-inbox.js';
 
 type PromotedMemoryExecutionRole = 'mission_controller' | 'chronos_gateway';
 
@@ -181,6 +182,7 @@ function parseSourceRef(sourceRef: string): {
   missionId?: string;
   taskSessionId?: string;
   artifactIds?: string[];
+  deliverableId?: string;
 } {
   const trimmed = String(sourceRef || '').trim();
   if (!trimmed) return {};
@@ -194,10 +196,32 @@ function parseSourceRef(sourceRef: string): {
     const artifactId = trimmed.replace(/^artifact:/u, '').trim();
     return artifactId ? { artifactIds: [artifactId] } : {};
   }
+  if (trimmed.startsWith('deliverable:')) {
+    const deliverableId = trimmed.replace(/^deliverable:/u, '').trim();
+    return deliverableId ? { deliverableId } : {};
+  }
   if (trimmed.startsWith('heuristic:')) {
     return {};
   }
   return {};
+}
+
+function assertDeliverablePromotionReady(candidate: MemoryCandidate): void {
+  const source = parseSourceRef(candidate.source_ref);
+  if (!source.deliverableId) return;
+  const entry = listInboxEntries({ query: source.deliverableId, limit: 10 }).find(
+    (item) => item.entry_id === source.deliverableId
+  );
+  if (!entry?.acceptance_receipt || !entry.delivery_receipt) {
+    throw new Error(
+      `Memory promotion candidate ${candidate.candidate_id} requires a human acceptance and delivery receipt for ${source.deliverableId}.`
+    );
+  }
+  if (entry.acceptance_receipt.artifact_digest !== entry.delivery_receipt.artifact_digest) {
+    throw new Error(
+      `Memory promotion candidate ${candidate.candidate_id} references a deliverable with mismatched artifact receipts.`
+    );
+  }
 }
 
 function toDistillSourceType(
@@ -390,6 +414,7 @@ export async function promoteMemoryCandidateToKnowledge(input: {
       `Memory promotion candidate ${candidateId} requires evidence_refs for promotion.`
     );
   }
+  assertDeliverablePromotionReady(candidate);
 
   const review = await inspectPromotionReview(candidate);
   const baseDistillCandidate = buildDistillCandidateFromMemoryCandidate(candidate);

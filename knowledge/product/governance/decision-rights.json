@@ -15,7 +15,9 @@
         "unit": "JPY"
       },
       "requires_review_from": "ceo",
-      "escalates_to": "ceo"
+      "escalates_to": "ceo",
+      "final_decision_holder": "human",
+      "requires_human_acceptance": true
     },
     {
       "decision_type": "contract_signature",
@@ -25,7 +27,9 @@
         "value": "medium"
       },
       "requires_review_from": "ceo",
-      "escalates_to": "ceo"
+      "escalates_to": "ceo",
+      "final_decision_holder": "human",
+      "requires_human_acceptance": true
     },
     {
       "decision_type": "headcount_expansion",
@@ -35,7 +39,9 @@
         "value": 1
       },
       "requires_review_from": "ceo",
-      "escalates_to": "ceo"
+      "escalates_to": "ceo",
+      "final_decision_holder": "human",
+      "requires_human_acceptance": true
     }
   ]
 }

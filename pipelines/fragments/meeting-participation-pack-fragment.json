@@ -1,0 +1,113 @@
+{
+  "action": "pipeline",
+  "name": "meeting-participation-pack-fragment",
+  "version": "1.0.0",
+  "description": "Reusable fragment: check meeting readiness, join a meeting, listen for a short window, and leave cleanly.",
+  "context": {
+    "platform": "auto",
+    "provider": "auto",
+    "provider_profile_id": "meeting-operations-teams-pipeline-realtime",
+    "execution_profile_id": "meeting-operations-teams-pipeline-realtime",
+    "mode": "transcribe",
+    "node": "local",
+    "audio_bridge": "pulseaudio",
+    "url_policy": "explicit_only",
+    "meeting_url": "https://example.zoom.us/j/9999999999",
+    "meeting_id": "9999999999",
+    "passcode": "",
+    "listen_sec": 30,
+    "mission_id": "MSN-EXAMPLE"
+  },
+  "steps": [
+    {
+      "id": "check_meeting_status",
+      "role": "source",
+      "op": "meeting:status",
+      "produces": {
+        "channel": "meeting_status",
+        "type": "MeetingActionResult"
+      },
+      "params": {
+        "platform": "{{platform}}",
+        "provider": "{{provider}}",
+        "provider_profile_id": "{{provider_profile_id}}",
+        "execution_profile_id": "{{execution_profile_id}}",
+        "mode": "{{mode}}",
+        "node": "{{node}}",
+        "audio_bridge": "{{audio_bridge}}",
+        "url_policy": "{{url_policy}}",
+        "url": "{{meeting_url}}",
+        "meeting_id": "{{meeting_id}}",
+        "passcode": "{{passcode}}"
+      }
+    },
+    {
+      "id": "join_meeting",
+      "role": "sink",
+      "op": "meeting:join",
+      "consumes": "meeting_status",
+      "produces": {
+        "channel": "join_result",
+        "type": "MeetingActionResult"
+      },
+      "params": {
+        "platform": "{{platform}}",
+        "provider": "{{provider}}",
+        "provider_profile_id": "{{provider_profile_id}}",
+        "execution_profile_id": "{{execution_profile_id}}",
+        "mode": "{{mode}}",
+        "node": "{{node}}",
+        "audio_bridge": "{{audio_bridge}}",
+        "url_policy": "{{url_policy}}",
+        "url": "{{meeting_url}}",
+        "meeting_id": "{{meeting_id}}",
+        "passcode": "{{passcode}}"
+      }
+    },
+    {
+      "id": "listen_briefly",
+      "role": "source",
+      "op": "meeting:listen",
+      "consumes": "join_result",
+      "produces": {
+        "channel": "meeting_listen_result",
+        "type": "MeetingActionResult"
+      },
+      "params": {
+        "platform": "{{platform}}",
+        "provider": "{{provider}}",
+        "provider_profile_id": "{{provider_profile_id}}",
+        "execution_profile_id": "{{execution_profile_id}}",
+        "mode": "{{mode}}",
+        "node": "{{node}}",
+        "audio_bridge": "{{audio_bridge}}",
+        "duration_sec": "{{listen_sec}}",
+        "meeting_id": "{{meeting_id}}"
+      }
+    },
+    {
+      "id": "leave_meeting",
+      "role": "sink",
+      "op": "meeting:leave",
+      "consumes": "meeting_listen_result",
+      "params": {
+        "platform": "{{platform}}",
+        "provider": "{{provider}}",
+        "provider_profile_id": "{{provider_profile_id}}",
+        "execution_profile_id": "{{execution_profile_id}}",
+        "mode": "{{mode}}",
+        "node": "{{node}}",
+        "audio_bridge": "{{audio_bridge}}",
+        "meeting_id": "{{meeting_id}}"
+      }
+    },
+    {
+      "id": "log_meeting_pack",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "Meeting participation pack completed for {{meeting_id}} on {{platform}}."
+      }
+    }
+  ]
+}

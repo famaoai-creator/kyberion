@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { markInboxEntry } from '@agent/core';
+import { acceptInboxEntryWithHumanReceipt, markInboxEntry } from '@agent/core';
 import { requireOperatorSurfaceMutationAccess } from '../../../lib/api-guard';
 
 export async function POST(req: NextRequest) {
@@ -24,7 +24,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Missing inbox mutation payload' }, { status: 400 });
   }
 
-  const updated = markInboxEntry(entryId, status);
+  const updated =
+    status === 'accepted'
+      ? acceptInboxEntryWithHumanReceipt({
+          entryId,
+          actorId: 'human:operator-surface',
+          authenticated: true,
+          authMethod: 'surface_session',
+          responsibilityStatement: 'I accept this deliverable on behalf of the operator.',
+        })
+      : markInboxEntry(entryId, status as 'read' | 'unread');
   if (!updated) {
     return NextResponse.json({ error: 'Inbox entry not found' }, { status: 404 });
   }

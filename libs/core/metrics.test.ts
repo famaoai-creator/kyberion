@@ -98,6 +98,56 @@ describe('metrics core', () => {
     expect(history[1].type).toBe('intervention');
   });
 
+  it('records extensible resource usage with separate commitment status', () => {
+    const metricsDir = path.join(process.cwd(), 'active/shared/tmp/resource-usage-test');
+    fs.rmSync(metricsDir, { recursive: true, force: true });
+    const mc = new MetricsCollector({
+      metricsDir,
+      resourceUsageFile: 'resource.jsonl',
+      persist: true,
+    });
+
+    const record = mc.recordResourceUsage({
+      resource_kind: 'human_time',
+      actor_id: 'human:founder',
+      mission_id: 'MSN-RESOURCE-1',
+      customer_id: 'customer-acme',
+      cost_center: 'operations',
+      quantity: 1.5,
+      unit: 'hour',
+      unit_cost_usd: 100,
+      status: 'committed',
+      source: 'manual-plan',
+    });
+
+    expect(record.cost_usd).toBe(150);
+    expect(mc.loadResourceUsageHistory()).toHaveLength(1);
+    expect(mc.loadResourceUsageHistory()[0]?.status).toBe('committed');
+  });
+
+  it('rejects invalid resource usage quantities and costs', () => {
+    const mc = new MetricsCollector({ persist: false });
+    expect(() =>
+      mc.recordResourceUsage({
+        resource_kind: 'api',
+        quantity: -1,
+        unit: 'call',
+        status: 'actual',
+        source: 'test',
+      })
+    ).toThrow(/quantity/);
+    expect(() =>
+      mc.recordResourceUsage({
+        resource_kind: 'api',
+        quantity: 1,
+        unit: 'call',
+        cost_usd: Number.NaN,
+        status: 'actual',
+        source: 'test',
+      })
+    ).toThrow(/cost_usd/);
+  });
+
   it('should build reports and regressions from persisted history', () => {
     const metricsDir = path.join(process.cwd(), 'active/shared/tmp/metrics-test-report');
     fs.rmSync(metricsDir, { recursive: true, force: true });
@@ -105,11 +155,41 @@ describe('metrics core', () => {
 
     const historyPath = path.join(metricsDir, 'history.jsonl');
     const entries = [
-      { skill: 'audit-capability', duration_ms: 100, status: 'success', timestamp: '2026-03-15T00:00:00.000Z', cacheStats: { hits: 1, misses: 0 } },
-      { skill: 'audit-capability', duration_ms: 110, status: 'success', timestamp: '2026-03-15T00:01:00.000Z', cacheStats: { hits: 1, misses: 0 } },
-      { skill: 'audit-capability', duration_ms: 105, status: 'success', timestamp: '2026-03-15T00:02:00.000Z', cacheStats: { hits: 1, misses: 0 } },
-      { skill: 'audit-capability', duration_ms: 115, status: 'success', timestamp: '2026-03-15T00:03:00.000Z', cacheStats: { hits: 1, misses: 0 } },
-      { skill: 'audit-capability', duration_ms: 500, status: 'success', timestamp: '2026-03-15T00:04:00.000Z', cacheStats: { hits: 0, misses: 1 } },
+      {
+        skill: 'audit-capability',
+        duration_ms: 100,
+        status: 'success',
+        timestamp: '2026-03-15T00:00:00.000Z',
+        cacheStats: { hits: 1, misses: 0 },
+      },
+      {
+        skill: 'audit-capability',
+        duration_ms: 110,
+        status: 'success',
+        timestamp: '2026-03-15T00:01:00.000Z',
+        cacheStats: { hits: 1, misses: 0 },
+      },
+      {
+        skill: 'audit-capability',
+        duration_ms: 105,
+        status: 'success',
+        timestamp: '2026-03-15T00:02:00.000Z',
+        cacheStats: { hits: 1, misses: 0 },
+      },
+      {
+        skill: 'audit-capability',
+        duration_ms: 115,
+        status: 'success',
+        timestamp: '2026-03-15T00:03:00.000Z',
+        cacheStats: { hits: 1, misses: 0 },
+      },
+      {
+        skill: 'audit-capability',
+        duration_ms: 500,
+        status: 'success',
+        timestamp: '2026-03-15T00:04:00.000Z',
+        cacheStats: { hits: 0, misses: 1 },
+      },
     ];
     fs.writeFileSync(historyPath, `${entries.map((entry) => JSON.stringify(entry)).join('\n')}\n`);
 
@@ -138,8 +218,18 @@ describe('metrics core', () => {
 
     const historyPath = path.join(metricsDir, 'history.jsonl');
     const entries = [
-      { component: 'code-actuator', duration_ms: 1000, status: 'success', timestamp: '2026-03-15T00:00:00.000Z' },
-      { component: 'code-actuator', duration_ms: 17000, status: 'success', timestamp: '2026-03-15T00:01:00.000Z' },
+      {
+        component: 'code-actuator',
+        duration_ms: 1000,
+        status: 'success',
+        timestamp: '2026-03-15T00:00:00.000Z',
+      },
+      {
+        component: 'code-actuator',
+        duration_ms: 17000,
+        status: 'success',
+        timestamp: '2026-03-15T00:01:00.000Z',
+      },
     ];
     fs.writeFileSync(historyPath, `${entries.map((entry) => JSON.stringify(entry)).join('\n')}\n`);
 

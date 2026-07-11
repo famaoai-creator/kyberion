@@ -66,6 +66,13 @@
         },
         "escalates_to": {
           "type": "string"
+        },
+        "final_decision_holder": {
+          "type": "string",
+          "enum": ["human", "delegated"]
+        },
+        "requires_human_acceptance": {
+          "type": "boolean"
         }
       },
       "additionalProperties": false

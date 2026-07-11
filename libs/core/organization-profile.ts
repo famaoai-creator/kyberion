@@ -10,7 +10,9 @@ const ajv = new Ajv({ allErrors: true });
 const ORGANIZATION_PROFILE_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/organization-profile.schema.json'
 );
-const ORGANIZATION_PROFILE_PATH = pathResolver.knowledge('product/governance/organization-profile.json');
+const ORGANIZATION_PROFILE_PATH = pathResolver.knowledge(
+  'product/governance/organization-profile.json'
+);
 
 let organizationProfileValidateFn: ValidateFunction | null = null;
 
@@ -29,6 +31,7 @@ export interface OrganizationProfile {
   name: string;
   description?: string;
   operating_principles?: string[];
+  accountable_human_resource_id?: string;
   mission_defaults?: {
     default_mission_class?: string;
     default_team_template?: string;
@@ -59,27 +62,30 @@ function errorsFrom(validate: ValidateFunction): string[] {
   );
 }
 
-export function loadOrganizationProfile(
-  rootDir?: string,
-): OrganizationProfile | null {
+export function loadOrganizationProfile(rootDir?: string): OrganizationProfile | null {
   const customerSlug = customerResolver.activeCustomer();
-  const rootScopedCustomerPath = rootDir && customerSlug
-    ? path.join(rootDir, 'customer', customerSlug, 'organization-profile.json')
-    : null;
+  const rootScopedCustomerPath =
+    rootDir && customerSlug
+      ? path.join(rootDir, 'customer', customerSlug, 'organization-profile.json')
+      : null;
   const activeCustomerPath = customerSlug
     ? customerResolver.customerRoot('organization-profile.json')
     : null;
   const candidatePaths = [
     rootScopedCustomerPath,
     activeCustomerPath,
-    rootDir ? path.join(rootDir, 'knowledge', 'public', 'governance', 'organization-profile.json') : null,
+    rootDir
+      ? path.join(rootDir, 'knowledge', 'public', 'governance', 'organization-profile.json')
+      : null,
     ORGANIZATION_PROFILE_PATH,
   ].filter((entry): entry is string => Boolean(entry));
 
   for (const profilePath of candidatePaths) {
     if (!safeExistsSync(profilePath)) continue;
     try {
-      const parsed = JSON.parse(safeReadFile(profilePath, { encoding: 'utf8' }) as string) as OrganizationProfile;
+      const parsed = JSON.parse(
+        safeReadFile(profilePath, { encoding: 'utf8' }) as string
+      ) as OrganizationProfile;
       const validate = ensureOrganizationProfileValidator();
       if (!validate(parsed)) {
         throw new Error(`Invalid organization-profile: ${errorsFrom(validate).join('; ')}`);

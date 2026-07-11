@@ -14,6 +14,8 @@ export interface DecisionRight {
   threshold: DecisionThreshold;
   requires_review_from?: string;
   escalates_to?: string;
+  final_decision_holder?: 'human' | 'delegated';
+  requires_human_acceptance?: boolean;
 }
 
 export interface DecisionRightsMatrix {
@@ -41,6 +43,8 @@ export interface DecisionRightsEvaluation {
   thresholdValue: number | string | null;
   requiresEscalation: boolean;
   escalationReason: string | null;
+  finalDecisionHolder: 'human' | 'delegated' | null;
+  requiresHumanAcceptance: boolean;
 }
 
 const DEFAULT_DECISION_RIGHTS_PATHS = [
@@ -187,12 +191,17 @@ export function evaluateDecisionRights(
     overThreshold = inputRank > thresholdRank;
   }
 
-  const requiresEscalation = roleMismatch || overThreshold;
+  const finalDecisionHolder = matched.final_decision_holder || null;
+  const requiresHumanAcceptance =
+    matched.requires_human_acceptance === true || finalDecisionHolder === 'human';
+  const requiresEscalation = roleMismatch || overThreshold || requiresHumanAcceptance;
   const escalationReason = roleMismatch
     ? `actor role ${actorRole} is not authorized for ${decisionType}`
     : overThreshold
       ? `decision value exceeds threshold ${String(thresholdValue)}`
-      : null;
+      : requiresHumanAcceptance
+        ? 'final decision holder is human'
+        : null;
 
   return {
     decisionType,
@@ -201,5 +210,7 @@ export function evaluateDecisionRights(
     thresholdValue,
     requiresEscalation,
     escalationReason,
+    finalDecisionHolder,
+    requiresHumanAcceptance,
   };
 }

@@ -1,0 +1,96 @@
+{
+  "action": "pipeline",
+  "name": "wisdom-sdlc-pack-fragment",
+  "version": "1.0.0",
+  "description": "Reusable fragment: run the standard SDLC wisdom chain from requirements through task decomposition.",
+  "context": {
+    "mission_id": "MSN-EXAMPLE",
+    "project_name": "kyberion",
+    "source_path": "active/shared/tmp/requirements-source.md",
+    "requirements_draft_path": "active/shared/tmp/requirements-draft.json",
+    "design_spec_path": "active/shared/tmp/design-spec.json",
+    "app_id": "kyberion",
+    "must_have_ids": []
+  },
+  "steps": [
+    {
+      "id": "extract_requirements",
+      "role": "source",
+      "op": "wisdom:extract_requirements",
+      "produces": {
+        "channel": "requirements_draft",
+        "type": "RequirementsDraft"
+      },
+      "params": {
+        "mission_id": "{{mission_id}}",
+        "project_name": "{{project_name}}",
+        "source_path": "{{source_path}}"
+      }
+    },
+    {
+      "id": "extract_design_spec",
+      "role": "source",
+      "op": "wisdom:extract_design_spec",
+      "consumes": "requirements_draft",
+      "produces": {
+        "channel": "design_spec",
+        "type": "DesignSpec"
+      },
+      "params": {
+        "mission_id": "{{mission_id}}",
+        "project_name": "{{project_name}}",
+        "requirements_draft_path": "{{requirements_draft_path}}"
+      }
+    },
+    {
+      "id": "extract_test_plan",
+      "role": "source",
+      "op": "wisdom:extract_test_plan",
+      "consumes": "design_spec",
+      "produces": {
+        "channel": "test_plan",
+        "type": "TestPlan"
+      },
+      "params": {
+        "mission_id": "{{mission_id}}",
+        "project_name": "{{project_name}}",
+        "app_id": "{{app_id}}",
+        "requirements_draft_path": "{{requirements_draft_path}}",
+        "design_spec_path": "{{design_spec_path}}"
+      }
+    },
+    {
+      "id": "decompose_into_tasks",
+      "role": "source",
+      "op": "wisdom:decompose_into_tasks",
+      "consumes": "design_spec",
+      "produces": {
+        "channel": "task_plan",
+        "type": "TaskPlan"
+      },
+      "params": {
+        "mission_id": "{{mission_id}}",
+        "project_name": "{{project_name}}",
+        "requirements_draft_path": "{{requirements_draft_path}}",
+        "design_spec_path": "{{design_spec_path}}"
+      }
+    },
+    {
+      "id": "evaluate_task_plan_ready",
+      "role": "gate",
+      "op": "wisdom:evaluate_task_plan_ready",
+      "consumes": "task_plan",
+      "params": {
+        "mission_id": "{{mission_id}}"
+      }
+    },
+    {
+      "id": "log_wisdom_pack",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "Wisdom SDLC pack completed for {{project_name}}."
+      }
+    }
+  ]
+}

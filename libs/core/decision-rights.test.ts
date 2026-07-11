@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { resolveDecisionRightsMatrix } from './decision-rights.js';
+import { evaluateDecisionRights, resolveDecisionRightsMatrix } from './decision-rights.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 
@@ -83,5 +83,30 @@ describe('decision-rights', () => {
     expect(matrix.source_kind).toBe('public');
     expect(matrix.company_id).toBe('missing');
     expect(matrix.decisions).toHaveLength(0);
+  });
+
+  it('requires human acceptance even when a decision is within its threshold', () => {
+    const evaluation = evaluateDecisionRights(
+      {
+        version: '1.0.0',
+        company_id: 'default',
+        tenant_slug: null,
+        source_kind: 'public',
+        source_path: 'decision-rights.json',
+        decisions: [
+          {
+            decision_type: 'contract_signature',
+            authorized_role: 'legal_strategist',
+            threshold: { metric: 'risk_level', value: 'medium' },
+            final_decision_holder: 'human',
+          },
+        ],
+      },
+      { decisionType: 'contract_signature', actorRole: 'legal_strategist', riskLevel: 'low' }
+    );
+
+    expect(evaluation?.requiresHumanAcceptance).toBe(true);
+    expect(evaluation?.requiresEscalation).toBe(true);
+    expect(evaluation?.escalationReason).toBe('final decision holder is human');
   });
 });

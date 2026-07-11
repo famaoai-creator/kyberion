@@ -67,6 +67,14 @@ export interface CeoSurfaceSummary {
   approval_queue: CeoApprovalItem[];
   outcome_feed: CeoOutcomeItem[];
   exception_feed: CeoExceptionItem[];
+  workforce?: OperatorHomeSummary['workforceSummary'];
+  action_queue?: OperatorHomeSummary['actionQueue'];
+  runway?: {
+    total_usd: number;
+    budget_usd?: number;
+    remaining_usd?: number | null;
+    over_budget: boolean;
+  };
 }
 
 const MISSION_STATUS_JA: Record<string, string> = {
@@ -182,6 +190,16 @@ export function composeCeoSurfaceSummary(input: {
     approval_queue: approvalQueue,
     outcome_feed: outcomeFeed,
     exception_feed: exceptionFeed,
+    workforce: home.workforceSummary,
+    action_queue: home.actionQueue,
+    runway: {
+      total_usd: home.costSummary.totalUsd,
+      ...(home.costSummary.budgetUsd !== undefined
+        ? { budget_usd: home.costSummary.budgetUsd }
+        : {}),
+      remaining_usd: home.costSummary.remainingUsd,
+      over_budget: home.costSummary.overBudget,
+    },
   };
 }
 

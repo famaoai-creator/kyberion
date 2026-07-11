@@ -1,0 +1,91 @@
+{
+  "action": "pipeline",
+  "name": "service-reachability-smoke-fragment",
+  "version": "1.0.0",
+  "description": "Reusable fragment: hit a small set of governed service presets to confirm external reachability and preset wiring.",
+  "context": {
+    "comfyui_output_dir": "active/shared/tmp/comfyui",
+    "meeting_platform": "darwin"
+  },
+  "steps": [
+    {
+      "id": "check_comfyui_stats",
+      "role": "source",
+      "op": "service:preset",
+      "produces": {
+        "channel": "comfyui_stats",
+        "type": "ServiceResult"
+      },
+      "params": {
+        "service_id": "comfyui",
+        "action": "get_stats"
+      }
+    },
+    {
+      "id": "check_comfyui_queue",
+      "role": "source",
+      "op": "service:preset",
+      "produces": {
+        "channel": "comfyui_queue",
+        "type": "ServiceResult"
+      },
+      "params": {
+        "service_id": "comfyui",
+        "action": "get_queue"
+      }
+    },
+    {
+      "id": "check_comfyui_history",
+      "role": "source",
+      "op": "service:preset",
+      "produces": {
+        "channel": "comfyui_history",
+        "type": "ServiceResult"
+      },
+      "params": {
+        "service_id": "comfyui",
+        "action": "get_history"
+      }
+    },
+    {
+      "id": "check_comfyui_outputs",
+      "role": "source",
+      "op": "service:preset",
+      "produces": {
+        "channel": "comfyui_outputs",
+        "type": "ServiceResult"
+      },
+      "params": {
+        "service_id": "comfyui",
+        "action": "list_outputs",
+        "params": {
+          "output_dir": "{{comfyui_output_dir}}"
+        }
+      }
+    },
+    {
+      "id": "check_meeting_status",
+      "role": "source",
+      "op": "service:preset",
+      "produces": {
+        "channel": "meeting_status",
+        "type": "ServiceResult"
+      },
+      "params": {
+        "service_id": "meeting",
+        "action": "status",
+        "params": {
+          "platform": "{{meeting_platform}}"
+        }
+      }
+    },
+    {
+      "id": "log_reachability",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "Service reachability smoke completed for comfyui and meeting."
+      }
+    }
+  ]
+}

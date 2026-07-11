@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/resource-usage.schema.json",
+  "title": "Resource Usage Ledger Record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "type",
+    "usage_id",
+    "timestamp",
+    "resource_kind",
+    "quantity",
+    "unit",
+    "cost_usd",
+    "status",
+    "source"
+  ],
+  "properties": {
+    "type": { "const": "resource_usage" },
+    "usage_id": { "type": "string", "minLength": 1 },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "resource_kind": {
+      "type": "string",
+      "enum": ["llm", "api", "compute", "saas", "human_time", "other"]
+    },
+    "actor_id": { "type": "string", "minLength": 1 },
+    "mission_id": { "type": "string", "minLength": 1 },
+    "customer_id": { "type": "string", "minLength": 1 },
+    "cost_center": { "type": "string", "minLength": 1 },
+    "quantity": { "type": "number", "minimum": 0 },
+    "unit": { "type": "string", "minLength": 1 },
+    "unit_cost_usd": { "type": "number", "minimum": 0 },
+    "cost_usd": { "type": "number", "minimum": 0 },
+    "status": { "type": "string", "enum": ["actual", "estimated", "committed"] },
+    "source": { "type": "string", "minLength": 1 },
+    "metadata": { "type": "object", "additionalProperties": true }
+  }
+}

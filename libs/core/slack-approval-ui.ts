@@ -1,6 +1,10 @@
 import { randomUUID } from 'node:crypto';
 
-import { createApprovalRequest, decideApprovalRequest, loadApprovalRequest } from './approval-store.js';
+import {
+  createApprovalRequest,
+  decideApprovalRequest,
+  loadApprovalRequest,
+} from './approval-store.js';
 import { appendGovernedArtifactJsonl } from './artifact-store.js';
 
 import type {
@@ -10,12 +14,16 @@ import type {
 } from './channel-surface-types.js';
 
 function emitSlackApprovalEvent(event: Record<string, unknown>): string {
-  return appendGovernedArtifactJsonl('slack_bridge', 'active/shared/observability/channels/slack/approvals.jsonl', {
-    ts: new Date().toISOString(),
-    event_id: randomUUID(),
-    channel: 'slack',
-    ...event,
-  });
+  return appendGovernedArtifactJsonl(
+    'slack_bridge',
+    'active/shared/observability/channels/slack/approvals.jsonl',
+    {
+      ts: new Date().toISOString(),
+      event_id: randomUUID(),
+      channel: 'slack',
+      ...event,
+    }
+  );
 }
 
 export function createSlackApprovalRequest(params: {
@@ -63,15 +71,17 @@ export function buildSlackApprovalBlocks(record: SlackApprovalRequestRecord): an
       },
     },
     ...(record.details
-      ? [{
-          type: 'context',
-          elements: [
-            {
-              type: 'mrkdwn',
-              text: `Details: ${record.details}`,
-            },
-          ],
-        }]
+      ? [
+          {
+            type: 'context',
+            elements: [
+              {
+                type: 'mrkdwn',
+                text: `Details: ${record.details}`,
+              },
+            ],
+          },
+        ]
       : []),
     {
       type: 'context',
@@ -90,14 +100,20 @@ export function buildSlackApprovalBlocks(record: SlackApprovalRequestRecord): an
           style: 'primary',
           text: { type: 'plain_text', text: 'Approve' },
           action_id: 'slack_approval_decide',
-          value: JSON.stringify({ requestId: record.id, decision: 'approved' satisfies SlackApprovalActionPayload['decision'] }),
+          value: JSON.stringify({
+            requestId: record.id,
+            decision: 'approved' satisfies SlackApprovalActionPayload['decision'],
+          }),
         },
         {
           type: 'button',
           style: 'danger',
           text: { type: 'plain_text', text: 'Reject' },
           action_id: 'slack_approval_decide',
-          value: JSON.stringify({ requestId: record.id, decision: 'rejected' satisfies SlackApprovalActionPayload['decision'] }),
+          value: JSON.stringify({
+            requestId: record.id,
+            decision: 'rejected' satisfies SlackApprovalActionPayload['decision'],
+          }),
         },
       ],
     },
@@ -113,12 +129,18 @@ export function applySlackApprovalDecision(params: {
   decision: 'approved' | 'rejected';
   decidedBy: string;
 }): SlackApprovalRequestRecord {
+  const record = loadApprovalRequest('slack', params.requestId);
+  if (!record) throw new Error(`Approval request not found: slack/${params.requestId}`);
   const updated = decideApprovalRequest('slack_bridge', {
     channel: 'slack',
     storageChannel: 'slack',
     requestId: params.requestId,
     decision: params.decision,
     decidedBy: params.decidedBy,
+    decidedByType: 'human',
+    authenticated: true,
+    payloadHash: record.accountability?.payloadHash,
+    effectBinding: record.accountability?.effectBinding,
   });
   emitSlackApprovalEvent({
     correlation_id: updated.correlationId,

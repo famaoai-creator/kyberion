@@ -1172,6 +1172,10 @@ app.post('/api/approvals/:requestId/decision', (req, res) => {
       decidedBy: 'presence-studio',
       decidedByRole: 'sovereign',
       authMethod: 'surface_session',
+      decidedByType: 'human',
+      authenticated: true,
+      payloadHash: record.accountability?.payloadHash,
+      effectBinding: record.accountability?.effectBinding,
       note: 'Decision captured from Presence Studio approval inbox.',
     });
     logger.info(
