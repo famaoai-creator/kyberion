@@ -19,6 +19,7 @@
  */
 
 import { spawn, spawnSync } from 'node:child_process';
+import { childDelegationEnv } from './operation-policy-gate.js';
 import { z, type ZodType } from 'zod';
 import { logger } from './core.js';
 import type {
@@ -488,7 +489,8 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
     return new Promise((resolve, reject) => {
       const child = spawn(this.bin, args, {
         stdio: ['pipe', 'pipe', 'pipe'],
-        env: { ...process.env },
+        // SA-05: the spawned CLI is one delegation hop deeper than us.
+        env: { ...process.env, ...childDelegationEnv() },
       });
       let stdout = '';
       let stderr = '';

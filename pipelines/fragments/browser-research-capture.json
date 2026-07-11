@@ -1,0 +1,49 @@
+{
+  "action": "pipeline",
+  "name": "browser-research-capture-fragment",
+  "version": "1.0.0",
+  "description": "Reusable fragment: open a browser target, capture a snapshot, and stage the output for follow-up analysis.",
+  "context": {
+    "target_url": "https://example.com",
+    "snapshot_path": "active/shared/tmp/browser-research-capture.png",
+    "mission_id": "MSN-EXAMPLE"
+  },
+  "steps": [
+    {
+      "id": "visit_target",
+      "role": "sink",
+      "op": "browser:goto",
+      "params": {
+        "url": "{{target_url}}"
+      }
+    },
+    {
+      "id": "capture_snapshot",
+      "role": "source",
+      "op": "browser:snapshot",
+      "produces": {
+        "channel": "browser_snapshot",
+        "type": "SnapshotResult"
+      },
+      "params": {}
+    },
+    {
+      "id": "persist_snapshot",
+      "role": "sink",
+      "op": "file:write",
+      "consumes": "browser_snapshot",
+      "params": {
+        "path": "{{snapshot_path}}",
+        "content": "{{browser_snapshot}}"
+      }
+    },
+    {
+      "id": "log_capture",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "Captured browser snapshot for {{target_url}} at {{snapshot_path}}"
+      }
+    }
+  ]
+}

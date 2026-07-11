@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
+  acceptInboxEntryWithHumanReceipt: vi.fn(),
   markInboxEntry: vi.fn(),
 }));
 
 vi.mock('@agent/core', () => ({
+  acceptInboxEntryWithHumanReceipt: mocks.acceptInboxEntryWithHumanReceipt,
   markInboxEntry: mocks.markInboxEntry,
 }));
 
@@ -12,7 +14,7 @@ import { POST } from './route.js';
 
 describe('operator-surface inbox route', () => {
   it('marks inbox entries as accepted via form data', async () => {
-    mocks.markInboxEntry.mockReturnValue({
+    mocks.acceptInboxEntryWithHumanReceipt.mockReturnValue({
       entry_id: 'INBOX-1',
       status: 'accepted',
     });
@@ -26,6 +28,12 @@ describe('operator-surface inbox route', () => {
     );
 
     expect(response.status).toBe(303);
-    expect(mocks.markInboxEntry).toHaveBeenCalledWith('INBOX-1', 'accepted');
+    expect(mocks.acceptInboxEntryWithHumanReceipt).toHaveBeenCalledWith({
+      entryId: 'INBOX-1',
+      actorId: 'human:operator-surface',
+      authenticated: true,
+      authMethod: 'surface_session',
+      responsibilityStatement: 'I accept this deliverable on behalf of the operator.',
+    });
   });
 });

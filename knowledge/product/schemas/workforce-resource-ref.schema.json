@@ -1,0 +1,51 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/workforce-resource-ref.schema.json",
+  "title": "Workforce Resource Reference",
+  "description": "Actor-neutral reference for a human, AI agent, or service resource.",
+  "type": "object",
+  "required": [
+    "resource_id",
+    "resource_type",
+    "display_name",
+    "authority_roles",
+    "capabilities",
+    "availability",
+    "cost_profile",
+    "status",
+    "accountable_human_id"
+  ],
+  "properties": {
+    "resource_id": { "type": "string", "minLength": 1 },
+    "resource_type": { "type": "string", "enum": ["human", "agent", "service"] },
+    "display_name": { "type": "string", "minLength": 1 },
+    "authority_roles": { "type": "array", "items": { "type": "string" } },
+    "capabilities": { "type": "array", "items": { "type": "string" } },
+    "availability": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "cost_profile": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "status": { "type": "string", "enum": ["active", "suspended", "revoked"] },
+    "accountable_human_id": { "type": ["string", "null"] },
+    "provider": { "type": ["string", "null"] },
+    "model_id": { "type": ["string", "null"] },
+    "runtime_identity": { "type": ["string", "null"] }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "resource_type": { "enum": ["agent", "service"] } }
+      },
+      "then": {
+        "properties": {
+          "accountable_human_id": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  ],
+  "additionalProperties": false
+}

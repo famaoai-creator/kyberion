@@ -47,6 +47,7 @@ import {
   createDistillCandidateRecord,
   createNextActionContract,
   decideApprovalRequest,
+  loadApprovalRequest,
   enqueueSurfaceNotification,
   emitChannelSurfaceEvent,
   emitMissionOrchestrationObservation,
@@ -1847,6 +1848,10 @@ export async function POST(req: NextRequest) {
       if (!requestId || !storageChannel || !channel || !decision) {
         return NextResponse.json({ error: 'Missing approval decision payload' }, { status: 400 });
       }
+      const approvalRecord = loadApprovalRequest(storageChannel, requestId);
+      if (!approvalRecord) {
+        return NextResponse.json({ error: 'Approval request not found' }, { status: 404 });
+      }
       const updated = decideApprovalRequest('chronos_localadmin', {
         channel,
         storageChannel,
@@ -1855,6 +1860,10 @@ export async function POST(req: NextRequest) {
         decidedBy: 'chronos-localadmin',
         decidedByRole: 'sovereign',
         authMethod: 'surface_session',
+        decidedByType: 'human',
+        authenticated: true,
+        payloadHash: approvalRecord.accountability?.payloadHash,
+        effectBinding: approvalRecord.accountability?.effectBinding,
         note: 'Decision captured from Chronos approval panel.',
       });
       enqueueSurfaceNotification({

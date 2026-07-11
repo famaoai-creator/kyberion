@@ -64,4 +64,47 @@ describe('buildCostReport', () => {
     expect(lines[0]).toContain('estimated');
     expect(lines.join('\n')).toContain('MSN-A');
   });
+
+  it('separates actual, estimated, and committed resource usage by owner dimensions', () => {
+    const report = buildCostReport([
+      entry({
+        type: 'resource_usage',
+        resource_kind: 'api',
+        actor_id: 'agent:ops',
+        mission_id: 'MSN-R',
+        customer_id: 'ACME',
+        cost_center: 'sales',
+        cost_usd: 2,
+        status: 'actual',
+      }),
+      entry({
+        type: 'resource_usage',
+        resource_kind: 'saas',
+        actor_id: 'service:crm',
+        mission_id: 'MSN-R',
+        customer_id: 'ACME',
+        cost_center: 'sales',
+        cost_usd: 5,
+        status: 'committed',
+      }),
+      entry({
+        type: 'resource_usage',
+        resource_kind: 'compute',
+        actor_id: 'agent:ops',
+        customer_id: 'ACME',
+        cost_usd: 1,
+        status: 'estimated',
+      }),
+    ]);
+
+    expect(report.total_usd).toBe(8);
+    expect(report.actual_usd).toBe(2);
+    expect(report.estimated_usd).toBe(1);
+    expect(report.committed_usd).toBe(5);
+    expect(report.resource_usage_entries).toBe(3);
+    expect(report.resource_usage_cost_usd).toBe(8);
+    expect(report.by_actor.find((bucket) => bucket.key === 'agent:ops')?.cost_usd).toBe(3);
+    expect(report.by_customer[0]?.key).toBe('ACME');
+    expect(report.by_cost_center[0]?.key).toBe('sales');
+  });
 });

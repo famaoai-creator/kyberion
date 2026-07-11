@@ -50,6 +50,7 @@ const allowedCoreFsImports = [
   'libs/core/src/pfc/PfcController.test.ts',
   'libs/core/src/pfc/SovereignSentinel.test.ts',
   'libs/core/src/pipeline-engine.test.ts',
+  'libs/core/src/pipeline-fragments-catalog.test.ts',
   'libs/core/src/pipeline-preview.test.ts',
   'libs/core/src/trace.test.ts',
   'libs/core/storage-janitor.test.ts',
