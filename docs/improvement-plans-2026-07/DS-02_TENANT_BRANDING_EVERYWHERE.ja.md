@@ -75,3 +75,12 @@
 - chronos-mirror-v2 に `app/api/tenant-design` を追加し、URL の tenant 文脈から request-scoped に css_vars を取得できるようにした。
 - `presence/displays/chronos-mirror-v2/src/app/page.tsx` で tenant css_vars をローカル state に合成し、global theme は維持しつつ tenant 文脈の画面だけ反映するようにした。
 - `presence/displays/chronos-mirror-v2/src/app/api/tenant-design/route.test.ts` で tenant あり / default の応答を固定した。
+
+## 実装状況 追記 (2026-07-12)
+
+**受入条件4(tier 隔離)を固定し DS-02 は DONE。**
+
+- 再突合: 受入1(共有 resolver + media リファクタ)/ 受入2(chronos `/api/tenant-design` → css_vars)/ 受入3(video-content-brief-contract が resolver 参照)は実装済み。
+- **発見・修正**: chronos の `/api/tenant-design` に他 API と同じ `guardRequest` が**入っておらず**、未認証で confidential ブランド値を照会できた → ガード追加。
+- **隔離テスト3本**: 無文脈解決は default(confidential 値が結果に一切含まれない)/ 他テナント文脈へのフォールスルー無し / 一致文脈のみ tenant 解決。
+- `docs/developer/design/DESIGN_SYSTEM.md` に Tenant Branding 節を追記(オンボード手順込み)。
