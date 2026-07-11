@@ -1,4 +1,5 @@
 import express from 'express';
+import { installProcessGuards } from '@agent/core';
 import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
@@ -80,6 +81,9 @@ import {
   resolveEmailTriagePath,
 } from '@agent/core/email-workflow';
 import { collectDoctorReport } from '../../../scripts/run_doctor.js';
+
+// IP-08 Task 6: record unhandled rejections/exceptions in this long-lived process.
+installProcessGuards('presence-studio');
 
 type Client = express.Response;
 

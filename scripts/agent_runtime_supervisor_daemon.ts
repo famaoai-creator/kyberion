@@ -26,6 +26,10 @@ import {
   stopAgentRuntime,
 } from '@agent/core';
 import type { TaskModelHint } from '@agent/core/reasoning-model-routing';
+import { installProcessGuards } from '@agent/core';
+
+// IP-08 Task 6: record unhandled rejections/exceptions in this long-lived process.
+installProcessGuards('agent-runtime-supervisor');
 
 type SupervisorMethod =
   | 'health'
