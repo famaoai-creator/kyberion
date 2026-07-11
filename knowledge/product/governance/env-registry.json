@@ -907,6 +907,15 @@
       "documented": false
     },
     {
+      "name": "KYBERION_MANIFEST_SIGNING_KEY",
+      "category": "secret",
+      "type": "string",
+      "required": false,
+      "description": "HMAC-SHA256 key for environment manifest signatures. When set, loadEnvironmentManifest enforces valid signatures fail-closed; sign manifests with pnpm manifests:sign.",
+      "documented": true,
+      "subsystem": "governance"
+    },
+    {
       "name": "KYBERION_MEDIA_BACKEND_REGISTRY_PATH",
       "category": "path",
       "type": "path",

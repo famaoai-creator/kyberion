@@ -840,11 +840,13 @@ export { MissionEvidenceDoc } from './mission-evidence-doc.js';
 export type { MissionEvidenceDocOptions } from './mission-evidence-doc.js';
 export {
   bootstrapManifest,
+  computeManifestSignature,
   loadEnvironmentManifest,
   listEnvironmentManifestIds,
   probeManifest,
   registerEnvironmentCapabilityProbe,
   resetEnvironmentCapabilityProbeRegistry,
+  verifyManifestSignature,
   verifyReady,
 } from './environment-capability.js';
 export { installCoreEnvironmentProbes } from './environment-capability-probes.js';
