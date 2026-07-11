@@ -8,8 +8,8 @@
 
 | 判定    | 件数 |
 | ------- | ---- |
-| DONE    | 39   |
-| PARTIAL | 52   |
+| DONE    | 41   |
+| PARTIAL | 50   |
 | TODO    | 0    |
 
 ## P0 残作業(プロダクション化のクリティカルパス)
@@ -26,8 +26,8 @@
 | AR-01 | PARTIAL | 2026-07-12: ループ全廃 + エンジン一本化 + Task 3/4 完了 + run_pipeline 意味論パリティ(budget 執行・step on_error)。golden 緑。残: run_pipeline ループの機械的委譲(意味論分岐は解消済み、性能/保守リファクタ扱い)                                                                                                                                                                                                                                                                                          |
 | AR-02 | PARTIAL | describeOps、op-discovery に input_schema 反映、未知 op の apply 既定撤廃(check:op-registry は 2026-07-11 に修復し validate/CI へ接続済み)                                                                                                                                                                                                                                                                                                                                                                |
 | AO-02 | PARTIAL | 2026-07-11: scan/台帳/ルーブリック実装済み + §3.3 unit test + 適用フロー(propose 既定・--apply で backup→bump→install/typecheck/smoke→再スキャン→確定/ロールバック)。カナリアも 2026-07-11 接続済み(確定後に runDegradationWatch、台帳へ verdict 記録)→ AO-02 は全タスク完了。透過依存は 2026-07-11 に --override(pnpm.overrides 経由、明示オプトイン)で対応済み。日次スキャンは pipelines/dependency-vuln-scan.json の cron(JST 5:00)で配線済み・実走確認済み。Task 4 defer 再評価は 2026-07-11 実装済み |
-| IL-01 | PARTIAL | 2026-07-11 突合: outcome-contract.ts に intentGoal 貫通が実装済み(IL-01 注記付き、テスト緑)。残: 全 seam の網羅精査                                                                                                                                                                                                                                                                                                                                                                                       |
-| IL-04 | PARTIAL | intent-reconciliation エンジン、完了ゲート、学習記録                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| IL-01 | DONE    | 2026-07-12 完了: 全 seam 精査(mission 昇格2経路 / task_session / state 永続化 / フォールバック実装済み確認)+ 唯一のギャップだった pipeline 経路を実装(run_pipeline --context へ intent_goal 貫通、テスト3本)                                                                                                                                                                                                                                                                                              |
+| IL-04 | DONE    | 2026-07-12 再突合で DONE: 突合エンジン・完了ゲート(task-session + mission finish)・全 shape クロージング(direct_reply 含む)・学習記録すべて実装済み、テスト21本緑                                                                                                                                                                                                                                                                                                                                         |
 
 ## 全計画一覧
 
@@ -157,10 +157,10 @@
 
 | ID    | 状態    | 残作業                                                                                              |
 | ----- | ------- | --------------------------------------------------------------------------------------------------- |
-| IL-01 | PARTIAL | outcome-contract の goal 貫通は実装済み(2026-07-11 突合)。残: 全 seam 網羅精査                      |
+| IL-01 | DONE    | 2026-07-12 完了(pipeline seam 実装で全 seam 貫通)                                                   |
 | IL-02 | PARTIAL | 2026-07-11 突合: scripts/intent_trace.ts(pnpm intent:trace)実在。残: 相関 ID の全経路貫通精査       |
 | IL-03 | PARTIAL | 2026-07-11 突合: intent-delta.ts(goalSimilarity 起点比較)+ テスト実在・緑。残: 実行中ドリフトゲート |
-| IL-04 | PARTIAL | intent-reconciliation エンジン、完了ゲート、学習記録                                                |
+| IL-04 | DONE    | 2026-07-12 再突合で DONE(全受入条件が実装・テスト済みだった)                                        |
 | IL-05 | PARTIAL | 2026-07-11 突合: pending-intent-store.ts + テスト実在・緑。残: 修正検知/completed 再オープンの精査  |
 
 ### ONB(初回オンボーディング)
