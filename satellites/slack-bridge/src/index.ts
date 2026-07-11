@@ -4,6 +4,7 @@ import { installProcessGuards } from '@agent/core';
 // IP-08 Task 6: record unhandled rejections/exceptions in this long-lived process.
 installProcessGuards('slack-bridge');
 import {
+  resolveOperatorLocale,
   logger,
   pathResolver,
   emitChannelSurfaceEvent,
@@ -500,7 +501,7 @@ async function start() {
       await client.chat.postMessage({
         channel: message.channel,
         thread_ts: threadTs,
-        text: buildBridgeEmptyReplyText({ locale: 'ja' }),
+        text: buildBridgeEmptyReplyText({ locale: resolveOperatorLocale() }),
       });
     } catch (err: any) {
       logger.error(`❌ [SlackBridge] Ingestion failed: ${err.message}`);
@@ -509,7 +510,7 @@ async function start() {
         conversationKey: `slack:${message.channel}:${threadTs}`,
         err,
         surface: 'slack',
-        locale: 'ja',
+        locale: resolveOperatorLocale(),
         post: (text) =>
           client.chat.postMessage({ channel: message.channel, thread_ts: threadTs, text }),
       });
