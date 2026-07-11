@@ -7,6 +7,7 @@ import { pathToFileURL } from 'node:url';
 installProcessGuards('telegram-bridge');
 
 import {
+  resolveOperatorLocale,
   createStandardYargs,
   startBridgeTypingLoop,
   logger,
@@ -416,7 +417,7 @@ export async function handleTelegramUpdate(
       conversationKey: `telegram:${chatId}:${threadTs}`,
       err,
       surface: 'telegram',
-      locale: 'ja',
+      locale: resolveOperatorLocale(),
       post: (errorText) => sendTelegramMessage({ chatId, text: errorText }, options),
     });
     return {
@@ -447,7 +448,7 @@ export async function handleTelegramUpdate(
   } else {
     // UX-01: an empty agent reply must not read as silence.
     reply = await sendTelegramMessage(
-      { chatId, text: buildBridgeEmptyReplyText({ locale: 'ja' }) },
+      { chatId, text: buildBridgeEmptyReplyText({ locale: resolveOperatorLocale() }) },
       options
     );
   }

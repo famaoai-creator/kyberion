@@ -69,3 +69,8 @@
 
 - `libs/core/question-resolver.ts` の固定英語文を `knowledge/product/orchestration/user-facing-vocabulary.json` の `question_*` キー経由に置換した。
 - `question-resolver.test.ts` に ja/en の期待値を追加し、明確化質問のロケール差分を固定した。
+
+## 実装状況 追記 (2026-07-12)
+
+- **locale-resolver 一元化完了**: `resolveOperatorLocale()`(operator-identity.ts)— 優先順 `KYBERION_LOCALE` env → onboarding identity の language(my-identity.json)→ fallback(ja)。4ブリッジの empty-reply / エラー応答と surface orchestrator の clarification packet のハードコード 'ja' 既定(計9箇所)を resolver 経由に置換。identity の language が english のオペレータは全ブリッジ応答が自動的に en へ。
+- 残: onboarding/cli help の ja/en 化(文言表)、chronos 言語トグル。
