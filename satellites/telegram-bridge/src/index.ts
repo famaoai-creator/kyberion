@@ -1,6 +1,10 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
+import { installProcessGuards } from '@agent/core';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
+
+// IP-08 Task 6: record unhandled rejections/exceptions in this long-lived process.
+installProcessGuards('telegram-bridge');
 
 import {
   createStandardYargs,
