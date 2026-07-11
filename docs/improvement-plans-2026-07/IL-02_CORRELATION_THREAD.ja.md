@@ -50,3 +50,10 @@
 - 相関 ID の貫通は多数のモジュールを横断する薄い変更の集合で、AA-05・SA-01・統一 Trace と接触する。**フィールド追加のみ**を厳守し、これらの計画と相関キー名を統一(`correlation_id`)しておく(各計画の該当箇所に相互参照を明記)。
 - 既存ミッション・memory には相関 ID が無い。trace コマンドは「相関 ID あり=フル結合、なし=部分表示」で degrade する。
 - confidential 発話が trace 出力・memory に生で残らないよう、格納は参照(snapshot ref)ベースにし、本文は tier 保護領域に留める。
+
+## 実装状況 追記 (2026-07-12)
+
+**全経路貫通精査を完了 — IL-02 は DONE。**
+
+- 精査結果(貫通済みを確認): 4ブリッジの相関 ID 発行(`<surface>-<msgId>`)→ surface orchestrator → intent-handoff → mission-creation(state の correlation_id / traceRef)→ task-session → a2a-bridge(`resolveCorrelationId` + イベント伝搬)→ mission worker(correlation/causation 13箇所)。audit-chain は `correlationId` フィールド + metadata フォールバックを実装済み、`pnpm intent:trace` は audit エントリを含む時系列を出力(受入2/3/4 実装済み)。
+- **修正した唯一のギャップ**: a2a-bridge のセキュリティ監査3種(署名不正 / 無署名 / 未知送信者)が `correlationId` を渡していなかった → envelope の correlation_id を貫通(bridge テスト13本緑)。
