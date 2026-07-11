@@ -53,6 +53,13 @@
       "base_url": "https://{{host}}.com/api/v4",
       "preset_path": "knowledge/product/orchestration/service-presets/gitlab.json"
     },
+    "gemini": {
+      "base_url": "https://generativelanguage.googleapis.com/v1beta",
+      "preset_path": "knowledge/product/orchestration/service-presets/gemini.json",
+      "credential_suffixes": {
+        "accessToken": ["API_KEY"]
+      }
+    },
     "google-maps": {
       "preset_path": "knowledge/product/orchestration/service-presets/google-maps.json"
     },
