@@ -1,6 +1,7 @@
 import {
   TraceContext,
   finalizeAndPersist,
+  persistTrace,
   classifyError,
   formatClassification,
   logger,
@@ -85,6 +86,82 @@ function runTsFallbackPipeline(fallbackPath: string): ReturnType<typeof safeExec
       KYBERION_PIPELINE_FALLBACK_ACTIVE: '1',
     },
   });
+}
+
+type PipelineFailure = ReturnType<typeof formatPipelineFailure>;
+
+export function recordFallbackOutcome(
+  trace: TraceContext,
+  fallbackPath: string,
+  failure: PipelineFailure,
+  outcome: { status: number; error?: unknown }
+): boolean {
+  const recovered = outcome.status === 0;
+  const fallbackError =
+    outcome.error instanceof Error ? outcome.error.message : String(outcome.error || '');
+  trace.addEvent(recovered ? 'pipeline.fallback_succeeded' : 'pipeline.fallback_failed', {
+    fallback_pipeline: fallbackPath,
+    primary_error_category: failure.classification.category,
+    primary_error_rule_id: failure.classification.ruleId,
+    fallback_exit_status: outcome.status,
+    ...(fallbackError ? { fallback_error: fallbackError } : {}),
+  });
+  return recovered;
+}
+
+function tryPermissionFallback(
+  pipeline: Record<string, unknown>,
+  failure: PipelineFailure,
+  trace: TraceContext
+): boolean {
+  const fallbackPath = String(pipeline.fallback_pipeline || '');
+  if (
+    !fallbackPath ||
+    failure.classification.category !== 'permission_denied' ||
+    process.env.KYBERION_PIPELINE_FALLBACK_ACTIVE
+  ) {
+    return false;
+  }
+
+  logger.warn(
+    `⚠️ [PIPELINE] Primary first-win failed with permission denial. Running fallback pipeline: ${fallbackPath}`
+  );
+  trace.addEvent('pipeline.fallback_started', {
+    fallback_pipeline: fallbackPath,
+    primary_error_category: failure.classification.category,
+    primary_error_rule_id: failure.classification.ruleId,
+  });
+
+  try {
+    const fallbackResult = runTsFallbackPipeline(fallbackPath);
+    const recovered = recordFallbackOutcome(trace, fallbackPath, failure, fallbackResult);
+    if (recovered) {
+      logger.success(`✅ [PIPELINE] Fallback succeeded: ${fallbackPath}`);
+      return true;
+    }
+    logger.error(`❌ [PIPELINE] Fallback failed: ${fallbackPath}`);
+    if (fallbackResult.stdout.trim()) logger.error(fallbackResult.stdout.trim());
+    if (fallbackResult.stderr.trim()) logger.error(fallbackResult.stderr.trim());
+  } catch (error: any) {
+    recordFallbackOutcome(trace, fallbackPath, failure, {
+      status: 1,
+      error: error?.message ?? String(error),
+    });
+    logger.error(`❌ [PIPELINE] Fallback failed: ${fallbackPath}`);
+  }
+  return false;
+}
+
+export function finalizePipelineTrace(
+  trace: TraceContext,
+  recovered = false,
+  opts?: { dir?: string }
+) {
+  if (!recovered) return finalizeAndPersist(trace, opts);
+  const finalized = trace.finalize();
+  // A recovered run retains the failed primary child span, but its final outcome is successful.
+  finalized.rootSpan.status = 'ok';
+  return { trace: finalized, path: persistTrace(finalized, opts) };
 }
 
 export interface NormalizedStepBudget {
@@ -231,6 +308,14 @@ export function validateFlow(
     // Gate steps don't block channel availability — nested steps are handled separately
   }
   return errors;
+}
+
+function formatFlowValidationErrors(errors: FlowValidationError[]): string {
+  return errors
+    .map(
+      (error) => `Step "${error.stepId}" consumes unknown channel(s): ${error.missing.join(', ')}`
+    )
+    .join('; ');
 }
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
@@ -597,6 +682,7 @@ export async function runSteps(
   const shellBin = 'bash';
   const rootDir = pathResolver.rootDir();
   for (const step of steps) {
+    const stepNumber = results.length + 1;
     const stepStartedAtMs = Date.now();
     const stepPolicy = normalizeReasoningPolicy(step);
     const stepTraceBase = {
@@ -614,7 +700,7 @@ export async function runSteps(
     opts.trace?.addEvent('step.started', stepTraceBase);
 
     if (!opts.quiet) {
-      logger.info(`[step ${results.length + 1}/${steps.length}] ${step.op} …`);
+      logger.info(`[step ${stepNumber}/${steps.length}] ${step.op} …`);
     }
 
     let attempt = 0;
@@ -637,7 +723,7 @@ export async function runSteps(
 
       if (!opts.quiet && (status === 'success' || status === 'failed')) {
         logger.info(
-          `[step ${results.length + 1}/${steps.length}] ${currentNormalizedOp} ${status} in ${Math.round((Date.now() - stepStartedAtMs) / 1000)}s`
+          `[step ${stepNumber}/${steps.length}] ${currentNormalizedOp} ${status} in ${Math.round((Date.now() - stepStartedAtMs) / 1000)}s`
         );
       }
     };
@@ -1326,6 +1412,31 @@ export async function runSteps(
   return { status: derivePipelineStatus(results), results, context: ctx };
 }
 
+/** Validate Typed Flow channel integrity before allowing any step side effects. */
+export async function runValidatedSteps(
+  steps: PipelineAdfStep[],
+  initialCtx: Record<string, unknown> = {},
+  opts: RunStepsOptions = {}
+) {
+  const flowErrors = validateFlow(steps, initialCtx);
+  if (flowErrors.length === 0) return runSteps(steps, initialCtx, opts);
+
+  const error = formatFlowValidationErrors(flowErrors);
+  for (const flowError of flowErrors) {
+    logger.warn(`[FLOW_VALIDATION] ${formatFlowValidationErrors([flowError])}.`);
+  }
+  opts.trace?.addEvent('pipeline.validation_failed', {
+    validation_type: 'typed_flow',
+    error,
+    error_count: flowErrors.length,
+  });
+  return {
+    status: 'failed' as const,
+    results: [{ op: 'flow:validate', status: 'failed' as const, error }],
+    context: { ...initialCtx },
+  };
+}
+
 async function attemptAutonomousRepair(
   step: PipelineAdfStep,
   failure: any,
@@ -1536,28 +1647,22 @@ export async function main() {
       ...step,
       params: step.params || {},
     }));
-    // Typed Flow: validate channel integrity before execution
-    const flowErrors = validateFlow(stepsToRun, mergedContext);
-    if (flowErrors.length > 0) {
-      for (const e of flowErrors) {
-        logger.warn(
-          `[FLOW_VALIDATION] Step "${e.stepId}" consumes unknown channel(s): ${e.missing.join(', ')} — ensure a preceding step produces them.`
-        );
-      }
-    }
-    const result = await runSteps(stepsToRun, mergedContext, {
+    const result = await runValidatedSteps(stepsToRun, mergedContext, {
       trace,
       pipelinePath: argv.input as string,
       quiet: argv.quiet as boolean,
     });
-    const persisted = finalizeAndPersist(trace);
+    const failed = result.results.find((entry) => entry.status === 'failed');
+    const failure = failed ? formatPipelineFailure(failed.error || 'unknown error') : undefined;
+    const recovered = failure ? tryPermissionFallback(pipeline, failure, trace) : false;
+    const persisted = finalizePipelineTrace(trace, recovered);
     result.context.trace_summary = persisted.trace.rootSpan.status;
     result.context.trace_persisted_path =
       nodePath.relative(pathResolver.rootDir(), persisted.path) || persisted.path;
     logger.info(`   [PIPELINE] Trace: ${result.context.trace_persisted_path}`);
-    const pipelineStatus = result.status === 'succeeded' ? 'succeeded' : 'failed';
+    const pipelineStatus = result.status === 'succeeded' || recovered ? 'succeeded' : 'failed';
     runFeedbackLoop(pipelineId, pipelineStatus, persisted.trace);
-    if (result.status === 'succeeded') {
+    if (result.status === 'succeeded' || recovered) {
       logger.success(`✅ [PIPELINE] Completed: ${pipeline.name || argv.input}`);
       if (autoContext.__pipeline_options && (autoContext.__pipeline_options as any).keep_alive) {
         logger.info(
@@ -1567,52 +1672,23 @@ export async function main() {
         process.exit(0);
       }
     } else {
-      const failed = result.results.find((entry) => entry.status === 'failed');
       if (failed) {
-        const failure = formatPipelineFailure(failed.error || 'unknown error');
-        const fallbackPath = String((pipeline as any).fallback_pipeline || '');
-        if (
-          fallbackPath &&
-          failure.classification.category === 'permission_denied' &&
-          !process.env.KYBERION_PIPELINE_FALLBACK_ACTIVE
-        ) {
-          logger.warn(
-            `⚠️ [PIPELINE] Primary first-win failed with permission denial. Running fallback pipeline: ${fallbackPath}`
-          );
-          const fallbackResult = runTsFallbackPipeline(fallbackPath);
-          if (fallbackResult.status === 0) {
-            logger.success(`✅ [PIPELINE] Fallback succeeded: ${fallbackPath}`);
-            process.exit(0);
-          }
-          logger.error(`❌ [PIPELINE] Fallback failed: ${fallbackPath}`);
-          if (fallbackResult.stdout.trim()) logger.error(fallbackResult.stdout.trim());
-          if (fallbackResult.stderr.trim()) logger.error(fallbackResult.stderr.trim());
-        }
-        logger.error(`❌ [PIPELINE] Failed step: ${failed.op} :: ${failure.summary}`);
-        logNextActionForPipelineFailure(failure, String(argv.input));
+        logger.error(`❌ [PIPELINE] Failed step: ${failed.op} :: ${failure!.summary}`);
+        logNextActionForPipelineFailure(failure!, String(argv.input));
       }
       logger.error(`❌ [PIPELINE] Failed: ${pipeline.name || argv.input}`);
       process.exit(1);
     }
   } catch (err: any) {
     const failure = formatPipelineFailure(err);
-    const fallbackPath = String((pipeline as any).fallback_pipeline || '');
-    if (
-      fallbackPath &&
-      failure.classification.category === 'permission_denied' &&
-      !process.env.KYBERION_PIPELINE_FALLBACK_ACTIVE
-    ) {
-      logger.warn(
-        `⚠️ [PIPELINE] Primary first-win failed with permission denial. Running fallback pipeline: ${fallbackPath}`
+    const recovered = tryPermissionFallback(pipeline, failure, trace);
+    if (recovered) {
+      const persisted = finalizePipelineTrace(trace, true);
+      runFeedbackLoop(pipelineId, 'succeeded', persisted.trace);
+      logger.info(
+        `   [PIPELINE] Trace: ${nodePath.relative(pathResolver.rootDir(), persisted.path) || persisted.path}`
       );
-      const fallbackResult = runTsFallbackPipeline(fallbackPath);
-      if (fallbackResult.status === 0) {
-        logger.success(`✅ [PIPELINE] Fallback succeeded: ${fallbackPath}`);
-        process.exit(0);
-      }
-      logger.error(`❌ [PIPELINE] Fallback failed: ${fallbackPath}`);
-      if (fallbackResult.stdout.trim()) logger.error(fallbackResult.stdout.trim());
-      if (fallbackResult.stderr.trim()) logger.error(fallbackResult.stderr.trim());
+      process.exit(0);
     }
     trace.addEvent('pipeline.error', {
       error: err?.message ?? String(err),
