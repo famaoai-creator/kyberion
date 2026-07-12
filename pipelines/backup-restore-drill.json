@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "description": "Monthly restore drill for OP-02. Restores the latest backup archive into a disposable target and reports whether the archive can be decrypted and extracted.",
   "_refs": {
-    "plan": "docs/improvement-plans-2026-07/OP-02_BACKUP_RECOVERY.ja.md",
+    "plan": "docs/developer/improvement-plans-2026-07/OP-02_BACKUP_RECOVERY.ja.md",
     "implementation": "scripts/backup.ts"
   },
   "context": {

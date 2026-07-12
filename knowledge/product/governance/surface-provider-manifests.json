@@ -1055,6 +1055,65 @@
         ]
       }
     },
+    "cowork": {
+      "id": "cowork",
+      "displayName": "Claude Cowork",
+      "agentId": "cowork-surface-agent",
+      "channel": "cowork",
+      "interactionMode": "session",
+      "capabilities": {
+        "reply": true,
+        "edit": false,
+        "react": false,
+        "notify": true,
+        "asyncRequest": true,
+        "responding": true
+      },
+      "delivery": {
+        "directReply": "outbox",
+        "supportsOutbox": true,
+        "supportsNotifications": true
+      },
+      "mcp": {
+        "transport": "stdio",
+        "server_script": "dist/scripts/mcp_server.js",
+        "description": "Kyberion MCP server exposing pipeline, mission, knowledge, and capability tools to Cowork."
+      },
+      "intent_rules": {
+        "rules": [
+          {
+            "id": "pipeline-run",
+            "label": "request_pipeline_run",
+            "patterns": [
+              { "type": "contains", "value": "pipeline" },
+              { "type": "contains", "value": "パイプライン" },
+              { "type": "contains", "value": "pnpm pipeline" }
+            ]
+          },
+          {
+            "id": "mission-work",
+            "label": "request_mission_work",
+            "patterns": [
+              { "type": "contains", "value": "mission" },
+              { "type": "contains", "value": "ミッション" },
+              { "type": "contains", "value": "status" },
+              { "type": "contains", "value": "ステータス" }
+            ]
+          },
+          {
+            "id": "knowledge-search",
+            "label": "request_knowledge_search",
+            "patterns": [
+              { "type": "contains", "value": "knowledge" },
+              { "type": "contains", "value": "ナレッジ" },
+              { "type": "contains", "value": "手順" },
+              { "type": "contains", "value": "検索" }
+            ]
+          }
+        ],
+        "default_label": "request_deeper_reasoning"
+      }
+    },
     "cli": {
       "id": "cli",
       "displayName": "Terminal CLI",

@@ -1,4 +1,4 @@
-/* eslint-disable no-restricted-imports -- IP-08 で safeExec へ移行予定 (docs/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
+/* eslint-disable no-restricted-imports -- IP-08 で safeExec へ移行予定 (docs/developer/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 /**
  * Audit Forwarder — pluggable publish bridge for the hash-chained audit log.
  * Forwards each AuditEntry to an external SIEM / log-sink after it has been

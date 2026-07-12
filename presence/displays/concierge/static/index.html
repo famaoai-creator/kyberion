@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Kyberion Concierge — 秘書</title>
+<style>
+  :root{
+    --bg-main:#020617; --panel:rgba(10,25,47,.82); --panel-2:rgba(15,23,42,.6);
+    --accent:#00F2FF; --accent-soft:rgba(0,242,255,.14);
+    --warning:#FFAB00; --ok:#34D399; --err:#FB7185;
+    --text:#F8FAFC; --muted:#94A3B8; --border:rgba(148,163,184,.14);
+    --font: "Hiragino Sans","Noto Sans JP","Yu Gothic UI",system-ui,-apple-system,"Segoe UI",sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:
+      radial-gradient(1200px 700px at 50% -10%, rgba(0,242,255,.08), transparent 60%),
+      var(--bg-main);
+    color:var(--text); font-family:var(--font);
+    display:flex; flex-direction:column; align-items:center;
+    min-height:100dvh; padding:24px 16px 0;
+  }
+  @media (prefers-reduced-motion: reduce){ *{animation:none!important; transition:none!important} }
+
+  header{display:flex;align-items:center;gap:10px;opacity:.7;font-size:12px;letter-spacing:.18em;text-transform:uppercase;margin-bottom:8px}
+  header .dot{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 10px var(--ok)}
+
+  /* ---- Avatar (2.5D SVG + CSS) ---- */
+  .stage{display:flex;flex-direction:column;align-items:center;gap:14px;margin:8px 0 6px}
+  .avatar-wrap{position:relative;width:220px;height:220px;display:flex;align-items:center;justify-content:center}
+  .ring{position:absolute;inset:0;border-radius:50%;border:2px solid var(--accent);opacity:0;transform:scale(.8)}
+  .avatar{width:180px;height:180px;filter:drop-shadow(0 10px 30px rgba(0,242,255,.18));animation:breathe 4.8s ease-in-out infinite}
+  @keyframes breathe{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-4px) scale(1.015)}}
+  .eye{transform-origin:center;transform-box:fill-box;animation:blink 5.6s infinite}
+  @keyframes blink{0%,96%,100%{transform:scaleY(1)}98%{transform:scaleY(.1)}}
+  .mouth{transform-origin:center;transform-box:fill-box;transition:transform .15s}
+  .think-dots{opacity:0}
+  .think-dots circle{animation:thinkpulse 1.2s infinite}
+  .think-dots circle:nth-child(2){animation-delay:.2s}
+  .think-dots circle:nth-child(3){animation-delay:.4s}
+  @keyframes thinkpulse{0%,100%{opacity:.25;transform:translateY(0)}50%{opacity:1;transform:translateY(-3px)}}
+
+  /* state: listening */
+  .state-listening .ring{animation:pulsering 1.8s ease-out infinite}
+  @keyframes pulsering{0%{opacity:.5;transform:scale(.82)}100%{opacity:0;transform:scale(1.12)}}
+  /* state: thinking */
+  .state-thinking .avatar{animation-duration:2.4s}
+  .state-thinking .think-dots{opacity:1}
+  .state-thinking .mouth{transform:scaleY(.5)}
+  /* state: speaking */
+  .state-speaking .mouth{animation:talk .28s ease-in-out infinite}
+  @keyframes talk{0%,100%{transform:scaleY(.55)}50%{transform:scaleY(1.35)}}
+  .state-speaking .avatar{filter:drop-shadow(0 10px 34px rgba(0,242,255,.4))}
+  /* state: error */
+  .state-error .avatar{filter:drop-shadow(0 10px 30px rgba(251,113,133,.4))}
+
+  .status{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+  .status .sdot{width:8px;height:8px;border-radius:50%;background:var(--muted);transition:background .3s,box-shadow .3s}
+  .state-listening .sdot{background:var(--accent);box-shadow:0 0 10px var(--accent)}
+  .state-thinking .sdot{background:var(--warning);box-shadow:0 0 10px var(--warning)}
+  .state-speaking .sdot{background:var(--ok);box-shadow:0 0 10px var(--ok)}
+  .state-error .sdot{background:var(--err);box-shadow:0 0 10px var(--err)}
+
+  /* ---- Conversation ---- */
+  .chat{width:100%;max-width:560px;flex:1;display:flex;flex-direction:column;gap:10px;overflow-y:auto;padding:8px 4px 120px}
+  .msg{max-width:82%;padding:10px 14px;border-radius:16px;font-size:14px;line-height:1.6;white-space:pre-wrap;word-break:break-word;animation:rise .25s ease-out}
+  @keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  .msg.user{align-self:flex-end;background:var(--accent-soft);border:1px solid rgba(0,242,255,.25)}
+  .msg.bot{align-self:flex-start;background:var(--panel);border:1px solid var(--border)}
+  .msg.err{align-self:flex-start;background:rgba(251,113,133,.12);border:1px solid rgba(251,113,133,.3)}
+  .msg .who{font-size:9px;letter-spacing:.14em;text-transform:uppercase;opacity:.5;margin-bottom:3px}
+
+  /* ---- Composer ---- */
+  .composer{position:fixed;bottom:0;left:0;right:0;display:flex;justify-content:center;padding:14px 16px calc(14px + env(safe-area-inset-bottom));
+    background:linear-gradient(to top, var(--bg-main) 60%, transparent)}
+  .composer .bar{width:100%;max-width:560px;display:flex;gap:8px;align-items:center;
+    background:var(--panel);border:1px solid var(--border);border-radius:18px;padding:8px 8px 8px 16px;backdrop-filter:blur(8px)}
+  .bar input{flex:1;background:transparent;border:none;outline:none;color:var(--text);font-size:15px;font-family:var(--font)}
+  .bar button{border:none;cursor:pointer;border-radius:12px;width:42px;height:42px;display:flex;align-items:center;justify-content:center;
+    background:var(--accent-soft);color:var(--accent);transition:transform .1s,background .2s}
+  .bar button:hover{transform:translateY(-1px)}
+  .bar button:active{transform:translateY(0)}
+  .bar button.send{background:var(--accent);color:#001318}
+  .bar button.mic.on{background:var(--accent);color:#001318;animation:micpulse 1.2s infinite}
+  @keyframes micpulse{0%,100%{box-shadow:0 0 0 0 rgba(0,242,255,.5)}50%{box-shadow:0 0 0 8px rgba(0,242,255,0)}}
+  .bar button svg{width:20px;height:20px}
+  .hint{max-width:560px;width:100%;font-size:11px;color:var(--muted);opacity:.7;text-align:center;margin:-4px auto 6px}
+</style>
+</head>
+<body>
+  <header><span class="dot"></span> Kyberion Concierge · 秘書</header>
+
+  <div class="stage" id="stage">
+    <div class="avatar-wrap">
+      <div class="ring"></div>
+      <svg class="avatar" viewBox="0 0 200 200" aria-label="秘書アバター">
+        <defs>
+          <radialGradient id="face" cx="50%" cy="42%" r="60%">
+            <stop offset="0%" stop-color="#12324a"/><stop offset="100%" stop-color="#0a1a2c"/>
+          </radialGradient>
+        </defs>
+        <circle cx="100" cy="100" r="86" fill="url(#face)" stroke="rgba(0,242,255,.25)" stroke-width="2"/>
+        <circle cx="100" cy="100" r="86" fill="none" stroke="rgba(0,242,255,.5)" stroke-width="1" stroke-dasharray="3 10" opacity=".5"/>
+        <!-- eyes -->
+        <rect class="eye" x="66" y="86" width="14" height="18" rx="7" fill="var(--accent)"/>
+        <rect class="eye" x="120" y="86" width="14" height="18" rx="7" fill="var(--accent)"/>
+        <!-- mouth -->
+        <rect class="mouth" x="82" y="128" width="36" height="8" rx="4" fill="var(--accent)" opacity=".9"/>
+        <!-- thinking dots -->
+        <g class="think-dots" transform="translate(0,150)">
+          <circle cx="86" cy="10" r="4" fill="var(--warning)"/>
+          <circle cx="100" cy="10" r="4" fill="var(--warning)"/>
+          <circle cx="114" cy="10" r="4" fill="var(--warning)"/>
+        </g>
+      </svg>
+    </div>
+    <div class="status"><span class="sdot"></span><span id="statusText">お手伝いできます</span></div>
+  </div>
+
+  <div class="chat" id="chat"></div>
+
+  <div class="hint" id="hint">テキストか🎤音声で話しかけてください。軽いご用件はその場でお答えします。</div>
+
+  <div class="composer">
+    <div class="bar">
+      <input id="input" type="text" placeholder="ご用件をどうぞ…" autocomplete="off" />
+      <button class="mic" id="mic" title="音声入力" aria-label="音声入力">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><path d="M12 18v4"/></svg>
+      </button>
+      <button class="send" id="send" title="送信" aria-label="送信">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7z"/></svg>
+      </button>
+    </div>
+  </div>
+
+<script>
+(function(){
+  "use strict";
+  var stage = document.getElementById('stage');
+  var chat = document.getElementById('chat');
+  var input = document.getElementById('input');
+  var sendBtn = document.getElementById('send');
+  var micBtn = document.getElementById('mic');
+  var statusText = document.getElementById('statusText');
+  var busy = false;
+
+  var STATES = {
+    idle:      { cls:'',                text:'お手伝いできます' },
+    listening: { cls:'state-listening', text:'聞いています…' },
+    thinking:  { cls:'state-thinking',  text:'考えています…' },
+    speaking:  { cls:'state-speaking',  text:'お答えします' },
+    error:     { cls:'state-error',     text:'うまく処理できませんでした' }
+  };
+  function setState(s){
+    stage.className = 'stage ' + (STATES[s] ? STATES[s].cls : '');
+    statusText.textContent = STATES[s] ? STATES[s].text : '';
+  }
+  function addMsg(who, text, kind){
+    var el = document.createElement('div');
+    el.className = 'msg ' + (kind || (who==='あなた'?'user':'bot'));
+    var label = document.createElement('div'); label.className='who'; label.textContent = who;
+    var body = document.createElement('div'); body.textContent = text;
+    el.appendChild(label); el.appendChild(body);
+    chat.appendChild(el);
+    chat.scrollTop = chat.scrollHeight;
+    return body;
+  }
+
+  // Browser-native TTS (lightweight); voice-hub also speaks server-side if running.
+  function speak(text){
+    try{
+      if(!('speechSynthesis' in window) || !text) return;
+      var u = new SpeechSynthesisUtterance(text);
+      u.lang = /[぀-ヿ一-鿿]/.test(text) ? 'ja-JP' : 'en-US';
+      u.rate = 1.02;
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(u);
+    }catch(e){}
+  }
+
+  async function send(text){
+    text = (text||'').trim();
+    if(!text || busy) return;
+    busy = true;
+    addMsg('あなた', text);
+    input.value = '';
+    setState('thinking');
+    try{
+      var resp = await fetch('/api/message', {
+        method:'POST', headers:{'content-type':'application/json'},
+        body: JSON.stringify({ text: text, speaker:'Sovereign' })
+      });
+      var data = await resp.json();
+      if(!resp.ok){
+        setState('error');
+        addMsg('秘書', (data && data.message) || '応答できませんでした。', 'err');
+      }else{
+        var reply = (data && data.reply) || '(応答が空でした)';
+        setState('speaking');
+        addMsg('秘書', reply);
+        // Degraded mode (voice-hub down): tell the user TTS/expression is off.
+        if(data && data.degraded && data.notice){
+          addMsg('システム', data.notice, 'err');
+        }
+        speak(reply);
+      }
+    }catch(e){
+      setState('error');
+      addMsg('秘書', 'ネットワークエラーが発生しました。', 'err');
+    }finally{
+      busy = false;
+      setTimeout(function(){ setState('idle'); }, 900);
+    }
+  }
+
+  sendBtn.addEventListener('click', function(){ send(input.value); });
+  input.addEventListener('keydown', function(e){ if(e.key==='Enter'){ send(input.value); } });
+
+  // Web Speech API voice input (browser-native STT; no server round-trip)
+  var recognition = null, listening = false;
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(SR){
+    recognition = new SR();
+    recognition.lang = 'ja-JP';
+    recognition.interimResults = true;
+    recognition.continuous = false;
+    var finalText = '';
+    recognition.onstart = function(){ listening=true; micBtn.classList.add('on'); setState('listening'); };
+    recognition.onresult = function(ev){
+      finalText='';
+      for(var i=ev.resultIndex;i<ev.results.length;i++){
+        finalText += ev.results[i][0].transcript;
+        if(ev.results[i].isFinal){
+          input.value = finalText;
+        }
+      }
+      input.value = finalText;
+    };
+    recognition.onerror = function(){ stopListen(); };
+    recognition.onend = function(){
+      micBtn.classList.remove('on'); listening=false;
+      if(finalText.trim()){ send(finalText); } else { setState('idle'); }
+    };
+  } else {
+    micBtn.style.opacity = .35; micBtn.title = 'このブラウザは音声入力に未対応です';
+  }
+  function stopListen(){ try{ recognition && recognition.stop(); }catch(e){} }
+  micBtn.addEventListener('click', function(){
+    if(!recognition) return;
+    if(listening){ stopListen(); }
+    else { try{ finalText=''; recognition.start(); }catch(e){} }
+  });
+
+  setState('idle');
+})();
+</script>
+</body>
+</html>
