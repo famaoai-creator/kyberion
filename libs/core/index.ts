@@ -1370,7 +1370,9 @@ export {
   loadOnboardingFlowPolicyCatalog,
   resolveOnboardingFlowPolicy,
   resetOnboardingFlowPolicyCatalogCache,
+  resolveOnboardingText,
 } from './onboarding-flow-policy.js';
+export type { LocalizedOnboardingText } from './onboarding-flow-policy.js';
 export {
   loadMissionDistillMarkdownPolicyCatalog,
   resolveMissionDistillMarkdownPolicy,

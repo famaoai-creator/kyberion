@@ -1,15 +1,45 @@
 {
-  "version": "1.0.0",
+  "version": "1.1.0",
   "phase_titles": {
-    "identity": "Identity & Purpose",
-    "services": "Infrastructure & Services",
-    "tenants": "Multi-Tenant Registration",
-    "tutorial": "Hands-on Tutorial",
-    "summary": "Summary"
+    "identity": {
+      "en": "Identity & Purpose",
+      "ja": "アイデンティティと目的"
+    },
+    "services": {
+      "en": "Infrastructure & Services",
+      "ja": "インフラとサービス"
+    },
+    "tenants": {
+      "en": "Multi-Tenant Registration",
+      "ja": "マルチテナント登録"
+    },
+    "tutorial": {
+      "en": "Hands-on Tutorial",
+      "ja": "ハンズオン・チュートリアル"
+    },
+    "summary": {
+      "en": "Summary",
+      "ja": "サマリ"
+    }
   },
-  "tutorial_plan_title": "Onboarding Tutorial Plan",
-  "tutorial_next_step_title": "Suggested next step",
-  "tutorial_skipped_message": "Tutorial skipped during onboarding.",
-  "tutorial_default_summary": "Demonstrate the initial Kyberion setup with a safe dry-run.",
-  "complete_message": "Onboarding complete."
+  "tutorial_plan_title": {
+    "en": "Onboarding Tutorial Plan",
+    "ja": "オンボーディング・チュートリアル計画"
+  },
+  "tutorial_next_step_title": {
+    "en": "Suggested next step",
+    "ja": "推奨される次のステップ"
+  },
+  "tutorial_skipped_message": {
+    "en": "Tutorial skipped during onboarding.",
+    "ja": "オンボーディング中にチュートリアルはスキップされました。"
+  },
+  "tutorial_default_summary": {
+    "en": "Demonstrate the initial Kyberion setup with a safe dry-run.",
+    "ja": "安全な dry-run で Kyberion の初期セットアップを実演します。"
+  },
+  "complete_message": {
+    "en": "Onboarding complete.",
+    "ja": "オンボーディング完了。"
+  }
 }
