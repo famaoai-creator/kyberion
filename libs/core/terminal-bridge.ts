@@ -1,6 +1,16 @@
 import * as path from 'node:path';
-import { safeExec, safeExistsSync, safeMkdir, safeReadFile, safeReaddir, safeWriteFile } from './secure-io.js';
+import {
+  safeExec,
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeReaddir,
+  safeWriteFile,
+} from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
+import { createLogger } from './logger.js';
+
+const logger = createLogger('terminal-bridge');
 
 /**
  * Terminal Bridge v4.0 (Isolated Session Protocol)
@@ -11,7 +21,13 @@ const RUNTIME_BASE = pathResolver.shared('runtime/terminal');
 
 function listReflexTerminalSessions() {
   if (!safeExistsSync(RUNTIME_BASE)) return [];
-  const sessions: Array<{ winId: string; sessionId: string; type: string; status?: string; pid?: number }> = [];
+  const sessions: Array<{
+    winId: string;
+    sessionId: string;
+    type: string;
+    status?: string;
+    pid?: number;
+  }> = [];
   for (const id of safeReaddir(RUNTIME_BASE)) {
     const stateFile = path.join(RUNTIME_BASE, id, 'state.json');
     if (!safeExistsSync(stateFile)) continue;
@@ -36,7 +52,7 @@ const STRATEGIES: Record<string, any> = {
   ReflexTerminal: {
     findIdle: () => {
       if (!safeExistsSync(RUNTIME_BASE)) return null;
-      
+
       const sessions = safeReaddir(RUNTIME_BASE);
       for (const id of sessions) {
         const stateFile = path.join(RUNTIME_BASE, id, 'state.json');
@@ -56,27 +72,34 @@ const STRATEGIES: Record<string, any> = {
     inject: async (winId: string, sessionId: string, text: string) => {
       const sid = sessionId || 'default';
       const sessionInDir = path.join(RUNTIME_BASE, sid, 'in');
-      
+
       try {
         if (!safeExistsSync(sessionInDir)) {
           safeMkdir(sessionInDir, { recursive: true });
         }
-        
+
         const requestId = `req-${Date.now()}`;
         const requestPath = path.join(sessionInDir, `${requestId}.json`);
-        
-        safeWriteFile(requestPath, JSON.stringify({
-          id: requestId,
-          ts: new Date().toISOString(),
-          text
-        }, null, 2));
-        
+
+        safeWriteFile(
+          requestPath,
+          JSON.stringify(
+            {
+              id: requestId,
+              ts: new Date().toISOString(),
+              text,
+            },
+            null,
+            2
+          )
+        );
+
         return true;
       } catch (err: any) {
-        console.error(`[TerminalBridge] File Injection Failed for ${sid}: ${err.message}`);
+        logger.error(`file injection failed for ${sid}: ${err.message}`);
         return false;
       }
-    }
+    },
   },
   iTerm2: {
     findIdle: () => {
@@ -117,7 +140,9 @@ const STRATEGIES: Record<string, any> = {
         if (result === 'NOT_FOUND' || !result.includes(':')) return null;
         const [winId, sessionId] = result.split(':');
         return { winId, sessionId, type: 'iTerm2' };
-      } catch (_) { return null; }
+      } catch (_) {
+        return null;
+      }
     },
     inject: async (winId: string, sessionId: string, text: string) => {
       const escapedText = text.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
@@ -146,9 +171,11 @@ const STRATEGIES: Record<string, any> = {
       try {
         const result = safeExec('osascript', ['-e', script]).trim();
         return result === 'SUCCESS';
-      } catch (_) { return false; }
-    }
-  }
+      } catch (_) {
+        return false;
+      }
+    },
+  },
 };
 
 export const terminalBridge = {
@@ -177,7 +204,12 @@ export const terminalBridge = {
       },
     ];
   },
-  injectAndExecute: async (winId: string, sessionId: string, text: string, terminalType = 'iTerm2') => {
+  injectAndExecute: async (
+    winId: string,
+    sessionId: string,
+    text: string,
+    terminalType = 'iTerm2'
+  ) => {
     const strategy = STRATEGIES[terminalType];
     if (!strategy) throw new Error(`Unsupported terminal strategy: ${terminalType}`);
     return await strategy.inject(winId, sessionId, text);
@@ -189,11 +221,13 @@ export const terminalBridge = {
         try {
           const content = JSON.parse(safeReadFile(latestPath, { encoding: 'utf8' }) as string);
           return content.data.message || '';
-        } catch (_) { return ''; }
+        } catch (_) {
+          return '';
+        }
       }
       return '';
     }
     // Fallback for iTerm2
     return '';
-  }
+  },
 };

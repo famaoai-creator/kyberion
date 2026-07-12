@@ -2,6 +2,9 @@ import * as path from 'node:path';
 
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile, safeReaddir, safeStat } from './secure-io.js';
+import { createLogger } from './logger.js';
+
+const logger = createLogger('service-endpoint-registry');
 
 export interface ServiceEndpointRecord {
   base_url?: string;
@@ -13,7 +16,12 @@ export interface ServiceEndpointRecord {
   intent_aliases?: string[];
   headers?: Record<string, string>;
   oauth?: Record<string, unknown>;
-  credential_suffixes?: Partial<Record<'accessToken' | 'appToken' | 'refreshToken' | 'clientId' | 'clientSecret' | 'redirectUri', string[]>>;
+  credential_suffixes?: Partial<
+    Record<
+      'accessToken' | 'appToken' | 'refreshToken' | 'clientId' | 'clientSecret' | 'redirectUri',
+      string[]
+    >
+  >;
   [key: string]: unknown;
 }
 
@@ -23,8 +31,12 @@ export interface ServiceEndpointsCatalog {
   services: Record<string, ServiceEndpointRecord>;
 }
 
-const DEFAULT_SERVICE_ENDPOINTS_PATH = pathResolver.knowledge('product/orchestration/service-endpoints.json');
-const DEFAULT_SERVICE_ENDPOINTS_DIR = pathResolver.knowledge('product/orchestration/service-endpoints');
+const DEFAULT_SERVICE_ENDPOINTS_PATH = pathResolver.knowledge(
+  'product/orchestration/service-endpoints.json'
+);
+const DEFAULT_SERVICE_ENDPOINTS_DIR = pathResolver.knowledge(
+  'product/orchestration/service-endpoints'
+);
 const FALLBACK_SERVICE_ENDPOINTS: ServiceEndpointsCatalog = {
   version: 'fallback',
   default_pattern: 'https://api.{service_id}.com/v1',
@@ -45,9 +57,13 @@ function getServiceEndpointsDir(): string {
 
 function loadServiceEndpointsCatalogFromPath(catalogPath: string): ServiceEndpointsCatalog {
   try {
-    return JSON.parse(safeReadFile(pathResolver.rootResolve(catalogPath), { encoding: 'utf8' }) as string) as ServiceEndpointsCatalog;
+    return JSON.parse(
+      safeReadFile(pathResolver.rootResolve(catalogPath), { encoding: 'utf8' }) as string
+    ) as ServiceEndpointsCatalog;
   } catch (error: any) {
-    throw new Error(`Failed to load service endpoints catalog at ${catalogPath}: ${error?.message || error}`);
+    throw new Error(
+      `Failed to load service endpoints catalog at ${catalogPath}: ${error?.message || error}`
+    );
   }
 }
 
@@ -57,7 +73,9 @@ function loadServiceEndpointsDirectory(catalogDir: string): ServiceEndpointsCata
     throw new Error(`Service endpoints directory not found: ${dir}`);
   }
 
-  const files = safeReaddir(dir).filter((entry) => entry.endsWith('.json')).sort();
+  const files = safeReaddir(dir)
+    .filter((entry) => entry.endsWith('.json'))
+    .sort();
   if (files.length === 0) {
     throw new Error(`Service endpoints directory is empty: ${dir}`);
   }
@@ -115,11 +133,18 @@ function loadServiceEndpointsDirectory(catalogDir: string): ServiceEndpointsCata
 export function loadServiceEndpointsCatalog(): ServiceEndpointsCatalog {
   const catalogPath = getServiceEndpointsPath();
   const catalogDir = getServiceEndpointsDir();
-  if (cachedServiceEndpointsPath === catalogPath && cachedServiceEndpointsDir === catalogDir && cachedServiceEndpoints) {
+  if (
+    cachedServiceEndpointsPath === catalogPath &&
+    cachedServiceEndpointsDir === catalogDir &&
+    cachedServiceEndpoints
+  ) {
     return cachedServiceEndpoints;
   }
 
-  if (catalogPath === DEFAULT_SERVICE_ENDPOINTS_PATH && safeExistsSync(pathResolver.rootResolve(catalogDir))) {
+  if (
+    catalogPath === DEFAULT_SERVICE_ENDPOINTS_PATH &&
+    safeExistsSync(pathResolver.rootResolve(catalogDir))
+  ) {
     const dirEntries = safeReaddir(pathResolver.rootResolve(catalogDir));
     const hasJsonFiles = dirEntries.some((entry) => entry.endsWith('.json'));
     if (hasJsonFiles) {
@@ -151,7 +176,7 @@ export function loadServiceEndpointsCatalog(): ServiceEndpointsCatalog {
     cachedServiceEndpoints = parsed;
     return parsed;
   } catch (error: any) {
-    console.warn(`[SERVICE_ENDPOINTS] Failed to load catalog at ${catalogPath}: ${error.message}`);
+    logger.warn(`failed to load catalog at ${catalogPath}: ${error.message}`);
     cachedServiceEndpointsPath = catalogPath;
     cachedServiceEndpointsDir = catalogDir;
     cachedServiceEndpoints = FALLBACK_SERVICE_ENDPOINTS;
@@ -192,4 +217,3 @@ export function resolveServiceIdForIntent(intentId: string): string | null {
   }
   return null;
 }
-
