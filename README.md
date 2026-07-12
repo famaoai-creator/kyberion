@@ -60,6 +60,15 @@ Kyberion's first visible result comes in three short paths:
 - 5 minutes: run the clean browser smoke and get `active/shared/tmp/first-win-session.png`
 - 15 minutes: read the Quickstart structure map, then inspect the pipeline and actuator entrypoints
 
+### First-win shortest paths (one table)
+
+| Path              | Prerequisites                                           | Time         | Command                                               | Notes                                                                                                                                 |
+| :---------------- | :------------------------------------------------------ | :----------- | :---------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------ |
+| Readiness check   | Node 24+, pnpm (`pnpm install`)                         | ~30s         | `pnpm doctor`                                         | No build needed                                                                                                                       |
+| Browser first-win | + `pnpm build`, `pnpm exec playwright install chromium` | ~5min        | `pnpm pipeline --input pipelines/verify-session.json` | Writes `active/shared/tmp/first-win-session.png`                                                                                      |
+| Voice first-win   | macOS only (native TTS; not available in Docker)        | ~5min        | `pnpm pipeline --input pipelines/voice-hello.json`    | Run after the browser smoke                                                                                                           |
+| Docker path       | Docker Desktop                                          | ~10min build | `docker compose --profile deploy up`                  | Headless services only — voice/GUI actuators need the native macOS path. Final image boot verification is still an open item (OP-03). |
+
 If you want the shortest startup path first, run this:
 
 ```bash
