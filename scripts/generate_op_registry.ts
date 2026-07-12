@@ -17,6 +17,11 @@ import { describeOps as describeAgentOps } from '../libs/actuators/agent-actuato
 import { describeOps as describeArtifactOps } from '../libs/actuators/artifact-actuator/src/op-catalog.js';
 import { describeOps as describeNetworkOps } from '../libs/actuators/network-actuator/src/op-catalog.js';
 import { describeOps as describeWisdomOps } from '../libs/actuators/wisdom-actuator/src/op-catalog.js';
+import { describeOps as describeBlockchainOps } from '../libs/actuators/blockchain-actuator/src/op-catalog.js';
+import { describeOps as describeBuildOps } from '../libs/actuators/build-actuator/src/op-catalog.js';
+import { describeOps as describeCalendarOps } from '../libs/actuators/calendar-actuator/src/op-catalog.js';
+import { describeOps as describeEmailOps } from '../libs/actuators/email-actuator/src/op-catalog.js';
+import { describeOps as describePresenceOps } from '../libs/actuators/presence-actuator/src/op-catalog.js';
 
 // AR-02: actuators that self-describe their op surface. The registry and
 // discovery index are generated from these; check:op-registry fails on
@@ -43,6 +48,11 @@ const DESCRIBE_OPS_SOURCES: Record<
   'approval-actuator': describeApprovalOps,
   'agent-actuator': describeAgentOps,
   'artifact-actuator': describeArtifactOps,
+  'blockchain-actuator': describeBlockchainOps,
+  'build-actuator': describeBuildOps,
+  'calendar-actuator': describeCalendarOps,
+  'email-actuator': describeEmailOps,
+  'presence-actuator': describePresenceOps,
 };
 
 type PipelineOpKind = 'capture' | 'transform' | 'apply' | 'control';
