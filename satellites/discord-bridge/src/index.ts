@@ -6,6 +6,7 @@ import { Client, GatewayIntentBits, Events, Message } from 'discord.js';
 // IP-08 Task 6: record unhandled rejections/exceptions in this long-lived process.
 installProcessGuards('discord-bridge');
 import {
+  resolveOperatorLocale,
   createStandardYargs,
   logger,
   startBridgeTypingLoop,
@@ -184,7 +185,7 @@ async function handleDiscordMessage(message: Message) {
       });
     } else {
       // UX-01: an empty agent reply must not read as silence.
-      await message.reply(buildBridgeEmptyReplyText({ locale: 'ja' }));
+      await message.reply(buildBridgeEmptyReplyText({ locale: resolveOperatorLocale() }));
     }
   } catch (err: any) {
     logger.error(`❌ [DiscordBridge] Conversation failed: ${err.message}`);
@@ -193,7 +194,7 @@ async function handleDiscordMessage(message: Message) {
       conversationKey: `discord:${message.channelId}`,
       err,
       surface: 'discord',
-      locale: 'ja',
+      locale: resolveOperatorLocale(),
       post: (errorText) => message.reply(errorText),
     });
   } finally {
