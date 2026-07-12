@@ -1,4 +1,4 @@
-import { uxText } from './ux-vocabulary';
+import { uxText, uxTextOr } from './ux-vocabulary';
 
 type Locale = 'en' | 'ja';
 
@@ -130,11 +130,9 @@ export function buildUserFacingError(
   const surfacePrefix = opts.surface ? `${opts.surface}: ` : '';
 
   return {
-    title: uxText('error_title', 'Something went wrong', locale),
-    body: `${surfacePrefix}${uxText(bodyKey(category), 'The request could not be completed.', locale)}`,
-    nextAction: uxText(nextActionKey(category), 'Try the request again.', locale),
-    traceLine: opts.traceId
-      ? `${uxText('error_trace_label', 'Trace', locale)} ${opts.traceId}`
-      : undefined,
+    title: uxText('error_title', locale),
+    body: `${surfacePrefix}${uxTextOr(bodyKey(category), 'The request could not be completed.', locale)}`,
+    nextAction: uxTextOr(nextActionKey(category), 'Try the request again.', locale),
+    traceLine: opts.traceId ? `${uxText('error_trace_label', locale)} ${opts.traceId}` : undefined,
   };
 }

@@ -15,7 +15,7 @@ import {
 import { buildAttentionItems, type AttentionItem } from '../lib/operator-console';
 import type { RuntimeTopologySnapshot } from '../lib/runtime-topology';
 import { buildUserFacingError } from '../lib/user-facing-error';
-import { resolveChronosLocale, uxText } from '../lib/ux-vocabulary';
+import { resolveChronosLocale, uxText, uxTextOr } from '../lib/ux-vocabulary';
 import { SurfaceStatusPanel } from './SurfaceStatusPanel';
 
 interface MissionSummary {
@@ -1211,7 +1211,7 @@ export function MissionIntelligence({
   focusedMissionId?: string | null;
 }) {
   const locale = resolveChronosLocale();
-  const mt = (key: string, fallbackEn: string) => uxText(key, fallbackEn, locale);
+  const mt = (key: string, fallbackEn: string) => uxTextOr(key, fallbackEn, locale);
   const [mounted, setMounted] = useState(false);
   const [data, setData] = useState<IntelligencePayload | null>(null);
   const [error, setError] = useState<string | null>(null);

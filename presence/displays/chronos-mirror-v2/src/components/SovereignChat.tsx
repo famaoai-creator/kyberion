@@ -33,36 +33,20 @@ const PANEL_VIEWPORT_MARGIN = 16;
 function buildGuidedPrompts(locale: Parameters<typeof uxText>[2]) {
   return [
     {
-      label: uxText('chronos_chat_prompt_health_label', 'Health', locale),
-      query: uxText(
-        'chronos_chat_prompt_health_query',
-        'Summarize system health and current blockers.',
-        locale
-      ),
+      label: uxText('chronos_chat_prompt_health_label', locale),
+      query: uxText('chronos_chat_prompt_health_query', locale),
     },
     {
-      label: uxText('chronos_chat_prompt_missions_label', 'Missions', locale),
-      query: uxText(
-        'chronos_chat_prompt_missions_query',
-        'List the active missions and what needs attention.',
-        locale
-      ),
+      label: uxText('chronos_chat_prompt_missions_label', locale),
+      query: uxText('chronos_chat_prompt_missions_query', locale),
     },
     {
-      label: uxText('chronos_chat_prompt_traces_label', 'Traces', locale),
-      query: uxText(
-        'chronos_chat_prompt_traces_query',
-        'Show the latest trace issues and what failed.',
-        locale
-      ),
+      label: uxText('chronos_chat_prompt_traces_label', locale),
+      query: uxText('chronos_chat_prompt_traces_query', locale),
     },
     {
-      label: uxText('chronos_chat_prompt_next_step_label', 'Next step', locale),
-      query: uxText(
-        'chronos_chat_prompt_next_step_query',
-        'What should I do next to unblock delivery?',
-        locale
-      ),
+      label: uxText('chronos_chat_prompt_next_step_label', locale),
+      query: uxText('chronos_chat_prompt_next_step_query', locale),
     },
   ];
 }
@@ -225,7 +209,7 @@ export function SovereignChat({
             {
               id: `cancelled-${Date.now()}`,
               role: 'agent',
-              content: uxText('chronos_chat_cancelled', 'Request cancelled.', locale),
+              content: uxText('chronos_chat_cancelled', locale),
               timestamp: new Date().toISOString(),
               status: 'complete',
             },
@@ -310,7 +294,7 @@ export function SovereignChat({
       <button
         type="button"
         onClick={() => setIsOpen(true)}
-        aria-label={uxText('chronos_chat_open', 'Open Sovereign chat', locale)}
+        aria-label={uxText('chronos_chat_open', locale)}
         className="fixed bottom-6 right-6 w-14 h-14 bg-kyberion-warning/20 border border-kyberion-warning/30 rounded-full flex items-center justify-center hover:bg-kyberion-warning/30 transition z-50"
       >
         <MessageSquare className="text-kyberion-warning w-6 h-6" />
@@ -341,11 +325,11 @@ export function SovereignChat({
         <button
           type="button"
           onClick={() => setIsOpen(false)}
-          aria-label={uxText('chronos_chat_minimize', 'Minimize Sovereign chat', locale)}
+          aria-label={uxText('chronos_chat_minimize', locale)}
           className="text-[10px] opacity-40 hover:opacity-80 transition"
           onPointerDown={(e) => e.stopPropagation()}
         >
-          {uxText('chronos_chat_minimize', 'MINIMIZE', locale)}
+          {uxText('chronos_chat_minimize', locale)}
         </button>
       </div>
 
@@ -360,16 +344,12 @@ export function SovereignChat({
         {messages.length === 0 && (
           <div className="flex flex-col gap-6 pt-4">
             <div className="text-center text-[11px] leading-6 text-white/45">
-              {uxText(
-                'chronos_chat_welcome',
-                'Start with a short request or pick one of the guided prompts below.',
-                locale
-              )}
+              {uxText('chronos_chat_welcome', locale)}
             </div>
 
             <div className="space-y-3">
               <div className="px-2 text-[9px] uppercase tracking-widest text-white/30">
-                {uxText('chronos_chat_guided_prompts', 'Guided prompts', locale)}
+                {uxText('chronos_chat_guided_prompts', locale)}
               </div>
               <div className="grid gap-2 sm:grid-cols-2">
                 {guidedPrompts.map((hint) => (
@@ -416,24 +396,17 @@ export function SovereignChat({
             <div className="flex items-center gap-2 px-3 py-2 bg-white/5 border border-white/5 rounded-xl">
               <Loader2 className="w-4 h-4 animate-spin opacity-40" />
               <span className="text-[10px] text-white/45" role="status">
-                {phase === 'sending' &&
-                  uxText('chronos_chat_phase_sending', 'Sending request…', locale)}
-                {phase === 'thinking' &&
-                  uxText('chronos_chat_phase_thinking', 'Sovereign is thinking…', locale)}
-                {phase === 'long_running' &&
-                  uxText(
-                    'chronos_chat_phase_long_running',
-                    'Still working — long tasks can take a while.',
-                    locale
-                  )}
+                {phase === 'sending' && uxText('chronos_chat_phase_sending', locale)}
+                {phase === 'thinking' && uxText('chronos_chat_phase_thinking', locale)}
+                {phase === 'long_running' && uxText('chronos_chat_phase_long_running', locale)}
               </span>
               <button
                 type="button"
                 onClick={cancelQuery}
-                aria-label={uxText('chronos_chat_cancel', 'Cancel', locale)}
+                aria-label={uxText('chronos_chat_cancel', locale)}
                 className="ml-1 text-[9px] uppercase tracking-widest text-white/40 hover:text-red-300 border border-white/10 hover:border-red-400/30 rounded px-1.5 py-0.5 transition"
               >
-                {uxText('chronos_chat_cancel', 'Cancel', locale)}
+                {uxText('chronos_chat_cancel', locale)}
               </button>
             </div>
           </div>
@@ -444,7 +417,7 @@ export function SovereignChat({
       <div className="p-3 border-t border-white/5">
         <div className="flex gap-2">
           <input
-            aria-label={uxText('chronos_chat_input', 'Chat input', locale)}
+            aria-label={uxText('chronos_chat_input', locale)}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
@@ -455,12 +428,8 @@ export function SovereignChat({
             }}
             placeholder={
               isListening
-                ? uxText('chronos_chat_listening', 'Listening...', locale)
-                : uxText(
-                    'chronos_chat_placeholder',
-                    'Ask for health, missions, traces, or a next step...',
-                    locale
-                  )
+                ? uxText('chronos_chat_listening', locale)
+                : uxText('chronos_chat_placeholder', locale)
             }
             className={`flex-1 bg-white/5 border rounded-lg px-3 py-2 text-[11px] outline-none transition ${
               isListening
@@ -485,7 +454,7 @@ export function SovereignChat({
             type="button"
             onClick={sendMessage}
             disabled={isLoading || !input.trim()}
-            aria-label={uxText('chronos_chat_send', 'Send message', locale)}
+            aria-label={uxText('chronos_chat_send', locale)}
             className="p-2 bg-kyberion-warning/20 border border-kyberion-warning/20 rounded-lg hover:bg-kyberion-warning/30 transition disabled:opacity-20"
           >
             <Send className="w-4 h-4 text-kyberion-warning" />
