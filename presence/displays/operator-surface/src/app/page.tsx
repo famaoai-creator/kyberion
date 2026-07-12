@@ -1,6 +1,7 @@
 import { listMissions, getCapabilities, getProviderPins } from '@/lib/data';
 import { emitMosRead } from '@/lib/audit-mos';
 import CapabilityDashboard from '@/components/CapabilityDashboard';
+import { renderStatus } from '@agent/core';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,12 +13,12 @@ export default async function MissionsPage() {
   return (
     <section>
       <h1 style={{ marginBottom: '4px' }}>Missions</h1>
-      <p style={{ color: '#9aa0aa', marginTop: 0 }}>
-        Filtered by the operator's <code>KYBERION_TENANT</code>. Click a row to
-        inspect its evidence, history, and checkpoints. Read-only.
+      <p style={{ color: 'var(--kb-muted-text)', marginTop: 0 }}>
+        Filtered by the operator's <code>KYBERION_TENANT</code>. Click a row to inspect its
+        evidence, history, and checkpoints. Read-only.
       </p>
       {missions.length === 0 ? (
-        <p style={{ color: '#9aa0aa' }}>No missions visible to this tenant scope.</p>
+        <p style={{ color: 'var(--kb-muted-text)' }}>No missions visible to this tenant scope.</p>
       ) : (
         <table
           style={{
@@ -28,7 +29,7 @@ export default async function MissionsPage() {
           }}
         >
           <thead>
-            <tr style={{ background: '#15171c', textAlign: 'left' }}>
+            <tr style={{ background: 'var(--kb-surface)', textAlign: 'left' }}>
               <th style={th}>Mission ID</th>
               <th style={th}>Status</th>
               <th style={th}>Tier</th>
@@ -40,14 +41,11 @@ export default async function MissionsPage() {
           </thead>
           <tbody>
             {missions.map((m) => (
-              <tr
-                key={m.mission_id}
-                style={{ borderBottom: '1px solid #1a1c22' }}
-              >
+              <tr key={m.mission_id} style={{ borderBottom: '1px solid var(--kb-border)' }}>
                 <td style={td}>
                   <a
-                     href={`/missions/${encodeURIComponent(m.mission_id)}`}
-                     style={{ color: '#8ec3ff' }}
+                    href={`/missions/${encodeURIComponent(m.mission_id)}`}
+                    style={{ color: 'var(--kb-accent-text)' }}
                   >
                     {m.mission_id}
                   </a>
@@ -62,7 +60,7 @@ export default async function MissionsPage() {
                 <td style={td}>{m.assigned_persona ?? '—'}</td>
                 <td style={td}>{m.checkpoints_count ?? 0}</td>
                 <td style={td}>
-                  <code style={{ color: '#9aa0aa' }}>{m.latest_commit ?? '—'}</code>
+                  <code style={{ color: 'var(--kb-muted-text)' }}>{m.latest_commit ?? '—'}</code>
                 </td>
               </tr>
             ))}
@@ -76,28 +74,32 @@ export default async function MissionsPage() {
   );
 }
 
-const th: React.CSSProperties = { padding: '8px 12px', borderBottom: '1px solid #2a2c33', fontWeight: 600 };
+const th: React.CSSProperties = {
+  padding: '8px 12px',
+  borderBottom: '1px solid var(--kb-border)',
+  fontWeight: 600,
+};
 const td: React.CSSProperties = { padding: '8px 12px', verticalAlign: 'top' };
 
 function statusBadge(status: string) {
   const colors: Record<string, string> = {
-    active: '#9be3a8',
-    completed: '#9aa0aa',
-    failed: '#ff8fa3',
-    paused: '#ffd57e',
-    planned: '#8ec3ff',
-    archived: '#5a6068',
-    distilling: '#c08eff',
+    active: 'var(--kb-success)',
+    completed: 'var(--kb-muted-text)',
+    failed: 'var(--kb-danger)',
+    paused: 'var(--kb-warning)',
+    planned: 'var(--kb-accent-text)',
+    archived: 'var(--kb-muted-text)',
+    distilling: 'var(--kb-accent)',
   };
   return (
     <span
       style={{
-        color: colors[status] ?? '#e4e6eb',
+        color: colors[status] ?? 'var(--kb-text-primary)',
         fontFamily: 'ui-monospace, monospace',
         fontSize: '12px',
       }}
     >
-      {status}
+      {renderStatus('mission', status, 'en')}
     </span>
   );
 }

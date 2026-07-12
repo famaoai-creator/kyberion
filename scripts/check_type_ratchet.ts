@@ -146,17 +146,17 @@ export function checkTypeRatchet(
   const current = scanCurrentCounts(options.scanRoots || DEFAULT_SCAN_ROOTS);
   const baseline = loadBaseline(baselinePath);
 
-  if (!baseline) {
-    if (options.writeBaseline) {
-      safeMkdir(path.dirname(baselinePath), { recursive: true });
-      safeWriteFile(baselinePath, JSON.stringify(current, null, 2));
-      return {
-        ...current,
-        baseline_path: baselinePath,
-        violations: [],
-      };
-    }
+  if (options.writeBaseline) {
+    safeMkdir(path.dirname(baselinePath), { recursive: true });
+    safeWriteFile(baselinePath, JSON.stringify(current, null, 2));
+    return {
+      ...current,
+      baseline_path: baselinePath,
+      violations: [],
+    };
+  }
 
+  if (!baseline) {
     return {
       ...current,
       baseline_path: baselinePath,

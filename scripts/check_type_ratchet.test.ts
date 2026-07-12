@@ -1,6 +1,13 @@
 import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { pathResolver, safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from '@agent/core';
+import {
+  pathResolver,
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeWriteFile,
+} from '@agent/core';
 import { checkTypeRatchet } from './check_type_ratchet.js';
 
 const FIXTURE_DIR = pathResolver.sharedTmp('check-type-ratchet');
@@ -80,5 +87,30 @@ describe('check_type_ratchet', () => {
       'src.ts_ignore increased from 0 to 1',
       'src.files increased from 0 to 1',
     ]);
+  });
+
+  it('explicitly refreshes an existing baseline', () => {
+    const baselinePath = writeFixture(
+      'baseline.json',
+      JSON.stringify({
+        version: 1,
+        generated_at: '2026-07-01T00:00:00.000Z',
+        counts: {
+          src: { any_keywords: 0, as_any: 0, ts_ignore: 0, files: 0 },
+          test: { any_keywords: 0, as_any: 0, ts_ignore: 0, files: 0 },
+        },
+      })
+    );
+    writeFixture('src/example.ts', 'export const value: unknown = 1;');
+
+    const report = checkTypeRatchet({
+      baselinePath,
+      scanRoots: [pathResolver.sharedTmp('check-type-ratchet')],
+      writeBaseline: true,
+    });
+
+    const refreshed = JSON.parse(String(safeReadFile(baselinePath, { encoding: 'utf8' })));
+    expect(report.violations).toEqual([]);
+    expect(refreshed.counts.src.files).toBe(1);
   });
 });

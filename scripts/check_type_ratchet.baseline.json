@@ -1,18 +1,18 @@
 {
   "version": 1,
-  "generated_at": "2026-07-12T07:22:00.000Z",
+  "generated_at": "2026-07-12T21:26:33.655Z",
   "counts": {
     "src": {
-      "any_keywords": 3124,
-      "as_any": 593,
+      "any_keywords": 3174,
+      "as_any": 620,
       "ts_ignore": 7,
-      "files": 1091
+      "files": 1099
     },
     "test": {
-      "any_keywords": 1134,
+      "any_keywords": 1135,
       "as_any": 779,
       "ts_ignore": 2,
-      "files": 773
+      "files": 786
     }
   }
 }
