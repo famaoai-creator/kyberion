@@ -1,4 +1,7 @@
 import type { VideoStoryboard } from './video-content-brief-contract.js';
+import { createLogger } from './logger.js';
+
+const logger = createLogger('narrated-video-brief-compiler');
 import { resolveCreativeDesign } from './creative-design-resolver.js';
 import type {
   VideoCompositionADF,
@@ -96,6 +99,14 @@ export function compileNarratedVideoBriefToCompositionADF(
   const title = brief.title || `${brief.design_system.brand_name} Intro`;
   const compositionFormat = storyboard?.format || resolveDefaultCompositionFormat();
 
+  if (!storyboard?.beats?.length) {
+    // LLM-boundary audit fix C: without a storyboard the scenes are template
+    // pours of brief.script — draft a storyboard (reasoning step) upstream
+    // for story-matched videos.
+    logger.warn(
+      'compiling narrated video without a storyboard — scenes fall back to template text; draft a storyboard first for story-matched output'
+    );
+  }
   const scenes = storyboard?.beats?.length
     ? buildStoryboardScenes(brief, storyboard)
     : buildLegacyScenes(brief, totalDuration);
