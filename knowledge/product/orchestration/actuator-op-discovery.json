@@ -1348,14 +1348,68 @@
     {
       "n": "media-generation-actuator",
       "path": "libs/actuators/media-generation-actuator",
-      "source": "registry",
-      "ops": []
+      "source": "describeOps",
+      "ops": [
+        {
+          "op": "capture_focused_window",
+          "kind": "capture"
+        },
+        {
+          "op": "capture_screen",
+          "kind": "capture"
+        },
+        {
+          "op": "get_generation_job",
+          "kind": "capture"
+        },
+        {
+          "op": "collect_generation_artifact",
+          "kind": "apply"
+        },
+        {
+          "op": "generate_image",
+          "kind": "apply"
+        },
+        {
+          "op": "submit_generation",
+          "kind": "apply"
+        },
+        {
+          "op": "wait_generation_job",
+          "kind": "apply"
+        }
+      ]
     },
     {
       "n": "meeting-actuator",
       "path": "libs/actuators/meeting-actuator",
-      "source": "registry",
-      "ops": []
+      "source": "describeOps",
+      "ops": [
+        {
+          "op": "listen",
+          "kind": "capture"
+        },
+        {
+          "op": "status",
+          "kind": "capture"
+        },
+        {
+          "op": "chat",
+          "kind": "apply"
+        },
+        {
+          "op": "join",
+          "kind": "apply"
+        },
+        {
+          "op": "leave",
+          "kind": "apply"
+        },
+        {
+          "op": "speak",
+          "kind": "apply"
+        }
+      ]
     },
     {
       "n": "meeting-browser-driver",
@@ -2242,20 +2296,119 @@
     {
       "n": "video-composition-actuator",
       "path": "libs/actuators/video-composition-actuator",
-      "source": "registry",
-      "ops": []
+      "source": "describeOps",
+      "ops": [
+        {
+          "op": "get_video_composition_job_status",
+          "kind": "capture"
+        },
+        {
+          "op": "get_video_composition_queue",
+          "kind": "capture"
+        },
+        {
+          "op": "list_video_composition_templates",
+          "kind": "capture"
+        },
+        {
+          "op": "compile_narrated_video_brief",
+          "kind": "transform"
+        },
+        {
+          "op": "compile_video_content_brief",
+          "kind": "transform"
+        },
+        {
+          "op": "await_video_composition_job",
+          "kind": "apply"
+        },
+        {
+          "op": "cancel_video_composition_job",
+          "kind": "apply"
+        },
+        {
+          "op": "create_narrated_intro_movie",
+          "kind": "apply"
+        },
+        {
+          "op": "create_narrated_video_from_content_brief",
+          "kind": "apply"
+        },
+        {
+          "op": "prepare_video_composition",
+          "kind": "apply"
+        },
+        {
+          "op": "verify_rendered_video_artifact",
+          "kind": "apply"
+        }
+      ]
     },
     {
       "n": "vision-actuator",
       "path": "libs/actuators/vision-actuator",
-      "source": "registry",
-      "ops": []
+      "source": "describeOps",
+      "ops": [
+        {
+          "op": "inspect_image",
+          "kind": "capture"
+        },
+        {
+          "op": "ocr_image",
+          "kind": "capture"
+        }
+      ]
     },
     {
       "n": "voice-actuator",
       "path": "libs/actuators/voice-actuator",
-      "source": "registry",
-      "ops": []
+      "source": "describeOps",
+      "ops": [
+        {
+          "op": "health",
+          "kind": "capture"
+        },
+        {
+          "op": "list_voices",
+          "kind": "capture"
+        },
+        {
+          "op": "transcribe",
+          "kind": "capture"
+        },
+        {
+          "op": "transcribe_voice_sample",
+          "kind": "capture"
+        },
+        {
+          "op": "collect_and_register_voice_profile",
+          "kind": "apply"
+        },
+        {
+          "op": "collect_voice_samples",
+          "kind": "apply"
+        },
+        {
+          "op": "generate_voice",
+          "kind": "apply"
+        },
+        {
+          "op": "record_interaction",
+          "kind": "apply"
+        },
+        {
+          "op": "record_voice_sample",
+          "kind": "apply"
+        },
+        {
+          "op": "register_voice_profile",
+          "kind": "apply"
+        },
+        {
+          "op": "speak_local",
+          "kind": "apply"
+        }
+      ]
     },
     {
       "n": "wisdom-actuator",

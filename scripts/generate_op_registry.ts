@@ -26,6 +26,11 @@ import { describeOps as describeServiceOps } from '../libs/actuators/service-act
 import { describeOps as describeOrchestratorOps } from '../libs/actuators/orchestrator-actuator/src/op-catalog.js';
 import { describeOps as describeAndroidOps } from '../libs/actuators/android-actuator/src/op-catalog.js';
 import { describeOps as describeIosOps } from '../libs/actuators/ios-actuator/src/op-catalog.js';
+import { describeOps as describeVisionOps } from '../libs/actuators/vision-actuator/src/op-catalog.js';
+import { describeOps as describeVoiceOps } from '../libs/actuators/voice-actuator/src/op-catalog.js';
+import { describeOps as describeMeetingOps } from '../libs/actuators/meeting-actuator/src/op-catalog.js';
+import { describeOps as describeMediaGenerationOps } from '../libs/actuators/media-generation-actuator/src/op-catalog.js';
+import { describeOps as describeVideoCompositionOps } from '../libs/actuators/video-composition-actuator/src/op-catalog.js';
 
 // AR-02: actuators that self-describe their op surface. The registry and
 // discovery index are generated from these; check:op-registry fails on
@@ -61,6 +66,11 @@ const DESCRIBE_OPS_SOURCES: Record<
   'orchestrator-actuator': describeOrchestratorOps,
   'android-actuator': describeAndroidOps,
   'ios-actuator': describeIosOps,
+  'vision-actuator': describeVisionOps,
+  'voice-actuator': describeVoiceOps,
+  'meeting-actuator': describeMeetingOps,
+  'media-generation-actuator': describeMediaGenerationOps,
+  'video-composition-actuator': describeVideoCompositionOps,
 };
 
 type PipelineOpKind = 'capture' | 'transform' | 'apply' | 'control';
