@@ -22,7 +22,12 @@ import {
   safeWriteFile,
   transitionStatus,
 } from '@agent/core';
-import { finishMission, verifyMission } from './mission-lifecycle.js';
+import {
+  evaluateMissionFinishExitGate,
+  finishMission,
+  reconcileLifecycleClosureCriteria,
+  verifyMission,
+} from './mission-lifecycle.js';
 
 const missionId = 'MSN-LIFECYCLE-GATE-001';
 const missionPath = pathResolver.missionDir(missionId, 'public');
@@ -99,6 +104,46 @@ afterEach(() => {
 });
 
 describe('mission lifecycle finish gate', () => {
+  it('resolves circular lifecycle closure criteria from verify and distill history', () => {
+    const reconciliation = reconcileLifecycleClosureCriteria(
+      {
+        satisfied: false,
+        delivered: [],
+        gaps: [
+          'Mission lifecycle reaches completed with verification and distillation.',
+          'A customer-visible report is delivered.',
+        ],
+        confidence: 0.28,
+        evidence_refs: ['evidence/report.md'],
+      },
+      {
+        status: 'completed',
+        history: [{ event: 'VERIFY' }, { event: 'DISTILL' }],
+      }
+    );
+
+    expect(reconciliation.satisfied).toBe(false);
+    expect(reconciliation.gaps).toEqual(['A customer-visible report is delivered.']);
+    expect(reconciliation.delivered).toContain(
+      'mission lifecycle verification and distillation recorded'
+    );
+
+    const lifecycleOnly = reconcileLifecycleClosureCriteria(
+      {
+        satisfied: false,
+        delivered: [],
+        gaps: ['Mission lifecycle reaches completed with verification and distillation.'],
+        confidence: 0.28,
+      },
+      {
+        status: 'completed',
+        history: [{ event: 'VERIFY' }, { event: 'DISTILL' }],
+      }
+    );
+    expect(lifecycleOnly.satisfied).toBe(true);
+    expect(lifecycleOnly.gaps).toEqual([]);
+  });
+
   it('blocks verification when the intent drift gate sees a blocking origin mismatch', async () => {
     prepareMissionState('active');
     safeMkdir(`${missionPath}/evidence`, { recursive: true });
@@ -200,6 +245,101 @@ describe('mission lifecycle finish gate', () => {
     expect(
       nextTasksAfterSecondFailure.filter((task: any) => task.task_id === 'repair-finish-exit')
     ).toHaveLength(1);
+    expect(
+      nextTasksAfterSecondFailure.find(
+        (task: { task_id?: string; dependencies?: string[] }) =>
+          task.task_id === 'repair-finish-exit'
+      )?.dependencies
+    ).not.toContain('repair-finish-exit');
+  });
+
+  it('closes system repair and goal-gap tasks after dependencies and evidence are complete', () => {
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify(
+        [
+          {
+            task_id: 'task-1',
+            status: 'completed',
+            deliverable: 'evidence/closeout.md',
+          },
+          {
+            task_id: 'repair-finish-exit',
+            status: 'planned',
+            dependencies: ['task-1'],
+            deliverable: 'evidence/repair-finish-exit.md',
+          },
+          {
+            task_id: 'goal-gap-r1-1',
+            status: 'planned',
+            dependencies: [],
+            deliverable: 'evidence/goal-gap-r1-1.md',
+          },
+          {
+            task_id: 'goal-gap-r1-1-review',
+            status: 'planned',
+            dependencies: ['goal-gap-r1-1'],
+            deliverable: 'evidence/REVIEW-goal-gap-r1-1.md',
+          },
+        ],
+        null,
+        2
+      )
+    );
+    seedMissionEvidence('repair-finish-exit.md', '# Repair\nAll pending tasks were verified.');
+    seedMissionEvidence('goal-gap-r1-1.md', '# Goal gap\nVerification and distillation passed.');
+    seedMissionEvidence('REVIEW-goal-gap-r1-1.md', '# Review\nVerified.');
+
+    const gate = evaluateMissionFinishExitGate(missionPath);
+    const tasks = JSON.parse(
+      String(safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }))
+    ) as Array<{ task_id?: string; status?: string }>;
+
+    expect(gate).toEqual({ ok: true, pendingTasks: [] });
+    expect(tasks.find((task) => task.task_id === 'repair-finish-exit')?.status).toBe('completed');
+    expect(tasks.find((task) => task.task_id === 'goal-gap-r1-1-review')?.status).toBe('completed');
+  });
+
+  it('retires stale circular goal repairs for in-flight missions after the lifecycle evidence exists', () => {
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify(
+        [
+          {
+            task_id: 'repair-goal-satisfaction',
+            status: 'planned',
+            description:
+              'Repair mission goal-satisfaction gate failure: Mission lifecycle reaches completed with verification and distillation.',
+            deliverable: 'evidence/repair-goal-satisfaction.md',
+            dependencies: [],
+          },
+          {
+            task_id: 'repair-finish-exit',
+            status: 'planned',
+            description: 'Repair the exit gate after goal satisfaction.',
+            deliverable: 'evidence/repair-finish-exit.md',
+            dependencies: ['repair-goal-satisfaction'],
+          },
+        ],
+        null,
+        2
+      )
+    );
+    seedMissionEvidence(
+      'repair-finish-exit.md',
+      '# Exit repair\nPrior lifecycle evidence verified.'
+    );
+
+    const gate = evaluateMissionFinishExitGate(missionPath, {
+      status: 'validating',
+      history: [{ event: 'VERIFY' }, { event: 'DISTILL' }],
+    });
+    const tasks = JSON.parse(
+      String(safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }))
+    ) as Array<{ task_id?: string; status?: string }>;
+
+    expect(gate).toEqual({ ok: true, pendingTasks: [] });
+    expect(tasks.every((task) => task.status === 'completed')).toBe(true);
   });
 
   it('records a completion reconciliation summary when finish succeeds', async () => {
@@ -257,6 +397,48 @@ describe('mission lifecycle finish gate', () => {
     });
   });
 
+  it('finishes a repaired validating mission through the legal distilling transition', async () => {
+    prepareMissionState('completed', undefined, undefined, {
+      requested_result: 'Deliver mission outcome aligned to the vision.',
+      success_criteria: ['Mission lifecycle reaches completed with verification and distillation.'],
+      deliverable_kind: 'markdown',
+      evidence_required: true,
+      expected_artifacts: [{ kind: 'markdown', storage_class: 'mission' }],
+      verification_method: 'self_check',
+    });
+    const state = JSON.parse(
+      safeReadFile(`${missionPath}/mission-state.json`, { encoding: 'utf8' }) as string
+    );
+    state.status = 'validating';
+    state.history = [
+      { ts: new Date().toISOString(), event: 'VERIFY', note: 'Verified.' },
+      { ts: new Date().toISOString(), event: 'DISTILL', note: 'Distilled.' },
+    ];
+    safeWriteFile(`${missionPath}/mission-state.json`, JSON.stringify(state, null, 2));
+    seedMissionEvidence(
+      'closeout.md',
+      '# Closeout\nDeliver mission outcome aligned to the vision.'
+    );
+    safeWriteFile(`${missionPath}/NEXT_TASKS.json`, JSON.stringify([], null, 2));
+
+    await finishMission(missionId, false, {
+      archiveDir: pathResolver.rootResolve('active/shared/tmp/mission-archives'),
+      agentRuntimeEventPath: `${missionPath}/runtime-events.jsonl`,
+      getGitHash: (cwd: string) => safeExec('git', ['rev-parse', 'HEAD'], { cwd }).trim(),
+      sealMission: async () => undefined,
+      syncProjectLedgerIfLinked: async () => undefined,
+      transitionStatus,
+    });
+
+    const archivedState = JSON.parse(
+      safeReadFile(`${missionPath}/mission-state.json`, { encoding: 'utf8' }) as string
+    );
+    expect(archivedState.status).toBe('archived');
+    expect(
+      archivedState.history.some((entry: { event?: string }) => entry.event === 'FINISH')
+    ).toBe(true);
+  });
+
   it('goal satisfaction loop: dispatches gap tasks instead of completing, and escalates after max rounds', async () => {
     prepareMissionState('completed', undefined, undefined, {
       requested_result: 'Deliver the launch summary report',
@@ -311,14 +493,25 @@ describe('mission lifecycle finish gate', () => {
     state = JSON.parse(
       safeReadFile(`${missionPath}/mission-state.json`, { encoding: 'utf8' }) as string
     );
-    expect(state.status).toBe('validating');
+    expect(state.status).toBe('paused');
     expect(state.context.mission_finish_gate_last_reason).toContain(
       'goal not satisfied after 2 gap-closing rounds'
     );
+    expect(state.context.mission_finish_gate_requires_operator).toBe(true);
     const repairTasks = JSON.parse(
       safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }) as string
     );
-    expect(repairTasks.some((task: any) => task.task_id === 'repair-goal-satisfaction')).toBe(true);
+    expect(repairTasks.some((task: any) => task.task_id === 'repair-goal-satisfaction')).toBe(
+      false
+    );
+
+    const failureCount = state.context.mission_finish_gate_failure_count;
+    await finishMission(missionId, false, args);
+    state = JSON.parse(
+      safeReadFile(`${missionPath}/mission-state.json`, { encoding: 'utf8' }) as string
+    );
+    expect(state.status).toBe('paused');
+    expect(state.context.mission_finish_gate_failure_count).toBe(failureCount);
   });
 
   it('creates a repair task when finish quality validation fails', async () => {
