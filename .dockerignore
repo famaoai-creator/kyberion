@@ -1,9 +1,12 @@
 node_modules
+**/node_modules/
+**/.next/
+**/dist/
 npm-debug.log
 dist
 coverage
 .git
-.github
+# .github stays IN the context: check:reference-drift validates workflow files.
 .vscode
 .gemini
 active/
@@ -15,3 +18,14 @@ test-results/
 .DS_Store
 *.log
 docs/architecture/*.mmd
+
+# Data-tier isolation (OP-03): confidential / personal / customer data must
+# never be baked into an image — images travel (registries, laptops).
+knowledge/personal/
+knowledge/confidential/
+customer/
+work/
+.env
+.env.*
+*.pem
+*.key
