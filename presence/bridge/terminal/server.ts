@@ -193,7 +193,9 @@ function saveSessionState(session: Session, active = Boolean(session.rt)) {
         2
       )
     );
-  } catch (_) {}
+  } catch (err) {
+    logger.warn(`[server] suppressed error in saveSessionState: ${err}`);
+  }
 }
 
 function persistSessionFeedback(session: Session, text: string, skipBroadcast = false) {
@@ -230,7 +232,9 @@ function persistSessionFeedback(session: Session, text: string, skipBroadcast = 
     }
 
     if (!skipBroadcast) emitGlobalStimulus(cleanText, session);
-  } catch (_) {}
+  } catch (err) {
+    logger.warn(`[server] suppressed error in persistSessionFeedback: ${err}`);
+  }
 }
 
 function emitGlobalStimulus(text: string, session: Session) {
@@ -255,7 +259,9 @@ function emitGlobalStimulus(text: string, session: Session) {
     };
     const stimuliFile = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');
     safeAppendFileSync(stimuliFile, JSON.stringify(stimulus) + '\n');
-  } catch (_) {}
+  } catch (err) {
+    logger.warn(`[server] suppressed error in emitGlobalStimulus: ${err}`);
+  }
 }
 
 async function typeLine(session: Session, text: string, useSync = true) {
@@ -307,7 +313,9 @@ async function setupSessionWatcher(session: Session) {
               registry.profiles[profileKey] || registry.profiles[registry.default_profile];
             if (profile) bootCommand = `${profile.cmd} ${profile.args.join(' ')}`;
           }
-        } catch (_) {}
+        } catch (err) {
+          logger.warn(`[server] suppressed error in setupSessionWatcher: ${err}`);
+        }
 
         if (bootCommand && session.active_brain !== requestedBrain) {
           typeLine(session, bootCommand);

@@ -156,7 +156,9 @@ function resolveServiceBaseUrl(serviceId: string): string {
     if (typeof baseUrl === 'string' && baseUrl.trim()) return baseUrl.trim();
     const pattern = typeof catalog?.default_pattern === 'string' ? catalog.default_pattern : '';
     if (pattern.includes('{service_id}')) return pattern.replace('{service_id}', serviceId);
-  } catch (_) {}
+  } catch (err) {
+    logger.warn(`[service-actuator-helpers] suppressed error in resolveServiceBaseUrl: ${err}`);
+  }
   return `https://api.${serviceId}.com/v1`;
 }
 

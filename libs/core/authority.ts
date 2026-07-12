@@ -1,17 +1,10 @@
 import * as path from 'node:path';
-import {
-  safeExistsSync,
-  safeReaddir,
-  safeReadFile,
-} from './secure-io.js';
+import { safeExistsSync, safeReaddir, safeReadFile } from './secure-io.js';
 import * as pathResolver from './path-resolver.js';
-import {
-  Persona,
-  Authority,
-  ExecutionMode,
-  IdentityContext,
-} from './types.js';
+import { Persona, Authority, ExecutionMode, IdentityContext } from './types.js';
 import { getServiceAuthorities } from './service-authority-map.js';
+import { createLogger } from './logger.js';
+const logger = createLogger('authority');
 
 type RolePersonaIndex = {
   authority_roles?: Record<string, { default_persona?: Persona }>;
@@ -29,48 +22,57 @@ type AuthorityRoleFile = {
 
 const LEGACY_ROLE_PERSONA_DEFAULTS: Record<string, Persona> = {
   // system roles
-  ecosystem_architect:     'ecosystem_architect',
-  knowledge_steward:       'analyst',
-  solution_architect:      'ecosystem_architect',
-  integration_steward:     'ecosystem_architect',
-  reliability_engineer:    'worker',
+  ecosystem_architect: 'ecosystem_architect',
+  knowledge_steward: 'analyst',
+  solution_architect: 'ecosystem_architect',
+  integration_steward: 'ecosystem_architect',
+  reliability_engineer: 'worker',
   infrastructure_sentinel: 'worker',
   // mission roles
-  sovereign_concierge:     'sovereign',
-  mission_controller:      'worker',
-  software_developer:      'worker',
-  incident_commander:      'worker',
-  performance_engineer:    'worker',
+  sovereign_concierge: 'sovereign',
+  mission_controller: 'worker',
+  software_developer: 'worker',
+  incident_commander: 'worker',
+  performance_engineer: 'worker',
   // surface/infra authority roles
-  slack_bridge:            'worker',
-  chronos_gateway:         'worker',
-  chronos_operator:        'worker',
-  chronos_localadmin:      'worker',
-  service_actuator:        'worker',
-  surface_runtime:         'worker',
+  slack_bridge: 'worker',
+  chronos_gateway: 'worker',
+  chronos_operator: 'worker',
+  chronos_localadmin: 'worker',
+  service_actuator: 'worker',
+  surface_runtime: 'worker',
   // context roles
-  ceo:                     'analyst',
-  business_owner:          'analyst',
-  product_manager:         'analyst',
-  strategic_sales:         'analyst',
-  marketing_growth:        'analyst',
-  customer_success:        'worker',
-  pmo_governance:          'analyst',
-  qa_lead:                 'analyst',
-  legal_strategist:        'analyst',
-  cyber_security:          'analyst',
-  ruthless_auditor:        'analyst',
-  designer:                'worker',
-  executive_assistant:     'worker',
-  finance_controller:      'analyst',
-  talent_culture:          'worker',
-  line_manager:            'worker',
+  ceo: 'analyst',
+  business_owner: 'analyst',
+  product_manager: 'analyst',
+  strategic_sales: 'analyst',
+  marketing_growth: 'analyst',
+  customer_success: 'worker',
+  pmo_governance: 'analyst',
+  qa_lead: 'analyst',
+  legal_strategist: 'analyst',
+  cyber_security: 'analyst',
+  ruthless_auditor: 'analyst',
+  designer: 'worker',
+  executive_assistant: 'worker',
+  finance_controller: 'analyst',
+  talent_culture: 'worker',
+  line_manager: 'worker',
 };
 
 let cachedRolePersonaIndex: RolePersonaIndex | null = null;
 
-type RoleAuthorityMapEntry = { role: string; persona: Persona; execution_mode?: string; authority_role?: string };
-type RoleAuthorityMap = { system_roles?: RoleAuthorityMapEntry[]; mission_roles?: RoleAuthorityMapEntry[]; context_roles?: RoleAuthorityMapEntry[] };
+type RoleAuthorityMapEntry = {
+  role: string;
+  persona: Persona;
+  execution_mode?: string;
+  authority_role?: string;
+};
+type RoleAuthorityMap = {
+  system_roles?: RoleAuthorityMapEntry[];
+  mission_roles?: RoleAuthorityMapEntry[];
+  context_roles?: RoleAuthorityMapEntry[];
+};
 
 let cachedRoleAuthorityMap: Record<string, Persona> | null = null;
 
@@ -78,14 +80,25 @@ function loadRoleAuthorityMapPersonas(): Record<string, Persona> {
   if (cachedRoleAuthorityMap) return cachedRoleAuthorityMap;
   const filePath = pathResolver.knowledge('product/governance/role-authority-map.json');
   try {
-    if (!safeExistsSync(filePath)) { cachedRoleAuthorityMap = {}; return cachedRoleAuthorityMap; }
-    const raw = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as RoleAuthorityMap;
+    if (!safeExistsSync(filePath)) {
+      cachedRoleAuthorityMap = {};
+      return cachedRoleAuthorityMap;
+    }
+    const raw = JSON.parse(
+      safeReadFile(filePath, { encoding: 'utf8' }) as string
+    ) as RoleAuthorityMap;
     const result: Record<string, Persona> = {};
-    for (const entry of [...(raw.system_roles ?? []), ...(raw.mission_roles ?? []), ...(raw.context_roles ?? [])]) {
+    for (const entry of [
+      ...(raw.system_roles ?? []),
+      ...(raw.mission_roles ?? []),
+      ...(raw.context_roles ?? []),
+    ]) {
       if (entry.role && entry.persona) result[entry.role] = entry.persona;
     }
     cachedRoleAuthorityMap = result;
-  } catch { cachedRoleAuthorityMap = {}; }
+  } catch {
+    cachedRoleAuthorityMap = {};
+  }
   return cachedRoleAuthorityMap;
 }
 
@@ -95,7 +108,9 @@ function loadRolePersonaIndexDirectory(): RolePersonaIndex | null {
     return null;
   }
 
-  const files = safeReaddir(directoryPath).filter((entry) => entry.endsWith('.json')).sort();
+  const files = safeReaddir(directoryPath)
+    .filter((entry) => entry.endsWith('.json'))
+    .sort();
   if (!files.length) {
     return null;
   }
@@ -103,7 +118,9 @@ function loadRolePersonaIndexDirectory(): RolePersonaIndex | null {
   const authority_roles: Record<string, { default_persona?: Persona }> = {};
   for (const file of files) {
     const filePath = pathResolver.knowledge(`product/governance/authority-roles/${file}`);
-    const payload = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as AuthorityRoleFile;
+    const payload = JSON.parse(
+      safeReadFile(filePath, { encoding: 'utf8' }) as string
+    ) as AuthorityRoleFile;
     const role = String(payload.role || '').trim();
     if (!role) {
       throw new Error(`Authority role file ${file} must declare a role id`);
@@ -129,7 +146,9 @@ function loadRolePersonaIndex(): RolePersonaIndex {
 
   const indexPath = pathResolver.knowledge('product/governance/authority-role-index.json');
   try {
-    cachedRolePersonaIndex = JSON.parse(safeReadFile(indexPath, { encoding: 'utf8' }) as string) as RolePersonaIndex;
+    cachedRolePersonaIndex = JSON.parse(
+      safeReadFile(indexPath, { encoding: 'utf8' }) as string
+    ) as RolePersonaIndex;
   } catch {
     cachedRolePersonaIndex = {};
   }
@@ -144,11 +163,13 @@ function loadRolePersonaIndex(): RolePersonaIndex {
 function normalizePersona(value: string | undefined): Persona {
   if (!value) return 'unknown';
   const normalized = value.toLowerCase().replace(/\s+/g, '_');
-  if (normalized === 'sovereign' ||
-      normalized === 'ecosystem_architect' ||
-      normalized === 'mission_owner' ||
-      normalized === 'worker' ||
-      normalized === 'analyst') {
+  if (
+    normalized === 'sovereign' ||
+    normalized === 'ecosystem_architect' ||
+    normalized === 'mission_owner' ||
+    normalized === 'worker' ||
+    normalized === 'analyst'
+  ) {
     return normalized;
   }
   return 'unknown';
@@ -160,7 +181,8 @@ function resolveRole(): string | undefined {
 
   const argv1 = process.argv[1] || '';
   const procName = path.basename(argv1, path.extname(argv1)).toLowerCase().replace(/[-]/g, '_');
-  if (procName.includes('mission_controller') || procName === 'controller') return 'mission_controller';
+  if (procName.includes('mission_controller') || procName === 'controller')
+    return 'mission_controller';
   if (procName.includes('surface_runtime')) return 'surface_runtime';
   if (procName.includes('orchestrator')) return 'orchestrator';
   return procName || undefined;
@@ -178,7 +200,7 @@ export function inferPersonaFromRole(role?: string): Persona {
 export function buildExecutionEnv(
   baseEnv: NodeJS.ProcessEnv = process.env,
   role?: string,
-  persona?: Persona,
+  persona?: Persona
 ): NodeJS.ProcessEnv {
   const nextEnv: NodeJS.ProcessEnv = { ...baseEnv };
   if (role) nextEnv.MISSION_ROLE = role;
@@ -250,9 +272,7 @@ export function resolveIdentityContext(): IdentityContext {
   // Try the legacy no-tier path first, then fall back to tier-aware lookup
   // (covers active/missions/{personal,confidential,public}/{id}/...).
   if (missionId) {
-    const candidates: string[] = [
-      pathResolver.active(`missions/${missionId}/mission-state.json`),
-    ];
+    const candidates: string[] = [pathResolver.active(`missions/${missionId}/mission-state.json`)];
     const tierPath = pathResolver.findMissionPath(missionId);
     if (tierPath) candidates.push(`${tierPath}/mission-state.json`);
     for (const statePath of candidates) {
@@ -279,7 +299,9 @@ export function resolveIdentityContext(): IdentityContext {
           }
           break;
         }
-      } catch (_) {}
+      } catch (err) {
+        logger.warn(`suppressed error in resolveIdentityContext: ${err}`);
+      }
     }
   }
 
@@ -291,11 +313,12 @@ export function resolveIdentityContext(): IdentityContext {
   if (persona === 'unknown') {
     const argv1 = process.argv[1] || '';
     const procName = path.basename(argv1, path.extname(argv1)).toLowerCase().replace(/[-]/g, '_');
-    if (procName.includes('orchestrator') || procName.includes('controller')) persona = 'ecosystem_architect';
+    if (procName.includes('orchestrator') || procName.includes('controller'))
+      persona = 'ecosystem_architect';
   }
 
   // 3. Resolve Authorities
-  
+
   // A. Persona-based intrinsic authorities
   if (persona === 'sovereign' || persona === 'ecosystem_architect') {
     authorities.push('GIT_WRITE', 'SECRET_READ', 'NETWORK_FETCH', 'SYSTEM_EXEC', 'KNOWLEDGE_WRITE');
@@ -306,17 +329,19 @@ export function resolveIdentityContext(): IdentityContext {
   if (safeExistsSync(grantsPath) && missionId) {
     try {
       const grants = JSON.parse(safeReadFile(grantsPath, { encoding: 'utf8' }) as string);
-      const activeGrants = grants.filter((g: any) => 
-        g.missionId === missionId && g.expiresAt > Date.now()
+      const activeGrants = grants.filter(
+        (g: any) => g.missionId === missionId && g.expiresAt > Date.now()
       );
-      
+
       for (const grant of activeGrants) {
         for (const authority of getServiceAuthorities(String(grant.serviceId || ''))) {
           authorities.push(authority as Authority);
         }
         if (grant.authority) authorities.push(grant.authority as Authority);
       }
-    } catch (_) {}
+    } catch (err) {
+      logger.warn(`suppressed error in resolveIdentityContext: ${err}`);
+    }
   }
 
   // C. Environment Sudo Overrides
@@ -325,9 +350,11 @@ export function resolveIdentityContext(): IdentityContext {
   }
 
   const executionMode: ExecutionMode =
-    persona === 'sovereign'           ? 'sovereign' :
-    persona === 'ecosystem_architect' ? 'system' :
-    'mission';
+    persona === 'sovereign'
+      ? 'sovereign'
+      : persona === 'ecosystem_architect'
+        ? 'system'
+        : 'mission';
 
   return {
     persona,

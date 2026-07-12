@@ -2,14 +2,21 @@
  * libs/core/nerve-bridge.ts
  * Kyberion Autonomous Nerve System (KANS) - Nerve Bridge v1.2
  * [SECURE-IO COMPLIANT]
- * 
+ *
  * Provides structured messaging (To/From/Type) over the stimuli bus
  * with Distributed Node Identification (Nerve Cluster Foundation).
  */
 
 import * as path from 'node:path';
 import * as os from 'node:os';
-import { logger, pathResolver, safeReadFile, safeAppendFileSync, safeExistsSync, safeStat } from './index.js';
+import {
+  logger,
+  pathResolver,
+  safeReadFile,
+  safeAppendFileSync,
+  safeExistsSync,
+  safeStat,
+} from './index.js';
 
 const STIMULI_PATH = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');
 const NODE_ID = `${os.hostname()}-${process.pid}`;
@@ -34,12 +41,12 @@ export interface NerveMessage {
  * Send a structured message to the nerve bus
  */
 export function sendNerveMessage(input: {
-  to: string | 'broadcast',
-  from: string,
-  intent: string,
-  payload: any,
-  type?: NerveMessage['type'],
-  replyTo?: string
+  to: string | 'broadcast';
+  from: string;
+  intent: string;
+  payload: any;
+  type?: NerveMessage['type'];
+  replyTo?: string;
 }): string {
   const msg: NerveMessage = {
     id: `msg-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
@@ -53,15 +60,17 @@ export function sendNerveMessage(input: {
     metadata: {
       reply_to: input.replyTo,
       mission_id: process.env.MISSION_ID,
-      ttl: 60
-    }
+      ttl: 60,
+    },
   };
 
   try {
     safeAppendFileSync(STIMULI_PATH, JSON.stringify(msg) + '\n');
     logger.info(`📡 [BRIDGE:${NODE_ID}] Message sent: ${msg.intent} (${msg.from} -> ${msg.to})`);
-  } catch (_) {}
-  
+  } catch (err) {
+    logger.warn(`[nerve-bridge] suppressed error in sendNerveMessage: ${err}`);
+  }
+
   return msg.id;
 }
 
@@ -70,7 +79,7 @@ export function sendNerveMessage(input: {
  */
 export function listenToNerve(nerveId: string, onMessage: (msg: NerveMessage) => void) {
   logger.info(`👂 [BRIDGE:${NODE_ID}] Nerve '${nerveId}' started listening...`);
-  
+
   let lastSize = 0;
   if (safeExistsSync(STIMULI_PATH)) {
     lastSize = safeStat(STIMULI_PATH).size;
@@ -78,14 +87,14 @@ export function listenToNerve(nerveId: string, onMessage: (msg: NerveMessage) =>
 
   const timer = setInterval(() => {
     if (!safeExistsSync(STIMULI_PATH)) return;
-    
+
     const stats = safeStat(STIMULI_PATH);
     if (stats.size > lastSize) {
       const content = safeReadFile(STIMULI_PATH, { encoding: null }) as Buffer;
       const appended = content.subarray(lastSize).toString('utf8');
       const newLines = appended.trim().split('\n');
-      
-      newLines.forEach(line => {
+
+      newLines.forEach((line) => {
         if (!line) return;
         try {
           const msg = JSON.parse(line) as NerveMessage;
@@ -93,7 +102,9 @@ export function listenToNerve(nerveId: string, onMessage: (msg: NerveMessage) =>
           if ((msg.to === nerveId || msg.to === 'broadcast') && msg.node_id !== NODE_ID) {
             onMessage(msg);
           }
-        } catch (e) {}
+        } catch (err) {
+          logger.warn(`[nerve-bridge] suppressed error in listenToNerve: ${err}`);
+        }
       });
       lastSize = stats.size;
     }

@@ -130,7 +130,9 @@ function registerDefaultStructuredRunners(): void {
 }
 
 export function loadUserLlmTools(): UserLlmTools {
-  const identityPath = customerResolver.customerRoot('my-identity.json') ?? pathResolver.knowledge('personal/my-identity.json');
+  const identityPath =
+    customerResolver.customerRoot('my-identity.json') ??
+    pathResolver.knowledge('personal/my-identity.json');
   if (!safeExistsSync(identityPath)) return {};
   try {
     const identity = readJsonFile<{ llm_tools?: UserLlmTools }>(identityPath);
@@ -145,7 +147,10 @@ export function isToolAvailable(command: string, userTools: UserLlmTools): boole
   return userTools.available.includes(command);
 }
 
-export function probeLlmCommandAvailability(command: string): { available: boolean; reason?: string } {
+export function probeLlmCommandAvailability(command: string): {
+  available: boolean;
+  reason?: string;
+} {
   const cached = commandAvailabilityCache.get(command);
   if (cached) return cached;
 
@@ -155,7 +160,8 @@ export function probeLlmCommandAvailability(command: string): { available: boole
     commandAvailabilityCache.set(command, result);
     return result;
   } catch (err: any) {
-    const reason = err?.stderr?.toString?.().trim?.() || err?.message || `failed to execute ${command}`;
+    const reason =
+      err?.stderr?.toString?.().trim?.() || err?.message || `failed to execute ${command}`;
     const result = { available: false, reason };
     commandAvailabilityCache.set(command, result);
     return result;
@@ -169,10 +175,7 @@ export function invokeShellProfile(prompt: string, profile: LlmProfile): string 
   return stdout;
 }
 
-function resolveCandidateProfileNames(
-  purpose: string,
-  policy?: LlmPolicyConfig,
-): string[] {
+function resolveCandidateProfileNames(purpose: string, policy?: LlmPolicyConfig): string[] {
   const purposeMap = policy?.purpose_map || {};
   const defaultName = policy?.default_profile || 'standard';
   const overrideProfile = process.env.KYBERION_WISDOM_LLM_PROFILE?.trim();
@@ -181,19 +184,14 @@ function resolveCandidateProfileNames(
   const profiles = Object.keys(policy?.profiles || {});
 
   return Array.from(
-    new Set([
-      targetName,
-      ...PROFILE_FALLBACK_ORDER,
-      ...profiles,
-      'stub',
-    ].filter(Boolean)),
+    new Set([targetName, ...PROFILE_FALLBACK_ORDER, ...profiles, 'stub'].filter(Boolean))
   );
 }
 
 export function inspectLlmResolution(
   purpose: string,
   policy?: LlmPolicyConfig,
-  options: LlmResolutionOptions = {},
+  options: LlmResolutionOptions = {}
 ): LlmResolutionStatus {
   const userTools = options.userTools ?? loadUserLlmTools();
   const organizationProfile = options.organizationProfile ?? loadOrganizationProfile();
@@ -231,7 +229,9 @@ export function inspectLlmResolution(
       });
       continue;
     }
-    const availability = options.isCommandAvailable?.(effectiveProfile.command) ?? probeLlmCommandAvailability(effectiveProfile.command);
+    const availability =
+      options.isCommandAvailable?.(effectiveProfile.command) ??
+      probeLlmCommandAvailability(effectiveProfile.command);
     checkedProfiles.push({
       name,
       command: effectiveProfile.command,
@@ -257,7 +257,9 @@ export function inspectLlmResolution(
     };
   }
 
-  const fallbackAvailability = options.isCommandAvailable?.(BUILTIN_FALLBACK.command) ?? probeLlmCommandAvailability(BUILTIN_FALLBACK.command);
+  const fallbackAvailability =
+    options.isCommandAvailable?.(BUILTIN_FALLBACK.command) ??
+    probeLlmCommandAvailability(BUILTIN_FALLBACK.command);
   checkedProfiles.push({
     name: 'builtin-fallback',
     command: BUILTIN_FALLBACK.command,
@@ -280,12 +282,16 @@ export function inspectLlmResolution(
 export function resolveLlmConfig(
   purpose: string,
   policy?: LlmPolicyConfig,
-  options: LlmResolutionOptions = {},
+  options: LlmResolutionOptions = {}
 ): LlmProfile {
   const userTools = options.userTools ?? loadUserLlmTools();
   const organizationProfile = options.organizationProfile ?? loadOrganizationProfile();
   const profiles = policy?.profiles || {};
-  const status = inspectLlmResolution(purpose, policy, { ...options, userTools, organizationProfile });
+  const status = inspectLlmResolution(purpose, policy, {
+    ...options,
+    userTools,
+    organizationProfile,
+  });
 
   for (const entry of status.checkedProfiles) {
     if (entry.available && entry.name !== 'builtin-fallback') {
@@ -295,10 +301,14 @@ export function resolveLlmConfig(
       const userOverride = userTools.profile_overrides?.[entry.name];
       const merged = { ...profile, ...(orgOverride || {}), ...(userOverride || {}) } as LlmProfile;
       if (userOverride?.command && isToolAvailable(userOverride.command, userTools)) {
-        logger.info(`🤖 LLM resolved: purpose="${purpose}" → profile="${entry.name}" (user override, cmd=${merged.command})`);
+        logger.info(
+          `🤖 LLM resolved: purpose="${purpose}" → profile="${entry.name}" (user override, cmd=${merged.command})`
+        );
         return merged;
       }
-      logger.info(`🤖 LLM resolved: purpose="${purpose}" → profile="${entry.name}" (cmd=${merged.command})`);
+      logger.info(
+        `🤖 LLM resolved: purpose="${purpose}" → profile="${entry.name}" (cmd=${merged.command})`
+      );
       return merged;
     }
   }
@@ -313,8 +323,8 @@ export function resolveLlmConfig(
     .join('; ');
   throw new Error(
     `No usable LLM tool available for purpose "${purpose}". ` +
-    `Set KYBERION_WISDOM_LLM_PROFILE, update wisdom-policy.json, or use stub distillation. ` +
-    `Checks: ${details || 'none'}`,
+      `Set KYBERION_WISDOM_LLM_PROFILE, update wisdom-policy.json, or use stub distillation. ` +
+      `Checks: ${details || 'none'}`
   );
 }
 
@@ -328,10 +338,10 @@ export async function runStructuredLlmProfile<T>(
   profile: LlmProfile,
   prompt: string,
   schema: ZodType<T>,
-  options: { systemPrompt?: string } = {},
+  options: { systemPrompt?: string } = {}
 ): Promise<T> {
   registerDefaultStructuredRunners();
-  
+
   // Custom adapter takes absolute precedence if registered
   const adapter = inferAdapter(profile);
   if (structuredRunners.has(adapter)) {
@@ -370,16 +380,17 @@ export function parseLlmResponse(raw: string, responseFormat?: string): any {
   let content: string;
   if (format === 'json_envelope') {
     const envelope = JSON.parse(raw);
-    content = typeof envelope.result === 'string'
-      ? envelope.result
-      : JSON.stringify(envelope.result);
+    content =
+      typeof envelope.result === 'string' ? envelope.result : JSON.stringify(envelope.result);
   } else {
     content = raw;
   }
 
   try {
     return JSON.parse(content);
-  } catch (_) {}
+  } catch (err) {
+    logger.warn(`[mission-llm] suppressed error in parseLlmResponse: ${err}`);
+  }
 
   const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
   if (jsonMatch) {
@@ -400,7 +411,11 @@ export async function runAdaptiveStructuredLlmProfile<T>(
   purpose: string,
   prompt: string,
   schema: ZodType<T>,
-  options: { systemPrompt?: string; policy?: LlmPolicyConfig; isCommandAvailable?: (command: string) => { available: boolean; reason?: string } } = {},
+  options: {
+    systemPrompt?: string;
+    policy?: LlmPolicyConfig;
+    isCommandAvailable?: (command: string) => { available: boolean; reason?: string };
+  } = {}
 ): Promise<T> {
   const { policy, systemPrompt, isCommandAvailable } = options;
   const candidateNames = resolveCandidateProfileNames(purpose, policy);
@@ -420,7 +435,8 @@ export async function runAdaptiveStructuredLlmProfile<T>(
       continue;
     }
 
-    const availability = isCommandAvailable?.(profile.command) ?? probeLlmCommandAvailability(profile.command);
+    const availability =
+      isCommandAvailable?.(profile.command) ?? probeLlmCommandAvailability(profile.command);
     if (!availability.available) {
       logger.info(`  [Skip] ${name}: ${availability.reason || 'unavailable'}`);
       continue;
