@@ -97,6 +97,11 @@
       "transform": [],
       "apply": ["append_event", "ensure_dir", "write_delivery_pack", "write_json"]
     },
+    "blockchain": {
+      "capture": ["verify_anchor"],
+      "transform": [],
+      "apply": ["anchor_mission", "anchor_trust"]
+    },
     "browser": {
       "capture": [
         "console",
@@ -137,6 +142,24 @@
         "wait_ref"
       ]
     },
+    "build": {
+      "capture": [],
+      "transform": [],
+      "apply": [
+        "android_build",
+        "android_bundle",
+        "android_test",
+        "ios_archive",
+        "ios_build",
+        "ios_generate_project",
+        "ios_test"
+      ]
+    },
+    "calendar": {
+      "capture": ["list_calendars", "list_events"],
+      "transform": [],
+      "apply": ["create_event"]
+    },
     "code": {
       "capture": [
         "discover_capabilities",
@@ -153,6 +176,11 @@
       "capture": ["app-server", "cloud", "features", "mcp", "review"],
       "transform": [],
       "apply": ["exec", "plugin"]
+    },
+    "email": {
+      "capture": [],
+      "transform": [],
+      "apply": ["create_draft", "send", "send_from_file"]
     },
     "file": {
       "capture": ["exists", "list", "read", "read_file", "read_json", "search", "stat", "tail"],
@@ -222,6 +250,11 @@
       "capture": ["discover_capabilities", "discover_skills"],
       "transform": [],
       "apply": ["deploy", "log"]
+    },
+    "presence": {
+      "capture": [],
+      "transform": [],
+      "apply": ["dispatch", "dispatch_timeline", "receive_event", "record_interaction"]
     },
     "process": {
       "capture": ["list", "list-surfaces", "status"],
