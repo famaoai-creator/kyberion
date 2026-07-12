@@ -4509,7 +4509,7 @@
     {
       "path": "product/pipeline-templates/automate-browser-workflow.json",
       "tier": "public",
-      "size": 2396,
+      "size": 2219,
       "type": "json"
     },
     {
@@ -4522,12 +4522,6 @@
       "path": "product/pipeline-templates/board-meeting-prep.json",
       "tier": "public",
       "size": 3188,
-      "type": "json"
-    },
-    {
-      "path": "product/pipeline-templates/browser-authenticated-snapshot.json",
-      "tier": "public",
-      "size": 2038,
       "type": "json"
     },
     {
@@ -4863,7 +4857,7 @@
     {
       "path": "product/pipeline-templates/meeting-proxy-workflow.json",
       "tier": "public",
-      "size": 3267,
+      "size": 3100,
       "type": "json"
     },
     {
@@ -5043,7 +5037,7 @@
     {
       "path": "product/pipeline-templates/speak-with-my-voice.json",
       "tier": "public",
-      "size": 1773,
+      "size": 1509,
       "type": "json"
     },
     {
