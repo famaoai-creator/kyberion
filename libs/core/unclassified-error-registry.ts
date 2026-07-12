@@ -1,6 +1,8 @@
 import { pathResolver } from './path-resolver.js';
 import { safeReadFile, safeWriteFile, safeExistsSync } from './secure-io.js';
 import * as nodePath from 'node:path';
+import { createLogger } from './logger.js';
+const logger = createLogger('unclassified-error-registry');
 
 export interface UnclassifiedErrorEntry {
   message_excerpt: string;
@@ -17,7 +19,12 @@ interface UnclassifiedErrorRegistry {
   entries: UnclassifiedErrorEntry[];
 }
 
-const REGISTRY_RELATIVE = nodePath.join('active', 'shared', 'tmp', 'unclassified-error-registry.json');
+const REGISTRY_RELATIVE = nodePath.join(
+  'active',
+  'shared',
+  'tmp',
+  'unclassified-error-registry.json'
+);
 const EXCERPT_LEN = 200;
 
 // In-process cooldown: skip disk write if the same excerpt was recorded within 60 s.
@@ -41,7 +48,9 @@ function readRegistry(): UnclassifiedErrorRegistry {
 function writeRegistry(registry: UnclassifiedErrorRegistry): void {
   try {
     safeWriteFile(registryPath(), JSON.stringify(registry, null, 2));
-  } catch { /* observability must never break the caller */ }
+  } catch {
+    /* observability must never break the caller */
+  }
 }
 
 /**
@@ -63,7 +72,7 @@ export function recordUnclassifiedError(message: string, code?: string | number)
     const timestamp = new Date(now).toISOString();
     const registry = readRegistry();
     const existing = registry.entries.find(
-      e => e.message_excerpt === excerpt && e.code === codeStr,
+      (e) => e.message_excerpt === excerpt && e.code === codeStr
     );
 
     if (existing) {
@@ -82,7 +91,9 @@ export function recordUnclassifiedError(message: string, code?: string | number)
     }
 
     writeRegistry(registry);
-  } catch { /* never propagate */ }
+  } catch {
+    /* never propagate */
+  }
 }
 
 export function listUnclassifiedErrors(): UnclassifiedErrorEntry[] {
@@ -101,14 +112,16 @@ export function markReconciled(excerpts: string[]): void {
       }
     }
     writeRegistry(registry);
-  } catch {}
+  } catch (err) {
+    logger.warn(`suppressed error in markReconciled: ${err}`);
+  }
 }
 
 export function pruneReconciled(): number {
   try {
     const registry = readRegistry();
     const before = registry.entries.length;
-    registry.entries = registry.entries.filter(e => !e.reconciled);
+    registry.entries = registry.entries.filter((e) => !e.reconciled);
     writeRegistry(registry);
     return before - registry.entries.length;
   } catch {

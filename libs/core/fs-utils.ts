@@ -1,6 +1,8 @@
 import * as path from 'node:path';
 import { loadProjectStandards } from './config-loader.js';
 import { safeLstat, safeReaddir } from './secure-io.js';
+import { createLogger } from './logger.js';
+const logger = createLogger('fs-utils');
 
 const standards = loadProjectStandards();
 
@@ -35,7 +37,9 @@ export function* walk(dir: string, options: WalkOptions = {}): Generator<string>
         if (standards.ignore_extensions.includes(ext)) continue;
         yield fullPath;
       }
-    } catch (_e) {}
+    } catch (err) {
+      logger.warn(`suppressed error in walk: ${err}`);
+    }
   }
 }
 
@@ -72,7 +76,9 @@ export async function* walkAsync(dir: string, options: WalkOptions = {}): AsyncG
         if (standards.ignore_extensions.includes(ext)) continue;
         yield fullPath;
       }
-    } catch (_e) {}
+    } catch (err) {
+      logger.warn(`suppressed error in walkAsync: ${err}`);
+    }
   }
 }
 
@@ -90,11 +96,15 @@ export async function getAllFilesAsync(dir: string, options: WalkOptions = {}): 
 /**
  * Map an array through an async function with limited concurrency.
  */
-export async function mapAsync<T, R>(items: T[], concurrency: number, taskFn: (item: T) => Promise<R>): Promise<R[]> {
+export async function mapAsync<T, R>(
+  items: T[],
+  concurrency: number,
+  taskFn: (item: T) => Promise<R>
+): Promise<R[]> {
   const results: R[] = [];
   const queue = [...items];
   const total = items.length;
-  
+
   const runners = Array(Math.min(concurrency, items.length))
     .fill(null)
     .map(async () => {

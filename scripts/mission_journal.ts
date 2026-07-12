@@ -1,5 +1,11 @@
 import * as path from 'node:path';
-import { logger, pathResolver, resolveMissionJournalPolicy, safeExistsSync, safeReaddir } from '@agent/core';
+import {
+  logger,
+  pathResolver,
+  resolveMissionJournalPolicy,
+  safeExistsSync,
+  safeReaddir,
+} from '@agent/core';
 import chalk from 'chalk';
 import { readJsonFile } from './refactor/cli-input.js';
 
@@ -28,7 +34,7 @@ function scanMissions() {
     pathResolver.active('missions/public'),
     pathResolver.active('missions/confidential'),
     pathResolver.knowledge('personal/missions'),
-    pathResolver.active('archive/missions')
+    pathResolver.active('archive/missions'),
   ];
 
   const missions: Mission[] = [];
@@ -41,7 +47,9 @@ function scanMissions() {
       if (safeExistsSync(statePath)) {
         try {
           missions.push(readJsonFile<Mission>(statePath));
-        } catch (_) {}
+        } catch (err) {
+          logger.warn(`[mission_journal] suppressed error in scanMissions: ${err}`);
+        }
       }
     }
   }
@@ -56,27 +64,34 @@ function scanMissions() {
 function renderJournal() {
   const policy = resolveMissionJournalPolicy();
   console.log(chalk.bold.cyan(`\n📜 [KYBERION] ${policy.title}\n`));
-  
+
   const missions = scanMissions();
-  
+
   if (missions.length === 0) {
     console.log(policy.empty_message);
     return;
   }
 
-  missions.forEach(m => {
-    const statusColor = m.status === 'completed' ? chalk.green : m.status === 'active' ? chalk.yellow : chalk.gray;
+  missions.forEach((m) => {
+    const statusColor =
+      m.status === 'completed' ? chalk.green : m.status === 'active' ? chalk.yellow : chalk.gray;
     const tierIcon = m.tier === 'personal' ? '🛡️' : m.tier === 'confidential' ? '🔒' : '🌐';
-    
-    console.log(`${tierIcon} ${chalk.bold(m.mission_id.padEnd(25))} [${statusColor(m.status.toUpperCase())}] (${m.tier})`);
-    
+
+    console.log(
+      `${tierIcon} ${chalk.bold(m.mission_id.padEnd(25))} [${statusColor(m.status.toUpperCase())}] (${m.tier})`
+    );
+
     // Relationships
     if (m.relationships) {
       if (m.relationships.prerequisites?.length) {
-        console.log(`   ${chalk.blue(`← ${policy.relationship_labels.prerequisites}:`)} ${m.relationships.prerequisites.join(', ')}`);
+        console.log(
+          `   ${chalk.blue(`← ${policy.relationship_labels.prerequisites}:`)} ${m.relationships.prerequisites.join(', ')}`
+        );
       }
       if (m.relationships.successors?.length) {
-        console.log(`   ${chalk.magenta(`→ ${policy.relationship_labels.successors}:`)} ${m.relationships.successors.join(', ')}`);
+        console.log(
+          `   ${chalk.magenta(`→ ${policy.relationship_labels.successors}:`)} ${m.relationships.successors.join(', ')}`
+        );
       }
     }
 
@@ -84,7 +99,9 @@ function renderJournal() {
       const isLast = idx === m.history.length - 1;
       const prefix = isLast ? ' └── ' : ' ├── ';
       const time = new Date(h.ts).toLocaleString();
-      console.log(`   ${chalk.gray(prefix)}${chalk.dim(time)}: ${chalk.white(h.event)} - ${chalk.italic(h.note)}`);
+      console.log(
+        `   ${chalk.gray(prefix)}${chalk.dim(time)}: ${chalk.white(h.event)} - ${chalk.italic(h.note)}`
+      );
     });
     console.log('');
   });
@@ -96,7 +113,7 @@ function renderJournal() {
   }, {} as any);
 
   console.log(chalk.bold(`📈 ${policy.summary_title}:`));
-  Object.keys(stats).forEach(s => {
+  Object.keys(stats).forEach((s) => {
     console.log(`  - ${s.toUpperCase()}: ${stats[s]}`);
   });
   console.log(`  - TOTAL MISSIONS: ${missions.length}\n`);
@@ -107,7 +124,7 @@ function renderJournal() {
     const raw = readJsonFile<any>(ledgerPath);
     const ledger = raw?.agents ?? raw ?? {};
     console.log(chalk.bold(`🤝 ${policy.trust_scores_title}:`));
-    Object.keys(ledger).forEach(a => {
+    Object.keys(ledger).forEach((a) => {
       const score = ledger[a].current_score;
       const normalized = score / 100;
       const color = normalized >= 7.0 ? chalk.green : normalized >= 5.0 ? chalk.yellow : chalk.red;

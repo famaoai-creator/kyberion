@@ -786,7 +786,9 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
             if (safeExistsSync(statePath)) {
               try {
                 state = JSON.parse(safeReadFile(statePath, { encoding: 'utf8' }) as string);
-              } catch {}
+              } catch (err) {
+                logger.warn(`[system-pipeline-helpers] suppressed error in scanDir: ${err}`);
+              }
             }
             if (requestedStatus && state?.status !== requestedStatus) continue;
             allMissions.push({
@@ -826,7 +828,9 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
                 description: pkg.description,
                 version: pkg.version,
               });
-            } catch {}
+            } catch (err) {
+              logger.warn(`[system-pipeline-helpers] suppressed error in scanDir: ${err}`);
+            }
           }
         }
       }

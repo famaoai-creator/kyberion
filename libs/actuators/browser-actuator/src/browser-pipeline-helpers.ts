@@ -1400,7 +1400,11 @@ function loadPasskeyProviderCatalog(): {
         safeReadFile(passkeyProviderCatalogPath, { encoding: 'utf8' }) as string
       );
       if (parsed && typeof parsed === 'object' && parsed.providers) return parsed;
-    } catch (_) {}
+    } catch (err) {
+      logger.warn(
+        `[browser-pipeline-helpers] suppressed error in loadPasskeyProviderCatalog: ${err}`
+      );
+    }
   }
 
   return {

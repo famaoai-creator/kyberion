@@ -1135,7 +1135,9 @@ async function speakReplyManaged(text: string): Promise<void> {
     if (refTextFile && safeExistsSync(refTextFile)) {
       try {
         refText = (safeReadFile(refTextFile, { encoding: 'utf8' }) as string).trim();
-      } catch (_) {}
+      } catch (err) {
+        logger.warn(`[server] suppressed error in speakReplyManaged: ${err}`);
+      }
     }
 
     const tmpPath = pathResolver.sharedTmp(`voice-playback-${Date.now()}.wav`);

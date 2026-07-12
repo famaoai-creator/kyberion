@@ -12,6 +12,8 @@ import type { AgentHandle, SpawnOptions } from './agent-lifecycle.js';
 import type { AgentRecord } from './agent-registry.js';
 import { resolveAgentTrustScore } from './agent-registry.js';
 import type { TaskModelHint } from './reasoning-model-routing.js';
+import { createLogger } from './logger.js';
+const logger = createLogger('agent-runtime-supervisor-client');
 
 type SupervisorMethod =
   | 'health'
@@ -176,7 +178,9 @@ async function waitForSupervisorHealth(
 export async function ensureAgentRuntimeSupervisorDaemon(): Promise<AgentRuntimeSupervisorHealth> {
   try {
     return await waitForSupervisorHealth(750);
-  } catch (_) {}
+  } catch (err) {
+    logger.warn(`suppressed error in ensureAgentRuntimeSupervisorDaemon: ${err}`);
+  }
 
   ensureSocketDir();
 

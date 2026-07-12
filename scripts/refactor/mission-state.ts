@@ -224,7 +224,9 @@ export function getActiveMissionSearchDirs(): string[] {
       return ACTIVE_TIERS.map((tier) => dirs[tier])
         .filter((d): d is string => !!d)
         .map((d) => pathResolver.rootResolve(d));
-    } catch (_) {}
+    } catch (err) {
+      logger.warn(`[mission-state] suppressed error in getActiveMissionSearchDirs: ${err}`);
+    }
   }
   return [pathResolver.active('missions')];
 }
@@ -241,9 +243,13 @@ export function listMissionsInSearchDirs(): Array<{ missionId: string; missionPa
             missionId: entry,
             missionPath: path.join(dir, entry),
           });
-        } catch (_) {}
+        } catch (err) {
+          logger.warn(`[mission-state] suppressed error in listMissionsInSearchDirs: ${err}`);
+        }
       }
-    } catch (_) {}
+    } catch (err) {
+      logger.warn(`[mission-state] suppressed error in listMissionsInSearchDirs: ${err}`);
+    }
   }
   return missions;
 }
