@@ -16,6 +16,8 @@ import {
   safeWriteFile,
   withExecutionContext,
   withLock,
+  resolveOnboardingText,
+  resolveOperatorLocale,
 } from '@agent/core';
 import {
   evaluateReasoningBackend,
@@ -211,17 +213,20 @@ export async function applyTenants(
 export async function applyTutorial(input: ApplyInput, now: string) {
   const mode = input.tutorial?.mode || 'simulate';
   const flowPolicy = resolveOnboardingFlowPolicy();
-  const summary = input.tutorial?.summary || flowPolicy.tutorial_default_summary;
+  const onboardingLocale = resolveOperatorLocale();
+  const summary =
+    input.tutorial?.summary ||
+    resolveOnboardingText(flowPolicy.tutorial_default_summary, onboardingLocale);
   const planPath = path.join(onboardingRoot(), 'tutorial-plan.md');
   await writeText(
     planPath,
     [
-      `# ${flowPolicy.tutorial_plan_title}`,
+      `# ${resolveOnboardingText(flowPolicy.tutorial_plan_title, onboardingLocale)}`,
       '',
       `- Mode: ${mode}`,
       `- Summary: ${summary}`,
       '',
-      `## ${flowPolicy.tutorial_next_step_title}`,
+      `## ${resolveOnboardingText(flowPolicy.tutorial_next_step_title, onboardingLocale)}`,
       mode === 'apply'
         ? '- Review the plan and create a mission manually if the setup is ready.'
         : '- Run the tutorial as a dry-run first, then decide whether to promote it to a mission.',

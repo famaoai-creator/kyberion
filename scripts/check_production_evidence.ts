@@ -1,5 +1,12 @@
 #!/usr/bin/env node
-import { pathResolver, resolveProductionEvidenceSummaryPolicy, safeExistsSync, safeReadFile } from '@agent/core';
+import {
+  pathResolver,
+  resolveProductionEvidenceSummaryPolicy,
+  safeExistsSync,
+  safeReadFile,
+  resolveOnboardingText,
+  resolveOperatorLocale,
+} from '@agent/core';
 
 export type ProductionEvidenceStatus = 'pending_external_evidence' | 'verified';
 
@@ -43,10 +50,17 @@ export interface ProductionEvidenceSummary {
 
 const DEFAULT_REGISTER_PATH = 'knowledge/product/governance/production-evidence-register.json';
 const SUPPORTED_REF_SCHEMES = ['http:', 'https:'];
-export const REQUIRED_PRODUCTION_EVIDENCE_IDS = ['EV-30DAY-OPS', 'EV-EXT-CONTRIB', 'EV-FDE-DEPLOY'] as const;
+export const REQUIRED_PRODUCTION_EVIDENCE_IDS = [
+  'EV-30DAY-OPS',
+  'EV-EXT-CONTRIB',
+  'EV-FDE-DEPLOY',
+] as const;
 const SEMVER_RE = /^[0-9]+\.[0-9]+\.[0-9]+$/;
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-const MINIMUM_EVIDENCE_REF_COUNTS: Record<(typeof REQUIRED_PRODUCTION_EVIDENCE_IDS)[number], number> = {
+const MINIMUM_EVIDENCE_REF_COUNTS: Record<
+  (typeof REQUIRED_PRODUCTION_EVIDENCE_IDS)[number],
+  number
+> = {
   'EV-30DAY-OPS': 3,
   'EV-EXT-CONTRIB': 3,
   'EV-FDE-DEPLOY': 4,
@@ -56,10 +70,18 @@ const REQUIRED_TEMPLATE_REFS: Record<(typeof REQUIRED_PRODUCTION_EVIDENCE_IDS)[n
   'EV-EXT-CONTRIB': 'docs/operator/templates/production-evidence-external-contribution.md',
   'EV-FDE-DEPLOY': 'docs/operator/templates/production-evidence-fde-deployment.md',
 };
-const REQUIRED_REF_REQUIREMENT_IDS: Record<(typeof REQUIRED_PRODUCTION_EVIDENCE_IDS)[number], readonly string[]> = {
+const REQUIRED_REF_REQUIREMENT_IDS: Record<
+  (typeof REQUIRED_PRODUCTION_EVIDENCE_IDS)[number],
+  readonly string[]
+> = {
   'EV-30DAY-OPS': ['run_summary', 'trace_bundle', 'incident_summary'],
   'EV-EXT-CONTRIB': ['issue_url', 'pr_url', 'review_record'],
-  'EV-FDE-DEPLOY': ['deployment_summary', 'customer_overlay', 'runtime_artifact', 'no_fork_statement'],
+  'EV-FDE-DEPLOY': [
+    'deployment_summary',
+    'customer_overlay',
+    'runtime_artifact',
+    'no_fork_statement',
+  ],
 };
 const REQUIRED_REF_REQUIREMENT_PATTERNS: Record<string, readonly string[]> = {
   run_summary: ['docs/operator/', 'https://'],
@@ -67,7 +89,10 @@ const REQUIRED_REF_REQUIREMENT_PATTERNS: Record<string, readonly string[]> = {
   incident_summary: ['docs/operator/', 'https://'],
   issue_url: ['/issues/'],
   pr_url: ['/pull/'],
-  review_record: ['docs/operator/templates/production-evidence-external-contribution.md', 'https://github.com/'],
+  review_record: [
+    'docs/operator/templates/production-evidence-external-contribution.md',
+    'https://github.com/',
+  ],
   deployment_summary: ['docs/operator/', 'https://'],
   customer_overlay: ['customer/', 'docs/operator/', 'https://'],
   runtime_artifact: ['active/shared/logs/traces/', 'active/shared/tmp/', 'https://'],
@@ -83,7 +108,9 @@ function parseRegister(raw: string, source: string): ProductionEvidenceRegister 
   }
 }
 
-export function loadProductionEvidenceRegister(registerPath = DEFAULT_REGISTER_PATH): ProductionEvidenceRegister {
+export function loadProductionEvidenceRegister(
+  registerPath = DEFAULT_REGISTER_PATH
+): ProductionEvidenceRegister {
   const resolved = pathResolver.rootResolve(registerPath);
   const raw = safeReadFile(resolved, { encoding: 'utf8' }) as string;
   return parseRegister(raw, registerPath);
@@ -120,9 +147,7 @@ function isValidIsoCalendarDate(value: string): boolean {
   const [year, month, day] = value.split('-').map(Number);
   const date = new Date(Date.UTC(year, month - 1, day));
   return (
-    date.getUTCFullYear() === year &&
-    date.getUTCMonth() === month - 1 &&
-    date.getUTCDate() === day
+    date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
   );
 }
 
@@ -130,7 +155,10 @@ function isValidPastOrTodayIsoDate(value: string): boolean {
   return isValidIsoCalendarDate(value) && value <= todayIsoDate();
 }
 
-function matchesRefRequirement(ref: string, requirement: ProductionEvidenceRefRequirement): boolean {
+function matchesRefRequirement(
+  ref: string,
+  requirement: ProductionEvidenceRefRequirement
+): boolean {
   return requirement.accepted_ref_patterns.some((pattern) => ref.includes(pattern));
 }
 
@@ -193,7 +221,10 @@ function findMissingEvidenceRefs(evidenceRefs: string[], itemId: string): string
 }
 
 function patternsEqual(actual: string[], expected: readonly string[]): boolean {
-  return actual.length === expected.length && actual.every((pattern, index) => pattern === expected[index]);
+  return (
+    actual.length === expected.length &&
+    actual.every((pattern, index) => pattern === expected[index])
+  );
 }
 
 export function checkProductionEvidenceRegister(
@@ -234,9 +265,12 @@ export function checkProductionEvidenceRegister(
     if (!item.template_ref || !item.template_ref.trim()) {
       invalid.push(`${item.id || 'item'}.template_ref is required`);
     } else if (!isExistingLocalEvidenceRef(item.template_ref)) {
-      invalid.push(`${item.id || 'item'}.template_ref must point to an existing repo-local template`);
+      invalid.push(
+        `${item.id || 'item'}.template_ref must point to an existing repo-local template`
+      );
     } else {
-      const expectedTemplateRef = REQUIRED_TEMPLATE_REFS[item.id as keyof typeof REQUIRED_TEMPLATE_REFS];
+      const expectedTemplateRef =
+        REQUIRED_TEMPLATE_REFS[item.id as keyof typeof REQUIRED_TEMPLATE_REFS];
       if (expectedTemplateRef && item.template_ref !== expectedTemplateRef) {
         invalid.push(`${item.id || 'item'}.template_ref must be ${expectedTemplateRef}`);
       }
@@ -262,14 +296,23 @@ export function checkProductionEvidenceRegister(
           invalid.push(`${item.id || 'item'}.ref_requirements.id is required`);
         }
         if (requirement.id && requirementIds.has(requirement.id)) {
-          invalid.push(`${item.id || 'item'}.ref_requirements contains duplicate id: ${requirement.id}`);
+          invalid.push(
+            `${item.id || 'item'}.ref_requirements contains duplicate id: ${requirement.id}`
+          );
         }
         if (requirement.id) requirementIds.add(requirement.id);
         if (!requirement.description || !requirement.description.trim()) {
-          invalid.push(`${item.id || 'item'}.${requirement.id || 'requirement'}.description is required`);
+          invalid.push(
+            `${item.id || 'item'}.${requirement.id || 'requirement'}.description is required`
+          );
         }
-        if (!Array.isArray(requirement.accepted_ref_patterns) || requirement.accepted_ref_patterns.length === 0) {
-          invalid.push(`${item.id || 'item'}.${requirement.id || 'requirement'}.accepted_ref_patterns must include at least one pattern`);
+        if (
+          !Array.isArray(requirement.accepted_ref_patterns) ||
+          requirement.accepted_ref_patterns.length === 0
+        ) {
+          invalid.push(
+            `${item.id || 'item'}.${requirement.id || 'requirement'}.accepted_ref_patterns must include at least one pattern`
+          );
         } else {
           for (const pattern of requirement.accepted_ref_patterns) {
             if (typeof pattern !== 'string' || !pattern.trim()) {
@@ -279,14 +322,18 @@ export function checkProductionEvidenceRegister(
             }
           }
           const expectedPatterns = REQUIRED_REF_REQUIREMENT_PATTERNS[requirement.id];
-          if (expectedPatterns && !patternsEqual(requirement.accepted_ref_patterns, expectedPatterns)) {
+          if (
+            expectedPatterns &&
+            !patternsEqual(requirement.accepted_ref_patterns, expectedPatterns)
+          ) {
             invalid.push(
               `${item.id || 'item'}.${requirement.id}.accepted_ref_patterns must be ${expectedPatterns.join(', ')}`
             );
           }
         }
       }
-      const expectedRequirementIds = REQUIRED_REF_REQUIREMENT_IDS[item.id as keyof typeof REQUIRED_REF_REQUIREMENT_IDS];
+      const expectedRequirementIds =
+        REQUIRED_REF_REQUIREMENT_IDS[item.id as keyof typeof REQUIRED_REF_REQUIREMENT_IDS];
       if (expectedRequirementIds) {
         for (const expectedId of expectedRequirementIds) {
           if (!requirementIds.has(expectedId)) {
@@ -295,47 +342,57 @@ export function checkProductionEvidenceRegister(
         }
         for (const requirementId of requirementIds) {
           if (!expectedRequirementIds.includes(requirementId)) {
-            invalid.push(`${item.id}.ref_requirements contains unknown category id: ${requirementId}`);
+            invalid.push(
+              `${item.id}.ref_requirements contains unknown category id: ${requirementId}`
+            );
           }
         }
       }
     }
-    if (!Array.isArray(item.evidence_refs)) invalid.push(`${item.id || 'item'}.evidence_refs must be an array`);
+    if (!Array.isArray(item.evidence_refs))
+      invalid.push(`${item.id || 'item'}.evidence_refs must be an array`);
     if (item.status === 'verified') {
       if (!item.reviewed_at) invalid.push(`${item.id}.reviewed_at is required when verified`);
       else if (!isValidPastOrTodayIsoDate(item.reviewed_at)) {
         invalid.push(`${item.id}.reviewed_at must be an ISO date that is not in the future`);
       }
-      if (!item.reviewer || !item.reviewer.trim()) invalid.push(`${item.id}.reviewer is required when verified`);
+      if (!item.reviewer || !item.reviewer.trim())
+        invalid.push(`${item.id}.reviewer is required when verified`);
       if (!Array.isArray(item.evidence_refs) || item.evidence_refs.length === 0) {
         invalid.push(`${item.id}.evidence_refs must include at least one artifact when verified`);
       } else {
-        const minimumRefCount = MINIMUM_EVIDENCE_REF_COUNTS[item.id as keyof typeof MINIMUM_EVIDENCE_REF_COUNTS];
+        const minimumRefCount =
+          MINIMUM_EVIDENCE_REF_COUNTS[item.id as keyof typeof MINIMUM_EVIDENCE_REF_COUNTS];
         if (minimumRefCount && item.evidence_refs.length < minimumRefCount) {
-          invalid.push(`${item.id}.evidence_refs must include at least ${minimumRefCount} artifacts when verified`);
+          invalid.push(
+            `${item.id}.evidence_refs must include at least ${minimumRefCount} artifacts when verified`
+          );
         }
         for (const ref of item.evidence_refs) {
           if (typeof ref !== 'string' || !isValidEvidenceRef(ref)) {
-            invalid.push(`${item.id}.evidence_refs contains unsupported or missing artifact: ${String(ref)}`);
+            invalid.push(
+              `${item.id}.evidence_refs contains unsupported or missing artifact: ${String(ref)}`
+            );
           } else if (ref !== ref.trim()) {
-            invalid.push(`${item.id}.evidence_refs contains artifact with surrounding whitespace: ${ref}`);
+            invalid.push(
+              `${item.id}.evidence_refs contains artifact with surrounding whitespace: ${ref}`
+            );
           }
         }
-        const stringEvidenceRefs = item.evidence_refs.filter((ref): ref is string => typeof ref === 'string');
+        const stringEvidenceRefs = item.evidence_refs.filter(
+          (ref): ref is string => typeof ref === 'string'
+        );
         invalid.push(...findDuplicateEvidenceRefs(stringEvidenceRefs, item.id));
         invalid.push(...findMissingEvidenceRefs(stringEvidenceRefs, item.id));
         invalid.push(
-          ...findDistinctRequirementIssues(
-            stringEvidenceRefs,
-            item.ref_requirements || [],
-            item.id
-          )
+          ...findDistinctRequirementIssues(stringEvidenceRefs, item.ref_requirements || [], item.id)
         );
       }
     }
   }
   for (const expectedId of REQUIRED_PRODUCTION_EVIDENCE_IDS) {
-    if (!seen.has(expectedId)) invalid.push(`register.items missing required evidence id: ${expectedId}`);
+    if (!seen.has(expectedId))
+      invalid.push(`register.items missing required evidence id: ${expectedId}`);
   }
   for (const id of seen) {
     if (!(REQUIRED_PRODUCTION_EVIDENCE_IDS as readonly string[]).includes(id)) {
@@ -350,7 +407,11 @@ export function checkProductionEvidenceRegister(
   if (items.length > 0 && pending.length === 0 && register.release_decision !== 'verified') {
     invalid.push('register.release_decision must be verified when all evidence items are verified');
   }
-  const complete = invalid.length === 0 && items.length > 0 && pending.length === 0 && register.release_decision === 'verified';
+  const complete =
+    invalid.length === 0 &&
+    items.length > 0 &&
+    pending.length === 0 &&
+    register.release_decision === 'verified';
   const ok = invalid.length === 0 && (!options.requireComplete || complete);
 
   return {
@@ -377,7 +438,8 @@ function formatSummary(summary: ProductionEvidenceSummary): string {
     lines.push(`${policy.pending_title}:`);
     for (const item of summary.pending) lines.push(`- ${item.id}: ${item.gate}`);
   }
-  if (summary.complete) lines.push(policy.complete_message);
+  if (summary.complete)
+    lines.push(resolveOnboardingText(policy.complete_message, resolveOperatorLocale()));
   return `${lines.join('\n')}\n`;
 }
 
