@@ -958,6 +958,182 @@
       "chronos_chat_send": {
         "en": "Send",
         "ja": "送信"
+      },
+      "chronos_qa_prepare_title": {
+        "en": "Prepare",
+        "ja": "準備"
+      },
+      "chronos_qa_prepare_hint": {
+        "en": "Check the local toolchain and readiness manifests before you start the operator flow.",
+        "ja": "operator フローを始める前に、ローカルのツールチェーンと readiness manifest を確認します。"
+      },
+      "chronos_qa_schedule_title": {
+        "en": "Schedule",
+        "ja": "スケジュール"
+      },
+      "chronos_qa_schedule_hint": {
+        "en": "Run scheduled generation jobs or inspect the current schedule registry.",
+        "ja": "スケジュール済みの生成ジョブを実行するか、現在のスケジュール登録を確認します。"
+      },
+      "chronos_qa_observe_title": {
+        "en": "Observe",
+        "ja": "観測"
+      },
+      "chronos_qa_observe_hint": {
+        "en": "Open governed readouts before you intervene.",
+        "ja": "介入する前に、統制された読み出しを開きます。"
+      },
+      "chronos_qa_verify_title": {
+        "en": "Verify",
+        "ja": "検証"
+      },
+      "chronos_qa_verify_hint": {
+        "en": "Run deterministic checks when the control plane needs proof.",
+        "ja": "control plane に証拠が必要なとき、決定論的チェックを実行します。"
+      },
+      "chronos_qa_operate_title": {
+        "en": "Operate",
+        "ja": "運用"
+      },
+      "chronos_qa_operate_hint": {
+        "en": "Escalate only when mission flow, runtime health, or delivery is blocked.",
+        "ja": "ミッションの流れ・ランタイム健全性・デリバリーが詰まったときだけエスカレーションします。"
+      },
+      "chronos_qa_action_prereq_check": {
+        "en": "Prereq Check",
+        "ja": "前提チェック"
+      },
+      "chronos_qa_action_setup_report": {
+        "en": "Setup Report",
+        "ja": "セットアップ報告"
+      },
+      "chronos_qa_action_doctor": {
+        "en": "Doctor",
+        "ja": "Doctor"
+      },
+      "chronos_qa_action_surface_setup": {
+        "en": "Surface Setup",
+        "ja": "Surface セットアップ"
+      },
+      "chronos_qa_action_schedule_tick": {
+        "en": "Schedule Tick",
+        "ja": "スケジュール実行"
+      },
+      "chronos_qa_action_schedule_list": {
+        "en": "Schedule List",
+        "ja": "スケジュール一覧"
+      },
+      "chronos_qa_action_dashboard": {
+        "en": "Dashboard",
+        "ja": "ダッシュボード"
+      },
+      "chronos_qa_action_missions": {
+        "en": "Missions",
+        "ja": "ミッション"
+      },
+      "chronos_qa_action_agents": {
+        "en": "Agents",
+        "ja": "エージェント"
+      },
+      "chronos_qa_action_audit_log": {
+        "en": "Audit Log",
+        "ja": "監査ログ"
+      },
+      "chronos_qa_action_traces": {
+        "en": "Traces",
+        "ja": "トレース"
+      },
+      "chronos_qa_action_vital_check": {
+        "en": "Vital Check",
+        "ja": "バイタルチェック"
+      },
+      "chronos_qa_action_diagnostics": {
+        "en": "Diagnostics",
+        "ja": "診断"
+      },
+      "chronos_qa_action_capability_audit": {
+        "en": "Capability Audit",
+        "ja": "能力監査"
+      },
+      "chronos_qa_action_provider_check": {
+        "en": "Provider Check",
+        "ja": "プロバイダ確認"
+      },
+      "chronos_qa_action_build_test": {
+        "en": "Build & Test",
+        "ja": "ビルド&テスト"
+      },
+      "chronos_qa_action_policies": {
+        "en": "Policies",
+        "ja": "ポリシー"
+      },
+      "chronos_qa_action_upgrade_check": {
+        "en": "Upgrade Check",
+        "ja": "アップデート確認"
+      },
+      "chronos_qa_action_knowledge": {
+        "en": "Knowledge",
+        "ja": "ナレッジ"
+      },
+      "chronos_sc_needs_attention_label": {
+        "en": "Needs Attention",
+        "ja": "要注意"
+      },
+      "chronos_sc_needs_attention_value": {
+        "en": "Exceptions",
+        "ja": "例外"
+      },
+      "chronos_sc_needs_attention_detail": {
+        "en": "Start with mission blockers, runtime incidents, and delivery exceptions.",
+        "ja": "ミッションのブロッカー、ランタイム障害、デリバリー例外から確認します。"
+      },
+      "chronos_sc_toolchain_label": {
+        "en": "Toolchain",
+        "ja": "ツールチェーン"
+      },
+      "chronos_sc_toolchain_value": {
+        "en": "Preflight",
+        "ja": "事前確認"
+      },
+      "chronos_sc_toolchain_detail": {
+        "en": "Confirm local prerequisites and setup reports before you work from source.",
+        "ja": "ソースから作業する前に、ローカル前提条件とセットアップ報告を確認します。"
+      },
+      "chronos_sc_schedules_label": {
+        "en": "Schedules",
+        "ja": "スケジュール"
+      },
+      "chronos_sc_schedules_value": {
+        "en": "Registry",
+        "ja": "登録簿"
+      },
+      "chronos_sc_schedules_detail": {
+        "en": "Inspect and tick scheduled generation jobs from the operator console.",
+        "ja": "operator コンソールからスケジュール済み生成ジョブを確認・実行します。"
+      },
+      "chronos_sc_runtime_governance_label": {
+        "en": "Runtime Governance",
+        "ja": "ランタイム統制"
+      },
+      "chronos_sc_runtime_governance_value": {
+        "en": "Supervisor",
+        "ja": "スーパーバイザ"
+      },
+      "chronos_sc_runtime_governance_detail": {
+        "en": "Managed runtimes, lease ownership, and remediation live here.",
+        "ja": "管理ランタイム、リース所有権、是正処置はここに集約されます。"
+      },
+      "chronos_sc_delivery_label": {
+        "en": "Delivery",
+        "ja": "デリバリー"
+      },
+      "chronos_sc_delivery_value": {
+        "en": "Outbox",
+        "ja": "送信箱"
+      },
+      "chronos_sc_delivery_detail": {
+        "en": "Slack and Chronos share one operator-visible delivery queue.",
+        "ja": "Slack と Chronos は operator から見える単一のデリバリーキューを共有します。"
       }
     }
   }
