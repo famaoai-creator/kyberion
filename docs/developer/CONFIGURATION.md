@@ -32,7 +32,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_SUDO_KEY`                   | string | no       | _undocumented_                                                                                                                                                         |
 | `KYBERION_TERMINAL_TOKEN`             | string | no       | _undocumented_                                                                                                                                                         |
 
-## path (62)
+## path (63)
 
 | Variable                                                         | Type | Required | Description                                                                                                                   |
 | ---------------------------------------------------------------- | ---- | -------- | ----------------------------------------------------------------------------------------------------------------------------- |
@@ -58,6 +58,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_INTENT_CONTRACT_MEMORY_RUNTIME_PATH`                   | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_INTENT_CONTRACT_MEMORY_SCHEMA_PATH`                    | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_INTENT_CONTRACT_MEMORY_SEED_PATH`                      | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_KI_CACHE_DIR`                                          | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_KNOWLEDGE_ROOT`                                        | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_MEDIA_BACKEND_REGISTRY_PATH`                           | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_MEMORY_QUEUE_PATH`                                     | path | no       | _undocumented_                                                                                                                |
@@ -196,7 +197,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_TERMINAL_HOST`                  | string | no       | _undocumented_                                                                                                                                                                           |
 | `KYBERION_TTS_COMMAND`                    | string | no       | _undocumented_                                                                                                                                                                           |
 
-## runtime (95)
+## runtime (96)
 
 | Variable                                      | Type   | Required | Description                                                                                             |
 | --------------------------------------------- | ------ | -------- | ------------------------------------------------------------------------------------------------------- |
@@ -240,6 +241,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_INJECTION_SCOPE`                    | string | no       | _undocumented_                                                                                          |
 | `KYBERION_INJECTION_SUSPECTED`                | string | no       | _undocumented_                                                                                          |
 | `KYBERION_KEPT`                               | string | no       | _undocumented_                                                                                          |
+| `KYBERION_KI_CACHE_MAX_MB`                    | string | no       | _undocumented_                                                                                          |
 | `KYBERION_LLM_CONCURRENCY`                    | string | no       | _undocumented_                                                                                          |
 | `KYBERION_LOCALE`                             | string | no       | _undocumented_                                                                                          |
 | `KYBERION_LOCALHOST_AUTOADMIN`                | string | no       | _undocumented_                                                                                          |
