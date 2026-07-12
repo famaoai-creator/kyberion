@@ -72,12 +72,15 @@ describe('mission orchestration dashboard contract', () => {
     const agentRoute = read('presence/displays/chronos-mirror-v2/src/app/api/agent/route.ts');
 
     expect(page).toContain('MissionIntelligence');
-    expect(page).toContain('Jump to section');
-    expect(page).toContain('Prereq Check');
-    expect(page).toContain('Setup Report');
-    expect(page).toContain('Schedule Tick');
-    expect(page).toContain('Schedule List');
-    expect(page).toContain('Toolchain');
+    // UX-03: the label moved into the vocabulary catalog; the page renders it via its key.
+    expect(page).toContain("uxText('chronos_jump_to_section'");
+    const vocabulary = read('knowledge/product/orchestration/user-facing-vocabulary.json');
+    expect(vocabulary).toContain('Jump to section');
+    expect(page).toContain("uxText('chronos_qa_action_prereq_check'");
+    expect(page).toContain("uxText('chronos_qa_action_setup_report'");
+    expect(page).toContain("uxText('chronos_qa_action_schedule_tick'");
+    expect(page).toContain("uxText('chronos_qa_action_schedule_list'");
+    expect(page).toContain("uxText('chronos_sc_toolchain_label'");
     expect(page).toContain('mission-control-plane');
     expect(page).toContain('runtime-lease-doctor');
     expect(page).toContain('recent-surface-outbox');
