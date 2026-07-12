@@ -72,6 +72,31 @@
     "xlsx_render"
   ],
   "domains": {
+    "agent": {
+      "capture": ["health", "list", "list_manifests", "list_runtimes", "snapshot"],
+      "transform": ["team_plan", "team_role"],
+      "apply": [
+        "a2a",
+        "ask",
+        "prewarm_mission",
+        "refresh",
+        "restart",
+        "shutdown",
+        "shutdown_all",
+        "spawn",
+        "staff_mission"
+      ]
+    },
+    "approval": {
+      "capture": ["list_pending", "load"],
+      "transform": [],
+      "apply": ["create", "decide"]
+    },
+    "artifact": {
+      "capture": ["list", "read_json"],
+      "transform": [],
+      "apply": ["append_event", "ensure_dir", "write_delivery_pack", "write_json"]
+    },
     "browser": {
       "capture": [
         "console",
@@ -198,6 +223,16 @@
       "transform": [],
       "apply": ["deploy", "log"]
     },
+    "process": {
+      "capture": ["list", "list-surfaces", "status"],
+      "transform": [],
+      "apply": ["spawn", "stop"]
+    },
+    "secret": {
+      "capture": ["get", "list"],
+      "transform": ["set"],
+      "apply": ["delete"]
+    },
     "service": {
       "capture": ["list", "read"],
       "transform": [],
@@ -267,6 +302,20 @@
         "write_artifact",
         "write_file",
         "write_json"
+      ]
+    },
+    "terminal": {
+      "capture": ["list", "list_terminal_sessions", "poll", "poll_terminal"],
+      "transform": [],
+      "apply": [
+        "kill",
+        "kill_terminal",
+        "resize",
+        "shell_command",
+        "spawn",
+        "spawn_terminal",
+        "write",
+        "write_terminal"
       ]
     },
     "wisdom": {
