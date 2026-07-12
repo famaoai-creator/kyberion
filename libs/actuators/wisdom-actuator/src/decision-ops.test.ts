@@ -766,3 +766,136 @@ describe("dispatchDecisionOp 'derive_test_inventory'", () => {
     );
   });
 });
+
+describe('typed participant wisdom operations', () => {
+  beforeEach(() => {
+    resetReasoningBackend();
+  });
+
+  const participant = (id: string, tenant = 'tenant-a') => ({
+    participant_id: id,
+    organization_role_id: 'cyber_security',
+    team_role_id: 'reviewer',
+    perspective_ids: ['security_attacker'],
+    agent_profile_id: 'reasoning-worker',
+    authority_role_id: 'ecosystem_architect',
+    reasoning_route_id: 'local-test',
+    security_scope: {
+      tenant_id: tenant,
+      project_id: 'project-x',
+      mission_id: 'MSN-TYPED-WISDOM',
+      participant_id: id,
+      read_tiers: ['public', 'confidential'],
+      write_tier: 'confidential',
+      purpose: 'security-review',
+      external_egress: 'deny',
+    },
+  });
+
+  it('filters context per participant and persists a scope receipt', async () => {
+    const output = tmpPath(`typed-fanout-${Date.now()}.json`).rel;
+    const result = await dispatchDecisionOp(
+      'perspective_fanout',
+      {
+        participants: [participant('security-review')],
+        context_fragments: [
+          {
+            fragment_id: 'MATCH',
+            source_ref: 'knowledge/confidential/tenant-a/project-x/review.md',
+            source_tier: 'confidential',
+            tenant_id: 'tenant-a',
+            project_id: 'project-x',
+            mission_id: 'MSN-TYPED-WISDOM',
+            purpose_tags: ['security-review'],
+            content: 'allowed',
+          },
+          {
+            fragment_id: 'OTHER-TENANT',
+            source_ref: 'knowledge/confidential/tenant-b/project-x/review.md',
+            source_tier: 'confidential',
+            tenant_id: 'tenant-b',
+            project_id: 'project-x',
+            mission_id: 'MSN-TYPED-WISDOM',
+            purpose_tags: ['security-review'],
+            content: 'denied',
+          },
+        ],
+        min_hypotheses_per_participant: 1,
+        topic: 'typed scope check',
+        output_path: output,
+        output_tier: 'confidential',
+        export_as: 'typed_fanout',
+      },
+      {}
+    );
+
+    expect(result.handled).toBe(true);
+    const payload = JSON.parse(
+      safeReadFile(pathResolver.rootResolve(output), { encoding: 'utf8' }) as string
+    );
+    expect(payload.operation).toBe('perspective_fanout');
+    expect(payload.participant_receipts[0]).toMatchObject({
+      participant_id: 'security-review',
+      backend_name: 'stub',
+      accepted_fragment_ids: ['MATCH'],
+      rejected_fragments: [{ fragment_id: 'OTHER-TENANT', code: 'TENANT_SCOPE_MISMATCH' }],
+    });
+    expect(payload.hypotheses[0]).toMatchObject({
+      participant_id: 'security-review',
+      proposed_by: 'security-review',
+      perspective_ids: ['security_attacker'],
+    });
+  });
+
+  it('blocks lower-tier output and cross-tenant critique projection', async () => {
+    const fanoutOutput = tmpPath(`typed-fanout-guard-${Date.now()}.json`).rel;
+    await expect(
+      dispatchDecisionOp(
+        'perspective_fanout',
+        {
+          participants: [participant('security-review')],
+          context_fragments: [
+            {
+              fragment_id: 'CONFIDENTIAL',
+              source_ref: 'knowledge/confidential/tenant-a/project-x/review.md',
+              source_tier: 'confidential',
+              tenant_id: 'tenant-a',
+              project_id: 'project-x',
+              mission_id: 'MSN-TYPED-WISDOM',
+              purpose_tags: ['security-review'],
+              content: 'sensitive',
+            },
+          ],
+          topic: 'downflow check',
+          output_path: fanoutOutput,
+          output_tier: 'public',
+        },
+        {}
+      )
+    ).rejects.toThrow('[CONTEXT_TIER_DOWNFLOW]');
+
+    await dispatchDecisionOp(
+      'perspective_fanout',
+      {
+        participants: [participant('security-review')],
+        min_hypotheses_per_participant: 1,
+        topic: 'critique scope check',
+        output_path: fanoutOutput,
+        output_tier: 'confidential',
+      },
+      {}
+    );
+    await expect(
+      dispatchDecisionOp(
+        'typed_cross_critique',
+        {
+          source_path: fanoutOutput,
+          participants: [participant('other-review', 'tenant-b')],
+          output_path: tmpPath(`typed-critique-${Date.now()}.json`).rel,
+          output_tier: 'confidential',
+        },
+        {}
+      )
+    ).rejects.toThrow('[CROSS_CRITIQUE_SCOPE_DENIED]');
+  });
+});

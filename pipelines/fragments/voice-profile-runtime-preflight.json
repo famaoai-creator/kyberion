@@ -1,0 +1,28 @@
+{
+  "action": "pipeline",
+  "name": "voice-profile-runtime-preflight",
+  "version": "1.0.0",
+  "description": "Reusable fragment: verify the voice runtime bridge is ready and the promoted runtime profile directory exists before a cloned-voice speak flow.",
+  "steps": [
+    {
+      "role": "gate",
+      "op": "core:include",
+      "params": {
+        "fragment": "fragments/voice-runtime-preflight.json",
+        "context": {
+          "python_bin": "{{python_bin}}"
+        }
+      }
+    },
+    {
+      "role": "gate",
+      "op": "core:include",
+      "params": {
+        "fragment": "fragments/runtime-preflight.json",
+        "context": {
+          "preflight_cmd": "test -d active/shared/runtime/voice-profiles/{{profile_id}} && find active/shared/runtime/voice-profiles/{{profile_id}} -maxdepth 1 -type f | grep -q . && echo ok"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "action": "pipeline",
+  "name": "avatar-runtime-preflight-fragment",
+  "version": "1.0.0",
+  "description": "Reusable fragment: verify camera capture and avatar registration prerequisites before avatar onboarding runs.",
+  "steps": [
+    {
+      "role": "gate",
+      "op": "core:include",
+      "params": {
+        "fragment": "fragments/runtime-preflight.json",
+        "context": {
+          "preflight_cmd": "node --input-type=module -e \"import { createVirtualCameraBridge } from './dist/libs/core/virtual-camera-bridge.js'; const bridge = createVirtualCameraBridge(); const probe = await bridge.probe(); if (!probe.available) { throw new Error(probe.reason || 'camera unavailable'); } console.log(probe.backend);\""
+        }
+      }
+    },
+    {
+      "role": "gate",
+      "op": "core:include",
+      "params": {
+        "fragment": "fragments/runtime-preflight.json",
+        "context": {
+          "preflight_cmd": "test -d knowledge/personal && echo ok"
+        }
+      }
+    }
+  ]
+}

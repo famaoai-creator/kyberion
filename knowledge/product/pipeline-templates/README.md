@@ -32,3 +32,7 @@ Domain-specific templates may layer additional checks, but they should not dupli
 2. Fill in tenant-specific params and secrets
 3. Keep the preflight gate intact unless the template is explicitly a non-executable reference
 4. Run from the tenant path after validating the preflight contract
+
+## Notable templates
+
+- `create-my-avatar.json` - avatar onboarding template that captures a reference photo, runs image generation through the active host bridge or fallback provider, and registers the avatar into the personal profile.

@@ -114,6 +114,12 @@ export function loadModelRegistry(): ModelRegistryFile {
   return registry;
 }
 
+export function resolveModelProvider(modelId: string): string {
+  const model = loadModelRegistry().models.find((entry) => entry.model_id === modelId);
+  if (!model) throw new Error(`Model registry does not contain model ${modelId}`);
+  return model.provider;
+}
+
 function findPrimaryIntentCompilerModel(registry: ModelRegistryFile): ModelRegistryEntry {
   const approvedPrimary = registry.models.find(
     (model) => model.status === 'approved' && model.role_fit.intent_compiler === 'primary'

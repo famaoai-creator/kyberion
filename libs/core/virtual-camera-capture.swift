@@ -9,6 +9,7 @@ final class FrameCaptureDelegate: NSObject, AVCaptureVideoDataOutputSampleBuffer
   private let semaphore: DispatchSemaphore
   private let context = CIContext(options: nil)
   private var didFinish = false
+  private var frameCount = 0
   private(set) var lastError: Error?
 
   init(outputURL: URL, semaphore: DispatchSemaphore) {
@@ -23,6 +24,12 @@ final class FrameCaptureDelegate: NSObject, AVCaptureVideoDataOutputSampleBuffer
     from connection: AVCaptureConnection,
   ) {
     guard !didFinish else { return }
+
+    frameCount += 1
+    if frameCount < 15 {
+      return
+    }
+
     didFinish = true
 
     guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else {
