@@ -698,6 +698,254 @@
       "chronos_chat_prompt_next_step_query": {
         "en": "What should I do next to unblock delivery?",
         "ja": "デリバリーを前に進めるために次に何をすべきですか?"
+      },
+      "cli_help_usage": {
+        "en": "Usage: npm run cli -- <command> [arguments]",
+        "ja": "使い方: npm run cli -- <コマンド> [引数]"
+      },
+      "cli_help_sec_actuators": {
+        "en": "── Actuator Management ─────────────────────────────────────────────",
+        "ja": "── アクチュエータ管理 ──────────────────────────────────────────────"
+      },
+      "cli_help_list": {
+        "en": "  list [--check]       List actuators in the manifest catalog (--check: runtime detection)",
+        "ja": "  list [--check]       マニフェストカタログのアクチュエータ一覧(--check: 実行環境検出)"
+      },
+      "cli_help_search": {
+        "en": "  search <query>       Search actuators by name, description, or path",
+        "ja": "  search <query>       名前・説明・パスでアクチュエータを検索"
+      },
+      "cli_help_info": {
+        "en": "  info <name>          Show details for a specific actuator",
+        "ja": "  info <name>          指定アクチュエータの詳細を表示"
+      },
+      "cli_help_examples_cmd": {
+        "en": "  examples [name]      List actuator-owned examples (all, or one actuator)",
+        "ja": "  examples [name]      アクチュエータ付属の実行例一覧(全件または1件)"
+      },
+      "cli_help_mobile_profiles": {
+        "en": "  mobile-profiles [id] List shared mobile app profiles or inspect one",
+        "ja": "  mobile-profiles [id] 共有モバイルアプリプロファイルの一覧/詳細"
+      },
+      "cli_help_web_profiles": {
+        "en": "  web-profiles [id]    List shared web app profiles or inspect one",
+        "ja": "  web-profiles [id]    共有 Web アプリプロファイルの一覧/詳細"
+      },
+      "cli_help_run": {
+        "en": "  run <name> [args]    Execute an actuator (30-min timeout; use --help for actuator flags)",
+        "ja": "  run <name> [args]    アクチュエータを実行(タイムアウト30分。フラグは --help 参照)"
+      },
+      "cli_help_sec_pipelines": {
+        "en": "── Pipelines ───────────────────────────────────────────────────────",
+        "ja": "── パイプライン ────────────────────────────────────────────────────"
+      },
+      "cli_help_preview": {
+        "en": "  preview <file>       Validate a pipeline JSON and show its step tree",
+        "ja": "  preview <file>       パイプライン JSON を検証しステップツリーを表示"
+      },
+      "cli_help_schedule_list": {
+        "en": "  schedule list        List scheduled pipelines registered with chronos",
+        "ja": "  schedule list        chronos に登録済みのスケジュール一覧"
+      },
+      "cli_help_schedule_register_desc": {
+        "en": "                       Register a new scheduled pipeline",
+        "ja": "                       スケジュール実行するパイプラインを新規登録"
+      },
+      "cli_help_schedule_remove": {
+        "en": "  schedule remove <id> Remove a scheduled pipeline from chronos",
+        "ja": "  schedule remove <id> chronos からスケジュールを削除"
+      },
+      "cli_help_sec_artifacts": {
+        "en": "── Artifacts ───────────────────────────────────────────────────────",
+        "ja": "── アーティファクト ────────────────────────────────────────────────"
+      },
+      "cli_help_artifact": {
+        "en": "  artifact <path>      Inspect a generated artifact (text preview for text types)",
+        "ja": "  artifact <path>      生成アーティファクトを確認(テキスト系はプレビュー)"
+      },
+      "cli_help_open_artifact": {
+        "en": "  open-artifact <path> Open a generated artifact with the OS default viewer",
+        "ja": "  open-artifact <path> 生成アーティファクトを OS 既定ビューアで開く"
+      },
+      "cli_help_intent": {
+        "en": "  intent [--clarify] \"<utterance>\"   Resolve free text into an intent or clarification packet",
+        "ja": "  intent [--clarify] \"<発話>\"   自由文を intent または明確化パケットへ解決"
+      },
+      "cli_help_sec_packets": {
+        "en": "── Operator Packets ────────────────────────────────────────────────",
+        "ja": "── オペレータパケット ──────────────────────────────────────────────"
+      },
+      "cli_help_packet": {
+        "en": "  packet <path>        Render an operator packet, status report, or response preview",
+        "ja": "  packet <path>        オペレータパケット/状況報告/応答プレビューを表示"
+      },
+      "cli_help_accept_next": {
+        "en": "  accept-next-action <packet> <id>  Execute a suggested next action from a packet",
+        "ja": "  accept-next-action <packet> <id>  パケット内の推奨アクションを実行"
+      },
+      "cli_help_sec_approvals": {
+        "en": "── Approvals & Governance ──────────────────────────────────────────",
+        "ja": "── 承認とガバナンス ────────────────────────────────────────────────"
+      },
+      "cli_help_approvals": {
+        "en": "  approvals [channel]  List pending approval requests (run this first to find IDs)",
+        "ja": "  approvals [channel]  保留中の承認リクエスト一覧(ID 確認はまずこれ)"
+      },
+      "cli_help_approve": {
+        "en": "  approve <id> [ch]    Approve a pending request as the current sovereign",
+        "ja": "  approve <id> [ch]    現在の sovereign として承認"
+      },
+      "cli_help_reject": {
+        "en": "  reject  <id> [ch]    Reject a pending request as the current sovereign",
+        "ja": "  reject  <id> [ch]    現在の sovereign として却下"
+      },
+      "cli_help_sec_email": {
+        "en": "── Email Workflow ───────────────────────────────────────────────────",
+        "ja": "── メールワークフロー ───────────────────────────────────────────────"
+      },
+      "cli_help_email_summary": {
+        "en": "  email <status|draft|latest-draft|deliver|archive-inbox>  Email workflow (run `npm run cli -- email --help` for details)",
+        "ja": "  email <status|draft|latest-draft|deliver|archive-inbox>  メールワークフロー(詳細は `npm run cli -- email --help`)"
+      },
+      "cli_help_email_status": {
+        "en": "  email status         Check Gmail auth readiness",
+        "ja": "  email status         Gmail 認証の準備状態を確認"
+      },
+      "cli_help_email_draft": {
+        "en": "  email draft          Generate a reply draft from inbox triage",
+        "ja": "  email draft          受信トレイのトリアージから返信ドラフトを生成"
+      },
+      "cli_help_email_latest": {
+        "en": "  email latest-draft   Show the latest stored draft artifact",
+        "ja": "  email latest-draft   最新の保存済みドラフトを表示"
+      },
+      "cli_help_email_deliver": {
+        "en": "  email deliver        Create a Gmail draft or send an approved reply",
+        "ja": "  email deliver        Gmail 下書きを作成、または承認済み返信を送信"
+      },
+      "cli_help_email_archive": {
+        "en": "  email archive-inbox  Create archive filters for repeated inbox senders",
+        "ja": "  email archive-inbox  常連差出人のアーカイブフィルタを作成"
+      },
+      "cli_help_calendar_summary": {
+        "en": "  calendar <status|list-calendars|agenda|freebusy|create-event>  Calendar workflow (run `npm run cli -- calendar --help` for details)",
+        "ja": "  calendar <status|list-calendars|agenda|freebusy|create-event>  カレンダーワークフロー(詳細は `npm run cli -- calendar --help`)"
+      },
+      "cli_help_calendar_status": {
+        "en": "  calendar status      Check calendar auth readiness",
+        "ja": "  calendar status      カレンダー認証の準備状態を確認"
+      },
+      "cli_help_calendar_list": {
+        "en": "  calendar list-calendars  List calendars on the authenticated account",
+        "ja": "  calendar list-calendars  認証済みアカウントのカレンダー一覧"
+      },
+      "cli_help_calendar_agenda": {
+        "en": "  calendar agenda      Show upcoming events from a calendar",
+        "ja": "  calendar agenda      カレンダーの今後の予定を表示"
+      },
+      "cli_help_calendar_freebusy": {
+        "en": "  calendar freebusy    Query free/busy windows for one or more calendars",
+        "ja": "  calendar freebusy    1つ以上のカレンダーの空き/埋まり時間を照会"
+      },
+      "cli_help_calendar_create": {
+        "en": "  calendar create-event  Create a calendar event, optionally with Google Meet",
+        "ja": "  calendar create-event  予定を作成(Google Meet 付与も可)"
+      },
+      "cli_help_examples": {
+        "en": "Examples:",
+        "ja": "例:"
+      },
+      "cli_help_first_run": {
+        "en": "Useful first-run commands:",
+        "ja": "初回セットアップに便利なコマンド:"
+      },
+      "cli_help_onboard": {
+        "en": "  pnpm onboard          # customer/{slug}/ preferred when KYBERION_CUSTOMER is set",
+        "ja": "  pnpm onboard          # KYBERION_CUSTOMER 設定時は customer/{slug}/ を優先"
+      },
+      "cli_help_doctor": {
+        "en": "  pnpm doctor          Check environment readiness",
+        "ja": "  pnpm doctor          環境の準備状態を確認"
+      },
+      "cli_help_capabilities": {
+        "en": "  pnpm capabilities    Check which actuator capabilities fit this environment",
+        "ja": "  pnpm capabilities    この環境で使えるアクチュエータ能力を確認"
+      },
+      "cli_help_journal": {
+        "en": "  pnpm mission:journal Inspect mission history",
+        "ja": "  pnpm mission:journal ミッション履歴を確認"
+      },
+      "cli_help_email_usage": {
+        "en": "Usage: npm run cli -- email <status|draft|latest-draft|deliver|archive-inbox> [options]",
+        "ja": "使い方: npm run cli -- email <status|draft|latest-draft|deliver|archive-inbox> [オプション]"
+      },
+      "cli_help_commands": {
+        "en": "Commands:",
+        "ja": "コマンド:"
+      },
+      "cli_help_email_status_short": {
+        "en": "  status        Check Gmail auth readiness",
+        "ja": "  status        Gmail 認証の準備状態を確認"
+      },
+      "cli_help_email_draft_short": {
+        "en": "  draft         Generate a reply draft from inbox triage",
+        "ja": "  draft         受信トレイのトリアージから返信ドラフトを生成"
+      },
+      "cli_help_email_latest_short": {
+        "en": "  latest-draft  Show the latest stored draft artifact",
+        "ja": "  latest-draft  最新の保存済みドラフトを表示"
+      },
+      "cli_help_email_deliver_short": {
+        "en": "  deliver       Create a Gmail draft or send an approved email",
+        "ja": "  deliver       Gmail 下書きを作成、または承認済みメールを送信"
+      },
+      "cli_help_email_archive_short": {
+        "en": "  archive-inbox Create archive filters for repeated inbox senders",
+        "ja": "  archive-inbox 常連差出人のアーカイブフィルタを作成"
+      },
+      "cli_help_calendar_usage": {
+        "en": "Usage: npm run cli -- calendar <status|list-calendars|agenda|freebusy|create-event> [options]",
+        "ja": "使い方: npm run cli -- calendar <status|list-calendars|agenda|freebusy|create-event> [オプション]"
+      },
+      "cli_help_calendar_status_short": {
+        "en": "  status        Check calendar auth readiness",
+        "ja": "  status        カレンダー認証の準備状態を確認"
+      },
+      "cli_help_calendar_list_short": {
+        "en": "  list-calendars  List calendars on the authenticated account",
+        "ja": "  list-calendars  認証済みアカウントのカレンダー一覧"
+      },
+      "cli_help_calendar_agenda_short": {
+        "en": "  agenda        Show upcoming events from a calendar",
+        "ja": "  agenda        カレンダーの今後の予定を表示"
+      },
+      "cli_help_calendar_freebusy_short": {
+        "en": "  freebusy      Query free/busy windows for one or more calendars",
+        "ja": "  freebusy      1つ以上のカレンダーの空き/埋まり時間を照会"
+      },
+      "cli_help_calendar_create_short": {
+        "en": "  create-event  Create a calendar event, optionally with meeting metadata",
+        "ja": "  create-event  予定を作成(会議メタデータ付与も可)"
+      },
+      "cli_header_tagline": {
+        "en": "Discover, inspect, and run actuators from the sovereign console.",
+        "ja": "sovereign console からアクチュエータを探索・確認・実行します。"
+      },
+      "cli_help_indexed_actuators": {
+        "en": "Indexed actuators:",
+        "ja": "索引済みアクチュエータ:"
+      },
+      "cli_error_unknown_command": {
+        "en": "Unknown command \"{command}\". Try `npm run cli -- help`.",
+        "ja": "不明なコマンド \"{command}\" です。`npm run cli -- help` を確認してください。"
+      },
+      "cli_error_execution_failed": {
+        "en": "❌ Execution failed: {message}",
+        "ja": "❌ 実行に失敗しました: {message}"
+      },
+      "cli_error_branch_not_found": {
+        "en": "❌ Error: Branch \"{branch}\" not found in Wisdom Vault.",
+        "ja": "❌ エラー: ブランチ \"{branch}\" が Wisdom Vault に見つかりません。"
       }
     }
   }

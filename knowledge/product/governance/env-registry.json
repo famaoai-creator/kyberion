@@ -911,6 +911,22 @@
       "documented": false
     },
     {
+      "name": "KYBERION_KI_CACHE_DIR",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_KI_CACHE_MAX_MB",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_KILL_SWITCH_INTERVAL_MS",
       "category": "tuning",
       "type": "number",
