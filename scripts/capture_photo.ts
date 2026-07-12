@@ -1,4 +1,4 @@
-import { createVirtualCameraBridge } from '../libs/core/virtual-camera-bridge.js';
+import { createVirtualCameraBridge } from '@agent/core';
 import * as path from 'node:path';
 
 async function main() {
