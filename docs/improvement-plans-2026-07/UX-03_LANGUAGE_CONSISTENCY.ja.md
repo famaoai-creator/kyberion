@@ -73,4 +73,5 @@
 ## 実装状況 追記 (2026-07-12)
 
 - **locale-resolver 一元化完了**: `resolveOperatorLocale()`(operator-identity.ts)— 優先順 `KYBERION_LOCALE` env → onboarding identity の language(my-identity.json)→ fallback(ja)。4ブリッジの empty-reply / エラー応答と surface orchestrator の clarification packet のハードコード 'ja' 既定(計9箇所)を resolver 経由に置換。identity の language が english のオペレータは全ブリッジ応答が自動的に en へ。
-- 残: onboarding/cli help の ja/en 化(文言表)、chronos 言語トグル。
+- **Task 4 完了(2026-07-12)**: printHelp / printEmailHelp / printCalendarHelp と主要エラー3件(unknown command / execution failed / branch not found)を語彙カタログ `cli_*` 62キー(en/ja、en は従来文言と同一)へキー化し `t()` 置換。`--locale` を main → 各 help/handler へ貫通(従来 `t()` は process.argv しか見ておらずテスト非密閉だった)。ja 表示のスモークテスト追加。
+- 残: onboarding の ja/en 化(Task 3)、chronos 言語トグル(Task 5)、未対応面リストの記録(Task 6)。

@@ -58,14 +58,14 @@
 
 ### UX(ユーザー接点)
 
-| ID    | 状態    | 残作業                                                                                                                                                                                             |
-| ----- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| UX-01 | DONE    |                                                                                                                                                                                                    |
-| UX-02 | DONE    | 2026-07-12 完了: 4ブリッジ typing 表示(discord sendTyping / telegram sendChatAction / slack 👀 リアクション / imessage 先行一言)を共通ヘルパーで実装。chronos キャンセル+フェーズ表示は 07-11 済み |
-| UX-03 | PARTIAL | 2026-07-12: locale-resolver 一元化(KYBERION_LOCALE → identity language → ja、ブリッジ/orchestrator の9箇所置換)。残: onboarding/cli help の ja/en 文言表、chronos 言語トグル                       |
-| UX-04 | PARTIAL | 2026-07-12: CLI 承認動詞統一(approve/reject + 名前付きフラグ、旧形式は警告エイリアス)・decidedBy の identity 化・chronos 番号選択+拒否経路を実装。残: slack-bridge 提案の Block Kit ボタン化のみ   |
-| UX-05 | PARTIAL | 契約スナップショットテスト+CI ゲート、dashboard の renderStatus 経由化                                                                                                                             |
-| UX-06 | DONE    | (軽微: 3面バナーの版数統一)                                                                                                                                                                        |
+| ID    | 状態    | 残作業                                                                                                                                                                                                                                         |
+| ----- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| UX-01 | DONE    |                                                                                                                                                                                                                                                |
+| UX-02 | DONE    | 2026-07-12 完了: 4ブリッジ typing 表示(discord sendTyping / telegram sendChatAction / slack 👀 リアクション / imessage 先行一言)を共通ヘルパーで実装。chronos キャンセル+フェーズ表示は 07-11 済み                                             |
+| UX-03 | PARTIAL | 2026-07-12: locale-resolver 一元化(KYBERION_LOCALE → identity language → ja、ブリッジ/orchestrator の9箇所置換)。cli help/主要エラーの ja/en 化完了(62キーの文言表 + t() 置換 + --locale 貫通)。残: onboarding の ja/en 化、chronos 言語トグル |
+| UX-04 | PARTIAL | 2026-07-12: CLI 承認動詞統一(approve/reject + 名前付きフラグ、旧形式は警告エイリアス)・decidedBy の identity 化・chronos 番号選択+拒否経路を実装。残: slack-bridge 提案の Block Kit ボタン化のみ                                               |
+| UX-05 | PARTIAL | 契約スナップショットテスト+CI ゲート、dashboard の renderStatus 経由化                                                                                                                                                                         |
+| UX-06 | DONE    | (軽微: 3面バナーの版数統一)                                                                                                                                                                                                                    |
 
 ### AC(アクチュエータ能力)
 
