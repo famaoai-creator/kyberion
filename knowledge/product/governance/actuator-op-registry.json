@@ -139,6 +139,7 @@
       "capture": [
         "console",
         "content",
+        "distill_dom",
         "evaluate",
         "export_session_handoff",
         "goto",
@@ -152,7 +153,7 @@
         "title",
         "url"
       ],
-      "transform": ["export_adf", "export_playwright", "json_query", "regex_extract"],
+      "transform": ["export_adf", "export_playwright", "json_query", "llm_decide", "regex_extract"],
       "apply": [
         "authenticate_passkey",
         "clear_passkey_credentials",
