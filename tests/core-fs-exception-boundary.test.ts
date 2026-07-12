@@ -42,6 +42,7 @@ const allowedCoreFsImports = [
   'libs/core/speech-to-text-bridge.test.ts',
   'libs/core/src/actuator-capability.test.ts',
   'libs/core/src/feedback-loop.test.ts',
+  'libs/core/src/knowledge-cache-budget.test.ts',
   'libs/core/src/knowledge-index.test.ts',
   'libs/core/src/native-docx-engine/__tests__/docx-engine.test.ts',
   'libs/core/src/native-pdf-engine/__tests__/pdf-binary.test.ts',
