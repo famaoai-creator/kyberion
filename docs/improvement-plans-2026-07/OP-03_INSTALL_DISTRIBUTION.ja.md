@@ -48,3 +48,12 @@
 - npm 公開は**製品人格の判断(構想評価 §3-1)と OSS 公開範囲**に関わる経営マターなので、本計画は「公開可能にする構造 + ローカル bin」まで。公開の実行はしない。
 - Docker のマルチステージ化でビルドが壊れやすい。既存の `pnpm build` 成果物をそのまま COPY する形にし、イメージ内ビルドを段階的に外す。
 - 音声/ブラウザ依存の分離で既存の音声 first-win(ロードマップの目玉)を壊さないよう、macOS ネイティブ経路は Docker と別物として維持する。
+
+## 実装状況 追記 (2026-07-12 後半 — Task 3)
+
+- **tier 隔離の重大修正**: `.dockerignore` が `knowledge/personal/` / `knowledge/confidential/` / `customer/` を除外しておらず、**Docker イメージに confidential データが焼かれる**状態だった(builder の `COPY . .` → production の `COPY --from=builder /app/knowledge`)。除外を追加(+ `work/`、`.env*`、鍵ファイル)。イメージはレジストリ/他マシンへ移動し得るため、これはデータ tier 不変条件の実違反だった。
+- **deploy サービス追加**: `docker-compose.yml` に `kyberion-deploy`(`profiles: ["deploy"]`、production ターゲット、source mount なし・実行時ビルドなし)。`docker compose --profile deploy up --build` で起動、`node dist/scripts/cli.js list implemented` を実行。macOS 専用 MLX 音声は Linux イメージでは無効(コア CLI は動作)。
+- 検証: production ターゲットの実ビルド + `list implemented` 実行 + イメージ内に confidential/customer が存在しないことの確認(下記コマンドで再現可)。
+  - `docker build --target production -t kyberion .`
+  - `docker run --rm kyberion node dist/scripts/cli.js list implemented`
+  - `docker run --rm kyberion sh -c 'ls knowledge/confidential customer 2>&1'` → No such file
