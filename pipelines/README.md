@@ -15,13 +15,11 @@ knowledge/product/pipeline-templates/
 ```
 
 **Scope rule:**
-
 - `pipelines/` contains only pipelines that operate Kyberion itself — health checks, self-repair, onboarding, capability assimilation, chaos tests.
 - User-facing workflows (voice, meeting, sales, content, etc.) live as **templates** in `knowledge/product/pipeline-templates/`.
 - Tenant-specific instantiations go in `knowledge/confidential/{tenant}/pipelines/` or `knowledge/personal/pipelines/`.
 
 **Running a system pipeline:**
-
 ```bash
 node dist/scripts/run_pipeline.js --input pipelines/<name>.json
 # or shortcut:
@@ -29,7 +27,6 @@ pnpm pipeline --input pipelines/<name>.json
 ```
 
 **Running a template directly (dev/testing only):**
-
 ```bash
 node dist/scripts/run_pipeline.js --input knowledge/product/pipeline-templates/<name>.json
 ```
@@ -40,67 +37,67 @@ node dist/scripts/run_pipeline.js --input knowledge/product/pipeline-templates/<
 
 ### Health & Diagnostics
 
-| Pipeline                      | pnpm shortcut                                         | Description                                                   |
-| ----------------------------- | ----------------------------------------------------- | ------------------------------------------------------------- |
-| `baseline-check`              | `pnpm pipeline --input pipelines/baseline-check.json` | Session-start health gate (onboarding / recovery / all-clear) |
-| `vital-check`                 | `pnpm vital`                                          | Core liveness check                                           |
-| `system-diagnostics`          | `pnpm diagnose`                                       | Detailed system-level diagnostic report                       |
-| `full-health-report`          | —                                                     | Aggregated health across all surfaces                         |
-| `monitor-service-health`      | —                                                     | Continuous service health monitor                             |
-| `system-upgrade-check`        | `pnpm system:upgrade:check`                           | Detect available system + dependency upgrades                 |
-| `system-upgrade-execute`      | `pnpm system:upgrade:execute`                         | Apply upgrades interactively                                  |
-| `inspect-system-hardware`     | —                                                     | Hardware and resource inventory                               |
-| `inspect-network-environment` | —                                                     | Network topology and connectivity check                       |
-| `inspect-workspace-surfaces`  | —                                                     | Active surface and channel inventory                          |
-| `agent-provider-check`        | —                                                     | Verify AI provider availability                               |
+| Pipeline | pnpm shortcut | Description |
+|---|---|---|
+| `baseline-check` | `pnpm pipeline --input pipelines/baseline-check.json` | Session-start health gate (onboarding / recovery / all-clear) |
+| `vital-check` | `pnpm vital` | Core liveness check |
+| `system-diagnostics` | `pnpm diagnose` | Detailed system-level diagnostic report |
+| `full-health-report` | — | Aggregated health across all surfaces |
+| `monitor-service-health` | — | Continuous service health monitor |
+| `system-upgrade-check` | `pnpm system:upgrade:check` | Detect available system + dependency upgrades |
+| `system-upgrade-execute` | `pnpm system:upgrade:execute` | Apply upgrades interactively |
+| `inspect-system-hardware` | — | Hardware and resource inventory |
+| `inspect-network-environment` | — | Network topology and connectivity check |
+| `inspect-workspace-surfaces` | — | Active surface and channel inventory |
+| `agent-provider-check` | — | Verify AI provider availability |
 
 ### Feedback Loop (Self-Repair)
 
-| Pipeline                        | Description                                                                      |
-| ------------------------------- | -------------------------------------------------------------------------------- |
-| `reconcile-config-fallbacks`    | Auto-repair missing knowledge JSON files recorded during config loader fallbacks |
-| `reconcile-unclassified-errors` | Write rule-proposal stubs for errors that matched no classification rule         |
-| `reconcile-unhandled-intents`   | Write routing proposals for unrouted or unrecognized surface intents             |
+| Pipeline | Description |
+|---|---|
+| `reconcile-config-fallbacks` | Auto-repair missing knowledge JSON files recorded during config loader fallbacks |
+| `reconcile-unclassified-errors` | Write rule-proposal stubs for errors that matched no classification rule |
+| `reconcile-unhandled-intents` | Write routing proposals for unrouted or unrecognized surface intents |
 
 ### Onboarding & Provisioning
 
-| Pipeline                         | pnpm shortcut  | Description                                                 |
-| -------------------------------- | -------------- | ----------------------------------------------------------- |
+| Pipeline | pnpm shortcut | Description |
+|---|---|---|
 | `kyberion-autonomous-onboarding` | `pnpm onboard` | Full autonomous onboarding (install → surfaces → alignment) |
-| `kyberion-config-provisioner`    | —              | Provision operator config from canonical defaults           |
-| `launch-first-run-onboarding`    | —              | Interactive first-run setup wizard                          |
-| `platform-onboarding`            | —              | Platform-level dependency bootstrap                         |
+| `kyberion-config-provisioner` | — | Provision operator config from canonical defaults |
+| `launch-first-run-onboarding` | — | Interactive first-run setup wizard |
+| `platform-onboarding` | — | Platform-level dependency bootstrap |
 
 ### Capability & Knowledge
 
-| Pipeline                             | pnpm shortcut         | Description                                             |
-| ------------------------------------ | --------------------- | ------------------------------------------------------- |
-| `knowledge-sync`                     | `pnpm knowledge:sync` | Sync knowledge artifacts to public tier                 |
-| `list-capabilities`                  | —                     | Enumerate installed actuators and their ops             |
-| `assimilate-gateway-capability`      | —                     | Ingest an external gateway into the capability registry |
-| `assimilate-gateway-capability-test` | —                     | Smoke test for gateway assimilation                     |
-| `assimilate-harness-capability`      | —                     | Ingest a harness-style capability bundle                |
-| `license-injection-inner`            | —                     | Inner stage of license key injection                    |
-| `license-injection-outer`            | —                     | Outer stage of license key injection                    |
+| Pipeline | pnpm shortcut | Description |
+|---|---|---|
+| `knowledge-sync` | `pnpm knowledge:sync` | Sync knowledge artifacts to public tier |
+| `list-capabilities` | — | Enumerate installed actuators and their ops |
+| `assimilate-gateway-capability` | — | Ingest an external gateway into the capability registry |
+| `assimilate-gateway-capability-test` | — | Smoke test for gateway assimilation |
+| `assimilate-harness-capability` | — | Ingest a harness-style capability bundle |
+| `license-injection-inner` | — | Inner stage of license key injection |
+| `license-injection-outer` | — | Outer stage of license key injection |
 
 ### Verification
 
-| Pipeline                  | Description                               |
-| ------------------------- | ----------------------------------------- |
-| `verify-discovery-ops`    | Verify provider discovery and op registry |
-| `verify-session`          | Verify surface session lifecycle          |
-| `verify-session-fallback` | Verify session fallback behaviour         |
-| `service-lifecycle-smoke` | Service start/stop/health smoke test      |
-| `orchestration-jobs`      | Run scheduled orchestration batch         |
+| Pipeline | Description |
+|---|---|
+| `verify-discovery-ops` | Verify provider discovery and op registry |
+| `verify-session` | Verify surface session lifecycle |
+| `verify-session-fallback` | Verify session fallback behaviour |
+| `service-lifecycle-smoke` | Service start/stop/health smoke test |
+| `orchestration-jobs` | Run scheduled orchestration batch |
 
 ### Chaos & Resilience
 
-| Pipeline                  | Description                                                |
-| ------------------------- | ---------------------------------------------------------- |
-| `chaos-actuator-down`     | Simulate actuator failure; validate fallback               |
+| Pipeline | Description |
+|---|---|
+| `chaos-actuator-down` | Simulate actuator failure; validate fallback |
 | `chaos-network-partition` | Simulate network partition; validate retry/circuit-breaker |
-| `chaos-repair-test`       | Validate self-repair after injected fault                  |
-| `chaos-secret-missing`    | Simulate missing secret; validate secret-guard error path  |
+| `chaos-repair-test` | Validate self-repair after injected fault |
+| `chaos-secret-missing` | Simulate missing secret; validate secret-guard error path |
 
 ---
 
@@ -121,7 +118,6 @@ See `pipelines/fragments/` for the full catalog.
 Canonical user-facing pipeline patterns. These are parameterized (use `{{params.*}}` placeholders) and contain no hardcoded personal data.
 
 **Instantiate a template for your tenant:**
-
 1. Copy the template to `knowledge/confidential/{tenant}/pipelines/{name}.json`
 2. Fill in tenant-specific params (endpoints, persona, credentials via `secret:`)
 3. Run from the tenant path
@@ -147,7 +143,6 @@ Every step `op` uses **`domain:action`** format:
 ### Pipeline ID Resolution
 
 In `intent-routing-map.json`:
-
 - **Bare ID** (e.g. `"baseline-check"`) → runner prepends `pipelines/`
 - **Path ID** (e.g. `"knowledge/product/pipeline-templates/speak-with-my-voice"`) → runner appends `.json` and uses the path as-is
 
@@ -180,12 +175,10 @@ Output paths must be within the project root. Use `active/shared/tmp/` or `activ
 **Default: write paths as repo-relative.** A relative path like `active/shared/tmp/run.json` or `knowledge/product/x.md` is already portable across machines — it is resolved against the project root at runtime (actuator ops relativize against root, and `system:exec` / `system:shell` run with `cwd` = project root). You almost never need an absolute path in a pipeline.
 
 **Never do:**
-
 - **Machine-absolute paths** — `/Users/<name>/...`, `/home/<user>/...`, `C:\Users\...`. These break the moment the pipeline runs on another machine. The governance lint (`pnpm check:governance-rules`) fails the build on these in committed `knowledge/`, `libs/`, `scripts/`.
-- **Leading-slash "repo" paths** — `/knowledge/personal/x.md` is an _absolute_ path pointing at the filesystem root (`/knowledge/...`), **not** the repo. Drop the leading slash: `knowledge/personal/x.md`. (This was a real bug fixed in `system-upgrade-check.json`.)
+- **Leading-slash "repo" paths** — `/knowledge/personal/x.md` is an *absolute* path pointing at the filesystem root (`/knowledge/...`), **not** the repo. Drop the leading slash: `knowledge/personal/x.md`. (This was a real bug fixed in `system-upgrade-check.json`.)
 
 **When you genuinely need an absolute path at runtime** (e.g. a value handed to an external tool that does not inherit `cwd` = root), resolve it at runtime instead of hardcoding it — keep the source portable:
-
 - **Inline path tokens** in any `{{...}}`-templated field: `{{@root}}`, `{{@knowledge:product/x.md}}`, `{{@shared:tmp/run.json}}`, `{{@active:missions}}`, `{{@tmp:run.json}}`, `{{@vault:...}}`. Each expands to a machine-local absolute path at run time. Unknown domains are left literal.
 - **`system:resolve_path` op** (pure, no I/O) — `mode`: `resolve` | `shared` | `knowledge` | `active` | `tmp` | `vault` to expand, and `to_relative` | `normalize` to collapse back.
 
