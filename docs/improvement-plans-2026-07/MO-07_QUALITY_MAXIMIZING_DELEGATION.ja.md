@@ -70,3 +70,4 @@ repo には**2つの断絶した世界**がある:
 
 - **Task 4.2 実装(draft→refine エンジン)**: `libs/core/draft-refine.ts` — doc/deck の下書きを決定論的ルーブリック(`evaluateDeliverableQuality`)で採点し、findings を明示した改稿プロンプトで再生成(**上限2パス**、ルーブリック改善が無ければ即終了、悪化時は前稿を保持、refine 失敗でも原稿は失わない)。critique 関数は注入可能で stub 環境でもテストが実挙動を固定(計画 Task 4.3 の fixture 方針どおり)。テスト5本。
 - **worker 配線済み(同日)**: 高リスク(high/high_stakes)× 実装系ロール × テキスト文書 deliverable(.md/.txt)のタスクは、受入ゲート前に 1 パスの refine を適用(改善時のみ上書き + `draft_refined` イベントで cost_multiplier 記録、失敗はブロックせず warn)。`KYBERION_DRAFT_REFINE=0` で無効化。tier 昇格連動の再実行は MO-05 ルーティングと合わせて設計要。
+- **task-session 配線済み(同日)**: `claude-task-session-executor` の document 出力(report_document / document_generation)に保存前1パスの refine を接続(`maybeRefineDocumentOutput`)。800字未満はコスト対効果でスキップ、失敗・悪化時は原稿維持、改善時のみ履歴に記録。browser 出力は対象外。計画 Task 4.2 が挙げた media LLM zone(`media-document-helpers.ts`)は現状 llm_zone 宣言のみで LLM 起草実装が存在しないため、実在する成果物生産経路(worker + task-session)への配線をもって Task 4.2 の適用を完了とする。

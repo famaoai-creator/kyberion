@@ -8,8 +8,57 @@ import {
   runApprovedClaudeDocumentTask,
   type ClaudeTaskRunnerContext,
 } from './claude-task-runner.js';
+import type { DraftRefineInput } from './draft-refine.js';
 
 export type ClaudeTaskSessionKind = 'browser' | 'document';
+
+/** Skip refine for short outputs: the rubric adds no signal and the extra pass is pure cost. */
+const DRAFT_REFINE_MIN_CHARS = 800;
+
+export interface TaskSessionRefineOutcome {
+  content: string;
+  refined: boolean;
+  passes: number;
+}
+
+/**
+ * MO-07 Task 4.2, task-session side of the #518 worker wiring: document
+ * task-session outputs get one rubric-driven refine pass before they are
+ * stored. Failure or a worse rewrite never loses the original draft.
+ */
+export async function maybeRefineDocumentOutput(input: {
+  kind: ClaudeTaskSessionKind;
+  output: string;
+  goalSummary?: string;
+  refine?: DraftRefineInput['refine'];
+}): Promise<TaskSessionRefineOutcome> {
+  const passthrough = { content: input.output, refined: false, passes: 0 };
+  if (input.kind !== 'document') return passthrough;
+  if (process.env.KYBERION_DRAFT_REFINE === '0') return passthrough;
+  if (input.output.trim().length < DRAFT_REFINE_MIN_CHARS) return passthrough;
+  try {
+    // Lazy import: draft-refine pulls the reasoning-backend graph, which
+    // consumers of this module (and their minimally-mocked tests) must not
+    // pay for unless a refine actually runs.
+    const { draftRefine } = await import('./draft-refine.js');
+    const outcome = await draftRefine({
+      kind: 'doc',
+      content: input.output,
+      goalSummary: input.goalSummary,
+      maxPasses: 1,
+      refine: input.refine,
+    });
+    if (outcome.improved) {
+      return { content: outcome.content, refined: true, passes: outcome.passes };
+    }
+    return passthrough;
+  } catch (error: any) {
+    logger.warn(
+      `[claude-task-session-executor] draft refine failed, keeping original output: ${error?.message || error}`
+    );
+    return passthrough;
+  }
+}
 
 export interface ExecuteApprovedClaudeTaskSessionParams {
   session: TaskSession;
@@ -116,15 +165,22 @@ export async function executeApprovedClaudeTaskSession(
             approvalContext
           );
 
+    const refineOutcome = await maybeRefineDocumentOutput({
+      kind,
+      output,
+      goalSummary: params.session.goal.summary,
+    });
+    const finalOutput = refineOutcome.content;
+
     const outputPath = buildOutputPath(params.session.session_id);
-    safeWriteFile(outputPath, `${output.trim()}\n`, { mkdir: true, encoding: 'utf8' });
+    safeWriteFile(outputPath, `${finalOutput.trim()}\n`, { mkdir: true, encoding: 'utf8' });
 
     const updated = updateTaskSession(params.session.session_id, {
       status: 'completed',
       artifact: {
         kind: `claude_${kind}_output`,
         output_path: outputPath,
-        ...truncateTextWithCount(output, 500),
+        ...truncateTextWithCount(finalOutput, 500),
         storage_class: 'tmp',
       },
     });
@@ -141,11 +197,18 @@ export async function executeApprovedClaudeTaskSession(
         type: 'artifact',
         text: `Output stored at ${outputPath}.`,
       });
+      if (refineOutcome.refined) {
+        recordTaskSessionHistory(updated.session_id, {
+          ts: timestamp,
+          type: 'execution',
+          text: `Draft refine improved the document output (${refineOutcome.passes} pass).`,
+        });
+      }
     }
 
     return {
       kind,
-      output,
+      output: finalOutput,
       outputPath,
       session: updated || params.session,
     };
