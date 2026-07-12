@@ -9,7 +9,7 @@ import {
   ArrowDown,
   Minus,
 } from 'lucide-react';
-import { uxText } from '../lib/ux-vocabulary';
+import { uxText, uxTextOr } from '../lib/ux-vocabulary';
 import { useChronosLocale } from '../lib/hooks';
 
 /**
@@ -19,7 +19,7 @@ import { useChronosLocale } from '../lib/hooks';
 function useA2UIText() {
   const locale = useChronosLocale();
   return (key: string | undefined, fallbackEn: string) =>
-    key ? uxText(key, fallbackEn, locale) : fallbackEn;
+    key ? uxTextOr(key, fallbackEn, locale) : fallbackEn;
 }
 
 // --- display:gauge ---

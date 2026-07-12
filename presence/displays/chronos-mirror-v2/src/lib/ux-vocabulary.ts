@@ -74,8 +74,21 @@ export function uxLabel(key: string, locale = resolveChronosLocale()): string {
   return entry[locale] || entry[catalog.default_locale] || key;
 }
 
-export function uxText(key: string, fallbackEn: string, locale = resolveChronosLocale()): string {
+// UX-03 Task 5.3: no per-call fallback — the catalog is the single source
+// of truth. A missing key renders as the key itself (loud, greppable) and
+// tests/chronos-ux-vocabulary-contract.test.ts fails CI before that ships.
+export function uxText(key: string, locale = resolveChronosLocale()): string {
   const entry = catalog.domains?.ux?.[key];
-  if (!entry) return fallbackEn;
-  return entry[locale] || entry[catalog.default_locale] || fallbackEn;
+  if (!entry) return key;
+  return entry[locale] || entry[catalog.default_locale] || key;
+}
+
+/**
+ * Fallback-carrying variant for DYNAMIC keys only (computed at runtime, so
+ * the contract test cannot verify them). Static keys must use uxText.
+ */
+export function uxTextOr(key: string, fallback: string, locale = resolveChronosLocale()): string {
+  const entry = catalog.domains?.ux?.[key];
+  if (!entry) return fallback;
+  return entry[locale] || entry[catalog.default_locale] || fallback;
 }
