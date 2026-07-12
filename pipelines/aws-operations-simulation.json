@@ -1,0 +1,62 @@
+{
+  "action": "pipeline",
+  "name": "aws-operations-simulation",
+  "version": "1.0.0",
+  "description": "AWS 運用操作の副作用なし決定的シミュレーション(ドライラン)。変更計画(change-plan)を入力に、terraform plan / aws-cli --dry-run 相当の実行トレース(作成/変更/削除リソース・IAM/権限チェック・影響範囲(blast radius)・切り戻し手順・前提条件の合否)を生成し、実プロビジョニングせずに評価結果を出力する。it-operations-automation ワークフローの simulate フェーズが参照。実 AWS への適用は承認済みの別フロー(sandbox 外)で行うこと。",
+  "context": {
+    "mission_id": "",
+    "mission_evidence_dir": "active/shared/tmp",
+    "change_plan_path": "active/shared/tmp/change-plan.json",
+    "target_environment": "aws-sandbox-simulation",
+    "output_path": "active/shared/tmp/aws-simulation-report.json"
+  },
+  "steps": [
+    {
+      "id": "log_start",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "☁️ [AWS-SIM] Starting side-effect-free AWS operations simulation for {{change_plan_path}} (env={{target_environment}})"
+      }
+    },
+    {
+      "id": "read_change_plan",
+      "role": "source",
+      "op": "system:read_file",
+      "produces": { "channel": "change_plan_raw", "type": "FileContent" },
+      "params": {
+        "path": "{{change_plan_path}}",
+        "export_as": "change_plan_raw"
+      }
+    },
+    {
+      "id": "simulate_aws_operations",
+      "role": "transform",
+      "op": "reasoning:synthesize",
+      "params": {
+        "use_subagent": true,
+        "effort": "high",
+        "input": "{{change_plan_raw}}",
+        "instruction": "You are an AWS operations simulator. DO NOT execute anything; produce a deterministic DRY-RUN of the change plan as a single JSON object with this shape: { \"summary\": string, \"target_environment\": string, \"planned_changes\": [ { \"service\": string, \"action\": \"create\"|\"modify\"|\"destroy\"|\"no-op\", \"resource\": string, \"details\": string } ], \"iam_permission_checks\": [ { \"principal\": string, \"action\": string, \"verdict\": \"allow\"|\"deny\"|\"needs-review\" } ], \"blast_radius\": { \"scope\": string, \"affected_resources\": number, \"risk\": \"low\"|\"medium\"|\"high\" }, \"preconditions\": [ { \"check\": string, \"status\": \"pass\"|\"fail\"|\"unknown\" } ], \"rollback_plan\": [ string ], \"verdict\": \"safe-to-apply\"|\"apply-with-conditions\"|\"blocked\", \"conditions\": [ string ] }. Model realistic AWS primitives (terraform plan / CloudFormation change set / aws-cli --dry-run style): IAM, VPC/SG, EC2/EKS/Lambda, RDS/Aurora, S3, ALB, WAF, CloudWatch. Base the plan strictly on the input change plan. Output ONLY the JSON object.",
+        "export_as": "aws_simulation"
+      }
+    },
+    {
+      "id": "write_simulation_report",
+      "role": "sink",
+      "op": "system:write_file",
+      "params": {
+        "path": "{{output_path}}",
+        "content": "{{aws_simulation}}"
+      }
+    },
+    {
+      "id": "log_done",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "☁️ [AWS-SIM] Simulation complete → {{output_path}} (no AWS resources were touched). Review verdict before requesting a real apply."
+      }
+    }
+  ]
+}

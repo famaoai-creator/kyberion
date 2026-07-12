@@ -1528,6 +1528,7 @@ export * from './ceo-surface-summary.js';
 export * from './mic-capture.js';
 export * from './in-room-minutes-recorder.js';
 export * from './in-room-meeting-driver.js';
+export * from './chrome-extension-meeting-driver.js';
 export * from './channel-directory.js';
 export * from './tool-loop-guardrail.js';
 export * from './surface-ingress-contract.js';

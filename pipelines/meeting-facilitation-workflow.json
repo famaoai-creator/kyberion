@@ -1,0 +1,73 @@
+{
+  "action": "pipeline",
+  "name": "meeting-facilitation-workflow",
+  "version": "2.0.0",
+  "description": "AI-led meeting session: join → listen N seconds → leave. Emits a transcript artifact for downstream action-item and fairness follow-up pipelines. Supports Google Meet, Microsoft Teams, and Zoom.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used export_as without roles.",
+  "context": {
+    "persona_name": "Operator",
+    "profile_id": "operator-default-v1",
+    "meeting_url": "",
+    "meeting_id": "",
+    "passcode": "",
+    "platform": "auto",
+    "display_name": "Kyberion Agent",
+    "agenda": ["Status check", "Action items"],
+    "listen_duration_sec": 300,
+    "language": "ja",
+    "operator_label": "Operator",
+    "attendees": [],
+    "python_bin": "python3",
+    "screenshot_path": "active/shared/tmp/meeting-facilitation-screenshot.png",
+    "transcript_path": "active/shared/tmp/meeting-transcript.txt"
+  },
+  "steps": [
+    {
+      "id": "preflight",
+      "role": "gate",
+      "op": "core:include",
+      "params": { "fragment": "fragments/meeting-runtime-preflight.json" }
+    },
+    {
+      "id": "open_log",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "🎙️ Meeting facilitation start — url={{meeting_url}} persona={{persona_name}} duration={{listen_duration_sec}}s"
+      }
+    },
+    {
+      "id": "join_session",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "Meeting browser join CLI was retired; instantiate this template with meeting-actuator join_backend=browser-playwright before live use."
+      }
+    },
+    {
+      "id": "log_session",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "Meeting join skipped: browser join CLI is retired until this template is instantiated with meeting-actuator."
+      }
+    },
+    {
+      "id": "write_transcript_stub",
+      "role": "sink",
+      "op": "code:write_artifact",
+      "params": {
+        "path": "{{transcript_path}}",
+        "content": "# Meeting Transcript\n\nPersona: {{persona_name}}\nMeeting URL: {{meeting_url}}\nListen Duration: {{listen_duration_sec}}s\nAgenda:\n- {{agenda[0]}}\n- {{agenda[1]}}\n\nSession result: meeting join skipped; instantiate this template with meeting-actuator for live capture.\n"
+      }
+    },
+    {
+      "id": "wrap",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "🛑 Meeting closed. Screenshot: {{screenshot_path}} | Transcript: {{transcript_path}}. Run pipelines/meeting-facilitation-postprocess.json for action-item extraction."
+      }
+    }
+  ]
+}
