@@ -87,6 +87,39 @@
         "staff_mission"
       ]
     },
+    "android": {
+      "capture": [
+        "adb_health_check",
+        "android_cli_describe",
+        "android_cli_docs_search",
+        "android_cli_health_check",
+        "android_cli_layout",
+        "android_cli_screen_resolve",
+        "capture_foreground_activity",
+        "capture_runtime_session_handoff",
+        "extract_ui_tree",
+        "read_json",
+        "read_text_file"
+      ],
+      "transform": ["find_ui_nodes", "set", "summarize_ui_tree"],
+      "apply": [
+        "android_cli_screen_capture",
+        "authenticate_with_passkey",
+        "capture_screen",
+        "emit_session_handoff",
+        "fill_login_form",
+        "input_text",
+        "input_text_into_ui_node",
+        "launch_app",
+        "log",
+        "open_deep_link",
+        "swipe",
+        "tap",
+        "tap_ui_node",
+        "wait_for_ui_node",
+        "wait_for_ui_text"
+      ]
+    },
     "approval": {
       "capture": ["list_pending", "load"],
       "transform": [],
@@ -205,6 +238,26 @@
       "capture": [],
       "transform": [],
       "apply": ["agent-task", "api", "issue", "pr", "repo", "run-workflow", "skill"]
+    },
+    "ios": {
+      "capture": [
+        "capture_runtime_session_handoff",
+        "read_json",
+        "read_text_file",
+        "simctl_health_check"
+      ],
+      "transform": ["set"],
+      "apply": [
+        "boot_simulator",
+        "capture_screen",
+        "emit_session_handoff",
+        "install_app",
+        "launch_app",
+        "log",
+        "open_deep_link",
+        "shutdown_simulator",
+        "uninstall_app"
+      ]
     },
     "media": {
       "capture": ["json_read", "pptx_extract", "pptx_slide_text", "xlsx_extract"],

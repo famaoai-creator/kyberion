@@ -75,8 +75,125 @@
     {
       "n": "android-actuator",
       "path": "libs/actuators/android-actuator",
-      "source": "registry",
-      "ops": []
+      "source": "describeOps",
+      "ops": [
+        {
+          "op": "adb_health_check",
+          "kind": "capture"
+        },
+        {
+          "op": "android_cli_describe",
+          "kind": "capture"
+        },
+        {
+          "op": "android_cli_docs_search",
+          "kind": "capture"
+        },
+        {
+          "op": "android_cli_health_check",
+          "kind": "capture"
+        },
+        {
+          "op": "android_cli_layout",
+          "kind": "capture"
+        },
+        {
+          "op": "android_cli_screen_resolve",
+          "kind": "capture"
+        },
+        {
+          "op": "capture_foreground_activity",
+          "kind": "capture"
+        },
+        {
+          "op": "capture_runtime_session_handoff",
+          "kind": "capture"
+        },
+        {
+          "op": "extract_ui_tree",
+          "kind": "capture"
+        },
+        {
+          "op": "read_json",
+          "kind": "capture"
+        },
+        {
+          "op": "read_text_file",
+          "kind": "capture"
+        },
+        {
+          "op": "find_ui_nodes",
+          "kind": "transform"
+        },
+        {
+          "op": "set",
+          "kind": "transform"
+        },
+        {
+          "op": "summarize_ui_tree",
+          "kind": "transform"
+        },
+        {
+          "op": "android_cli_screen_capture",
+          "kind": "apply"
+        },
+        {
+          "op": "authenticate_with_passkey",
+          "kind": "apply"
+        },
+        {
+          "op": "capture_screen",
+          "kind": "apply"
+        },
+        {
+          "op": "emit_session_handoff",
+          "kind": "apply"
+        },
+        {
+          "op": "fill_login_form",
+          "kind": "apply"
+        },
+        {
+          "op": "input_text",
+          "kind": "apply"
+        },
+        {
+          "op": "input_text_into_ui_node",
+          "kind": "apply"
+        },
+        {
+          "op": "launch_app",
+          "kind": "apply"
+        },
+        {
+          "op": "log",
+          "kind": "apply"
+        },
+        {
+          "op": "open_deep_link",
+          "kind": "apply"
+        },
+        {
+          "op": "swipe",
+          "kind": "apply"
+        },
+        {
+          "op": "tap",
+          "kind": "apply"
+        },
+        {
+          "op": "tap_ui_node",
+          "kind": "apply"
+        },
+        {
+          "op": "wait_for_ui_node",
+          "kind": "apply"
+        },
+        {
+          "op": "wait_for_ui_text",
+          "kind": "apply"
+        }
+      ]
     },
     {
       "n": "approval-actuator",
@@ -1093,8 +1210,65 @@
     {
       "n": "ios-actuator",
       "path": "libs/actuators/ios-actuator",
-      "source": "registry",
-      "ops": []
+      "source": "describeOps",
+      "ops": [
+        {
+          "op": "capture_runtime_session_handoff",
+          "kind": "capture"
+        },
+        {
+          "op": "read_json",
+          "kind": "capture"
+        },
+        {
+          "op": "read_text_file",
+          "kind": "capture"
+        },
+        {
+          "op": "simctl_health_check",
+          "kind": "capture"
+        },
+        {
+          "op": "set",
+          "kind": "transform"
+        },
+        {
+          "op": "boot_simulator",
+          "kind": "apply"
+        },
+        {
+          "op": "capture_screen",
+          "kind": "apply"
+        },
+        {
+          "op": "emit_session_handoff",
+          "kind": "apply"
+        },
+        {
+          "op": "install_app",
+          "kind": "apply"
+        },
+        {
+          "op": "launch_app",
+          "kind": "apply"
+        },
+        {
+          "op": "log",
+          "kind": "apply"
+        },
+        {
+          "op": "open_deep_link",
+          "kind": "apply"
+        },
+        {
+          "op": "shutdown_simulator",
+          "kind": "apply"
+        },
+        {
+          "op": "uninstall_app",
+          "kind": "apply"
+        }
+      ]
     },
     {
       "n": "media-actuator",
