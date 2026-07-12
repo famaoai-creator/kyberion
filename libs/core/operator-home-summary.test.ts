@@ -85,4 +85,32 @@ describe('operator home summary', () => {
     expect(summary.nextAction.title.length).toBeGreaterThan(0);
     expect(summary.inboxEntries).toHaveLength(1);
   });
+
+  it('surfaces a pending software quality decision for the accountable human', async () => {
+    const qualityDir = path.join(tmpRoot, 'active/shared/runtime/qa');
+    fs.mkdirSync(qualityDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(qualityDir, 'latest-quality-report.json'),
+      JSON.stringify({
+        report_id: 'QUALITY-RUN-1',
+        project_id: 'project-1',
+        subject_ref: 'git:abc',
+        recommendation: 'no_go',
+        human_decision: 'pending',
+        accountable_human_id: 'human:owner',
+        generated_at: '2026-07-12T00:00:00.000Z',
+        residual_risks: ['Critical defect remains.'],
+        evidence_refs: ['trace:1'],
+      })
+    );
+    const { collectOperatorHomeSummary } = await import('./operator-home-summary.js');
+    const summary = collectOperatorHomeSummary();
+    expect(summary.status).toBe('attention');
+    expect(summary.counts.pendingQualityDecisions).toBe(1);
+    expect(summary.qualitySummary).toMatchObject({
+      recommendation: 'no_go',
+      accountableHumanId: 'human:owner',
+    });
+    expect(summary.nextAction.title).toContain('quality');
+  });
 });

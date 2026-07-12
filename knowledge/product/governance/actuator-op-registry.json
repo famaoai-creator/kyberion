@@ -283,6 +283,7 @@
         "cross_critique",
         "decompose_into_tasks",
         "deploy_release",
+        "derive_test_inventory",
         "distill",
         "emit_dissent_log",
         "escalate_for_review",

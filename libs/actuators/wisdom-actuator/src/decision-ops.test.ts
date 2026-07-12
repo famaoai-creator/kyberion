@@ -721,3 +721,48 @@ describe('reasoning_mode visibility', () => {
     ).toBe('placeholder');
   });
 });
+
+describe("dispatchDecisionOp 'derive_test_inventory'", () => {
+  it('writes deterministic QA viewpoints through the wisdom actuator', async () => {
+    resetReasoningBackend();
+    const contract = tmpPath(`quality-contract-${Date.now()}.json`);
+    const output = tmpPath(`test-inventory-${Date.now()}.json`);
+    safeWriteFile(
+      contract.abs,
+      JSON.stringify({
+        version: '1.0.0',
+        project_id: 'project-1',
+        accountable_human_id: 'human:owner',
+        must_have_requirement_ids: ['REQ-1'],
+        dor: [{ check_id: 'DOR-1', description: 'Ready', status: 'pending' }],
+        acceptance_criteria: [
+          {
+            criterion_id: 'AC-1',
+            description: 'Returns 200',
+            requirement_refs: ['REQ-1'],
+            expected_result: '200',
+            status: 'pending',
+          },
+        ],
+        dod: [{ check_id: 'DOD-1', description: 'Done', status: 'pending' }],
+      })
+    );
+    const result = await dispatchDecisionOp(
+      'derive_test_inventory',
+      {
+        contract_path: contract.rel,
+        output_path: output.rel,
+        system_tags: ['api', 'ai'],
+        risk_refs: ['RISK-1'],
+        export_as: 'inventory',
+      },
+      {}
+    );
+    expect(result.handled).toBe(true);
+    expect(result.ctx.inventory.items.length).toBeGreaterThan(0);
+    const written = JSON.parse(safeReadFile(output.abs, { encoding: 'utf8' }) as string);
+    expect(written.items.flatMap((item: any) => item.viewpoint_ids)).toContain(
+      'security.trust-boundary'
+    );
+  });
+});

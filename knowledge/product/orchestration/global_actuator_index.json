@@ -370,7 +370,7 @@
       "d": "Knowledge-tier search, injection, import/export, and decision-support operations",
       "s": "implemented",
       "version": "1.2.1",
-      "capability_count": 34,
+      "capability_count": 35,
       "ops": [
         "a2a_fanout",
         "a2a_roleplay",
@@ -381,6 +381,7 @@
         "cross_critique",
         "decompose_into_tasks",
         "deploy_release",
+        "derive_test_inventory",
         "emit_dissent_log",
         "evaluate_architecture_ready",
         "evaluate_customer_signoff",

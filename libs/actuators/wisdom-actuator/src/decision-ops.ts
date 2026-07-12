@@ -48,6 +48,8 @@ import {
   type PresentationPreferenceProfile,
   delegateBestOf,
   requestPeerAdvice,
+  deriveTestInventory,
+  type SoftwareQualityContract,
 } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
 import * as path from 'node:path';
@@ -2793,6 +2795,37 @@ export async function dispatchDecisionOp(
         design_spec_path: resolved('design_spec_path'),
       });
       return { handled: true, ctx: assign(result) };
+    }
+
+    case 'derive_test_inventory': {
+      const contractPath = resolved('contract_path');
+      const contractValue =
+        params.contract ??
+        ctx[params.contract_from || 'quality_contract'] ??
+        (contractPath && safeExistsSync(pathResolver.rootResolve(contractPath))
+          ? JSON.parse(
+              safeReadFile(pathResolver.rootResolve(contractPath), { encoding: 'utf8' }) as string
+            )
+          : null);
+      if (!contractValue) throw new Error('[derive_test_inventory] quality contract not found');
+      const systemTagsValue = params.system_tags ?? ctx[params.system_tags_from || 'system_tags'];
+      const riskRefsValue = params.risk_refs ?? ctx[params.risk_refs_from || 'risk_refs'];
+      const inventory = await deriveTestInventory({
+        contract: contractValue as SoftwareQualityContract,
+        systemTags: Array.isArray(systemTagsValue) ? systemTagsValue.map(String) : [],
+        riskRefs: Array.isArray(riskRefsValue) ? riskRefsValue.map(String) : [],
+        additionalContext: resolved('additional_context'),
+        projectId: resolved('project_id') || undefined,
+      });
+      const outputPath = resolved('output_path');
+      if (outputPath) {
+        safeWriteFile(
+          pathResolver.rootResolve(outputPath),
+          `${JSON.stringify(inventory, null, 2)}\n`,
+          { encoding: 'utf8' }
+        );
+      }
+      return { handled: true, ctx: assign(inventory) };
     }
 
     case 'evaluate_qa_ready': {

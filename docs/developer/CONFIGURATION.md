@@ -98,7 +98,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_VOICE_RUNTIME_POLICY_PATH`                             | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_VOICE_SAMPLE_INGESTION_POLICY_PATH`                    | path | no       | _undocumented_                                                                                                                |
 
-## flag (12)
+## flag (13)
 
 | Variable                                           | Type                   | Required | Description                                                                                                                                                                                                                   |
 | -------------------------------------------------- | ---------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -113,6 +113,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_DISABLE_EMBEDDINGS`                      | boolean                | no       | _undocumented_                                                                                                                                                                                                                |
 | `KYBERION_ENABLE_SERVICE_ACTUATE_TOOL`             | boolean                | no       | _undocumented_                                                                                                                                                                                                                |
 | `KYBERION_SECRET_ENCRYPTION`                       | enum: none \| keychain | no       | At-rest encryption mode for connection documents (AC-05). none=plaintext (default, compatible); keychain=AES-256-GCM with a macOS-keychain-held key. Migrate with pnpm secrets:encrypt (--decrypt exports back to plaintext). |
+| `KYBERION_SKIP_TYPE_RATCHET`                       | boolean                | no       | _undocumented_                                                                                                                                                                                                                |
 | `KYBERION_SPEND_GUARD_TEST`                        | boolean                | no       | Test-only opt-in: lets vitest exercise the reasoning-path spend guard against real history/policy (normally disabled under VITEST).                                                                                           |
 
 ## tuning (27)
@@ -194,7 +195,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_TERMINAL_HOST`                  | string | no       | _undocumented_                                                                                                                                                                           |
 | `KYBERION_TTS_COMMAND`                    | string | no       | _undocumented_                                                                                                                                                                           |
 
-## runtime (92)
+## runtime (93)
 
 | Variable                                      | Type   | Required | Description                                                                                             |
 | --------------------------------------------- | ------ | -------- | ------------------------------------------------------------------------------------------------------- |
@@ -227,6 +228,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_DEPLOY_PROJECT`                     | string | no       | _undocumented_                                                                                          |
 | `KYBERION_DEPLOYMENT_PROJECT`                 | string | no       | _undocumented_                                                                                          |
 | `KYBERION_DISPATCH_MAX_ROUNDS`                | string | no       | _undocumented_                                                                                          |
+| `KYBERION_DRAFT_REFINE`                       | string | no       | _undocumented_                                                                                          |
 | `KYBERION_EGRESS_POLICY`                      | string | no       | _undocumented_                                                                                          |
 | `KYBERION_EMAIL_FROM`                         | string | no       | _undocumented_                                                                                          |
 | `KYBERION_FLAG`                               | string | no       | _undocumented_                                                                                          |

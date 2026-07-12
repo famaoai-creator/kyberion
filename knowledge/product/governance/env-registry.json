@@ -663,6 +663,14 @@
       "documented": false
     },
     {
+      "name": "KYBERION_DRAFT_REFINE",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_EGRESS_POLICY",
       "category": "runtime",
       "type": "string",
@@ -1559,6 +1567,14 @@
       "name": "KYBERION_SHELL_COMMAND_POLICY_PATH",
       "category": "path",
       "type": "path",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_SKIP_TYPE_RATCHET",
+      "category": "flag",
+      "type": "boolean",
       "required": false,
       "description": "",
       "documented": false
