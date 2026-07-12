@@ -3,7 +3,7 @@ title: Scenario Catalog
 category: User
 tags: [scenarios, use-cases, catalog, automation]
 importance: 7
-last_updated: 2026-06-21
+last_updated: 2026-07-13
 ---
 
 # Scenario Catalog
@@ -44,3 +44,15 @@ See also:
 | Customer-branded video package        |  0-4 | `video-production.json` plus customer overlay | `KYBERION_CUSTOMER` resolves brand and marketing policy without cross-customer fallback |
 
 All external publication is a Distribution responsibility and requires an authenticated human approval bound to the exact effect payload. Strategy, Creative, and Review roles have no publication authority.
+
+# Cross-tool Productivity Tasks
+
+| Scenario                                 | Effect             | Entry point                                         | Completion boundary                                                           |
+| ---------------------------------------- | ------------------ | --------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Calendar availability check              | `read`             | `pnpm cli -- task plan`                             | Read plan and expected evidence are visible                                   |
+| Meeting prep with deck and email draft   | `draft`            | `pnpm cli -- task start`                            | Task Session and plan artifact exist; nothing is sent                         |
+| Calendar update or meeting participation | `external_write`   | Productivity plan plus approval workflow            | Authenticated human approval and effect receipt are required                  |
+| Browser checkout or payment              | `financial_commit` | Productivity plan plus browser procedure dispatcher | Merchant, amount, limit, bound approval, and post-action receipt are required |
+| Connected-system information collection  | `read`             | `service:preset` selected by the plan               | Source bindings and collection evidence are recorded                          |
+
+The canonical dry-run template is `knowledge/product/pipeline-templates/productivity-task-orchestration.json`. It validates a plan and creates a review package and receipt without network access or external effects.

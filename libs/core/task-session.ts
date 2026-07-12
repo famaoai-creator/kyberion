@@ -45,6 +45,8 @@ export type TaskSessionType =
   | 'presentation_deck'
   | 'report_document'
   | 'service_operation'
+  | 'meeting_operations'
+  | 'external_data_fetch'
   | 'document_generation'
   | 'analysis';
 export type TaskSessionStatus =
@@ -1235,7 +1237,9 @@ export function reopenTaskSession(
   const session = loadTaskSession(sessionId);
   if (!session) return null;
   const reopened = updateTaskSession(sessionId, {
-    status: input.status || (session.requirements?.missing?.length ? 'collecting_requirements' : 'planning'),
+    status:
+      input.status ||
+      (session.requirements?.missing?.length ? 'collecting_requirements' : 'planning'),
     requirements: input.requirements || session.requirements,
     payload: {
       ...(session.payload || {}),
