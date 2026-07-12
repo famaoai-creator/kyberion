@@ -578,6 +578,28 @@ describe('task-session', () => {
     expect(valid, JSON.stringify(validate.errors || [])).toBe(true);
   });
 
+  it.each([
+    ['オンラインミーティングに代わりに参加して', 'meeting_operations'],
+    ['https://example.com から最新情報を取ってきて', 'external_data_fetch'],
+  ] as const)('validates classified %s sessions', (utterance, expectedTaskType) => {
+    const classified = classifyTaskSessionIntent(utterance);
+    expect(classified?.taskType).toBe(expectedTaskType);
+
+    const session = createTaskSession({
+      sessionId: `TSK-TEST-${expectedTaskType.toUpperCase()}`,
+      surface: 'terminal',
+      taskType: classified!.taskType,
+      status: classified!.requirements?.missing?.length ? 'collecting_requirements' : 'planning',
+      goal: classified!.goal,
+      intentId: classified!.intentId,
+      requirements: classified!.requirements,
+      payload: classified!.payload,
+    });
+
+    const result = validateTaskSession(session);
+    expect(result.valid, result.errors.join('; ')).toBe(true);
+  });
+
   it('accepts the canonical task-session-capture-photo example', () => {
     const ajv = new Ajv({ allErrors: true });
     const schemaPath = path.join(

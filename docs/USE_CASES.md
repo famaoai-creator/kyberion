@@ -59,6 +59,7 @@ Kyberion に対する指示例:
 | 28  | 生活・予約       | [家事代行・修理・配送手配](#28-家事代行修理配送手配)                     |
 | 29  | 生活・予約       | [家族・子ども関連の予定管理](#29-家族子ども関連の予定管理)               |
 | 30  | 生活・予約       | [サブスク・契約更新・解約管理](#30-サブスク契約更新解約管理)             |
+| 31  | 横断業務         | [カレンダー・会議・メール・資料・ブラウザの一括計画](#31-カレンダー会議メール資料ブラウザの一括計画) |
 
 ---
 
@@ -974,6 +975,42 @@ Kyberion:
 ```
 
 **ポイント**: 解約・契約変更・支払い方法変更は approval gate で停止します。更新期限はリマインダーとしてスケジューリングできます。
+
+---
+
+## 31. カレンダー・会議・メール・資料・ブラウザの一括計画
+
+**課題**: 「会議前に関連システムから情報を集め、資料とメールを用意し、予定も調整して」のような依頼は、個別 CLI と Pipeline を利用者が組み合わせる必要がある。決済や送信が混ざると、どこで承認が必要かも分かりにくい。
+
+まず共通 planner で dry-run する。
+
+```bash
+pnpm cli -- task plan "連携システムから情報を集め、会議資料とメール下書きを作って"
+pnpm cli -- task plan "ブラウザで購入して決済を確定して"
+```
+
+planner は対象を `calendar / meeting / email / document / presentation / browser / connected_systems` に分解し、各 step を次の効果レベルに分類する。
+
+| Effect             | 例                               | 実行境界                               |
+| ------------------ | -------------------------------- | -------------------------------------- |
+| `read`             | 予定確認、接続済みシステムの参照 | read-only                              |
+| `draft`            | メール下書き、DOCX、PPTX         | ローカル成果物のみ                     |
+| `external_write`   | 予定登録、メール送信、会議参加   | 人間承認が必要                         |
+| `financial_commit` | 注文確定、決済                   | 人間承認、金額・加盟店・上限確認が必要 |
+
+Task Session として保存する場合:
+
+```bash
+pnpm cli -- task start "明日の会議資料と参加者向けメール下書きを作って"
+```
+
+`task start` は plan artifact と Task Session を保存するが、外部操作は行わない。レビュー用 Evidence を生成する dry-run は次で再実行できる。
+
+```bash
+pnpm pipeline --input knowledge/product/pipeline-templates/productivity-task-orchestration.json
+```
+
+**ポイント**: planner は承認そのものではない。`external_write` と `financial_commit` は既存の approval gate と実行 receipt に接続されるまで preview-only のまま扱う。`pnpm task:list` などの TaskScenario CLI は反復業務用、`pnpm cli -- task ...` は自由文から始める横断タスク用である。
 
 ---
 
