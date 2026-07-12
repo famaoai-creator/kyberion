@@ -23,6 +23,10 @@ vi.mock('../secure-io.js', () => ({
   safeMkdir: () => {
     /* no-op in tests */
   },
+  safeStat: (p: string) => fs.statSync(p),
+  safeUnlinkSync: () => {
+    /* no-op in tests */
+  },
 }));
 
 import {
