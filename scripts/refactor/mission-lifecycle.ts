@@ -58,7 +58,9 @@ function collectMissionEvidence(missionDir: string): Array<{ ref: string; text?:
         if (safeExistsSync(ref)) {
           text = String(safeReadFile(ref, { encoding: 'utf8' })).slice(0, 2000);
         }
-      } catch (_) {}
+      } catch (err) {
+        logger.warn(`[mission-lifecycle] suppressed error in collectMissionEvidence: ${err}`);
+      }
       return { ref, text };
     });
 }

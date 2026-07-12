@@ -29,9 +29,20 @@ import {
   type SurfaceScenarioGuide,
   type SurfaceLauncherRecommendation,
 } from '@agent/core';
+import { logger } from '@agent/core';
 
-export { getSurfaceDirectory, getSurfaceDirectorySummary, getSurfaceScenarioGuide, buildSurfaceLauncherRecommendations };
-export type { SurfaceDirectoryRow, SurfaceDirectorySummary, SurfaceScenarioGuide, SurfaceLauncherRecommendation };
+export {
+  getSurfaceDirectory,
+  getSurfaceDirectorySummary,
+  getSurfaceScenarioGuide,
+  buildSurfaceLauncherRecommendations,
+};
+export type {
+  SurfaceDirectoryRow,
+  SurfaceDirectorySummary,
+  SurfaceScenarioGuide,
+  SurfaceLauncherRecommendation,
+};
 
 const TENANT_SLUG_RE = /^[a-z][a-z0-9-]{1,30}$/;
 
@@ -132,10 +143,7 @@ function listMissionsForTier(tier: 'personal' | 'confidential' | 'public'): Miss
 
 export function listMissions(): MissionRow[] {
   const scope = getTenantScope();
-  const all = [
-    ...listMissionsForTier('public'),
-    ...listMissionsForTier('confidential'),
-  ];
+  const all = [...listMissionsForTier('public'), ...listMissionsForTier('confidential')];
   return all
     .filter((m) => eligibleTier(m.tier, scope))
     .filter((m) => {
@@ -204,7 +212,9 @@ export function getMissionDetail(missionId: string): MissionDetail | null {
   return null;
 }
 
-function listEvidenceFiles(missionDir: string): Array<{ name: string; bytes: number; modified_at: string }> {
+function listEvidenceFiles(
+  missionDir: string
+): Array<{ name: string; bytes: number; modified_at: string }> {
   const evidenceDir = path.join(missionDir, 'evidence');
   if (!safeExistsSync(evidenceDir)) return [];
   const out: Array<{ name: string; bytes: number; modified_at: string }> = [];
@@ -306,9 +316,7 @@ export function getHealthSummary(): HealthSummary {
     completed_missions: missions.filter((m) => m.status === 'completed').length,
     failed_missions: missions.filter((m) => m.status === 'failed').length,
     recent_audit_events_24h: recent.length,
-    recent_override_events: events.filter(
-      (e) => e.action === 'rubric.override_accepted',
-    ).length,
+    recent_override_events: events.filter((e) => e.action === 'rubric.override_accepted').length,
     ...(getTenantScope() ? { scope: getTenantScope() } : {}),
   };
 }
@@ -341,8 +349,8 @@ export function getCapabilities() {
 
   return registry.bundles.map((bundle: CapabilityBundleEntry) => {
     const refs = bundle.harness_capability_refs || [];
-    const requiredCaps = scanned.filter(c => refs.includes(c.capability_id));
-    const missingCount = requiredCaps.filter(c => c.discovery_status === 'missing').length;
+    const requiredCaps = scanned.filter((c) => refs.includes(c.capability_id));
+    const missingCount = requiredCaps.filter((c) => c.discovery_status === 'missing').length;
     const totalCount = requiredCaps.length;
 
     let health: 'active' | 'degraded' | 'inactive' = 'active';
@@ -362,11 +370,11 @@ export function getCapabilities() {
       health,
       intents: bundle.intents || [],
       required_actuators: bundle.required_actuators || [],
-      dependencies: requiredCaps.map(c => ({
+      dependencies: requiredCaps.map((c) => ({
         id: c.capability_id,
         status: c.discovery_status as 'available' | 'missing',
-        provider: c.source.provider
-      }))
+        provider: c.source.provider,
+      })),
     };
   });
 }
@@ -380,7 +388,9 @@ export function getProviderPins(): Record<string, any> {
     try {
       const data = JSON.parse(safeReadFile(defaultPath, { encoding: 'utf8' }) as string);
       Object.assign(pins, data.pins || {});
-    } catch (_) {}
+    } catch (err) {
+      logger.warn(`[data] suppressed error in getProviderPins: ${err}`);
+    }
   }
 
   // 2. Scan all session pin files in active/shared/runtime/provider-pins/
@@ -394,7 +404,9 @@ export function getProviderPins(): Record<string, any> {
         const data = JSON.parse(safeReadFile(fullPath, { encoding: 'utf8' }) as string);
         Object.assign(pins, data.pins || {});
       }
-    } catch (_) {}
+    } catch (err) {
+      logger.warn(`[data] suppressed error in getProviderPins: ${err}`);
+    }
   }
 
   return pins;
