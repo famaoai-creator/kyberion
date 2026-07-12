@@ -305,7 +305,7 @@ function printBranchBanner(branchId?: string) {
   const patchPath = path.join(rootDir, 'knowledge/evolution/latent-wisdom', `${branchId}.json`);
   if (!safeExistsSync(patchPath)) {
     process.stderr.write(
-      chalk.red(`\n❌ Error: Branch "${branchId}" not found in Wisdom Vault.\n`)
+      chalk.red(`\n${t('cli_error_branch_not_found').replace('{branch}', branchId)}\n`)
     );
     return;
   }
@@ -315,73 +315,61 @@ function printBranchBanner(branchId?: string) {
   );
 }
 
-function printHeader() {
+function printHeader(locale = resolveLocale()) {
   console.log(chalk.yellow('\n🌌 KYBERION CONSOLE v2.2 [SECURE-IO ENFORCED]'));
-  console.log(chalk.gray('Discover, inspect, and run actuators from the sovereign console.\n'));
+  console.log(chalk.gray(t('cli_header_tagline', locale) + '\n'));
 }
 
-function printHelp(actuators: ActuatorRecord[]) {
-  printHeader();
-  console.log('Usage: npm run cli -- <command> [arguments]');
+function printHelp(actuators: ActuatorRecord[], locale = resolveLocale()) {
+  printHeader(locale);
+  console.log(t('cli_help_usage', locale));
   console.log('');
-  console.log('── Actuator Management ─────────────────────────────────────────────');
-  console.log(
-    '  list [--check]       List actuators in the manifest catalog (--check: runtime detection)'
-  );
-  console.log('  search <query>       Search actuators by name, description, or path');
-  console.log('  info <name>          Show details for a specific actuator');
-  console.log('  examples [name]      List actuator-owned examples (all, or one actuator)');
-  console.log('  mobile-profiles [id] List shared mobile app profiles or inspect one');
-  console.log('  web-profiles [id]    List shared web app profiles or inspect one');
-  console.log(
-    '  run <name> [args]    Execute an actuator (30-min timeout; use --help for actuator flags)'
-  );
+  console.log(t('cli_help_sec_actuators', locale));
+  console.log(t('cli_help_list', locale));
+  console.log(t('cli_help_search', locale));
+  console.log(t('cli_help_info', locale));
+  console.log(t('cli_help_examples_cmd', locale));
+  console.log(t('cli_help_mobile_profiles', locale));
+  console.log(t('cli_help_web_profiles', locale));
+  console.log(t('cli_help_run', locale));
   console.log('');
-  console.log('── Pipelines ───────────────────────────────────────────────────────');
-  console.log('  preview <file>       Validate a pipeline JSON and show its step tree');
-  console.log('  schedule list        List scheduled pipelines registered with chronos');
+  console.log(t('cli_help_sec_pipelines', locale));
+  console.log(t('cli_help_preview', locale));
+  console.log(t('cli_help_schedule_list', locale));
   console.log('  schedule register <id> <pipeline> <actuator> "<cron>"');
-  console.log('                       Register a new scheduled pipeline');
-  console.log('  schedule remove <id> Remove a scheduled pipeline from chronos');
+  console.log(t('cli_help_schedule_register_desc', locale));
+  console.log(t('cli_help_schedule_remove', locale));
   console.log('');
-  console.log('── Artifacts ───────────────────────────────────────────────────────');
-  console.log('  artifact <path>      Inspect a generated artifact (text preview for text types)');
-  console.log('  open-artifact <path> Open a generated artifact with the OS default viewer');
+  console.log(t('cli_help_sec_artifacts', locale));
+  console.log(t('cli_help_artifact', locale));
+  console.log(t('cli_help_open_artifact', locale));
   console.log('');
-  console.log(
-    '  intent [--clarify] "<utterance>"   Resolve free text into an intent or clarification packet'
-  );
+  console.log(t('cli_help_intent', locale));
   console.log('');
-  console.log('── Operator Packets ────────────────────────────────────────────────');
-  console.log(
-    '  packet <path>        Render an operator packet, status report, or response preview'
-  );
-  console.log('  accept-next-action <packet> <id>  Execute a suggested next action from a packet');
+  console.log(t('cli_help_sec_packets', locale));
+  console.log(t('cli_help_packet', locale));
+  console.log(t('cli_help_accept_next', locale));
   console.log('');
-  console.log('── Approvals & Governance ──────────────────────────────────────────');
-  console.log('  approvals [channel]  List pending approval requests (run this first to find IDs)');
-  console.log('  approve <id> [ch]    Approve a pending request as the current sovereign');
-  console.log('  reject  <id> [ch]    Reject a pending request as the current sovereign');
+  console.log(t('cli_help_sec_approvals', locale));
+  console.log(t('cli_help_approvals', locale));
+  console.log(t('cli_help_approve', locale));
+  console.log(t('cli_help_reject', locale));
   console.log('');
-  console.log('── Email Workflow ───────────────────────────────────────────────────');
-  console.log(
-    '  email <status|draft|latest-draft|deliver|archive-inbox>  Email workflow (run `npm run cli -- email --help` for details)'
-  );
-  console.log('  email status         Check Gmail auth readiness');
-  console.log('  email draft          Generate a reply draft from inbox triage');
-  console.log('  email latest-draft   Show the latest stored draft artifact');
-  console.log('  email deliver        Create a Gmail draft or send an approved reply');
-  console.log('  email archive-inbox  Create archive filters for repeated inbox senders');
-  console.log(
-    '  calendar <status|list-calendars|agenda|freebusy|create-event>  Calendar workflow (run `npm run cli -- calendar --help` for details)'
-  );
-  console.log('  calendar status      Check calendar auth readiness');
-  console.log('  calendar list-calendars  List calendars on the authenticated account');
-  console.log('  calendar agenda      Show upcoming events from a calendar');
-  console.log('  calendar freebusy    Query free/busy windows for one or more calendars');
-  console.log('  calendar create-event  Create a calendar event, optionally with Google Meet');
+  console.log(t('cli_help_sec_email', locale));
+  console.log(t('cli_help_email_summary', locale));
+  console.log(t('cli_help_email_status', locale));
+  console.log(t('cli_help_email_draft', locale));
+  console.log(t('cli_help_email_latest', locale));
+  console.log(t('cli_help_email_deliver', locale));
+  console.log(t('cli_help_email_archive', locale));
+  console.log(t('cli_help_calendar_summary', locale));
+  console.log(t('cli_help_calendar_status', locale));
+  console.log(t('cli_help_calendar_list', locale));
+  console.log(t('cli_help_calendar_agenda', locale));
+  console.log(t('cli_help_calendar_freebusy', locale));
+  console.log(t('cli_help_calendar_create', locale));
   console.log('');
-  console.log('Examples:');
+  console.log(t('cli_help_examples', locale));
   console.log('  npm run cli -- list');
   console.log('  npm run cli -- search browser');
   console.log('  npm run cli -- run file-actuator -- --help');
@@ -394,29 +382,27 @@ function printHelp(actuators: ActuatorRecord[]) {
   console.log('  npm run cli -- calendar list-calendars');
   console.log('  npm run cli -- calendar agenda --calendar-id primary --days 7');
   console.log('');
-  console.log('Useful first-run commands:');
-  console.log('  pnpm onboard          # customer/{slug}/ preferred when KYBERION_CUSTOMER is set');
-  console.log('  pnpm doctor          Check environment readiness');
-  console.log('  pnpm capabilities    Check which actuator capabilities fit this environment');
-  console.log('  pnpm mission:journal Inspect mission history');
+  console.log(t('cli_help_first_run', locale));
+  console.log(t('cli_help_onboard', locale));
+  console.log(t('cli_help_doctor', locale));
+  console.log(t('cli_help_capabilities', locale));
+  console.log(t('cli_help_journal', locale));
   console.log('');
-  console.log(`Indexed actuators: ${actuators.length}`);
+  console.log(`${t('cli_help_indexed_actuators', locale)} ${actuators.length}`);
 }
 
-function printEmailHelp(): void {
-  printHeader();
-  console.log(
-    'Usage: npm run cli -- email <status|draft|latest-draft|deliver|archive-inbox> [options]'
-  );
+function printEmailHelp(locale = resolveLocale()): void {
+  printHeader(locale);
+  console.log(t('cli_help_email_usage', locale));
   console.log('');
-  console.log('Commands:');
-  console.log('  status        Check Gmail auth readiness');
-  console.log('  draft         Generate a reply draft from inbox triage');
-  console.log('  latest-draft  Show the latest stored draft artifact');
-  console.log('  deliver       Create a Gmail draft or send an approved email');
-  console.log('  archive-inbox Create archive filters for repeated inbox senders');
+  console.log(t('cli_help_commands', locale));
+  console.log(t('cli_help_email_status_short', locale));
+  console.log(t('cli_help_email_draft_short', locale));
+  console.log(t('cli_help_email_latest_short', locale));
+  console.log(t('cli_help_email_deliver_short', locale));
+  console.log(t('cli_help_email_archive_short', locale));
   console.log('');
-  console.log('Examples:');
+  console.log(t('cli_help_examples', locale));
   console.log('  npm run cli -- email status');
   console.log('  npm run cli -- email draft --triage-file active/shared/tmp/email-inbox-triage.md');
   console.log('  npm run cli -- email latest-draft');
@@ -429,20 +415,18 @@ function printEmailHelp(): void {
   console.log('  npm run cli -- email archive-inbox --apply');
 }
 
-function printCalendarHelp(): void {
-  printHeader();
-  console.log(
-    'Usage: npm run cli -- calendar <status|list-calendars|agenda|freebusy|create-event> [options]'
-  );
+function printCalendarHelp(locale = resolveLocale()): void {
+  printHeader(locale);
+  console.log(t('cli_help_calendar_usage', locale));
   console.log('');
-  console.log('Commands:');
-  console.log('  status        Check calendar auth readiness');
-  console.log('  list-calendars  List calendars on the authenticated account');
-  console.log('  agenda        Show upcoming events from a calendar');
-  console.log('  freebusy      Query free/busy windows for one or more calendars');
-  console.log('  create-event  Create a calendar event, optionally with meeting metadata');
+  console.log(t('cli_help_commands', locale));
+  console.log(t('cli_help_calendar_status_short', locale));
+  console.log(t('cli_help_calendar_list_short', locale));
+  console.log(t('cli_help_calendar_agenda_short', locale));
+  console.log(t('cli_help_calendar_freebusy_short', locale));
+  console.log(t('cli_help_calendar_create_short', locale));
   console.log('');
-  console.log('Examples:');
+  console.log(t('cli_help_examples', locale));
   console.log('  npm run cli -- calendar status');
   console.log('  npm run cli -- calendar status --provider m365');
   console.log('  npm run cli -- calendar list-calendars');
@@ -475,10 +459,11 @@ function parseEmailWorkflowOptions(args: string[]): Record<string, string | bool
 
 async function handleEmailWorkflowCommand(
   subcommand: string | undefined,
-  args: string[]
+  args: string[],
+  locale = resolveLocale()
 ): Promise<void> {
   if (!subcommand || subcommand === 'help' || subcommand === '--help' || subcommand === '-h') {
-    printEmailHelp();
+    printEmailHelp(locale);
     return;
   }
   const options = parseEmailWorkflowOptions(args);
@@ -575,10 +560,11 @@ async function handleEmailWorkflowCommand(
 
 async function handleCalendarWorkflowCommand(
   subcommand: string | undefined,
-  args: string[]
+  args: string[],
+  locale = resolveLocale()
 ): Promise<void> {
   if (!subcommand || subcommand === 'help' || subcommand === '--help' || subcommand === '-h') {
-    printCalendarHelp();
+    printCalendarHelp(locale);
     return;
   }
 
@@ -1436,7 +1422,11 @@ function runActuator(
     const timeoutHint = isTimeout
       ? ' (30-minute timeout exceeded — for long-running tasks, run the actuator directly: `node dist/<path>/src/index.js --input <file>`)'
       : '';
-    process.stderr.write(chalk.red(`\n❌ Execution failed: ${err.message}${timeoutHint}\n`));
+    process.stderr.write(
+      chalk.red(
+        `\n${t('cli_error_execution_failed').replace('{message}', err.message)}${timeoutHint}\n`
+      )
+    );
     if (err.stdout) {
       process.stdout.write(err.stdout.toString());
     }
@@ -1452,11 +1442,12 @@ export async function main(args = process.argv.slice(2)) {
   printMissionContextBanner(missionId);
 
   const actuators = loadActuators();
+  const locale = resolveLocale(args);
   const normalizedArgs = stripNpmSeparatorArg(stripLocaleArg(args));
   const [command = 'help', firstArg, ...restArgs] = normalizedArgs;
 
   if (command === 'help' || command === '--help' || command === '-h') {
-    printHelp(actuators);
+    printHelp(actuators, locale);
     return;
   }
 
@@ -1593,12 +1584,12 @@ export async function main(args = process.argv.slice(2)) {
   }
 
   if (command === 'email') {
-    await handleEmailWorkflowCommand(firstArg, restArgs);
+    await handleEmailWorkflowCommand(firstArg, restArgs, locale);
     return;
   }
 
   if (command === 'calendar') {
-    await handleCalendarWorkflowCommand(firstArg, restArgs);
+    await handleCalendarWorkflowCommand(firstArg, restArgs, locale);
     return;
   }
 
@@ -1818,7 +1809,7 @@ export async function main(args = process.argv.slice(2)) {
     process.exit(0);
   }
 
-  throw new Error(`Unknown command "${command}". Try \`npm run cli -- help\`.`);
+  throw new Error(t('cli_error_unknown_command', locale).replace('{command}', command));
 }
 
 const isDirectRun =

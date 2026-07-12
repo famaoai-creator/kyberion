@@ -150,7 +150,7 @@ describe('Kyberion CLI helpers', () => {
   it('includes the email workflow command in help output', async () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
-    await main(['help']);
+    await main(['help', '--locale', 'en']);
 
     const output = logSpy.mock.calls.flat().join('\n');
     expect(output).toContain('email <status|draft|latest-draft|deliver|archive-inbox>');
@@ -161,10 +161,21 @@ describe('Kyberion CLI helpers', () => {
     expect(output).toContain('intent [--clarify] "<utterance>"');
   });
 
+  it('renders help in Japanese when --locale ja is passed (UX-03)', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await main(['help', '--locale', 'ja']);
+
+    const output = logSpy.mock.calls.flat().join('\n');
+    expect(output).toContain('使い方: npm run cli -- <コマンド> [引数]');
+    expect(output).toContain('── アクチュエータ管理 ──');
+    expect(output).toContain('Gmail 認証の準備状態を確認');
+  });
+
   it('includes the inbox archive example in email help output', async () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
-    await main(['email', 'help']);
+    await main(['email', 'help', '--locale', 'en']);
 
     const output = logSpy.mock.calls.flat().join('\n');
     expect(output).toContain('email <status|draft|latest-draft|deliver|archive-inbox>');
@@ -174,7 +185,7 @@ describe('Kyberion CLI helpers', () => {
   it('includes the calendar workflow command in help output', async () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
-    await main(['calendar', 'help']);
+    await main(['calendar', 'help', '--locale', 'en']);
 
     const output = logSpy.mock.calls.flat().join('\n');
     expect(output).toContain('calendar <status|list-calendars|agenda|freebusy|create-event>');
