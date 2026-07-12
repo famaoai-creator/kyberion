@@ -1215,7 +1215,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 49270,
+      "size": 49454,
       "type": "json"
     },
     {
@@ -6961,6 +6961,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/software-test-viewpoints.schema.json",
+      "tier": "public",
+      "size": 1097,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/specialist-catalog.schema.json",
       "tier": "public",
       "size": 897,
@@ -7120,6 +7126,18 @@
       "path": "product/schemas/test-case-adf.schema.json",
       "tier": "public",
       "size": 1111,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/test-execution-record.schema.json",
+      "tier": "public",
+      "size": 1793,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/test-inventory.schema.json",
+      "tier": "public",
+      "size": 1938,
       "type": "json"
     },
     {
