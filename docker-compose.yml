@@ -15,5 +15,17 @@ services:
       pnpm build &&
       node dist/scripts/cli.js list implemented"
 
+  # OP-03 Task 3: deploy service — runs the built image (no source mount,
+  # no install/build at runtime). macOS-only voice (MLX) is unavailable on
+  # Linux images; core CLI works without it.
+  kyberion-deploy:
+    profiles: ['deploy']
+    build:
+      context: .
+      target: production
+    environment:
+      NODE_ENV: production
+    command: node dist/scripts/cli.js list implemented
+
 volumes:
   node_modules_data:

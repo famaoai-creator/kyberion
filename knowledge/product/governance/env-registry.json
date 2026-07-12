@@ -1556,6 +1556,14 @@
       "documented": false
     },
     {
+      "name": "KYBERION_SKIP_TYPE_RATCHET",
+      "category": "flag",
+      "type": "boolean",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_SMTP_HOST",
       "category": "provider",
       "type": "string",
