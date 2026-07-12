@@ -37,6 +37,13 @@
               "minLength": 1
             }
           },
+          "role_hints": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
           "lifecycle": {
             "type": "object",
             "additionalProperties": false,
