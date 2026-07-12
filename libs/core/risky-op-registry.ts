@@ -12,6 +12,7 @@
 
 import { randomUUID } from 'node:crypto';
 import { enforceApprovalGate, type ApprovalGateResult } from './approval-gate.js';
+import type { TraceContext } from './src/trace.js';
 
 /** Canonical op IDs for risky operations enforced by the approval gate. */
 export const RISKY_OPS = {
@@ -41,6 +42,8 @@ export interface RequireApprovalParams {
     summary: string;
     severity?: 'low' | 'medium' | 'high';
   };
+  /** Pipeline trace context — threaded into the approval gate for event emission. */
+  trace?: TraceContext;
 }
 
 /**
@@ -70,6 +73,7 @@ export function requireApprovalForOp(params: RequireApprovalParams): ApprovalGat
     intentId: params.opId,
     payload: params.payload,
     draft: params.draft,
+    trace: params.trace,
   });
 }
 
