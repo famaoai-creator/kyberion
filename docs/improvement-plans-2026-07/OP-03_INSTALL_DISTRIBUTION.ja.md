@@ -49,6 +49,12 @@
 - Docker のマルチステージ化でビルドが壊れやすい。既存の `pnpm build` 成果物をそのまま COPY する形にし、イメージ内ビルドを段階的に外す。
 - 音声/ブラウザ依存の分離で既存の音声 first-win(ロードマップの目玉)を壊さないよう、macOS ネイティブ経路は Docker と別物として維持する。
 
+## 実装状況 追記 (2026-07-12)
+
+- **Task 2 完了(bin フィールドとローカル CLI)**: `package.json` に `bin: { "kyberion": "dist/scripts/cli.js" }` を追加し、`scripts/cli.ts` に shebang を付与(tsc がビルド出力へ保持することを確認)。`private: true` は維持 — `pnpm link --global` で `kyberion` コマンドが張れる。`node dist/scripts/cli.js help` の起動確認済み。
+- npx 公開の是非は計画どおり**経営判断事項として未実装**(論点: 製品人格・サポート体制・secret 同梱リスク。公開時は files allowlist と postinstall 検査が前提)。
+- 残: Task 3(動く Docker イメージ / deploy サービス)。
+
 ## 実装状況 追記 (2026-07-12 後半 — Task 3)
 
 - **tier 隔離の重大修正**: `.dockerignore` が `knowledge/personal/` / `knowledge/confidential/` / `customer/` を除外しておらず、**Docker イメージに confidential データが焼かれる**状態だった(builder の `COPY . .` → production の `COPY --from=builder /app/knowledge`)。除外を追加(+ `work/`、`.env*`、鍵ファイル)。イメージはレジストリ/他マシンへ移動し得るため、これはデータ tier 不変条件の実違反だった。

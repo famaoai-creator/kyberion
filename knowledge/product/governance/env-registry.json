@@ -955,6 +955,14 @@
       "subsystem": "surfaces"
     },
     {
+      "name": "KYBERION_LOCALE",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_LOCALHOST_AUTOADMIN",
       "category": "runtime",
       "type": "string",
