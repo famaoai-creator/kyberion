@@ -1,9 +1,5 @@
 import { generateNativePptx } from '@agent/core';
-import type {
-  PptxDesignProtocol,
-  PptxElement,
-  PptxSlide,
-} from '@agent/core';
+import type { PptxDesignProtocol, PptxElement, PptxSlide } from '@agent/core';
 
 // ─── Color Palette ──────────────────────────────────────────
 const C = {

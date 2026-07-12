@@ -16,11 +16,15 @@ import {
   safeExistsSync,
   safeReaddir,
   safeReadFile,
+  safeStat,
   safeWriteFile,
+  sha256,
   listArtifactOwnershipRecordsForMission,
   loadArtifactRecord,
   trustEngine,
   validateOutcomeContractAtCompletion,
+  validateMarketingCompletionEvidence,
+  type MarketingCompletionEvidence,
   evaluateArtifactBundleGate,
   loadLatestArtifactBundleForMission,
 } from '@agent/core';
@@ -87,6 +91,12 @@ export async function validateMissionQuality(
   const state = loadState(id);
   if (!state) return { ok: false, reason: 'Mission state not found.' };
 
+  const marketingCompletion = validateMarketingMissionCompletionGate({
+    missionType: state.mission_type,
+    missionPath: findMissionPath(id),
+  });
+  if (!marketingCompletion.ok) return marketingCompletion;
+
   if (state.outcome_contract) {
     const missionPath = findMissionPath(id);
     const evidenceRefs =
@@ -152,6 +162,53 @@ export async function validateMissionQuality(
   }
 
   return { ok: true };
+}
+
+export function validateMarketingMissionCompletionGate(input: {
+  missionType?: string;
+  missionPath: string | null;
+}): { ok: boolean; reason?: string } {
+  if (!/marketing|campaign|publication/i.test(input.missionType || '')) return { ok: true };
+  if (!input.missionPath) return { ok: false, reason: 'Marketing mission path not found.' };
+  const evidenceRoot = path.join(input.missionPath, 'evidence');
+  const candidates: string[] = [];
+  const visit = (directory: string, depth: number): void => {
+    if (depth > 5 || !safeExistsSync(directory)) return;
+    for (const entry of safeReaddir(directory)) {
+      const candidate = path.join(directory, entry);
+      const stat = safeStat(candidate);
+      if (stat.isDirectory()) visit(candidate, depth + 1);
+      else if (entry === 'completion-evidence.json') candidates.push(candidate);
+    }
+  };
+  visit(evidenceRoot, 0);
+  if (candidates.length === 0) {
+    return { ok: false, reason: 'Marketing mission requires completion-evidence.json.' };
+  }
+  candidates.sort((left, right) => safeStat(right).mtimeMs - safeStat(left).mtimeMs);
+  try {
+    const evidence = JSON.parse(
+      safeReadFile(candidates[0], { encoding: 'utf8' }) as string
+    ) as MarketingCompletionEvidence;
+    const currentArtifacts = Object.fromEntries(
+      Object.entries(evidence.artifact_bindings || {}).map(([name, binding]) => {
+        const artifactPath = path.isAbsolute(binding.path)
+          ? binding.path
+          : pathResolver.rootResolve(binding.path);
+        if (!safeExistsSync(artifactPath)) return [name, { path: binding.path, sha256: '' }];
+        return [name, { path: binding.path, sha256: sha256(safeReadFile(artifactPath) as Buffer) }];
+      })
+    );
+    const result = validateMarketingCompletionEvidence({ evidence, currentArtifacts });
+    return result.ok
+      ? { ok: true }
+      : { ok: false, reason: `Marketing completion gate failed: ${result.reasons.join('; ')}` };
+  } catch (error) {
+    return {
+      ok: false,
+      reason: `Marketing completion evidence is invalid: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
 }
 
 export function recordAgentRuntimeEvent(
