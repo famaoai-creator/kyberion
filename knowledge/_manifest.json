@@ -1005,7 +1005,7 @@
     {
       "path": "product/governance/approval-policy.json",
       "tier": "public",
-      "size": 1981,
+      "size": 2419,
       "type": "json"
     },
     {
@@ -1279,6 +1279,18 @@
       "type": "json"
     },
     {
+      "path": "product/governance/gate-profiles/gate-profile-registry.json",
+      "tier": "public",
+      "size": 13588,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/gate-profiles/sdlc.json",
+      "tier": "public",
+      "size": 825,
+      "type": "json"
+    },
+    {
       "path": "product/governance/gateway-capability-registry.json",
       "tier": "public",
       "size": 47,
@@ -1295,6 +1307,12 @@
       "tier": "public",
       "size": 3029,
       "type": "md"
+    },
+    {
+      "path": "product/governance/governance-body-registry.json",
+      "tier": "public",
+      "size": 19022,
+      "type": "json"
     },
     {
       "path": "product/governance/governance-policy.md",
@@ -1359,7 +1377,7 @@
     {
       "path": "product/governance/intent-domain-ontology.json",
       "tier": "public",
-      "size": 105211,
+      "size": 110970,
       "type": "json"
     },
     {
@@ -1389,7 +1407,7 @@
     {
       "path": "product/governance/intent-routing-map.json",
       "tier": "public",
-      "size": 3096,
+      "size": 4020,
       "type": "json"
     },
     {
@@ -1599,7 +1617,7 @@
     {
       "path": "product/governance/mission-workflow-catalog.json",
       "tier": "public",
-      "size": 142979,
+      "size": 198769,
       "type": "json"
     },
     {
@@ -1713,7 +1731,7 @@
     {
       "path": "product/governance/organization-team-template-catalogs/it-managed-services.json",
       "tier": "public",
-      "size": 1098,
+      "size": 1859,
       "type": "json"
     },
     {
@@ -2007,7 +2025,7 @@
     {
       "path": "product/governance/security-policy.json",
       "tier": "public",
-      "size": 17986,
+      "size": 18526,
       "type": "json"
     },
     {
@@ -2097,7 +2115,7 @@
     {
       "path": "product/governance/standard-intents.json",
       "tier": "public",
-      "size": 173923,
+      "size": 188068,
       "type": "json"
     },
     {
@@ -2797,6 +2815,12 @@
       "type": "md"
     },
     {
+      "path": "product/operations/incident-severity-model.md",
+      "tier": "public",
+      "size": 4700,
+      "type": "md"
+    },
+    {
       "path": "product/operations/incident_knowledge_loop.md",
       "tier": "public",
       "size": 1143,
@@ -3301,9 +3325,21 @@
       "type": "md"
     },
     {
+      "path": "product/orchestration/mission-playbooks/asset-management-and-it-operations.md",
+      "tier": "public",
+      "size": 9995,
+      "type": "md"
+    },
+    {
       "path": "product/orchestration/mission-playbooks/ceo-strategy.md",
       "tier": "public",
       "size": 1383,
+      "type": "md"
+    },
+    {
+      "path": "product/orchestration/mission-playbooks/it-delivery-operations-governance.md",
+      "tier": "public",
+      "size": 10475,
       "type": "md"
     },
     {
@@ -3325,6 +3361,12 @@
       "type": "md"
     },
     {
+      "path": "product/orchestration/mission-playbooks/security-audit-service.md",
+      "tier": "public",
+      "size": 12261,
+      "type": "md"
+    },
+    {
       "path": "product/orchestration/mission-portability-standard.md",
       "tier": "public",
       "size": 1857,
@@ -3333,7 +3375,7 @@
     {
       "path": "product/orchestration/mission-team-templates.json",
       "tier": "public",
-      "size": 4935,
+      "size": 5426,
       "type": "json"
     },
     {
@@ -5023,6 +5065,12 @@
       "type": "json"
     },
     {
+      "path": "product/pipeline-templates/security-audit-static-analysis.json",
+      "tier": "public",
+      "size": 4403,
+      "type": "json"
+    },
+    {
       "path": "product/pipeline-templates/security-vulnerability-scan.json",
       "tier": "public",
       "size": 2663,
@@ -6013,6 +6061,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/gate-profile.schema.json",
+      "tier": "public",
+      "size": 2961,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/generated-knowledge-hint-record.schema.json",
       "tier": "public",
       "size": 1718,
@@ -6052,6 +6106,12 @@
       "path": "product/schemas/golden-scenario.schema.json",
       "tier": "public",
       "size": 1378,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/governance-body-registry.schema.json",
+      "tier": "public",
+      "size": 4268,
       "type": "json"
     },
     {
@@ -7408,6 +7468,12 @@
       "path": "product/schemas/work-scope-policy.schema.json",
       "tier": "public",
       "size": 2790,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/workflow-registration-request.schema.json",
+      "tier": "public",
+      "size": 5819,
       "type": "json"
     },
     {
