@@ -3,8 +3,8 @@
  * Common logic for MCP client wrappers.
  */
 
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
 export interface McpActionRequest {
   action: 'list_tools' | 'call_tool' | 'list_resources';
@@ -24,19 +24,19 @@ export async function executeMcp(
   command: string,
   args: string[],
   actionRequest: McpActionRequest,
-  options?: { env?: Record<string, unknown> },
+  options?: { env?: Record<string, unknown> }
 ) {
   const transport = new StdioClientTransport({
     command,
     args,
     env: buildChildEnv(options?.env),
-    stderr: "inherit",
+    stderr: 'inherit',
   });
 
   const client = new Client(
     {
-      name: "Kyberion-Connector-Client",
-      version: "1.0.0",
+      name: 'Kyberion-Connector-Client',
+      version: '1.0.0',
     },
     {
       capabilities: {},
@@ -50,7 +50,7 @@ export async function executeMcp(
     if (actionRequest.action === 'list_tools') {
       result = await client.listTools();
     } else if (actionRequest.action === 'call_tool') {
-      if (!actionRequest.name) throw new Error("Tool name is required for call_tool");
+      if (!actionRequest.name) throw new Error('Tool name is required for call_tool');
       result = await client.callTool({
         name: actionRequest.name,
         arguments: actionRequest.arguments || {},
@@ -65,6 +65,8 @@ export async function executeMcp(
   } finally {
     try {
       await transport.close();
-    } catch (e) {}
+    } catch (e) {
+      /* best-effort cleanup */
+    }
   }
 }

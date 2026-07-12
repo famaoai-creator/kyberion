@@ -255,11 +255,15 @@ export function safeWriteFile(
       if (fd !== null)
         try {
           fs.closeSync(fd);
-        } catch (_) {}
+        } catch (_) {
+          /* best-effort cleanup */
+        }
       if (fs.existsSync(tempPath))
         try {
           fs.unlinkSync(tempPath);
-        } catch (_) {}
+        } catch (_) {
+          /* best-effort cleanup */
+        }
       throw atomicErr;
     }
   };
@@ -442,10 +446,14 @@ export function safeCreateExclusiveFileSync(filePath: string, data: string | Buf
   } catch (err) {
     try {
       fs.closeSync(fd);
-    } catch (_) {}
+    } catch (_) {
+      /* best-effort cleanup */
+    }
     try {
       fs.unlinkSync(resolved);
-    } catch (_) {}
+    } catch (_) {
+      /* best-effort cleanup */
+    }
     throw err;
   }
 }
