@@ -807,6 +807,14 @@
       "documented": false
     },
     {
+      "name": "KYBERION_HOST_AGENT_ACTIVE",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_IN_SESSION_SUBAGENT",
       "category": "runtime",
       "type": "string",

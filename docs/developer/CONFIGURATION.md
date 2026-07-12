@@ -196,7 +196,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_TERMINAL_HOST`                  | string | no       | _undocumented_                                                                                                                                                                           |
 | `KYBERION_TTS_COMMAND`                    | string | no       | _undocumented_                                                                                                                                                                           |
 
-## runtime (95)
+## runtime (96)
 
 | Variable                                      | Type   | Required | Description                                                                                             |
 | --------------------------------------------- | ------ | -------- | ------------------------------------------------------------------------------------------------------- |
@@ -236,6 +236,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_FORMAT`                             | string | no       | _undocumented_                                                                                          |
 | `KYBERION_GEMINI_TTS_VOICE`                   | string | no       | _undocumented_                                                                                          |
 | `KYBERION_GOAL_LOOP_MAX_ROUNDS`               | string | no       | _undocumented_                                                                                          |
+| `KYBERION_HOST_AGENT_ACTIVE`                  | string | no       | _undocumented_                                                                                          |
 | `KYBERION_IN_SESSION_SUBAGENT`                | string | no       | _undocumented_                                                                                          |
 | `KYBERION_INJECTION_SCOPE`                    | string | no       | _undocumented_                                                                                          |
 | `KYBERION_INJECTION_SUSPECTED`                | string | no       | _undocumented_                                                                                          |
