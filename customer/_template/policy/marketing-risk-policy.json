@@ -1,0 +1,33 @@
+{
+  "version": "1.0.0",
+  "levels": {
+    "0": {
+      "required_gates": ["G0", "G1", "G3"],
+      "required_reviewers": [],
+      "required_approvals": 0
+    },
+    "1": {
+      "required_gates": ["G0", "G1", "G3", "G4", "G5"],
+      "required_reviewers": ["content-reviewer"],
+      "required_approvals": 1
+    },
+    "2": {
+      "required_gates": ["G0", "G1", "G2", "G3", "G4", "G5", "G6"],
+      "required_reviewers": ["content-reviewer", "brand-reviewer", "fact-reviewer"],
+      "required_approvals": 1
+    },
+    "3": {
+      "required_gates": ["G0", "G1", "G2", "G3", "G4", "G5", "G6"],
+      "required_reviewers": ["legal-reviewer", "security-reviewer", "privacy-reviewer"],
+      "required_approvals": 1
+    },
+    "4": {
+      "required_gates": ["G0", "G1", "G2", "G3", "G4", "G5", "G6"],
+      "required_reviewers": ["legal-reviewer", "security-reviewer", "privacy-reviewer"],
+      "required_approvals": 2,
+      "dry_run_required": true
+    }
+  },
+  "allowed_channels": ["internal", "website", "youtube"],
+  "cta_domain_allowlist": ["example.com"]
+}

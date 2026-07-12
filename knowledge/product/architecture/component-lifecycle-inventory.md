@@ -52,7 +52,6 @@ This inventory is generated from the filesystem. Manifest-backed actuators are t
 - Source of truth: [legacy_component_index.json](knowledge/product/orchestration/legacy_component_index.json)
 - Count: 0
 
-
 ## Consolidation Recommendations
 
 - `physical-bridge` has been retired to `retired/actuators/physical-bridge/` (2026-05-28). No action required.
