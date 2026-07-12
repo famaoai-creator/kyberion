@@ -468,4 +468,66 @@ describe('video composition compiler', () => {
     expect(html).toContain('../assets/avatar-smile.png');
     expect(safeExistsSync(`${bundleDir}/assets/avatar-smile.png`)).toBe(true);
   });
+
+  it('renders the quote-card template and honors visual-direction scene layouts', () => {
+    const bundleDir = pathResolver.sharedTmp('video-composition-bundle-tests/quote-card');
+    const adf: any = {
+      kind: 'video-composition-adf',
+      version: '1.0.0',
+      title: 'Quote Demo',
+      composition: {
+        duration_sec: 6,
+        fps: 30,
+        width: 1080,
+        height: 1920,
+        visual_direction: {
+          mood: 'mono-editorial',
+          palette: {
+            bg: '#fafafa',
+            panel: '#f0f0f0',
+            accent: '#dc2626',
+            accent_text: '#7f1d1d',
+            text: '#0a0a0a',
+            subtext: '#525252',
+          },
+          typography: { headline_px: 104, body_px: 36 },
+          per_scene: [
+            { scene_id: 'hook', layout_variant: 'quote-card' },
+            { scene_id: 'detail', layout_variant: 'split-highlight' },
+          ],
+        },
+      },
+      scenes: [
+        {
+          scene_id: 'hook',
+          role: 'hook',
+          start_sec: 0,
+          duration_sec: 3,
+          content: { headline: '意図こそがインターフェースだ', eyebrow: 'Kyberion' },
+        },
+        {
+          scene_id: 'detail',
+          role: 'generic',
+          start_sec: 3,
+          duration_sec: 3,
+          // body is missing -> split-highlight is NOT satisfiable, so the
+          // directed layout must be skipped and the default kept.
+          content: { headline: 'Detail scene' },
+        },
+      ],
+      output: { format: 'mp4', bundle_dir: bundleDir },
+    };
+
+    writeVideoCompositionBundle(adf);
+    const hook = safeReadFile(`${bundleDir}/compositions/hook.html`, {
+      encoding: 'utf8',
+    }) as string;
+    expect(hook).toContain('quote-text');
+    expect(hook).toContain('意図こそがインターフェースだ');
+    expect(hook).toContain('--headline-size: 104px;');
+    const detail = safeReadFile(`${bundleDir}/compositions/detail.html`, {
+      encoding: 'utf8',
+    }) as string;
+    expect(detail).not.toContain('split-card');
+  });
 });
