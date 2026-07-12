@@ -5,6 +5,7 @@ import {
   resolveOperatorDisplayName,
   safeExistsSync,
   safeExec,
+  safeMkdir,
   safeReadFile,
   safeWriteFile,
   safeReaddir,
@@ -345,6 +346,7 @@ function printHelp(actuators: ActuatorRecord[], locale = resolveLocale()) {
   console.log(t('cli_help_open_artifact', locale));
   console.log('');
   console.log(t('cli_help_intent', locale));
+  console.log(t('cli_help_task_summary', locale));
   console.log('');
   console.log(t('cli_help_sec_packets', locale));
   console.log(t('cli_help_packet', locale));
@@ -381,6 +383,7 @@ function printHelp(actuators: ActuatorRecord[], locale = resolveLocale()) {
   console.log('  npm run cli -- calendar status');
   console.log('  npm run cli -- calendar list-calendars');
   console.log('  npm run cli -- calendar agenda --calendar-id primary --days 7');
+  console.log('  npm run cli -- task plan "明日の会議資料とメール下書きを作って"');
   console.log('');
   console.log(t('cli_help_first_run', locale));
   console.log(t('cli_help_onboard', locale));
@@ -441,6 +444,22 @@ function printCalendarHelp(locale = resolveLocale()): void {
   );
 }
 
+function printTaskHelp(locale = resolveLocale()): void {
+  printHeader(locale);
+  console.log(t('cli_help_task_usage', locale));
+  console.log('');
+  console.log(t('cli_help_commands', locale));
+  console.log(t('cli_help_task_plan_short', locale));
+  console.log(t('cli_help_task_start_short', locale));
+  console.log('');
+  console.log(t('cli_help_examples', locale));
+  console.log('  npm run cli -- task plan "明日の会議資料とメール下書きを作って"');
+  console.log(
+    '  npm run cli -- task plan "ブラウザで購入して決済して" --output active/shared/tmp/purchase-plan.json'
+  );
+  console.log('  npm run cli -- task start "連携システムから情報収集して資料を作って"');
+}
+
 function parseEmailWorkflowOptions(args: string[]): Record<string, string | boolean> {
   const parsed: Record<string, string | boolean> = {};
   for (let index = 0; index < args.length; index += 1) {
@@ -455,6 +474,119 @@ function parseEmailWorkflowOptions(args: string[]): Record<string, string | bool
     index += 1;
   }
   return parsed;
+}
+
+function parseTaskRequest(args: string[]): { request: string; outputPath?: string } {
+  const options = parseEmailWorkflowOptions(args);
+  const requestOption = typeof options['--request'] === 'string' ? options['--request'] : '';
+  const positional: string[] = [];
+  for (let index = 0; index < args.length; index += 1) {
+    const value = args[index];
+    if (value.startsWith('--')) {
+      const next = args[index + 1];
+      if (next && !next.startsWith('--')) index += 1;
+      continue;
+    }
+    positional.push(value);
+  }
+  return {
+    request: (requestOption || positional.join(' ')).trim(),
+    outputPath: typeof options['--output'] === 'string' ? options['--output'] : undefined,
+  };
+}
+
+async function handleTaskCommand(
+  subcommand: string | undefined,
+  args: string[],
+  locale = resolveLocale()
+): Promise<void> {
+  if (!subcommand || subcommand === 'help' || subcommand === '--help' || subcommand === '-h') {
+    printTaskHelp(locale);
+    return;
+  }
+  if (subcommand !== 'plan' && subcommand !== 'start') {
+    throw new Error(`Unknown task subcommand: ${subcommand}`);
+  }
+
+  const { request, outputPath } = parseTaskRequest(args);
+  if (!request) {
+    throw new Error('task request is required; pass it as text or with --request');
+  }
+
+  const {
+    buildProductivityTaskPlan,
+    classifyTaskSessionIntent,
+    createTaskSession,
+    saveTaskSession,
+    validateTaskSession,
+  } = await import('@agent/core');
+  const plan = buildProductivityTaskPlan(request);
+
+  if (subcommand === 'plan') {
+    if (outputPath) {
+      const absoluteOutputPath = pathResolver.rootResolve(outputPath);
+      safeMkdir(path.dirname(absoluteOutputPath), { recursive: true });
+      safeWriteFile(absoluteOutputPath, `${JSON.stringify(plan, null, 2)}\n`);
+    }
+    console.log(JSON.stringify(outputPath ? { ...plan, plan_path: outputPath } : plan, null, 2));
+    return;
+  }
+
+  const classified = classifyTaskSessionIntent(request);
+  const composite = plan.domains.length > 1;
+  const missing = [
+    ...new Set([...(classified?.requirements?.missing || []), ...plan.missing_inputs]),
+  ];
+  const session = createTaskSession({
+    surface: 'terminal',
+    taskType: composite ? 'analysis' : classified?.taskType || 'analysis',
+    status: missing.length
+      ? 'collecting_requirements'
+      : plan.approval.required
+        ? 'awaiting_confirmation'
+        : 'planning',
+    requiresApproval: plan.approval.required,
+    goal: classified?.goal || {
+      summary: request,
+      success_condition: 'The requested productivity task is completed with governed evidence.',
+    },
+    intentId: composite ? undefined : classified?.intentId,
+    requirements: {
+      missing,
+      collected: classified?.requirements?.collected || {},
+    },
+    payload: composite
+      ? {
+          productivity_plan_kind: plan.kind,
+          detected_domains: plan.domains,
+          recommended_pipeline: plan.recommended_pipeline,
+        }
+      : classified?.payload,
+  });
+  const validation = validateTaskSession(session);
+  if (!validation.valid) {
+    throw new Error(`generated task session is invalid: ${validation.errors.join('; ')}`);
+  }
+
+  const planPath =
+    outputPath || `active/shared/tmp/productivity-task-plans/${session.session_id}.json`;
+  const absolutePlanPath = pathResolver.rootResolve(planPath);
+  safeMkdir(path.dirname(absolutePlanPath), { recursive: true });
+  safeWriteFile(absolutePlanPath, `${JSON.stringify(plan, null, 2)}\n`);
+  const sessionPath = saveTaskSession(session);
+  console.log(
+    JSON.stringify(
+      {
+        status: 'task_session_created',
+        session_id: session.session_id,
+        session_path: path.relative(rootDir, sessionPath),
+        plan_path: planPath,
+        external_effects_executed: false,
+      },
+      null,
+      2
+    )
+  );
 }
 
 async function handleEmailWorkflowCommand(
@@ -1590,6 +1722,11 @@ export async function main(args = process.argv.slice(2)) {
 
   if (command === 'calendar') {
     await handleCalendarWorkflowCommand(firstArg, restArgs, locale);
+    return;
+  }
+
+  if (command === 'task') {
+    await handleTaskCommand(firstArg, restArgs, locale);
     return;
   }
 
