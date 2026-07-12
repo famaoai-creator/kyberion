@@ -3,6 +3,9 @@
  */
 
 import AdmZip from 'adm-zip';
+import { createLogger } from './logger.js';
+
+const logger = createLogger('excel-theme-resolver');
 
 export interface ThemePalette {
   [key: number]: string;
@@ -39,7 +42,7 @@ export async function extractThemePalette(filePath: string): Promise<ThemePalett
     const accent6Match = schemeXml.match(/<a:accent6>.*?val="([0-9A-F]{6})"/s);
     if (accent6Match) palette[9] = 'FF' + accent6Match[1];
   } catch (err) {
-    console.warn('[ExcelThemeResolver] Failed to extract theme:', err);
+    logger.warn(`failed to extract theme: ${err}`);
   }
 
   return palette;

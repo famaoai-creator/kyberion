@@ -176,3 +176,21 @@
 | `scripts/run_pipeline.ts`                                           | 460  | (b)  | logger.warn 付与済み(2026-07-12)              |
 | `scripts/surface_runtime.ts`                                        | 150  | (a)  | 理由コメント付与(クリーンアップ系)            |
 | `scripts/surface_runtime.ts`                                        | 160  | (a)  | 理由コメント付与(クリーンアップ系)            |
+
+## console.\* → logger 置換の除外一覧(2026-07-12, Task 4 成果物)
+
+libs/ の console.\* 95箇所(計画時115から他改修で減少)のうち、**9箇所を logger へ置換**し、以下を意図的に除外した(受入条件3の除外一覧)。
+
+| 箇所                                                                                                                                 | 件数 | 除外理由                                                           |
+| ------------------------------------------------------------------------------------------------------------------------------------ | ---- | ------------------------------------------------------------------ |
+| `libs/core/core.ts`(logger 実装内 2)                                                                                                 | 2    | logger 自体の出口(console.error/log がログの実体)                  |
+| `libs/core/doctor_core.ts`                                                                                                           | 22   | doctor 系の対話出力(計画で除外可と明記)                            |
+| `libs/core/skill-wrapper.ts`                                                                                                         | 9    | スキル実行結果の CLI 出力(stdout が結果面)                         |
+| `libs/core/cli-utils.ts`                                                                                                             | 5    | CLI ハーネス(printResult の stdout / ユーザー向け stderr)          |
+| `libs/core/test-utils.ts`                                                                                                            | 4    | ミニテストハーネスの結果出力                                       |
+| `libs/shared-vision/src/vision-judge.ts`                                                                                             | 6    | readline 対話 UI(tie-break プロンプト)                             |
+| `libs/core/video-composition-compiler.ts`                                                                                            | 4    | ブラウザ/iframe 実行文脈に埋め込まれるコード断片(node logger 不在) |
+| `libs/core/src/native-*/examples/**`                                                                                                 | 30   | デモ CLI エントリポイント                                          |
+| アクチュエータ CLI エントリ(file/process/meeting の `console.log(JSON.stringify(result))` + process-actuator index の console.error) | 4    | stdout/stderr がハーネスとの結果契約                               |
+
+置換した9箇所: excel-theme-resolver(core/shared-media)、service-endpoint-registry、terminal-bridge、surface-runtime、metrics、native-pdf-engine ×2、core.ts の DEBUG stack dump。

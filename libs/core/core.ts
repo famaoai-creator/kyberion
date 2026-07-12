@@ -378,7 +378,7 @@ export const _fileCache = new Cache(200, 3600000);
 
 export const errorHandler = (err: any, context = '') => {
   logger.error(context + ': ' + (err.message || err));
-  if (process.env.DEBUG) console.error(err.stack);
+  if (process.env.DEBUG) logger.error(String(err.stack));
   process.exit(1);
 };
 
