@@ -46,7 +46,7 @@ import {
   OPERATOR_VIEW_LINKS,
   SURFACE_ROLES,
 } from '../lib/operator-console';
-import { uxText } from '../lib/ux-vocabulary';
+import { setChronosLocalePreference, uxText } from '../lib/ux-vocabulary';
 import { useChronosLocale } from '../lib/hooks';
 
 type QuickAction = {
@@ -1123,6 +1123,16 @@ export default function ChronosMirrorV2() {
                 >
                   <Palette size={12} />
                   <span>{themeModePreference}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setChronosLocalePreference(locale === 'ja' ? 'en' : 'ja')}
+                  aria-label={
+                    locale === 'ja' ? 'Switch language to English' : '言語を日本語に切り替え'
+                  }
+                  className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 ${isLightTheme ? 'border-[color:var(--kb-border)] bg-white/80 text-[var(--kb-text-primary)] hover:bg-white' : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10 hover:text-cyan-400'}`}
+                >
+                  <span>{locale === 'ja' ? 'JA' : 'EN'}</span>
                 </button>
                 <IdentityBadge />
                 <button
