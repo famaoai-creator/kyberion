@@ -13,6 +13,17 @@
   },
   "steps": [
     {
+      "id": "preflight_profile",
+      "role": "gate",
+      "op": "core:include",
+      "params": {
+        "fragment": "fragments/voice-profile-runtime-preflight.json",
+        "context": {
+          "profile_id": "{{profile_id}}"
+        }
+      }
+    },
+    {
       "id": "log_start",
       "role": "sink",
       "op": "system:log",

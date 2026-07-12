@@ -9,6 +9,7 @@
     "generated_at",
     "summary",
     "scope",
+    "security_scope",
     "recipient",
     "mission",
     "sources",
@@ -33,6 +34,36 @@
         "work_item_id": { "type": "string", "minLength": 1 }
       },
       "additionalProperties": true
+    },
+    "security_scope": {
+      "type": "object",
+      "required": ["tenant_id", "mission_id", "read_tiers", "write_tier", "purpose"],
+      "properties": {
+        "tenant_id": { "type": "string", "minLength": 1 },
+        "organization_id": { "type": "string", "minLength": 1 },
+        "project_id": { "type": "string", "minLength": 1 },
+        "mission_id": { "type": "string", "minLength": 1 },
+        "participant_id": { "type": "string", "minLength": 1 },
+        "read_tiers": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "enum": ["personal", "confidential", "public"] }
+        },
+        "write_tier": {
+          "type": "string",
+          "enum": ["personal", "confidential", "public"]
+        },
+        "purpose": { "type": "string", "minLength": 1 },
+        "external_egress": { "type": "string", "enum": ["deny", "allow"] },
+        "allowed_reasoning_backends": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      },
+      "additionalProperties": false
     },
     "recipient": {
       "type": "object",

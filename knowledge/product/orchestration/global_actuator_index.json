@@ -370,7 +370,7 @@
       "d": "Knowledge-tier search, injection, import/export, and decision-support operations",
       "s": "implemented",
       "version": "1.2.1",
-      "capability_count": 35,
+      "capability_count": 36,
       "ops": [
         "a2a_fanout",
         "a2a_roleplay",
@@ -400,13 +400,15 @@
         "knowledge_inject",
         "knowledge_search",
         "peer_advice",
+        "perspective_fanout",
         "pptx_diff",
         "recommend",
         "register_presentation_preference_profile",
         "simulate_all",
         "stakeholder_grid_sort",
         "synthesize_counterparty_persona",
-        "transcribe_audio"
+        "transcribe_audio",
+        "typed_cross_critique"
       ],
       "contract_schema": "schemas/wisdom-action.schema.json",
       "prerequisites_summary": "-"

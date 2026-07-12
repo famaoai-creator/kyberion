@@ -1,0 +1,62 @@
+{
+  "action": "pipeline",
+  "name": "browser-session-with-intra-login",
+  "version": "1.0.0",
+  "description": "Reusable fragment: verify the browser runtime, start a managed browser session, optionally open a landing page, and hand off to the generic intra-site login flow when credentials are supplied.",
+  "steps": [
+    {
+      "role": "gate",
+      "op": "core:include",
+      "params": {
+        "fragment": "fragments/browser-runtime-preflight.json"
+      }
+    },
+    {
+      "role": "gate",
+      "op": "core:include",
+      "params": {
+        "fragment": "fragments/browser-session-start.json"
+      }
+    },
+    {
+      "id": "maybe_open_start_url",
+      "role": "sink",
+      "op": "core:if",
+      "params": {
+        "condition": "start_url",
+        "then": [
+          {
+            "id": "open_start_url",
+            "role": "sink",
+            "op": "browser:goto",
+            "params": {
+              "url": "{{start_url}}"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "maybe_login",
+      "role": "gate",
+      "op": "core:if",
+      "params": {
+        "condition": "login_user",
+        "then": [
+          {
+            "id": "intra_login",
+            "role": "gate",
+            "op": "core:include",
+            "params": {
+              "fragment": "fragments/intra-login.json",
+              "context": {
+                "login_user": "{{login_user}}",
+                "login_password": "{{login_password}}"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,4 +1,6 @@
 import { pathResolver } from './path-resolver.js';
+import { resolveActiveProfileRoot } from './profile-root.js';
+import { withExecutionContext } from './authority.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { safeJsonParse } from './validators.js';
 
@@ -42,7 +44,10 @@ let cachedPolicyPath: string | null = null;
 let cachedPolicy: ToolRuntimePolicy | null = null;
 
 function getPolicyPath(): string {
-  return process.env.KYBERION_TOOL_RUNTIME_POLICY_PATH?.trim() || DEFAULT_POLICY_PATH;
+  const explicit = process.env.KYBERION_TOOL_RUNTIME_POLICY_PATH?.trim();
+  if (explicit) return explicit;
+  const operatorOverlay = `${resolveActiveProfileRoot()}/onboarding/tool-runtime-policy.json`;
+  return safeExistsSync(operatorOverlay) ? operatorOverlay : DEFAULT_POLICY_PATH;
 }
 
 export function resetToolRuntimePolicyCache(): void {
@@ -61,7 +66,11 @@ export function getToolRuntimePolicy(): ToolRuntimePolicy {
   }
 
   try {
-    const raw = safeReadFile(policyPath, { encoding: 'utf8' }) as string;
+    const raw = withExecutionContext(
+      'sovereign_concierge',
+      () => safeReadFile(policyPath, { encoding: 'utf8' }) as string,
+      'ecosystem_architect'
+    );
     const parsed = safeJsonParse<ToolRuntimePolicy>(raw, 'tool runtime policy');
     cachedPolicyPath = policyPath;
     cachedPolicy = parsed;
@@ -77,6 +86,8 @@ export function resolveToolRuntimeRoot(policy: ToolRuntimePolicy = getToolRuntim
   return pathResolver.rootResolve(policy.managed_roots.tool_runtime_root);
 }
 
-export function resolveToolRuntimeCacheRoot(policy: ToolRuntimePolicy = getToolRuntimePolicy()): string {
+export function resolveToolRuntimeCacheRoot(
+  policy: ToolRuntimePolicy = getToolRuntimePolicy()
+): string {
   return pathResolver.rootResolve(policy.managed_roots.cache_root);
 }

@@ -2078,6 +2078,16 @@ function createChecks(): ContractCheck[] {
             task_session_id: 'TSK-CONTEXT-PACK-001',
             work_item_id: 'WIT-CONTEXT-PACK-001',
           },
+          security_scope: {
+            tenant_id: 'acme',
+            project_id: 'PRJ-CONTEXT-PACK-001',
+            mission_id: 'MSN-CONTEXT-PACK-001',
+            participant_id: 'implementation-architect',
+            read_tiers: ['public'],
+            write_tier: 'public',
+            purpose: 'implementer',
+            external_egress: 'allow',
+          },
           recipient: {
             kind: 'agent',
             team_role: 'implementer',
