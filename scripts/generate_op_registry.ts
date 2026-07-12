@@ -9,6 +9,12 @@ import { describeOps as describeBrowserOps } from '../libs/actuators/browser-act
 import { describeOps as describeCodeOps } from '../libs/actuators/code-actuator/src/op-catalog.js';
 import { describeOps as describeFileOps } from '../libs/actuators/file-actuator/src/op-catalog.js';
 import { describeOps as describeModelingOps } from '../libs/actuators/modeling-actuator/src/op-catalog.js';
+import { describeOps as describeProcessOps } from '../libs/actuators/process-actuator/src/op-catalog.js';
+import { describeOps as describeTerminalOps } from '../libs/actuators/terminal-actuator/src/op-catalog.js';
+import { describeOps as describeSecretOps } from '../libs/actuators/secret-actuator/src/op-catalog.js';
+import { describeOps as describeApprovalOps } from '../libs/actuators/approval-actuator/src/op-catalog.js';
+import { describeOps as describeAgentOps } from '../libs/actuators/agent-actuator/src/op-catalog.js';
+import { describeOps as describeArtifactOps } from '../libs/actuators/artifact-actuator/src/op-catalog.js';
 import { describeOps as describeNetworkOps } from '../libs/actuators/network-actuator/src/op-catalog.js';
 import { describeOps as describeWisdomOps } from '../libs/actuators/wisdom-actuator/src/op-catalog.js';
 
@@ -31,6 +37,12 @@ const DESCRIBE_OPS_SOURCES: Record<
   'modeling-actuator': describeModelingOps,
   'wisdom-actuator': describeWisdomOps,
   'browser-actuator': describeBrowserOps,
+  'process-actuator': describeProcessOps,
+  'terminal-actuator': describeTerminalOps,
+  'secret-actuator': describeSecretOps,
+  'approval-actuator': describeApprovalOps,
+  'agent-actuator': describeAgentOps,
+  'artifact-actuator': describeArtifactOps,
 };
 
 type PipelineOpKind = 'capture' | 'transform' | 'apply' | 'control';
