@@ -1,0 +1,89 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/software-quality-contract.schema.json",
+  "title": "Software Quality Contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "project_id",
+    "accountable_human_id",
+    "dor",
+    "acceptance_criteria",
+    "dod"
+  ],
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "project_id": { "type": "string", "minLength": 1 },
+    "accountable_human_id": { "type": "string", "minLength": 1 },
+    "must_have_requirement_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "dor": { "type": "array", "minItems": 1, "items": { "$ref": "#/definitions/check" } },
+    "acceptance_criteria": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/criterion" }
+    },
+    "dod": { "type": "array", "minItems": 1, "items": { "$ref": "#/definitions/check" } },
+    "waivers": { "type": "array", "items": { "$ref": "#/definitions/waiver" } }
+  },
+  "definitions": {
+    "status": { "type": "string", "enum": ["pending", "passed", "failed", "waived"] },
+    "refs": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["check_id", "description", "status"],
+      "properties": {
+        "check_id": { "type": "string", "minLength": 1 },
+        "description": { "type": "string", "minLength": 1 },
+        "status": { "$ref": "#/definitions/status" },
+        "evidence_refs": { "$ref": "#/definitions/refs" },
+        "owner_id": { "type": "string", "minLength": 1 },
+        "blocking": { "type": "boolean", "default": true }
+      }
+    },
+    "criterion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["criterion_id", "description", "requirement_refs", "expected_result", "status"],
+      "properties": {
+        "criterion_id": { "type": "string", "minLength": 1 },
+        "description": { "type": "string", "minLength": 1 },
+        "requirement_refs": { "$ref": "#/definitions/refs", "minItems": 1 },
+        "expected_result": { "type": "string", "minLength": 1 },
+        "status": { "$ref": "#/definitions/status" },
+        "evidence_refs": { "$ref": "#/definitions/refs" }
+      }
+    },
+    "waiver": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "waiver_id",
+        "check_refs",
+        "reason",
+        "accountable_human_id",
+        "expires_at",
+        "compensating_controls",
+        "residual_risk"
+      ],
+      "properties": {
+        "waiver_id": { "type": "string", "minLength": 1 },
+        "check_refs": { "$ref": "#/definitions/refs", "minItems": 1 },
+        "reason": { "type": "string", "minLength": 1 },
+        "accountable_human_id": { "type": "string", "minLength": 1 },
+        "expires_at": { "type": "string", "format": "date-time" },
+        "compensating_controls": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "residual_risk": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

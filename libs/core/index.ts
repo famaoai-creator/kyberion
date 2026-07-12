@@ -136,6 +136,8 @@ export * from './operation-policy-gate.js';
 export * from './operation-policy-gate.js';
 export * from './runtime-health-history.js';
 export * from './bridge-typing.js';
+export * from './draft-refine.js';
+export * from './gemini-embedding-backend.js';
 export * from './process-guards.js';
 export * from './process-guards.js';
 export * from './guided-coordination-brief.js';
@@ -1781,3 +1783,29 @@ export {
   processUntrustedContentAsync,
   sanitizeUntrustedContentAsync,
 } from './untrusted-content.js';
+
+// Software QA lifecycle (QA-01)
+export type {
+  QualityCheckStatus,
+  QualityCheck,
+  AcceptanceCriterion,
+  QualityWaiver,
+  SoftwareQualityContract,
+  TestInventoryItem,
+  TestInventory,
+  QualityEvaluation,
+  TestExecutionResult,
+  TestExecutionRecord,
+  DefectCandidate,
+  SoftwareQualityReportSummary,
+} from './software-quality.js';
+export * from './software-quality-operations.js';
+export {
+  evaluateQualityContract,
+  evaluateDefinitionOfReady,
+  evaluateAcceptanceCriteria,
+  evaluateDefinitionOfDone,
+  evaluateTestTraceability,
+  createDefectCandidates,
+  buildSoftwareQualityReport,
+} from './software-quality.js';

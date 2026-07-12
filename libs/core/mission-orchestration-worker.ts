@@ -21,6 +21,7 @@ import {
   renderStructuredOutputSchemaPrompt,
 } from './structured-output-contracts.js';
 import { evaluateMissionGate, type MissionGateDefinition } from './mission-gate-engine.js';
+import { draftRefine } from './draft-refine.js';
 import {
   ensureMissionTeamRuntimeViaSupervisor,
   shutdownAllAgentRuntimes,
@@ -1580,6 +1581,14 @@ async function dispatchPlannedMissionTask(input: {
     }
   }
 
+  if (isDraftRefineCandidate({ teamRole: input.teamRole, task: input.task })) {
+    await applyDraftRefineToDeliverable({
+      missionId: input.missionId,
+      task: input.task,
+      teamRole: input.teamRole,
+    });
+  }
+
   const acceptance = await evaluateTaskAcceptanceGate({
     missionId: input.missionId,
     task: input.task,
@@ -1957,6 +1966,72 @@ async function obtainTaskResultResponse(input: {
 // independent judge picks the winner, and the loser is kept as evidence.
 // Narrow by design (cost doubles); KYBERION_BEST_OF_N=0 disables it.
 // ---------------------------------------------------------------------------
+
+// MO-07 Task 4.2 wiring: high-risk document deliverables get one
+// rubric-driven refine pass before the acceptance gate. Narrow by design
+// (extra reasoning call); KYBERION_DRAFT_REFINE=0 disables it.
+export function isDraftRefineCandidate(input: {
+  teamRole: string;
+  task: PlannedNextTask;
+}): boolean {
+  if (process.env.KYBERION_DRAFT_REFINE === '0') return false;
+  const role = String(input.teamRole || '').toLowerCase();
+  if (role === 'reviewer' || role === 'qa' || role === 'planner') return false;
+  const risk = String(input.task.risk || '').toLowerCase();
+  if (risk !== 'high' && risk !== 'high_stakes') return false;
+  const deliverable = String(input.task.deliverable || '').toLowerCase();
+  return (
+    deliverable.endsWith('.md') || deliverable.endsWith('.markdown') || deliverable.endsWith('.txt')
+  );
+}
+
+async function applyDraftRefineToDeliverable(input: {
+  missionId: string;
+  task: PlannedNextTask;
+  teamRole: string;
+}): Promise<void> {
+  const deliverable = String(input.task.deliverable || '');
+  if (!deliverable) return;
+  const deliverablePath = deliverable.startsWith('/')
+    ? deliverable
+    : `${missionDir(input.missionId, 'public')}/${deliverable}`;
+  try {
+    if (!safeExistsSync(deliverablePath)) return;
+    const original = String(safeReadFile(deliverablePath, { encoding: 'utf8' }) || '');
+    if (!original.trim()) return;
+    const outcome = await draftRefine({
+      kind: 'doc',
+      content: original,
+      goalSummary: input.task.description,
+      maxPasses: 1,
+    });
+    if (outcome.passes > 0 && outcome.improved) {
+      safeWriteFile(deliverablePath, outcome.content);
+      emitMissionTaskEvent({
+        event_type: 'task_reviewed',
+        mission_id: input.missionId,
+        task_id: input.task.task_id,
+        agent_id: 'mission-orchestration-worker',
+        team_role: input.teamRole,
+        decision: 'task_reviewed',
+        why: `draft refined (${outcome.initial_severity} → ${outcome.final_severity})`,
+        policy_used: 'mission_orchestration_control_plane_v1',
+        evidence: [deliverable],
+        payload: {
+          kind: 'draft_refined',
+          passes: outcome.passes,
+          initial_severity: outcome.initial_severity,
+          final_severity: outcome.final_severity,
+          cost_multiplier: 1 + outcome.passes,
+        },
+      });
+    }
+  } catch (err: any) {
+    // Refinement is a quality bonus, never a gate: failures must not block
+    // acceptance of the original deliverable.
+    logger.warn(`[worker] draft refine skipped for ${input.task.task_id}: ${err?.message || err}`);
+  }
+}
 
 export function isBestOfNCandidate(input: { teamRole: string; task: PlannedNextTask }): boolean {
   if (process.env.KYBERION_BEST_OF_N === '0') return false;

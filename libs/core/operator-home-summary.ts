@@ -62,6 +62,18 @@ export interface OperatorHomeActionItem {
   nextAction: string;
 }
 
+export interface OperatorHomeQualitySummary {
+  reportId: string;
+  projectId: string;
+  subjectRef: string;
+  recommendation: 'go' | 'conditional_go' | 'no_go' | 'insufficient_evidence';
+  humanDecision: 'pending' | 'approved' | 'rejected';
+  accountableHumanId: string;
+  generatedAt: string;
+  residualRisks: string[];
+  evidenceRefs: string[];
+}
+
 export type OperatorHomeApprovalItem = ReturnType<typeof listApprovalRequests>[number];
 
 export interface OperatorHomeSummary {
@@ -79,6 +91,7 @@ export interface OperatorHomeSummary {
     clarificationQuestions: number;
     unreadInbox: number;
     totalInbox: number;
+    pendingQualityDecisions: number;
   };
   activeMissions: OperatorHomeMissionItem[];
   pendingApprovals: OperatorHomeApprovalItem[];
@@ -86,7 +99,41 @@ export interface OperatorHomeSummary {
   costSummary: OperatorHomeCostSummary;
   workforceSummary?: OperatorHomeWorkforceSummary;
   actionQueue?: OperatorHomeActionItem[];
+  qualitySummary?: OperatorHomeQualitySummary;
   nextAction: NextAction;
+}
+
+function collectQualitySummary(): OperatorHomeQualitySummary | undefined {
+  const reportPath = pathResolver.shared('runtime/qa/latest-quality-report.json');
+  if (!safeExistsSync(reportPath)) return undefined;
+  try {
+    const report = JSON.parse(safeReadFile(reportPath, { encoding: 'utf8' }) as string) as {
+      report_id?: string;
+      project_id?: string;
+      subject_ref?: string;
+      recommendation?: OperatorHomeQualitySummary['recommendation'];
+      human_decision?: OperatorHomeQualitySummary['humanDecision'];
+      accountable_human_id?: string;
+      generated_at?: string;
+      residual_risks?: string[];
+      evidence_refs?: string[];
+    };
+    if (!report.report_id || !report.recommendation || !report.accountable_human_id)
+      return undefined;
+    return {
+      reportId: report.report_id,
+      projectId: report.project_id ?? '',
+      subjectRef: report.subject_ref ?? '',
+      recommendation: report.recommendation,
+      humanDecision: report.human_decision ?? 'pending',
+      accountableHumanId: report.accountable_human_id,
+      generatedAt: report.generated_at ?? '',
+      residualRisks: report.residual_risks ?? [],
+      evidenceRefs: report.evidence_refs ?? [],
+    };
+  } catch {
+    return undefined;
+  }
 }
 
 function readMissionManagementDirs(): string[] {
@@ -358,10 +405,12 @@ export function collectOperatorHomeSummary(
   });
   const workforceSummary = collectWorkforceSummary(missionItems);
   const actionQueue = collectActionQueue(missionItems, pendingApprovals, inboxEntries);
+  const qualitySummary = collectQualitySummary();
+  const pendingQualityDecisions = qualitySummary?.humanDecision === 'pending' ? 1 : 0;
   const status =
     blockedMissions.length > 0
       ? 'blocked'
-      : pendingApprovals.length > 0 || unreadInbox > 0
+      : pendingApprovals.length > 0 || unreadInbox > 0 || pendingQualityDecisions > 0
         ? 'attention'
         : 'ready';
   const statusLabel =
@@ -370,7 +419,7 @@ export function collectOperatorHomeSummary(
     status === 'blocked'
       ? `${blockedMissions.length} mission(s) are paused or failed.`
       : status === 'attention'
-        ? `${pendingApprovals.length} approval(s) and ${unreadInbox} inbox item(s) need attention.`
+        ? `${pendingApprovals.length} approval(s), ${unreadInbox} inbox item(s), and ${pendingQualityDecisions} quality decision(s) need attention.`
         : 'No blocking issues detected.';
 
   const nextAction =
@@ -388,19 +437,26 @@ export function collectOperatorHomeSummary(
             next_action_type: 'run_command',
             suggested_command: 'pnpm kyberion approvals',
           })
-        : unreadInbox > 0
+        : pendingQualityDecisions > 0
           ? buildNextAction({
-              title: 'Acknowledge new deliverables',
-              reason: `${unreadInbox} inbox item(s) were delivered and are still unread.`,
+              title: 'Review the software quality recommendation',
+              reason: `${qualitySummary?.recommendation ?? 'unknown'} is awaiting the accountable human decision.`,
               next_action_type: 'inspect_artifact',
-              suggested_command: 'pnpm kyberion inbox',
+              suggested_command: 'pnpm quality:report -- --help',
             })
-          : buildNextAction({
-              title: 'Keep monitoring the surface',
-              reason: 'No immediate operator action is pending.',
-              next_action_type: 'open_docs',
-              suggested_command: 'pnpm doctor',
-            });
+          : unreadInbox > 0
+            ? buildNextAction({
+                title: 'Acknowledge new deliverables',
+                reason: `${unreadInbox} inbox item(s) were delivered and are still unread.`,
+                next_action_type: 'inspect_artifact',
+                suggested_command: 'pnpm kyberion inbox',
+              })
+            : buildNextAction({
+                title: 'Keep monitoring the surface',
+                reason: 'No immediate operator action is pending.',
+                next_action_type: 'open_docs',
+                suggested_command: 'pnpm doctor',
+              });
 
   return {
     generatedAt: new Date().toISOString(),
@@ -418,6 +474,7 @@ export function collectOperatorHomeSummary(
       clarificationQuestions,
       unreadInbox,
       totalInbox: inboxEntries.length,
+      pendingQualityDecisions,
     },
     activeMissions: activeMissions.slice(0, input.limit || 8),
     pendingApprovals,
@@ -425,6 +482,7 @@ export function collectOperatorHomeSummary(
     costSummary,
     workforceSummary,
     actionQueue,
+    qualitySummary,
     nextAction,
   };
 }
