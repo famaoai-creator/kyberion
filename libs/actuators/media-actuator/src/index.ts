@@ -1,3 +1,4 @@
+import { selectDeckTheme } from '@agent/core';
 import {
   logger,
   safeReadFile,
@@ -1851,6 +1852,28 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
       const category = resolveMediaBriefCategory(rawBrief);
       const brief = normalizeBriefForCategory(rootDir, rawBrief);
       const outline = buildOutlineFromNormalizedBrief(rootDir, category, brief);
+
+      // Story-matched theme (deck counterpart of video-visual-direction):
+      // only when the brief did not explicitly choose one — operator intent
+      // always wins, and failure keeps the preset default.
+      const explicitTheme = (brief as any).theme || (brief as any).payload?.theme;
+      if (!explicitTheme && outline?.recommended_theme) {
+        const catalogRaw = loadThemeCatalog(rootDir)?.themes || {};
+        const catalog = Object.entries(catalogRaw).map(([id, record]: [string, any]) => ({
+          id,
+          name: record?.name ? String(record.name) : undefined,
+        }));
+        outline.recommended_theme = await selectDeckTheme({
+          title: String((brief as any).title || outline.document_type || 'Document'),
+          summary: JSON.stringify(
+            (brief as any).sections ?? (brief as any).objective ?? brief
+          ).slice(0, 1500),
+          tone: (brief as any).tone ? String((brief as any).tone) : undefined,
+          audience: (brief as any).audience ? String((brief as any).audience) : undefined,
+          catalog,
+          defaultTheme: String(outline.recommended_theme),
+        });
+      }
 
       return {
         ...ctx,

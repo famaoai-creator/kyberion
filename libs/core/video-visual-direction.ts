@@ -1,4 +1,6 @@
 import { createLogger } from './logger.js';
+import { pathResolver } from './path-resolver.js';
+import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { tryRepairJson } from './json-repair.js';
 
 // DS-04 / agy short-video quality: scene layout and visual composition used
@@ -125,6 +127,73 @@ export function visualDirectionToCssVars(direction: VideoVisualDirection): strin
   ].join('\n');
 }
 
+export interface VideoVisualPattern {
+  name: string;
+  description?: string;
+  mood: string;
+  palette: VideoVisualDirection['palette'];
+  typography: {
+    portrait: { headline_px: number; body_px: number };
+    landscape: { headline_px: number; body_px: number };
+  };
+}
+
+let cachedPatternCatalog: Record<string, VideoVisualPattern> | null = null;
+
+/**
+ * Curated pattern pack (pptx themes.json counterpart for video). The LLM
+ * only SELECTS an id from this governed catalog — it never invents colors,
+ * so a bad model reply can only ever land on another curated pattern or the
+ * default, not on an ungoverned palette.
+ */
+export function loadVideoVisualPatternCatalog(): Record<string, VideoVisualPattern> {
+  if (cachedPatternCatalog) return cachedPatternCatalog;
+  try {
+    const catalogPath = pathResolver.knowledge(
+      'public/design-patterns/media-templates/video-visual-patterns.json'
+    );
+    if (safeExistsSync(catalogPath)) {
+      const parsed = JSON.parse(safeReadFile(catalogPath, { encoding: 'utf8' }) as string);
+      if (parsed?.patterns && typeof parsed.patterns === 'object') {
+        cachedPatternCatalog = parsed.patterns as Record<string, VideoVisualPattern>;
+        return cachedPatternCatalog;
+      }
+    }
+  } catch (error: any) {
+    logger.warn(`pattern catalog unreadable, using built-in default: ${error?.message || error}`);
+  }
+  cachedPatternCatalog = {
+    'calm-tech': {
+      name: 'Calm Tech',
+      mood: DEFAULT_VISUAL_DIRECTION.mood,
+      palette: DEFAULT_VISUAL_DIRECTION.palette,
+      typography: {
+        portrait: { headline_px: 96, body_px: 34 },
+        landscape: { headline_px: 68, body_px: 23 },
+      },
+    },
+  };
+  return cachedPatternCatalog;
+}
+
+export function resetVideoVisualPatternCatalogCache(): void {
+  cachedPatternCatalog = null;
+}
+
+/** Resolve a curated pattern into a concrete direction for the given frame. */
+export function patternToVisualDirection(
+  patternId: string,
+  pattern: VideoVisualPattern,
+  frame: { width: number; height: number }
+): VideoVisualDirection {
+  const portrait = frame.height > frame.width;
+  const typography = portrait ? pattern.typography.portrait : pattern.typography.landscape;
+  return normalizeVideoVisualDirection(
+    { mood: pattern.mood || patternId, palette: pattern.palette, typography },
+    frame
+  );
+}
+
 export interface GenerateVisualDirectionInput {
   title: string;
   story: string;
@@ -145,21 +214,29 @@ export async function generateVideoVisualDirection(
   input: GenerateVisualDirectionInput
 ): Promise<VideoVisualDirection> {
   const portrait = input.frame.height > input.frame.width;
+  const catalog = loadVideoVisualPatternCatalog();
+  const entries = Object.entries(catalog);
+  const defaultEntry = entries[0];
   const prompt = [
-    'You are an art director for short-form video. Design a visual direction',
-    `for a ${portrait ? 'vertical 9:16 short' : 'landscape'} video.`,
+    'You are an art director for short-form video. Choose the visual pattern',
+    `that best fits this ${portrait ? 'vertical 9:16 short' : 'landscape'} video story.`,
     `Title: ${input.title}`,
     input.tone ? `Tone: ${input.tone}` : '',
     input.audience ? `Audience: ${input.audience}` : '',
     `Story: ${input.story.slice(0, 2000)}`,
-    input.scene_ids?.length ? `Scene ids: ${input.scene_ids.join(', ')}` : '',
     '',
+    'Available patterns (pick exactly one id):',
+    ...entries.map(
+      ([id, pattern]) =>
+        `- ${id} (${pattern.name})${pattern.description ? `: ${pattern.description}` : ''}`
+    ),
+    '',
+    input.scene_ids?.length
+      ? `Optionally assign per-scene layouts for scene ids: ${input.scene_ids.join(', ')}`
+      : '',
     'Reply with ONLY a JSON object:',
-    '{ "mood": string, "palette": { "bg": "#rrggbb", "panel": "#rrggbb", "accent": "#rrggbb",',
-    '  "accent_text": "#rrggbb", "text": "#rrggbb", "subtext": "#rrggbb" },',
-    `  "typography": { "headline_px": number (${portrait ? '72-132' : '48-96'}), "body_px": number (${portrait ? '28-48' : '18-34'}) },`,
+    '{ "pattern_id": string, "reason": string,',
     '  "per_scene": [{ "scene_id": string, "layout_variant": "default" | "howto-guide" | "split-highlight" | "quote-card" }] }',
-    'Pick colors that fit the story mood with strong text contrast (WCAG AA on bg).',
   ]
     .filter(Boolean)
     .join('\n');
@@ -173,15 +250,29 @@ export async function generateVideoVisualDirection(
       });
     const raw = await generate(prompt);
     const jsonText = raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1);
-    let parsed: unknown;
+    let parsed: any;
     try {
       parsed = JSON.parse(jsonText);
     } catch {
       parsed = tryRepairJson(jsonText);
     }
-    return normalizeVideoVisualDirection(parsed, input.frame);
+    const chosenId = String(parsed?.pattern_id ?? '').trim();
+    const chosen = catalog[chosenId] ? ([chosenId, catalog[chosenId]] as const) : defaultEntry;
+    if (!catalog[chosenId]) {
+      logger.warn(`pattern "${chosenId}" not in catalog — using ${chosen[0]}`);
+    }
+    const direction = patternToVisualDirection(chosen[0], chosen[1], input.frame);
+    const perScene = Array.isArray(parsed?.per_scene)
+      ? parsed.per_scene
+          .filter((entry: any) => entry && typeof entry === 'object' && entry.scene_id)
+          .map((entry: any) => ({
+            scene_id: String(entry.scene_id),
+            layout_variant: String(entry.layout_variant || 'default'),
+          }))
+      : [];
+    return perScene.length > 0 ? { ...direction, per_scene: perScene } : direction;
   } catch (error: any) {
-    logger.warn(`visual direction generation failed, using default: ${error?.message || error}`);
-    return normalizeVideoVisualDirection(null, input.frame);
+    logger.warn(`visual direction selection failed, using default: ${error?.message || error}`);
+    return patternToVisualDirection(defaultEntry[0], defaultEntry[1], input.frame);
   }
 }
