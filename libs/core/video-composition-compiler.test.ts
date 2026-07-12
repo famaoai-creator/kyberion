@@ -206,7 +206,7 @@ describe('video composition compiler', () => {
     expect(plan.artifact_refs).toContain(pathResolver.resolve('active/shared/tmp/music-track.mp3'));
   });
 
-  it('renders a process-oriented fallback visual when no supporting asset is provided', () => {
+  it('omits placeholder process steps when no visual_steps are provided', () => {
     const bundleDir = pathResolver.sharedTmp('video-composition-bundle-tests/process-visual');
     const adf: VideoCompositionADF = {
       kind: 'video-composition-adf',
@@ -242,8 +242,11 @@ describe('video composition compiler', () => {
     const html = safeReadFile(`${bundleDir}/compositions/feature.html`, {
       encoding: 'utf8',
     }) as string;
-    expect(html).toContain('Brief intake');
-    expect(html).toContain('Render package');
+    // agy short-video quality: missing visual_steps must no longer inject
+    // English demo placeholders ("Brief intake" etc.) into real videos.
+    expect(html).not.toContain('Brief intake');
+    expect(html).not.toContain('Render package');
+    expect(html).toContain('process-visual');
     expect(html).toContain('var(--kb-accent-blue-soft, #93c5fd)');
     expect(html).toContain('var(--kb-bg-main, #081225)');
   });
