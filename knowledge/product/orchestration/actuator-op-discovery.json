@@ -135,8 +135,21 @@
     {
       "n": "blockchain-actuator",
       "path": "libs/actuators/blockchain-actuator",
-      "source": "registry",
-      "ops": []
+      "source": "describeOps",
+      "ops": [
+        {
+          "op": "verify_anchor",
+          "kind": "capture"
+        },
+        {
+          "op": "anchor_mission",
+          "kind": "apply"
+        },
+        {
+          "op": "anchor_trust",
+          "kind": "apply"
+        }
+      ]
     },
     {
       "n": "browser-actuator",
@@ -532,14 +545,56 @@
     {
       "n": "build-actuator",
       "path": "libs/actuators/build-actuator",
-      "source": "registry",
-      "ops": []
+      "source": "describeOps",
+      "ops": [
+        {
+          "op": "ios_generate_project",
+          "kind": "apply"
+        },
+        {
+          "op": "ios_build",
+          "kind": "apply"
+        },
+        {
+          "op": "ios_test",
+          "kind": "apply"
+        },
+        {
+          "op": "ios_archive",
+          "kind": "apply"
+        },
+        {
+          "op": "android_build",
+          "kind": "apply"
+        },
+        {
+          "op": "android_test",
+          "kind": "apply"
+        },
+        {
+          "op": "android_bundle",
+          "kind": "apply"
+        }
+      ]
     },
     {
       "n": "calendar-actuator",
       "path": "libs/actuators/calendar-actuator",
-      "source": "registry",
-      "ops": []
+      "source": "describeOps",
+      "ops": [
+        {
+          "op": "list_calendars",
+          "kind": "capture"
+        },
+        {
+          "op": "list_events",
+          "kind": "capture"
+        },
+        {
+          "op": "create_event",
+          "kind": "apply"
+        }
+      ]
     },
     {
       "n": "code-actuator",
@@ -611,8 +666,21 @@
     {
       "n": "email-actuator",
       "path": "libs/actuators/email-actuator",
-      "source": "registry",
-      "ops": []
+      "source": "describeOps",
+      "ops": [
+        {
+          "op": "create_draft",
+          "kind": "apply"
+        },
+        {
+          "op": "send",
+          "kind": "apply"
+        },
+        {
+          "op": "send_from_file",
+          "kind": "apply"
+        }
+      ]
     },
     {
       "n": "file-actuator",
@@ -1277,8 +1345,25 @@
     {
       "n": "presence-actuator",
       "path": "libs/actuators/presence-actuator",
-      "source": "registry",
-      "ops": []
+      "source": "describeOps",
+      "ops": [
+        {
+          "op": "receive_event",
+          "kind": "apply"
+        },
+        {
+          "op": "dispatch",
+          "kind": "apply"
+        },
+        {
+          "op": "dispatch_timeline",
+          "kind": "apply"
+        },
+        {
+          "op": "record_interaction",
+          "kind": "apply"
+        }
+      ]
     },
     {
       "n": "process-actuator",
