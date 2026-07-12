@@ -7,6 +7,8 @@ import {
   safeReaddir,
   safeWriteFile,
   safeMkdir,
+  safeStat,
+  safeUnlinkSync,
 } from '../secure-io.js';
 import {
   getEmbeddingBackend,
@@ -145,9 +147,98 @@ function computeTextHash(text: string): string {
   return createHash('sha256').update(text).digest('hex').slice(0, 12);
 }
 
-function cacheFilePath(scopeHash: string): string {
+function cacheDir(): string {
+  const override = process.env.KYBERION_KI_CACHE_DIR?.trim();
+  if (override) return override;
   const root = path.dirname(pathResolver.knowledge());
-  return path.join(root, 'active', 'shared', 'cache', `ki-${scopeHash}.json`);
+  return path.join(root, 'active', 'shared', 'cache');
+}
+
+function cacheFilePath(scopeHash: string): string {
+  return path.join(cacheDir(), `ki-${scopeHash}.json`);
+}
+
+// ─── Cache budget (KM-02 Task 1.2: LRU eviction) ─────────────────────────────
+//
+// ki-*.json files accumulate as scopes and embedding models change (every
+// model switch mints a new scope hash and orphans the old file). A sidecar
+// usage map records last-use per scope so eviction tracks reads, not just
+// writes; files without a usage entry fall back to mtime.
+
+const USAGE_FILE = 'ki-usage.json';
+const DEFAULT_CACHE_BUDGET_MB = 200;
+const KI_FILE_PATTERN = /^ki-[0-9a-f]{16}\.json$/;
+
+function usageFilePath(): string {
+  return path.join(cacheDir(), USAGE_FILE);
+}
+
+function loadUsageMap(): Record<string, string> {
+  try {
+    if (!safeExistsSync(usageFilePath())) return {};
+    const parsed = JSON.parse(safeReadFile(usageFilePath(), { encoding: 'utf8' }) as string);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    /* corrupt usage map: rebuild from scratch */
+    return {};
+  }
+}
+
+function touchScopeUsage(scopeHash: string): void {
+  try {
+    const usage = loadUsageMap();
+    usage[scopeHash] = new Date().toISOString();
+    const dir = cacheDir();
+    if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
+    safeWriteFile(usageFilePath(), JSON.stringify(usage));
+  } catch {
+    /* usage tracking is best-effort; eviction falls back to mtime */
+  }
+}
+
+function resolveCacheBudgetBytes(): number {
+  const raw = Number(process.env.KYBERION_KI_CACHE_MAX_MB || '');
+  const mb = Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_CACHE_BUDGET_MB;
+  return mb * 1024 * 1024;
+}
+
+/**
+ * Delete least-recently-used ki-*.json cache files until the cache directory
+ * fits the budget (KYBERION_KI_CACHE_MAX_MB, default 200MB). Exported for
+ * tests and operational use.
+ */
+export function enforceKnowledgeCacheBudget(): void {
+  try {
+    const dir = cacheDir();
+    if (!safeExistsSync(dir)) return;
+    const files = (safeReaddir(dir) as string[]).filter((f) => KI_FILE_PATTERN.test(f));
+    const usage = loadUsageMap();
+    const stats = files.map((f) => {
+      const full = path.join(dir, f);
+      const st = safeStat(full);
+      const scopeHash = f.slice(3, 19);
+      const lastUsed = usage[scopeHash] ? Date.parse(usage[scopeHash]) : st.mtimeMs;
+      return { full, scopeHash, size: st.size, lastUsed };
+    });
+    let total = stats.reduce((sum, s) => sum + s.size, 0);
+    const budget = resolveCacheBudgetBytes();
+    if (total <= budget) return;
+
+    stats.sort((a, b) => a.lastUsed - b.lastUsed);
+    const evictedScopes: string[] = [];
+    for (const s of stats) {
+      if (total <= budget) break;
+      safeUnlinkSync(s.full);
+      total -= s.size;
+      evictedScopes.push(s.scopeHash);
+    }
+    if (evictedScopes.length > 0) {
+      for (const scope of evictedScopes) delete usage[scope];
+      safeWriteFile(usageFilePath(), JSON.stringify(usage));
+    }
+  } catch {
+    /* eviction is best-effort; an oversized cache is not fatal */
+  }
 }
 
 function loadDiskCache(scopeHash: string): Map<string, { textHash: string; vector: Float32Array }> {
@@ -163,6 +254,7 @@ function loadDiskCache(scopeHash: string): Map<string, { textHash: string; vecto
         vector: new Float32Array(entry.vector),
       });
     }
+    touchScopeUsage(scopeHash);
   } catch {
     // Corrupt or unreadable cache — ignore, will rebuild
   }
@@ -181,6 +273,8 @@ function saveDiskCache(scopeHash: string, modelName: string, entries: DiskCacheE
       entries,
     };
     safeWriteFile(filePath, JSON.stringify(cache));
+    touchScopeUsage(scopeHash);
+    enforceKnowledgeCacheBudget();
   } catch {
     // Cache write failure is non-fatal
   }
