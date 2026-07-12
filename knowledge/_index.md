@@ -254,6 +254,7 @@
 - [PagerDuty Best Practices](./product/operations/pagerduty_best_practices.md) (public | Ecosystem Architect)
 - [Runbook & Playbook Best Practices (AI-Native Operations)](./product/operations/runbook_best_practices.md) (public | Ecosystem Architect)
 - [SLO & Dashboard Best Practices](./product/operations/slo_dashboard_best_practices.md) (public | Ecosystem Architect)
+- [インシデント重大度モデル (Incident Severity Model)](./product/operations/incident-severity-model.md) (public | Ecosystem Architect)
 
 ## 📁 product/operations/monitoring
 - [Datadog 導入・運用ベストプラクティス](./product/operations/monitoring/datadog_best_practices.md) (public | Ecosystem Architect)
@@ -358,8 +359,11 @@
 ## 📁 product/orchestration/mission-playbooks
 - [Scenario: Messaging Bridge Activation & Orchestration](./product/orchestration/mission-playbooks/messaging-bridge-orchestration.md) (public | Unknown)
 - [ミッション・プレイブック：CEO戦略的意思決定](./product/orchestration/mission-playbooks/ceo-strategy.md) (public | Ecosystem Architect)
+- [ミッション・プレイブック：IT デリバリ＆運用ガバナンス](./product/orchestration/mission-playbooks/it-delivery-operations-governance.md) (public | Ecosystem Architect)
 - [ミッション・プレイブック：SaaS事業 ROI ＆ ユニットエコノミクス策定](./product/orchestration/mission-playbooks/saas-roi.md) (public | Ecosystem Architect)
+- [ミッション・プレイブック：ソースコード・セキュリティ診断サービス](./product/orchestration/mission-playbooks/security-audit-service.md) (public | Ecosystem Architect)
 - [ミッション・プレイブック：プロダクト健全性 ＆ リリース監査](./product/orchestration/mission-playbooks/product-audit.md) (public | Ecosystem Architect)
+- [ミッション・プレイブック：資材管理・IT運用・動的ワークフロー登録](./product/orchestration/mission-playbooks/asset-management-and-it-operations.md) (public | Ecosystem Architect)
 
 ## 📁 product/orchestration/mobile-app-profiles
 - [Mobile App Profiles](./product/orchestration/mobile-app-profiles/README.md) (public | Unknown)

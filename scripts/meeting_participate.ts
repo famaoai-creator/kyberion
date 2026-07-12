@@ -29,6 +29,7 @@ import {
   StubMeetingJoinDriver,
   getMeetingJoinDriver,
   installInRoomMeetingJoinDriver,
+  installChromeExtensionMeetingJoinDriver,
   getStreamingSttBridge,
   getStreamingTtsBridge,
   getVoiceProfileRegistry,
@@ -129,6 +130,9 @@ async function loadDriver(
     cdpUrl?: string;
     cdpPort?: number;
     browserChannel?: 'chrome' | 'chromium';
+    extensionWsPort?: number;
+    extensionWsHost?: string;
+    extensionJoinTimeoutSec?: number;
   } = {}
 ): Promise<MeetingJoinDriver> {
   if (driverId === 'in-room') {
@@ -184,6 +188,16 @@ async function loadDriver(
         );
       }
     }
+  }
+  if (driverId === 'chrome-extension') {
+    // Browser control via the operator's own Chrome running the Meet Copilot
+    // extension (tools/meet-copilot-extension), over a local WebSocket channel.
+    // Audio still flows through the BlackHole bus (decoupled from the driver).
+    installChromeExtensionMeetingJoinDriver({
+      wsPort: opts.extensionWsPort,
+      wsHost: opts.extensionWsHost,
+      joinTimeoutSec: opts.extensionJoinTimeoutSec,
+    });
   }
   const driver = getMeetingJoinDriver(driverId);
   if (driver) {
@@ -345,6 +359,18 @@ async function main(): Promise<void> {
     .option('cdp-url', { type: 'string' })
     .option('cdp-port', { type: 'number' })
     .option('browser-channel', { type: 'string', choices: ['chrome', 'chromium'] as const })
+    .option('extension-ws-port', {
+      type: 'number',
+      describe: 'chrome-extension driver: local WS control port (default 8779)',
+    })
+    .option('extension-ws-host', {
+      type: 'string',
+      describe: 'chrome-extension driver: local WS host (default 127.0.0.1)',
+    })
+    .option('extension-join-timeout-sec', {
+      type: 'number',
+      describe: 'chrome-extension driver: seconds to wait for the extension to connect + join',
+    })
     .option('max-minutes', { type: 'number', default: 30 })
     .option('headed', { type: 'boolean', default: false })
     .option('account-slug', { type: 'string', default: 'default' })
@@ -450,6 +476,18 @@ async function main(): Promise<void> {
       cdpUrl: typeof argv['cdp-url'] === 'string' ? String(argv['cdp-url']) : undefined,
       cdpPort: typeof argv['cdp-port'] === 'number' ? Number(argv['cdp-port']) : undefined,
       browserChannel: (argv['browser-channel'] as 'chrome' | 'chromium' | undefined) ?? undefined,
+      extensionWsPort:
+        typeof argv['extension-ws-port'] === 'number'
+          ? Number(argv['extension-ws-port'])
+          : undefined,
+      extensionWsHost:
+        typeof argv['extension-ws-host'] === 'string'
+          ? String(argv['extension-ws-host'])
+          : undefined,
+      extensionJoinTimeoutSec:
+        typeof argv['extension-join-timeout-sec'] === 'number'
+          ? Number(argv['extension-join-timeout-sec'])
+          : undefined,
     });
     const selectedDevices = {
       microphone:

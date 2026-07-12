@@ -1,0 +1,91 @@
+{
+  "action": "pipeline",
+  "name": "security-audit-static-analysis",
+  "version": "1.0.0",
+  "description": "ソースコード静的解析セキュリティ診断サービスの決定的実行エンジン。preflight ゲート → semgrep 静的解析 → レッドチーム多視点による脆弱性仮説の発散 → ブルーチームによる相互批判で検証 → 検証済み所見を統一 content-JSON(title/summary/sections/tables/callouts)に合成する。security-audit-service ワークフローの static_analysis フェーズが pipeline_ref から参照する。所見の重大度較正・ADR 突合・レポート執筆は後続の判断フェーズ(findings_alignment/report_r1)が担う。",
+  "context": {
+    "mission_id": "",
+    "mission_evidence_dir": "active/shared/tmp",
+    "target_dir": "libs/core",
+    "semgrep_config": "auto",
+    "tenant_slug": "sbiss",
+    "reference_standards": "OWASP SCVS, Solana/Anchor Security Best Practices, project ADR",
+    "personas": [
+      "red-team-web-vulnerability-expert",
+      "red-team-system-auditor",
+      "red-team-cryptographic-auditor"
+    ],
+    "critiquers": ["blue-team-secure-architect", "blue-team-qa-engineer"]
+  },
+  "steps": [
+    {
+      "id": "preflight",
+      "role": "gate",
+      "op": "core:include",
+      "params": {
+        "fragment": "fragments/security-audit-preflight.json",
+        "context": { "target_dir": "{{target_dir}}" }
+      }
+    },
+    {
+      "id": "semgrep_static_scan",
+      "role": "source",
+      "op": "code:semgrep_scan",
+      "params": {
+        "target_dir": "{{target_dir}}",
+        "config": "{{semgrep_config}}",
+        "export_as": "semgrep_findings"
+      }
+    },
+    {
+      "id": "vulnerability_hypothesis_divergence",
+      "role": "sink",
+      "op": "wisdom:a2a_fanout",
+      "params": {
+        "personas": "{{personas}}",
+        "topic": "Enumerate concrete, exploitable security weaknesses in {{target_dir}}. Reason from the static-analysis signal and the source itself, cross-checked against {{reference_standards}}. Static findings: {{semgrep_findings}}",
+        "min_hypotheses_per_persona": 2,
+        "output_path": "{{mission_evidence_dir}}/audit-hypotheses-raw.json"
+      }
+    },
+    {
+      "id": "vulnerability_hypothesis_critique",
+      "role": "sink",
+      "op": "wisdom:cross_critique",
+      "params": {
+        "input": "{{mission_evidence_dir}}/audit-hypotheses-raw.json",
+        "personas": "{{critiquers}}",
+        "output_path": "{{mission_evidence_dir}}/audit-hypotheses-verified.json"
+      }
+    },
+    {
+      "id": "synthesize_findings",
+      "role": "transform",
+      "op": "reasoning:synthesize",
+      "params": {
+        "use_subagent": true,
+        "effort": "high",
+        "input": "{{mission_evidence_dir}}/audit-hypotheses-verified.json",
+        "instruction": "You are the lead auditor. From the verified vulnerability hypotheses, produce a findings document as a single JSON object with this exact shape: { \"title\": string, \"summary\": string, \"sections\": [ { \"heading\": string, \"body\": string[], \"tables\"?: [{ \"title\": string, \"columns\": string[], \"rows\": string[][] }], \"callouts\"?: [{ \"title\": string, \"tone\": \"info\"|\"warning\"|\"critical\", \"body\": string }] } ] }. Requirements: (1) assign each finding a stable ID FIND-01, FIND-02, ...; (2) rate each with severity Critical/High/Medium/Low/Informational and note its recommended remediation timing; (3) each finding section MUST include 該当箇所 (file:line), リスク, and 推奨策; (4) include one section titled '指摘事項一覧' with a table of ID/severity/status(Open); (5) drop hypotheses the blue-team critique refuted. Reference standards: {{reference_standards}}. Output ONLY the JSON object.",
+        "export_as": "audit_findings_content"
+      }
+    },
+    {
+      "id": "write_findings",
+      "role": "sink",
+      "op": "system:write_file",
+      "params": {
+        "path": "{{mission_evidence_dir}}/audit-findings.json",
+        "content": "{{audit_findings_content}}"
+      }
+    },
+    {
+      "id": "log_done",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "🔎 [SEC-AUDIT] Static analysis complete. Findings: {{mission_evidence_dir}}/audit-findings.json — hand off to findings_alignment for severity calibration and ADR reconciliation."
+      }
+    }
+  ]
+}

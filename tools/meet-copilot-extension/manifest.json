@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "Kyberion Meeting Copilot",
+  "version": "0.2.0",
+  "description": "Drives meeting participation (join / mute / leave / captions) for Google Meet, Microsoft Teams, and Zoom on behalf of the Kyberion meeting coordinator via a local WebSocket control channel. Runs inside the operator's own signed-in Chrome — no bot session, no CDP.",
+  "permissions": ["scripting", "tabs", "storage", "activeTab"],
+  "host_permissions": [
+    "https://meet.google.com/*",
+    "https://teams.microsoft.com/*",
+    "https://teams.live.com/*",
+    "https://*.zoom.us/*"
+  ],
+  "background": { "service_worker": "background.js" },
+  "web_accessible_resources": [
+    {
+      "resources": ["content.js"],
+      "matches": [
+        "https://meet.google.com/*",
+        "https://teams.microsoft.com/*",
+        "https://teams.live.com/*",
+        "https://*.zoom.us/*"
+      ]
+    }
+  ],
+  "action": { "default_title": "Kyberion Meet Copilot", "default_popup": "popup.html" }
+}

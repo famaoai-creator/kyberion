@@ -1,0 +1,35 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body { font: 13px/1.5 -apple-system, system-ui, sans-serif; width: 280px; margin: 0; padding: 12px; }
+      h1 { font-size: 13px; margin: 0 0 8px; }
+      .row { display: flex; justify-content: space-between; align-items: center; margin: 4px 0; }
+      .k { color: #666; }
+      .v { font-weight: 600; }
+      .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+      .ok { background: #2e7d32; }
+      .no { background: #c62828; }
+      .err { color: #c62828; font-size: 11px; word-break: break-word; margin-top: 6px; }
+      input { width: 70px; }
+      button { margin-top: 8px; margin-right: 6px; }
+      .muted { color: #999; font-size: 11px; margin-top: 8px; }
+    </style>
+  </head>
+  <body>
+    <h1>Kyberion Meeting Copilot</h1>
+    <div class="row"><span class="k">Control channel</span><span class="v"><span id="wsDot" class="dot no"></span><span id="ws">…</span></span></div>
+    <div class="row"><span class="k">Meeting phase</span><span class="v" id="phase">…</span></div>
+    <div class="row"><span class="k">Captions captured</span><span class="v" id="captions">0</span></div>
+    <div class="row"><span class="k">WS port</span><span><input id="port" type="number" /> </span></div>
+    <div>
+      <button id="save">Save port</button>
+      <button id="diagnose">Diagnose DOM</button>
+      <button id="leave">Leave</button>
+    </div>
+    <div id="err" class="err"></div>
+    <div class="muted">Driver runs the WS server; this extension connects to it.</div>
+    <script src="popup.js"></script>
+  </body>
+</html>
