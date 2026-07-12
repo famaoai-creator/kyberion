@@ -61,31 +61,42 @@ describe('video visual direction (agy short-video quality)', () => {
     expect(css).toContain('--headline-size: 100px;');
   });
 
-  it('generateVideoVisualDirection parses injected model output and degrades on garbage', async () => {
-    const good = await generateVideoVisualDirection({
+  it('selects a curated pattern by id (never invents colors)', async () => {
+    const direction = await generateVideoVisualDirection({
       title: 'T',
-      story: 'S',
+      story: 'a warm human interview story',
       frame: PORTRAIT,
-      generate: async () => `Here you go:\n${JSON.stringify(VALID)}`,
+      scene_ids: ['hook'],
+      generate: async () =>
+        JSON.stringify({
+          pattern_id: 'warm-documentary',
+          per_scene: [{ scene_id: 'hook', layout_variant: 'quote-card' }],
+        }),
     });
-    expect(good.palette.bg).toBe('#1a120b');
+    expect(direction.palette.accent).toBe('#f59e0b');
+    expect(direction.typography.headline_px).toBe(100);
+    expect(direction.per_scene?.[0].layout_variant).toBe('quote-card');
+  });
 
-    const bad = await generateVideoVisualDirection({
+  it('falls back to the first catalog pattern for unknown ids or failures', async () => {
+    const unknown = await generateVideoVisualDirection({
       title: 'T',
       story: 'S',
       frame: PORTRAIT,
-      generate: async () => 'no json at all',
+      generate: async () => JSON.stringify({ pattern_id: 'neon-vaporwave-9000' }),
     });
-    expect(bad.palette).toEqual(DEFAULT_VISUAL_DIRECTION.palette);
+    expect(unknown.palette).toEqual(DEFAULT_VISUAL_DIRECTION.palette);
+    expect(unknown.typography.headline_px).toBe(96);
 
     const thrown = await generateVideoVisualDirection({
       title: 'T',
       story: 'S',
-      frame: PORTRAIT,
+      frame: LANDSCAPE,
       generate: async () => {
         throw new Error('backend down');
       },
     });
     expect(thrown.palette).toEqual(DEFAULT_VISUAL_DIRECTION.palette);
+    expect(thrown.typography.headline_px).toBe(68);
   });
 });

@@ -138,6 +138,7 @@ export * from './adf-engine.js';
 export * from './autonomous-repair.js';
 export * from './operation-policy-gate.js';
 export * from './video-visual-direction.js';
+export * from './deck-theme-direction.js';
 export * from './ranking-signals.js';
 export * from './operation-policy-gate.js';
 export * from './ranking-signals.js';
