@@ -50,6 +50,11 @@ import {
   requestPeerAdvice,
   deriveTestInventory,
   type SoftwareQualityContract,
+  resolveReasoningParticipant,
+  renderReasoningParticipantContext,
+  validateContextOutputTier,
+  type GovernedContextFragment,
+  type ReasoningParticipant,
 } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
 import * as path from 'node:path';
@@ -983,6 +988,9 @@ export async function a2aFanout(input: {
   topic: string;
   output_path: string;
 }): Promise<{ written_to: string; reasoning_mode: 'placeholder' | 'model' }> {
+  logger.warn(
+    '[WISDOM_PERSONA_COMPAT] a2a_fanout uses unscoped persona labels; migrate to perspective_fanout with typed participants'
+  );
   const backend = getReasoningBackend();
   const hypotheses = await backend.divergePersonas({
     topic: input.topic,
@@ -993,6 +1001,165 @@ export async function a2aFanout(input: {
   writeJSON(input.output_path, {
     topic: input.topic,
     hypotheses,
+    generated_by: backend.name,
+    generated_at: nowIso(),
+    reasoning_mode: reasoningMode,
+  });
+  return { written_to: input.output_path, reasoning_mode: reasoningMode };
+}
+
+interface PerspectiveFanoutReceipt {
+  participant_id: string;
+  backend_name: string;
+  security_scope: ReasoningParticipant['security_scope'];
+  effective_input_tier: 'personal' | 'confidential' | 'public';
+  accepted_fragment_ids: string[];
+  rejected_fragments: Array<{ fragment_id: string; code: string; reason: string }>;
+}
+
+export async function perspectiveFanout(input: {
+  participants: ReasoningParticipant[];
+  candidate_fragments?: GovernedContextFragment[];
+  min_hypotheses_per_participant: number;
+  topic: string;
+  output_path: string;
+  output_tier: 'personal' | 'confidential' | 'public';
+}): Promise<{
+  written_to: string;
+  reasoning_mode: 'placeholder' | 'model';
+  participant_count: number;
+}> {
+  if (!input.participants.length) {
+    throw new Error('[PERSPECTIVE_FANOUT_INVALID] participants must not be empty');
+  }
+  const backend = getReasoningBackend();
+  const hypotheses: any[] = [];
+  const participantReceipts: PerspectiveFanoutReceipt[] = [];
+
+  for (const participant of input.participants) {
+    const resolvedParticipant = resolveReasoningParticipant({
+      participant,
+      candidate_fragments: input.candidate_fragments,
+      backend_name: backend.name,
+    });
+    const outputGuard = validateContextOutputTier(
+      resolvedParticipant.context_pack,
+      input.output_tier
+    );
+    if (!outputGuard.allowed) throw new Error(outputGuard.reason);
+
+    const participantHypotheses = await backend.divergePersonas({
+      topic: input.topic,
+      personas: [participant.participant_id],
+      minPerPersona: input.min_hypotheses_per_participant,
+      context: renderReasoningParticipantContext(resolvedParticipant),
+    });
+    hypotheses.push(
+      ...participantHypotheses.map((hypothesis) => ({
+        ...hypothesis,
+        proposed_by: participant.participant_id,
+        participant_id: participant.participant_id,
+        perspective_ids: participant.perspective_ids,
+      }))
+    );
+    participantReceipts.push({
+      participant_id: participant.participant_id,
+      backend_name: backend.name,
+      security_scope: participant.security_scope,
+      effective_input_tier: resolvedParticipant.context_pack.effective_input_tier,
+      accepted_fragment_ids: resolvedParticipant.context_pack.fragments.map(
+        (fragment) => fragment.fragment_id
+      ),
+      rejected_fragments: resolvedParticipant.context_pack.rejected.map((rejection) => ({
+        fragment_id: rejection.fragment_id,
+        code: rejection.code,
+        reason: rejection.reason,
+      })),
+    });
+  }
+
+  const reasoningMode = deriveReasoningMode(backend.name);
+  writeJSON(input.output_path, {
+    operation: 'perspective_fanout',
+    topic: input.topic,
+    hypotheses,
+    participant_receipts: participantReceipts,
+    output_tier: input.output_tier,
+    generated_by: backend.name,
+    generated_at: nowIso(),
+    reasoning_mode: reasoningMode,
+  });
+  return {
+    written_to: input.output_path,
+    reasoning_mode: reasoningMode,
+    participant_count: input.participants.length,
+  };
+}
+
+export async function typedCrossCritique(input: {
+  source_path: string;
+  participants: ReasoningParticipant[];
+  output_path: string;
+  output_tier: 'personal' | 'confidential' | 'public';
+}): Promise<{ written_to: string; reasoning_mode: 'placeholder' | 'model' }> {
+  const backend = getReasoningBackend();
+  const src = readJSON<any>(input.source_path);
+  if (src.operation !== 'perspective_fanout' || !Array.isArray(src.participant_receipts)) {
+    throw new Error('[CROSS_CRITIQUE_SCOPE_MISSING] typed perspective fanout receipt is required');
+  }
+  const sourceTier = String(src.output_tier || '') as 'personal' | 'confidential' | 'public';
+  const sourceScopes = new Map<string, ReasoningParticipant['security_scope']>(
+    src.participant_receipts.map((receipt: PerspectiveFanoutReceipt) => [
+      receipt.participant_id,
+      receipt.security_scope,
+    ])
+  );
+
+  for (const participant of input.participants) {
+    const resolvedParticipant = resolveReasoningParticipant({
+      participant,
+      backend_name: backend.name,
+    });
+    if (!participant.security_scope.read_tiers.includes(sourceTier)) {
+      throw new Error(
+        `[CROSS_CRITIQUE_SCOPE_DENIED] ${participant.participant_id} cannot read ${sourceTier}`
+      );
+    }
+    for (const sourceScope of sourceScopes.values()) {
+      if (
+        sourceTier !== 'public' &&
+        (sourceScope.tenant_id !== participant.security_scope.tenant_id ||
+          sourceScope.project_id !== participant.security_scope.project_id ||
+          sourceScope.mission_id !== participant.security_scope.mission_id)
+      ) {
+        throw new Error(
+          `[CROSS_CRITIQUE_SCOPE_DENIED] ${participant.participant_id} cannot receive cross-scope hypotheses`
+        );
+      }
+    }
+    const outputGuard = validateContextOutputTier(
+      { effective_input_tier: sourceTier },
+      input.output_tier
+    );
+    if (!outputGuard.allowed) throw new Error(outputGuard.reason);
+  }
+
+  const { hypotheses } = await backend.crossCritique({
+    topic: src.topic,
+    hypotheses: src.hypotheses ?? [],
+    personas: input.participants.map((participant) => participant.participant_id),
+  });
+  const reasoningMode = deriveReasoningMode(backend.name);
+  writeJSON(input.output_path, {
+    operation: 'typed_cross_critique',
+    topic: src.topic,
+    hypotheses,
+    participant_receipts: input.participants.map((participant) => ({
+      participant_id: participant.participant_id,
+      backend_name: backend.name,
+      security_scope: participant.security_scope,
+    })),
+    output_tier: input.output_tier,
     generated_by: backend.name,
     generated_at: nowIso(),
     reasoning_mode: reasoningMode,
@@ -2664,6 +2831,24 @@ export async function dispatchDecisionOp(
       return { handled: true, ctx: assign(result) };
     }
 
+    case 'perspective_fanout': {
+      const participantsResolved =
+        resolved('participants') || ctx[params.participants_from || 'participants'] || [];
+      const fragmentsResolved =
+        resolved('context_fragments') ||
+        ctx[params.context_fragments_from || 'context_fragments'] ||
+        [];
+      const result = await perspectiveFanout({
+        participants: Array.isArray(participantsResolved) ? participantsResolved : [],
+        candidate_fragments: Array.isArray(fragmentsResolved) ? fragmentsResolved : [],
+        min_hypotheses_per_participant: Number(resolved('min_hypotheses_per_participant')) || 2,
+        topic: resolved('topic'),
+        output_path: resolved('output_path'),
+        output_tier: resolved('output_tier') || 'public',
+      });
+      return { handled: true, ctx: assign(result) };
+    }
+
     case 'cross_critique': {
       const personasResolved =
         resolved('personas') || ctx[params.personas_from || 'personas'] || [];
@@ -2671,6 +2856,18 @@ export async function dispatchDecisionOp(
         source_path: resolved('input') || resolved('source_path'),
         personas: Array.isArray(personasResolved) ? personasResolved : [],
         output_path: resolved('output_path'),
+      });
+      return { handled: true, ctx: assign(result) };
+    }
+
+    case 'typed_cross_critique': {
+      const participantsResolved =
+        resolved('participants') || ctx[params.participants_from || 'participants'] || [];
+      const result = await typedCrossCritique({
+        source_path: resolved('input') || resolved('source_path'),
+        participants: Array.isArray(participantsResolved) ? participantsResolved : [],
+        output_path: resolved('output_path'),
+        output_tier: resolved('output_tier') || 'public',
       });
       return { handled: true, ctx: assign(result) };
     }

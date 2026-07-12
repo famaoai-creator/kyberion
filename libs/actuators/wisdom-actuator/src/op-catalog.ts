@@ -24,6 +24,7 @@ export const WISDOM_ACTUATOR_TRANSFORM_OPS = [
 
 export const WISDOM_ACTUATOR_APPLY_OPS = [
   'a2a_fanout',
+  'perspective_fanout',
   'a2a_roleplay',
   'adjust_proposal',
   'audit_speaker_fairness',
@@ -31,6 +32,7 @@ export const WISDOM_ACTUATOR_APPLY_OPS = [
   'compute_readiness_matrix',
   'conduct_1on1',
   'cross_critique',
+  'typed_cross_critique',
   'decompose_into_tasks',
   'deploy_release',
   'distill',

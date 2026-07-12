@@ -40,6 +40,20 @@
       "notes": "Routes image generation through the Gemini API / AI Studio service preset using GEMINI_API_KEY."
     },
     {
+      "backend_id": "media-generation.host_agent",
+      "modality": "image",
+      "display_name": "Host Agent Tool Image Generation",
+      "kind": "agent_tool",
+      "provider": "antigravity",
+      "status": "active",
+      "platforms": ["any"],
+      "supports": {
+        "artifact_formats": ["jpg", "jpeg", "png", "webp"],
+        "async": false
+      },
+      "notes": "Requests the outer agent/host environment (e.g. agy / Antigravity IDE) to generate the image via its native tool and stores it."
+    },
+    {
       "backend_id": "media-generation.local_flux",
       "modality": "image",
       "display_name": "Local FLUX Image Generation",
