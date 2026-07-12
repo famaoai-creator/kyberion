@@ -4,8 +4,73 @@
     {
       "n": "agent-actuator",
       "path": "libs/actuators/agent-actuator",
-      "source": "registry",
-      "ops": []
+      "source": "describeOps",
+      "ops": [
+        {
+          "op": "list",
+          "kind": "capture"
+        },
+        {
+          "op": "list_manifests",
+          "kind": "capture"
+        },
+        {
+          "op": "list_runtimes",
+          "kind": "capture"
+        },
+        {
+          "op": "health",
+          "kind": "capture"
+        },
+        {
+          "op": "snapshot",
+          "kind": "capture"
+        },
+        {
+          "op": "team_plan",
+          "kind": "transform"
+        },
+        {
+          "op": "team_role",
+          "kind": "transform"
+        },
+        {
+          "op": "spawn",
+          "kind": "apply"
+        },
+        {
+          "op": "ask",
+          "kind": "apply"
+        },
+        {
+          "op": "shutdown",
+          "kind": "apply"
+        },
+        {
+          "op": "shutdown_all",
+          "kind": "apply"
+        },
+        {
+          "op": "refresh",
+          "kind": "apply"
+        },
+        {
+          "op": "restart",
+          "kind": "apply"
+        },
+        {
+          "op": "a2a",
+          "kind": "apply"
+        },
+        {
+          "op": "staff_mission",
+          "kind": "apply"
+        },
+        {
+          "op": "prewarm_mission",
+          "kind": "apply"
+        }
+      ]
     },
     {
       "n": "android-actuator",
@@ -16,14 +81,56 @@
     {
       "n": "approval-actuator",
       "path": "libs/actuators/approval-actuator",
-      "source": "registry",
-      "ops": []
+      "source": "describeOps",
+      "ops": [
+        {
+          "op": "load",
+          "kind": "capture"
+        },
+        {
+          "op": "list_pending",
+          "kind": "capture"
+        },
+        {
+          "op": "create",
+          "kind": "apply"
+        },
+        {
+          "op": "decide",
+          "kind": "apply"
+        }
+      ]
     },
     {
       "n": "artifact-actuator",
       "path": "libs/actuators/artifact-actuator",
-      "source": "registry",
-      "ops": []
+      "source": "describeOps",
+      "ops": [
+        {
+          "op": "read_json",
+          "kind": "capture"
+        },
+        {
+          "op": "list",
+          "kind": "capture"
+        },
+        {
+          "op": "write_json",
+          "kind": "apply"
+        },
+        {
+          "op": "append_event",
+          "kind": "apply"
+        },
+        {
+          "op": "ensure_dir",
+          "kind": "apply"
+        },
+        {
+          "op": "write_delivery_pack",
+          "kind": "apply"
+        }
+      ]
     },
     {
       "n": "blockchain-actuator",
@@ -1176,14 +1283,52 @@
     {
       "n": "process-actuator",
       "path": "libs/actuators/process-actuator",
-      "source": "registry",
-      "ops": []
+      "source": "describeOps",
+      "ops": [
+        {
+          "op": "status",
+          "kind": "capture"
+        },
+        {
+          "op": "list",
+          "kind": "capture"
+        },
+        {
+          "op": "list-surfaces",
+          "kind": "capture"
+        },
+        {
+          "op": "spawn",
+          "kind": "apply"
+        },
+        {
+          "op": "stop",
+          "kind": "apply"
+        }
+      ]
     },
     {
       "n": "secret-actuator",
       "path": "libs/actuators/secret-actuator",
-      "source": "registry",
-      "ops": []
+      "source": "describeOps",
+      "ops": [
+        {
+          "op": "get",
+          "kind": "capture"
+        },
+        {
+          "op": "list",
+          "kind": "capture"
+        },
+        {
+          "op": "set",
+          "kind": "transform"
+        },
+        {
+          "op": "delete",
+          "kind": "apply"
+        }
+      ]
     },
     {
       "n": "service-actuator",
@@ -1779,8 +1924,57 @@
     {
       "n": "terminal-actuator",
       "path": "libs/actuators/terminal-actuator",
-      "source": "registry",
-      "ops": []
+      "source": "describeOps",
+      "ops": [
+        {
+          "op": "poll",
+          "kind": "capture"
+        },
+        {
+          "op": "list",
+          "kind": "capture"
+        },
+        {
+          "op": "poll_terminal",
+          "kind": "capture"
+        },
+        {
+          "op": "list_terminal_sessions",
+          "kind": "capture"
+        },
+        {
+          "op": "spawn",
+          "kind": "apply"
+        },
+        {
+          "op": "write",
+          "kind": "apply"
+        },
+        {
+          "op": "resize",
+          "kind": "apply"
+        },
+        {
+          "op": "kill",
+          "kind": "apply"
+        },
+        {
+          "op": "spawn_terminal",
+          "kind": "apply"
+        },
+        {
+          "op": "write_terminal",
+          "kind": "apply"
+        },
+        {
+          "op": "kill_terminal",
+          "kind": "apply"
+        },
+        {
+          "op": "shell_command",
+          "kind": "apply"
+        }
+      ]
     },
     {
       "n": "video-composition-actuator",
