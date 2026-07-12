@@ -1215,7 +1215,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 49810,
+      "size": 50351,
       "type": "json"
     },
     {
@@ -3561,7 +3561,7 @@
     {
       "path": "product/orchestration/peer-network.md",
       "tier": "public",
-      "size": 2560,
+      "size": 4020,
       "type": "md"
     },
     {

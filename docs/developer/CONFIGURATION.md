@@ -10,7 +10,7 @@
 
 Copy [`env.example`](./env.example) to `.env` at the repo root for local overrides (the example is generated here because root dotfiles are write-protected by the policy engine).
 
-## secret (16)
+## secret (17)
 
 | Variable                              | Type   | Required | Description                                                                                                                                                            |
 | ------------------------------------- | ------ | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -23,6 +23,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_MESH_SHARED_SECRET`         | string | no       | _undocumented_                                                                                                                                                         |
 | `KYBERION_NEMOTRON_KEY`               | string | no       | _undocumented_                                                                                                                                                         |
 | `KYBERION_OPENROUTER_KEY`             | string | no       | _undocumented_                                                                                                                                                         |
+| `KYBERION_PEER_KEY_REF`               | string | no       | _undocumented_                                                                                                                                                         |
 | `KYBERION_PEER_SHARED_SECRET`         | string | no       | _undocumented_                                                                                                                                                         |
 | `KYBERION_REQUIRED_TOKEN`             | string | no       | _undocumented_                                                                                                                                                         |
 | `KYBERION_SECRET_RESOLVER_COMMAND`    | string | no       | _undocumented_                                                                                                                                                         |
@@ -195,7 +196,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_TERMINAL_HOST`                  | string | no       | _undocumented_                                                                                                                                                                           |
 | `KYBERION_TTS_COMMAND`                    | string | no       | _undocumented_                                                                                                                                                                           |
 
-## runtime (93)
+## runtime (95)
 
 | Variable                                      | Type   | Required | Description                                                                                             |
 | --------------------------------------------- | ------ | -------- | ------------------------------------------------------------------------------------------------------- |
@@ -243,6 +244,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_LOCALE`                             | string | no       | _undocumented_                                                                                          |
 | `KYBERION_LOCALHOST_AUTOADMIN`                | string | no       | _undocumented_                                                                                          |
 | `KYBERION_MEMORY_AUTOPROMOTE`                 | string | no       | _undocumented_                                                                                          |
+| `KYBERION_MESH_NAMESPACE`                     | string | no       | _undocumented_                                                                                          |
 | `KYBERION_MESH_PEER_ID`                       | string | no       | _undocumented_                                                                                          |
 | `KYBERION_MFLUX_PACKAGE`                      | string | no       | _undocumented_                                                                                          |
 | `KYBERION_MFLUX_QUANTIZE`                     | string | no       | _undocumented_                                                                                          |
@@ -279,6 +281,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_TASK_MODEL_ROUTING`                 | string | no       | _undocumented_                                                                                          |
 | `KYBERION_TELEMETRY`                          | string | no       | _undocumented_                                                                                          |
 | `KYBERION_TENANT`                             | string | no       | Active tenant slug for tenant-scoped writes and branding.                                               |
+| `KYBERION_TENANT_ID`                          | string | no       | _undocumented_                                                                                          |
 | `KYBERION_TERMINAL_ALLOW_REMOTE`              | string | no       | _undocumented_                                                                                          |
 | `KYBERION_TERMINAL_RESTORE_RUNTIME`           | string | no       | _undocumented_                                                                                          |
 | `KYBERION_TEST_MISSING_ENV`                   | string | no       | _undocumented_                                                                                          |

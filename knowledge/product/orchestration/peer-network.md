@@ -22,6 +22,7 @@ Use this catalog to exchange messages between Kyberion instances.
 - `peer:conversation-server` starts a conversation-capable Kyberion peer listener.
 - `peer:send` resolves a peer from the catalog and sends a signed envelope.
 - `peer:conversation` opens, sends, lists, and closes peer conversation sessions.
+- `peer:collaboration` lists and explicitly accepts or rejects governed proposals created from conversation handoffs.
 - Messages are stored as inbox / outbox / event JSONL records under `active/shared/runtime/peer-messaging/` and `active/shared/observability/peer-messaging/`.
 - Conversation sessions are stored under `active/shared/runtime/peer-conversations/` and `active/shared/observability/peer-conversations/`.
 - Message handling is synchronous on receipt: the recipient processes the envelope inside the HTTP request handler, then returns the ACK response only after the responder finishes.
@@ -34,6 +35,42 @@ Use this catalog to exchange messages between Kyberion instances.
 2. Start another peer on `127.0.0.1:4101`.
 3. Register both peers in `knowledge/product/orchestration/peer-network.json`.
 4. Send a message with `pnpm peer:send --from-peer-id kyberion-local-a --to-peer-id kyberion-local-b --subject status --payload '{}'`.
+
+## Same-host governed collaboration
+
+Start a tenant-aware conversation peer. Supplying `--tenant-id` enrolls the peer,
+advertises `peer.collaboration`, and maintains Mesh presence for the listener lifetime.
+
+```bash
+KYBERION_PEER_SHARED_SECRET='<secret>' pnpm peer:conversation-server \
+  --peer-id kyberion-local-b \
+  --host 127.0.0.1 \
+  --port 4101 \
+  --tenant-id default \
+  --key-ref env:KYBERION_PEER_SHARED_SECRET
+```
+
+A `handoff` becomes a proposal only when its metadata contains a complete,
+typed `collaboration_request` whose value is a valid `mesh-request`. Ordinary
+conversation messages retain their existing behavior. The recipient checks the
+signed sender, tenant, target peer, request kind, payload classification, and TTL
+before persisting a pending proposal.
+
+Inspect and decide proposals locally:
+
+```bash
+pnpm peer:collaboration list --peer-id kyberion-local-b --status pending
+pnpm peer:collaboration accept \
+  --peer-id kyberion-local-b \
+  --proposal-id <proposal-id> \
+  --actor-id <operator-id> \
+  --reason '<validation reason>'
+```
+
+Use `reject` instead of `accept` to reject a proposal. Decisions are append-only,
+require an actor and reason, and cannot be overwritten. Acceptance records local
+authorization only; it does not mutate mission state or automatically execute the
+embedded WorkItem/A2A proposal.
 
 ## LAN workflow
 
