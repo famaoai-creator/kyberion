@@ -169,6 +169,12 @@
       "note": "SDLC test phase: requirements (+ optional design) → test-plan.json (test-case-adf-compatible)."
     },
     {
+      "op": "derive_test_inventory",
+      "platforms": ["darwin", "linux", "win32"],
+      "implementation": "full",
+      "note": "QA-01: retain deterministic test viewpoints and use the reasoning backend only to add novel coverage candidates."
+    },
+    {
       "op": "evaluate_qa_ready",
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "full",
