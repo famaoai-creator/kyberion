@@ -165,29 +165,34 @@ function resolveChronosThemeMode(
   return systemPrefersDark ? 'dark' : 'light';
 }
 
-const QUICK_ACTION_GROUPS: QuickActionGroup[] = [
+const buildQuickActionGroups = (locale: SupportedLocale): QuickActionGroup[] => [
   {
-    title: 'Prepare',
-    hint: 'Check the local toolchain and readiness manifests before you start the operator flow.',
+    title: uxText('chronos_qa_prepare_title', locale),
+    hint: uxText('chronos_qa_prepare_hint', locale),
     icon: ClipboardCheck,
     accent: 'from-emerald-400/16 via-emerald-300/8 to-transparent',
     accentText: 'text-emerald-200/85',
     actions: [
       {
-        label: 'Prereq Check',
+        label: uxText('chronos_qa_action_prereq_check', locale),
         query: 'chronos://quick-action/prereq-check',
         icon: '🧰',
         tone: 'verify',
       },
       {
-        label: 'Setup Report',
+        label: uxText('chronos_qa_action_setup_report', locale),
         query: 'chronos://quick-action/setup-report',
         icon: '📑',
         tone: 'verify',
       },
-      { label: 'Doctor', query: 'chronos://quick-action/doctor', icon: '🩺', tone: 'verify' },
       {
-        label: 'Surface Setup',
+        label: uxText('chronos_qa_action_doctor', locale),
+        query: 'chronos://quick-action/doctor',
+        icon: '🩺',
+        tone: 'verify',
+      },
+      {
+        label: uxText('chronos_qa_action_surface_setup', locale),
         query: 'chronos://quick-action/surfaces-setup',
         icon: '🛰',
         tone: 'verify',
@@ -195,20 +200,20 @@ const QUICK_ACTION_GROUPS: QuickActionGroup[] = [
     ],
   },
   {
-    title: 'Schedule',
-    hint: 'Run scheduled generation jobs or inspect the current schedule registry.',
+    title: uxText('chronos_qa_schedule_title', locale),
+    hint: uxText('chronos_qa_schedule_hint', locale),
     icon: CalendarClock,
     accent: 'from-violet-400/16 via-violet-300/8 to-transparent',
     accentText: 'text-violet-200/85',
     actions: [
       {
-        label: 'Schedule Tick',
+        label: uxText('chronos_qa_action_schedule_tick', locale),
         query: 'chronos://quick-action/schedule-tick',
         icon: '⏱',
         tone: 'operate',
       },
       {
-        label: 'Schedule List',
+        label: uxText('chronos_qa_action_schedule_list', locale),
         query: 'chronos://quick-action/schedule-list',
         icon: '🗂',
         tone: 'observe',
@@ -216,28 +221,38 @@ const QUICK_ACTION_GROUPS: QuickActionGroup[] = [
     ],
   },
   {
-    title: 'Observe',
-    hint: 'Open governed readouts before you intervene.',
+    title: uxText('chronos_qa_observe_title', locale),
+    hint: uxText('chronos_qa_observe_hint', locale),
     icon: Radar,
     accent: 'from-cyan-400/16 via-cyan-300/8 to-transparent',
     accentText: 'text-cyan-200/85',
     actions: [
       {
-        label: 'Dashboard',
+        label: uxText('chronos_qa_action_dashboard', locale),
         query: 'chronos://quick-action/dashboard',
         icon: '📊',
         tone: 'observe',
       },
-      { label: 'Missions', query: 'chronos://quick-action/missions', icon: '🎯', tone: 'observe' },
-      { label: 'Agents', query: 'chronos://quick-action/agents', icon: '🤖', tone: 'observe' },
       {
-        label: 'Audit Log',
+        label: uxText('chronos_qa_action_missions', locale),
+        query: 'chronos://quick-action/missions',
+        icon: '🎯',
+        tone: 'observe',
+      },
+      {
+        label: uxText('chronos_qa_action_agents', locale),
+        query: 'chronos://quick-action/agents',
+        icon: '🤖',
+        tone: 'observe',
+      },
+      {
+        label: uxText('chronos_qa_action_audit_log', locale),
         query: 'chronos://quick-action/audit-log',
         icon: '📋',
         tone: 'observe',
       },
       {
-        label: 'Traces',
+        label: uxText('chronos_qa_action_traces', locale),
         query: 'chronos://operator-view/trace-viewer',
         icon: '🔭',
         tone: 'observe',
@@ -245,32 +260,32 @@ const QUICK_ACTION_GROUPS: QuickActionGroup[] = [
     ],
   },
   {
-    title: 'Verify',
-    hint: 'Run deterministic checks when the control plane needs proof.',
+    title: uxText('chronos_qa_verify_title', locale),
+    hint: uxText('chronos_qa_verify_hint', locale),
     icon: ActivitySquare,
     accent: 'from-amber-300/18 via-amber-200/8 to-transparent',
     accentText: 'text-amber-200/85',
     actions: [
       {
-        label: 'Vital Check',
+        label: uxText('chronos_qa_action_vital_check', locale),
         query: 'chronos://quick-action/vital-check',
         icon: '💓',
         tone: 'verify',
       },
       {
-        label: 'Diagnostics',
+        label: uxText('chronos_qa_action_diagnostics', locale),
         query: 'chronos://quick-action/diagnostics',
         icon: '🔍',
         tone: 'verify',
       },
       {
-        label: 'Capability Audit',
+        label: uxText('chronos_qa_action_capability_audit', locale),
         query: 'chronos://quick-action/capability-audit',
         icon: '🧩',
         tone: 'verify',
       },
       {
-        label: 'Provider Check',
+        label: uxText('chronos_qa_action_provider_check', locale),
         query: 'chronos://quick-action/provider-check',
         icon: '🔌',
         tone: 'verify',
@@ -278,28 +293,33 @@ const QUICK_ACTION_GROUPS: QuickActionGroup[] = [
     ],
   },
   {
-    title: 'Operate',
-    hint: 'Escalate only when mission flow, runtime health, or delivery is blocked.',
+    title: uxText('chronos_qa_operate_title', locale),
+    hint: uxText('chronos_qa_operate_hint', locale),
     icon: Wrench,
     accent: 'from-rose-400/16 via-orange-300/8 to-transparent',
     accentText: 'text-orange-200/85',
     actions: [
       {
-        label: 'Build & Test',
+        label: uxText('chronos_qa_action_build_test', locale),
         query: 'chronos://quick-action/build-test',
         icon: '🔨',
         tone: 'operate',
       },
-      { label: 'Policies', query: 'chronos://quick-action/policies', icon: '🛡', tone: 'operate' },
       {
-        label: 'Upgrade Check',
+        label: uxText('chronos_qa_action_policies', locale),
+        query: 'chronos://quick-action/policies',
+        icon: '🛡',
+        tone: 'operate',
+      },
+      {
+        label: uxText('chronos_qa_action_upgrade_check', locale),
         query:
           'node dist/scripts/run_pipeline.js --input pipelines/system-upgrade-check.json を実行して、アップデートの有無を表示して',
         icon: '⬆',
         tone: 'operate',
       },
       {
-        label: 'Knowledge',
+        label: uxText('chronos_qa_action_knowledge', locale),
         query: 'chronos://quick-action/knowledge',
         icon: '🧠',
         tone: 'operate',
@@ -308,43 +328,43 @@ const QUICK_ACTION_GROUPS: QuickActionGroup[] = [
   },
 ];
 
-const STATUS_CARDS: StatusCard[] = [
+const buildStatusCards = (locale: SupportedLocale): StatusCard[] => [
   {
-    label: 'Needs Attention',
-    value: 'Exceptions',
-    detail: 'Start with mission blockers, runtime incidents, and delivery exceptions.',
+    label: uxText('chronos_sc_needs_attention_label', locale),
+    value: uxText('chronos_sc_needs_attention_value', locale),
+    detail: uxText('chronos_sc_needs_attention_detail', locale),
     icon: Shield,
     accent: 'border-amber-200/16 bg-amber-300/8 text-amber-100',
     targetId: 'mission-control-plane',
   },
   {
-    label: 'Toolchain',
-    value: 'Preflight',
-    detail: 'Confirm local prerequisites and setup reports before you work from source.',
+    label: uxText('chronos_sc_toolchain_label', locale),
+    value: uxText('chronos_sc_toolchain_value', locale),
+    detail: uxText('chronos_sc_toolchain_detail', locale),
     icon: ClipboardCheck,
     accent: 'border-emerald-200/16 bg-emerald-300/8 text-emerald-100',
     targetId: 'operator-quick-actions',
   },
   {
-    label: 'Schedules',
-    value: 'Registry',
-    detail: 'Inspect and tick scheduled generation jobs from the operator console.',
+    label: uxText('chronos_sc_schedules_label', locale),
+    value: uxText('chronos_sc_schedules_value', locale),
+    detail: uxText('chronos_sc_schedules_detail', locale),
     icon: CalendarClock,
     accent: 'border-violet-200/16 bg-violet-300/8 text-violet-100',
     targetId: 'operator-quick-actions',
   },
   {
-    label: 'Runtime Governance',
-    value: 'Supervisor',
-    detail: 'Managed runtimes, lease ownership, and remediation live here.',
+    label: uxText('chronos_sc_runtime_governance_label', locale),
+    value: uxText('chronos_sc_runtime_governance_value', locale),
+    detail: uxText('chronos_sc_runtime_governance_detail', locale),
     icon: Bot,
     accent: 'border-cyan-200/16 bg-cyan-300/8 text-cyan-100',
     targetId: 'runtime-lease-doctor',
   },
   {
-    label: 'Delivery',
-    value: 'Outbox',
-    detail: 'Slack and Chronos share one operator-visible delivery queue.',
+    label: uxText('chronos_sc_delivery_label', locale),
+    value: uxText('chronos_sc_delivery_value', locale),
+    detail: uxText('chronos_sc_delivery_detail', locale),
     icon: Radar,
     accent: 'border-rose-200/16 bg-rose-300/8 text-rose-100',
     targetId: 'recent-surface-outbox',
@@ -353,6 +373,8 @@ const STATUS_CARDS: StatusCard[] = [
 
 export default function ChronosMirrorV2() {
   const locale = useChronosLocale();
+  const quickActionGroups = useMemo(() => buildQuickActionGroups(locale), [locale]);
+  const statusCards = useMemo(() => buildStatusCards(locale), [locale]);
   const [surface, setSurface] = useState<any>(null);
   const [agentPanelOpen, setAgentPanelOpen] = useState(false);
   const [focusedOperatorView, setFocusedOperatorView] = useState<string | null>(null);
@@ -2117,7 +2139,7 @@ export default function ChronosMirrorV2() {
                   </div>
 
                   <div className="space-y-5">
-                    {QUICK_ACTION_GROUPS.map((group) => {
+                    {quickActionGroups.map((group) => {
                       const Icon = group.icon;
                       return (
                         <div
@@ -2279,7 +2301,7 @@ export default function ChronosMirrorV2() {
                 </section>
 
                 <section className="grid gap-3 md:grid-cols-3 xl:grid-cols-1">
-                  {STATUS_CARDS.map((card) => {
+                  {statusCards.map((card) => {
                     const Icon = card.icon;
                     return (
                       <button
