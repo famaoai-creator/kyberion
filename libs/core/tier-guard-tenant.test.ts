@@ -52,7 +52,9 @@ describe('tier-guard tenant scope (IP-1)', () => {
     try {
       if (savedUnitSharedGroup === null) fs.rmSync(groupPath, { force: true });
       else fs.writeFileSync(groupPath, savedUnitSharedGroup);
-    } catch {}
+    } catch {
+      /* best-effort cleanup */
+    }
     if (savedTenant === undefined) delete process.env.KYBERION_TENANT;
     else process.env.KYBERION_TENANT = savedTenant;
     if (savedPersona === undefined) delete process.env.KYBERION_PERSONA;

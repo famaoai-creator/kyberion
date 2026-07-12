@@ -103,7 +103,9 @@ function scheduleChronosShutdown() {
     try {
       const { stopAgentRuntime } = await loadChronosCore();
       await stopAgentRuntime(CHRONOS_AGENT_ID, 'chronos_api');
-    } catch (_) {}
+    } catch (_) {
+      /* best-effort cleanup */
+    }
     clearChronosCache();
   }, CHRONOS_IDLE_TIMEOUT_MS);
   g.__kyberionChronosIdleTimer.unref?.();

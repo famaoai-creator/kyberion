@@ -22,7 +22,9 @@ afterEach(() => {
   clearPeerConversationRuntime('peer-b-test');
   try {
     safeRmSync(CATALOG_PATH, { force: true });
-  } catch (_) {}
+  } catch (_) {
+    /* best-effort cleanup */
+  }
 });
 
 describe('peer conversation', () => {
@@ -82,8 +84,8 @@ describe('peer conversation', () => {
           ],
         },
         null,
-        2,
-      ),
+        2
+      )
     );
 
     const server = createPeerMessagingServer({
@@ -92,14 +94,18 @@ describe('peer conversation', () => {
       responder: createPeerConversationResponder({ peerId: 'peer-b-test' }),
     });
 
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (_input: any, init?: RequestInit) => {
-      const envelope = JSON.parse(String(init?.body || '{}')) as Parameters<typeof server.processEnvelope>[0];
-      const result = await server.processEnvelope(envelope);
-      return new Response(JSON.stringify(result.body), {
-        status: result.status,
-        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async (_input: any, init?: RequestInit) => {
+        const envelope = JSON.parse(String(init?.body || '{}')) as Parameters<
+          typeof server.processEnvelope
+        >[0];
+        const result = await server.processEnvelope(envelope);
+        return new Response(JSON.stringify(result.body), {
+          status: result.status,
+          headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        });
       });
-    });
 
     const outcome = await sendPeerConversationMessageToPeer({
       senderPeerId: 'peer-a-test',

@@ -27,7 +27,9 @@ describe('SA-03 Prompt Injection & Untrusted Content Defense', () => {
         safeWriteFile(signalPath, JSON.stringify({ injection_suspected: false }), {
           encoding: 'utf8',
         });
-      } catch {}
+      } catch {
+        /* expected: this path may throw in the scenario under test */
+      }
     }
   });
 
@@ -48,7 +50,9 @@ describe('SA-03 Prompt Injection & Untrusted Content Defense', () => {
         safeWriteFile(signalPath, JSON.stringify({ injection_suspected: false }), {
           encoding: 'utf8',
         });
-      } catch {}
+      } catch {
+        /* expected: this path may throw in the scenario under test */
+      }
     }
   });
 

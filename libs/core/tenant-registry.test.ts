@@ -38,11 +38,15 @@ describe('tenant-registry', () => {
     try {
       if (savedDefaultProfile === null) fs.rmSync(defaultPath, { force: true });
       else fs.writeFileSync(defaultPath, savedDefaultProfile);
-    } catch {}
+    } catch {
+      /* best-effort cleanup */
+    }
     try {
       if (savedUnitSharedGroup === null) fs.rmSync(groupPath, { force: true });
       else fs.writeFileSync(groupPath, savedUnitSharedGroup);
-    } catch {}
+    } catch {
+      /* best-effort cleanup */
+    }
     if (savedPersona === undefined) delete process.env.KYBERION_PERSONA;
     else process.env.KYBERION_PERSONA = savedPersona;
     if (savedRole === undefined) delete process.env.MISSION_ROLE;
@@ -78,7 +82,7 @@ describe('tenant-registry', () => {
         status: 'active',
         member_tenants: ['acme-corp'],
         shared_prefixes: ['knowledge/public/shared/unit-shared/'],
-      }),
+      })
     ).toThrow(/invalid tenant group profile/i);
   });
 });

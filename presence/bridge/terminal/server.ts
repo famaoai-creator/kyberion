@@ -324,7 +324,9 @@ async function setupSessionWatcher(session: Session) {
         }
       }
       safeUnlinkSync(filePath);
-    } catch (_) {}
+    } catch (_) {
+      /* best-effort cleanup */
+    }
   });
 }
 
@@ -336,7 +338,9 @@ function destroySessionRuntime(session: Session, reason: string) {
   session.disconnectTimer = undefined;
   try {
     session.watcher?.close?.();
-  } catch (_) {}
+  } catch (_) {
+    /* best-effort cleanup */
+  }
   session.watcher = undefined;
   session.ws = null;
   if (session.rt) {
@@ -357,7 +361,9 @@ function prunePersistedSessionState() {
     logger.info(`[TerminalHub] Pruning stale terminal session ${state.id}`);
     try {
       safeRmSync(paths.base, { recursive: true, force: true });
-    } catch (_) {}
+    } catch (_) {
+      /* best-effort cleanup */
+    }
     sessions.delete(state.id);
   }
 }

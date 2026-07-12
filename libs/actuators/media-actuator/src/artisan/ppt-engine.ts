@@ -1,10 +1,10 @@
 import * as path from 'node:path';
 import { DocumentArtifact } from '@agent/core/shared-business-types';
-import { 
-  safeWriteFile, 
-  safeUnlinkSync, 
-  safeMkdir, 
-  safeExistsSync, 
+import {
+  safeWriteFile,
+  safeUnlinkSync,
+  safeMkdir,
+  safeExistsSync,
   safeExec,
   pathResolver,
 } from '@agent/core';
@@ -46,7 +46,7 @@ export async function convertToPPTX(options: PPTConvertOptions): Promise<PPTResu
   const localMarp = pathResolver.rootResolve('node_modules/.bin/marp');
   const marpCmd = safeExistsSync(localMarp) ? localMarp : 'npx';
   const args = safeExistsSync(localMarp) ? [] : ['-y', '@marp-team/marp-cli'];
-  
+
   args.push(inputPath, '--pptx', '--pptx-editable', '-o', outputPath, '--allow-local-files');
 
   if (themePath) {
@@ -67,6 +67,8 @@ export async function convertToPPTX(options: PPTConvertOptions): Promise<PPTResu
     try {
       if (safeExistsSync(inputPath)) safeUnlinkSync(inputPath);
       if (themePath && safeExistsSync(themePath)) safeUnlinkSync(themePath);
-    } catch (_e) {}
+    } catch (_e) {
+      /* best-effort cleanup */
+    }
   }
 }
