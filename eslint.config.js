@@ -93,6 +93,9 @@ export default [
       '@typescript-eslint/no-empty-object-type': 'off',
       '@typescript-eslint/no-unsafe-function-type': 'off',
       'prefer-const': 'off',
+      // IP-08: an empty catch must carry a reason comment (no-empty ignores
+      // blocks that contain a comment).
+      'no-empty': ['error', { allowEmptyCatch: false }],
     },
   },
   {
@@ -187,6 +190,30 @@ export default [
     files: ['scripts/ts-loader.mjs', 'tests/**/*.ts', '**/*.test.ts'],
     rules: {
       'no-restricted-imports': 'off',
+    },
+  },
+  {
+    // IP-08 Task 5.3: library code must not call process.exit — throw and let
+    // the CLI entry guard decide. Excluded files are CLI/harness surfaces.
+    files: ['libs/**/*.ts'],
+    ignores: [
+      'libs/**/src/index.ts',
+      'libs/**/examples/**',
+      'libs/core/cli-utils.ts',
+      'libs/core/test-utils.ts',
+      'libs/core/skill-wrapper.ts',
+      '**/*.test.ts',
+    ],
+    rules: {
+      'no-restricted-properties': [
+        'error',
+        {
+          object: 'process',
+          property: 'exit',
+          message:
+            'IP-08: library code must throw instead of process.exit; exits belong to CLI entry guards (see IP-08 plan Task 5).',
+        },
+      ],
     },
   },
   {

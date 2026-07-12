@@ -219,7 +219,9 @@ export function inspectServiceAuth(serviceId: string, presetPath?: string): Serv
           cliFallbacks,
           setupHint: `CLI fallback available via ${bin}.`,
         };
-      } catch (err) {}
+      } catch (err) {
+        /* this strategy failed: try the next auth fallback */
+      }
     }
 
     return {

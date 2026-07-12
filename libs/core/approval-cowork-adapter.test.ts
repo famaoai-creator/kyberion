@@ -135,7 +135,9 @@ describe('decideApprovalFromCowork()', () => {
     mockListApprovalRequests.mockReturnValue([]);
     try {
       decideApprovalFromCowork({ requestId: 'bad-id', decision: 'approved', decidedBy: 'op' });
-    } catch {}
+    } catch {
+      /* expected: this path may throw in the scenario under test */
+    }
 
     expect(mockAuditRecord).toHaveBeenCalledWith(
       expect.objectContaining({ result: 'denied', action: 'cowork.approval.decide' })

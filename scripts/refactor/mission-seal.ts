@@ -33,26 +33,66 @@ export async function sealMission(id: string): Promise<string | undefined> {
   const encryptedPath = pathResolver.sharedTmp(`missions/${upperId}/${upperId}.enc`);
 
   try {
-    safeExec('tar', ['-czf', archivePath, '-C', path.dirname(missionDir), path.basename(missionDir)]);
+    safeExec('tar', [
+      '-czf',
+      archivePath,
+      '-C',
+      path.dirname(missionDir),
+      path.basename(missionDir),
+    ]);
     safeExec('openssl', ['rand', '-out', symKeyPath, '32']);
-    safeExec('openssl', ['enc', '-aes-256-cbc', '-salt', '-in', archivePath, '-out', encryptedPath, '-pass', `file:${symKeyPath}`, '-pbkdf2']);
-    safeExec('openssl', ['rsautl', '-encrypt', '-pubin', '-inkey', pubKeyPath, '-in', symKeyPath, '-out', encKeyPath]);
+    safeExec('openssl', [
+      'enc',
+      '-aes-256-cbc',
+      '-salt',
+      '-in',
+      archivePath,
+      '-out',
+      encryptedPath,
+      '-pass',
+      `file:${symKeyPath}`,
+      '-pbkdf2',
+    ]);
+    safeExec('openssl', [
+      'rsautl',
+      '-encrypt',
+      '-pubin',
+      '-inkey',
+      pubKeyPath,
+      '-in',
+      symKeyPath,
+      '-out',
+      encKeyPath,
+    ]);
 
-    logger.success(`✅ Mission ${upperId} sealed cryptographically (Encrypted key: ${path.basename(encKeyPath)}).`);
+    logger.success(
+      `✅ Mission ${upperId} sealed cryptographically (Encrypted key: ${path.basename(encKeyPath)}).`
+    );
 
     const { createHash } = await import('node:crypto');
     const fileBuffer = safeReadFile(encryptedPath, { encoding: null }) as Buffer;
     const hash = createHash('sha256').update(fileBuffer).digest('hex');
 
-    const anchorInput = pathResolver.sharedTmp(`missions/${upperId}/anchor-${upperId}-${Date.now()}.json`);
-    safeWriteFile(anchorInput, JSON.stringify({
-      action: 'anchor_mission',
-      params: { mission_id: upperId, hash }
-    }));
+    const anchorInput = pathResolver.sharedTmp(
+      `missions/${upperId}/anchor-${upperId}-${Date.now()}.json`
+    );
+    safeWriteFile(
+      anchorInput,
+      JSON.stringify({
+        action: 'anchor_mission',
+        params: { mission_id: upperId, hash },
+      })
+    );
 
     try {
-      safeExec('node', [pathResolver.capabilityEntry('blockchain-actuator'), '--input', anchorInput]);
-    } catch (_) {}
+      safeExec('node', [
+        pathResolver.capabilityEntry('blockchain-actuator'),
+        '--input',
+        anchorInput,
+      ]);
+    } catch (_) {
+      /* best-effort: failure here must not break the primary flow */
+    }
     safeUnlinkSync(anchorInput);
 
     safeUnlinkSync(archivePath);

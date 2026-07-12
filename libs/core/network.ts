@@ -23,7 +23,9 @@ function loadNetworkGuardrails(): { maxRequestSizeKb: number } {
         return { maxRequestSizeKb };
       }
     }
-  } catch (_) {}
+  } catch (_) {
+    /* policy unreadable: fall back to default guardrails */
+  }
   return { maxRequestSizeKb: 2048 };
 }
 

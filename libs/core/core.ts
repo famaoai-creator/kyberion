@@ -259,7 +259,9 @@ export class Cache {
             }
           }
           rawUnlinkSync(v8Path);
-        } catch (_) {}
+        } catch (_) {
+          /* best-effort cleanup */
+        }
       }
 
       if (rawExistsSync(diskPath)) {
@@ -280,7 +282,9 @@ export class Cache {
           } else {
             rawUnlinkSync(diskPath);
           }
-        } catch (_) {}
+        } catch (_) {
+          /* best-effort cleanup */
+        }
       }
       this._stats.misses++;
       return undefined;
@@ -376,10 +380,12 @@ export class Cache {
 
 export const _fileCache = new Cache(200, 3600000);
 
+// IP-08 Task 5: library code must not kill the host process. Fatal-ness is
+// the caller's decision — CLI entry guards exit, daemons recover.
 export const errorHandler = (err: any, context = '') => {
   logger.error(context + ': ' + (err.message || err));
   if (process.env.DEBUG) logger.error(String(err.stack));
-  process.exit(1);
+  throw err instanceof Error ? err : new Error(String(err));
 };
 
 export const fileUtils = {

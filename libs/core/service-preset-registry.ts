@@ -33,7 +33,9 @@ function getServicePresetsDir(): string {
 
 function loadPresetFromPath(presetPath: string): ServicePresetRecord {
   try {
-    return JSON.parse(safeReadFile(pathResolver.rootResolve(presetPath), { encoding: 'utf8' }) as string) as ServicePresetRecord;
+    return JSON.parse(
+      safeReadFile(pathResolver.rootResolve(presetPath), { encoding: 'utf8' }) as string
+    ) as ServicePresetRecord;
   } catch (error: any) {
     throw new Error(`Failed to load service preset at ${presetPath}: ${error?.message || error}`);
   }
@@ -45,7 +47,9 @@ function loadServicePresetsDirectory(catalogDir: string): ServicePresetsCatalog 
     throw new Error(`Service presets directory not found: ${dir}`);
   }
 
-  const files = safeReaddir(dir).filter((entry) => entry.endsWith('.json')).sort();
+  const files = safeReaddir(dir)
+    .filter((entry) => entry.endsWith('.json'))
+    .sort();
   if (files.length === 0) {
     throw new Error(`Service presets directory is empty: ${dir}`);
   }
@@ -122,35 +126,47 @@ export function loadServicePresetsCatalog(): ServicePresetsCatalog {
   return fallback;
 }
 
-export function getServicePresetRecord(serviceId: string, presetPathHint?: string): ServicePresetRecord | null {
+export function getServicePresetRecord(
+  serviceId: string,
+  presetPathHint?: string
+): ServicePresetRecord | null {
   const normalizedServiceId = serviceId.trim();
   if (!normalizedServiceId) return null;
 
   if (presetPathHint) {
     try {
       const parsed = loadPresetFromPath(presetPathHint);
-      const presetServiceId = String(parsed.service_id || normalizedServiceId).trim() || normalizedServiceId;
+      const presetServiceId =
+        String(parsed.service_id || normalizedServiceId).trim() || normalizedServiceId;
       if (presetServiceId === normalizedServiceId || !parsed.service_id) {
         return parsed;
       }
-    } catch (_) {}
+    } catch (_) {
+      /* best-effort cleanup */
+    }
   }
 
   const catalog = loadServicePresetsCatalog();
   const direct = catalog.services[normalizedServiceId];
   if (direct) return direct;
 
-  const endpointPresetPath = loadServiceEndpointsCatalog().services?.[normalizedServiceId]?.preset_path;
+  const endpointPresetPath =
+    loadServiceEndpointsCatalog().services?.[normalizedServiceId]?.preset_path;
   if (typeof endpointPresetPath === 'string' && endpointPresetPath.trim()) {
     try {
       return loadPresetFromPath(endpointPresetPath);
-    } catch (_) {}
+    } catch (_) {
+      /* best-effort cleanup */
+    }
   }
 
   return null;
 }
 
-export function resolveServicePresetPath(serviceId: string, presetPathHint?: string): string | null {
+export function resolveServicePresetPath(
+  serviceId: string,
+  presetPathHint?: string
+): string | null {
   if (presetPathHint) {
     const hintedPath = pathResolver.rootResolve(presetPathHint);
     if (safeExistsSync(hintedPath)) return presetPathHint;
@@ -163,7 +179,10 @@ export function resolveServicePresetPath(serviceId: string, presetPathHint?: str
   }
 
   const endpointPresetPath = loadServiceEndpointsCatalog().services?.[serviceId]?.preset_path;
-  if (typeof endpointPresetPath === 'string' && safeExistsSync(pathResolver.rootResolve(endpointPresetPath))) {
+  if (
+    typeof endpointPresetPath === 'string' &&
+    safeExistsSync(pathResolver.rootResolve(endpointPresetPath))
+  ) {
     return endpointPresetPath;
   }
 

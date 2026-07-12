@@ -10,7 +10,7 @@ const lngDetector = new LanguageDetect();
 export function detectEncoding(bufferOrPath: string | Buffer) {
   const buffer = Buffer.isBuffer(bufferOrPath)
     ? bufferOrPath
-    : safeReadFile(bufferOrPath, { encoding: null }) as Buffer;
+    : (safeReadFile(bufferOrPath, { encoding: null }) as Buffer);
   const result = jschardet.detect(buffer);
   const content = buffer.toString();
 
@@ -45,7 +45,9 @@ export function detectFormat(text: string) {
     try {
       JSON.parse(trimmed);
       return { format: 'json', confidence: 1.0 };
-    } catch (_) {}
+    } catch (_) {
+      /* best-effort cleanup */
+    }
   }
 
   if (trimmed.includes('---') || trimmed.includes(': ')) {

@@ -34,7 +34,9 @@ afterEach(() => {
   const catalogPath = pathResolver.sharedTmp('peer-network-catalog.test.json');
   try {
     safeRmSync(catalogPath, { force: true });
-  } catch (_) {}
+  } catch (_) {
+    /* best-effort cleanup */
+  }
 });
 
 describe('peer messaging', () => {

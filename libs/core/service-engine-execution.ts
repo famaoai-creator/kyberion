@@ -60,7 +60,9 @@ export async function executeMcp(
   } finally {
     try {
       await transport.close();
-    } catch (_) {}
+    } catch (_) {
+      /* best-effort cleanup */
+    }
   }
 }
 
@@ -98,7 +100,9 @@ export async function executeRemoteMcp(
   } finally {
     try {
       await transport.close();
-    } catch (_) {}
+    } catch (_) {
+      /* best-effort cleanup */
+    }
   }
 }
 
@@ -263,7 +267,10 @@ export async function executeServicePresetAlternative(
           headers,
           data: method !== 'GET' ? payload : undefined,
           params: requestParams ?? (method === 'GET' ? payload : undefined),
-          authenticateRequest: Object.keys(authQuery).length > 0 || Boolean(headers.Authorization) || Boolean(headers.authorization),
+          authenticateRequest:
+            Object.keys(authQuery).length > 0 ||
+            Boolean(headers.Authorization) ||
+            Boolean(headers.authorization),
           kyberion_allow_local_network:
             Boolean(input.alt.allow_local_network) ||
             Boolean(input.preset.allow_local_network) ||
