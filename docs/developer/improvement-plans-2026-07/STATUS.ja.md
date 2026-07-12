@@ -1,6 +1,6 @@
 # 改善計画 実装状況正本(STATUS)
 
-> **監査日**: 2026-07-05(全93計画を実コードと突き合わせて検証)/ 2026-07-06 MO-01 を DONE に更新 / 2026-07-11 IP-07・AA-02 行の陳腐化を再突合で訂正 / 同日 TODO 全18行を機械突合し 11 ID(SA-03/OP-01/IL-01/02/03/05/AO-04/AA-04/CO-01〜04)を PARTIAL へ訂正(実装+緑テストを確認。KM-02/DS-04/HO-02/CO-05/AC-05/IP-10 は真に未了と再確認)/ 2026-07-12 SA-02 行の陳腐化を再突合で訂正(残とされた3点は実装済み・19テスト緑を確認)
+> **監査日**: 2026-07-05(全93計画を実コードと突き合わせて検証)/ 2026-07-06 MO-01 を DONE に更新 / 2026-07-11 IP-07・AA-02 行の陳腐化を再突合で訂正 / 同日 TODO 全18行を機械突合し 11 ID(SA-03/OP-01/IL-01/02/03/05/AO-04/AA-04/CO-01〜04)を PARTIAL へ訂正(実装+緑テストを確認。KM-02/DS-04/HO-02/CO-05/AC-05/IP-10 は真に未了と再確認)/ 2026-07-12 SA-02 行の陳腐化を再突合で訂正(残とされた3点は実装済み・19テスト緑を確認)/ 2026-07-13 DS-01・UX-05 を DONE に更新(UI/UX governance audit、CI/validate、operator surface token 化を実証)
 > **更新規約**: 計画の実装・レビュー完了時に本表を更新する。各計画文書内の「実装状況」節と矛盾する場合は本表を正とし、文書側を追従させる。
 > **判定基準**: DONE = 受入条件を実コードで検証済 / PARTIAL = 一部充足 / TODO = 実質未着手。
 
@@ -8,8 +8,8 @@
 
 | 判定    | 件数 |
 | ------- | ---- |
-| DONE    | 51   |
-| PARTIAL | 41   |
+| DONE    | 53   |
+| PARTIAL | 39   |
 | TODO    | 0    |
 
 ## P0 残作業(プロダクション化のクリティカルパス)
@@ -64,7 +64,7 @@
 | UX-02 | DONE    | 2026-07-12 完了: 4ブリッジ typing 表示(discord sendTyping / telegram sendChatAction / slack 👀 リアクション / imessage 先行一言)を共通ヘルパーで実装。chronos キャンセル+フェーズ表示は 07-11 済み                                                                                                       |
 | UX-03 | DONE    | 2026-07-12 完了: locale-resolver 一元化、cli help/主要エラー62キー、onboarding(flow-policy {en,ja} + wizard + TTY拒否文)、chronos 言語トグル(localStorage 永続)、uxText fallback 撤去 + 契約テスト、hero/ヘッダ/FirstRunBanner/QuickAction/StatusCard 両対応(計106+キー)。未対応面リストは計画文書に記録 |
 | UX-04 | PARTIAL | 2026-07-12: CLI 承認動詞統一(approve/reject + 名前付きフラグ、旧形式は警告エイリアス)・decidedBy の identity 化・chronos 番号選択+拒否経路を実装。残: slack-bridge 提案の Block Kit ボタン化のみ                                                                                                         |
-| UX-05 | PARTIAL | 契約スナップショットテスト+CI ゲート、dashboard の renderStatus 経由化                                                                                                                                                                                                                                   |
+| UX-05 | DONE    | 2026-07-13 完了: operator output の契約 fixture、dashboard の connection/provider/mission/runtime `renderStatus()` 配線、`check:ui-ux` の validate/CI/週次 pipeline 接続を実装                                                                                                                           |
 | UX-06 | DONE    | (軽微: 3面バナーの版数統一)                                                                                                                                                                                                                                                                              |
 
 ### AC(アクチュエータ能力)
@@ -103,7 +103,7 @@
 
 | ID    | 状態    | 残作業                                                                                                                                                                                                                                                                                                                                                                             |
 | ----- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| DS-01 | PARTIAL | 生成ゲートの validate チェーン接続、operator-surface 残り約124 hex の変換                                                                                                                                                                                                                                                                                                          |
+| DS-01 | DONE    | 2026-07-13 完了: semantic token を4面CSS/Tailwindへ生成、明示 light/dark selector を正準化、operator-surface の raw 色を0件化、`check:ui-ux` を validate/CI/週次 pipeline へ接続                                                                                                                                                                                                   |
 | DS-02 | DONE    | 2026-07-12 完了: tier 隔離テスト3本(無文脈= default・フォールスルー無し)+ chronos /api/tenant-design の認証ガード欠落を発見・修正 + DESIGN_SYSTEM.md テナント節                                                                                                                                                                                                                    |
 | DS-03 | DONE    | pptx ea 日本語フォント、PDF サブセット埋め込み、日本語ゴールデン                                                                                                                                                                                                                                                                                                                   |
 | DS-04 | PARTIAL | 2026-07-13: agy 縦型ショートの品質修復 — **キュレーション済み pattern pack(video-visual-patterns.json、5パターン)から LLM が選択**(色の発明はさせない、pptx themes.json と同型)+ scene CSS トークン注入、プレースホルダ工程図全廃、縦型タイポスケール対応。pptx 側も themes.json からのストーリー適合テーマ選択を配線(deck-theme-direction.ts)。残: motion/transition のトークン化 |

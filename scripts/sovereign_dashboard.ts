@@ -14,6 +14,7 @@ import {
   pathResolver,
   safeExistsSync,
   safeReaddir,
+  renderStatus,
 } from '@agent/core';
 import chalk from 'chalk';
 import { summarizeBackupStatus } from './backup.js';
@@ -139,7 +140,7 @@ function drawHeader() {
   );
   console.log(chalk.dim(' --------------------------------------------------- '));
   console.log(
-    ` Status: ${status === 'OPERATIONAL' ? chalk.green(status) : chalk.yellow(status)} | User: ${chalk.bold(identity?.name || 'Operator')} | Time: ${new Date().toLocaleTimeString()}\n`
+    ` Status: ${status === 'OPERATIONAL' ? chalk.green(renderStatus('connection', 'connected', 'en').toUpperCase()) : chalk.yellow(renderStatus('connection', 'degraded', 'en').toUpperCase())} | User: ${chalk.bold(identity?.name || 'Operator')} | Time: ${new Date().toLocaleTimeString()}\n`
   );
 }
 
@@ -391,14 +392,15 @@ function drawConnectionReview() {
   console.log(`  ${chalk.gray('•')} Review cue: ${chalk.white(recommended)}`);
 
   for (const entry of services.slice(0, 5)) {
+    const renderedStatus = renderStatus('connection', entry.status, 'en').toUpperCase();
     const label =
       entry.status === 'ready'
-        ? chalk.green('READY')
+        ? chalk.green(renderedStatus)
         : entry.status === 'blocked'
-          ? chalk.yellow('BLOCKED')
+          ? chalk.yellow(renderedStatus)
           : entry.status === 'missing'
-            ? chalk.red('MISSING')
-            : chalk.dim('PENDING');
+            ? chalk.red(renderedStatus)
+            : chalk.dim(renderedStatus);
     const requirements =
       entry.requirements.length > 0 ? chalk.dim(` needs=${entry.requirements.join('|')}`) : '';
     console.log(`  ${chalk.gray('•')} ${entry.serviceId.padEnd(16)} [${label}]${requirements}`);
@@ -511,8 +513,8 @@ function drawCapabilityLandscape() {
     for (const capability of previewCapabilities) {
       const status =
         capability.discovery_status === 'available'
-          ? chalk.green('available')
-          : chalk.yellow('missing');
+          ? chalk.green(renderStatus('provider', 'available', 'en'))
+          : chalk.yellow(renderStatus('provider', 'missing', 'en'));
       console.log(
         `    ${chalk.gray('•')} ${capability.capability_id.padEnd(38)} ${chalk.dim(capability.provider)} ${status}`
       );
@@ -662,7 +664,9 @@ function drawOnboardingHome() {
     console.log(chalk.dim('  Connections:'));
     for (const file of connectionFiles.slice(0, 4)) {
       const serviceId = path.basename(file, '.json');
-      const status = serviceMap.has(serviceId) ? chalk.green('captured') : chalk.yellow('pending');
+      const status = serviceMap.has(serviceId)
+        ? chalk.green(renderStatus('connection', 'connected', 'en'))
+        : chalk.yellow(renderStatus('connection', 'pending', 'en'));
       console.log(`    ${chalk.gray('•')} ${serviceId.padEnd(16)} ${status}`);
     }
   } else {
@@ -695,7 +699,7 @@ function drawMissions() {
             : 0;
           const planning = planReady ? chalk.green('PLAN READY') : chalk.yellow('PLANNING');
           console.log(
-            `  ${chalk.gray('•')} ${color(state.mission_id.padEnd(25))} [${chalk.green('ACTIVE')}] ${chalk.dim(state.mission_type || 'development')} ${chalk.gray(`next=${nextTaskCount}`)} ${planning}`
+            `  ${chalk.gray('•')} ${color(state.mission_id.padEnd(25))} [${chalk.green(renderStatus('mission', state.status, 'en').toUpperCase())}] ${chalk.dim(state.mission_type || 'development')} ${chalk.gray(`next=${nextTaskCount}`)} ${planning}`
           );
           count++;
         }
@@ -892,7 +896,9 @@ function drawRuntimeSurfaces() {
 
   for (const surface of manifest.surfaces) {
     const record = state.surfaces?.[surface.id];
-    const status = record?.pid ? chalk.green('RUNNING') : chalk.dim('STOPPED');
+    const status = record?.pid
+      ? chalk.green(renderStatus('runtime', 'running', 'en').toUpperCase())
+      : chalk.dim(renderStatus('runtime', 'stopped', 'en').toUpperCase());
     const pid = record?.pid ? chalk.gray(` pid=${record.pid}`) : '';
     console.log(
       `  ${chalk.gray('•')} ${surface.id.padEnd(20)} [${status}] ${chalk.dim(surface.kind)}${pid}`

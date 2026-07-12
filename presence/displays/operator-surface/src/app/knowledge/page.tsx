@@ -1,10 +1,5 @@
 import * as path from 'node:path';
-import {
-  safeReaddir,
-  safeExistsSync,
-  safeLstat,
-  pathResolver,
-} from '@agent/core';
+import { safeReaddir, safeExistsSync, safeLstat, pathResolver } from '@agent/core';
 import { emitMosRead } from '@/lib/audit-mos';
 
 export const dynamic = 'force-dynamic';
@@ -51,16 +46,15 @@ export default async function KnowledgePage() {
   return (
     <section>
       <h1 style={{ marginBottom: 4 }}>Knowledge (public tier)</h1>
-      <p style={{ color: '#9aa0aa', marginTop: 0, fontSize: 13 }}>
-        Browse the reusable public knowledge tree. Confidential / personal
-        content is intentionally out of scope of the MOS — use the CLI to
-        view those.
+      <p style={{ color: 'var(--kb-muted-text)', marginTop: 0, fontSize: 13 }}>
+        Browse the reusable public knowledge tree. Confidential / personal content is intentionally
+        out of scope of the MOS — use the CLI to view those.
       </p>
       <ul style={{ fontFamily: 'ui-monospace, monospace', fontSize: 13 }}>
         {top.map((node) => (
           <li key={node.rel}>
             {node.is_dir ? '📁' : '📄'} {node.name}
-            <span style={{ color: '#9aa0aa', marginLeft: 8 }}>
+            <span style={{ color: 'var(--kb-muted-text)', marginLeft: 8 }}>
               <code>{node.rel}</code>
             </span>
           </li>
