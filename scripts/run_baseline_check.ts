@@ -14,7 +14,7 @@ import {
   readJanitorLastRunMs,
 } from '@agent/core';
 import { spawnManagedProcess } from '@agent/core/managed-process';
-import { runCoworkHealthCheck } from '@agent/core/cowork-health-check';
+import { runCoworkHealthCheck } from '@agent/core/cowork-health-check.js';
 import { scanTenantDrift } from './watch_tenant_drift.js';
 
 function hasAnyKey(obj: Record<string, unknown>, keys: string[]): boolean {

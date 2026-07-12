@@ -55,20 +55,37 @@ function verifyGolden(conditions) {
       if (condition.kind === 'text_present') {
         const needle = condition.name_contains || '';
         const pass = !needle || (document.body?.innerText || '').includes(needle);
-        return { kind: condition.kind, pass, detail: pass ? 'テキスト一致' : `"${needle}" が見つかりません` };
+        return {
+          kind: condition.kind,
+          pass,
+          detail: pass ? 'テキスト一致' : `"${needle}" が見つかりません`,
+        };
       }
       if (condition.kind === 'ref_visible') {
         const matches = interactiveElements().filter(
           (el) =>
             (!condition.role || roleOf(el) === condition.role) &&
             (!condition.name_contains || accessibleName(el).includes(condition.name_contains)) &&
-            isVisible(el),
+            isVisible(el)
         );
-        return { kind: condition.kind, pass: matches.length > 0, detail: matches.length > 0 ? '要素あり' : '対象要素が見つかりません' };
+        return {
+          kind: condition.kind,
+          pass: matches.length > 0,
+          detail: matches.length > 0 ? '要素あり' : '対象要素が見つかりません',
+        };
       }
-      return { kind: condition.kind, pass: true, verified: false, detail: 'このブラウザでは検証対象外' };
+      return {
+        kind: condition.kind,
+        pass: true,
+        verified: false,
+        detail: 'このブラウザでは検証対象外',
+      };
     } catch (error) {
-      return { kind: condition.kind, pass: false, detail: error instanceof Error ? error.message : String(error) };
+      return {
+        kind: condition.kind,
+        pass: false,
+        detail: error instanceof Error ? error.message : String(error),
+      };
     }
   });
   return { ok: true, results };
@@ -88,10 +105,12 @@ async function executeStep(step, value) {
       ? [...interactiveElements(), ...document.querySelectorAll('form')]
       : interactiveElements();
   const matches = candidates.filter(
-    (element) => semanticRef(element, roleOf(element), accessibleName(element)) === step.target.ref,
+    (element) => semanticRef(element, roleOf(element), accessibleName(element)) === step.target.ref
   );
-  if (matches.length === 0) return { status: 'not_found', detail: `対象 ${step.target.ref} が見つかりません` };
-  if (matches.length > 1) return { status: 'ambiguous', detail: `対象 ${step.target.ref} が複数あります` };
+  if (matches.length === 0)
+    return { status: 'not_found', detail: `対象 ${step.target.ref} が見つかりません` };
+  if (matches.length > 1)
+    return { status: 'ambiguous', detail: `対象 ${step.target.ref} が複数あります` };
   const element = matches[0];
   if (roleOf(element) !== step.target.role || accessibleName(element) !== step.target.name) {
     return { status: 'ambiguous', detail: '対象の役割または名称が記録時から変化しました' };
@@ -110,7 +129,8 @@ async function performAction(element, step, value) {
       element.click();
       return { status: 'done', detail: 'クリックしました' };
     case 'fill_ref':
-      if (value == null || value === '') return { status: 'skipped', detail: '入力値が指定されていません' };
+      if (value == null || value === '')
+        return { status: 'skipped', detail: '入力値が指定されていません' };
       setFieldValue(element, String(value));
       return { status: 'done', detail: '入力しました（値は記録しません）' };
     case 'select_ref':
@@ -122,6 +142,25 @@ async function performAction(element, step, value) {
       else form.submit();
       return { status: 'done', detail: '送信しました' };
     }
+    case 'press_ref': {
+      // Dispatch a key press on the resolved element (default Enter).
+      const key = typeof step.key === 'string' && step.key ? step.key : 'Enter';
+      element.focus();
+      const opts = { key, bubbles: true, cancelable: true };
+      element.dispatchEvent(new KeyboardEvent('keydown', opts));
+      element.dispatchEvent(new KeyboardEvent('keyup', opts));
+      return { status: 'done', detail: `${key} キーを送信しました` };
+    }
+    case 'wait_for_ref':
+      // executeStep already re-snapshotted and uniquely resolved the ref before
+      // calling performAction, so reaching here means the target is present.
+      return { status: 'done', detail: '対象の出現を確認しました' };
+    case 'extract_text_ref': {
+      // Read-only observation. Redact before returning so no PII/secret leaves
+      // the page (server re-redacts as well, browser-extension-bridge.ts).
+      const text = safeText(element.textContent || '');
+      return { status: 'done', detail: 'テキストを抽出しました', text };
+    }
     default:
       return { status: 'error', detail: `未対応の操作: ${step.op}` };
   }
@@ -129,7 +168,10 @@ async function performAction(element, step, value) {
 
 function setFieldValue(element, value) {
   if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
-    const proto = element instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+    const proto =
+      element instanceof HTMLTextAreaElement
+        ? HTMLTextAreaElement.prototype
+        : HTMLInputElement.prototype;
     const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
     if (setter) setter.call(element, value);
     else element.value = value;
@@ -157,8 +199,11 @@ function applySelection(element, selection) {
     return { status: 'done', detail: `トグルを${selection.checked ? '有効' : '無効'}にしました` };
   }
   if (element instanceof HTMLSelectElement) {
-    const option = [...element.options].find((candidate) => safeText(candidate.label || candidate.textContent) === selection.label);
-    if (!option) return { status: 'not_found', detail: `選択肢「${selection.label}」が見つかりません` };
+    const option = [...element.options].find(
+      (candidate) => safeText(candidate.label || candidate.textContent) === selection.label
+    );
+    if (!option)
+      return { status: 'not_found', detail: `選択肢「${selection.label}」が見つかりません` };
     element.value = option.value;
     element.dispatchEvent(new Event('change', { bubbles: true }));
     return { status: 'done', detail: `「${selection.label}」を選択しました` };
@@ -166,25 +211,29 @@ function applySelection(element, selection) {
   return { status: 'error', detail: 'option 選択は select 要素のみ対応します' };
 }
 
-document.addEventListener('click', (event) => {
-  if (!recordingEnabled) return;
-  const control = interactiveControl(event.target);
-  if (isToggle(control)) {
-    return;
-  }
-  if (isCustomToggle(control)) {
-    queueMicrotask(() => recordCustomToggle(control));
-    return;
-  }
-  if (control instanceof HTMLSelectElement) return;
-  const target = describeTarget(event.target);
-  if (!target) return;
-  record({
-    op: 'click_ref',
-    summary: `${target.name || target.role} を選択`,
-    target,
-  });
-}, true);
+document.addEventListener(
+  'click',
+  (event) => {
+    if (!recordingEnabled) return;
+    const control = interactiveControl(event.target);
+    if (isToggle(control)) {
+      return;
+    }
+    if (isCustomToggle(control)) {
+      queueMicrotask(() => recordCustomToggle(control));
+      return;
+    }
+    if (control instanceof HTMLSelectElement) return;
+    const target = describeTarget(event.target);
+    if (!target) return;
+    record({
+      op: 'click_ref',
+      summary: `${target.name || target.role} を選択`,
+      target,
+    });
+  },
+  true
+);
 
 document.addEventListener('input', handleFieldEvent, true);
 document.addEventListener('change', handleFieldEvent, true);
@@ -192,7 +241,10 @@ document.addEventListener('change', handleFieldEvent, true);
 function handleFieldEvent(event) {
   if (!recordingEnabled) return;
   const element = event.target;
-  const isFormControl = element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement || element instanceof HTMLSelectElement;
+  const isFormControl =
+    element instanceof HTMLInputElement ||
+    element instanceof HTMLTextAreaElement ||
+    element instanceof HTMLSelectElement;
   const isEditable = element instanceof HTMLElement && element.isContentEditable;
   if (!isFormControl && !isEditable) return;
   if (isFormControl && isToggle(element)) {
@@ -202,53 +254,71 @@ function handleFieldEvent(event) {
   const target = describeTarget(element);
   if (!target) return;
   if (isFormControl && isSensitiveInput(element)) {
-    record({
-      op: 'sensitive_input_omitted',
-      summary: `${target.name || '秘密入力'} は記録から除外しました`,
-      target,
-    }, `sensitive:${target.ref}`);
+    record(
+      {
+        op: 'sensitive_input_omitted',
+        summary: `${target.name || '秘密入力'} は記録から除外しました`,
+        target,
+      },
+      `sensitive:${target.ref}`
+    );
     return;
   }
   if (element instanceof HTMLSelectElement) {
     const option = element.selectedOptions[0];
     const label = safeText(option?.label || option?.textContent || '選択項目');
-    record({
-      op: 'select_ref',
-      summary: `${target.name || target.role} を「${label}」に設定`,
-      target,
-      selection: { kind: 'option', label },
-    }, `select:${target.ref}:${label}`);
+    record(
+      {
+        op: 'select_ref',
+        summary: `${target.name || target.role} を「${label}」に設定`,
+        target,
+        selection: { kind: 'option', label },
+      },
+      `select:${target.ref}:${label}`
+    );
     return;
   }
-  record({
-    op: 'fill_ref',
-    summary: `${target.name || target.role} を入力（値は保存しない）`,
-    target,
-    variable: {
-      name: variableName(element, target),
-      classification: 'user_input',
+  record(
+    {
+      op: 'fill_ref',
+      summary: `${target.name || target.role} を入力（値は保存しない）`,
+      target,
+      variable: {
+        name: variableName(element, target),
+        classification: 'user_input',
+      },
     },
-  }, `fill:${target.ref}`);
+    `fill:${target.ref}`
+  );
 }
 
-document.addEventListener('submit', (event) => {
-  if (!recordingEnabled) return;
-  const target = describeTarget(event.target);
-  if (!target) return;
-  record({
-    op: 'submit_form',
-    summary: `${target.name || 'フォーム'} を送信`,
-    target,
-  });
-}, true);
+document.addEventListener(
+  'submit',
+  (event) => {
+    if (!recordingEnabled) return;
+    const target = describeTarget(event.target);
+    if (!target) return;
+    record({
+      op: 'submit_form',
+      summary: `${target.name || 'フォーム'} を送信`,
+      target,
+    });
+  },
+  true
+);
 
 async function observePage() {
-  snapshotHash = await sha256(JSON.stringify({
-    origin: location.origin,
-    path: location.pathname,
-    title: document.title,
-    elements: interactiveElements().map((element) => ({ role: roleOf(element), name: accessibleName(element) })),
-  }));
+  snapshotHash = await sha256(
+    JSON.stringify({
+      origin: location.origin,
+      path: location.pathname,
+      title: document.title,
+      elements: interactiveElements().map((element) => ({
+        role: roleOf(element),
+        name: accessibleName(element),
+      })),
+    })
+  );
   return {
     url: location.href,
     title: document.title,
@@ -259,13 +329,18 @@ async function observePage() {
 }
 
 function interactiveElements() {
-  return [...document.querySelectorAll('a, button, input, textarea, select, [role="button"], [role="link"], [contenteditable="true"]')]
-    .filter((element) => element instanceof HTMLElement && isVisible(element));
+  return [
+    ...document.querySelectorAll(
+      'a, button, input, textarea, select, [role="button"], [role="link"], [contenteditable="true"]'
+    ),
+  ].filter((element) => element instanceof HTMLElement && isVisible(element));
 }
 
 function describeTarget(candidate) {
   if (!(candidate instanceof Element)) return null;
-  const element = candidate.closest('a, button, input, textarea, select, form, [role], [contenteditable="true"]');
+  const element = candidate.closest(
+    'a, button, input, textarea, select, form, [role], [contenteditable="true"]'
+  );
   if (!(element instanceof HTMLElement) || !isVisible(element)) return null;
   const role = roleOf(element);
   const name = accessibleName(element);
@@ -309,10 +384,11 @@ function accessibleName(element) {
   // Editable fields (incl. contenteditable) must never derive their name from
   // their own editable content — that would leak the value the user typed.
   if (isEditableField(element)) {
-    const label = element.labels?.[0]?.textContent
-      || element.getAttribute('name')
-      || element.getAttribute('placeholder')
-      || element.getAttribute('title');
+    const label =
+      element.labels?.[0]?.textContent ||
+      element.getAttribute('name') ||
+      element.getAttribute('placeholder') ||
+      element.getAttribute('title');
     return safeText(label || '');
   }
   // Only leaf controls (buttons, links, options…) may take their name from their
@@ -326,18 +402,25 @@ function accessibleName(element) {
 
 function isLeafControl(element) {
   const role = element.getAttribute('role');
-  if (role) return ['button', 'link', 'menuitem', 'tab', 'option', 'checkbox', 'radio', 'switch'].includes(role);
-  return element instanceof HTMLButtonElement
-    || element instanceof HTMLAnchorElement
-    || element instanceof HTMLInputElement
-    || element.tagName === 'SUMMARY';
+  if (role)
+    return ['button', 'link', 'menuitem', 'tab', 'option', 'checkbox', 'radio', 'switch'].includes(
+      role
+    );
+  return (
+    element instanceof HTMLButtonElement ||
+    element instanceof HTMLAnchorElement ||
+    element instanceof HTMLInputElement ||
+    element.tagName === 'SUMMARY'
+  );
 }
 
 function isEditableField(element) {
-  return element instanceof HTMLInputElement
-    || element instanceof HTMLTextAreaElement
-    || element instanceof HTMLSelectElement
-    || (element instanceof HTMLElement && element.isContentEditable);
+  return (
+    element instanceof HTMLInputElement ||
+    element instanceof HTMLTextAreaElement ||
+    element instanceof HTMLSelectElement ||
+    (element instanceof HTMLElement && element.isContentEditable)
+  );
 }
 
 function safeText(value) {
@@ -365,9 +448,13 @@ function armPopupSentinel() {
         if (node.nodeType !== Node.ELEMENT_NODE) continue;
         if (!isModalNode(node)) continue;
         const heading = node.querySelector?.('[role="heading"], h1, h2');
-        const title = safeText(node.getAttribute?.('aria-label') || heading?.textContent || node.tagName || '');
+        const title = safeText(
+          node.getAttribute?.('aria-label') || heading?.textContent || node.tagName || ''
+        );
         const reason = isMfaNode(node) ? 'mfa' : 'new_popup';
-        chrome.runtime.sendMessage({ type: 'bridge:execution-interrupted', reason, detail: title }).catch(() => undefined);
+        chrome.runtime
+          .sendMessage({ type: 'bridge:execution-interrupted', reason, detail: title })
+          .catch(() => undefined);
         return;
       }
     }
@@ -384,10 +471,12 @@ function isModalNode(el) {
   if (!(el instanceof HTMLElement)) return false;
   const tag = el.tagName.toLowerCase();
   const role = el.getAttribute('role') || '';
-  return tag === 'dialog'
-    || role === 'dialog'
-    || role === 'alertdialog'
-    || el.getAttribute('aria-modal') === 'true';
+  return (
+    tag === 'dialog' ||
+    role === 'dialog' ||
+    role === 'alertdialog' ||
+    el.getAttribute('aria-modal') === 'true'
+  );
 }
 
 function isMfaNode(el) {
@@ -396,13 +485,18 @@ function isMfaNode(el) {
 }
 
 function semanticRef(element, role, name) {
-  const siblings = interactiveElements().filter((candidate) => roleOf(candidate) === role && accessibleName(candidate) === name);
+  const siblings = interactiveElements().filter(
+    (candidate) => roleOf(candidate) === role && accessibleName(candidate) === name
+  );
   const index = Math.max(0, siblings.indexOf(element)) + 1;
   return `@${tokenFor(role)}_${shortHash(name)}_${index}`;
 }
 
 function tokenFor(value) {
-  const token = String(value).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  const token = String(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
   return token || 'element';
 }
 
@@ -427,19 +521,26 @@ function variableName(element, target) {
 
 function isSensitiveInput(element) {
   const type = element instanceof HTMLInputElement ? element.type.toLowerCase() : '';
-  const hint = `${element.getAttribute('name') || ''} ${element.id || ''} ${element.getAttribute('autocomplete') || ''}`.toLowerCase();
-  return ['password', 'hidden'].includes(type)
-    || /password|passcode|otp|one-time|token|secret|credit|card|cc-/.test(hint);
+  const hint =
+    `${element.getAttribute('name') || ''} ${element.id || ''} ${element.getAttribute('autocomplete') || ''}`.toLowerCase();
+  return (
+    ['password', 'hidden'].includes(type) ||
+    /password|passcode|otp|one-time|token|secret|credit|card|cc-/.test(hint)
+  );
 }
 
 function isVisible(element) {
   const style = window.getComputedStyle(element);
-  return style.visibility !== 'hidden' && style.display !== 'none' && element.getClientRects().length > 0;
+  return (
+    style.visibility !== 'hidden' && style.display !== 'none' && element.getClientRects().length > 0
+  );
 }
 
 function interactiveControl(candidate) {
   if (!(candidate instanceof Element)) return null;
-  const control = candidate.closest('input, textarea, select, [role="checkbox"], [role="radio"], [role="switch"]');
+  const control = candidate.closest(
+    'input, textarea, select, [role="checkbox"], [role="radio"], [role="switch"]'
+  );
   return control instanceof HTMLElement ? control : null;
 }
 
@@ -448,7 +549,10 @@ function isToggle(element) {
 }
 
 function isCustomToggle(element) {
-  return element instanceof HTMLElement && ['checkbox', 'radio', 'switch'].includes(element.getAttribute('role') || '');
+  return (
+    element instanceof HTMLElement &&
+    ['checkbox', 'radio', 'switch'].includes(element.getAttribute('role') || '')
+  );
 }
 
 function recordSelection(element) {
@@ -456,24 +560,30 @@ function recordSelection(element) {
   if (!target) return;
   const checked = Boolean(element.checked);
   const label = checked ? '有効' : '無効';
-  record({
-    op: 'select_ref',
-    summary: `${target.name || target.role} を${label}に設定`,
-    target,
-    selection: { kind: 'toggle', checked },
-  }, `toggle:${target.ref}:${checked}`);
+  record(
+    {
+      op: 'select_ref',
+      summary: `${target.name || target.role} を${label}に設定`,
+      target,
+      selection: { kind: 'toggle', checked },
+    },
+    `toggle:${target.ref}:${checked}`
+  );
 }
 
 function recordCustomToggle(element) {
   const target = describeTarget(element);
   if (!target) return;
   const checked = element.getAttribute('aria-checked') === 'true';
-  record({
-    op: 'select_ref',
-    summary: `${target.name || target.role} を${checked ? '有効' : '無効'}に設定`,
-    target,
-    selection: { kind: 'toggle', checked },
-  }, `toggle:${target.ref}:${checked}`);
+  record(
+    {
+      op: 'select_ref',
+      summary: `${target.name || target.role} を${checked ? '有効' : '無効'}に設定`,
+      target,
+      selection: { kind: 'toggle', checked },
+    },
+    `toggle:${target.ref}:${checked}`
+  );
 }
 
 function record(event, dedupeKey) {

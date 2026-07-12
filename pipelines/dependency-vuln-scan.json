@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "description": "Daily dependency vulnerability scan and ledger append for AO-02.",
   "_refs": {
-    "plan": "docs/improvement-plans-2026-07/AO-02_DEPENDENCY_VULN_PATCH.ja.md",
+    "plan": "docs/developer/improvement-plans-2026-07/AO-02_DEPENDENCY_VULN_PATCH.ja.md",
     "implementation": "scripts/scan_dependency_vulns.ts"
   },
   "schedule": {

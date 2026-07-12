@@ -1,12 +1,35 @@
 const SAFE_OPERATIONS = new Set([
+  // observation (read-only)
   'snapshot',
+  'screenshot',
+  'extract_text_ref',
+  'list_tabs',
+  // low-risk execution (spec §6)
+  'open_tab',
+  'select_tab',
   'click_ref',
   'fill_ref',
   'select_ref',
+  'press_ref',
+  'wait_for_ref',
+  // high-risk execution (require approval; see HIGH_RISK_OPERATIONS)
   'submit_form',
+  // recorder-only markers
   'sensitive_input_omitted',
 ]);
-const HIGH_RISK_OPERATIONS = new Set(['submit_form']);
+// High-risk operations mirror libs/core/browser-extension-bridge.ts
+// HIGH_RISK_OPERATIONS (spec §6). Keep this set in sync — the bridge is the
+// authority; the extension enforces the same set locally against the lease's
+// approved_step_hashes so a high-risk op can never bypass approval client-side.
+const HIGH_RISK_OPERATIONS = new Set([
+  'submit_form',
+  'upload_file',
+  'download_file',
+  'delete',
+  'purchase',
+  'credential_submit',
+  'settings_change',
+]);
 const STATE_KEY = 'browserBridgeState';
 const NATIVE_HOST = 'com.kyberion.browser_bridge';
 
@@ -21,26 +44,32 @@ chrome.action.onClicked.addListener(async (tab) => {
 let stateLock = Promise.resolve();
 function withStateLock(fn) {
   const next = stateLock.then(fn, fn);
-  stateLock = next.then(() => undefined, () => undefined);
+  stateLock = next.then(
+    () => undefined,
+    () => undefined
+  );
   return next;
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   withStateLock(() => handleMessage(message, sender))
     .then((result) => sendResponse({ ok: true, ...result }))
-    .catch((error) => sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) }));
+    .catch((error) =>
+      sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) })
+    );
   return true;
 });
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) =>
-  withStateLock(() => handleTabUpdate(tabId, changeInfo, tab)).catch(() => undefined),
+  withStateLock(() => handleTabUpdate(tabId, changeInfo, tab)).catch(() => undefined)
 );
 
 async function handleTabUpdate(tabId, changeInfo, tab) {
   if (changeInfo.status === 'loading') {
     const state = await loadState();
     if (!state.recording || state.recording.tabId !== tabId || state.recording.pausedReason) return;
-    state.recording.pausedReason = 'ページ遷移を検出しました。自動で続行します（別サイトへの遷移は handoff として記録します）。';
+    state.recording.pausedReason =
+      'ページ遷移を検出しました。自動で続行します（別サイトへの遷移は handoff として記録します）。';
     state.notice = state.recording.pausedReason;
     await saveState(state);
     await broadcastState();
@@ -116,26 +145,46 @@ async function hasHostAccess() {
 
 async function handleMessage(message, sender) {
   switch (message?.type) {
-    case 'bridge:get-state': return { state: await loadState() };
-    case 'bridge:connect-active-tab': return connectActiveTab();
-    case 'bridge:disconnect': return disconnect();
-    case 'bridge:start-recording': return startRecording();
-    case 'bridge:resume-recording': return resumeRecording();
-    case 'bridge:stop-recording': return stopRecording();
-    case 'bridge:discard-last-action': return discardLastAction();
-    case 'bridge:review-action': return reviewAction(message.actionId, message.decision, message.reason);
-    case 'bridge:finalize-review': return finalizeReview();
-    case 'bridge:reject-draft': return rejectDraft();
-    case 'bridge:record-event': return recordEvent(message.event, sender);
-    case 'bridge:preflight-draft': return preflightDraft();
-    case 'bridge:request-execution': return requestExecution(message.values || {});
-    case 'bridge:resolve-intent': return resolveIntent(message.intent, message.origin);
-    case 'bridge:report-mfa-challenge': return handleMfaChallenge(message.lease, message.recording, message.session);
-    case 'bridge:prepare-procedure': return prepareProcedure(message.procedureId, message.origin);
-    case 'bridge:execute-procedure': return executeProcedure(message.procedureId, message.origin, message.values || {});
-    case 'bridge:execution-interrupted': return handleExecutionInterrupted(message.reason, message.detail);
-    case 'bridge:apply-repair': return applyRepair(message.procedureId);
-    default: throw new Error('Unsupported Browser Bridge message.');
+    case 'bridge:get-state':
+      return { state: await loadState() };
+    case 'bridge:connect-active-tab':
+      return connectActiveTab();
+    case 'bridge:disconnect':
+      return disconnect();
+    case 'bridge:start-recording':
+      return startRecording();
+    case 'bridge:resume-recording':
+      return resumeRecording();
+    case 'bridge:stop-recording':
+      return stopRecording();
+    case 'bridge:discard-last-action':
+      return discardLastAction();
+    case 'bridge:review-action':
+      return reviewAction(message.actionId, message.decision, message.reason);
+    case 'bridge:finalize-review':
+      return finalizeReview();
+    case 'bridge:reject-draft':
+      return rejectDraft();
+    case 'bridge:record-event':
+      return recordEvent(message.event, sender);
+    case 'bridge:preflight-draft':
+      return preflightDraft();
+    case 'bridge:request-execution':
+      return requestExecution(message.values || {});
+    case 'bridge:resolve-intent':
+      return resolveIntent(message.intent, message.origin);
+    case 'bridge:report-mfa-challenge':
+      return handleMfaChallenge(message.lease, message.recording, message.session);
+    case 'bridge:prepare-procedure':
+      return prepareProcedure(message.procedureId, message.origin);
+    case 'bridge:execute-procedure':
+      return executeProcedure(message.procedureId, message.origin, message.values || {});
+    case 'bridge:execution-interrupted':
+      return handleExecutionInterrupted(message.reason, message.detail);
+    case 'bridge:apply-repair':
+      return applyRepair(message.procedureId);
+    default:
+      throw new Error('Unsupported Browser Bridge message.');
   }
 }
 
@@ -152,10 +201,11 @@ async function connectActiveTab() {
     url: String(observation?.url || tab.url || ''),
     observedAt: new Date().toISOString(),
   };
-  const resumable = state.recording
-    && state.recording.pausedReason
-    && state.recording.tabId === tab.id
-    && state.recording.origin === origin;
+  const resumable =
+    state.recording &&
+    state.recording.pausedReason &&
+    state.recording.tabId === tab.id &&
+    state.recording.origin === origin;
   state.notice = resumable
     ? '同じ origin に再接続しました。記録を続行できます。'
     : 'このタブを接続しました。ページ内の文言は外部データとして扱われます。';
@@ -166,7 +216,8 @@ async function connectActiveTab() {
 
 async function disconnect() {
   const state = await loadState();
-  if (state.recording) throw new Error('記録中は解除できません。記録を停止して Review に送ってから解除してください。');
+  if (state.recording)
+    throw new Error('記録中は解除できません。記録を停止して Review に送ってから解除してください。');
   state.connected = null;
   state.notice = 'タブとの接続を解除しました。';
   await saveState(state);
@@ -178,7 +229,8 @@ async function startRecording() {
   const tab = await activeTab();
   const origin = assertSupportedTab(tab);
   let state = await loadState();
-  if (state.recording) throw new Error('記録が残っています。続行または停止して Review に送ってください。');
+  if (state.recording)
+    throw new Error('記録が残っています。続行または停止して Review に送ってください。');
   if (!state.connected || state.connected.tabId !== tab.id || state.connected.origin !== origin) {
     await connectActiveTab();
     state = await loadState();
@@ -212,7 +264,9 @@ async function resumeRecording() {
   const recording = state.recording;
   if (!recording?.pausedReason) throw new Error('再開できる一時停止中の記録がありません。');
   if (recording.tabId !== tab.id || recording.origin !== origin) {
-    throw new Error('遷移先が異なる tab または origin です。現在の記録を停止し、新しい recording を開始してください。');
+    throw new Error(
+      '遷移先が異なる tab または origin です。現在の記録を停止し、新しい recording を開始してください。'
+    );
   }
   await ensureContentScript(tab.id);
   const observation = await chrome.tabs.sendMessage(tab.id, { type: 'bridge:observe' });
@@ -236,10 +290,14 @@ async function stopRecording() {
   const state = await loadState();
   const recording = state.recording;
   if (!recording) throw new Error('記録中ではありません。');
-  await chrome.tabs.sendMessage(recording.tabId, { type: 'bridge:set-recording', enabled: false }).catch(() => undefined);
+  await chrome.tabs
+    .sendMessage(recording.tabId, { type: 'bridge:set-recording', enabled: false })
+    .catch(() => undefined);
   if (recording.actions.length === 0) throw new Error('記録された操作がありません。');
 
-  const highRiskCount = recording.actions.filter((action) => HIGH_RISK_OPERATIONS.has(action.op)).length;
+  const highRiskCount = recording.actions.filter((action) =>
+    HIGH_RISK_OPERATIONS.has(action.op)
+  ).length;
   // tab.origin is the INITIAL origin (origins[0]); after cross-origin handoffs
   // recording.origin holds the current segment. navigate actions carry the rest.
   const initialOrigin = recording.origins?.[0] || recording.origin;
@@ -265,7 +323,9 @@ async function stopRecording() {
       decisions: recording.actions.map((action) => ({
         action_id: action.action_id,
         status: action.op === 'sensitive_input_omitted' ? 'rejected' : 'pending',
-        ...(action.op === 'sensitive_input_omitted' ? { reason: 'Sensitive input is never replayed.' } : {}),
+        ...(action.op === 'sensitive_input_omitted'
+          ? { reason: 'Sensitive input is never replayed.' }
+          : {}),
       })),
     },
   };
@@ -289,7 +349,8 @@ async function discardLastAction() {
 }
 
 async function reviewAction(actionId, decision, reason) {
-  if (!['approved', 'rejected'].includes(decision)) throw new Error('Review decision must be approved or rejected.');
+  if (!['approved', 'rejected'].includes(decision))
+    throw new Error('Review decision must be approved or rejected.');
   const state = await loadState();
   const draft = state.lastDraft;
   if (!draft || draft.review.status === 'approved' || draft.review.status === 'rejected') {
@@ -318,7 +379,11 @@ async function finalizeReview() {
   if (!draft || !draft.review) throw new Error('確定できる下書きがありません。');
   const actionable = draft.actions.filter((action) => action.op !== 'sensitive_input_omitted');
   const decisions = new Map(draft.review.decisions.map((entry) => [entry.action_id, entry.status]));
-  if (actionable.some((action) => !decisions.has(action.action_id) || decisions.get(action.action_id) === 'pending')) {
+  if (
+    actionable.some(
+      (action) => !decisions.has(action.action_id) || decisions.get(action.action_id) === 'pending'
+    )
+  ) {
     throw new Error('すべての操作を承認または除外してください。');
   }
   if (!actionable.some((action) => decisions.get(action.action_id) === 'approved')) {
@@ -345,8 +410,13 @@ async function rejectDraft() {
 }
 
 function approvedActionableActions(draft) {
-  const decisions = new Map((draft.review?.decisions || []).map((entry) => [entry.action_id, entry.status]));
-  return draft.actions.filter((action) => action.op !== 'sensitive_input_omitted' && decisions.get(action.action_id) === 'approved');
+  const decisions = new Map(
+    (draft.review?.decisions || []).map((entry) => [entry.action_id, entry.status])
+  );
+  return draft.actions.filter(
+    (action) =>
+      action.op !== 'sensitive_input_omitted' && decisions.get(action.action_id) === 'approved'
+  );
 }
 
 function buildSessionRequest(draft, mode, tabId) {
@@ -388,13 +458,15 @@ function callNativeHost(payload) {
 }
 
 async function actionHash(action) {
-  return sha256(JSON.stringify({
-    action_id: action.action_id,
-    op: action.op,
-    target: action.target,
-    variable: action.variable,
-    selection: action.selection,
-  }));
+  return sha256(
+    JSON.stringify({
+      action_id: action.action_id,
+      op: action.op,
+      target: action.target,
+      variable: action.variable,
+      selection: action.selection,
+    })
+  );
 }
 
 async function preflightDraft() {
@@ -402,8 +474,15 @@ async function preflightDraft() {
   const draft = state.lastDraft;
   if (draft?.review?.status !== 'approved') throw new Error('承認済みの下書きがありません。');
   const tabId = state.connected?.tabId ?? 0;
-  const response = await callNativeHost({ type: 'preflight', recording: draft, session: buildSessionRequest(draft, 'record', tabId) });
-  if (!response?.ok) throw new Error((response?.errors || []).join('; ') || response?.error || 'preflight に失敗しました。');
+  const response = await callNativeHost({
+    type: 'preflight',
+    recording: draft,
+    session: buildSessionRequest(draft, 'record', tabId),
+  });
+  if (!response?.ok)
+    throw new Error(
+      (response?.errors || []).join('; ') || response?.error || 'preflight に失敗しました。'
+    );
   state.execution = { status: 'preflighted', preflight: response };
   state.notice = `Kyberion preflight: ${response.status}${response.approval_required ? '（承認が必要です）' : ''}`;
   await saveState(state);
@@ -439,10 +518,15 @@ async function requestExecution(values) {
 
   const session = buildSessionRequest(draft, 'execute', state.connected.tabId);
   const response = await callNativeHost({ type: 'request_execution', recording: draft, session });
-  if (!response?.ok) throw new Error(response?.error || 'Native Bridge がリクエストを拒否しました。');
+  if (!response?.ok)
+    throw new Error(response?.error || 'Native Bridge がリクエストを拒否しました。');
 
   if (response.status === 'approval_required') {
-    state.execution = { status: 'approval_required', requestId: response.request_id || null, session };
+    state.execution = {
+      status: 'approval_required',
+      requestId: response.request_id || null,
+      session,
+    };
     state.notice = `高リスク操作の承認待ちです（${response.request_id || '承認要求を作成しました'}）。Kyberion で承認後にもう一度実行してください。`;
     await saveState(state);
     await broadcastState();
@@ -466,7 +550,12 @@ async function runApprovedExecution(draft, session, lease, values) {
     if (HIGH_RISK_OPERATIONS.has(step.op)) {
       const hash = await actionHash(step);
       if (!lease.approved_step_hashes.includes(hash)) {
-        results.push({ action_id: step.action_id, op: step.op, status: 'blocked', detail: 'lease に承認ハッシュがありません' });
+        results.push({
+          action_id: step.action_id,
+          op: step.op,
+          status: 'blocked',
+          detail: 'lease に承認ハッシュがありません',
+        });
         finalStatus = 'blocked';
         break;
       }
@@ -481,15 +570,28 @@ async function runApprovedExecution(draft, session, lease, values) {
     } catch (error) {
       outcome = { status: 'error', detail: error instanceof Error ? error.message : String(error) };
     }
-    results.push({ action_id: step.action_id, op: step.op, status: outcome?.status || 'error', detail: outcome?.detail });
+    results.push({
+      action_id: step.action_id,
+      op: step.op,
+      status: outcome?.status || 'error',
+      detail: outcome?.detail,
+    });
 
     const progress = await loadState();
-    progress.execution = { status: 'running', lease, total: steps.length, completed: results.length, results, session };
+    progress.execution = {
+      status: 'running',
+      lease,
+      total: steps.length,
+      completed: results.length,
+      results,
+      session,
+    };
     await saveState(progress);
     await broadcastState();
 
     if (outcome?.status !== 'done' && outcome?.status !== 'skipped') {
-      finalStatus = outcome?.status === 'ambiguous' || outcome?.status === 'not_found' ? 'cancelled' : 'failed';
+      finalStatus =
+        outcome?.status === 'ambiguous' || outcome?.status === 'not_found' ? 'cancelled' : 'failed';
       break;
     }
   }
@@ -503,7 +605,16 @@ async function runApprovedExecution(draft, session, lease, values) {
   }
 
   const done = await loadState();
-  done.execution = { status: finalStatus, lease, total: steps.length, completed: results.length, results, receipt, receiptAck, session };
+  done.execution = {
+    status: finalStatus,
+    lease,
+    total: steps.length,
+    completed: results.length,
+    results,
+    receipt,
+    receiptAck,
+    session,
+  };
   done.notice = `実行 ${finalStatus}: ${results.filter((entry) => entry.status === 'done').length}/${steps.length} 操作。receipt ${receipt.receipt_id} を生成しました。`;
   await saveState(done);
   await broadcastState();
@@ -515,7 +626,8 @@ async function recordEvent(event, sender) {
   const recording = state.recording;
   if (!recording || sender.tab?.id !== recording.tabId) return { ignored: true };
   const senderOrigin = originOf(sender.tab.url || '');
-  if (!senderOrigin || senderOrigin !== recording.origin || recording.pausedReason) return { ignored: true };
+  if (!senderOrigin || senderOrigin !== recording.origin || recording.pausedReason)
+    return { ignored: true };
   const action = normalizeRecordedAction(event);
   if (!action) return { ignored: true };
   recording.actions.push(action);
@@ -531,7 +643,13 @@ function normalizeRecordedAction(event) {
     action_id: `step-${crypto.randomUUID()}`,
     op: event.op,
     summary: String(event.summary || '').slice(0, 500),
-    risk: HIGH_RISK_OPERATIONS.has(event.op) ? 'high' : event.op === 'sensitive_input_omitted' ? 'sensitive' : event.op === 'snapshot' ? 'observe' : 'low',
+    risk: HIGH_RISK_OPERATIONS.has(event.op)
+      ? 'high'
+      : event.op === 'sensitive_input_omitted'
+        ? 'sensitive'
+        : event.op === 'snapshot'
+          ? 'observe'
+          : 'low',
     captured_at: new Date().toISOString(),
   };
   if (!action.summary) return null;
@@ -548,11 +666,15 @@ function normalizeRecordedAction(event) {
   if (event.variable) {
     if (!/^[a-z][a-z0-9_]{0,63}$/.test(String(event.variable.name || ''))) return null;
     if (!['user_input', 'secret_ref'].includes(event.variable.classification)) return null;
-    action.variable = { name: String(event.variable.name), classification: event.variable.classification };
+    action.variable = {
+      name: String(event.variable.name),
+      classification: event.variable.classification,
+    };
   }
   if (event.selection) {
     if (!['option', 'toggle'].includes(event.selection.kind)) return null;
-    if (event.selection.kind === 'toggle' && typeof event.selection.checked !== 'boolean') return null;
+    if (event.selection.kind === 'toggle' && typeof event.selection.checked !== 'boolean')
+      return null;
     action.selection = {
       kind: event.selection.kind,
       ...(event.selection.label ? { label: String(event.selection.label).slice(0, 500) } : {}),
@@ -566,7 +688,8 @@ function normalizeRecordedAction(event) {
 
 async function activeTab() {
   const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tabs[0]?.id) throw new Error('操作対象のタブを確認できません。拡張アイコンからもう一度開いてください。');
+  if (!tabs[0]?.id)
+    throw new Error('操作対象のタブを確認できません。拡張アイコンからもう一度開いてください。');
   return tabs[0];
 }
 
@@ -595,7 +718,9 @@ async function ensureContentScript(tabId) {
   try {
     await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
   } catch (_) {
-    throw new Error('このページにアクセスできません。Side Panel の「このタブを接続」でサイトへのアクセスを許可してください。許可後はページ遷移や再接続でも継続できます。');
+    throw new Error(
+      'このページにアクセスできません。Side Panel の「このタブを接続」でサイトへのアクセスを許可してください。許可後はページ遷移や再接続でも継続できます。'
+    );
   }
 }
 
@@ -626,7 +751,11 @@ async function broadcastState() {
 async function resolveIntent(intent, origin) {
   if (typeof intent !== 'string' || !intent.trim()) throw new Error('intent が空です。');
   const effectiveOrigin = origin || (await loadState()).connected?.origin;
-  const response = await callNativeHost({ type: 'resolve_intent', intent: intent.trim(), origin: effectiveOrigin });
+  const response = await callNativeHost({
+    type: 'resolve_intent',
+    intent: intent.trim(),
+    origin: effectiveOrigin,
+  });
   if (!response?.ok) throw new Error(response?.error || 'intent 解決に失敗しました。');
   const state = await loadState();
   state.intentResolution = {
@@ -649,7 +778,8 @@ function formatResolutionNotice(resolution) {
     const pct = Math.round((resolution.best.confidence || 0) * 100);
     return `手順が見つかりました: "${resolution.best.procedure_id}" (信頼度 ${pct}%) → Pattern B 実行可能`;
   }
-  if (resolution.outcome === 'ambiguous') return `複数の候補が見つかりました。候補を選択してください。`;
+  if (resolution.outcome === 'ambiguous')
+    return `複数の候補が見つかりました。候補を選択してください。`;
   return '一致する手順がありません。Pattern A: 新しい操作を記録してください。';
 }
 
@@ -696,7 +826,11 @@ async function executeProcedure(procedureId, origin, values = {}) {
   if (!response?.ok) throw new Error(response?.error || '手順の配信に失敗しました。');
 
   if (response.status === 'approval_required') {
-    state.execution = { status: 'approval_required', requestId: response.request_id || null, procedureId };
+    state.execution = {
+      status: 'approval_required',
+      requestId: response.request_id || null,
+      procedureId,
+    };
     state.notice = `手順の実行承認待ちです（${response.request_id || 'approval_required'}）。Kyberion で承認後にもう一度実行してください。`;
     await saveState(state);
     await broadcastState();
@@ -704,7 +838,12 @@ async function executeProcedure(procedureId, origin, values = {}) {
   }
 
   if (response.status === 'dispatched_segmented' && Array.isArray(response.segments)) {
-    const out = await runSegmentedExecution(procedureId, response.segments, response.session, values);
+    const out = await runSegmentedExecution(
+      procedureId,
+      response.segments,
+      response.session,
+      values
+    );
     await verifyGoldenScenario(procedureId, response.golden_scenario, out.status);
     return out;
   }
@@ -713,7 +852,13 @@ async function executeProcedure(procedureId, origin, values = {}) {
     throw new Error('実行リースを取得できませんでした。');
   }
 
-  const out = await runCompiledSteps(procedureId, response.compiled_steps || [], response.session, response.lease, values);
+  const out = await runCompiledSteps(
+    procedureId,
+    response.compiled_steps || [],
+    response.session,
+    response.lease,
+    values
+  );
   await verifyGoldenScenario(procedureId, response.golden_scenario, out.status);
   return out;
 }
@@ -721,7 +866,12 @@ async function executeProcedure(procedureId, origin, values = {}) {
 // #3: after execution, verify the golden scenario's success conditions against
 // the live page (content script). Records the verdict on the execution state.
 async function verifyGoldenScenario(procedureId, golden, runStatus) {
-  if (!golden || !Array.isArray(golden.success_conditions) || golden.success_conditions.length === 0) return;
+  if (
+    !golden ||
+    !Array.isArray(golden.success_conditions) ||
+    golden.success_conditions.length === 0
+  )
+    return;
   if (runStatus !== 'completed') return; // only verify a run that actually finished
   const connectedTabId = (await loadState()).connected?.tabId;
   if (!connectedTabId) return;
@@ -757,8 +907,10 @@ async function applyRepair(procedureId) {
   const state = await loadState();
   const repair = state.repairPending;
   const draft = state.lastDraft;
-  if (!repair || repair.procedure_id !== procedureId) throw new Error('対象の修復対象が見つかりません。');
-  if (draft?.review?.status !== 'approved') throw new Error('承認済みの修正記録がありません。先に Review を確定してください。');
+  if (!repair || repair.procedure_id !== procedureId)
+    throw new Error('対象の修復対象が見つかりません。');
+  if (draft?.review?.status !== 'approved')
+    throw new Error('承認済みの修正記録がありません。先に Review を確定してください。');
 
   // 1. Persist the corrective recording into the allowlisted store.
   const saved = await callNativeHost({ type: 'save_recording', recording: draft });
@@ -772,10 +924,15 @@ async function applyRepair(procedureId) {
     error: repair.reason,
     delta_recording_ref: saved.recording_ref,
   });
-  if (!deltaResp?.ok || !deltaResp.delta_path) throw new Error(deltaResp?.error || 'デルタの保存に失敗しました。');
+  if (!deltaResp?.ok || !deltaResp.delta_path)
+    throw new Error(deltaResp?.error || 'デルタの保存に失敗しました。');
 
   // 3. Merge the delta into the base recording (re-promotion stays human-gated).
-  const applied = await callNativeHost({ type: 'apply_procedure_delta', procedure_id: procedureId, delta_path: deltaResp.delta_path });
+  const applied = await callNativeHost({
+    type: 'apply_procedure_delta',
+    procedure_id: procedureId,
+    delta_path: deltaResp.delta_path,
+  });
   if (!applied?.ok) throw new Error(applied?.error || 'デルタの適用に失敗しました。');
 
   state.repairPending = null;
@@ -792,7 +949,11 @@ async function waitForOrigin(tabId, expectedOrigin, timeoutMs = 15000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     let tab;
-    try { tab = await chrome.tabs.get(tabId); } catch { tab = null; }
+    try {
+      tab = await chrome.tabs.get(tabId);
+    } catch {
+      tab = null;
+    }
     const current = originOf(tab?.url || '');
     if (current === expectedOrigin) return current;
     await new Promise((r) => setTimeout(r, 250));
@@ -815,7 +976,13 @@ async function runSegmentedExecution(procedureId, segments, session, values) {
       const reached = await waitForOrigin(connectedTabId, segment.origin);
       if (reached !== segment.origin) {
         const s = await loadState();
-        s.execution = { status: 'failed', procedureId, total: segments.length, completed: segment.segment_index, session };
+        s.execution = {
+          status: 'failed',
+          procedureId,
+          total: segments.length,
+          completed: segment.segment_index,
+          session,
+        };
         s.notice = `セグメント ${segment.segment_index + 1} の遷移先 ${segment.origin} に到達できませんでした（現在: ${reached || '不明'}）。`;
         await saveState(s);
         await broadcastState();
@@ -830,10 +997,17 @@ async function runSegmentedExecution(procedureId, segments, session, values) {
     }
 
     const segSession = { ...session, origin: segment.origin };
-    last = await runCompiledSteps(procedureId, segment.steps || [], segSession, segment.lease, values, {
-      segmentIndex: segment.segment_index,
-      segmentCount: segments.length,
-    });
+    last = await runCompiledSteps(
+      procedureId,
+      segment.steps || [],
+      segSession,
+      segment.lease,
+      values,
+      {
+        segmentIndex: segment.segment_index,
+        segmentCount: segments.length,
+      }
+    );
     if (last.status !== 'completed') return last; // stop the chain on any segment failure
   }
   return last;
@@ -845,7 +1019,9 @@ async function runCompiledSteps(procedureId, steps, session, lease, values, segm
   await ensureContentScript(connectedTabId);
 
   // Arm the popup sentinel in the content script
-  await chrome.tabs.sendMessage(connectedTabId, { type: 'bridge:set-execution-active' }).catch(() => undefined);
+  await chrome.tabs
+    .sendMessage(connectedTabId, { type: 'bridge:set-execution-active' })
+    .catch(() => undefined);
 
   const results = [];
   let finalStatus = 'completed';
@@ -855,7 +1031,9 @@ async function runCompiledSteps(procedureId, steps, session, lease, values, segm
       // Adapt compiled step shape to what content.js executeStep expects
       const contentStep = {
         op: step.op,
-        target: step.ref ? { ref: step.ref, role: step.role || '', name: step.name || '' } : undefined,
+        target: step.ref
+          ? { ref: step.ref, role: step.role || '', name: step.name || '' }
+          : undefined,
         selection: step.selection,
       };
       let outcome;
@@ -866,19 +1044,39 @@ async function runCompiledSteps(procedureId, steps, session, lease, values, segm
           value: step.op === 'fill_ref' ? (values[step.variable?.name] ?? null) : null,
         });
       } catch (error) {
-        outcome = { status: 'error', detail: error instanceof Error ? error.message : String(error) };
+        outcome = {
+          status: 'error',
+          detail: error instanceof Error ? error.message : String(error),
+        };
       }
 
-      results.push({ step_index: step.step_index, op: step.op, status: outcome?.status || 'error', detail: outcome?.detail });
+      results.push({
+        step_index: step.step_index,
+        op: step.op,
+        status: outcome?.status || 'error',
+        detail: outcome?.detail,
+      });
 
       const progress = await loadState();
-      progress.execution = { status: 'running', procedureId, lease, total: steps.length, completed: results.length, results, session, segment: segmentInfo };
+      progress.execution = {
+        status: 'running',
+        procedureId,
+        lease,
+        total: steps.length,
+        completed: results.length,
+        results,
+        session,
+        segment: segmentInfo,
+      };
       await saveState(progress);
       await broadcastState();
 
       if (outcome?.status !== 'done' && outcome?.status !== 'skipped') {
         const errorMsg = outcome?.detail || 'ステップ実行に失敗しました';
-        finalStatus = outcome?.status === 'ambiguous' || outcome?.status === 'not_found' ? 'cancelled' : 'failed';
+        finalStatus =
+          outcome?.status === 'ambiguous' || outcome?.status === 'not_found'
+            ? 'cancelled'
+            : 'failed';
         // Authoritative classification comes from the host (single source of
         // truth); fall back to the local heuristic only if the host is offline.
         let reason;
@@ -890,7 +1088,10 @@ async function runCompiledSteps(procedureId, steps, session, lease, values, segm
             error: errorMsg,
             step: { op: step.op, summary: step.summary },
           });
-          reason = classified?.ok && classified.reason ? classified.reason : classifyStepFailure(errorMsg, step.op);
+          reason =
+            classified?.ok && classified.reason
+              ? classified.reason
+              : classifyStepFailure(errorMsg, step.op);
         } catch (_) {
           reason = classifyStepFailure(errorMsg, step.op);
         }
@@ -909,7 +1110,9 @@ async function runCompiledSteps(procedureId, steps, session, lease, values, segm
     }
   } finally {
     // Always disarm sentinel
-    await chrome.tabs.sendMessage(connectedTabId, { type: 'bridge:set-execution-inactive' }).catch(() => undefined);
+    await chrome.tabs
+      .sendMessage(connectedTabId, { type: 'bridge:set-execution-inactive' })
+      .catch(() => undefined);
   }
 
   // Submit receipt (best-effort)
@@ -928,10 +1131,21 @@ async function runCompiledSteps(procedureId, steps, session, lease, values, segm
   };
   try {
     await callNativeHost({ type: 'submit_receipt', receipt });
-  } catch (_) { /* best-effort */ }
+  } catch (_) {
+    /* best-effort */
+  }
 
   const done = await loadState();
-  done.execution = { status: finalStatus, procedureId, lease, total: steps.length, completed: results.length, results, receipt, session };
+  done.execution = {
+    status: finalStatus,
+    procedureId,
+    lease,
+    total: steps.length,
+    completed: results.length,
+    results,
+    receipt,
+    session,
+  };
   if (finalStatus === 'completed') {
     done.notice = `手順「${procedureId}」を正常に完了しました。`;
   } else if (!done.repairPending) {
@@ -961,16 +1175,18 @@ async function handleExecutionInterrupted(reason, detail) {
     failed_at: new Date().toISOString(),
   };
   state.execution.status = reason === 'mfa' ? 'mfa_in_progress' : 'interrupted';
-  state.notice = reason === 'mfa'
-    ? 'MFA チャレンジが検出されました。認証完了後に続行します。'
-    : `実行中に予期しないダイアログが表示されました（${detail || ''}）。修正操作を記録してください。`;
+  state.notice =
+    reason === 'mfa'
+      ? 'MFA チャレンジが検出されました。認証完了後に続行します。'
+      : `実行中に予期しないダイアログが表示されました（${detail || ''}）。修正操作を記録してください。`;
   await saveState(state);
   await broadcastState();
   return { state };
 }
 
 async function handleMfaChallenge(lease, recording, session) {
-  if (!lease || !recording || !session) throw new Error('mfa-challenge には lease / recording / session が必要です。');
+  if (!lease || !recording || !session)
+    throw new Error('mfa-challenge には lease / recording / session が必要です。');
   const response = await callNativeHost({ type: 'extend_lease', lease, recording, session });
   if (!response?.ok) throw new Error(response?.error || 'MFA リース延長に失敗しました。');
   const state = await loadState();

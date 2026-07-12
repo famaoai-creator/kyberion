@@ -1917,51 +1917,110 @@ app.post('/api/voice/native-listen', async (req, res) => {
     })
   );
 
-  const response = await fetch(`${VOICE_HUB_URL}/api/listen-once`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      request_id: requestId,
-      locale: parsed.data.locale || 'ja-JP',
-      device_id: parsed.data.device_id,
-      backend: parsed.data.backend,
-      timeout_seconds: parsed.data.timeout_seconds || 8,
-      intent: parsed.data.intent || 'conversation',
-      speaker: parsed.data.speaker || 'User',
-      reflect_to_surface:
-        parsed.data.reflect_to_surface === undefined
-          ? true
-          : toBoolean(parsed.data.reflect_to_surface),
-      auto_reply: parsed.data.auto_reply === undefined ? true : toBoolean(parsed.data.auto_reply),
-    }),
-  });
+  try {
+    const response = await fetch(`${VOICE_HUB_URL}/api/listen-once`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        request_id: requestId,
+        locale: parsed.data.locale || 'ja-JP',
+        device_id: parsed.data.device_id,
+        backend: parsed.data.backend,
+        timeout_seconds: parsed.data.timeout_seconds || 8,
+        intent: parsed.data.intent || 'conversation',
+        speaker: parsed.data.speaker || 'User',
+        reflect_to_surface:
+          parsed.data.reflect_to_surface === undefined
+            ? true
+            : toBoolean(parsed.data.reflect_to_surface),
+        auto_reply: parsed.data.auto_reply === undefined ? true : toBoolean(parsed.data.auto_reply),
+      }),
+    });
 
-  const payload = await response.text();
-  logger.info(
-    presenceStudioAuditLine(req, 'voice/native-listen.complete', {
-      request_id: requestId,
-      status: response.status,
-    })
-  );
-  res.status(response.status).type('application/json').send(payload);
+    const contentType = response.headers.get('content-type') || '';
+    const payload = await response.text();
+    logger.info(
+      presenceStudioAuditLine(req, 'voice/native-listen.complete', {
+        request_id: requestId,
+        status: response.status,
+      })
+    );
+
+    if (!contentType.includes('application/json')) {
+      return res
+        .status(502)
+        .json({ ok: false, error: `Invalid content-type from voice-hub: ${contentType}` });
+    }
+    res.status(response.status).type('application/json').send(payload);
+  } catch (error: any) {
+    logger.error(
+      presenceStudioAuditLine(req, 'voice/native-listen.error', {
+        request_id: requestId,
+        error: error?.message || String(error),
+      })
+    );
+    res.status(503).json({
+      ok: false,
+      error: `Voice hub connection failed: ${error?.message || String(error)}`,
+    });
+  }
 });
 
-app.get('/api/voice/input-devices', async (_req, res) => {
-  const response = await fetch(`${VOICE_HUB_URL}/api/input-devices`);
-  const payload = await response.text();
-  res.status(response.status).type('application/json').send(payload);
+app.get('/api/voice/input-devices', async (req, res) => {
+  try {
+    const response = await fetch(`${VOICE_HUB_URL}/api/input-devices`);
+    const contentType = response.headers.get('content-type') || '';
+    const payload = await response.text();
+    if (!contentType.includes('application/json')) {
+      return res
+        .status(502)
+        .json({ ok: false, error: `Invalid content-type from voice-hub: ${contentType}` });
+    }
+    res.status(response.status).type('application/json').send(payload);
+  } catch (error: any) {
+    res.status(503).json({
+      ok: false,
+      error: `Voice hub connection failed: ${error?.message || String(error)}`,
+    });
+  }
 });
 
-app.get('/api/voice/stt-backends', async (_req, res) => {
-  const response = await fetch(`${VOICE_HUB_URL}/api/stt/backends`);
-  const payload = await response.text();
-  res.status(response.status).type('application/json').send(payload);
+app.get('/api/voice/stt-backends', async (req, res) => {
+  try {
+    const response = await fetch(`${VOICE_HUB_URL}/api/stt/backends`);
+    const contentType = response.headers.get('content-type') || '';
+    const payload = await response.text();
+    if (!contentType.includes('application/json')) {
+      return res
+        .status(502)
+        .json({ ok: false, error: `Invalid content-type from voice-hub: ${contentType}` });
+    }
+    res.status(response.status).type('application/json').send(payload);
+  } catch (error: any) {
+    res.status(503).json({
+      ok: false,
+      error: `Voice hub connection failed: ${error?.message || String(error)}`,
+    });
+  }
 });
 
-app.get('/api/voice/speech-state', async (_req, res) => {
-  const response = await fetch(`${VOICE_HUB_URL}/api/speech/state`);
-  const payload = await response.text();
-  res.status(response.status).type('application/json').send(payload);
+app.get('/api/voice/speech-state', async (req, res) => {
+  try {
+    const response = await fetch(`${VOICE_HUB_URL}/api/speech/state`);
+    const contentType = response.headers.get('content-type') || '';
+    const payload = await response.text();
+    if (!contentType.includes('application/json')) {
+      return res
+        .status(502)
+        .json({ ok: false, error: `Invalid content-type from voice-hub: ${contentType}` });
+    }
+    res.status(response.status).type('application/json').send(payload);
+  } catch (error: any) {
+    res.status(503).json({
+      ok: false,
+      error: `Voice hub connection failed: ${error?.message || String(error)}`,
+    });
+  }
 });
 
 app.get('/api/context/location', (_req, res) => {

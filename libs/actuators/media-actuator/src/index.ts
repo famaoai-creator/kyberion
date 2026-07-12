@@ -499,21 +499,12 @@ function buildPptxSlideFromPattern(
   const bodyText = bodyLines.join('\n');
   const elements: any[] = [];
 
-  // Resolve logo from branding > theme assets with fallback to nested structures and defaults
-  let rawLogoPath =
+  // Resolve logo from branding > theme assets. No cross-tenant fallback: a
+  // hardcoded default tenant's logo must never render on another tenant's
+  // deck, and reading another tenant's confidential/ path is a tier-guard
+  // violation anyway. Absent an explicit logo_url, render without a logo.
+  const rawLogoPath =
     data.branding?.logo_url || theme?.assets?.logo_url || theme?.theme?.assets?.logo_url || null;
-  if (!rawLogoPath) {
-    const fallbackPaths = [
-      'knowledge/confidential/sbijsm/design/assets/logo.png',
-      'knowledge/confidential/sbijsm/assets/logo.png',
-    ];
-    for (const p of fallbackPaths) {
-      if (safeExistsSync(path.resolve(rootDir, p))) {
-        rawLogoPath = p;
-        break;
-      }
-    }
-  }
   const logoPath = rawLogoPath ? path.resolve(rootDir, rawLogoPath) : null;
   const logoExists = logoPath ? safeExistsSync(logoPath) : false;
   const brandName = data.branding?.brand_name || theme?.name || theme?.theme?.name || '';

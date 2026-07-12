@@ -83,7 +83,7 @@ Kyberion enforces layered guardrails around agent-initiated execution:
 - **ADF static guardrails** (`libs/core/adf-guardrails.ts`): validated pipelines are additionally scanned before execution — command hooks against the shell policy, HTTP targets against the egress policy, and step/loop limits against governance caps. `readValidatedPipelineAdf` rejects pipelines with error-severity findings.
 - **Runtime bounds** (`libs/core/execution-bounds.ts`): shared step-count / wall-clock / loop-iteration backstops (`[SAFETY_LIMIT]`) used by pipeline engines as the last line of defense.
 
-These guardrails are one layer of defense in depth against naive-to-moderate dangerous commands — they are **not** a sandbox. Full isolation (containers/eBPF) is tracked as future work in `docs/improvement-plans-2026-07/SA-02_ADF_SHELL_GUARDRAILS.ja.md`.
+These guardrails are one layer of defense in depth against naive-to-moderate dangerous commands — they are **not** a sandbox. Full isolation (containers/eBPF) is tracked as future work in `docs/developer/improvement-plans-2026-07/SA-02_ADF_SHELL_GUARDRAILS.ja.md`.
 
 ## Declarative Policy Engine & Kill Switch (SA-05)
 
