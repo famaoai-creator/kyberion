@@ -65,3 +65,8 @@ repo には**2つの断絶した世界**がある:
 ## 実装状況(2026-07-07)
 
 最小起動済み(E2E-03 Task 5): `risk === 'high' | 'high_stakes'` の implement 系タスクは best-of-2(最小実装優先 vs 堅牢性優先)+ 独立 judge で採択される(`mission-orchestration-worker.ts` の `obtainBestOfTaskResultResponse`)。敗者は `evidence/alternatives/` に保存、judge 判定は task イベント `best_of_judged`(cost_multiplier: 2)で記録。`KYBERION_BEST_OF_N=0` で無効化。draft-refine / 敵対レビュー全面適用は残余。
+
+## 実装状況 追記 (2026-07-12)
+
+- **Task 4.2 実装(draft→refine エンジン)**: `libs/core/draft-refine.ts` — doc/deck の下書きを決定論的ルーブリック(`evaluateDeliverableQuality`)で採点し、findings を明示した改稿プロンプトで再生成(**上限2パス**、ルーブリック改善が無ければ即終了、悪化時は前稿を保持、refine 失敗でも原稿は失わない)。critique 関数は注入可能で stub 環境でもテストが実挙動を固定(計画 Task 4.3 の fixture 方針どおり)。テスト5本。
+- **worker 配線済み(同日)**: 高リスク(high/high_stakes)× 実装系ロール × テキスト文書 deliverable(.md/.txt)のタスクは、受入ゲート前に 1 パスの refine を適用(改善時のみ上書き + `draft_refined` イベントで cost_multiplier 記録、失敗はブロックせず warn)。`KYBERION_DRAFT_REFINE=0` で無効化。tier 昇格連動の再実行は MO-05 ルーティングと合わせて設計要。

@@ -8,7 +8,7 @@
 
 | 判定    | 件数 |
 | ------- | ---- |
-| DONE    | 47   |
+| DONE    | 48   |
 | PARTIAL | 44   |
 | TODO    | 0    |
 
@@ -50,6 +50,12 @@
 | IP-13 | DONE    |                                                                                                                                                                                                                |
 | IP-14 | DONE    |                                                                                                                                                                                                                |
 
+### QA(ソフトウェア品質ライフサイクル)
+
+| ID    | 状態 | 残作業                                                                                                                                                                                           |
+| ----- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| QA-01 | DONE | 2026-07-12: 5 schema、10観点、DoR/AC/DoD/traceability gate、wisdom補完op、actuator ADF compiler/dispatch、安全分類、欠陥状態機械、品質報告、operator home、6シナリオE2E、段階enforceを実装・検証 |
+
 ### UX(ユーザー接点)
 
 | ID    | 状態    | 残作業                                                                                                                                                                                             |
@@ -74,24 +80,24 @@
 
 ### KM(ナレッジ/メモリ)
 
-| ID    | 状態    | 残作業                                                                                                                                                                                                         |
-| ----- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| KM-01 | DONE    |                                                                                                                                                                                                                |
-| KM-02 | PARTIAL | 2026-07-11: 本文チャンク索引(~1000字・文書集約・戻り型互換)と縮退可視化(embeddingBackend メタ + doctor DEGRADED 表示)を実装。残: キャッシュ差分/LRU、before/after fixture、非 Mac 実埋め込み経路、ランカー統合 |
-| KM-03 | DONE    |                                                                                                                                                                                                                |
-| KM-04 | DONE    |                                                                                                                                                                                                                |
+| ID    | 状態    | 残作業                                                                                                                                                                    |
+| ----- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| KM-01 | DONE    |                                                                                                                                                                           |
+| KM-02 | PARTIAL | 2026-07-12: 非 Mac 実埋め込み経路(Gemini text-embedding-004、MLX→Gemini→hash の解決順、secureFetch/egress 統制下)。残: キャッシュ LRU、before/after fixture、ランカー統合 |
+| KM-03 | DONE    |                                                                                                                                                                           |
+| KM-04 | DONE    |                                                                                                                                                                           |
 
 ### MO(ミッション・オーケストレーション)
 
-| ID    | 状態    | 残作業                                                                                                                                                          |
-| ----- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| MO-01 | DONE    | (worker イベント連鎖のフェーズ駆動化は MO-02 側で実施。gate-pass 機械評価・entry_gate deferral・deliverable_quality check は MO-01 側で先行実装済み)            |
-| MO-02 | PARTIAL | 残: フェーズ exit ゲートの warn→enforce 昇格、human_override 署名強制、realign 自動再計画(exit ゲート実行時評価は 2026-07-12 実装、他は再突合で実装済み確認)    |
-| MO-03 | DONE    | 2026-07-12 完了: スキーマ/検証/循環検出/並列 wave/リースは実装済みを再突合確認、Task 2.3(scope 由来 dispatch 予算 + blocked(timeout) + 依存 blocked 連鎖)を実装 |
-| MO-04 | DONE    |                                                                                                                                                                 |
-| MO-05 | DONE    | (軽微: 集計スクリプト)                                                                                                                                          |
-| MO-06 | DONE    |                                                                                                                                                                 |
-| MO-07 | PARTIAL | tier 昇格連動の再実行、media draft→refine                                                                                                                       |
+| ID    | 状態    | 残作業                                                                                                                                                                       |
+| ----- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| MO-01 | DONE    | (worker イベント連鎖のフェーズ駆動化は MO-02 側で実施。gate-pass 機械評価・entry_gate deferral・deliverable_quality check は MO-01 側で先行実装済み)                         |
+| MO-02 | PARTIAL | 残: フェーズ exit ゲートの warn→enforce 昇格、human_override 署名強制、realign 自動再計画(exit ゲート実行時評価は 2026-07-12 実装、他は再突合で実装済み確認)                 |
+| MO-03 | DONE    | 2026-07-12 完了: スキーマ/検証/循環検出/並列 wave/リースは実装済みを再突合確認、Task 2.3(scope 由来 dispatch 予算 + blocked(timeout) + 依存 blocked 連鎖)を実装              |
+| MO-04 | DONE    |                                                                                                                                                                              |
+| MO-05 | DONE    | (軽微: 集計スクリプト)                                                                                                                                                       |
+| MO-06 | DONE    |                                                                                                                                                                              |
+| MO-07 | PARTIAL | 2026-07-12: draft→refine エンジン + worker 配線(高リスク文書 deliverable、受入前1パス、KYBERION_DRAFT_REFINE=0 で無効)。残: task-session 側配線、tier 昇格連動(MO-05 と設計) |
 
 ### DS(デザインシステム)
 
@@ -140,6 +146,7 @@
 | ----- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | OP-01 | DONE    | spend-guard は 2026-07-11 実装(spend-policy.json、warn 既定/block で SpendCapExceededError、reasoning failover 前段に配線、日次 dedupe アラート)。usage 計測も 2026-07-11 に全経路接続(anthropic SDK は実 usage、gemini/codex CLI は estimated 概算)。cost report CLI も 2026-07-11 実装(pnpm cost:report、mission/model/日別、sdk 実コスト優先、estimated 分離表示 — 実履歴で確認)。週次サマリ接続も 2026-07-11 実装(weekly-review pipeline に cost_report --last-days 7 ステップ、実走確認)。operator packet 週次コスト表示(status report findings `weekly-cost` + metrics `weekly_cost_usd`)とテナント override(`tenant_overrides` 実効化、`KYBERION_TENANT`)は 2026-07-12 完了。KPI 正本 docs/KPI_TRACKING.md 新設 → **DONE** |
 | OP-02 | DONE    | (残: 外部ボリューム定期運用の実績)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| OP-03 | PARTIAL | 2026-07-12: bin(#512)+ docker deploy サービス + .dockerignore の tier 隔離修正(confidential/customer がイメージに焼かれていた)。残: インストール文書整合(Task 4)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | OP-04 | PARTIAL | 残: soak 実証のみ(RSS/restart 履歴 + 24h トレンド評価は 2026-07-12 実装、supervisor 毎時サンプル + degradation watch 統合。劣化ループ・cron・doctor・healthz は実装済み)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | OP-03 | PARTIAL | 2026-07-12: bin フィールド + shebang(pnpm link --global で kyberion CLI)実装。残: docker deploy サービスのみ                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | OP-05 | PARTIAL | 2026-07-11: env-registry(228変数)+ check:env-registry(validate/CI)+ env-validator + doctor 配線 + env.example/CONFIGURATION.md 生成。残: 棚卸しの継続キュレーション(documented=false 211件)、baseline-check 接続、集中ローダー移行                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |

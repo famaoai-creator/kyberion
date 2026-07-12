@@ -11,6 +11,20 @@ import {
   inferDeliverableKind,
   qualityScoreFromReport,
 } from './deliverable-quality.js';
+import {
+  evaluateAcceptanceCriteria,
+  evaluateDefinitionOfDone,
+  evaluateDefinitionOfReady,
+  evaluateQualityContract,
+  evaluateTestTraceability,
+  type SoftwareQualityContract,
+  type TestInventory,
+  type SoftwareQualityReportSummary,
+} from './software-quality.js';
+import {
+  evaluateQualityEnforcement,
+  type QualityEnforcementMode,
+} from './software-quality-operations.js';
 
 export type MissionGateCheckKind =
   | 'evidence_exists'
@@ -20,6 +34,12 @@ export type MissionGateCheckKind =
   | 'human_override'
   | 'deliverable_quality'
   | 'llm_review'
+  | 'quality_contract_valid'
+  | 'dor_satisfied'
+  | 'acceptance_criteria_verified'
+  | 'dod_satisfied'
+  | 'test_traceability'
+  | 'quality_release_allowed'
   | 'custom';
 
 export interface MissionGateCheck {
@@ -125,6 +145,10 @@ async function evaluateGateCheck(check: MissionGateCheck): Promise<{
   passed: boolean;
   reason?: string;
 }> {
+  const qualityContractFrom = (params: Record<string, unknown>): SoftwareQualityContract | null => {
+    const value = params.contract ?? params.quality_contract;
+    return value && typeof value === 'object' ? (value as SoftwareQualityContract) : null;
+  };
   switch (check.kind) {
     case 'evidence_exists': {
       const params = check.params || {};
@@ -305,7 +329,10 @@ async function evaluateGateCheck(check: MissionGateCheck): Promise<{
         });
         const jsonMatch = response.match(/\{[\s\S]*\}/u);
         if (!jsonMatch) {
-          return { passed: false, reason: `llm_review: unparsable verdict: ${response.slice(0, 200)}` };
+          return {
+            passed: false,
+            reason: `llm_review: unparsable verdict: ${response.slice(0, 200)}`,
+          };
         }
         const verdict = JSON.parse(jsonMatch[0]) as {
           pass?: boolean;
@@ -324,6 +351,74 @@ async function evaluateGateCheck(check: MissionGateCheck): Promise<{
       } catch (error: any) {
         return { passed: false, reason: `llm_review failed: ${error?.message ?? String(error)}` };
       }
+    }
+    case 'quality_contract_valid':
+    case 'dor_satisfied':
+    case 'acceptance_criteria_verified':
+    case 'dod_satisfied': {
+      const params = check.params || {};
+      const contract = qualityContractFrom(params);
+      if (!contract) return { passed: false, reason: 'No software quality contract was provided.' };
+      const now = firstString(params.now)
+        ? new Date(firstString(params.now) as string)
+        : new Date();
+      const result =
+        check.kind === 'quality_contract_valid'
+          ? evaluateQualityContract(contract)
+          : check.kind === 'dor_satisfied'
+            ? evaluateDefinitionOfReady(contract, now)
+            : check.kind === 'acceptance_criteria_verified'
+              ? evaluateAcceptanceCriteria(contract, now)
+              : evaluateDefinitionOfDone(contract, now);
+      return result.passed
+        ? { passed: true }
+        : { passed: false, reason: result.reasons.join('; ') };
+    }
+    case 'test_traceability': {
+      const params = check.params || {};
+      const contract = qualityContractFrom(params);
+      const inventoryValue = params.inventory ?? params.test_inventory;
+      const inventory =
+        inventoryValue && typeof inventoryValue === 'object'
+          ? (inventoryValue as TestInventory)
+          : null;
+      if (!contract) return { passed: false, reason: 'No software quality contract was provided.' };
+      if (!inventory) return { passed: false, reason: 'No test inventory was provided.' };
+      const result = evaluateTestTraceability({
+        contract,
+        inventory,
+        requiredRiskRefs: toStringList(params.required_risk_refs ?? params.requiredRiskRefs),
+      });
+      return result.passed
+        ? { passed: true }
+        : { passed: false, reason: result.reasons.join('; ') };
+    }
+    case 'quality_release_allowed': {
+      const params = check.params || {};
+      const reportValue = params.report ?? params.quality_report;
+      if (!reportValue || typeof reportValue !== 'object') {
+        return { passed: false, reason: 'No software quality report was provided.' };
+      }
+      const requestedMode = firstString(params.mode, params.enforcement_mode) ?? 'report-only';
+      const mode: QualityEnforcementMode =
+        requestedMode === 'enforce' || requestedMode === 'warn' ? requestedMode : 'report-only';
+      const result = evaluateQualityEnforcement({
+        report: reportValue as SoftwareQualityReportSummary,
+        mode,
+      });
+      return result.allowed
+        ? {
+            passed: true,
+            ...(result.severity === 'warning'
+              ? {
+                  reason: `Quality warning: ${result.reasons.join('; ') || 'release is not recommended'}`,
+                }
+              : {}),
+          }
+        : {
+            passed: false,
+            reason: `Quality enforcement blocked release: ${result.reasons.join('; ') || 'release is not recommended'}`,
+          };
     }
     case 'custom': {
       const params = check.params || {};
