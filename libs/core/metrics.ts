@@ -219,7 +219,7 @@ export class MetricsCollector {
     };
 
     if (memory.heapUsedMB > this._memoryBudgetMB) {
-      console.warn(
+      logger.warn(
         chalk.yellow(
           `[${componentName}] Memory budget exceeded: ${memory.heapUsedMB}MB (Budget: ${this._memoryBudgetMB}MB)`
         )
