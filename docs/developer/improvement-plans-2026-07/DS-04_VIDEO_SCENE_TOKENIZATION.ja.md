@@ -48,3 +48,26 @@
 
 - 動画は視覚回帰の自動検証が難しい。**フォールバック値に現行 hex を残す**方式により「css_vars 未指定 = 現行と同一」を構造的に保証し、置換ミスはコンパイルテストとサンプルレンダリングで捕まえる。
 - 明度バリアントのトークン追加は DS-01 の正準モデルに逆流させる(video 専用の野良トークンを増やさない)。
+
+## 実装状況 追記(2026-07-12 — agy 縦型ショート動画の品質修復)
+
+- **原因診断**: (1) scene の見た目が compiler 内ハードコード CSS(紺一色・68px 見出し・単一骨格)で、LLM はテキスト欄のみ供給 = ストーリーに合わせた art direction が構造的に不可能。(2) `visual_steps` 欠落時に英語デモ工程(Brief intake / Content plan / Render package)が実動画へ混入。(3) 9:16 縦型でも横型と同じタイポグラフィスケール。
+- **修復**: `libs/core/video-visual-direction.ts` 新設 — reasoning backend がストーリー(storyboard beats / narration)から visual direction(mood・6色パレット・タイポスケール・scene 別 layout_variant)を JSON 起草(LLM zone)→ スキーマ検証 + クランプ(hex 必須・縦型は 72–132px 等、compiler zone は決定論維持)→ 失敗時は旧既定へ縮退(レンダを絶対に止めない)。既存の `--kb-*` トークン間接層に `:root` 注入で適用、font-size もトークン化。actuator の narrated 系2アクションへ自動配線。プレースホルダ工程図は全廃(契約テストも新契約へ更新)。
+- テスト: direction 検証6本 + compiler/narrated/actuator/render 計38本緑。
+
+### 追記(2026-07-13 — 選択方式への転換)
+
+- オペレータ指摘(生成 + 検証は縮退しがち)を受け、**生成 → カタログ選択**へ転換: `knowledge/public/design-patterns/media-templates/video-visual-patterns.json` に5つのキュレーション済みパターン(calm-tech / warm-documentary / bold-pop / fresh-clarity / midnight-executive、各 portrait/landscape タイポ調整済み)を新設し、LLM は id を選ぶだけ(カタログ外 id は先頭パターンへ縮退)。pptx の themes.json 選択(`deck-theme-direction.ts`、brief 明示指定はオペレータ優先)と対になる構造。
+
+### 追記(2026-07-13 — 境界監査 A/B/C の実装)
+
+- **A**: `media:apply_theme` が `theme: 'auto'` を受理 — 統制カタログから story 適合テーマを LLM 選択(失敗はカタログ既定へ)。`marketing-content.json` の既定を auto 化(他 creative pipeline は apply_theme 不使用を確認)。
+- **B(最小実装)**: `draftDeckSectionBodies` — 宣言のみだった llm_zone `draft_body_content` を実体化。**本文が空のセクションだけ**を起草し(既存本文とオペレータ入力は不可侵)、失敗時は outline 不変。`document_outline_from_brief` へ配線。
+- **C**: storyboard 無しの narrated 合成に警告(テンプレ流し込みへの縮退を可視化し、上流に storyboard 起草を促す)。
+
+### 追記(2026-07-13 — レイアウトパターン拡充)
+
+- **quote-card テンプレート実装**: 選択メニューに載っていたのにレンダラ未実装(default 落ち)だった quote-card を registry + compiler に実装(大型引用 + 帰属、縦型最適)。全 role 対応。
+- **per_scene レイアウト割当の実配線**: visual direction の per_scene は従来 compiler 未消費(選択が化粧だった)。ADF が template を明示しないシーンに限り適用し、対象テンプレの role / format / required_content_fields を満たす場合のみ上書き(**レイアウト選択は決して有効なコンパイルを壊さない**)。
+- **pattern pack 5 → 10**: sakura-lifestyle / ocean-depth / mono-editorial / citrus-energy / neon-cyber を追加(ライト背景系3種を含む — 従来はダーク系のみだった)。
+- **選択メニューを実 registry と同期**(basic-title-card / howto-guide / split-highlight / promo-spot / quote-card)。

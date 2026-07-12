@@ -69,3 +69,14 @@
 - **最大リスク: 意味論統一で既存テンプレの挙動が変わる**。golden(`check_golden_output`)を各段で回し、`while`/`foreach` の有無で壊れるテンプレを事前に洗う。段階移行(per-actuator → super-nerve の順)で影響を局所化。
 - IP-05(CLI runner)と密接。**同時進行**でボイラープレート二重除去を避ける。
 - 並列 op(`parallel_foreach`)の追加は HN-03 が所有。AR-01 は「1エンジンに集約」まで、並列拡張は HN-03 に委譲。
+
+## run_pipeline 本体ループ委譲の設計メモ(2026-07-12、着手前記録)
+
+残る唯一の私製ループ(`scripts/run_pipeline.ts` の `runSteps`、~800行)は以下の意味論を持ち、一括委譲は単一スライスの安全域を超える。段階委譲の設計:
+
+1. **Phase A(ハンドラ抽出)— 2026-07-12 leaf 分完了**: ctx 更新のみで完結する leaf 6分岐(system:exec / write_file / shell、core:wait / run_janitor / transform)を `runInline*` 関数群へ verbatim 抽出(`ctx = await runInlineX(params, ctx, …)` 形)。results.push・early return・nested runSteps を伴う分岐(core:if / foreach / parallel_foreach / accumulate / include)と reasoning 系は設計どおり Phase C まで inline 維持。run_pipeline 36テスト + golden 2本緑で回帰なし。
+2. **Phase B(retry/repair のステップ内在化)**: `attempt < 2` + autonomous-repair を「ステップハンドラをラップする高階関数」に変換(canonical エンジンは retry を持たない設計のため、リトライはハンドラ内部関心事に落とす)。
+3. **Phase C(委譲)**: trace span / quiet ログ / produces ブリッジ / reasoning policy を beforeStep/afterStep hooks とハンドララッパへ移し、`executeAdfSteps(steps, ctx, {maxSteps, timeoutMs, resolveVars}, handlers, hooks)` に置換。flatten results はエンジンの戻りから再構成。
+4. 各 Phase を独立 PR とし、golden(`tests/golden/pipelines.json`)+ run_pipeline.test を各段で緑にする。parallel_foreach の並列拡張は従来どおり HN-03 所有。
+
+意味論分岐は解消済みのため本委譲は純リファクタ(性能/保守)。優先度は P1 バックログ相当。

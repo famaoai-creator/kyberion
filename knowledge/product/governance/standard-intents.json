@@ -234,7 +234,15 @@
       "execution_profile_id": "voice-speak-with-my-voice-local-say",
       "outcome_ids": ["artifact:audio"],
       "specialist_id": "document-specialist",
-      "trigger_keywords": ["喋らせて", "読んで", "発話", "speak", "cloned", "私の声", "クローンボイス"],
+      "trigger_keywords": [
+        "喋らせて",
+        "読んで",
+        "発話",
+        "speak",
+        "cloned",
+        "私の声",
+        "クローンボイス"
+      ],
       "resolution": {
         "shape": "pipeline",
         "result_shape": "summary"
@@ -450,7 +458,13 @@
       ],
       "outcome_ids": ["service_started"],
       "specialist_id": "service-operator",
-      "trigger_keywords": ["サービスを起動して", "起動して", "start the service", "立ち上げて", "start"],
+      "trigger_keywords": [
+        "サービスを起動して",
+        "起動して",
+        "start the service",
+        "立ち上げて",
+        "start"
+      ],
       "resolution": {
         "shape": "task_session",
         "result_shape": "service_started"
@@ -639,22 +653,10 @@
         "run adversarial persona critique over legal, ops, and red-team lenses",
         "record surviving risks for human review"
       ],
-      "intake_requirements": [
-        "source document",
-        "review target",
-        "approval or release scope"
-      ],
+      "intake_requirements": ["source document", "review target", "approval or release scope"],
       "outcome_ids": ["review_findings"],
       "specialist_id": "document-specialist",
-      "trigger_keywords": [
-        "契約",
-        "仕様書",
-        "contract",
-        "spec",
-        "レビュー",
-        "法務",
-        "red-team"
-      ],
+      "trigger_keywords": ["契約", "仕様書", "contract", "spec", "レビュー", "法務", "red-team"],
       "resolution": {
         "shape": "pipeline",
         "result_shape": "review"
@@ -682,11 +684,7 @@
         "identify the review purpose and role lens",
         "run the governed review and summarize findings"
       ],
-      "intake_requirements": [
-        "source text",
-        "review purpose",
-        "persona / tenant / role lens"
-      ],
+      "intake_requirements": ["source text", "review purpose", "persona / tenant / role lens"],
       "outcome_ids": ["review_findings"],
       "specialist_id": "document-specialist",
       "trigger_keywords": [
@@ -871,12 +869,18 @@
         {
           "op": "core:if",
           "params": {
-            "condition": { "from": "mission_id", "operator": "exists" },
+            "condition": {
+              "from": "mission_id",
+              "operator": "exists"
+            },
             "then": [
               {
                 "op": "core:if",
                 "params": {
-                  "condition": { "from": "meeting_url", "operator": "exists" },
+                  "condition": {
+                    "from": "meeting_url",
+                    "operator": "exists"
+                  },
                   "then": [
                     {
                       "op": "system:shell",
@@ -1111,7 +1115,13 @@
       ],
       "outcome_ids": ["design_theme_created", "artifact:design_spec"],
       "specialist_id": "document-specialist",
-      "trigger_keywords": ["デザインテーマ", "ブランド", "テーマ化", "extract design", "brand styles"],
+      "trigger_keywords": [
+        "デザインテーマ",
+        "ブランド",
+        "テーマ化",
+        "extract design",
+        "brand styles"
+      ],
       "resolution": {
         "shape": "task_session",
         "task_kind": "design_extraction",
@@ -1144,7 +1154,13 @@
       ],
       "outcome_ids": ["website_built", "artifact:web_assets"],
       "specialist_id": "project-lead",
-      "trigger_keywords": ["Webサイト構築", "サイト作成", "LP作成", "build website", "landing page"],
+      "trigger_keywords": [
+        "Webサイト構築",
+        "サイト作成",
+        "LP作成",
+        "build website",
+        "landing page"
+      ],
       "resolution": {
         "shape": "task_session",
         "task_kind": "web_development",
@@ -1318,7 +1334,20 @@
       ],
       "outcome_ids": ["voice_profile_created"],
       "specialist_id": "service-operator",
-      "trigger_keywords": ["クローン", "録音", "register", "clone", "voice clone", "使えるようにして", "声を使えるようにして", "自分の声", "学習", "利用できるように", "私の音声", "私の声"],
+      "trigger_keywords": [
+        "クローン",
+        "録音",
+        "register",
+        "clone",
+        "voice clone",
+        "使えるようにして",
+        "声を使えるようにして",
+        "自分の声",
+        "学習",
+        "利用できるように",
+        "私の音声",
+        "私の声"
+      ],
       "resolution": {
         "shape": "pipeline",
         "result_shape": "summary"
@@ -1388,7 +1417,15 @@
       ],
       "outcome_ids": ["surface_report"],
       "specialist_id": "service-operator",
-      "trigger_keywords": ["ディスプレイ", "モニター", "画面", "解像度", "display", "resolution", "monitor"],
+      "trigger_keywords": [
+        "ディスプレイ",
+        "モニター",
+        "画面",
+        "解像度",
+        "display",
+        "resolution",
+        "monitor"
+      ],
       "resolution": {
         "shape": "task_session",
         "result_shape": "summary"
@@ -1599,15 +1636,7 @@
       "intake_requirements": ["conversation_context"],
       "outcome_ids": ["conversation_summary"],
       "specialist_id": "knowledge-specialist",
-      "trigger_keywords": [
-        "summarize",
-        "summary",
-        "要約",
-        "まとめ",
-        "整理",
-        "recap",
-        "thread"
-      ],
+      "trigger_keywords": ["summarize", "summary", "要約", "まとめ", "整理", "recap", "thread"],
       "resolution": {
         "shape": "direct_reply",
         "result_shape": "conversation_summary"
@@ -1741,7 +1770,14 @@
       "intake_requirements": ["audience", "metrics or source material", "decision purpose"],
       "outcome_ids": ["executive_report"],
       "specialist_id": "document-specialist",
-      "trigger_keywords": ["経営会議", "KPI", "経営レポート", "executive report", "役員向け", "1枚"],
+      "trigger_keywords": [
+        "経営会議",
+        "KPI",
+        "経営レポート",
+        "executive report",
+        "役員向け",
+        "1枚"
+      ],
       "resolution": {
         "shape": "direct_reply",
         "result_shape": "executive_report"
@@ -1772,7 +1808,14 @@
       "intake_requirements": ["audience", "message goal", "approval boundary"],
       "outcome_ids": ["stakeholder_message"],
       "specialist_id": "document-specialist",
-      "trigger_keywords": ["メッセージ", "説明文", "ステークホルダー", "社員向け", "役員会", "communication"],
+      "trigger_keywords": [
+        "メッセージ",
+        "説明文",
+        "ステークホルダー",
+        "社員向け",
+        "役員会",
+        "communication"
+      ],
       "resolution": {
         "shape": "direct_reply",
         "result_shape": "stakeholder_message"
@@ -1834,7 +1877,14 @@
       "intake_requirements": ["decision scope", "options", "evaluation axes"],
       "outcome_ids": ["technical_decision_memo"],
       "specialist_id": "knowledge-specialist",
-      "trigger_keywords": ["技術判断", "意思決定メモ", "ADR", "採用可否", "technical decision", "tradeoff"],
+      "trigger_keywords": [
+        "技術判断",
+        "意思決定メモ",
+        "ADR",
+        "採用可否",
+        "technical decision",
+        "tradeoff"
+      ],
       "resolution": {
         "shape": "direct_reply",
         "result_shape": "technical_decision_memo"
@@ -1865,7 +1915,16 @@
       "intake_requirements": ["use case", "quality metric", "cost or governance constraint"],
       "outcome_ids": ["provider_selection_report"],
       "specialist_id": "knowledge-specialist",
-      "trigger_keywords": ["OpenAI", "Anthropic", "Gemini", "provider", "LLM", "モデル選定", "コスト", "品質"],
+      "trigger_keywords": [
+        "OpenAI",
+        "Anthropic",
+        "Gemini",
+        "provider",
+        "LLM",
+        "モデル選定",
+        "コスト",
+        "品質"
+      ],
       "resolution": {
         "shape": "direct_reply",
         "result_shape": "provider_selection_report"
@@ -1896,7 +1955,16 @@
       "intake_requirements": ["runtime scope", "target metric", "safety boundary"],
       "outcome_ids": ["runtime_tuning_plan"],
       "specialist_id": "service-operator",
-      "trigger_keywords": ["runtime", "遅延", "latency", "メモリ", "起動数", "tuning", "コスト", "agent runtime"],
+      "trigger_keywords": [
+        "runtime",
+        "遅延",
+        "latency",
+        "メモリ",
+        "起動数",
+        "tuning",
+        "コスト",
+        "agent runtime"
+      ],
       "resolution": {
         "shape": "direct_reply",
         "result_shape": "runtime_tuning_plan"
@@ -1942,6 +2010,284 @@
       "risk_profile": "approval_required"
     },
     {
+      "id": "security-audit-service",
+      "category": "outcome_execution",
+      "description": "Deliver a source-code static-analysis security audit as a governed, repeatable service engagement: proposal and approval, scope agreement, static analysis, findings calibration and ADR reconciliation, a reviewed Round 1 report, remediation verification, and a signed-off final report.",
+      "surface_examples": [
+        "このリポジトリのセキュリティ静的解析診断をサービスとして実施して",
+        "ソースコードのセキュリティ監査を提案から最終報告まで回して",
+        "スマートコントラクトの脆弱性診断レポートを作成して納品して",
+        "Run a source-code security audit engagement end to end"
+      ],
+      "plan_outline": [
+        "frame the engagement and produce a proposal for customer approval",
+        "agree the audit scope, severity model, and reference standards",
+        "run static analysis and multi-persona vulnerability verification",
+        "calibrate findings and reconcile against ADR / design decisions",
+        "deliver the reviewed Round 1 report, verify remediation, and finalize a signed-off report"
+      ],
+      "intake_requirements": ["target_repository", "audit_scope", "reference_standards"],
+      "outcome_ids": ["review_findings", "artifact:report"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": [
+        "セキュリティ診断",
+        "脆弱性診断",
+        "静的解析",
+        "セキュリティ監査",
+        "コード監査",
+        "監査レポート",
+        "診断レポート",
+        "security audit",
+        "static analysis",
+        "vulnerability",
+        "code review",
+        "SCVS",
+        "semgrep"
+      ],
+      "resolution": {
+        "shape": "mission",
+        "result_shape": "review"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "review",
+      "object": "source_code_security_audit",
+      "execution_shape": "mission",
+      "mission_class": "customer_engagement",
+      "risk_profile": "approval_required"
+    },
+    {
+      "id": "feature-expansion-delivery",
+      "category": "outcome_execution",
+      "description": "Run a feature-expansion project for an existing service from customer requirements hearing through requirements, design, build, validation, UAT, release, and closure under phase gates (G1-G7).",
+      "surface_examples": [
+        "既存サービスの機能拡張プロジェクトを要件ヒアリングから進めて",
+        "この機能追加を要件定義から設計・実装・リリースまで回して",
+        "顧客ヒアリングを起点に機能拡張のデリバリを進行して",
+        "Run a feature expansion from customer hearing to release"
+      ],
+      "plan_outline": [
+        "frame the initiative and get initiation approval (G1)",
+        "conduct the customer requirements hearing",
+        "baseline requirements with customer agreement (G2)",
+        "produce and review the design (G3)",
+        "build, validate, run UAT, and release under gates (G4-G6)",
+        "close out with a retrospective (G7)"
+      ],
+      "intake_requirements": ["target_service", "expansion_scope", "customer_stakeholders"],
+      "outcome_ids": ["execution_result"],
+      "specialist_id": "project-lead",
+      "trigger_keywords": [
+        "機能拡張",
+        "機能追加",
+        "要件ヒアリング",
+        "要件定義",
+        "デリバリ",
+        "リリース",
+        "feature expansion",
+        "enhancement",
+        "requirements hearing",
+        "delivery"
+      ],
+      "resolution": {
+        "shape": "mission",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "create",
+      "object": "feature_delivery",
+      "execution_shape": "mission",
+      "mission_class": "product_delivery",
+      "risk_profile": "approval_required"
+    },
+    {
+      "id": "incident-response",
+      "category": "outcome_execution",
+      "description": "Respond to a production incident end to end: detection, triage and severity classification, containment, remediation, recovery validation, post-mortem, review, and closure.",
+      "surface_examples": [
+        "インシデントが発生したので対応して",
+        "障害対応を検知から復旧・振り返りまで進めて",
+        "重大度を判定して封じ込めと恒久対応を回して",
+        "Respond to this production incident end to end"
+      ],
+      "plan_outline": [
+        "log the incident intake",
+        "triage and classify severity (SEV), convene incident command",
+        "approve and execute containment",
+        "approve permanent remediation and validate recovery",
+        "run the post-mortem, review, and close with a report"
+      ],
+      "intake_requirements": ["incident_symptom", "affected_service", "detected_at"],
+      "outcome_ids": ["remediation_plan"],
+      "specialist_id": "service-operator",
+      "trigger_keywords": [
+        "インシデント",
+        "障害",
+        "障害対応",
+        "重大度",
+        "封じ込め",
+        "復旧",
+        "incident",
+        "outage",
+        "severity",
+        "containment",
+        "remediation"
+      ],
+      "resolution": {
+        "shape": "mission",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "system_state",
+      "action": "execute",
+      "object": "incident_response",
+      "execution_shape": "mission",
+      "mission_class": "operations_and_release",
+      "risk_profile": "high_stakes"
+    },
+    {
+      "id": "gate-review-session",
+      "category": "outcome_execution",
+      "description": "Convene a gating governance body (会議体) to make a phase-gate decision: prepare the gate-review packet, hold the review under quorum, and record a Go / Conditional Go / No-Go decision with conditions.",
+      "surface_examples": [
+        "リリース判定会議を開いて Go/No-Go を判定して",
+        "設計審査会を開催して判定を記録して",
+        "このゲートの判定会を実施して議事録を残して",
+        "Convene a gate review and record the decision"
+      ],
+      "plan_outline": [
+        "prepare the gate-review packet and confirm convening preconditions",
+        "hold the review body against agenda and exit criteria under quorum",
+        "record the decision, conditions, and action items"
+      ],
+      "intake_requirements": ["gate_id", "governance_body", "review_artifacts"],
+      "outcome_ids": ["gate_verdict"],
+      "specialist_id": "governance-lead",
+      "trigger_keywords": [
+        "判定会",
+        "審査会",
+        "リリース判定",
+        "会議体",
+        "レビュー会",
+        "ゲート",
+        "gate review",
+        "review board",
+        "go/no-go",
+        "CAB"
+      ],
+      "resolution": {
+        "shape": "mission",
+        "result_shape": "review"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "review",
+      "object": "gate_review",
+      "execution_shape": "mission",
+      "mission_class": "operations_and_release",
+      "risk_profile": "approval_required"
+    },
+    {
+      "id": "software-asset-management",
+      "category": "outcome_execution",
+      "description": "Run software asset management as a governed process: asset inventory, SBOM generation, dependency vulnerability scan, key/secret inventory and rotation review, versioning/release tagging, and asset-ledger registration under gates.",
+      "surface_examples": [
+        "資材管理を実施して(SBOM・鍵・バージョン管理)",
+        "この成果物の SBOM を作って脆弱性と鍵と版を台帳登録して",
+        "ソフトウェア資産の棚卸しとバージョン管理を回して",
+        "Run software asset management with SBOM and key inventory"
+      ],
+      "plan_outline": [
+        "inventory the software assets and owners",
+        "generate SBOM and scan dependency vulnerabilities",
+        "inventory keys/secrets and review rotation",
+        "assign versions/release tags and register into the asset ledger"
+      ],
+      "intake_requirements": ["target_repositories", "artifact_scope"],
+      "outcome_ids": ["service_summary"],
+      "specialist_id": "service-operator",
+      "trigger_keywords": [
+        "資材管理",
+        "SBOM",
+        "ソフトウェア資産",
+        "鍵管理",
+        "シークレット",
+        "バージョン管理",
+        "版管理",
+        "脆弱性",
+        "台帳",
+        "asset management",
+        "software bill of materials",
+        "dependency",
+        "versioning"
+      ],
+      "resolution": {
+        "shape": "mission",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "outcome",
+      "action": "create",
+      "object": "software_asset",
+      "execution_shape": "mission",
+      "mission_class": "operations_and_release",
+      "risk_profile": "approval_required"
+    },
+    {
+      "id": "it-operations-automation",
+      "category": "outcome_execution",
+      "description": "Automate operations of another system end to end under gates: monitor/detect, diagnose, plan the change (CAB), simulate on AWS (dry-run, no side effects), execute the automation on approval, verify, and record to the operations ledger.",
+      "surface_examples": [
+        "このシステムの運用を自動化して",
+        "運用の変更を CAB 承認のうえ AWS でシミュレーションしてから自動実行して",
+        "監視検知から診断・自動対応・検証まで回して",
+        "Automate this system's operations with an AWS dry-run first"
+      ],
+      "plan_outline": [
+        "receive the monitoring signal / operations request",
+        "diagnose root cause and candidate actions",
+        "plan the change and get CAB approval",
+        "simulate the change on AWS without side effects",
+        "execute the automation on approval, verify, and record"
+      ],
+      "intake_requirements": ["target_system", "operation_goal"],
+      "outcome_ids": ["service_summary"],
+      "specialist_id": "service-operator",
+      "trigger_keywords": [
+        "運用自動化",
+        "IT運用",
+        "自動化",
+        "運用",
+        "AWS",
+        "シミュレーション",
+        "ドライラン",
+        "変更",
+        "ops automation",
+        "operations",
+        "runbook",
+        "infrastructure",
+        "dry-run"
+      ],
+      "resolution": {
+        "shape": "mission",
+        "result_shape": "summary"
+      },
+      "legacy_category": "surface",
+      "exposed_to_surface": true,
+      "target": "system_state",
+      "action": "execute",
+      "object": "system_operation",
+      "execution_shape": "mission",
+      "mission_class": "operations_and_release",
+      "risk_profile": "high_stakes"
+    },
+    {
       "id": "operator-profile-learning",
       "category": "knowledge_lifecycle",
       "description": "Extract reusable operator preference or request-pattern learning from repeated interactions and propose a tiered memory update.",
@@ -1958,7 +2304,14 @@
       "intake_requirements": ["request history", "operator corrections", "tier policy"],
       "outcome_ids": ["operator_learning_update"],
       "specialist_id": "knowledge-specialist",
-      "trigger_keywords": ["学習", "個人ナレッジ", "依頼傾向", "operator profile", "最適化", "preference"],
+      "trigger_keywords": [
+        "学習",
+        "個人ナレッジ",
+        "依頼傾向",
+        "operator profile",
+        "最適化",
+        "preference"
+      ],
       "resolution": {
         "shape": "direct_reply",
         "result_shape": "operator_learning_update"
@@ -2248,7 +2601,16 @@
       ],
       "outcome_ids": ["organization_toolchain_configured"],
       "specialist_id": "service-operator",
-      "trigger_keywords": ["ci/cd", "cicd", "toolchain", "integration", "github actions", "slack", "deploy", "workspace"],
+      "trigger_keywords": [
+        "ci/cd",
+        "cicd",
+        "toolchain",
+        "integration",
+        "github actions",
+        "slack",
+        "deploy",
+        "workspace"
+      ],
       "resolution": {
         "shape": "task_session",
         "result_shape": "organization_toolchain_configured"
@@ -2318,7 +2680,16 @@
       ],
       "outcome_ids": ["presentation_preference_profile_registered"],
       "specialist_id": "service-operator",
-      "trigger_keywords": ["theme", "design", "presentation", "資料", "見た目", "register", "profile", "プレゼン"],
+      "trigger_keywords": [
+        "theme",
+        "design",
+        "presentation",
+        "資料",
+        "見た目",
+        "register",
+        "profile",
+        "プレゼン"
+      ],
       "resolution": {
         "shape": "task_session",
         "result_shape": "presentation_preference_profile_registered"
@@ -2779,7 +3150,15 @@
       ],
       "outcome_ids": ["generation_schedule_summary"],
       "specialist_id": "service-operator",
-      "trigger_keywords": ["schedule", "scheduled", "cron", "task", "jobs", "スケジュール", "タスク"],
+      "trigger_keywords": [
+        "schedule",
+        "scheduled",
+        "cron",
+        "task",
+        "jobs",
+        "スケジュール",
+        "タスク"
+      ],
       "resolution": {
         "shape": "task_session",
         "result_shape": "generation_schedule_summary"
@@ -2813,16 +3192,32 @@
       "mission_class": "platform_onboarding",
       "risk_profile": "review_required",
       "description": "Scan, register, reconcile, and refresh governed capabilities across providers, gateways, and platform surfaces.",
-      "surface_examples": ["capabilityを最新化して", "機能一覧をスキャンして", "provider capability を再同期して"],
+      "surface_examples": [
+        "capabilityを最新化して",
+        "機能一覧をスキャンして",
+        "provider capability を再同期して"
+      ],
       "plan_outline": [
         "discover available capability surfaces",
         "normalize and register the current state",
         "reconcile registry, adapter, and observability records"
       ],
-      "intake_requirements": ["provider availability", "registry access", "execution receipt policy"],
+      "intake_requirements": [
+        "provider availability",
+        "registry access",
+        "execution receipt policy"
+      ],
       "outcome_ids": ["capability_lifecycle_report"],
       "specialist_id": "service-operator",
-      "trigger_keywords": ["capability", "scan", "refresh", "reconcile", "最新化", "再同期", "機能一覧"],
+      "trigger_keywords": [
+        "capability",
+        "scan",
+        "refresh",
+        "reconcile",
+        "最新化",
+        "再同期",
+        "機能一覧"
+      ],
       "resolution": {
         "shape": "pipeline",
         "result_shape": "capability_lifecycle_report"
@@ -2878,7 +3273,11 @@
       "id": "restart-service",
       "category": "system_observability",
       "description": "Restart a governed background service and report the resulting state.",
-      "surface_examples": ["サービスを再起動して", "restart the service", "このサービスを再起動して"],
+      "surface_examples": [
+        "サービスを再起動して",
+        "restart the service",
+        "このサービスを再起動して"
+      ],
       "plan_outline": [
         "resolve target service",
         "restart the service under policy",
@@ -3482,11 +3881,7 @@
       "mission_class": "operations_and_release",
       "risk_profile": "review_required",
       "description": "Create a governance approval request.",
-      "surface_examples": [
-        "承認を依頼して",
-        "稟議の承認を依頼して",
-        "この案件の承認を申請して"
-      ],
+      "surface_examples": ["承認を依頼して", "稟議の承認を依頼して", "この案件の承認を申請して"],
       "plan_outline": [
         "resolve scope",
         "execute governed operation",
@@ -3577,15 +3972,7 @@
       "intake_requirements": ["service_name", "openapi_url_or_docs"],
       "outcome_ids": ["gateway_adapter_created"],
       "specialist_id": "service-operator",
-      "trigger_keywords": [
-        "API",
-        "SaaS",
-        "同化",
-        "取り込んで",
-        "assimilate",
-        "openapi",
-        "gateway"
-      ],
+      "trigger_keywords": ["API", "SaaS", "同化", "取り込んで", "assimilate", "openapi", "gateway"],
       "resolution": {
         "shape": "pipeline",
         "task_kind": "service_onboarding",
@@ -3604,7 +3991,9 @@
           "op": "system:shell",
           "params": {
             "cmd": "node dist/scripts/run_pipeline.js --input pipelines/assimilate-gateway-capability.json --context '{\"service_name\": \"{{service_name}}\", \"openapi_url\": \"{{openapi_url_or_docs}}\"}'",
-            "env": { "KYBERION_PERSONA": "sovereign" },
+            "env": {
+              "KYBERION_PERSONA": "sovereign"
+            },
             "export_as": "assimilation_result"
           }
         }
@@ -3633,11 +4022,24 @@
       "outcome_ids": ["hypothesis_tree_result"],
       "specialist_id": "project-lead",
       "trigger_keywords": [
-        "仮説", "発散", "批判", "複数視点", "ブレスト",
-        "hypothesis", "fanout", "diverge", "tree of thoughts", "ToT",
-        "a2a", "cross critique", "多角的"
+        "仮説",
+        "発散",
+        "批判",
+        "複数視点",
+        "ブレスト",
+        "hypothesis",
+        "fanout",
+        "diverge",
+        "tree of thoughts",
+        "ToT",
+        "a2a",
+        "cross critique",
+        "多角的"
       ],
-      "resolution": { "shape": "pipeline", "result_shape": "hypothesis_tree_result" },
+      "resolution": {
+        "shape": "pipeline",
+        "result_shape": "hypothesis_tree_result"
+      },
       "exposed_to_surface": true,
       "target": "outcome",
       "action": "compose",
@@ -3678,11 +4080,25 @@
       "outcome_ids": ["task_plan"],
       "specialist_id": "project-lead",
       "trigger_keywords": [
-        "要件", "設計", "テスト", "タスク分解", "段階的", "ステップ",
-        "chain of thought", "CoT", "requirements", "decompose",
-        "順番に", "ステップバイステップ", "step by step"
+        "要件",
+        "設計",
+        "テスト",
+        "タスク分解",
+        "段階的",
+        "ステップ",
+        "chain of thought",
+        "CoT",
+        "requirements",
+        "decompose",
+        "順番に",
+        "ステップバイステップ",
+        "step by step"
       ],
-      "resolution": { "shape": "task_session", "task_kind": "planning", "result_shape": "task_plan" },
+      "resolution": {
+        "shape": "task_session",
+        "task_kind": "planning",
+        "result_shape": "task_plan"
+      },
       "exposed_to_surface": true,
       "target": "outcome",
       "action": "compose",
@@ -3693,19 +4109,27 @@
       "pipeline": [
         {
           "op": "wisdom:extract_requirements",
-          "params": { "export_as": "requirements_draft" }
+          "params": {
+            "export_as": "requirements_draft"
+          }
         },
         {
           "op": "wisdom:extract_design_spec",
-          "params": { "export_as": "design_spec" }
+          "params": {
+            "export_as": "design_spec"
+          }
         },
         {
           "op": "wisdom:extract_test_plan",
-          "params": { "export_as": "test_plan" }
+          "params": {
+            "export_as": "test_plan"
+          }
         },
         {
           "op": "wisdom:decompose_into_tasks",
-          "params": { "export_as": "task_plan" }
+          "params": {
+            "export_as": "task_plan"
+          }
         }
       ]
     },
@@ -3731,11 +4155,23 @@
       "outcome_ids": ["execution_result"],
       "specialist_id": "project-lead",
       "trigger_keywords": [
-        "実行", "進めて", "タスク実行", "plan", "execute", "自動実行",
-        "plan and execute", "plan-and-execute", "アクションアイテム",
-        "依存関係", "順番に実行"
+        "実行",
+        "進めて",
+        "タスク実行",
+        "plan",
+        "execute",
+        "自動実行",
+        "plan and execute",
+        "plan-and-execute",
+        "アクションアイテム",
+        "依存関係",
+        "順番に実行"
       ],
-      "resolution": { "shape": "task_session", "task_kind": "execution", "result_shape": "execution_result" },
+      "resolution": {
+        "shape": "task_session",
+        "task_kind": "execution",
+        "result_shape": "execution_result"
+      },
       "exposed_to_surface": true,
       "target": "outcome",
       "action": "execute",
@@ -3746,15 +4182,21 @@
       "pipeline": [
         {
           "op": "wisdom:decompose_into_tasks",
-          "params": { "export_as": "task_plan" }
+          "params": {
+            "export_as": "task_plan"
+          }
         },
         {
           "op": "wisdom:execute_self_action_items",
-          "params": { "export_as": "execution_result" }
+          "params": {
+            "export_as": "execution_result"
+          }
         },
         {
           "op": "wisdom:track_pending_action_items",
-          "params": { "export_as": "tracking_result" }
+          "params": {
+            "export_as": "tracking_result"
+          }
         }
       ]
     },
@@ -3780,11 +4222,24 @@
       "outcome_ids": ["prior_knowledge_summary"],
       "specialist_id": "knowledge-specialist",
       "trigger_keywords": [
-        "過去", "先例", "以前", "失敗", "経験", "学習",
-        "prior knowledge", "distilled", "recall", "past incidents",
-        "蓄積", "知識注入", "ナレッジ活用"
+        "過去",
+        "先例",
+        "以前",
+        "失敗",
+        "経験",
+        "学習",
+        "prior knowledge",
+        "distilled",
+        "recall",
+        "past incidents",
+        "蓄積",
+        "知識注入",
+        "ナレッジ活用"
       ],
-      "resolution": { "shape": "direct_reply", "result_shape": "prior_knowledge_summary" },
+      "resolution": {
+        "shape": "direct_reply",
+        "result_shape": "prior_knowledge_summary"
+      },
       "exposed_to_surface": true,
       "target": "knowledge",
       "action": "query",
@@ -3834,11 +4289,23 @@
       "outcome_ids": ["consensus_result"],
       "specialist_id": "project-lead",
       "trigger_keywords": [
-        "合意", "コンセンサス", "ステークホルダー", "go/no-go",
-        "multi-agent", "consensus", "全員", "賛否",
-        "反対意見", "debate", "議論", "判定"
+        "合意",
+        "コンセンサス",
+        "ステークホルダー",
+        "go/no-go",
+        "multi-agent",
+        "consensus",
+        "全員",
+        "賛否",
+        "反対意見",
+        "debate",
+        "議論",
+        "判定"
       ],
-      "resolution": { "shape": "pipeline", "result_shape": "consensus_result" },
+      "resolution": {
+        "shape": "pipeline",
+        "result_shape": "consensus_result"
+      },
       "exposed_to_surface": true,
       "target": "outcome",
       "action": "compose",
@@ -3878,11 +4345,22 @@
       "outcome_ids": ["gate_verdict"],
       "specialist_id": "project-lead",
       "trigger_keywords": [
-        "counterfactual", "反事実", "シミュレーション", "アンサンブル",
-        "不確かさ", "uncertainty", "収束", "convergence",
-        "gate判定", "信頼度", "シナリオ分析"
+        "counterfactual",
+        "反事実",
+        "シミュレーション",
+        "アンサンブル",
+        "不確かさ",
+        "uncertainty",
+        "収束",
+        "convergence",
+        "gate判定",
+        "信頼度",
+        "シナリオ分析"
       ],
-      "resolution": { "shape": "pipeline", "result_shape": "gate_verdict" },
+      "resolution": {
+        "shape": "pipeline",
+        "result_shape": "gate_verdict"
+      },
       "exposed_to_surface": true,
       "target": "outcome",
       "action": "inspect",
@@ -3893,7 +4371,11 @@
       "pipeline": [
         {
           "op": "wisdom:fork_branches",
-          "params": { "goal": "{{goal}}", "output_dir": "{{output_dir}}", "export_as": "branches" }
+          "params": {
+            "goal": "{{goal}}",
+            "output_dir": "{{output_dir}}",
+            "export_as": "branches"
+          }
         },
         {
           "op": "wisdom:simulate_all_ensemble",
@@ -3917,7 +4399,9 @@
         },
         {
           "op": "system:log",
-          "params": { "message": "Gate verdict: {{gate_verdict.verdict}} (convergence={{gate_verdict.mean_convergence}})" }
+          "params": {
+            "message": "Gate verdict: {{gate_verdict.verdict}} (convergence={{gate_verdict.mean_convergence}})"
+          }
         }
       ]
     },
@@ -3942,11 +4426,23 @@
       "outcome_ids": ["adaptive_analysis"],
       "specialist_id": "project-lead",
       "trigger_keywords": [
-        "ペルソナ", "視点", "専門家", "CFO", "法務", "技術",
-        "adaptive", "prompting", "システムプロンプト", "役割を変えて",
-        "立場から", "として分析"
+        "ペルソナ",
+        "視点",
+        "専門家",
+        "CFO",
+        "法務",
+        "技術",
+        "adaptive",
+        "prompting",
+        "システムプロンプト",
+        "役割を変えて",
+        "立場から",
+        "として分析"
       ],
-      "resolution": { "shape": "direct_reply", "result_shape": "adaptive_analysis" },
+      "resolution": {
+        "shape": "direct_reply",
+        "result_shape": "adaptive_analysis"
+      },
       "exposed_to_surface": true,
       "target": "outcome",
       "action": "inspect",
@@ -3965,7 +4461,9 @@
         },
         {
           "op": "system:log",
-          "params": { "message": "Adaptive analysis complete: {{adaptive_analysis}}" }
+          "params": {
+            "message": "Adaptive analysis complete: {{adaptive_analysis}}"
+          }
         }
       ]
     },
@@ -3990,10 +4488,19 @@
       "outcome_ids": ["tool_use_result"],
       "specialist_id": "project-lead",
       "trigger_keywords": [
-        "ツール", "tool use", "function calling", "MoE",
-        "mixture of experts", "ツール選択", "実行", "tool_use"
+        "ツール",
+        "tool use",
+        "function calling",
+        "MoE",
+        "mixture of experts",
+        "ツール選択",
+        "実行",
+        "tool_use"
       ],
-      "resolution": { "shape": "pipeline", "result_shape": "tool_use_result" },
+      "resolution": {
+        "shape": "pipeline",
+        "result_shape": "tool_use_result"
+      },
       "exposed_to_surface": true,
       "target": "outcome",
       "action": "execute",
@@ -4033,10 +4540,21 @@
       "outcome_ids": ["review_id"],
       "specialist_id": "project-lead",
       "trigger_keywords": [
-        "レビュー", "確認", "escalate", "escalation", "人間",
-        "上長", "承認", "pending", "保留", "active learning"
+        "レビュー",
+        "確認",
+        "escalate",
+        "escalation",
+        "人間",
+        "上長",
+        "承認",
+        "pending",
+        "保留",
+        "active learning"
       ],
-      "resolution": { "shape": "direct_reply", "result_shape": "review_record" },
+      "resolution": {
+        "shape": "direct_reply",
+        "result_shape": "review_record"
+      },
       "exposed_to_surface": true,
       "target": "outcome",
       "action": "review",
@@ -4055,7 +4573,9 @@
         },
         {
           "op": "system:log",
-          "params": { "message": "Human review queued: review_id={{review_record.review_id}}, path={{review_record.review_path}}" }
+          "params": {
+            "message": "Human review queued: review_id={{review_record.review_id}}, path={{review_record.review_path}}"
+          }
         }
       ]
     },
@@ -4081,12 +4601,25 @@
       "outcome_ids": ["data_retrieved"],
       "specialist_id": "service-operator",
       "trigger_keywords": [
-        "天気", "weather", "気温", "温度",
-        "為替", "レート", "exchange rate",
-        "ニュース", "news",
-        "株価", "stock",
-        "調べて", "取得", "fetch", "取ってきて",
-        "外部データ", "url", "サイト", "このページ"
+        "天気",
+        "weather",
+        "気温",
+        "温度",
+        "為替",
+        "レート",
+        "exchange rate",
+        "ニュース",
+        "news",
+        "株価",
+        "stock",
+        "調べて",
+        "取得",
+        "fetch",
+        "取ってきて",
+        "外部データ",
+        "url",
+        "サイト",
+        "このページ"
       ],
       "resolution": {
         "shape": "task_session",
@@ -4121,8 +4654,19 @@
       "outcome_ids": ["weather_report"],
       "specialist_id": "service-operator",
       "trigger_keywords": [
-        "天気", "天候", "晴れ", "雨", "雪", "曇り", "気温",
-        "降水確率", "台風", "weather", "forecast", "rain", "sunny"
+        "天気",
+        "天候",
+        "晴れ",
+        "雨",
+        "雪",
+        "曇り",
+        "気温",
+        "降水確率",
+        "台風",
+        "weather",
+        "forecast",
+        "rain",
+        "sunny"
       ],
       "resolution": {
         "shape": "task_session",
@@ -4166,9 +4710,24 @@
       "outcome_ids": ["transit_plan"],
       "specialist_id": "service-operator",
       "trigger_keywords": [
-        "電車", "時間", "乗換", "時刻表", "発車", "新宿",
-        "渋谷", "東京", "路線", "駅", "運行情報", "新幹線",
-        "遅延", "ダイヤ", "transit", "train", "schedule", "station"
+        "電車",
+        "時間",
+        "乗換",
+        "時刻表",
+        "発車",
+        "新宿",
+        "渋谷",
+        "東京",
+        "路線",
+        "駅",
+        "運行情報",
+        "新幹線",
+        "遅延",
+        "ダイヤ",
+        "transit",
+        "train",
+        "schedule",
+        "station"
       ],
       "resolution": {
         "shape": "task_session",
@@ -4210,9 +4769,21 @@
       "outcome_ids": ["restaurant_reservation"],
       "specialist_id": "service-operator",
       "trigger_keywords": [
-        "レストラン", "居酒屋", "ラーメン", "カフェ", "予約",
-        "ディナー", "ランチ", "ごはん", "美味しい", "グルメ",
-        "restaurant", "cafe", "sushi", "dining", "booking"
+        "レストラン",
+        "居酒屋",
+        "ラーメン",
+        "カフェ",
+        "予約",
+        "ディナー",
+        "ランチ",
+        "ごはん",
+        "美味しい",
+        "グルメ",
+        "restaurant",
+        "cafe",
+        "sushi",
+        "dining",
+        "booking"
       ],
       "resolution": {
         "shape": "task_session",
@@ -4254,8 +4825,17 @@
       "outcome_ids": ["news_summary"],
       "specialist_id": "service-operator",
       "trigger_keywords": [
-        "ニュース", "トピック", "トレンド", "動向", "話題",
-        "最新情報", "news", "trend", "tech", "headline", "summary"
+        "ニュース",
+        "トピック",
+        "トレンド",
+        "動向",
+        "話題",
+        "最新情報",
+        "news",
+        "trend",
+        "tech",
+        "headline",
+        "summary"
       ],
       "resolution": {
         "shape": "task_session",
@@ -4297,8 +4877,16 @@
       "outcome_ids": ["email_draft"],
       "specialist_id": "service-operator",
       "trigger_keywords": [
-        "メール", "下書き", "文面", "返信", "作成して",
-        "email", "draft", "response", "reply", "write"
+        "メール",
+        "下書き",
+        "文面",
+        "返信",
+        "作成して",
+        "email",
+        "draft",
+        "response",
+        "reply",
+        "write"
       ],
       "resolution": {
         "shape": "task_session",
@@ -4341,8 +4929,16 @@
       "outcome_ids": ["calendar_update"],
       "specialist_id": "service-operator",
       "trigger_keywords": [
-        "予定", "スケジュール", "カレンダー", "ミーティング",
-        "会議", "登録して", "教えて", "schedule", "calendar", "meeting"
+        "予定",
+        "スケジュール",
+        "カレンダー",
+        "ミーティング",
+        "会議",
+        "登録して",
+        "教えて",
+        "schedule",
+        "calendar",
+        "meeting"
       ],
       "resolution": {
         "shape": "task_session",
@@ -4385,8 +4981,21 @@
       "outcome_ids": ["device_state_change"],
       "specialist_id": "service-operator",
       "trigger_keywords": [
-        "エアコン", "電気", "照明", "ライト", "温度", "消して", "つけて",
-        "オン", "オフ", "設定して", "device", "light", "aircon", "turn on", "turn off"
+        "エアコン",
+        "電気",
+        "照明",
+        "ライト",
+        "温度",
+        "消して",
+        "つけて",
+        "オン",
+        "オフ",
+        "設定して",
+        "device",
+        "light",
+        "aircon",
+        "turn on",
+        "turn off"
       ],
       "resolution": {
         "shape": "task_session",
@@ -4429,8 +5038,17 @@
       "outcome_ids": ["reminder_created"],
       "specialist_id": "service-operator",
       "trigger_keywords": [
-        "リマインド", "リマインダー", "ToDo", "ToDoリスト", "やること",
-        "買い物リスト", "追加して", "登録して", "remind", "todo", "reminder"
+        "リマインド",
+        "リマインダー",
+        "ToDo",
+        "ToDoリスト",
+        "やること",
+        "買い物リスト",
+        "追加して",
+        "登録して",
+        "remind",
+        "todo",
+        "reminder"
       ],
       "resolution": {
         "shape": "task_session",
@@ -4473,7 +5091,13 @@
       "outcome_ids": ["translation_result"],
       "specialist_id": "service-operator",
       "trigger_keywords": [
-        "翻訳", "英語で", "日本語で", "何て言う", "訳して", "translate", "translation"
+        "翻訳",
+        "英語で",
+        "日本語で",
+        "何て言う",
+        "訳して",
+        "translate",
+        "translation"
       ],
       "resolution": {
         "shape": "task_session",

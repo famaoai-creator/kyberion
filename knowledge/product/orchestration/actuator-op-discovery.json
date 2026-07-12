@@ -4,38 +4,279 @@
     {
       "n": "agent-actuator",
       "path": "libs/actuators/agent-actuator",
-      "source": "registry",
-      "ops": []
+      "source": "describeOps",
+      "ops": [
+        {
+          "op": "list",
+          "kind": "capture"
+        },
+        {
+          "op": "list_manifests",
+          "kind": "capture"
+        },
+        {
+          "op": "list_runtimes",
+          "kind": "capture"
+        },
+        {
+          "op": "health",
+          "kind": "capture"
+        },
+        {
+          "op": "snapshot",
+          "kind": "capture"
+        },
+        {
+          "op": "team_plan",
+          "kind": "transform"
+        },
+        {
+          "op": "team_role",
+          "kind": "transform"
+        },
+        {
+          "op": "spawn",
+          "kind": "apply"
+        },
+        {
+          "op": "ask",
+          "kind": "apply"
+        },
+        {
+          "op": "shutdown",
+          "kind": "apply"
+        },
+        {
+          "op": "shutdown_all",
+          "kind": "apply"
+        },
+        {
+          "op": "refresh",
+          "kind": "apply"
+        },
+        {
+          "op": "restart",
+          "kind": "apply"
+        },
+        {
+          "op": "a2a",
+          "kind": "apply"
+        },
+        {
+          "op": "staff_mission",
+          "kind": "apply"
+        },
+        {
+          "op": "prewarm_mission",
+          "kind": "apply"
+        }
+      ]
     },
     {
       "n": "android-actuator",
       "path": "libs/actuators/android-actuator",
-      "source": "registry",
-      "ops": []
+      "source": "describeOps",
+      "ops": [
+        {
+          "op": "adb_health_check",
+          "kind": "capture"
+        },
+        {
+          "op": "android_cli_describe",
+          "kind": "capture"
+        },
+        {
+          "op": "android_cli_docs_search",
+          "kind": "capture"
+        },
+        {
+          "op": "android_cli_health_check",
+          "kind": "capture"
+        },
+        {
+          "op": "android_cli_layout",
+          "kind": "capture"
+        },
+        {
+          "op": "android_cli_screen_resolve",
+          "kind": "capture"
+        },
+        {
+          "op": "capture_foreground_activity",
+          "kind": "capture"
+        },
+        {
+          "op": "capture_runtime_session_handoff",
+          "kind": "capture"
+        },
+        {
+          "op": "extract_ui_tree",
+          "kind": "capture"
+        },
+        {
+          "op": "read_json",
+          "kind": "capture"
+        },
+        {
+          "op": "read_text_file",
+          "kind": "capture"
+        },
+        {
+          "op": "find_ui_nodes",
+          "kind": "transform"
+        },
+        {
+          "op": "set",
+          "kind": "transform"
+        },
+        {
+          "op": "summarize_ui_tree",
+          "kind": "transform"
+        },
+        {
+          "op": "android_cli_screen_capture",
+          "kind": "apply"
+        },
+        {
+          "op": "authenticate_with_passkey",
+          "kind": "apply"
+        },
+        {
+          "op": "capture_screen",
+          "kind": "apply"
+        },
+        {
+          "op": "emit_session_handoff",
+          "kind": "apply"
+        },
+        {
+          "op": "fill_login_form",
+          "kind": "apply"
+        },
+        {
+          "op": "input_text",
+          "kind": "apply"
+        },
+        {
+          "op": "input_text_into_ui_node",
+          "kind": "apply"
+        },
+        {
+          "op": "launch_app",
+          "kind": "apply"
+        },
+        {
+          "op": "log",
+          "kind": "apply"
+        },
+        {
+          "op": "open_deep_link",
+          "kind": "apply"
+        },
+        {
+          "op": "swipe",
+          "kind": "apply"
+        },
+        {
+          "op": "tap",
+          "kind": "apply"
+        },
+        {
+          "op": "tap_ui_node",
+          "kind": "apply"
+        },
+        {
+          "op": "wait_for_ui_node",
+          "kind": "apply"
+        },
+        {
+          "op": "wait_for_ui_text",
+          "kind": "apply"
+        }
+      ]
     },
     {
       "n": "approval-actuator",
       "path": "libs/actuators/approval-actuator",
-      "source": "registry",
-      "ops": []
+      "source": "describeOps",
+      "ops": [
+        {
+          "op": "load",
+          "kind": "capture"
+        },
+        {
+          "op": "list_pending",
+          "kind": "capture"
+        },
+        {
+          "op": "create",
+          "kind": "apply"
+        },
+        {
+          "op": "decide",
+          "kind": "apply"
+        }
+      ]
     },
     {
       "n": "artifact-actuator",
       "path": "libs/actuators/artifact-actuator",
-      "source": "registry",
-      "ops": []
+      "source": "describeOps",
+      "ops": [
+        {
+          "op": "read_json",
+          "kind": "capture"
+        },
+        {
+          "op": "list",
+          "kind": "capture"
+        },
+        {
+          "op": "write_json",
+          "kind": "apply"
+        },
+        {
+          "op": "append_event",
+          "kind": "apply"
+        },
+        {
+          "op": "ensure_dir",
+          "kind": "apply"
+        },
+        {
+          "op": "write_delivery_pack",
+          "kind": "apply"
+        }
+      ]
     },
     {
       "n": "blockchain-actuator",
       "path": "libs/actuators/blockchain-actuator",
-      "source": "registry",
-      "ops": []
+      "source": "describeOps",
+      "ops": [
+        {
+          "op": "verify_anchor",
+          "kind": "capture"
+        },
+        {
+          "op": "anchor_mission",
+          "kind": "apply"
+        },
+        {
+          "op": "anchor_trust",
+          "kind": "apply"
+        }
+      ]
     },
     {
       "n": "browser-actuator",
       "path": "libs/actuators/browser-actuator",
       "source": "describeOps",
       "ops": [
+        {
+          "op": "distill_dom",
+          "kind": "capture"
+        },
         {
           "op": "console",
           "kind": "capture"
@@ -148,6 +389,10 @@
         {
           "op": "url",
           "kind": "capture"
+        },
+        {
+          "op": "llm_decide",
+          "kind": "transform"
         },
         {
           "op": "export_adf",
@@ -425,14 +670,56 @@
     {
       "n": "build-actuator",
       "path": "libs/actuators/build-actuator",
-      "source": "registry",
-      "ops": []
+      "source": "describeOps",
+      "ops": [
+        {
+          "op": "ios_generate_project",
+          "kind": "apply"
+        },
+        {
+          "op": "ios_build",
+          "kind": "apply"
+        },
+        {
+          "op": "ios_test",
+          "kind": "apply"
+        },
+        {
+          "op": "ios_archive",
+          "kind": "apply"
+        },
+        {
+          "op": "android_build",
+          "kind": "apply"
+        },
+        {
+          "op": "android_test",
+          "kind": "apply"
+        },
+        {
+          "op": "android_bundle",
+          "kind": "apply"
+        }
+      ]
     },
     {
       "n": "calendar-actuator",
       "path": "libs/actuators/calendar-actuator",
-      "source": "registry",
-      "ops": []
+      "source": "describeOps",
+      "ops": [
+        {
+          "op": "list_calendars",
+          "kind": "capture"
+        },
+        {
+          "op": "list_events",
+          "kind": "capture"
+        },
+        {
+          "op": "create_event",
+          "kind": "apply"
+        }
+      ]
     },
     {
       "n": "code-actuator",
@@ -504,8 +791,21 @@
     {
       "n": "email-actuator",
       "path": "libs/actuators/email-actuator",
-      "source": "registry",
-      "ops": []
+      "source": "describeOps",
+      "ops": [
+        {
+          "op": "create_draft",
+          "kind": "apply"
+        },
+        {
+          "op": "send",
+          "kind": "apply"
+        },
+        {
+          "op": "send_from_file",
+          "kind": "apply"
+        }
+      ]
     },
     {
       "n": "file-actuator",
@@ -918,8 +1218,65 @@
     {
       "n": "ios-actuator",
       "path": "libs/actuators/ios-actuator",
-      "source": "registry",
-      "ops": []
+      "source": "describeOps",
+      "ops": [
+        {
+          "op": "capture_runtime_session_handoff",
+          "kind": "capture"
+        },
+        {
+          "op": "read_json",
+          "kind": "capture"
+        },
+        {
+          "op": "read_text_file",
+          "kind": "capture"
+        },
+        {
+          "op": "simctl_health_check",
+          "kind": "capture"
+        },
+        {
+          "op": "set",
+          "kind": "transform"
+        },
+        {
+          "op": "boot_simulator",
+          "kind": "apply"
+        },
+        {
+          "op": "capture_screen",
+          "kind": "apply"
+        },
+        {
+          "op": "emit_session_handoff",
+          "kind": "apply"
+        },
+        {
+          "op": "install_app",
+          "kind": "apply"
+        },
+        {
+          "op": "launch_app",
+          "kind": "apply"
+        },
+        {
+          "op": "log",
+          "kind": "apply"
+        },
+        {
+          "op": "open_deep_link",
+          "kind": "apply"
+        },
+        {
+          "op": "shutdown_simulator",
+          "kind": "apply"
+        },
+        {
+          "op": "uninstall_app",
+          "kind": "apply"
+        }
+      ]
     },
     {
       "n": "media-actuator",
@@ -999,14 +1356,68 @@
     {
       "n": "media-generation-actuator",
       "path": "libs/actuators/media-generation-actuator",
-      "source": "registry",
-      "ops": []
+      "source": "describeOps",
+      "ops": [
+        {
+          "op": "capture_focused_window",
+          "kind": "capture"
+        },
+        {
+          "op": "capture_screen",
+          "kind": "capture"
+        },
+        {
+          "op": "get_generation_job",
+          "kind": "capture"
+        },
+        {
+          "op": "collect_generation_artifact",
+          "kind": "apply"
+        },
+        {
+          "op": "generate_image",
+          "kind": "apply"
+        },
+        {
+          "op": "submit_generation",
+          "kind": "apply"
+        },
+        {
+          "op": "wait_generation_job",
+          "kind": "apply"
+        }
+      ]
     },
     {
       "n": "meeting-actuator",
       "path": "libs/actuators/meeting-actuator",
-      "source": "registry",
-      "ops": []
+      "source": "describeOps",
+      "ops": [
+        {
+          "op": "listen",
+          "kind": "capture"
+        },
+        {
+          "op": "status",
+          "kind": "capture"
+        },
+        {
+          "op": "chat",
+          "kind": "apply"
+        },
+        {
+          "op": "join",
+          "kind": "apply"
+        },
+        {
+          "op": "leave",
+          "kind": "apply"
+        },
+        {
+          "op": "speak",
+          "kind": "apply"
+        }
+      ]
     },
     {
       "n": "meeting-browser-driver",
@@ -1147,7 +1558,7 @@
     {
       "n": "orchestrator-actuator",
       "path": "libs/actuators/orchestrator-actuator",
-      "source": "registry",
+      "source": "describeOps",
       "ops": [
         {
           "op": "discover_capabilities",
@@ -1162,7 +1573,7 @@
           "kind": "apply"
         },
         {
-          "op": "log",
+          "op": "run_execution_plan_set",
           "kind": "apply"
         }
       ]
@@ -1170,44 +1581,103 @@
     {
       "n": "presence-actuator",
       "path": "libs/actuators/presence-actuator",
-      "source": "registry",
-      "ops": []
+      "source": "describeOps",
+      "ops": [
+        {
+          "op": "receive_event",
+          "kind": "apply"
+        },
+        {
+          "op": "dispatch",
+          "kind": "apply"
+        },
+        {
+          "op": "dispatch_timeline",
+          "kind": "apply"
+        },
+        {
+          "op": "record_interaction",
+          "kind": "apply"
+        }
+      ]
     },
     {
       "n": "process-actuator",
       "path": "libs/actuators/process-actuator",
-      "source": "registry",
-      "ops": []
-    },
-    {
-      "n": "secret-actuator",
-      "path": "libs/actuators/secret-actuator",
-      "source": "registry",
-      "ops": []
-    },
-    {
-      "n": "service-actuator",
-      "path": "libs/actuators/service-actuator",
-      "source": "registry",
+      "source": "describeOps",
       "ops": [
+        {
+          "op": "status",
+          "kind": "capture"
+        },
         {
           "op": "list",
           "kind": "capture"
         },
         {
-          "op": "read",
+          "op": "list-surfaces",
           "kind": "capture"
         },
         {
-          "op": "deploy",
+          "op": "spawn",
           "kind": "apply"
         },
         {
-          "op": "log",
+          "op": "stop",
+          "kind": "apply"
+        }
+      ]
+    },
+    {
+      "n": "secret-actuator",
+      "path": "libs/actuators/secret-actuator",
+      "source": "describeOps",
+      "ops": [
+        {
+          "op": "get",
+          "kind": "capture"
+        },
+        {
+          "op": "list",
+          "kind": "capture"
+        },
+        {
+          "op": "set",
+          "kind": "transform"
+        },
+        {
+          "op": "delete",
+          "kind": "apply"
+        }
+      ]
+    },
+    {
+      "n": "service-actuator",
+      "path": "libs/actuators/service-actuator",
+      "source": "describeOps",
+      "ops": [
+        {
+          "op": "preset",
+          "kind": "capture"
+        },
+        {
+          "op": "api",
           "kind": "apply"
         },
         {
-          "op": "notify",
+          "op": "cli",
+          "kind": "apply"
+        },
+        {
+          "op": "mcp",
+          "kind": "apply"
+        },
+        {
+          "op": "oauth",
+          "kind": "apply"
+        },
+        {
+          "op": "reconcile",
           "kind": "apply"
         }
       ]
@@ -1779,26 +2249,174 @@
     {
       "n": "terminal-actuator",
       "path": "libs/actuators/terminal-actuator",
-      "source": "registry",
-      "ops": []
+      "source": "describeOps",
+      "ops": [
+        {
+          "op": "poll",
+          "kind": "capture"
+        },
+        {
+          "op": "list",
+          "kind": "capture"
+        },
+        {
+          "op": "poll_terminal",
+          "kind": "capture"
+        },
+        {
+          "op": "list_terminal_sessions",
+          "kind": "capture"
+        },
+        {
+          "op": "spawn",
+          "kind": "apply"
+        },
+        {
+          "op": "write",
+          "kind": "apply"
+        },
+        {
+          "op": "resize",
+          "kind": "apply"
+        },
+        {
+          "op": "kill",
+          "kind": "apply"
+        },
+        {
+          "op": "spawn_terminal",
+          "kind": "apply"
+        },
+        {
+          "op": "write_terminal",
+          "kind": "apply"
+        },
+        {
+          "op": "kill_terminal",
+          "kind": "apply"
+        },
+        {
+          "op": "shell_command",
+          "kind": "apply"
+        }
+      ]
     },
     {
       "n": "video-composition-actuator",
       "path": "libs/actuators/video-composition-actuator",
-      "source": "registry",
-      "ops": []
+      "source": "describeOps",
+      "ops": [
+        {
+          "op": "get_video_composition_job_status",
+          "kind": "capture"
+        },
+        {
+          "op": "get_video_composition_queue",
+          "kind": "capture"
+        },
+        {
+          "op": "list_video_composition_templates",
+          "kind": "capture"
+        },
+        {
+          "op": "compile_narrated_video_brief",
+          "kind": "transform"
+        },
+        {
+          "op": "compile_video_content_brief",
+          "kind": "transform"
+        },
+        {
+          "op": "await_video_composition_job",
+          "kind": "apply"
+        },
+        {
+          "op": "cancel_video_composition_job",
+          "kind": "apply"
+        },
+        {
+          "op": "create_narrated_intro_movie",
+          "kind": "apply"
+        },
+        {
+          "op": "create_narrated_video_from_content_brief",
+          "kind": "apply"
+        },
+        {
+          "op": "prepare_video_composition",
+          "kind": "apply"
+        },
+        {
+          "op": "verify_rendered_video_artifact",
+          "kind": "apply"
+        }
+      ]
     },
     {
       "n": "vision-actuator",
       "path": "libs/actuators/vision-actuator",
-      "source": "registry",
-      "ops": []
+      "source": "describeOps",
+      "ops": [
+        {
+          "op": "inspect_image",
+          "kind": "capture"
+        },
+        {
+          "op": "ocr_image",
+          "kind": "capture"
+        }
+      ]
     },
     {
       "n": "voice-actuator",
       "path": "libs/actuators/voice-actuator",
-      "source": "registry",
-      "ops": []
+      "source": "describeOps",
+      "ops": [
+        {
+          "op": "health",
+          "kind": "capture"
+        },
+        {
+          "op": "list_voices",
+          "kind": "capture"
+        },
+        {
+          "op": "transcribe",
+          "kind": "capture"
+        },
+        {
+          "op": "transcribe_voice_sample",
+          "kind": "capture"
+        },
+        {
+          "op": "collect_and_register_voice_profile",
+          "kind": "apply"
+        },
+        {
+          "op": "collect_voice_samples",
+          "kind": "apply"
+        },
+        {
+          "op": "generate_voice",
+          "kind": "apply"
+        },
+        {
+          "op": "record_interaction",
+          "kind": "apply"
+        },
+        {
+          "op": "record_voice_sample",
+          "kind": "apply"
+        },
+        {
+          "op": "register_voice_profile",
+          "kind": "apply"
+        },
+        {
+          "op": "speak_local",
+          "kind": "apply"
+        }
+      ]
     },
     {
       "n": "wisdom-actuator",

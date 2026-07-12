@@ -16,6 +16,7 @@ import {
 } from './approval-store.js';
 import type { GovernedArtifactRole } from './artifact-store.js';
 import { auditChain } from './audit-chain.js';
+import type { TraceContext } from './src/trace.js';
 import { recordGovernanceAction } from './kill-switch.js';
 import { notifyOperator } from './operator-notifications.js';
 
@@ -41,6 +42,8 @@ export interface ApprovalGateParams {
     details?: string;
     severity?: 'low' | 'medium' | 'high';
   };
+  /** Pipeline trace context — when provided, decision events are emitted into the active span. */
+  trace?: TraceContext;
 }
 
 export interface ApprovalGateResult {
@@ -207,7 +210,8 @@ export function enforceApprovalGate(
   params: ApprovalGateParams,
   role: GovernedArtifactRole = 'mission_controller'
 ): ApprovalGateResult {
-  const { intentId, operationId, agentId, callerRole, correlationId, channel, payload } = params;
+  const { intentId, operationId, agentId, callerRole, correlationId, channel, payload, trace } =
+    params;
   recordGovernanceAction(agentId, 'approval_gate', operationId, false);
 
   const decisionRightsContext = extractDecisionRightsContext(agentId, callerRole, payload);
@@ -257,6 +261,11 @@ export function enforceApprovalGate(
       reason: 'No approval required by policy',
       metadata: { correlationId, intentId, matchedRuleId: policy.matchedRuleId },
     });
+    trace?.addEvent('approval.not_required', {
+      operation_id: operationId,
+      agent_id: agentId,
+      matched_rule_id: policy.matchedRuleId ?? '',
+    });
     recordGovernanceAction(agentId, 'approval_gate', `${operationId}:allowed`, false);
     return { allowed: true, status: 'not_required', message: 'No approval required' };
   }
@@ -292,6 +301,13 @@ export function enforceApprovalGate(
         reason: 'Existing approval found',
         metadata: { correlationId, intentId, approvalId: matched.id },
       });
+      trace?.addEvent('approval.granted', {
+        operation_id: operationId,
+        agent_id: agentId,
+        request_id: matched.id,
+        decided_by: matched.decidedBy ?? 'unknown',
+        decided_at: matched.decidedAt ?? 'unknown',
+      });
       recordGovernanceAction(agentId, 'approval_gate', `${operationId}:allowed`, false);
       return {
         allowed: true,
@@ -314,6 +330,13 @@ export function enforceApprovalGate(
       result: 'denied',
       reason: `Existing request is ${effectiveStatus}`,
       metadata: { correlationId, intentId, requestId: matched.id, requestStatus: effectiveStatus },
+    });
+    trace?.addEvent('approval.blocked', {
+      operation_id: operationId,
+      agent_id: agentId,
+      request_id: matched.id,
+      request_status: matched.status,
+      reason: `existing request is ${matched.status}`,
     });
     recordGovernanceAction(agentId, 'approval_gate', `${operationId}:denied`, true);
     return {
@@ -349,6 +372,13 @@ export function enforceApprovalGate(
     reason: 'New approval request created; awaiting decision',
     metadata: { correlationId, intentId, requestId: record.id },
   });
+  trace?.addEvent('approval.blocked', {
+    operation_id: operationId,
+    agent_id: agentId,
+    request_id: record.id,
+    request_status: 'pending_new',
+    reason: 'new approval request created; awaiting decision',
+  });
   recordGovernanceAction(agentId, 'approval_gate', `${operationId}:pending`, true);
   void notifyOperator('approval_required', {
     title: draft.title || `Approval required: ${operationId}`,
@@ -361,8 +391,9 @@ export function enforceApprovalGate(
     allowed: false,
     status: 'pending',
     requestId: record.id,
-    message: decisionRightsEvaluation?.escalationReason
-      ? `Approval request ${record.id} created; ${decisionRightsEvaluation.escalationReason}`
-      : `Approval request ${record.id} created; awaiting decision`,
+    message:
+      decisionRightsEvaluation?.escalationReason && decisionRightsEvaluation.requiresEscalation
+        ? `Approval request ${record.id} created; ${decisionRightsEvaluation.escalationReason}`
+        : `Approval request ${record.id} created; awaiting decision`,
   };
 }

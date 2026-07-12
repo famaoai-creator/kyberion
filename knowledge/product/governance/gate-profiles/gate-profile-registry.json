@@ -1,0 +1,305 @@
+{
+  "version": "1.0.0",
+  "description": "Domain-agnostic gate profile registry referenced by knowledge/product/architecture/sdlc-gating-model.md. Each gate fixes required_artifacts + exit_criteria + decision_owner and binds to a governance body (governance-body-registry.json) and, where applicable, a machine-checkable mission-workflow-catalog exit_gate. Profiles are split per file; this registry indexes them.",
+  "profile_files": {
+    "sdlc": "knowledge/product/governance/gate-profiles/sdlc.json",
+    "incident": "knowledge/product/governance/gate-profiles/incident.json"
+  },
+  "profiles": {
+    "sdlc": {
+      "domain": "delivery",
+      "description": "7-gate feature-delivery / feature-expansion sequence: Initiation → Requirements Baseline → Design Approval → Build Readiness → Validation Approval → Release Readiness → Closure Review.",
+      "gates": [
+        {
+          "gate_id": "gate-initiation-approval",
+          "phase": "initiate",
+          "scope": "project",
+          "purpose": "Authorize the project to proceed from idea to defined scope (Why is correct).",
+          "decision_owner": "business_owner",
+          "governance_body": "initiation-review",
+          "preconditions": [
+            "project-charter draft circulated",
+            "business-impact-analysis attached",
+            "customer sponsor / decision owner identified"
+          ],
+          "required_artifacts": [
+            "project-charter",
+            "business-impact-analysis",
+            "stakeholder-communication-register"
+          ],
+          "entry_criteria": [
+            "Problem and opportunity are articulated",
+            "Rough scope hypothesis exists"
+          ],
+          "exit_criteria": [
+            "Problem statement and success criteria are approved.",
+            "Decision owner and stakeholder map are explicit.",
+            "Funding, capacity, or sponsorship assumptions are documented."
+          ],
+          "decision_outcomes": ["go", "conditional_go", "no_go", "hold"],
+          "exception_approver": "steering-committee",
+          "mission_gate_id": "PROPOSAL_APPROVED"
+        },
+        {
+          "gate_id": "gate-requirements-baseline",
+          "phase": "define",
+          "scope": "track",
+          "purpose": "Freeze the accountable requirements baseline before design completion (What is sufficiently defined).",
+          "decision_owner": "product_manager",
+          "governance_body": "requirements-review-board",
+          "preconditions": [
+            "requirements-definition and traceability-matrix pre-reviewed",
+            "customer hearing open questions resolved or logged",
+            "NFR and SLO/SLI drafts prepared"
+          ],
+          "required_artifacts": [
+            "requirements-definition",
+            "requirements-traceability-matrix",
+            "slo-sli-definition",
+            "information-asset-registry"
+          ],
+          "entry_criteria": ["Requirements draft complete", "Customer hearing conducted"],
+          "exit_criteria": [
+            "Requirements have identifiers and acceptance criteria.",
+            "Traceability links requirements to future design and validation.",
+            "Information assets and service objectives are agreed."
+          ],
+          "decision_outcomes": ["go", "conditional_go", "no_go", "hold"],
+          "exception_approver": "steering-committee",
+          "mission_gate_id": "REQUIREMENTS_BASELINE"
+        },
+        {
+          "gate_id": "gate-design-approval",
+          "phase": "design",
+          "scope": "track",
+          "purpose": "Approve the target architecture and operating design before build (How is sound).",
+          "decision_owner": "solution_architect",
+          "governance_body": "design-review-board",
+          "preconditions": [
+            "basic-design / architecture-design circulated",
+            "security design and data flow documented",
+            "design risks logged"
+          ],
+          "required_artifacts": [
+            "basic-design",
+            "architecture-design",
+            "detailed-design",
+            "operational-design",
+            "data-flow-lifecycle-map",
+            "compliance-control-matrix"
+          ],
+          "entry_criteria": ["Requirements baseline approved"],
+          "exit_criteria": [
+            "Design covers functional, operational, security, and data concerns.",
+            "Control obligations are mapped to design and procedure references.",
+            "Open design risks have owners and disposition."
+          ],
+          "decision_outcomes": ["go", "conditional_go", "no_go", "hold"],
+          "exception_approver": "steering-committee",
+          "mission_gate_id": "DESIGN_APPROVED"
+        },
+        {
+          "gate_id": "gate-build-readiness",
+          "phase": "build",
+          "scope": "track",
+          "purpose": "Ensure execution is controlled and changes are governable.",
+          "decision_owner": "pmo_governance",
+          "governance_body": "change-advisory-board",
+          "preconditions": [
+            "change request and impact analysis submitted",
+            "rollback-plan exists",
+            "change risk class pre-assessed"
+          ],
+          "required_artifacts": [
+            "project-management-plan",
+            "mission-ledger",
+            "raid-log",
+            "issue-log",
+            "change-control-ledger"
+          ],
+          "entry_criteria": ["Design approved"],
+          "exit_criteria": [
+            "Work breakdown, ownership, and reporting cadence are active.",
+            "Active changes are traceable through mission and change ledgers.",
+            "Known risks, assumptions, issues, and dependencies are current."
+          ],
+          "decision_outcomes": ["go", "conditional_go", "no_go", "hold"],
+          "exception_approver": "steering-committee",
+          "mission_gate_id": "BUILD_DONE"
+        },
+        {
+          "gate_id": "gate-validation-approval",
+          "phase": "validate",
+          "scope": "track",
+          "purpose": "Demonstrate that the release candidate is acceptable for a release decision.",
+          "decision_owner": "qa_lead",
+          "governance_body": "validation-review",
+          "preconditions": [
+            "test-validation-report and traceability-matrix submitted",
+            "security-audit-report attached",
+            "open defects and residual risks listed"
+          ],
+          "required_artifacts": [
+            "test-plan",
+            "test-case-specification",
+            "requirements-traceability-matrix",
+            "test-validation-report",
+            "security-audit-report",
+            "gate-review-packet"
+          ],
+          "entry_criteria": ["Build complete and testable"],
+          "exit_criteria": [
+            "Planned validation is complete or approved with explicit exceptions.",
+            "Requirements are traced to test evidence and defects.",
+            "Security findings and residual risks are dispositioned."
+          ],
+          "decision_outcomes": ["go", "conditional_go", "no_go", "hold"],
+          "exception_approver": "steering-committee",
+          "mission_gate_id": "UAT_PASSED"
+        },
+        {
+          "gate_id": "gate-release-readiness",
+          "phase": "transfer_run",
+          "scope": "track",
+          "purpose": "Decide whether release and cutover may proceed.",
+          "decision_owner": "pmo_governance",
+          "governance_body": "release-readiness-review",
+          "preconditions": [
+            "release-readiness-checklist fully populated",
+            "rollback-plan and deployment-verification procedure finalized",
+            "operation-runbook and user-facing materials available",
+            "release window and comms agreed"
+          ],
+          "required_artifacts": [
+            "release-readiness-checklist",
+            "cutover-migration-plan",
+            "rollback-plan",
+            "deployment-verification-report",
+            "operation-runbook",
+            "user-manual-faq"
+          ],
+          "entry_criteria": ["Validation approved"],
+          "exit_criteria": [
+            "Operational, deployment, and rollback readiness are approved.",
+            "Post-deployment verification criteria are explicit.",
+            "Support and user-facing handoff materials are available."
+          ],
+          "decision_outcomes": ["go", "conditional_go", "no_go", "hold"],
+          "exception_approver": "steering-committee",
+          "mission_gate_id": "RELEASE_READINESS"
+        },
+        {
+          "gate_id": "gate-closure-review",
+          "phase": "close",
+          "scope": "track",
+          "purpose": "Formally close delivery and capture reusable learning.",
+          "decision_owner": "pmo_governance",
+          "governance_body": "closure-review",
+          "preconditions": [
+            "mission-closure-report draft submitted",
+            "open critical items listed",
+            "lessons learned compiled"
+          ],
+          "required_artifacts": ["incident-report", "post-mortem", "mission-closure-report"],
+          "entry_criteria": ["Release stabilized"],
+          "exit_criteria": [
+            "Open critical items have a follow-up owner.",
+            "Lessons learned are recorded for reuse.",
+            "Closure approval is recorded."
+          ],
+          "decision_outcomes": ["go", "conditional_go", "hold"],
+          "exception_approver": "steering-committee",
+          "mission_gate_id": "CLOSURE_REVIEW"
+        }
+      ]
+    },
+    "incident": {
+      "domain": "incident_response",
+      "description": "Incident response gate sequence: Severity → Containment → Remediation → Post-Incident Review, owned by incident-command and post-incident-review bodies.",
+      "gates": [
+        {
+          "gate_id": "gate-incident-severity",
+          "phase": "triage",
+          "scope": "track",
+          "purpose": "Confirm incident severity (SEV) and the response structure.",
+          "decision_owner": "incident_commander",
+          "governance_body": "incident-command",
+          "preconditions": ["incident-intake recorded (target, event, timestamp JST, impact)"],
+          "required_artifacts": ["incident-intake", "triage-assessment"],
+          "entry_criteria": ["Incident detected and logged"],
+          "exit_criteria": [
+            "Severity (SEV0-SEV3) is assigned per incident-severity-model.",
+            "Incident commander and response roles are assigned."
+          ],
+          "decision_outcomes": ["go", "conditional_go", "hold"],
+          "exception_approver": "steering-committee",
+          "mission_gate_id": "SEVERITY_GATE"
+        },
+        {
+          "gate_id": "gate-incident-containment",
+          "phase": "containment",
+          "scope": "track",
+          "purpose": "Authorize execution of the containment (interim) procedure.",
+          "decision_owner": "incident_commander",
+          "governance_body": "incident-command",
+          "preconditions": [
+            "containment procedure drafted",
+            "blast-radius and rollback of the containment action understood"
+          ],
+          "required_artifacts": ["containment-report"],
+          "entry_criteria": ["Severity gate passed"],
+          "exit_criteria": [
+            "Containment action is approved and its risk accepted.",
+            "Customer/stakeholder comms plan is set."
+          ],
+          "decision_outcomes": ["go", "conditional_go", "hold"],
+          "exception_approver": "steering-committee",
+          "mission_gate_id": "CONTAINMENT_APPROVED"
+        },
+        {
+          "gate_id": "gate-incident-remediation",
+          "phase": "remediation",
+          "scope": "track",
+          "purpose": "Approve the permanent fix and its validation plan.",
+          "decision_owner": "incident_commander",
+          "governance_body": "incident-command",
+          "preconditions": [
+            "root cause hypothesis identified",
+            "remediation plan with validation drafted"
+          ],
+          "required_artifacts": ["remediation-report"],
+          "entry_criteria": ["Containment stable"],
+          "exit_criteria": [
+            "Permanent fix approved with a validation plan.",
+            "Recovery verification criteria are explicit."
+          ],
+          "decision_outcomes": ["go", "conditional_go", "hold"],
+          "exception_approver": "steering-committee",
+          "mission_gate_id": "REMEDIATION_APPROVED"
+        },
+        {
+          "gate_id": "gate-post-incident-review",
+          "phase": "postmortem",
+          "scope": "track",
+          "purpose": "Verify root cause and recurrence-prevention blamelessly and close the incident.",
+          "decision_owner": "reliability_engineer",
+          "governance_body": "post-incident-review",
+          "preconditions": [
+            "post-mortem draft submitted (timeline, root cause, prevention)",
+            "evidence indexed"
+          ],
+          "required_artifacts": ["post-mortem", "incident-timeline", "evidence-index"],
+          "entry_criteria": ["Recovery validated"],
+          "exit_criteria": [
+            "Cause and countermeasures are consistent with evidence.",
+            "Prevention actions have owners and due dates.",
+            "Blameless principle upheld."
+          ],
+          "decision_outcomes": ["go", "conditional_go", "hold"],
+          "exception_approver": "steering-committee",
+          "mission_gate_id": "POST_INCIDENT_REVIEW"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "concept": "gate-profile",
+  "profile": "sdlc",
+  "version": "1.0.0",
+  "source_of_truth": "knowledge/product/governance/gate-profiles/gate-profile-registry.json#/profiles/sdlc",
+  "supersedes": "knowledge/product/governance/sdlc-gate-catalog.json",
+  "note": "The authoritative SDLC gate profile is maintained in gate-profile-registry.json under profiles.sdlc (7 gates: initiation → requirements-baseline → design-approval → build-readiness → validation-approval → release-readiness → closure-review). Each gate binds required_artifacts + exit_criteria + decision_owner + governance_body (governance-body-registry.json) + a machine-checkable mission_gate_id. This file exists to satisfy the pointer from the deprecated sdlc-gate-catalog.json; do not duplicate gate definitions here — edit the registry."
+}

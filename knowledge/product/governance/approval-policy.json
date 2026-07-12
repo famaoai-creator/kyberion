@@ -62,6 +62,18 @@
       "intent_ids": ["customer:outbound"],
       "requires_approval": true,
       "missing_requirements": ["approval_confirmation"]
+    },
+    {
+      "id": "security-audit-deliver",
+      "intent_ids": ["security-audit-service", "security-audit:deliver"],
+      "requires_approval": true,
+      "missing_requirements": ["approval_confirmation"]
+    },
+    {
+      "id": "feature-expansion-release",
+      "intent_ids": ["feature-expansion-delivery", "feature-expansion:release"],
+      "requires_approval": true,
+      "missing_requirements": ["approval_confirmation"]
     }
   ],
   "defaults": {

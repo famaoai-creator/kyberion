@@ -1,4 +1,5 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { generateVideoVisualDirection } from '@agent/core';
 import {
   compileNarratedVideoBriefToCompositionADF,
   compileVideoCompositionADF,
@@ -181,6 +182,30 @@ async function listVideoCompositionTemplates() {
   };
 }
 
+// agy short-video quality: after the deterministic compile, draft a
+// story-matched visual direction (LLM zone). Failure never blocks the
+// render — the compiler degrades to the legacy palette.
+async function attachVisualDirection(adf: any, brief: Record<string, unknown>): Promise<void> {
+  try {
+    const storyboard = (brief as any).storyboard;
+    const story = Array.isArray(storyboard?.beats)
+      ? storyboard.beats
+          .map((beat: any) => `${beat?.title ?? ''} ${beat?.narration ?? beat?.summary ?? ''}`)
+          .join('\n')
+      : String((brief as any).narration?.script ?? (brief as any).summary ?? adf.title ?? '');
+    adf.composition.visual_direction = await generateVideoVisualDirection({
+      title: String(adf.title || 'Short video'),
+      story,
+      tone: (brief as any).tone ? String((brief as any).tone) : undefined,
+      audience: (brief as any).audience ? String((brief as any).audience) : undefined,
+      frame: { width: adf.composition.width, height: adf.composition.height },
+      scene_ids: (adf.scenes || []).map((scene: any) => String(scene.scene_id)),
+    });
+  } catch {
+    /* art direction is best-effort; compiler falls back to defaults */
+  }
+}
+
 async function compileNarratedVideoBrief(params: {
   narrated_video_brief?: Record<string, unknown>;
 }) {
@@ -188,6 +213,7 @@ async function compileNarratedVideoBrief(params: {
     throw new Error('compile_narrated_video_brief requires params.narrated_video_brief');
   }
   const adf = compileNarratedVideoBriefToCompositionADF(params.narrated_video_brief as any);
+  await attachVisualDirection(adf, params.narrated_video_brief);
   return {
     status: 'succeeded',
     kind: 'compiled_video_composition_adf',
@@ -268,6 +294,7 @@ async function createNarratedIntroMovie(params: {
     throw new Error('create_narrated_intro_movie requires params.narrated_video_brief');
   }
   const adf = compileNarratedVideoBriefToCompositionADF(params.narrated_video_brief as any);
+  await attachVisualDirection(adf, params.narrated_video_brief);
   const execution = await prepareVideoComposition({
     video_composition_adf: adf,
     job_id: params.job_id,

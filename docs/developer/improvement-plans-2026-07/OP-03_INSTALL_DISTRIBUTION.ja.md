@@ -63,3 +63,8 @@
   - `docker build --target production -t kyberion .`
   - `docker run --rm kyberion node dist/scripts/cli.js list implemented`
   - `docker run --rm kyberion sh -c 'ls knowledge/confidential customer 2>&1'` → No such file
+
+## Task 4 完了(2026-07-12)
+
+- README の Quick Start に first-win 最短経路の一表(前提・所要・macOS 音声制約・Docker 経路)を追加。INITIALIZATION.md を正本とする関係は README 冒頭の注記どおり維持(コマンドは QUICKSTART/INITIALIZATION の実コマンドと同一)。DEPLOYMENT.md は既に実態一致を確認。`docs/verification/evaluation_report.md` の V-1-01(D1)へ進捗1行を追記。
+- OP-03 の残余は「イメージ最終起動検証」のみで、これは運用キュー(ディスク要件のためユーザー環境で1ビルド+prune)。文書・構造タスクはすべて完了。

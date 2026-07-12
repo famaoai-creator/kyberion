@@ -12,24 +12,71 @@
     "complete_message"
   ],
   "properties": {
-    "version": { "type": "string" },
+    "version": {
+      "type": "string"
+    },
     "phase_titles": {
       "type": "object",
       "required": ["identity", "services", "tenants", "tutorial", "summary"],
       "properties": {
-        "identity": { "type": "string", "minLength": 1 },
-        "services": { "type": "string", "minLength": 1 },
-        "tenants": { "type": "string", "minLength": 1 },
-        "tutorial": { "type": "string", "minLength": 1 },
-        "summary": { "type": "string", "minLength": 1 }
+        "identity": {
+          "$ref": "#/$defs/localizedText"
+        },
+        "services": {
+          "$ref": "#/$defs/localizedText"
+        },
+        "tenants": {
+          "$ref": "#/$defs/localizedText"
+        },
+        "tutorial": {
+          "$ref": "#/$defs/localizedText"
+        },
+        "summary": {
+          "$ref": "#/$defs/localizedText"
+        }
       },
       "additionalProperties": false
     },
-    "tutorial_plan_title": { "type": "string", "minLength": 1 },
-    "tutorial_next_step_title": { "type": "string", "minLength": 1 },
-    "tutorial_skipped_message": { "type": "string", "minLength": 1 },
-    "tutorial_default_summary": { "type": "string", "minLength": 1 },
-    "complete_message": { "type": "string", "minLength": 1 }
+    "tutorial_plan_title": {
+      "$ref": "#/$defs/localizedText"
+    },
+    "tutorial_next_step_title": {
+      "$ref": "#/$defs/localizedText"
+    },
+    "tutorial_skipped_message": {
+      "$ref": "#/$defs/localizedText"
+    },
+    "tutorial_default_summary": {
+      "$ref": "#/$defs/localizedText"
+    },
+    "complete_message": {
+      "$ref": "#/$defs/localizedText"
+    }
   },
-  "additionalProperties": false
+  "additionalProperties": false,
+  "$defs": {
+    "localizedText": {
+      "oneOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "object",
+          "required": ["en"],
+          "additionalProperties": false,
+          "properties": {
+            "en": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ja": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      ]
+    }
+  }
 }

@@ -13,6 +13,8 @@ import {
   resolveOnboardingFlowPolicy,
   resolveOnboardingSummaryPolicy,
   resolveVocabularyLocale,
+  resolveOnboardingText,
+  type LocalizedOnboardingText,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
@@ -54,6 +56,10 @@ function setWizardLanguage(language: string): void {
 
 function t(en: string, ja: string): string {
   return wizardLocale === 'ja' ? ja : en;
+}
+
+function pt(value: LocalizedOnboardingText): string {
+  return resolveOnboardingText(value, wizardLocale);
 }
 
 type OnboardingPhase = 'identity' | 'reasoning' | 'services' | 'tenants' | 'tutorial' | 'summary';
@@ -320,7 +326,7 @@ function buildSummaryMarkdown(state: OnboardingState): string {
 
 async function runIdentityPhase(state: OnboardingState): Promise<void> {
   const flowPolicy = resolveOnboardingFlowPolicy();
-  console.log(`\n🧬 Phase 1 — ${flowPolicy.phase_titles.identity}\n`);
+  console.log(`\n🧬 Phase 1 — ${pt(flowPolicy.phase_titles.identity)}\n`);
   const identity = buildIdentityFromState(state);
   setWizardLanguage(identity.language);
 
@@ -407,7 +413,7 @@ async function runIdentityPhase(state: OnboardingState): Promise<void> {
 }
 
 async function runReasoningPhase(state: OnboardingState): Promise<void> {
-  console.log('\nReasoning Backend\n');
+  console.log(t('\nReasoning Backend\n', '\n推論バックエンド\n'));
   let reasoning = await evaluateReasoningBackend();
   if (reasoning.available) {
     console.log(
@@ -526,9 +532,15 @@ async function promptGenericConnection(serviceId: string): Promise<Record<string
 
 async function runServicesPhase(state: OnboardingState): Promise<void> {
   const flowPolicy = resolveOnboardingFlowPolicy();
-  console.log(`\n🔌 Phase 2 — ${flowPolicy.phase_titles.services}\n`);
+  console.log(`\n🔌 Phase 2 — ${pt(flowPolicy.phase_titles.services)}\n`);
   const wantsServiceSetup = isAffirmative(
-    await ask('Capture service connection candidates now? (y/N): ', 'n')
+    await ask(
+      t(
+        'Capture service connection candidates now? (y/N): ',
+        'サービス接続候補を今すぐ登録しますか? (y/N): '
+      ),
+      'n'
+    )
   );
   const candidates: ServiceCandidateDraft[] = [];
   const connDir = connectionDir();
@@ -606,14 +618,16 @@ async function runServicesPhase(state: OnboardingState): Promise<void> {
 
 async function runTenantsPhase(state: OnboardingState): Promise<void> {
   const flowPolicy = resolveOnboardingFlowPolicy();
-  console.log(`\n🏢 Phase 3 — ${flowPolicy.phase_titles.tenants}\n`);
+  console.log(`\n🏢 Phase 3 — ${pt(flowPolicy.phase_titles.tenants)}\n`);
   const entries: TenantDraft[] = [];
   const defaultTenant = withExecutionContext(
     'knowledge_steward',
     () => ensureDefaultTenantProfile(),
     'ecosystem_architect'
   );
-  const wantsTenantSetup = isAffirmative(await ask('Register a tenant now? (y/N): ', 'n'));
+  const wantsTenantSetup = isAffirmative(
+    await ask(t('Register a tenant now? (y/N): ', 'テナントを今すぐ登録しますか? (y/N): '), 'n')
+  );
   const tenantDirPath = tenantDir();
   if (!safeExistsSync(tenantDirPath)) safeMkdir(tenantDirPath, { recursive: true });
   entries.push({
@@ -631,14 +645,20 @@ async function runTenantsPhase(state: OnboardingState): Promise<void> {
   if (wantsTenantSetup) {
     let tenantSlug = '';
     while (!tenantSlug) {
-      const slugInput = await ask('Tenant slug [e.g. acme-co]: ', '');
+      const slugInput = await ask(
+        t('Tenant slug [e.g. acme-co]: ', 'テナント slug [例: acme-co]: '),
+        ''
+      );
       try {
         tenantSlug = normalizeTenantSlug(slugInput);
       } catch (error) {
         console.log(chalk.red(String(error)));
       }
     }
-    const displayName = await ask('Tenant display name [required]: ', tenantSlug);
+    const displayName = await ask(
+      t('Tenant display name [required]: ', 'テナント表示名 [必須]: '),
+      tenantSlug
+    );
     const assignedRole = await ask('Your role in this tenant [strategist]: ', 'strategist');
     const purpose = await ask('Purpose / scope for this tenant [optional]: ');
     const createdAt = new Date().toISOString();
@@ -685,7 +705,7 @@ async function runTenantsPhase(state: OnboardingState): Promise<void> {
 
 async function runTutorialPhase(state: OnboardingState): Promise<void> {
   const flowPolicy = resolveOnboardingFlowPolicy();
-  console.log(`\n🎓 Phase 4 — ${flowPolicy.phase_titles.tutorial}\n`);
+  console.log(`\n🎓 Phase 4 — ${pt(flowPolicy.phase_titles.tutorial)}\n`);
   const modeInput = (
     await ask('Tutorial mode: simulate / apply / skipped [simulate]: ', 'simulate')
   )
@@ -695,20 +715,23 @@ async function runTutorialPhase(state: OnboardingState): Promise<void> {
     modeInput === 'apply' ? 'apply' : modeInput === 'skipped' ? 'skipped' : 'simulate';
   const summary =
     mode === 'skipped'
-      ? flowPolicy.tutorial_skipped_message
+      ? pt(flowPolicy.tutorial_skipped_message)
       : await ask(
-          'Describe the first tutorial mission in one sentence: ',
-          flowPolicy.tutorial_default_summary
+          t(
+            'Describe the first tutorial mission in one sentence: ',
+            '最初のチュートリアル・ミッションを一文で説明してください: '
+          ),
+          pt(flowPolicy.tutorial_default_summary)
         );
 
   const planPath = path.join(onboardingRoot(), 'tutorial-plan.md');
   const planMarkdown = [
-    `# ${flowPolicy.tutorial_plan_title}`,
+    `# ${pt(flowPolicy.tutorial_plan_title)}`,
     '',
     `- Mode: ${mode}`,
     `- Summary: ${summary}`,
     '',
-    `## ${flowPolicy.tutorial_next_step_title}`,
+    `## ${pt(flowPolicy.tutorial_next_step_title)}`,
     mode === 'apply'
       ? '- Review the plan and create a mission manually if the setup is ready.'
       : '- Run the tutorial as a dry-run first, then decide whether to promote it to a mission.',
@@ -726,7 +749,7 @@ async function runTutorialPhase(state: OnboardingState): Promise<void> {
 
 async function runSummaryPhase(state: OnboardingState): Promise<void> {
   const flowPolicy = resolveOnboardingFlowPolicy();
-  console.log(`\n📊 Phase 5 — ${flowPolicy.phase_titles.summary}\n`);
+  console.log(`\n📊 Phase 5 — ${pt(flowPolicy.phase_titles.summary)}\n`);
   const summary = buildSummaryMarkdown(state);
   await writeTextArtifact(summaryPath(), summary, 'onboarding-summary');
   state.completed_phases = Array.from(new Set([...state.completed_phases, 'summary']));
@@ -736,26 +759,45 @@ async function runSummaryPhase(state: OnboardingState): Promise<void> {
   await saveState(state);
 
   const identity = state.identity;
-  console.log(chalk.green(`✅ ${flowPolicy.complete_message}`));
+  console.log(chalk.green(`✅ ${pt(flowPolicy.complete_message)}`));
   console.log(
     `Identity: ${identity?.name || 'Sovereign'} / ${identity?.agent_id || 'KYBERION-PRIME'}`
   );
   console.log(`Summary written to: ${summaryPath()}`);
   console.log(`State written to: ${statePath()}`);
-  console.log('\nNext steps:');
+  console.log(t('\nNext steps:', '\n次のステップ:'));
   if (state.reasoning && !state.reasoning.available) {
     console.log(
-      '0. Configure a real reasoning backend with `pnpm reasoning:setup` before real work.'
+      t(
+        '0. Configure a real reasoning backend with `pnpm reasoning:setup` before real work.',
+        '0. 実運用の前に `pnpm reasoning:setup` で実際の推論バックエンドを設定してください。'
+      )
     );
   }
   console.log(
-    `1. Review the service connection drafts in \`${path.join(profileRoot(), 'connections')}/\`.`
+    t(
+      `1. Review the service connection drafts in \`${path.join(profileRoot(), 'connections')}/\`.`,
+      `1. \`${path.join(profileRoot(), 'connections')}/\` のサービス接続ドラフトを確認してください。`
+    )
   );
-  console.log(`2. Review the tenant draft in \`${path.join(profileRoot(), 'tenants')}/\`.`);
   console.log(
-    '3. If the tutorial should become real work, create a mission explicitly after review.'
+    t(
+      `2. Review the tenant draft in \`${path.join(profileRoot(), 'tenants')}/\`.`,
+      `2. \`${path.join(profileRoot(), 'tenants')}/\` のテナントドラフトを確認してください。`
+    )
   );
-  console.log('4. Re-run `pnpm surfaces:reconcile` after the workspace is ready.');
+  console.log(
+    t(
+      '3. If the tutorial should become real work, create a mission explicitly after review.',
+      '3. チュートリアルを実作業にする場合は、レビュー後に明示的にミッションを作成してください。'
+    )
+  );
+  console.log(
+    t(
+      '4. Re-run `pnpm surfaces:reconcile` after the workspace is ready.',
+      '4. ワークスペースの準備ができたら `pnpm surfaces:reconcile` を再実行してください。'
+    )
+  );
 }
 
 function onboardingArtifactsMissing(state: OnboardingState, phase: OnboardingPhase): boolean {
@@ -795,11 +837,33 @@ async function runOnboarding() {
   const personalDir = profileRoot();
 
   if (!interactive && process.env.KYBERION_ONBOARDING_NON_INTERACTIVE_OK !== '1') {
-    console.error(chalk.red('\n❌ Refusing to run interactive onboarding without a TTY.'));
-    console.error('  This wizard would otherwise silently apply default values for every prompt,');
-    console.error("  producing an identity that does not reflect the Sovereign's intent.");
-    console.error('\n  Options:');
-    console.error('    1. Run from a real terminal: pnpm onboard');
+    console.error(
+      chalk.red(
+        t(
+          '\n❌ Refusing to run interactive onboarding without a TTY.',
+          '\n❌ TTY が無いため対話式オンボーディングの実行を拒否します。'
+        )
+      )
+    );
+    console.error(
+      t(
+        '  This wizard would otherwise silently apply default values for every prompt,',
+        '  このまま実行すると、すべての質問に既定値が黙って適用され、'
+      )
+    );
+    console.error(
+      t(
+        "  producing an identity that does not reflect the Sovereign's intent.",
+        '  Sovereign の意図を反映しないアイデンティティが作られてしまいます。'
+      )
+    );
+    console.error(t('\n  Options:', '\n  選択肢:'));
+    console.error(
+      t(
+        '    1. Run from a real terminal: pnpm onboard',
+        '    1. 実ターミナルから実行する: pnpm onboard'
+      )
+    );
     console.error(
       '    2. If you need a customer overlay, create it first with `pnpm customer:create <slug>`'
     );
@@ -818,12 +882,25 @@ async function runOnboarding() {
     process.exit(2);
   }
 
-  console.log('\n🌟 Welcome to Kyberion Sovereign Awakening 🌟\n');
   console.log(
-    'This flow captures identity, service readiness, tenant scope, and a safe first tutorial.\n'
+    t(
+      '\n🌟 Welcome to Kyberion Sovereign Awakening 🌟\n',
+      '\n🌟 Kyberion Sovereign Awakening へようこそ 🌟\n'
+    )
   );
-  console.log('Estimated time: 5-10 minutes.');
-  console.log('You can stop with Ctrl-C at any point and resume later.\n');
+  console.log(
+    t(
+      'This flow captures identity, service readiness, tenant scope, and a safe first tutorial.\n',
+      'このフローでは、アイデンティティ、サービスの準備状態、テナントのスコープ、安全な最初のチュートリアルを設定します。\n'
+    )
+  );
+  console.log(t('Estimated time: 5-10 minutes.', '所要時間の目安: 5〜10分。'));
+  console.log(
+    t(
+      'You can stop with Ctrl-C at any point and resume later.\n',
+      'Ctrl-C でいつでも中断でき、後から再開できます。\n'
+    )
+  );
 
   if (!safeExistsSync(personalDir)) {
     safeMkdir(personalDir, { recursive: true });
@@ -896,7 +973,7 @@ async function runOnboarding() {
     }
   }
 
-  console.log('\nWelcome aboard.');
+  console.log(t('\nWelcome aboard.', '\nようこそ。'));
   console.log(`Workspace root: ${rootDir}`);
   rl.close();
 }
