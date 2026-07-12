@@ -7,7 +7,15 @@ import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { rawExistsSync, rawReadTextFile } from './fs-primitives.js';
 import { resolveIdentityContext } from './authority.js';
-import type { TierLevel, TierWeightMap, TierValidation, MarkerScanResult, Authority, TierScope } from './types.js';
+import { createLogger } from './logger.js';
+import type {
+  TierLevel,
+  TierWeightMap,
+  TierValidation,
+  MarkerScanResult,
+  Authority,
+  TierScope,
+} from './types.js';
 
 export { TierLevel, TierScope, TierWeightMap, TierValidation, MarkerScanResult };
 
@@ -37,14 +45,44 @@ function isOutsideProjectRoot(relativePath: string): boolean {
   return firstSegment === '..';
 }
 
-function loadPolicy(): any | null {
+const logger = createLogger('tier-guard');
+
+type PolicyLoad = { status: 'loaded'; policy: any } | { status: 'missing' } | { status: 'corrupt' };
+
+let corruptPolicyWarned = false;
+
+/**
+ * A missing policy means an unprovisioned workspace (allow: bootstrap).
+ * A policy that exists but cannot be parsed must NOT silently disable tier
+ * isolation — protected tiers fail closed until the file is repaired.
+ */
+function loadPolicy(): PolicyLoad {
+  if (!rawExistsSync(POLICY_PATH)) return { status: 'missing' };
   try {
-    if (rawExistsSync(POLICY_PATH)) {
-      return JSON.parse(rawReadTextFile(POLICY_PATH));
+    return { status: 'loaded', policy: JSON.parse(rawReadTextFile(POLICY_PATH)) };
+  } catch (err) {
+    if (!corruptPolicyWarned) {
+      corruptPolicyWarned = true;
+      logger.error(
+        `security-policy.json exists but cannot be parsed; personal/confidential tiers fail closed: ${err}`
+      );
     }
-  } catch (_) {}
-  return null;
+    return { status: 'corrupt' };
+  }
 }
+
+function isProtectedTierPath(relativePath: string): boolean {
+  return (
+    pathStartsWith(relativePath, 'knowledge/personal') ||
+    pathStartsWith(relativePath, 'knowledge/confidential')
+  );
+}
+
+const CORRUPT_POLICY_DENIAL = {
+  allowed: false as const,
+  reason:
+    '[POLICY_VIOLATION] security-policy.json exists but cannot be parsed. Access to personal/confidential tiers fails closed until the policy file is repaired.',
+};
 
 /**
  * Checks project-level access within the confidential tier.
@@ -55,7 +93,7 @@ function checkProjectScope(
   relativePath: string,
   policy: any,
   currentPersona: string,
-  authorities: Authority[],
+  authorities: Authority[]
 ): { allowed: false; reason: string } | null {
   if (!pathStartsWith(relativePath, 'knowledge/confidential/')) return null;
 
@@ -101,10 +139,12 @@ function hasAuthorityAccess(
   authorities: Authority[],
   relativePath: string,
   missionId?: string,
-  accessType: 'allow_read' | 'allow_write' = 'allow_write',
+  accessType: 'allow_read' | 'allow_write' = 'allow_write'
 ): boolean {
   const authorityPermissions = policy.authority_permissions || {};
-  return authorities.some((authority) => matchesAny(relativePath, authorityPermissions[authority]?.[accessType], missionId));
+  return authorities.some((authority) =>
+    matchesAny(relativePath, authorityPermissions[authority]?.[accessType], missionId)
+  );
 }
 
 function tenantScopeConfig(policy: any): {
@@ -118,7 +158,8 @@ function tenantScopeConfig(policy: any): {
   };
 } {
   const cfg = policy?.tenant_scope || {};
-  const slugPatternRaw = typeof cfg.slug_pattern === 'string' ? cfg.slug_pattern : '^[a-z][a-z0-9-]{1,30}$';
+  const slugPatternRaw =
+    typeof cfg.slug_pattern === 'string' ? cfg.slug_pattern : '^[a-z][a-z0-9-]{1,30}$';
   let slugPattern = /^[a-z][a-z0-9-]{1,30}$/;
   try {
     slugPattern = new RegExp(slugPatternRaw);
@@ -143,7 +184,7 @@ function tenantScopeConfig(policy: any): {
 
 function extractTenantFromProtectedPrefix(
   relativePath: string,
-  protectedPrefixes: string[],
+  protectedPrefixes: string[]
 ): { tenant: string; prefix: string } | null {
   for (const prefix of protectedPrefixes) {
     if (!pathStartsWith(relativePath, prefix)) continue;
@@ -162,7 +203,9 @@ interface TenantGroupProfile {
 }
 
 function extractTenantGroupFromSharedPath(relativePath: string): string | null {
-  const match = relativePath.match(/^knowledge\/confidential\/shared\/([a-z][a-z0-9-]{1,30})(?:\/|$)/);
+  const match = relativePath.match(
+    /^knowledge\/confidential\/shared\/([a-z][a-z0-9-]{1,30})(?:\/|$)/
+  );
   return match?.[1] ?? null;
 }
 
@@ -182,7 +225,9 @@ function isValidTenantGroupProfile(groupId: string, profile: TenantGroupProfile)
   return (
     profile &&
     profile.tenant_group_id === groupId &&
-    (profile.status === 'active' || profile.status === 'suspended' || profile.status === 'archived') &&
+    (profile.status === 'active' ||
+      profile.status === 'suspended' ||
+      profile.status === 'archived') &&
     Array.isArray(profile.member_tenants) &&
     profile.member_tenants.length > 0 &&
     profile.member_tenants.every((tenant) => /^[a-z][a-z0-9-]{1,30}$/.test(String(tenant))) &&
@@ -197,7 +242,7 @@ function isValidTenantGroupProfile(groupId: string, profile: TenantGroupProfile)
 function checkTenantGroupScope(
   relativePath: string,
   tenantSlug: string | undefined,
-  brokeredTenants: string[] | undefined,
+  brokeredTenants: string[] | undefined
 ): { allowed: boolean; reason?: string } | null {
   const groupId = extractTenantGroupFromSharedPath(relativePath);
   if (!groupId) return null;
@@ -211,9 +256,10 @@ function checkTenantGroupScope(
   }
 
   const members = Array.isArray(group.member_tenants) ? group.member_tenants : [];
-  const sharedPrefixes = Array.isArray(group.shared_prefixes) && group.shared_prefixes.length > 0
-    ? group.shared_prefixes
-    : [`knowledge/confidential/shared/${groupId}/`];
+  const sharedPrefixes =
+    Array.isArray(group.shared_prefixes) && group.shared_prefixes.length > 0
+      ? group.shared_prefixes
+      : [`knowledge/confidential/shared/${groupId}/`];
   if (!sharedPrefixes.some((prefix) => pathStartsWith(relativePath, prefix))) {
     return {
       allowed: false,
@@ -266,7 +312,7 @@ function checkTenantScope(
         expiresAt?: string;
       }
     | undefined,
-  authorities: Authority[],
+  authorities: Authority[]
 ): { allowed: boolean; reason?: string } | null {
   if (authorities.includes('SUDO')) return null;
   const cfg = tenantScopeConfig(policy);
@@ -352,21 +398,23 @@ function recordBrokerAccess(input: {
   brokerTenants: string[];
   targetTenant: string;
 }): void {
-  import('./audit-chain.js').then(({ auditChain }) => {
-    auditChain.record({
-      agentId: 'tier-guard',
-      action: 'tenant.broker_access',
-      operation: input.relativePath,
-      result: 'allowed',
-      reason: `Brokered cross-tenant access to '${input.targetTenant}' via mission allowed across {${input.brokerTenants.join(', ')}}.`,
-      metadata: {
-        target_tenant: input.targetTenant,
-        broker_tenants: input.brokerTenants,
-      },
+  import('./audit-chain.js')
+    .then(({ auditChain }) => {
+      auditChain.record({
+        agentId: 'tier-guard',
+        action: 'tenant.broker_access',
+        operation: input.relativePath,
+        result: 'allowed',
+        reason: `Brokered cross-tenant access to '${input.targetTenant}' via mission allowed across {${input.brokerTenants.join(', ')}}.`,
+        metadata: {
+          target_tenant: input.targetTenant,
+          broker_tenants: input.brokerTenants,
+        },
+      });
+    })
+    .catch(() => {
+      /* best-effort */
     });
-  }).catch(() => {
-    /* best-effort */
-  });
 }
 
 function recordGroupAccess(input: {
@@ -374,21 +422,23 @@ function recordGroupAccess(input: {
   groupId: string;
   tenantSlug: string;
 }): void {
-  import('./audit-chain.js').then(({ auditChain }) => {
-    auditChain.record({
-      agentId: 'tier-guard',
-      action: 'tenant.group_access',
-      operation: input.relativePath,
-      result: 'allowed',
-      reason: `Tenant '${input.tenantSlug}' accessed shared tenant group '${input.groupId}'.`,
-      metadata: {
-        tenant_slug: input.tenantSlug,
-        tenant_group_id: input.groupId,
-      },
+  import('./audit-chain.js')
+    .then(({ auditChain }) => {
+      auditChain.record({
+        agentId: 'tier-guard',
+        action: 'tenant.group_access',
+        operation: input.relativePath,
+        result: 'allowed',
+        reason: `Tenant '${input.tenantSlug}' accessed shared tenant group '${input.groupId}'.`,
+        metadata: {
+          tenant_slug: input.tenantSlug,
+          tenant_group_id: input.groupId,
+        },
+      });
+    })
+    .catch(() => {
+      /* best-effort */
     });
-  }).catch(() => {
-    /* best-effort */
-  });
 }
 
 export function validateWritePermission(filePath: string): { allowed: boolean; reason?: string } {
@@ -397,32 +447,66 @@ export function validateWritePermission(filePath: string): { allowed: boolean; r
   const currentMission = process.env.MISSION_ID;
 
   if (isOutsideProjectRoot(relativePath)) {
-    return { allowed: false, reason: `[POLICY_VIOLATION] Path outside project root: '${resolvedPath}'` };
+    return {
+      allowed: false,
+      reason: `[POLICY_VIOLATION] Path outside project root: '${resolvedPath}'`,
+    };
   }
 
   // 1. Identify Identity Context (Persona & Authority)
-  const { persona: currentPersona, role: currentRole, authorities, sudoScope, tenantSlug, brokeredTenants, brokerApproval } = resolveIdentityContext();
+  const {
+    persona: currentPersona,
+    role: currentRole,
+    authorities,
+    sudoScope,
+    tenantSlug,
+    brokeredTenants,
+    brokerApproval,
+  } = resolveIdentityContext();
 
-  const policy = loadPolicy();
-  if (!policy) return { allowed: true };
+  const loaded = loadPolicy();
+  if (loaded.status === 'missing') return { allowed: true };
+  if (loaded.status === 'corrupt') {
+    return isProtectedTierPath(relativePath) ? CORRUPT_POLICY_DENIAL : { allowed: true };
+  }
+  const policy = loaded.policy;
 
   // 1.5 Tenant scope — deny cross-tenant writes when the persona is tenant-bound.
-  const tenantDenial = checkTenantScope(policy, relativePath, tenantSlug, brokeredTenants, brokerApproval, authorities);
+  const tenantDenial = checkTenantScope(
+    policy,
+    relativePath,
+    tenantSlug,
+    brokeredTenants,
+    brokerApproval,
+    authorities
+  );
   if (tenantDenial) return tenantDenial;
 
-  const defaultAllow = (policy.default_allow || []).map((p: string) => expandPolicyPath(p, currentMission));
+  const defaultAllow = (policy.default_allow || []).map((p: string) =>
+    expandPolicyPath(p, currentMission)
+  );
   if (defaultAllow.some((p: string) => pathStartsWith(relativePath, p))) return { allowed: true };
 
-  if (authorities.includes('SUDO') && hasScopedSudoAccess(relativePath, sudoScope)) return { allowed: true };
-  if (hasAuthorityAccess(policy, authorities, relativePath, currentMission, 'allow_write')) return { allowed: true };
+  if (authorities.includes('SUDO') && hasScopedSudoAccess(relativePath, sudoScope))
+    return { allowed: true };
+  if (hasAuthorityAccess(policy, authorities, relativePath, currentMission, 'allow_write'))
+    return { allowed: true };
 
   const roleRules = currentRole ? policy.authority_role_permissions?.[currentRole] : null;
-  if (roleRules?.allow_write?.some((p: string) => pathStartsWith(relativePath, expandPolicyPath(p, currentMission)))) {
+  if (
+    roleRules?.allow_write?.some((p: string) =>
+      pathStartsWith(relativePath, expandPolicyPath(p, currentMission))
+    )
+  ) {
     return { allowed: true };
   }
 
   const personaRules = policy.persona_permissions?.[currentPersona];
-  if (personaRules?.allow_write?.some((p: string) => pathStartsWith(relativePath, expandPolicyPath(p, currentMission)))) {
+  if (
+    personaRules?.allow_write?.some((p: string) =>
+      pathStartsWith(relativePath, expandPolicyPath(p, currentMission))
+    )
+  ) {
     return { allowed: true };
   }
 
@@ -438,7 +522,7 @@ export function validateWritePermission(filePath: string): { allowed: boolean; r
   }
   return {
     allowed: false,
-    reason: `[POLICY_VIOLATION] Persona '${currentPersona}' with authority role '${currentRole || 'unknown'}' is NOT authorized to write to '${relativePath}'.`
+    reason: `[POLICY_VIOLATION] Persona '${currentPersona}' with authority role '${currentRole || 'unknown'}' is NOT authorized to write to '${relativePath}'.`,
   };
 }
 
@@ -460,37 +544,82 @@ export function validateReadPermission(filePath: string): { allowed: boolean; re
   const relativePath = path.relative(PROJECT_ROOT, resolvedPath);
 
   if (isOutsideProjectRoot(relativePath)) {
-    return { allowed: false, reason: `[POLICY_VIOLATION] Path outside project root: '${resolvedPath}'` };
+    return {
+      allowed: false,
+      reason: `[POLICY_VIOLATION] Path outside project root: '${resolvedPath}'`,
+    };
   }
 
   if (!pathStartsWith(relativePath, 'knowledge')) return { allowed: true };
   if (pathStartsWith(relativePath, 'knowledge/public')) return { allowed: true };
 
-  if (!pathStartsWith(relativePath, 'knowledge/personal') &&
-      !pathStartsWith(relativePath, 'knowledge/confidential')) {
+  if (
+    !pathStartsWith(relativePath, 'knowledge/personal') &&
+    !pathStartsWith(relativePath, 'knowledge/confidential')
+  ) {
     return { allowed: true };
   }
 
-  const policy = loadPolicy();
-  if (!policy) return { allowed: true };
+  const loaded = loadPolicy();
+  if (loaded.status === 'missing') return { allowed: true };
+  if (loaded.status === 'corrupt') return CORRUPT_POLICY_DENIAL;
+  const policy = loaded.policy;
 
-  const { persona: currentPersona, role: currentRole, authorities, sudoScope, tenantSlug, brokeredTenants, brokerApproval } = resolveIdentityContext();
+  const {
+    persona: currentPersona,
+    role: currentRole,
+    authorities,
+    sudoScope,
+    tenantSlug,
+    brokeredTenants,
+    brokerApproval,
+  } = resolveIdentityContext();
 
   // Tenant scope — deny cross-tenant reads from confidential.
-  const tenantDenial = checkTenantScope(policy, relativePath, tenantSlug, brokeredTenants, brokerApproval, authorities);
+  const tenantDenial = checkTenantScope(
+    policy,
+    relativePath,
+    tenantSlug,
+    brokeredTenants,
+    brokerApproval,
+    authorities
+  );
   if (tenantDenial) return tenantDenial;
 
-  if (authorities.includes('SUDO') && hasScopedSudoAccess(relativePath, sudoScope)) return { allowed: true };
-  if (hasAuthorityAccess(policy, authorities, relativePath, process.env.MISSION_ID, 'allow_read')) return { allowed: true };
-  if (hasAuthorityAccess(policy, authorities, relativePath, process.env.MISSION_ID, 'allow_write')) return { allowed: true };
+  if (authorities.includes('SUDO') && hasScopedSudoAccess(relativePath, sudoScope))
+    return { allowed: true };
+  if (hasAuthorityAccess(policy, authorities, relativePath, process.env.MISSION_ID, 'allow_read'))
+    return { allowed: true };
+  if (hasAuthorityAccess(policy, authorities, relativePath, process.env.MISSION_ID, 'allow_write'))
+    return { allowed: true };
 
   const roleRules = currentRole ? policy.authority_role_permissions?.[currentRole] : null;
-  if (roleRules?.allow_read?.some((p: string) => pathStartsWith(relativePath, expandPolicyPath(p, process.env.MISSION_ID)))) return { allowed: true };
-  if (roleRules?.allow_write?.some((p: string) => pathStartsWith(relativePath, expandPolicyPath(p, process.env.MISSION_ID)))) return { allowed: true };
+  if (
+    roleRules?.allow_read?.some((p: string) =>
+      pathStartsWith(relativePath, expandPolicyPath(p, process.env.MISSION_ID))
+    )
+  )
+    return { allowed: true };
+  if (
+    roleRules?.allow_write?.some((p: string) =>
+      pathStartsWith(relativePath, expandPolicyPath(p, process.env.MISSION_ID))
+    )
+  )
+    return { allowed: true };
 
   const personaRules = policy.persona_permissions?.[currentPersona];
-  if (personaRules?.allow_read?.some((p: string) => pathStartsWith(relativePath, expandPolicyPath(p, process.env.MISSION_ID)))) return { allowed: true };
-  if (personaRules?.allow_write?.some((p: string) => pathStartsWith(relativePath, expandPolicyPath(p, process.env.MISSION_ID)))) return { allowed: true };
+  if (
+    personaRules?.allow_read?.some((p: string) =>
+      pathStartsWith(relativePath, expandPolicyPath(p, process.env.MISSION_ID))
+    )
+  )
+    return { allowed: true };
+  if (
+    personaRules?.allow_write?.some((p: string) =>
+      pathStartsWith(relativePath, expandPolicyPath(p, process.env.MISSION_ID))
+    )
+  )
+    return { allowed: true };
 
   // Project scope check for confidential tier (before generic tier restrictions)
   const projectDenial = checkProjectScope(relativePath, policy, currentPersona, authorities);
@@ -506,12 +635,16 @@ export function validateReadPermission(filePath: string): { allowed: boolean; re
   return { allowed: true };
 }
 
-export function validateSovereignBoundary(content: string, activeSecrets: string[] = []): { safe: boolean; detected: string[] } {
+export function validateSovereignBoundary(
+  content: string,
+  activeSecrets: string[] = []
+): { safe: boolean; detected: string[] } {
   if (!content || activeSecrets.length === 0) return { safe: true, detected: [] };
   const detected: string[] = [];
   for (const secret of activeSecrets) {
     if (secret && content.includes(secret)) {
-      const masked = secret.length <= 8 ? '********' : `${secret.slice(0, 4)}...${secret.slice(-4)}`;
+      const masked =
+        secret.length <= 8 ? '********' : `${secret.slice(0, 4)}...${secret.slice(-4)}`;
       detected.push(`SECRET_LEAK:${masked}`);
     }
   }
@@ -528,7 +661,9 @@ export function scanForConfidentialMarkers(content: string): MarkerScanResult {
       if (re.test(content)) {
         markers.push(pattern.name);
       }
-    } catch (_) {}
+    } catch (err) {
+      logger.warn(`marker pattern '${pattern.name}' failed to compile and is not enforced: ${err}`);
+    }
   }
   return { hasMarkers: markers.length > 0, markers };
 }
@@ -544,6 +679,10 @@ function loadMarkerPatterns(): { name: string; regex: string }[] {
         if (p?.name && p?.regex) patterns.push({ name: p.name, regex: p.regex });
       }
     }
-  } catch (_) {}
+  } catch (err) {
+    logger.warn(
+      `knowledge-sync-rules.json PII patterns unavailable — marker scan degraded: ${err}`
+    );
+  }
   return patterns;
 }
