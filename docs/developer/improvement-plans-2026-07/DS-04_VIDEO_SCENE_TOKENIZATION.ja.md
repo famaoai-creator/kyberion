@@ -58,3 +58,9 @@
 ### 追記(2026-07-13 — 選択方式への転換)
 
 - オペレータ指摘(生成 + 検証は縮退しがち)を受け、**生成 → カタログ選択**へ転換: `knowledge/public/design-patterns/media-templates/video-visual-patterns.json` に5つのキュレーション済みパターン(calm-tech / warm-documentary / bold-pop / fresh-clarity / midnight-executive、各 portrait/landscape タイポ調整済み)を新設し、LLM は id を選ぶだけ(カタログ外 id は先頭パターンへ縮退)。pptx の themes.json 選択(`deck-theme-direction.ts`、brief 明示指定はオペレータ優先)と対になる構造。
+
+### 追記(2026-07-13 — 境界監査 A/B/C の実装)
+
+- **A**: `media:apply_theme` が `theme: 'auto'` を受理 — 統制カタログから story 適合テーマを LLM 選択(失敗はカタログ既定へ)。`marketing-content.json` の既定を auto 化(他 creative pipeline は apply_theme 不使用を確認)。
+- **B(最小実装)**: `draftDeckSectionBodies` — 宣言のみだった llm_zone `draft_body_content` を実体化。**本文が空のセクションだけ**を起草し(既存本文とオペレータ入力は不可侵)、失敗時は outline 不変。`document_outline_from_brief` へ配線。
+- **C**: storyboard 無しの narrated 合成に警告(テンプレ流し込みへの縮退を可視化し、上流に storyboard 起草を促す)。

@@ -1,4 +1,4 @@
-import { selectDeckTheme } from '@agent/core';
+import { draftDeckSectionBodies, selectDeckTheme } from '@agent/core';
 import {
   logger,
   safeReadFile,
@@ -1637,7 +1637,31 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
         logger.warn('[MEDIA_TRANSFORM] theme catalog not found, skipping theme application');
         return ctx;
       }
-      const themeName = resolve(params.theme) || themes.default_theme || 'kyberion-standard';
+      let themeName = resolve(params.theme) || themes.default_theme || 'kyberion-standard';
+      // LLM-boundary audit fix A: theme: 'auto' selects a story-matched theme
+      // from the governed catalog (selection only — never invents colors);
+      // failure or an empty story keeps the catalog default.
+      if (themeName === 'auto') {
+        const fallbackTheme = themes.default_theme || 'kyberion-standard';
+        const storySource =
+          ctx.document_outline ||
+          ctx.last_brief ||
+          ctx.brief ||
+          params.story ||
+          ctx.last_json ||
+          {};
+        themeName = await selectDeckTheme({
+          title: String(
+            (storySource as any).title || (storySource as any).document_type || 'Document'
+          ),
+          summary: JSON.stringify(storySource).slice(0, 1500),
+          catalog: Object.entries(themes.themes).map(([id, record]: [string, any]) => ({
+            id,
+            name: record?.name ? String(record.name) : undefined,
+          })),
+          defaultTheme: fallbackTheme,
+        });
+      }
       const theme = themes.themes[themeName];
       const confidentialPack = theme ? null : resolveConfidentialThemePack(rootDir, themeName);
       const resolvedTheme =
@@ -1873,6 +1897,37 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
           catalog,
           defaultTheme: String(outline.recommended_theme),
         });
+      }
+
+      // LLM-boundary audit fix B: fill ONLY empty section bodies (the
+      // llm_zone declared draft_body_content but nothing implemented it —
+      // body-less briefs rendered heading-only decks). Existing bodies and
+      // failures leave the outline untouched.
+      const outlineSections = Array.isArray((outline as any)?.sections)
+        ? ((outline as any).sections as any[])
+        : [];
+      const draftTargets = outlineSections.map((section: any) => ({
+        id: String(section.section_id || section.id || section.title || 'section'),
+        title: String(section.title || section.section_id || 'Section'),
+        body: Array.isArray(section.body) ? section.body.join(' ') : section.body,
+      }));
+      if (draftTargets.some((section) => !String(section.body ?? '').trim())) {
+        const drafts = await draftDeckSectionBodies({
+          title: String((brief as any).title || outline.document_type || 'Document'),
+          tone: (brief as any).tone ? String((brief as any).tone) : undefined,
+          audience: (brief as any).audience ? String((brief as any).audience) : undefined,
+          locale: (brief as any).locale ? String((brief as any).locale) : undefined,
+          sections: draftTargets,
+        });
+        for (const section of outlineSections) {
+          const key = String(section.section_id || section.id || section.title || 'section');
+          const hasBody = Array.isArray(section.body)
+            ? section.body.some((value: any) => String(value ?? '').trim())
+            : Boolean(String(section.body ?? '').trim());
+          if (!hasBody && drafts[key]) {
+            section.body = Array.isArray(section.body) ? [drafts[key]] : drafts[key];
+          }
+        }
       }
 
       return {
