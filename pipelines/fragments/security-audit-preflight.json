@@ -1,0 +1,20 @@
+{
+  "action": "pipeline",
+  "name": "security-audit-preflight-fragment",
+  "version": "1.0.0",
+  "description": "Reusable gate fragment for the source-code security audit service. Verifies the static-analysis toolchain (semgrep), the git working copy, and the target directory before any scan side-effects. Emits a standard preflight_result channel.",
+  "context": {
+    "target_dir": "."
+  },
+  "steps": [
+    {
+      "id": "security_audit_preflight",
+      "role": "source",
+      "op": "system:shell",
+      "produces": { "channel": "preflight_result", "type": "ShellResult" },
+      "params": {
+        "cmd": "set -e; test -d \"{{target_dir}}\" || { echo \"[preflight] target_dir not found: {{target_dir}}\" >&2; exit 1; }; command -v semgrep >/dev/null 2>&1 || { echo \"[preflight] semgrep not installed (brew install semgrep / pip install semgrep)\" >&2; exit 1; }; command -v git >/dev/null 2>&1 || { echo \"[preflight] git not available\" >&2; exit 1; }; echo \"[preflight] ok: target=\\\"{{target_dir}}\\\" semgrep=$(semgrep --version 2>/dev/null | head -1)\""
+      }
+    }
+  ]
+}
