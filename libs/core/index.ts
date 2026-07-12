@@ -136,6 +136,8 @@ export * from './operation-policy-gate.js';
 export * from './operation-policy-gate.js';
 export * from './runtime-health-history.js';
 export * from './bridge-typing.js';
+export * from './draft-refine.js';
+export * from './gemini-embedding-backend.js';
 export * from './process-guards.js';
 export * from './process-guards.js';
 export * from './guided-coordination-brief.js';
