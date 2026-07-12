@@ -1,0 +1,77 @@
+{
+  "description": "KM-02 Task 1.4: 20 representative retrieval queries. 'head' queries are answerable from the document summary the pre-chunking index carried; 'body' queries are answerable only from body text beyond the 300-char summary, so they require chunk entries to hit.",
+  "queries": [
+    { "query": "quorum handshake tuning", "expected": "public/mesh-consensus.md", "needs": "head" },
+    {
+      "query": "xylograph rollback lever",
+      "expected": "public/mesh-consensus.md",
+      "needs": "body"
+    },
+    {
+      "query": "egress manifest allowlist",
+      "expected": "public/egress-policy.md",
+      "needs": "head"
+    },
+    {
+      "query": "brumewick escalation ladder",
+      "expected": "public/egress-policy.md",
+      "needs": "body"
+    },
+    {
+      "query": "vector cache eviction budget",
+      "expected": "public/embedding-cache.md",
+      "needs": "head"
+    },
+    {
+      "query": "quenchcoil compaction pass",
+      "expected": "public/embedding-cache.md",
+      "needs": "body"
+    },
+    {
+      "query": "mission checkpoint resume",
+      "expected": "public/mission-recovery.md",
+      "needs": "head"
+    },
+    {
+      "query": "farrowdene pause marker",
+      "expected": "public/mission-recovery.md",
+      "needs": "body"
+    },
+    {
+      "query": "actuator manifest discovery",
+      "expected": "public/actuator-catalog.md",
+      "needs": "head"
+    },
+    {
+      "query": "veldspar preflight probe",
+      "expected": "public/actuator-catalog.md",
+      "needs": "body"
+    },
+    { "query": "approval sovereign gate", "expected": "public/approval-flow.md", "needs": "head" },
+    { "query": "morrowgate dual signoff", "expected": "public/approval-flow.md", "needs": "body" },
+    {
+      "query": "slide layout grammar tokens",
+      "expected": "public/deck-grammar.md",
+      "needs": "head"
+    },
+    { "query": "tessellume contrast audit", "expected": "public/deck-grammar.md", "needs": "body" },
+    { "query": "bridge typing indicator loop", "expected": "public/bridge-ux.md", "needs": "head" },
+    { "query": "glimmerfen reaction fallback", "expected": "public/bridge-ux.md", "needs": "body" },
+    {
+      "query": "spend guard tenant override",
+      "expected": "public/cost-controls.md",
+      "needs": "head"
+    },
+    {
+      "query": "coldspindle amortization table",
+      "expected": "public/cost-controls.md",
+      "needs": "body"
+    },
+    {
+      "query": "peer envelope signature mode",
+      "expected": "public/a2a-security.md",
+      "needs": "head"
+    },
+    { "query": "harrowlark replay window", "expected": "public/a2a-security.md", "needs": "body" }
+  ]
+}
