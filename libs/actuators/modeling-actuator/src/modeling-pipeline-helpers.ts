@@ -625,7 +625,11 @@ async function loadBrowserExecutionPresetCatalog(): Promise<{
         buildRetryOptions()
       );
       if (parsed && typeof parsed === 'object' && parsed.presets) return parsed;
-    } catch (_) {}
+    } catch (err) {
+      logger.warn(
+        `[modeling-pipeline-helpers] suppressed error in loadBrowserExecutionPresetCatalog: ${err}`
+      );
+    }
   }
 
   return {

@@ -197,7 +197,9 @@ function extractBrainProfile(payload: string): { profile: string; cleanPayload: 
           return { profile, cleanPayload };
         }
       }
-    } catch (_) {}
+    } catch (err) {
+      logger.warn(`[nexus-daemon] suppressed error in extractBrainProfile: ${err}`);
+    }
   }
 
   return { profile: 'default', cleanPayload: payload };

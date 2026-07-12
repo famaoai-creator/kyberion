@@ -87,7 +87,9 @@ setInterval(
         inflight_total: daemonGlobalInflight,
         inflight_by_agent: agentInflightObj,
       });
-    } catch (_) {}
+    } catch (err) {
+      logger.warn(`[agent_runtime_supervisor_daemon] suppressed error in best-effort step: ${err}`);
+    }
   },
   Number(process.env.KYBERION_RUNTIME_SWEEP_INTERVAL_MS || 30_000)
 ).unref?.();

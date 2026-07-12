@@ -11,6 +11,8 @@ import {
   safeUnlinkSync,
   safeWriteFile,
 } from './secure-io.js';
+import { createLogger } from './logger.js';
+const logger = createLogger('oauth-session-store');
 
 export interface PendingOAuthSession {
   serviceId: string;
@@ -48,10 +50,15 @@ export function savePendingOAuthSession(session: PendingOAuthSession): void {
   safeWriteFile(filePath, JSON.stringify(session, null, 2) + '\n');
   try {
     safeFsyncFile(filePath);
-  } catch (_) {}
+  } catch (err) {
+    logger.warn(`suppressed error in savePendingOAuthSession: ${err}`);
+  }
 }
 
-export function loadPendingOAuthSession(serviceId: string, state?: string): PendingOAuthSession | null {
+export function loadPendingOAuthSession(
+  serviceId: string,
+  state?: string
+): PendingOAuthSession | null {
   const dir = serviceSessionDir(serviceId);
   if (!safeExistsSync(dir)) return null;
 
@@ -66,7 +73,10 @@ export function loadPendingOAuthSession(serviceId: string, state?: string): Pend
   }
 
   try {
-    const files = safeReaddir(dir).filter((file) => file.endsWith('.json')).sort().reverse();
+    const files = safeReaddir(dir)
+      .filter((file) => file.endsWith('.json'))
+      .sort()
+      .reverse();
     if (files.length === 0) return null;
     return JSON.parse(safeReadFile(path.join(dir, files[0]), { encoding: 'utf8' }) as string);
   } catch (_) {
@@ -91,19 +101,28 @@ export function listPendingOAuthSessions(): PendingOAuthSession[] {
       for (const fileName of safeReaddir(fullDir)) {
         if (!fileName.endsWith('.json')) continue;
         try {
-          const session = JSON.parse(safeReadFile(path.join(fullDir, fileName), { encoding: 'utf8' }) as string) as PendingOAuthSession;
+          const session = JSON.parse(
+            safeReadFile(path.join(fullDir, fileName), { encoding: 'utf8' }) as string
+          ) as PendingOAuthSession;
           sessions.push(session);
-        } catch (_) {}
+        } catch (err) {
+          logger.warn(`suppressed error in listPendingOAuthSessions: ${err}`);
+        }
       }
     }
-  } catch (_) {}
+  } catch (err) {
+    logger.warn(`suppressed error in listPendingOAuthSessions: ${err}`);
+  }
   return sessions;
 }
 
 export function normalizeScopes(scopes?: string[] | string): string[] {
   if (!scopes) return [];
   if (Array.isArray(scopes)) return scopes.filter(Boolean);
-  return scopes.split(/[ ,]+/).map((value) => value.trim()).filter(Boolean);
+  return scopes
+    .split(/[ ,]+/)
+    .map((value) => value.trim())
+    .filter(Boolean);
 }
 
 export function findPendingOAuthSessionByState(state: string): PendingOAuthSession | null {

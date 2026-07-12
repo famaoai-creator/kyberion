@@ -1,5 +1,6 @@
 import { classifyError } from './error-classifier.js';
-import { logger } from './core.js';
+import { createLogger } from './logger.js';
+const logger = createLogger('service-engine-helpers');
 import * as customerResolver from './customer-resolver.js';
 import { pathResolver } from './path-resolver.js';
 import { resolveServiceBinding } from './service-binding.js';
@@ -35,7 +36,9 @@ export function loadConnectionWithFallback(serviceId: string): Record<string, an
     try {
       const primary = JSON.parse(safeReadFile(connectionPath, { encoding: 'utf8' }) as string);
       if (primary && typeof primary === 'object' && Object.keys(primary).length > 0) return primary;
-    } catch (_) {}
+    } catch (err) {
+      logger.warn(`suppressed error in loadConnectionWithFallback: ${err}`);
+    }
   }
   try {
     const fallbackPath = pathResolver.resolve(`knowledge/personal/connections/${serviceId}.json`);
@@ -51,7 +54,10 @@ function isUnresolvedTemplateString(value: unknown): value is string {
   return typeof value === 'string' && /^\{\{\s*[^}]+\s*\}\}$/.test(value.trim());
 }
 
-export function mergeParamsWithConnection(connection: Record<string, any>, params: Record<string, any>): Record<string, any> {
+export function mergeParamsWithConnection(
+  connection: Record<string, any>,
+  params: Record<string, any>
+): Record<string, any> {
   const merged: Record<string, any> = { ...connection };
   for (const [key, value] of Object.entries(params || {})) {
     if (isUnresolvedTemplateString(value) && merged[key] !== undefined) continue;
@@ -110,7 +116,7 @@ function resolvePathToken(token: string): string | undefined {
 export function resolveVars(
   input: string | undefined,
   vars: Record<string, any>,
-  maxDepth = 8,
+  maxDepth = 8
 ): string {
   if (!input) return '';
   let out = input;
@@ -129,7 +135,7 @@ export function resolveVars(
   }
   if (/{{.*?}}/.test(out)) {
     logger.warn(
-      `[resolveVars] max expansion depth (${maxDepth}) reached without converging — possible variable cycle. Unresolved: "${out.slice(0, 120)}"`,
+      `[resolveVars] max expansion depth (${maxDepth}) reached without converging — possible variable cycle. Unresolved: "${out.slice(0, 120)}"`
     );
   }
   return out;
@@ -155,7 +161,7 @@ export function resolveTemplateValue(input: any, vars: Record<string, any>): any
   }
   if (input && typeof input === 'object') {
     return Object.fromEntries(
-      Object.entries(input).map(([key, value]) => [key, resolveTemplateValue(value, vars)]),
+      Object.entries(input).map(([key, value]) => [key, resolveTemplateValue(value, vars)])
     );
   }
   return input;
@@ -174,7 +180,8 @@ function resolveRetryPolicy(...sources: Array<Record<string, any> | undefined>):
   const merged: RetryPolicy = {};
   for (const source of sources) {
     const policy = resolveRecoveryPolicy(source);
-    const retry = policy.retry || policy.default_retry || source?.retry_policy || source?.retry || {};
+    const retry =
+      policy.retry || policy.default_retry || source?.retry_policy || source?.retry || {};
     if (isPlainObject(retry)) {
       Object.assign(merged, retry);
     }
@@ -185,12 +192,14 @@ function resolveRetryPolicy(...sources: Array<Record<string, any> | undefined>):
 export function buildRetryOptions(
   serviceConfig: Record<string, any>,
   preset: Record<string, any>,
-  operation: Record<string, any>,
+  operation: Record<string, any>
 ): Required<RetryPolicy> & { shouldRetry: (error: Error) => boolean } {
   const retryableCategories = new Set<string>();
   for (const source of [serviceConfig, preset, operation]) {
     const policy = resolveRecoveryPolicy(source);
-    const categories = Array.isArray(policy.retryable_categories) ? policy.retryable_categories : [];
+    const categories = Array.isArray(policy.retryable_categories)
+      ? policy.retryable_categories
+      : [];
     for (const category of categories) retryableCategories.add(String(category));
   }
 
@@ -244,7 +253,7 @@ export function buildApiKeyQueryAuth(
   authStrategy: string | undefined,
   authParams: Record<string, any> | undefined,
   binding: ReturnType<typeof resolveServiceBinding>,
-  templateVars: Record<string, any>,
+  templateVars: Record<string, any>
 ): Record<string, string> {
   if (!authStrategy || authStrategy.toLowerCase() !== 'api_key_query') return {};
 
@@ -259,7 +268,9 @@ export function buildApiKeyQueryAuth(
   });
   const value = typeof resolvedValue === 'string' ? resolvedValue : String(resolvedValue ?? '');
   if (!value) {
-    throw new Error(`api_key_query auth requires an access token for service "${binding.serviceId}"`);
+    throw new Error(
+      `api_key_query auth requires an access token for service "${binding.serviceId}"`
+    );
   }
 
   return { [key]: value };
@@ -267,7 +278,7 @@ export function buildApiKeyQueryAuth(
 
 export function buildAuthHeaders(
   authStrategy: string | undefined,
-  binding: ReturnType<typeof resolveServiceBinding>,
+  binding: ReturnType<typeof resolveServiceBinding>
 ): Record<string, string> {
   if (!authStrategy || authStrategy.toLowerCase() === 'none') return {};
 
@@ -280,13 +291,18 @@ export function buildAuthHeaders(
 
   if (authStrategy.toLowerCase() === 'basic') {
     if (binding.clientId && binding.clientSecret) {
-      const credentials = Buffer.from(`${binding.clientId}:${binding.clientSecret}`, 'utf8').toString('base64');
+      const credentials = Buffer.from(
+        `${binding.clientId}:${binding.clientSecret}`,
+        'utf8'
+      ).toString('base64');
       return { Authorization: `Basic ${credentials}` };
     }
     if (binding.accessToken) {
       return { Authorization: `Basic ${binding.accessToken}` };
     }
-    throw new Error(`Basic auth requires client credentials or a pre-encoded token for service "${binding.serviceId}"`);
+    throw new Error(
+      `Basic auth requires client credentials or a pre-encoded token for service "${binding.serviceId}"`
+    );
   }
 
   return {};
@@ -318,7 +334,7 @@ export function stripUnresolvedTemplateValues(input: any): any {
     return Object.fromEntries(
       Object.entries(input)
         .map(([key, value]) => [key, stripUnresolvedTemplateValues(value)])
-        .filter(([, value]) => value !== undefined),
+        .filter(([, value]) => value !== undefined)
     );
   }
   return input;
@@ -326,8 +342,15 @@ export function stripUnresolvedTemplateValues(input: any): any {
 
 export function prepareRequestBody(payload: any, headers: Record<string, any>): any {
   const normalizedPayload = stripUnresolvedTemplateValues(payload);
-  const contentType = String(headers['Content-Type'] || headers['content-type'] || '').toLowerCase();
-  if (contentType.includes('application/x-www-form-urlencoded') && normalizedPayload && typeof normalizedPayload === 'object' && !Array.isArray(normalizedPayload)) {
+  const contentType = String(
+    headers['Content-Type'] || headers['content-type'] || ''
+  ).toLowerCase();
+  if (
+    contentType.includes('application/x-www-form-urlencoded') &&
+    normalizedPayload &&
+    typeof normalizedPayload === 'object' &&
+    !Array.isArray(normalizedPayload)
+  ) {
     return encodeFormBody(normalizedPayload);
   }
   return normalizedPayload;
@@ -336,7 +359,7 @@ export function prepareRequestBody(payload: any, headers: Record<string, any>): 
 export function isCliAllowedForOperation(
   serviceConfig: Record<string, any>,
   preset: Record<string, any>,
-  operation: Record<string, any>,
+  operation: Record<string, any>
 ): boolean {
   if (process.env.KYBERION_ALLOW_UNSAFE_CLI === 'true') return true;
   return (

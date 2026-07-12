@@ -1,4 +1,5 @@
-import { logger } from './core.js';
+import { createLogger } from './logger.js';
+const logger = createLogger('agent-adapter');
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReaddir, safeReadFile } from './secure-io.js';
 import { spawnManagedProcess, stopManagedProcess, touchManagedProcess } from './managed-process.js';
@@ -353,7 +354,9 @@ abstract class BaseACPAdapter implements AgentAdapter {
         methodId: this.authMethod,
         type: this.authMethod,
       });
-    } catch (e) {}
+    } catch (err) {
+      logger.warn(`suppressed error in createTerminal: ${err}`);
+    }
 
     const sessionRes: any = await this.connection.extMethod(this.dialect.newSession, {
       cwd: PROJECT_ROOT,
@@ -376,7 +379,9 @@ abstract class BaseACPAdapter implements AgentAdapter {
         sessionId: this.acpSessionId,
         modelId: resolveRuntimeModelId('gemini-default'),
       });
-    } catch (e) {}
+    } catch (err) {
+      logger.warn(`suppressed error in createTerminal: ${err}`);
+    }
   }
 
   public async ask(prompt: string, options?: AgentAskOptions): Promise<AgentResponse> {
@@ -487,7 +492,9 @@ export class GeminiAdapter extends BaseACPAdapter {
         sessionId: this.acpSessionId,
         modelId: targetModel,
       });
-    } catch (_) {}
+    } catch (err) {
+      logger.warn(`suppressed error in boot: ${err}`);
+    }
   }
 }
 

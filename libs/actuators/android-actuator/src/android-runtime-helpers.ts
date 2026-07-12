@@ -1097,7 +1097,9 @@ function loadAndroidUiDefaults(): any {
   if (safeExistsSync(ANDROID_UI_DEFAULTS_PATH)) {
     try {
       return JSON.parse(safeReadFile(ANDROID_UI_DEFAULTS_PATH, { encoding: 'utf8' }) as string);
-    } catch (_) {}
+    } catch (err) {
+      logger.warn(`[android-runtime-helpers] suppressed error in loadAndroidUiDefaults: ${err}`);
+    }
   }
   return {
     login: {

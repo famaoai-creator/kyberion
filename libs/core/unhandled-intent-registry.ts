@@ -1,6 +1,8 @@
 import { pathResolver } from './path-resolver.js';
 import { safeReadFile, safeWriteFile, safeExistsSync } from './secure-io.js';
 import * as nodePath from 'node:path';
+import { createLogger } from './logger.js';
+const logger = createLogger('unhandled-intent-registry');
 
 export type IntentMissType = 'unrouted' | 'unrecognized';
 
@@ -25,7 +27,12 @@ interface UnhandledIntentRegistry {
   entries: UnhandledIntentEntry[];
 }
 
-const REGISTRY_RELATIVE = nodePath.join('active', 'shared', 'tmp', 'unhandled-intent-registry.json');
+const REGISTRY_RELATIVE = nodePath.join(
+  'active',
+  'shared',
+  'tmp',
+  'unhandled-intent-registry.json'
+);
 const UTTERANCE_EXCERPT_LEN = 100;
 const MAX_UTTERANCE_SAMPLES = 3;
 
@@ -50,10 +57,16 @@ function readRegistry(): UnhandledIntentRegistry {
 function writeRegistry(registry: UnhandledIntentRegistry): void {
   try {
     safeWriteFile(registryPath(), JSON.stringify(registry, null, 2));
-  } catch { /* observability must never break the caller */ }
+  } catch {
+    /* observability must never break the caller */
+  }
 }
 
-function dedupeKey(missType: IntentMissType, intentId: string | undefined, utteranceExcerpt: string): string {
+function dedupeKey(
+  missType: IntentMissType,
+  intentId: string | undefined,
+  utteranceExcerpt: string
+): string {
   if (missType === 'unrouted' && intentId) return `unrouted:${intentId}`;
   return `unrecognized:${utteranceExcerpt.slice(0, 60)}`;
 }
@@ -87,7 +100,7 @@ export function recordUnhandledIntent(opts: {
     const matchExisting = (e: UnhandledIntentEntry): boolean => {
       if (e.miss_type !== opts.missType) return false;
       if (opts.missType === 'unrouted') return e.intent_id === opts.intentId;
-      return e.utterance_samples.some(s => s.startsWith(utteranceExcerpt.slice(0, 40)));
+      return e.utterance_samples.some((s) => s.startsWith(utteranceExcerpt.slice(0, 40)));
     };
 
     const existing = registry.entries.find(matchExisting);
@@ -95,7 +108,10 @@ export function recordUnhandledIntent(opts: {
     if (existing) {
       existing.occurrence_count += 1;
       existing.last_seen = timestamp;
-      if (!existing.utterance_samples.includes(utteranceExcerpt) && existing.utterance_samples.length < MAX_UTTERANCE_SAMPLES) {
+      if (
+        !existing.utterance_samples.includes(utteranceExcerpt) &&
+        existing.utterance_samples.length < MAX_UTTERANCE_SAMPLES
+      ) {
         existing.utterance_samples.push(utteranceExcerpt);
       }
     } else {
@@ -112,7 +128,9 @@ export function recordUnhandledIntent(opts: {
     }
 
     writeRegistry(registry);
-  } catch { /* never propagate */ }
+  } catch {
+    /* never propagate */
+  }
 }
 
 export function listUnhandledIntents(): UnhandledIntentEntry[] {
@@ -132,14 +150,16 @@ export function markIntentsReconciled(keys: string[]): void {
       }
     }
     writeRegistry(registry);
-  } catch {}
+  } catch (err) {
+    logger.warn(`suppressed error in markIntentsReconciled: ${err}`);
+  }
 }
 
 export function pruneReconciledIntents(): number {
   try {
     const registry = readRegistry();
     const before = registry.entries.length;
-    registry.entries = registry.entries.filter(e => !e.reconciled);
+    registry.entries = registry.entries.filter((e) => !e.reconciled);
     writeRegistry(registry);
     return before - registry.entries.length;
   } catch {
