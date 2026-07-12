@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "gate-profile.schema.json",
+  "title": "Gate Profile Registry",
+  "description": "Domain-agnostic gate profiles. Each gate fixes the three things sdlc-gating-model.md requires — required artifacts, exit criteria, and decision owner — plus the governance body that makes the call and the preconditions to convene it. Referenced by knowledge/product/architecture/sdlc-gating-model.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "profiles"],
+  "properties": {
+    "version": { "type": "string" },
+    "description": { "type": "string" },
+    "profile_files": {
+      "description": "Optional index of profile id to a standalone profile file.",
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "profiles": {
+      "description": "Map of profile id (e.g. 'sdlc', 'incident') to an ordered gate list.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["domain", "gates"],
+        "properties": {
+          "domain": { "type": "string" },
+          "description": { "type": "string" },
+          "gates": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "gate_id",
+                "phase",
+                "scope",
+                "purpose",
+                "decision_owner",
+                "governance_body",
+                "required_artifacts",
+                "entry_criteria",
+                "exit_criteria"
+              ],
+              "properties": {
+                "gate_id": { "type": "string" },
+                "phase": { "type": "string" },
+                "scope": { "type": "string", "enum": ["project", "track"] },
+                "purpose": { "type": "string" },
+                "decision_owner": { "type": "string" },
+                "governance_body": { "type": "string" },
+                "preconditions": { "type": "array", "items": { "type": "string" } },
+                "required_artifacts": {
+                  "type": "array",
+                  "items": { "type": "string" },
+                  "minItems": 1
+                },
+                "entry_criteria": { "type": "array", "items": { "type": "string" } },
+                "exit_criteria": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+                "decision_outcomes": { "type": "array", "items": { "type": "string" } },
+                "exception_approver": { "type": "string" },
+                "mission_gate_id": {
+                  "description": "Machine-checkable exit_gate id in mission-workflow-catalog this gate maps to, if any.",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

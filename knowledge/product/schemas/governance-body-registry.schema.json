@@ -1,0 +1,113 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "governance-body-registry.schema.json",
+  "title": "Governance Body Registry",
+  "description": "Catalog of standing gating/decision meeting bodies (会議体). Each body defines its agenda, entry/exit criteria (クライテリア), convening preconditions (開催事前条件), decision owner, quorum, and the SDLC/incident gates it owns.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "bodies"],
+  "properties": {
+    "version": { "type": "string" },
+    "description": { "type": "string" },
+    "decision_outcomes": {
+      "description": "Shared vocabulary of gate decisions used across all bodies.",
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "bodies": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name_ja",
+          "name_en",
+          "purpose",
+          "scope",
+          "trigger",
+          "decision_owner",
+          "quorum",
+          "preconditions",
+          "agenda",
+          "entry_criteria",
+          "exit_criteria",
+          "decisions"
+        ],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+          "name_ja": { "type": "string" },
+          "name_en": { "type": "string" },
+          "purpose": { "type": "string" },
+          "scope": { "type": "string", "enum": ["project", "track", "portfolio"] },
+          "trigger": {
+            "description": "When this body convenes: a cadence and/or an event that triggers it.",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "kind": { "type": "string", "enum": ["cadence", "event", "gate"] },
+              "detail": { "type": "string" }
+            },
+            "required": ["kind", "detail"]
+          },
+          "decision_owner": {
+            "description": "Persona/authority role accountable for the gate decision.",
+            "type": "string"
+          },
+          "quorum": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["required_roles", "min_attendees"],
+            "properties": {
+              "required_roles": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+              "optional_roles": { "type": "array", "items": { "type": "string" } },
+              "min_attendees": { "type": "integer", "minimum": 1 }
+            }
+          },
+          "preconditions": {
+            "description": "開催事前条件 — must all be satisfied before the body may convene.",
+            "type": "array",
+            "items": { "type": "string" },
+            "minItems": 1
+          },
+          "agenda": {
+            "description": "Ordered agenda items for the session.",
+            "type": "array",
+            "items": { "type": "string" },
+            "minItems": 1
+          },
+          "entry_criteria": {
+            "description": "Inputs/artifacts that must exist for the decision to be made.",
+            "type": "array",
+            "items": { "type": "string" },
+            "minItems": 1
+          },
+          "exit_criteria": {
+            "description": "クライテリア — conditions that must hold to record a GO decision.",
+            "type": "array",
+            "items": { "type": "string" },
+            "minItems": 1
+          },
+          "decisions": {
+            "description": "Allowed decision outcomes for this body (keys into decision_outcomes).",
+            "type": "array",
+            "items": { "type": "string" },
+            "minItems": 1
+          },
+          "gates_owned": {
+            "description": "SDLC/incident gate_ids (gate-profile-registry) whose decision this body owns.",
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "required_artifacts": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "escalation": { "type": "string" },
+          "tier": { "type": "string", "enum": ["public", "confidential", "personal", "product"] }
+        }
+      }
+    }
+  }
+}

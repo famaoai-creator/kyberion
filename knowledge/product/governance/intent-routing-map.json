@@ -18,7 +18,8 @@
     "review-text": "knowledge/product/pipeline-templates/review-text",
     "assimilate-gateway-capability": "assimilate-gateway-capability",
     "diverge-hypotheses": "knowledge/product/pipeline-templates/hypothesis-tree",
-    "multi-agent-consensus": "knowledge/product/pipeline-templates/stakeholder-consensus-orchestrator"
+    "multi-agent-consensus": "knowledge/product/pipeline-templates/stakeholder-consensus-orchestrator",
+    "security-audit-service": "knowledge/product/pipeline-templates/security-audit-static-analysis"
   },
   "mission_intent_action_map": {
     "create-mission": "create",
@@ -34,8 +35,14 @@
     "inspect-mission-state": "inspect_state"
   },
   "direct_intent_commands": {
-    "bootstrap-kyberion-runtime": { "command": "pnpm", "args": ["env:bootstrap"] },
-    "verify-actuator-capability": { "command": "pnpm", "args": ["capabilities"] }
+    "bootstrap-kyberion-runtime": {
+      "command": "pnpm",
+      "args": ["env:bootstrap"]
+    },
+    "verify-actuator-capability": {
+      "command": "pnpm",
+      "args": ["capabilities"]
+    }
   },
   "track_intent_policy_map": {
     "request-feature-development": {
@@ -66,6 +73,31 @@
     "define-operational-process": {
       "track_type": "operational_governance",
       "default_lifecycle": "governance-sdlc",
+      "min_confidence_to_autostart": 0.8
+    },
+    "security-audit-service": {
+      "track_type": "delivery",
+      "default_lifecycle": "default-sdlc",
+      "min_confidence_to_autostart": 0.7
+    },
+    "feature-expansion-delivery": {
+      "track_type": "delivery",
+      "default_lifecycle": "default-sdlc",
+      "min_confidence_to_autostart": 0.75
+    },
+    "incident-response": {
+      "track_type": "incident",
+      "default_lifecycle": "incident-response",
+      "min_confidence_to_autostart": 0.85
+    },
+    "software-asset-management": {
+      "track_type": "operations",
+      "default_lifecycle": "ops-continuous",
+      "min_confidence_to_autostart": 0.75
+    },
+    "it-operations-automation": {
+      "track_type": "change",
+      "default_lifecycle": "change-control",
       "min_confidence_to_autostart": 0.8
     }
   }

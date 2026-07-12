@@ -469,6 +469,17 @@
         "knowledge/public/design-patterns/media-templates/themes.json",
         "knowledge/public/design-patterns/media-templates/themes/themes.json"
       ]
+    },
+    "register_workflow": {
+      "allow_write": [
+        "knowledge/product/governance/mission-workflow-catalog.json",
+        "knowledge/product/governance/standard-intents.json",
+        "knowledge/product/governance/intent-domain-ontology.json",
+        "knowledge/product/governance/intent-routing-map.json",
+        "knowledge/product/governance/gate-profiles/gate-profile-registry.json",
+        "knowledge/product/governance/governance-body-registry.json",
+        "active/shared/tmp/workflow-registration-proposals"
+      ]
     }
   },
   "authority_permissions": {
