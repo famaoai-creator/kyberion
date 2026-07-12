@@ -26,6 +26,8 @@ export interface VideoCompositionADF {
     height: number;
     background_color?: string;
     aspect_ratio?: string;
+    /** Story-matched art direction (LLM-drafted, schema-clamped). */
+    visual_direction?: import('./video-visual-direction.js').VideoVisualDirection;
   };
   audio?: {
     narration_ref?: string;
