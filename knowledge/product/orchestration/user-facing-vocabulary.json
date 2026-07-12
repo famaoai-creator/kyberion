@@ -487,6 +487,10 @@
         "en": "needs external assets",
         "ja": "外部素材が必要"
       },
+      "readiness_setup": {
+        "en": "setup required",
+        "ja": "設定が必要"
+      },
       "readiness_runtime": {
         "en": "missing runtime prerequisites",
         "ja": "実行環境が不足"
@@ -531,6 +535,22 @@
         "en": "connecting",
         "ja": "接続中"
       },
+      "connection_pending": {
+        "en": "pending",
+        "ja": "確認待ち"
+      },
+      "connection_blocked": {
+        "en": "blocked",
+        "ja": "要対応"
+      },
+      "connection_missing": {
+        "en": "missing",
+        "ja": "未設定"
+      },
+      "connection_not_applicable": {
+        "en": "not required",
+        "ja": "不要"
+      },
       "connection_degraded": {
         "en": "degraded",
         "ja": "接続品質が低下"
@@ -554,6 +574,10 @@
       "provider_error": {
         "en": "error",
         "ja": "エラー"
+      },
+      "provider_missing": {
+        "en": "missing",
+        "ja": "未導入"
       },
       "mission_planned": {
         "en": "planned",
@@ -582,6 +606,30 @@
       "mission_recovered": {
         "en": "recovered",
         "ja": "復旧"
+      },
+      "mission_paused": {
+        "en": "paused",
+        "ja": "一時停止"
+      },
+      "mission_distilling": {
+        "en": "distilling",
+        "ja": "学習整理中"
+      },
+      "mission_archived": {
+        "en": "archived",
+        "ja": "保管済み"
+      },
+      "runtime_running": {
+        "en": "running",
+        "ja": "稼働中"
+      },
+      "runtime_stale": {
+        "en": "stale",
+        "ja": "応答遅延"
+      },
+      "runtime_stopped": {
+        "en": "stopped",
+        "ja": "停止"
       },
       "cli_readiness": {
         "en": "Readiness",

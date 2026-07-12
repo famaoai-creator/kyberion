@@ -54,3 +54,5 @@
 - `libs/core/ux-vocabulary.ts` を追加し、`renderStatus()` で readiness / mission などの表示語彙を `user-facing-vocabulary.json` から引くようにした。
 - `scripts/cli.ts` の operator packet と `scripts/mission_controller.ts` の mission status 表示を共有レンダラ経由に寄せた。
 - `repairSurfaceUxContractText()` を追加し、`runSurfaceMessageConversation` は違反時に配信前修復を試みるようにした。
+- 2026-07-13: connection/provider/mission/runtime の不足語彙を補完し、sovereign dashboard の代表状態表示を `renderStatus()` 経由へ統一した。
+- 2026-07-13: `tests/ux-contract-surfaces.test.ts` と `check:ui-ux` を CI/validate/週次 audit pipeline に接続し、主要面の契約を継続強制するようにした。

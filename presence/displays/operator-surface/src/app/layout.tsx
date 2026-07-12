@@ -28,7 +28,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           style={{
             padding: '12px 24px',
             background: 'var(--kb-panel-bg)',
-            borderBottom: '1px solid var(--kb-border, #2a2c33)',
+            borderBottom: '1px solid var(--kb-border)',
             display: 'flex',
             gap: '24px',
             alignItems: 'baseline',
@@ -41,7 +41,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               fontSize: '12px',
               padding: '2px 10px',
               borderRadius: '999px',
-              border: '1px solid var(--kb-border, #2a2c33)',
+              border: '1px solid var(--kb-border)',
               color: 'var(--kb-text-secondary)',
               whiteSpace: 'nowrap',
             }}
@@ -70,7 +70,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </nav>
           <span style={{ marginLeft: 'auto', fontSize: '12px', color: 'var(--kb-text-secondary)' }}>
             tenant:{' '}
-            <code style={{ color: scope ? '#9be3a8' : 'var(--kb-text-secondary)' }}>
+            <code style={{ color: scope ? 'var(--kb-success)' : 'var(--kb-text-secondary)' }}>
               {scope ?? 'agnostic'}
             </code>
             {' · read-only'}
