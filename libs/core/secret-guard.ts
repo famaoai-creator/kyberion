@@ -71,7 +71,9 @@ const _loadPersonalSecrets = () => {
         _mapContentToSecrets(serviceName, content);
       }
     }
-  } catch (_) {}
+  } catch (_) {
+    /* startup scan is best-effort; missing/corrupt docs are skipped */
+  }
 };
 
 const _mapContentToSecrets = (serviceName: string, content: any) => {
@@ -263,7 +265,9 @@ export const getSecret = (key: string, scope?: string): string | null => {
     try {
       const secrets = JSON.parse(safeReadFile(SECRETS_FILE, { encoding: 'utf8' }) as string);
       value = secrets[key];
-    } catch (_) {}
+    } catch (_) {
+      /* secrets file absent or corrupt: fall back to env-only resolution */
+    }
   }
 
   if (value && typeof value === 'string') {
@@ -293,7 +297,9 @@ export const storeConnectionDocument = (
     safeWriteFile(backupPath, safeReadFile(fullPath, { encoding: 'utf8' }) as string);
     try {
       safeFsyncFile(backupPath);
-    } catch (_) {}
+    } catch (_) {
+      /* best-effort fsync */
+    }
   }
 
   const serialized =
@@ -303,7 +309,9 @@ export const storeConnectionDocument = (
   safeWriteFile(fullPath, serialized + '\n');
   try {
     safeFsyncFile(fullPath);
-  } catch (_) {}
+  } catch (_) {
+    /* best-effort fsync */
+  }
 
   const serviceName = _sanitizeServiceId(serviceId).toUpperCase();
   _clearServiceSecrets(serviceName);
@@ -339,7 +347,9 @@ function _saveGrants(grants: AuthGrant[]) {
   safeWriteFile(GRANTS_FILE, JSON.stringify(freshGrants, null, 2));
   try {
     safeFsyncFile(GRANTS_FILE);
-  } catch (_) {}
+  } catch (_) {
+    /* best-effort fsync */
+  }
 }
 
 export const getActiveSecrets = () => Array.from(_activeSecrets);

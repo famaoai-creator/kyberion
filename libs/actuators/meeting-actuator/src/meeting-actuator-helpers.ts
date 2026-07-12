@@ -370,6 +370,6 @@ const modulePath = fileURLToPath(import.meta.url);
 if (entrypoint && (modulePath === entrypoint || entrypoint.endsWith('index.js'))) {
   main().catch((err) => {
     logger.error(err.message);
-    process.exit(1);
+    process.exit(1); // eslint-disable-line no-restricted-properties -- CLI entry guard
   });
 }

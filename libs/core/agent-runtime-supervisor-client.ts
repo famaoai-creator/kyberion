@@ -196,7 +196,9 @@ export async function ensureAgentRuntimeSupervisorDaemon(): Promise<AgentRuntime
         safeUnlinkSync(SPAWN_LOCK_PATH);
         return ensureAgentRuntimeSupervisorDaemon();
       }
-    } catch (_) {}
+    } catch (_) {
+      /* best-effort cleanup */
+    }
 
     return waitForSupervisorHealth();
   }
@@ -226,7 +228,9 @@ export async function ensureAgentRuntimeSupervisorDaemon(): Promise<AgentRuntime
   } finally {
     try {
       if (safeExistsSync(SPAWN_LOCK_PATH)) safeUnlinkSync(SPAWN_LOCK_PATH);
-    } catch (_) {}
+    } catch (_) {
+      /* best-effort cleanup */
+    }
   }
 }
 
