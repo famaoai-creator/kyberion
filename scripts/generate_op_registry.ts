@@ -22,6 +22,8 @@ import { describeOps as describeBuildOps } from '../libs/actuators/build-actuato
 import { describeOps as describeCalendarOps } from '../libs/actuators/calendar-actuator/src/op-catalog.js';
 import { describeOps as describeEmailOps } from '../libs/actuators/email-actuator/src/op-catalog.js';
 import { describeOps as describePresenceOps } from '../libs/actuators/presence-actuator/src/op-catalog.js';
+import { describeOps as describeServiceOps } from '../libs/actuators/service-actuator/src/op-catalog.js';
+import { describeOps as describeOrchestratorOps } from '../libs/actuators/orchestrator-actuator/src/op-catalog.js';
 
 // AR-02: actuators that self-describe their op surface. The registry and
 // discovery index are generated from these; check:op-registry fails on
@@ -53,6 +55,8 @@ const DESCRIBE_OPS_SOURCES: Record<
   'calendar-actuator': describeCalendarOps,
   'email-actuator': describeEmailOps,
   'presence-actuator': describePresenceOps,
+  'service-actuator': describeServiceOps,
+  'orchestrator-actuator': describeOrchestratorOps,
 };
 
 type PipelineOpKind = 'capture' | 'transform' | 'apply' | 'control';
