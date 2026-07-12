@@ -12,13 +12,14 @@ describe('surface smoke contract', () => {
 
     expect(page).toContain('FirstRunBanner');
     expect(page).toContain('IdentityBadge');
-    expect(page).toContain('Agent Runtimes');
-    expect(page).toContain('Prereq Check');
-    expect(page).toContain('Setup Report');
-    expect(page).toContain('Schedule Tick');
-    expect(page).toContain('Schedule List');
-    expect(page).toContain('Vital Check');
-    expect(page).toContain('Build & Test');
+    // UX-03: the label moved into the vocabulary catalog; the page renders it via its key.
+    expect(page).toContain("uxText('chronos_agent_runtimes'");
+    expect(page).toContain("uxText('chronos_qa_action_prereq_check'");
+    expect(page).toContain("uxText('chronos_qa_action_setup_report'");
+    expect(page).toContain("uxText('chronos_qa_action_schedule_tick'");
+    expect(page).toContain("uxText('chronos_qa_action_schedule_list'");
+    expect(page).toContain("uxText('chronos_qa_action_vital_check'");
+    expect(page).toContain("uxText('chronos_qa_action_build_test'");
     expect(page).toContain('chronos://quick-action/prereq-check');
     expect(page).toContain('chronos://quick-action/setup-report');
     expect(page).toContain('chronos://quick-action/schedule-tick');

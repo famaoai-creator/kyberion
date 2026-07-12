@@ -8,8 +8,8 @@
 
 | 判定    | 件数 |
 | ------- | ---- |
-| DONE    | 49   |
-| PARTIAL | 43   |
+| DONE    | 50   |
+| PARTIAL | 42   |
 | TODO    | 0    |
 
 ## P0 残作業(プロダクション化のクリティカルパス)
@@ -58,14 +58,14 @@
 
 ### UX(ユーザー接点)
 
-| ID    | 状態    | 残作業                                                                                                                                                                                                                                                                             |
-| ----- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| UX-01 | DONE    |                                                                                                                                                                                                                                                                                    |
-| UX-02 | DONE    | 2026-07-12 完了: 4ブリッジ typing 表示(discord sendTyping / telegram sendChatAction / slack 👀 リアクション / imessage 先行一言)を共通ヘルパーで実装。chronos キャンセル+フェーズ表示は 07-11 済み                                                                                 |
-| UX-03 | PARTIAL | 2026-07-12: locale-resolver 一元化(KYBERION_LOCALE → identity language → ja、ブリッジ/orchestrator の9箇所置換)。cli help/主要エラー(62キー)+ onboarding の ja/en 化完了(flow-policy を {en,ja} 化 + wizard 残余20箇所 + 非対話拒否文)。残: chronos 言語トグル、未対応面リスト記録 |
-| UX-04 | PARTIAL | 2026-07-12: CLI 承認動詞統一(approve/reject + 名前付きフラグ、旧形式は警告エイリアス)・decidedBy の identity 化・chronos 番号選択+拒否経路を実装。残: slack-bridge 提案の Block Kit ボタン化のみ                                                                                   |
-| UX-05 | PARTIAL | 契約スナップショットテスト+CI ゲート、dashboard の renderStatus 経由化                                                                                                                                                                                                             |
-| UX-06 | DONE    | (軽微: 3面バナーの版数統一)                                                                                                                                                                                                                                                        |
+| ID    | 状態    | 残作業                                                                                                                                                                                                                                                                                                   |
+| ----- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| UX-01 | DONE    |                                                                                                                                                                                                                                                                                                          |
+| UX-02 | DONE    | 2026-07-12 完了: 4ブリッジ typing 表示(discord sendTyping / telegram sendChatAction / slack 👀 リアクション / imessage 先行一言)を共通ヘルパーで実装。chronos キャンセル+フェーズ表示は 07-11 済み                                                                                                       |
+| UX-03 | DONE    | 2026-07-12 完了: locale-resolver 一元化、cli help/主要エラー62キー、onboarding(flow-policy {en,ja} + wizard + TTY拒否文)、chronos 言語トグル(localStorage 永続)、uxText fallback 撤去 + 契約テスト、hero/ヘッダ/FirstRunBanner/QuickAction/StatusCard 両対応(計106+キー)。未対応面リストは計画文書に記録 |
+| UX-04 | PARTIAL | 2026-07-12: CLI 承認動詞統一(approve/reject + 名前付きフラグ、旧形式は警告エイリアス)・decidedBy の identity 化・chronos 番号選択+拒否経路を実装。残: slack-bridge 提案の Block Kit ボタン化のみ                                                                                                         |
+| UX-05 | PARTIAL | 契約スナップショットテスト+CI ゲート、dashboard の renderStatus 経由化                                                                                                                                                                                                                                   |
+| UX-06 | DONE    | (軽微: 3面バナーの版数統一)                                                                                                                                                                                                                                                                              |
 
 ### AC(アクチュエータ能力)
 
