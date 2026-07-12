@@ -1,0 +1,20 @@
+{
+  "intake": {
+    "outcome": "Generate a governed local video review package",
+    "audience": ["internal marketing reviewers"],
+    "owner": "marketing-owner",
+    "channels": ["internal"],
+    "deliverables": ["video", "thumbnail", "captions", "review_package"],
+    "deadline": "2026-07-31T10:00:00+09:00",
+    "success_criteria": [
+      "video_artifact_exists",
+      "captions_exist",
+      "technical_validation_passed",
+      "review_package_exists"
+    ],
+    "data_classification": "confidential",
+    "publication_intent": "none",
+    "risk_level": 0
+  },
+  "claim_register": []
+}

@@ -91,16 +91,16 @@ Secrets must **never** live in the customer overlay, even though `customer/{slug
 
 ## 3. What Goes Where
 
-| File | Customer overlay (`customer/{slug}/`) | Legacy personal fallback (`knowledge/personal/`) | Public default (`knowledge/public/`) |
-|---|---|---|---|
-| Identity | `identity.json` | `my-identity.json` | — |
-| Vision | `vision.md` | `my-vision.md` | — |
-| Connections | `connections/*.json` | `connections/*.json` | — |
-| Tenants | `tenants/*.json` | `tenants/*.json` | — |
-| Voice profile | `voice/profile.json` | `voice/profile-registry.json` | `voice/*` |
-| Approval policy | `policy/approval-policy.json` | — | `governance/approval-policy.json` |
-| Path scope | `policy/path-scope-policy.json` | — | `governance/path-scope-policy.json` |
-| Mission seeds | `mission-seeds/*.json` | — | (additive only) |
+| File            | Customer overlay (`customer/{slug}/`) | Legacy personal fallback (`knowledge/personal/`) | Public default (`knowledge/public/`) |
+| --------------- | ------------------------------------- | ------------------------------------------------ | ------------------------------------ |
+| Identity        | `identity.json`                       | `my-identity.json`                               | —                                    |
+| Vision          | `vision.md`                           | `my-vision.md`                                   | —                                    |
+| Connections     | `connections/*.json`                  | `connections/*.json`                             | —                                    |
+| Tenants         | `tenants/*.json`                      | `tenants/*.json`                                 | —                                    |
+| Voice profile   | `voice/profile.json`                  | `voice/profile-registry.json`                    | `voice/*`                            |
+| Approval policy | `policy/approval-policy.json`         | —                                                | `governance/approval-policy.json`    |
+| Path scope      | `policy/path-scope-policy.json`       | —                                                | `governance/path-scope-policy.json`  |
+| Mission seeds   | `mission-seeds/*.json`                | —                                                | (additive only)                      |
 
 ## 4. Migration from Existing Single-User Setup
 
@@ -108,6 +108,7 @@ For users who already have a `knowledge/personal/` filled in:
 
 1. **Do nothing** — the existing setup keeps working when `KYBERION_CUSTOMER` is unset.
 2. To convert to a customer-overlay structure:
+
    ```bash
    pnpm customer:create my-org
    # Copies knowledge/personal/* into customer/my-org/* with appropriate renames.
@@ -176,3 +177,9 @@ The 3-tier system continues to govern **tier hygiene** (no leaks from confidenti
 - [x] Onboarding apply consumer (`scripts/onboarding_apply.ts`)
 - [x] Slack onboarding consumer (`libs/core/slack-onboarding.ts`)
   - [x] Mission prerequisites / creation consumer (`scripts/refactor/mission-state.ts`, `scripts/refactor/mission-creation.ts`, `scripts/refactor/mission-llm.ts`)
+
+# Marketing Policy And Brand Overlay
+
+With `KYBERION_CUSTOMER=<slug>`, marketing risk policy resolves from `customer/<slug>/policy/marketing-risk-policy.json`; otherwise the product governance policy is used. Brand assets resolve under `customer/<slug>/brand/`, and customer Mission seeds under `customer/<slug>/mission-seeds/marketing/`. Never merge confidential artifacts between customer roots, and never copy customer content into `knowledge/public/`.
+
+The marketing overlay contract is covered by an A/B filesystem test: two governed customer roots receive different allowed channels and CTA domains, resolve independently through `KYBERION_CUSTOMER`, and do not affect the no-customer product fallback.
