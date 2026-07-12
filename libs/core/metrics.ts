@@ -2,6 +2,8 @@ import { safeReadFile, safeAppendFileSync, safeMkdir, safeExistsSync } from './s
 import * as pathResolver from './path-resolver.js';
 import * as path from 'node:path';
 import chalk from 'chalk';
+import { createLogger } from './logger.js';
+const logger = createLogger('metrics');
 
 /**
  * Lightweight metrics collection for Kyberion.
@@ -524,7 +526,9 @@ export class MetricsCollector {
       }
       const filePath = path.join(this._metricsDir, this._metricsFile);
       safeAppendFileSync(filePath, JSON.stringify(entry) + '\n');
-    } catch (_) {}
+    } catch (err) {
+      logger.warn(`suppressed error in _appendToFile: ${err}`);
+    }
   }
 
   private _appendResourceUsage(entry: ResourceUsageRecord) {

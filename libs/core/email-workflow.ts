@@ -12,6 +12,8 @@ import {
   safeStat,
   safeWriteFile,
 } from './secure-io.js';
+import { createLogger } from './logger.js';
+const logger = createLogger('email-workflow');
 
 export interface EmailDraftArtifact {
   exists: boolean;
@@ -158,7 +160,9 @@ export function extractFirstJsonBlock(text: string): Record<string, unknown> | n
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
         return parsed as Record<string, unknown>;
       }
-    } catch (_) {}
+    } catch (err) {
+      logger.warn(`suppressed error in extractFirstJsonBlock: ${err}`);
+    }
   }
   const first = trimmed.indexOf('{');
   const last = trimmed.lastIndexOf('}');
@@ -168,7 +172,9 @@ export function extractFirstJsonBlock(text: string): Record<string, unknown> | n
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
         return parsed as Record<string, unknown>;
       }
-    } catch (_) {}
+    } catch (err) {
+      logger.warn(`suppressed error in extractFirstJsonBlock: ${err}`);
+    }
   }
   return null;
 }
@@ -625,7 +631,9 @@ export function readEmailDraftArtifact(): EmailDraftArtifact {
             typeof parsed.triage_path === 'string' ? parsed.triage_path : resolveEmailTriagePath(),
         };
       }
-    } catch (_) {}
+    } catch (err) {
+      logger.warn(`suppressed error in readEmailDraftArtifact: ${err}`);
+    }
   }
   if (safeExistsSync(markdown)) {
     const draftMarkdown = String(safeReadFile(markdown, { encoding: 'utf8' }) || '');
