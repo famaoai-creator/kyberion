@@ -87,10 +87,15 @@ export function renderKyberionDesignTokenBlock(tokens: KyberionDesignTokens): st
     `  --kb-warning: ${light.warning};`,
     `  --kb-text-primary: ${light.text_primary};`,
     `  --kb-text-secondary: ${light.text_secondary};`,
+    `  --kb-accent-text: ${light.accent_text || light.accent};`,
+    `  --kb-surface: ${light.surface || light.panel_bg};`,
+    `  --kb-muted-text: ${light.muted_text || light.text_secondary};`,
+    `  --kb-border: ${light.border || light.secondary};`,
+    `  --kb-success: ${light.success || light.accent};`,
+    `  --kb-danger: ${light.danger || light.warning};`,
     `  --kb-font-sans: ${fonts.sans};`,
     `  --kb-font-mono: ${fonts.mono};`,
     '  --kb-blur: blur(12px);',
-    '  --kb-border: 1px solid rgba(148, 163, 184, 0.1);',
     '  --kb-glow-cyan: 0 0 15px rgba(0, 242, 255, 0.4);',
     '}',
     '',
@@ -106,7 +111,53 @@ export function renderKyberionDesignTokenBlock(tokens: KyberionDesignTokens): st
     `    --kb-warning: ${dark.warning};`,
     `    --kb-text-primary: ${dark.text_primary};`,
     `    --kb-text-secondary: ${dark.text_secondary};`,
+    `    --kb-accent-text: ${dark.accent_text || dark.accent};`,
+    `    --kb-surface: ${dark.surface || dark.panel_bg};`,
+    `    --kb-muted-text: ${dark.muted_text || dark.text_secondary};`,
+    `    --kb-border: ${dark.border || dark.secondary};`,
+    `    --kb-success: ${dark.success || dark.accent};`,
+    `    --kb-danger: ${dark.danger || dark.warning};`,
     '  }',
+    '}',
+    '',
+    "[data-theme='light'] {",
+    '  color-scheme: light;',
+    `  --background: ${light.bg_main};`,
+    `  --foreground: ${light.text_primary};`,
+    `  --kb-bg-main: ${light.bg_main};`,
+    `  --kb-panel-bg: ${light.panel_bg};`,
+    `  --kb-primary: ${light.primary};`,
+    `  --kb-secondary: ${light.secondary};`,
+    `  --kb-accent: ${light.accent};`,
+    `  --kb-warning: ${light.warning};`,
+    `  --kb-text-primary: ${light.text_primary};`,
+    `  --kb-text-secondary: ${light.text_secondary};`,
+    `  --kb-accent-text: ${light.accent_text || light.accent};`,
+    `  --kb-surface: ${light.surface || light.panel_bg};`,
+    `  --kb-muted-text: ${light.muted_text || light.text_secondary};`,
+    `  --kb-border: ${light.border || light.secondary};`,
+    `  --kb-success: ${light.success || light.accent};`,
+    `  --kb-danger: ${light.danger || light.warning};`,
+    '}',
+    '',
+    "[data-theme='dark'] {",
+    '  color-scheme: dark;',
+    `  --background: ${dark.bg_main};`,
+    `  --foreground: ${dark.text_primary};`,
+    `  --kb-bg-main: ${dark.bg_main};`,
+    `  --kb-panel-bg: ${dark.panel_bg};`,
+    `  --kb-primary: ${dark.primary};`,
+    `  --kb-secondary: ${dark.secondary};`,
+    `  --kb-accent: ${dark.accent};`,
+    `  --kb-warning: ${dark.warning};`,
+    `  --kb-text-primary: ${dark.text_primary};`,
+    `  --kb-text-secondary: ${dark.text_secondary};`,
+    `  --kb-accent-text: ${dark.accent_text || dark.accent};`,
+    `  --kb-surface: ${dark.surface || dark.panel_bg};`,
+    `  --kb-muted-text: ${dark.muted_text || dark.text_secondary};`,
+    `  --kb-border: ${dark.border || dark.secondary};`,
+    `  --kb-success: ${dark.success || dark.accent};`,
+    `  --kb-danger: ${dark.danger || dark.warning};`,
     '}',
   ].join('\n');
 }
@@ -122,6 +173,12 @@ export function renderKyberionTailwindColorsBlock(): string {
     '          warning: "var(--kb-warning)",',
     '          text_primary: "var(--kb-text-primary)",',
     '          text_secondary: "var(--kb-text-secondary)",',
+    '          accent_text: "var(--kb-accent-text)",',
+    '          surface: "var(--kb-surface)",',
+    '          muted_text: "var(--kb-muted-text)",',
+    '          border: "var(--kb-border)",',
+    '          success: "var(--kb-success)",',
+    '          danger: "var(--kb-danger)",',
     '        }',
   ].join('\n');
 }
@@ -207,7 +264,7 @@ export function expectedKyberionThemeEntries(
 
 export function replaceTokenBlock(sourceText: string, tokenBlock: string): string {
   const pattern =
-    /:root\s*{\s*[\s\S]*?\n}\n\n@media\s*\(prefers-color-scheme:\s*dark\)\s*{\s*\n\s*:root\s*{\s*[\s\S]*?\n\s*}\n}/m;
+    /:root\s*{\s*[\s\S]*?\n}\n\n@media\s*\(prefers-color-scheme:\s*dark\)\s*{\s*\n\s*:root\s*{\s*[\s\S]*?\n\s*}\n}(?:\n\n\[data-theme='light'\]\s*{[\s\S]*?\n}\n\n\[data-theme='dark'\]\s*{[\s\S]*?\n})?/m;
   if (!pattern.test(sourceText)) {
     throw new Error('Failed to locate Kyberion token block in source file');
   }
@@ -216,7 +273,7 @@ export function replaceTokenBlock(sourceText: string, tokenBlock: string): strin
 
 export function extractKyberionTokenBlock(sourceText: string): string | null {
   const pattern =
-    /:root\s*{\s*[\s\S]*?\n}\n\n@media\s*\(prefers-color-scheme:\s*dark\)\s*{\s*\n\s*:root\s*{\s*[\s\S]*?\n\s*}\n}/m;
+    /:root\s*{\s*[\s\S]*?\n}\n\n@media\s*\(prefers-color-scheme:\s*dark\)\s*{\s*\n\s*:root\s*{\s*[\s\S]*?\n\s*}\n}(?:\n\n\[data-theme='light'\]\s*{[\s\S]*?\n}\n\n\[data-theme='dark'\]\s*{[\s\S]*?\n})?/m;
   const match = sourceText.match(pattern);
   return match ? match[0] : null;
 }

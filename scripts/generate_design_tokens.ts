@@ -4,6 +4,7 @@ import {
   safeExistsSync,
   safeReadFile,
   safeWriteFile,
+  withExecutionContext,
 } from '@agent/core';
 
 import {
@@ -16,12 +17,30 @@ import {
 
 const ROOT = pathResolver.rootDir();
 const GLOBALS_CSS_PATH = path.join(ROOT, 'presence/displays/chronos-mirror-v2/src/app/globals.css');
-const OPERATOR_GLOBALS_CSS_PATH = path.join(ROOT, 'presence/displays/operator-surface/src/app/globals.css');
-const PRESENCE_TOKENS_CSS_PATH = path.join(ROOT, 'presence/displays/presence-studio/static/design-tokens.css');
-const COMPUTER_TOKENS_CSS_PATH = path.join(ROOT, 'presence/displays/computer-surface/static/design-tokens.css');
-const TAILWIND_CONFIG_PATH = path.join(ROOT, 'presence/displays/chronos-mirror-v2/tailwind.config.cjs');
-const THEMES_JSON_PATH = path.join(ROOT, 'knowledge/public/design-patterns/media-templates/themes.json');
-const THEMES_JSON_NESTED_PATH = path.join(ROOT, 'knowledge/public/design-patterns/media-templates/themes/themes.json');
+const OPERATOR_GLOBALS_CSS_PATH = path.join(
+  ROOT,
+  'presence/displays/operator-surface/src/app/globals.css'
+);
+const PRESENCE_TOKENS_CSS_PATH = path.join(
+  ROOT,
+  'presence/displays/presence-studio/static/design-tokens.css'
+);
+const COMPUTER_TOKENS_CSS_PATH = path.join(
+  ROOT,
+  'presence/displays/computer-surface/static/design-tokens.css'
+);
+const TAILWIND_CONFIG_PATH = path.join(
+  ROOT,
+  'presence/displays/chronos-mirror-v2/tailwind.config.cjs'
+);
+const THEMES_JSON_PATH = path.join(
+  ROOT,
+  'knowledge/public/design-patterns/media-templates/themes.json'
+);
+const THEMES_JSON_NESTED_PATH = path.join(
+  ROOT,
+  'knowledge/public/design-patterns/media-templates/themes/themes.json'
+);
 
 function updateTokenSurface(filePath: string, tokenBlock: string) {
   if (!safeExistsSync(filePath)) return;
@@ -60,7 +79,7 @@ function updateThemesCatalog(
   }
 }
 
-async function run() {
+function run() {
   const tokens = readKyberionDesignTokens();
   const tokenBlock = renderKyberionDesignTokenBlock(tokens);
 
@@ -73,7 +92,9 @@ async function run() {
   updateThemesCatalog(THEMES_JSON_NESTED_PATH, tokens, false);
 }
 
-run().catch((error) => {
+try {
+  withExecutionContext('ecosystem_architect', run);
+} catch (error) {
   console.error(error);
   process.exitCode = 1;
-});
+}

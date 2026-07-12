@@ -17,6 +17,12 @@ module.exports = {
           warning: "var(--kb-warning)",
           text_primary: "var(--kb-text-primary)",
           text_secondary: "var(--kb-text-secondary)",
+          accent_text: "var(--kb-accent-text)",
+          surface: "var(--kb-surface)",
+          muted_text: "var(--kb-muted-text)",
+          border: "var(--kb-border)",
+          success: "var(--kb-success)",
+          danger: "var(--kb-danger)",
         }
       },
     },

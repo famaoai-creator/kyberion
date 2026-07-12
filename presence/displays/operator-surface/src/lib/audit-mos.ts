@@ -14,11 +14,21 @@
  */
 
 import { auditChain } from '@agent/core';
-import { getTenantScope } from './data.js';
+// Next.js resolves this source module directly; a `.js` suffix makes webpack
+// look for a physical JavaScript file instead of the colocated TypeScript file.
+import { getTenantScope } from './data';
 
 export interface MosReadEvent {
   page: string;
-  resource_kind: 'mission_list' | 'mission_detail' | 'audit' | 'health' | 'knowledge' | 'intent_snapshots' | 'surface_directory';
+  resource_kind:
+    | 'mission_list'
+    | 'mission_detail'
+    | 'audit'
+    | 'health'
+    | 'knowledge'
+    | 'intent_snapshots'
+    | 'surface_directory'
+    | 'deliverable_inbox';
   resource_id?: string;
   result_count?: number;
 }
