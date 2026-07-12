@@ -16,4 +16,11 @@ describe('ux-vocabulary', () => {
     expect(renderStatus('progress', 'working', 'ja')).toBe('処理中');
     expect(renderStatus('progress', 'failed', 'en')).toBe('Failed');
   });
+
+  it('covers operator dashboard connection, provider, mission, and runtime states', () => {
+    expect(renderStatus('connection', 'blocked', 'ja')).toBe('要対応');
+    expect(renderStatus('provider', 'missing', 'en')).toBe('missing');
+    expect(renderStatus('mission', 'distilling', 'ja')).toBe('学習整理中');
+    expect(renderStatus('runtime', 'stale', 'en')).toBe('stale');
+  });
 });
