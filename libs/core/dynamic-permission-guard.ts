@@ -8,6 +8,9 @@ import * as path from 'node:path';
 import * as pathResolver from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { sensoryMemory } from './sensory-memory.js';
+import { createLogger } from './logger.js';
+
+const logger = createLogger('dynamic-permission-guard');
 
 export interface DynamicPolicy {
   id: string;
@@ -25,7 +28,9 @@ export interface DynamicPolicy {
 class DynamicPermissionGuard {
   private static instance: DynamicPermissionGuard;
   private policies: DynamicPolicy[] = [];
-  private readonly POLICY_PATH = pathResolver.resolve('knowledge/product/governance/dynamic-policies.json');
+  private readonly POLICY_PATH = pathResolver.resolve(
+    'knowledge/product/governance/dynamic-policies.json'
+  );
 
   private constructor() {
     this.loadPolicies();
@@ -43,7 +48,10 @@ class DynamicPermissionGuard {
     try {
       const content = safeReadFile(this.POLICY_PATH, { encoding: 'utf8' }) as string;
       this.policies = JSON.parse(content).policies;
-    } catch (_) {}
+    } catch (err) {
+      // Fail-closed (no dynamic grants), but never silently: operators must see why grants vanished.
+      logger.warn(`dynamic-policies.json unreadable — no dynamic grants active: ${err}`);
+    }
   }
 
   public evaluate(role: string, filePath: string): { allowed: boolean; reason?: string } {
@@ -52,10 +60,10 @@ class DynamicPermissionGuard {
     for (const policy of this.policies) {
       if (policy.grant.role !== role) continue;
 
-      const pathMatch = policy.grant.allow_paths.some(p => relativePath.startsWith(p));
+      const pathMatch = policy.grant.allow_paths.some((p) => relativePath.startsWith(p));
       if (!pathMatch) continue;
 
-      const isContextActive = policy.condition.keyword 
+      const isContextActive = policy.condition.keyword
         ? sensoryMemory.hasActiveContext(policy.condition.keyword, policy.condition.lookback_ms)
         : !!sensoryMemory.getLatestByIntent(policy.condition.intent);
 
