@@ -1,0 +1,26 @@
+{
+  "intake": {
+    "outcome": "Generate a governed local YouTube video preview",
+    "audience": ["security leaders"],
+    "owner": "marketing-owner",
+    "approvers": ["marketing-owner"],
+    "channels": ["youtube"],
+    "deliverables": ["video", "thumbnail", "captions", "post_copy"],
+    "deadline": "2026-07-31T10:00:00+09:00",
+    "success_criteria": ["technical_validation_passed", "review_package_exists"],
+    "data_classification": "confidential",
+    "publication_intent": "public",
+    "risk_level": 2,
+    "claim_ids": ["claim-license"]
+  },
+  "claim_register": [
+    {
+      "id": "claim-license",
+      "text": "Released under the MIT License",
+      "source": "LICENSE",
+      "confidence": "verified",
+      "public_use": true,
+      "permitted_channels": ["website", "youtube", "social"]
+    }
+  ]
+}

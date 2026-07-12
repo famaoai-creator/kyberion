@@ -100,3 +100,10 @@ last_updated: 2026-06-21
 3. `pnpm task:list` の追加
 4. `pnpm task:init` の追加
 5. `pnpm task:run` の追加
+
+# Marketing Workload Track
+
+- Available: domain contract, risk policy, claim/review/approval binding, completion evidence evaluation.
+- Available: local video package, publication review, and YouTube dry-run ADF templates.
+- Available: customer policy, brand, design token, and marketing Mission seed templates.
+- Next: governed production connectors for YouTube/CMS/social, ffprobe-based media inspection, PII/secret scanning, screenshots, analytics ingestion, and UI.

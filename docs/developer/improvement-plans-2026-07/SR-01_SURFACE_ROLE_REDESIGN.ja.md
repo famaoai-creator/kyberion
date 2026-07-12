@@ -43,10 +43,12 @@ surface-mutation-guard(5)/ surface-roles 契約(4)/ deliverable-inbox 拡張(2)/
 - **副次修正**: `system:read_file` は SA-03 で常時 UNTRUSTED ラップされるため、構造化ブリーフの読込は `system:read_json` を使用(fragment 修正済み)。evidence の非統制書き換えがガバナンスに検知されることも確認(正しい挙動)。
 
 ## 実装メモ 追記2 (2026-07-07)
+
 - `plan-tasks --refresh-catalog` 追加: カタログから再解決(永続 phase_specs を無視)し、**task_id 一致でタスク status を引き継ぐ**(進捗を失わない再計画)。修正過程で「未分類ミッションの再解決時に既定 code_change が mission_type ヒントを遮蔽し別テンプレートに化ける」バグを発見・修正。
 - カタログ v1.3.0: **default_tasks を持つ全36フェーズに exit ゲートを付与**(evidence_exists 既定)。`check:workflow-catalog-refs` に「タスクを持つフェーズは exit_gate 必須」ルールを追加し再発防止。実ミッション(契約案件)で redline フェーズの REDLINE_DONE 通過→タスク完了化を実証。
 
 ## 実装メモ 追記3 (2026-07-07) — 可視化ダッシュボード群(V1-V3)
+
 - `libs/core/agent-activity-board.ts`: work items+mission state から「エージェント×現在タスク×ブロッカー(blocked/依存待ち/レビュー待ち/未割当)」を集約(テナントフィルタ対応、テスト付き)。
 - chronos: `GET /api/agent-activity`(?tenant=)+ `GET/POST /api/workitems`(看板の状態遷移は updateWorkItem 統制API)。ヘッダの「エージェント/看板」トグルで Activity Board(エージェント別サマリ+ブロッカーチップ)と5列看板を表示。実データ(aurora契約案件のエージェント5作業)で表示確認済み。
 - concierge: `/setup` ページ + `GET /api/setup` — オンボーディング進捗(推論バックエンド/5サーフェスの有効・ポート)と拡張設定の読み取りビュー(モデル振り分け表・主要コマンド)。

@@ -25,7 +25,7 @@ export const RISKY_OPS = {
   BROWSER_EXTENSION_EXECUTE: 'browser:extension_execute',
 } as const;
 
-export type RiskyOpId = typeof RISKY_OPS[keyof typeof RISKY_OPS];
+export type RiskyOpId = (typeof RISKY_OPS)[keyof typeof RISKY_OPS];
 
 export interface RequireApprovalParams {
   opId: RiskyOpId | string;

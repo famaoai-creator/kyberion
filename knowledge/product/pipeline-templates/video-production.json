@@ -1,0 +1,23 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "video-production",
+  "version": "1.0.0",
+  "description": "Local-only video production package. This template has no network or publication operation.",
+  "context": {
+    "mission_artifact_root": "knowledge/personal/missions/MSN-MARKETING-VIDEO-WORKLOAD-001/evidence/marketing-video",
+    "campaign_brief": "knowledge/product/schemas/marketing-video-local-dry-run.example.json",
+    "brand_profile": "customer/_template/brand/brand-guidelines.md",
+    "channel": "youtube",
+    "risk_level": 0
+  },
+  "steps": [
+    {
+      "id": "generate_local_video_package",
+      "role": "sink",
+      "op": "system:shell",
+      "params": {
+        "cmd": "MISSION_ROLE=mission_controller node --import ./scripts/ts-loader.mjs scripts/marketing_video_dry_run.ts --campaign-brief {{campaign_brief}} --brand-profile {{brand_profile}} --output-root {{mission_artifact_root}} --channel {{channel}} --risk-level {{risk_level}}"
+      }
+    }
+  ]
+}

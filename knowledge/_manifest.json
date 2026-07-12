@@ -237,7 +237,7 @@
     {
       "path": "product/architecture/component-lifecycle-inventory.md",
       "tier": "public",
-      "size": 6312,
+      "size": 6311,
       "type": "md"
     },
     {
@@ -460,6 +460,12 @@
       "path": "product/architecture/management-control-plane.md",
       "tier": "public",
       "size": 3510,
+      "type": "md"
+    },
+    {
+      "path": "product/architecture/marketing-video-workload.md",
+      "tier": "public",
+      "size": 6072,
       "type": "md"
     },
     {
@@ -1456,6 +1462,12 @@
       "path": "product/governance/maintenance-schedule.json",
       "tier": "public",
       "size": 241,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/marketing-risk-policy.json",
+      "tier": "public",
+      "size": 1322,
       "type": "json"
     },
     {
@@ -3243,7 +3255,7 @@
     {
       "path": "product/orchestration/global_actuator_index.json",
       "tier": "public",
-      "size": 16219,
+      "size": 15467,
       "type": "json"
     },
     {
@@ -5065,6 +5077,18 @@
       "type": "json"
     },
     {
+      "path": "product/pipeline-templates/publication-review.json",
+      "tier": "public",
+      "size": 866,
+      "type": "json"
+    },
+    {
+      "path": "product/pipeline-templates/publish-youtube-dry-run.json",
+      "tier": "public",
+      "size": 1549,
+      "type": "json"
+    },
+    {
       "path": "product/pipeline-templates/release-package.json",
       "tier": "public",
       "size": 2227,
@@ -5152,6 +5176,12 @@
       "path": "product/pipeline-templates/ui-voice-browser-smoke.json",
       "tier": "public",
       "size": 2224,
+      "type": "json"
+    },
+    {
+      "path": "product/pipeline-templates/video-production.json",
+      "tier": "public",
+      "size": 977,
       "type": "json"
     },
     {
@@ -6298,6 +6328,24 @@
       "path": "product/schemas/legacy-media-ops.schema.json",
       "tier": "public",
       "size": 336,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/marketing-video-local-dry-run.example.json",
+      "tier": "public",
+      "size": 594,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/marketing-workload.example.json",
+      "tier": "public",
+      "size": 818,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/marketing-workload.schema.json",
+      "tier": "public",
+      "size": 7848,
       "type": "json"
     },
     {

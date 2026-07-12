@@ -100,6 +100,7 @@ export {
 export { resolveTenantDesign } from './tenant-design-resolver.js';
 export * from './creative-design-resolver.js';
 export * from './campaign-suite.js';
+export * from './marketing-workload.js';
 export * from './customer-channel-binding.js';
 export * from './deal-store.js';
 export * from './customer-conversation.js';

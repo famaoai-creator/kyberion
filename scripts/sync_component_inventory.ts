@@ -270,6 +270,20 @@ function buildCapabilitiesGuide(current: CurrentIndexRecord[]): string {
   lines.push('');
   lines.push(...buildOpKindTable('control'));
   lines.push('');
+  lines.push('## Governed Core Workloads');
+  lines.push('');
+  lines.push(
+    '`@agent/core` also exposes the additive marketing workload contract for G0 intake, G1 data classification, G2 claims, G3 video/text/image validation, G4 independent review, G5 shared human approval binding, G6 publication verification, risk-policy resolution, and evidence-aware Mission completion.'
+  );
+  lines.push('');
+  lines.push(
+    'The workload composes the existing approval, artifact, media generation, video composition, browser, customer overlay, and Mission evidence capabilities. It does not register a marketing-specific Actuator or grant Strategy, Creative, or Review roles external publication authority.'
+  );
+  lines.push('');
+  lines.push(
+    'Canonical templates: `knowledge/product/pipeline-templates/video-production.json`, `publication-review.json`, and `publish-youtube-dry-run.json`.'
+  );
+  lines.push('');
   lines.push('See also:');
   lines.push('');
   lines.push('- Source manifests: `libs/actuators/*/manifest.json`');
