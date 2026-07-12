@@ -1006,7 +1006,7 @@ export default function ChronosMirrorV2() {
   );
 
   const activeSurfaceTitle = useMemo(
-    () => surface?.title || uxText('chronos_mission_intelligence', 'Mission Intelligence', locale),
+    () => surface?.title || uxText('chronos_mission_intelligence', locale),
     [surface?.title, locale]
   );
   const activeScenario = useMemo(
@@ -1092,16 +1092,18 @@ export default function ChronosMirrorV2() {
                 </div>
                 <div
                   className={`ml-2 rounded-full border border-cyan-400/20 bg-cyan-400/5 px-3 py-1 text-[11px] ${isLightTheme ? 'text-[var(--kb-text-secondary)]' : 'text-cyan-100/70'}`}
-                  title="このサーフェスの役割"
+                  title={locale === 'ja' ? 'このサーフェスの役割' : 'What this surface is for'}
                 >
-                  管制塔 — 実行状態の監視と介入
+                  {locale === 'ja'
+                    ? '管制塔 — 実行状態の監視と介入'
+                    : 'Control tower — monitor execution, intervene when needed'}
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowOpsBoards((current) => !current)}
                   className={`ml-2 rounded-full border px-3 py-1 text-[11px] transition ${showOpsBoards ? 'border-cyan-400/60 bg-cyan-400/20 text-cyan-100' : isLightTheme ? 'border-[color:var(--kb-border)] bg-white/80 text-[var(--kb-text-primary)] hover:bg-white' : 'border-white/15 bg-white/5 text-white/60 hover:bg-white/10'}`}
                 >
-                  エージェント/看板
+                  {locale === 'ja' ? 'エージェント/看板' : 'Agents / Boards'}
                 </button>
               </div>
               {tenantLabel ? (
@@ -1141,7 +1143,7 @@ export default function ChronosMirrorV2() {
                   className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 ${isLightTheme ? 'border-[color:var(--kb-border)] bg-white/80 text-[var(--kb-text-primary)] hover:bg-white' : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10 hover:text-cyan-400'}`}
                 >
                   <Cpu size={12} />
-                  <span>{uxText('chronos_agent_runtimes', 'Agent Runtimes', locale)}</span>
+                  <span>{uxText('chronos_agent_runtimes', locale)}</span>
                 </button>
               </div>
             </div>
@@ -1162,11 +1164,14 @@ export default function ChronosMirrorV2() {
                 <h2
                   className={`text-2xl font-semibold tracking-tight ${shellTitleClass} md:text-[2rem]`}
                 >
-                  Kyberionは、環境全体を自律的に制御し、あなたの意図（Intent）に合わせてシステムが最適に連携・動作する高度なインテリジェント・インターフェースです。
+                  {locale === 'ja'
+                    ? 'Kyberionは、環境全体を自律的に制御し、あなたの意図（Intent）に合わせてシステムが最適に連携・動作する高度なインテリジェント・インターフェースです。'
+                    : 'Kyberion is an intelligent interface that autonomously controls your environment so the whole system coordinates around your intent.'}
                 </h2>
                 <p className={`mt-3 max-w-2xl text-sm leading-7 ${shellSubtleClass}`}>
-                  この surface は `web-theme-pack` で色とタイポグラフィを、`web-design-system-pack`
-                  でレイアウトとセクション順を管理します。見た目の微調整ではなく、再利用可能な構造を先に固定します。
+                  {locale === 'ja'
+                    ? 'この surface は `web-theme-pack` で色とタイポグラフィを、`web-design-system-pack` でレイアウトとセクション順を管理します。見た目の微調整ではなく、再利用可能な構造を先に固定します。'
+                    : 'This surface manages color and typography via `web-theme-pack`, and layout plus section order via `web-design-system-pack`. Reusable structure is fixed first, before visual fine-tuning.'}
                 </p>
               </div>
               <div className="mt-5 flex flex-wrap gap-2">
@@ -2103,14 +2108,10 @@ export default function ChronosMirrorV2() {
                   <div className="mb-4 flex items-center justify-between">
                     <div>
                       <div className="text-[10px] uppercase tracking-[0.28em] text-white/45">
-                        {uxText('chronos_quick_actions', 'Quick Actions', locale)}
+                        {uxText('chronos_quick_actions', locale)}
                       </div>
                       <div className="mt-1 text-sm text-slate-200/65">
-                        {uxText(
-                          'chronos_grouped_by_operator_intent',
-                          'These drive the active A2UI surface on the right.',
-                          locale
-                        )}
+                        {uxText('chronos_grouped_by_operator_intent', locale)}
                       </div>
                     </div>
                   </div>
@@ -2306,7 +2307,7 @@ export default function ChronosMirrorV2() {
                           {card.detail}
                         </p>
                         <div className="mt-3 text-[10px] uppercase tracking-[0.2em] text-white/35">
-                          {uxText('chronos_jump_to_section', 'Jump to section', locale)}
+                          {uxText('chronos_jump_to_section', locale)}
                         </div>
                       </button>
                     );
