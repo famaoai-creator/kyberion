@@ -21,6 +21,9 @@ import { createRequire } from 'node:module';
 import fontkit from './fontkit-shim.js';
 import { safeExistsSync, safeExecResult, safeReadFile, safeWriteFile } from '../../secure-io.js';
 import { pathResolver } from '../../path-resolver.js';
+import { createLogger } from '../../logger.js';
+
+const logger = createLogger('native-pdf-engine');
 import type {
   PdfDesignProtocol,
   PdfRenderOptions,
@@ -1529,7 +1532,7 @@ export async function generateNativePdf(
       afList.push({ af, streamId });
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
-      console.warn(`[PDF] Associated file skipped: ${af.path} — ${message}`);
+      logger.warn(`associated file skipped: ${af.path} — ${message}`);
     }
   }
 
@@ -1585,7 +1588,7 @@ export async function generateNativePdf(
       writer['raw']('\nendstream\nendobj\n');
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
-      console.warn(`[PDF] Image skipped: ${imgPath} — ${message}`);
+      logger.warn(`image skipped: ${imgPath} — ${message}`);
     }
   }
 
