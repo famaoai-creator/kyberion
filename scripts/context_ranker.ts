@@ -25,6 +25,9 @@ import {
   safeReadFile,
   safeExistsSync,
   safeStat,
+  scopeAffinityScore,
+  docAuthorityScore,
+  recencyDecayScore,
 } from '@agent/core';
 import { readJsonFile } from './refactor/cli-input.js';
 
@@ -79,10 +82,13 @@ interface ScoredEntry extends KnowledgeEntry {
 }
 
 interface TaxonomyManifest {
-  kinds?: Record<string, {
-    default_authority?: string;
-    default_scope?: string;
-  }>;
+  kinds?: Record<
+    string,
+    {
+      default_authority?: string;
+      default_scope?: string;
+    }
+  >;
   directory_defaults?: Array<{
     path_prefix: string;
     kind: string;
@@ -94,7 +100,7 @@ interface TaxonomyManifest {
 
 function normalizeStringArray(value: unknown): string[] {
   return Array.isArray(value)
-    ? value.map(item => String(item).trim()).filter(Boolean)
+    ? value.map((item) => String(item).trim()).filter(Boolean)
     : typeof value === 'string' && value.trim()
       ? [value.trim()]
       : [];
@@ -122,28 +128,32 @@ function loadTaxonomy(): TaxonomyManifest {
 function resolveDirectoryDefault(relativePath: string) {
   const normalized = path.join('knowledge', relativePath).replace(/\\/g, '/');
   const defaults = loadTaxonomy().directory_defaults || [];
-  return defaults.find(entry => normalized.startsWith(entry.path_prefix));
+  return defaults.find((entry) => normalized.startsWith(entry.path_prefix));
 }
 
 function inferKind(relativePath: string, frontmatter: Record<string, any>): string {
-  if (typeof frontmatter.kind === 'string' && frontmatter.kind.trim()) return frontmatter.kind.trim();
+  if (typeof frontmatter.kind === 'string' && frontmatter.kind.trim())
+    return frontmatter.kind.trim();
   return resolveDirectoryDefault(relativePath)?.kind || 'reference';
 }
 
 function inferScope(frontmatter: Record<string, any>): string {
-  if (typeof frontmatter.scope === 'string' && frontmatter.scope.trim()) return frontmatter.scope.trim();
-  const kind = typeof frontmatter.kind === 'string' && frontmatter.kind.trim()
-    ? frontmatter.kind
-    : undefined;
+  if (typeof frontmatter.scope === 'string' && frontmatter.scope.trim())
+    return frontmatter.scope.trim();
+  const kind =
+    typeof frontmatter.kind === 'string' && frontmatter.kind.trim() ? frontmatter.kind : undefined;
   return (kind && loadTaxonomy().kinds?.[kind]?.default_scope) || 'global';
 }
 
 function inferDocAuthority(relativePath: string, frontmatter: Record<string, any>): string {
-  if (typeof frontmatter.docAuthority === 'string' && frontmatter.docAuthority.trim()) return frontmatter.docAuthority.trim();
-  if (typeof frontmatter.authority === 'string' && frontmatter.authority.trim()) return frontmatter.authority.trim();
+  if (typeof frontmatter.docAuthority === 'string' && frontmatter.docAuthority.trim())
+    return frontmatter.docAuthority.trim();
+  if (typeof frontmatter.authority === 'string' && frontmatter.authority.trim())
+    return frontmatter.authority.trim();
   const directoryDefault = resolveDirectoryDefault(relativePath);
   if (directoryDefault?.authority) return directoryDefault.authority;
-  const kind = typeof frontmatter.kind === 'string' ? frontmatter.kind : inferKind(relativePath, frontmatter);
+  const kind =
+    typeof frontmatter.kind === 'string' ? frontmatter.kind : inferKind(relativePath, frontmatter);
   return loadTaxonomy().kinds?.[kind]?.default_authority || 'reference';
 }
 
@@ -162,7 +172,10 @@ export function parseFrontmatter(content: string): Record<string, any> {
     let value: any = line.slice(colonIdx + 1).trim();
     // Parse arrays like [a, b, c]
     if (value.startsWith('[') && value.endsWith(']')) {
-      value = value.slice(1, -1).split(',').map((s: string) => s.trim().replace(/^['"]|['"]$/g, ''));
+      value = value
+        .slice(1, -1)
+        .split(',')
+        .map((s: string) => s.trim().replace(/^['"]|['"]$/g, ''));
     }
     // Parse numbers
     if (typeof value === 'string' && /^\d+$/.test(value)) {
@@ -183,11 +196,19 @@ function scanKnowledgeFiles(): KnowledgeEntry[] {
   function walk(dir: string) {
     if (!safeExistsSync(dir)) return;
     let items: string[];
-    try { items = safeReaddir(dir); } catch (_) { return; }
+    try {
+      items = safeReaddir(dir);
+    } catch (_) {
+      return;
+    }
     for (const item of items) {
       const fullPath = path.join(dir, item);
       let stat: ReturnType<typeof safeStat>;
-      try { stat = safeStat(fullPath); } catch (_) { continue; }
+      try {
+        stat = safeStat(fullPath);
+      } catch (_) {
+        continue;
+      }
       if (stat.isDirectory()) {
         // Skip hidden dirs, node_modules, external-wisdom
         if (item.startsWith('.') || item === 'node_modules' || item === 'external-wisdom') continue;
@@ -238,7 +259,10 @@ function scanKnowledgeFiles(): KnowledgeEntry[] {
 // Scoring
 // ---------------------------------------------------------------------------
 export function tokenize(text: string): string[] {
-  return text.toLowerCase().split(/[\s\-_/,;:]+/).filter(t => t.length > 1);
+  return text
+    .toLowerCase()
+    .split(/[\s\-_/,;:]+/)
+    .filter((t) => t.length > 1);
 }
 
 export function scoreEntry(
@@ -248,26 +272,26 @@ export function scoreEntry(
   phaseSlug: string,
   currentScope: string,
   weights: RankingWeights,
-  now: number,
+  now: number
 ): ScoredEntry {
   // 1. Intent Match — title + tags
   const titleTokens = tokenize(entry.title);
-  const tagTokens = entry.tags.map(t => t.toLowerCase());
+  const tagTokens = entry.tags.map((t) => t.toLowerCase());
   const pathTokens = tokenize(entry.path);
 
   let intentScore = 0;
   for (const token of intentTokens) {
-    if (titleTokens.some(t => t.includes(token))) intentScore += weights.title;
-    if (tagTokens.some(t => t.includes(token))) intentScore += weights.tag;
-    if (pathTokens.some(t => t.includes(token))) intentScore += weights.category;
+    if (titleTokens.some((t) => t.includes(token))) intentScore += weights.title;
+    if (tagTokens.some((t) => t.includes(token))) intentScore += weights.tag;
+    if (pathTokens.some((t) => t.includes(token))) intentScore += weights.category;
   }
 
   // 2. Role Match
   let roleScore = 0;
   const roleCandidates = [...entry.related_roles, ...entry.role_affinity];
   if (roleSlug && roleCandidates.length > 0) {
-    const normalizedRoles = roleCandidates.map(r => r.toLowerCase().replace(/\s+/g, '_'));
-    if (normalizedRoles.some(r => r.includes(roleSlug))) {
+    const normalizedRoles = roleCandidates.map((r) => r.toLowerCase().replace(/\s+/g, '_'));
+    if (normalizedRoles.some((r) => r.includes(roleSlug))) {
       roleScore = weights.role;
     }
   }
@@ -275,20 +299,13 @@ export function scoreEntry(
   const taxonomy = loadTaxonomy();
   let phaseScore = 0;
   if (phaseSlug) {
-    const normalizedPhases = entry.phase.map(p => p.toLowerCase());
+    const normalizedPhases = entry.phase.map((p) => p.toLowerCase());
     if (normalizedPhases.includes(phaseSlug)) {
       phaseScore = weights.phase;
     }
   }
 
-  let scopeScore = 0;
-  const scopeMatrix: Record<string, Record<string, number>> = {
-    global: { global: 1, repository: 0.6, mission: 0.4, environment: 0.2 },
-    repository: { global: 0.7, repository: 1, mission: 0.8, environment: 0.3 },
-    mission: { global: 0.5, repository: 0.8, mission: 1, environment: 0.4 },
-    environment: { global: 0.3, repository: 0.4, mission: 0.5, environment: 1 },
-  };
-  scopeScore = Math.round(weights.scope * (scopeMatrix[currentScope]?.[entry.scope] ?? 0.4));
+  const scopeScore = scopeAffinityScore(currentScope, entry.scope, weights.scope);
 
   let kindScore = 0;
   if (phaseSlug) {
@@ -299,24 +316,23 @@ export function scoreEntry(
     }
   }
 
-  const authorityWeights: Record<string, number> = {
-    policy: weights.authority,
-    standard: Math.max(1, weights.authority - 1),
-    recipe: Math.max(1, weights.authority - 2),
-    reference: Math.max(1, weights.authority - 4),
-    advisory: Math.max(1, weights.authority - 5),
-  };
-  const authorityScore = authorityWeights[entry.docAuthority] || 0;
+  const authorityScore = docAuthorityScore(entry.docAuthority, weights.authority);
 
   // 3. Importance (normalize to 0-10 scale)
   const importanceScore = entry.importance;
 
   // 4. Recency (days since last update, decayed)
-  const lastUpdated = new Date(entry.last_updated).getTime();
-  const daysSince = Math.max(0, (now - lastUpdated) / (1000 * 60 * 60 * 24));
-  const recencyScore = Math.max(0, 10 - daysSince / 30); // Lose ~1 point per month
+  const recencyScore = recencyDecayScore(new Date(entry.last_updated).getTime(), now);
 
-  const total = intentScore + roleScore + phaseScore + scopeScore + kindScore + authorityScore + importanceScore + recencyScore;
+  const total =
+    intentScore +
+    roleScore +
+    phaseScore +
+    scopeScore +
+    kindScore +
+    authorityScore +
+    importanceScore +
+    recencyScore;
 
   return {
     ...entry,
@@ -339,7 +355,17 @@ export function scoreEntry(
 // ---------------------------------------------------------------------------
 function loadWeights(): RankingWeights {
   const configPath = pathResolver.knowledge('product/governance/analysis-config.json');
-  const defaults: RankingWeights = { title: 10, id: 5, tag: 15, category: 3, role: 25, phase: 18, scope: 12, kind: 10, authority: 8 };
+  const defaults: RankingWeights = {
+    title: 10,
+    id: 5,
+    tag: 15,
+    category: 3,
+    role: 25,
+    phase: 18,
+    scope: 12,
+    kind: 10,
+    authority: 8,
+  };
   if (!safeExistsSync(configPath)) return defaults;
   try {
     const config = readJsonFile<any>(configPath);
@@ -365,11 +391,15 @@ async function main() {
   const limit = limitIdx >= 0 ? parseInt(args[limitIdx + 1], 10) : 7;
 
   if (!intent) {
-    console.log('Usage: node dist/scripts/context_ranker.js --intent "query" [--role "role"] [--phase "alignment"] [--scope "repository"] [--limit N] [--json]');
+    console.log(
+      'Usage: node dist/scripts/context_ranker.js --intent "query" [--role "role"] [--phase "alignment"] [--scope "repository"] [--limit N] [--json]'
+    );
     process.exit(1);
   }
 
-  logger.info(`🔍 [ContextRanker] Ranking knowledge for intent="${intent}", role="${role}", phase="${phase}", scope="${scope}", limit=${limit}`);
+  logger.info(
+    `🔍 [ContextRanker] Ranking knowledge for intent="${intent}", role="${role}", phase="${phase}", scope="${scope}", limit=${limit}`
+  );
 
   const weights = loadWeights();
   const entries = scanKnowledgeFiles();
@@ -379,8 +409,8 @@ async function main() {
   const now = Date.now();
 
   const scored = entries
-    .map(e => scoreEntry(e, intentTokens, roleSlug, phaseSlug, scope, weights, now))
-    .filter(e => e.score > 0)
+    .map((e) => scoreEntry(e, intentTokens, roleSlug, phaseSlug, scope, weights, now))
+    .filter((e) => e.score > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, limit);
 
@@ -399,7 +429,7 @@ async function main() {
 // Only run when executed directly (not when imported by tests)
 const isDirectRun = process.argv[1]?.includes('context_ranker');
 if (isDirectRun) {
-  main().catch(err => {
+  main().catch((err) => {
     logger.error(err.message);
     process.exit(1);
   });
