@@ -236,7 +236,7 @@ export async function generateVideoVisualDirection(
       : '',
     'Reply with ONLY a JSON object:',
     '{ "pattern_id": string, "reason": string,',
-    '  "per_scene": [{ "scene_id": string, "layout_variant": "default" | "howto-guide" | "split-highlight" | "quote-card" }] }',
+    '  "per_scene": [{ "scene_id": string, "layout_variant": "default" | "basic-title-card" | "howto-guide" | "split-highlight" | "promo-spot" | "quote-card" }] }',
   ]
     .filter(Boolean)
     .join('\n');

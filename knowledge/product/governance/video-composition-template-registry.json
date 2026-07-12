@@ -61,6 +61,16 @@
       "required_content_fields": ["headline"],
       "supported_output_formats": ["mp4", "mov", "webm"],
       "notes": "Final brand scene with logo placement and CTA lockup."
+    },
+    {
+      "template_id": "quote-card",
+      "display_name": "Quote Card",
+      "status": "active",
+      "renderer": "builtin_html",
+      "supported_roles": ["cta", "feature", "generic", "hook", "outro", "proof"],
+      "required_content_fields": ["headline"],
+      "supported_output_formats": ["mp4", "mov", "webm"],
+      "notes": "Large centered quotation with attribution — testimonials, key messages, hooks for vertical shorts."
     }
   ]
 }

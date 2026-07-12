@@ -2367,7 +2367,7 @@
     {
       "path": "product/governance/video-composition-template-registry.json",
       "tier": "public",
-      "size": 2494,
+      "size": 2943,
       "type": "json"
     },
     {
@@ -8085,7 +8085,7 @@
     {
       "path": "public/design-patterns/media-templates/video-visual-patterns.json",
       "tier": "public",
-      "size": 2998,
+      "size": 6281,
       "type": "json"
     },
     {
