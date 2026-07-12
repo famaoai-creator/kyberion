@@ -690,6 +690,184 @@ function logNextActionForPipelineFailure(
   }
 }
 
+// ── AR-01 Phase A: leaf inline-op handlers ─────────────────────────────────
+// Extracted verbatim from the runSteps dispatch chain (design note in
+// AR-01 plan doc). Each takes the step params + context and returns the
+// updated context; control-flow ops (if/foreach/include/accumulate) stay
+// inline until Phase C delegates the loop to the canonical engine.
+
+async function runInlineSystemExec(
+  params: Record<string, unknown>,
+  ctx: Record<string, unknown>,
+  rootDir: string
+): Promise<Record<string, unknown>> {
+  const resolvedParams = resolveParamsRecursive(params, ctx) as Record<string, unknown>;
+  const command = String(resolvedParams.command ?? resolvedParams.cmd ?? '');
+  if (!command) {
+    throw new Error('system:exec requires "command" param');
+  }
+  const args = Array.isArray(resolvedParams.args)
+    ? resolvedParams.args.map((value) => String(value))
+    : [];
+  const env = Object.fromEntries(
+    Object.entries((resolvedParams.env || {}) as Record<string, unknown>).map(([key, value]) => [
+      key,
+      typeof value === 'string' ? String(value) : String(value),
+    ])
+  ) as Record<string, string>;
+  const cwdValue =
+    typeof resolvedParams.cwd === 'string' && resolvedParams.cwd.trim().length > 0
+      ? String(resolvedParams.cwd)
+      : rootDir;
+  const timeoutMs =
+    typeof resolvedParams.timeout_ms === 'number' ? resolvedParams.timeout_ms : undefined;
+  const execResult = safeExecResult(command, args, {
+    cwd: nodePath.isAbsolute(cwdValue) ? cwdValue : nodePath.resolve(rootDir, cwdValue),
+    env,
+    ...(timeoutMs ? { timeoutMs } : {}),
+    input:
+      typeof resolvedParams.input === 'string'
+        ? String(resolveVars(resolvedParams.input, ctx))
+        : undefined,
+  });
+  const exportValue = {
+    stdout: execResult.stdout,
+    stderr: execResult.stderr,
+    status: execResult.status,
+  };
+  if (resolvedParams.export_as && typeof resolvedParams.export_as === 'string') {
+    ctx = { ...ctx, [resolvedParams.export_as]: exportValue };
+  }
+  const allowError = resolvedParams.allow_error === true || resolvedParams.allowError === true;
+  if (!allowError && execResult.status !== 0) {
+    throw new Error(
+      execResult.stderr.trim() ||
+        execResult.stdout.trim() ||
+        `system:exec exited with status ${execResult.status}`
+    );
+  }
+  return ctx;
+}
+
+async function runInlineSystemWriteFile(
+  params: Record<string, unknown>,
+  ctx: Record<string, unknown>,
+  rootDir: string
+): Promise<Record<string, unknown>> {
+  const enrichedCtx = { ...ctx, $now: new Date().toISOString() };
+  const resolvedParams = resolveParamsRecursive(params, enrichedCtx);
+  const writePath = nodePath.resolve(rootDir, String(resolvedParams.path ?? ''));
+  const rawContent = resolvedParams.content;
+  const contentStr =
+    typeof rawContent === 'string'
+      ? rawContent
+      : rawContent !== undefined
+        ? JSON.stringify(rawContent, null, 2)
+        : '';
+  const dir = nodePath.dirname(writePath);
+  if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
+  safeWriteFile(writePath, contentStr);
+  if (params.export_as && typeof params.export_as === 'string') {
+    ctx = { ...ctx, [params.export_as]: contentStr };
+  }
+  return ctx;
+}
+
+async function runInlineSystemShell(
+  params: Record<string, unknown>,
+  ctx: Record<string, unknown>,
+  rootDir: string,
+  shellBin: string
+): Promise<Record<string, unknown>> {
+  const cmd = String(resolveVars(params.cmd || '', ctx));
+  const env = Object.fromEntries(
+    Object.entries((params.env || {}) as Record<string, unknown>).map(([key, value]) => [
+      key,
+      typeof value === 'string' ? String(resolveVars(value, ctx)) : String(value),
+    ])
+  ) as Record<string, string>;
+  const timeoutMs = typeof params.timeout_ms === 'number' ? params.timeout_ms : undefined;
+  const output = safeExec(shellBin, ['-c', cmd], {
+    cwd: rootDir,
+    env,
+    ...(timeoutMs ? { timeoutMs } : {}),
+  }).trim();
+  let parsedOutput: unknown = output;
+  if (output) {
+    try {
+      parsedOutput = JSON.parse(output);
+    } catch {
+      parsedOutput = output;
+    }
+  }
+  if (params.export_as && typeof params.export_as === 'string') {
+    ctx = { ...ctx, [params.export_as]: parsedOutput };
+  }
+  // Track BlackHole mic routing state for SIGINT cleanup.
+  if (cmd.includes('blackhole_audio_router.py')) {
+    if (cmd.includes('setup_routing')) {
+      const pythonBin = cmd.split(/\s+/)[0];
+      const defaultMicDevice = String(ctx.default_mic_device || 'MacBook Pro Microphone');
+      markRouterActive(pythonBin, defaultMicDevice, rootDir);
+    } else if (cmd.includes('reset_routing')) {
+      markRouterInactive();
+    }
+  }
+  return ctx;
+}
+
+async function runInlineCoreWait(
+  params: Record<string, unknown>,
+  ctx: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  const ms = Number(resolveVars(params.duration_ms || params.ms || 1000, ctx));
+  await new Promise((resolve) => setTimeout(resolve, ms));
+  return ctx;
+}
+
+function runInlineCoreJanitor(
+  step: PipelineAdfStep,
+  params: Record<string, unknown>,
+  ctx: Record<string, unknown>
+): Record<string, unknown> {
+  const dryRunParam = resolveVars(params.dry_run ?? params.dryRun ?? true, ctx);
+  const dryRun = dryRunParam === true || dryRunParam === 'true';
+  const report = runJanitor({ dryRun });
+  const exportKey = resolveExportKey(step, 'janitor_report');
+  ctx = { ...ctx, [exportKey]: report };
+  return ctx;
+}
+
+async function runInlineCoreTransform(
+  step: PipelineAdfStep,
+  params: Record<string, unknown>,
+  ctx: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  const { Buffer } = await import('node:buffer');
+  const vm = await import('node:vm');
+  const util = await import('node:util');
+  const input = resolveVars(params.input || ctx, ctx);
+  const script = String(params.script || 'input');
+  // Wrap in IIFE so pipeline scripts can use `return` statements naturally
+  const wrappedScript = `(function() { ${script} })()`;
+  const sandbox = {
+    Buffer,
+    input,
+    ctx: { ...ctx },
+    console: {
+      log: (...args: any[]) =>
+        logger.info(
+          `[TRANSFORM-LOG] ${args.map((a) => (typeof a === 'object' ? util.inspect(a) : a)).join(' ')}`
+        ),
+    },
+  };
+  vm.createContext(sandbox);
+  const result = await new vm.Script(wrappedScript).runInContext(sandbox);
+  const transformKey = resolveExportKey(step, 'last_transform');
+  ctx = { ...ctx, [transformKey]: result };
+  return ctx;
+}
+
 export async function runSteps(
   steps: PipelineAdfStep[],
   initialCtx: Record<string, unknown> = {},
@@ -819,103 +997,11 @@ export async function runSteps(
         if (domain === 'system' && action === 'log') {
           logger.info(resolveLogMessage(params, ctx));
         } else if (domain === 'system' && action === 'exec') {
-          const resolvedParams = resolveParamsRecursive(params, ctx) as Record<string, unknown>;
-          const command = String(resolvedParams.command ?? resolvedParams.cmd ?? '');
-          if (!command) {
-            throw new Error('system:exec requires "command" param');
-          }
-          const args = Array.isArray(resolvedParams.args)
-            ? resolvedParams.args.map((value) => String(value))
-            : [];
-          const env = Object.fromEntries(
-            Object.entries((resolvedParams.env || {}) as Record<string, unknown>).map(
-              ([key, value]) => [key, typeof value === 'string' ? String(value) : String(value)]
-            )
-          ) as Record<string, string>;
-          const cwdValue =
-            typeof resolvedParams.cwd === 'string' && resolvedParams.cwd.trim().length > 0
-              ? String(resolvedParams.cwd)
-              : rootDir;
-          const timeoutMs =
-            typeof resolvedParams.timeout_ms === 'number' ? resolvedParams.timeout_ms : undefined;
-          const execResult = safeExecResult(command, args, {
-            cwd: nodePath.isAbsolute(cwdValue) ? cwdValue : nodePath.resolve(rootDir, cwdValue),
-            env,
-            ...(timeoutMs ? { timeoutMs } : {}),
-            input:
-              typeof resolvedParams.input === 'string'
-                ? String(resolveVars(resolvedParams.input, ctx))
-                : undefined,
-          });
-          const exportValue = {
-            stdout: execResult.stdout,
-            stderr: execResult.stderr,
-            status: execResult.status,
-          };
-          if (resolvedParams.export_as && typeof resolvedParams.export_as === 'string') {
-            ctx = { ...ctx, [resolvedParams.export_as]: exportValue };
-          }
-          const allowError =
-            resolvedParams.allow_error === true || resolvedParams.allowError === true;
-          if (!allowError && execResult.status !== 0) {
-            throw new Error(
-              execResult.stderr.trim() ||
-                execResult.stdout.trim() ||
-                `system:exec exited with status ${execResult.status}`
-            );
-          }
+          ctx = await runInlineSystemExec(params, ctx, rootDir);
         } else if (domain === 'system' && action === 'write_file') {
-          const enrichedCtx = { ...ctx, $now: new Date().toISOString() };
-          const resolvedParams = resolveParamsRecursive(params, enrichedCtx);
-          const writePath = nodePath.resolve(rootDir, String(resolvedParams.path ?? ''));
-          const rawContent = resolvedParams.content;
-          const contentStr =
-            typeof rawContent === 'string'
-              ? rawContent
-              : rawContent !== undefined
-                ? JSON.stringify(rawContent, null, 2)
-                : '';
-          const dir = nodePath.dirname(writePath);
-          if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-          safeWriteFile(writePath, contentStr);
-          if (params.export_as && typeof params.export_as === 'string') {
-            ctx = { ...ctx, [params.export_as]: contentStr };
-          }
+          ctx = await runInlineSystemWriteFile(params, ctx, rootDir);
         } else if (domain === 'system' && action === 'shell') {
-          const cmd = String(resolveVars(params.cmd || '', ctx));
-          const env = Object.fromEntries(
-            Object.entries((params.env || {}) as Record<string, unknown>).map(([key, value]) => [
-              key,
-              typeof value === 'string' ? String(resolveVars(value, ctx)) : String(value),
-            ])
-          ) as Record<string, string>;
-          const timeoutMs = typeof params.timeout_ms === 'number' ? params.timeout_ms : undefined;
-          const output = safeExec(shellBin, ['-c', cmd], {
-            cwd: rootDir,
-            env,
-            ...(timeoutMs ? { timeoutMs } : {}),
-          }).trim();
-          let parsedOutput: unknown = output;
-          if (output) {
-            try {
-              parsedOutput = JSON.parse(output);
-            } catch {
-              parsedOutput = output;
-            }
-          }
-          if (params.export_as && typeof params.export_as === 'string') {
-            ctx = { ...ctx, [params.export_as]: parsedOutput };
-          }
-          // Track BlackHole mic routing state for SIGINT cleanup.
-          if (cmd.includes('blackhole_audio_router.py')) {
-            if (cmd.includes('setup_routing')) {
-              const pythonBin = cmd.split(/\s+/)[0];
-              const defaultMicDevice = String(ctx.default_mic_device || 'MacBook Pro Microphone');
-              markRouterActive(pythonBin, defaultMicDevice, rootDir);
-            } else if (cmd.includes('reset_routing')) {
-              markRouterInactive();
-            }
-          }
+          ctx = await runInlineSystemShell(params, ctx, rootDir, shellBin);
         } else if (domain === 'core' && action === 'if') {
           const cond = params.condition;
           const conditionResult = evaluateCondition(cond, ctx);
@@ -1208,37 +1294,11 @@ export async function runSteps(
             return { status: 'failed', results, context: ctx };
           }
         } else if (domain === 'core' && action === 'wait') {
-          const ms = Number(resolveVars(params.duration_ms || params.ms || 1000, ctx));
-          await new Promise((resolve) => setTimeout(resolve, ms));
+          ctx = await runInlineCoreWait(params, ctx);
         } else if (domain === 'core' && (action === 'run_janitor' || action === 'run-janitor')) {
-          const dryRunParam = resolveVars(params.dry_run ?? params.dryRun ?? true, ctx);
-          const dryRun = dryRunParam === true || dryRunParam === 'true';
-          const report = runJanitor({ dryRun });
-          const exportKey = resolveExportKey(step, 'janitor_report');
-          ctx = { ...ctx, [exportKey]: report };
+          ctx = runInlineCoreJanitor(step, params, ctx);
         } else if (domain === 'core' && action === 'transform') {
-          const { Buffer } = await import('node:buffer');
-          const vm = await import('node:vm');
-          const util = await import('node:util');
-          const input = resolveVars(params.input || ctx, ctx);
-          const script = String(params.script || 'input');
-          // Wrap in IIFE so pipeline scripts can use `return` statements naturally
-          const wrappedScript = `(function() { ${script} })()`;
-          const sandbox = {
-            Buffer,
-            input,
-            ctx: { ...ctx },
-            console: {
-              log: (...args: any[]) =>
-                logger.info(
-                  `[TRANSFORM-LOG] ${args.map((a) => (typeof a === 'object' ? util.inspect(a) : a)).join(' ')}`
-                ),
-            },
-          };
-          vm.createContext(sandbox);
-          const result = await new vm.Script(wrappedScript).runInContext(sandbox);
-          const transformKey = resolveExportKey(step, 'last_transform');
-          ctx = { ...ctx, [transformKey]: result };
+          ctx = await runInlineCoreTransform(step, params, ctx);
         } else if (
           domain === 'reasoning' &&
           (action === 'analyze' || action === 'transform' || action === 'synthesize')

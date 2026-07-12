@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "description": "Creates an encrypted daily Kyberion state snapshot. OP-02 requires an external backup destination for real DR; the backup tool warns when the target is on the same device.",
   "_refs": {
-    "plan": "docs/improvement-plans-2026-07/OP-02_BACKUP_RECOVERY.ja.md",
+    "plan": "docs/developer/improvement-plans-2026-07/OP-02_BACKUP_RECOVERY.ja.md",
     "implementation": "scripts/backup.ts"
   },
   "context": {},

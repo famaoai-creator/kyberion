@@ -1,4 +1,4 @@
-/* eslint-disable no-restricted-imports -- IP-08 で managed-process 経由へ移行予定 (docs/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
+/* eslint-disable no-restricted-imports -- IP-08 で managed-process 経由へ移行予定 (docs/developer/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 /**
  * Gemini CLI Backend — spawns the local `gemini` CLI in `-p -o json -y`
  * mode to run structured-output reasoning tasks.

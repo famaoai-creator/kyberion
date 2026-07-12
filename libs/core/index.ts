@@ -138,7 +138,12 @@ export * from './op-suggestions.js';
 export * from './adf-engine.js';
 export * from './autonomous-repair.js';
 export * from './operation-policy-gate.js';
+export * from './video-visual-direction.js';
+export * from './deck-theme-direction.js';
+export * from './semantic-decide.js';
+export * from './ranking-signals.js';
 export * from './operation-policy-gate.js';
+export * from './ranking-signals.js';
 export * from './runtime-health-history.js';
 export * from './bridge-typing.js';
 export * from './draft-refine.js';
@@ -434,6 +439,7 @@ export { distillXlsxDesign } from './src/xlsx-utils.js';
 export { distillDocxDesign } from './src/docx-utils.js';
 export { generateNativePdf } from './src/native-pdf-engine/engine.js';
 export { generateNativePptx, patchPptxText } from './src/native-pptx-engine/engine.js';
+export type { PptxDesignProtocol, PptxElement, PptxSlide } from './src/types/pptx-protocol.js';
 export { generateNativeXlsx } from './src/native-xlsx-engine/engine.js';
 export { generateNativeDocx } from './src/native-docx-engine/engine.js';
 export {
@@ -1369,7 +1375,9 @@ export {
   loadOnboardingFlowPolicyCatalog,
   resolveOnboardingFlowPolicy,
   resetOnboardingFlowPolicyCatalogCache,
+  resolveOnboardingText,
 } from './onboarding-flow-policy.js';
+export type { LocalizedOnboardingText } from './onboarding-flow-policy.js';
 export {
   loadMissionDistillMarkdownPolicyCatalog,
   resolveMissionDistillMarkdownPolicy,
@@ -1534,6 +1542,7 @@ export * from './ceo-surface-summary.js';
 export * from './mic-capture.js';
 export * from './in-room-minutes-recorder.js';
 export * from './in-room-meeting-driver.js';
+export * from './chrome-extension-meeting-driver.js';
 export * from './channel-directory.js';
 export * from './tool-loop-guardrail.js';
 export * from './surface-ingress-contract.js';

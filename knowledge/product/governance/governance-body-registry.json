@@ -1,0 +1,422 @@
+{
+  "version": "1.0.0",
+  "description": "IT デリバリ／運用の標準ゲーティング会議体(会議体)カタログ。各会議体は開催事前条件(preconditions)・アジェンダ(agenda)・入口/出口クライテリア(entry/exit_criteria)・決裁者(decision_owner)・定足数(quorum)・所管ゲート(gates_owned)を定義する。SDLC ゲートは gate-profiles/sdlc.json、インシデントゲートは gate-profiles/incident.json と対応。固有(顧客/テナント)情報は含めない — テナント個別の会議体運用は knowledge/confidential/{tenant}/ に置く。",
+  "decision_outcomes": {
+    "go": "GO — 次フェーズへ進行を承認。exit_criteria を全て満たす。",
+    "conditional_go": "CONDITIONAL GO — 条件付き進行。未充足項目に担当・期限つきの条件を付す。",
+    "no_go": "NO-GO — 差し戻し。前フェーズで是正し再判定。",
+    "hold": "HOLD — 判定保留。追加情報・追加検証の取得後に再開催。"
+  },
+  "bodies": [
+    {
+      "id": "initiation-review",
+      "name_ja": "企画審査会",
+      "name_en": "Initiation Review",
+      "purpose": "案件を『なぜやるか(Why)』の観点で承認し、スコープ確定フェーズへの進行可否を決める。",
+      "scope": "project",
+      "trigger": { "kind": "gate", "detail": "新規案件/機能拡張の提案が起票されたとき (G1)" },
+      "decision_owner": "business_owner",
+      "quorum": {
+        "required_roles": ["business_owner", "pmo_governance", "solution_architect"],
+        "optional_roles": ["finance_controller", "customer_success"],
+        "min_attendees": 3
+      },
+      "preconditions": [
+        "project-charter ドラフトが事前配布されている",
+        "business-impact-analysis(投資対効果/リスク概算)が添付されている",
+        "顧客側の意思決定者(スポンサー)が特定されている"
+      ],
+      "agenda": [
+        "課題・目的とビジネス価値の確認",
+        "スコープ仮説と代替案の比較",
+        "概算コスト・体制・スケジュールの妥当性",
+        "主要リスクと前提の確認",
+        "GO / CONDITIONAL GO / NO-GO 判定"
+      ],
+      "entry_criteria": [
+        "project-charter",
+        "business-impact-analysis",
+        "stakeholder-communication-register"
+      ],
+      "exit_criteria": [
+        "課題定義と成功基準が承認されている",
+        "決裁者とステークホルダーマップが明確",
+        "資金/リソース/スポンサーシップの前提が文書化されている"
+      ],
+      "decisions": ["go", "conditional_go", "no_go", "hold"],
+      "gates_owned": ["gate-initiation-approval"],
+      "escalation": "steering-committee",
+      "tier": "product"
+    },
+    {
+      "id": "requirements-review-board",
+      "name_ja": "要件定義レビュー会",
+      "name_en": "Requirements Review Board",
+      "purpose": "『何を作るか(What)』が十分に定義され顧客合意可能かを判定し、要件ベースラインを凍結する。",
+      "scope": "track",
+      "trigger": { "kind": "gate", "detail": "要件定義フェーズ完了時 (G2)" },
+      "decision_owner": "product_manager",
+      "quorum": {
+        "required_roles": ["product_manager", "solution_architect", "qa_lead"],
+        "optional_roles": ["pmo_governance", "customer_success"],
+        "min_attendees": 3
+      },
+      "preconditions": [
+        "requirements-definition と traceability-matrix が事前レビュー済み",
+        "顧客ヒアリングの論点(要検討事項QA)が解消または記録されている",
+        "非機能要件(NFR)と SLO/SLI 案が揃っている"
+      ],
+      "agenda": [
+        "機能要件・業務プロセスの網羅性確認",
+        "非機能要件・SLO/SLI の妥当性",
+        "要件トレーサビリティの確認",
+        "未解決論点(オープンクエスチョン)の棚卸し",
+        "顧客合意事項の確認と判定"
+      ],
+      "entry_criteria": [
+        "requirements-definition",
+        "requirements-traceability-matrix",
+        "slo-sli-definition",
+        "information-asset-registry"
+      ],
+      "exit_criteria": [
+        "要件に識別子と受入基準が付与されている",
+        "要件が設計・検証へトレース可能",
+        "情報資産とサービス目標が合意されている",
+        "blocking なオープンクエスチョンが残っていない"
+      ],
+      "decisions": ["go", "conditional_go", "no_go", "hold"],
+      "gates_owned": ["gate-requirements-baseline"],
+      "escalation": "steering-committee",
+      "tier": "product"
+    },
+    {
+      "id": "design-review-board",
+      "name_ja": "設計審査会",
+      "name_en": "Design Review Board",
+      "purpose": "『どう作るか(How)』の目標アーキテクチャと運用設計を実装着手前に承認する。",
+      "scope": "track",
+      "trigger": { "kind": "gate", "detail": "基本設計/詳細設計フェーズ完了時 (G3)" },
+      "decision_owner": "solution_architect",
+      "quorum": {
+        "required_roles": ["solution_architect", "cyber_security", "reliability_engineer"],
+        "optional_roles": ["qa_lead", "software_developer", "integration_steward"],
+        "min_attendees": 3
+      },
+      "preconditions": [
+        "basic-design / architecture-design が事前配布されている",
+        "セキュリティ設計とデータフローが記載されている",
+        "設計リスクと対応方針が起票されている"
+      ],
+      "agenda": [
+        "アーキテクチャと機能設計のレビュー",
+        "セキュリティ・データ保護設計の確認",
+        "運用設計(監視・障害復旧・移行)の確認",
+        "統制要件(compliance-control-matrix)との対応",
+        "設計リスクの処理方針と判定"
+      ],
+      "entry_criteria": [
+        "basic-design",
+        "architecture-design",
+        "detailed-design",
+        "operational-design",
+        "data-flow-lifecycle-map",
+        "compliance-control-matrix"
+      ],
+      "exit_criteria": [
+        "設計が機能・運用・セキュリティ・データの各観点を網羅",
+        "統制義務が設計・手順の参照に対応づけられている",
+        "オープンな設計リスクに担当と処理方針がある"
+      ],
+      "decisions": ["go", "conditional_go", "no_go", "hold"],
+      "gates_owned": ["gate-design-approval"],
+      "escalation": "steering-committee",
+      "tier": "product"
+    },
+    {
+      "id": "change-advisory-board",
+      "name_ja": "変更諮問会議(CAB)",
+      "name_en": "Change Advisory Board",
+      "purpose": "本番影響のある変更の実行統制・影響範囲・切り戻し可否を評価し変更を承認する。",
+      "scope": "track",
+      "trigger": {
+        "kind": "event",
+        "detail": "本番影響のある変更申請、またはビルド着手判定時 (G4)"
+      },
+      "decision_owner": "pmo_governance",
+      "quorum": {
+        "required_roles": ["pmo_governance", "reliability_engineer", "solution_architect"],
+        "optional_roles": ["cyber_security", "customer_success", "software_developer"],
+        "min_attendees": 3
+      },
+      "preconditions": [
+        "変更申請(change request)と影響分析が提出されている",
+        "切り戻し計画(rollback-plan)が存在する",
+        "変更のリスク区分が事前評価されている"
+      ],
+      "agenda": [
+        "変更内容と影響範囲の確認",
+        "リスク評価と切り戻し可否",
+        "実行統制(WBS・変更台帳・RAID)の確認",
+        "実施ウィンドウと関係者合意",
+        "承認/条件付き承認/却下の判定"
+      ],
+      "entry_criteria": [
+        "project-management-plan",
+        "change-control-ledger",
+        "raid-log",
+        "rollback-plan"
+      ],
+      "exit_criteria": [
+        "作業分解・オーナーシップ・報告頻度が有効",
+        "有効な変更がミッション/変更台帳で追跡可能",
+        "既知のリスク・前提・課題・依存が最新化されている"
+      ],
+      "decisions": ["go", "conditional_go", "no_go", "hold"],
+      "gates_owned": ["gate-build-readiness"],
+      "escalation": "steering-committee",
+      "tier": "product"
+    },
+    {
+      "id": "validation-review",
+      "name_ja": "検証判定会",
+      "name_en": "Validation Approval Review",
+      "purpose": "『できたと主張する根拠が揃っているか』を評価し、リリース判定に進める品質状態を確認する。",
+      "scope": "track",
+      "trigger": { "kind": "gate", "detail": "テスト/検証フェーズ完了時 (G5)" },
+      "decision_owner": "qa_lead",
+      "quorum": {
+        "required_roles": ["qa_lead", "product_manager", "cyber_security"],
+        "optional_roles": ["solution_architect", "software_developer"],
+        "min_attendees": 3
+      },
+      "preconditions": [
+        "test-validation-report と traceability-matrix が提出されている",
+        "セキュリティ診断結果(security-audit-report)が添付されている",
+        "残存不具合と残留リスクの一覧がある"
+      ],
+      "agenda": [
+        "テスト計画に対する実施状況と結果",
+        "要件〜テスト〜不具合のトレーサビリティ確認",
+        "セキュリティ所見と残留リスクの処理",
+        "受入(UAT)状況の確認",
+        "リリース判定への進行可否"
+      ],
+      "entry_criteria": [
+        "test-plan",
+        "test-validation-report",
+        "requirements-traceability-matrix",
+        "security-audit-report",
+        "gate-review-packet"
+      ],
+      "exit_criteria": [
+        "計画された検証が完了、または明示的例外つきで承認されている",
+        "要件がテスト証跡・不具合にトレースされている",
+        "セキュリティ所見と残留リスクが処理されている"
+      ],
+      "decisions": ["go", "conditional_go", "no_go", "hold"],
+      "gates_owned": ["gate-validation-approval"],
+      "escalation": "steering-committee",
+      "tier": "product"
+    },
+    {
+      "id": "release-readiness-review",
+      "name_ja": "リリース判定会議",
+      "name_en": "Release Readiness Review",
+      "purpose": "本番移行と運用受け入れを許可するかの Go/No-Go を判定する。",
+      "scope": "track",
+      "trigger": { "kind": "gate", "detail": "リリース準備フェーズ完了時 (G6)" },
+      "decision_owner": "pmo_governance",
+      "quorum": {
+        "required_roles": ["pmo_governance", "reliability_engineer", "product_manager"],
+        "optional_roles": ["cyber_security", "customer_success", "solution_architect"],
+        "min_attendees": 3
+      },
+      "preconditions": [
+        "release-readiness-checklist が全項目埋まっている",
+        "rollback-plan と deployment-verification 手順が確定している",
+        "運用引き継ぎ資料(runbook)とユーザー向け資料が揃っている",
+        "リリースウィンドウと連絡体制が合意されている"
+      ],
+      "agenda": [
+        "リリース準備チェックリストの確認",
+        "切り戻し計画とデプロイ検証手順の確認",
+        "運用・サポート引き継ぎ状況",
+        "顧客/エンドユーザー影響と告知",
+        "Go / Conditional Go / No-Go 判定"
+      ],
+      "entry_criteria": [
+        "release-readiness-checklist",
+        "cutover-migration-plan",
+        "rollback-plan",
+        "deployment-verification-report",
+        "operation-runbook",
+        "user-manual-faq"
+      ],
+      "exit_criteria": [
+        "運用・デプロイ・切り戻しの準備が承認されている",
+        "デプロイ後の検証基準が明示されている",
+        "サポート・ユーザー向け引き継ぎ資料が利用可能"
+      ],
+      "decisions": ["go", "conditional_go", "no_go", "hold"],
+      "gates_owned": ["gate-release-readiness"],
+      "escalation": "steering-committee",
+      "tier": "product"
+    },
+    {
+      "id": "closure-review",
+      "name_ja": "クローズレビュー",
+      "name_en": "Closure Review",
+      "purpose": "デリバリを正式に閉じ、残課題処理と再利用可能な学びを確認する。",
+      "scope": "track",
+      "trigger": { "kind": "gate", "detail": "リリース後の安定化完了時 (G7)" },
+      "decision_owner": "pmo_governance",
+      "quorum": {
+        "required_roles": ["pmo_governance", "product_manager"],
+        "optional_roles": ["reliability_engineer", "customer_success"],
+        "min_attendees": 2
+      },
+      "preconditions": [
+        "mission-closure-report ドラフトが提出されている",
+        "残課題(open critical items)一覧がある",
+        "教訓(lessons learned)が整理されている"
+      ],
+      "agenda": [
+        "成果と勝利条件の達成確認",
+        "残課題のフォローアップ担当と期限",
+        "教訓の記録と横展開先の特定",
+        "クローズ承認"
+      ],
+      "entry_criteria": ["mission-closure-report", "post-mortem", "incident-report"],
+      "exit_criteria": [
+        "重大な残課題にフォローアップ担当がいる",
+        "教訓が再利用のために記録されている",
+        "クローズ承認が記録されている"
+      ],
+      "decisions": ["go", "conditional_go", "hold"],
+      "gates_owned": ["gate-closure-review"],
+      "escalation": "steering-committee",
+      "tier": "product"
+    },
+    {
+      "id": "incident-command",
+      "name_ja": "インシデント対応会議",
+      "name_en": "Incident Command",
+      "purpose": "発生中インシデントの重大度確定・封じ込め・恒久対応の実行判断を行う。速報性を最優先する。",
+      "scope": "track",
+      "trigger": {
+        "kind": "event",
+        "detail": "重大インシデント検知時に即時招集 (SEV0/SEV1 は必須)"
+      },
+      "decision_owner": "incident_commander",
+      "quorum": {
+        "required_roles": ["incident_commander", "reliability_engineer"],
+        "optional_roles": [
+          "cyber_security",
+          "software_developer",
+          "customer_success",
+          "pmo_governance"
+        ],
+        "min_attendees": 2
+      },
+      "preconditions": [
+        "incident-intake(対象・事象・発生日時・影響)が記録されている",
+        "重大度(SEV)判定の初期情報が揃っている",
+        "招集チャネル(通話/チャット)が確立している"
+      ],
+      "agenda": [
+        "事象と影響範囲の共有",
+        "重大度(SEV)の確定と対応体制の決定",
+        "封じ込め(暫定対応)の実行判断",
+        "顧客・関係者への連絡方針",
+        "恒久対応と復旧確認の計画"
+      ],
+      "entry_criteria": ["incident-intake", "triage-assessment"],
+      "exit_criteria": [
+        "重大度と対応体制が確定している",
+        "封じ込め手順の実行が承認されている",
+        "連絡方針と次アクションの担当・期限がある"
+      ],
+      "decisions": ["go", "conditional_go", "hold"],
+      "gates_owned": [
+        "gate-incident-severity",
+        "gate-incident-containment",
+        "gate-incident-remediation"
+      ],
+      "escalation": "steering-committee",
+      "tier": "product"
+    },
+    {
+      "id": "post-incident-review",
+      "name_ja": "ポストインシデントレビュー",
+      "name_en": "Post-Incident Review",
+      "purpose": "収束後に根本原因と再発防止策を blameless に検証し、学びを制度に反映する。",
+      "scope": "track",
+      "trigger": { "kind": "event", "detail": "インシデント復旧・収束後(通常5営業日以内)" },
+      "decision_owner": "reliability_engineer",
+      "quorum": {
+        "required_roles": ["reliability_engineer", "incident_commander", "qa_lead"],
+        "optional_roles": ["software_developer", "cyber_security", "pmo_governance"],
+        "min_attendees": 3
+      },
+      "preconditions": [
+        "post-mortem ドラフト(タイムライン・根本原因・再発防止策)が提出されている",
+        "インシデントの証跡(ログ・トレース)が索引化されている"
+      ],
+      "agenda": [
+        "タイムラインと検知〜収束の振り返り",
+        "根本原因分析(5-Whys/特性要因)の妥当性",
+        "再発防止策の実効性と担当・期限",
+        "類似リスクの横展開(cross-project remediation)",
+        "レビュー判定"
+      ],
+      "entry_criteria": ["post-mortem", "incident-timeline", "evidence-index"],
+      "exit_criteria": [
+        "原因と対策の因果が証跡と矛盾しない",
+        "再発防止策に担当と期限がある",
+        "blameless の原則が守られている"
+      ],
+      "decisions": ["go", "conditional_go", "hold"],
+      "gates_owned": ["gate-post-incident-review"],
+      "escalation": "steering-committee",
+      "tier": "product"
+    },
+    {
+      "id": "steering-committee",
+      "name_ja": "ステアリングコミッティ",
+      "name_en": "Steering Committee",
+      "purpose": "プロジェクト横断の統制・優先順位・例外承認・エスカレーションの最終意思決定を行う。",
+      "scope": "portfolio",
+      "trigger": {
+        "kind": "cadence",
+        "detail": "定例(隔週/月次)。加えて各ゲートからのエスカレーション時。"
+      },
+      "decision_owner": "ceo",
+      "quorum": {
+        "required_roles": ["ceo", "business_owner", "pmo_governance"],
+        "optional_roles": ["finance_controller", "solution_architect", "customer_success"],
+        "min_attendees": 3
+      },
+      "preconditions": [
+        "各トラックのゲート状況サマリが事前配布されている",
+        "エスカレーション事項に論点と選択肢が整理されている"
+      ],
+      "agenda": [
+        "ポートフォリオ全体のゲート状況・進捗",
+        "重大リスク・課題とエスカレーション事項",
+        "優先順位・リソース配分の調整",
+        "ゲート例外(exception)の承認可否",
+        "意思決定と次アクション"
+      ],
+      "entry_criteria": ["portfolio-gate-status-summary", "escalation-register"],
+      "exit_criteria": [
+        "エスカレーション事項に決定と担当・期限がある",
+        "ゲート例外の承認/却下が記録されている"
+      ],
+      "decisions": ["go", "conditional_go", "no_go", "hold"],
+      "gates_owned": [],
+      "escalation": "sovereign",
+      "tier": "product"
+    }
+  ]
+}

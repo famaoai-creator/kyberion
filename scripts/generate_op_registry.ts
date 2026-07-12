@@ -9,8 +9,28 @@ import { describeOps as describeBrowserOps } from '../libs/actuators/browser-act
 import { describeOps as describeCodeOps } from '../libs/actuators/code-actuator/src/op-catalog.js';
 import { describeOps as describeFileOps } from '../libs/actuators/file-actuator/src/op-catalog.js';
 import { describeOps as describeModelingOps } from '../libs/actuators/modeling-actuator/src/op-catalog.js';
+import { describeOps as describeProcessOps } from '../libs/actuators/process-actuator/src/op-catalog.js';
+import { describeOps as describeTerminalOps } from '../libs/actuators/terminal-actuator/src/op-catalog.js';
+import { describeOps as describeSecretOps } from '../libs/actuators/secret-actuator/src/op-catalog.js';
+import { describeOps as describeApprovalOps } from '../libs/actuators/approval-actuator/src/op-catalog.js';
+import { describeOps as describeAgentOps } from '../libs/actuators/agent-actuator/src/op-catalog.js';
+import { describeOps as describeArtifactOps } from '../libs/actuators/artifact-actuator/src/op-catalog.js';
 import { describeOps as describeNetworkOps } from '../libs/actuators/network-actuator/src/op-catalog.js';
 import { describeOps as describeWisdomOps } from '../libs/actuators/wisdom-actuator/src/op-catalog.js';
+import { describeOps as describeBlockchainOps } from '../libs/actuators/blockchain-actuator/src/op-catalog.js';
+import { describeOps as describeBuildOps } from '../libs/actuators/build-actuator/src/op-catalog.js';
+import { describeOps as describeCalendarOps } from '../libs/actuators/calendar-actuator/src/op-catalog.js';
+import { describeOps as describeEmailOps } from '../libs/actuators/email-actuator/src/op-catalog.js';
+import { describeOps as describePresenceOps } from '../libs/actuators/presence-actuator/src/op-catalog.js';
+import { describeOps as describeServiceOps } from '../libs/actuators/service-actuator/src/op-catalog.js';
+import { describeOps as describeOrchestratorOps } from '../libs/actuators/orchestrator-actuator/src/op-catalog.js';
+import { describeOps as describeAndroidOps } from '../libs/actuators/android-actuator/src/op-catalog.js';
+import { describeOps as describeIosOps } from '../libs/actuators/ios-actuator/src/op-catalog.js';
+import { describeOps as describeVisionOps } from '../libs/actuators/vision-actuator/src/op-catalog.js';
+import { describeOps as describeVoiceOps } from '../libs/actuators/voice-actuator/src/op-catalog.js';
+import { describeOps as describeMeetingOps } from '../libs/actuators/meeting-actuator/src/op-catalog.js';
+import { describeOps as describeMediaGenerationOps } from '../libs/actuators/media-generation-actuator/src/op-catalog.js';
+import { describeOps as describeVideoCompositionOps } from '../libs/actuators/video-composition-actuator/src/op-catalog.js';
 
 // AR-02: actuators that self-describe their op surface. The registry and
 // discovery index are generated from these; check:op-registry fails on
@@ -31,6 +51,26 @@ const DESCRIBE_OPS_SOURCES: Record<
   'modeling-actuator': describeModelingOps,
   'wisdom-actuator': describeWisdomOps,
   'browser-actuator': describeBrowserOps,
+  'process-actuator': describeProcessOps,
+  'terminal-actuator': describeTerminalOps,
+  'secret-actuator': describeSecretOps,
+  'approval-actuator': describeApprovalOps,
+  'agent-actuator': describeAgentOps,
+  'artifact-actuator': describeArtifactOps,
+  'blockchain-actuator': describeBlockchainOps,
+  'build-actuator': describeBuildOps,
+  'calendar-actuator': describeCalendarOps,
+  'email-actuator': describeEmailOps,
+  'presence-actuator': describePresenceOps,
+  'service-actuator': describeServiceOps,
+  'orchestrator-actuator': describeOrchestratorOps,
+  'android-actuator': describeAndroidOps,
+  'ios-actuator': describeIosOps,
+  'vision-actuator': describeVisionOps,
+  'voice-actuator': describeVoiceOps,
+  'meeting-actuator': describeMeetingOps,
+  'media-generation-actuator': describeMediaGenerationOps,
+  'video-composition-actuator': describeVideoCompositionOps,
 };
 
 type PipelineOpKind = 'capture' | 'transform' | 'apply' | 'control';

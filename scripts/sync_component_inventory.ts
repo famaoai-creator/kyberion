@@ -9,12 +9,7 @@ import {
   safeWriteFile,
 } from '@agent/core';
 import { withExecutionContext } from '@agent/core/governance';
-import {
-  SYSTEM_ACTUATOR_APPLY_OPS,
-  SYSTEM_ACTUATOR_CAPTURE_OPS,
-  SYSTEM_ACTUATOR_CONTROL_OPS,
-  SYSTEM_ACTUATOR_TRANSFORM_OPS,
-} from '../libs/actuators/system-actuator/src/op-catalog.js';
+import {} from '../libs/actuators/system-actuator/src/op-catalog.js';
 import { readJsonFile } from './refactor/cli-input.js';
 
 interface CapabilityManifest {
@@ -198,6 +193,42 @@ function writeJsonArtifacts(current: CurrentIndexRecord[], legacy: LegacyRecord[
   );
 }
 
+interface DiscoveryOpsRecord {
+  n: string;
+  ops: Array<{ op: string; kind: 'capture' | 'transform' | 'apply' | 'control' }>;
+}
+
+// AR-02: the op tables are generated from the self-described discovery index
+// (all actuators), not just the system actuator's exported constants.
+function loadDiscoveryOps(): DiscoveryOpsRecord[] {
+  const discoveryPath = pathResolver.knowledge('product/orchestration/actuator-op-discovery.json');
+  try {
+    const parsed = JSON.parse(safeReadFile(discoveryPath, { encoding: 'utf8' }) as string) as {
+      actuators?: DiscoveryOpsRecord[];
+    };
+    return parsed.actuators ?? [];
+  } catch {
+    return [];
+  }
+}
+
+function buildOpKindTable(kind: 'capture' | 'transform' | 'apply' | 'control'): string[] {
+  const rows = new Map<string, string[]>();
+  for (const record of loadDiscoveryOps()) {
+    for (const item of record.ops) {
+      if (item.kind !== kind) continue;
+      const owners = rows.get(item.op) ?? [];
+      owners.push(record.n.replace(/-actuator$/, ''));
+      rows.set(item.op, owners);
+    }
+  }
+  const lines: string[] = ['| Op | Actuators |', '| :--- | :--- |'];
+  for (const [op, owners] of [...rows.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    lines.push(`| \`${op}\` | ${[...new Set(owners)].sort().join(', ')} |`);
+  }
+  return lines;
+}
+
 function buildCapabilitiesGuide(current: CurrentIndexRecord[]): string {
   const lines: string[] = [];
   lines.push('# Kyberion Capabilities Guide');
@@ -206,7 +237,7 @@ function buildCapabilitiesGuide(current: CurrentIndexRecord[]): string {
   lines.push(`Last updated: ${new Date().toISOString().slice(0, 10)}`);
   lines.push('');
   lines.push(
-    'This guide is generated from `libs/actuators/*/manifest.json`. It is the human-readable counterpart to the compatibility snapshot `knowledge/product/orchestration/global_actuator_index.json`.'
+    'This guide is generated from `libs/actuators/*/manifest.json` (actuator table) and `knowledge/product/orchestration/actuator-op-discovery.json` (op tables, sourced from each actuator describeOps). Human-readable counterpart to `global_actuator_index.json`.'
   );
   lines.push('');
   lines.push(
@@ -225,35 +256,19 @@ function buildCapabilitiesGuide(current: CurrentIndexRecord[]): string {
   lines.push('');
   lines.push('### Capture ops (type: capture)');
   lines.push('');
-  lines.push('| Op | Notes |');
-  lines.push('| :--- | :--- |');
-  for (const op of SYSTEM_ACTUATOR_CAPTURE_OPS) {
-    lines.push(`| \`${op}\` | system-actuator capture op |`);
-  }
+  lines.push(...buildOpKindTable('capture'));
   lines.push('');
   lines.push('### Transform ops (type: transform)');
   lines.push('');
-  lines.push('| Op | Notes |');
-  lines.push('| :--- | :--- |');
-  for (const op of SYSTEM_ACTUATOR_TRANSFORM_OPS) {
-    lines.push(`| \`${op}\` | system-actuator transform op |`);
-  }
+  lines.push(...buildOpKindTable('transform'));
   lines.push('');
   lines.push('### Apply ops (type: apply)');
   lines.push('');
-  lines.push('| Op | Notes |');
-  lines.push('| :--- | :--- |');
-  for (const op of SYSTEM_ACTUATOR_APPLY_OPS) {
-    lines.push(`| \`${op}\` | system-actuator apply op |`);
-  }
+  lines.push(...buildOpKindTable('apply'));
   lines.push('');
   lines.push('### Control ops (type: control)');
   lines.push('');
-  lines.push('| Op | Notes |');
-  lines.push('| :--- | :--- |');
-  for (const op of SYSTEM_ACTUATOR_CONTROL_OPS) {
-    lines.push(`| \`${op}\` | system-actuator control op |`);
-  }
+  lines.push(...buildOpKindTable('control'));
   lines.push('');
   lines.push('## Governed Core Workloads');
   lines.push('');
