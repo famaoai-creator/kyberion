@@ -457,7 +457,9 @@ async function loadActuatorDispatch(domain: string): Promise<DispatchFunc> {
       let parsed = result;
       try {
         parsed = JSON.parse(result);
-      } catch {}
+      } catch (err) {
+        logger.warn(`[run_pipeline] suppressed error in reasoningPolicy: ${err}`);
+      }
       return {
         handled: true,
         ctx: { ...ctx, [params.export_as || 'last_provider_result']: parsed },

@@ -755,7 +755,9 @@ async function handleChronos(action: string, args: string[], json: boolean): Pro
       if (safeExistsSync(conversationsDir)) {
         try {
           threadCount = safeReaddir(conversationsDir).filter((f) => f.endsWith('.jsonl')).length;
-        } catch (_) {}
+        } catch (err) {
+          logger.warn(`[control_plane_cli] suppressed error in asArray: ${err}`);
+        }
       }
       let inflightCount = 0;
       try {
@@ -763,7 +765,9 @@ async function handleChronos(action: string, args: string[], json: boolean): Pro
           await import('@agent/core/agent-runtime-supervisor-client');
         const runtimes = await listAgentRuntimesViaDaemon();
         inflightCount = runtimes.filter((r) => r.status === 'busy').length;
-      } catch (_) {}
+      } catch (err) {
+        logger.warn(`[control_plane_cli] suppressed error in asArray: ${err}`);
+      }
       process.stdout.write(
         `- A2A conversations: ${threadCount} threads · ${inflightCount} inflight\n`
       );
@@ -781,7 +785,9 @@ async function handleChronos(action: string, args: string[], json: boolean): Pro
       if (safeExistsSync(conversationsDir)) {
         try {
           threadCount = safeReaddir(conversationsDir).filter((f) => f.endsWith('.jsonl')).length;
-        } catch (_) {}
+        } catch (err) {
+          logger.warn(`[control_plane_cli] suppressed error in asArray: ${err}`);
+        }
       }
       let inflightCount = 0;
       try {
@@ -789,7 +795,9 @@ async function handleChronos(action: string, args: string[], json: boolean): Pro
           await import('@agent/core/agent-runtime-supervisor-client');
         const runtimes = await listAgentRuntimesViaDaemon();
         inflightCount = runtimes.filter((r) => r.status === 'busy').length;
-      } catch (_) {}
+      } catch (err) {
+        logger.warn(`[control_plane_cli] suppressed error in asArray: ${err}`);
+      }
 
       if (outputJson) {
         return printJson({ threadCount, inflightCount });

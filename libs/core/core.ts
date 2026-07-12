@@ -179,7 +179,9 @@ export const sre = {
             });
           }
         }
-      } catch (_) {}
+      } catch (err) {
+        logger.warn(`[core] suppressed error in color: ${err}`);
+      }
     }
 
     // Fallback heuristic for TS/JS errors
@@ -325,7 +327,9 @@ export class Cache {
         const entry = { value, timestamp, ttl, h: hash };
         rawWriteFile(v8Path, v8.serialize(entry));
         rawWriteFile(diskPath, JSON.stringify(entry));
-      } catch (_) {}
+      } catch (err) {
+        logger.warn(`[core] suppressed error in set: ${err}`);
+      }
     }
   }
 
