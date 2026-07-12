@@ -147,7 +147,9 @@ function registerRunningSurfaceFromState(record: any) {
       cleanup: () => {
         try {
           process.kill(record.pid, 'SIGTERM');
-        } catch (_) {}
+        } catch (_) {
+          /* best-effort cleanup */
+        }
       },
     });
   }
@@ -157,7 +159,9 @@ function stopByPid(pid: number | undefined): void {
   if (!pid) return;
   try {
     process.kill(pid, 'SIGTERM');
-  } catch (_) {}
+  } catch (_) {
+    /* best-effort cleanup */
+  }
 }
 
 function buildSurfaceRepairHint(

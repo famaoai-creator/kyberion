@@ -190,7 +190,9 @@ function registerServiceRuntime(serviceId: string, pid: number | undefined, mani
       cleanup: () => {
         try {
           process.kill(pid, 'SIGTERM');
-        } catch (_) {}
+        } catch (_) {
+          /* best-effort cleanup */
+        }
       },
     });
   }
@@ -364,7 +366,9 @@ async function reconcileServices(input: ServiceAction) {
         if (isRunning(pid as number)) {
           try {
             process.kill(pid as number, 'SIGTERM');
-          } catch (_) {}
+          } catch (_) {
+            /* best-effort cleanup */
+          }
           logger.info(`  - ${id} stopped (not in manifest).`);
         }
         stopManagedProcess(serviceResourceId(id), null);
