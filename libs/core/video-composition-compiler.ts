@@ -1,4 +1,9 @@
 import * as path from 'node:path';
+import {
+  normalizeVideoVisualDirection,
+  visualDirectionToCssVars,
+  type VideoVisualDirection,
+} from './video-visual-direction.js';
 import { getVideoCompositionTemplateRecord } from './video-composition-template-registry.js';
 import { getVideoRenderRuntimePolicy } from './video-render-runtime-policy.js';
 import * as pathResolver from './path-resolver.js';
@@ -93,7 +98,10 @@ export function writeVideoCompositionBundle(
   safeMkdir(path.join(plan.bundle_dir, 'compositions'), { recursive: true });
 
   for (const scene of plan.scenes) {
-    const sceneSource = applyVideoThemeTokens(renderSceneHtml(adf, scene));
+    const sceneSource = applyVideoThemeTokens(
+      renderSceneHtml(adf, scene),
+      resolveAdfVisualDirection(adf)
+    );
     const scenePath = path.join(plan.bundle_dir, scene.output_html);
     safeWriteFile(scenePath, sceneSource);
 
@@ -101,7 +109,10 @@ export function writeVideoCompositionBundle(
     copySceneAssets(plan.bundle_dir, scene.asset_refs);
   }
 
-  safeWriteFile(plan.index_html, applyVideoThemeTokens(renderBundleIndexHtml(plan, adf)));
+  safeWriteFile(
+    plan.index_html,
+    applyVideoThemeTokens(renderBundleIndexHtml(plan, adf), resolveAdfVisualDirection(adf))
+  );
   safeWriteFile(path.join(plan.bundle_dir, 'render-plan.json'), JSON.stringify(plan, null, 2));
   safeWriteFile(path.join(plan.bundle_dir, 'README.md'), renderBundleReadme(plan, adf));
 
@@ -112,8 +123,28 @@ function compileScene(
   scene: VideoCompositionScene,
   adf: VideoCompositionADF
 ): CompiledVideoCompositionScene {
-  const template = getVideoCompositionTemplateRecord(scene.template_ref?.template_id);
   const role = scene.role || 'generic';
+  const directedLayout = resolveAdfVisualDirection(adf).per_scene?.find(
+    (entry) => entry.scene_id === scene.scene_id
+  )?.layout_variant;
+  // Visual-direction layout assignment: only when the ADF did not pin a
+  // template explicitly, and only if the scene satisfies the target
+  // template's required content fields (otherwise keep the original —
+  // a layout choice must never fail a previously valid compile).
+  let requestedTemplateId = scene.template_ref?.template_id;
+  if (!requestedTemplateId && directedLayout && directedLayout !== 'default') {
+    const candidate = getVideoCompositionTemplateRecord(directedLayout);
+    const satisfiable =
+      candidate.template_id === directedLayout &&
+      candidate.supported_roles.includes(role) &&
+      candidate.supported_output_formats.includes(adf.output.format) &&
+      candidate.required_content_fields.every((field) => {
+        const value = scene.content?.[field];
+        return typeof value === 'string' && value.trim().length > 0;
+      });
+    if (satisfiable) requestedTemplateId = directedLayout;
+  }
+  const template = getVideoCompositionTemplateRecord(requestedTemplateId);
   const sceneKey = safeSceneKey(scene.scene_id);
   if (template.status !== 'active') {
     throw new Error(`Template ${template.template_id} is not active`);
@@ -188,25 +219,7 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
             `
                 )
                 .join('')
-            : `
-              <div class="process-step">
-                <span>01</span>
-                <strong>Brief intake</strong>
-                <small>Audience, use case, constraints</small>
-              </div>
-              <div class="process-arrow"></div>
-              <div class="process-step">
-                <span>02</span>
-                <strong>Content plan</strong>
-                <small>Hook, scene order, required copy</small>
-              </div>
-              <div class="process-arrow"></div>
-              <div class="process-step">
-                <span>03</span>
-                <strong>Render package</strong>
-                <small>Bundle, narration, mp4 output</small>
-              </div>
-            `
+            : ''
         }
       </div>`;
   const hfScript = `<script>
@@ -1028,6 +1041,68 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
 </html>`;
   }
 
+  if (scene.template_id === 'quote-card') {
+    const attribution = eyebrow || body;
+    return `<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body {
+        width: ${adf.composition.width}px;
+        height: ${adf.composition.height}px;
+        font-family: var(--font-sans, 'Inter', 'Noto Sans JP', -apple-system, sans-serif);
+        background: radial-gradient(circle at 50% 18%, rgba(255,255,255,0.05), transparent 46%), var(--bg, #0B1020);
+        color: var(--text, #f8fafc);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .quote-wrap {
+        max-width: 82%;
+        text-align: center;
+      }
+      .quote-mark {
+        font-size: calc(var(--headline-size, 68px) * 1.4);
+        line-height: 1;
+        color: var(--kb-accent-blue, #60a5fa);
+        font-weight: 800;
+      }
+      .quote-text {
+        margin-top: 12px;
+        font-size: var(--headline-size, 68px);
+        line-height: 1.28;
+        font-weight: 800;
+        letter-spacing: -0.01em;
+      }
+      .quote-attribution {
+        margin-top: 28px;
+        font-size: var(--body-size, 23px);
+        color: var(--subtext, #94a3b8);
+        font-weight: 600;
+      }
+      .quote-rule {
+        margin: 22px auto 0;
+        width: 72px;
+        height: 4px;
+        border-radius: 2px;
+        background: var(--kb-accent-blue, #60a5fa);
+      }
+    </style>
+  </head>
+  <body class="scene-${sanitizeCssClass(scene.template_id)} layout-${layoutVariant}">
+    <div class="quote-wrap">
+      <div class="quote-mark">&ldquo;</div>
+      <div class="quote-text">${escapeHtml(title || '')}</div>
+      <div class="quote-rule"></div>
+      ${attribution ? `<div class="quote-attribution">${escapeHtml(attribution)}</div>` : ''}
+    </div>
+    ${hfScript}
+  </body>
+</html>`;
+  }
+
   if (scene.template_id === 'logo-outro') {
     return `<!doctype html>
 <html lang="ja">
@@ -1437,6 +1512,11 @@ function resolveAvatarAsset(
 }
 
 function tokenizeVideoCss(css: string): string {
+  // Typography follows the visual direction (portrait shorts need larger
+  // type); colors below keep their historical token mapping.
+  css = css
+    .replace(/font-size:\s*68px/gi, 'font-size: var(--headline-size, 68px)')
+    .replace(/font-size:\s*23px/gi, 'font-size: var(--body-size, 23px)');
   const tokenized = [
     { pattern: /#0B1020/gi, token: '--kb-bg-main' },
     { pattern: /#0b1224/gi, token: '--kb-bg-deep' },
@@ -1522,10 +1602,25 @@ function tokenizeVideoCss(css: string): string {
   );
 }
 
-function applyVideoThemeTokens(html: string): string {
-  return html.replace(/<style([^>]*)>([\s\S]*?)<\/style>/gi, (_match, attrs, css) => {
+function resolveAdfVisualDirection(adf: VideoCompositionADF): VideoVisualDirection {
+  return normalizeVideoVisualDirection(adf.composition.visual_direction, {
+    width: adf.composition.width,
+    height: adf.composition.height,
+  });
+}
+
+function applyVideoThemeTokens(html: string, direction?: VideoVisualDirection): string {
+  const tokenized = html.replace(/<style([^>]*)>([\s\S]*?)<\/style>/gi, (_match, attrs, css) => {
     return `<style${attrs}>${tokenizeVideoCss(css)}</style>`;
   });
+  if (!direction) return tokenized;
+  // The token pass rewrote hardcoded hexes to var(--kb-*); this :root block
+  // gives those tokens story-specific values (falls back to legacy palette
+  // when absent).
+  const rootVars = `<style data-kb-visual-direction="${escapeHtml(direction.mood)}">\n${visualDirectionToCssVars(direction)}\n</style>`;
+  return tokenized.includes('</head>')
+    ? tokenized.replace('</head>', `${rootVars}\n</head>`)
+    : `${rootVars}\n${tokenized}`;
 }
 
 function safeAssetName(assetPath: string): string {

@@ -9,8 +9,14 @@ import {
   ArrowDown,
   Minus,
 } from 'lucide-react';
-import { uxText } from '../lib/ux-vocabulary';
+import { uxText, uxTextOr } from '../lib/ux-vocabulary';
 import { useChronosLocale } from '../lib/hooks';
+import {
+  KyberionDonut,
+  KyberionBarChart,
+  KyberionStackedBar,
+  KyberionSparkline,
+} from './KyberionCharts';
 
 /**
  * A2UI Component Library for Chronos Mirror v2
@@ -19,7 +25,7 @@ import { useChronosLocale } from '../lib/hooks';
 function useA2UIText() {
   const locale = useChronosLocale();
   return (key: string | undefined, fallbackEn: string) =>
-    key ? uxText(key, fallbackEn, locale) : fallbackEn;
+    key ? uxTextOr(key, fallbackEn, locale) : fallbackEn;
 }
 
 // --- display:gauge ---
@@ -887,6 +893,11 @@ export const A2UI_COMPONENT_REGISTRY: Record<string, React.FC<any>> = {
   'display:list': KyberionList,
   'display:card': KyberionCard,
   'display:grid': KyberionGrid,
+  // Charts (self-contained SVG)
+  'display:donut': KyberionDonut,
+  'display:bar-chart': KyberionBarChart,
+  'display:stacked-bar': KyberionStackedBar,
+  'display:sparkline': KyberionSparkline,
   // Chronos Specific (kb-*)
   'kb-layout-grid': KbLayoutGrid,
   'kb-status-orbit': KbStatusOrbit,

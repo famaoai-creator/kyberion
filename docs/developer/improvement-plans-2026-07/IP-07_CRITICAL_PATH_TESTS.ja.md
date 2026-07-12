@@ -31,8 +31,13 @@
 - **完了(Task 1 / 受入1)**: `libs/core/adf-repair-agent.test.ts` — 有効素通し / JSON 軽量修復(LLM 不呼出)/ 委譲修復の schema 検証後採用 / 修復不能時の非書込 / guardrail 違反の非委譲リジェクト、の全分岐をカバー。
 - **完了(Task 2 / 受入2)**: 3 アダプタすべてにトランスポートモックのテストが揃った — `anthropic-reasoning-backend.test.ts`(effort→thinking budget)、`codex-cli-reasoning-backend.test.ts`、**`claude-agent-reasoning-backend.test.ts`(2026-07-05 新設)**: リクエスト整形(model/system/user prompt)、status 正規化、delegateTask の既定(単発 query)と `KYBERION_CLAUDE_AGENT_TOOLS=1` の governed agentic 経路切替、トランスポートエラーの透過、prompt() エイリアス。
 - **完了(Task 3 / 受入3)**: `scripts/check_contract_schemas.test.ts`(golden: 現行 repo exit 0 / 壊した fixture で非0)、`scripts/run_baseline_check.test.ts` + `tests/run-baseline-contract.test.ts`。
-- **一部(Task 4/5 / 受入4)**: orchestrator は `surface-runtime-orchestrator.delegation.test.ts` / `.fastpath.test.ts` の 2 経路が特性化済み。残る主要経路(意図受領→mission 昇格、pipeline 実行、直接コマンド)の設計表と実装は **IP-10 の分割着手前に** 追加する(残余)。
-- **残余(任意)**: `operator-learning.ts` の baseline 往復テスト。
+- **完了(Task 4/5 / 受入4)— 2026-07-12 再監査で確認**: 「残る主要経路」とされた3経路はすべて `.fastpath.test.ts` で特性化済みだった — 意図受領→mission 昇格(work-scope policy による task-session→mission 昇格)、pipeline 実行(hint 実行 + execution-receipt)、直接コマンド(knowledge-query / live-query 天気・位置・web検索の direct reply 3系統)。加えて task-session 作成、browser operator route、slot filling、channel/imessage コンテキスト貫通も網羅(計18本)。`.intent-context.test.ts`(IL-01)も存在。
+- **残余(任意)**: `operator-learning.ts` の baseline 往復テスト(dispatch-registry / scenario-pack / schema の3テストは存在。往復テストは任意のまま IP-10 に委ねる)。
+
+## 完了判定(2026-07-12)
+
+受入条件1〜5をすべて実コード+緑テストで確認(対象10テストファイル47本を一括実行して緑)。IP-07 は **DONE**。
+
 - 受入5(stub 決定論)は全テストで遵守(実 API 呼び出しなし)。
 
 ## 実装タスク

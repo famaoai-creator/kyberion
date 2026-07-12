@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Plus, Trash2, RefreshCw, Cpu, X, FileText, Terminal, RotateCcw } from 'lucide-react';
-import { resolveChronosLocale, uxText } from '../lib/ux-vocabulary';
+import { resolveChronosLocale, uxText, uxTextOr } from '../lib/ux-vocabulary';
+import { KyberionDonut } from './KyberionCharts';
 
 interface AgentRecord {
   agentId: string;
@@ -102,7 +103,7 @@ function describeProviderResolution(agent: AgentRecord): string | null {
 
 export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const locale = resolveChronosLocale();
-  const at = (key: string, fallbackEn: string) => uxText(key, fallbackEn, locale);
+  const at = (key: string, fallbackEn: string) => uxTextOr(key, fallbackEn, locale);
   const [agents, setAgents] = useState<AgentRecord[]>([]);
   const [health, setHealth] = useState<HealthSnapshot>({ total: 0, ready: 0, busy: 0, error: 0 });
   const [accessRole, setAccessRole] = useState<ChronosAccessRole>('readonly');
@@ -328,6 +329,21 @@ export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =
             </button>
           </div>
         </div>
+
+        {/* Health distribution chart */}
+        {agents.length > 0 && (
+          <div className="px-6 pt-4">
+            <KyberionDonut
+              title={at('chronos_agent_health', 'Agent Health')}
+              centerLabel={at('chronos_agents', 'Agents')}
+              data={[
+                { label: at('chronos_ready', 'Ready'), value: health.ready, color: '#34D399' },
+                { label: at('chronos_busy', 'Busy'), value: health.busy, color: '#FBBF24' },
+                { label: at('chronos_error', 'Error'), value: health.error, color: '#FB7185' },
+              ]}
+            />
+          </div>
+        )}
 
         {/* Agent List */}
         <div className="flex-1 overflow-y-auto p-4 space-y-2">

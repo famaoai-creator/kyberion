@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "description": "Runs governed TTL cleanup for active/shared/tmp, shared logs, data-vault, and runtime retention directories via libs/core/storage-janitor.ts.",
   "_refs": {
-    "plan": "docs/improvement-plans-2026-07/KM-01_VOLATILE_MEMORY_ACTIVATION.ja.md",
+    "plan": "docs/developer/improvement-plans-2026-07/KM-01_VOLATILE_MEMORY_ACTIVATION.ja.md",
     "implementation": "libs/core/storage-janitor.ts"
   },
   "context": {

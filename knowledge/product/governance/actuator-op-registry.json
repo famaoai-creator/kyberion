@@ -72,10 +72,74 @@
     "xlsx_render"
   ],
   "domains": {
+    "agent": {
+      "capture": ["health", "list", "list_manifests", "list_runtimes", "snapshot"],
+      "transform": ["team_plan", "team_role"],
+      "apply": [
+        "a2a",
+        "ask",
+        "prewarm_mission",
+        "refresh",
+        "restart",
+        "shutdown",
+        "shutdown_all",
+        "spawn",
+        "staff_mission"
+      ]
+    },
+    "android": {
+      "capture": [
+        "adb_health_check",
+        "android_cli_describe",
+        "android_cli_docs_search",
+        "android_cli_health_check",
+        "android_cli_layout",
+        "android_cli_screen_resolve",
+        "capture_foreground_activity",
+        "capture_runtime_session_handoff",
+        "extract_ui_tree",
+        "read_json",
+        "read_text_file"
+      ],
+      "transform": ["find_ui_nodes", "set", "summarize_ui_tree"],
+      "apply": [
+        "android_cli_screen_capture",
+        "authenticate_with_passkey",
+        "capture_screen",
+        "emit_session_handoff",
+        "fill_login_form",
+        "input_text",
+        "input_text_into_ui_node",
+        "launch_app",
+        "log",
+        "open_deep_link",
+        "swipe",
+        "tap",
+        "tap_ui_node",
+        "wait_for_ui_node",
+        "wait_for_ui_text"
+      ]
+    },
+    "approval": {
+      "capture": ["list_pending", "load"],
+      "transform": [],
+      "apply": ["create", "decide"]
+    },
+    "artifact": {
+      "capture": ["list", "read_json"],
+      "transform": [],
+      "apply": ["append_event", "ensure_dir", "write_delivery_pack", "write_json"]
+    },
+    "blockchain": {
+      "capture": ["verify_anchor"],
+      "transform": [],
+      "apply": ["anchor_mission", "anchor_trust"]
+    },
     "browser": {
       "capture": [
         "console",
         "content",
+        "distill_dom",
         "evaluate",
         "export_session_handoff",
         "goto",
@@ -89,7 +153,7 @@
         "title",
         "url"
       ],
-      "transform": ["export_adf", "export_playwright", "json_query", "regex_extract"],
+      "transform": ["export_adf", "export_playwright", "json_query", "llm_decide", "regex_extract"],
       "apply": [
         "authenticate_passkey",
         "clear_passkey_credentials",
@@ -112,6 +176,24 @@
         "wait_ref"
       ]
     },
+    "build": {
+      "capture": [],
+      "transform": [],
+      "apply": [
+        "android_build",
+        "android_bundle",
+        "android_test",
+        "ios_archive",
+        "ios_build",
+        "ios_generate_project",
+        "ios_test"
+      ]
+    },
+    "calendar": {
+      "capture": ["list_calendars", "list_events"],
+      "transform": [],
+      "apply": ["create_event"]
+    },
     "code": {
       "capture": [
         "discover_capabilities",
@@ -128,6 +210,11 @@
       "capture": ["app-server", "cloud", "features", "mcp", "review"],
       "transform": [],
       "apply": ["exec", "plugin"]
+    },
+    "email": {
+      "capture": [],
+      "transform": [],
+      "apply": ["create_draft", "send", "send_from_file"]
     },
     "file": {
       "capture": ["exists", "list", "read", "read_file", "read_json", "search", "stat", "tail"],
@@ -153,6 +240,26 @@
       "transform": [],
       "apply": ["agent-task", "api", "issue", "pr", "repo", "run-workflow", "skill"]
     },
+    "ios": {
+      "capture": [
+        "capture_runtime_session_handoff",
+        "read_json",
+        "read_text_file",
+        "simctl_health_check"
+      ],
+      "transform": ["set"],
+      "apply": [
+        "boot_simulator",
+        "capture_screen",
+        "emit_session_handoff",
+        "install_app",
+        "launch_app",
+        "log",
+        "open_deep_link",
+        "shutdown_simulator",
+        "uninstall_app"
+      ]
+    },
     "media": {
       "capture": ["json_read", "pptx_extract", "pptx_slide_text", "xlsx_extract"],
       "transform": [
@@ -172,6 +279,21 @@
         "write_file",
         "xlsx_render"
       ]
+    },
+    "media-generation": {
+      "capture": ["capture_focused_window", "capture_screen", "get_generation_job"],
+      "transform": [],
+      "apply": [
+        "collect_generation_artifact",
+        "generate_image",
+        "submit_generation",
+        "wait_generation_job"
+      ]
+    },
+    "meeting": {
+      "capture": ["listen", "status"],
+      "transform": [],
+      "apply": ["chat", "join", "leave", "speak"]
     },
     "modeling": {
       "capture": ["glob_files", "read_file", "read_json", "shell"],
@@ -196,12 +318,27 @@
     "orchestrator": {
       "capture": ["discover_capabilities", "discover_skills"],
       "transform": [],
-      "apply": ["deploy", "log"]
+      "apply": ["deploy", "run_execution_plan_set"]
+    },
+    "presence": {
+      "capture": [],
+      "transform": [],
+      "apply": ["dispatch", "dispatch_timeline", "receive_event", "record_interaction"]
+    },
+    "process": {
+      "capture": ["list", "list-surfaces", "status"],
+      "transform": [],
+      "apply": ["spawn", "stop"]
+    },
+    "secret": {
+      "capture": ["get", "list"],
+      "transform": ["set"],
+      "apply": ["delete"]
     },
     "service": {
-      "capture": ["list", "read"],
+      "capture": ["preset"],
       "transform": [],
-      "apply": ["deploy", "log", "notify"]
+      "apply": ["api", "cli", "mcp", "oauth", "reconcile"]
     },
     "system": {
       "capture": [
@@ -267,6 +404,54 @@
         "write_artifact",
         "write_file",
         "write_json"
+      ]
+    },
+    "terminal": {
+      "capture": ["list", "list_terminal_sessions", "poll", "poll_terminal"],
+      "transform": [],
+      "apply": [
+        "kill",
+        "kill_terminal",
+        "resize",
+        "shell_command",
+        "spawn",
+        "spawn_terminal",
+        "write",
+        "write_terminal"
+      ]
+    },
+    "video-composition": {
+      "capture": [
+        "get_video_composition_job_status",
+        "get_video_composition_queue",
+        "list_video_composition_templates"
+      ],
+      "transform": ["compile_narrated_video_brief", "compile_video_content_brief"],
+      "apply": [
+        "await_video_composition_job",
+        "cancel_video_composition_job",
+        "create_narrated_intro_movie",
+        "create_narrated_video_from_content_brief",
+        "prepare_video_composition",
+        "verify_rendered_video_artifact"
+      ]
+    },
+    "vision": {
+      "capture": ["inspect_image", "ocr_image"],
+      "transform": [],
+      "apply": []
+    },
+    "voice": {
+      "capture": ["health", "list_voices", "transcribe", "transcribe_voice_sample"],
+      "transform": [],
+      "apply": [
+        "collect_and_register_voice_profile",
+        "collect_voice_samples",
+        "generate_voice",
+        "record_interaction",
+        "record_voice_sample",
+        "register_voice_profile",
+        "speak_local"
       ]
     },
     "wisdom": {

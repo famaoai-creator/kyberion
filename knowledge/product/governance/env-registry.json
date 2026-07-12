@@ -719,6 +719,14 @@
       "documented": false
     },
     {
+      "name": "KYBERION_GATE_OVERRIDE_SIGNATURE",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_GEMINI_CLI_BIN",
       "category": "path",
       "type": "path",

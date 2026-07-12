@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "description": "Compressed soak / endurance harness for AO-04 with maintenance pulses and resource trend sampling.",
   "_refs": {
-    "plan": "docs/improvement-plans-2026-07/AO-04_SOAK_ENDURANCE_VALIDATION.ja.md",
+    "plan": "docs/developer/improvement-plans-2026-07/AO-04_SOAK_ENDURANCE_VALIDATION.ja.md",
     "implementation": "scripts/soak_endurance.ts"
   },
   "schedule": {
