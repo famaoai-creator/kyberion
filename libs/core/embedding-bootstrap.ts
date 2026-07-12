@@ -1,5 +1,6 @@
 import { getEmbeddingBackend, registerEmbeddingBackend } from './embedding-backend.js';
 import { MlxEmbeddingBackend, isMlxAvailable } from './mlx-embedding-backend.js';
+import { GeminiEmbeddingBackend, isGeminiEmbeddingAvailable } from './gemini-embedding-backend.js';
 import { logger } from './core.js';
 
 export function installEmbeddingBackendIfAvailable(): boolean {
@@ -11,7 +12,20 @@ export function installEmbeddingBackendIfAvailable(): boolean {
   if (isMlxAvailable()) {
     const mlxBackend = new MlxEmbeddingBackend();
     registerEmbeddingBackend(mlxBackend);
-    logger.success(`[embedding-bootstrap] Installed real LLM MLX embedding backend (model=${mlxBackend.name})`);
+    logger.success(
+      `[embedding-bootstrap] Installed real LLM MLX embedding backend (model=${mlxBackend.name})`
+    );
+    return true;
+  }
+
+  // KM-02 Task 3: real embeddings without Apple silicon — the Gemini
+  // embedding API slots in between MLX and the degraded hash fallback.
+  if (isGeminiEmbeddingAvailable()) {
+    const geminiBackend = new GeminiEmbeddingBackend();
+    registerEmbeddingBackend(geminiBackend);
+    logger.success(
+      `[embedding-bootstrap] Installed Gemini embedding backend (model=${geminiBackend.name})`
+    );
     return true;
   }
 
@@ -21,4 +35,3 @@ export function installEmbeddingBackendIfAvailable(): boolean {
   logger.info(`[embedding-bootstrap] Installed fallback embedding backend: ${backend.name}`);
   return true;
 }
-
