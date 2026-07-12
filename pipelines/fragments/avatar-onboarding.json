@@ -1,0 +1,64 @@
+{
+  "action": "pipeline",
+  "name": "avatar-onboarding-fragment",
+  "version": "2.0.0",
+  "description": "Capture a reference photo, generate an avatar through the active host bridge or fallback provider, and register the avatar into the personal profile.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes).",
+  "context": {
+    "fragment_slug": "avatar-onboarding-fragment",
+    "purpose": "Reusable avatar creation flow with bridge-selectable image generation and profile registration.",
+    "required_inputs": "capture_output_path, avatar_output_path, identity_path, profile_name, profile_language, interaction_style, bridge_preference, avatar_prompt",
+    "produced_channels": "capture_result, generation_result, registration_result",
+    "failure_modes": "camera unavailable, host bridge unavailable, avatar generation failure, identity write failure",
+    "verification_command": "pnpm pipeline --input pipelines/create-my-avatar.json"
+  },
+  "steps": [
+    {
+      "id": "log_start",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "🎬 Starting avatar onboarding for {{profile_name}} (bridge_preference={{bridge_preference}})..."
+      }
+    },
+    {
+      "id": "capture_photo",
+      "role": "source",
+      "op": "system:shell",
+      "produces": { "channel": "capture_result", "type": "ShellResult" },
+      "params": {
+        "cmd": "npx tsx scripts/capture_photo.ts \"{{capture_output_path}}\"",
+        "timeout_ms": 60000
+      }
+    },
+    {
+      "id": "generate_avatar",
+      "role": "source",
+      "op": "system:shell",
+      "consumes": "capture_result",
+      "produces": { "channel": "generation_result", "type": "ShellResult" },
+      "params": {
+        "cmd": "npx tsx scripts/generate_avatar.ts --input-photo \"{{capture_output_path}}\" --output-path \"{{avatar_output_path}}\" --prompt \"{{avatar_prompt}}\" --bridge-preference \"{{bridge_preference}}\"",
+        "timeout_ms": 120000
+      }
+    },
+    {
+      "id": "register_avatar",
+      "role": "sink",
+      "op": "system:shell",
+      "consumes": "generation_result",
+      "params": {
+        "cmd": "npx tsx scripts/register_avatar.ts --src-avatar \"{{avatar_output_path}}\" --dest-avatar \"knowledge/personal/avatar.png\" --identity-path \"{{identity_path}}\" --avatar-path \"knowledge/personal/avatar.png\" --profile-name \"{{profile_name}}\" --language \"{{profile_language}}\" --interaction-style \"{{interaction_style}}\"",
+        "timeout_ms": 30000
+      }
+    },
+    {
+      "id": "log_done",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "🏁 Avatar onboarding complete. Profile updated at {{identity_path}}."
+      }
+    }
+  ]
+}

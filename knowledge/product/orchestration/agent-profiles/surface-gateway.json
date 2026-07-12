@@ -1,0 +1,24 @@
+{
+  "version": "1.0.0",
+  "agents": {
+    "surface-gateway": {
+      "authority_roles": ["surface_runtime", "sovereign_concierge", "slack_bridge"],
+      "team_roles": ["surface_liaison"],
+      "capabilities": [
+        "surface",
+        "conversation",
+        "delegation",
+        "onboarding",
+        "identity",
+        "guidance",
+        "presence",
+        "realtime"
+      ],
+      "selection_hints": {
+        "preferred_provider": "agy",
+        "preferred_modelId": "gemini-2.5-flash"
+      },
+      "provider_strategy": "adaptive"
+    }
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "action": "pipeline",
+  "name": "browser-authenticated-snapshot",
+  "version": "2.0.0",
+  "description": "Open a browser session, optionally log in with the generic intra-site login fragment, take a snapshot, and summarize the authenticated page into a local artifact.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes).",
+  "context": {
+    "target_url": "",
+    "login_user": "",
+    "login_password": "",
+    "output_path": "active/shared/tmp/browser-authenticated-snapshot.md",
+    "summary_label": "Authenticated browser snapshot"
+  },
+  "steps": [
+    {
+      "id": "start_session",
+      "role": "gate",
+      "op": "core:include",
+      "params": {
+        "fragment": "fragments/browser-session-with-intra-login.json",
+        "context": {
+          "start_url": "{{target_url}}",
+          "login_user": "{{login_user}}",
+          "login_password": "{{login_password}}"
+        }
+      }
+    },
+    {
+      "id": "capture_snapshot",
+      "role": "source",
+      "op": "browser:snapshot",
+      "produces": { "channel": "page_snapshot", "type": "BrowserSnapshot" },
+      "params": {}
+    },
+    {
+      "id": "summarize",
+      "role": "transform",
+      "op": "reasoning:synthesize",
+      "consumes": "page_snapshot",
+      "produces": { "channel": "page_summary", "type": "PageSummary" },
+      "params": {
+        "instruction": "Summarize the authenticated page snapshot into a concise operational note. Mention the visible purpose, important controls, and anything that looks gated by login or role. Return markdown only.",
+        "context": ["{{page_snapshot}}"]
+      }
+    },
+    {
+      "id": "write_summary",
+      "role": "sink",
+      "op": "system:write_file",
+      "consumes": "page_summary",
+      "params": {
+        "path": "{{output_path}}",
+        "content": "{{page_summary}}"
+      }
+    },
+    {
+      "id": "log_done",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "✅ {{summary_label}} written to {{output_path}}"
+      }
+    }
+  ]
+}

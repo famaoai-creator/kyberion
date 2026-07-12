@@ -26,6 +26,7 @@ import {
   summarizeOrganizationOrgChart,
   type OrganizationOrgChartSummary,
 } from './org-chart.js';
+import { resolveParticipantContext, type ParticipantRisk } from './participant-context-resolver.js';
 
 export interface MissionTeamPlan {
   mission_id: string;
@@ -123,6 +124,49 @@ function buildTeamGovernance(
   };
 }
 
+function enrichAssignmentContext(input: {
+  assignment: MissionTeamAssignment;
+  missionId: string;
+  tier: 'personal' | 'confidential' | 'public';
+  tenantId: string;
+  risk: string;
+}): MissionTeamAssignment {
+  const assignment = input.assignment;
+  if (assignment.status !== 'assigned' || !assignment.agent_id || !assignment.authority_role) {
+    return assignment;
+  }
+  const participantId = `${assignment.agent_id}:${assignment.team_role}`;
+  const resolution = resolveParticipantContext({
+    participant_id: participantId,
+    team_role_id: assignment.team_role,
+    agent_profile_id: assignment.agent_id,
+    authority_role_id: assignment.authority_role,
+    risk: input.risk as ParticipantRisk,
+    security_scope: {
+      tenant_id: input.tenantId,
+      mission_id: input.missionId,
+      participant_id: participantId,
+      read_tiers:
+        input.tier === 'public'
+          ? ['public']
+          : input.tier === 'confidential'
+            ? ['public', 'confidential']
+            : ['public', 'personal'],
+      write_tier: input.tier,
+      purpose: assignment.team_role,
+      external_egress: input.tier === 'public' ? 'allow' : 'deny',
+    },
+  });
+  return {
+    ...assignment,
+    organization_role_id: resolution.participant.organization_role_id,
+    perspective_ids: resolution.participant.perspective_ids,
+    reasoning_route_id: resolution.participant.reasoning_route_id,
+    security_scope: resolution.participant.security_scope,
+    selection_reason_codes: resolution.selection_reason_codes,
+  };
+}
+
 export function summarizeMissionOrganizationProfile(
   organizationProfile?: OrganizationProfile | null
 ): MissionTeamOrganizationProfileSummary | undefined {
@@ -217,29 +261,38 @@ export function composeMissionTeamPlan(input: {
       });
       continue;
     }
-    assignments.push({
-      ...selectAgentForTeamRole(
-        role,
-        preferredAgentId &&
-          !roleRecord.selection_hints?.preferred_agents?.includes(preferredAgentId)
-          ? {
-              ...roleRecord,
-              selection_hints: {
-                ...(roleRecord.selection_hints || {}),
-                preferred_agents: [
-                  preferredAgentId,
-                  ...(roleRecord.selection_hints?.preferred_agents || []).filter(
-                    (agent) => agent !== preferredAgentId
-                  ),
-                ],
-              },
-            }
-          : roleRecord,
-        authorityRoles,
-        agents
-      ),
-      model_hint: missionTaskModelHint,
-    });
+    assignments.push(
+      enrichAssignmentContext({
+        assignment: {
+          ...selectAgentForTeamRole(
+            role,
+            preferredAgentId &&
+              !roleRecord.selection_hints?.preferred_agents?.includes(preferredAgentId)
+              ? {
+                  ...roleRecord,
+                  selection_hints: {
+                    ...(roleRecord.selection_hints || {}),
+                    preferred_agents: [
+                      preferredAgentId,
+                      ...(roleRecord.selection_hints?.preferred_agents || []).filter(
+                        (agent) => agent !== preferredAgentId
+                      ),
+                    ],
+                  },
+                }
+              : roleRecord,
+            authorityRoles,
+            agents,
+            missionTaskModelHint
+          ),
+          model_hint: missionTaskModelHint,
+        },
+        missionId: input.missionId,
+        tier: input.tier,
+        tenantId: organizationProfile?.organization_id || 'default',
+        risk: missionClassification.risk_profile,
+      })
+    );
   }
 
   for (const role of template.optional_roles) {
@@ -262,11 +315,20 @@ export function composeMissionTeamPlan(input: {
           }
         : roleRecord,
       authorityRoles,
-      agents
+      agents,
+      missionTaskModelHint
     );
     assignment.required = false;
     assignment.model_hint = missionTaskModelHint;
-    assignments.push(assignment);
+    assignments.push(
+      enrichAssignmentContext({
+        assignment,
+        missionId: input.missionId,
+        tier: input.tier,
+        tenantId: organizationProfile?.organization_id || 'default',
+        risk: missionClassification.risk_profile,
+      })
+    );
   }
 
   return {
