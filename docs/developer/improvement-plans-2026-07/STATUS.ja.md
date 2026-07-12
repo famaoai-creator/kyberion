@@ -121,14 +121,15 @@
 
 ### AR(アクチュエータリファクタリング/使いやすさ)
 
-| ID    | 状態    | 残作業                                                                                                                                                                                    |
-| ----- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| AR-01 | PARTIAL | 残: run_pipeline ループの機械的委譲のみ(意味論分岐は 2026-07-12 までに全解消: budget 執行・on_error・repair 統合・subprocess 廃止)                                                        |
-| AR-02 | PARTIAL | 残: ロングテール(非 pipeline 系)アクチュエータの self-describe、CAPABILITIES op 表の生成切替(主要7アクチュエータの self-describe 生成は 2026-07-12 完了)                                  |
-| AR-03 | PARTIAL | write_artifact/path 前倒し検証、notify/read_file/read_json/open_file 含む op_input_contracts、generate_op_registry/discovery 反映、browser/file/system の契約 coverage 検査、主要 op 検証 |
-| AR-04 | PARTIAL | canonical op family 定義、browser alias 共通化、browser/system の正規化と警告                                                                                                             |
-| AR-05 | PARTIAL | system file I/O の file-actuator forward、観察/変更・ドメイン境界の分割準備                                                                                                               |
-| AR-06 | PARTIAL | teach message(shared helper で network/orchestrator/file/system へ展開)、skipped 明示化(run_pipeline 含む)、silent default 回帰検知、AR-01 集約                                           |
+| ID    | 状態    | 残作業                                                                                                                                                                                                                                                                                                                                 |
+| ----- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AR-01 | PARTIAL | 残: run_pipeline ループの機械的委譲のみ(意味論分岐は 2026-07-12 までに全解消: budget 執行・on_error・repair 統合・subprocess 廃止)                                                                                                                                                                                                     |
+| AR-02 | PARTIAL | 残: ロングテール(非 pipeline 系)アクチュエータの self-describe、CAPABILITIES op 表の生成切替(主要7アクチュエータの self-describe 生成は 2026-07-12 完了)                                                                                                                                                                               |
+| AR-03 | PARTIAL | write_artifact/path 前倒し検証、notify/read_file/read_json/open_file 含む op_input_contracts、generate_op_registry/discovery 反映、browser/file/system の契約 coverage 検査、主要 op 検証                                                                                                                                              |
+| AR-04 | PARTIAL | canonical op family 定義、browser alias 共通化、browser/system の正規化と警告                                                                                                                                                                                                                                                          |
+| AR-05 | PARTIAL | system file I/O の file-actuator forward、観察/変更・ドメイン境界の分割準備                                                                                                                                                                                                                                                            |
+| AR-06 | PARTIAL | teach message(shared helper で network/orchestrator/file/system へ展開)、skipped 明示化(run_pipeline 含む)、silent default 回帰検知、AR-01 集約                                                                                                                                                                                        |
+| AR-07 | PARTIAL | 2026-07-13 新設+初期実装: T1〜T4 の連携層タクソノミと actuator 全体監査を計画化。core `decideFromObservation`(選択>生成、options 外は拒否)、browser `distill_dom`(決定論蒸留)+ `llm_decide` op、fillWithFallback の llm_pick 最終段(LLM 不調でも従来エラー契約維持)。残: android/terminal への横展開、蒸留ヘルパの system/network 適用 |
 
 ### SA(セキュリティ・監査)
 
