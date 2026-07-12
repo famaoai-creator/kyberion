@@ -6729,7 +6729,7 @@
     {
       "path": "product/schemas/organization-team-template-catalog.schema.json",
       "tier": "public",
-      "size": 1895,
+      "size": 2077,
       "type": "json"
     },
     {
