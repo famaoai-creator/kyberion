@@ -975,7 +975,7 @@
     {
       "path": "product/governance/actuator-op-registry.json",
       "tier": "public",
-      "size": 8583,
+      "size": 8616,
       "type": "json"
     },
     {
@@ -2077,6 +2077,12 @@
       "type": "json"
     },
     {
+      "path": "product/governance/software-test-viewpoints.json",
+      "tier": "public",
+      "size": 4177,
+      "type": "json"
+    },
+    {
       "path": "product/governance/spend-policy.json",
       "tier": "public",
       "size": 309,
@@ -2883,7 +2889,7 @@
     {
       "path": "product/orchestration/actuator-op-discovery.json",
       "tier": "public",
-      "size": 46804,
+      "size": 46892,
       "type": "json"
     },
     {
@@ -3189,7 +3195,7 @@
     {
       "path": "product/orchestration/global_actuator_index.json",
       "tier": "public",
-      "size": 15372,
+      "size": 15405,
       "type": "json"
     },
     {
@@ -5935,6 +5941,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/defect-record.schema.json",
+      "tier": "public",
+      "size": 1932,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/delivery-pack.schema.json",
       "tier": "public",
       "size": 1429,
@@ -6961,6 +6973,24 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/software-quality-contract.schema.json",
+      "tier": "public",
+      "size": 3278,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/software-quality-report.schema.json",
+      "tier": "public",
+      "size": 2353,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/software-test-viewpoints.schema.json",
+      "tier": "public",
+      "size": 1143,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/specialist-catalog.schema.json",
       "tier": "public",
       "size": 897,
@@ -7120,6 +7150,18 @@
       "path": "product/schemas/test-case-adf.schema.json",
       "tier": "public",
       "size": 1111,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/test-execution-record.schema.json",
+      "tier": "public",
+      "size": 1867,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/test-inventory.schema.json",
+      "tier": "public",
+      "size": 2685,
       "type": "json"
     },
     {

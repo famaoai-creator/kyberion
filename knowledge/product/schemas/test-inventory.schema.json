@@ -1,0 +1,76 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/test-inventory.schema.json",
+  "title": "Test Inventory",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "project_id", "items"],
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "project_id": { "type": "string", "minLength": 1 },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "item_id",
+          "title",
+          "viewpoint_ids",
+          "risk_level",
+          "expected_result",
+          "execution_mode"
+        ],
+        "properties": {
+          "item_id": { "type": "string", "minLength": 1 },
+          "title": { "type": "string", "minLength": 1 },
+          "viewpoint_ids": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "requirement_refs": { "$ref": "#/definitions/refs" },
+          "acceptance_criteria_refs": { "$ref": "#/definitions/refs" },
+          "risk_refs": { "$ref": "#/definitions/refs" },
+          "risk_level": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+          "preconditions": { "type": "array", "items": { "type": "string" } },
+          "steps": { "type": "array", "items": { "type": "string" } },
+          "expected_result": { "type": "string", "minLength": 1 },
+          "test_level": {
+            "type": "string",
+            "enum": [
+              "unit",
+              "component",
+              "contract",
+              "integration",
+              "e2e",
+              "acceptance",
+              "exploratory",
+              "static"
+            ]
+          },
+          "execution_mode": {
+            "type": "string",
+            "enum": ["safe_auto", "approval_required", "manual_only", "prohibited"]
+          },
+          "automation_backend": { "type": "string" },
+          "automation": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["actuator", "op", "params"],
+            "properties": {
+              "actuator": { "type": "string", "enum": ["code", "system", "browser", "network"] },
+              "op": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+              "params": { "type": "object" }
+            }
+          },
+          "omission_reason": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "refs": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+  }
+}
