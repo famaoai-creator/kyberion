@@ -3,7 +3,13 @@ import { missionDir, pathResolver } from './path-resolver.js';
 import { safeAppendFileSync, safeMkdir } from './secure-io.js';
 import { appendMissionExecutionLedgerEntry } from './mission-team-binding.js';
 
-export type MissionTaskEventType = 'task_issued' | 'task_submitted' | 'task_reviewed' | 'task_completed' | 'task_accepted';
+export type MissionTaskEventType =
+  | 'task_issued'
+  | 'task_submitted'
+  | 'task_reviewed'
+  | 'task_completed'
+  | 'task_accepted'
+  | 'participant_context_resolved';
 
 export interface MissionTaskEventInput {
   event_type: MissionTaskEventType;
@@ -20,7 +26,10 @@ export interface MissionTaskEventInput {
   correlation_id?: string;
 }
 
-function ensureTaskEventDirs(missionId: string): { missionEventPath: string; globalEventPath: string } {
+function ensureTaskEventDirs(missionId: string): {
+  missionEventPath: string;
+  globalEventPath: string;
+} {
   const missionEventsDir = `${missionDir(missionId, 'public')}/coordination/events`;
   const globalEventsDir = pathResolver.shared('observability/mission-control');
   safeMkdir(missionEventsDir);

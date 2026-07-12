@@ -23,6 +23,7 @@ import {
 import {
   buildPresenceSurfaceFrame,
   buildTrackGateReadinessSummaries,
+  applyBrowserOnboarding,
   createBrowserConversationSession,
   createPresenceVoiceStimulus,
   decideApprovalRequest,
@@ -31,6 +32,7 @@ import {
   getActiveBrowserConversationSession,
   getActiveTaskSession,
   getPresenceAvatarProfile,
+  getBrowserOnboardingState,
   buildSurfaceLauncherNextActions,
   buildSurfaceLauncherRecommendations,
   getSurfaceAgentCatalogEntry,
@@ -69,6 +71,8 @@ import {
   webThemePackToCssVars,
   installShellSpeechToTextBridgeIfAvailable,
   probeMicCapture,
+  previewBrowserOnboarding,
+  saveBrowserOnboardingVoiceSample,
   startInRoomMinutesSession,
   withExecutionContext,
 } from '@agent/core';
@@ -804,15 +808,57 @@ function bootstrapState(): void {
 bootstrapState();
 ensureStimuliDir();
 
-app.use(express.json({ limit: '1mb' }));
 app.use((_req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'no-referrer');
   next();
 });
+
+app.post(
+  '/api/onboarding/voice-sample',
+  requirePresenceStudioRateLimit(),
+  requirePresenceStudioAccess(),
+  express.raw({
+    type: ['audio/webm', 'audio/wav', 'audio/x-wav', 'audio/ogg', 'audio/mp4'],
+    limit: '12mb',
+  }),
+  (req, res) => {
+    try {
+      const profileId = String(req.query.profile_id || '').trim();
+      const data = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+      const result = saveBrowserOnboardingVoiceSample({
+        profileId,
+        contentType: String(req.headers['content-type'] || ''),
+        data,
+      });
+      logger.info(
+        presenceStudioAuditLine(req, 'onboarding/voice-sample.complete', {
+          profile_id: profileId,
+          bytes: result.bytes,
+          status: 201,
+        })
+      );
+      res.status(201).json({ ok: true, ...result });
+    } catch (error: any) {
+      logger.warn(
+        presenceStudioAuditLine(req, 'onboarding/voice-sample.reject', {
+          status: 400,
+          error: error?.message || String(error),
+        })
+      );
+      res.status(400).json({ ok: false, error: error?.message || String(error) });
+    }
+  }
+);
+
+app.use(express.json({ limit: '1mb' }));
 app.use(express.static(staticDir));
 app.use(['/api', '/a2ui'], requirePresenceStudioRateLimit(), requirePresenceStudioAccess());
+
+app.get('/onboarding', (_req, res) => {
+  res.sendFile(path.join(staticDir, 'onboarding.html'));
+});
 
 // Browsers always probe /favicon.ico — return 204 to silence noisy console 404.
 app.get('/favicon.ico', (_req, res) => {
@@ -939,6 +985,44 @@ app.get('/api/identity', (_req, res) => {
     res.json(summarizePresenceStudioIdentity(result));
   } catch (err: any) {
     res.status(500).json({ ok: false, error: err?.message || String(err) });
+  }
+});
+
+app.get('/api/onboarding/browser-state', (_req, res) => {
+  try {
+    const mic = probeMicCapture();
+    res.json({ ...getBrowserOnboardingState(), readiness: { microphone: mic } });
+  } catch (error: any) {
+    res.status(500).json({ ok: false, error: error?.message || String(error) });
+  }
+});
+
+app.post('/api/onboarding/preview', (req, res) => {
+  try {
+    res.json(previewBrowserOnboarding(req.body));
+  } catch (error: any) {
+    res.status(400).json({ ok: false, error: error?.message || String(error) });
+  }
+});
+
+app.post('/api/onboarding/apply', async (req, res) => {
+  try {
+    const result = await applyBrowserOnboarding(req.body);
+    logger.info(
+      presenceStudioAuditLine(req, 'onboarding/apply.complete', {
+        artifacts: result.artifacts.length,
+        status: 200,
+      })
+    );
+    res.json(result);
+  } catch (error: any) {
+    logger.warn(
+      presenceStudioAuditLine(req, 'onboarding/apply.reject', {
+        status: 400,
+        error: error?.message || String(error),
+      })
+    );
+    res.status(400).json({ ok: false, error: error?.message || String(error) });
   }
 });
 

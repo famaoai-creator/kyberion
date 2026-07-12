@@ -74,13 +74,28 @@
       "op": "a2a_fanout",
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "stub",
-      "protocol_ref": "knowledge/product/orchestration/hypothesis-tree-protocol.md"
+      "protocol_ref": "knowledge/product/orchestration/hypothesis-tree-protocol.md",
+      "note": "Deprecated compatibility path for unscoped persona labels. Use perspective_fanout."
+    },
+    {
+      "op": "perspective_fanout",
+      "platforms": ["darwin", "linux", "win32"],
+      "implementation": "full",
+      "protocol_ref": "knowledge/product/orchestration/hypothesis-tree-protocol.md",
+      "note": "Typed participant fanout with per-participant security-scope context compilation and egress/output-tier guards."
     },
     {
       "op": "cross_critique",
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "stub",
       "protocol_ref": "knowledge/product/orchestration/hypothesis-tree-protocol.md"
+    },
+    {
+      "op": "typed_cross_critique",
+      "platforms": ["darwin", "linux", "win32"],
+      "implementation": "full",
+      "protocol_ref": "knowledge/product/orchestration/hypothesis-tree-protocol.md",
+      "note": "Cross-critique over typed fanout receipts; rejects cross-tenant/project/mission projection."
     },
     {
       "op": "synthesize_counterparty_persona",

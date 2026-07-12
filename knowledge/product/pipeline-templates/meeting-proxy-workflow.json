@@ -2,7 +2,7 @@
   "action": "pipeline",
   "name": "meeting-proxy-workflow",
   "version": "2.0.0",
-  "description": "Meeting proxy: join with cloned voice → listen → extract action items. Supports Google Meet, Teams, and Zoom. persona_name / profile_id / display_name control the bot identity.",
+  "description": "Meeting proxy: join with cloned voice → listen → extract action items. Supports Google Meet and Teams via the meeting router; provide meeting_url for the selected platform. persona_name / profile_id / display_name control the bot identity.",
   "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as without roles.",
   "context": {
     "persona_name": "the operator",
@@ -46,10 +46,16 @@
     },
     {
       "id": "join_session",
-      "role": "sink",
-      "op": "system:log",
+      "role": "gate",
+      "op": "core:include",
       "params": {
-        "message": "Meeting browser join CLI was retired; instantiate this template with meeting-actuator join_backend=browser-playwright before live use."
+        "fragment": "fragments/meeting-join-router.json",
+        "context": {
+          "meeting_url": "{{meeting_url}}",
+          "meeting_id": "{{meeting_id}}",
+          "passcode": "{{passcode}}",
+          "display_name": "{{display_name}}"
+        }
       }
     },
     {
@@ -57,7 +63,7 @@
       "role": "sink",
       "op": "system:log",
       "params": {
-        "message": "Meeting join skipped: browser join CLI is retired until this template is instantiated with meeting-actuator."
+        "message": "Meeting join flow completed via router; transcript capture should now be available at {{transcript_output}}."
       }
     },
     {

@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/context-fragment.schema.json",
+  "title": "Governed Context Fragment",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["fragment_id", "source_ref", "source_tier", "content"],
+  "properties": {
+    "fragment_id": { "type": "string", "minLength": 1 },
+    "source_ref": { "type": "string", "minLength": 1 },
+    "source_tier": {
+      "type": "string",
+      "enum": ["personal", "confidential", "public"]
+    },
+    "tenant_id": { "type": "string", "minLength": 1 },
+    "organization_id": { "type": "string", "minLength": 1 },
+    "project_id": { "type": "string", "minLength": 1 },
+    "mission_id": { "type": "string", "minLength": 1 },
+    "purpose_tags": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "content": {}
+  }
+}

@@ -6,6 +6,14 @@
   "action": "pipeline",
   "steps": [
     {
+      "id": "preflight",
+      "role": "gate",
+      "op": "core:include",
+      "params": {
+        "fragment": "fragments/browser-runtime-preflight.json"
+      }
+    },
+    {
       "id": "init-session",
       "role": "sink",
       "op": "browser:open_tab",
@@ -47,11 +55,7 @@
       "produces": { "channel": "generated_adf", "type": "PipelineAdf" },
       "params": {
         "instruction": "Convert the recorded browser interaction history (action_trail) and DOM snapshot into a reusable Kyberion Pipeline ADF (JSON). The output should be a single, complete JSON ADF including pipeline_id, description, and steps. Parameterize the inputs (like URLs, credentials, or search terms) using {{handlebars}} syntax to make the pipeline generic and reusable.",
-        "context": [
-          "{{action_trail}}",
-          "{{final_snapshot}}",
-          "{{interaction_steps}}"
-        ]
+        "context": ["{{action_trail}}", "{{final_snapshot}}", "{{interaction_steps}}"]
       }
     },
     {

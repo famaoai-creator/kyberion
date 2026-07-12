@@ -1,6 +1,7 @@
 import { discoverProviders, type ProviderInfo } from './provider-discovery.js';
 import { loadProviderConfig } from './provider-config.js';
 import { resolveRuntimeModelId } from './runtime-model-defaults.js';
+import { loadOperatorProviderPreferences } from './browser-onboarding.js';
 
 export interface ResolveAgentProviderOptions {
   preferredProvider: string;
@@ -60,6 +61,8 @@ function modelCapabilities(
 
 function defaultModelFor(provider: string, providerInfo?: ProviderInfo): string {
   if (providerInfo?.models?.length) return providerInfo.models[0]!;
+  const operatorDefault = loadOperatorProviderPreferences()?.default_models[provider];
+  if (operatorDefault) return operatorDefault;
   return loadProviderConfig().default_models[provider] || provider;
 }
 
@@ -104,8 +107,14 @@ function resolvePriority(preferredProvider: string): string[] {
     .split(',')
     .map((entry) => entry.trim().toLowerCase())
     .filter(Boolean);
+  const operatorPriority = loadOperatorProviderPreferences()?.priority || [];
   return Array.from(
-    new Set([preferredProvider, ...envPriority, ...loadProviderConfig().default_priority])
+    new Set([
+      preferredProvider,
+      ...envPriority,
+      ...operatorPriority,
+      ...loadProviderConfig().default_priority,
+    ])
   );
 }
 

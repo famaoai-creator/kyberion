@@ -1,0 +1,45 @@
+{
+  "action": "pipeline",
+  "name": "create-my-avatar",
+  "version": "2.0.0",
+  "description": "Avatar onboarding template: capture a reference photo, generate an avatar through the active host bridge or fallback provider, and register the avatar into the personal profile.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes).",
+  "context": {
+    "capture_output_path": "active/shared/tmp/avatar-onboarding/{{profile_slug}}/user_face.jpg",
+    "avatar_output_path": "active/shared/tmp/avatar-onboarding/{{profile_slug}}/avatar.png",
+    "identity_path": "knowledge/personal/my-identity.json",
+    "profile_slug": "user",
+    "profile_name": "user",
+    "profile_language": "Japanese",
+    "interaction_style": "Concierge",
+    "bridge_preference": "host",
+    "avatar_prompt": "A highly detailed 3D Pixar style avatar, portrait, clean background, based on user face photo"
+  },
+  "steps": [
+    {
+      "id": "preflight",
+      "role": "gate",
+      "op": "core:include",
+      "params": {
+        "fragment": "fragments/avatar-runtime-preflight.json"
+      }
+    },
+    {
+      "role": "gate",
+      "op": "core:include",
+      "params": {
+        "fragment": "fragments/avatar-onboarding.json",
+        "context": {
+          "capture_output_path": "{{capture_output_path}}",
+          "avatar_output_path": "{{avatar_output_path}}",
+          "identity_path": "{{identity_path}}",
+          "profile_name": "{{profile_name}}",
+          "profile_language": "{{profile_language}}",
+          "interaction_style": "{{interaction_style}}",
+          "bridge_preference": "{{bridge_preference}}",
+          "avatar_prompt": "{{avatar_prompt}}"
+        }
+      }
+    }
+  ]
+}

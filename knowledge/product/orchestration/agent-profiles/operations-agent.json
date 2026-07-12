@@ -1,0 +1,15 @@
+{
+  "version": "1.0.0",
+  "agents": {
+    "operations-agent": {
+      "authority_roles": ["chronos_operator", "chronos_gateway"],
+      "team_roles": ["operator", "surface_liaison"],
+      "capabilities": ["operations", "runtime", "monitoring", "commands", "gateway", "dashboard"],
+      "selection_hints": {
+        "preferred_provider": "agy",
+        "preferred_modelId": "gemini-2.5-flash"
+      },
+      "provider_strategy": "adaptive"
+    }
+  }
+}

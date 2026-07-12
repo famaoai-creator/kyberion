@@ -63,6 +63,11 @@ export interface MissionStaffingAssignment {
   released_at: string | null;
   status: 'active' | 'released';
   source: 'team_composition';
+  organization_role_id?: string;
+  perspective_ids?: string[];
+  reasoning_route_id?: string;
+  security_scope?: import('./context-security-scope.js').ContextSecurityScope;
+  selection_reason_codes?: string[];
   /** Actor-neutral resource contract. Legacy agent_id fields remain for readers during migration. */
   resource: WorkforceResourceRef;
 }
@@ -210,6 +215,11 @@ export function buildMissionStaffingAssignments(plan: MissionTeamPlan): MissionS
           released_at: null,
           status: 'active',
           source: 'team_composition',
+          organization_role_id: assignment.organization_role_id,
+          perspective_ids: assignment.perspective_ids,
+          reasoning_route_id: assignment.reasoning_route_id,
+          security_scope: assignment.security_scope,
+          selection_reason_codes: assignment.selection_reason_codes,
           resource,
         },
       ];

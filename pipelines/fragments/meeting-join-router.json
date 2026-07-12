@@ -1,0 +1,53 @@
+{
+  "action": "pipeline",
+  "name": "meeting-join-router",
+  "version": "1.0.0",
+  "description": "Reusable fragment: run the meeting runtime preflight and route to Google Meet or Microsoft Teams join flows. Teams is selected when a meeting_id is supplied; otherwise Google Meet is used.",
+  "steps": [
+    {
+      "role": "gate",
+      "op": "core:include",
+      "params": {
+        "fragment": "fragments/meeting-runtime-preflight.json"
+      }
+    },
+    {
+      "id": "route_join_flow",
+      "role": "gate",
+      "op": "core:if",
+      "params": {
+        "condition": "meeting_id",
+        "then": [
+          {
+            "id": "teams_join",
+            "role": "gate",
+            "op": "core:include",
+            "params": {
+              "fragment": "fragments/microsoft-teams-join-self-contained.json",
+              "context": {
+                "meeting_url": "{{meeting_url}}",
+                "meeting_id": "{{meeting_id}}",
+                "passcode": "{{passcode}}",
+                "display_name": "{{display_name}}"
+              }
+            }
+          }
+        ],
+        "else": [
+          {
+            "id": "google_join",
+            "role": "gate",
+            "op": "core:include",
+            "params": {
+              "fragment": "fragments/google-meet-join-self-contained.json",
+              "context": {
+                "meeting_url": "{{meeting_url}}",
+                "display_name": "{{display_name}}"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

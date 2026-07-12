@@ -1,6 +1,32 @@
 {
   "version": "1.0.0",
   "agents": {
+    "control-plane-agent": {
+      "authority_roles": ["mission_controller", "ecosystem_architect", "knowledge_steward"],
+      "team_roles": [
+        "owner",
+        "planner",
+        "product_strategist",
+        "tracker",
+        "facilitator",
+        "relationship_curator"
+      ],
+      "capabilities": [
+        "reasoning",
+        "coordination",
+        "routing",
+        "analysis",
+        "planning",
+        "strategy",
+        "facilitation",
+        "listening"
+      ],
+      "selection_hints": {
+        "preferred_provider": "agy",
+        "preferred_modelId": "auto-gemini-3"
+      },
+      "provider_strategy": "adaptive"
+    },
     "attacker": {
       "authority_roles": ["mission_controller", "ecosystem_architect"],
       "team_roles": ["attacker"],
@@ -53,6 +79,16 @@
       },
       "provider_strategy": "strict"
     },
+    "operations-agent": {
+      "authority_roles": ["chronos_operator", "chronos_gateway"],
+      "team_roles": ["operator", "surface_liaison"],
+      "capabilities": ["operations", "runtime", "monitoring", "commands", "gateway", "dashboard"],
+      "selection_hints": {
+        "preferred_provider": "agy",
+        "preferred_modelId": "gemini-2.5-flash"
+      },
+      "provider_strategy": "adaptive"
+    },
     "onboarding-surface-agent": {
       "authority_roles": ["sovereign_concierge"],
       "team_roles": ["surface_liaison"],
@@ -85,6 +121,47 @@
       "provider_strategy": "adaptive",
       "fallback_providers": ["claude", "copilot", "codex"]
     },
+    "reasoning-worker": {
+      "authority_roles": ["ecosystem_architect", "software_developer", "mission_controller"],
+      "team_roles": [
+        "planner",
+        "implementer",
+        "reviewer",
+        "tester",
+        "experience_designer",
+        "product_strategist",
+        "attacker",
+        "defender",
+        "devils_advocate",
+        "counterparty_persona",
+        "scribe"
+      ],
+      "capabilities": [
+        "reasoning",
+        "analysis",
+        "planning",
+        "strategy",
+        "architecture",
+        "code",
+        "implementation",
+        "refactoring",
+        "review",
+        "testing",
+        "design",
+        "ux",
+        "security",
+        "critique",
+        "role_play",
+        "persona_modeling",
+        "documentation",
+        "summarization"
+      ],
+      "selection_hints": {
+        "preferred_provider": "agy",
+        "preferred_modelId": "auto-gemini-3"
+      },
+      "provider_strategy": "adaptive"
+    },
     "slack-surface-agent": {
       "authority_roles": ["slack_bridge", "sovereign_concierge"],
       "team_roles": ["surface_liaison"],
@@ -95,6 +172,25 @@
       },
       "provider_strategy": "adaptive",
       "fallback_providers": ["claude", "copilot", "codex"]
+    },
+    "surface-gateway": {
+      "authority_roles": ["surface_runtime", "sovereign_concierge", "slack_bridge"],
+      "team_roles": ["surface_liaison"],
+      "capabilities": [
+        "surface",
+        "conversation",
+        "delegation",
+        "onboarding",
+        "identity",
+        "guidance",
+        "presence",
+        "realtime"
+      ],
+      "selection_hints": {
+        "preferred_provider": "agy",
+        "preferred_modelId": "gemini-2.5-flash"
+      },
+      "provider_strategy": "adaptive"
     },
     "sovereign-brain": {
       "authority_roles": ["mission_controller", "knowledge_steward", "ecosystem_architect"],

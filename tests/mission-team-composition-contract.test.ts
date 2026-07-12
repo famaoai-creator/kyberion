@@ -202,7 +202,7 @@ describe('Mission team composition contract', () => {
       'nerve-agent'
     );
     expect(plan.assignments.find((entry) => entry.team_role === 'implementer')?.agent_id).toBe(
-      'implementation-architect'
+      'reasoning-worker'
     );
     expect(plan.assignments.find((entry) => entry.team_role === 'implementer')?.provider).toMatch(
       /^(gemini|codex|agy)$/
@@ -225,6 +225,10 @@ describe('Mission team composition contract', () => {
     ajv.addSchema(
       loadJson('knowledge/product/schemas/mission-classification.schema.json'),
       'mission-classification.schema.json'
+    );
+    ajv.addSchema(
+      loadJson('knowledge/product/schemas/security-scope.schema.json'),
+      'security-scope.schema.json'
     );
     const validate = ajv.compile(
       loadJson('knowledge/product/schemas/mission-team-plan.schema.json')

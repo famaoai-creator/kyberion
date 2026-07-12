@@ -139,6 +139,26 @@
 - **主要操作**: `system:exec`, `system:log`
 - **責任境界**: AI は `go / conditional_go / no_go / insufficient_evidence` を推奨するが、最終判断は品質報告の `accountable_human_id` が行う。
 
+### 27. `browser-session-with-intra-login.json`
+
+- **目的**: ブラウザを起動し、必要に応じて `intra-login` を挟んで認証済みセッションを作る。
+- **組み合わせ**: `browser-runtime-preflight` → `browser-session-start` → `intra-login`
+
+### 28. `meeting-join-router.json`
+
+- **目的**: `meeting_id` の有無で Teams / Google Meet を切り替えつつ、会議参加前提を整える。
+- **組み合わせ**: `meeting-runtime-preflight` → `microsoft-teams-join-self-contained` / `google-meet-join-self-contained`
+
+### 29. `voice-profile-runtime-preflight.json`
+
+- **目的**: 音声プロファイルの実行前に、音声ランタイムと登録済みプロファイルの存在を確認する。
+- **組み合わせ**: `voice-runtime-preflight` → `runtime-preflight(profile dir check)`
+
+### 30. `avatar-runtime-preflight.json`
+
+- **目的**: アバター作成前に、カメラ bridge と個人プロフィールの前提を確認する。
+- **組み合わせ**: `runtime-preflight(camera probe)` → `runtime-preflight(profile dir check)`
+
 ## Fragment Template
 
 新しい fragment を作るときは [`_template.json`](./_template.json) を起点にしてください。
