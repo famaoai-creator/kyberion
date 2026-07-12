@@ -279,6 +279,21 @@
         "xlsx_render"
       ]
     },
+    "media-generation": {
+      "capture": ["capture_focused_window", "capture_screen", "get_generation_job"],
+      "transform": [],
+      "apply": [
+        "collect_generation_artifact",
+        "generate_image",
+        "submit_generation",
+        "wait_generation_job"
+      ]
+    },
+    "meeting": {
+      "capture": ["listen", "status"],
+      "transform": [],
+      "apply": ["chat", "join", "leave", "speak"]
+    },
     "modeling": {
       "capture": ["glob_files", "read_file", "read_json", "shell"],
       "transform": [
@@ -402,6 +417,40 @@
         "spawn_terminal",
         "write",
         "write_terminal"
+      ]
+    },
+    "video-composition": {
+      "capture": [
+        "get_video_composition_job_status",
+        "get_video_composition_queue",
+        "list_video_composition_templates"
+      ],
+      "transform": ["compile_narrated_video_brief", "compile_video_content_brief"],
+      "apply": [
+        "await_video_composition_job",
+        "cancel_video_composition_job",
+        "create_narrated_intro_movie",
+        "create_narrated_video_from_content_brief",
+        "prepare_video_composition",
+        "verify_rendered_video_artifact"
+      ]
+    },
+    "vision": {
+      "capture": ["inspect_image", "ocr_image"],
+      "transform": [],
+      "apply": []
+    },
+    "voice": {
+      "capture": ["health", "list_voices", "transcribe", "transcribe_voice_sample"],
+      "transform": [],
+      "apply": [
+        "collect_and_register_voice_profile",
+        "collect_voice_samples",
+        "generate_voice",
+        "record_interaction",
+        "record_voice_sample",
+        "register_voice_profile",
+        "speak_local"
       ]
     },
     "wisdom": {
