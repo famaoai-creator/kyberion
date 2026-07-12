@@ -274,6 +274,10 @@
       "source": "describeOps",
       "ops": [
         {
+          "op": "distill_dom",
+          "kind": "capture"
+        },
+        {
           "op": "console",
           "kind": "capture"
         },
@@ -385,6 +389,10 @@
         {
           "op": "url",
           "kind": "capture"
+        },
+        {
+          "op": "llm_decide",
+          "kind": "transform"
         },
         {
           "op": "export_adf",
