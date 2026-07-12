@@ -91,3 +91,48 @@ jobs:
 
       - name: Contract semver baseline check
         run: pnpm run check:contract-semver
+
+  # Warn-phase Windows observation (IP-06/IP-03): the repo declares win32 in
+  # actuator capability platforms, but no workflow ever verified it. This job
+  # gathers real signal without blocking merges (continue-on-error). Once it
+  # shows a stable green streak, promote windows-latest into the matrix above
+  # and drop this job.
+  windows-observation:
+    name: windows-latest / Node 24 (observation, non-blocking)
+    runs-on: windows-latest
+    timeout-minutes: 35
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Non-UI build only: win32 capability declarations cover actuators/core,
+      # not the Next.js surface. First observation run (2026-07-11) showed the
+      # UI build failing on a Windows junction scandir (EPERM on
+      # "Application Data") while the TS builds passed — the UI is out of
+      # scope for this signal.
+      - name: Build (packages, actuators, repo)
+        run: pnpm run clean && pnpm run build:packages && pnpm run build:actuators && pnpm run build:repo
+
+      - name: Type check
+        run: pnpm run typecheck
+
+      - name: Contract schemas
+        run: pnpm run check:contract-schemas
+
+      - name: Unit tests (core)
+        run: pnpm run test:core
+
+      - name: Governance boundary tests
+        run: pnpm exec vitest run tests/foundation-io-boundary.test.ts tests/core-fs-exception-boundary.test.ts tests/process-boundary-governance.test.ts tests/runtime-child-process-boundary.test.ts

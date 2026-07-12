@@ -35,7 +35,7 @@
     "format:check": "prettier --check .",
     "format:check:ci": "prettier --check package.json .github/workflows/ci.yml .github/workflows/pr-validation.yml .github/workflows/release.yml .github/workflows/cross-os.yml",
     "build": "pnpm run clean && pnpm run build:packages && pnpm run build:actuators && pnpm run build:repo && pnpm run build:ui",
-    "build:packages": "pnpm --filter '@agent/core' --filter '@agent/shared-*' build",
+    "build:packages": "pnpm --filter \"@agent/core\" --filter \"@agent/shared-*\" build",
     "build:actuators": "tsc -p tsconfig.actuators.json",
     "build:repo": "tsc",
     "build:ui": "pnpm --dir presence/displays/chronos-mirror-v2 build",

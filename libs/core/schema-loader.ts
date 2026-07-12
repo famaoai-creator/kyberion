@@ -19,11 +19,16 @@ function collectExternalRefs(value: unknown, refs: Set<string>) {
 
 function registerSchema(ajv: Ajv, schemaPath: string, visited: Set<string>): any {
   const normalized = path.resolve(schemaPath);
-  if (visited.has(normalized)) {
+  // Ajv resolves relative $refs against the registered id with URI
+  // semantics, so the id must use forward slashes. On Windows the native
+  // path (D:\...\schemas\x.json) breaks `../knowledge/...` resolution with
+  // MissingRefError; on POSIX this is a no-op.
+  const canonicalId = normalized.split(path.sep).join('/');
+  if (visited.has(canonicalId)) {
     const raw = safeReadFile(normalized, { encoding: 'utf8' }) as string;
     return JSON.parse(raw);
   }
-  visited.add(normalized);
+  visited.add(canonicalId);
   const raw = safeReadFile(normalized, { encoding: 'utf8' }) as string;
   const schema = JSON.parse(raw);
   const refs = new Set<string>();
@@ -32,7 +37,7 @@ function registerSchema(ajv: Ajv, schemaPath: string, visited: Set<string>): any
     if (/^[a-z]+:/i.test(ref)) continue;
     registerSchema(ajv, path.resolve(path.dirname(normalized), ref), visited);
   }
-  const schemaIds = new Set<string>([normalized]);
+  const schemaIds = new Set<string>([canonicalId]);
   if (typeof schema.$id === 'string' && schema.$id) {
     schemaIds.add(schema.$id);
   }
