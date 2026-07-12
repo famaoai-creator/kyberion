@@ -1,0 +1,58 @@
+{
+  "action": "pipeline",
+  "name": "software-qa-lifecycle-fragment",
+  "version": "1.0.0",
+  "description": "Deterministic QA closeout: validate supplied QA artifacts, derive defect candidates, and emit an evidence-backed quality recommendation for human decision.",
+  "context": {
+    "contract_path": "active/shared/tmp/software-quality-contract.json",
+    "inventory_path": "active/shared/tmp/test-inventory.json",
+    "execution_path": "active/shared/tmp/test-execution-record.json",
+    "report_path": "active/shared/tmp/software-quality-report.json",
+    "defects_path": "active/shared/tmp/defect-candidates.json",
+    "operator_summary_path": "active/shared/runtime/qa/latest-quality-report.json",
+    "required_risk_refs": ""
+  },
+  "steps": [
+    {
+      "id": "announce_quality_evaluation",
+      "role": "source",
+      "op": "system:log",
+      "params": {
+        "message": "Evaluating DoR, AC, DoD, traceability, execution evidence, and defect candidates."
+      }
+    },
+    {
+      "id": "generate_quality_report",
+      "role": "transform",
+      "op": "system:exec",
+      "params": {
+        "command": "node",
+        "args": [
+          "dist/scripts/software_quality_report.js",
+          "--contract",
+          "{{contract_path}}",
+          "--inventory",
+          "{{inventory_path}}",
+          "--execution",
+          "{{execution_path}}",
+          "--output",
+          "{{report_path}}",
+          "--defects",
+          "{{defects_path}}",
+          "--publish-summary",
+          "{{operator_summary_path}}",
+          "--required-risks",
+          "{{required_risk_refs}}"
+        ]
+      }
+    },
+    {
+      "id": "quality_review_handoff",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "QA artifacts generated at {{report_path}} and {{defects_path}}. Accountable human review remains required."
+      }
+    }
+  ]
+}

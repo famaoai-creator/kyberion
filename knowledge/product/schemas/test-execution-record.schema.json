@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/test-execution-record.schema.json",
+  "title": "Test Execution Record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "run_id",
+    "project_id",
+    "subject_ref",
+    "environment",
+    "executor",
+    "started_at",
+    "finished_at",
+    "results"
+  ],
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "run_id": { "type": "string", "minLength": 1 },
+    "project_id": { "type": "string", "minLength": 1 },
+    "subject_ref": { "type": "string", "minLength": 1 },
+    "environment": { "type": "string", "minLength": 1 },
+    "executor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["resource_id", "resource_type"],
+      "properties": {
+        "resource_id": { "type": "string", "minLength": 1 },
+        "resource_type": { "type": "string", "enum": ["human", "ai_agent", "automation"] }
+      }
+    },
+    "started_at": { "type": "string", "format": "date-time" },
+    "finished_at": { "type": "string", "format": "date-time" },
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["item_id", "status", "evidence_refs"],
+        "properties": {
+          "item_id": { "type": "string", "minLength": 1 },
+          "status": {
+            "type": "string",
+            "enum": ["passed", "failed", "error", "blocked", "skipped"]
+          },
+          "evidence_refs": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+          "observed_result": { "type": "string" },
+          "defect_refs": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+          "retry_of": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}

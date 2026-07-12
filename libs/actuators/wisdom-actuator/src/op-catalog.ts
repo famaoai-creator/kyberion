@@ -34,6 +34,7 @@ export const WISDOM_ACTUATOR_APPLY_OPS = [
   'decompose_into_tasks',
   'deploy_release',
   'distill',
+  'derive_test_inventory',
   'emit_dissent_log',
   'escalate_for_review',
   'evaluate_architecture_ready',

@@ -133,6 +133,12 @@
 - **目的**: PPTX の抽出結果を digest 化し、再レンダリングと監査用の要約保存まで行う。
 - **主要操作**: `media:pptx_extract`, `media:document_digest`, `media:pptx_render`, `system:write_file`, `system:log`
 
+### 26. `software-qa-lifecycle.json`
+
+- **目的**: 品質契約、テスト台帳、実行記録から、欠陥候補と証跡付き品質報告を決定論的に生成する。
+- **主要操作**: `system:exec`, `system:log`
+- **責任境界**: AI は `go / conditional_go / no_go / insufficient_evidence` を推奨するが、最終判断は品質報告の `accountable_human_id` が行う。
+
 ## Fragment Template
 
 新しい fragment を作るときは [`_template.json`](./_template.json) を起点にしてください。
