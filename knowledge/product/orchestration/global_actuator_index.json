@@ -370,7 +370,7 @@
       "d": "Knowledge-tier search, injection, import/export, and decision-support operations",
       "s": "implemented",
       "version": "1.2.1",
-      "capability_count": 36,
+      "capability_count": 37,
       "ops": [
         "a2a_fanout",
         "a2a_roleplay",
