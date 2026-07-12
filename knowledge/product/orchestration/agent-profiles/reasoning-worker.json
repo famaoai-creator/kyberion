@@ -36,6 +36,10 @@
         "documentation",
         "summarization"
       ],
+      "selection_hints": {
+        "preferred_provider": "agy",
+        "preferred_modelId": "auto-gemini-3"
+      },
       "provider_strategy": "adaptive"
     }
   }

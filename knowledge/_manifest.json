@@ -2955,7 +2955,7 @@
     {
       "path": "product/orchestration/agent-profile-index.json",
       "tier": "public",
-      "size": 6737,
+      "size": 7215,
       "type": "json"
     },
     {
@@ -2979,7 +2979,7 @@
     {
       "path": "product/orchestration/agent-profiles/control-plane-agent.json",
       "tier": "public",
-      "size": 581,
+      "size": 699,
       "type": "json"
     },
     {
@@ -3009,7 +3009,7 @@
     {
       "path": "product/orchestration/agent-profiles/operations-agent.json",
       "tier": "public",
-      "size": 332,
+      "size": 453,
       "type": "json"
     },
     {
@@ -3027,7 +3027,7 @@
     {
       "path": "product/orchestration/agent-profiles/reasoning-worker.json",
       "tier": "public",
-      "size": 906,
+      "size": 1024,
       "type": "json"
     },
     {
@@ -3045,7 +3045,7 @@
     {
       "path": "product/orchestration/agent-profiles/surface-gateway.json",
       "tier": "public",
-      "size": 438,
+      "size": 559,
       "type": "json"
     },
     {
