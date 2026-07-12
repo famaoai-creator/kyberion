@@ -222,6 +222,8 @@ export interface MissionState {
     /** Goal Satisfaction Loop: how many gap-closing rounds have run. */
     goal_reconciliation_round?: number;
     goal_reconciliation_last_gaps?: string[];
+    mission_finish_gate_requires_operator?: boolean;
+    mission_finish_recovered_commit?: string;
   };
   history: Array<{
     ts: string;
