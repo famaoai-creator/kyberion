@@ -69,4 +69,4 @@ repo には**2つの断絶した世界**がある:
 ## 実装状況 追記 (2026-07-12)
 
 - **Task 4.2 実装(draft→refine エンジン)**: `libs/core/draft-refine.ts` — doc/deck の下書きを決定論的ルーブリック(`evaluateDeliverableQuality`)で採点し、findings を明示した改稿プロンプトで再生成(**上限2パス**、ルーブリック改善が無ければ即終了、悪化時は前稿を保持、refine 失敗でも原稿は失わない)。critique 関数は注入可能で stub 環境でもテストが実挙動を固定(計画 Task 4.3 の fixture 方針どおり)。テスト5本。
-- 適用ゲートは呼び出し側の責務(best-of-N と同じく high-risk/strict 限定 + 予算連動)。ミッション worker / task-session への配線は消費側スライスとして次段。tier 昇格連動の再実行は MO-05 ルーティングと合わせて設計要。
+- **worker 配線済み(同日)**: 高リスク(high/high_stakes)× 実装系ロール × テキスト文書 deliverable(.md/.txt)のタスクは、受入ゲート前に 1 パスの refine を適用(改善時のみ上書き + `draft_refined` イベントで cost_multiplier 記録、失敗はブロックせず warn)。`KYBERION_DRAFT_REFINE=0` で無効化。tier 昇格連動の再実行は MO-05 ルーティングと合わせて設計要。

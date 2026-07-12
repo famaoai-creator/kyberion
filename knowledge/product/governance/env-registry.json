@@ -663,6 +663,14 @@
       "documented": false
     },
     {
+      "name": "KYBERION_DRAFT_REFINE",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_EGRESS_POLICY",
       "category": "runtime",
       "type": "string",
