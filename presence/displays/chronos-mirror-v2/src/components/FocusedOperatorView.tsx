@@ -6,7 +6,7 @@ import { findLatestMissionHandoff, type MissionAssetCategory } from '../lib/miss
 import { buildAttentionItems, type AttentionItem } from '../lib/operator-console';
 import { buildRuntimeTopologyGraph } from '../lib/runtime-topology';
 import { buildUserFacingError } from '../lib/user-facing-error';
-import { resolveChronosLocale, uxText } from '../lib/ux-vocabulary';
+import { resolveChronosLocale, uxText, uxTextOr } from '../lib/ux-vocabulary';
 import { SurfaceStatusPanel } from './SurfaceStatusPanel';
 import { TraceViewer } from './TraceViewer';
 
@@ -404,7 +404,7 @@ export function FocusedOperatorView({
   onOpenMissionThread?: (missionId: string) => void;
 }) {
   const locale = resolveChronosLocale();
-  const ft = (key: string, fallbackEn: string) => uxText(key, fallbackEn, locale);
+  const ft = (key: string, fallbackEn: string) => uxTextOr(key, fallbackEn, locale);
   const [mounted, setMounted] = useState(false);
   const [data, setData] = useState<Payload | null>(null);
   const [error, setError] = useState<string | null>(null);
