@@ -57,4 +57,5 @@
 
 - **Task 3 実装(非 Mac 実埋め込み経路)**: `GeminiEmbeddingBackend`(text-embedding-004、768次元・正規化済み)を新設し、bootstrap の解決順を **MLX(Apple silicon)→ Gemini(キー存在時)→ hash 縮退**に拡張。API 呼び出しは secureFetch 経由(egress ポリシー統制下)。空応答は junk ベクトルでなく明示エラー。テスト4本(可用性判定・単発/バッチ・空応答)。
 - **キャッシュ LRU 実装(2026-07-12)**: contentHash 差分更新は実装済みを確認(textHash 単位で再埋め込み回避、保存時に消滅文書のエントリを自然剥落)。不足していた容量統制を追加 — `ki-usage.json` sidecar で scope 毎の最終利用を記録(読み取りでも touch)、`KYBERION_KI_CACHE_MAX_MB`(既定200MB)超過時に LRU 破棄(`enforceKnowledgeCacheBudget`、保存毎に自動実行)。usage 欠損時は mtime へ縮退。テスト4本。`KYBERION_KI_CACHE_DIR` でテスト隔離可。
-- 残: before/after 命中率 fixture、ランカー統合。
+- **before/after 命中率 fixture 完了(2026-07-12)**: 代表20クエリ(`tests/fixtures/km02-retrieval-queries.json`、うち10本は本文にのみ答えがある)を fixture 化。チャンク無し(旧: 300字要約のみ)では body-only が **0/10**、チャンク有りで **20/20**(top-3)をテストで固定 — チャンク化の後退はこのテストで即検出される。
+- 残: ランカー統合(Task 4)。
