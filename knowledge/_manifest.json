@@ -1659,7 +1659,7 @@
     {
       "path": "product/governance/onboarding-flow-policy.json",
       "tier": "public",
-      "size": 553,
+      "size": 1301,
       "type": "json"
     },
     {
@@ -6621,7 +6621,7 @@
     {
       "path": "product/schemas/onboarding-flow-policy.schema.json",
       "tier": "public",
-      "size": 1254,
+      "size": 1888,
       "type": "json"
     },
     {
