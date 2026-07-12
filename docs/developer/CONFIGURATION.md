@@ -195,7 +195,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_TERMINAL_HOST`                  | string | no       | _undocumented_                                                                                                                                                                           |
 | `KYBERION_TTS_COMMAND`                    | string | no       | _undocumented_                                                                                                                                                                           |
 
-## runtime (92)
+## runtime (93)
 
 | Variable                                      | Type   | Required | Description                                                                                             |
 | --------------------------------------------- | ------ | -------- | ------------------------------------------------------------------------------------------------------- |
@@ -228,6 +228,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_DEPLOY_PROJECT`                     | string | no       | _undocumented_                                                                                          |
 | `KYBERION_DEPLOYMENT_PROJECT`                 | string | no       | _undocumented_                                                                                          |
 | `KYBERION_DISPATCH_MAX_ROUNDS`                | string | no       | _undocumented_                                                                                          |
+| `KYBERION_DRAFT_REFINE`                       | string | no       | _undocumented_                                                                                          |
 | `KYBERION_EGRESS_POLICY`                      | string | no       | _undocumented_                                                                                          |
 | `KYBERION_EMAIL_FROM`                         | string | no       | _undocumented_                                                                                          |
 | `KYBERION_FLAG`                               | string | no       | _undocumented_                                                                                          |
