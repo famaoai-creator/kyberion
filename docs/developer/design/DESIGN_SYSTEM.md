@@ -23,10 +23,9 @@ This file specifies:
 To propagate the design tokens to the different interfaces, run the following generation script:
 
 ```bash
-npx tsx scripts/generate_design_tokens.ts
+node --import ./scripts/ts-loader.mjs scripts/generate_design_tokens.ts
+pnpm check:ui-ux
 ```
-
-_(Alternatively, run `pnpm pipeline --input ...` if integrated into our regular pipeline)._
 
 This script automatically generates and updates the following files:
 
@@ -38,6 +37,7 @@ This script automatically generates and updates the following files:
 6. `knowledge/public/design-patterns/media-templates/themes.json`
 
 The generated Kyberion token block and theme entries are checked by `pnpm run check:catalogs` so committed files cannot drift from the canonical brand-token JSON.
+`pnpm check:ui-ux` additionally rejects raw colors in operator-surface source, missing semantic tokens, and dashboard status-vocabulary bypasses. The same check runs in `pnpm validate`, GitHub Actions, and the scheduled `pipelines/ui-ux-governance-audit.json` pipeline.
 
 ## 3. Surface Application Patterns
 
@@ -47,6 +47,7 @@ We expose CSS variables with the prefix `--kb-*`.
 
 - Inline styles must reference the CSS variables using `var(--kb-*)`.
 - Tailwind is configured to map `kyberion.*` keys to the corresponding CSS variables (e.g., `text-kyberion-primary`).
+- Semantic UI states use `--kb-surface`, `--kb-muted-text`, `--kb-border`, `--kb-success`, and `--kb-danger`; do not infer state colors from brand accents in individual components.
 
 ### Static HTML Surfaces
 

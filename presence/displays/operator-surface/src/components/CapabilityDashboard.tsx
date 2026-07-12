@@ -24,21 +24,24 @@ interface CapabilityDashboardProps {
 
 export default function CapabilityDashboard({ bundles, pins }: CapabilityDashboardProps) {
   return (
-    <div style={{ marginTop: '40px', borderTop: '1px solid var(--kb-border, #2a2c33)', paddingTop: '30px' }}>
-      <h2 style={{ color: 'var(--kb-text-primary)', marginBottom: '8px' }}>🤖 Capability & Extension Control Plane</h2>
+    <div style={{ marginTop: '40px', borderTop: '1px solid var(--kb-border)', paddingTop: '30px' }}>
+      <h2 style={{ color: 'var(--kb-text-primary)', marginBottom: '8px' }}>
+        🤖 Capability & Extension Control Plane
+      </h2>
       <p style={{ color: 'var(--kb-text-secondary)', marginTop: 0, fontSize: '14px' }}>
         Dynamic harness capability matrix and visual provider-pin management. Read-only.
       </p>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '30px', marginTop: '20px' }}>
-
         {/* Capability Matrix Section */}
         <div style={sectionBox}>
           <h3 style={sectionTitle}>⚡ Capability Bundle Matrix</h3>
           <div style={gridContainer}>
-            {bundles.map(bundle => (
+            {bundles.map((bundle) => (
               <div key={bundle.bundle_id} style={cardStyle(bundle.health)}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                >
                   <span style={bundleTitle}>{bundle.bundle_id}</span>
                   <span style={healthBadge(bundle.health)}>{bundle.health.toUpperCase()}</span>
                 </div>
@@ -48,14 +51,43 @@ export default function CapabilityDashboard({ bundles, pins }: CapabilityDashboa
                   <span style={metaValue}>{(bundle.intents || []).join(', ') || 'None'}</span>
                 </div>
                 {bundle.dependencies && bundle.dependencies.length > 0 && (
-                  <div style={{ marginTop: '12px', borderTop: '1px solid var(--kb-border, #2a2c33)', paddingTop: '8px' }}>
+                  <div
+                    style={{
+                      marginTop: '12px',
+                      borderTop: '1px solid var(--kb-border)',
+                      paddingTop: '8px',
+                    }}
+                  >
                     <strong style={metaLabel}>Probe Dependencies:</strong>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
-                      {bundle.dependencies.map(dep => (
-                        <div key={dep.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
-                          <span style={{ color: 'var(--kb-text-secondary)' }}>{dep.id.replace('provider.runtime.', '')}</span>
-                          {/* Semantic status colors (success/danger) are not brand tokens yet. */}
-                          <span style={{ color: dep.status === 'available' ? '#9be3a8' : '#ff8fa3' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '4px',
+                        marginTop: '4px',
+                      }}
+                    >
+                      {bundle.dependencies.map((dep) => (
+                        <div
+                          key={dep.id}
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            fontSize: '11px',
+                          }}
+                        >
+                          <span style={{ color: 'var(--kb-text-secondary)' }}>
+                            {dep.id.replace('provider.runtime.', '')}
+                          </span>
+                          {}
+                          <span
+                            style={{
+                              color:
+                                dep.status === 'available'
+                                  ? 'var(--kb-success)'
+                                  : 'var(--kb-danger)',
+                            }}
+                          >
                             {dep.status === 'available' ? '✓ OK' : '✗ Missing'}
                           </span>
                         </div>
@@ -88,19 +120,30 @@ export default function CapabilityDashboard({ bundles, pins }: CapabilityDashboa
               </thead>
               <tbody>
                 {Object.entries(pins).map(([key, pin]: [string, any]) => (
-                  <tr key={key} style={{ borderBottom: '1px solid var(--kb-border, #1a1c22)' }}>
-                    <td style={tdStyle}><strong>{key}</strong></td>
-                    <td style={tdStyle}><span style={providerBadge}>{pin.provider}</span></td>
-                    <td style={tdStyle}><code>{pin.modelId}</code></td>
-                    <td style={tdStyle}><code>{pin.orchestration}</code></td>
-                    <td style={tdStyle}><span style={{ color: 'var(--kb-text-secondary)', fontSize: '12px' }}>{new Date(pin.pinnedAt).toLocaleString()}</span></td>
+                  <tr key={key} style={{ borderBottom: '1px solid var(--kb-border)' }}>
+                    <td style={tdStyle}>
+                      <strong>{key}</strong>
+                    </td>
+                    <td style={tdStyle}>
+                      <span style={providerBadge}>{pin.provider}</span>
+                    </td>
+                    <td style={tdStyle}>
+                      <code>{pin.modelId}</code>
+                    </td>
+                    <td style={tdStyle}>
+                      <code>{pin.orchestration}</code>
+                    </td>
+                    <td style={tdStyle}>
+                      <span style={{ color: 'var(--kb-text-secondary)', fontSize: '12px' }}>
+                        {new Date(pin.pinnedAt).toLocaleString()}
+                      </span>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           )}
         </div>
-
       </div>
     </div>
   );
@@ -109,9 +152,9 @@ export default function CapabilityDashboard({ bundles, pins }: CapabilityDashboa
 // Styling Object definitions
 const sectionBox: React.CSSProperties = {
   background: 'var(--kb-panel-bg)',
-  border: '1px solid var(--kb-border, #21262d)',
+  border: '1px solid var(--kb-border)',
   borderRadius: '8px',
-  padding: '20px'
+  padding: '20px',
 };
 
 const sectionTitle: React.CSSProperties = {
@@ -119,43 +162,43 @@ const sectionTitle: React.CSSProperties = {
   fontSize: '18px',
   fontWeight: 600,
   marginTop: 0,
-  marginBottom: '16px'
+  marginBottom: '16px',
 };
 
 const gridContainer: React.CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-  gap: '16px'
+  gap: '16px',
 };
 
 const cardStyle = (health: 'active' | 'degraded' | 'inactive'): React.CSSProperties => {
   const borderColors = {
-    active: 'var(--kb-warning)', // Was #308e49
-    degraded: 'var(--kb-accent)', // Was #8e7a30
-    inactive: 'var(--kb-secondary)' // Was #8e3030
+    active: 'var(--kb-success)',
+    degraded: 'var(--kb-warning)',
+    inactive: 'var(--kb-muted-text)',
   };
   return {
-    background: 'var(--kb-bg-main)', // Was #161b22
+    background: 'var(--kb-bg-main)',
     border: `1px solid ${borderColors[health]}`,
     borderRadius: '6px',
     padding: '16px',
     display: 'flex',
     flexDirection: 'column',
-    justifyContent: 'space-between'
+    justifyContent: 'space-between',
   };
 };
 
 const bundleTitle: React.CSSProperties = {
   fontWeight: 600,
   color: 'var(--kb-text-primary)',
-  fontSize: '15px'
+  fontSize: '15px',
 };
 
 const healthBadge = (health: 'active' | 'degraded' | 'inactive'): React.CSSProperties => {
   const colors = {
-    active: { bg: 'var(--kb-bg-main)', text: 'var(--kb-warning)' },
-    degraded: { bg: 'var(--kb-bg-main)', text: 'var(--kb-accent)' },
-    inactive: { bg: 'var(--kb-bg-main)', text: 'var(--kb-secondary)' }
+    active: { bg: 'var(--kb-surface)', text: 'var(--kb-success)' },
+    degraded: { bg: 'var(--kb-surface)', text: 'var(--kb-warning)' },
+    inactive: { bg: 'var(--kb-surface)', text: 'var(--kb-muted-text)' },
   };
   return {
     background: colors[health].bg,
@@ -164,7 +207,7 @@ const healthBadge = (health: 'active' | 'degraded' | 'inactive'): React.CSSPrope
     fontWeight: 'bold',
     padding: '2px 6px',
     borderRadius: '10px',
-    fontFamily: 'var(--kb-font-mono, monospace)'
+    fontFamily: 'var(--kb-font-mono, monospace)',
   };
 };
 
@@ -172,38 +215,38 @@ const bundleSummary: React.CSSProperties = {
   fontSize: '13px',
   color: 'var(--kb-text-secondary)',
   marginTop: '8px',
-  marginBottom: 0
+  marginBottom: 0,
 };
 
 const metaLabel: React.CSSProperties = {
   fontSize: '12px',
-  color: 'var(--kb-text-secondary)'
+  color: 'var(--kb-text-secondary)',
 };
 
 const metaValue: React.CSSProperties = {
   fontSize: '12px',
   color: 'var(--kb-text-primary)',
-  fontFamily: 'var(--kb-font-mono, monospace)'
+  fontFamily: 'var(--kb-font-mono, monospace)',
 };
 
 const tableStyle: React.CSSProperties = {
   width: '100%',
   borderCollapse: 'collapse',
   fontSize: '13px',
-  marginTop: '12px'
+  marginTop: '12px',
 };
 
 const thStyle: React.CSSProperties = {
   padding: '10px 12px',
-  borderBottom: '1px solid var(--kb-border, #21262d)',
+  borderBottom: '1px solid var(--kb-border)',
   color: 'var(--kb-text-secondary)',
-  fontWeight: 600
+  fontWeight: 600,
 };
 
 const tdStyle: React.CSSProperties = {
   padding: '10px 12px',
   verticalAlign: 'middle',
-  color: 'var(--kb-text-primary)'
+  color: 'var(--kb-text-primary)',
 };
 
 const providerBadge: React.CSSProperties = {
@@ -212,5 +255,5 @@ const providerBadge: React.CSSProperties = {
   padding: '2px 6px',
   borderRadius: '4px',
   fontSize: '11px',
-  fontFamily: 'var(--kb-font-mono, monospace)'
+  fontFamily: 'var(--kb-font-mono, monospace)',
 };

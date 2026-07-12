@@ -3,7 +3,13 @@ import { pathResolver } from './path-resolver.js';
 import { logger } from './core.js';
 
 export type UxVocabularyLocale = 'en' | 'ja';
-export type UxStatusDomain = 'readiness' | 'connection' | 'provider' | 'mission' | 'progress';
+export type UxStatusDomain =
+  | 'readiness'
+  | 'connection'
+  | 'provider'
+  | 'mission'
+  | 'progress'
+  | 'runtime';
 
 type VocabularyEntry = Record<string, string>;
 type VocabularyCatalog = {
@@ -24,12 +30,18 @@ const STATUS_KEY_MAP: Record<UxStatusDomain, Record<string, string>> = {
     needs_clarification: 'readiness_clarification',
     needs_external_assets: 'readiness_assets',
     needs_assets: 'readiness_assets',
+    needs_setup: 'readiness_setup',
     missing_runtime_prerequisites: 'readiness_runtime',
     needs_runtime_prerequisites: 'readiness_runtime',
   },
   connection: {
+    ready: 'connection_connected',
     connected: 'connection_connected',
     connecting: 'connection_connecting',
+    pending: 'connection_pending',
+    blocked: 'connection_blocked',
+    missing: 'connection_missing',
+    'n/a': 'connection_not_applicable',
     degraded: 'connection_degraded',
     disconnected: 'connection_disconnected',
     offline: 'connection_disconnected',
@@ -40,6 +52,7 @@ const STATUS_KEY_MAP: Record<UxStatusDomain, Record<string, string>> = {
     busy: 'provider_busy',
     fallback: 'provider_fallback',
     error: 'provider_error',
+    missing: 'provider_missing',
     unavailable: 'provider_error',
   },
   mission: {
@@ -51,11 +64,19 @@ const STATUS_KEY_MAP: Record<UxStatusDomain, Record<string, string>> = {
     failed: 'mission_failed',
     review: 'mission_review',
     recovered: 'mission_recovered',
+    paused: 'mission_paused',
+    distilling: 'mission_distilling',
+    archived: 'mission_archived',
   },
   progress: {
     working: 'progress_working',
     completed: 'progress_completed',
     failed: 'progress_failed',
+  },
+  runtime: {
+    running: 'runtime_running',
+    stale: 'runtime_stale',
+    stopped: 'runtime_stopped',
   },
 };
 

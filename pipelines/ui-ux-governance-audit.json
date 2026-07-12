@@ -1,0 +1,23 @@
+{
+  "pipeline_id": "ui-ux-governance-audit",
+  "version": "1.0.0",
+  "description": "Weekly deterministic audit for canonical design tokens and operator-facing UX vocabulary.",
+  "action": "pipeline",
+  "schedule": {
+    "id": "ui-ux-governance-weekly",
+    "cron": "30 7 * * 1",
+    "timezone": "Asia/Tokyo",
+    "enabled": true
+  },
+  "steps": [
+    {
+      "id": "check-ui-ux-governance",
+      "role": "sink",
+      "op": "system:exec",
+      "params": {
+        "command": "node",
+        "args": ["dist/scripts/check_ui_ux_governance.js", "--json"]
+      }
+    }
+  ]
+}
