@@ -5071,6 +5071,12 @@
       "type": "json"
     },
     {
+      "path": "product/pipeline-templates/productivity-task-orchestration.json",
+      "tier": "public",
+      "size": 3352,
+      "type": "json"
+    },
+    {
       "path": "product/pipeline-templates/project-kickstart.json",
       "tier": "public",
       "size": 3691,
@@ -6949,6 +6955,18 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/productivity-task-plan.example.json",
+      "tier": "public",
+      "size": 1641,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/productivity-task-plan.schema.json",
+      "tier": "public",
+      "size": 3223,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/project-mission-ledger.schema.json",
       "tier": "public",
       "size": 1369,
@@ -7287,7 +7305,7 @@
     {
       "path": "product/schemas/task-session.schema.json",
       "tier": "public",
-      "size": 13905,
+      "size": 13966,
       "type": "json"
     },
     {

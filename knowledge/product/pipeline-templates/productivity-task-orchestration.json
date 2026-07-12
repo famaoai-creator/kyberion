@@ -1,0 +1,69 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "productivity-task-orchestration",
+  "version": "1.0.0",
+  "name": "Productivity Task Orchestration Dry Run",
+  "description": "Validate a cross-tool productivity task plan and produce an approval-ready review package without calendar writes, meeting participation, email sends, browser actions, payments, or network access.",
+  "context": {
+    "mission_id": "MSN-PRODUCTIVITY-DRY-RUN",
+    "task_plan_path": "knowledge/product/schemas/productivity-task-plan.example.json",
+    "review_package_path": "active/shared/tmp/productivity-task-orchestration/review-package.json",
+    "execution_receipt_path": "active/shared/tmp/productivity-task-orchestration/execution-receipt.json"
+  },
+  "steps": [
+    {
+      "id": "read_task_plan",
+      "role": "source",
+      "op": "system:read_file",
+      "produces": { "channel": "task_plan_raw", "type": "ProductivityTaskPlanRaw" },
+      "params": {
+        "path": "{{task_plan_path}}"
+      }
+    },
+    {
+      "id": "validate_dry_run_boundary",
+      "role": "gate",
+      "op": "core:transform",
+      "consumes": "task_plan_raw",
+      "produces": { "channel": "review_package", "type": "ProductivityReviewPackage" },
+      "params": {
+        "script": "const raw = ctx.task_plan_raw; const text = typeof raw === 'string' ? raw : JSON.stringify(raw); const wrapped = text.match(/<untrusted-external[^>]*>\\n?([\\s\\S]*?)\\n?<\\/untrusted-external>/); const plan = JSON.parse((wrapped ? wrapped[1] : text).trim()); if (plan?.kind !== 'productivity-task-plan') throw new Error('invalid productivity task plan kind'); if (plan?.execution?.mode !== 'dry_run' || plan?.execution?.external_effects_executed !== false) throw new Error('productivity task plan must be dry-run only'); if (!Array.isArray(plan.steps) || plan.steps.some((step) => step.execution_mode !== 'preview_only')) throw new Error('all productivity steps must remain preview_only'); return { kind: 'productivity-review-package', mission_id: ctx.mission_id, status: plan.approval?.required ? 'approval_required' : 'ready_for_local_draft', request: plan.request, domains: plan.domains, steps: plan.steps, approval: plan.approval, missing_inputs: plan.missing_inputs, evidence_plan: plan.evidence_plan, external_effects_executed: false };"
+      }
+    },
+    {
+      "id": "write_review_package",
+      "role": "sink",
+      "op": "system:write_file",
+      "consumes": "review_package",
+      "params": {
+        "path": "{{review_package_path}}",
+        "content": "{{review_package}}"
+      }
+    },
+    {
+      "id": "write_execution_receipt",
+      "role": "sink",
+      "op": "system:write_file",
+      "params": {
+        "path": "{{execution_receipt_path}}",
+        "content": {
+          "kind": "productivity-task-dry-run-receipt",
+          "mission_id": "{{mission_id}}",
+          "status": "dry_run_completed",
+          "task_plan_path": "{{task_plan_path}}",
+          "review_package_path": "{{review_package_path}}",
+          "external_effects_executed": false,
+          "network_access_performed": false
+        }
+      }
+    },
+    {
+      "id": "log_completion",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "Productivity task dry-run completed. Review: {{review_package_path}} Receipt: {{execution_receipt_path}}"
+      }
+    }
+  ]
+}

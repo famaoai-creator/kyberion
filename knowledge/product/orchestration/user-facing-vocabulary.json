@@ -819,6 +819,22 @@
         "en": "  intent [--clarify] \"<utterance>\"   Resolve free text into an intent or clarification packet",
         "ja": "  intent [--clarify] \"<発話>\"   自由文を intent または明確化パケットへ解決"
       },
+      "cli_help_task_summary": {
+        "en": "  task <plan|start> \"<request>\"  Plan a cross-tool task or create a governed task session",
+        "ja": "  task <plan|start> \"<依頼>\"  複数ツールのタスク計画、または governed task session を作成"
+      },
+      "cli_help_task_usage": {
+        "en": "Usage: npm run cli -- task <plan|start> \"<request>\" [--output <path>]",
+        "ja": "使い方: npm run cli -- task <plan|start> \"<依頼>\" [--output <path>]"
+      },
+      "cli_help_task_plan_short": {
+        "en": "  plan   Preview domains, effects, approvals, missing inputs, and evidence without execution",
+        "ja": "  plan   実行せずに対象領域、外部効果、承認、入力不足、Evidence を確認"
+      },
+      "cli_help_task_start_short": {
+        "en": "  start  Save the preview and create a governed task session; external effects remain blocked",
+        "ja": "  start  プレビューを保存して governed task session を作成。外部効果は引き続き停止"
+      },
       "cli_help_sec_packets": {
         "en": "── Operator Packets ────────────────────────────────────────────────",
         "ja": "── オペレータパケット ──────────────────────────────────────────────"
