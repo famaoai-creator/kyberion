@@ -7,6 +7,7 @@ import { getOpInputContract } from '@agent/core';
 type OpSpecKind = 'capture' | 'transform' | 'apply' | 'control';
 
 export const BROWSER_ACTUATOR_CAPTURE_OPS = [
+  'distill_dom',
   'console',
   'content',
   'evaluate',
@@ -24,6 +25,7 @@ export const BROWSER_ACTUATOR_CAPTURE_OPS = [
 ] as const;
 
 export const BROWSER_ACTUATOR_TRANSFORM_OPS = [
+  'llm_decide',
   'export_adf',
   'export_playwright',
   'json_query',
