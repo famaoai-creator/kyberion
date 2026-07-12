@@ -975,7 +975,7 @@
     {
       "path": "product/governance/actuator-op-registry.json",
       "tier": "public",
-      "size": 8616,
+      "size": 8678,
       "type": "json"
     },
     {
@@ -1455,7 +1455,7 @@
     {
       "path": "product/governance/media-backend-registry.json",
       "tier": "public",
-      "size": 3012,
+      "size": 3533,
       "type": "json"
     },
     {
@@ -2889,7 +2889,7 @@
     {
       "path": "product/orchestration/actuator-op-discovery.json",
       "tier": "public",
-      "size": 46892,
+      "size": 47064,
       "type": "json"
     },
     {
@@ -2955,7 +2955,7 @@
     {
       "path": "product/orchestration/agent-profile-index.json",
       "tier": "public",
-      "size": 4652,
+      "size": 6737,
       "type": "json"
     },
     {
@@ -2974,6 +2974,12 @@
       "path": "product/orchestration/agent-profiles/chronos-mirror.json",
       "tier": "public",
       "size": 480,
+      "type": "json"
+    },
+    {
+      "path": "product/orchestration/agent-profiles/control-plane-agent.json",
+      "tier": "public",
+      "size": 581,
       "type": "json"
     },
     {
@@ -3001,6 +3007,12 @@
       "type": "json"
     },
     {
+      "path": "product/orchestration/agent-profiles/operations-agent.json",
+      "tier": "public",
+      "size": 332,
+      "type": "json"
+    },
+    {
       "path": "product/orchestration/agent-profiles/planner-agent.json",
       "tier": "public",
       "size": 413,
@@ -3013,6 +3025,12 @@
       "type": "json"
     },
     {
+      "path": "product/orchestration/agent-profiles/reasoning-worker.json",
+      "tier": "public",
+      "size": 906,
+      "type": "json"
+    },
+    {
       "path": "product/orchestration/agent-profiles/slack-surface-agent.json",
       "tier": "public",
       "size": 479,
@@ -3022,6 +3040,12 @@
       "path": "product/orchestration/agent-profiles/sovereign-brain.json",
       "tier": "public",
       "size": 510,
+      "type": "json"
+    },
+    {
+      "path": "product/orchestration/agent-profiles/surface-gateway.json",
+      "tier": "public",
+      "size": 438,
       "type": "json"
     },
     {
@@ -3195,7 +3219,7 @@
     {
       "path": "product/orchestration/global_actuator_index.json",
       "tier": "public",
-      "size": 15405,
+      "size": 15467,
       "type": "json"
     },
     {
@@ -4461,7 +4485,7 @@
     {
       "path": "product/pipeline-templates/README.md",
       "tier": "public",
-      "size": 1100,
+      "size": 1338,
       "type": "md"
     },
     {
@@ -4515,7 +4539,7 @@
     {
       "path": "product/pipeline-templates/automate-browser-workflow.json",
       "tier": "public",
-      "size": 2219,
+      "size": 2356,
       "type": "json"
     },
     {
@@ -4528,6 +4552,12 @@
       "path": "product/pipeline-templates/board-meeting-prep.json",
       "tier": "public",
       "size": 3188,
+      "type": "json"
+    },
+    {
+      "path": "product/pipeline-templates/browser-authenticated-snapshot.json",
+      "tier": "public",
+      "size": 2038,
       "type": "json"
     },
     {
@@ -4594,6 +4624,12 @@
       "path": "product/pipeline-templates/counterfactual-branch.json",
       "tier": "public",
       "size": 1955,
+      "type": "json"
+    },
+    {
+      "path": "product/pipeline-templates/create-my-avatar.json",
+      "tier": "public",
+      "size": 1693,
       "type": "json"
     },
     {
@@ -4863,7 +4899,7 @@
     {
       "path": "product/pipeline-templates/meeting-proxy-workflow.json",
       "tier": "public",
-      "size": 3100,
+      "size": 3267,
       "type": "json"
     },
     {
@@ -5043,7 +5079,7 @@
     {
       "path": "product/pipeline-templates/speak-with-my-voice.json",
       "tier": "public",
-      "size": 1509,
+      "size": 1773,
       "type": "json"
     },
     {
@@ -5905,6 +5941,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/context-fragment.schema.json",
+      "tier": "public",
+      "size": 913,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/contextual-intent-clarification-policy.schema.json",
       "tier": "public",
       "size": 2778,
@@ -6363,7 +6405,7 @@
     {
       "path": "product/schemas/mission-context-pack.schema.json",
       "tier": "public",
-      "size": 13438,
+      "size": 14624,
       "type": "json"
     },
     {
@@ -6441,7 +6483,7 @@
     {
       "path": "product/schemas/mission-team-plan.schema.json",
       "tier": "public",
-      "size": 5784,
+      "size": 6352,
       "type": "json"
     },
     {
@@ -6679,6 +6721,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/participant-context.schema.json",
+      "tier": "public",
+      "size": 1027,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/path-scope-policy.schema.json",
       "tier": "public",
       "size": 975,
@@ -6892,6 +6940,12 @@
       "path": "product/schemas/runtime-surface-manifest.schema.json",
       "tier": "public",
       "size": 1414,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/security-scope.schema.json",
+      "tier": "public",
+      "size": 1188,
       "type": "json"
     },
     {

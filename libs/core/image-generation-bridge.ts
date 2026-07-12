@@ -401,6 +401,129 @@ export class LocalFluxImageGenerationProvider implements ImageGenerationProvider
   }
 }
 
+type HostBridgeVariant = 'host_agent' | 'codex_host_bridge' | 'agy_host_bridge';
+
+interface HostBridgeProviderConfig {
+  id: HostBridgeVariant;
+  displayName: string;
+  requestFileName: string;
+  errorCode: string;
+  availability: () => boolean;
+}
+
+function writeHostBridgeRequest(
+  config: HostBridgeProviderConfig,
+  request: ImageGenerationRequest,
+  targetPath: string
+): void {
+  const requestFilePath = pathResolver.resolve(`active/shared/tmp/${config.requestFileName}`);
+  const outputDir = path.dirname(requestFilePath);
+  if (!safeExistsSync(outputDir)) {
+    safeMkdir(outputDir, { recursive: true });
+  }
+
+  try {
+    safeWriteFile(
+      requestFilePath,
+      JSON.stringify(
+        {
+          bridge_provider: config.id,
+          bridge_name: config.displayName,
+          prompt: request.prompt,
+          targetPath,
+          aspectRatio: request.aspectRatio || '1:1',
+          timestamp: new Date().toISOString(),
+        },
+        null,
+        2
+      )
+    );
+  } catch {
+    // Request metadata is best-effort; the bridge still returns the actionable instruction.
+  }
+}
+
+abstract class BaseHostBridgeImageGenerationProvider implements ImageGenerationProvider {
+  abstract readonly id: HostBridgeVariant;
+  protected abstract readonly config: HostBridgeProviderConfig;
+
+  async isAvailable(): Promise<boolean> {
+    return this.config.availability();
+  }
+
+  async generate(request: ImageGenerationRequest): Promise<ImageGenerationResult> {
+    const startedAt = Date.now();
+    const targetPath = getFallbackTargetPath(request);
+
+    if (safeExistsSync(targetPath)) {
+      logger.info(
+        `[image_generation_bridge] ${this.config.displayName} image already exists at ${targetPath}. Skipping generation.`
+      );
+      return {
+        status: 'succeeded',
+        provider: this.id,
+        path: targetPath,
+        elapsedMs: Date.now() - startedAt,
+      };
+    }
+
+    writeHostBridgeRequest(this.config, request, targetPath);
+
+    const errMessage = `${this.config.errorCode}: ${this.config.displayName} is required. Please use your 'generate_image' tool with prompt: "${request.prompt}" and save the image to "${targetPath}". After saving, please rerun the task.`;
+    logger.warn(`[image_generation_bridge] ${errMessage}`);
+    throw new Error(errMessage);
+  }
+}
+
+function envFlagEnabled(name: string): boolean {
+  return process.env[name] === 'true';
+}
+
+function envAnyEnabled(names: string[]): boolean {
+  return names.some((name) => Boolean(process.env[name]));
+}
+
+function envEquals(name: string, expected: string): boolean {
+  return process.env[name] === expected;
+}
+
+export class HostAgentImageGenerationProvider extends BaseHostBridgeImageGenerationProvider {
+  readonly id = 'host_agent';
+
+  protected readonly config: HostBridgeProviderConfig = {
+    id: 'host_agent',
+    displayName: 'Host agent bridge',
+    requestFileName: 'host_agent_image_request.json',
+    errorCode: 'HOST_AGENT_IMAGE_GENERATION_REQUIRED',
+    availability: () => envFlagEnabled('KYBERION_HOST_AGENT_ACTIVE'),
+  };
+}
+
+export class CodexHostBridgeImageGenerationProvider extends BaseHostBridgeImageGenerationProvider {
+  readonly id = 'codex_host_bridge';
+
+  protected readonly config: HostBridgeProviderConfig = {
+    id: 'codex_host_bridge',
+    displayName: 'Codex host bridge',
+    requestFileName: 'codex_host_bridge_image_request.json',
+    errorCode: 'HOST_BRIDGE_IMAGE_GENERATION_REQUIRED',
+    availability: () =>
+      envAnyEnabled(['CODEX_CLI', 'CODEX_VERSION']) || envEquals('TERM_PROGRAM', 'codex'),
+  };
+}
+
+export class AgyHostBridgeImageGenerationProvider extends BaseHostBridgeImageGenerationProvider {
+  readonly id = 'agy_host_bridge';
+
+  protected readonly config: HostBridgeProviderConfig = {
+    id: 'agy_host_bridge',
+    displayName: 'AGY host bridge',
+    requestFileName: 'agy_host_bridge_image_request.json',
+    errorCode: 'HOST_BRIDGE_IMAGE_GENERATION_REQUIRED',
+    availability: () => envAnyEnabled(['AGY_CLI', 'ANTIGRAVITY_CLI']),
+  };
+}
+
 export class AdaptivePolicyRouter {
   private providers: Map<string, ImageGenerationProvider> = new Map();
 
@@ -426,10 +549,26 @@ export class AdaptivePolicyRouter {
     if (mode === 'local_only' || mode === 'privacy_first') {
       defaultChain = ['local_flux', 'local_diffusion', 'comfyui'];
     } else if (mode === 'artistic') {
-      defaultChain = ['gemini_service', 'llm_api', 'local_flux', 'comfyui'];
+      defaultChain = [
+        'codex_host_bridge',
+        'agy_host_bridge',
+        'host_agent',
+        'gemini_service',
+        'llm_api',
+        'local_flux',
+        'comfyui',
+      ];
     } else {
       // balanced
-      defaultChain = ['local_flux', 'comfyui', 'gemini_service', 'llm_api'];
+      defaultChain = [
+        'codex_host_bridge',
+        'agy_host_bridge',
+        'host_agent',
+        'local_flux',
+        'comfyui',
+        'gemini_service',
+        'llm_api',
+      ];
     }
 
     for (const id of defaultChain) {
@@ -453,6 +592,9 @@ function getRouter(): AdaptivePolicyRouter {
       new LlmApiImageGenerationProvider(),
       new LocalFluxImageGenerationProvider(),
       new LocalDiffusionImageGenerationProvider(),
+      new CodexHostBridgeImageGenerationProvider(),
+      new AgyHostBridgeImageGenerationProvider(),
+      new HostAgentImageGenerationProvider(),
     ]);
   }
   return globalRouter;

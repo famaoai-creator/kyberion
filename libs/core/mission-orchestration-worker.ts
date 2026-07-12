@@ -958,6 +958,7 @@ async function buildTaskDispatchContext(input: {
   missionContextPackPath?: string;
   missionContextPackSummary: string;
   missionContextPackPruningSummary?: MissionContextPackPruningSummary;
+  securityScope?: import('./context-security-scope.js').ContextSecurityScope;
 }> {
   const missionStateRaw = loadMissionStateSnapshot(input.missionId);
   const missionState =
@@ -1062,6 +1063,7 @@ async function buildTaskDispatchContext(input: {
     missionContextPackPath,
     missionContextPackSummary: missionContextPack?.summary || 'degraded mission context pack',
     missionContextPackPruningSummary,
+    securityScope: missionContextPack?.security_scope,
   };
 }
 
@@ -1136,6 +1138,12 @@ async function dispatchPlannedMissionTask(input: {
   assignment: {
     agent_id: string;
     model_hint?: { model_id?: string; tier?: string; effort?: string; route_reason?: string };
+    organization_role_id?: string;
+    perspective_ids?: string[];
+    reasoning_route_id?: string;
+    selection_reason_codes?: string[];
+    provider?: string | null;
+    modelId?: string | null;
   };
   allTasks: PlannedNextTask[];
 }): Promise<DispatchMissionTaskOutcome | null> {
@@ -1196,6 +1204,7 @@ async function dispatchPlannedMissionTask(input: {
       agentId: input.assignment.agent_id,
       taskModelHint: input.assignment.model_hint,
       prompt: dispatchContext.prompt,
+      securityScope: dispatchContext.securityScope,
     };
     response = isBestOfNCandidate({ teamRole: input.teamRole, task: input.task })
       ? await obtainBestOfTaskResultResponse(dispatchArgs)
@@ -1220,6 +1229,29 @@ async function dispatchPlannedMissionTask(input: {
     }
     throw err;
   }
+  emitMissionTaskEvent({
+    event_type: 'participant_context_resolved',
+    mission_id: input.missionId,
+    task_id: input.task.task_id,
+    agent_id: input.assignment.agent_id,
+    team_role: input.teamRole,
+    decision: 'dispatch_context_compiled',
+    why: 'Record the resolved execution actor, perspective, model route, and security scope.',
+    policy_used: 'participant_context_v1',
+    evidence: dispatchContext.missionContextPackPath
+      ? [dispatchContext.missionContextPackPath]
+      : [],
+    payload: {
+      organization_role_id: input.assignment.organization_role_id,
+      perspective_ids: input.assignment.perspective_ids,
+      reasoning_route_id: input.assignment.reasoning_route_id,
+      selection_reason_codes: input.assignment.selection_reason_codes,
+      provider: input.assignment.provider,
+      model_id: input.assignment.modelId,
+      security_scope: dispatchContext.securityScope,
+      context_pack_id: dispatchContext.missionContextPackId,
+    },
+  });
   const taskResultNeeds = response.taskResult?.needs || [];
   const reviewFindings = normalizeReviewFindings(
     response.taskResult?.review_findings ||
@@ -1830,6 +1862,7 @@ async function obtainTaskResultResponse(input: {
   agentId: string;
   taskModelHint?: { model_id?: string; tier?: string; effort?: string; route_reason?: string };
   prompt: string;
+  securityScope?: import('./context-security-scope.js').ContextSecurityScope;
 }): Promise<{
   executionMode: 'agent';
   responseText: string;
@@ -1875,6 +1908,7 @@ async function obtainTaskResultResponse(input: {
         task_id: input.task.task_id,
         execution_mode: 'task',
         task_model_hint: input.taskModelHint,
+        security_scope: input.securityScope,
       },
     },
   });
@@ -1935,6 +1969,7 @@ async function obtainTaskResultResponse(input: {
           task_id: input.task.task_id,
           execution_mode: 'task',
           task_model_hint: input.taskModelHint,
+          security_scope: input.securityScope,
         },
       },
     });
@@ -2077,6 +2112,7 @@ async function obtainBestOfTaskResultResponse(input: {
   agentId: string;
   taskModelHint?: { model_id?: string; tier?: string; effort?: string; route_reason?: string };
   prompt: string;
+  securityScope?: import('./context-security-scope.js').ContextSecurityScope;
 }): Promise<Awaited<ReturnType<typeof obtainTaskResultResponse>>> {
   const attempts: Array<{
     key: string;
@@ -2134,6 +2170,7 @@ async function obtainBestOfTaskResultResponse(input: {
           team_role: 'reviewer',
           task_id: `${input.task.task_id}-judge`,
           execution_mode: 'task',
+          security_scope: input.securityScope,
         },
       },
     });

@@ -1854,6 +1854,10 @@
           "kind": "apply"
         },
         {
+          "op": "perspective_fanout",
+          "kind": "apply"
+        },
+        {
           "op": "a2a_roleplay",
           "kind": "apply"
         },
@@ -1879,6 +1883,10 @@
         },
         {
           "op": "cross_critique",
+          "kind": "apply"
+        },
+        {
+          "op": "typed_cross_critique",
           "kind": "apply"
         },
         {

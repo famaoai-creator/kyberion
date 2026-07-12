@@ -1,0 +1,42 @@
+{
+  "version": "1.0.0",
+  "agents": {
+    "reasoning-worker": {
+      "authority_roles": ["ecosystem_architect", "software_developer", "mission_controller"],
+      "team_roles": [
+        "planner",
+        "implementer",
+        "reviewer",
+        "tester",
+        "experience_designer",
+        "product_strategist",
+        "attacker",
+        "defender",
+        "devils_advocate",
+        "counterparty_persona",
+        "scribe"
+      ],
+      "capabilities": [
+        "reasoning",
+        "analysis",
+        "planning",
+        "strategy",
+        "architecture",
+        "code",
+        "implementation",
+        "refactoring",
+        "review",
+        "testing",
+        "design",
+        "ux",
+        "security",
+        "critique",
+        "role_play",
+        "persona_modeling",
+        "documentation",
+        "summarization"
+      ],
+      "provider_strategy": "adaptive"
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "version": "1.0.0",
+  "agents": {
+    "surface-gateway": {
+      "authority_roles": ["surface_runtime", "sovereign_concierge", "slack_bridge"],
+      "team_roles": ["surface_liaison"],
+      "capabilities": [
+        "surface",
+        "conversation",
+        "delegation",
+        "onboarding",
+        "identity",
+        "guidance",
+        "presence",
+        "realtime"
+      ],
+      "provider_strategy": "adaptive"
+    }
+  }
+}

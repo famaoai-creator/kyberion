@@ -28,6 +28,7 @@ import {
 import { getWorkItem, type WorkItem } from './work-coordination.js';
 import { loadTaskSession, validateTaskSession, type TaskSession } from './task-session.js';
 import { slugify } from './text-utils.js';
+import type { ContextSecurityScope } from './context-security-scope.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
@@ -289,6 +290,7 @@ export interface MissionContextPack {
   generated_at: string;
   summary: string;
   scope: MissionContextPackScope;
+  security_scope: ContextSecurityScope;
   recipient: MissionContextPackRecipient;
   mission: MissionContextPackMissionSummary;
   project?: MissionContextPackProjectSummary;
@@ -1167,6 +1169,21 @@ export function buildMissionContextPack(input: BuildMissionContextPackInput): Mi
     ...(taskSessionId ? { task_session_id: taskSessionId } : {}),
     ...(workItemId ? { work_item_id: workItemId } : {}),
   };
+  const securityScope: ContextSecurityScope = {
+    tenant_id: input.missionState.tenant_slug || input.missionState.tenant_id || 'default',
+    ...(projectId ? { project_id: projectId } : {}),
+    mission_id: input.missionState.mission_id,
+    ...(recipient.agent_id ? { participant_id: recipient.agent_id } : {}),
+    read_tiers:
+      missionTier === 'public'
+        ? ['public']
+        : missionTier === 'confidential'
+          ? ['public', 'confidential']
+          : ['public', 'personal'],
+    write_tier: missionTier,
+    purpose: input.teamRole || input.recipientKind || 'mission-execution',
+    external_egress: missionTier === 'public' ? 'allow' : 'deny',
+  };
 
   const mission: MissionContextPackMissionSummary = {
     mission_id: input.missionState.mission_id,
@@ -1348,6 +1365,7 @@ export function buildMissionContextPack(input: BuildMissionContextPackInput): Mi
     generated_at: new Date().toISOString(),
     summary,
     scope,
+    security_scope: securityScope,
     recipient,
     mission,
     ...(project ? { project } : {}),

@@ -5,6 +5,8 @@ import {
 } from './agent-provider-resolution.js';
 import { resolveSelectionHints } from './agent-manifest.js';
 import { resolveTeamRoleSelectionHints } from './team-role-selection.js';
+import { resolveModelProvider } from './reasoning-model-routing.js';
+import type { ContextSecurityScope } from './context-security-scope.js';
 
 export interface AuthorityRoleRecord {
   description: string;
@@ -69,6 +71,11 @@ export interface MissionTeamAssignment {
     model_id: string;
     route_reason: string;
   };
+  organization_role_id?: string;
+  perspective_ids?: string[];
+  reasoning_route_id?: string;
+  security_scope?: ContextSecurityScope;
+  selection_reason_codes?: string[];
 }
 
 interface SelectionCandidate {
@@ -91,7 +98,8 @@ export function selectAgentForTeamRole(
   teamRole: string,
   teamRoleRecord: TeamRoleRecord,
   authorityRoles: Record<string, AuthorityRoleRecord>,
-  agents: Record<string, AgentProfileRecord>
+  agents: Record<string, AgentProfileRecord>,
+  routingHint?: { model_id: string }
 ): MissionTeamAssignment {
   const requiredCapabilities = new Set(
     (teamRoleRecord.required_capabilities || [])
@@ -108,10 +116,12 @@ export function selectAgentForTeamRole(
       const profileCapabilities = new Set(
         (profile.capabilities || []).map((entry) => entry.trim().toLowerCase()).filter(Boolean)
       );
+      const routedModelId = routingHint?.model_id;
+      const routedProvider = routedModelId ? resolveModelProvider(routedModelId) : undefined;
       const { provider: selectionProvider, modelId: selectionModel } = resolveSelectionHints(
         profile.selection_hints,
-        undefined,
-        selectionHints.preferred_models[0],
+        routedProvider as any,
+        selectionHints.preferred_models[0] || routedModelId,
         agentId
       );
       const resolvedTarget = resolveAgentProviderTarget({

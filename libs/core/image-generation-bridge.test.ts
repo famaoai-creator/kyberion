@@ -2,9 +2,12 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import {
   AdaptivePolicyRouter,
   ComfyUiImageGenerationProvider,
+  CodexHostBridgeImageGenerationProvider,
+  AgyHostBridgeImageGenerationProvider,
   GeminiServiceImageGenerationProvider,
   LocalFluxImageGenerationProvider,
   LlmApiImageGenerationProvider,
+  HostAgentImageGenerationProvider,
 } from './image-generation-bridge.js';
 import { resolveLocalFluxGenerationPolicy } from './image-generation-policy.js';
 import { ImageGenerationProvider } from './image-generation-types.js';
@@ -56,6 +59,9 @@ describe('AdaptivePolicyRouter', () => {
   let mockLocalDiffusion: ImageGenerationProvider;
   let mockLocalFlux: ImageGenerationProvider;
   let mockLlmApi: ImageGenerationProvider;
+  let mockCodexHostBridge: ImageGenerationProvider;
+  let mockAgyHostBridge: ImageGenerationProvider;
+  let mockHostAgent: ImageGenerationProvider;
 
   beforeEach(() => {
     mockComfyUI = {
@@ -76,6 +82,21 @@ describe('AdaptivePolicyRouter', () => {
     mockLlmApi = {
       id: 'llm_api',
       isAvailable: vi.fn().mockResolvedValue(true),
+      generate: vi.fn(),
+    };
+    mockCodexHostBridge = {
+      id: 'codex_host_bridge',
+      isAvailable: vi.fn().mockResolvedValue(false),
+      generate: vi.fn(),
+    };
+    mockAgyHostBridge = {
+      id: 'agy_host_bridge',
+      isAvailable: vi.fn().mockResolvedValue(false),
+      generate: vi.fn(),
+    };
+    mockHostAgent = {
+      id: 'host_agent',
+      isAvailable: vi.fn().mockResolvedValue(false),
       generate: vi.fn(),
     };
   });
@@ -119,6 +140,26 @@ describe('AdaptivePolicyRouter', () => {
       mode: 'privacy_first',
     });
     expect(provider.id).toBe('local_flux');
+  });
+
+  it('prefers the codex host bridge when it is available', async () => {
+    (mockCodexHostBridge.isAvailable as any).mockResolvedValue(true);
+    const router = new AdaptivePolicyRouter([
+      mockComfyUI,
+      mockLocalDiffusion,
+      mockLocalFlux,
+      mockLlmApi,
+      mockCodexHostBridge,
+      mockAgyHostBridge,
+      mockHostAgent,
+    ]);
+
+    const provider = await router.selectProvider({
+      prompt: 'a cat',
+      mode: 'artistic',
+    });
+
+    expect(provider.id).toBe('codex_host_bridge');
   });
 });
 
@@ -407,5 +448,105 @@ describe('resolveLocalFluxGenerationPolicy', () => {
       quantize: 4,
       timeoutMs: 120000,
     });
+  });
+});
+
+describe('HostAgentImageGenerationProvider', () => {
+  const originalEnv = { ...process.env };
+
+  beforeEach(() => {
+    process.env = { ...originalEnv };
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
+  it('reports unavailable by default when KYBERION_HOST_AGENT_ACTIVE is not set', async () => {
+    const provider = new HostAgentImageGenerationProvider();
+    await expect(provider.isAvailable()).resolves.toBe(false);
+  });
+
+  it('reports available when KYBERION_HOST_AGENT_ACTIVE is true', async () => {
+    process.env.KYBERION_HOST_AGENT_ACTIVE = 'true';
+    const provider = new HostAgentImageGenerationProvider();
+    await expect(provider.isAvailable()).resolves.toBe(true);
+  });
+
+  it('skips generation if file already exists at targetPath', async () => {
+    process.env.KYBERION_HOST_AGENT_ACTIVE = 'true';
+    mocks.safeExistsSync.mockReturnValue(true);
+
+    const provider = new HostAgentImageGenerationProvider();
+    const result = await provider.generate({
+      prompt: 'test prompt',
+      targetPath: 'already-exists.png',
+    });
+
+    expect(result.status).toBe('succeeded');
+    expect(result.provider).toBe('host_agent');
+    expect(result.path).toBe('already-exists.png');
+  });
+
+  it('writes request metadata and throws exception if file does not exist', async () => {
+    process.env.KYBERION_HOST_AGENT_ACTIVE = 'true';
+    mocks.safeExistsSync.mockReturnValue(false);
+
+    const provider = new HostAgentImageGenerationProvider();
+    await expect(
+      provider.generate({
+        prompt: 'test prompt',
+        targetPath: 'needs-gen.png',
+      })
+    ).rejects.toThrow('HOST_AGENT_IMAGE_GENERATION_REQUIRED');
+  });
+});
+
+describe('CodexHostBridgeImageGenerationProvider', () => {
+  const originalEnv = { ...process.env };
+
+  beforeEach(() => {
+    process.env = { ...originalEnv };
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
+  it('reports available in a codex CLI environment', async () => {
+    process.env.CODEX_CLI = '1';
+    const provider = new CodexHostBridgeImageGenerationProvider();
+    await expect(provider.isAvailable()).resolves.toBe(true);
+  });
+
+  it('throws a host bridge required error when no request output exists', async () => {
+    process.env.CODEX_VERSION = '1.0.0';
+    mocks.safeExistsSync.mockReturnValue(false);
+
+    const provider = new CodexHostBridgeImageGenerationProvider();
+    await expect(
+      provider.generate({
+        prompt: 'test prompt',
+        targetPath: 'needs-codex-gen.png',
+      })
+    ).rejects.toThrow('HOST_BRIDGE_IMAGE_GENERATION_REQUIRED');
+  });
+});
+
+describe('AgyHostBridgeImageGenerationProvider', () => {
+  const originalEnv = { ...process.env };
+
+  beforeEach(() => {
+    process.env = { ...originalEnv };
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
+  it('reports available in an agy CLI environment', async () => {
+    process.env.AGY_CLI = '1';
+    const provider = new AgyHostBridgeImageGenerationProvider();
+    await expect(provider.isAvailable()).resolves.toBe(true);
   });
 });

@@ -591,6 +591,16 @@ describe('mission-context-pack', () => {
         'knowledge_hint',
       ])
     );
+    expect(pack.security_scope).toEqual({
+      tenant_id: 'acme',
+      project_id: 'PRJ-CONTEXT-PACK-001',
+      mission_id: missionId,
+      participant_id: 'implementation-architect',
+      read_tiers: ['public'],
+      write_tier: 'public',
+      purpose: 'implementer',
+      external_egress: 'allow',
+    });
 
     const rendered = renderMissionContextPack(pack);
     expect(rendered).toContain('Mission context pack (scoped, minimal, role-specific).');

@@ -1,0 +1,27 @@
+{
+  "version": "1.0.0",
+  "agents": {
+    "control-plane-agent": {
+      "authority_roles": ["mission_controller", "ecosystem_architect", "knowledge_steward"],
+      "team_roles": [
+        "owner",
+        "planner",
+        "product_strategist",
+        "tracker",
+        "facilitator",
+        "relationship_curator"
+      ],
+      "capabilities": [
+        "reasoning",
+        "coordination",
+        "routing",
+        "analysis",
+        "planning",
+        "strategy",
+        "facilitation",
+        "listening"
+      ],
+      "provider_strategy": "adaptive"
+    }
+  }
+}

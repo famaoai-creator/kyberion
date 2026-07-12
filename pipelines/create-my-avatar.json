@@ -1,0 +1,27 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "create-my-avatar",
+  "version": "2.0.0",
+  "name": "Create My Avatar and Register Profile",
+  "description": "Parameterised avatar onboarding flow that captures a reference photo, generates the avatar through the active host bridge or fallback provider, and registers it to the personal profile.",
+  "labels": ["profile", "avatar", "personal"],
+  "steps": [
+    {
+      "role": "gate",
+      "op": "core:include",
+      "params": {
+        "fragment": "fragments/avatar-onboarding.json",
+        "context": {
+          "capture_output_path": "active/shared/tmp/avatar-onboarding/user_face.jpg",
+          "avatar_output_path": "active/shared/tmp/avatar-onboarding/avatar.png",
+          "identity_path": "knowledge/personal/my-identity.json",
+          "profile_name": "user",
+          "profile_language": "Japanese",
+          "interaction_style": "Concierge",
+          "bridge_preference": "host",
+          "avatar_prompt": "A highly detailed 3D Pixar style avatar, portrait, clean background, based on user face photo"
+        }
+      }
+    }
+  ]
+}

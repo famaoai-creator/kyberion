@@ -111,6 +111,10 @@ export * from './working-principles.js';
 export * from './design-qa.js';
 export * from './apple-intelligence-bridge.js';
 export * from './mission-hygiene.js';
+export * from './context-security-scope.js';
+export * from './reasoning-participant.js';
+export * from './participant-context-resolver.js';
+export * from './context-promotion-ledger.js';
 
 // Utils
 export * from './fs-utils.js';
@@ -184,6 +188,7 @@ export { renderStatus, renderVocabularyText, resolveVocabularyLocale } from './u
 export type { UxStatusDomain, UxVocabularyLocale } from './ux-vocabulary.js';
 export * from './operator-home-summary.js';
 export { resolveActiveProfileRoot } from './profile-root.js';
+export * from './browser-onboarding.js';
 export { resolveOperatorDisplayName, resolveOperatorLocale } from './operator-identity.js';
 export * from './company.js';
 export * from './financial-model.js';

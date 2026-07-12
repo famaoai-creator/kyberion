@@ -39,6 +39,11 @@ import {
   toSupervisorEnsurePayload,
 } from './agent-runtime-supervisor-client.js';
 import { type TaskModelHint } from './reasoning-model-routing.js';
+import {
+  validateContextSecurityScope,
+  validateReasoningEgress,
+  type ContextSecurityScope,
+} from './context-security-scope.js';
 
 /**
  * A2A-to-ACP Bridge v1.1 [SECURITY HARDENED]
@@ -172,6 +177,17 @@ class A2ABridgeImpl {
 
     // Parse receiver
     const { agentId, provider } = this.parseReceiver(receiver);
+    const securityScope = this.extractSecurityScope(envelope.payload);
+    if (securityScope) {
+      const scopeErrors = validateContextSecurityScope(securityScope);
+      if (scopeErrors.length > 0) {
+        throw new Error(`[A2A_SCOPE_INVALID] ${scopeErrors.join('; ')}`);
+      }
+      if (provider) {
+        const egress = validateReasoningEgress(securityScope, provider);
+        if (!egress.allowed) throw new Error(egress.reason);
+      }
+    }
     const correlationId = this.resolveCorrelationId(envelope);
     const taskModelHint = this.extractTaskModelHint(envelope.payload);
     const taskContractValidation = this.validateTaskContractPayload(envelope.payload);
@@ -199,13 +215,16 @@ class A2ABridgeImpl {
     let rehydrated = false;
 
     const conversationId = envelope.header.conversation_id;
+    const storageConversationId = conversationId
+      ? this.scopeConversationId(conversationId, securityScope)
+      : undefined;
     const missionId =
       typeof envelope.payload?.context?.mission_id === 'string'
         ? String(envelope.payload.context.mission_id).toUpperCase()
         : undefined;
 
-    if (conversationId) {
-      const history = readConversationHistory(conversationId);
+    if (storageConversationId) {
+      const history = readConversationHistory(storageConversationId);
       if (history && history.length > 0) {
         const lastTurn = history[history.length - 1];
         const currentSessionId =
@@ -215,7 +234,7 @@ class A2ABridgeImpl {
           currentSessionId &&
           lastTurn.provider_session_id !== currentSessionId
         ) {
-          const rehydrationPrefix = rehydrateConversation(conversationId);
+          const rehydrationPrefix = rehydrateConversation(storageConversationId);
           if (rehydrationPrefix) {
             runtimePrompt = rehydrationPrefix + rawPrompt;
             rehydrated = true;
@@ -226,7 +245,7 @@ class A2ABridgeImpl {
         }
       }
 
-      await appendConversationTurn(conversationId, {
+      await appendConversationTurn(storageConversationId, {
         sender: envelope.header.sender,
         receiver: agentId,
         performative: envelope.header.performative,
@@ -306,7 +325,9 @@ class A2ABridgeImpl {
             `[A2A_BRIDGE] Crash detected during ask. Re-ensuring agent and retrying with rehydrated prompt...`
           );
           await this.ensureAgent(agentId, provider, envelope.payload, runtimeContextKey);
-          const rehydrationPrefix = conversationId ? rehydrateConversation(conversationId) : '';
+          const rehydrationPrefix = storageConversationId
+            ? rehydrateConversation(storageConversationId)
+            : '';
           const retriedPrompt = rehydrationPrefix ? rehydrationPrefix + rawPrompt : runtimePrompt;
           rehydrated = true;
 
@@ -358,7 +379,9 @@ class A2ABridgeImpl {
             `[A2A_BRIDGE] Crash detected during in-process ask. Re-ensuring agent and retrying with rehydrated prompt...`
           );
           await this.ensureAgent(agentId, provider, envelope.payload, runtimeContextKey);
-          const rehydrationPrefix = conversationId ? rehydrateConversation(conversationId) : '';
+          const rehydrationPrefix = storageConversationId
+            ? rehydrateConversation(storageConversationId)
+            : '';
           const retriedPrompt = rehydrationPrefix ? rehydrationPrefix + rawPrompt : runtimePrompt;
           rehydrated = true;
 
@@ -404,12 +427,12 @@ class A2ABridgeImpl {
     response.header.signature = signA2AMessage(response);
     response.header.sig_alg = 'hmac-sha256';
 
-    if (conversationId) {
+    if (storageConversationId) {
       const providerSessionId =
         typeof handle?.getRecord === 'function'
           ? handle.getRecord()?.sessionId || undefined
           : undefined;
-      await appendConversationTurn(conversationId, {
+      await appendConversationTurn(storageConversationId, {
         sender: agentId,
         receiver: envelope.header.sender,
         performative: 'result',
@@ -608,6 +631,38 @@ class A2ABridgeImpl {
     if (!context || typeof context !== 'object') return undefined;
     const executionMode = (context as Record<string, unknown>).execution_mode;
     return typeof executionMode === 'string' ? executionMode : undefined;
+  }
+
+  private extractSecurityScope(payload: unknown): ContextSecurityScope | undefined {
+    if (!payload || typeof payload !== 'object') return undefined;
+    const context = (payload as Record<string, unknown>).context;
+    if (!context || typeof context !== 'object') return undefined;
+    const scope = (context as Record<string, unknown>).security_scope;
+    return scope && typeof scope === 'object' ? (scope as ContextSecurityScope) : undefined;
+  }
+
+  private scopeConversationId(
+    conversationId: string,
+    securityScope?: ContextSecurityScope
+  ): string {
+    if (!securityScope) return conversationId;
+    const fingerprint = crypto
+      .createHash('sha256')
+      .update(
+        JSON.stringify({
+          tenant_id: securityScope.tenant_id,
+          organization_id: securityScope.organization_id || null,
+          project_id: securityScope.project_id || null,
+          mission_id: securityScope.mission_id,
+          participant_id: securityScope.participant_id || null,
+          read_tiers: [...securityScope.read_tiers].sort(),
+          write_tier: securityScope.write_tier,
+          purpose: securityScope.purpose,
+        })
+      )
+      .digest('hex')
+      .slice(0, 16);
+    return `${conversationId.slice(0, 110)}.${fingerprint}`;
   }
 
   private extractTaskModelHint(payload: unknown): TaskModelHint | undefined {
