@@ -64,3 +64,10 @@
 - **A**: `media:apply_theme` が `theme: 'auto'` を受理 — 統制カタログから story 適合テーマを LLM 選択(失敗はカタログ既定へ)。`marketing-content.json` の既定を auto 化(他 creative pipeline は apply_theme 不使用を確認)。
 - **B(最小実装)**: `draftDeckSectionBodies` — 宣言のみだった llm_zone `draft_body_content` を実体化。**本文が空のセクションだけ**を起草し(既存本文とオペレータ入力は不可侵)、失敗時は outline 不変。`document_outline_from_brief` へ配線。
 - **C**: storyboard 無しの narrated 合成に警告(テンプレ流し込みへの縮退を可視化し、上流に storyboard 起草を促す)。
+
+### 追記(2026-07-13 — レイアウトパターン拡充)
+
+- **quote-card テンプレート実装**: 選択メニューに載っていたのにレンダラ未実装(default 落ち)だった quote-card を registry + compiler に実装(大型引用 + 帰属、縦型最適)。全 role 対応。
+- **per_scene レイアウト割当の実配線**: visual direction の per_scene は従来 compiler 未消費(選択が化粧だった)。ADF が template を明示しないシーンに限り適用し、対象テンプレの role / format / required_content_fields を満たす場合のみ上書き(**レイアウト選択は決して有効なコンパイルを壊さない**)。
+- **pattern pack 5 → 10**: sakura-lifestyle / ocean-depth / mono-editorial / citrus-energy / neon-cyber を追加(ライト背景系3種を含む — 従来はダーク系のみだった)。
+- **選択メニューを実 registry と同期**(basic-title-card / howto-guide / split-highlight / promo-spot / quote-card)。
