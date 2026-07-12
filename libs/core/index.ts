@@ -287,13 +287,18 @@ export type {
 export {
   clearMeshHubPeerMessagingAdapterNamespace,
   createMeshHubPeerMessagingAdapter,
+  decideMeshHubRecipientProposal,
+  listMeshHubRecipientProposals,
   MeshHubPeerMessagingAdapter,
 } from './mesh-hub-peer-messaging-adapter.js';
 export type {
   MeshHubDispatchInput,
   MeshHubPeerMessagingAdapterOptions,
+  MeshHubRecipientProposalDecision,
   MeshHubRecipientProposalRecord,
+  MeshHubRecipientProposalView,
 } from './mesh-hub-peer-messaging-adapter.js';
+export type { MeshRequest } from './mesh-hub-contract.js';
 export { routeMeshRequest } from './mesh-router.js';
 export type {
   MeshRouteCandidate,

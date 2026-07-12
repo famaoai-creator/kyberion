@@ -15,10 +15,17 @@ import {
   buildWorkCoordinationPeerCommandEnvelope,
   type WorkCoordinationPeerCommandEnvelope,
 } from './work-coordination-peer.js';
-import { safeExistsSync, safeRmSync } from './secure-io.js';
+import { safeExistsSync, safeReadFile, safeRmSync } from './secure-io.js';
+import { withLock } from './src/lock-utils.js';
 import type { A2AMessage } from './a2a-bridge.js';
 import { signA2AMessage } from './a2a-bridge.js';
-import type { MeshRequest, MeshRequestKind, MeshTargetSelector } from './mesh-hub-contract.js';
+import {
+  isMeshPayloadClassification,
+  isMeshRequestKind,
+  type MeshRequest,
+  type MeshRequestKind,
+  type MeshTargetSelector,
+} from './mesh-hub-contract.js';
 
 const DEFAULT_RUNTIME_ROOT = 'active/shared/runtime/mesh-hub';
 const DEFAULT_OBSERVABILITY_ROOT = 'active/shared/observability/mesh-hub';
@@ -45,6 +52,22 @@ export interface MeshHubRecipientProposalRecord {
   };
   mission_controller_mutation: 'deny';
   created_at: string;
+}
+
+export interface MeshHubRecipientProposalDecision {
+  kind: 'mesh-hub-recipient-proposal-decision';
+  decision_id: string;
+  proposal_id: string;
+  peer_id: string;
+  decision: 'accepted' | 'rejected';
+  actor_id: string;
+  reason: string;
+  decided_at: string;
+}
+
+export interface MeshHubRecipientProposalView extends MeshHubRecipientProposalRecord {
+  status: 'pending' | 'accepted' | 'rejected';
+  decision?: MeshHubRecipientProposalDecision;
 }
 
 export interface MeshHubDispatchInput {
@@ -81,6 +104,10 @@ function proposalsPath(namespace: string | undefined, peerId: string): string {
   return `${meshHubRuntimeRoot(namespace)}/adapters/${peerId}/proposals.jsonl`;
 }
 
+function proposalDecisionsPath(namespace: string | undefined, peerId: string): string {
+  return `${meshHubRuntimeRoot(namespace)}/adapters/${peerId}/proposal-decisions.jsonl`;
+}
+
 function eventsPath(namespace: string | undefined, peerId: string): string {
   return `${meshHubObservabilityRoot(namespace)}/adapters/${peerId}/events.jsonl`;
 }
@@ -91,6 +118,16 @@ function randomId(prefix: string): string {
 
 function appendRecord(role: GovernedArtifactRole, logicalPath: string, record: unknown): string {
   return appendGovernedArtifactJsonl(role, logicalPath, record);
+}
+
+function readJsonl<T>(logicalPath: string): T[] {
+  if (!safeExistsSync(logicalPath)) return [];
+  const raw = String(safeReadFile(logicalPath, { encoding: 'utf8' }) || '');
+  return raw
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => JSON.parse(line) as T);
 }
 
 function recordEvent(
@@ -220,8 +257,72 @@ function validateRequestEnvelope(
   return request;
 }
 
+function validateLocalRequest(request: MeshRequest, peerId: string): MeshRequest {
+  if (!request || request.kind !== 'mesh-request') {
+    throw new Error('mesh_hub_invalid_local_request');
+  }
+  if (request.target.selector.kind === 'peer' && request.target.selector.peer_id !== peerId) {
+    throw new Error(`mesh_hub_recipient_mismatch:${request.request_id}`);
+  }
+  if (!isMeshRequestKind(String(request.request_kind || ''))) {
+    throw new Error(`mesh_hub_request_kind_denied:${request.request_id}`);
+  }
+  if (!isMeshPayloadClassification(String(request.payload?.classification || ''))) {
+    throw new Error(`mesh_hub_payload_classification_denied:${request.request_id}`);
+  }
+  const createdAt = new Date(request.created_at).getTime();
+  if (!Number.isFinite(createdAt) || !Number.isFinite(request.ttl_ms) || request.ttl_ms <= 0) {
+    throw new Error(`mesh_hub_invalid_ttl:${request.request_id}`);
+  }
+  if (createdAt + request.ttl_ms <= Date.now()) {
+    throw new Error(`mesh_hub_request_expired:${request.request_id}`);
+  }
+  return request;
+}
+
 export class MeshHubPeerMessagingAdapter {
   constructor(private readonly options: MeshHubPeerMessagingAdapterOptions) {}
+
+  public proposeLocalRequest(
+    request: MeshRequest,
+    messageId: string
+  ): MeshHubRecipientProposalRecord {
+    const validated = validateLocalRequest(request, this.options.peerId);
+    const existing = listMeshHubRecipientProposals(this.options.peerId, {
+      namespace: this.options.namespace,
+    }).find((proposal) => proposal.request_id === validated.request_id);
+    if (existing) {
+      recordEvent(this.options.namespace, this.options.peerId, {
+        type: 'mesh_hub_request_proposal_deduplicated',
+        request_id: validated.request_id,
+        message_id: messageId,
+        proposal_id: existing.proposal_id,
+      });
+      const { status: _status, decision: _decision, ...proposal } = existing;
+      return proposal;
+    }
+    const proposal = buildProposalRecord(
+      this.options.peerId,
+      messageId,
+      validated,
+      this.options.sharedSecret
+    );
+    appendRecord(
+      DEFAULT_WRITER_ROLE,
+      proposalsPath(this.options.namespace, this.options.peerId),
+      proposal
+    );
+    recordEvent(this.options.namespace, this.options.peerId, {
+      type: 'mesh_hub_request_proposed',
+      request_id: validated.request_id,
+      message_id: messageId,
+      request_kind: validated.request_kind,
+      proposal_kind: proposal.proposal_kind,
+      source: 'signed_peer_conversation',
+      mission_controller_mutation: 'deny',
+    });
+    return proposal;
+  }
 
   public createResponder(): PeerMessageResponder {
     return async ({ peerId, envelope }) => {
@@ -273,6 +374,79 @@ export class MeshHubPeerMessagingAdapter {
       timeoutMs: input.timeoutMs,
     });
   }
+}
+
+export function listMeshHubRecipientProposals(
+  peerId: string,
+  options: { namespace?: string; status?: MeshHubRecipientProposalView['status'] } = {}
+): MeshHubRecipientProposalView[] {
+  const proposals = readJsonl<MeshHubRecipientProposalRecord>(
+    proposalsPath(options.namespace, peerId)
+  );
+  const decisions = readJsonl<MeshHubRecipientProposalDecision>(
+    proposalDecisionsPath(options.namespace, peerId)
+  );
+  const latestDecision = new Map<string, MeshHubRecipientProposalDecision>();
+  for (const decision of decisions) latestDecision.set(decision.proposal_id, decision);
+
+  return proposals
+    .map((proposal) => {
+      const decision = latestDecision.get(proposal.proposal_id);
+      return {
+        ...proposal,
+        status: decision?.decision || 'pending',
+        ...(decision ? { decision } : {}),
+      } satisfies MeshHubRecipientProposalView;
+    })
+    .filter((proposal) => !options.status || proposal.status === options.status)
+    .sort((left, right) => left.created_at.localeCompare(right.created_at));
+}
+
+export async function decideMeshHubRecipientProposal(input: {
+  peerId: string;
+  proposalId: string;
+  decision: 'accepted' | 'rejected';
+  actorId: string;
+  reason: string;
+  namespace?: string;
+}): Promise<MeshHubRecipientProposalDecision> {
+  const actorId = String(input.actorId || '').trim();
+  const reason = String(input.reason || '').trim();
+  if (!actorId || !reason) throw new Error('proposal_decision_requires_actor_and_reason');
+  const lockId = `mesh-proposal-decision-${normalizeNamespace(input.namespace)}-${input.peerId}`;
+  return withLock(lockId, async () => {
+    const proposal = listMeshHubRecipientProposals(input.peerId, {
+      namespace: input.namespace,
+    }).find((entry) => entry.proposal_id === input.proposalId);
+    if (!proposal) throw new Error(`proposal_not_found:${input.proposalId}`);
+    if (proposal.status !== 'pending') {
+      throw new Error(`proposal_already_decided:${input.proposalId}:${proposal.status}`);
+    }
+
+    const decision: MeshHubRecipientProposalDecision = {
+      kind: 'mesh-hub-recipient-proposal-decision',
+      decision_id: randomId('mhd'),
+      proposal_id: proposal.proposal_id,
+      peer_id: input.peerId,
+      decision: input.decision,
+      actor_id: actorId,
+      reason,
+      decided_at: nowIso(),
+    };
+    appendRecord(
+      DEFAULT_WRITER_ROLE,
+      proposalDecisionsPath(input.namespace, input.peerId),
+      decision
+    );
+    recordEvent(input.namespace, input.peerId, {
+      type: `mesh_hub_proposal_${input.decision}`,
+      proposal_id: proposal.proposal_id,
+      request_id: proposal.request_id,
+      actor_id: actorId,
+      mission_controller_mutation: 'deny',
+    });
+    return decision;
+  });
 }
 
 export function createMeshHubPeerMessagingAdapter(
