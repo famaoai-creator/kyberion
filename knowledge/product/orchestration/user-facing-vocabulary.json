@@ -946,6 +946,18 @@
       "cli_error_branch_not_found": {
         "en": "❌ Error: Branch \"{branch}\" not found in Wisdom Vault.",
         "ja": "❌ エラー: ブランチ \"{branch}\" が Wisdom Vault に見つかりません。"
+      },
+      "chronos_chat_open": {
+        "en": "Open Sovereign chat",
+        "ja": "Sovereign チャットを開く"
+      },
+      "chronos_chat_input": {
+        "en": "Chat input",
+        "ja": "チャット入力"
+      },
+      "chronos_chat_send": {
+        "en": "Send",
+        "ja": "送信"
       }
     }
   }

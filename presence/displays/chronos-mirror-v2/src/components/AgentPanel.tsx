@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Plus, Trash2, RefreshCw, Cpu, X, FileText, Terminal, RotateCcw } from 'lucide-react';
-import { resolveChronosLocale, uxText } from '../lib/ux-vocabulary';
+import { resolveChronosLocale, uxText, uxTextOr } from '../lib/ux-vocabulary';
 
 interface AgentRecord {
   agentId: string;
@@ -102,7 +102,7 @@ function describeProviderResolution(agent: AgentRecord): string | null {
 
 export function AgentPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const locale = resolveChronosLocale();
-  const at = (key: string, fallbackEn: string) => uxText(key, fallbackEn, locale);
+  const at = (key: string, fallbackEn: string) => uxTextOr(key, fallbackEn, locale);
   const [agents, setAgents] = useState<AgentRecord[]>([]);
   const [health, setHealth] = useState<HealthSnapshot>({ total: 0, ready: 0, busy: 0, error: 0 });
   const [accessRole, setAccessRole] = useState<ChronosAccessRole>('readonly');
