@@ -139,9 +139,8 @@ describe('mission-gate-engine', () => {
   });
 
   it('llm_review verdicts follow the backend and fail closed on stub', async () => {
-    const { registerReasoningBackend, resetReasoningBackend } = await import(
-      './reasoning-backend.js'
-    );
+    const { registerReasoningBackend, resetReasoningBackend } =
+      await import('./reasoning-backend.js');
     safeMkdir(`${missionPath}/evidence`, { recursive: true });
     safeWriteFile(`${missionPath}/evidence/report.md`, '# 提案\n結論と根拠が揃った文書。');
     const gateDef = {
@@ -212,5 +211,151 @@ describe('mission-gate-engine', () => {
       confirmed_by: 'operator',
       source_gate_id: 'manual-review',
     });
+  });
+
+  it('evaluates software quality lifecycle and traceability checks', async () => {
+    const contract = {
+      version: '1.0.0',
+      project_id: 'project-1',
+      accountable_human_id: 'human:owner',
+      must_have_requirement_ids: ['REQ-1'],
+      dor: [
+        {
+          check_id: 'DOR-1',
+          description: 'Scope is ready',
+          status: 'passed',
+          evidence_refs: ['evidence/scope.md'],
+        },
+      ],
+      acceptance_criteria: [
+        {
+          criterion_id: 'AC-1',
+          description: 'Unauthorized requests return 403',
+          requirement_refs: ['REQ-1'],
+          expected_result: '403 is returned without a write.',
+          status: 'passed',
+          evidence_refs: ['evidence/ac-1.json'],
+        },
+      ],
+      dod: [
+        {
+          check_id: 'DOD-1',
+          description: 'Regression passed',
+          status: 'passed',
+          evidence_refs: ['evidence/regression.json'],
+        },
+      ],
+    };
+    const inventory = {
+      version: '1.0.0',
+      project_id: 'project-1',
+      items: [
+        {
+          item_id: 'TEST-1',
+          title: 'Authorization rejection',
+          viewpoint_ids: ['security.authorization'],
+          requirement_refs: ['REQ-1'],
+          acceptance_criteria_refs: ['AC-1'],
+          risk_refs: ['RISK-1'],
+          risk_level: 'high',
+          expected_result: '403 is returned.',
+          execution_mode: 'safe_auto',
+        },
+      ],
+    };
+
+    const gate = await evaluateMissionGate({
+      missionId,
+      gate: {
+        id: 'software-quality-gate',
+        checks: [
+          { kind: 'quality_contract_valid', params: { contract } },
+          { kind: 'dor_satisfied', params: { contract } },
+          { kind: 'acceptance_criteria_verified', params: { contract } },
+          { kind: 'dod_satisfied', params: { contract } },
+          {
+            kind: 'test_traceability',
+            params: { contract, inventory, required_risk_refs: ['RISK-1'] },
+          },
+        ],
+      },
+      evidenceDir: `${missionPath}/gates`,
+    });
+
+    expect(gate.verdict).toBe('pass');
+    expect(gate.checks).toHaveLength(5);
+  });
+
+  it('fails the QA gate when acceptance criteria lack evidence or coverage', async () => {
+    const contract = {
+      version: '1.0.0',
+      project_id: 'project-1',
+      accountable_human_id: 'human:owner',
+      dor: [],
+      acceptance_criteria: [
+        {
+          criterion_id: 'AC-1',
+          description: 'A request returns status 200',
+          requirement_refs: ['REQ-1'],
+          expected_result: 'The response status is 200.',
+          status: 'passed',
+          evidence_refs: [],
+        },
+      ],
+      dod: [],
+    };
+    const gate = await evaluateMissionGate({
+      missionId,
+      gate: {
+        id: 'failing-software-quality-gate',
+        checks: [
+          { kind: 'acceptance_criteria_verified', params: { contract } },
+          {
+            kind: 'test_traceability',
+            params: {
+              contract,
+              inventory: { version: '1.0.0', project_id: 'project-1', items: [] },
+            },
+          },
+        ],
+      },
+    });
+
+    expect(gate.verdict).toBe('fail');
+    expect(gate.reasons.join(' ')).toContain('without evidence');
+    expect(gate.reasons.join(' ')).toContain('not covered');
+  });
+
+  it('enforces a no-go quality report only in enforce mode', async () => {
+    const report = {
+      gate_status: { dor: 'pass', acceptance_criteria: 'fail', dod: 'fail' },
+      coverage: { required: 2, covered: 1 },
+      execution: { planned: 2, failed: 1 },
+      defects: { candidates: 1 },
+      residual_risks: ['A critical test failed.'],
+      recommendation: 'no_go',
+      recommendation_reasons: ['A critical test failed.'],
+      evidence_refs: ['trace:1'],
+      accountable_human_id: 'human:owner',
+      human_decision: 'pending',
+    };
+    const warn = await evaluateMissionGate({
+      missionId,
+      gate: {
+        id: 'quality-warn',
+        checks: [{ kind: 'quality_release_allowed', params: { report, mode: 'warn' } }],
+      },
+    });
+    const enforce = await evaluateMissionGate({
+      missionId,
+      gate: {
+        id: 'quality-enforce',
+        checks: [{ kind: 'quality_release_allowed', params: { report, mode: 'enforce' } }],
+      },
+    });
+    expect(warn.verdict).toBe('pass');
+    expect(warn.checks[0].reason).toContain('Quality warning');
+    expect(enforce.verdict).toBe('fail');
+    expect(enforce.reasons.join(' ')).toContain('blocked release');
   });
 });

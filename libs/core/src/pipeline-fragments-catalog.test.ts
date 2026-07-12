@@ -51,6 +51,10 @@ const FRAGMENTS: Array<{
       'system:write_file',
     ],
   },
+  {
+    file: 'pipelines/fragments/software-qa-lifecycle.json',
+    requiredOps: ['system:exec', 'system:log'],
+  },
 ];
 
 describe('pipeline fragments catalog', () => {

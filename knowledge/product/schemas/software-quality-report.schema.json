@@ -1,0 +1,66 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/software-quality-report.schema.json",
+  "title": "Software Quality Report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "report_id",
+    "project_id",
+    "subject_ref",
+    "generated_at",
+    "gate_status",
+    "coverage",
+    "execution",
+    "defects",
+    "residual_risks",
+    "waiver_refs",
+    "recommendation",
+    "evidence_refs",
+    "accountable_human_id",
+    "human_decision"
+  ],
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "report_id": { "type": "string", "minLength": 1 },
+    "project_id": { "type": "string", "minLength": 1 },
+    "subject_ref": { "type": "string", "minLength": 1 },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "gate_status": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dor", "acceptance_criteria", "dod"],
+      "properties": {
+        "dor": { "$ref": "#/definitions/gateVerdict" },
+        "acceptance_criteria": { "$ref": "#/definitions/gateVerdict" },
+        "dod": { "$ref": "#/definitions/gateVerdict" }
+      }
+    },
+    "coverage": { "$ref": "#/definitions/counts" },
+    "execution": { "$ref": "#/definitions/counts" },
+    "defects": { "$ref": "#/definitions/counts" },
+    "residual_risks": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "waiver_refs": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "recommendation": {
+      "type": "string",
+      "enum": ["go", "conditional_go", "no_go", "insufficient_evidence"]
+    },
+    "recommendation_reasons": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "evidence_refs": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "accountable_human_id": { "type": "string", "minLength": 1 },
+    "human_decision": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+    "human_decided_at": { "type": "string", "format": "date-time" }
+  },
+  "definitions": {
+    "gateVerdict": {
+      "type": "string",
+      "enum": ["pass", "fail", "waived", "insufficient_evidence"]
+    },
+    "counts": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } }
+  }
+}
