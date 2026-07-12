@@ -41,14 +41,14 @@ class RuntimeSupervisorImpl {
       if (this.cleanupStarted) return;
       this.cleanupStarted = true;
 
-      const forceExitTimer = setTimeout(() => process.exit(exitCode), 1500);
+      const forceExitTimer = setTimeout(() => process.exit(exitCode), 1500); // eslint-disable-line no-restricted-properties -- intentional shutdown path
       forceExitTimer.unref?.();
 
       this.cleanupAll(`signal:${exitCode}`)
         .catch(() => {})
         .finally(() => {
           clearTimeout(forceExitTimer);
-          process.exit(exitCode);
+          process.exit(exitCode); // eslint-disable-line no-restricted-properties -- intentional shutdown path
         });
     };
 
@@ -76,7 +76,9 @@ class RuntimeSupervisorImpl {
   }
 
   list(): RuntimeResourceRecord[] {
-    return Array.from(this.resources.values()).sort((left, right) => left.createdAt - right.createdAt);
+    return Array.from(this.resources.values()).sort(
+      (left, right) => left.createdAt - right.createdAt
+    );
   }
 
   snapshot(now = Date.now()): RuntimeResourceSnapshot[] {
@@ -95,7 +97,7 @@ class RuntimeSupervisorImpl {
 
   update(
     resourceId: string,
-    patch: Partial<Omit<RuntimeResourceRecord, 'resourceId' | 'createdAt'>>,
+    patch: Partial<Omit<RuntimeResourceRecord, 'resourceId' | 'createdAt'>>
   ): RuntimeResourceRecord | undefined {
     const record = this.resources.get(resourceId);
     if (!record) return undefined;
@@ -114,7 +116,9 @@ class RuntimeSupervisorImpl {
     try {
       await record.cleanup?.();
     } catch (error: any) {
-      logger.warn(`[RUNTIME_SUPERVISOR] Cleanup failed for ${resourceId} (${reason}): ${error?.message || error}`);
+      logger.warn(
+        `[RUNTIME_SUPERVISOR] Cleanup failed for ${resourceId} (${reason}): ${error?.message || error}`
+      );
     } finally {
       this.resources.delete(resourceId);
     }

@@ -76,106 +76,106 @@
 機械抽出(`catch {}` 完全空のみ): **94 箇所**。コメントのみの catch **202 箇所**は理由が明文化済みのため分類 (a) 相当として台帳対象外。
 ヒューリスティック一次分類: **(a) 正当(クリーンアップ/テスト期待例外) 32** / **(b) 要ログ付与 49** / **(c) ガバナンス経路・要人間確認 13**。
 
-- 分類は文脈キーワードによる一次判定であり、(c) は修正前に必ず人間が確認する(Task 2.2)。
+- 分類は文脈キーワードによる一次判定。(c) 13箇所は 2026-07-12 に全件実地レビュー済み — 実バグは tier-guard の破損ポリシー fail-open 1件のみ(#519 で fail-closed 化)、残りは fail-closed / best-effort を確認。
 - 処置の横展開: **分類 (b) 49箇所は 2026-07-12 に全件 logger.warn 付与済み**(制御フロー不変、握りつぶし内容の可視化のみ)。残るは (a) への理由コメント付与(任意)。
 - (c) の代表例: `libs/core/secret-guard.ts`(5箇所)、`libs/core/tier-guard.ts`(3箇所)、`libs/core/trust-engine.ts`。これらは「ガード失敗を握りつぶして許可側に倒れていないか」の観点で個別レビューする。
 
-| ファイル                                                            | 行   | 分類 | 処置                                          |
-| ------------------------------------------------------------------- | ---- | ---- | --------------------------------------------- |
-| `libs/actuators/android-actuator/src/android-runtime-helpers.ts`    | 1100 | (b)  | logger.warn 付与済み(2026-07-12)              |
-| `libs/actuators/browser-actuator/src/browser-pipeline-helpers.ts`   | 1403 | (b)  | logger.warn 付与済み(2026-07-12)              |
-| `libs/actuators/media-actuator/src/artisan/ppt-engine.ts`           | 70   | (a)  | 理由コメント付与(クリーンアップ系)            |
-| `libs/actuators/modeling-actuator/src/modeling-pipeline-helpers.ts` | 628  | (b)  | logger.warn 付与済み(2026-07-12)              |
-| `libs/actuators/service-actuator/src/service-actuator-helpers.ts`   | 159  | (b)  | logger.warn 付与済み(2026-07-12)              |
-| `libs/actuators/service-actuator/src/service-actuator-helpers.ts`   | 191  | (a)  | 理由コメント付与(クリーンアップ系)            |
-| `libs/actuators/service-actuator/src/service-actuator-helpers.ts`   | 365  | (a)  | 理由コメント付与(クリーンアップ系)            |
-| `libs/actuators/system-actuator/src/system-pipeline-helpers.ts`     | 789  | (b)  | logger.warn 付与済み(2026-07-12)              |
-| `libs/actuators/system-actuator/src/system-pipeline-helpers.ts`     | 829  | (b)  | logger.warn 付与済み(2026-07-12)              |
-| `libs/core/agent-adapter.ts`                                        | 356  | (b)  | logger.warn 付与済み(2026-07-12)              |
-| `libs/core/agent-adapter.ts`                                        | 379  | (b)  | logger.warn 付与済み(2026-07-12)              |
-| `libs/core/agent-adapter.ts`                                        | 490  | (b)  | logger.warn 付与済み(2026-07-12)              |
-| `libs/core/agent-runtime-supervisor-client.ts`                      | 179  | (b)  | logger.warn 付与済み(2026-07-12)              |
-| `libs/core/agent-runtime-supervisor-client.ts`                      | 195  | (a)  | 理由コメント付与(クリーンアップ系)            |
-| `libs/core/agent-runtime-supervisor-client.ts`                      | 225  | (a)  | 理由コメント付与(クリーンアップ系)            |
-| `libs/core/approval-cowork-adapter.test.ts`                         | 138  | (a)  | テスト内の期待例外 — 現状維持可(コメント推奨) |
-| `libs/core/authority.ts`                                            | 282  | (b)  | logger.warn 付与済み(2026-07-12)              |
-| `libs/core/authority.ts`                                            | 319  | (b)  | logger.warn 付与済み(2026-07-12)              |
-| `libs/core/core.ts`                                                 | 182  | (b)  | logger.warn 付与済み(2026-07-12)              |
-| `libs/core/core.ts`                                                 | 260  | (a)  | 理由コメント付与(クリーンアップ系)            |
-| `libs/core/core.ts`                                                 | 281  | (a)  | 理由コメント付与(クリーンアップ系)            |
-| `libs/core/core.ts`                                                 | 328  | (b)  | logger.warn 付与済み(2026-07-12)              |
-| `libs/core/detectors.ts`                                            | 48   | (a)  | 理由コメント付与(クリーンアップ系)            |
-| `libs/core/dynamic-permission-guard.ts`                             | 46   | (c)  | 要人間確認(ガバナンス経路の握りつぶし疑い)    |
-| `libs/core/email-workflow.ts`                                       | 161  | (b)  | logger.warn 付与済み(2026-07-12)              |
-| `libs/core/email-workflow.ts`                                       | 171  | (b)  | logger.warn 付与済み(2026-07-12)              |
-| `libs/core/email-workflow.ts`                                       | 628  | (b)  | logger.warn 付与済み(2026-07-12)              |
-| `libs/core/fs-utils.ts`                                             | 38   | (b)  | logger.warn 付与済み(2026-07-12)              |
-| `libs/core/fs-utils.ts`                                             | 75   | (b)  | logger.warn 付与済み(2026-07-12)              |
-| `libs/core/metrics.ts`                                              | 527  | (b)  | logger.warn 付与済み(2026-07-12)              |
-| `libs/core/nerve-bridge.ts`                                         | 63   | (b)  | logger.warn 付与済み(2026-07-12)              |
-| `libs/core/nerve-bridge.ts`                                         | 96   | (b)  | logger.warn 付与済み(2026-07-12)              |
-| `libs/core/network.ts`                                              | 26   | (c)  | 要人間確認(ガバナンス経路の握りつぶし疑い)    |
-| `libs/core/oauth-session-store.ts`                                  | 51   | (b)  | logger.warn 付与済み(2026-07-12)              |
-| `libs/core/oauth-session-store.ts`                                  | 96   | (b)  | logger.warn 付与済み(2026-07-12)              |
-| `libs/core/oauth-session-store.ts`                                  | 99   | (b)  | logger.warn 付与済み(2026-07-12)              |
-| `libs/core/peer-conversation.test.ts`                               | 25   | (a)  | テスト内の期待例外 — 現状維持可(コメント推奨) |
-| `libs/core/peer-messaging.test.ts`                                  | 37   | (a)  | テスト内の期待例外 — 現状維持可(コメント推奨) |
-| `libs/core/secret-guard.ts`                                         | 74   | (c)  | 要人間確認(ガバナンス経路の握りつぶし疑い)    |
-| `libs/core/secret-guard.ts`                                         | 266  | (c)  | 要人間確認(ガバナンス経路の握りつぶし疑い)    |
-| `libs/core/secret-guard.ts`                                         | 296  | (c)  | 要人間確認(ガバナンス経路の握りつぶし疑い)    |
-| `libs/core/secret-guard.ts`                                         | 306  | (c)  | 要人間確認(ガバナンス経路の握りつぶし疑い)    |
-| `libs/core/secret-guard.ts`                                         | 342  | (c)  | 要人間確認(ガバナンス経路の握りつぶし疑い)    |
-| `libs/core/secure-io.ts`                                            | 258  | (a)  | 理由コメント付与(クリーンアップ系)            |
-| `libs/core/secure-io.ts`                                            | 262  | (a)  | 理由コメント付与(クリーンアップ系)            |
-| `libs/core/secure-io.ts`                                            | 445  | (a)  | 理由コメント付与(クリーンアップ系)            |
-| `libs/core/secure-io.ts`                                            | 448  | (a)  | 理由コメント付与(クリーンアップ系)            |
-| `libs/core/sensory-memory.ts`                                       | 30   | (b)  | logger.warn 付与済み(2026-07-12)              |
-| `libs/core/service-engine-execution.ts`                             | 63   | (a)  | 理由コメント付与(クリーンアップ系)            |
-| `libs/core/service-engine-execution.ts`                             | 101  | (a)  | 理由コメント付与(クリーンアップ系)            |
-| `libs/core/service-engine-helpers.ts`                               | 38   | (b)  | logger.warn 付与済み(2026-07-12)              |
-| `libs/core/service-preset-registry.ts`                              | 136  | (a)  | 理由コメント付与(クリーンアップ系)            |
-| `libs/core/service-preset-registry.ts`                              | 147  | (a)  | 理由コメント付与(クリーンアップ系)            |
-| `libs/core/src/pfc/ServiceValidator.ts`                             | 222  | (c)  | 要人間確認(ガバナンス経路の握りつぶし疑い)    |
-| `libs/core/tenant-registry.test.ts`                                 | 41   | (a)  | テスト内の期待例外 — 現状維持可(コメント推奨) |
-| `libs/core/tenant-registry.test.ts`                                 | 45   | (a)  | テスト内の期待例外 — 現状維持可(コメント推奨) |
-| `libs/core/tier-guard-tenant.test.ts`                               | 55   | (a)  | テスト内の期待例外 — 現状維持可(コメント推奨) |
-| `libs/core/tier-guard.ts`                                           | 45   | (c)  | 要人間確認(ガバナンス経路の握りつぶし疑い)    |
-| `libs/core/tier-guard.ts`                                           | 531  | (c)  | 要人間確認(ガバナンス経路の握りつぶし疑い)    |
-| `libs/core/tier-guard.ts`                                           | 547  | (c)  | 要人間確認(ガバナンス経路の握りつぶし疑い)    |
-| `libs/core/trust-engine.ts`                                         | 231  | (c)  | 要人間確認(ガバナンス経路の握りつぶし疑い)    |
-| `libs/core/trust-engine.ts`                                         | 252  | (c)  | 要人間確認(ガバナンス経路の握りつぶし疑い)    |
-| `libs/core/unclassified-error-registry.ts`                          | 104  | (b)  | logger.warn 付与済み(2026-07-12)              |
-| `libs/core/unhandled-intent-registry.ts`                            | 135  | (b)  | logger.warn 付与済み(2026-07-12)              |
-| `libs/core/untrusted-content.test.ts`                               | 30   | (a)  | テスト内の期待例外 — 現状維持可(コメント推奨) |
-| `libs/core/untrusted-content.test.ts`                               | 51   | (a)  | テスト内の期待例外 — 現状維持可(コメント推奨) |
-| `libs/shared-network/src/mcp-client-engine.ts`                      | 68   | (a)  | 理由コメント付与(クリーンアップ系)            |
-| `presence/bridge/nexus-daemon.ts`                                   | 200  | (b)  | logger.warn 付与済み(2026-07-12)              |
-| `presence/bridge/terminal/server.ts`                                | 196  | (b)  | logger.warn 付与済み(2026-07-12)              |
-| `presence/bridge/terminal/server.ts`                                | 233  | (b)  | logger.warn 付与済み(2026-07-12)              |
-| `presence/bridge/terminal/server.ts`                                | 258  | (b)  | logger.warn 付与済み(2026-07-12)              |
-| `presence/bridge/terminal/server.ts`                                | 310  | (b)  | logger.warn 付与済み(2026-07-12)              |
-| `presence/bridge/terminal/server.ts`                                | 319  | (a)  | 理由コメント付与(クリーンアップ系)            |
-| `presence/bridge/terminal/server.ts`                                | 331  | (a)  | 理由コメント付与(クリーンアップ系)            |
-| `presence/bridge/terminal/server.ts`                                | 352  | (a)  | 理由コメント付与(クリーンアップ系)            |
-| `presence/displays/chronos-mirror-v2/src/app/api/agent/route.ts`    | 106  | (a)  | 理由コメント付与(クリーンアップ系)            |
-| `presence/displays/operator-surface/src/lib/data.ts`                | 383  | (b)  | logger.warn 付与済み(2026-07-12)              |
-| `presence/displays/operator-surface/src/lib/data.ts`                | 397  | (b)  | logger.warn 付与済み(2026-07-12)              |
-| `satellites/voice-hub/server.ts`                                    | 1138 | (b)  | logger.warn 付与済み(2026-07-12)              |
-| `scripts/agent_runtime_supervisor_daemon.ts`                        | 90   | (b)  | logger.warn 付与済み(2026-07-12)              |
-| `scripts/control_plane_cli.ts`                                      | 758  | (b)  | logger.warn 付与済み(2026-07-12)              |
-| `scripts/control_plane_cli.ts`                                      | 766  | (b)  | logger.warn 付与済み(2026-07-12)              |
-| `scripts/control_plane_cli.ts`                                      | 784  | (b)  | logger.warn 付与済み(2026-07-12)              |
-| `scripts/control_plane_cli.ts`                                      | 792  | (b)  | logger.warn 付与済み(2026-07-12)              |
-| `scripts/mission_journal.ts`                                        | 44   | (b)  | logger.warn 付与済み(2026-07-12)              |
-| `scripts/refactor/mission-lifecycle.ts`                             | 61   | (b)  | logger.warn 付与済み(2026-07-12)              |
-| `scripts/refactor/mission-llm.ts`                                   | 382  | (b)  | logger.warn 付与済み(2026-07-12)              |
-| `scripts/refactor/mission-seal.ts`                                  | 55   | (a)  | 理由コメント付与(クリーンアップ系)            |
-| `scripts/refactor/mission-state.ts`                                 | 227  | (b)  | logger.warn 付与済み(2026-07-12)              |
-| `scripts/refactor/mission-state.ts`                                 | 244  | (b)  | logger.warn 付与済み(2026-07-12)              |
-| `scripts/refactor/mission-state.ts`                                 | 246  | (b)  | logger.warn 付与済み(2026-07-12)              |
-| `scripts/run_pipeline.ts`                                           | 460  | (b)  | logger.warn 付与済み(2026-07-12)              |
-| `scripts/surface_runtime.ts`                                        | 150  | (a)  | 理由コメント付与(クリーンアップ系)            |
-| `scripts/surface_runtime.ts`                                        | 160  | (a)  | 理由コメント付与(クリーンアップ系)            |
+| ファイル                                                            | 行   | 分類 | 処置                                                                                       |
+| ------------------------------------------------------------------- | ---- | ---- | ------------------------------------------------------------------------------------------ |
+| `libs/actuators/android-actuator/src/android-runtime-helpers.ts`    | 1100 | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `libs/actuators/browser-actuator/src/browser-pipeline-helpers.ts`   | 1403 | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `libs/actuators/media-actuator/src/artisan/ppt-engine.ts`           | 70   | (a)  | 理由コメント付与済み(2026-07-12)                                                           |
+| `libs/actuators/modeling-actuator/src/modeling-pipeline-helpers.ts` | 628  | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `libs/actuators/service-actuator/src/service-actuator-helpers.ts`   | 159  | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `libs/actuators/service-actuator/src/service-actuator-helpers.ts`   | 191  | (a)  | 理由コメント付与済み(2026-07-12)                                                           |
+| `libs/actuators/service-actuator/src/service-actuator-helpers.ts`   | 365  | (a)  | 理由コメント付与済み(2026-07-12)                                                           |
+| `libs/actuators/system-actuator/src/system-pipeline-helpers.ts`     | 789  | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `libs/actuators/system-actuator/src/system-pipeline-helpers.ts`     | 829  | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `libs/core/agent-adapter.ts`                                        | 356  | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `libs/core/agent-adapter.ts`                                        | 379  | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `libs/core/agent-adapter.ts`                                        | 490  | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `libs/core/agent-runtime-supervisor-client.ts`                      | 179  | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `libs/core/agent-runtime-supervisor-client.ts`                      | 195  | (a)  | 理由コメント付与済み(2026-07-12)                                                           |
+| `libs/core/agent-runtime-supervisor-client.ts`                      | 225  | (a)  | 理由コメント付与済み(2026-07-12)                                                           |
+| `libs/core/approval-cowork-adapter.test.ts`                         | 138  | (a)  | 理由コメント付与済み(2026-07-12)                                                           |
+| `libs/core/authority.ts`                                            | 282  | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `libs/core/authority.ts`                                            | 319  | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `libs/core/core.ts`                                                 | 182  | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `libs/core/core.ts`                                                 | 260  | (a)  | 理由コメント付与済み(2026-07-12)                                                           |
+| `libs/core/core.ts`                                                 | 281  | (a)  | 理由コメント付与済み(2026-07-12)                                                           |
+| `libs/core/core.ts`                                                 | 328  | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `libs/core/detectors.ts`                                            | 48   | (a)  | 理由コメント付与済み(2026-07-12)                                                           |
+| `libs/core/dynamic-permission-guard.ts`                             | 46   | (c)  | 実地レビュー済み: fail-open は #519 で根治、他は best-effort 確認+コメント付与(2026-07-12) |
+| `libs/core/email-workflow.ts`                                       | 161  | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `libs/core/email-workflow.ts`                                       | 171  | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `libs/core/email-workflow.ts`                                       | 628  | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `libs/core/fs-utils.ts`                                             | 38   | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `libs/core/fs-utils.ts`                                             | 75   | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `libs/core/metrics.ts`                                              | 527  | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `libs/core/nerve-bridge.ts`                                         | 63   | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `libs/core/nerve-bridge.ts`                                         | 96   | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `libs/core/network.ts`                                              | 26   | (c)  | 実地レビュー済み: fail-open は #519 で根治、他は best-effort 確認+コメント付与(2026-07-12) |
+| `libs/core/oauth-session-store.ts`                                  | 51   | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `libs/core/oauth-session-store.ts`                                  | 96   | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `libs/core/oauth-session-store.ts`                                  | 99   | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `libs/core/peer-conversation.test.ts`                               | 25   | (a)  | 理由コメント付与済み(2026-07-12)                                                           |
+| `libs/core/peer-messaging.test.ts`                                  | 37   | (a)  | 理由コメント付与済み(2026-07-12)                                                           |
+| `libs/core/secret-guard.ts`                                         | 74   | (c)  | 実地レビュー済み: fail-open は #519 で根治、他は best-effort 確認+コメント付与(2026-07-12) |
+| `libs/core/secret-guard.ts`                                         | 266  | (c)  | 実地レビュー済み: fail-open は #519 で根治、他は best-effort 確認+コメント付与(2026-07-12) |
+| `libs/core/secret-guard.ts`                                         | 296  | (c)  | 実地レビュー済み: fail-open は #519 で根治、他は best-effort 確認+コメント付与(2026-07-12) |
+| `libs/core/secret-guard.ts`                                         | 306  | (c)  | 実地レビュー済み: fail-open は #519 で根治、他は best-effort 確認+コメント付与(2026-07-12) |
+| `libs/core/secret-guard.ts`                                         | 342  | (c)  | 実地レビュー済み: fail-open は #519 で根治、他は best-effort 確認+コメント付与(2026-07-12) |
+| `libs/core/secure-io.ts`                                            | 258  | (a)  | 理由コメント付与済み(2026-07-12)                                                           |
+| `libs/core/secure-io.ts`                                            | 262  | (a)  | 理由コメント付与済み(2026-07-12)                                                           |
+| `libs/core/secure-io.ts`                                            | 445  | (a)  | 理由コメント付与済み(2026-07-12)                                                           |
+| `libs/core/secure-io.ts`                                            | 448  | (a)  | 理由コメント付与済み(2026-07-12)                                                           |
+| `libs/core/sensory-memory.ts`                                       | 30   | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `libs/core/service-engine-execution.ts`                             | 63   | (a)  | 理由コメント付与済み(2026-07-12)                                                           |
+| `libs/core/service-engine-execution.ts`                             | 101  | (a)  | 理由コメント付与済み(2026-07-12)                                                           |
+| `libs/core/service-engine-helpers.ts`                               | 38   | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `libs/core/service-preset-registry.ts`                              | 136  | (a)  | 理由コメント付与済み(2026-07-12)                                                           |
+| `libs/core/service-preset-registry.ts`                              | 147  | (a)  | 理由コメント付与済み(2026-07-12)                                                           |
+| `libs/core/src/pfc/ServiceValidator.ts`                             | 222  | (c)  | 実地レビュー済み: fail-open は #519 で根治、他は best-effort 確認+コメント付与(2026-07-12) |
+| `libs/core/tenant-registry.test.ts`                                 | 41   | (a)  | 理由コメント付与済み(2026-07-12)                                                           |
+| `libs/core/tenant-registry.test.ts`                                 | 45   | (a)  | 理由コメント付与済み(2026-07-12)                                                           |
+| `libs/core/tier-guard-tenant.test.ts`                               | 55   | (a)  | 理由コメント付与済み(2026-07-12)                                                           |
+| `libs/core/tier-guard.ts`                                           | 45   | (c)  | 実地レビュー済み: fail-open は #519 で根治、他は best-effort 確認+コメント付与(2026-07-12) |
+| `libs/core/tier-guard.ts`                                           | 531  | (c)  | 実地レビュー済み: fail-open は #519 で根治、他は best-effort 確認+コメント付与(2026-07-12) |
+| `libs/core/tier-guard.ts`                                           | 547  | (c)  | 実地レビュー済み: fail-open は #519 で根治、他は best-effort 確認+コメント付与(2026-07-12) |
+| `libs/core/trust-engine.ts`                                         | 231  | (c)  | 実地レビュー済み: fail-open は #519 で根治、他は best-effort 確認+コメント付与(2026-07-12) |
+| `libs/core/trust-engine.ts`                                         | 252  | (c)  | 実地レビュー済み: fail-open は #519 で根治、他は best-effort 確認+コメント付与(2026-07-12) |
+| `libs/core/unclassified-error-registry.ts`                          | 104  | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `libs/core/unhandled-intent-registry.ts`                            | 135  | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `libs/core/untrusted-content.test.ts`                               | 30   | (a)  | 理由コメント付与済み(2026-07-12)                                                           |
+| `libs/core/untrusted-content.test.ts`                               | 51   | (a)  | 理由コメント付与済み(2026-07-12)                                                           |
+| `libs/shared-network/src/mcp-client-engine.ts`                      | 68   | (a)  | 理由コメント付与済み(2026-07-12)                                                           |
+| `presence/bridge/nexus-daemon.ts`                                   | 200  | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `presence/bridge/terminal/server.ts`                                | 196  | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `presence/bridge/terminal/server.ts`                                | 233  | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `presence/bridge/terminal/server.ts`                                | 258  | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `presence/bridge/terminal/server.ts`                                | 310  | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `presence/bridge/terminal/server.ts`                                | 319  | (a)  | 理由コメント付与済み(2026-07-12)                                                           |
+| `presence/bridge/terminal/server.ts`                                | 331  | (a)  | 理由コメント付与済み(2026-07-12)                                                           |
+| `presence/bridge/terminal/server.ts`                                | 352  | (a)  | 理由コメント付与済み(2026-07-12)                                                           |
+| `presence/displays/chronos-mirror-v2/src/app/api/agent/route.ts`    | 106  | (a)  | 理由コメント付与済み(2026-07-12)                                                           |
+| `presence/displays/operator-surface/src/lib/data.ts`                | 383  | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `presence/displays/operator-surface/src/lib/data.ts`                | 397  | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `satellites/voice-hub/server.ts`                                    | 1138 | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `scripts/agent_runtime_supervisor_daemon.ts`                        | 90   | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `scripts/control_plane_cli.ts`                                      | 758  | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `scripts/control_plane_cli.ts`                                      | 766  | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `scripts/control_plane_cli.ts`                                      | 784  | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `scripts/control_plane_cli.ts`                                      | 792  | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `scripts/mission_journal.ts`                                        | 44   | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `scripts/refactor/mission-lifecycle.ts`                             | 61   | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `scripts/refactor/mission-llm.ts`                                   | 382  | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `scripts/refactor/mission-seal.ts`                                  | 55   | (a)  | 理由コメント付与済み(2026-07-12)                                                           |
+| `scripts/refactor/mission-state.ts`                                 | 227  | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `scripts/refactor/mission-state.ts`                                 | 244  | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `scripts/refactor/mission-state.ts`                                 | 246  | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `scripts/run_pipeline.ts`                                           | 460  | (b)  | logger.warn 付与済み(2026-07-12)                                                           |
+| `scripts/surface_runtime.ts`                                        | 150  | (a)  | 理由コメント付与済み(2026-07-12)                                                           |
+| `scripts/surface_runtime.ts`                                        | 160  | (a)  | 理由コメント付与済み(2026-07-12)                                                           |
 
 ## console.\* → logger 置換の除外一覧(2026-07-12, Task 4 成果物)
 
@@ -194,3 +194,12 @@ libs/ の console.\* 95箇所(計画時115から他改修で減少)のうち、*
 | アクチュエータ CLI エントリ(file/process/meeting の `console.log(JSON.stringify(result))` + process-actuator index の console.error) | 4    | stdout/stderr がハーネスとの結果契約                               |
 
 置換した9箇所: excel-theme-resolver(core/shared-media)、service-endpoint-registry、terminal-bridge、surface-runtime、metrics、native-pdf-engine ×2、core.ts の DEBUG stack dump。
+
+## Task 5 完了記録(2026-07-12)
+
+- `process.exit` 42箇所を全数精査。計画が深部候補として挙げた voice/media/file-helpers 等は現行コードでは全て CLI エントリガード(`if (entrypoint && modulePath === entrypoint)`)内へ移動済みで正当(Task 5.1)。
+- 真に library 深部だったのは `core.ts` の `errorHandler` 1箇所のみ — 任意のエラーでホストプロセスを殺していた(`fileUtils.writeJson` 失敗でも即死)。**log + throw へ変更**(Task 5.2、テスト3本)。
+- eslint `no-restricted-properties` で `process.exit` を `libs/**` に対し **error** 設定(Task 5.3。`--max-warnings 0` 運用のため warn ではなく error。CLI/harness 面は config で除外、共有ファイル内の CLI ガードと supervisor の意図的 shutdown は理由付き inline disable)。
+- あわせて `no-empty`(allowEmptyCatch: false)を有効化し、残余の空 catch 48箇所へ理由コメントを付与(受入条件2の (a) 処置完了 + 再発防止)。
+
+これにより受入条件 1〜5 をすべて充足し、IP-08 は完了。
