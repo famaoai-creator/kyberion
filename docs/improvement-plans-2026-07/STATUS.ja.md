@@ -89,15 +89,15 @@
 
 ### MO(ミッション・オーケストレーション)
 
-| ID    | 状態    | 残作業                                                                                                                                                                       |
-| ----- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| MO-01 | DONE    | (worker イベント連鎖のフェーズ駆動化は MO-02 側で実施。gate-pass 機械評価・entry_gate deferral・deliverable_quality check は MO-01 側で先行実装済み)                         |
-| MO-02 | PARTIAL | 残: フェーズ exit ゲートの warn→enforce 昇格、human_override 署名強制、realign 自動再計画(exit ゲート実行時評価は 2026-07-12 実装、他は再突合で実装済み確認)                 |
-| MO-03 | DONE    | 2026-07-12 完了: スキーマ/検証/循環検出/並列 wave/リースは実装済みを再突合確認、Task 2.3(scope 由来 dispatch 予算 + blocked(timeout) + 依存 blocked 連鎖)を実装              |
-| MO-04 | DONE    |                                                                                                                                                                              |
-| MO-05 | DONE    | (軽微: 集計スクリプト)                                                                                                                                                       |
-| MO-06 | DONE    |                                                                                                                                                                              |
-| MO-07 | PARTIAL | 2026-07-12: draft→refine エンジン + worker 配線(高リスク文書 deliverable、受入前1パス、KYBERION_DRAFT_REFINE=0 で無効)。残: task-session 側配線、tier 昇格連動(MO-05 と設計) |
+| ID    | 状態    | 残作業                                                                                                                                                                                                                                 |
+| ----- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| MO-01 | DONE    | (worker イベント連鎖のフェーズ駆動化は MO-02 側で実施。gate-pass 機械評価・entry_gate deferral・deliverable_quality check は MO-01 側で先行実装済み)                                                                                   |
+| MO-02 | PARTIAL | 残: フェーズ exit ゲートの warn→enforce 昇格、human_override 署名強制、realign 自動再計画(exit ゲート実行時評価は 2026-07-12 実装、他は再突合で実装済み確認)                                                                           |
+| MO-03 | DONE    | 2026-07-12 完了: スキーマ/検証/循環検出/並列 wave/リースは実装済みを再突合確認、Task 2.3(scope 由来 dispatch 予算 + blocked(timeout) + 依存 blocked 連鎖)を実装                                                                        |
+| MO-04 | DONE    |                                                                                                                                                                                                                                        |
+| MO-05 | DONE    | (軽微: 集計スクリプト)                                                                                                                                                                                                                 |
+| MO-06 | DONE    |                                                                                                                                                                                                                                        |
+| MO-07 | PARTIAL | 2026-07-12: draft→refine エンジン + worker 配線(高リスク文書 deliverable、受入前1パス、KYBERION_DRAFT_REFINE=0 で無効)。task-session 側配線済み(document 出力へ受入前1パス、800字未満/失敗はスキップ)。残: tier 昇格連動(MO-05 と設計) |
 
 ### DS(デザインシステム)
 
