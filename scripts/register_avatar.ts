@@ -5,7 +5,7 @@ import {
   safeMkdir,
   safeReadFile,
   safeWriteFile,
-} from '../libs/core/secure-io.js';
+} from '@agent/core';
 
 function parseArgs(argv: string[]): Record<string, string> {
   const result: Record<string, string> = {};

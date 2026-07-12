@@ -1,7 +1,5 @@
 import * as path from 'node:path';
-import { generateImage } from '../libs/core/image-generation-bridge.js';
-import type { ImageGenerationMode } from '../libs/core/image-generation-types.js';
-import { safeExistsSync } from '../libs/core/secure-io.js';
+import { generateImage, type ImageGenerationMode, safeExistsSync } from '@agent/core';
 
 function parseArgs(argv: string[]): Record<string, string | boolean> {
   const result: Record<string, string | boolean> = {};
