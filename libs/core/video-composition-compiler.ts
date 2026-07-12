@@ -1,4 +1,9 @@
 import * as path from 'node:path';
+import {
+  normalizeVideoVisualDirection,
+  visualDirectionToCssVars,
+  type VideoVisualDirection,
+} from './video-visual-direction.js';
 import { getVideoCompositionTemplateRecord } from './video-composition-template-registry.js';
 import { getVideoRenderRuntimePolicy } from './video-render-runtime-policy.js';
 import * as pathResolver from './path-resolver.js';
@@ -93,7 +98,10 @@ export function writeVideoCompositionBundle(
   safeMkdir(path.join(plan.bundle_dir, 'compositions'), { recursive: true });
 
   for (const scene of plan.scenes) {
-    const sceneSource = applyVideoThemeTokens(renderSceneHtml(adf, scene));
+    const sceneSource = applyVideoThemeTokens(
+      renderSceneHtml(adf, scene),
+      resolveAdfVisualDirection(adf)
+    );
     const scenePath = path.join(plan.bundle_dir, scene.output_html);
     safeWriteFile(scenePath, sceneSource);
 
@@ -101,7 +109,10 @@ export function writeVideoCompositionBundle(
     copySceneAssets(plan.bundle_dir, scene.asset_refs);
   }
 
-  safeWriteFile(plan.index_html, applyVideoThemeTokens(renderBundleIndexHtml(plan, adf)));
+  safeWriteFile(
+    plan.index_html,
+    applyVideoThemeTokens(renderBundleIndexHtml(plan, adf), resolveAdfVisualDirection(adf))
+  );
   safeWriteFile(path.join(plan.bundle_dir, 'render-plan.json'), JSON.stringify(plan, null, 2));
   safeWriteFile(path.join(plan.bundle_dir, 'README.md'), renderBundleReadme(plan, adf));
 
@@ -188,25 +199,7 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
             `
                 )
                 .join('')
-            : `
-              <div class="process-step">
-                <span>01</span>
-                <strong>Brief intake</strong>
-                <small>Audience, use case, constraints</small>
-              </div>
-              <div class="process-arrow"></div>
-              <div class="process-step">
-                <span>02</span>
-                <strong>Content plan</strong>
-                <small>Hook, scene order, required copy</small>
-              </div>
-              <div class="process-arrow"></div>
-              <div class="process-step">
-                <span>03</span>
-                <strong>Render package</strong>
-                <small>Bundle, narration, mp4 output</small>
-              </div>
-            `
+            : ''
         }
       </div>`;
   const hfScript = `<script>
@@ -1437,6 +1430,11 @@ function resolveAvatarAsset(
 }
 
 function tokenizeVideoCss(css: string): string {
+  // Typography follows the visual direction (portrait shorts need larger
+  // type); colors below keep their historical token mapping.
+  css = css
+    .replace(/font-size:\s*68px/gi, 'font-size: var(--headline-size, 68px)')
+    .replace(/font-size:\s*23px/gi, 'font-size: var(--body-size, 23px)');
   const tokenized = [
     { pattern: /#0B1020/gi, token: '--kb-bg-main' },
     { pattern: /#0b1224/gi, token: '--kb-bg-deep' },
@@ -1522,10 +1520,25 @@ function tokenizeVideoCss(css: string): string {
   );
 }
 
-function applyVideoThemeTokens(html: string): string {
-  return html.replace(/<style([^>]*)>([\s\S]*?)<\/style>/gi, (_match, attrs, css) => {
+function resolveAdfVisualDirection(adf: VideoCompositionADF): VideoVisualDirection {
+  return normalizeVideoVisualDirection(adf.composition.visual_direction, {
+    width: adf.composition.width,
+    height: adf.composition.height,
+  });
+}
+
+function applyVideoThemeTokens(html: string, direction?: VideoVisualDirection): string {
+  const tokenized = html.replace(/<style([^>]*)>([\s\S]*?)<\/style>/gi, (_match, attrs, css) => {
     return `<style${attrs}>${tokenizeVideoCss(css)}</style>`;
   });
+  if (!direction) return tokenized;
+  // The token pass rewrote hardcoded hexes to var(--kb-*); this :root block
+  // gives those tokens story-specific values (falls back to legacy palette
+  // when absent).
+  const rootVars = `<style data-kb-visual-direction="${escapeHtml(direction.mood)}">\n${visualDirectionToCssVars(direction)}\n</style>`;
+  return tokenized.includes('</head>')
+    ? tokenized.replace('</head>', `${rootVars}\n</head>`)
+    : `${rootVars}\n${tokenized}`;
 }
 
 function safeAssetName(assetPath: string): string {

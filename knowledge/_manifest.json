@@ -8083,6 +8083,12 @@
       "type": "json"
     },
     {
+      "path": "public/design-patterns/media-templates/video-visual-patterns.json",
+      "tier": "public",
+      "size": 2998,
+      "type": "json"
+    },
+    {
       "path": "public/design-patterns/presentation/client-proposal.json",
       "tier": "public",
       "size": 746,
