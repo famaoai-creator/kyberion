@@ -1,4 +1,4 @@
-/* eslint-disable no-restricted-imports -- IP-08 で safeExec/managed-process 経由へ移行予定 (docs/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
+/* eslint-disable no-restricted-imports -- IP-08 で safeExec/managed-process 経由へ移行予定 (docs/developer/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
 import { ACPMediator, ACPMediatorOptions } from './acp-mediator.js';

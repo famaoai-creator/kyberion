@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "description": "Daily confidential tenant drift scan using scripts/watch_tenant_drift.ts with alerting enabled.",
   "_refs": {
-    "plan": "docs/improvement-plans-2026-07/AO-01_AUTONOMOUS_MAINTENANCE_LOOP.ja.md",
+    "plan": "docs/developer/improvement-plans-2026-07/AO-01_AUTONOMOUS_MAINTENANCE_LOOP.ja.md",
     "implementation": "scripts/watch_tenant_drift.ts"
   },
   "schedule": {

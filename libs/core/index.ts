@@ -435,6 +435,11 @@ export { distillXlsxDesign } from './src/xlsx-utils.js';
 export { distillDocxDesign } from './src/docx-utils.js';
 export { generateNativePdf } from './src/native-pdf-engine/engine.js';
 export { generateNativePptx, patchPptxText } from './src/native-pptx-engine/engine.js';
+export type {
+  PptxDesignProtocol,
+  PptxElement,
+  PptxSlide,
+} from './src/types/pptx-protocol.js';
 export { generateNativeXlsx } from './src/native-xlsx-engine/engine.js';
 export { generateNativeDocx } from './src/native-docx-engine/engine.js';
 export {

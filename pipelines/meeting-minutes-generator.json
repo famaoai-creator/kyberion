@@ -1,0 +1,45 @@
+{
+  "id": "meeting-minutes-generator",
+  "version": "1.0.0",
+  "description": "会議やプレゼン発表の録音から、文字起こし、要約、課題、決定事項を自動抽出し、Kyberionのプロジェクト要件として連携・エクスポートするシステムパイプライン",
+  "context": {
+    "mission_id": "meeting_sync_mission",
+    "project_name": "kyberion_voice_sync",
+    "language": "ja",
+    "audio_path": "active/shared/tmp/meeting-recording.wav",
+    "transcript_output_path": "active/shared/tmp/meeting-recording.wav.transcript.txt",
+    "customer_name": "Sovereign Operator",
+    "customer_org": "Kyberion Sovereign Org"
+  },
+  "steps": [
+    {
+      "name": "Audio Transcription (Speech-to-Text)",
+      "op": "wisdom:transcribe_audio",
+      "params": {
+        "audio_path": "{{audio_path}}",
+        "language": "{{language}}",
+        "output_path": "{{transcript_output_path}}"
+      }
+    },
+    {
+      "name": "Extract Meeting Summary & Action Items (Reasoning Engine)",
+      "op": "wisdom:extract_requirements",
+      "params": {
+        "mission_id": "{{mission_id}}",
+        "project_name": "{{project_name}}",
+        "source_path": "{{transcript_output_path}}",
+        "source_type": "call_transcript",
+        "language": "{{language}}",
+        "customer_name": "{{customer_name}}",
+        "customer_org": "{{customer_org}}"
+      }
+    },
+    {
+      "name": "Export Minutes and Requirements Summary",
+      "op": "system:shell",
+      "params": {
+        "command": "mkdir -p active/shared/exports && cp active/shared/tmp/meeting-recording.wav.transcript.txt active/shared/exports/meeting_minutes_raw.txt && echo '[Success] Meeting Transcription and Analysis Pipeline completed. Artifacts exported to active/shared/exports/'"
+      }
+    }
+  ]
+}
