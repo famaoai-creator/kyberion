@@ -64,6 +64,11 @@ jobs:
       - name: Check knowledge catalogs & index freshness
         run: pnpm run check:catalogs
 
+      # DS-01 / UX-05: prevent new operator-surface color literals and
+      # dashboard status vocabulary bypasses after the generated-token gate.
+      - name: Check UI/UX governance drift
+        run: pnpm run check:ui-ux
+
       # Actuator op registry / discovery catalog must be regenerated when
       # actuator manifests or dispatch ops change (REVIEW_CODEX_2026-07-11:
       # scaffold-to-registry drift was previously unchecked).
