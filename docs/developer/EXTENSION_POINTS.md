@@ -213,3 +213,11 @@ Stable surfaces are deprecated for **at least one minor version** before removal
 - **Wire protocols** (HTTP/gRPC over network). Kyberion does not currently expose stable wire protocols externally — Phase D' may introduce them.
 - **Plugin marketplace contract**. Phase D'-1 (engine refinement) introduces this and will live by its own semver.
 - **A2A protocol**. Currently Beta; will be lifted to v1 after broader inter-agent usage stabilizes.
+
+# Marketing Workload Extension
+
+Marketing workloads compose existing Stable surfaces: ADF v1, Actuator contracts v1, Knowledge Tier Layout v1, Customer Aggregation v1, and the approval store's human accountability/payload binding. `libs/core/marketing-workload.ts` is additive and does not change an existing Stable contract. Trace remains Beta and is evidence metadata, not an authorization source.
+
+Production publishers must remain Distribution-only actuators. Before any external effect they must re-hash every artifact, evaluate G5 against the exact title/description/CTA/destination/visibility payload, and record approval ID plus hashes in the audit trail. A publisher must not create or mutate its own approval record.
+
+Publishers must also execute G1 sensitive-data scanning before G5. Scan evidence must not contain the matched secret or PII value. Media validators must fail closed when ffprobe/ffmpeg inspection fails; absence of detector output is not evidence that black frames or silence are absent.
