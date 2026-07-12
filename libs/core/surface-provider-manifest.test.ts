@@ -10,7 +10,16 @@ describe('surface-provider-manifest', () => {
     const ids = listSurfaceProviderManifests()
       .map((entry) => entry.id)
       .sort();
-    expect(ids).toEqual(['chronos', 'cli', 'discord', 'imessage', 'presence', 'slack', 'telegram']);
+    expect(ids).toEqual([
+      'chronos',
+      'cli',
+      'cowork',
+      'discord',
+      'imessage',
+      'presence',
+      'slack',
+      'telegram',
+    ]);
   });
 
   it('keeps provider capabilities explicit', () => {

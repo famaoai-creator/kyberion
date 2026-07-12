@@ -237,7 +237,7 @@
     {
       "path": "product/architecture/component-lifecycle-inventory.md",
       "tier": "public",
-      "size": 6311,
+      "size": 6312,
       "type": "md"
     },
     {
@@ -2193,7 +2193,7 @@
     {
       "path": "product/governance/surface-provider-manifests.json",
       "tier": "public",
-      "size": 30901,
+      "size": 32855,
       "type": "json"
     },
     {
@@ -3243,7 +3243,7 @@
     {
       "path": "product/orchestration/global_actuator_index.json",
       "tier": "public",
-      "size": 15467,
+      "size": 16219,
       "type": "json"
     },
     {

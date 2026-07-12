@@ -1,4 +1,4 @@
-/* eslint-disable no-restricted-imports -- IP-08 で managed-process 経由へ移行予定 (docs/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
+/* eslint-disable no-restricted-imports -- IP-08 で managed-process 経由へ移行予定 (docs/developer/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 /**
  * Shell Claude CLI Backend — spawns the local `claude` CLI in `-p --output-format json`
  * mode to run structured-output reasoning tasks. Designed for environments that
