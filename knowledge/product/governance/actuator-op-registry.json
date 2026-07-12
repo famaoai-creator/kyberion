@@ -249,7 +249,7 @@
     "orchestrator": {
       "capture": ["discover_capabilities", "discover_skills"],
       "transform": [],
-      "apply": ["deploy", "log"]
+      "apply": ["deploy", "run_execution_plan_set"]
     },
     "presence": {
       "capture": [],
@@ -267,9 +267,9 @@
       "apply": ["delete"]
     },
     "service": {
-      "capture": ["list", "read"],
+      "capture": ["preset"],
       "transform": [],
-      "apply": ["deploy", "log", "notify"]
+      "apply": ["api", "cli", "mcp", "oauth", "reconcile"]
     },
     "system": {
       "capture": [

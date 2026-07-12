@@ -1322,7 +1322,7 @@
     {
       "n": "orchestrator-actuator",
       "path": "libs/actuators/orchestrator-actuator",
-      "source": "registry",
+      "source": "describeOps",
       "ops": [
         {
           "op": "discover_capabilities",
@@ -1337,7 +1337,7 @@
           "kind": "apply"
         },
         {
-          "op": "log",
+          "op": "run_execution_plan_set",
           "kind": "apply"
         }
       ]
@@ -1418,26 +1418,30 @@
     {
       "n": "service-actuator",
       "path": "libs/actuators/service-actuator",
-      "source": "registry",
+      "source": "describeOps",
       "ops": [
         {
-          "op": "list",
+          "op": "preset",
           "kind": "capture"
         },
         {
-          "op": "read",
-          "kind": "capture"
-        },
-        {
-          "op": "deploy",
+          "op": "api",
           "kind": "apply"
         },
         {
-          "op": "log",
+          "op": "cli",
           "kind": "apply"
         },
         {
-          "op": "notify",
+          "op": "mcp",
+          "kind": "apply"
+        },
+        {
+          "op": "oauth",
+          "kind": "apply"
+        },
+        {
+          "op": "reconcile",
           "kind": "apply"
         }
       ]
