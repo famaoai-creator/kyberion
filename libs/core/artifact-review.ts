@@ -218,6 +218,14 @@ export function evaluateArtifactReviews(input: {
     }
   }
 
+  for (const artifact of input.artifacts) {
+    const covered = input.reviews.some(
+      (review) =>
+        review.artifact_path === artifact.path && review.artifact_sha256 === artifact.sha256
+    );
+    if (!covered) reasons.push(`artifact has no current review: ${artifact.path}`);
+  }
+
   const reviewerRoles = new Set(
     input.reviews.flatMap((review) => review.reviewer_roles || [review.reviewer_role])
   );
