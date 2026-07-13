@@ -159,6 +159,7 @@ describe('Kyberion CLI helpers', () => {
     expect(output).toContain('calendar <status|list-calendars|agenda|freebusy|create-event>');
     expect(output).toContain('npm run cli -- calendar status');
     expect(output).toContain('intent [--clarify] "<utterance>"');
+    expect(output).toContain('task <plan|start> "<request>"');
   });
 
   it('renders help in Japanese when --locale ja is passed (UX-03)', async () => {
@@ -190,6 +191,28 @@ describe('Kyberion CLI helpers', () => {
     const output = logSpy.mock.calls.flat().join('\n');
     expect(output).toContain('calendar <status|list-calendars|agenda|freebusy|create-event>');
     expect(output).toContain('npm run cli -- calendar create-event --summary "Planning"');
+  });
+
+  it('previews a governed cross-tool task without external effects', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await main(['task', 'plan', '会議の日程を変更して参加者にメールを送って']);
+
+    const output = logSpy.mock.calls.flat().join('\n');
+    expect(output).toContain('"kind": "productivity-task-plan"');
+    expect(output).toContain('"external_write"');
+    expect(output).toContain('"required": true');
+    expect(output).toContain('"external_effects_executed": false');
+  });
+
+  it('shows task command help in Japanese', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await main(['task', 'help', '--locale', 'ja']);
+
+    const output = logSpy.mock.calls.flat().join('\n');
+    expect(output).toContain('使い方: npm run cli -- task <plan|start>');
+    expect(output).toContain('外部効果は引き続き停止');
   });
 
   it('allows only approved packet commands', () => {

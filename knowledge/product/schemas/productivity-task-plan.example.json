@@ -1,0 +1,51 @@
+{
+  "kind": "productivity-task-plan",
+  "version": "1.0.0",
+  "request": "連携システムから情報を集めて会議資料の下書きを作る",
+  "primary_intent_id": "meeting-operations",
+  "domains": ["meeting", "document", "connected_systems"],
+  "steps": [
+    {
+      "id": "step-01-meeting",
+      "domain": "meeting",
+      "title": "Prepare or operate the meeting",
+      "effect": "read",
+      "capability": "meeting:status",
+      "approval_required": false,
+      "execution_mode": "preview_only",
+      "evidence": ["meeting_result"]
+    },
+    {
+      "id": "step-02-document",
+      "domain": "document",
+      "title": "Create the document draft",
+      "effect": "draft",
+      "capability": "media:docx_render",
+      "approval_required": false,
+      "execution_mode": "preview_only",
+      "evidence": ["document_result"]
+    },
+    {
+      "id": "step-03-connected_systems",
+      "domain": "connected_systems",
+      "title": "Collect information from connected systems",
+      "effect": "read",
+      "capability": "service:preset",
+      "approval_required": false,
+      "execution_mode": "preview_only",
+      "evidence": ["connected_systems_result"]
+    }
+  ],
+  "approval": {
+    "required": false,
+    "blocked_step_ids": [],
+    "reasons": []
+  },
+  "missing_inputs": ["meeting_url", "meeting_role_boundary", "meeting_purpose"],
+  "recommended_pipeline": "knowledge/product/pipeline-templates/productivity-task-orchestration.json",
+  "evidence_plan": ["meeting_result", "document_result", "connected_systems_result"],
+  "execution": {
+    "mode": "dry_run",
+    "external_effects_executed": false
+  }
+}
