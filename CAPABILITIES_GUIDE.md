@@ -1,7 +1,7 @@
 # Kyberion Capabilities Guide
 
 Total Actuators: 30
-Last updated: 2026-07-12
+Last updated: 2026-07-13
 
 This guide is generated from `libs/actuators/*/manifest.json` (actuator table) and `knowledge/product/orchestration/actuator-op-discovery.json` (op tables, sourced from each actuator describeOps). Human-readable counterpart to `global_actuator_index.json`.
 
@@ -64,6 +64,7 @@ Legacy or conceptual capability names are intentionally excluded here. If a comp
 | `control_media_devices`            | system                                                 |
 | `discover_capabilities`            | code, orchestrator                                     |
 | `discover_skills`                  | code, orchestrator                                     |
+| `distill_dom`                      | browser                                                |
 | `evaluate`                         | browser                                                |
 | `exec`                             | system                                                 |
 | `exists`                           | file                                                   |
@@ -163,6 +164,7 @@ Legacy or conceptual capability names are intentionally excluded here. If a comp
 | `json_parse`                         | file                                       |
 | `json_query`                         | browser, modeling, network, system, wisdom |
 | `json_update`                        | code                                       |
+| `llm_decide`                         | browser                                    |
 | `merge_content`                      | media                                      |
 | `mermaid_gen`                        | modeling                                   |
 | `path_join`                          | file                                       |
@@ -396,11 +398,28 @@ Legacy or conceptual capability names are intentionally excluded here. If a comp
 | `setup_passkey_authenticator`  | browser                                                |
 | `while`                        | browser, code, file, modeling, network, system, wisdom |
 
+## Capability Boundaries
+
+Several use cases map to more than one actuator by name alone. This table is the tie-breaker (AC-06).
+
+| Use case                                                            | Use this                                                              | Avoid / why                                                                                                                                                                    |
+| :------------------------------------------------------------------ | :-------------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Screen capture (general purpose)                                    | `system-actuator` (`test_screen_stream`, `test_screen_mp4_roundtrip`) | `media-generation-actuator`'s `capture_screen`/`record_screen` are scoped to generation workflows that need a recording bundled with generated output, not standalone capture. |
+| Document rendering from a template (pptx/docx/pdf, partial updates) | `media-actuator`                                                      | Deterministic rendering, not generative — use `media-generation-actuator` for content that has to be authored/synthesized.                                                     |
+| Generative image, video, or music                                   | `media-generation-actuator`                                           | `media-actuator` only renders from existing templates/content; it does not generate.                                                                                           |
+| Assembling a narrated video from scenes/briefs                      | `video-composition-actuator`                                          | Distinct from `media-generation-actuator`'s `generate_video`, which produces a single generative video clip rather than composing a narrated sequence.                         |
+| Image perception (OCR, layout/content inspection)                   | `vision-actuator` (`inspect_image`, `ocr_image`)                      | `vision-actuator` is perception-only; its generation-shaped ops are compatibility facades that forward to `media-generation-actuator`.                                         |
+| One-shot OS command / shell                                         | `system-actuator` (`pipeline` → `system:exec`, `system:shell`)        | Use `process-actuator` instead if the command must be supervised or outlive the calling step.                                                                                  |
+| Supervised, long-lived process (start/stop/status)                  | `process-actuator`                                                    | `system-actuator` and `terminal-actuator` do not track process lifecycle across steps.                                                                                         |
+| Interactive terminal session (PTY, read/write a running shell)      | `terminal-actuator`                                                   | `system-actuator`'s `pipeline` ops run a command to completion; they do not expose an interactive PTY.                                                                         |
+
 ## Governed Core Workloads
 
 `@agent/core` also exposes the additive marketing workload contract for G0 intake, G1 data classification, G2 claims, G3 video/text/image validation, G4 independent review, G5 shared human approval binding, G6 publication verification, risk-policy resolution, and evidence-aware Mission completion.
 
 The workload composes the existing approval, artifact, media generation, video composition, browser, customer overlay, and Mission evidence capabilities. It does not register a marketing-specific Actuator or grant Strategy, Creative, or Review roles external publication authority.
+
+Canonical templates: `knowledge/product/pipeline-templates/video-production.json`, `publication-review.json`, and `publish-youtube-dry-run.json`.
 
 See also:
 
