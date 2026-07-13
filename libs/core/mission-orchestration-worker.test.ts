@@ -393,6 +393,98 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
     );
   });
 
+  it('reviews a reconciled implementation artifact and preserves its reconciliation evidence', async () => {
+    const { missionDir } = await import('./path-resolver.js');
+    const { safeReadFile, safeWriteFile } = await import('./secure-io.js');
+    const { dispatchMissionNextTasks } = await import('./mission-orchestration-worker.js');
+    const missionPath = missionDir('MSN-FOLLOWUP', 'public');
+    safeWriteFile(
+      `${missionPath}/deliverables/REVIEW-task-implementation.md`,
+      '# reconciled implementation review'
+    );
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify(
+        [
+          {
+            task_id: 'task-implementation',
+            status: 'completed',
+            assigned_to: { role: 'implementer', agent_id: 'implementation-architect' },
+            description: 'Implement the artifact',
+            deliverable: 'deliverables/task-a.md',
+            reconciliation: {
+              manifest_sha256: 'a'.repeat(64),
+              evidence: [
+                {
+                  path: 'libs/core/artifact-review.ts',
+                  sha256: 'b'.repeat(64),
+                  kind: 'artifact',
+                },
+              ],
+            },
+          },
+          {
+            task_id: 'task-review',
+            status: 'planned',
+            assigned_to: { role: 'reviewer', agent_id: 'independent-reviewer' },
+            description: 'Review the reconciled artifact',
+            deliverable: 'deliverables/REVIEW-task-implementation.md',
+            dependencies: ['task-implementation'],
+            review_target: 'task-implementation',
+            acceptance_criteria: ['The reconciled artifact has no blocking defects.'],
+          },
+        ],
+        null,
+        2
+      )
+    );
+    mocks.resolveMissionTeamReceiver.mockReturnValue({
+      agent_id: 'independent-reviewer',
+      model_hint: {
+        tier: 'small',
+        effort: 'low',
+        model_id: 'openai:gpt-5.4-mini',
+        route_reason: 'phase_kind=review -> small/low',
+      },
+    });
+    mocks.route.mockResolvedValue({
+      payload: {
+        text: makeTaskResultText({
+          summary: 'The reconciled implementation passes review.',
+          artifacts: [{ path: 'deliverables/REVIEW-task-implementation.md', kind: 'markdown' }],
+          verification_done: [
+            'Reviewed the commit-bound implementation artifact.',
+            'The reconciled artifact has no blocking defects.',
+          ],
+          gaps: [],
+          needs: [],
+        }),
+      },
+    });
+
+    const dispatched = await dispatchMissionNextTasks('MSN-FOLLOWUP');
+
+    const prompt = String(mocks.route.mock.calls[0]?.[0]?.payload?.text || '');
+    const tasks = JSON.parse(
+      String(safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }))
+    ) as Array<{
+      task_id: string;
+      status: string;
+      reconciliation?: { evidence?: Array<{ path: string }> };
+      artifact_review_receipt?: string;
+    }>;
+    expect(dispatched).toEqual([
+      { task_id: 'task-review', team_role: 'reviewer', agent_id: 'independent-reviewer' },
+    ]);
+    expect(prompt).toContain('libs/core/artifact-review.ts');
+    expect(prompt).toContain('code-reviewer');
+    expect(tasks[0].reconciliation?.evidence?.[0]?.path).toBe('libs/core/artifact-review.ts');
+    expect(tasks[1]).toMatchObject({
+      status: 'completed',
+      artifact_review_receipt: 'evidence/reviews/task-review-r1.json',
+    });
+  });
+
   it('dispatches dependency-ready tasks in task_id order up to the parallel cap', async () => {
     const { missionDir } = await import('./path-resolver.js');
     const { safeWriteFile, safeReadFile } = await import('./secure-io.js');

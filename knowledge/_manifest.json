@@ -2991,7 +2991,7 @@
     {
       "path": "product/orchestration/agent-profile-index.json",
       "tier": "public",
-      "size": 7215,
+      "size": 7226,
       "type": "json"
     },
     {
@@ -3027,7 +3027,7 @@
     {
       "path": "product/orchestration/agent-profiles/implementation-architect.json",
       "tier": "public",
-      "size": 532,
+      "size": 543,
       "type": "json"
     },
     {

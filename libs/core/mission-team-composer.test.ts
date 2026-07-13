@@ -190,6 +190,14 @@ describe('mission-team-composer classification integration', () => {
       expect(selected?.required_capabilities).toEqual(
         expect.arrayContaining(['review', 'documentation', 'analysis'])
       );
+
+      const codeReviewer = resolveMissionTeamReceiver({
+        missionId,
+        teamRole: 'reviewer',
+        excludedAgentIds: ['reasoning-worker'],
+        requiredCapabilities: ['review', 'code', 'testing'],
+      });
+      expect(codeReviewer?.agent_id).toBe('implementation-architect');
     } finally {
       safeRmSync(missionPath, { recursive: true, force: true });
       if (previousRole === undefined) delete process.env.MISSION_ROLE;
