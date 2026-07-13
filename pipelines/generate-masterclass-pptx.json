@@ -1,36 +1,35 @@
 {
   "id": "generate-masterclass-pptx",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Generate premium masterclass PPTX via media-actuator pipeline",
   "steps": [
     {
-      "name": "Execute Media Sub-Pipeline",
-      "op": "media:pipeline",
+      "id": "read-design-protocol",
+      "role": "source",
+      "op": "system:read_json",
+      "produces": {
+        "channel": "last_pptx_design",
+        "type": "PptxDesignProtocol"
+      },
       "params": {
-        "steps": [
-          {
-            "type": "capture",
-            "op": "json_read",
-            "params": {
-              "path": "pipelines/fragments/masterclass_design_protocol.json",
-              "export_as": "last_pptx_design"
-            }
-          },
-          {
-            "type": "apply",
-            "op": "pptx_render",
-            "params": {
-              "path": "active/shared/tmp/all_objects_layout_sample.pptx"
-            }
-          }
-        ]
+        "path": "pipelines/fragments/masterclass_design_protocol.json"
       }
     },
     {
-      "name": "Export to Output Directory",
+      "id": "render-pptx",
+      "role": "sink",
+      "op": "media:pptx_render",
+      "consumes": "last_pptx_design",
+      "params": {
+        "path": "active/shared/tmp/all_objects_layout_sample.pptx"
+      }
+    },
+    {
+      "id": "export",
+      "role": "sink",
       "op": "system:shell",
       "params": {
-        "command": "mkdir -p active/shared/exports && cp active/shared/tmp/all_objects_layout_sample.pptx active/shared/exports/all_objects_layout_sample.pptx"
+        "cmd": "mkdir -p active/shared/exports && cp active/shared/tmp/all_objects_layout_sample.pptx active/shared/exports/all_objects_layout_sample.pptx"
       }
     }
   ]
