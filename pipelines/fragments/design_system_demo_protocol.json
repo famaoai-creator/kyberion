@@ -1,0 +1,2856 @@
+{
+  "version": "1.0.0-diagnostic",
+  "generatedAt": "2026-07-14T00:00:00.000Z",
+  "canvas": {
+    "w": 10,
+    "h": 5.63
+  },
+  "theme": {
+    "dk1": "0F172A",
+    "lt1": "FFFFFF",
+    "dk2": "334155",
+    "lt2": "F1F5F9",
+    "accent1": "0066CC",
+    "accent2": "15803D",
+    "accent3": "EAB308",
+    "accent4": "B91C1C",
+    "accent5": "475569",
+    "accent6": "E2E8F0",
+    "hlink": "0066CC",
+    "folHlink": "334155"
+  },
+  "master": {
+    "elements": []
+  },
+  "slides": [
+    {
+      "id": "cover.xml",
+      "backgroundFill": "#0F172A",
+      "elements": [
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0,
+            "y": 0,
+            "w": 10,
+            "h": 5.63
+          },
+          "text": "",
+          "style": {
+            "fill": "#0F172A"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.75,
+            "y": 1.8,
+            "w": 8.5,
+            "h": 1.2
+          },
+          "text": "Design System Diagnostic Deck",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 32,
+            "bold": true,
+            "color": "#FFFFFF",
+            "align": "left"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.75,
+            "y": 2.9,
+            "w": 8.5,
+            "h": 0.6
+          },
+          "text": "All 11 slide-layout-presets + core element types (text / shape / line / table / image)",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 16,
+            "color": "#F1F5F9"
+          }
+        },
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0.75,
+            "y": 3.7,
+            "w": 2.2,
+            "h": 0.06
+          },
+          "text": "",
+          "style": {
+            "fill": "#0066CC"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.75,
+            "y": 4.9,
+            "w": 8.5,
+            "h": 0.4
+          },
+          "text": "Theme: kyberion-standard  |  Canvas: 10in x 5.63in (16:9)",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 11,
+            "color": "#F1F5F9"
+          }
+        }
+      ]
+    },
+    {
+      "id": "layout-01-cover-statement.xml",
+      "backgroundFill": "#FFFFFF",
+      "elements": [
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0,
+            "y": 0,
+            "w": 10,
+            "h": 5.63
+          },
+          "text": "",
+          "style": {
+            "fill": "#FFFFFF"
+          }
+        },
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0,
+            "y": 0,
+            "w": 10,
+            "h": 0.55
+          },
+          "text": "",
+          "style": {
+            "fill": "#0F172A"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.3,
+            "y": 0.08,
+            "w": 9.4,
+            "h": 0.4
+          },
+          "text": "LAYOUT 01/11  cover-statement",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 14,
+            "bold": true,
+            "color": "#FFFFFF",
+            "valign": "middle"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.75,
+            "y": 0.55,
+            "w": 8.5,
+            "h": 0.85
+          },
+          "text": "“cover-statement” — title zone",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 30,
+            "bold": true,
+            "align": "left",
+            "valign": "top",
+            "color": "#0F172A"
+          }
+        },
+        {
+          "type": "line",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0.75,
+            "y": 0.55,
+            "w": 8.5,
+            "h": 0.85
+          },
+          "style": {
+            "line": "#E2E8F0",
+            "lineWidth": 0.75,
+            "lineDash": "dash"
+          }
+        },
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0.75,
+            "y": 1.65,
+            "w": 5.5,
+            "h": 1.7
+          },
+          "text": "",
+          "style": {
+            "fill": "#F1F5F9"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.75,
+            "y": 1.65,
+            "w": 5.5,
+            "h": 1.7
+          },
+          "text": "Body zone: this text box uses the preset's own body position/size/fontSize from slide-layout-presets.json, unmodified.",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 16,
+            "bold": false,
+            "align": "left",
+            "valign": "top",
+            "color": "#0F172A"
+          }
+        },
+        {
+          "type": "line",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0.75,
+            "y": 1.65,
+            "w": 5.5,
+            "h": 1.7
+          },
+          "style": {
+            "line": "#E2E8F0",
+            "lineWidth": 0.75,
+            "lineDash": "dash"
+          }
+        },
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 6.7,
+            "y": 1.6,
+            "w": 2.1,
+            "h": 2.1
+          },
+          "text": "",
+          "style": {
+            "fill": "#0066CC"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 6.7,
+            "y": 1.6,
+            "w": 2.1,
+            "h": 2.1
+          },
+          "text": "visual zone",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 14,
+            "bold": false,
+            "align": "left",
+            "valign": "middle",
+            "color": "#FFFFFF"
+          }
+        },
+        {
+          "type": "line",
+          "shapeType": "rect",
+          "pos": {
+            "x": 6.7,
+            "y": 1.6,
+            "w": 2.1,
+            "h": 2.1
+          },
+          "style": {
+            "line": "#E2E8F0",
+            "lineWidth": 0.75,
+            "lineDash": "dash"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.3,
+            "y": 5.28,
+            "w": 9.4,
+            "h": 0.3
+          },
+          "text": "Kyberion design-system diagnostic deck — generated via media-actuator pptx_render",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 9,
+            "color": "#475569"
+          }
+        }
+      ]
+    },
+    {
+      "id": "layout-02-title-body.xml",
+      "backgroundFill": "#FFFFFF",
+      "elements": [
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0,
+            "y": 0,
+            "w": 10,
+            "h": 5.63
+          },
+          "text": "",
+          "style": {
+            "fill": "#FFFFFF"
+          }
+        },
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0,
+            "y": 0,
+            "w": 10,
+            "h": 0.55
+          },
+          "text": "",
+          "style": {
+            "fill": "#0F172A"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.3,
+            "y": 0.08,
+            "w": 9.4,
+            "h": 0.4
+          },
+          "text": "LAYOUT 02/11  title-body",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 14,
+            "bold": true,
+            "color": "#FFFFFF",
+            "valign": "middle"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.75,
+            "y": 0.55,
+            "w": 8.5,
+            "h": 0.85
+          },
+          "text": "“title-body” — title zone",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 26,
+            "bold": true,
+            "align": "left",
+            "valign": "top",
+            "color": "#0F172A"
+          }
+        },
+        {
+          "type": "line",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0.75,
+            "y": 0.55,
+            "w": 8.5,
+            "h": 0.85
+          },
+          "style": {
+            "line": "#E2E8F0",
+            "lineWidth": 0.75,
+            "lineDash": "dash"
+          }
+        },
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0.75,
+            "y": 1.65,
+            "w": 8.1,
+            "h": 2.5
+          },
+          "text": "",
+          "style": {
+            "fill": "#F1F5F9"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.75,
+            "y": 1.65,
+            "w": 8.1,
+            "h": 2.5
+          },
+          "text": "Body zone: this text box uses the preset's own body position/size/fontSize from slide-layout-presets.json, unmodified.",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 16,
+            "bold": false,
+            "align": "left",
+            "valign": "top",
+            "color": "#0F172A"
+          }
+        },
+        {
+          "type": "line",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0.75,
+            "y": 1.65,
+            "w": 8.1,
+            "h": 2.5
+          },
+          "style": {
+            "line": "#E2E8F0",
+            "lineWidth": 0.75,
+            "lineDash": "dash"
+          }
+        },
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0.9,
+            "y": 4.5,
+            "w": 8.1,
+            "h": 0.45
+          },
+          "text": "",
+          "style": {
+            "fill": "#0066CC"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.9,
+            "y": 4.5,
+            "w": 8.1,
+            "h": 0.45
+          },
+          "text": "visual zone",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 14,
+            "bold": false,
+            "align": "left",
+            "valign": "middle",
+            "color": "#FFFFFF"
+          }
+        },
+        {
+          "type": "line",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0.9,
+            "y": 4.5,
+            "w": 8.1,
+            "h": 0.45
+          },
+          "style": {
+            "line": "#E2E8F0",
+            "lineWidth": 0.75,
+            "lineDash": "dash"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.3,
+            "y": 5.28,
+            "w": 9.4,
+            "h": 0.3
+          },
+          "text": "Kyberion design-system diagnostic deck — generated via media-actuator pptx_render",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 9,
+            "color": "#475569"
+          }
+        }
+      ]
+    },
+    {
+      "id": "layout-03-evidence-callout.xml",
+      "backgroundFill": "#FFFFFF",
+      "elements": [
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0,
+            "y": 0,
+            "w": 10,
+            "h": 5.63
+          },
+          "text": "",
+          "style": {
+            "fill": "#FFFFFF"
+          }
+        },
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0,
+            "y": 0,
+            "w": 10,
+            "h": 0.55
+          },
+          "text": "",
+          "style": {
+            "fill": "#0F172A"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.3,
+            "y": 0.08,
+            "w": 9.4,
+            "h": 0.4
+          },
+          "text": "LAYOUT 03/11  evidence-callout",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 14,
+            "bold": true,
+            "color": "#FFFFFF",
+            "valign": "middle"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.75,
+            "y": 0.55,
+            "w": 8.5,
+            "h": 0.85
+          },
+          "text": "“evidence-callout” — title zone",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 26,
+            "bold": true,
+            "align": "left",
+            "valign": "top",
+            "color": "#0F172A"
+          }
+        },
+        {
+          "type": "line",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0.75,
+            "y": 0.55,
+            "w": 8.5,
+            "h": 0.85
+          },
+          "style": {
+            "line": "#E2E8F0",
+            "lineWidth": 0.75,
+            "lineDash": "dash"
+          }
+        },
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0.75,
+            "y": 1.65,
+            "w": 4.6,
+            "h": 2.8
+          },
+          "text": "",
+          "style": {
+            "fill": "#F1F5F9"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.75,
+            "y": 1.65,
+            "w": 4.6,
+            "h": 2.8
+          },
+          "text": "Body zone: this text box uses the preset's own body position/size/fontSize from slide-layout-presets.json, unmodified.",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 16,
+            "bold": false,
+            "align": "left",
+            "valign": "top",
+            "color": "#0F172A"
+          }
+        },
+        {
+          "type": "line",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0.75,
+            "y": 1.65,
+            "w": 4.6,
+            "h": 2.8
+          },
+          "style": {
+            "line": "#E2E8F0",
+            "lineWidth": 0.75,
+            "lineDash": "dash"
+          }
+        },
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 5.9,
+            "y": 1.4,
+            "w": 2.8,
+            "h": 2.9
+          },
+          "text": "",
+          "style": {
+            "fill": "#0066CC"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 5.9,
+            "y": 1.4,
+            "w": 2.8,
+            "h": 2.9
+          },
+          "text": "visual zone",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 14,
+            "bold": true,
+            "align": "left",
+            "valign": "middle",
+            "color": "#FFFFFF"
+          }
+        },
+        {
+          "type": "line",
+          "shapeType": "rect",
+          "pos": {
+            "x": 5.9,
+            "y": 1.4,
+            "w": 2.8,
+            "h": 2.9
+          },
+          "style": {
+            "line": "#E2E8F0",
+            "lineWidth": 0.75,
+            "lineDash": "dash"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.3,
+            "y": 5.28,
+            "w": 9.4,
+            "h": 0.3
+          },
+          "text": "Kyberion design-system diagnostic deck — generated via media-actuator pptx_render",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 9,
+            "color": "#475569"
+          }
+        }
+      ]
+    },
+    {
+      "id": "layout-04-two-column-story.xml",
+      "backgroundFill": "#FFFFFF",
+      "elements": [
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0,
+            "y": 0,
+            "w": 10,
+            "h": 5.63
+          },
+          "text": "",
+          "style": {
+            "fill": "#FFFFFF"
+          }
+        },
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0,
+            "y": 0,
+            "w": 10,
+            "h": 0.55
+          },
+          "text": "",
+          "style": {
+            "fill": "#0F172A"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.3,
+            "y": 0.08,
+            "w": 9.4,
+            "h": 0.4
+          },
+          "text": "LAYOUT 04/11  two-column-story",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 14,
+            "bold": true,
+            "color": "#FFFFFF",
+            "valign": "middle"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.75,
+            "y": 0.55,
+            "w": 8.5,
+            "h": 0.85
+          },
+          "text": "“two-column-story” — title zone",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 26,
+            "bold": true,
+            "align": "left",
+            "valign": "top",
+            "color": "#0F172A"
+          }
+        },
+        {
+          "type": "line",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0.75,
+            "y": 0.55,
+            "w": 8.5,
+            "h": 0.85
+          },
+          "style": {
+            "line": "#E2E8F0",
+            "lineWidth": 0.75,
+            "lineDash": "dash"
+          }
+        },
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0.75,
+            "y": 1.65,
+            "w": 3.8,
+            "h": 3.0
+          },
+          "text": "",
+          "style": {
+            "fill": "#F1F5F9"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.75,
+            "y": 1.65,
+            "w": 3.8,
+            "h": 3.0
+          },
+          "text": "Body zone: this text box uses the preset's own body position/size/fontSize from slide-layout-presets.json, unmodified.",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 16,
+            "bold": false,
+            "align": "left",
+            "valign": "top",
+            "color": "#0F172A"
+          }
+        },
+        {
+          "type": "line",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0.75,
+            "y": 1.65,
+            "w": 3.8,
+            "h": 3.0
+          },
+          "style": {
+            "line": "#E2E8F0",
+            "lineWidth": 0.75,
+            "lineDash": "dash"
+          }
+        },
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 5.2,
+            "y": 1.6,
+            "w": 3.3,
+            "h": 3.0
+          },
+          "text": "",
+          "style": {
+            "fill": "#0066CC"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 5.2,
+            "y": 1.6,
+            "w": 3.3,
+            "h": 3.0
+          },
+          "text": "visual zone",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 14,
+            "bold": false,
+            "align": "left",
+            "valign": "middle",
+            "color": "#FFFFFF"
+          }
+        },
+        {
+          "type": "line",
+          "shapeType": "rect",
+          "pos": {
+            "x": 5.2,
+            "y": 1.6,
+            "w": 3.3,
+            "h": 3.0
+          },
+          "style": {
+            "line": "#E2E8F0",
+            "lineWidth": 0.75,
+            "lineDash": "dash"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.3,
+            "y": 5.28,
+            "w": 9.4,
+            "h": 0.3
+          },
+          "text": "Kyberion design-system diagnostic deck — generated via media-actuator pptx_render",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 9,
+            "color": "#475569"
+          }
+        }
+      ]
+    },
+    {
+      "id": "layout-05-three-point-architecture.xml",
+      "backgroundFill": "#FFFFFF",
+      "elements": [
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0,
+            "y": 0,
+            "w": 10,
+            "h": 5.63
+          },
+          "text": "",
+          "style": {
+            "fill": "#FFFFFF"
+          }
+        },
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0,
+            "y": 0,
+            "w": 10,
+            "h": 0.55
+          },
+          "text": "",
+          "style": {
+            "fill": "#0F172A"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.3,
+            "y": 0.08,
+            "w": 9.4,
+            "h": 0.4
+          },
+          "text": "LAYOUT 05/11  three-point-architecture",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 14,
+            "bold": true,
+            "color": "#FFFFFF",
+            "valign": "middle"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.75,
+            "y": 0.55,
+            "w": 8.5,
+            "h": 0.85
+          },
+          "text": "“three-point-architecture” — title zone",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 26,
+            "bold": true,
+            "align": "left",
+            "valign": "top",
+            "color": "#0F172A"
+          }
+        },
+        {
+          "type": "line",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0.75,
+            "y": 0.55,
+            "w": 8.5,
+            "h": 0.85
+          },
+          "style": {
+            "line": "#E2E8F0",
+            "lineWidth": 0.75,
+            "lineDash": "dash"
+          }
+        },
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0.75,
+            "y": 1.65,
+            "w": 8.0,
+            "h": 1.5
+          },
+          "text": "",
+          "style": {
+            "fill": "#F1F5F9"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.75,
+            "y": 1.65,
+            "w": 8.0,
+            "h": 1.5
+          },
+          "text": "Body zone: this text box uses the preset's own body position/size/fontSize from slide-layout-presets.json, unmodified.",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 16,
+            "bold": false,
+            "align": "left",
+            "valign": "top",
+            "color": "#0F172A"
+          }
+        },
+        {
+          "type": "line",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0.75,
+            "y": 1.65,
+            "w": 8.0,
+            "h": 1.5
+          },
+          "style": {
+            "line": "#E2E8F0",
+            "lineWidth": 0.75,
+            "lineDash": "dash"
+          }
+        },
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0.9,
+            "y": 3.4,
+            "w": 8.0,
+            "h": 1.0
+          },
+          "text": "",
+          "style": {
+            "fill": "#0066CC"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.9,
+            "y": 3.4,
+            "w": 8.0,
+            "h": 1.0
+          },
+          "text": "visual zone",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 14,
+            "bold": false,
+            "align": "left",
+            "valign": "middle",
+            "color": "#FFFFFF"
+          }
+        },
+        {
+          "type": "line",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0.9,
+            "y": 3.4,
+            "w": 8.0,
+            "h": 1.0
+          },
+          "style": {
+            "line": "#E2E8F0",
+            "lineWidth": 0.75,
+            "lineDash": "dash"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.3,
+            "y": 5.28,
+            "w": 9.4,
+            "h": 0.3
+          },
+          "text": "Kyberion design-system diagnostic deck — generated via media-actuator pptx_render",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 9,
+            "color": "#475569"
+          }
+        }
+      ]
+    },
+    {
+      "id": "layout-06-risk-controls.xml",
+      "backgroundFill": "#FFFFFF",
+      "elements": [
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0,
+            "y": 0,
+            "w": 10,
+            "h": 5.63
+          },
+          "text": "",
+          "style": {
+            "fill": "#FFFFFF"
+          }
+        },
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0,
+            "y": 0,
+            "w": 10,
+            "h": 0.55
+          },
+          "text": "",
+          "style": {
+            "fill": "#0F172A"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.3,
+            "y": 0.08,
+            "w": 9.4,
+            "h": 0.4
+          },
+          "text": "LAYOUT 06/11  risk-controls",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 14,
+            "bold": true,
+            "color": "#FFFFFF",
+            "valign": "middle"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.75,
+            "y": 0.55,
+            "w": 8.5,
+            "h": 0.85
+          },
+          "text": "“risk-controls” — title zone",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 26,
+            "bold": true,
+            "align": "left",
+            "valign": "top",
+            "color": "#0F172A"
+          }
+        },
+        {
+          "type": "line",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0.75,
+            "y": 0.55,
+            "w": 8.5,
+            "h": 0.85
+          },
+          "style": {
+            "line": "#E2E8F0",
+            "lineWidth": 0.75,
+            "lineDash": "dash"
+          }
+        },
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0.75,
+            "y": 1.65,
+            "w": 3.9,
+            "h": 3.1
+          },
+          "text": "",
+          "style": {
+            "fill": "#F1F5F9"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.75,
+            "y": 1.65,
+            "w": 3.9,
+            "h": 3.1
+          },
+          "text": "Body zone: this text box uses the preset's own body position/size/fontSize from slide-layout-presets.json, unmodified.",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 16,
+            "bold": false,
+            "align": "left",
+            "valign": "top",
+            "color": "#0F172A"
+          }
+        },
+        {
+          "type": "line",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0.75,
+            "y": 1.65,
+            "w": 3.9,
+            "h": 3.1
+          },
+          "style": {
+            "line": "#E2E8F0",
+            "lineWidth": 0.75,
+            "lineDash": "dash"
+          }
+        },
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 5.2,
+            "y": 1.45,
+            "w": 3.4,
+            "h": 3.1
+          },
+          "text": "",
+          "style": {
+            "fill": "#0066CC"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 5.2,
+            "y": 1.45,
+            "w": 3.4,
+            "h": 3.1
+          },
+          "text": "visual zone",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 14,
+            "bold": false,
+            "align": "left",
+            "valign": "middle",
+            "color": "#FFFFFF"
+          }
+        },
+        {
+          "type": "line",
+          "shapeType": "rect",
+          "pos": {
+            "x": 5.2,
+            "y": 1.45,
+            "w": 3.4,
+            "h": 3.1
+          },
+          "style": {
+            "line": "#E2E8F0",
+            "lineWidth": 0.75,
+            "lineDash": "dash"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.3,
+            "y": 5.28,
+            "w": 9.4,
+            "h": 0.3
+          },
+          "text": "Kyberion design-system diagnostic deck — generated via media-actuator pptx_render",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 9,
+            "color": "#475569"
+          }
+        }
+      ]
+    },
+    {
+      "id": "layout-07-timeline-roadmap.xml",
+      "backgroundFill": "#FFFFFF",
+      "elements": [
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0,
+            "y": 0,
+            "w": 10,
+            "h": 5.63
+          },
+          "text": "",
+          "style": {
+            "fill": "#FFFFFF"
+          }
+        },
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0,
+            "y": 0,
+            "w": 10,
+            "h": 0.55
+          },
+          "text": "",
+          "style": {
+            "fill": "#0F172A"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.3,
+            "y": 0.08,
+            "w": 9.4,
+            "h": 0.4
+          },
+          "text": "LAYOUT 07/11  timeline-roadmap",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 14,
+            "bold": true,
+            "color": "#FFFFFF",
+            "valign": "middle"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.75,
+            "y": 0.55,
+            "w": 8.5,
+            "h": 0.85
+          },
+          "text": "“timeline-roadmap” — title zone",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 26,
+            "bold": true,
+            "align": "left",
+            "valign": "top",
+            "color": "#0F172A"
+          }
+        },
+        {
+          "type": "line",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0.75,
+            "y": 0.55,
+            "w": 8.5,
+            "h": 0.85
+          },
+          "style": {
+            "line": "#E2E8F0",
+            "lineWidth": 0.75,
+            "lineDash": "dash"
+          }
+        },
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0.75,
+            "y": 1.65,
+            "w": 2.8,
+            "h": 2.8
+          },
+          "text": "",
+          "style": {
+            "fill": "#F1F5F9"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.75,
+            "y": 1.65,
+            "w": 2.8,
+            "h": 2.8
+          },
+          "text": "Body zone: this text box uses the preset's own body position/size/fontSize from slide-layout-presets.json, unmodified.",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 16,
+            "bold": false,
+            "align": "left",
+            "valign": "top",
+            "color": "#0F172A"
+          }
+        },
+        {
+          "type": "line",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0.75,
+            "y": 1.65,
+            "w": 2.8,
+            "h": 2.8
+          },
+          "style": {
+            "line": "#E2E8F0",
+            "lineWidth": 0.75,
+            "lineDash": "dash"
+          }
+        },
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 4.1,
+            "y": 1.8,
+            "w": 4.5,
+            "h": 1.8
+          },
+          "text": "",
+          "style": {
+            "fill": "#0066CC"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 4.1,
+            "y": 1.8,
+            "w": 4.5,
+            "h": 1.8
+          },
+          "text": "visual zone",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 14,
+            "bold": false,
+            "align": "left",
+            "valign": "middle",
+            "color": "#FFFFFF"
+          }
+        },
+        {
+          "type": "line",
+          "shapeType": "rect",
+          "pos": {
+            "x": 4.1,
+            "y": 1.8,
+            "w": 4.5,
+            "h": 1.8
+          },
+          "style": {
+            "line": "#E2E8F0",
+            "lineWidth": 0.75,
+            "lineDash": "dash"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.3,
+            "y": 5.28,
+            "w": 9.4,
+            "h": 0.3
+          },
+          "text": "Kyberion design-system diagnostic deck — generated via media-actuator pptx_render",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 9,
+            "color": "#475569"
+          }
+        }
+      ]
+    },
+    {
+      "id": "layout-08-decision-cta.xml",
+      "backgroundFill": "#FFFFFF",
+      "elements": [
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0,
+            "y": 0,
+            "w": 10,
+            "h": 5.63
+          },
+          "text": "",
+          "style": {
+            "fill": "#FFFFFF"
+          }
+        },
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0,
+            "y": 0,
+            "w": 10,
+            "h": 0.55
+          },
+          "text": "",
+          "style": {
+            "fill": "#0F172A"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.3,
+            "y": 0.08,
+            "w": 9.4,
+            "h": 0.4
+          },
+          "text": "LAYOUT 08/11  decision-cta",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 14,
+            "bold": true,
+            "color": "#FFFFFF",
+            "valign": "middle"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.75,
+            "y": 0.55,
+            "w": 8.5,
+            "h": 0.85
+          },
+          "text": "“decision-cta” — title zone",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 26,
+            "bold": true,
+            "align": "center",
+            "valign": "top",
+            "color": "#0F172A"
+          }
+        },
+        {
+          "type": "line",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0.75,
+            "y": 0.55,
+            "w": 8.5,
+            "h": 0.85
+          },
+          "style": {
+            "line": "#E2E8F0",
+            "lineWidth": 0.75,
+            "lineDash": "dash"
+          }
+        },
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 1.5,
+            "y": 1.65,
+            "w": 6.8,
+            "h": 1.2
+          },
+          "text": "",
+          "style": {
+            "fill": "#F1F5F9"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 1.5,
+            "y": 1.65,
+            "w": 6.8,
+            "h": 1.2
+          },
+          "text": "Body zone: this text box uses the preset's own body position/size/fontSize from slide-layout-presets.json, unmodified.",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 16,
+            "bold": false,
+            "align": "center",
+            "valign": "top",
+            "color": "#0F172A"
+          }
+        },
+        {
+          "type": "line",
+          "shapeType": "rect",
+          "pos": {
+            "x": 1.5,
+            "y": 1.65,
+            "w": 6.8,
+            "h": 1.2
+          },
+          "style": {
+            "line": "#E2E8F0",
+            "lineWidth": 0.75,
+            "lineDash": "dash"
+          }
+        },
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 2.5,
+            "y": 3.7,
+            "w": 4.5,
+            "h": 0.6
+          },
+          "text": "",
+          "style": {
+            "fill": "#0066CC"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 2.5,
+            "y": 3.7,
+            "w": 4.5,
+            "h": 0.6
+          },
+          "text": "visual zone",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 14,
+            "bold": true,
+            "align": "left",
+            "valign": "middle",
+            "color": "#FFFFFF"
+          }
+        },
+        {
+          "type": "line",
+          "shapeType": "rect",
+          "pos": {
+            "x": 2.5,
+            "y": 3.7,
+            "w": 4.5,
+            "h": 0.6
+          },
+          "style": {
+            "line": "#E2E8F0",
+            "lineWidth": 0.75,
+            "lineDash": "dash"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.3,
+            "y": 5.28,
+            "w": 9.4,
+            "h": 0.3
+          },
+          "text": "Kyberion design-system diagnostic deck — generated via media-actuator pptx_render",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 9,
+            "color": "#475569"
+          }
+        }
+      ]
+    },
+    {
+      "id": "layout-09-immersive-vision.xml",
+      "backgroundFill": "#FFFFFF",
+      "elements": [
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0,
+            "y": 0,
+            "w": 10,
+            "h": 5.63
+          },
+          "text": "",
+          "style": {
+            "fill": "#FFFFFF"
+          }
+        },
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0,
+            "y": 0,
+            "w": 10,
+            "h": 0.55
+          },
+          "text": "",
+          "style": {
+            "fill": "#0F172A"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.3,
+            "y": 0.08,
+            "w": 9.4,
+            "h": 0.4
+          },
+          "text": "LAYOUT 09/11  immersive-vision",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 14,
+            "bold": true,
+            "color": "#FFFFFF",
+            "valign": "middle"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.75,
+            "y": 0.55,
+            "w": 8.5,
+            "h": 0.85
+          },
+          "text": "“immersive-vision” — title zone",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 30,
+            "bold": true,
+            "align": "left",
+            "valign": "top",
+            "color": "#0F172A"
+          }
+        },
+        {
+          "type": "line",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0.75,
+            "y": 0.55,
+            "w": 8.5,
+            "h": 0.85
+          },
+          "style": {
+            "line": "#E2E8F0",
+            "lineWidth": 0.75,
+            "lineDash": "dash"
+          }
+        },
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0.75,
+            "y": 1.65,
+            "w": 3.2,
+            "h": 2.5
+          },
+          "text": "",
+          "style": {
+            "fill": "#F1F5F9"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.75,
+            "y": 1.65,
+            "w": 3.2,
+            "h": 2.5
+          },
+          "text": "Body zone: this text box uses the preset's own body position/size/fontSize from slide-layout-presets.json, unmodified.",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 16,
+            "bold": false,
+            "align": "left",
+            "valign": "top",
+            "color": "#0F172A"
+          }
+        },
+        {
+          "type": "line",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0.75,
+            "y": 1.65,
+            "w": 3.2,
+            "h": 2.5
+          },
+          "style": {
+            "line": "#E2E8F0",
+            "lineWidth": 0.75,
+            "lineDash": "dash"
+          }
+        },
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 4.6,
+            "y": 1.3,
+            "w": 4.0,
+            "h": 3.1
+          },
+          "text": "",
+          "style": {
+            "fill": "#0066CC"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 4.6,
+            "y": 1.3,
+            "w": 4.0,
+            "h": 3.1
+          },
+          "text": "visual zone",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 14,
+            "bold": false,
+            "align": "left",
+            "valign": "middle",
+            "color": "#FFFFFF"
+          }
+        },
+        {
+          "type": "line",
+          "shapeType": "rect",
+          "pos": {
+            "x": 4.6,
+            "y": 1.3,
+            "w": 4.0,
+            "h": 3.1
+          },
+          "style": {
+            "line": "#E2E8F0",
+            "lineWidth": 0.75,
+            "lineDash": "dash"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.3,
+            "y": 5.28,
+            "w": 9.4,
+            "h": 0.3
+          },
+          "text": "Kyberion design-system diagnostic deck — generated via media-actuator pptx_render",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 9,
+            "color": "#475569"
+          }
+        }
+      ]
+    },
+    {
+      "id": "layout-10-three-pillars.xml",
+      "backgroundFill": "#FFFFFF",
+      "elements": [
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0,
+            "y": 0,
+            "w": 10,
+            "h": 5.63
+          },
+          "text": "",
+          "style": {
+            "fill": "#FFFFFF"
+          }
+        },
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0,
+            "y": 0,
+            "w": 10,
+            "h": 0.55
+          },
+          "text": "",
+          "style": {
+            "fill": "#0F172A"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.3,
+            "y": 0.08,
+            "w": 9.4,
+            "h": 0.4
+          },
+          "text": "LAYOUT 10/11  three-pillars",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 14,
+            "bold": true,
+            "color": "#FFFFFF",
+            "valign": "middle"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.75,
+            "y": 0.55,
+            "w": 8.5,
+            "h": 0.85
+          },
+          "text": "“three-pillars” — title zone",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 26,
+            "bold": true,
+            "align": "left",
+            "valign": "top",
+            "color": "#0F172A"
+          }
+        },
+        {
+          "type": "line",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0.75,
+            "y": 0.55,
+            "w": 8.5,
+            "h": 0.85
+          },
+          "style": {
+            "line": "#E2E8F0",
+            "lineWidth": 0.75,
+            "lineDash": "dash"
+          }
+        },
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0.75,
+            "y": 1.65,
+            "w": 8.0,
+            "h": 1.4
+          },
+          "text": "",
+          "style": {
+            "fill": "#F1F5F9"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.75,
+            "y": 1.65,
+            "w": 8.0,
+            "h": 1.4
+          },
+          "text": "Body zone: this text box uses the preset's own body position/size/fontSize from slide-layout-presets.json, unmodified.",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 16,
+            "bold": false,
+            "align": "left",
+            "valign": "top",
+            "color": "#0F172A"
+          }
+        },
+        {
+          "type": "line",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0.75,
+            "y": 1.65,
+            "w": 8.0,
+            "h": 1.4
+          },
+          "style": {
+            "line": "#E2E8F0",
+            "lineWidth": 0.75,
+            "lineDash": "dash"
+          }
+        },
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0.9,
+            "y": 3.1,
+            "w": 8.0,
+            "h": 1.2
+          },
+          "text": "",
+          "style": {
+            "fill": "#0066CC"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.9,
+            "y": 3.1,
+            "w": 8.0,
+            "h": 1.2
+          },
+          "text": "visual zone",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 14,
+            "bold": false,
+            "align": "left",
+            "valign": "middle",
+            "color": "#FFFFFF"
+          }
+        },
+        {
+          "type": "line",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0.9,
+            "y": 3.1,
+            "w": 8.0,
+            "h": 1.2
+          },
+          "style": {
+            "line": "#E2E8F0",
+            "lineWidth": 0.75,
+            "lineDash": "dash"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.3,
+            "y": 5.28,
+            "w": 9.4,
+            "h": 0.3
+          },
+          "text": "Kyberion design-system diagnostic deck — generated via media-actuator pptx_render",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 9,
+            "color": "#475569"
+          }
+        }
+      ]
+    },
+    {
+      "id": "layout-11-operating-model.xml",
+      "backgroundFill": "#FFFFFF",
+      "elements": [
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0,
+            "y": 0,
+            "w": 10,
+            "h": 5.63
+          },
+          "text": "",
+          "style": {
+            "fill": "#FFFFFF"
+          }
+        },
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0,
+            "y": 0,
+            "w": 10,
+            "h": 0.55
+          },
+          "text": "",
+          "style": {
+            "fill": "#0F172A"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.3,
+            "y": 0.08,
+            "w": 9.4,
+            "h": 0.4
+          },
+          "text": "LAYOUT 11/11  operating-model",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 14,
+            "bold": true,
+            "color": "#FFFFFF",
+            "valign": "middle"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.75,
+            "y": 0.55,
+            "w": 8.5,
+            "h": 0.85
+          },
+          "text": "“operating-model” — title zone",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 26,
+            "bold": true,
+            "align": "left",
+            "valign": "top",
+            "color": "#0F172A"
+          }
+        },
+        {
+          "type": "line",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0.75,
+            "y": 0.55,
+            "w": 8.5,
+            "h": 0.85
+          },
+          "style": {
+            "line": "#E2E8F0",
+            "lineWidth": 0.75,
+            "lineDash": "dash"
+          }
+        },
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0.75,
+            "y": 1.65,
+            "w": 3.5,
+            "h": 2.9
+          },
+          "text": "",
+          "style": {
+            "fill": "#F1F5F9"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.75,
+            "y": 1.65,
+            "w": 3.5,
+            "h": 2.9
+          },
+          "text": "Body zone: this text box uses the preset's own body position/size/fontSize from slide-layout-presets.json, unmodified.",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 16,
+            "bold": false,
+            "align": "left",
+            "valign": "top",
+            "color": "#0F172A"
+          }
+        },
+        {
+          "type": "line",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0.75,
+            "y": 1.65,
+            "w": 3.5,
+            "h": 2.9
+          },
+          "style": {
+            "line": "#E2E8F0",
+            "lineWidth": 0.75,
+            "lineDash": "dash"
+          }
+        },
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 4.8,
+            "y": 1.5,
+            "w": 3.8,
+            "h": 2.9
+          },
+          "text": "",
+          "style": {
+            "fill": "#0066CC"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 4.8,
+            "y": 1.5,
+            "w": 3.8,
+            "h": 2.9
+          },
+          "text": "visual zone",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 14,
+            "bold": false,
+            "align": "left",
+            "valign": "middle",
+            "color": "#FFFFFF"
+          }
+        },
+        {
+          "type": "line",
+          "shapeType": "rect",
+          "pos": {
+            "x": 4.8,
+            "y": 1.5,
+            "w": 3.8,
+            "h": 2.9
+          },
+          "style": {
+            "line": "#E2E8F0",
+            "lineWidth": 0.75,
+            "lineDash": "dash"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.3,
+            "y": 5.28,
+            "w": 9.4,
+            "h": 0.3
+          },
+          "text": "Kyberion design-system diagnostic deck — generated via media-actuator pptx_render",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 9,
+            "color": "#475569"
+          }
+        }
+      ]
+    },
+    {
+      "id": "objects-shape.xml",
+      "backgroundFill": "#FFFFFF",
+      "elements": [
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0,
+            "y": 0,
+            "w": 10,
+            "h": 5.63
+          },
+          "text": "",
+          "style": {
+            "fill": "#FFFFFF"
+          }
+        },
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0,
+            "y": 0,
+            "w": 10,
+            "h": 0.55
+          },
+          "text": "",
+          "style": {
+            "fill": "#0F172A"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.3,
+            "y": 0.08,
+            "w": 9.4,
+            "h": 0.4
+          },
+          "text": "OBJECTS  shape (prstGeom variety)",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 14,
+            "bold": true,
+            "color": "#FFFFFF",
+            "valign": "middle"
+          }
+        },
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0.6,
+            "y": 1.1,
+            "w": 2.4,
+            "h": 1.5
+          },
+          "text": "rect",
+          "style": {
+            "fill": "#0066CC",
+            "color": "FFFFFF",
+            "fontFamily": "Inter",
+            "fontSize": 13,
+            "bold": true,
+            "align": "center",
+            "valign": "middle"
+          }
+        },
+        {
+          "type": "shape",
+          "shapeType": "roundRect",
+          "pos": {
+            "x": 3.6,
+            "y": 1.1,
+            "w": 2.4,
+            "h": 1.5
+          },
+          "text": "roundRect",
+          "style": {
+            "fill": "#334155",
+            "color": "FFFFFF",
+            "fontFamily": "Inter",
+            "fontSize": 13,
+            "bold": true,
+            "align": "center",
+            "valign": "middle"
+          }
+        },
+        {
+          "type": "shape",
+          "shapeType": "ellipse",
+          "pos": {
+            "x": 6.6,
+            "y": 1.1,
+            "w": 2.4,
+            "h": 1.5
+          },
+          "text": "ellipse",
+          "style": {
+            "fill": "#0066CC",
+            "color": "FFFFFF",
+            "fontFamily": "Inter",
+            "fontSize": 13,
+            "bold": true,
+            "align": "center",
+            "valign": "middle"
+          }
+        },
+        {
+          "type": "shape",
+          "shapeType": "triangle",
+          "pos": {
+            "x": 0.6,
+            "y": 3.1,
+            "w": 2.4,
+            "h": 1.5
+          },
+          "text": "triangle",
+          "style": {
+            "fill": "#334155",
+            "color": "FFFFFF",
+            "fontFamily": "Inter",
+            "fontSize": 13,
+            "bold": true,
+            "align": "center",
+            "valign": "middle"
+          }
+        },
+        {
+          "type": "shape",
+          "shapeType": "diamond",
+          "pos": {
+            "x": 3.6,
+            "y": 3.1,
+            "w": 2.4,
+            "h": 1.5
+          },
+          "text": "diamond",
+          "style": {
+            "fill": "#0066CC",
+            "color": "FFFFFF",
+            "fontFamily": "Inter",
+            "fontSize": 13,
+            "bold": true,
+            "align": "center",
+            "valign": "middle"
+          }
+        },
+        {
+          "type": "shape",
+          "shapeType": "rightArrow",
+          "pos": {
+            "x": 6.6,
+            "y": 3.1,
+            "w": 2.4,
+            "h": 1.5
+          },
+          "text": "rightArrow",
+          "style": {
+            "fill": "#334155",
+            "color": "FFFFFF",
+            "fontFamily": "Inter",
+            "fontSize": 13,
+            "bold": true,
+            "align": "center",
+            "valign": "middle"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.3,
+            "y": 5.28,
+            "w": 9.4,
+            "h": 0.3
+          },
+          "text": "Kyberion design-system diagnostic deck — generated via media-actuator pptx_render",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 9,
+            "color": "#475569"
+          }
+        }
+      ]
+    },
+    {
+      "id": "objects-line.xml",
+      "backgroundFill": "#FFFFFF",
+      "elements": [
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0,
+            "y": 0,
+            "w": 10,
+            "h": 5.63
+          },
+          "text": "",
+          "style": {
+            "fill": "#FFFFFF"
+          }
+        },
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0,
+            "y": 0,
+            "w": 10,
+            "h": 0.55
+          },
+          "text": "",
+          "style": {
+            "fill": "#0F172A"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.3,
+            "y": 0.08,
+            "w": 9.4,
+            "h": 0.4
+          },
+          "text": "OBJECTS  line (connector variety)",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 14,
+            "bold": true,
+            "color": "#FFFFFF",
+            "valign": "middle"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.6,
+            "y": 0.85,
+            "w": 4,
+            "h": 0.3
+          },
+          "text": "straightConnector1 / solid",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 11,
+            "color": "#475569"
+          }
+        },
+        {
+          "type": "line",
+          "shapeType": "straightConnector1",
+          "pos": {
+            "x": 0.6,
+            "y": 1.2,
+            "w": 8.4,
+            "h": 0.6
+          },
+          "style": {
+            "line": "#0F172A",
+            "lineWidth": 2
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.6,
+            "y": 1.85,
+            "w": 4,
+            "h": 0.3
+          },
+          "text": "straightConnector1 / dash",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 11,
+            "color": "#475569"
+          }
+        },
+        {
+          "type": "line",
+          "shapeType": "straightConnector1",
+          "pos": {
+            "x": 0.6,
+            "y": 2.2,
+            "w": 8.4,
+            "h": 0.6
+          },
+          "style": {
+            "line": "#0F172A",
+            "lineWidth": 2,
+            "lineDash": "dash"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.6,
+            "y": 2.85,
+            "w": 4,
+            "h": 0.3
+          },
+          "text": "bentConnector3 / solid",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 11,
+            "color": "#475569"
+          }
+        },
+        {
+          "type": "line",
+          "shapeType": "bentConnector3",
+          "pos": {
+            "x": 0.6,
+            "y": 3.2,
+            "w": 8.4,
+            "h": 0.6
+          },
+          "style": {
+            "line": "#0F172A",
+            "lineWidth": 2
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.6,
+            "y": 3.85,
+            "w": 4,
+            "h": 0.3
+          },
+          "text": "curvedConnector3 / solid",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 11,
+            "color": "#475569"
+          }
+        },
+        {
+          "type": "line",
+          "shapeType": "curvedConnector3",
+          "pos": {
+            "x": 0.6,
+            "y": 4.2,
+            "w": 8.4,
+            "h": 0.6
+          },
+          "style": {
+            "line": "#0F172A",
+            "lineWidth": 2
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.3,
+            "y": 5.28,
+            "w": 9.4,
+            "h": 0.3
+          },
+          "text": "Kyberion design-system diagnostic deck — generated via media-actuator pptx_render",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 9,
+            "color": "#475569"
+          }
+        }
+      ]
+    },
+    {
+      "id": "objects-table.xml",
+      "backgroundFill": "#FFFFFF",
+      "elements": [
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0,
+            "y": 0,
+            "w": 10,
+            "h": 5.63
+          },
+          "text": "",
+          "style": {
+            "fill": "#FFFFFF"
+          }
+        },
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0,
+            "y": 0,
+            "w": 10,
+            "h": 0.55
+          },
+          "text": "",
+          "style": {
+            "fill": "#0F172A"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.3,
+            "y": 0.08,
+            "w": 9.4,
+            "h": 0.4
+          },
+          "text": "OBJECTS  table",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 14,
+            "bold": true,
+            "color": "#FFFFFF",
+            "valign": "middle"
+          }
+        },
+        {
+          "type": "table",
+          "pos": {
+            "x": 0.6,
+            "y": 1.1,
+            "w": 8.8,
+            "h": 3.5
+          },
+          "rows": [
+            ["Layout preset", "Zones", "Status"],
+            ["cover-statement", "title / body / visual", "rendered"],
+            ["two-column-story", "title / body / visual", "rendered"],
+            ["timeline-roadmap", "title / body / visual", "rendered"],
+            ["operating-model", "title / body / visual", "rendered"]
+          ]
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.3,
+            "y": 5.28,
+            "w": 9.4,
+            "h": 0.3
+          },
+          "text": "Kyberion design-system diagnostic deck — generated via media-actuator pptx_render",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 9,
+            "color": "#475569"
+          }
+        }
+      ]
+    },
+    {
+      "id": "objects-image.xml",
+      "backgroundFill": "#FFFFFF",
+      "elements": [
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0,
+            "y": 0,
+            "w": 10,
+            "h": 5.63
+          },
+          "text": "",
+          "style": {
+            "fill": "#FFFFFF"
+          }
+        },
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0,
+            "y": 0,
+            "w": 10,
+            "h": 0.55
+          },
+          "text": "",
+          "style": {
+            "fill": "#0F172A"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.3,
+            "y": 0.08,
+            "w": 9.4,
+            "h": 0.4
+          },
+          "text": "OBJECTS  image (embedded base64 PNG)",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 14,
+            "bold": true,
+            "color": "#FFFFFF",
+            "valign": "middle"
+          }
+        },
+        {
+          "type": "image",
+          "pos": {
+            "x": 2.9,
+            "y": 1.3,
+            "w": 4.2,
+            "h": 2.36
+          },
+          "imageData": "iVBORw0KGgoAAAANSUhEUgAAAPAAAACHCAIAAACnEEO8AAABFElEQVR42u3SAQkAAAzDsKm92ouajMMJREFpMgt/SIChwdBgaDA0hgZDg6HB0GBoDA2GBkODocHQGBoMDYYGQ4OhMTQYGgwNhgZDY2gwNBgaDA2GxtBgaDA0GBoMjaHB0GBoMDSGBkODocHQYGgMDYYGQ4OhwdAYGgwNhgZDg6ExNBgaDA2GBkNjaDA0GBoMDYbG0GBoMDQYGgyNocHQYGgwNBgaQ4OhwdBgaAwNhgZDg6HB0BgaDA2GBkODoTE0GBoMDYYGQ2NoMDQYGgwNhsbQYGgwNBgaDI2hwdBgaDA0GBpDg6HB0GBoDK0ChgZDg6HB0BgaDA2GBkODoTE0GBoMDYYGQ2NoMDQYGgwNhsbQYGg4UyKNUPqv73gSAAAAAElFTkSuQmCC",
+          "altText": "solid accent-color placeholder"
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.6,
+            "y": 3.9,
+            "w": 8.8,
+            "h": 0.4
+          },
+          "text": "240x135px solid-fill placeholder, embedded inline (no external asset dependency)",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 11,
+            "color": "#475569",
+            "align": "center"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.3,
+            "y": 5.28,
+            "w": 9.4,
+            "h": 0.3
+          },
+          "text": "Kyberion design-system diagnostic deck — generated via media-actuator pptx_render",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 9,
+            "color": "#475569"
+          }
+        }
+      ]
+    },
+    {
+      "id": "scope-note.xml",
+      "backgroundFill": "#FFFFFF",
+      "elements": [
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0,
+            "y": 0,
+            "w": 10,
+            "h": 5.63
+          },
+          "text": "",
+          "style": {
+            "fill": "#FFFFFF"
+          }
+        },
+        {
+          "type": "shape",
+          "shapeType": "rect",
+          "pos": {
+            "x": 0,
+            "y": 0,
+            "w": 10,
+            "h": 0.55
+          },
+          "text": "",
+          "style": {
+            "fill": "#0F172A"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.3,
+            "y": 0.08,
+            "w": 9.4,
+            "h": 0.4
+          },
+          "text": "SCOPE NOTE  smartart / chart intentionally excluded",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 14,
+            "bold": true,
+            "color": "#FFFFFF",
+            "valign": "middle"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.6,
+            "y": 1.0,
+            "w": 8.8,
+            "h": 3.5
+          },
+          "text": "smartart and chart element types exist in the native-pptx-engine (engine.ts) but require hand-authored raw OOXML diagram/chart XML with no example fixture anywhere in this repo — zero test coverage for either path. Rather than risk a corrupt file from hand-written XML, this deck covers the other 6 element types plus all 11 layout presets. If smartart/chart matter for your use case, that is a separate, focused follow-up — flag it and we can build a minimal known-good fixture for just those two paths.",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 14,
+            "color": "#0F172A"
+          }
+        },
+        {
+          "type": "text",
+          "pos": {
+            "x": 0.3,
+            "y": 5.28,
+            "w": 9.4,
+            "h": 0.3
+          },
+          "text": "Kyberion design-system diagnostic deck — generated via media-actuator pptx_render",
+          "style": {
+            "fontFamily": "Inter",
+            "fontSize": 9,
+            "color": "#475569"
+          }
+        }
+      ]
+    }
+  ]
+}
