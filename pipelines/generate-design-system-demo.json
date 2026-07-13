@@ -1,7 +1,7 @@
 {
-  "id": "generate-masterclass-pptx",
-  "version": "1.1.0",
-  "description": "Generate premium masterclass PPTX via media-actuator pipeline",
+  "id": "generate-design-system-demo",
+  "version": "1.0.0",
+  "description": "Diagnostic PPTX exercising all 11 slide-layout-presets and 5 core element types (shape/line/table/image/text) via media:pptx_render.",
   "steps": [
     {
       "id": "read-design-protocol",
@@ -12,7 +12,7 @@
         "type": "PptxDesignProtocol"
       },
       "params": {
-        "path": "pipelines/fragments/masterclass_design_protocol.json"
+        "path": "pipelines/fragments/design_system_demo_protocol.json"
       }
     },
     {
@@ -21,7 +21,7 @@
       "op": "media:pptx_render",
       "consumes": "last_pptx_design",
       "params": {
-        "path": "active/shared/tmp/all_objects_layout_sample.pptx"
+        "path": "active/shared/tmp/design_system_demo.pptx"
       }
     },
     {
@@ -29,7 +29,7 @@
       "role": "sink",
       "op": "system:shell",
       "params": {
-        "cmd": "mkdir -p active/shared/exports && cp active/shared/tmp/all_objects_layout_sample.pptx active/shared/exports/all_objects_layout_sample.pptx"
+        "cmd": "mkdir -p active/shared/exports && cp active/shared/tmp/design_system_demo.pptx active/shared/exports/design_system_demo.pptx"
       }
     }
   ]
