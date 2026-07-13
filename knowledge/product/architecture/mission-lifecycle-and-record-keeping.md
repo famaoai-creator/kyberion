@@ -48,23 +48,23 @@ Create mission
 
 ## Canonical stages and artifacts
 
-| Stage | Owner | Primary artifacts | Notes |
-|---|---|---|---|
-| Create | `mission_controller` | `mission-state.json`, `team-composition.json`, `team-blueprint.json` | Initializes the mission repo and durable metadata. |
-| Start | `mission_controller` | `mission-state.json`, `TASK_BOARD.md`, `ROLE_PROCEDURE.md` | Activates the mission and binds the focus branch. |
-| Team | `mission_controller` + team composer | `team-composition.json`, `team-blueprint.json` | Chooses roles and governance before delegation begins. |
-| Staff | `agent-runtime-supervisor` | runtime request/result logs, runtime observability | Ensures live agents exist before tasks are delegated. |
-| Record task | mission owner / planner | `LATEST_TASK.json`, `execution-ledger.jsonl` | Flight recorder entry for the next unit of work. |
-| Context pack | mission owner / planner | `coordination/context-packs/**` | Compiles a scoped mission context pack from mission / project / task / role state before execution. |
-| Ticket dispatch | mission owner / planner | `coordination/tickets/**`, `coordination/events/ticket-events.jsonl`, `NEXT_TASKS.json` ticket annotations | Registers mission tasks as durable WorkItem records and optional GitHub / Jira payload artifacts before live routing. |
-| Work item dispatch | mission owner / planner | `coordination/tickets/replies/**`, ticket manifest updates, mission evidence response artifacts | Routes registered WorkItems to a live agent or subagent and writes the completion / review result back to the ticket records. |
-| Existing work reconciliation | `mission_controller` | reconciliation manifest, `evidence/work-reconciliation/**`, `execution-ledger.jsonl`, `NEXT_TASKS.json` reconciliation annotations | Exception path for adopting hash-bound, verified work completed before dispatch. It is not a replacement for normal work-item dispatch. |
-| Board update | Work Coordination Platform | `WorkItem`, board view, claim/handoff/release state | Durable work tracking; not runtime ownership. |
-| A2A / transport | agents | A2A messages, peer transport, short-lived coordination logs | Used for short instructions or branching work, not lifecycle authority. |
-| Fanout / critique | `wisdom` ops | `hypothesis-tree*.json`, `dissent-log.json` | Divergent reasoning and review. |
-| Checkpoint | `mission_controller` | `mission-state.json`, git checkpoint history | Records a task boundary and mission commit hash. |
-| Verify / distill | `mission_controller` | verification output, distilled notes | Moves the mission toward completion. |
-| Finish | `mission_controller` | archived mission repo, trace summary | Closes the mission after evidence and validation are complete. |
+| Stage                        | Owner                                | Primary artifacts                                                                                                                  | Notes                                                                                                                                   |
+| ---------------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Create                       | `mission_controller`                 | `mission-state.json`, `team-composition.json`, `team-blueprint.json`                                                               | Initializes the mission repo and durable metadata.                                                                                      |
+| Start                        | `mission_controller`                 | `mission-state.json`, `TASK_BOARD.md`, `ROLE_PROCEDURE.md`                                                                         | Activates the mission and binds the focus branch.                                                                                       |
+| Team                         | `mission_controller` + team composer | `team-composition.json`, `team-blueprint.json`                                                                                     | Chooses roles and governance before delegation begins.                                                                                  |
+| Staff                        | `agent-runtime-supervisor`           | runtime request/result logs, runtime observability                                                                                 | Ensures live agents exist before tasks are delegated.                                                                                   |
+| Record task                  | mission owner / planner              | `LATEST_TASK.json`, `execution-ledger.jsonl`                                                                                       | Flight recorder entry for the next unit of work.                                                                                        |
+| Context pack                 | mission owner / planner              | `coordination/context-packs/**`                                                                                                    | Compiles a scoped mission context pack from mission / project / task / role state before execution.                                     |
+| Ticket dispatch              | mission owner / planner              | `coordination/tickets/**`, `coordination/events/ticket-events.jsonl`, `NEXT_TASKS.json` ticket annotations                         | Registers mission tasks as durable WorkItem records and optional GitHub / Jira payload artifacts before live routing.                   |
+| Work item dispatch           | mission owner / planner              | `coordination/tickets/replies/**`, ticket manifest updates, mission evidence response artifacts                                    | Routes registered WorkItems to a live agent or subagent and writes the completion / review result back to the ticket records.           |
+| Existing work reconciliation | `mission_controller`                 | reconciliation manifest, `evidence/work-reconciliation/**`, `execution-ledger.jsonl`, `NEXT_TASKS.json` reconciliation annotations | Exception path for adopting hash-bound, verified work completed before dispatch. It is not a replacement for normal work-item dispatch. |
+| Board update                 | Work Coordination Platform           | `WorkItem`, board view, claim/handoff/release state                                                                                | Durable work tracking; not runtime ownership.                                                                                           |
+| A2A / transport              | agents                               | A2A messages, peer transport, short-lived coordination logs                                                                        | Used for short instructions or branching work, not lifecycle authority.                                                                 |
+| Fanout / critique            | `wisdom` ops                         | `hypothesis-tree*.json`, `dissent-log.json`                                                                                        | Divergent reasoning and review.                                                                                                         |
+| Checkpoint                   | `mission_controller`                 | `mission-state.json`, git checkpoint history                                                                                       | Records a task boundary and mission commit hash.                                                                                        |
+| Verify / distill             | `mission_controller`                 | verification output, distilled notes                                                                                               | Moves the mission toward completion.                                                                                                    |
+| Finish                       | `mission_controller`                 | archived mission repo, trace summary                                                                                               | Closes the mission after evidence and validation are complete.                                                                          |
 
 ## Board vs transport
 
@@ -163,6 +163,36 @@ It does not execute the recorded verification command, infer completion from a
 Git diff, close external tickets, or accept changed artifacts. Operators must
 run the verification first and preserve its result as Evidence.
 
+### Artifact quality review during reconciliation
+
+Reviewer and QA tasks have a stricter contract than implementation tasks. A
+review task must provide exactly one `kind: review` Evidence entry containing
+an `artifact-review-receipt` JSON document. The receipt binds:
+
+- Mission, review task, and review target task IDs
+- artifact path, kind, and SHA-256
+- reviewer agent, specialist roles, and implementer identities
+- reviewer independence, verdict, findings, and acceptance criteria
+
+Both the receipt and reviewed artifact must exist unchanged in the declared
+source commit. `reconcile-work` rejects a generic review note, self-review,
+missing specialist role, blocking finding, non-approved verdict, or changed
+artifact. On apply, it copies a normalized receipt into
+`evidence/reviews/` and annotates the reviewer task. `finish` re-hashes the
+artifact and evaluates the same receipt again.
+
+Reviewer profiles are selected from artifact kind, Mission class, and risk.
+Specialist roles define the review perspective; required capabilities guide
+agent selection. The task-specific resolver excludes known implementation
+agents before choosing the reviewer.
+
+If a reviewed artifact changes, `finish` reopens only its review task and
+keeps the implementation task completed. If ordinary work remains, `finish`
+returns the Mission to `active` without adding a synthetic
+`repair-finish-exit` task. Lifecycle bookkeeping failures that do not identify
+an artifact review task pause for operator action instead of creating artifact
+rework.
+
 ## Persona and authority split
 
 - `KYBERION_PERSONA` describes the display / reasoning persona.
@@ -187,12 +217,13 @@ For a new team-composing mission, the stable operator sequence is:
 6. `mission_controller dispatch-tickets <MISSION_ID>`
 7. `mission_controller dispatch-workitems <MISSION_ID>`
 8. If work already exists outside dispatch, dry-run and apply `reconcile-work`
-9. Update the board or work item view
-10. Use `a2a_fanout` for divergent analysis or critique
-11. `mission_controller checkpoint <MISSION_ID> <TASK_ID> <NOTE>`
-12. `mission_controller verify <MISSION_ID> verified <NOTE>`
-13. `mission_controller distill <MISSION_ID>`
-14. `mission_controller finish <MISSION_ID>`
+9. Ensure reviewer tasks have valid hash-bound artifact review receipts
+10. Update the board or work item view
+11. Use `a2a_fanout` for divergent analysis or critique
+12. `mission_controller checkpoint <MISSION_ID> <TASK_ID> <NOTE>`
+13. `mission_controller verify <MISSION_ID> verified <NOTE>`
+14. `mission_controller distill <MISSION_ID>`
+15. `mission_controller finish <MISSION_ID>`
 
 Each step should leave a durable artifact or audit trail.
 
