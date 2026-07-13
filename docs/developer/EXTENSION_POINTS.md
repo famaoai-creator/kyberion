@@ -3,7 +3,7 @@ title: Kyberion Extension Points
 category: Developer
 tags: [extension, semver, contract, plugin, actuator]
 importance: 10
-last_updated: 2026-06-24
+last_updated: 2026-07-13
 ---
 
 # Kyberion Extension Points
@@ -143,6 +143,30 @@ The set of `pnpm <command>` scripts in `package.json`.
 **Internal**:
 
 - The internal helper scripts under `scripts/`.
+
+### 2.9 Mission Artifact Review — **Beta**
+
+The artifact review receipt and reviewer profile are exposed for governed
+Mission extensions but may evolve before promotion to Stable.
+
+**Beta**:
+
+- `knowledge/product/schemas/artifact-review-receipt.schema.json`
+- `resolveArtifactReviewerProfile(...)`
+- `evaluateArtifactReviews(...)`
+- Optional `excludedAgentIds` and `requiredCapabilities` filters on
+  `resolveMissionTeamReceiver(...)`
+
+**Internal**:
+
+- `NEXT_TASKS.json` annotations such as `artifact_review_profile` and
+  `artifact_review_receipt`
+- Mission-local receipt file naming and review-round bookkeeping
+- Finish failure classification and task reopen mechanics
+
+Extensions should emit a schema-valid receipt and use the public evaluator.
+They must not infer approval from a free-form review note or bypass artifact
+re-hashing at reconcile/finish time.
 
 ## 3. Semver Rules
 

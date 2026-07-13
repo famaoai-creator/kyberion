@@ -6,11 +6,14 @@
 import * as path from 'node:path';
 import {
   auditChain,
+  evaluateArtifactReviews,
   evaluateDeliverableQuality,
   findMissionPath,
   logger,
   pathResolver,
   inferDeliverableKind,
+  inferArtifactReviewKind,
+  loadArtifactReviewReceipt,
   safeAppendFileSync,
   safeExec,
   safeExistsSync,
@@ -24,6 +27,7 @@ import {
   trustEngine,
   validateOutcomeContractAtCompletion,
   validateMarketingCompletionEvidence,
+  receiptToArtifactReviewDecision,
   type MarketingCompletionEvidence,
   evaluateArtifactBundleGate,
   loadLatestArtifactBundleForMission,
@@ -80,7 +84,17 @@ export function readTrustLedger(): Record<string, any> {
 
 export async function validateMissionQuality(
   id: string
-): Promise<{ ok: boolean; reason?: string }> {
+): Promise<{ ok: boolean; reason?: string; reviewTaskIds?: string[] }> {
+  const state = loadState(id);
+  if (!state) return { ok: false, reason: 'Mission state not found.' };
+
+  const missionPath = findMissionPath(id);
+  const artifactReviewGate = validateMissionArtifactReviewGate({
+    missionId: id,
+    missionPath,
+  });
+  if (!artifactReviewGate.ok) return artifactReviewGate;
+
   const policyPath = pathResolver.knowledge('product/governance/security-policy.json');
   if (!safeExistsSync(policyPath)) return { ok: true };
 
@@ -88,17 +102,13 @@ export async function validateMissionQuality(
   const reqs = policy.quality_requirements;
   if (!reqs) return { ok: true };
 
-  const state = loadState(id);
-  if (!state) return { ok: false, reason: 'Mission state not found.' };
-
   const marketingCompletion = validateMarketingMissionCompletionGate({
     missionType: state.mission_type,
-    missionPath: findMissionPath(id),
+    missionPath,
   });
   if (!marketingCompletion.ok) return marketingCompletion;
 
   if (state.outcome_contract) {
-    const missionPath = findMissionPath(id);
     const evidenceRefs =
       missionPath && safeExistsSync(path.join(missionPath, 'evidence'))
         ? safeReaddir(path.join(missionPath, 'evidence'))
@@ -150,7 +160,6 @@ export async function validateMissionQuality(
     }
   }
 
-  const missionPath = findMissionPath(id);
   if (missionPath) {
     const head = safeExec('git', ['rev-parse', 'HEAD'], { cwd: missionPath }).trim();
     if (state.git.latest_commit !== head) {
@@ -161,6 +170,137 @@ export async function validateMissionQuality(
     }
   }
 
+  return { ok: true };
+}
+
+interface ArtifactReviewPlannedTask {
+  task_id?: string;
+  status?: string;
+  assigned_to?: { role?: string };
+  review_target?: string;
+  artifact_review_receipt?: string;
+  artifact_review_profile?: {
+    artifact_kind?: 'doc' | 'deck' | 'code' | 'media';
+    artifact_path?: string;
+    artifact_sha256?: string;
+    required_reviewer_roles?: string[];
+    independence_required?: boolean;
+    implementer_agent_ids?: string[];
+  };
+}
+
+const TERMINAL_REVIEW_TASK_STATUSES = new Set(['done', 'completed', 'accepted', 'reviewed']);
+
+export function validateMissionArtifactReviewGate(input: {
+  missionId: string;
+  missionPath: string | null;
+}): { ok: boolean; reason?: string; reviewTaskIds?: string[] } {
+  if (!input.missionPath) return { ok: true };
+  const taskPath = path.join(input.missionPath, 'NEXT_TASKS.json');
+  if (!safeExistsSync(taskPath)) return { ok: true };
+
+  let tasks: ArtifactReviewPlannedTask[];
+  try {
+    const raw = JSON.parse(String(safeReadFile(taskPath, { encoding: 'utf8' }))) as unknown;
+    if (!Array.isArray(raw)) return { ok: false, reason: 'NEXT_TASKS.json must contain an array.' };
+    tasks = raw.filter((entry): entry is ArtifactReviewPlannedTask =>
+      Boolean(entry && typeof entry === 'object')
+    );
+  } catch (error) {
+    return {
+      ok: false,
+      reason: `Artifact review gate could not read NEXT_TASKS.json: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+
+  for (const task of tasks) {
+    const profile = task.artifact_review_profile;
+    if (!profile) continue;
+    const taskId = String(task.task_id || '').trim();
+    const role = String(task.assigned_to?.role || '')
+      .trim()
+      .toLowerCase();
+    if (role !== 'reviewer' && role !== 'qa') continue;
+    if (!TERMINAL_REVIEW_TASK_STATUSES.has(String(task.status || '').toLowerCase())) continue;
+    const receiptReference = String(task.artifact_review_receipt || '').trim();
+    if (!receiptReference) {
+      return {
+        ok: false,
+        reason: `Artifact review gate failed for ${taskId}: review receipt is missing.`,
+        reviewTaskIds: [taskId],
+      };
+    }
+    const receiptPath = path.resolve(input.missionPath, receiptReference);
+    const relativeReceiptPath = path.relative(input.missionPath, receiptPath);
+    if (relativeReceiptPath.startsWith('..') || path.isAbsolute(relativeReceiptPath)) {
+      return {
+        ok: false,
+        reason: `Artifact review gate failed for ${taskId}: receipt must remain inside the mission directory.`,
+        reviewTaskIds: [taskId],
+      };
+    }
+
+    try {
+      const receipt = loadArtifactReviewReceipt(receiptPath);
+      const identityReasons: string[] = [];
+      if (receipt.mission_id.toUpperCase() !== input.missionId.toUpperCase()) {
+        identityReasons.push(`receipt mission_id is ${receipt.mission_id}`);
+      }
+      if (receipt.review_task_id !== taskId) {
+        identityReasons.push(`receipt review_task_id is ${receipt.review_task_id}`);
+      }
+      if (task.review_target && receipt.review_target_task_id !== task.review_target) {
+        identityReasons.push(`receipt review_target_task_id is ${receipt.review_target_task_id}`);
+      }
+      if (profile.artifact_path && receipt.artifact.path !== profile.artifact_path) {
+        identityReasons.push('receipt artifact path does not match the review profile');
+      }
+      if (profile.artifact_sha256 && receipt.artifact.sha256 !== profile.artifact_sha256) {
+        identityReasons.push('receipt artifact hash does not match the review profile');
+      }
+      const artifactPath = pathResolver.rootResolve(receipt.artifact.path);
+      const inferredArtifactKind = inferArtifactReviewKind(receipt.artifact.path);
+      if (receipt.artifact.kind !== inferredArtifactKind) {
+        identityReasons.push(
+          `receipt artifact kind ${receipt.artifact.kind} does not match inferred kind ${inferredArtifactKind}`
+        );
+      }
+      if (profile.artifact_kind && receipt.artifact.kind !== profile.artifact_kind) {
+        identityReasons.push('receipt artifact kind does not match the review profile');
+      }
+      if (!safeExistsSync(artifactPath) || !safeStat(artifactPath).isFile()) {
+        identityReasons.push(`reviewed artifact is missing: ${receipt.artifact.path}`);
+      }
+      if (identityReasons.length > 0) {
+        return {
+          ok: false,
+          reason: `Artifact review gate failed for ${taskId}: ${identityReasons.join('; ')}.`,
+          reviewTaskIds: [taskId],
+        };
+      }
+      const currentHash = sha256(safeReadFile(artifactPath) as Buffer);
+      const evaluation = evaluateArtifactReviews({
+        artifacts: [{ path: receipt.artifact.path, sha256: currentHash }],
+        reviews: [receiptToArtifactReviewDecision(receipt)],
+        requiredReviewerRoles: profile.required_reviewer_roles || [],
+        implementerAgentIds: profile.implementer_agent_ids || [],
+        requireIndependence: profile.independence_required === true,
+      });
+      if (!evaluation.ready) {
+        return {
+          ok: false,
+          reason: `Artifact review gate failed for ${taskId}: ${evaluation.reasons.join('; ')}.`,
+          reviewTaskIds: [taskId],
+        };
+      }
+    } catch (error) {
+      return {
+        ok: false,
+        reason: `Artifact review gate failed for ${taskId}: ${error instanceof Error ? error.message : String(error)}`,
+        reviewTaskIds: [taskId],
+      };
+    }
+  }
   return { ok: true };
 }
 

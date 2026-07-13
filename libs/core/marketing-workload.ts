@@ -3,6 +3,7 @@ import * as customerResolver from './customer-resolver.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { computeApprovalPayloadHash, type ApprovalRequestRecord } from './approval-store.js';
+import { evaluateArtifactReviews } from './artifact-review.js';
 
 export type MarketingRiskLevel = 0 | 1 | 2 | 3 | 4;
 export type MarketingGateId = 'G0' | 'G1' | 'G2' | 'G3' | 'G4' | 'G5' | 'G6';
@@ -380,29 +381,25 @@ export function aggregateMarketingReviews(input: {
   reviews: MarketingReview[];
   requiredReviewerRoles: string[];
 }): GateResult {
-  const reasons: string[] = [];
-  const currentHashes = new Map(
-    Object.values(input.artifacts).map((artifact) => [artifact.path, artifact.sha256])
-  );
-  for (const review of input.reviews) {
-    if (currentHashes.get(review.artifact_path) !== review.artifact_sha256) {
-      reasons.push(`review ${review.review_id} was invalidated by artifact change`);
-    }
-    if (review.findings.some((finding) => finding.severity === 'blocking')) {
-      reasons.push(`review ${review.review_id} has blocking findings`);
-    }
-    if (review.verdict !== 'approved')
-      reasons.push(`review ${review.review_id} is ${review.verdict}`);
-  }
-  const reviewerRoles = new Set(input.reviews.map((review) => review.reviewer_role));
-  for (const role of input.requiredReviewerRoles) {
-    if (!reviewerRoles.has(role)) reasons.push(`required reviewer role is missing: ${role}`);
-  }
-  return gateResult(
-    'G4',
-    reasons,
-    input.reviews.map((review) => review.review_id)
-  );
+  const evaluation = evaluateArtifactReviews({
+    artifacts: Object.values(input.artifacts),
+    reviews: input.reviews.map((review) => ({
+      review_id: review.review_id,
+      artifact_path: review.artifact_path,
+      artifact_sha256: review.artifact_sha256,
+      reviewer_role: review.reviewer_role,
+      verdict: review.verdict,
+      findings: review.findings.map((finding) => ({
+        severity: finding.severity,
+        category: finding.category,
+        description: finding.description,
+        ...(finding.required_action ? { required_action: finding.required_action } : {}),
+        ...(finding.location ? { location: JSON.stringify(finding.location) } : {}),
+      })),
+    })),
+    requiredReviewerRoles: input.requiredReviewerRoles,
+  });
+  return gateResult('G4', evaluation.reasons, evaluation.review_ids);
 }
 
 export function validatePublicationApproval(input: {

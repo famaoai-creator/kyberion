@@ -569,6 +569,13 @@ Mission tasks were dispatched. Start from
 every task acceptance criterion to hash-bound Evidence plus a passed
 verification record.
 
+Reviewer/QA tasks additionally require one `kind: review` Evidence entry that
+is a JSON `artifact-review-receipt`. A Markdown review summary alone cannot
+complete a reviewer task. The receipt must identify the review target,
+reviewed artifact SHA-256, specialist roles, reviewer agent, and verified
+independence from the implementation agent. The reviewed artifact and receipt
+must both be unchanged in the source commit.
+
 Always run `--dry-run` first. Reconciliation fails without changing Mission
 state when the source commit is not on the declared branch, an artifact hash
 changed, Evidence is not tracked unchanged by that commit, Evidence escapes
@@ -579,6 +586,13 @@ apply writes a receipt under
 marks only listed tasks completed, and synchronizes an existing local WorkItem.
 It never closes GitHub or Jira tickets and never executes the recorded test
 command.
+
+`finish` does not create `repair-finish-exit` when normal pending tasks already
+exist. Run `dispatch-workitems` for those tasks instead. If an artifact changed
+after approval, only the corresponding reviewer task is reopened; rerun the
+review and then repeat verify/distill/finish. A lifecycle bookkeeping mismatch
+such as a stale checkpoint pauses for operator action and must not be treated
+as a request to rewrite the deliverable.
 
 ### Reasoning policy
 

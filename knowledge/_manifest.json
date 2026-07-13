@@ -507,7 +507,7 @@
     {
       "path": "product/architecture/mission-lifecycle-and-record-keeping.md",
       "tier": "public",
-      "size": 9568,
+      "size": 14315,
       "type": "md"
     },
     {
@@ -1611,7 +1611,7 @@
     {
       "path": "product/governance/mission-review-gate-registry.json",
       "tier": "public",
-      "size": 5413,
+      "size": 7625,
       "type": "json"
     },
     {
@@ -5875,6 +5875,18 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/artifact-review-receipt.example.json",
+      "tier": "public",
+      "size": 1013,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/artifact-review-receipt.schema.json",
+      "tier": "public",
+      "size": 2909,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/assistant-compiler-request.schema.json",
       "tier": "public",
       "size": 2624,
@@ -6579,7 +6591,7 @@
     {
       "path": "product/schemas/mission-review-gate-registry.schema.json",
       "tier": "public",
-      "size": 2559,
+      "size": 4081,
       "type": "json"
     },
     {
