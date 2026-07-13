@@ -206,6 +206,13 @@ interface PlannedNextTask {
     implementer_agent_ids: string[];
   };
   artifact_review_receipt?: string;
+  reconciliation?: Record<string, unknown> & {
+    evidence?: Array<{
+      path: string;
+      sha256?: string;
+      kind: 'artifact' | 'test_report' | 'review' | 'trace' | 'receipt';
+    }>;
+  };
   last_result?: TaskResultBlock;
   review_findings?: Array<{
     severity: 'must_fix' | 'should_fix' | 'nit';
@@ -354,6 +361,9 @@ function validatePlannedNextTasks(rawTasks: unknown, missionId: string): Planned
         : {}),
       ...(typeof task.artifact_review_receipt === 'string' && task.artifact_review_receipt.trim()
         ? { artifact_review_receipt: task.artifact_review_receipt.trim() }
+        : {}),
+      ...(task.reconciliation && typeof task.reconciliation === 'object'
+        ? { reconciliation: task.reconciliation as PlannedNextTask['reconciliation'] }
         : {}),
       ...(task.last_result && typeof task.last_result === 'object'
         ? { last_result: task.last_result as PlannedNextTask['last_result'] }
@@ -557,9 +567,14 @@ function resolveReviewArtifact(input: {
   const resultArtifacts = (targetTask.last_result?.artifacts || [])
     .map((artifact) => String(artifact?.path || '').trim())
     .filter(Boolean);
+  const reconciledArtifacts = (targetTask.reconciliation?.evidence || [])
+    .filter((evidence) => evidence.kind === 'artifact')
+    .map((evidence) => String(evidence.path || '').trim())
+    .filter(Boolean);
   const candidates = [
     diffPath,
     ...resultArtifacts,
+    ...reconciledArtifacts,
     String(targetTask.target_path || '').trim(),
     String(targetTask.deliverable || '').trim(),
   ].filter(Boolean);
@@ -572,7 +587,7 @@ function resolveReviewArtifact(input: {
     if (absolutePath) break;
   }
   const kind = inferArtifactReviewKind(
-    String(targetTask.target_path || targetTask.deliverable || absolutePath || '')
+    String(targetTask.target_path || absolutePath || targetTask.deliverable || '')
   );
   const targetRole = String(targetTask.assigned_to?.role || '').trim();
   const resolvedAgent =
