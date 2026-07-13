@@ -142,6 +142,7 @@ export * from './operation-policy-gate.js';
 export * from './video-visual-direction.js';
 export * from './deck-theme-direction.js';
 export * from './semantic-decide.js';
+export * from './observation-distill.js';
 export * from './ranking-signals.js';
 export * from './operation-policy-gate.js';
 export * from './ranking-signals.js';
@@ -1154,6 +1155,10 @@ export {
   registerReasoningBackend,
   resetReasoningBackend,
   stubReasoningBackend,
+  getStubServedOps,
+  resetStubServedOps,
+  stubExplicitlyRequested,
+  type StubServedRecord,
 } from './reasoning-backend.js';
 export { AnthropicReasoningBackend } from './anthropic-reasoning-backend.js';
 export type { AnthropicReasoningBackendOptions } from './anthropic-reasoning-backend.js';
@@ -1237,6 +1242,39 @@ export {
   resolveReasoningBackendModeFromContext,
   resetReasoningBackendPolicyCache,
 } from './reasoning-backend-policy.js';
+export {
+  markReasoningDegraded,
+  clearReasoningDegraded,
+  readReasoningDegraded,
+  reasoningDegradedMarkerPath,
+  type ReasoningDegradedMarker,
+} from './reasoning-degradation.js';
+export {
+  recordAdhocPipelineRun,
+  listPromotionCandidates,
+  PROMOTION_CANDIDATE_MIN_RUNS,
+  type AdhocRunTally,
+} from './promotion-candidates.js';
+export {
+  appendSemanticDegradationRun,
+  summarizeSemanticDegradations,
+  type SemanticDegradationRun,
+  type SemanticDegradationSummary,
+} from './semantic-degradation-log.js';
+export {
+  REJECTION_REASON_CATEGORIES,
+  normalizeRejectionReasonCategory,
+  type RejectionReasonCategory,
+} from './rejection-reason.js';
+export {
+  enqueueReviewReentryRequest,
+  listReviewReentryRequests,
+  listPendingReviewReentryRequests,
+  markReviewReentryProcessed,
+  buildReviewGapText,
+  type ReviewReentryRequest,
+  type ReviewReentryVerdict,
+} from './review-reentry.js';
 export {
   loadReasoningLevelPolicy,
   resolveReasoningLevelDecision,
@@ -1699,6 +1737,7 @@ export type { Trace, TraceSpan, TraceEvent, TraceArtifact } from './src/trace.js
 export {
   extractHintsFromTrace,
   persistHints,
+  readHintsByCategory,
   checkScheduleHealth,
   recordPipelineResult,
   runFeedbackLoop,

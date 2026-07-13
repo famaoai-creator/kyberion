@@ -149,43 +149,45 @@ Legacy or conceptual capability names are intentionally excluded here. If a comp
 
 ### Transform ops (type: transform)
 
-| Op                                   | Actuators                                  |
-| :----------------------------------- | :----------------------------------------- |
-| `ajv_validate`                       | modeling                                   |
-| `apply_pattern`                      | media                                      |
-| `apply_theme`                        | media                                      |
-| `array_count`                        | wisdom                                     |
-| `compile_narrated_video_brief`       | video-composition                          |
-| `compile_video_content_brief`        | video-composition                          |
-| `export_adf`                         | browser                                    |
-| `export_playwright`                  | browser                                    |
-| `find_ui_nodes`                      | android                                    |
-| `impact_analysis`                    | code                                       |
-| `json_parse`                         | file                                       |
-| `json_query`                         | browser, modeling, network, system, wisdom |
-| `json_update`                        | code                                       |
-| `llm_decide`                         | browser                                    |
-| `merge_content`                      | media                                      |
-| `mermaid_gen`                        | modeling                                   |
-| `path_join`                          | file                                       |
-| `proposal_content_from_storyline`    | media                                      |
-| `proposal_storyline_from_brief`      | media                                      |
-| `regex_extract`                      | browser, network, system, wisdom           |
-| `regex_replace`                      | code, file, wisdom                         |
-| `run_js`                             | code, system                               |
-| `set`                                | android, ios, media, secret                |
-| `sre_analyze`                        | system                                     |
-| `summarize_ui_tree`                  | android                                    |
-| `team_plan`                          | agent                                      |
-| `team_role`                          | agent                                      |
-| `terraform_to_architecture_adf`      | modeling                                   |
-| `terraform_to_topology_ir`           | modeling                                   |
-| `test_inventory_to_browser_pipeline` | modeling                                   |
-| `test_inventory_to_device_pipeline`  | modeling                                   |
-| `theme_from_pptx_design`             | media                                      |
-| `ui_flow_to_test_inventory`          | modeling                                   |
-| `web_profile_to_ui_flow_adf`         | modeling                                   |
-| `yaml_update`                        | wisdom                                     |
+| Op                                   | Actuators                                   |
+| :----------------------------------- | :------------------------------------------ |
+| `ajv_validate`                       | modeling                                    |
+| `apply_pattern`                      | media                                       |
+| `apply_theme`                        | media                                       |
+| `array_count`                        | wisdom                                      |
+| `compile_narrated_video_brief`       | video-composition                           |
+| `compile_video_content_brief`        | video-composition                           |
+| `distill_output`                     | system                                      |
+| `distill_response`                   | network                                     |
+| `export_adf`                         | browser                                     |
+| `export_playwright`                  | browser                                     |
+| `find_ui_nodes`                      | android                                     |
+| `impact_analysis`                    | code                                        |
+| `json_parse`                         | file                                        |
+| `json_query`                         | browser, modeling, network, system, wisdom  |
+| `json_update`                        | code                                        |
+| `llm_decide`                         | android, browser, network, system, terminal |
+| `merge_content`                      | media                                       |
+| `mermaid_gen`                        | modeling                                    |
+| `path_join`                          | file                                        |
+| `proposal_content_from_storyline`    | media                                       |
+| `proposal_storyline_from_brief`      | media                                       |
+| `regex_extract`                      | browser, network, system, wisdom            |
+| `regex_replace`                      | code, file, wisdom                          |
+| `run_js`                             | code, system                                |
+| `set`                                | android, ios, media, secret                 |
+| `sre_analyze`                        | system                                      |
+| `summarize_ui_tree`                  | android                                     |
+| `team_plan`                          | agent                                       |
+| `team_role`                          | agent                                       |
+| `terraform_to_architecture_adf`      | modeling                                    |
+| `terraform_to_topology_ir`           | modeling                                    |
+| `test_inventory_to_browser_pipeline` | modeling                                    |
+| `test_inventory_to_device_pipeline`  | modeling                                    |
+| `theme_from_pptx_design`             | media                                       |
+| `ui_flow_to_test_inventory`          | modeling                                    |
+| `web_profile_to_ui_flow_adf`         | modeling                                    |
+| `yaml_update`                        | wisdom                                      |
 
 ### Apply ops (type: apply)
 

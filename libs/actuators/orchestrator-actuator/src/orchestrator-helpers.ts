@@ -1,5 +1,7 @@
 import {
   buildCostReportFromHistory,
+  summarizeSemanticDegradations,
+  listPromotionCandidates,
   logger,
   safeReadFile,
   safeWriteFile,
@@ -623,6 +625,50 @@ async function opTransform(op: string, params: any, ctx: any) {
       } catch (_) {
         /* no cost ledger yet — omit the finding */
       }
+      // LC-09 follow-up: weekly llm_decide degradation count — a pipeline
+      // fleet quietly riding deterministic fallbacks should be visible here.
+      let weeklyDegradations: number | undefined;
+      try {
+        const degradation = summarizeSemanticDegradations({
+          sinceMs: 7 * 24 * 60 * 60 * 1000,
+        });
+        if (degradation.total > 0) {
+          weeklyDegradations = degradation.total;
+          const reasons = Object.entries(degradation.by_reason)
+            .map(([reason, count]) => `${reason}=${count}`)
+            .join(', ');
+          const pipelines = degradation.top_pipelines
+            .map((entry) => `${entry.pipeline_id} (${entry.total})`)
+            .join(', ');
+          findings.push({
+            id: 'semantic-degradations',
+            severity: 'warn',
+            message: `llm_decide degraded ${degradation.total}x across ${degradation.runs} run(s) this week (${reasons})`,
+            detail: `top pipelines — ${pipelines || '(none)'}`,
+          });
+        }
+      } catch (_) {
+        /* no degradation log yet — omit the finding */
+      }
+      // LC-02 follow-up: ad-hoc ADFs that keep succeeding are promotion
+      // candidates — surface them instead of waiting for someone to notice.
+      try {
+        const candidates = listPromotionCandidates();
+        if (candidates.length > 0) {
+          const listed = candidates
+            .slice(0, 3)
+            .map((entry) => `${entry.path} (${entry.count}x)`)
+            .join(', ');
+          findings.push({
+            id: 'promotion-candidates',
+            severity: 'info',
+            message: `${candidates.length} ad-hoc pipeline(s) succeeded repeatedly — promote with pipeline:promote`,
+            detail: listed,
+          });
+        }
+      } catch (_) {
+        /* no tally yet — omit the finding */
+      }
       const surfaceCount = Object.keys(snapshot.surface_status?.surfaces || {}).length;
       const headline = findings.some((item) => item.severity === 'error')
         ? 'System requires attention'
@@ -651,6 +697,9 @@ async function opTransform(op: string, params: any, ctx: any) {
             esm_ok: Boolean(snapshot.esm_integrity?.ok),
             catalogs_ok: Boolean(snapshot.catalog_integrity?.ok),
             ...(weeklyCostUsd !== undefined ? { weekly_cost_usd: weeklyCostUsd } : {}),
+            ...(weeklyDegradations !== undefined
+              ? { weekly_semantic_degradations: weeklyDegradations }
+              : {}),
           },
           sources: [
             'dist/scripts/surface_runtime.js --action status',

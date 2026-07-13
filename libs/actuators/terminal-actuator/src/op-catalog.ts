@@ -16,7 +16,7 @@ export const TERMINAL_ACTUATOR_CAPTURE_OPS = [
   'list_terminal_sessions',
 ] as const;
 
-export const TERMINAL_ACTUATOR_TRANSFORM_OPS = [] as const;
+export const TERMINAL_ACTUATOR_TRANSFORM_OPS = ['llm_decide'] as const;
 
 export const TERMINAL_ACTUATOR_APPLY_OPS = [
   'spawn',

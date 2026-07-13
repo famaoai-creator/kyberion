@@ -13,6 +13,7 @@
         "knowledge/",
         "libs/core/",
         "scripts/",
+        "pipelines/",
         "README.md",
         "CAPABILITIES_GUIDE.md",
         "CONTRIBUTING.md",

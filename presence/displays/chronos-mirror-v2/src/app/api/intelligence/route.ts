@@ -48,6 +48,7 @@ import {
   createNextActionContract,
   decideApprovalRequest,
   loadApprovalRequest,
+  normalizeRejectionReasonCategory,
   enqueueSurfaceNotification,
   emitChannelSurfaceEvent,
   emitMissionOrchestrationObservation,
@@ -1848,6 +1849,10 @@ export async function POST(req: NextRequest) {
       if (!requestId || !storageChannel || !channel || !decision) {
         return NextResponse.json({ error: 'Missing approval decision payload' }, { status: 400 });
       }
+      // LC-10: carry the operator's rejection reason (ask-why on the panel)
+      // into the decision so the event stream and learning loops see it.
+      const decisionNote = typeof body?.note === 'string' ? body.note.trim() : '';
+      const decisionReasonCategory = normalizeRejectionReasonCategory(body?.reasonCategory);
       const approvalRecord = loadApprovalRequest(storageChannel, requestId);
       if (!approvalRecord) {
         return NextResponse.json({ error: 'Approval request not found' }, { status: 404 });
@@ -1864,7 +1869,8 @@ export async function POST(req: NextRequest) {
         authenticated: true,
         payloadHash: approvalRecord.accountability?.payloadHash,
         effectBinding: approvalRecord.accountability?.effectBinding,
-        note: 'Decision captured from Chronos approval panel.',
+        note: decisionNote || 'Decision captured from Chronos approval panel.',
+        reasonCategory: decisionReasonCategory,
       });
       enqueueSurfaceNotification({
         surface: 'presence',

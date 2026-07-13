@@ -36,6 +36,7 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 import { logger } from './core.js';
+import { clearReasoningDegraded, markReasoningDegraded } from './reasoning-degradation.js';
 import { AnthropicReasoningBackend } from './anthropic-reasoning-backend.js';
 import { AnthropicIntentExtractor } from './anthropic-intent-extractor.js';
 import { AnthropicVoiceBridge } from './anthropic-voice-bridge.js';
@@ -462,6 +463,27 @@ export function installReasoningBackends(options: InstallReasoningOptions = {}):
   return result;
 }
 
+/**
+ * LC-08: a selected non-stub mode that ends up keeping stubs is a silent
+ * degradation — every later getReasoningBackend() call serves fabricated
+ * output. Persist a marker (read by baseline-check → needs_attention) and
+ * notify the operator once. KYBERION_ALLOW_STUB_FALLBACK=1 restores the old
+ * quiet behavior for environments where stub residency is intentional.
+ */
+function reportResidualStubDegradation(mode: string, reason: string): void {
+  if (process.env.KYBERION_ALLOW_STUB_FALLBACK === '1') return;
+  markReasoningDegraded(mode, reason);
+  void import('./operator-notifications.js')
+    .then((m) =>
+      m.notifyOperator('ops_alert', {
+        title: 'Reasoning backend degraded to stub',
+        body: `mode=${mode}: ${reason}. Run \`pnpm reasoning:setup\` — until then all LLM judgments are deterministic placeholders.`,
+        correlation_id: 'reasoning-degraded',
+      })
+    )
+    .catch(() => {});
+}
+
 function _installReasoningBackendsCore(options: InstallReasoningOptions): boolean {
   const mode = consultCapabilityBrokerForMode(resolveMode(options));
 
@@ -486,6 +508,7 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
     installed = true;
     installedMode = 'stub';
     logger.info('[reasoning-bootstrap] mode=stub — keeping deterministic stubs');
+    clearReasoningDegraded();
     return false;
   }
 
@@ -496,6 +519,7 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
     logger.warn(
       `[reasoning-bootstrap] mode=${mode} selected but no usable reasoning backend could be built — keeping stubs.`
     );
+    reportResidualStubDegradation(mode, 'no usable reasoning backend could be built');
     return false;
   }
 
@@ -505,6 +529,7 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
     logger.warn(
       `[reasoning-bootstrap] mode=${mode} selected but no failover candidates were available — keeping stubs.`
     );
+    reportResidualStubDegradation(mode, 'no failover candidates were available');
     return false;
   }
 
@@ -526,6 +551,44 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
   }
   installed = true;
   installedMode = primaryMode;
+  // LC-08 follow-up (found by loop simulation): CLI backends construct
+  // without verifying their binary exists, so a machine with no CLIs and no
+  // API keys still "installs" a chain that can only throw at first use —
+  // and baseline-check would report all_clear. Detect the hollow chain at
+  // install time: every candidate is CLI-backed and none of those CLIs is
+  // discovered healthy. The chain stays installed (runtime behavior is
+  // unchanged and loud); only the health reporting changes.
+  const healthyProviders = new Set(
+    discoverProviders(false)
+      .filter((provider) => provider.installed && provider.healthy)
+      .map((provider) => provider.provider)
+  );
+  // Only CLI-backed candidates can be probed via provider discovery; API-key /
+  // URL-backed candidates (anthropic, openrouter, local, nemotron) only enter
+  // the chain when their credential exists, so they count as usable.
+  const CLI_PROBED_PROVIDERS = new Set(['claude', 'codex', 'gemini', 'agy', 'copilot']);
+  const chainUsable = chain.some((candidate) => {
+    const provider = providerForReasoningMode(candidate.mode);
+    if (!provider || !CLI_PROBED_PROVIDERS.has(provider)) return true;
+    return healthyProviders.has(provider);
+  });
+  if (!chainUsable && process.env.KYBERION_ALLOW_STUB_FALLBACK !== '1') {
+    markReasoningDegraded(
+      mode,
+      `hollow chain: candidates [${chain.map((candidate) => candidate.mode).join(', ')}] are CLI-backed but no healthy CLI provider was discovered`
+    );
+    void import('./operator-notifications.js')
+      .then((m) =>
+        m.notifyOperator('ops_alert', {
+          title: 'Reasoning chain installed but unusable',
+          body: `mode=${mode}: the failover chain contains only CLI backends whose binaries are missing or unhealthy. The first real delegation will fail. Run \`pnpm reasoning:setup\`.`,
+          correlation_id: 'reasoning-degraded',
+        })
+      )
+      .catch(() => {});
+  } else {
+    clearReasoningDegraded();
+  }
   logger.success(
     `[reasoning-bootstrap] mode=${mode} — reasoning failover chain installed (primary=${primaryMode}, candidates=${chain
       .map((candidate) => candidate.mode)

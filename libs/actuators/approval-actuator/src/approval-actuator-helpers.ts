@@ -1,4 +1,4 @@
-import { classifyError, safeReadFile, retry } from '@agent/core';
+import { classifyError, normalizeRejectionReasonCategory, safeReadFile, retry } from '@agent/core';
 import {
   createApprovalRequest,
   decideApprovalRequest,
@@ -84,6 +84,8 @@ export interface ApprovalAction {
     payloadHash?: string;
     effectBinding?: string;
     note?: string;
+    /** LC-10: closed-vocabulary rejection reason (rejection-reason.ts). */
+    reasonCategory?: string;
     requestKind?: 'channel-approval' | 'secret_mutation';
     expiresAt?: string;
     requestedByContext?: ApprovalRequesterContext;
@@ -149,6 +151,7 @@ export async function handleApprovalAction(input: ApprovalAction) {
           payloadHash: params.payloadHash,
           effectBinding: params.effectBinding,
           note: params.note,
+          reasonCategory: normalizeRejectionReasonCategory(params.reasonCategory),
         }),
       };
     case 'list_pending': {

@@ -1,10 +1,16 @@
 import { randomUUID } from 'node:crypto';
 
 import {
+  annotateApprovalRejectionReason,
   createApprovalRequest,
   decideApprovalRequest,
   loadApprovalRequest,
 } from './approval-store.js';
+import {
+  REJECTION_REASON_CATEGORIES,
+  normalizeRejectionReasonCategory,
+  type RejectionReasonCategory,
+} from './rejection-reason.js';
 import { appendGovernedArtifactJsonl } from './artifact-store.js';
 
 import type {
@@ -154,4 +160,72 @@ export function applySlackApprovalDecision(params: {
     decided_by: params.decidedBy,
   });
   return updated;
+}
+
+// ── LC-10 (bridge ask-why) ───────────────────────────────────────────────────
+// A rejection decided by button gets ONE skippable follow-up question. Buttons
+// (not free text) keep the reply deterministic — no conversation state needed.
+
+const ASK_WHY_LABELS: Record<RejectionReasonCategory, string> = {
+  incorrect_content: '内容が誤り',
+  wrong_direction: '方向が違う',
+  quality: '品質不足',
+  scope: 'スコープ過不足',
+  other: 'その他',
+};
+
+export interface SlackAskWhyActionPayload {
+  requestId: string;
+  category: RejectionReasonCategory | 'skip';
+}
+
+export function buildSlackApprovalAskWhyBlocks(requestId: string): any[] {
+  return [
+    {
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: 'どこが期待と違いましたか？(1問だけ・スキップ可 — 理由は次回の作業改善に使われます)',
+      },
+    },
+    {
+      type: 'actions',
+      elements: [
+        ...REJECTION_REASON_CATEGORIES.map((category) => ({
+          type: 'button',
+          text: { type: 'plain_text', text: ASK_WHY_LABELS[category] },
+          action_id: 'slack_approval_askwhy',
+          value: JSON.stringify({ requestId, category } satisfies SlackAskWhyActionPayload),
+        })),
+        {
+          type: 'button',
+          text: { type: 'plain_text', text: 'スキップ' },
+          action_id: 'slack_approval_askwhy',
+          value: JSON.stringify({ requestId, category: 'skip' } satisfies SlackAskWhyActionPayload),
+        },
+      ],
+    },
+  ];
+}
+
+export function parseSlackAskWhyAction(value: string): SlackAskWhyActionPayload {
+  const parsed = JSON.parse(value) as SlackAskWhyActionPayload;
+  if (parsed.category !== 'skip' && !normalizeRejectionReasonCategory(parsed.category)) {
+    return { requestId: parsed.requestId, category: 'skip' };
+  }
+  return parsed;
+}
+
+export function applySlackApprovalRejectionReason(params: {
+  requestId: string;
+  category: RejectionReasonCategory;
+  annotatedBy: string;
+}): SlackApprovalRequestRecord {
+  return annotateApprovalRejectionReason('slack_bridge', {
+    channel: 'slack',
+    storageChannel: 'slack',
+    requestId: params.requestId,
+    reasonCategory: params.category,
+    annotatedBy: params.annotatedBy,
+  });
 }

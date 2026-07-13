@@ -143,6 +143,7 @@ export function validatePipelineGuardrails(
       return;
     }
 
+    let sawDistillOp = false;
     for (const [index, step] of steps.entries()) {
       totalSteps += 1;
       const stepPath = `${basePath}[${index}]`;
@@ -153,6 +154,34 @@ export function validatePipelineGuardrails(
           message: `Pipeline step count (${totalSteps}) exceeds max_steps (${maxSteps})`,
           path: stepPath,
         });
+      }
+
+      // LC-05: semantic-op placement lint (see
+      // knowledge/product/governance/llm-invocation-rubric.md). Warnings only —
+      // authors may have a reason, but the default shape is distill → decide,
+      // selection over generation.
+      const opName = String(step.op || '');
+      if (opName.includes('distill')) sawDistillOp = true;
+      if (opName === 'llm_decide' || opName.endsWith(':llm_decide')) {
+        const params = (step.params ?? {}) as Record<string, unknown>;
+        if (!sawDistillOp && params.observation == null && params.from == null) {
+          findings.push({
+            code: 'llm-decide-without-distill',
+            severity: 'warn',
+            message:
+              'llm_decide has no preceding distill op and no explicit observation/from — the rubric expects a deterministic distillation before a semantic decision',
+            path: stepPath,
+          });
+        }
+        if (!Array.isArray(params.options) && params.on_degraded == null) {
+          findings.push({
+            code: 'llm-decide-without-fallback',
+            severity: 'warn',
+            message:
+              'generation-mode llm_decide (no options) without on_degraded — prefer selection mode, or declare how degradation is handled',
+            path: stepPath,
+          });
+        }
       }
 
       inspectStep(step, stepPath, depth);
