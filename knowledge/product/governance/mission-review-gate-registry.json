@@ -158,5 +158,64 @@
         ]
       }
     }
-  ]
+  ],
+  "artifact_review": {
+    "defaults": {
+      "independence_required": true
+    },
+    "profiles": [
+      {
+        "id": "document-content-review",
+        "artifact_kinds": ["doc"],
+        "required_reviewer_roles": ["content-reviewer"],
+        "required_capabilities": ["review", "documentation", "analysis"]
+      },
+      {
+        "id": "deck-content-and-brand-review",
+        "artifact_kinds": ["deck"],
+        "required_reviewer_roles": ["content-reviewer", "brand-reviewer"],
+        "required_capabilities": ["review", "documentation", "design"]
+      },
+      {
+        "id": "code-quality-review",
+        "artifact_kinds": ["code"],
+        "required_reviewer_roles": ["code-reviewer"],
+        "required_capabilities": ["review", "code", "testing"]
+      },
+      {
+        "id": "media-content-and-accessibility-review",
+        "artifact_kinds": ["media"],
+        "required_reviewer_roles": ["content-reviewer", "accessibility-reviewer"],
+        "required_capabilities": ["review", "documentation", "ux"]
+      },
+      {
+        "id": "high-risk-security-review",
+        "artifact_kinds": ["doc", "deck", "code", "media"],
+        "required_reviewer_roles": ["security-reviewer"],
+        "required_capabilities": ["review", "security", "analysis"],
+        "risk_profiles": ["approval_required", "high_stakes"]
+      },
+      {
+        "id": "customer-fact-and-privacy-review",
+        "artifact_kinds": ["doc", "deck", "media"],
+        "required_reviewer_roles": ["fact-reviewer", "privacy-reviewer"],
+        "required_capabilities": ["review", "analysis", "security"],
+        "mission_classes": ["customer_engagement"]
+      },
+      {
+        "id": "content-fact-review",
+        "artifact_kinds": ["doc", "deck", "media"],
+        "required_reviewer_roles": ["fact-reviewer"],
+        "required_capabilities": ["review", "analysis"],
+        "mission_classes": ["content_and_media"]
+      },
+      {
+        "id": "release-readiness-review",
+        "artifact_kinds": ["code"],
+        "required_reviewer_roles": ["release-reviewer"],
+        "required_capabilities": ["review", "testing", "operations"],
+        "mission_classes": ["operations_and_release"]
+      }
+    ]
+  }
 }
