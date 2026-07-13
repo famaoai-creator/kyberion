@@ -580,6 +580,9 @@ For the normal `dispatch-workitems` path, the controller generates this receipt
 from the structured reviewer result and stores it under `evidence/reviews/`.
 The explicit `kind: review` manifest entry is required only when adopting an
 already-completed review through `reconcile-work`.
+The dispatcher also rechecks `NEXT_TASKS.json` dependencies before each run;
+ticket registration order does not allow delivery or retrospective tasks to
+bypass an unfinished review.
 
 Always run `--dry-run` first. Reconciliation fails without changing Mission
 state when the source commit is not on the declared branch, an artifact hash
