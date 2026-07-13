@@ -113,6 +113,7 @@ UI・CLI・会話ブリッジ・音声のユーザー接点調査(2026-07-02 追
 | [MO-05](./MO-05_MODEL_EFFORT_ROUTING.ja.md)          | タスク単位モデル/エフォート・ルーティング(shadow→段階的 enforce)                       | P1     | M    | MO-03             |
 | [MO-06](./MO-06_DURABLE_RESUME.ja.md)                | 調整の永続化と決定論的レジューム(バス JSONL 化・イベント journal)                      | P1     | S〜M | なし              |
 | [MO-07](./MO-07_QUALITY_MAXIMIZING_DELEGATION.ja.md) | 品質最大化タスク移譲(休眠品質機構の起動・best-of-N・judge・敵対レビュー・draft-refine) | P1     | L    | MO-02,MO-04,MO-05 |
+| [MO-08](./MO-08_ARTIFACT_REVIEW_CLOSURE.ja.md)       | 成果物品質レビューと Mission 終了処理の分離(hash-bound review・reconcile・finish)      | **P0** | M    | MO-02,MO-05       |
 
 ### デザインシステム(Web / PPTX・文書 / 動画)
 

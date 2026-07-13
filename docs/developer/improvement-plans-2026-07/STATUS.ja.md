@@ -1,6 +1,6 @@
 # 改善計画 実装状況正本(STATUS)
 
-> **監査日**: 2026-07-05(全93計画を実コードと突き合わせて検証)/ 2026-07-06 MO-01 を DONE に更新 / 2026-07-11 IP-07・AA-02 行の陳腐化を再突合で訂正 / 同日 TODO 全18行を機械突合し 11 ID(SA-03/OP-01/IL-01/02/03/05/AO-04/AA-04/CO-01〜04)を PARTIAL へ訂正(実装+緑テストを確認。KM-02/DS-04/HO-02/CO-05/AC-05/IP-10 は真に未了と再確認)/ 2026-07-12 SA-02 行の陳腐化を再突合で訂正(残とされた3点は実装済み・19テスト緑を確認)/ 2026-07-13 DS-01・UX-05 を DONE に更新(UI/UX governance audit、CI/validate、operator surface token 化を実証)/ 同日 IP-09 を DONE に更新(残 slugify 6箇所の正本化+再発防止文書化)/ 同日 IP-11 の Task 3(@ts-ignore 6箇所解消)完了を反映(PARTIAL のまま、残タスクは別増分) / 2026-07-14 AC-06 を DONE に更新(陳腐化していた能力境界表を生成元スクリプトへ追加し再生成、GLOSSARY 断リンク解消)/ 同日 CO-01 を DONE に更新(getGoldenRule のテナント対応は実装済み・未検証だった — フォールバック経路をテストで固定)
+> **監査日**: 2026-07-05(全93計画を実コードと突き合わせて検証)/ 2026-07-06 MO-01 を DONE に更新 / 2026-07-11 IP-07・AA-02 行の陳腐化を再突合で訂正 / 同日 TODO 全18行を機械突合し 11 ID(SA-03/OP-01/IL-01/02/03/05/AO-04/AA-04/CO-01〜04)を PARTIAL へ訂正(実装+緑テストを確認。KM-02/DS-04/HO-02/CO-05/AC-05/IP-10 は真に未了と再確認)/ 2026-07-12 SA-02 行の陳腐化を再突合で訂正(残とされた3点は実装済み・19テスト緑を確認)/ 2026-07-13 DS-01・UX-05 を DONE に更新(UI/UX governance audit、CI/validate、operator surface token 化を実証)/ 同日 IP-09 を DONE に更新(残 slugify 6箇所の正本化+再発防止文書化)/ 同日 IP-11 の Task 3(@ts-ignore 6箇所解消)完了を反映(PARTIAL のまま、残タスクは別増分) / 同日 MO-08 を DONE に更新(hash-bound 成果物 review、独立 reviewer routing、reconcile/finish の品質 gate 分離を実証) / 2026-07-14 AC-06 を DONE に更新(陳腐化していた能力境界表を生成元スクリプトへ追加し再生成、GLOSSARY 断リンク解消)/ 同日 CO-01 を DONE に更新(getGoldenRule のテナント対応は実装済み・未検証だった — フォールバック経路をテストで固定)
 > **更新規約**: 計画の実装・レビュー完了時に本表を更新する。各計画文書内の「実装状況」節と矛盾する場合は本表を正とし、文書側を追従させる。
 > **判定基準**: DONE = 受入条件を実コードで検証済 / PARTIAL = 一部充足 / TODO = 実質未着手。
 
@@ -8,7 +8,7 @@
 
 | 判定    | 件数 |
 | ------- | ---- |
-| DONE    | 56   |
+| DONE    | 57   |
 | PARTIAL | 36   |
 | TODO    | 0    |
 
@@ -19,6 +19,7 @@
 | IP-07 | DONE    | 2026-07-12 網羅精査で完了確認: 受入1(adf-repair カスケード5本)/受入2(3アダプタのトランスポートモック)/受入3(ゲート2script の golden)/受入4(orchestrator 特性化 — mission昇格・pipeline実行・直接応答3系統を含む fastpath 18本 + delegation + intent-context)/受入5(stub 決定論)すべて充足。47本一括緑                                                                                                                                                                                                     |
 | MO-01 | DONE    | 2026-07-06 完了: phaseSpec スキーマ(catalog v1.1.0)+タスク展開(plan-tasks/createMission)+3プロセステンプレート追加。worker イベント連鎖のフェーズ駆動化は計画どおり MO-02 に委譲                                                                                                                                                                                                                                                                                                                          |
 | MO-02 | PARTIAL | 2026-07-12 再突合+実装: gate-engine/計画・受入ゲート/finish 修復ループ/override 記録は実装済みだった。フェーズ exit ゲートの実行時評価を新設(completion 前、既定 warn → KYBERION_PHASE_GATE_MODE=enforce でブロック、3回失敗で circuit breaker 通知)。human_override 署名強制実装(HMAC、warn→enforce 段階、KYBERION_GATE_OVERRIDE_SIGNATURE)。残: warn 観測→enforce 昇格(運用)、realign 自動再計画                                                                                                        |
+| MO-08 | DONE    | 2026-07-13 完了: 成果物レビューを hash-bound receipt と専門 reviewer routing に一般化。reconcile/finish で再検証し、artifact 変更時は review task のみ再開。pending task 由来の synthetic finish repair loop を廃止。                                                                                                                                                                                                                                                                                     |
 | AA-02 | DONE    | 2026-07-11 完了: driver/dispatchToPeer/writer fencing に加え、2-peer E2E(実 HTTP+HMAC、正常配送・復帰再配送・dead-letter・dedup)を実装。物理2プロセス実証のみ E3 パイロットへ                                                                                                                                                                                                                                                                                                                             |
 | SA-02 | DONE    | 2026-07-12 再突合: 「残」とされた3点は実装済みだった — execution-bounds.ts(system-actuator 移行済み)/ SECURITY.md「Shell & ADF Execution Guardrails」節 / enforce は全経路で既定(warn 段階を経ず fail-closed、KYBERION_SHELL_POLICY 変数は不要と判断され不存在)。受入条件5点をコード+19テスト緑で確認。HMAC 署名は 2026-07-11 実装済み                                                                                                                                                                    |
 | SA-05 | DONE    | 2026-07-12 完了: Task 2(dormant enforcement 2重バグ根治: YAML パーサ不全で全ポリシー無効 + `(?i)` 不発、発火文脈接続)/ Task 1(policy violation・actuator dispatch の kill-switch 供給。monitor 起動・graduated response・閾値外出しは実装済みを確認)/ Task 3.3(require_approval を requireApprovalForOp へ統一 — pending 承認リクエスト作成、承認後に再試行可)/ Task 4(統制サマリへ policies declared/loaded と anomalies 追加)。rapid-fire 閾値の実運用調整のみ trust-policy.json で運用対応             |
@@ -98,6 +99,7 @@
 | MO-05 | DONE    | (軽微: 集計スクリプト)                                                                                                                                                                                                                 |
 | MO-06 | DONE    |                                                                                                                                                                                                                                        |
 | MO-07 | PARTIAL | 2026-07-12: draft→refine エンジン + worker 配線(高リスク文書 deliverable、受入前1パス、KYBERION_DRAFT_REFINE=0 で無効)。task-session 側配線済み(document 出力へ受入前1パス、800字未満/失敗はスキップ)。残: tier 昇格連動(MO-05 と設計) |
+| MO-08 | DONE    | 2026-07-13 完了: hash-bound artifact review receipt、専門 role/capability reviewer routing、通常 dispatch と reconcile の共通 Evidence、finish 再検証、review task 限定 reopen、synthetic finish repair loop 廃止を実装。              |
 
 ### DS(デザインシステム)
 

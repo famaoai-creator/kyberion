@@ -28,7 +28,7 @@ const manifestPath = nodePath.join(fixtureRoot, 'manifest.json');
 const namespace = 'mission-work-reconciliation-test';
 const actorId = 'reconciliation-test-actor';
 const artifactPath = 'package.json';
-const verificationPath = 'scripts/refactor/mission-lifecycle.test.ts';
+const verificationPath = 'scripts/refactor/mission-distill.test.ts';
 let previousMissionRole: string | undefined;
 let previousPersona: string | undefined;
 
@@ -134,6 +134,115 @@ function buildManifest(
 function writeManifest(manifest: MissionWorkReconciliationManifest): void {
   safeMkdir(fixtureRoot, { recursive: true });
   safeWriteFile(manifestPath, JSON.stringify(manifest, null, 2));
+}
+
+function prepareReviewReconciliationFixture(input?: {
+  receiptHash?: string;
+  reviewerAgentId?: string;
+  artifactKind?: 'doc' | 'code';
+}): MissionWorkReconciliationManifest {
+  const sourceRepository = nodePath.join(fixtureRoot, 'review-source');
+  safeMkdir(sourceRepository, { recursive: true });
+  safeExec('git', ['init'], { cwd: sourceRepository });
+  safeExec('git', ['config', 'user.email', 'review-test@example.invalid'], {
+    cwd: sourceRepository,
+  });
+  safeExec('git', ['config', 'user.name', 'Review Test'], { cwd: sourceRepository });
+  const reviewedArtifactPath = nodePath.join(sourceRepository, 'artifact.md');
+  safeWriteFile(reviewedArtifactPath, '# Commit-bound reviewed artifact');
+  const reviewedArtifactHash = sha256(safeReadFile(reviewedArtifactPath) as Buffer);
+  const reviewerAgentId = input?.reviewerAgentId || 'independent-reviewer';
+  safeWriteFile(
+    nodePath.join(sourceRepository, 'review.json'),
+    JSON.stringify(
+      {
+        kind: 'artifact-review-receipt',
+        version: '1.0.0',
+        review_id: 'review-content-r1',
+        mission_id: missionId,
+        review_task_id: 'review-content',
+        review_target_task_id: 'implementation',
+        artifact: {
+          path: 'artifact.md',
+          sha256: input?.receiptHash || reviewedArtifactHash,
+          kind: input?.artifactKind || 'doc',
+        },
+        reviewer: {
+          agent_id: reviewerAgentId,
+          team_role: 'reviewer',
+          specialist_roles: ['content-reviewer'],
+          independent_from: ['implementation-agent'],
+          independence_verified: true,
+        },
+        verdict: 'approved',
+        findings: [],
+        acceptance_criteria: ['The artifact has an independent content review.'],
+        reviewed_at: '2026-07-13T00:00:00.000Z',
+      },
+      null,
+      2
+    )
+  );
+  safeExec('git', ['add', 'artifact.md', 'review.json'], { cwd: sourceRepository });
+  safeExec('git', ['commit', '-m', 'add review fixture'], { cwd: sourceRepository });
+  const commit = safeExec('git', ['rev-parse', 'HEAD'], { cwd: sourceRepository }).trim();
+  prepareMission([
+    {
+      task_id: 'implementation',
+      status: 'completed',
+      description: 'Create the artifact.',
+      acceptance_criteria: ['The artifact exists.'],
+      assigned_to: { role: 'implementer', agent_id: 'implementation-agent' },
+      dependencies: [],
+    },
+    {
+      task_id: 'review-content',
+      status: 'planned',
+      description: 'Review the artifact content.',
+      acceptance_criteria: ['The artifact has an independent content review.'],
+      assigned_to: { role: 'reviewer', agent_id: reviewerAgentId },
+      review_target: 'implementation',
+      dependencies: ['implementation'],
+    },
+  ]);
+  return {
+    kind: 'mission-work-reconciliation',
+    version: '1.0.0',
+    mission_id: missionId,
+    source: {
+      repository: pathResolver.toRepoRelative(sourceRepository),
+      branch: commit,
+      commit,
+    },
+    adopted_by: actorId,
+    reason: 'Adopt a commit-bound independent artifact review.',
+    tasks: [
+      {
+        task_id: 'review-content',
+        evidence: [
+          {
+            path: 'review.json',
+            sha256: fileHash(
+              pathResolver.toRepoRelative(nodePath.join(sourceRepository, 'review.json'))
+            ),
+            kind: 'review',
+          },
+        ],
+        criteria: [
+          {
+            criterion: 'The artifact has an independent content review.',
+            evidence_refs: ['review.json'],
+          },
+        ],
+        verification: {
+          command: 'review receipt validation',
+          status: 'passed',
+          exit_code: 0,
+          evidence_refs: ['review.json'],
+        },
+      },
+    ],
+  };
 }
 
 beforeEach(() => {
@@ -345,5 +454,50 @@ describe('mission existing work reconciliation', () => {
     await expect(
       reconcileMissionExistingWork({ missionId, manifestPath, dryRun: true })
     ).rejects.toThrow('Mission controller authority is required');
+  });
+
+  it('adopts a commit-bound independent artifact review and persists its receipt in the mission', async () => {
+    const manifest = prepareReviewReconciliationFixture();
+    writeManifest(manifest);
+
+    const result = await reconcileMissionExistingWork({ missionId, manifestPath });
+
+    expect(result.reconciled_task_ids).toEqual(['review-content']);
+    const tasks = JSON.parse(
+      String(safeReadFile(nodePath.join(missionPath, 'NEXT_TASKS.json'), { encoding: 'utf8' }))
+    );
+    expect(tasks[1].status).toBe('completed');
+    expect(tasks[1].artifact_review_profile.required_reviewer_roles).toContain('content-reviewer');
+    expect(tasks[1].artifact_review_receipt).toMatch(/^evidence\/reviews\/reconciled-/u);
+    expect(safeExistsSync(nodePath.join(missionPath, tasks[1].artifact_review_receipt))).toBe(true);
+  });
+
+  it('rejects a reconciled review whose receipt hash does not match the committed artifact', async () => {
+    const manifest = prepareReviewReconciliationFixture({ receiptHash: '0'.repeat(64) });
+    writeManifest(manifest);
+
+    await expect(
+      reconcileMissionExistingWork({ missionId, manifestPath, dryRun: true })
+    ).rejects.toThrow('invalidated by artifact change');
+  });
+
+  it('rejects a reconciled review performed by the implementation agent', async () => {
+    const manifest = prepareReviewReconciliationFixture({
+      reviewerAgentId: 'implementation-agent',
+    });
+    writeManifest(manifest);
+
+    await expect(
+      reconcileMissionExistingWork({ missionId, manifestPath, dryRun: true })
+    ).rejects.toThrow('performed by an implementation agent');
+  });
+
+  it('rejects a receipt whose declared artifact kind does not match the reviewed path', async () => {
+    const manifest = prepareReviewReconciliationFixture({ artifactKind: 'code' });
+    writeManifest(manifest);
+
+    await expect(
+      reconcileMissionExistingWork({ missionId, manifestPath, dryRun: true })
+    ).rejects.toThrow('does not match inferred kind doc');
   });
 });

@@ -120,6 +120,7 @@ describe('mission ticket dispatch', () => {
             description: 'Implement ticket dispatch flow',
             deliverable: 'scripts/refactor/mission-ticket-dispatch.ts',
             target_path: 'scripts/refactor/mission-ticket-dispatch.ts',
+            review_target: 'task-0',
             risk: 'low',
             estimated_scope: 'S',
           },
@@ -151,6 +152,7 @@ describe('mission ticket dispatch', () => {
     expect(items[0].metadata).toMatchObject({
       risk: 'low',
       estimated_scope: 'S',
+      review_target: 'task-0',
       task_model_hint: expect.objectContaining({
         model_id: 'openai:gpt-5.4-mini',
         tier: 'small',

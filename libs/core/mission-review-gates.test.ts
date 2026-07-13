@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   evaluateArtifactBundleGate,
   evaluateIntentDriftReviewGate,
+  resolveArtifactReviewerProfile,
   resolveMissionReviewDesign,
   summarizeReviewGateVerdicts,
 } from './mission-review-gates.js';
@@ -34,6 +35,35 @@ describe('mission-review-gates', () => {
     expect(review.review_mode).toBe('lean');
     expect(review.required_gate_ids).toContain('CONTRACT_VALID');
     expect(review.required_gate_ids).not.toContain('DELIVERABLE_QUALITY');
+  });
+
+  it('selects specialist reviewer roles by artifact, mission class, and risk', () => {
+    const code = resolveArtifactReviewerProfile({
+      artifactKind: 'code',
+      missionClass: 'code_change',
+      riskProfile: 'high_stakes',
+    });
+    expect(code.required_reviewer_roles).toEqual(
+      expect.arrayContaining(['code-reviewer', 'security-reviewer'])
+    );
+    expect(code.required_reviewer_capabilities).toEqual(
+      expect.arrayContaining(['review', 'code', 'testing', 'security', 'analysis'])
+    );
+    expect(code.independence_required).toBe(true);
+
+    const customerDeck = resolveArtifactReviewerProfile({
+      artifactKind: 'deck',
+      missionClass: 'customer_engagement',
+      riskProfile: 'review_required',
+    });
+    expect(customerDeck.required_reviewer_roles).toEqual(
+      expect.arrayContaining([
+        'content-reviewer',
+        'brand-reviewer',
+        'fact-reviewer',
+        'privacy-reviewer',
+      ])
+    );
   });
 
   it('aggregates gate verdicts with strictest priority', () => {
