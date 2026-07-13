@@ -70,6 +70,8 @@ export const SYSTEM_ACTUATOR_TRANSFORM_OPS = [
   'json_query',
   'sre_analyze',
   'run_js',
+  'distill_output',
+  'llm_decide',
 ] as const;
 
 export const SYSTEM_ACTUATOR_CONTROL_OPS = ['if', 'while'] as const;

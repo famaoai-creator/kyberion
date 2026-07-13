@@ -1,4 +1,6 @@
 import {
+  distillHttpResponse,
+  executeLlmDecideOp,
   logger,
   secureFetch,
   safeReadFile,
@@ -259,6 +261,29 @@ async function opTransform(op: string, params: any, ctx: any) {
       const data = ctx[params.from || 'last_capture'];
       const result = getPathValue(data, params.path);
       return { ...ctx, [params.export_as]: result };
+
+    case 'distill_response': {
+      // AR-07: deterministic distillation of a fetched response (JSON shape /
+      // HTML title+links / text preview, bounded) so llm_decide never sees
+      // the raw body.
+      const source = ctx[params.from || 'last_capture'];
+      const distillate = distillHttpResponse(source, {
+        maxPreviewChars: params.max_preview_chars,
+        maxJsonKeys: params.max_json_keys,
+        maxLinks: params.max_links,
+      });
+      return { ...ctx, [params.export_as || 'response_distillate']: distillate };
+    }
+
+    case 'llm_decide': {
+      // AR-07: one in-loop decision about the distilled response.
+      return executeLlmDecideOp({
+        params,
+        ctx,
+        resolve: (value: any) => (typeof value === 'string' ? resolveVars(value, ctx) : value),
+        defaultFromKey: 'response_distillate',
+      });
+    }
 
     case 'regex_extract':
       const input = String(ctx[params.from || 'last_capture'] || '');

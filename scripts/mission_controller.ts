@@ -620,6 +620,12 @@ async function reconcileExistingWork(missionId: string, manifestPath: string, dr
   return result;
 }
 
+async function reenterMissionFromReview(missionId: string) {
+  const result = await missionSystem.reenterMissionFromReview(missionId);
+  console.log(JSON.stringify(result, null, 2));
+  return result;
+}
+
 async function purgeMissions(dryRun: boolean = false) {
   return missionSystem.purgeMissions(dryRun);
 }
@@ -1330,6 +1336,7 @@ Maintenance Commands:
                                  Append an execution-ledger evidence entry and commit it
   reconcile-work <ID> --manifest <PATH> [--dry-run]
                                  Validate and adopt verified work completed outside dispatch-workitems
+  review-reenter <ID>            Turn pending human review rejections into rework tasks and reactivate the mission
   scope-approve <ID> [--goal <TEXT>] [--reason <TEXT>]
                                  Approve a scope change and rebaseline the origin intent
   purge    [--execute]            Preview stale missions to archive (--execute to apply)
@@ -1823,6 +1830,7 @@ export async function main() {
     recordTask,
     recordEvidence,
     reconcileExistingWork,
+    reenterMissionFromReview,
     purgeMissions,
     listMissions,
     listOrganizationCatalogs,

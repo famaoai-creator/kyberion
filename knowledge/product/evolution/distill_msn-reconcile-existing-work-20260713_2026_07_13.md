@@ -1,7 +1,7 @@
 ---
-title: "Adopting Verified Work Into Mission Tasks"
+title: 'Adopting Verified Work Into Mission Tasks'
 category: Engineering
-tags: ["mission", "task-contract", "evidence", "reconciliation"]
+tags: ['mission', 'task-contract', 'evidence', 'reconciliation']
 importance: 7
 source_mission: MSN-RECONCILE-EXISTING-WORK-20260713
 author: Kyberion Wisdom Distiller
@@ -11,11 +11,13 @@ last_updated: 2026-07-13
 # Adopting Verified Work Into Mission Tasks
 
 ## Summary
+
 Mission tasks and Mission Evidence are separate contracts. Work completed on a
 feature branch before `dispatch-workitems` must not remain permanently
 `planned`, but Evidence presence alone must not bypass the finish exit gate.
 
 ## Key Learnings
+
 - Normal work should continue through `dispatch-tickets` and
   `dispatch-workitems`; reconciliation is an explicit exception path.
 - Safe adoption requires exact task IDs, source branch and commit, SHA-256
@@ -29,6 +31,7 @@ feature branch before `dispatch-workitems` must not remain permanently
   ledger, receipt, or audit mutation.
 
 ## Patterns Discovered
+
 - Bind an adoption receipt to a commit in the repository that owns the
   Evidence. The receipt may reference a separate implementation commit while
   remaining immutable itself.
@@ -44,6 +47,7 @@ feature branch before `dispatch-workitems` must not remain permanently
   exact form when the condition is a compound sentence.
 
 ## Failures & Recoveries
+
 - The first implementation required SUDO, which was stronger than Mission
   lifecycle ownership requires. The boundary was narrowed to
   `mission_controller` role or explicit SUDO.
@@ -63,4 +67,5 @@ feature branch before `dispatch-workitems` must not remain permanently
   then this document was manually reviewed and corrected.
 
 ---
-*Distilled by Kyberion | Mission: MSN-RECONCILE-EXISTING-WORK-20260713 | 2026-07-13*
+
+_Distilled by Kyberion | Mission: MSN-RECONCILE-EXISTING-WORK-20260713 | 2026-07-13_

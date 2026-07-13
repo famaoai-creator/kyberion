@@ -31,6 +31,9 @@ import {
   buildSlackApprovalBlocks,
   parseSlackApprovalAction,
   applySlackApprovalDecision,
+  buildSlackApprovalAskWhyBlocks,
+  parseSlackAskWhyAction,
+  applySlackApprovalRejectionReason,
   dispatchPresenceFrame,
   buildBridgeEmptyReplyText,
   postBridgeError,
@@ -537,8 +540,50 @@ async function start() {
             ? `Approved by <@${actorId}>: ${updated.title}`
             : `Rejected by <@${actorId}>: ${updated.title}`,
       });
+      // LC-10 ask-why: one skippable follow-up on rejection. Buttons keep
+      // the reply deterministic — no pending-conversation state needed.
+      if (payload.decision === 'rejected') {
+        await client.chat.postMessage({
+          channel: updated.channel,
+          thread_ts: updated.threadTs,
+          text: 'どこが期待と違いましたか？(スキップ可)',
+          blocks: buildSlackApprovalAskWhyBlocks(updated.id),
+        });
+      }
     } catch (err: any) {
       logger.error(`❌ [SlackBridge] Approval decision handling failed: ${err.message}`);
+    }
+  });
+
+  app.action('slack_approval_askwhy', async ({ ack, action, body, client }) => {
+    await ack();
+    try {
+      const payload = parseSlackAskWhyAction((action as any).value);
+      const actorId = (body as any).user?.id || 'unknown';
+      const channel = (body as any).channel?.id;
+      const threadTs = (body as any).message?.thread_ts || (body as any).message?.ts;
+      if (payload.category === 'skip') {
+        if (channel) {
+          await client.chat.postMessage({
+            channel,
+            thread_ts: threadTs,
+            text: '理由の記録をスキップしました。',
+          });
+        }
+        return;
+      }
+      const updated = applySlackApprovalRejectionReason({
+        requestId: payload.requestId,
+        category: payload.category,
+        annotatedBy: actorId,
+      });
+      await client.chat.postMessage({
+        channel: updated.channel || channel,
+        thread_ts: updated.threadTs || threadTs,
+        text: `却下理由を記録しました(${payload.category})。次回の作業改善に反映されます。`,
+      });
+    } catch (err: any) {
+      logger.error(`❌ [SlackBridge] Ask-why handling failed: ${err.message}`);
     }
   });
 

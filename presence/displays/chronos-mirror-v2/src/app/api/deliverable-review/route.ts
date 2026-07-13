@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { acceptInboxEntryWithHumanReceipt, listInboxEntries, markInboxEntry } from '@agent/core';
+import {
+  acceptInboxEntryWithHumanReceipt,
+  enqueueReviewReentryRequest,
+  listInboxEntries,
+  markInboxEntry,
+  normalizeRejectionReasonCategory,
+  type RejectionReasonCategory,
+} from '@agent/core';
 import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
 import { reviewDeliverable } from '../../../lib/deliverable-review';
 
@@ -17,6 +24,7 @@ const VERDICT_TO_INBOX_STATUS = {
 function syncInboxWithVerdict(input: {
   verdict: keyof typeof VERDICT_TO_INBOX_STATUS;
   comment: string;
+  reasonCategory?: RejectionReasonCategory;
   missionId?: string;
   artifactPath?: string;
 }): number {
@@ -41,6 +49,7 @@ function syncInboxWithVerdict(input: {
           })
         : markInboxEntry(entry.entry_id, status, {
             verdictNote: input.comment,
+            verdictReasonCategory: input.reasonCategory,
             reviewedBy: 'chronos-localadmin',
           });
     if (updatedEntry) {
@@ -66,6 +75,7 @@ export async function POST(req: NextRequest) {
         ? body.verdict
         : null;
     const comment = typeof body?.comment === 'string' ? body.comment : '';
+    const reasonCategory = normalizeRejectionReasonCategory(body?.reasonCategory);
     if (!artifactId || !verdict) {
       return NextResponse.json({ error: 'Missing deliverable review payload' }, { status: 400 });
     }
@@ -74,6 +84,7 @@ export async function POST(req: NextRequest) {
       artifactId,
       verdict,
       comment,
+      reasonCategory,
       reviewer: 'chronos-localadmin',
       reviewRole: 'mission_controller',
     });
@@ -83,6 +94,7 @@ export async function POST(req: NextRequest) {
       inboxUpdated = syncInboxWithVerdict({
         verdict,
         comment,
+        reasonCategory,
         missionId: result.artifact?.mission_id,
         artifactPath: result.artifact?.path,
       });
@@ -90,11 +102,34 @@ export async function POST(req: NextRequest) {
       // Inbox sync is best-effort; the review record is the source of truth.
     }
 
+    // LC-11: a non-accept verdict on a mission deliverable enqueues a
+    // re-entry request; the mission lifecycle turns it into rework tasks
+    // (goal loop) at finish, or via `mission_controller review-reenter` for
+    // already-completed missions. Best-effort — the review record stands.
+    let reentryRequestId: string | null = null;
+    if (verdict !== 'accept' && result.artifact?.mission_id) {
+      try {
+        const reentry = enqueueReviewReentryRequest('mission_controller', {
+          missionId: result.artifact.mission_id,
+          artifactId,
+          artifactPath: result.artifact.path,
+          verdict,
+          comment,
+          reasonCategory,
+          reviewer: 'chronos-localadmin',
+        });
+        reentryRequestId = reentry.request_id;
+      } catch {
+        // Re-entry is additive; never fail the review response over it.
+      }
+    }
+
     return NextResponse.json({
       ok: true,
       review: result.review,
       state: result.state,
       inboxUpdated,
+      reentryRequestId,
     });
   } catch (err: any) {
     return NextResponse.json(

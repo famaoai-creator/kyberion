@@ -364,6 +364,38 @@ async function handleTaskSessionRoute(
   let intent: any = null;
 
   if (activeSession && activeSession.requirements?.missing?.length > 0 && correctionDetected) {
+    // IL-05 Task 2: a correction targets what was JUST answered — backtrack
+    // to the last filled slot (restore it to the front of missing and drop
+    // its value) instead of re-asking the next empty slot, which would lose
+    // the correction target. With nothing filled yet, re-ask the current one.
+    const filledOrder = activeSession.requirements.filled_order || [];
+    if (filledOrder.length > 0) {
+      const lastFilled = filledOrder[filledOrder.length - 1];
+      const restoredMissing = [
+        lastFilled,
+        ...activeSession.requirements.missing.filter((slot) => slot !== lastFilled),
+      ];
+      const restoredPayload = { ...(activeSession.payload || {}) };
+      delete restoredPayload[lastFilled];
+      const backtracked = updateTaskSession(activeSession.session_id, {
+        payload: restoredPayload,
+        requirements: {
+          ...activeSession.requirements,
+          missing: restoredMissing,
+          filled_order: filledOrder.slice(0, -1),
+        },
+        status: 'collecting_requirements',
+      });
+      return emptySurfaceResult(
+        buildTaskSessionReply({
+          session: backtracked || activeSession,
+          status: 'pending',
+          intentId: (activeSession.payload?.intent_id as string) || '',
+          summary: `了解です。${lastFilled} を修正します。もう一度教えてください。`,
+          missingInputs: restoredMissing,
+        })
+      );
+    }
     const currentSlot = activeSession.requirements.missing[0];
     return emptySurfaceResult(
       buildTaskSessionReply({
@@ -421,7 +453,11 @@ async function handleTaskSessionRoute(
       ...extraPayload,
     };
     const updatedMissing = missingList.slice(1);
-    const updatedRequirements = { ...activeSession.requirements, missing: updatedMissing };
+    const updatedRequirements = {
+      ...activeSession.requirements,
+      missing: updatedMissing,
+      filled_order: [...(activeSession.requirements?.filled_order || []), nextSlot],
+    };
     const nextStatus = updatedMissing.length === 0 ? 'planning' : 'collecting_requirements';
 
     const updatedSession = updateTaskSession(activeSession.session_id, {

@@ -403,6 +403,13 @@ export default function ChronosMirrorV2() {
   const [deliverableReviewComment, setDeliverableReviewComment] = useState('');
   const [deliverableReviewBusy, setDeliverableReviewBusy] = useState(false);
   const [deliverableReviewError, setDeliverableReviewError] = useState<string | null>(null);
+  // LC-10 ask-why: when a reject / request-changes lands without any reason,
+  // ask exactly one skippable question so the redo/learning loops get a
+  // deterministic category instead of nothing.
+  const [deliverableAskWhyVerdict, setDeliverableAskWhyVerdict] = useState<
+    'reject' | 'request-changes' | null
+  >(null);
+  const [approvalAskWhyId, setApprovalAskWhyId] = useState<string | null>(null);
   const [operatorHomeSummary, setOperatorHomeSummary] = useState<any | null>(null);
   const [operatorHomeError, setOperatorHomeError] = useState<string | null>(null);
   const [operatorHomeRefreshTick, setOperatorHomeRefreshTick] = useState(0);
@@ -888,12 +895,27 @@ export default function ChronosMirrorV2() {
   }, []);
 
   const submitDeliverableReview = useCallback(
-    async (verdict: 'accept' | 'reject' | 'request-changes') => {
+    async (
+      verdict: 'accept' | 'reject' | 'request-changes',
+      options?: { reasonCategory?: string; skipAskWhy?: boolean }
+    ) => {
       const item = deliverables.find((entry) => entry.artifactId === selectedDeliverableId);
       if (!item) {
         setDeliverableReviewError('成果物を選択してください');
         return;
       }
+      // LC-10 ask-why: a rejection with no comment and no category teaches
+      // nothing — ask one skippable question before submitting.
+      if (
+        verdict !== 'accept' &&
+        !deliverableReviewComment.trim() &&
+        !options?.reasonCategory &&
+        !options?.skipAskWhy
+      ) {
+        setDeliverableAskWhyVerdict(verdict);
+        return;
+      }
+      setDeliverableAskWhyVerdict(null);
       setDeliverableReviewBusy(true);
       setDeliverableReviewError(null);
       try {
@@ -904,6 +926,7 @@ export default function ChronosMirrorV2() {
             artifactId: item.artifactId,
             verdict,
             comment: deliverableReviewComment,
+            reasonCategory: options?.reasonCategory,
           }),
         });
         const payload = await response.json();
@@ -924,7 +947,18 @@ export default function ChronosMirrorV2() {
   );
 
   const submitApprovalDecision = useCallback(
-    async (item: any, decision: 'approved' | 'rejected') => {
+    async (
+      item: any,
+      decision: 'approved' | 'rejected',
+      options?: { reasonCategory?: string; skipAskWhy?: boolean }
+    ) => {
+      // LC-10 ask-why: a rejection with no reason teaches nothing — ask one
+      // skippable question before submitting.
+      if (decision === 'rejected' && !options?.reasonCategory && !options?.skipAskWhy) {
+        setApprovalAskWhyId(item.id);
+        return;
+      }
+      setApprovalAskWhyId(null);
       setApprovalDecisionBusyId(item.id);
       try {
         const response = await fetch('/api/intelligence', {
@@ -936,6 +970,7 @@ export default function ChronosMirrorV2() {
             storageChannel: item.storageChannel,
             channel: item.channel,
             decision,
+            reasonCategory: options?.reasonCategory,
           }),
         });
         const payload = await response.json();
@@ -1627,6 +1662,48 @@ export default function ChronosMirrorV2() {
                             reject
                           </button>
                         </div>
+                        {approvalAskWhyId === item.id ? (
+                          <div className="mt-3 rounded-xl border border-amber-400/20 bg-amber-400/8 px-4 py-3">
+                            <div className="text-[11px] text-amber-100/80">
+                              どこが期待と違いましたか？（1問だけ・スキップ可）
+                            </div>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {(
+                                [
+                                  ['incorrect_content', '内容が誤り'],
+                                  ['wrong_direction', '方向が違う'],
+                                  ['quality', '品質不足'],
+                                  ['scope', 'スコープ過不足'],
+                                  ['other', 'その他'],
+                                ] as const
+                              ).map(([category, label]) => (
+                                <button
+                                  key={category}
+                                  type="button"
+                                  disabled={approvalDecisionBusyId === item.id}
+                                  onClick={() =>
+                                    submitApprovalDecision(item, 'rejected', {
+                                      reasonCategory: category,
+                                    })
+                                  }
+                                  className="rounded-lg border border-amber-400/25 bg-amber-400/10 px-3 py-1.5 text-[11px] text-amber-50/90 transition hover:bg-amber-400/18 disabled:opacity-50"
+                                >
+                                  {label}
+                                </button>
+                              ))}
+                              <button
+                                type="button"
+                                disabled={approvalDecisionBusyId === item.id}
+                                onClick={() =>
+                                  submitApprovalDecision(item, 'rejected', { skipAskWhy: true })
+                                }
+                                className="rounded-lg border border-white/12 bg-white/5 px-3 py-1.5 text-[11px] text-white/55 transition hover:bg-white/10 disabled:opacity-50"
+                              >
+                                スキップ
+                              </button>
+                            </div>
+                          </div>
+                        ) : null}
                       </div>
                     ))
                   )}
@@ -2077,6 +2154,50 @@ export default function ChronosMirrorV2() {
                         {deliverableReviewError ? (
                           <div className="mt-3 rounded-xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-[11px] text-red-100/80">
                             {deliverableReviewError}
+                          </div>
+                        ) : null}
+                        {deliverableAskWhyVerdict ? (
+                          <div className="mt-3 rounded-xl border border-amber-400/20 bg-amber-400/8 px-4 py-3">
+                            <div className="text-[11px] text-amber-100/80">
+                              どこが期待と違いましたか？（1問だけ・スキップ可）
+                            </div>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {(
+                                [
+                                  ['incorrect_content', '内容が誤り'],
+                                  ['wrong_direction', '方向が違う'],
+                                  ['quality', '品質不足'],
+                                  ['scope', 'スコープ過不足'],
+                                  ['other', 'その他'],
+                                ] as const
+                              ).map(([category, label]) => (
+                                <button
+                                  key={category}
+                                  type="button"
+                                  disabled={deliverableReviewBusy}
+                                  onClick={() =>
+                                    submitDeliverableReview(deliverableAskWhyVerdict, {
+                                      reasonCategory: category,
+                                    })
+                                  }
+                                  className="rounded-lg border border-amber-400/25 bg-amber-400/10 px-3 py-1.5 text-[11px] text-amber-50/90 transition hover:bg-amber-400/18 disabled:opacity-50"
+                                >
+                                  {label}
+                                </button>
+                              ))}
+                              <button
+                                type="button"
+                                disabled={deliverableReviewBusy}
+                                onClick={() =>
+                                  submitDeliverableReview(deliverableAskWhyVerdict, {
+                                    skipAskWhy: true,
+                                  })
+                                }
+                                className="rounded-lg border border-white/12 bg-white/5 px-3 py-1.5 text-[11px] text-white/55 transition hover:bg-white/10 disabled:opacity-50"
+                              >
+                                スキップ
+                              </button>
+                            </div>
                           </div>
                         ) : null}
                         <div className="mt-3 flex flex-wrap gap-2">
