@@ -21,11 +21,22 @@ vi.mock('./reasoning-backend.js', () => ({
   getReasoningBackend: vi.fn(() => ({ delegateTask })),
 }));
 
+// LC-01: in-memory ADF files for the deterministic repair cascade.
+const adfFiles = vi.hoisted(() => new Map<string, string>());
+vi.mock('./secure-io.js', () => ({
+  safeExistsSync: (filePath: string) => adfFiles.has(filePath),
+  safeReadFile: (filePath: string) => adfFiles.get(filePath) ?? '',
+  safeWriteFile: (filePath: string, data: string | Buffer) => {
+    adfFiles.set(filePath, String(data));
+  },
+}));
+
 describe('attemptAutonomousRepair (AR-01 Task 4)', () => {
   beforeEach(() => {
     vi.mocked(sendOpsAlert).mockClear();
     vi.mocked(getReasoningBackend).mockClear();
     delegateTask.mockReset().mockResolvedValue('fixed the params');
+    adfFiles.clear();
   });
 
   it('fails closed and escalates for sensitive categories (AO-03 §4)', async () => {
@@ -69,6 +80,36 @@ describe('attemptAutonomousRepair (AR-01 Task 4)', () => {
     });
 
     expect(repaired).toBe(false);
+  });
+
+  it('repairs mechanically broken JSON without any LLM call (LC-01)', async () => {
+    adfFiles.set('pipelines/broken.json', '{"id": "demo", "steps": [{"op": "file:read"},],}');
+    const validate = vi.fn().mockResolvedValue(undefined);
+
+    const repaired = await attemptAutonomousRepair({
+      step: { op: 'file:read' },
+      failure: { category: 'validation_error', detail: 'invalid JSON' },
+      pipelinePath: 'pipelines/broken.json',
+      validate,
+    });
+
+    expect(repaired).toBe(true);
+    expect(delegateTask).not.toHaveBeenCalled();
+    expect(validate).toHaveBeenCalledTimes(1);
+    expect(() => JSON.parse(adfFiles.get('pipelines/broken.json')!)).not.toThrow();
+  });
+
+  it('skips deterministic repair for parseable JSON and escalates to the LLM (LC-01)', async () => {
+    adfFiles.set('pipelines/semantic.json', '{"id": "demo", "steps": [{"op": "unknown:op"}]}');
+
+    const repaired = await attemptAutonomousRepair({
+      step: { op: 'unknown:op' },
+      failure: { category: 'validation_error', detail: 'unknown op' },
+      pipelinePath: 'pipelines/semantic.json',
+    });
+
+    expect(repaired).toBe(true);
+    expect(delegateTask).toHaveBeenCalledTimes(1);
   });
 
   it('returns false when the repair subagent itself fails', async () => {

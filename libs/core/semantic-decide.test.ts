@@ -68,3 +68,42 @@ describe('decideFromObservation (AR-07)', () => {
     expect(decision?.decision).toBe('disk-full');
   });
 });
+
+describe('semantic-decide degradation registry (LC-09)', () => {
+  it('records reasons and tracks consecutive model errors, reset on success', async () => {
+    const {
+      consecutiveSemanticDecideModelErrors,
+      getSemanticDecideDegradations,
+      resetSemanticDecideDegradations,
+    } = await import('./semantic-decide.js');
+    resetSemanticDecideDegradations();
+
+    const failing = async () => {
+      throw new Error('backend down');
+    };
+    await decideFromObservation({ goal: 'g1', observation: 'o', generate: failing });
+    await decideFromObservation({ goal: 'g2', observation: 'o', generate: failing });
+    expect(consecutiveSemanticDecideModelErrors()).toBe(2);
+
+    await decideFromObservation({
+      goal: 'g3',
+      observation: 'o',
+      options: ['a', 'b'],
+      generate: async () => '{"decision": "not-an-option"}',
+    });
+    const reasons = getSemanticDecideDegradations().map((entry) => entry.reason);
+    expect(reasons).toEqual(['model_error', 'model_error', 'option_rejected']);
+    expect(consecutiveSemanticDecideModelErrors()).toBe(0);
+
+    await decideFromObservation({
+      goal: 'g4',
+      observation: 'o',
+      options: ['a', 'b'],
+      generate: async () => '{"decision": "a"}',
+    });
+    expect(getSemanticDecideDegradations()).toHaveLength(3);
+
+    resetSemanticDecideDegradations();
+    expect(getSemanticDecideDegradations()).toHaveLength(0);
+  });
+});

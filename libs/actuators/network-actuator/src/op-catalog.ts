@@ -6,7 +6,12 @@ type OpSpecKind = 'capture' | 'transform' | 'apply' | 'control';
 
 export const NETWORK_ACTUATOR_CAPTURE_OPS = ['a2a_poll', 'fetch', 'shell'] as const;
 
-export const NETWORK_ACTUATOR_TRANSFORM_OPS = ['json_query', 'regex_extract'] as const;
+export const NETWORK_ACTUATOR_TRANSFORM_OPS = [
+  'json_query',
+  'regex_extract',
+  'distill_response',
+  'llm_decide',
+] as const;
 
 export const NETWORK_ACTUATOR_APPLY_OPS = [
   'a2a_send',

@@ -1,6 +1,7 @@
 import {
   logger,
   missionDir,
+  sendOpsAlert,
   safeReadFile,
   safeWriteFile,
   safeMkdir,
@@ -1367,6 +1368,23 @@ export async function simulateAll(input: {
     );
     finalRun = await runSimulation(retrySteps);
   }
+  // LC-06 (MO-07 residual): a still-poor result after the redo pass must not
+  // dissolve into a persisted-but-unread severity — put it in front of the
+  // operator.
+  if (finalRun.quality.severity === 'poor') {
+    sendOpsAlert({
+      severity: 'warning',
+      title: `Simulation quality stayed poor after redo: ${input.goal}`,
+      context: {
+        goal: input.goal,
+        retry_count: retryCount,
+        quality_path: qualityPath,
+      },
+      recommendation:
+        'The branch simulation did not reach acceptable quality even after a wider redo pass. Review the hypotheses / goal framing before trusting this decision.',
+      dedupe_key: `simulation-quality-poor:${input.goal}`,
+    });
+  }
 
   writeJSON(outPath, finalRun.summary);
   writeJSON(qualityPath, finalRun.quality);
@@ -2115,6 +2133,21 @@ export async function simulateAllEnsemble(input: {
     const retryRuns = Math.max(input.runs + 2, Math.ceil(input.runs * 1.5));
     logger.info(`[simulateAllEnsemble] convergence poor; retrying with runs=${retryRuns}`);
     ensembleRun = await executeEnsemble(retryRuns);
+  }
+  // LC-06 (MO-07 residual): escalate a still-poor convergence after redo.
+  if (ensembleRun.convergence.severity === 'poor') {
+    sendOpsAlert({
+      severity: 'warning',
+      title: `Simulation ensemble stayed divergent after redo: ${input.goal}`,
+      context: {
+        goal: input.goal,
+        retry_count: retryCount,
+        runs: ensembleRun.runs.length,
+      },
+      recommendation:
+        'Ensemble runs did not converge even after adding runs. The decision space is unstable — narrow the hypotheses or escalate to a human decision.',
+      dedupe_key: `simulation-convergence-poor:${input.goal}`,
+    });
   }
 
   const runs = ensembleRun.runs;

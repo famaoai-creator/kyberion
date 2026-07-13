@@ -1,4 +1,5 @@
 import { a2aBridge, AgentBusyError } from './a2a-bridge.js';
+import { readHintsByCategory } from './src/feedback-loop.js';
 import {
   buildMissionTeamView,
   resolveMissionTeamPlan,
@@ -938,6 +939,22 @@ function buildMissionGoalLines(missionState: Record<string, unknown>): string[] 
   ];
 }
 
+/**
+ * LC-12 v2: surface the last few human-rejection lessons (persisted by
+ * review-reentry) directly in the worker brief, so same-shape work stops
+ * repeating a rejection the operator already explained. Ephemeral advisory
+ * lines — deliberately outside the context-pack pruning budget.
+ */
+function buildRejectionLessonLines(): string[] {
+  try {
+    return readHintsByCategory('human-rejection')
+      .slice(-3)
+      .map((hint) => `- ${hint.hint}`);
+  } catch {
+    return [];
+  }
+}
+
 function buildTaskExecutionPrompt(input: {
   missionId: string;
   task: PlannedNextTask;
@@ -950,6 +967,7 @@ function buildTaskExecutionPrompt(input: {
   teamSnapshotLines: string[];
   reviewFindingsLines: string[];
   artifactReviewLines: string[];
+  rejectionLessonLines?: string[];
   targetPath?: string;
 }): string {
   const lines = [
@@ -981,6 +999,13 @@ function buildTaskExecutionPrompt(input: {
       ? ['## Review findings to address', ...input.reviewFindingsLines, '']
       : []),
     ...input.artifactReviewLines,
+    ...(input.rejectionLessonLines && input.rejectionLessonLines.length > 0
+      ? [
+          '## Recent human-rejection lessons (avoid repeating these)',
+          ...input.rejectionLessonLines,
+          '',
+        ]
+      : []),
     input.missionContextPack,
     '',
     'Return exactly one ```task_result``` block and nothing else structured.',
@@ -1241,11 +1266,13 @@ async function buildTaskDispatchContext(input: {
     });
   }
   const artifactReviewLines = buildArtifactReviewLines(input.task);
+  const rejectionLessonLines = buildRejectionLessonLines();
   const promptSupplementChars =
     upstreamResultLines.join('\n').length +
     teamSnapshotLines.join('\n').length +
     reviewFindingsLines.join('\n').length +
     artifactReviewLines.join('\n').length +
+    rejectionLessonLines.join('\n').length +
     256;
   const prompt = buildTaskExecutionPrompt({
     missionId: input.missionId,
@@ -1253,6 +1280,7 @@ async function buildTaskDispatchContext(input: {
     teamRole: input.teamRole,
     agentId: input.agentId,
     taskModelHint: input.taskModelHint,
+    rejectionLessonLines,
     missionContextPack: missionContextPackText,
     missionGoalLines: buildMissionGoalLines(missionState),
     upstreamResultLines,

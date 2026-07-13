@@ -23,6 +23,7 @@ export const ANDROID_ACTUATOR_CAPTURE_OPS = [
 
 export const ANDROID_ACTUATOR_TRANSFORM_OPS = [
   'find_ui_nodes',
+  'llm_decide',
   'set',
   'summarize_ui_tree',
 ] as const;
