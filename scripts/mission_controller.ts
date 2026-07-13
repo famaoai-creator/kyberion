@@ -614,6 +614,12 @@ async function recordEvidence(
   return result;
 }
 
+async function reconcileExistingWork(missionId: string, manifestPath: string, dryRun = false) {
+  const result = await missionSystem.reconcileExistingWork(missionId, manifestPath, dryRun);
+  console.log(JSON.stringify(result, null, 2));
+  return result;
+}
+
 async function purgeMissions(dryRun: boolean = false) {
   return missionSystem.purgeMissions(dryRun);
 }
@@ -1322,6 +1328,8 @@ Maintenance Commands:
   record-task <ID> <description> Record a task intention (flight recorder)
   record-evidence <ID> <task_id> <note>
                                  Append an execution-ledger evidence entry and commit it
+  reconcile-work <ID> --manifest <PATH> [--dry-run]
+                                 Validate and adopt verified work completed outside dispatch-workitems
   scope-approve <ID> [--goal <TEXT>] [--reason <TEXT>]
                                  Approve a scope change and rebaseline the origin intent
   purge    [--execute]            Preview stale missions to archive (--execute to apply)
@@ -1814,6 +1822,7 @@ export async function main() {
     cancelMission,
     recordTask,
     recordEvidence,
+    reconcileExistingWork,
     purgeMissions,
     listMissions,
     listOrganizationCatalogs,

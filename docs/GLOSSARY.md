@@ -88,6 +88,10 @@ A durable authority grant over a mission, task, bridge, or resource. Leases defi
 
 A structured unit of delegated work inside a mission. Task contracts define objective, write scope, expected outputs, and acceptance criteria.
 
+### Existing Work Reconciliation
+
+An explicit Mission owner operation that adopts work completed outside normal WorkItem dispatch. It validates a source commit, Evidence hashes, acceptance-criterion mappings, verification records, dependencies, and actor identity before updating `NEXT_TASKS.json`; `record-evidence` alone never completes a task.
+
 ### KSMC (Kyberion Sovereign Mission Controller)
 
 The mission lifecycle controller referenced in the charter. It handles mission start, checkpoints, finish, and transactional safeguards.
