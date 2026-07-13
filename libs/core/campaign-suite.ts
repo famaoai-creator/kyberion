@@ -1,5 +1,6 @@
 import { resolveCreativeDesign, type ResolvedCreativeDesign } from './creative-design-resolver.js';
 import { webThemePackToCssVars, type WebThemePack } from './web-design-system.js';
+import { slugify } from './text-utils.js';
 
 /**
  * E2E-02 Task 6: campaign planner — one brief, one resolved design, N deliverables.
@@ -93,13 +94,7 @@ function buildDocumentBrief(
 }
 
 function slugifyTitle(title: string): string {
-  return (
-    title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 48) || 'campaign'
-  );
+  return slugify(title, { maxLength: 48, fallback: 'campaign' });
 }
 
 function escapeHtml(value: string): string {
