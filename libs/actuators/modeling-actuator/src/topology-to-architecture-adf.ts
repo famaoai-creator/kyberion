@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { safeExistsSync, safeLstat, safeReadFile, safeReaddir } from '@agent/core';
+import { safeExistsSync, safeLstat, safeReadFile, safeReaddir, slugify } from '@agent/core';
 import type { TerraformBlock, TerraformTopologyIr } from './topology-ir.js';
 import { resolveTerraformModuleSourceDir } from './terraform-topology.js';
 
@@ -9,10 +9,6 @@ function titleCase(value: string): string {
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ');
-}
-
-function slugify(value: string): string {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 }
 
 function shouldSkipTerraformDir(name: string): boolean {
@@ -32,7 +28,11 @@ function listModuleTfFiles(dir: string): string[] {
   return out.sort();
 }
 
-function blockLookupId(ref: string, currentDir: string, blocksById: Map<string, TerraformBlock>): string | null {
+function blockLookupId(
+  ref: string,
+  currentDir: string,
+  blocksById: Map<string, TerraformBlock>
+): string | null {
   const candidates: string[] = [];
   if (ref.startsWith('module.')) candidates.push(`${currentDir}::${ref}`);
   else if (ref.startsWith('data.')) candidates.push(`${currentDir}::${ref}`);
@@ -52,7 +52,9 @@ function blockLookupId(ref: string, currentDir: string, blocksById: Map<string, 
 
 function extractSecurityGroupReference(body: string): string | null {
   const text = String(body || '');
-  const direct = text.match(/security_group_id\s*=\s*"\$\{(aws_security_group\.[A-Za-z0-9_]+)\.id\}"/);
+  const direct = text.match(
+    /security_group_id\s*=\s*"\$\{(aws_security_group\.[A-Za-z0-9_]+)\.id\}"/
+  );
   if (direct) return direct[1];
   const loose = text.match(/security_group_id\s*=\s*"\$\{([^}]+)\}"/);
   if (loose) return loose[1];
@@ -114,7 +116,9 @@ function shouldCreateSemanticLane(parentId: string, tier: string): boolean {
   if (!parentId || !tier) return false;
   if (!parentId.startsWith('container::')) return false;
   if (tier === 'module') return false;
-  return ['state', 'control', 'network', 'security', 'edge', 'web', 'application', 'data'].includes(tier);
+  return ['state', 'control', 'network', 'security', 'edge', 'web', 'application', 'data'].includes(
+    tier
+  );
 }
 
 function preferredSizeForLane(tier: string): { preferred_width: number; preferred_height: number } {
@@ -139,7 +143,10 @@ function preferredSizeForLane(tier: string): { preferred_width: number; preferre
   }
 }
 
-function preferredSizeForBlock(block: TerraformBlock, semanticTier: string): Record<string, number> {
+function preferredSizeForBlock(
+  block: TerraformBlock,
+  semanticTier: string
+): Record<string, number> {
   if (block.kind === 'module') {
     return { preferred_width: 196, preferred_height: 112 };
   }
@@ -147,14 +154,18 @@ function preferredSizeForBlock(block: TerraformBlock, semanticTier: string): Rec
     return { preferred_width: 84, preferred_height: 84 };
   }
   if (block.kind === 'data') {
-    if (block.type === 'terraform_remote_state') return { preferred_width: 92, preferred_height: 92 };
+    if (block.type === 'terraform_remote_state')
+      return { preferred_width: 92, preferred_height: 92 };
     if (block.type === 'template_file') return { preferred_width: 140, preferred_height: 72 };
     return { preferred_width: 80, preferred_height: 80 };
   }
   if (block.kind === 'resource') {
-    if (block.type === 'aws_security_group_rule') return { preferred_width: 72, preferred_height: 72 };
-    if (semanticTier === 'edge' || semanticTier === 'data') return { preferred_width: 92, preferred_height: 92 };
-    if (semanticTier === 'security' || semanticTier === 'control') return { preferred_width: 80, preferred_height: 80 };
+    if (block.type === 'aws_security_group_rule')
+      return { preferred_width: 72, preferred_height: 72 };
+    if (semanticTier === 'edge' || semanticTier === 'data')
+      return { preferred_width: 92, preferred_height: 92 };
+    if (semanticTier === 'security' || semanticTier === 'control')
+      return { preferred_width: 80, preferred_height: 80 };
     return { preferred_width: 88, preferred_height: 88 };
   }
   return {};
@@ -165,12 +176,45 @@ function inferSemanticTier(block: TerraformBlock): string {
   const type = String(block.type || '').toLowerCase();
   const body = String(block.body || '').toLowerCase();
   if (type === 'terraform_remote_state' || type.startsWith('backend_')) return 'state';
-  if (type.includes('db') || type.includes('rds') || type.includes('s3') || dir.includes('data-store') || dir.includes('/mysql')) return 'data';
-  if (type.includes('security_group') || type.startsWith('aws_iam_') || body.includes('cidr_blocks')) return 'security';
-  if (type.includes('cloudwatch') || type.includes('autoscaling_schedule') || type.includes('availability_zones') || type === 'template_file') return 'control';
-  if (type.includes('vpc') || type.includes('subnet') || type.includes('internet_gateway') || type.includes('nat_gateway') || dir.includes('/network') || dir.includes('/vpc')) return 'network';
+  if (
+    type.includes('db') ||
+    type.includes('rds') ||
+    type.includes('s3') ||
+    dir.includes('data-store') ||
+    dir.includes('/mysql')
+  )
+    return 'data';
+  if (
+    type.includes('security_group') ||
+    type.startsWith('aws_iam_') ||
+    body.includes('cidr_blocks')
+  )
+    return 'security';
+  if (
+    type.includes('cloudwatch') ||
+    type.includes('autoscaling_schedule') ||
+    type.includes('availability_zones') ||
+    type === 'template_file'
+  )
+    return 'control';
+  if (
+    type.includes('vpc') ||
+    type.includes('subnet') ||
+    type.includes('internet_gateway') ||
+    type.includes('nat_gateway') ||
+    dir.includes('/network') ||
+    dir.includes('/vpc')
+  )
+    return 'network';
   if (type === 'aws_elb' || type === 'aws_lb' || dir.includes('load-balancer')) return 'edge';
-  if (type.includes('instance') || type.includes('launch_configuration') || type.includes('launch_template') || type.includes('autoscaling_group') || dir.includes('webserver')) return 'web';
+  if (
+    type.includes('instance') ||
+    type.includes('launch_configuration') ||
+    type.includes('launch_template') ||
+    type.includes('autoscaling_group') ||
+    dir.includes('webserver')
+  )
+    return 'web';
   if (block.kind === 'module') return 'module';
   if (block.kind === 'backend') return 'state';
   return 'application';
@@ -182,7 +226,8 @@ function inferContainerTier(dir: string): string {
   if (value.includes('global') || value.includes('state')) return 'state';
   if (value.includes('network') || value.includes('vpc')) return 'network';
   if (value.includes('services') || value.includes('webserver')) return 'web';
-  if (value.includes('data-stores') || value.includes('mysql') || value.includes('s3')) return 'data';
+  if (value.includes('data-stores') || value.includes('mysql') || value.includes('s3'))
+    return 'data';
   if (value.includes('security')) return 'security';
   if (value.includes('modules')) return 'module';
   return 'application';
@@ -190,7 +235,8 @@ function inferContainerTier(dir: string): string {
 
 function isVpcScopedBlock(block: TerraformBlock): boolean {
   const type = String(block?.type || '').toLowerCase();
-  if (block?.kind === 'provider' || block?.kind === 'backend' || block?.kind === 'module') return false;
+  if (block?.kind === 'provider' || block?.kind === 'backend' || block?.kind === 'module')
+    return false;
   if (type === 'terraform_remote_state' || type === 'template_file') return false;
   if (type.includes('s3')) return false;
   return [
@@ -266,9 +312,17 @@ function buildScopeNetworkModel(blocks: TerraformBlock[]): Map<string, any> {
     const tier = inferSemanticTier(block);
     const type = String(block.type || '').toLowerCase();
     const body = String(block.body || '').toLowerCase();
-    if (entry.vpcScoped && (type.includes('availability_zones') || type.includes('autoscaling_group') || type === 'aws_elb' || type === 'aws_lb')) entry.multiAz = true;
+    if (
+      entry.vpcScoped &&
+      (type.includes('availability_zones') ||
+        type.includes('autoscaling_group') ||
+        type === 'aws_elb' ||
+        type === 'aws_lb')
+    )
+      entry.multiAz = true;
     if (entry.vpcScoped && tier === 'edge') entry.hasPublic = true;
-    if (entry.vpcScoped && ['web', 'application', 'data', 'security'].includes(tier)) entry.hasPrivate = true;
+    if (entry.vpcScoped && ['web', 'application', 'data', 'security'].includes(tier))
+      entry.hasPrivate = true;
     if (entry.vpcScoped && tier === 'application') entry.hasAppTier = true;
     if (entry.vpcScoped && tier === 'web') entry.hasWebTier = true;
     if (entry.vpcScoped && tier === 'security') entry.hasSecurityTier = true;
@@ -289,7 +343,11 @@ function buildScopeNetworkModel(blocks: TerraformBlock[]): Map<string, any> {
       entry.hasNatGateway = true;
       entry.hasPrivate = true;
     }
-    if (entry.vpcScoped && block.kind === 'resource' && (type.includes('route_table') || type === 'aws_route')) {
+    if (
+      entry.vpcScoped &&
+      block.kind === 'resource' &&
+      (type.includes('route_table') || type === 'aws_route')
+    ) {
       entry.hasRouteTable = true;
     }
   }
@@ -300,35 +358,71 @@ function inferSubnetKindForBlock(block: TerraformBlock, resolvedTier: string): s
   const type = String(block?.type || '').toLowerCase();
   const name = String(block?.name || '').toLowerCase();
   const body = String(block?.body || '').toLowerCase();
-  const relatedSecurityGroup = extractSecurityGroupReference(block?.body || '')?.toLowerCase() || '';
-  if (type === 'aws_elb' || type === 'aws_lb' || type.includes('internet_gateway') || type.includes('nat_gateway')) return 'public';
+  const relatedSecurityGroup =
+    extractSecurityGroupReference(block?.body || '')?.toLowerCase() || '';
+  if (
+    type === 'aws_elb' ||
+    type === 'aws_lb' ||
+    type.includes('internet_gateway') ||
+    type.includes('nat_gateway')
+  )
+    return 'public';
   if (type.includes('db') || type.includes('rds') || resolvedTier === 'data') return 'private-data';
   if (type === 'aws_security_group' || type === 'aws_security_group_rule') {
-    const publicFacing = type === 'aws_security_group'
-      ? (name.includes('elb') || body.includes('elb'))
-      : (name.includes('elb') || body.includes('elb') || relatedSecurityGroup.includes('elb') || body.includes('cidr_blocks'));
+    const publicFacing =
+      type === 'aws_security_group'
+        ? name.includes('elb') || body.includes('elb')
+        : name.includes('elb') ||
+          body.includes('elb') ||
+          relatedSecurityGroup.includes('elb') ||
+          body.includes('cidr_blocks');
     return publicFacing ? 'public' : 'private-app';
   }
   if (type.includes('route_table') || type === 'aws_route') {
-    const publicFacing = name.includes('public') || body.includes('internet_gateway') || body.includes('0.0.0.0/0') || body.includes('igw');
+    const publicFacing =
+      name.includes('public') ||
+      body.includes('internet_gateway') ||
+      body.includes('0.0.0.0/0') ||
+      body.includes('igw');
     if (publicFacing) return 'public';
     if (body.includes('nat_gateway') || body.includes('private')) return 'private-app';
   }
-  if (resolvedTier === 'network' || resolvedTier === 'web' || resolvedTier === 'application' || resolvedTier === 'security') return 'private-app';
+  if (
+    resolvedTier === 'network' ||
+    resolvedTier === 'web' ||
+    resolvedTier === 'application' ||
+    resolvedTier === 'security'
+  )
+    return 'private-app';
   return null;
 }
 
-function regionalLaneHostForBlock(block: TerraformBlock, resolvedTier: string, networkModel: Map<string, any>): string | null {
+function regionalLaneHostForBlock(
+  block: TerraformBlock,
+  resolvedTier: string,
+  networkModel: Map<string, any>
+): string | null {
   const dir = block.dir || '.';
   const entry = networkModel.get(dir);
   if (!entry?.vpcScoped || !entry.multiAz) return null;
-  if (block.kind === 'data' && block.type === 'aws_availability_zones') return containerIdForDir(dir);
-  if (block.kind === 'resource' && (block.type === 'aws_elb' || block.type === 'aws_lb') && resolvedTier === 'edge') return vpcContainerIdForDir(dir);
-  if (block.kind === 'resource' && block.type === 'aws_autoscaling_group' && resolvedTier === 'web') return vpcContainerIdForDir(dir);
+  if (block.kind === 'data' && block.type === 'aws_availability_zones')
+    return containerIdForDir(dir);
+  if (
+    block.kind === 'resource' &&
+    (block.type === 'aws_elb' || block.type === 'aws_lb') &&
+    resolvedTier === 'edge'
+  )
+    return vpcContainerIdForDir(dir);
+  if (block.kind === 'resource' && block.type === 'aws_autoscaling_group' && resolvedTier === 'web')
+    return vpcContainerIdForDir(dir);
   return null;
 }
 
-function laneHostParentForBlock(block: TerraformBlock, resolvedTier: string, networkModel: Map<string, any>): string {
+function laneHostParentForBlock(
+  block: TerraformBlock,
+  resolvedTier: string,
+  networkModel: Map<string, any>
+): string {
   const scopeParent = containerIdForDir(block.dir);
   const regionalParent = regionalLaneHostForBlock(block, resolvedTier, networkModel);
   if (regionalParent) return regionalParent;
@@ -343,11 +437,11 @@ function nodeForBlock(block: TerraformBlock, networkModel: Map<string, any>): an
   const semanticTier = inferSemanticTier(block);
   const scopeParent = containerIdForDir(block.dir);
   const resolvedTier =
-    block.kind === 'provider' ? 'control' :
-    block.kind === 'backend' ? 'state' :
-    semanticTier;
+    block.kind === 'provider' ? 'control' : block.kind === 'backend' ? 'state' : semanticTier;
   const baseParent = laneHostParentForBlock(block, resolvedTier, networkModel);
-  const parent = shouldCreateSemanticLane(scopeParent, resolvedTier) ? laneContainerId(baseParent, resolvedTier) : baseParent;
+  const parent = shouldCreateSemanticLane(scopeParent, resolvedTier)
+    ? laneContainerId(baseParent, resolvedTier)
+    : baseParent;
   const sizeHints = preferredSizeForBlock(block, resolvedTier);
 
   if (block.kind === 'provider') {
@@ -400,7 +494,8 @@ function nodeForBlock(block: TerraformBlock, networkModel: Map<string, any>): an
     };
   }
   if (block.kind === 'resource') {
-    const relatedSecurityGroup = block.type === 'aws_security_group_rule' ? extractSecurityGroupReference(block.body) : null;
+    const relatedSecurityGroup =
+      block.type === 'aws_security_group_rule' ? extractSecurityGroupReference(block.body) : null;
     const securityClusterKey =
       block.type === 'aws_security_group'
         ? `security:${block.dir}:aws_security_group.${block.name}`
@@ -418,7 +513,8 @@ function nodeForBlock(block: TerraformBlock, networkModel: Map<string, any>): an
       parent,
       render_hints: {
         semantic_tier: semanticTier,
-        related_security_group: relatedSecurityGroup || extractSecurityGroupReference(block.body) || undefined,
+        related_security_group:
+          relatedSecurityGroup || extractSecurityGroupReference(block.body) || undefined,
         cluster_key: securityClusterKey,
         ...sizeHints,
       },
@@ -427,7 +523,11 @@ function nodeForBlock(block: TerraformBlock, networkModel: Map<string, any>): an
   return null;
 }
 
-function collectDirContainers(exampleName: string, blocks: TerraformBlock[], networkModel: Map<string, any>): any[] {
+function collectDirContainers(
+  exampleName: string,
+  blocks: TerraformBlock[],
+  networkModel: Map<string, any>
+): any[] {
   const region = inferExampleRegion(blocks);
   const accountId = `container::account::${slugify(exampleName)}`;
   const regionId = `container::region::${slugify(exampleName)}::${slugify(region)}`;
@@ -450,7 +550,12 @@ function collectDirContainers(exampleName: string, blocks: TerraformBlock[], net
       technology: `Terraform Example ${exampleName}`,
       provider: 'aws',
       boundary: 'example',
-      render_hints: { container: true, preferred_width: 300, preferred_height: 220, semantic_tier: 'application' },
+      render_hints: {
+        container: true,
+        preferred_width: 300,
+        preferred_height: 220,
+        semantic_tier: 'application',
+      },
     },
     {
       id: accountId,
@@ -460,7 +565,12 @@ function collectDirContainers(exampleName: string, blocks: TerraformBlock[], net
       provider: 'aws',
       boundary: 'account',
       parent: `container::${slugify(exampleName)}`,
-      render_hints: { container: true, preferred_width: 320, preferred_height: 240, semantic_tier: 'application' },
+      render_hints: {
+        container: true,
+        preferred_width: 320,
+        preferred_height: 240,
+        semantic_tier: 'application',
+      },
     },
     {
       id: regionId,
@@ -470,7 +580,12 @@ function collectDirContainers(exampleName: string, blocks: TerraformBlock[], net
       provider: 'aws',
       boundary: 'region',
       parent: accountId,
-      render_hints: { container: true, preferred_width: 300, preferred_height: 220, semantic_tier: 'network' },
+      render_hints: {
+        container: true,
+        preferred_width: 300,
+        preferred_height: 220,
+        semantic_tier: 'network',
+      },
     },
     {
       id: 'container::.',
@@ -480,7 +595,12 @@ function collectDirContainers(exampleName: string, blocks: TerraformBlock[], net
       provider: 'terraform',
       boundary: 'scope',
       parent: regionId,
-      render_hints: { container: true, preferred_width: 260, preferred_height: 180, semantic_tier: 'application' },
+      render_hints: {
+        container: true,
+        preferred_width: 260,
+        preferred_height: 180,
+        semantic_tier: 'application',
+      },
     },
   ];
 
@@ -495,7 +615,12 @@ function collectDirContainers(exampleName: string, blocks: TerraformBlock[], net
       provider: 'terraform',
       boundary: 'scope',
       parent: parentDir === '.' ? regionId : `container::${parentDir}`,
-      render_hints: { container: true, preferred_width: 260, preferred_height: 180, semantic_tier: inferContainerTier(dir) },
+      render_hints: {
+        container: true,
+        preferred_width: 260,
+        preferred_height: 180,
+        semantic_tier: inferContainerTier(dir),
+      },
     });
   }
 
@@ -503,7 +628,8 @@ function collectDirContainers(exampleName: string, blocks: TerraformBlock[], net
   const subnetContainers: any[] = [];
   for (const dir of [...vpcScopeDirs].sort()) {
     const vpcId = vpcContainerIdForDir(dir);
-    const parentDir = dir === '.' ? '.' : (dir.includes('/') ? dir.slice(0, dir.lastIndexOf('/')) : '.');
+    const parentDir =
+      dir === '.' ? '.' : dir.includes('/') ? dir.slice(0, dir.lastIndexOf('/')) : '.';
     vpcContainers.push({
       id: vpcId,
       type: 'aws_vpc',
@@ -512,7 +638,12 @@ function collectDirContainers(exampleName: string, blocks: TerraformBlock[], net
       provider: 'aws',
       boundary: 'vpc',
       parent: parentDir === '.' ? regionId : `container::${parentDir}`,
-      render_hints: { container: true, preferred_width: 280, preferred_height: 200, semantic_tier: 'network' },
+      render_hints: {
+        container: true,
+        preferred_width: 280,
+        preferred_height: 200,
+        semantic_tier: 'network',
+      },
     });
     const net = networkModel.get(dir) || {};
     const azKeys = net.multiAz ? ['a', 'b'] : ['a'];
@@ -526,7 +657,12 @@ function collectDirContainers(exampleName: string, blocks: TerraformBlock[], net
         provider: 'aws',
         boundary: 'az',
         parent: vpcId,
-        render_hints: { container: true, preferred_width: 300, preferred_height: 220, semantic_tier: 'network' },
+        render_hints: {
+          container: true,
+          preferred_width: 300,
+          preferred_height: 220,
+          semantic_tier: 'network',
+        },
       });
       if (net.hasPublic) {
         subnetContainers.push({
@@ -537,7 +673,12 @@ function collectDirContainers(exampleName: string, blocks: TerraformBlock[], net
           provider: 'aws',
           boundary: 'subnet',
           parent: azId,
-          render_hints: { container: true, preferred_width: 260, preferred_height: 180, semantic_tier: 'network' },
+          render_hints: {
+            container: true,
+            preferred_width: 260,
+            preferred_height: 180,
+            semantic_tier: 'network',
+          },
         });
       }
       if (net.hasPrivate) {
@@ -549,7 +690,12 @@ function collectDirContainers(exampleName: string, blocks: TerraformBlock[], net
           provider: 'aws',
           boundary: 'subnet',
           parent: azId,
-          render_hints: { container: true, preferred_width: 280, preferred_height: 220, semantic_tier: 'network' },
+          render_hints: {
+            container: true,
+            preferred_width: 280,
+            preferred_height: 220,
+            semantic_tier: 'network',
+          },
         });
         subnetContainers.push({
           id: subnetContainerId(dir, azKey, 'private-data'),
@@ -559,7 +705,12 @@ function collectDirContainers(exampleName: string, blocks: TerraformBlock[], net
           provider: 'aws',
           boundary: 'subnet',
           parent: azId,
-          render_hints: { container: true, preferred_width: 260, preferred_height: 180, semantic_tier: 'network' },
+          render_hints: {
+            container: true,
+            preferred_width: 260,
+            preferred_height: 180,
+            semantic_tier: 'network',
+          },
         });
       }
     }
@@ -584,10 +735,12 @@ function collectDirContainers(exampleName: string, blocks: TerraformBlock[], net
 
   for (const block of blocks) {
     const semanticTier = inferSemanticTier(block);
-    const resolvedTier = block.kind === 'provider' ? 'control' : block.kind === 'backend' ? 'state' : semanticTier;
+    const resolvedTier =
+      block.kind === 'provider' ? 'control' : block.kind === 'backend' ? 'state' : semanticTier;
     const scopeParent = containerIdForDir(block.dir);
     const laneHostParent = laneHostParentForBlock(block, resolvedTier, networkModel);
-    if (shouldCreateSemanticLane(scopeParent, resolvedTier)) ensureLane(laneHostParent, resolvedTier);
+    if (shouldCreateSemanticLane(scopeParent, resolvedTier))
+      ensureLane(laneHostParent, resolvedTier);
   }
 
   for (const [dir, net] of [...networkModel.entries()]) {
@@ -597,7 +750,8 @@ function collectDirContainers(exampleName: string, blocks: TerraformBlock[], net
     ensureLane(scopeParent, 'control');
     if (net.multiAz && net.hasPublic) ensureLane(vpcParent, 'edge', 'Regional Edge');
     if (net.multiAz && net.hasWebTier) ensureLane(vpcParent, 'web', 'Regional Web');
-    if (net.multiAz && (net.hasPublic || net.hasPrivate || net.hasDataTier)) ensureLane(vpcParent, 'network', 'Regional Network');
+    if (net.multiAz && (net.hasPublic || net.hasPrivate || net.hasDataTier))
+      ensureLane(vpcParent, 'network', 'Regional Network');
     const azKeys = net.multiAz ? ['a', 'b'] : ['a'];
     for (const azKey of azKeys) {
       if (net.hasPublic) {
@@ -620,7 +774,12 @@ function collectDirContainers(exampleName: string, blocks: TerraformBlock[], net
     }
   }
 
-  const allContainers = [...containers, ...vpcContainers, ...subnetContainers, ...[...laneMap.values()].sort((a, b) => a.id.localeCompare(b.id))];
+  const allContainers = [
+    ...containers,
+    ...vpcContainers,
+    ...subnetContainers,
+    ...[...laneMap.values()].sort((a, b) => a.id.localeCompare(b.id)),
+  ];
   const ids = new Set(allContainers.map((item) => item.id));
   return allContainers.map((item) => {
     if (!item.id.startsWith('container::') || item.id.startsWith('container::vpc::')) return item;
@@ -633,7 +792,10 @@ function collectDirContainers(exampleName: string, blocks: TerraformBlock[], net
   });
 }
 
-function collectModuleSourceInterface(exampleRoot: string, dir: string): { variables: string[]; outputs: string[] } {
+function collectModuleSourceInterface(
+  exampleRoot: string,
+  dir: string
+): { variables: string[]; outputs: string[] } {
   const moduleRoot = path.join(exampleRoot, dir);
   if (!safeExistsSync(moduleRoot)) return { variables: [], outputs: [] };
   const variables = new Set<string>();
@@ -662,13 +824,22 @@ function collectModuleSourceArtifacts(ir: TerraformTopologyIr): any[] {
       provider: 'terraform',
       boundary: 'scope',
       parent: `container::${slugify(ir.title)}`,
-      render_hints: { container: true, preferred_width: 320, preferred_height: 220, semantic_tier: 'module' },
+      render_hints: {
+        container: true,
+        preferred_width: 320,
+        preferred_height: 220,
+        semantic_tier: 'module',
+      },
     },
   ];
   for (const dir of ir.moduleSourceDirs) {
     const callers = ir.callerBlocksBySource[dir] || [];
     const summary = collectModuleSourceInterface(ir.source_root, dir);
-    const callerLabels = callers.map((block) => block.dir || block.id.replace(/^.*::module\./, '')).filter(Boolean).filter((value, index, list) => list.indexOf(value) === index).sort();
+    const callerLabels = callers
+      .map((block) => block.dir || block.id.replace(/^.*::module\./, ''))
+      .filter(Boolean)
+      .filter((value, index, list) => list.indexOf(value) === index)
+      .sort();
     nodes.push({
       id: `container::module-source::${dir}`,
       type: 'terraform_module_source',
@@ -677,7 +848,12 @@ function collectModuleSourceArtifacts(ir: TerraformTopologyIr): any[] {
       provider: 'terraform',
       boundary: 'scope',
       parent: `container::module-sources::${slugify(ir.title)}`,
-      render_hints: { container: true, semantic_tier: 'module', preferred_width: 300, preferred_height: 280 },
+      render_hints: {
+        container: true,
+        semantic_tier: 'module',
+        preferred_width: 300,
+        preferred_height: 280,
+      },
     });
     nodes.push({
       id: `module-source::${dir}::inputs`,
@@ -687,7 +863,11 @@ function collectModuleSourceArtifacts(ir: TerraformTopologyIr): any[] {
       provider: 'terraform',
       group: 'control',
       parent: `container::module-source::${dir}`,
-      render_hints: { semantic_tier: 'control', preferred_width: 240, preferred_height: Math.max(110, 52 + summary.variables.length * 18) },
+      render_hints: {
+        semantic_tier: 'control',
+        preferred_width: 240,
+        preferred_height: Math.max(110, 52 + summary.variables.length * 18),
+      },
     });
     nodes.push({
       id: `module-source::${dir}::outputs`,
@@ -697,7 +877,11 @@ function collectModuleSourceArtifacts(ir: TerraformTopologyIr): any[] {
       provider: 'terraform',
       group: 'data',
       parent: `container::module-source::${dir}`,
-      render_hints: { semantic_tier: 'data', preferred_width: 240, preferred_height: Math.max(110, 52 + summary.outputs.length * 18) },
+      render_hints: {
+        semantic_tier: 'data',
+        preferred_width: 240,
+        preferred_height: Math.max(110, 52 + summary.outputs.length * 18),
+      },
     });
     nodes.push({
       id: `module-source::${dir}::callers`,
@@ -707,17 +891,26 @@ function collectModuleSourceArtifacts(ir: TerraformTopologyIr): any[] {
       provider: 'terraform',
       group: 'module',
       parent: `container::module-source::${dir}`,
-      render_hints: { semantic_tier: 'module', preferred_width: 240, preferred_height: Math.max(96, 52 + callerLabels.length * 18) },
+      render_hints: {
+        semantic_tier: 'module',
+        preferred_width: 240,
+        preferred_height: Math.max(96, 52 + callerLabels.length * 18),
+      },
     });
   }
   return nodes;
 }
 
-function cloneExpandedModuleBlock(callerBlock: TerraformBlock, sourceBlock: TerraformBlock): TerraformBlock {
+function cloneExpandedModuleBlock(
+  callerBlock: TerraformBlock,
+  sourceBlock: TerraformBlock
+): TerraformBlock {
   const localId =
-    sourceBlock.kind === 'resource' ? `resource.${sourceBlock.type}.${sourceBlock.name}` :
-    sourceBlock.kind === 'data' ? `data.${sourceBlock.type}.${sourceBlock.name}` :
-    `${sourceBlock.kind}.${sourceBlock.type}.${sourceBlock.name || 'root'}`;
+    sourceBlock.kind === 'resource'
+      ? `resource.${sourceBlock.type}.${sourceBlock.name}`
+      : sourceBlock.kind === 'data'
+        ? `data.${sourceBlock.type}.${sourceBlock.name}`
+        : `${sourceBlock.kind}.${sourceBlock.type}.${sourceBlock.name || 'root'}`;
   return {
     ...sourceBlock,
     id: `expanded::${callerBlock.id}::${localId}`,
@@ -753,7 +946,9 @@ export function enrichTopologyIr(ir: TerraformTopologyIr): EnrichedTopology {
     .flatMap((callerBlock) => {
       const relSourceDir = resolveTerraformModuleSourceDir(callerBlock, ir.source_root);
       if (!relSourceDir || !ir.moduleSourceDirs.includes(relSourceDir)) return [];
-      const sourceBlocks = ir.allBlocks.filter((block) => block.dir === relSourceDir && ['resource', 'data'].includes(block.kind)).sort((a, b) => a.id.localeCompare(b.id));
+      const sourceBlocks = ir.allBlocks
+        .filter((block) => block.dir === relSourceDir && ['resource', 'data'].includes(block.kind))
+        .sort((a, b) => a.id.localeCompare(b.id));
       return sourceBlocks.map((sourceBlock) => cloneExpandedModuleBlock(callerBlock, sourceBlock));
     });
   const infraBlocks = [...ir.runtimeBlocks, ...expandedBlocks];
@@ -762,13 +957,18 @@ export function enrichTopologyIr(ir: TerraformTopologyIr): EnrichedTopology {
   return { infraBlocks, networkModel, expandedModuleArtifacts };
 }
 
-function collectExpandedModuleArtifacts(ir: TerraformTopologyIr, networkModel: Map<string, any>): { nodes: any[]; edges: any[] } {
+function collectExpandedModuleArtifacts(
+  ir: TerraformTopologyIr,
+  networkModel: Map<string, any>
+): { nodes: any[]; edges: any[] } {
   const nodes: any[] = [];
   const edges: any[] = [];
   for (const callerBlock of ir.runtimeBlocks.filter((item) => item.kind === 'module')) {
     const relSourceDir = resolveTerraformModuleSourceDir(callerBlock, ir.source_root);
     if (!relSourceDir || !ir.moduleSourceDirs.includes(relSourceDir)) continue;
-    const sourceBlocks = ir.allBlocks.filter((block) => block.dir === relSourceDir && ['resource', 'data'].includes(block.kind)).sort((a, b) => a.id.localeCompare(b.id));
+    const sourceBlocks = ir.allBlocks
+      .filter((block) => block.dir === relSourceDir && ['resource', 'data'].includes(block.kind))
+      .sort((a, b) => a.id.localeCompare(b.id));
     if (sourceBlocks.length === 0) continue;
     const expansionContainerId = `container::module-expansion::${callerBlock.id}`;
     const callerScopeLabel = callerBlock.dir === '.' ? 'root' : callerBlock.dir;
@@ -780,7 +980,12 @@ function collectExpandedModuleArtifacts(ir: TerraformTopologyIr, networkModel: M
       provider: 'aws',
       boundary: 'scope',
       parent: containerIdForDir(callerBlock.dir),
-      render_hints: { container: true, semantic_tier: 'module', preferred_width: 260, preferred_height: 120 },
+      render_hints: {
+        container: true,
+        semantic_tier: 'module',
+        preferred_width: 260,
+        preferred_height: 120,
+      },
     });
     const sourceBlocksById = new Map(sourceBlocks.map((block) => [block.id, block]));
     const expandedIdBySourceId = new Map<string, string>();
@@ -802,16 +1007,25 @@ function collectExpandedModuleArtifacts(ir: TerraformTopologyIr, networkModel: M
       const expandedTarget = expandedIdBySourceId.get(sourceBlock.id);
       if (!expandedTarget) continue;
       const refs = new Set<string>();
-      for (const match of sourceBlock.body.matchAll(/\bdata\.([A-Za-z0-9_]+\.[A-Za-z0-9_]+)\b/g)) refs.add(`data.${match[1]}`);
-      for (const match of sourceBlock.body.matchAll(/\bmodule\.([A-Za-z0-9_]+)\b/g)) refs.add(`module.${match[1]}`);
-      for (const match of sourceBlock.body.matchAll(/\b(aws_[A-Za-z0-9_]+\.[A-Za-z0-9_]+)\b/g)) refs.add(match[1]);
+      for (const match of sourceBlock.body.matchAll(/\bdata\.([A-Za-z0-9_]+\.[A-Za-z0-9_]+)\b/g))
+        refs.add(`data.${match[1]}`);
+      for (const match of sourceBlock.body.matchAll(/\bmodule\.([A-Za-z0-9_]+)\b/g))
+        refs.add(`module.${match[1]}`);
+      for (const match of sourceBlock.body.matchAll(/\b(aws_[A-Za-z0-9_]+\.[A-Za-z0-9_]+)\b/g))
+        refs.add(match[1]);
       for (const ref of refs) {
         const resolvedSourceId = blockLookupId(ref, sourceBlock.dir, sourceBlocksById);
         const expandedSource = resolvedSourceId ? expandedIdBySourceId.get(resolvedSourceId) : null;
-        if (expandedSource && expandedSource !== expandedTarget) edges.push({ from: expandedSource, to: expandedTarget, direction: 'uni' });
+        if (expandedSource && expandedSource !== expandedTarget)
+          edges.push({ from: expandedSource, to: expandedTarget, direction: 'uni' });
       }
     }
-    edges.push({ from: callerBlock.id, to: expansionContainerId, label: 'expands', direction: 'uni' });
+    edges.push({
+      from: callerBlock.id,
+      to: expansionContainerId,
+      label: 'expands',
+      direction: 'uni',
+    });
   }
   return { nodes, edges };
 }
@@ -844,7 +1058,9 @@ function collectSyntheticNetworkNodes(networkModel: Map<string, any>): any[] {
         technology: 'Internet Gateway',
         provider: 'aws',
         group: 'network',
-        parent: net.multiAz ? laneContainerId(vpcParent, 'network') : laneContainerId(subnetContainerId(dir, 'a', 'public'), 'network'),
+        parent: net.multiAz
+          ? laneContainerId(vpcParent, 'network')
+          : laneContainerId(subnetContainerId(dir, 'a', 'public'), 'network'),
         render_hints: { semantic_tier: 'network', preferred_width: 88, preferred_height: 88 },
       });
     }
@@ -856,7 +1072,9 @@ function collectSyntheticNetworkNodes(networkModel: Map<string, any>): any[] {
             id: `${dir}::synthetic.public_route_table::${azKey}`,
             type: 'aws_route_table',
             icon_key: 'aws_route_table',
-            name: net.multiAz ? `Public Route Table AZ ${azKey.toUpperCase()}` : 'Public Route Table',
+            name: net.multiAz
+              ? `Public Route Table AZ ${azKey.toUpperCase()}`
+              : 'Public Route Table',
             technology: 'Route Table',
             provider: 'aws',
             group: 'network',
@@ -878,12 +1096,18 @@ function collectSyntheticNetworkNodes(networkModel: Map<string, any>): any[] {
           });
         }
       }
-      if (net.hasPrivate && (net.hasAppTier || net.hasWebTier || net.hasSecurityTier) && !net.hasRouteTable) {
+      if (
+        net.hasPrivate &&
+        (net.hasAppTier || net.hasWebTier || net.hasSecurityTier) &&
+        !net.hasRouteTable
+      ) {
         nodes.push({
           id: `${dir}::synthetic.private_app_route_table::${azKey}`,
           type: 'aws_route_table',
           icon_key: 'aws_route_table',
-          name: net.multiAz ? `Private App Route Table AZ ${azKey.toUpperCase()}` : 'Private App Route Table',
+          name: net.multiAz
+            ? `Private App Route Table AZ ${azKey.toUpperCase()}`
+            : 'Private App Route Table',
           technology: 'Route Table',
           provider: 'aws',
           group: 'network',
@@ -896,7 +1120,9 @@ function collectSyntheticNetworkNodes(networkModel: Map<string, any>): any[] {
           id: `${dir}::synthetic.private_data_route_table::${azKey}`,
           type: 'aws_route_table',
           icon_key: 'aws_route_table',
-          name: net.multiAz ? `Private Data Route Table AZ ${azKey.toUpperCase()}` : 'Private Data Route Table',
+          name: net.multiAz
+            ? `Private Data Route Table AZ ${azKey.toUpperCase()}`
+            : 'Private Data Route Table',
           technology: 'Route Table',
           provider: 'aws',
           group: 'network',
@@ -930,7 +1156,11 @@ function collectSyntheticComputeNodes(networkModel: Map<string, any>): any[] {
   return nodes;
 }
 
-function buildEdges(runtimeBlocks: TerraformBlock[], exampleRoot: string, moduleSourceDirs: string[]): any[] {
+function buildEdges(
+  runtimeBlocks: TerraformBlock[],
+  exampleRoot: string,
+  moduleSourceDirs: string[]
+): any[] {
   const blocksById = new Map(runtimeBlocks.map((block) => [block.id, block]));
   const edges = new Map<string, any>();
   const addEdge = (from: string | null, to: string | null, label?: string) => {
@@ -940,9 +1170,12 @@ function buildEdges(runtimeBlocks: TerraformBlock[], exampleRoot: string, module
   };
   for (const block of runtimeBlocks) {
     const refs = new Set<string>();
-    for (const match of block.body.matchAll(/\bdata\.([A-Za-z0-9_]+\.[A-Za-z0-9_]+)\b/g)) refs.add(`data.${match[1]}`);
-    for (const match of block.body.matchAll(/\bmodule\.([A-Za-z0-9_]+)\b/g)) refs.add(`module.${match[1]}`);
-    for (const match of block.body.matchAll(/\b(aws_[A-Za-z0-9_]+\.[A-Za-z0-9_]+)\b/g)) refs.add(match[1]);
+    for (const match of block.body.matchAll(/\bdata\.([A-Za-z0-9_]+\.[A-Za-z0-9_]+)\b/g))
+      refs.add(`data.${match[1]}`);
+    for (const match of block.body.matchAll(/\bmodule\.([A-Za-z0-9_]+)\b/g))
+      refs.add(`module.${match[1]}`);
+    for (const match of block.body.matchAll(/\b(aws_[A-Za-z0-9_]+\.[A-Za-z0-9_]+)\b/g))
+      refs.add(match[1]);
     for (const ref of refs) addEdge(blockLookupId(ref, block.dir, blocksById), block.id);
   }
   for (const block of runtimeBlocks.filter((item) => item.kind === 'module')) {

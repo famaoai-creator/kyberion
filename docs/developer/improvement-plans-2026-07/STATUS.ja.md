@@ -1,6 +1,6 @@
 # 改善計画 実装状況正本(STATUS)
 
-> **監査日**: 2026-07-05(全93計画を実コードと突き合わせて検証)/ 2026-07-06 MO-01 を DONE に更新 / 2026-07-11 IP-07・AA-02 行の陳腐化を再突合で訂正 / 同日 TODO 全18行を機械突合し 11 ID(SA-03/OP-01/IL-01/02/03/05/AO-04/AA-04/CO-01〜04)を PARTIAL へ訂正(実装+緑テストを確認。KM-02/DS-04/HO-02/CO-05/AC-05/IP-10 は真に未了と再確認)/ 2026-07-12 SA-02 行の陳腐化を再突合で訂正(残とされた3点は実装済み・19テスト緑を確認)/ 2026-07-13 DS-01・UX-05 を DONE に更新(UI/UX governance audit、CI/validate、operator surface token 化を実証)
+> **監査日**: 2026-07-05(全93計画を実コードと突き合わせて検証)/ 2026-07-06 MO-01 を DONE に更新 / 2026-07-11 IP-07・AA-02 行の陳腐化を再突合で訂正 / 同日 TODO 全18行を機械突合し 11 ID(SA-03/OP-01/IL-01/02/03/05/AO-04/AA-04/CO-01〜04)を PARTIAL へ訂正(実装+緑テストを確認。KM-02/DS-04/HO-02/CO-05/AC-05/IP-10 は真に未了と再確認)/ 2026-07-12 SA-02 行の陳腐化を再突合で訂正(残とされた3点は実装済み・19テスト緑を確認)/ 2026-07-13 DS-01・UX-05 を DONE に更新(UI/UX governance audit、CI/validate、operator surface token 化を実証)/ 同日 IP-09 を DONE に更新(残 slugify 6箇所の正本化+再発防止文書化)
 > **更新規約**: 計画の実装・レビュー完了時に本表を更新する。各計画文書内の「実装状況」節と矛盾する場合は本表を正とし、文書側を追従させる。
 > **判定基準**: DONE = 受入条件を実コードで検証済 / PARTIAL = 一部充足 / TODO = 実質未着手。
 
@@ -8,8 +8,8 @@
 
 | 判定    | 件数 |
 | ------- | ---- |
-| DONE    | 53   |
-| PARTIAL | 39   |
+| DONE    | 54   |
+| PARTIAL | 38   |
 | TODO    | 0    |
 
 ## P0 残作業(プロダクション化のクリティカルパス)
@@ -33,22 +33,22 @@
 
 ### IP(コード品質)
 
-| ID    | 状態    | 残作業(PARTIAL/TODO のみ)                                                                                                                                                                                                                                             |
-| ----- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| IP-01 | DONE    |                                                                                                                                                                                                                                                                       |
-| IP-02 | DONE    |                                                                                                                                                                                                                                                                       |
-| IP-03 | DONE    |                                                                                                                                                                                                                                                                       |
-| IP-04 | DONE    | 2026-07-12 完了: 再監査で「参照ゼロ6本」は陳腐化(大半は manifest の contract_schema 正規参照)。真の未参照2本(ingestion/super-nerve)のみ削除、契約チェック緑。同名別契約の browser-pipeline は二重定義に非ず                                                           |
-| IP-05 | DONE    |                                                                                                                                                                                                                                                                       |
-| IP-06 | DONE    |                                                                                                                                                                                                                                                                       |
-| IP-07 | PARTIAL | 2026-07-11 突合: backend/orchestrator/operator-learning のテストは実在し緑。残: 受入条件全体との網羅精査                                                                                                                                                              |
-| IP-08 | DONE    | 2026-07-12 完了: 台帳(a32/b49/c13)→ (c) 実バグ根治(tier-guard 破損ポリシー fail-open)、(b) 49箇所 logger.warn、(a)+残余48箇所へ理由コメント、console→logger(除外一覧文書化)、errorHandler の process.exit を throw 化、eslint で no-empty + process.exit 制限を恒久化 |
-| IP-09 | PARTIAL | slugify ローカル定義5箇所の正本 import 化、再発防止 lint                                                                                                                                                                                                              |
-| IP-10 | PARTIAL | 2026-07-11: check_contract_schemas から policy/manifest 系46チェック(1,170行)を \_policy_checks へ抽出(4,684→3,527行、check:contract-schemas 実走で同一動作を確認)。残: 同ファイルの継続分割と他の巨大ファイル                                                        |
-| IP-11 | PARTIAL | strict 系フラグ有効化、@ts-ignore 残6、media-actuator any 半減                                                                                                                                                                                                        |
-| IP-12 | DONE    |                                                                                                                                                                                                                                                                       |
-| IP-13 | DONE    |                                                                                                                                                                                                                                                                       |
-| IP-14 | DONE    |                                                                                                                                                                                                                                                                       |
+| ID    | 状態    | 残作業(PARTIAL/TODO のみ)                                                                                                                                                                                                                                                                                     |
+| ----- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| IP-01 | DONE    |                                                                                                                                                                                                                                                                                                               |
+| IP-02 | DONE    |                                                                                                                                                                                                                                                                                                               |
+| IP-03 | DONE    |                                                                                                                                                                                                                                                                                                               |
+| IP-04 | DONE    | 2026-07-12 完了: 再監査で「参照ゼロ6本」は陳腐化(大半は manifest の contract_schema 正規参照)。真の未参照2本(ingestion/super-nerve)のみ削除、契約チェック緑。同名別契約の browser-pipeline は二重定義に非ず                                                                                                   |
+| IP-05 | DONE    |                                                                                                                                                                                                                                                                                                               |
+| IP-06 | DONE    |                                                                                                                                                                                                                                                                                                               |
+| IP-07 | PARTIAL | 2026-07-11 突合: backend/orchestrator/operator-learning のテストは実在し緑。残: 受入条件全体との網羅精査                                                                                                                                                                                                      |
+| IP-08 | DONE    | 2026-07-12 完了: 台帳(a32/b49/c13)→ (c) 実バグ根治(tier-guard 破損ポリシー fail-open)、(b) 49箇所 logger.warn、(a)+残余48箇所へ理由コメント、console→logger(除外一覧文書化)、errorHandler の process.exit を throw 化、eslint で no-empty + process.exit 制限を恒久化                                         |
+| IP-09 | DONE    | 2026-07-13 完了: 残っていた slugify ローカル定義6箇所(voice-hub/campaign-suite/modeling-actuator/scripts3本)を正本 `@agent/core` slugify() へ移行(挙動一致をスクリプト検証+回帰テスト2本で確認)。再発防止は EXTENSION_POINTS.md §8 に文書化(retry は識別子が汎用的で lint 誤検知リスクが高いため文書化を採用) |
+| IP-10 | PARTIAL | 2026-07-11: check_contract_schemas から policy/manifest 系46チェック(1,170行)を \_policy_checks へ抽出(4,684→3,527行、check:contract-schemas 実走で同一動作を確認)。残: 同ファイルの継続分割と他の巨大ファイル                                                                                                |
+| IP-11 | PARTIAL | strict 系フラグ有効化、@ts-ignore 残6、media-actuator any 半減                                                                                                                                                                                                                                                |
+| IP-12 | DONE    |                                                                                                                                                                                                                                                                                                               |
+| IP-13 | DONE    |                                                                                                                                                                                                                                                                                                               |
+| IP-14 | DONE    |                                                                                                                                                                                                                                                                                                               |
 
 ### QA(ソフトウェア品質ライフサイクル)
 
