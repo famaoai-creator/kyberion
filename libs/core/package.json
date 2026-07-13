@@ -774,6 +774,18 @@
     "./presence-bridge": {
       "types": "./dist/presence-bridge.d.ts",
       "default": "./dist/presence-bridge.js"
+    },
+    "./rejection-reason": {
+      "types": "./dist/rejection-reason.d.ts",
+      "default": "./dist/rejection-reason.js"
+    },
+    "./review-reentry": {
+      "types": "./dist/review-reentry.d.ts",
+      "default": "./dist/review-reentry.js"
+    },
+    "./reasoning-degradation": {
+      "types": "./dist/reasoning-degradation.d.ts",
+      "default": "./dist/reasoning-degradation.js"
     }
   },
   "dependencies": {

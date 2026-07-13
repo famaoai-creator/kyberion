@@ -103,3 +103,46 @@ describe('validatePipelineGuardrails', () => {
     expect(report.findings).toHaveLength(0);
   });
 });
+
+describe('semantic-op placement lint (LC-05)', () => {
+  it('warns on llm_decide without a preceding distill op or explicit observation', () => {
+    const report = validatePipelineGuardrails({
+      id: 'lint-demo',
+      steps: [
+        { op: 'browser:navigate', params: { url: 'https://example.com' } },
+        { op: 'browser:llm_decide', params: { goal: 'pick something' } },
+      ],
+    } as any);
+    const codes = report.findings.map((finding) => finding.code);
+    expect(report.ok).toBe(true); // warnings only
+    expect(codes).toContain('llm-decide-without-distill');
+    expect(codes).toContain('llm-decide-without-fallback');
+  });
+
+  it('stays quiet for the rubric-shaped distill -> select pattern', () => {
+    const report = validatePipelineGuardrails({
+      id: 'lint-clean',
+      steps: [
+        { op: 'browser:distill_dom', params: {} },
+        {
+          op: 'browser:llm_decide',
+          params: { goal: 'pick the submit selector', options: ['#a', '#b'] },
+        },
+      ],
+    } as any);
+    expect(report.findings).toHaveLength(0);
+  });
+
+  it('accepts explicit observation or on_degraded declarations', () => {
+    const report = validatePipelineGuardrails({
+      id: 'lint-declared',
+      steps: [
+        {
+          op: 'browser:llm_decide',
+          params: { goal: 'summarize', observation: 'pre-distilled text', on_degraded: 'fail' },
+        },
+      ],
+    } as any);
+    expect(report.findings).toHaveLength(0);
+  });
+});

@@ -15,7 +15,10 @@ import {
   createActuatorTrace,
   finalizeActuatorTrace,
   buildCompletionNextAction,
+  buildReviewGapText,
   type CompletionReconciliation,
+  listPendingReviewReentryRequests,
+  markReviewReentryProcessed,
   ledger,
   logger,
   latestSnapshot,
@@ -1138,9 +1141,31 @@ export async function finishMission(
     reconcileCompletionStructurally(reconciliationInput),
     state
   );
-  const completionReconciliation = structuralReconciliation.satisfied
+  const rawCompletionReconciliation = structuralReconciliation.satisfied
     ? structuralReconciliation
     : reconcileLifecycleClosureCriteria(await reconcileCompletion(reconciliationInput), state);
+
+  // LC-11: pending human review rejections are goal gaps too — merge them so
+  // the goal loop below converts "the reviewer said no" into rework tasks
+  // with the reviewer's reason as the brief, instead of finishing anyway.
+  let pendingReviewReentries: ReturnType<typeof listPendingReviewReentryRequests> = [];
+  try {
+    pendingReviewReentries = listPendingReviewReentryRequests(upperId);
+  } catch {
+    pendingReviewReentries = [];
+  }
+  const completionReconciliation =
+    pendingReviewReentries.length > 0
+      ? {
+          ...rawCompletionReconciliation,
+          satisfied: false,
+          gaps: [
+            ...rawCompletionReconciliation.gaps,
+            ...pendingReviewReentries.map((request) => buildReviewGapText(request)),
+          ],
+          confidence: Math.min(rawCompletionReconciliation.confidence, 0.5),
+        }
+      : rawCompletionReconciliation;
   const completionNextAction = buildCompletionNextAction({
     goal: completionGoal,
     reconciliation: completionReconciliation,
@@ -1166,6 +1191,14 @@ export async function finishMission(
         gaps: completionReconciliation.gaps,
         goal: completionGoal,
       });
+      for (const request of pendingReviewReentries) {
+        try {
+          markReviewReentryProcessed('mission_controller', upperId, request.request_id, gapTaskIds);
+        } catch {
+          // Best-effort: an unprocessable marker leaves the request pending,
+          // which re-merges it next round instead of losing it.
+        }
+      }
       state.context = {
         ...(state.context || {}),
         goal_reconciliation_round: nextRound,
@@ -1434,6 +1467,92 @@ export async function finishMission(
   };
   await saveState(upperId, state);
   logger.success(`📦 Mission ${upperId} archived and finalized.`);
+}
+
+/**
+ * LC-11: process pending human review re-entry requests for a mission that
+ * already finished (or is otherwise idle). Rides the IL-04 goal loop: each
+ * request becomes goal-gap rework tasks whose brief carries the reviewer's
+ * verdict, category, and comment; the mission returns to `active` for the
+ * orchestration worker. In-flight missions don't need this command — finish
+ * merges pending requests into reconciliation automatically.
+ */
+export async function reenterMissionFromReview(
+  id: string
+): Promise<{ status: 'no_pending' | 'reentered'; gapTaskIds: string[] }> {
+  if (!id) {
+    logger.error('Usage: mission_controller review-reenter <MISSION_ID>');
+    return { status: 'no_pending', gapTaskIds: [] };
+  }
+  const upperId = id.toUpperCase();
+  const state = loadState(upperId);
+  if (!state) {
+    logger.error(`Mission ${upperId} not found.`);
+    return { status: 'no_pending', gapTaskIds: [] };
+  }
+  const pending = listPendingReviewReentryRequests(upperId);
+  if (pending.length === 0) {
+    logger.info(`Mission ${upperId} has no pending review re-entry requests.`);
+    return { status: 'no_pending', gapTaskIds: [] };
+  }
+  const missionDir = findMissionPath(upperId);
+  if (!missionDir) {
+    logger.error(`Mission directory not found for ${upperId}.`);
+    return { status: 'no_pending', gapTaskIds: [] };
+  }
+
+  const goal = {
+    summary:
+      state.intent?.goal_summary ||
+      state.outcome_contract?.requested_result ||
+      `Mission ${upperId}`,
+    success_condition:
+      state.intent?.success_condition ||
+      state.outcome_contract?.success_criteria?.join('; ') ||
+      state.outcome_contract?.requested_result ||
+      `Mission ${upperId}`,
+  };
+  // Share the goal-loop round counter so task ids never collide with
+  // finish-time gap tasks; an operator-invoked re-entry is deliberate, so it
+  // is not capped by KYBERION_GOAL_LOOP_MAX_ROUNDS.
+  const nextRound = Number(state.context?.goal_reconciliation_round || 0) + 1;
+  const gaps = pending.map((request) => buildReviewGapText(request));
+  const gapTaskIds = upsertGoalGapTasks({ missionDir, round: nextRound, gaps, goal });
+  for (const request of pending) {
+    try {
+      markReviewReentryProcessed('mission_controller', upperId, request.request_id, gapTaskIds);
+    } catch {
+      // Leaving the request pending re-merges it at the next finish attempt.
+    }
+  }
+
+  const previousStatus = state.status;
+  state.status = 'active';
+  state.context = {
+    ...(state.context || {}),
+    goal_reconciliation_round: nextRound,
+    review_reentry_last_gaps: gaps.slice(0, 5),
+  };
+  state.history.push({
+    ts: new Date().toISOString(),
+    event: 'REVIEW_GAP_REALIGN',
+    note: `Human review re-entry (${pending.length} request(s), was ${previousStatus}). Rework tasks: ${gapTaskIds.join(', ')}`,
+  });
+  await saveState(upperId, state);
+  recordAgentRuntimeEvent(
+    pathResolver.shared('observability/mission-control/agent-runtime-events.jsonl'),
+    {
+      event: 'MISSION_REVIEW_GAP_REALIGN',
+      mission_id: upperId,
+      round: nextRound,
+      requests: pending.map((request) => request.request_id),
+      gap_task_ids: gapTaskIds,
+    }
+  );
+  logger.warn(
+    `🔁 [REVIEW_LOOP] Mission ${upperId} re-entered from human review (${pending.length} request(s)) — dispatched ${gapTaskIds.length} rework task(s). Run the orchestration worker, then finish again.`
+  );
+  return { status: 'reentered', gapTaskIds };
 }
 
 export async function pauseMission(id: string, note?: string): Promise<void> {

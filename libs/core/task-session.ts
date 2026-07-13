@@ -108,6 +108,10 @@ export interface TaskSession {
   requirements?: {
     missing?: string[];
     collected?: Record<string, unknown>;
+    /** IL-05 Task 2: slot names in the order they were filled, so a
+     * correction utterance can backtrack to the LAST FILLED slot instead of
+     * re-asking the next empty one (which loses the correction target). */
+    filled_order?: string[];
   };
   control: {
     interruptible: boolean;
@@ -1237,7 +1241,9 @@ export function reopenTaskSession(
   const session = loadTaskSession(sessionId);
   if (!session) return null;
   const reopened = updateTaskSession(sessionId, {
-    status: input.status || (session.requirements?.missing?.length ? 'collecting_requirements' : 'planning'),
+    status:
+      input.status ||
+      (session.requirements?.missing?.length ? 'collecting_requirements' : 'planning'),
     requirements: input.requirements || session.requirements,
     payload: {
       ...(session.payload || {}),

@@ -11,7 +11,7 @@ import {
   saveArtifactRecord,
   type ArtifactRecord,
 } from '@agent/core/artifact-record';
-import type { GovernedArtifactRole } from '@agent/core';
+import type { GovernedArtifactRole, RejectionReasonCategory } from '@agent/core';
 
 const REVIEW_DIR = 'active/shared/coordination/deliverable-reviews';
 const REVIEW_LOG = `${REVIEW_DIR}/reviews.jsonl`;
@@ -24,6 +24,8 @@ export interface DeliverableReviewEntry {
   version: number;
   verdict: DeliverableVerdict;
   comment?: string;
+  /** LC-10: closed-vocabulary rejection reason (rejection-reason.ts). */
+  reason_category?: RejectionReasonCategory;
   reviewer: string;
   reviewed_at: string;
   new_artifact_id?: string;
@@ -43,6 +45,7 @@ export interface DeliverableReviewInput {
   artifactId: string;
   verdict: DeliverableVerdict;
   comment?: string;
+  reasonCategory?: RejectionReasonCategory;
   reviewer: string;
   reviewRole?: GovernedArtifactRole;
 }
@@ -122,6 +125,7 @@ export function reviewDeliverable(input: DeliverableReviewInput): {
     version: reviewSequence,
     verdict: input.verdict,
     comment: input.comment,
+    reason_category: input.reasonCategory,
     reviewer: input.reviewer,
     reviewed_at: new Date().toISOString(),
   };
@@ -139,6 +143,7 @@ export function reviewDeliverable(input: DeliverableReviewInput): {
         review_artifact_version: nextArtifactVersion,
         review_verdict: input.verdict,
         review_comment: input.comment,
+        review_reason_category: input.reasonCategory,
       },
     };
     saveArtifactRecord(nextArtifact);

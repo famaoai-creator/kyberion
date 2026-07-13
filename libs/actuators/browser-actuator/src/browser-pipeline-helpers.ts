@@ -16,6 +16,7 @@ import {
   classifyError,
   processUntrustedContent,
   decideFromObservation,
+  executeLlmDecideOp,
 } from '@agent/core';
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
 import { chromium, type CDPSession, type Page } from '@playwright/test';
@@ -805,21 +806,17 @@ async function opCapture(
       // params.options the reply must be a member (selection mode); a null
       // decision exports null and downstream `if` conditions handle it —
       // the op itself never throws on model failure.
-      const goal = String(resolve(params.goal) || '');
-      if (!goal) throw new Error('llm_decide requires params.goal');
-      const fromKey = String(params.from || 'dom_distillate');
-      const observationRaw =
-        params.observation != null ? resolve(params.observation) : ctx[fromKey];
-      const observation =
-        typeof observationRaw === 'string' ? observationRaw : JSON.stringify(observationRaw ?? '');
-      const options = Array.isArray(params.options)
-        ? params.options.map((option: unknown) => String(resolve(option)))
-        : undefined;
-      const decision = await decideFromObservation({ goal, observation, options });
-      return browserRuntimeHelpers.recordBrowserAction(
-        { ...ctx, [params.export_as || 'llm_decision']: decision },
-        { kind: 'capture', op: 'llm_decide', tab_id: runtime.activeTabId }
-      );
+      const decided = await executeLlmDecideOp({
+        params,
+        ctx,
+        resolve: resolve as (value: any) => any,
+        defaultFromKey: 'dom_distillate',
+      });
+      return browserRuntimeHelpers.recordBrowserAction(decided, {
+        kind: 'capture',
+        op: 'llm_decide',
+        tab_id: runtime.activeTabId,
+      });
     }
     case 'passkey_credentials': {
       const credentials = await getVirtualPasskeyCredentials(runtime, page);

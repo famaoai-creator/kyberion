@@ -100,6 +100,7 @@
     "check:tier-hygiene": "node dist/scripts/check_tier_hygiene.js",
     "smoke:intent": "node dist/scripts/intent_smoke.js",
     "watch:tenant-drift": "node dist/scripts/watch_tenant_drift.js",
+    "pipeline:promote": "node --import ./scripts/ts-loader.mjs scripts/pipeline_promote.ts",
     "vuln:scan": "node --import ./scripts/ts-loader.mjs scripts/scan_dependency_vulns.ts",
     "patch:dependency": "node --import ./scripts/ts-loader.mjs scripts/apply_dependency_patch.ts",
     "manifests:sign": "node --import ./scripts/ts-loader.mjs scripts/sign_environment_manifests.ts",

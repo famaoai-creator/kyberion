@@ -457,6 +457,12 @@
       "type": "md"
     },
     {
+      "path": "product/architecture/loop-closure-machinery.md",
+      "tier": "public",
+      "size": 12361,
+      "type": "md"
+    },
+    {
       "path": "product/architecture/management-control-plane.md",
       "tier": "public",
       "size": 3510,
@@ -981,7 +987,7 @@
     {
       "path": "product/governance/actuator-op-registry.json",
       "tier": "public",
-      "size": 13568,
+      "size": 13716,
       "type": "json"
     },
     {
@@ -1457,6 +1463,12 @@
       "tier": "public",
       "size": 169,
       "type": "json"
+    },
+    {
+      "path": "product/governance/llm-invocation-rubric.md",
+      "tier": "public",
+      "size": 4648,
+      "type": "md"
     },
     {
       "path": "product/governance/maintenance-schedule.json",
@@ -2019,7 +2031,7 @@
     {
       "path": "product/governance/role-write-access.json",
       "tier": "public",
-      "size": 3292,
+      "size": 3314,
       "type": "json"
     },
     {
@@ -2925,7 +2937,7 @@
     {
       "path": "product/orchestration/actuator-op-discovery.json",
       "tier": "public",
-      "size": 59465,
+      "size": 59961,
       "type": "json"
     },
     {

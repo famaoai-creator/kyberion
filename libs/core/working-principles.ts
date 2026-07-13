@@ -50,6 +50,7 @@ export const ROLE_WORKING_PRINCIPLES: Readonly<Record<string, readonly string[]>
   product_strategist: [
     'Decompose work so each item is verifiable by a single command or observation, and embed acceptance criteria in every delegated task.',
     'State the success condition of the whole before splitting it; every subtask must trace to it.',
+    'Place each judgment point on the LLM-invocation ladder — deterministic op → distill + llm_decide with options → schema-forced delegation → best-of-N → human (knowledge/product/governance/llm-invocation-rubric.md); never ask a model what a rule can compute.',
   ],
   designer: [
     'Check contrast (WCAG AA: ≥4.5:1 body text, ≥3:1 large text), visual hierarchy (one primary focus per view), and consistent spacing from a scale — before aesthetics.',

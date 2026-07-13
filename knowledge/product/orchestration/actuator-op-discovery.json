@@ -126,6 +126,10 @@
           "kind": "transform"
         },
         {
+          "op": "llm_decide",
+          "kind": "transform"
+        },
+        {
           "op": "set",
           "kind": "transform"
         },
@@ -1530,6 +1534,14 @@
           "kind": "transform"
         },
         {
+          "op": "distill_response",
+          "kind": "transform"
+        },
+        {
+          "op": "llm_decide",
+          "kind": "transform"
+        },
+        {
           "op": "a2a_send",
           "kind": "apply"
         },
@@ -1907,6 +1919,14 @@
           "kind": "transform"
         },
         {
+          "op": "distill_output",
+          "kind": "transform"
+        },
+        {
+          "op": "llm_decide",
+          "kind": "transform"
+        },
+        {
           "op": "scroll",
           "kind": "apply"
         },
@@ -2266,6 +2286,10 @@
         {
           "op": "list_terminal_sessions",
           "kind": "capture"
+        },
+        {
+          "op": "llm_decide",
+          "kind": "transform"
         },
         {
           "op": "spawn",

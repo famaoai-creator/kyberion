@@ -7,6 +7,7 @@ import {
   type GovernedArtifactRole,
 } from './artifact-store.js';
 import { pathResolver } from './path-resolver.js';
+import type { RejectionReasonCategory } from './rejection-reason.js';
 import { safeExistsSync, safeReaddir } from './secure-io.js';
 import {
   buildOrganizationWorkLoopSummary,
@@ -86,6 +87,8 @@ export interface ApprovalRecord {
   approvedAt?: string;
   authMethod?: 'surface_session' | 'totp' | 'passkey' | 'manual';
   note?: string;
+  /** LC-10: closed-vocabulary rejection reason (see rejection-reason.ts). */
+  reasonCategory?: RejectionReasonCategory;
   decidedByType?: 'human' | 'ai_agent' | 'service';
   authenticated?: boolean;
   payloadHash?: string;
@@ -278,6 +281,56 @@ export function createApprovalRequest(
   return record;
 }
 
+/**
+ * LC-10 (bridge ask-why): attach a rejection reason AFTER the decision was
+ * recorded — bridges decide via a button first and ask "why" as a follow-up.
+ * Updates the rejected workflow entry and appends a dedicated event so the
+ * learning/re-execution loops see the reason in the event stream.
+ */
+export function annotateApprovalRejectionReason(
+  role: GovernedArtifactRole,
+  params: {
+    channel: string;
+    storageChannel?: string;
+    requestId: string;
+    reasonCategory: RejectionReasonCategory;
+    note?: string;
+    annotatedBy: string;
+  }
+): ApprovalRequestRecord {
+  const storageChannel = params.storageChannel || params.channel;
+  const record = loadApprovalRequest(normalizeApprovalChannel(storageChannel), params.requestId);
+  if (!record) throw new Error(`Approval request not found: ${params.channel}/${params.requestId}`);
+  const workflow = record.workflow
+    ? {
+        ...record.workflow,
+        approvals: record.workflow.approvals.map((approval) =>
+          approval.status === 'rejected'
+            ? {
+                ...approval,
+                reasonCategory: params.reasonCategory,
+                note: params.note ?? approval.note,
+              }
+            : approval
+        ),
+      }
+    : undefined;
+  const updated: ApprovalRequestRecord = { ...record, workflow };
+  writeGovernedArtifactJson(role, approvalRequestLogicalPath(storageChannel, updated.id), updated);
+  appendGovernedArtifactJsonl(role, approvalEventLogicalPath(storageChannel), {
+    ts: new Date().toISOString(),
+    event: 'rejection_reason_captured',
+    request_id: updated.id,
+    correlation_id: updated.correlationId,
+    annotated_by: params.annotatedBy,
+    reason_category: params.reasonCategory,
+    note: params.note,
+    channel: updated.channel,
+    thread_ts: updated.threadTs,
+  });
+  return updated;
+}
+
 export function loadApprovalRequest(
   storageChannel: string,
   id: string
@@ -344,6 +397,8 @@ export function decideApprovalRequest(
     payloadHash?: string;
     effectBinding?: string;
     note?: string;
+    /** LC-10: closed-vocabulary rejection reason (see rejection-reason.ts). */
+    reasonCategory?: RejectionReasonCategory;
   }
 ): ApprovalRequestRecord {
   const storageChannel = params.storageChannel || params.channel;
@@ -380,6 +435,7 @@ export function decideApprovalRequest(
             payloadHash: params.payloadHash,
             effectBinding: params.effectBinding,
             note: params.note,
+            reasonCategory: params.reasonCategory,
           };
         }),
       }
@@ -408,6 +464,11 @@ export function decideApprovalRequest(
     effect_binding: params.effectBinding,
     channel: updated.channel,
     thread_ts: updated.threadTs,
+    // LC-10: the rejection rationale must survive into the event stream —
+    // downstream re-execution and learning loops read events, not the nested
+    // per-request workflow record.
+    note: params.note,
+    reason_category: params.reasonCategory,
   });
 
   return updated;

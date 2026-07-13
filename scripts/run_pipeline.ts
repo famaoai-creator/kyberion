@@ -22,6 +22,11 @@ import {
   pathResolver,
   installReasoningBackends,
   runFeedbackLoop,
+  determineActuatorStepType,
+  getSemanticDecideDegradations,
+  appendSemanticDegradationRun,
+  recordAdhocPipelineRun,
+  PROMOTION_CANDIDATE_MIN_RUNS,
   safeExecResult,
   buildNextActionFromError,
   formatNextAction,
@@ -53,7 +58,19 @@ function resolveStepType(step: PipelineAdfStep): string {
     if (step.role === 'sink') return 'apply';
     if (step.role === 'gate') return 'control';
   }
-  return step.type ?? 'apply';
+  if (step.type) return step.type;
+  // No declared role/type: the op registry is the truth for actuator ops —
+  // a blind 'apply' default routed transform ops into the wrong dispatch
+  // switch (UNKNOWN_OP inside the actuator; found by loop simulation).
+  if (typeof step.op === 'string' && step.op.includes(':')) {
+    const [domain, action] = step.op.split(':');
+    try {
+      return determineActuatorStepType(domain, action);
+    } catch {
+      /* unregistered op — keep the legacy default */
+    }
+  }
+  return 'apply';
 }
 
 /** Resolve the export key from produces / params.export_as. produces takes precedence. */
@@ -489,13 +506,38 @@ async function loadActuatorDispatch(domain: string): Promise<DispatchFunc> {
 
       if (!result.handled && typeof mod.handleAction === 'function') {
         try {
+          // Resolve the sub-step kind from the op registry instead of a blind
+          // 'apply' default — a transform op routed into the apply switch
+          // throws UNKNOWN_OP inside the actuator (found by loop simulation).
+          let resolvedType = type;
+          if (!resolvedType) {
+            try {
+              resolvedType = determineActuatorStepType(domain, op);
+            } catch {
+              resolvedType = 'apply';
+            }
+          }
           const actionResult = await mod.handleAction({
             action: 'pipeline',
-            steps: [{ type: type || 'apply', op, params }],
+            steps: [{ type: resolvedType, op, params }],
             context: ctx,
             options: ctx.__pipeline_options,
             ...(trace ? { pipelineTrace: trace } : {}),
           });
+          // A sub-pipeline that reports failed steps must fail this step —
+          // "did not throw" is not success (MO-07 §14 / AR-06).
+          if (
+            actionResult &&
+            typeof actionResult === 'object' &&
+            (actionResult as any).status === 'failed'
+          ) {
+            const failedEntry = Array.isArray((actionResult as any).results)
+              ? (actionResult as any).results.find((entry: any) => entry.status === 'failed')
+              : undefined;
+            throw new Error(
+              failedEntry?.error || `Actuator sub-pipeline reported failure for ${domain}:${op}`
+            );
+          }
           result = {
             handled: true,
             ctx:
@@ -1781,8 +1823,44 @@ export async function main() {
     logger.info(`   [PIPELINE] Trace: ${result.context.trace_persisted_path}`);
     const pipelineStatus = result.status === 'succeeded' || recovered ? 'succeeded' : 'failed';
     runFeedbackLoop(pipelineId, pipelineStatus, persisted.trace);
+    // LC-09: surface semantic-decision degradations in the run summary —
+    // a pipeline that "succeeded" on deterministic fallbacks every time is
+    // otherwise indistinguishable from one whose LLM decisions worked.
+    const semanticDegradations = getSemanticDecideDegradations();
+    if (semanticDegradations.length > 0) {
+      const byReason = semanticDegradations.reduce<Record<string, number>>((acc, entry) => {
+        acc[entry.reason] = (acc[entry.reason] || 0) + 1;
+        return acc;
+      }, {});
+      appendSemanticDegradationRun(pipelineId, byReason);
+      logger.warn(
+        `   [PIPELINE] llm_decide degraded ${semanticDegradations.length}x (${Object.entries(
+          byReason
+        )
+          .map(([reason, count]) => `${reason}=${count}`)
+          .join(', ')}) — deterministic fallbacks were used.`
+      );
+    }
     if (result.status === 'succeeded' || recovered) {
       logger.success(`✅ [PIPELINE] Completed: ${pipeline.name || argv.input}`);
+      // LC-02: success-first, promote-on-reuse. An ad-hoc ADF (outside the
+      // pipelines/ catalog) that just succeeded is a promotion candidate —
+      // one advisory line, never forced.
+      const inputRelative = nodePath
+        .relative(pathResolver.rootDir(), nodePath.resolve(String(argv.input)))
+        .replace(/\\/g, '/');
+      if (!inputRelative.startsWith('pipelines/') && !inputRelative.startsWith('..')) {
+        const successCount = recordAdhocPipelineRun(inputRelative);
+        if (successCount >= PROMOTION_CANDIDATE_MIN_RUNS) {
+          logger.warn(
+            `   [PIPELINE] This ad-hoc ADF has now succeeded ${successCount}x — promote it: pnpm pipeline:promote --input ${inputRelative}`
+          );
+        } else {
+          logger.info(
+            `   [PIPELINE] Reusable? Promote this run into the catalog: pnpm pipeline:promote --input ${inputRelative}`
+          );
+        }
+      }
       if (autoContext.__pipeline_options && (autoContext.__pipeline_options as any).keep_alive) {
         logger.info(
           '   [PROCESS] Browser session kept alive per pipeline options. Terminal will remain open.'

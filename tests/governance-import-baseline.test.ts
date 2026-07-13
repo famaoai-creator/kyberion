@@ -38,6 +38,10 @@ function walk(dirPath: string, relativeBase = ''): string[] {
     const relPath = relativeBase ? path.join(relativeBase, entry.name) : entry.name;
 
     if (entry.isDirectory()) {
+      // Machine-local knowledge tiers can never be represented in the
+      // committed baseline (their paths must not leak into a public fixture),
+      // so the scan skips them — keeping local runs consistent with CI.
+      if (relPath === 'knowledge/confidential' || relPath === 'knowledge/personal') continue;
       files.push(...walk(absPath, relPath));
       continue;
     }
