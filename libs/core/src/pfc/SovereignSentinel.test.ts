@@ -24,7 +24,7 @@ describe('SovereignSentinel (Integrated PFC)', () => {
 
   it('should pass fast path if all registered layers are valid', async () => {
     const sentinel = new SovereignSentinel(STATE_FILE);
-    
+
     sentinel.registerLayer('L0', async () => true);
     sentinel.registerLayer('L1', async () => true);
 
@@ -35,7 +35,7 @@ describe('SovereignSentinel (Integrated PFC)', () => {
 
   it('should halt execution if a layer fails and record state', async () => {
     const sentinel = new SovereignSentinel(STATE_FILE);
-    
+
     // L0 fails
     sentinel.registerLayer('L0', async () => false);
     // L1 should not be reached
@@ -54,5 +54,37 @@ describe('SovereignSentinel (Integrated PFC)', () => {
     const state = JSON.parse(fs.readFileSync(STATE_FILE, 'utf-8'));
     expect(state.layers['L0'].attempt_count).toBe(1);
     expect(state.layers['L1'].attempt_count).toBe(0);
+  });
+
+  it('runs every registered layer through L7, not just L0-L5', async () => {
+    const sentinel = new SovereignSentinel(STATE_FILE);
+    const reached: string[] = [];
+    for (const layer of ['L0', 'L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7'] as const) {
+      sentinel.registerLayer(layer, async () => {
+        reached.push(layer);
+        return true;
+      });
+    }
+
+    const result = await sentinel.run();
+
+    expect(result.success).toBe(true);
+    expect(reached).toEqual(['L0', 'L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7']);
+  });
+
+  it('halts on L6 without reaching L7', async () => {
+    const sentinel = new SovereignSentinel(STATE_FILE);
+    let l7Reached = false;
+    sentinel.registerLayer('L6', async () => false);
+    sentinel.registerLayer('L7', async () => {
+      l7Reached = true;
+      return true;
+    });
+
+    const result = await sentinel.run();
+
+    expect(result.success).toBe(false);
+    expect(result.failedLayer).toBe('L6');
+    expect(l7Reached).toBe(false);
   });
 });
