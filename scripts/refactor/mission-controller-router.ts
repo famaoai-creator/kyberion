@@ -144,6 +144,11 @@ export interface MissionControllerRoutingContext {
     actorId?: string,
     actorType?: 'agent' | 'human' | 'service'
   ) => Awaitable<void>;
+  reconcileExistingWork: (
+    missionId: string,
+    manifestPath: string,
+    dryRun?: boolean
+  ) => Awaitable<unknown>;
   purgeMissions: (dryRun?: boolean) => Awaitable<void>;
   listMissions: (filterStatus?: string) => void;
   listOrganizationCatalogs: (organizationId?: string, jsonOutput?: boolean) => Awaitable<void>;
@@ -626,6 +631,12 @@ export async function runMissionControllerAction(
         getValue('--actor-type', context.argv) as any
       );
       break;
+    case 'reconcile-work': {
+      const manifestPath = getValue('--manifest', context.argv);
+      if (!manifestPath) throw new Error('reconcile-work requires --manifest <PATH>');
+      await context.reconcileExistingWork(arg1!, manifestPath, context.hasDryRun);
+      break;
+    }
     case 'purge':
       await context.purgeMissions(!context.argv.includes('--execute'));
       break;

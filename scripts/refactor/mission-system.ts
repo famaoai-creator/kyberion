@@ -34,6 +34,7 @@ import {
 import { distillMission as _distillMission } from './mission-distill.js';
 import { dispatchMissionTickets as _dispatchMissionTickets } from './mission-ticket-dispatch.js';
 import { dispatchMissionWorkItems as _dispatchMissionWorkItems } from './mission-workitem-dispatch.js';
+import { reconcileMissionExistingWork as _reconcileMissionExistingWork } from './mission-work-reconciliation.js';
 import { sealMission as _sealMission } from './mission-seal.js';
 import {
   loadState,
@@ -209,6 +210,12 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
         getGitHash,
         syncProjectLedgerIfLinked: syncProjectLedgerIfLinkedInternal,
       }).then(() => syncProjectOperationalStateIfLinked(missionId));
+    },
+    reconcileExistingWork(missionId: string, manifestPath: string, dryRun = false) {
+      return _reconcileMissionExistingWork({ missionId, manifestPath, dryRun }).then((result) => {
+        if (dryRun) return result;
+        return syncProjectOperationalStateIfLinked(missionId).then(() => result);
+      });
     },
     purgeMissions(dryRun = false) {
       return _purgeMissions(rootDir, dryRun);
