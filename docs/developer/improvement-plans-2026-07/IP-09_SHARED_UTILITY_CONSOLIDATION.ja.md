@@ -1,6 +1,7 @@
 # IP-09: 重複ユーティリティの統合
 
 > 優先度: P2 / 規模: S / 依存: なし / 関連: IP-05(parseArgs は CLI ランナー側で解決)
+> **状態(2026-07-13)**: 完了。残っていた slugify ローカル定義6箇所を正本化 + 再発防止の文書化。詳細は「実装メモ」末尾。
 
 ## 背景と課題
 
@@ -91,3 +92,6 @@
 - `meeting-browser-driver/src/index.ts` の Playwright 接続/終了/ページ操作も `withRetry()` から `retry()` に寄せた。
 - 残っていたテストモック群(`terminal`, `voice`, `network`, `approval`, `service`, `media-generation`, `secret`, `ios`, `email`, `blockchain`, `video-composition`, `service-engine`) も `retry` 名義に揃え、`calendar-actuator/src/index.js` の実装呼び出しも `retry()` に寄せた。`service-engine.test.ts` は `./async-utils.js` をモックして retry 引数の検証を維持した。
 - `secure-io.ts` に `loadJson()` と `ensureDir()` を追加し、`work-design.ts` / `mission-team-index.ts` / `mission-team-plan-composer.ts` の局所 `loadJson()` を撤去して正本へ寄せた。`secure-io.test.ts` で JSON 解析とディレクトリ作成の契約を固定した。
+- **残っていた `slugify` ローカル定義6箇所を正本化(2026-07-13)**: `satellites/voice-hub/server.ts`(`slugifyProjectId`/`slugifyProjectRootToken`)、`libs/core/campaign-suite.ts`(`slugifyTitle`)、`libs/actuators/modeling-actuator/src/topology-to-architecture-adf.ts`、`scripts/generate_project_os.ts`、`scripts/reconcile_unclassified_errors.ts`、`scripts/reconcile_unhandled_intents.ts`。挙動一致は代表入力+境界値(maxLength 境界で separator が来るケース含む)をスクリプトで網羅比較して確認(全一致)。うち2スクリプト(`reconcile_unclassified_errors`/`reconcile_unhandled_intents`)はローカル実装が「slice してから trim」の順序だった(正本は trim してから slice)ため、`slugify(text, { separator: '_', maxLength: 60 }).replace(/^_|_$/g, '')` で trim-after-slice を呼び出し側で合成し出力を完全一致させた(正本自体の意味論は変更していない)。`voice-hub` の `slugifyProjectId` は大文字化版だったため `slugify(...).toUpperCase()` で合成(小文字化してから大文字化しても、非英数字のフィルタ対象文字集合は case-insensitive なので出力は既存と一致)。回帰テストは公開エントリポイントを持つ2箇所(`buildCampaignPlan`、`topologyIrToArchitectureAdf`)に追加(`campaign-suite.test.ts`、`topology-to-architecture-adf.test.ts`)。残り4箇所(voice-hub の巨大サーバファイル、CLI スクリプト3本)は既存のテスト基盤が無く、新設のコストが本タスクの規模(S)に対して過大なため、上記の網羅的等価性検証で代替した。
+- **Task 4(再発防止)完了**: `docs/developer/EXTENSION_POINTS.md` に「§8 Shared Utilities (Internal)」を新設し、`slugify`/`retry` 等の共通ユーティリティは `@agent/core` の正本を import する(ローカル再実装しない)ことを明記(lint 化は `retry` という識別子が汎用的すぎて誤検知リスクが高いため見送り、文書化のみとした — plan の「軽い方でよい」を採用)。
+- **棚卸し結果(2026-07-13)**: `retry`/`chunk`/`ensureDir`/`loadJson` の残存ローカル定義は網羅 grep で確認 — 真の重複は残っていない(`retry` という名前がヒットした8箇所は全て retry **policy** を保持するローカル変数で、関数の再実装ではなかった)。`parseArgs`(scripts 16箇所)は元計画どおり IP-05(`createStandardYargs`)の管轄として本タスクの範囲外。

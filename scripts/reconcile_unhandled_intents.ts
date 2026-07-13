@@ -10,6 +10,7 @@
  * Outputs a structured JSON summary to stdout for pipeline consumption.
  */
 
+import { slugify } from '@agent/core';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeWriteFile, safeMkdir } from '@agent/core/secure-io';
 import {
@@ -38,14 +39,6 @@ const SUMMARY_RELATIVE = path.join(
   'tmp',
   'unhandled-intent-last-run.summary.txt'
 );
-
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '_')
-    .slice(0, 60)
-    .replace(/^_|_$/g, '');
-}
 
 function run(): void {
   const entries = listUnhandledIntents().filter((e) => !e.reconciled);
@@ -90,7 +83,8 @@ function writeProposal(
   const key = entry.intent_id ?? entry.utterance_samples[0] ?? 'unknown';
   try {
     safeMkdir(proposalsDir);
-    const slug = slugify(key) || 'unknown_intent';
+    const slug =
+      slugify(key, { separator: '_', maxLength: 60 }).replace(/^_|_$/g, '') || 'unknown_intent';
     const filename = `${entry.miss_type}_${slug}.proposal.json`;
     const proposalPath = path.join(proposalsDir, filename);
 
@@ -159,7 +153,8 @@ function buildUnroutedProposal(entry: UnhandledIntentEntry, key: string): object
 }
 
 function buildUnrecognizedProposal(entry: UnhandledIntentEntry, key: string): object {
-  const slug = slugify(key) || 'new_intent';
+  const slug =
+    slugify(key, { separator: '_', maxLength: 60 }).replace(/^_|_$/g, '') || 'new_intent';
   return {
     miss_type: 'unrecognized',
     utterance_samples: entry.utterance_samples,
