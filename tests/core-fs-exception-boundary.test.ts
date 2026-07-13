@@ -6,6 +6,9 @@ import { getAllFiles } from '@agent/core/fs-utils';
 const rootDir = process.cwd();
 const allowedCoreFsImports = [
   'libs/core/action-item-store.test.ts',
+  'libs/core/approval-rejection-reason.test.ts',
+  'libs/core/reasoning-degradation.test.ts',
+  'libs/core/review-reentry.test.ts',
   'libs/core/audit-chain-tenant.test.ts',
   'libs/core/browser-extension-bridge.test.ts',
   'libs/core/data-vault.test.ts',

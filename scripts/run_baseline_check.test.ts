@@ -54,4 +54,14 @@ describe('run_baseline_check', () => {
 
     expect(status).toBe('all_clear');
   });
+
+  it('returns needs_attention when the reasoning chain degraded to stub (LC-08)', () => {
+    const status = deriveBaselineStatus(
+      { success: true, failedLayer: null },
+      { submitted: false, pending: false, reason: null },
+      true
+    );
+
+    expect(status).toBe('needs_attention');
+  });
 });

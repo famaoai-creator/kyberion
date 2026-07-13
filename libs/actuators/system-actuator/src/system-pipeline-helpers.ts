@@ -1,4 +1,6 @@
 import {
+  distillTextObservation,
+  executeLlmDecideOp,
   logger,
   safeReadFile,
   safeWriteFile,
@@ -1272,6 +1274,29 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
 
 async function opTransform(op: string, params: any, ctx: any, resolve: (value: any) => any) {
   switch (op) {
+    case 'distill_output': {
+      // AR-07: deterministic distillation of command output (same text →
+      // same distillate; bounded) so llm_decide never sees raw output.
+      const fromKey = String(params.from || 'last_exec');
+      const source = params.text != null ? resolve(params.text) : ctx[fromKey];
+      const text =
+        typeof source === 'string'
+          ? source
+          : [source?.stdout, source?.stderr].filter(Boolean).join('\n') ||
+            JSON.stringify(source ?? '');
+      const distillate = distillTextObservation(text, {
+        maxHeadLines: params.max_head_lines,
+        maxTailLines: params.max_tail_lines,
+        maxErrorLines: params.max_error_lines,
+      });
+      return { ...ctx, [params.export_as || 'output_distillate']: distillate };
+    }
+    case 'llm_decide': {
+      // AR-07: one in-loop decision about a distilled observation
+      // (distill_output first). Selection over generation; null decision
+      // exports null + reason and never throws unless on_degraded: 'fail'.
+      return executeLlmDecideOp({ params, ctx, resolve, defaultFromKey: 'output_distillate' });
+    }
     case 'regex_extract': {
       const input = String(ctx[params.from || 'last_capture'] || '');
       const match = input.match(new RegExp(params.pattern, 'm'));

@@ -7,6 +7,10 @@ const ptyState = {
 const mocks = vi.hoisted(() => ({
   retry: vi.fn(async (fn: any) => fn()),
   classifyError: vi.fn(() => ({ category: 'timeout' })),
+  executeLlmDecideOp: vi.fn(async ({ params }: any) => {
+    const exportAs = params.export_as || 'llm_decision';
+    return { [exportAs]: { decision: 'retry' }, [`${exportAs}_degraded`]: null };
+  }),
 }));
 
 vi.mock('@agent/core', () => ({
@@ -21,6 +25,7 @@ vi.mock('@agent/core', () => ({
   emitComputerSurfacePatch: vi.fn(),
   classifyError: mocks.classifyError,
   retry: mocks.retry,
+  executeLlmDecideOp: mocks.executeLlmDecideOp,
   ptyEngine: {
     spawn: vi.fn((shell: string, args: string[], cwd?: string) => {
       const id = `pty-${ptyState.sessions.size + 1}`;
@@ -372,5 +377,29 @@ describe('terminal-actuator computer_interaction edge cases', () => {
         action: { type: 'unsupported_action' },
       } as any)
     ).rejects.toThrow('Unsupported computer interaction action');
+  });
+});
+
+describe('terminal llm_decide op (AR-07 rollout)', () => {
+  it('decides on an explicit observation and reports status ok', async () => {
+    const { handleAction } = await import('./index');
+    const result = await handleAction({
+      action: 'llm_decide',
+      params: {
+        goal: 'should we retry the failing command?',
+        observation: 'output: connection timed out (3 attempts)',
+        options: ['retry', 'abort'],
+      },
+    } as any);
+    expect(result.status).toBe('ok');
+    expect(result.decision).toEqual({ decision: 'retry' });
+    expect(mocks.executeLlmDecideOp).toHaveBeenCalled();
+  });
+
+  it('requires an explicit observation (no pipeline ctx on this actuator)', async () => {
+    const { handleAction } = await import('./index');
+    await expect(
+      handleAction({ action: 'llm_decide', params: { goal: 'pick something' } } as any)
+    ).rejects.toThrow('requires params.observation');
   });
 });

@@ -101,7 +101,7 @@
         "read_json",
         "read_text_file"
       ],
-      "transform": ["find_ui_nodes", "set", "summarize_ui_tree"],
+      "transform": ["find_ui_nodes", "llm_decide", "set", "summarize_ui_tree"],
       "apply": [
         "android_cli_screen_capture",
         "authenticate_with_passkey",
@@ -312,7 +312,7 @@
     },
     "network": {
       "capture": ["a2a_poll", "fetch", "shell"],
-      "transform": ["json_query", "regex_extract"],
+      "transform": ["distill_response", "json_query", "llm_decide", "regex_extract"],
       "apply": ["a2a_send", "log", "write_artifact", "write_file"]
     },
     "orchestrator": {
@@ -376,7 +376,14 @@
         "vision_consult",
         "window_list"
       ],
-      "transform": ["json_query", "regex_extract", "run_js", "sre_analyze"],
+      "transform": [
+        "distill_output",
+        "json_query",
+        "llm_decide",
+        "regex_extract",
+        "run_js",
+        "sre_analyze"
+      ],
       "apply": [
         "activate_application",
         "app_quit",
@@ -408,7 +415,7 @@
     },
     "terminal": {
       "capture": ["list", "list_terminal_sessions", "poll", "poll_terminal"],
-      "transform": [],
+      "transform": ["llm_decide"],
       "apply": [
         "kill",
         "kill_terminal",

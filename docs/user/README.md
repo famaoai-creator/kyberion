@@ -4,18 +4,18 @@ For people **using** Kyberion to get work done. If you're trying to operate / de
 
 ## Start here
 
-| Doc | When to read |
-|---|---|
-| [WHY.md](../WHY.md) | First. What is this thing and why does it exist. |
-| [QUICKSTART.md](../QUICKSTART.md) | Then. 5 minutes from clone to first working smoke. |
+| Doc                                                                | When to read                                                                                          |
+| ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
+| [WHY.md](../WHY.md)                                                | First. What is this thing and why does it exist.                                                      |
+| [QUICKSTART.md](../QUICKSTART.md)                                  | Then. 5 minutes from clone to first working smoke.                                                    |
 | [OPERATIONS_READINESS_MATRIX.md](./OPERATIONS_READINESS_MATRIX.md) | What is ready, conditional, or environment-dependent in normal use. Pair it with `pnpm setup:report`. |
-| [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) | First-stop recovery guide for missing auth, stale surfaces, and first-run setup noise. |
-| [USE_CASE_QUICKSTARTS.md](./USE_CASE_QUICKSTARTS.md) | Three task-first entry points: meeting facilitator, report generation, browser research. |
-| [PRODUCTIVITY_TASKS.md](./PRODUCTIVITY_TASKS.md) | Plan ad hoc work across calendar, meeting, email, documents, browser, and connected systems. |
-| [SCENARIO_CATALOG.md](../SCENARIO_CATALOG.md) | Browse the canonical catalog of automated workflows you can ask Kyberion to do. |
-| [customer-overlay-use-cases.md](./customer-overlay-use-cases.md) | Customer overlay story: create, inspect, activate, onboard, and switch engagements. |
-| [meeting-facilitator.md](./meeting-facilitator.md) | How Kyberion joins meetings, keeps consent boundaries, and handles follow-up. |
-| [OPERATOR_UX_GUIDE.md](../OPERATOR_UX_GUIDE.md) | Daily operations from the operator perspective (Slack, Chronos, terminal). |
+| [TROUBLESHOOTING.md](./TROUBLESHOOTING.md)                         | First-stop recovery guide for missing auth, stale surfaces, and first-run setup noise.                |
+| [USE_CASE_QUICKSTARTS.md](./USE_CASE_QUICKSTARTS.md)               | Three task-first entry points: meeting facilitator, report generation, browser research.              |
+| [PRODUCTIVITY_TASKS.md](./PRODUCTIVITY_TASKS.md)                   | Plan ad hoc work across calendar, meeting, email, documents, browser, and connected systems.          |
+| [SCENARIO_CATALOG.md](../SCENARIO_CATALOG.md)                      | Browse the canonical catalog of automated workflows you can ask Kyberion to do.                       |
+| [customer-overlay-use-cases.md](./customer-overlay-use-cases.md)   | Customer overlay story: create, inspect, activate, onboard, and switch engagements.                   |
+| [meeting-facilitator.md](./meeting-facilitator.md)                 | How Kyberion joins meetings, keeps consent boundaries, and handles follow-up.                         |
+| [OPERATOR_UX_GUIDE.md](../OPERATOR_UX_GUIDE.md)                    | Daily operations from the operator perspective (Slack, Chronos, terminal).                            |
 
 ## Scope of this directory
 
