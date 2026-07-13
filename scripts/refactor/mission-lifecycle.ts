@@ -518,15 +518,25 @@ function recordMissionFinishGateFailure(input: {
   reason: string;
   agentRuntimeEventPath: string;
   pendingTasks: string[];
-  repairStrategy?: 'task' | 'operator';
+  repairStrategy?: 'task' | 'operator' | 'existing_tasks' | 'artifact_review';
+  actionTaskIds?: string[];
 }): string {
   const now = new Date().toISOString();
   const context = input.state.context || {};
   const failureCount = Number(context.mission_finish_gate_failure_count || 0) + 1;
   const requiresOperator = input.repairStrategy === 'operator';
+  const resumesExistingWork =
+    input.repairStrategy === 'existing_tasks' || input.repairStrategy === 'artifact_review';
   const shouldRealign =
-    !requiresOperator && failureCount >= 2 && input.state.status === 'validating';
-  const nextStatus = requiresOperator ? 'paused' : shouldRealign ? 'active' : 'validating';
+    !requiresOperator &&
+    !resumesExistingWork &&
+    failureCount >= 2 &&
+    input.state.status === 'validating';
+  const nextStatus = requiresOperator
+    ? 'paused'
+    : resumesExistingWork || shouldRealign
+      ? 'active'
+      : 'validating';
 
   input.state.context = {
     ...context,
@@ -535,40 +545,55 @@ function recordMissionFinishGateFailure(input: {
     mission_finish_gate_last_checked_at: now,
     mission_finish_gate_requires_operator: requiresOperator,
   };
-  const repairTaskIds = requiresOperator
-    ? []
-    : upsertMissionGateRepairTask({
-        missionDir: input.missionDir,
-        gateId: input.gateId,
-        reason: input.reason,
-        pendingTasks: input.pendingTasks,
-      });
+  const repairTaskIds =
+    requiresOperator || resumesExistingWork
+      ? []
+      : upsertMissionGateRepairTask({
+          missionDir: input.missionDir,
+          gateId: input.gateId,
+          reason: input.reason,
+          pendingTasks: input.pendingTasks,
+        });
+  const actionTaskIds = input.actionTaskIds || repairTaskIds;
   input.state.status = nextStatus;
   input.state.history.push({
     ts: now,
     event: requiresOperator
       ? 'OPERATOR_DECISION_REQUIRED'
-      : shouldRealign
-        ? 'REALIGN'
-        : 'EXIT_GATE_FAIL',
+      : input.repairStrategy === 'artifact_review'
+        ? 'ARTIFACT_REVIEW_REQUIRED'
+        : input.repairStrategy === 'existing_tasks'
+          ? 'WORK_REMAINS'
+          : shouldRealign
+            ? 'REALIGN'
+            : 'EXIT_GATE_FAIL',
     note: requiresOperator
       ? `Autonomous finish retries exhausted; operator decision required. Reason: ${input.reason}`
-      : shouldRealign
-        ? `Finish gate failed ${failureCount} times; realigning to active. Reason: ${input.reason}`
-        : `Finish gate failed. Reason: ${input.reason}`,
+      : input.repairStrategy === 'artifact_review'
+        ? `Artifact review task reopened without changing its reviewed implementation. Reason: ${input.reason}`
+        : input.repairStrategy === 'existing_tasks'
+          ? `Finish stopped because existing work remains; no synthetic repair task was created. Reason: ${input.reason}`
+          : shouldRealign
+            ? `Finish gate failed ${failureCount} times; realigning to active. Reason: ${input.reason}`
+            : `Finish gate failed. Reason: ${input.reason}`,
   });
   recordAgentRuntimeEvent(input.agentRuntimeEventPath, {
     event: requiresOperator
       ? 'MISSION_FINISH_OPERATOR_DECISION_REQUIRED'
-      : shouldRealign
-        ? 'MISSION_REALIGN_REQUESTED'
-        : 'MISSION_FINISH_GATE_FAILED',
+      : input.repairStrategy === 'artifact_review'
+        ? 'MISSION_ARTIFACT_REVIEW_REQUIRED'
+        : input.repairStrategy === 'existing_tasks'
+          ? 'MISSION_WORK_REMAINS'
+          : shouldRealign
+            ? 'MISSION_REALIGN_REQUESTED'
+            : 'MISSION_FINISH_GATE_FAILED',
     mission_id: input.missionId,
     gate_id: input.gateId,
     failure_count: failureCount,
     reason: input.reason,
     next_status: input.state.status,
     repair_task_ids: repairTaskIds,
+    action_task_ids: actionTaskIds,
   });
   void notifyOperator('mission_failed', {
     title: `Mission ${input.missionId} blocked at ${input.gateId}`,
@@ -589,6 +614,31 @@ function recordMissionFinishGateFailure(input: {
     mission_finish_gate_last_path: gatePath,
   };
   return gatePath;
+}
+
+function reopenArtifactReviewTasks(input: {
+  missionDir: string;
+  taskIds: string[];
+  reason: string;
+}): string[] {
+  const taskIds = new Set(input.taskIds);
+  const tasks = readMissionNextTasks(input.missionDir);
+  const reopened: string[] = [];
+  const invalidatedAt = new Date().toISOString();
+  for (const task of tasks) {
+    const taskId = String(task.task_id || '');
+    if (!taskIds.has(taskId)) continue;
+    task.status = 'planned';
+    delete task.artifact_review_receipt;
+    delete task.reconciliation;
+    task.last_review_invalidation = {
+      invalidated_at: invalidatedAt,
+      reason: input.reason,
+    };
+    reopened.push(taskId);
+  }
+  if (reopened.length > 0) writeMissionNextTasks(input.missionDir, tasks);
+  return reopened;
 }
 
 function recordMissionIntentDriftGateFailure(input: {
@@ -999,6 +1049,8 @@ export async function finishMission(
         reason: exitGate.reason || 'exit gate blocked',
         agentRuntimeEventPath: args.agentRuntimeEventPath,
         pendingTasks: exitGate.pendingTasks,
+        repairStrategy: 'existing_tasks',
+        actionTaskIds: exitGate.pendingTasks,
       });
       await saveState(upperId, state);
     }
@@ -1022,6 +1074,13 @@ export async function finishMission(
     );
     const state = loadState(upperId);
     if (state) {
+      const reopenedReviewTaskIds = quality.reviewTaskIds?.length
+        ? reopenArtifactReviewTasks({
+            missionDir,
+            taskIds: quality.reviewTaskIds,
+            reason: quality.reason || 'artifact review gate blocked',
+          })
+        : [];
       recordMissionFinishGateFailure({
         missionId: upperId,
         state,
@@ -1030,6 +1089,8 @@ export async function finishMission(
         reason: quality.reason || 'quality gate blocked',
         agentRuntimeEventPath: args.agentRuntimeEventPath,
         pendingTasks: [],
+        repairStrategy: reopenedReviewTaskIds.length > 0 ? 'artifact_review' : 'operator',
+        actionTaskIds: reopenedReviewTaskIds,
       });
       await saveState(upperId, state);
     }

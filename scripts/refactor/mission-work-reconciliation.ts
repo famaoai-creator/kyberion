@@ -6,13 +6,18 @@ import { Ajv, type ValidateFunction } from 'ajv';
 import * as nodePath from 'node:path';
 import {
   appendMissionExecutionLedgerEntry,
+  evaluateArtifactReviews,
   auditChain,
   compileSchemaFromPath,
   detectTier,
   findMissionPath,
   getWorkItem,
+  inferArtifactReviewKind,
   logger,
+  loadArtifactReviewReceipt,
   pathResolver,
+  receiptToArtifactReviewDecision,
+  resolveArtifactReviewerProfile,
   hasAuthority,
   resolveIdentityContext,
   safeExec,
@@ -24,6 +29,8 @@ import {
   sha256,
   updateWorkItem,
   withLock,
+  type ArtifactReviewReceipt,
+  type ArtifactReviewerProfile,
 } from '@agent/core';
 import { loadState, saveState } from './mission-state.js';
 
@@ -91,8 +98,22 @@ interface PlannedTask extends Record<string, unknown> {
   deliverable?: string;
   acceptance_criteria?: string[];
   dependencies?: string[];
+  review_target?: string;
+  risk?: string;
+  assigned_to?: { role?: string; agent_id?: string };
+  artifact_review_profile?: ArtifactReviewerProfile & {
+    artifact_path?: string;
+    artifact_sha256?: string;
+    implementer_agent_ids: string[];
+  };
+  artifact_review_receipt?: string;
   ticket_dispatch?: { work_item_id?: string };
   reconciliation?: Record<string, unknown>;
+}
+
+interface ReconciledArtifactReview {
+  profile: NonNullable<PlannedTask['artifact_review_profile']>;
+  receipt: ArtifactReviewReceipt;
 }
 
 let validateManifest: ValidateFunction | null = null;
@@ -273,6 +294,184 @@ function validateTaskContract(input: {
   }
 }
 
+function assertCommitBoundSourceFile(input: {
+  taskId: string;
+  label: string;
+  sourceRepository: string;
+  sourceCommit: string;
+  absolutePath: string;
+}): string {
+  if (!isInside(input.sourceRepository, input.absolutePath)) {
+    throw new Error(
+      `Task ${input.taskId} ${input.label} escapes source.repository: ${input.absolutePath}`
+    );
+  }
+  if (!safeExistsSync(input.absolutePath) || !safeStat(input.absolutePath).isFile()) {
+    throw new Error(`Task ${input.taskId} ${input.label} file not found: ${input.absolutePath}`);
+  }
+  const repositoryRelativePath = nodePath
+    .relative(input.sourceRepository, input.absolutePath)
+    .split(nodePath.sep)
+    .join('/');
+  try {
+    safeExec('git', ['cat-file', '-e', `${input.sourceCommit}:${repositoryRelativePath}`], {
+      cwd: input.sourceRepository,
+    });
+    safeExec('git', ['diff', '--quiet', input.sourceCommit, '--', repositoryRelativePath], {
+      cwd: input.sourceRepository,
+    });
+  } catch {
+    throw new Error(
+      `Task ${input.taskId} ${input.label} is not commit-bound to ${input.sourceCommit}: ${repositoryRelativePath}`
+    );
+  }
+  return repositoryRelativePath;
+}
+
+function validateReconciledArtifactReview(input: {
+  missionId: string;
+  missionType?: string;
+  missionRiskProfile?: string;
+  plannedTask: PlannedTask;
+  manifestTask: MissionWorkReconciliationTask;
+  sourceRepository: string;
+  sourceCommit: string;
+  taskById: Map<string, PlannedTask>;
+}): ReconciledArtifactReview | null {
+  const role = String(input.plannedTask.assigned_to?.role || '')
+    .trim()
+    .toLowerCase();
+  const reviewTargetId = String(input.plannedTask.review_target || '').trim();
+  const isReviewTask = role === 'reviewer' || role === 'qa' || Boolean(reviewTargetId);
+  if (!isReviewTask) return null;
+  if (!reviewTargetId) {
+    throw new Error(`Task ${input.manifestTask.task_id} is a review task without review_target`);
+  }
+  const reviewEvidence = input.manifestTask.evidence.filter((entry) => entry.kind === 'review');
+  if (reviewEvidence.length !== 1) {
+    throw new Error(
+      `Task ${input.manifestTask.task_id} must provide exactly one artifact review receipt as review evidence`
+    );
+  }
+  const receiptPath = nodePath.resolve(input.sourceRepository, reviewEvidence[0].path);
+  let receipt: ArtifactReviewReceipt;
+  try {
+    receipt = loadArtifactReviewReceipt(receiptPath);
+  } catch (error) {
+    throw new Error(
+      `Task ${input.manifestTask.task_id} review evidence is not a valid artifact review receipt: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+  const identityReasons: string[] = [];
+  if (receipt.mission_id.toUpperCase() !== input.missionId.toUpperCase()) {
+    identityReasons.push(`receipt mission_id is ${receipt.mission_id}`);
+  }
+  if (receipt.review_task_id !== input.manifestTask.task_id) {
+    identityReasons.push(`receipt review_task_id is ${receipt.review_task_id}`);
+  }
+  if (receipt.review_target_task_id !== reviewTargetId) {
+    identityReasons.push(`receipt review_target_task_id is ${receipt.review_target_task_id}`);
+  }
+  const targetTask = input.taskById.get(reviewTargetId);
+  if (!targetTask) identityReasons.push(`review_target ${reviewTargetId} does not exist`);
+  if (identityReasons.length > 0) {
+    throw new Error(
+      `Task ${input.manifestTask.task_id} artifact review identity mismatch: ${identityReasons.join('; ')}`
+    );
+  }
+
+  const artifactPath = nodePath.resolve(input.sourceRepository, receipt.artifact.path);
+  assertCommitBoundSourceFile({
+    taskId: input.manifestTask.task_id,
+    label: 'reviewed artifact',
+    sourceRepository: input.sourceRepository,
+    sourceCommit: input.sourceCommit,
+    absolutePath: artifactPath,
+  });
+  const normalizedArtifactPath = pathResolver.toRepoRelative(artifactPath);
+  const currentHash = sha256(safeReadFile(artifactPath) as Buffer);
+  const inferredArtifactKind = inferArtifactReviewKind(normalizedArtifactPath);
+  const derivedProfile = resolveArtifactReviewerProfile({
+    artifactKind: receipt.artifact.kind,
+    missionClass: input.missionType,
+    riskProfile: input.missionRiskProfile || input.plannedTask.risk || targetTask?.risk,
+  });
+  const declaredProfile = input.plannedTask.artifact_review_profile;
+  const requiredReviewerRoles = Array.from(
+    new Set([
+      ...derivedProfile.required_reviewer_roles,
+      ...(declaredProfile?.required_reviewer_roles || []),
+    ])
+  );
+  const requiredReviewerCapabilities = Array.from(
+    new Set([
+      ...derivedProfile.required_reviewer_capabilities,
+      ...(declaredProfile?.required_reviewer_capabilities || []),
+    ])
+  );
+  const implementerAgentIds = Array.from(
+    new Set(
+      [...(declaredProfile?.implementer_agent_ids || []), targetTask?.assigned_to?.agent_id].filter(
+        (entry): entry is string => Boolean(entry)
+      )
+    )
+  );
+  const requireIndependence =
+    derivedProfile.independence_required || declaredProfile?.independence_required === true;
+  const reasons: string[] = [];
+  if (receipt.artifact.kind !== inferredArtifactKind) {
+    reasons.push(
+      `receipt artifact kind ${receipt.artifact.kind} does not match inferred kind ${inferredArtifactKind}`
+    );
+  }
+  if (receipt.artifact.sha256 !== currentHash) {
+    reasons.push(`review ${receipt.review_id} was invalidated by artifact change`);
+  }
+  if (declaredProfile?.artifact_path && declaredProfile.artifact_path !== normalizedArtifactPath) {
+    reasons.push('reviewed artifact path does not match the declared review profile');
+  }
+  if (declaredProfile?.artifact_sha256 && declaredProfile.artifact_sha256 !== currentHash) {
+    reasons.push('reviewed artifact hash does not match the declared review profile');
+  }
+  if (requireIndependence && implementerAgentIds.length === 0) {
+    reasons.push('implementer identity is missing, so reviewer independence cannot be verified');
+  }
+  for (const implementerAgentId of implementerAgentIds) {
+    if (!receipt.reviewer.independent_from.includes(implementerAgentId)) {
+      reasons.push(`review receipt is not bound as independent from ${implementerAgentId}`);
+    }
+  }
+  const normalizedReceipt: ArtifactReviewReceipt = {
+    ...receipt,
+    artifact: { ...receipt.artifact, path: normalizedArtifactPath },
+  };
+  const evaluation = evaluateArtifactReviews({
+    artifacts: [{ path: normalizedArtifactPath, sha256: currentHash }],
+    reviews: [receiptToArtifactReviewDecision(normalizedReceipt)],
+    requiredReviewerRoles,
+    implementerAgentIds,
+    requireIndependence,
+  });
+  reasons.push(...evaluation.reasons);
+  if (reasons.length > 0) {
+    throw new Error(
+      `Task ${input.manifestTask.task_id} artifact review is not acceptable: ${Array.from(new Set(reasons)).join('; ')}`
+    );
+  }
+  return {
+    profile: {
+      ...derivedProfile,
+      required_reviewer_roles: requiredReviewerRoles,
+      required_reviewer_capabilities: requiredReviewerCapabilities,
+      independence_required: requireIndependence,
+      artifact_path: normalizedArtifactPath,
+      artifact_sha256: currentHash,
+      implementer_agent_ids: implementerAgentIds,
+    },
+    receipt: normalizedReceipt,
+  };
+}
+
 function assertDependenciesResolved(
   plannedTask: PlannedTask,
   taskById: Map<string, PlannedTask>,
@@ -365,6 +564,15 @@ export async function reconcileMissionExistingWork(input: {
     const adoptedTaskIds = new Set(manifestTaskIds);
     const reconciledTaskIds: string[] = [];
     const alreadyReconciledTaskIds: string[] = [];
+    const reconciledArtifactReviews = new Map<string, ReconciledArtifactReview>();
+    const missionRiskProfile = String(
+      ((state as unknown as { classification?: Record<string, unknown> }).classification || {})
+        .risk_profile || ''
+    ).trim();
+    const missionClass = String(
+      ((state as unknown as { classification?: Record<string, unknown> }).classification || {})
+        .mission_class || ''
+    ).trim();
 
     for (const manifestTask of manifest.tasks) {
       const plannedTask = taskById.get(manifestTask.task_id);
@@ -391,6 +599,17 @@ export async function reconcileMissionExistingWork(input: {
         sourceCommit: manifest.source.commit,
         missionTier: state.tier,
       });
+      const artifactReview = validateReconciledArtifactReview({
+        missionId,
+        missionType: missionClass || state.mission_type,
+        missionRiskProfile: missionRiskProfile || undefined,
+        plannedTask,
+        manifestTask,
+        sourceRepository,
+        sourceCommit: manifest.source.commit,
+        taskById,
+      });
+      if (artifactReview) reconciledArtifactReviews.set(manifestTask.task_id, artifactReview);
       assertDependenciesResolved(plannedTask, taskById, adoptedTaskIds);
       reconciledTaskIds.push(manifestTask.task_id);
     }
@@ -412,6 +631,23 @@ export async function reconcileMissionExistingWork(input: {
       const plannedTask = taskById.get(manifestTask.task_id)!;
       if (alreadyReconciledTaskIds.includes(manifestTask.task_id)) continue;
       plannedTask.status = 'completed';
+      const artifactReview = reconciledArtifactReviews.get(manifestTask.task_id);
+      if (artifactReview) {
+        const reviewDir = nodePath.join(missionPath, 'evidence', 'reviews');
+        safeMkdir(reviewDir, { recursive: true });
+        const safeReviewId = artifactReview.receipt.review_id.replace(/[^a-zA-Z0-9._-]/g, '-');
+        const safeTaskId = manifestTask.task_id.replace(/[^a-zA-Z0-9._-]/g, '-');
+        const artifactReviewReceiptPath = nodePath.join(
+          reviewDir,
+          `reconciled-${safeTaskId}-${safeReviewId}.json`
+        );
+        safeWriteFile(artifactReviewReceiptPath, JSON.stringify(artifactReview.receipt, null, 2));
+        plannedTask.artifact_review_profile = artifactReview.profile;
+        plannedTask.artifact_review_receipt = nodePath
+          .relative(missionPath, artifactReviewReceiptPath)
+          .split(nodePath.sep)
+          .join('/');
+      }
       plannedTask.reconciliation = {
         kind: manifest.kind,
         version: manifest.version,
