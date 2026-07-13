@@ -27,6 +27,7 @@ function collectProductionTsFiles(dir: string): string[] {
       continue;
     }
     if (!entry.endsWith('.ts')) continue;
+    if (entry.endsWith('.d.ts')) continue;
     if (entry.endsWith('.test.ts')) continue;
     files.push(fullPath);
   }
