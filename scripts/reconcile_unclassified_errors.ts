@@ -9,6 +9,7 @@
  * Outputs a structured JSON summary to stdout for pipeline consumption.
  */
 
+import { slugify } from '@agent/core';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeWriteFile, safeMkdir } from '@agent/core/secure-io';
 import {
@@ -25,16 +26,12 @@ interface ReconcileResult {
 
 const PROPOSALS_RELATIVE = path.join('active', 'shared', 'tmp', 'unclassified-error-proposals');
 
-function slugify(text: string): string {
-  return text.toLowerCase().replace(/[^a-z0-9]+/g, '_').slice(0, 60).replace(/^_|_$/g, '');
-}
-
 function escapeRegex(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function run(): void {
-  const entries = listUnclassifiedErrors().filter(e => !e.reconciled);
+  const entries = listUnclassifiedErrors().filter((e) => !e.reconciled);
   const result: ReconcileResult = {
     proposals_written: [],
     skipped: [],
@@ -53,11 +50,13 @@ function run(): void {
 function writeProposal(
   entry: UnclassifiedErrorEntry,
   proposalsDir: string,
-  result: ReconcileResult,
+  result: ReconcileResult
 ): void {
   try {
     safeMkdir(proposalsDir);
-    const slug = slugify(entry.message_excerpt) || 'unknown_error';
+    const slug =
+      slugify(entry.message_excerpt, { separator: '_', maxLength: 60 }).replace(/^_|_$/g, '') ||
+      'unknown_error';
     const proposalPath = path.join(proposalsDir, `${slug}.proposal.json`);
 
     // Derive a candidate pattern from the excerpt: escape special chars, use first 60 chars.

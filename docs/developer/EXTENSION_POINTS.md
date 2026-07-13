@@ -214,6 +214,12 @@ Stable surfaces are deprecated for **at least one minor version** before removal
 - **Plugin marketplace contract**. Phase D'-1 (engine refinement) introduces this and will live by its own semver.
 - **A2A protocol**. Currently Beta; will be lifted to v1 after broader inter-agent usage stabilizes.
 
+## 8. Shared Utilities (Internal)
+
+Common helpers (`slugify`, `retry`, `sleep`, `chunk`, `loadJson`/`ensureDir`) have exactly one canonical implementation in `@agent/core` (`libs/core/text-utils.ts`, `libs/core/async-utils.ts`, `libs/core/secure-io.ts`). See IP-09 (`docs/developer/improvement-plans-2026-07/IP-09_SHARED_UTILITY_CONSOLIDATION.ja.md`) for the history of why: independently-drifted local copies previously produced ID/output mismatches (mission dir names, file names) across call sites.
+
+**Do not add a new local `function slugify(...)` / `function retry(...)` / etc.** Import the canonical version from `@agent/core` instead. If a call site genuinely needs different behavior (e.g. a different separator, max length, or fallback), pass options to the canonical function rather than hand-rolling a variant — see `SlugifyOptions` in `libs/core/text-utils.ts`.
+
 # Marketing Workload Extension
 
 Marketing workloads compose existing Stable surfaces: ADF v1, Actuator contracts v1, Knowledge Tier Layout v1, Customer Aggregation v1, and the approval store's human accountability/payload binding. `libs/core/marketing-workload.ts` is additive and does not change an existing Stable contract. Trace remains Beta and is evidence metadata, not an authorization source.
