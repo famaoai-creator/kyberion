@@ -60,3 +60,11 @@
 - 修正検知の誤爆(正常発話を修正と誤判定)は会話を混乱させる。決定論パターンは高信頼な語のみにし、曖昧時は明確化質問に落とす(勝手にバックトラックしない)。
 - 完了セッションの再オープンは「いつまで遡れるか」を限定しないと際限がない。相関 ID 一致 or 直近 N 分/最新1件に限定。
 - shape 正準化は dispatch 経路の挙動を変え得る。まず不一致を**記録するだけ**(正準は現行 routeFamily 維持)で観測し、乖離の実態を見てから正準を切り替える 2 段構え。
+
+## 実装状況 (2026-07-13, 完了)
+
+- Task 1(shape 正準化): `intent-contract.ts` が `shape_disagreement` をトレース記録(実装済みを確認)。
+- Task 2(修正検知とバックトラック): `libs/core/correction-detection.ts` + slot-filling 割り込みは実装済みだったが、**直前に埋めたスロットでなく次の空きスロットを再質問**しており修正対象が失われていた。`requirements.filled_order` を導入し、修正発話で最後に埋めたスロットを missing 先頭へ差し戻し・値を破棄・再質問する真のバックトラックに修正(orchestrator fastpath テスト1本追加)。
+- Task 3(pending intent 永続化): `pending-intent-store.ts` + テスト(実装済みを確認)。
+- Task 4(納品後修正の再オープン): `reopenTaskSession` + 相関ID一致の直近 completed 判定(`surface-runtime-orchestrator.ts` 実装済みを確認)。
+- 関連: LOOP_CLOSURE_PLAN LC-10/11 の ask-why・review-reentry は本計画の会話面を補完する。iMessage/Telegram ブリッジには承認決定フロー自体が存在しないため、ブリッジ ask-why の横展開対象は Slack のみ(実装済み)。

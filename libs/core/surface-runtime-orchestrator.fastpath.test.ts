@@ -501,6 +501,49 @@ describe('surface-runtime-orchestrator fast-path', () => {
     );
   });
 
+  it('backtracks to the last filled slot on a correction utterance (IL-05 Task 2)', async () => {
+    const session = {
+      session_id: 'TSK-CORRECTION',
+      surface: 'presence',
+      task_type: 'service_operation',
+      status: 'collecting_requirements',
+      goal: { summary: 'adjust schedule', success_condition: 'reconciled' },
+      payload: { intent_id: 'schedule-coordination', schedule_scope: '来週の定例' },
+      requirements: {
+        missing: ['date_range'],
+        collected: {},
+        filled_order: ['schedule_scope'],
+      },
+    };
+    mocks.getActiveTaskSession.mockReturnValue(session as any);
+    mocks.updateTaskSession.mockImplementation((_id: string, patch: any) => ({
+      ...session,
+      ...patch,
+    }));
+    const { runSurfaceConversation } = await import('./surface-runtime-orchestrator.js');
+    const result = await runSurfaceConversation({
+      agentId: 'presence-surface-agent',
+      query: '違う、そうじゃない',
+      senderAgentId: 'test-sender',
+    });
+    expect(result.text).toContain('schedule_scope を修正します');
+    expect(mocks.updateTaskSession).toHaveBeenCalledWith(
+      'TSK-CORRECTION',
+      expect.objectContaining({
+        requirements: expect.objectContaining({
+          missing: ['schedule_scope', 'date_range'],
+          filled_order: [],
+        }),
+      })
+    );
+    const patch = mocks.updateTaskSession.mock.calls[0][1];
+    expect(patch.payload.schedule_scope).toBeUndefined();
+    // clearAllMocks does not clear implementations — restore the defaults so
+    // later tests do not inherit this active session.
+    mocks.getActiveTaskSession.mockReset();
+    mocks.updateTaskSession.mockReset();
+  });
+
   it('creates a task session for schedule coordination requests', async () => {
     mocks.classifyTaskSessionIntent.mockReturnValue({
       intentId: 'schedule-coordination',

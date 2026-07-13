@@ -1,4 +1,9 @@
-import { getReasoningBackend } from './reasoning-backend.js';
+import {
+  getReasoningBackend,
+  getStubServedOps,
+  stubExplicitlyRequested,
+} from './reasoning-backend.js';
+import { logger } from './core.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 import {
   buildCompletionNextAction,
@@ -196,10 +201,34 @@ function structuralReconcile(input: IntentReconciliationInput): CompletionReconc
   };
 }
 
+/**
+ * LC-07 (LOOP_CLOSURE_PLAN): completion may not be declared on judgments a
+ * fabricated stub brain produced. When any reasoning op in this process was
+ * answered by the unconfigured stub backend, force satisfied=false with an
+ * explicit gap so the goal loop (IL-04) surfaces it instead of shipping a
+ * false success. Explicit stub mode (deterministic tests) is exempt.
+ */
+function applyStubTaintGate(reconciliation: CompletionReconciliation): CompletionReconciliation {
+  if (stubExplicitlyRequested()) return reconciliation;
+  const served = getStubServedOps();
+  if (served.length === 0) return reconciliation;
+  const ops = Array.from(new Set(served.map((entry) => entry.op)))
+    .slice(0, 6)
+    .join(', ');
+  const gap = `reasoning_stub_served: ${served.length} reasoning op(s) [${ops}] were answered by the unconfigured stub backend — run \`pnpm reasoning:setup\` and re-run`;
+  logger.warn(`[intent-reconciliation] completion blocked by stub taint (${served.length} op(s))`);
+  return {
+    ...reconciliation,
+    satisfied: false,
+    gaps: reconciliation.gaps.includes(gap) ? reconciliation.gaps : [...reconciliation.gaps, gap],
+    confidence: Math.min(reconciliation.confidence, 0.2),
+  };
+}
+
 export function reconcileCompletionStructurally(
   input: IntentReconciliationInput
 ): CompletionReconciliation {
-  return structuralReconcile(input);
+  return applyStubTaintGate(structuralReconcile(input));
 }
 
 export async function reconcileCompletion(

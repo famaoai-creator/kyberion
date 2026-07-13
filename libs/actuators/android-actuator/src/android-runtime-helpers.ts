@@ -1,4 +1,5 @@
 import {
+  executeLlmDecideOp,
   logger,
   safeExec,
   safeReadFile,
@@ -428,6 +429,12 @@ async function opTransform(
       const xml = resolveUiTreeSource(params, ctx, resolve);
       const matches = matchUiNodes(parseUiTreeNodes(xml), params, resolve);
       return { ...ctx, [params.export_as || 'ui_node_matches']: matches };
+    }
+    case 'llm_decide': {
+      // AR-07 rollout: one in-loop decision about a distilled UI observation
+      // (summarize_ui_tree / find_ui_nodes output). Selection over generation;
+      // a null decision exports null + reason and never throws by default.
+      return executeLlmDecideOp({ params, ctx, resolve, defaultFromKey: 'ui_tree_summary' });
     }
     default:
       throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);

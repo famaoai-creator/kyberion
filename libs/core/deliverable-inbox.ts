@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
+import type { RejectionReasonCategory } from './rejection-reason.js';
 import {
   safeCreateExclusiveFileSync,
   safeExistsSync,
@@ -30,6 +31,8 @@ export interface DeliverableInboxEntry {
   kind?: string;
   /** SU-03: reviewer note attached with a rejected / changes_requested verdict. */
   verdict_note?: string;
+  /** LC-10: closed-vocabulary rejection reason (see rejection-reason.ts). */
+  verdict_reason_category?: RejectionReasonCategory;
   /** SU-03: who recorded the latest verdict. */
   reviewed_by?: string;
   acceptance_receipt?: HumanAcceptanceReceipt;
@@ -267,7 +270,11 @@ export function listInboxEntries(query: DeliverableInboxQuery = {}): Deliverable
 export function markInboxEntry(
   entryId: string,
   status: DeliverableInboxStatus,
-  options: { verdictNote?: string; reviewedBy?: string } = {}
+  options: {
+    verdictNote?: string;
+    reviewedBy?: string;
+    verdictReasonCategory?: RejectionReasonCategory;
+  } = {}
 ): DeliverableInboxEntry | null {
   const normalizedId = String(entryId || '').trim();
   if (!normalizedId) return null;
@@ -282,10 +289,12 @@ export function markInboxEntry(
     if (index < 0) return null;
     const verdictNote = options.verdictNote?.trim();
     const reviewedBy = options.reviewedBy?.trim();
+    const verdictReasonCategory = options.verdictReasonCategory;
     entries[index] = {
       ...entries[index],
       status,
       ...(verdictNote ? { verdict_note: verdictNote } : {}),
+      ...(verdictReasonCategory ? { verdict_reason_category: verdictReasonCategory } : {}),
       ...(reviewedBy ? { reviewed_by: reviewedBy } : {}),
       updated_at: new Date().toISOString(),
     };

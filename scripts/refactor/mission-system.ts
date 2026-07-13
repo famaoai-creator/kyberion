@@ -12,6 +12,7 @@ import {
   grantMissionSudo as _grantMissionSudo,
   importMission as _importMission,
   pauseMission as _pauseMission,
+  reenterMissionFromReview as _reenterMissionFromReview,
   verifyMission as _verifyMission,
 } from './mission-lifecycle.js';
 import {
@@ -181,6 +182,11 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
     },
     pauseMission(id: string, note?: string) {
       return _pauseMission(id, note).then(() => syncProjectOperationalStateIfLinked(id));
+    },
+    reenterMissionFromReview(id: string) {
+      return _reenterMissionFromReview(id).then((result) =>
+        syncProjectOperationalStateIfLinked(id).then(() => result)
+      );
     },
     cancelMission(id: string, note?: string) {
       return _cancelMission(id, note).then(() => syncProjectOperationalStateIfLinked(id));

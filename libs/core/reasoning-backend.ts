@@ -906,15 +906,51 @@ export function getReasoningBackend(): ReasoningBackend {
 /** Clear the registered backend. Used by tests. */
 export function resetReasoningBackend(): void {
   registered = null;
+  resetStubServedOps();
 }
 
 const UNCONFIGURED_STUB_WARNING =
   'Reasoning backend is not configured. Run `pnpm reasoning:setup` before using Kyberion for real work.';
 
 function stubText(message: string): string {
-  return process.env.KYBERION_REASONING_BACKEND === 'stub'
-    ? message
-    : `${UNCONFIGURED_STUB_WARNING}\n${message}`;
+  return stubExplicitlyRequested() ? message : `${UNCONFIGURED_STUB_WARNING}\n${message}`;
+}
+
+/**
+ * LC-07 (LOOP_CLOSURE_PLAN): stub-taint registry. Every stub op invocation is
+ * recorded process-wide so completion gates (intent-reconciliation) can refuse
+ * to mark work "done" when its judgments came from fabricated placeholders.
+ * Explicit stub mode (KYBERION_REASONING_BACKEND=stub) opts out — that is the
+ * deterministic-test configuration where stub output is the point.
+ */
+export interface StubServedRecord {
+  op: string;
+  at: number;
+}
+
+const stubServedOps: StubServedRecord[] = [];
+const STUB_SERVED_CAP = 500;
+
+export function stubExplicitlyRequested(): boolean {
+  return process.env.KYBERION_REASONING_BACKEND === 'stub';
+}
+
+function recordStubServed(op: string, detail?: string): void {
+  if (stubServedOps.length < STUB_SERVED_CAP) {
+    stubServedOps.push({ op, at: Date.now() });
+  }
+  logger.warn(
+    `[reasoning-backend:stub] ${op} — no real backend registered${detail ? `; ${detail}` : ''}`
+  );
+}
+
+export function getStubServedOps(): readonly StubServedRecord[] {
+  return stubServedOps;
+}
+
+/** Clear the stub-taint registry. Used by tests and by resetReasoningBackend. */
+export function resetStubServedOps(): void {
+  stubServedOps.length = 0;
 }
 
 /** Deterministic, offline backend that emits structured placeholders. */
@@ -922,9 +958,7 @@ export const stubReasoningBackend: ReasoningBackend = {
   name: 'stub',
 
   async divergePersonas(input) {
-    logger.warn(
-      `[reasoning-backend:stub] divergePersonas — no real backend registered; topic="${input.topic}"`
-    );
+    recordStubServed('divergePersonas', `topic="${input.topic}"`);
     const min = Math.max(1, input.minPerPersona ?? 1);
     const out: HypothesisSketch[] = [];
     for (const persona of input.personas) {
@@ -941,7 +975,7 @@ export const stubReasoningBackend: ReasoningBackend = {
   },
 
   async crossCritique(input) {
-    logger.warn('[reasoning-backend:stub] crossCritique — no real backend registered');
+    recordStubServed('crossCritique');
     const hypotheses = input.hypotheses.map((hypothesis, idx) => {
       const critics = input.personas.filter((p) => p !== hypothesis.proposed_by).slice(0, 1);
       const survived = idx % 2 === 0;
@@ -957,7 +991,7 @@ export const stubReasoningBackend: ReasoningBackend = {
   },
 
   async synthesizePersona(input) {
-    logger.warn('[reasoning-backend:stub] synthesizePersona — no real backend registered');
+    recordStubServed('synthesizePersona');
     const node = input.relationshipNode as {
       identity?: Record<string, unknown>;
       communication_style?: Record<string, unknown>;
@@ -974,7 +1008,7 @@ export const stubReasoningBackend: ReasoningBackend = {
   },
 
   async forkBranches(input) {
-    logger.warn('[reasoning-backend:stub] forkBranches — no real backend registered');
+    recordStubServed('forkBranches');
     const surviving = input.hypotheses.filter((h) => h.status !== 'rejected');
     return surviving.map((h, i) => ({
       branch_id: String.fromCharCode(65 + i),
@@ -984,7 +1018,7 @@ export const stubReasoningBackend: ReasoningBackend = {
   },
 
   async simulateBranches(input) {
-    logger.warn('[reasoning-backend:stub] simulateBranches — no real backend registered');
+    recordStubServed('simulateBranches');
     return {
       branches: input.branches.map((b) => ({
         branch_id: b.branch_id,
@@ -997,9 +1031,7 @@ export const stubReasoningBackend: ReasoningBackend = {
   },
 
   async extractRequirements(input) {
-    logger.warn(
-      '[reasoning-backend:stub] extractRequirements — no real backend registered; emitting a single placeholder requirement'
-    );
+    recordStubServed('extractRequirements', 'emitting a single placeholder requirement');
     const head =
       input.sourceText
         .split(/\r?\n/u)
@@ -1029,7 +1061,7 @@ export const stubReasoningBackend: ReasoningBackend = {
   },
 
   async extractDesignSpec(_input) {
-    logger.warn('[reasoning-backend:stub] extractDesignSpec — no real backend registered');
+    recordStubServed('extractDesignSpec');
     return {
       architecture_summary:
         '[STUB] Register a real backend to generate a real architecture summary.',
@@ -1053,7 +1085,7 @@ export const stubReasoningBackend: ReasoningBackend = {
   },
 
   async extractTestPlan(input) {
-    logger.warn('[reasoning-backend:stub] extractTestPlan — no real backend registered');
+    recordStubServed('extractTestPlan');
     return {
       app_id: input.appId ?? 'stub-app',
       cases: [
@@ -1069,7 +1101,7 @@ export const stubReasoningBackend: ReasoningBackend = {
   },
 
   async decomposeIntoTasks(_input) {
-    logger.warn('[reasoning-backend:stub] decomposeIntoTasks — no real backend registered');
+    recordStubServed('decomposeIntoTasks');
     return {
       strategy_summary:
         '[STUB] No real backend registered. Register AnthropicReasoningBackend or ClaudeAgentReasoningBackend.',
@@ -1086,16 +1118,12 @@ export const stubReasoningBackend: ReasoningBackend = {
   },
 
   async delegateTask(instruction, context) {
-    logger.warn(
-      `[reasoning-backend:stub] delegateTask — no real backend registered; instruction="${instruction}"`
-    );
+    recordStubServed('delegateTask', `instruction="${instruction}"`);
     return stubText(`[STUB] Delegated task execution (stub). Context: ${context ?? 'none'}`);
   },
 
   async prompt(prompt) {
-    logger.warn(
-      `[reasoning-backend:stub] prompt — no real backend registered; prompt="${prompt.slice(0, 80)}"`
-    );
+    recordStubServed('prompt', `prompt="${prompt.slice(0, 80)}"`);
     return stubText(`[STUB] ${prompt}`);
   },
 };

@@ -94,25 +94,48 @@ export function persistHints(hints: KnowledgeHint[], category: string = 'auto-le
     try {
       const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
       existing = JSON.parse(raw);
-    } catch { /* start fresh */ }
+    } catch {
+      /* start fresh */
+    }
   }
 
   // Deduplicate by topic
-  const topicSet = new Set(existing.map(h => h.topic));
-  const newHints = hints.filter(h => !topicSet.has(h.topic));
+  const topicSet = new Set(existing.map((h) => h.topic));
+  const newHints = hints.filter((h) => !topicSet.has(h.topic));
 
   if (newHints.length === 0) return;
 
   // Keep max 100 auto-generated hints (rotate oldest)
   const combined = [...existing, ...newHints].slice(-100);
   safeWriteFile(filePath, JSON.stringify(combined, null, 2));
-  logger.info(`[FEEDBACK] Persisted ${newHints.length} new hints to ${category}.json (total: ${combined.length})`);
+  logger.info(
+    `[FEEDBACK] Persisted ${newHints.length} new hints to ${category}.json (total: ${combined.length})`
+  );
+}
+
+/**
+ * LC-03: read back a persisted hint category (e.g. 'adf-repair') so repair /
+ * planning prompts can inject lessons from earlier same-class failures.
+ */
+export function readHintsByCategory(category: string): KnowledgeHint[] {
+  const filePath = path.join(FEEDBACK_HINTS_DIR, `${sanitizeCategory(category)}.json`);
+  if (!safeExistsSync(filePath)) return [];
+  try {
+    const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
 }
 
 /**
  * Check scheduled pipeline health and auto-disable on repeated failures.
  */
-export function checkScheduleHealth(scheduleId: string, maxConsecutiveFailures: number = 3): {
+export function checkScheduleHealth(
+  scheduleId: string,
+  maxConsecutiveFailures: number = 3
+): {
   healthy: boolean;
   action?: 'disabled' | 'warning';
   message?: string;

@@ -1,4 +1,5 @@
 import {
+  executeLlmDecideOp,
   logger,
   ptyEngine,
   encodeTerminalInput,
@@ -29,7 +30,7 @@ const DEFAULT_TERMINAL_RETRY = {
 let cachedRecoveryPolicy: Record<string, any> | null = null;
 
 export interface TerminalAction {
-  action: 'spawn' | 'poll' | 'write' | 'kill' | 'list' | 'resize';
+  action: 'spawn' | 'poll' | 'write' | 'kill' | 'list' | 'resize' | 'llm_decide';
   params: {
     sessionId?: string;
     threadId?: string;
@@ -44,6 +45,15 @@ export interface TerminalAction {
     rows?: number;
     offset?: number;
     limit?: number;
+    /** AR-07 llm_decide: what to decide about the observation. */
+    goal?: string;
+    /** AR-07 llm_decide: distilled observation (poll output tail etc.). */
+    observation?: string;
+    /** AR-07 llm_decide: selection mode — reply must be one of these. */
+    options?: string[];
+    on_degraded?: 'continue' | 'fail';
+    degraded_threshold?: number;
+    export_as?: string;
   };
 }
 
@@ -166,6 +176,29 @@ export async function handleAction(input: TerminalAction): Promise<TerminalResul
         ...result,
         messages,
         exitCode: session?.exitCode,
+      };
+    }
+
+    case 'llm_decide': {
+      // AR-07 rollout: one in-loop decision about a distilled terminal
+      // observation. The terminal actuator is action-based (no pipeline ctx),
+      // so the caller passes the observation explicitly — poll first, decide
+      // on the output tail. Selection over generation; a null decision is
+      // reported as degraded, never thrown (unless on_degraded: 'fail').
+      if (params.observation == null) {
+        throw new Error('llm_decide requires params.observation (poll the session first)');
+      }
+      const decided = await executeLlmDecideOp({
+        params,
+        ctx: {},
+        resolve: (value) => value,
+        defaultFromKey: 'observation',
+      });
+      const exportAs = String(params.export_as || 'llm_decision');
+      return {
+        status: decided[exportAs] ? 'ok' : 'degraded',
+        decision: decided[exportAs],
+        degraded_reason: decided[`${exportAs}_degraded`],
       };
     }
 

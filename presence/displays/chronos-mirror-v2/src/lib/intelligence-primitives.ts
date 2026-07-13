@@ -10,6 +10,7 @@ export {
   listApprovalRequests,
   loadApprovalRequest,
 } from '@agent/core/approval-store';
+export { normalizeRejectionReasonCategory } from '@agent/core/rejection-reason';
 export {
   clearSurfaceOutboxMessage,
   enqueueSurfaceNotification,

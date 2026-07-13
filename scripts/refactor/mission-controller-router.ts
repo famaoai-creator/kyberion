@@ -149,6 +149,7 @@ export interface MissionControllerRoutingContext {
     manifestPath: string,
     dryRun?: boolean
   ) => Awaitable<unknown>;
+  reenterMissionFromReview: (missionId: string) => Awaitable<unknown>;
   purgeMissions: (dryRun?: boolean) => Awaitable<void>;
   listMissions: (filterStatus?: string) => void;
   listOrganizationCatalogs: (organizationId?: string, jsonOutput?: boolean) => Awaitable<void>;
@@ -637,6 +638,9 @@ export async function runMissionControllerAction(
       await context.reconcileExistingWork(arg1!, manifestPath, context.hasDryRun);
       break;
     }
+    case 'review-reenter':
+      await context.reenterMissionFromReview(arg1!);
+      break;
     case 'purge':
       await context.purgeMissions(!context.argv.includes('--execute'));
       break;

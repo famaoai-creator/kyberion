@@ -12,6 +12,7 @@ import {
   loadServiceEndpointsCatalog,
   killSwitch,
   readJanitorLastRunMs,
+  readReasoningDegraded,
 } from '@agent/core';
 import { spawnManagedProcess } from '@agent/core/managed-process';
 import { runCoworkHealthCheck } from '@agent/core/cowork-health-check';
@@ -299,7 +300,8 @@ function maybeSubmitJanitorMaintenanceJob(): {
 
 export function deriveBaselineStatus(
   result: { success: boolean; failedLayer?: string | null },
-  janitorMaintenance: BaselineMaintenanceState
+  janitorMaintenance: BaselineMaintenanceState,
+  reasoningDegraded = false
 ): 'all_clear' | 'needs_onboarding' | 'needs_recovery' | 'needs_attention' {
   if (!result.success) {
     if (result.failedLayer === 'L3') return 'needs_onboarding';
@@ -307,6 +309,9 @@ export function deriveBaselineStatus(
     return 'needs_attention';
   }
   if (janitorMaintenance.pending) return 'needs_attention';
+  // LC-08: a healthy report while the reasoning chain silently degraded to
+  // stub would invite real work on a fabricated brain — surface it.
+  if (reasoningDegraded) return 'needs_attention';
   return 'all_clear';
 }
 
@@ -393,8 +398,11 @@ async function main() {
   const result = await sentinel.run();
   const state = sentinel.getState();
 
+  // LC-08: bootstrap writes this marker when a non-stub mode kept stubs.
+  const reasoningDegraded = readReasoningDegraded();
+
   // Determine High-Level Status
-  const status = deriveBaselineStatus(result, janitorMaintenance);
+  const status = deriveBaselineStatus(result, janitorMaintenance, reasoningDegraded !== null);
 
   // Format Output
   const report = {
@@ -403,6 +411,7 @@ async function main() {
     failed_layer: result.failedLayer || null,
     details: state.layers,
     config_degraded: baselineConfigDegraded,
+    reasoning_degraded: reasoningDegraded,
     cache: {
       tenant_drift: {
         cached: tenantDriftSnapshot.cached,
