@@ -49,6 +49,7 @@ const ALLOWED_TEST_SOURCE_IMPORTS = new Map<string, string[]>([
     ['../libs/core/schema-loader.js'],
   ],
   ['tests/weekly-executive-digest-contract.test.ts', ['../libs/core/schema-loader.js']],
+  ['tests/ux-contract-surfaces.test.ts', ['../libs/core/surface-ux-contract.js']],
   [
     'tests/co-business-process-library-contract.test.ts',
     ['../libs/core/mission-workflow-catalog.js'],
