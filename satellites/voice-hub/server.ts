@@ -1,5 +1,5 @@
 import express from 'express';
-import { installProcessGuards } from '@agent/core';
+import { installProcessGuards, slugify } from '@agent/core';
 import { createServer } from 'node:http';
 import { createHash, randomUUID } from 'node:crypto';
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -3196,13 +3196,7 @@ function buildTaskCompletionReply(
 }
 
 function slugifyProjectId(value: string): string {
-  return (
-    value
-      .toUpperCase()
-      .replace(/[^A-Z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 48) || 'PROJECT'
-  );
+  return slugify(value, { maxLength: 48, fallback: 'PROJECT' }).toUpperCase();
 }
 
 function inferDefaultTrackNameFromProjectName(projectName: string): string {
@@ -3210,13 +3204,7 @@ function inferDefaultTrackNameFromProjectName(projectName: string): string {
 }
 
 function slugifyProjectRootToken(value: string): string {
-  return (
-    value
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '') || 'project'
-  );
+  return slugify(value, { fallback: 'project' });
 }
 
 function inferProjectRootPath(projectId: string, projectName: string): string {
