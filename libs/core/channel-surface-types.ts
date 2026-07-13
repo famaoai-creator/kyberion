@@ -183,12 +183,19 @@ export interface TaskReviewFinding {
   instruction: string;
 }
 
+export interface TaskAcceptanceEvidence {
+  criterion: string;
+  status: 'passed' | 'failed';
+  evidence: string;
+}
+
 export interface TaskResultBlock {
   summary: string;
   artifacts: TaskResultArtifact[];
   verification_done: string[];
   gaps: string[];
   needs: string[];
+  acceptance_evidence?: TaskAcceptanceEvidence[];
   review_findings?: TaskReviewFinding[];
 }
 

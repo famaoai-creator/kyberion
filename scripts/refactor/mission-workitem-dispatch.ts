@@ -910,20 +910,33 @@ function evaluateAcceptanceCriteriaEvidence(input: {
   criteria: string[];
   responseText: string;
   responseExcerpt: string;
-}): { satisfied: boolean; missing: string[] } {
+  taskResult?: TaskResultBlock;
+}): { satisfied: boolean; missing: string[]; structured: boolean } {
   const criteria = Array.from(
     new Set(input.criteria.map((criterion) => normalizeAcceptanceText(criterion)).filter(Boolean))
   );
   if (criteria.length === 0) {
-    return { satisfied: true, missing: [] };
+    return { satisfied: true, missing: [], structured: false };
   }
 
   const evidenceParts = [input.responseText, input.responseExcerpt];
   const evidence = normalizeAcceptanceText(evidenceParts.join('\n'));
-  const missing = criteria.filter((criterion) => !evidence.includes(criterion));
+  const structuredEvidence = new Map(
+    (input.taskResult?.acceptance_evidence || []).map((entry) => [
+      normalizeAcceptanceText(entry.criterion),
+      entry,
+    ])
+  );
+  const missing = criteria.filter((criterion) => {
+    const entry = structuredEvidence.get(criterion);
+    if (entry) return entry.status !== 'passed' || !entry.evidence.trim();
+    return !evidence.includes(criterion);
+  });
   return {
     satisfied: missing.length === 0,
     missing,
+    structured:
+      missing.length === 0 && criteria.some((criterion) => structuredEvidence.has(criterion)),
   };
 }
 
@@ -1047,6 +1060,7 @@ async function reflectTicketOutcome(input: {
     criteria: acceptanceCriteria,
     responseText: input.responseText,
     responseExcerpt: input.responseExcerpt,
+    taskResult: input.taskResult,
   });
   const approvedArtifactReview = input.artifactReviewReceipt?.receipt.verdict === 'approved';
   const acceptanceSatisfied = acceptanceCheck.satisfied || approvedArtifactReview;
@@ -1063,6 +1077,8 @@ async function reflectTicketOutcome(input: {
     notes.push(
       `acceptance criteria satisfied by approved artifact review receipt: ${input.artifactReviewReceipt?.relativePath}`
     );
+  } else if (acceptanceCheck.structured) {
+    notes.push('acceptance criteria satisfied by task_result.acceptance_evidence');
   } else if (!acceptanceSatisfied) {
     notes.push(`acceptance criteria not met: ${acceptanceMissing.join('; ')}`);
   }
@@ -1561,7 +1577,10 @@ function buildWorkItemPromptBody(input: {
     '',
     ...buildWorkingPrinciplesLines(input.teamRole),
     'Return exactly one ```task_result``` block and nothing else structured.',
-    'Task result schema: {"summary":"3 sentences max","artifacts":[{"path":"...","kind":"..."}],"verification_done":["..."],"gaps":["..."],"needs":["..."]}',
+    'Task result schema: {"summary":"3 sentences max","artifacts":[{"path":"...","kind":"..."}],"verification_done":["..."],"gaps":["..."],"needs":["..."],"acceptance_evidence":[{"criterion":"exact criterion text","status":"passed|failed","evidence":"specific verification or artifact"}]}',
+    acceptanceCriteria.length > 0
+      ? 'For every acceptance criterion, copy its exact text into acceptance_evidence and record specific evidence. Do not mark it passed without evidence.'
+      : '',
     'Do not paste file contents. Include only conclusions, artifact paths, verification steps, gaps, and needs.',
   ].filter(Boolean);
   return lines.join('\n');
@@ -1573,10 +1592,16 @@ function buildTaskResultRetryPrompt(input: {
   previousResponse: string;
   parseErrors: string[];
 }): string {
+  const metadata = (input.item.metadata || {}) as Record<string, unknown>;
+  const hasAcceptanceCriteria =
+    Array.isArray(metadata.acceptance_criteria) && metadata.acceptance_criteria.length > 0;
   return [
     `The previous response for mission ${input.missionId} and work item ${input.item.item_id} was rejected.`,
     'Resend the answer as exactly one ```task_result``` block.',
     'Required fields: summary, artifacts, verification_done, gaps, needs.',
+    hasAcceptanceCriteria
+      ? 'Also include acceptance_evidence for every acceptance criterion, using the exact criterion text and specific evidence.'
+      : '',
     'Do not include other structured blocks.',
     'Errors:',
     ...input.parseErrors.map((error) => `- ${error}`),

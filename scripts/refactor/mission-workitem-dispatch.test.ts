@@ -95,6 +95,11 @@ function makeTaskResultText(input: {
   verification_done?: string[];
   gaps?: string[];
   needs?: string[];
+  acceptance_evidence?: Array<{
+    criterion: string;
+    status: 'passed' | 'failed';
+    evidence: string;
+  }>;
   review_findings?: Array<{
     severity: 'must_fix' | 'should_fix' | 'nit';
     location: string;
@@ -110,6 +115,7 @@ function makeTaskResultText(input: {
       verification_done: input.verification_done || [],
       gaps: input.gaps || [],
       needs: input.needs || [],
+      ...(input.acceptance_evidence ? { acceptance_evidence: input.acceptance_evidence } : {}),
       ...(input.review_findings ? { review_findings: input.review_findings } : {}),
     }),
     '```',
@@ -557,6 +563,13 @@ describe('mission work item dispatch', () => {
               verification_done: ['Compared the output against the acceptance criteria.'],
               gaps: ['The gate phrase is absent.'],
               needs: [],
+              acceptance_evidence: [
+                {
+                  criterion: 'mention the acceptance gate',
+                  status: 'failed',
+                  evidence: 'The requested gate phrase is absent from the artifact.',
+                },
+              ],
               extraText: 'The task was completed, but the gate phrase is absent.',
             }),
           },
@@ -579,6 +592,69 @@ describe('mission work item dispatch', () => {
       acceptance_criteria_satisfied: false,
     });
     expect(reply.notes.join('\n')).toContain('acceptance criteria not met');
+  });
+
+  it('accepts criterion-bound structured evidence without matching prose language', async () => {
+    const criterion = 'リリース/PR が作成されている';
+    createWorkItem({
+      title: `${missionId}: Verify delivery`,
+      description: 'Verify the pull request and record concrete delivery evidence.',
+      status: 'ready',
+      source: 'local',
+      sourceRef: `mission:${missionId}:task-delivery-evidence`,
+      projectId: missionId,
+      assigneePeerId: 'sovereign-brain',
+      labels: [`mission:${missionId}`, 'team_role:implementer', 'ticket:workitem'],
+      metadata: {
+        mission_id: missionId,
+        team_role: 'implementer',
+        deliverable: 'evidence/delivery-report.md',
+        acceptance_criteria: [criterion],
+        risk: 'low',
+        estimated_scope: 'S',
+      },
+    });
+
+    const manifest = await dispatchMissionWorkItems(
+      makeMissionState(),
+      { mode: 'agent', finalStatus: 'done' },
+      {
+        routeA2A: vi.fn(async () => ({
+          a2a_version: '1.0',
+          header: {
+            msg_id: 'RES-AC-STRUCTURED-1',
+            sender: 'sovereign-brain',
+            receiver: 'kyberion:workitem-dispatcher',
+            performative: 'result' as const,
+            timestamp: new Date().toISOString(),
+          },
+          payload: {
+            text: makeTaskResultText({
+              summary: 'Verified the existing pull request and recorded its URL.',
+              artifacts: [{ path: 'evidence/delivery-report.md', kind: 'markdown' }],
+              verification_done: ['Checked pull request #561 with the GitHub CLI.'],
+              gaps: [],
+              needs: [],
+              acceptance_evidence: [
+                {
+                  criterion,
+                  status: 'passed',
+                  evidence: 'GitHub CLI returned OPEN for pull request #561.',
+                },
+              ],
+            }),
+          },
+        })),
+      }
+    );
+
+    expect(manifest.records[0]).toMatchObject({
+      work_item_status_after: 'done',
+      reflection_status: 'done',
+    });
+    expect(manifest.records[0].notes).toContain(
+      'acceptance criteria satisfied by task_result.acceptance_evidence'
+    );
   });
 
   it('auto-rounds: retries blocked items in a later round and stops on no progress', async () => {
