@@ -152,6 +152,7 @@ Mission extensions but may evolve before promotion to Stable.
 **Beta**:
 
 - `knowledge/product/schemas/artifact-review-receipt.schema.json`
+- `buildArtifactReviewReceipt(...)`
 - `resolveArtifactReviewerProfile(...)`
 - `evaluateArtifactReviews(...)`
 - Optional `excludedAgentIds` and `requiredCapabilities` filters on

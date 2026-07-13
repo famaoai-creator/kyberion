@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import * as nodePath from 'node:path';
 
 import {
   artifactOwnershipRegistryPath,
@@ -6,7 +7,9 @@ import {
   createArtifactOwnershipRecord,
   clearWorkCoordinationStore,
   createWorkItem,
+  hashArtifactForReview,
   listWorkItems,
+  loadArtifactReviewReceipt,
   pathResolver,
   safeExistsSync,
   safeMkdir,
@@ -92,6 +95,11 @@ function makeTaskResultText(input: {
   verification_done?: string[];
   gaps?: string[];
   needs?: string[];
+  review_findings?: Array<{
+    severity: 'must_fix' | 'should_fix' | 'nit';
+    location: string;
+    instruction: string;
+  }>;
   extraText?: string;
 }): string {
   return [
@@ -102,6 +110,7 @@ function makeTaskResultText(input: {
       verification_done: input.verification_done || [],
       gaps: input.gaps || [],
       needs: input.needs || [],
+      ...(input.review_findings ? { review_findings: input.review_findings } : {}),
     }),
     '```',
     input.extraText || '',
@@ -130,6 +139,131 @@ afterEach(() => {
 });
 
 describe('mission work item dispatch', () => {
+  it('binds a canonical reviewer dispatch to the reconciled artifact hash', async () => {
+    safeMkdir(`${missionPath}/deliverables`, { recursive: true });
+    safeWriteFile(`${missionPath}/deliverables/reconciled.ts`, 'export const value = 1;\n');
+    safeWriteFile(`${missionPath}/evidence/REVIEW-implementation.md`, '# Review\n');
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify(
+        [
+          {
+            task_id: 'implementation',
+            status: 'completed',
+            assigned_to: { role: 'implementer', agent_id: 'sovereign-brain' },
+            deliverable: 'evidence/implementation.md',
+            reconciliation: {
+              evidence: [{ path: 'deliverables/reconciled.ts', kind: 'artifact' }],
+            },
+          },
+          {
+            task_id: 'review-implementation',
+            status: 'planned',
+            assigned_to: { role: 'reviewer' },
+            deliverable: 'evidence/REVIEW-implementation.md',
+            review_target: 'implementation',
+            acceptance_criteria: ['no blocking defects remain'],
+            risk: 'medium',
+          },
+        ],
+        null,
+        2
+      )
+    );
+    createWorkItem({
+      title: `${missionId}: Review the reconciled implementation`,
+      description:
+        'Review the reconciled implementation for correctness, security, regressions, and acceptance evidence.',
+      status: 'ready',
+      source: 'local',
+      sourceRef: `mission:${missionId}:review-implementation`,
+      projectId: missionId,
+      assigneePeerId: 'implementation-architect',
+      labels: [`mission:${missionId}`, 'team_role:reviewer', 'ticket:workitem'],
+      metadata: {
+        mission_id: missionId,
+        task_id: 'review-implementation',
+        team_role: 'reviewer',
+        deliverable: 'evidence/REVIEW-implementation.md',
+        review_target: 'implementation',
+        acceptance_criteria: ['no blocking defects remain'],
+        risk: 'medium',
+        estimated_scope: 'S',
+      },
+    });
+    const delegateTask = vi.fn(async () =>
+      makeTaskResultText({
+        summary: 'Reviewed the reconciled implementation; no blocking defects remain.',
+        artifacts: [{ path: 'evidence/REVIEW-implementation.md', kind: 'markdown' }],
+        verification_done: ['no blocking defects remain'],
+        gaps: [],
+        needs: [],
+        review_findings: [],
+      })
+    );
+
+    const manifest = await dispatchMissionWorkItems(
+      makeMissionState(),
+      { mode: 'subagent', finalStatus: 'done' },
+      { delegateTask }
+    );
+
+    expect(manifest.records[0]).toMatchObject({
+      reflection_status: 'done',
+      work_item_status_after: 'done',
+      artifact_review_receipt: expect.stringMatching(/^evidence\/reviews\//u),
+      assignee_peer_id: 'implementation-architect',
+    });
+    const delegateCall = delegateTask.mock.calls[0] as unknown as [string];
+    const prompt = String(delegateCall?.[0] || '');
+    expect(prompt).toContain('deliverables/reconciled.ts');
+    expect(prompt).toContain('code-reviewer');
+
+    const tasks = JSON.parse(
+      String(safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }))
+    ) as Array<{
+      status?: string;
+      assigned_to?: { role?: string; agent_id?: string };
+      reconciliation?: { evidence?: Array<{ path?: string }> };
+      artifact_review_profile?: {
+        artifact_kind?: string;
+        required_reviewer_roles?: string[];
+        implementer_agent_ids?: string[];
+      };
+      artifact_review_receipt?: string;
+    }>;
+    expect(tasks[0].reconciliation?.evidence?.[0]?.path).toBe('deliverables/reconciled.ts');
+    expect(tasks[1]).toMatchObject({
+      status: 'completed',
+      assigned_to: { role: 'reviewer', agent_id: 'implementation-architect' },
+      artifact_review_profile: {
+        artifact_kind: 'code',
+        required_reviewer_roles: ['code-reviewer'],
+        implementer_agent_ids: ['sovereign-brain'],
+      },
+      artifact_review_receipt: expect.stringMatching(/^evidence\/reviews\//u),
+    });
+    const receipt = loadArtifactReviewReceipt(
+      nodePath.join(missionPath, String(tasks[1].artifact_review_receipt))
+    );
+    expect(receipt).toMatchObject({
+      review_task_id: 'review-implementation',
+      review_target_task_id: 'implementation',
+      artifact: {
+        path: expect.stringContaining('deliverables/reconciled.ts'),
+        sha256: hashArtifactForReview(`${missionPath}/deliverables/reconciled.ts`),
+        kind: 'code',
+      },
+      reviewer: {
+        agent_id: 'implementation-architect',
+        specialist_roles: ['code-reviewer'],
+        independent_from: ['sovereign-brain'],
+        independence_verified: true,
+      },
+      verdict: 'approved',
+    });
+  });
+
   it('routes a work item to the assigned agent and records the response', async () => {
     createWorkItem({
       title: `${missionId}: Draft the outline`,

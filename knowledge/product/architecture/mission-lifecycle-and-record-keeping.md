@@ -186,6 +186,13 @@ Specialist roles define the review perspective; required capabilities guide
 agent selection. The task-specific resolver excludes known implementation
 agents before choosing the reviewer.
 
+On the normal path, `dispatch-workitems` resolves the target artifact from the
+task result or reconciliation Evidence, re-hashes it, sends the specialist
+mandate to the selected reviewer, and writes the receipt into
+`evidence/reviews/` while annotating `NEXT_TASKS.json`. Blocking findings keep
+the ticket and Mission task in review. `reconcile-work` applies the same
+contract only when the review was completed outside this dispatch path.
+
 If a reviewed artifact changes, `finish` reopens only its review task and
 keeps the implementation task completed. If ordinary work remains, `finish`
 returns the Mission to `active` without adding a synthetic

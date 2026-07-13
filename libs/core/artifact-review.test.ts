@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildArtifactReviewReceipt,
   evaluateArtifactReviews,
   inferArtifactReviewKind,
   validateArtifactReviewReceipt,
@@ -35,6 +36,36 @@ function receipt(overrides: Partial<ArtifactReviewReceipt> = {}): ArtifactReview
 }
 
 describe('artifact review contract', () => {
+  it('builds verdict and reviewer independence from structured findings', () => {
+    const built = buildArtifactReviewReceipt({
+      reviewId: 'review-built',
+      missionId: 'MSN-1',
+      reviewTaskId: 'task-review',
+      reviewTargetTaskId: 'task-implement',
+      artifact: { path: 'src/change.ts', sha256: 'a'.repeat(64), kind: 'code' },
+      reviewerAgentId: 'review-agent',
+      reviewerTeamRole: 'reviewer',
+      specialistRoles: ['code-reviewer'],
+      independentFrom: ['implementation-agent'],
+      findings: [
+        {
+          severity: 'blocking',
+          category: 'correctness',
+          description: 'The error path is not handled.',
+          required_action: 'Handle the error path.',
+        },
+      ],
+      acceptanceCriteria: ['All error paths are handled.'],
+      reviewedAt: '2026-07-13T00:00:00.000Z',
+    });
+
+    expect(built).toMatchObject({
+      verdict: 'changes_requested',
+      reviewer: { independence_verified: true },
+    });
+    expect(validateArtifactReviewReceipt(built).valid).toBe(true);
+  });
+
   it('validates a hash-bound independent review receipt', () => {
     expect(validateArtifactReviewReceipt(receipt())).toMatchObject({ valid: true, errors: [] });
   });
