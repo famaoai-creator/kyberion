@@ -374,7 +374,6 @@ abstract class BaseACPAdapter implements AgentAdapter {
 
     // Gemini often needs a specific model via set_model if default is busy
     try {
-      // @ts-ignore
       await this.connection.extMethod('session/set_model', {
         sessionId: this.acpSessionId,
         modelId: resolveRuntimeModelId('gemini-default'),
@@ -393,7 +392,6 @@ abstract class BaseACPAdapter implements AgentAdapter {
     this.accumulatedResponse = '';
     this.accumulatedThought = '';
 
-    // @ts-ignore
     const response: any = await this.connection.extMethod(this.dialect.prompt, {
       sessionId: this.acpSessionId,
       threadId: this.acpSessionId,
@@ -487,7 +485,6 @@ export class GeminiAdapter extends BaseACPAdapter {
     await super.boot();
     const targetModel = this.options.model || resolveRuntimeModelId('gemini-default');
     try {
-      // @ts-ignore
       await this.connection?.extMethod('session/set_model', {
         sessionId: this.acpSessionId,
         modelId: targetModel,
