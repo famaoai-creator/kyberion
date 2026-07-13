@@ -24,6 +24,7 @@ import { pathResolver } from './path-resolver.js';
 import { discoverProviders } from './provider-discovery.js';
 import { listDemotedProviders } from './provider-health-registry.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
+import type { FinanceControllerDecision } from './finance-controller.js';
 
 export interface HealthThresholds {
   /** detectRegressions multiplier: last run vs historical average. */
@@ -43,7 +44,12 @@ export interface HealthThresholds {
 }
 
 export interface DegradationFinding {
-  kind: 'latency_regression' | 'provider_demotion' | 'rss_growth' | 'restart_frequency';
+  kind:
+    | 'latency_regression'
+    | 'provider_demotion'
+    | 'rss_growth'
+    | 'restart_frequency'
+    | 'budget_or_kpi_signal';
   severity: 'warning' | 'critical';
   detail: string;
 }
@@ -126,6 +132,8 @@ export function evaluateDegradation(input: {
   demotedProviders: string[];
   /** OP-04: RSS/restart trend samples over the window (optional). */
   runtimeSamples?: RuntimeHealthSample[];
+  /** CO-03: budget/KPI signal from the finance controller (optional). */
+  financeDecision?: FinanceControllerDecision | null;
   thresholds?: HealthThresholds;
   now?: number;
 }): DegradationReport {
@@ -137,6 +145,14 @@ export function evaluateDegradation(input: {
       kind: trend.kind,
       severity: trend.severity,
       detail: trend.detail,
+    });
+  }
+
+  if (input.financeDecision && input.financeDecision.mode !== 'growth') {
+    findings.push({
+      kind: 'budget_or_kpi_signal',
+      severity: input.financeDecision.mode === 'cost_cutting' ? 'critical' : 'warning',
+      detail: input.financeDecision.reasons.join('; ') || `finance controller mode: monitor`,
     });
   }
 
@@ -177,6 +193,8 @@ export interface DegradationWatchDeps {
   regressions?: LatencyRegression[];
   demotedProviders?: string[];
   runtimeSamples?: RuntimeHealthSample[];
+  /** CO-03: budget/KPI signal from the finance controller (opt-in; not fetched by default). */
+  financeDecision?: FinanceControllerDecision | null;
   thresholds?: HealthThresholds;
   alert?: typeof sendOpsAlert;
   now?: number;
@@ -202,6 +220,7 @@ export function runDegradationWatch(deps: DegradationWatchDeps = {}): {
     regressions,
     runtimeSamples,
     demotedProviders,
+    financeDecision: deps.financeDecision ?? null,
     thresholds,
     now: deps.now,
   });
