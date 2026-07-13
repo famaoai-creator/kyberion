@@ -44,4 +44,9 @@
 
 - 集中ローダーへの全面移行は 150+ ファイルに及ぶ大手術。**本計画では基盤(レジストリ + 検証 + 生成)と新規コードへの適用まで**とし、既存散在読みの全面書き換えは「継続的移行」として CI 検出で漸進する(一括はしない)。
 - fail-fast の対象を誤ると起動できなくなる。fail-fast は「必須シークレット欠落」等の明白なものに限定し、それ以外は warn。
+
+## 実装メモ
+
+- 2026-07-14: Task2点2(baseline-check接続)を実装。`run_baseline_check.ts` に `L7`(Configuration Layer)を追加 — `validateEnv()` の `errors`(必須変数欠落のみ)で pass/fail、`warnings`/`unknown` はJSONレポートの `env` フィールドに出すのみで層を落とさない(既定 warn の設計どおり)。
+- 実装中に副次的な既存バグを発見・修正: `SovereignSentinel.run()` の実行順 `ORDER` 配列が `L0`〜`L5` のみで、2026-06-23 に追加された `L6`(Cowork Integration Layer)が `registerLayer` はされていても `ORDER` に無いため**一度も実行されないdead codeだった**(3週間気づかれず)。`PfcController.getDefaultState()` も `L6` までしか初期化しておらず `L7` 追加で同型の欠落が再発するところだった。`ORDER` を `L0`〜`L7` に拡張し、`loadState()` に欠落レイヤーキーのバックフィル(`{...getDefaultState().layers, ...parsed.layers}`)を追加して将来のレイヤー追加でも既存 state ファイルが壊れないようにした。`SovereignSentinel.test.ts` にレイヤー横断のテスト2本を追加(全層実行の確認、中間層失敗時に後続層へ進まないことの確認)。
 - env 検証が秘密の値をログに出さないこと(名前と有無のみ報告、値は出さない)。
