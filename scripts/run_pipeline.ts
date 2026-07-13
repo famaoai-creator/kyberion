@@ -868,6 +868,115 @@ async function runInlineCoreTransform(
   return ctx;
 }
 
+/** Outcome of a single step-execution attempt, reported by the caller-supplied handler. */
+type StepAttemptSignal =
+  | { kind: 'done' }
+  | { kind: 'skip' }
+  | {
+      kind: 'early_return';
+      result: { status: 'failed'; results: RunStepResult[]; context: Record<string, unknown> };
+    };
+
+type StepRepairOutcome =
+  | { status: 'succeeded'; signal: StepAttemptSignal }
+  | { status: 'recovered' }
+  | { status: 'failed'; error: any };
+
+/**
+ * AR-01 Phase B: retry + autonomous-repair extracted into a higher-order
+ * function that wraps a single step-execution attempt, instead of being
+ * loop machinery inlined in runSteps. The canonical engine
+ * (executeAdfSteps) has no built-in retry, so Phase C delegation needs
+ * retry/repair as something a handler opts into, not something the engine
+ * itself does — this is the shape that opt-in takes.
+ */
+async function runStepWithRepair(
+  step: PipelineAdfStep,
+  opts: RunStepsOptions,
+  stepPolicy: ReasoningStepPolicy,
+  attemptOnce: () => Promise<StepAttemptSignal>,
+  tryOnErrorRecovery: (err: any) => Promise<boolean>
+): Promise<StepRepairOutcome> {
+  let attempt = 0;
+  let lastError: any = null;
+  while (attempt < 2) {
+    try {
+      const signal = await attemptOnce();
+      return { status: 'succeeded', signal };
+    } catch (err: any) {
+      lastError = err;
+
+      // AR-01: step-level on_error (skip / abort / fallback) — same
+      // semantics as the canonical engine's native recovery path. Explicit
+      // author intent takes precedence over autonomous repair.
+      if ((step as any).on_error) {
+        try {
+          const recovered = await tryOnErrorRecovery(err);
+          if (recovered) return { status: 'recovered' };
+        } catch {
+          /* on_error recovery failed — fall through to autonomous repair */
+        }
+      }
+
+      const failure = classifyError(err);
+
+      // Don't repair if we already tried and the error message didn't change (prevents loops)
+      if (attempt === 0 && failure.repairAction) {
+        if (!opts.quiet) {
+          logger.warn(
+            `  [SYS_PIPELINE] Step failed: ${failure.label}. Attempting autonomous repair...`
+          );
+          logger.info(
+            `  [SYS_PIPELINE] 修復サブエージェント実行中(数分かかることがあります) — ${step.op}`
+          );
+        }
+        const repaired = await attemptAutonomousRepair({
+          step: { op: step.op, id: step.id, params: step.params },
+          failure,
+          pipelinePath: opts.pipelinePath!,
+          policy: stepPolicy,
+          validate: () => readValidatedWorkflowAdf(opts.pipelinePath!),
+          logPrefix: '[SYS_PIPELINE:REPAIR]',
+        });
+        if (repaired) {
+          if (!opts.quiet) {
+            logger.success(
+              `  [SYS_PIPELINE] Repair successful. Refreshing ADF and retrying step ${step.op}...`
+            );
+          }
+
+          try {
+            // Reload fully from disk to get the REPAIRED definition
+            const refreshedPipeline = await readValidatedWorkflowAdf(opts.pipelinePath!);
+            const refreshedStep = refreshedPipeline.steps?.find(
+              (s: any) => s.id === step.id || s.op === step.op
+            );
+
+            if (refreshedStep) {
+              // Update the step object in place so the next attempt picks it up
+              step.op = refreshedStep.op;
+              step.params = refreshedStep.params;
+
+              logger.info(
+                `  [SYS_PIPELINE] Step definition refreshed for ${step.id || step.op}. New path: ${step.params.path}`
+              );
+
+              attempt++;
+              continue; // Re-evaluate normalizedOp/domain/action/params with NEW values
+            }
+          } catch (reloadErr: any) {
+            logger.warn(
+              `  [SYS_PIPELINE] Failed to reload ADF after repair: ${reloadErr.message}.`
+            );
+          }
+        }
+      }
+      return { status: 'failed', error: lastError };
+    }
+  }
+  return { status: 'failed', error: lastError };
+}
+
 export async function runSteps(
   steps: PipelineAdfStep[],
   initialCtx: Record<string, unknown> = {},
@@ -928,10 +1037,6 @@ export async function runSteps(
       logger.info(`[step ${stepNumber}/${steps.length}] ${step.op} …`);
     }
 
-    let attempt = 0;
-    let stepSucceeded = false;
-    let stepSkipped = false;
-    let lastError: any = null;
     let currentNormalizedOp = step.op;
     const finishStepTrace = (
       eventName: string,
@@ -975,9 +1080,13 @@ export async function runSteps(
       }
     }
 
-    while (attempt < 2 && !stepSucceeded) {
-      // CRITICAL: Resolve normalizedOp, domain, action, and params INSIDE the attempt loop
-      // so that repaired step definitions are actually used during the retry.
+    let stepSucceeded = false;
+    let stepSkipped = false;
+    let lastError: any = null;
+
+    const attemptOnce = async (): Promise<StepAttemptSignal> => {
+      // CRITICAL: Resolve normalizedOp, domain, action, and params INSIDE the attempt
+      // closure so that repaired step definitions are actually used during the retry.
       const normalizedOp = normalizePipelineOp(step.op);
       currentNormalizedOp = normalizedOp;
       const [domain, action] = normalizedOp.split(':');
@@ -993,531 +1102,479 @@ export async function runSteps(
         _producedChannel && !rawParams.export_as
           ? { ...rawParams, export_as: _producedChannel }
           : rawParams;
-      try {
-        if (domain === 'system' && action === 'log') {
-          logger.info(resolveLogMessage(params, ctx));
-        } else if (domain === 'system' && action === 'exec') {
-          ctx = await runInlineSystemExec(params, ctx, rootDir);
-        } else if (domain === 'system' && action === 'write_file') {
-          ctx = await runInlineSystemWriteFile(params, ctx, rootDir);
-        } else if (domain === 'system' && action === 'shell') {
-          ctx = await runInlineSystemShell(params, ctx, rootDir, shellBin);
-        } else if (domain === 'core' && action === 'if') {
-          const cond = params.condition;
-          const conditionResult = evaluateCondition(cond, ctx);
-          const branch = conditionResult ? params.then : params.else;
-          if (Array.isArray(branch)) {
-            const nested = await runSteps(branch as PipelineAdfStep[], ctx, opts);
-            ctx = nested.context;
-            results.push(...nested.results);
-          } else if (!conditionResult) {
-            stepSkipped = true;
-            results.push({ op: currentNormalizedOp, status: 'skipped' });
-            finishStepTrace('step.skipped', 'skipped', {
-              reason: 'core:if condition evaluated to false and no else branch was provided',
-            });
-            opts.trace?.endSpan('ok');
-            stepSucceeded = true;
-            continue;
+      if (domain === 'system' && action === 'log') {
+        logger.info(resolveLogMessage(params, ctx));
+      } else if (domain === 'system' && action === 'exec') {
+        ctx = await runInlineSystemExec(params, ctx, rootDir);
+      } else if (domain === 'system' && action === 'write_file') {
+        ctx = await runInlineSystemWriteFile(params, ctx, rootDir);
+      } else if (domain === 'system' && action === 'shell') {
+        ctx = await runInlineSystemShell(params, ctx, rootDir, shellBin);
+      } else if (domain === 'core' && action === 'if') {
+        const cond = params.condition;
+        const conditionResult = evaluateCondition(cond, ctx);
+        const branch = conditionResult ? params.then : params.else;
+        if (Array.isArray(branch)) {
+          const nested = await runSteps(branch as PipelineAdfStep[], ctx, opts);
+          ctx = nested.context;
+          results.push(...nested.results);
+        } else if (!conditionResult) {
+          results.push({ op: currentNormalizedOp, status: 'skipped' });
+          finishStepTrace('step.skipped', 'skipped', {
+            reason: 'core:if condition evaluated to false and no else branch was provided',
+          });
+          opts.trace?.endSpan('ok');
+          return { kind: 'skip' };
+        }
+      } else if (
+        domain === 'core' &&
+        (action === 'while' || action === 'loop_until' || action === 'retry_until_quality')
+      ) {
+        const body = Array.isArray(params.pipeline)
+          ? (params.pipeline as PipelineAdfStep[])
+          : undefined;
+        if (!body) {
+          throw new Error(`${step.op} requires "pipeline" param`);
+        }
+        const maxIterations = coercePositiveInt(params.max_iterations ?? params.maxIterations, 1);
+        const condition = params.condition ?? params.until ?? params.quality_condition;
+        const exportKey = resolveExportKey(step, 'last_loop_result');
+        const iterations: Array<{
+          iteration: number;
+          context: Record<string, unknown>;
+          results: typeof results;
+        }> = [];
+        let loopCount = 0;
+        while (loopCount < maxIterations) {
+          if (condition !== undefined && action !== 'retry_until_quality') {
+            const shouldContinue = Boolean(evaluateCondition(condition, ctx));
+            if (!shouldContinue) break;
           }
-        } else if (
-          domain === 'core' &&
-          (action === 'while' || action === 'loop_until' || action === 'retry_until_quality')
-        ) {
-          const body = Array.isArray(params.pipeline)
-            ? (params.pipeline as PipelineAdfStep[])
-            : undefined;
-          if (!body) {
-            throw new Error(`${step.op} requires "pipeline" param`);
-          }
-          const maxIterations = coercePositiveInt(params.max_iterations ?? params.maxIterations, 1);
-          const condition = params.condition ?? params.until ?? params.quality_condition;
-          const exportKey = resolveExportKey(step, 'last_loop_result');
-          const iterations: Array<{
-            iteration: number;
-            context: Record<string, unknown>;
-            results: typeof results;
-          }> = [];
-          let loopCount = 0;
-          while (loopCount < maxIterations) {
-            if (condition !== undefined && action !== 'retry_until_quality') {
-              const shouldContinue = Boolean(evaluateCondition(condition, ctx));
-              if (!shouldContinue) break;
-            }
-            const nested = await runSteps(body, ctx, opts);
-            ctx = nested.context;
-            results.push(...nested.results);
-            iterations.push({
-              iteration: loopCount + 1,
-              context: nested.context,
-              results: nested.results,
-            });
-            loopCount += 1;
-            if (action === 'retry_until_quality') {
-              const verdict = String(
-                (ctx as Record<string, unknown>).verdict ||
-                  (ctx as Record<string, unknown>).quality ||
-                  ''
-              );
-              if (verdict === 'ok' || verdict === 'pass' || verdict === 'passed') {
-                break;
-              }
-            }
-            if (condition !== undefined && action === 'retry_until_quality') {
-              const shouldContinue = Boolean(evaluateCondition(condition, ctx));
-              if (!shouldContinue) break;
+          const nested = await runSteps(body, ctx, opts);
+          ctx = nested.context;
+          results.push(...nested.results);
+          iterations.push({
+            iteration: loopCount + 1,
+            context: nested.context,
+            results: nested.results,
+          });
+          loopCount += 1;
+          if (action === 'retry_until_quality') {
+            const verdict = String(
+              (ctx as Record<string, unknown>).verdict ||
+                (ctx as Record<string, unknown>).quality ||
+                ''
+            );
+            if (verdict === 'ok' || verdict === 'pass' || verdict === 'passed') {
+              break;
             }
           }
-          if (loopCount === 0) {
-            stepSkipped = true;
-            results.push({ op: currentNormalizedOp, status: 'skipped' });
-            finishStepTrace('step.skipped', 'skipped', {
-              reason: 'core:while condition evaluated to false before execution',
-            });
-            opts.trace?.endSpan('ok');
-            stepSucceeded = true;
-            continue;
+          if (condition !== undefined && action === 'retry_until_quality') {
+            const shouldContinue = Boolean(evaluateCondition(condition, ctx));
+            if (!shouldContinue) break;
           }
-          ctx = {
-            ...ctx,
-            [exportKey]: {
-              iterations: loopCount,
-              history: iterations,
-              final_context: ctx,
-            },
-          };
-        } else if (domain === 'core' && action === 'foreach') {
-          const items = resolveVars(params.items, ctx);
-          const subSteps = params.do as PipelineAdfStep[];
-          if (Array.isArray(items) && Array.isArray(subSteps)) {
-            const itemName = (params.as as string) || 'item';
-            const originalItemValue = ctx[itemName];
-            for (const item of items) {
-              const loopCtx = { ...ctx, [itemName]: item };
-              const nested = await runSteps(subSteps, loopCtx, opts);
-              ctx = { ...nested.context };
-              if (originalItemValue === undefined) delete ctx[itemName];
-              else ctx[itemName] = originalItemValue;
-              results.push(...nested.results);
-              if (nested.status === 'failed') break;
-            }
-          }
-        } else if (domain === 'core' && action === 'parallel_foreach') {
-          const items = resolveVars(params.items, ctx);
-          const subSteps = params.do as PipelineAdfStep[];
-          if (Array.isArray(items) && Array.isArray(subSteps)) {
-            const itemName = (params.as as string) || 'item';
-            const concurrency = coercePositiveInt(params.concurrency ?? params.parallelism, 2);
-            const exportKey = resolveExportKey(step, 'last_parallel_foreach');
-            const originalItemValue = ctx[itemName];
-            const originalSharedCtx = { ...ctx };
-            const perItemContexts: Array<Record<string, unknown>> = [];
-            const perItemResults: Array<RunStepResult[]> = [];
-            const perItemOutputs: Array<{
-              index: number;
-              item: unknown;
-              context: Record<string, unknown>;
-              results: RunStepResult[];
-            }> = [];
-
-            await runParallelBatches(items, concurrency, async (item, index) => {
-              const loopCtx = { ...originalSharedCtx, [itemName]: item };
-              const nested = await runSteps(subSteps, loopCtx, opts);
-              if (nested.status === 'failed') {
-                throw new Error(
-                  `parallel_foreach item ${index + 1} failed: ${nested.results.find((r) => r.status === 'failed')?.error || 'nested failure'}`
-                );
-              }
-              perItemContexts[index] = nested.context;
-              perItemResults[index] = nested.results;
-              perItemOutputs[index] = {
-                index,
-                item,
-                context: nested.context,
-                results: nested.results,
-              };
-            });
-
-            ctx = {
-              ...ctx,
-              [exportKey]: perItemOutputs,
-            };
+        }
+        if (loopCount === 0) {
+          results.push({ op: currentNormalizedOp, status: 'skipped' });
+          finishStepTrace('step.skipped', 'skipped', {
+            reason: 'core:while condition evaluated to false before execution',
+          });
+          opts.trace?.endSpan('ok');
+          return { kind: 'skip' };
+        }
+        ctx = {
+          ...ctx,
+          [exportKey]: {
+            iterations: loopCount,
+            history: iterations,
+            final_context: ctx,
+          },
+        };
+      } else if (domain === 'core' && action === 'foreach') {
+        const items = resolveVars(params.items, ctx);
+        const subSteps = params.do as PipelineAdfStep[];
+        if (Array.isArray(items) && Array.isArray(subSteps)) {
+          const itemName = (params.as as string) || 'item';
+          const originalItemValue = ctx[itemName];
+          for (const item of items) {
+            const loopCtx = { ...ctx, [itemName]: item };
+            const nested = await runSteps(subSteps, loopCtx, opts);
+            ctx = { ...nested.context };
             if (originalItemValue === undefined) delete ctx[itemName];
             else ctx[itemName] = originalItemValue;
-            results.push(...perItemResults.flat());
-            if (perItemContexts.length > 0) {
-              ctx = { ...ctx, ...perItemContexts[perItemContexts.length - 1] };
-            }
+            results.push(...nested.results);
+            if (nested.status === 'failed') break;
           }
-        } else if (domain === 'core' && action === 'accumulate') {
-          const items = resolveVars(params.items, ctx);
-          const subSteps = params.do as PipelineAdfStep[];
-          if (!Array.isArray(items)) {
-            throw new Error('core:accumulate requires "items" to be an array');
-          }
-          if (!Array.isArray(subSteps)) {
-            throw new Error('core:accumulate requires "do" pipeline steps');
-          }
+        }
+      } else if (domain === 'core' && action === 'parallel_foreach') {
+        const items = resolveVars(params.items, ctx);
+        const subSteps = params.do as PipelineAdfStep[];
+        if (Array.isArray(items) && Array.isArray(subSteps)) {
           const itemName = (params.as as string) || 'item';
-          const collectKey = String(params.collect_as || params.export_as || 'result');
-          const exportKey = resolveExportKey(step, 'last_accumulate');
+          const concurrency = coercePositiveInt(params.concurrency ?? params.parallelism, 2);
+          const exportKey = resolveExportKey(step, 'last_parallel_foreach');
           const originalItemValue = ctx[itemName];
           const originalSharedCtx = { ...ctx };
-          const targetCount = coercePositiveInt(
-            params.target_count ?? params.targetCount,
-            items.length
-          );
-          const maxIterations = coercePositiveInt(
-            params.max_iterations ?? params.maxIterations,
-            items.length
-          );
-          const dryStreakLimit = coercePositiveInt(
-            params.dry_streak_limit ?? params.dryStreakLimit,
-            2
-          );
-          const seen = new Set<string>();
-          const collected: Array<{
+          const perItemContexts: Array<Record<string, unknown>> = [];
+          const perItemResults: Array<RunStepResult[]> = [];
+          const perItemOutputs: Array<{
             index: number;
             item: unknown;
-            value: unknown;
             context: Record<string, unknown>;
             results: RunStepResult[];
           }> = [];
-          let dryStreak = 0;
-          let loopCount = 0;
 
-          for (const [index, item] of items.entries()) {
-            if (loopCount >= maxIterations) break;
-            if (collected.length >= targetCount) break;
-
+          await runParallelBatches(items, concurrency, async (item, index) => {
             const loopCtx = { ...originalSharedCtx, [itemName]: item };
             const nested = await runSteps(subSteps, loopCtx, opts);
             if (nested.status === 'failed') {
               throw new Error(
-                `accumulate item ${index + 1} failed: ${nested.results.find((r) => r.status === 'failed')?.error || 'nested failure'}`
+                `parallel_foreach item ${index + 1} failed: ${nested.results.find((r) => r.status === 'failed')?.error || 'nested failure'}`
               );
             }
-
-            const candidateValue =
-              (nested.context as Record<string, unknown>)[collectKey] ?? nested.context ?? item;
-            const fingerprint = (() => {
-              try {
-                return JSON.stringify(candidateValue);
-              } catch {
-                return String(candidateValue);
-              }
-            })();
-
-            loopCount += 1;
-            if (!seen.has(fingerprint)) {
-              seen.add(fingerprint);
-              collected.push({
-                index,
-                item,
-                value: candidateValue,
-                context: nested.context,
-                results: nested.results,
-              });
-              dryStreak = 0;
-            } else {
-              dryStreak += 1;
-            }
-
-            results.push(...nested.results);
-            if (dryStreak >= dryStreakLimit) break;
-          }
+            perItemContexts[index] = nested.context;
+            perItemResults[index] = nested.results;
+            perItemOutputs[index] = {
+              index,
+              item,
+              context: nested.context,
+              results: nested.results,
+            };
+          });
 
           ctx = {
             ...ctx,
-            [exportKey]: {
-              collected,
-              iterations: loopCount,
-              dry_streak: dryStreak,
-              target_count: targetCount,
-              final_context: ctx,
-            },
+            [exportKey]: perItemOutputs,
           };
           if (originalItemValue === undefined) delete ctx[itemName];
           else ctx[itemName] = originalItemValue;
-        } else if (domain === 'core' && action === 'include') {
-          const fragmentRef = String(resolveVars(params.fragment || '', ctx));
-          if (!fragmentRef) throw new Error('core:include requires "fragment" param');
-          const fragmentPath = resolveFragmentPath(fragmentRef);
-          if (!safeExistsSync(fragmentPath)) {
+          results.push(...perItemResults.flat());
+          if (perItemContexts.length > 0) {
+            ctx = { ...ctx, ...perItemContexts[perItemContexts.length - 1] };
+          }
+        }
+      } else if (domain === 'core' && action === 'accumulate') {
+        const items = resolveVars(params.items, ctx);
+        const subSteps = params.do as PipelineAdfStep[];
+        if (!Array.isArray(items)) {
+          throw new Error('core:accumulate requires "items" to be an array');
+        }
+        if (!Array.isArray(subSteps)) {
+          throw new Error('core:accumulate requires "do" pipeline steps');
+        }
+        const itemName = (params.as as string) || 'item';
+        const collectKey = String(params.collect_as || params.export_as || 'result');
+        const exportKey = resolveExportKey(step, 'last_accumulate');
+        const originalItemValue = ctx[itemName];
+        const originalSharedCtx = { ...ctx };
+        const targetCount = coercePositiveInt(
+          params.target_count ?? params.targetCount,
+          items.length
+        );
+        const maxIterations = coercePositiveInt(
+          params.max_iterations ?? params.maxIterations,
+          items.length
+        );
+        const dryStreakLimit = coercePositiveInt(
+          params.dry_streak_limit ?? params.dryStreakLimit,
+          2
+        );
+        const seen = new Set<string>();
+        const collected: Array<{
+          index: number;
+          item: unknown;
+          value: unknown;
+          context: Record<string, unknown>;
+          results: RunStepResult[];
+        }> = [];
+        let dryStreak = 0;
+        let loopCount = 0;
+
+        for (const [index, item] of items.entries()) {
+          if (loopCount >= maxIterations) break;
+          if (collected.length >= targetCount) break;
+
+          const loopCtx = { ...originalSharedCtx, [itemName]: item };
+          const nested = await runSteps(subSteps, loopCtx, opts);
+          if (nested.status === 'failed') {
             throw new Error(
-              `core:include: fragment not found: ${fragmentRef} (resolved: ${fragmentPath})`
+              `accumulate item ${index + 1} failed: ${nested.results.find((r) => r.status === 'failed')?.error || 'nested failure'}`
             );
           }
-          const includeStack = opts._includeStack ?? new Set<string>();
-          if (includeStack.has(fragmentPath)) {
-            throw new Error(
-              `core:include: circular reference detected — ${fragmentRef} is already in the include chain`
-            );
-          }
-          const fragmentRaw = String(safeReadFile(fragmentPath, { encoding: 'utf8' }));
-          const fragmentJson = (() => {
+
+          const candidateValue =
+            (nested.context as Record<string, unknown>)[collectKey] ?? nested.context ?? item;
+          const fingerprint = (() => {
             try {
-              return JSON.parse(fragmentRaw);
+              return JSON.stringify(candidateValue);
             } catch {
-              /* fall through */
+              return String(candidateValue);
             }
-            const repaired = tryRepairJson(fragmentRaw);
-            if (repaired !== null) {
-              logger.warn(`[pipeline] Auto-repaired malformed JSON in fragment: ${fragmentRef}`);
-              return repaired;
-            }
-            throw new Error(
-              `core:include: fragment at ${fragmentRef} contains invalid JSON that could not be repaired`
-            );
           })();
-          const fragmentSteps: PipelineAdfStep[] = (fragmentJson.steps || []).map((s: any) => ({
-            ...s,
-            params: s.params || {},
-          }));
-          const inlineCtx: Record<string, unknown> =
-            params.context && typeof params.context === 'object'
-              ? Object.fromEntries(
-                  Object.entries(params.context as Record<string, unknown>).map(([k, v]) => [
-                    k,
-                    typeof v === 'string' ? resolveVars(v, ctx) : v,
-                  ])
-                )
-              : {};
-          const childOpts: RunStepsOptions = {
-            ...opts,
-            _includeStack: new Set([...includeStack, fragmentPath]),
-          };
-          const nested = await runSteps(fragmentSteps, { ...ctx, ...inlineCtx }, childOpts);
-          ctx = nested.context;
+
+          loopCount += 1;
+          if (!seen.has(fingerprint)) {
+            seen.add(fingerprint);
+            collected.push({
+              index,
+              item,
+              value: candidateValue,
+              context: nested.context,
+              results: nested.results,
+            });
+            dryStreak = 0;
+          } else {
+            dryStreak += 1;
+          }
+
+          results.push(...nested.results);
+          if (dryStreak >= dryStreakLimit) break;
+        }
+
+        ctx = {
+          ...ctx,
+          [exportKey]: {
+            collected,
+            iterations: loopCount,
+            dry_streak: dryStreak,
+            target_count: targetCount,
+            final_context: ctx,
+          },
+        };
+        if (originalItemValue === undefined) delete ctx[itemName];
+        else ctx[itemName] = originalItemValue;
+      } else if (domain === 'core' && action === 'include') {
+        const fragmentRef = String(resolveVars(params.fragment || '', ctx));
+        if (!fragmentRef) throw new Error('core:include requires "fragment" param');
+        const fragmentPath = resolveFragmentPath(fragmentRef);
+        if (!safeExistsSync(fragmentPath)) {
+          throw new Error(
+            `core:include: fragment not found: ${fragmentRef} (resolved: ${fragmentPath})`
+          );
+        }
+        const includeStack = opts._includeStack ?? new Set<string>();
+        if (includeStack.has(fragmentPath)) {
+          throw new Error(
+            `core:include: circular reference detected — ${fragmentRef} is already in the include chain`
+          );
+        }
+        const fragmentRaw = String(safeReadFile(fragmentPath, { encoding: 'utf8' }));
+        const fragmentJson = (() => {
+          try {
+            return JSON.parse(fragmentRaw);
+          } catch {
+            /* fall through */
+          }
+          const repaired = tryRepairJson(fragmentRaw);
+          if (repaired !== null) {
+            logger.warn(`[pipeline] Auto-repaired malformed JSON in fragment: ${fragmentRef}`);
+            return repaired;
+          }
+          throw new Error(
+            `core:include: fragment at ${fragmentRef} contains invalid JSON that could not be repaired`
+          );
+        })();
+        const fragmentSteps: PipelineAdfStep[] = (fragmentJson.steps || []).map((s: any) => ({
+          ...s,
+          params: s.params || {},
+        }));
+        const inlineCtx: Record<string, unknown> =
+          params.context && typeof params.context === 'object'
+            ? Object.fromEntries(
+                Object.entries(params.context as Record<string, unknown>).map(([k, v]) => [
+                  k,
+                  typeof v === 'string' ? resolveVars(v, ctx) : v,
+                ])
+              )
+            : {};
+        const childOpts: RunStepsOptions = {
+          ...opts,
+          _includeStack: new Set([...includeStack, fragmentPath]),
+        };
+        const nested = await runSteps(fragmentSteps, { ...ctx, ...inlineCtx }, childOpts);
+        ctx = nested.context;
+        results.push(...nested.results);
+        if (nested.status === 'failed') {
+          return { kind: 'early_return', result: { status: 'failed', results, context: ctx } };
+        }
+      } else if (domain === 'core' && action === 'wait') {
+        ctx = await runInlineCoreWait(params, ctx);
+      } else if (domain === 'core' && (action === 'run_janitor' || action === 'run-janitor')) {
+        ctx = runInlineCoreJanitor(step, params, ctx);
+      } else if (domain === 'core' && action === 'transform') {
+        ctx = await runInlineCoreTransform(step, params, ctx);
+      } else if (
+        domain === 'reasoning' &&
+        (action === 'analyze' || action === 'transform' || action === 'synthesize')
+      ) {
+        const { getReasoningBackend } = await import('@agent/core');
+        const backend = getReasoningBackend();
+        const resolvedInstruction =
+          typeof params.instruction === 'string'
+            ? resolveVars(params.instruction, ctx)
+            : params.instruction;
+        const resolvedContext = Array.isArray(params.context)
+          ? params.context.map((item) => (typeof item === 'string' ? resolveVars(item, ctx) : item))
+          : typeof params.context === 'string'
+            ? resolveVars(params.context, ctx)
+            : params.context || ctx;
+        const prompt = `Instruction: ${resolvedInstruction || 'Analyze the context.'}\nContext: ${JSON.stringify(resolvedContext)}${buildReasoningPolicyNote(stepPolicy)}`;
+        const reasoningCallOptions = {
+          effort: stepPolicy.effort,
+          budget: stepPolicy.budget,
+        };
+        const preCallBudgetError = isReasoningBudgetExceeded(stepPolicy, prompt, '');
+        if (preCallBudgetError) {
+          throw new Error(
+            `Reasoning budget exceeded${stepPolicy.budget?.approval_required ? '; approval required' : ''}: ${preCallBudgetError}`
+          );
+        }
+        const rawResponse = shouldUseSubagentForReasoningStep(params)
+          ? await backend.delegateTask(
+              String(resolvedInstruction || 'Analyze the context.'),
+              JSON.stringify(resolvedContext),
+              reasoningCallOptions as any
+            )
+          : await retry(() => backend.prompt(prompt, reasoningCallOptions as any), {
+              maxRetries: 2,
+              initialDelayMs: 3000,
+              maxDelayMs: 15000,
+              factor: 2,
+              shouldRetry: (err: Error) =>
+                err.message.includes('timed out') ||
+                err.message.includes('INVALID_STREAM') ||
+                err.message.includes('empty response') ||
+                err.message.includes('missing "response"'),
+              onRetry: (err: Error, attempt: number) =>
+                logger.warn(
+                  `  [REASONING] Retry ${attempt}/2 for reasoning:analyze — ${err.message.slice(0, 120)}`
+                ),
+            });
+        const postCallBudgetError = isReasoningBudgetExceeded(
+          stepPolicy,
+          prompt,
+          String(rawResponse || '')
+        );
+        if (postCallBudgetError) {
+          throw new Error(
+            `Reasoning budget exceeded${stepPolicy.budget?.approval_required ? '; approval required' : ''}: ${postCallBudgetError}`
+          );
+        }
+        const reasoningExportKey =
+          typeof params.export_as === 'string' && params.export_as
+            ? params.export_as
+            : 'last_reasoning';
+        ctx = { ...ctx, [reasoningExportKey]: rawResponse };
+      } else {
+        // Emit capability.missing before dispatch so the trace records the gap
+        // even if the subsequent import throws and the step is classified generically.
+        if (opts.trace) {
+          const mainEntry = capabilityEntry(`${domain}-actuator`);
+          const altEntry = capabilityEntry(domain);
+          if (!safeExistsSync(mainEntry) && !safeExistsSync(altEntry)) {
+            opts.trace.addEvent('capability.missing', {
+              actuator: domain,
+              step_op: step.op,
+              tried_entries: `${mainEntry}, ${altEntry}`,
+            });
+          }
+        }
+        validatePipelineOpInput(domain, action, params);
+        await assertPipelineStepCapabilityAvailable(domain, action);
+        const dispatch = await loadActuatorDispatch(domain);
+        const result = await dispatch(
+          action,
+          { ...params, _reasoning_policy: stepPolicy },
+          ctx,
+          effectiveType,
+          opts.trace,
+          stepPolicy
+        );
+        if (!result.handled) {
+          throw new Error(`Unsupported pipeline op: ${step.op}`);
+        }
+
+        // CRITICAL: Safety check for source (capture) ops.
+        // Resolve export key via produces > params.export_as > default.
+        if (effectiveType === 'capture') {
+          const exportKey = resolveExportKey(step, 'last_capture');
+          const actualCtx =
+            result.ctx && typeof result.ctx === 'object' && 'context' in result.ctx
+              ? (result.ctx as any).context
+              : result.ctx;
+          const data = actualCtx[exportKey];
+          if (data === undefined) {
+            logger.warn(
+              `  [SYS_PIPELINE] Source op ${step.op} returned no data for channel: ${exportKey}.`
+            );
+            throw new Error(
+              `Source op ${step.op} returned no data for channel "${exportKey}". Check that the query, path, or topic is valid and that the current persona has read access. Run \`pnpm doctor\` to verify credential and capability prerequisites.`
+            );
+          }
+        }
+
+        if (result.ctx && typeof result.ctx === 'object' && 'context' in result.ctx) {
+          ctx = result.ctx.context as Record<string, unknown>;
+        } else {
+          ctx = result.ctx;
+        }
+      }
+      return { kind: 'done' };
+    };
+
+    const tryOnErrorRecovery = async (err: any): Promise<boolean> => {
+      const stepOnError = (step as any).on_error;
+      const recovery = await handleStepError(
+        err,
+        step,
+        stepOnError,
+        ctx,
+        async (fallbackSteps: any[], errCtx: any) => {
+          const nested = await runSteps(
+            fallbackSteps as PipelineAdfStep[],
+            errCtx as Record<string, unknown>,
+            opts
+          );
           results.push(...nested.results);
           if (nested.status === 'failed') {
-            return { status: 'failed', results, context: ctx };
-          }
-        } else if (domain === 'core' && action === 'wait') {
-          ctx = await runInlineCoreWait(params, ctx);
-        } else if (domain === 'core' && (action === 'run_janitor' || action === 'run-janitor')) {
-          ctx = runInlineCoreJanitor(step, params, ctx);
-        } else if (domain === 'core' && action === 'transform') {
-          ctx = await runInlineCoreTransform(step, params, ctx);
-        } else if (
-          domain === 'reasoning' &&
-          (action === 'analyze' || action === 'transform' || action === 'synthesize')
-        ) {
-          const { getReasoningBackend } = await import('@agent/core');
-          const backend = getReasoningBackend();
-          const resolvedInstruction =
-            typeof params.instruction === 'string'
-              ? resolveVars(params.instruction, ctx)
-              : params.instruction;
-          const resolvedContext = Array.isArray(params.context)
-            ? params.context.map((item) =>
-                typeof item === 'string' ? resolveVars(item, ctx) : item
-              )
-            : typeof params.context === 'string'
-              ? resolveVars(params.context, ctx)
-              : params.context || ctx;
-          const prompt = `Instruction: ${resolvedInstruction || 'Analyze the context.'}\nContext: ${JSON.stringify(resolvedContext)}${buildReasoningPolicyNote(stepPolicy)}`;
-          const reasoningCallOptions = {
-            effort: stepPolicy.effort,
-            budget: stepPolicy.budget,
-          };
-          const preCallBudgetError = isReasoningBudgetExceeded(stepPolicy, prompt, '');
-          if (preCallBudgetError) {
             throw new Error(
-              `Reasoning budget exceeded${stepPolicy.budget?.approval_required ? '; approval required' : ''}: ${preCallBudgetError}`
+              nested.results.find((r) => r.status === 'failed')?.error ||
+                'on_error fallback pipeline failed'
             );
           }
-          const rawResponse = shouldUseSubagentForReasoningStep(params)
-            ? await backend.delegateTask(
-                String(resolvedInstruction || 'Analyze the context.'),
-                JSON.stringify(resolvedContext),
-                reasoningCallOptions as any
-              )
-            : await retry(() => backend.prompt(prompt, reasoningCallOptions as any), {
-                maxRetries: 2,
-                initialDelayMs: 3000,
-                maxDelayMs: 15000,
-                factor: 2,
-                shouldRetry: (err: Error) =>
-                  err.message.includes('timed out') ||
-                  err.message.includes('INVALID_STREAM') ||
-                  err.message.includes('empty response') ||
-                  err.message.includes('missing "response"'),
-                onRetry: (err: Error, attempt: number) =>
-                  logger.warn(
-                    `  [REASONING] Retry ${attempt}/2 for reasoning:analyze — ${err.message.slice(0, 120)}`
-                  ),
-              });
-          const postCallBudgetError = isReasoningBudgetExceeded(
-            stepPolicy,
-            prompt,
-            String(rawResponse || '')
-          );
-          if (postCallBudgetError) {
-            throw new Error(
-              `Reasoning budget exceeded${stepPolicy.budget?.approval_required ? '; approval required' : ''}: ${postCallBudgetError}`
-            );
-          }
-          const reasoningExportKey =
-            typeof params.export_as === 'string' && params.export_as
-              ? params.export_as
-              : 'last_reasoning';
-          ctx = { ...ctx, [reasoningExportKey]: rawResponse };
-        } else {
-          // Emit capability.missing before dispatch so the trace records the gap
-          // even if the subsequent import throws and the step is classified generically.
-          if (opts.trace) {
-            const mainEntry = capabilityEntry(`${domain}-actuator`);
-            const altEntry = capabilityEntry(domain);
-            if (!safeExistsSync(mainEntry) && !safeExistsSync(altEntry)) {
-              opts.trace.addEvent('capability.missing', {
-                actuator: domain,
-                step_op: step.op,
-                tried_entries: `${mainEntry}, ${altEntry}`,
-              });
-            }
-          }
-          validatePipelineOpInput(domain, action, params);
-          await assertPipelineStepCapabilityAvailable(domain, action);
-          const dispatch = await loadActuatorDispatch(domain);
-          const result = await dispatch(
-            action,
-            { ...params, _reasoning_policy: stepPolicy },
-            ctx,
-            effectiveType,
-            opts.trace,
-            stepPolicy
-          );
-          if (!result.handled) {
-            throw new Error(`Unsupported pipeline op: ${step.op}`);
-          }
-
-          // CRITICAL: Safety check for source (capture) ops.
-          // Resolve export key via produces > params.export_as > default.
-          if (effectiveType === 'capture') {
-            const exportKey = resolveExportKey(step, 'last_capture');
-            const actualCtx =
-              result.ctx && typeof result.ctx === 'object' && 'context' in result.ctx
-                ? (result.ctx as any).context
-                : result.ctx;
-            const data = actualCtx[exportKey];
-            if (data === undefined) {
-              logger.warn(
-                `  [SYS_PIPELINE] Source op ${step.op} returned no data for channel: ${exportKey}.`
-              );
-              throw new Error(
-                `Source op ${step.op} returned no data for channel "${exportKey}". Check that the query, path, or topic is valid and that the current persona has read access. Run \`pnpm doctor\` to verify credential and capability prerequisites.`
-              );
-            }
-          }
-
-          if (result.ctx && typeof result.ctx === 'object' && 'context' in result.ctx) {
-            ctx = result.ctx.context as Record<string, unknown>;
-          } else {
-            ctx = result.ctx;
-          }
-        }
-        stepSucceeded = true;
-      } catch (err: any) {
-        lastError = err;
-
-        // AR-01: step-level on_error (skip / abort / fallback) — same
-        // semantics as the canonical engine's native recovery path. Explicit
-        // author intent takes precedence over autonomous repair.
-        const stepOnError = (step as any).on_error;
-        if (stepOnError) {
-          try {
-            const recovery = await handleStepError(
-              err,
-              step,
-              stepOnError,
-              ctx,
-              async (fallbackSteps: any[], errCtx: any) => {
-                const nested = await runSteps(
-                  fallbackSteps as PipelineAdfStep[],
-                  errCtx as Record<string, unknown>,
-                  opts
-                );
-                results.push(...nested.results);
-                if (nested.status === 'failed') {
-                  throw new Error(
-                    nested.results.find((r) => r.status === 'failed')?.error ||
-                      'on_error fallback pipeline failed'
-                  );
-                }
-                return nested.context;
-              },
-              (val: any) => resolveVars(val, ctx)
-            );
-            if (recovery.recovered) {
-              ctx = recovery.ctx as Record<string, unknown>;
-              results.push({ op: currentNormalizedOp, status: 'recovered' });
-              finishStepTrace('step.recovered', 'recovered', { error: err.message });
-              opts.trace?.endSpan('error', err.message);
-              stepSucceeded = true;
-              stepSkipped = true;
-              break;
-            }
-          } catch (_recoveryErr) {
-            /* on_error recovery failed — fall through to autonomous repair */
-          }
-        }
-
-        const failure = classifyError(err);
-
-        // Don't repair if we already tried and the error message didn't change (prevents loops)
-        if (attempt === 0 && failure.repairAction) {
-          if (!opts.quiet) {
-            logger.warn(
-              `  [SYS_PIPELINE] Step failed: ${failure.label}. Attempting autonomous repair...`
-            );
-            logger.info(
-              `  [SYS_PIPELINE] 修復サブエージェント実行中(数分かかることがあります) — ${step.op}`
-            );
-          }
-          const repaired = await attemptAutonomousRepair({
-            step: { op: step.op, id: step.id, params: step.params },
-            failure,
-            pipelinePath: opts.pipelinePath!,
-            policy: stepPolicy,
-            validate: () => readValidatedWorkflowAdf(opts.pipelinePath!),
-            logPrefix: '[SYS_PIPELINE:REPAIR]',
-          });
-          if (repaired) {
-            if (!opts.quiet) {
-              logger.success(
-                `  [SYS_PIPELINE] Repair successful. Refreshing ADF and retrying step ${step.op}...`
-              );
-            }
-
-            try {
-              // Reload fully from disk to get the REPAIRED definition
-              const refreshedPipeline = await readValidatedWorkflowAdf(opts.pipelinePath!);
-              const refreshedStep = refreshedPipeline.steps?.find(
-                (s: any) => s.id === step.id || s.op === step.op
-              );
-
-              if (refreshedStep) {
-                // Update the step object in place for the NEXT iteration of the while loop
-                step.op = refreshedStep.op;
-                step.params = refreshedStep.params;
-
-                logger.info(
-                  `  [SYS_PIPELINE] Step definition refreshed for ${step.id || step.op}. New path: ${step.params.path}`
-                );
-
-                attempt++;
-                continue; // This will re-evaluate normalizedOp/domain/action/params with NEW values
-              }
-            } catch (reloadErr: any) {
-              logger.warn(
-                `  [SYS_PIPELINE] Failed to reload ADF after repair: ${reloadErr.message}.`
-              );
-            }
-          }
-        }
-        break; // Max attempts or repair failed/not possible
+          return nested.context;
+        },
+        (val: any) => resolveVars(val, ctx)
+      );
+      if (recovery.recovered) {
+        ctx = recovery.ctx as Record<string, unknown>;
+        results.push({ op: currentNormalizedOp, status: 'recovered' });
+        finishStepTrace('step.recovered', 'recovered', { error: err.message });
+        opts.trace?.endSpan('error', err.message);
+        return true;
       }
+      return false;
+    };
+
+    const attemptOutcome = await runStepWithRepair(
+      step,
+      opts,
+      stepPolicy,
+      attemptOnce,
+      tryOnErrorRecovery
+    );
+
+    if (attemptOutcome.status === 'succeeded') {
+      if (attemptOutcome.signal.kind === 'early_return') {
+        return attemptOutcome.signal.result;
+      }
+      stepSucceeded = true;
+      stepSkipped = attemptOutcome.signal.kind === 'skip';
+    } else if (attemptOutcome.status === 'recovered') {
+      stepSucceeded = true;
+      stepSkipped = true;
+    } else {
+      lastError = attemptOutcome.error;
     }
 
     if (stepSucceeded) {
