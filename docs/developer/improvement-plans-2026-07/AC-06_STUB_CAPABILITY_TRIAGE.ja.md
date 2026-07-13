@@ -69,3 +69,10 @@
 
 - blockchain の結果形式変更(`simulated` 追加)は監査ログの読み手に影響し得る。既存フィールドは変えず追加のみとする。
 - STREAM/gist の削除は semver 上は破壊的変更に当たる可能性がある。`check:contract-semver` の判定に従い、必要ならメジャー表記/契約バージョンの更新を行う。
+
+## 訂正(2026-07-14)
+
+- 上記「完了: `CAPABILITIES_GUIDE.md` に能力境界表を追加し、`docs/GLOSSARY.md` に境界リンクを追加した」は**陳腐化していた**: `docs/GLOSSARY.md:191` のリンク(`CAPABILITIES_GUIDE.md#capability-boundaries`)は存在したが、`CAPABILITIES_GUIDE.md` は `scripts/sync_component_inventory.ts` の `buildCapabilitiesGuide()` から**都度全文再生成される**ファイルで、当時の追加は生成関数ではなくファイル本体に直接行われたため、後続の `pnpm sync:component-inventory` 実行で上書き消失していた(壊れたリンクとして STATUS.ja.md に残存)。
+- 今回、`buildCapabilitiesGuide()` に `## Capability Boundaries` セクションを追加(Task 4 の対応表 8 行: 画面キャプチャ/文書レンダリング/生成/ナレーション動画合成/画像知覚/コマンド一発/常駐管理/対話端末)し、`pnpm run sync:component-inventory` で再生成して定着させた(次回以降の再生成でも消えない)。
+- 再生成に伴い、AR-07 で追加済みだった browser-actuator の `distill_dom`/`llm_decide` op が(前回の再生成以降ガイド未反映だったため)`CAPABILITIES_GUIDE.md` と `global_actuator_index.json` に追加反映された(副次的なカタログ鮮度回復)。
+- 検証: `npx tsc --noEmit`、`pnpm run check:catalogs`(`pnpm generate:knowledge-index` 実行後)、`check:op-registry`/`check:contract-schemas`/`check:contract-semver`/`check:script-integrity`/`check:reference-drift` すべて緑。
