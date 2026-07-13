@@ -576,6 +576,11 @@ reviewed artifact SHA-256, specialist roles, reviewer agent, and verified
 independence from the implementation agent. The reviewed artifact and receipt
 must both be unchanged in the source commit.
 
+For the normal `dispatch-workitems` path, the controller generates this receipt
+from the structured reviewer result and stores it under `evidence/reviews/`.
+The explicit `kind: review` manifest entry is required only when adopting an
+already-completed review through `reconcile-work`.
+
 Always run `--dry-run` first. Reconciliation fails without changing Mission
 state when the source commit is not on the declared branch, an artifact hash
 changed, Evidence is not tracked unchanged by that commit, Evidence escapes
