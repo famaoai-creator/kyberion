@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
-import { guardRequest } from "../../../lib/api-guard";
-import { pathResolver } from "@agent/core/path-resolver";
-import { safeExistsSync, safeReadFile } from "@agent/core/secure-io";
+import { NextRequest, NextResponse } from 'next/server';
+import { guardRequest } from '../../../lib/api-guard';
+import * as customerResolver from '@agent/core/customer-resolver';
+import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
 
-export const runtime = "nodejs";
+export const runtime = 'nodejs';
 
 interface SovereignIdentity {
   name?: string;
@@ -20,21 +20,21 @@ interface AgentIdentity {
   trust_tier?: string;
 }
 
-function readJson<T>(relPath: string): T | null {
-  const full = pathResolver.knowledge(relPath);
+function readJson<T>(fileName: string): T | null {
+  const full = customerResolver.resolveOverlay(fileName);
   if (!safeExistsSync(full)) return null;
   try {
-    return JSON.parse(safeReadFile(full, { encoding: "utf8" }) as string) as T;
+    return JSON.parse(safeReadFile(full, { encoding: 'utf8' }) as string) as T;
   } catch {
     return null;
   }
 }
 
-function readText(relPath: string): string | null {
-  const full = pathResolver.knowledge(relPath);
+function readText(fileName: string): string | null {
+  const full = customerResolver.resolveOverlay(fileName);
   if (!safeExistsSync(full)) return null;
   try {
-    return safeReadFile(full, { encoding: "utf8" }) as string;
+    return safeReadFile(full, { encoding: 'utf8' }) as string;
   } catch {
     return null;
   }
@@ -44,15 +44,22 @@ export async function GET(req: NextRequest) {
   const denied = guardRequest(req);
   if (denied) return denied;
 
-  const sovereign = readJson<SovereignIdentity>("personal/my-identity.json");
-  const agent = readJson<AgentIdentity>("personal/agent-identity.json");
-  const visionRaw = readText("personal/my-vision.md");
+  // ONB-03 Task 5: prefer the active customer overlay (KYBERION_CUSTOMER)
+  // over knowledge/personal/, matching operator-identity.ts's resolution
+  // order, so vital-check and FirstRunBanner don't misreport identity as
+  // missing under a tenant overlay.
+  const sovereign = readJson<SovereignIdentity>('my-identity.json');
+  const agent = readJson<AgentIdentity>('agent-identity.json');
+  const visionRaw = readText('my-vision.md');
   const vision = visionRaw
-    ? visionRaw.replace(/^#[^\n]*\n+/, "").trim().slice(0, 600)
+    ? visionRaw
+        .replace(/^#[^\n]*\n+/, '')
+        .trim()
+        .slice(0, 600)
     : null;
 
   return NextResponse.json({
-    status: "ok",
+    status: 'ok',
     onboarded: Boolean(sovereign && agent),
     sovereign: sovereign
       ? {
