@@ -1,52 +1,54 @@
 import * as path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { pathResolver, safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from '@agent/core';
+import { pathResolver, safeMkdir, safeRmSync, safeWriteFile } from '@agent/core';
 
-// The route calls guardRequest(req), which expects a NextRequest (cookies
-// API etc.) that a plain Request doesn't implement. Bypass it here the same
-// way operator-home/route.test.ts does, and exercise everything else (the
-// customer-overlay resolution this test is actually about) for real.
+// route.ts calls guardRequest(req), which needs a NextRequest (cookies API
+// etc.) that a plain Request doesn't implement. Bypass it here (this test
+// is about identity overlay resolution, not auth) the same way
+// operator-home/route.test.ts does.
 vi.mock('../../../lib/api-guard', () => ({
   guardRequest: vi.fn(() => null),
 }));
 
+// knowledge/personal/my-identity.json is a real, shared, non-namespaced
+// fixture path that many other test files across the repo also touch
+// concurrently (scripts/onboarding_reset.test.ts, tests/a2a-lifecycle.test.ts,
+// etc.). Writing to it here would race with them under vitest's parallel
+// file execution. Mock resolveOverlay to point at a per-test unique
+// active/shared/tmp/ directory instead (safeReadFile's tier-guard rejects
+// paths outside the project root, so this has to stay inside it) so this
+// test is hermetic and still exercises the route's real logic (it calls
+// resolveOverlay(fileName) and reads whatever path comes back).
+const mockResolveOverlay = vi.fn((fileName: string) => path.join(fixtureDir(), fileName));
+vi.mock('@agent/core/customer-resolver', () => ({
+  resolveOverlay: (fileName: string) => mockResolveOverlay(fileName),
+}));
+
 import { GET } from './route.js';
 
-const CUSTOMER_SLUG = 'onb03-fixture';
-const CUSTOMER_DIR = path.join(pathResolver.rootDir(), 'customer', CUSTOMER_SLUG);
-const PERSONAL_IDENTITY = pathResolver.knowledge('personal/my-identity.json');
-const PERSONAL_AGENT_IDENTITY = pathResolver.knowledge('personal/agent-identity.json');
-const PERSONAL_VISION = pathResolver.knowledge('personal/my-vision.md');
+let currentFixtureDir = '';
+function fixtureDir(): string {
+  return currentFixtureDir;
+}
 
 function request() {
   return new Request('http://localhost/api/identity');
 }
 
-describe('identity route', () => {
-  const personalIdentityExisted = safeExistsSync(PERSONAL_IDENTITY);
-  const personalAgentIdentityExisted = safeExistsSync(PERSONAL_AGENT_IDENTITY);
-  const personalVisionExisted = safeExistsSync(PERSONAL_VISION);
-  const originalPersona = process.env.KYBERION_PERSONA;
+function writeFixture(fileName: string, content: string) {
+  safeWriteFile(path.join(currentFixtureDir, fileName), content);
+}
 
+describe('identity route', () => {
   beforeEach(() => {
-    delete process.env.KYBERION_CUSTOMER;
-    // tier-guard requires an authorized persona to write under customer/ and
-    // knowledge/personal/; 'sovereign' has full read/write to both.
-    process.env.KYBERION_PERSONA = 'sovereign';
-    safeRmSync(CUSTOMER_DIR, { recursive: true, force: true });
-    if (!personalIdentityExisted) safeRmSync(PERSONAL_IDENTITY, { force: true });
-    if (!personalAgentIdentityExisted) safeRmSync(PERSONAL_AGENT_IDENTITY, { force: true });
-    if (!personalVisionExisted) safeRmSync(PERSONAL_VISION, { force: true });
+    currentFixtureDir = pathResolver.sharedTmp(`identity-route-test-${randomUUID()}`);
+    safeMkdir(currentFixtureDir, { recursive: true });
+    mockResolveOverlay.mockClear();
   });
 
   afterEach(() => {
-    delete process.env.KYBERION_CUSTOMER;
-    safeRmSync(CUSTOMER_DIR, { recursive: true, force: true });
-    if (!personalIdentityExisted) safeRmSync(PERSONAL_IDENTITY, { force: true });
-    if (!personalAgentIdentityExisted) safeRmSync(PERSONAL_AGENT_IDENTITY, { force: true });
-    if (!personalVisionExisted) safeRmSync(PERSONAL_VISION, { force: true });
-    if (originalPersona === undefined) delete process.env.KYBERION_PERSONA;
-    else process.env.KYBERION_PERSONA = originalPersona;
+    safeRmSync(currentFixtureDir, { recursive: true, force: true });
   });
 
   it('reports not onboarded when neither overlay nor personal data exists', async () => {
@@ -58,47 +60,36 @@ describe('identity route', () => {
     expect(payload.vision).toBeNull();
   });
 
-  it('falls back to knowledge/personal when no customer overlay is active', async () => {
-    safeWriteFile(
-      PERSONAL_IDENTITY,
-      JSON.stringify({ name: 'Personal Op', language: 'ja', status: 'active' })
+  it('resolves identity, agent identity, and vision through the overlay resolver', async () => {
+    writeFixture(
+      'my-identity.json',
+      JSON.stringify({ name: 'Op', language: 'en', status: 'active' })
     );
-    safeWriteFile(PERSONAL_AGENT_IDENTITY, JSON.stringify({ agent_id: 'agent-personal' }));
-    safeWriteFile(PERSONAL_VISION, '# Vision\n\nPersonal vision text.');
+    writeFixture('agent-identity.json', JSON.stringify({ agent_id: 'agent-1' }));
+    writeFixture('my-vision.md', '# Vision\n\nOverlay vision text.');
 
     const response = await GET(request());
     const payload = await response.json();
 
     expect(payload.onboarded).toBe(true);
-    expect(payload.sovereign.name).toBe('Personal Op');
-    expect(payload.agent.agent_id).toBe('agent-personal');
-    expect(payload.vision).toBe('Personal vision text.');
+    expect(payload.sovereign.name).toBe('Op');
+    expect(payload.agent.agent_id).toBe('agent-1');
+    expect(payload.vision).toBe('Overlay vision text.');
+    // The route must resolve each file through the customer-overlay
+    // resolver (the ONB-03 fix) rather than a hardcoded personal-tier path.
+    expect(mockResolveOverlay).toHaveBeenCalledWith('my-identity.json');
+    expect(mockResolveOverlay).toHaveBeenCalledWith('agent-identity.json');
+    expect(mockResolveOverlay).toHaveBeenCalledWith('my-vision.md');
   });
 
-  it('prefers the active customer overlay over knowledge/personal', async () => {
-    process.env.KYBERION_CUSTOMER = CUSTOMER_SLUG;
-    safeMkdir(CUSTOMER_DIR, { recursive: true });
-    safeWriteFile(
-      path.join(CUSTOMER_DIR, 'my-identity.json'),
-      JSON.stringify({ name: 'Tenant Op', language: 'en', status: 'active' })
-    );
-    safeWriteFile(
-      path.join(CUSTOMER_DIR, 'agent-identity.json'),
-      JSON.stringify({ agent_id: 'agent-tenant' })
-    );
-    safeWriteFile(path.join(CUSTOMER_DIR, 'my-vision.md'), '# Vision\n\nTenant vision text.');
-    // A personal-tier file also exists; the overlay must win, not this one.
-    safeWriteFile(
-      PERSONAL_IDENTITY,
-      JSON.stringify({ name: 'Personal Op', language: 'ja', status: 'active' })
-    );
+  it('reports onboarded=false when only agent identity is missing', async () => {
+    writeFixture('my-identity.json', JSON.stringify({ name: 'Op', language: 'en' }));
 
     const response = await GET(request());
     const payload = await response.json();
 
-    expect(payload.onboarded).toBe(true);
-    expect(payload.sovereign.name).toBe('Tenant Op');
-    expect(payload.agent.agent_id).toBe('agent-tenant');
-    expect(payload.vision).toBe('Tenant vision text.');
+    expect(payload.onboarded).toBe(false);
+    expect(payload.sovereign.name).toBe('Op');
+    expect(payload.agent).toBeNull();
   });
 });
