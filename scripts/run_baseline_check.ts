@@ -13,6 +13,7 @@ import {
   killSwitch,
   readJanitorLastRunMs,
   readReasoningDegraded,
+  validateEnv,
 } from '@agent/core';
 import { spawnManagedProcess } from '@agent/core/managed-process';
 import { runCoworkHealthCheck } from '@agent/core/cowork-health-check';
@@ -395,6 +396,12 @@ async function main() {
     return coworkHealth.healthy;
   });
 
+  // L7: Configuration Layer (OP-05) — warn-only for unknown/malformed
+  // KYBERION_* vars (surfaced via envReport below, never blocking); only a
+  // missing `required: true` registry entry fails this layer.
+  const envReport = validateEnv();
+  sentinel.registerLayer('L7', async () => envReport.errors.length === 0);
+
   const result = await sentinel.run();
   const state = sentinel.getState();
 
@@ -429,6 +436,12 @@ async function main() {
         pending: janitorMaintenance.pending,
         reason: janitorMaintenance.reason,
       },
+    },
+    env: {
+      checked: envReport.checked,
+      errors: envReport.errors,
+      warnings: envReport.warnings,
+      unknown: envReport.unknown,
     },
   };
 
