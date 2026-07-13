@@ -234,6 +234,10 @@ describe('mission existing work reconciliation', () => {
     writeManifest(buildManifest());
 
     const first = await reconcileMissionExistingWork({ missionId, manifestPath });
+    const receiptPath = pathResolver.rootResolve(first.receipt_path!);
+    const ledgerPath = nodePath.join(missionPath, 'execution-ledger.jsonl');
+    const receiptBeforeRepeat = String(safeReadFile(receiptPath, { encoding: 'utf8' }));
+    const ledgerBeforeRepeat = String(safeReadFile(ledgerPath, { encoding: 'utf8' }));
     const second = await reconcileMissionExistingWork({ missionId, manifestPath });
 
     expect(first.status).toBe('applied');
@@ -241,6 +245,9 @@ describe('mission existing work reconciliation', () => {
     expect(first.auto_completed_repair_task_ids).toEqual(['repair-finish-exit']);
     expect(first.work_item_ids_updated).toEqual([workItem.item_id]);
     expect(second.already_reconciled_task_ids).toEqual(['implementation']);
+    expect(second.auto_completed_repair_task_ids).toEqual([]);
+    expect(String(safeReadFile(receiptPath, { encoding: 'utf8' }))).toBe(receiptBeforeRepeat);
+    expect(String(safeReadFile(ledgerPath, { encoding: 'utf8' }))).toBe(ledgerBeforeRepeat);
     const tasks = JSON.parse(
       String(safeReadFile(nodePath.join(missionPath, 'NEXT_TASKS.json'), { encoding: 'utf8' }))
     );

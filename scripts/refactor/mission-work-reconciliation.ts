@@ -434,6 +434,7 @@ export async function reconcileMissionExistingWork(input: {
     );
     for (const task of tasks) {
       if (task.task_id !== 'repair-finish-exit') continue;
+      if (TERMINAL_TASK_STATUSES.has(String(task.status || '').toLowerCase())) continue;
       const dependencies = (task.dependencies || []).filter(
         (dependency) => dependency !== task.task_id
       );
@@ -460,6 +461,23 @@ export async function reconcileMissionExistingWork(input: {
     for (const manifestTask of manifest.tasks) {
       const itemId = updateLinkedWorkItem(taskById.get(manifestTask.task_id)!, receiptRelative);
       if (itemId) resultBase.work_item_ids_updated.push(itemId);
+    }
+
+    const hasMutation =
+      reconciledTaskIds.length > 0 ||
+      resultBase.auto_completed_repair_task_ids.length > 0 ||
+      resultBase.work_item_ids_updated.length > 0;
+    if (!hasMutation) {
+      logger.info(`Mission ${missionId} already reflects reconciliation ${manifestHash}.`);
+      return {
+        status: 'applied',
+        ...resultBase,
+        ...(safeExistsSync(receiptPath) ? { receipt_path: receiptRelative } : {}),
+      };
+    }
+
+    for (const manifestTask of manifest.tasks) {
+      if (!reconciledTaskIds.includes(manifestTask.task_id)) continue;
       appendMissionExecutionLedgerEntry({
         mission_id: missionId,
         mission_path_hint: missionPath,
@@ -476,8 +494,26 @@ export async function reconcileMissionExistingWork(input: {
         },
       });
     }
+    for (const repairTaskId of resultBase.auto_completed_repair_task_ids) {
+      appendMissionExecutionLedgerEntry({
+        mission_id: missionId,
+        mission_path_hint: missionPath,
+        event_type: 'existing_work_reconciliation_repair_completed',
+        task_id: repairTaskId,
+        actor_id: manifest.adopted_by,
+        actor_type: 'human',
+        decision: 'All finish-exit repair dependencies are terminal.',
+        evidence: manifest.tasks.flatMap((task) => task.evidence.map((entry) => entry.path)),
+        payload: {
+          manifest_sha256: manifestHash,
+          source_commit: manifest.source.commit,
+        },
+      });
+    }
 
-    safeWriteFile(nodePath.join(missionPath, 'NEXT_TASKS.json'), JSON.stringify(tasks, null, 2));
+    if (reconciledTaskIds.length > 0 || resultBase.auto_completed_repair_task_ids.length > 0) {
+      safeWriteFile(nodePath.join(missionPath, 'NEXT_TASKS.json'), JSON.stringify(tasks, null, 2));
+    }
     const receipt: MissionWorkReconciliationResult & { adopted_at: string; reason: string } = {
       status: 'applied',
       ...resultBase,
