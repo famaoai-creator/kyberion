@@ -1,0 +1,94 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/artifact-review-receipt.schema.json",
+  "title": "Artifact Review Receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "version",
+    "review_id",
+    "mission_id",
+    "review_task_id",
+    "review_target_task_id",
+    "artifact",
+    "reviewer",
+    "verdict",
+    "findings",
+    "acceptance_criteria",
+    "reviewed_at"
+  ],
+  "properties": {
+    "kind": { "const": "artifact-review-receipt" },
+    "version": { "const": "1.0.0" },
+    "review_id": { "type": "string", "minLength": 1 },
+    "mission_id": { "type": "string", "minLength": 1 },
+    "review_task_id": { "type": "string", "minLength": 1 },
+    "review_target_task_id": { "type": "string", "minLength": 1 },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "kind"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "kind": { "type": "string", "enum": ["doc", "deck", "code", "media"] }
+      }
+    },
+    "reviewer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "agent_id",
+        "team_role",
+        "specialist_roles",
+        "independent_from",
+        "independence_verified"
+      ],
+      "properties": {
+        "agent_id": { "type": "string", "minLength": 1 },
+        "team_role": { "type": "string", "enum": ["reviewer", "qa"] },
+        "specialist_roles": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "independent_from": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "independence_verified": { "type": "boolean" }
+      }
+    },
+    "verdict": {
+      "type": "string",
+      "enum": ["approved", "changes_requested", "rejected"]
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["severity", "category", "description"],
+        "properties": {
+          "severity": { "type": "string", "enum": ["blocking", "suggestion"] },
+          "category": { "type": "string", "minLength": 1 },
+          "description": { "type": "string", "minLength": 1 },
+          "required_action": { "type": "string", "minLength": 1 },
+          "location": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "acceptance_criteria": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "reviewed_at": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{3})?Z$"
+    }
+  }
+}

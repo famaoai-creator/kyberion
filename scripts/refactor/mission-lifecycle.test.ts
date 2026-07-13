@@ -12,6 +12,7 @@ vi.mock('@agent/core', async () => {
 import {
   customerResolver,
   emitIntentSnapshot,
+  hashArtifactForReview,
   pathResolver,
   safeExec,
   safeExistsSync,
@@ -31,6 +32,13 @@ import {
 
 const missionId = 'MSN-LIFECYCLE-GATE-001';
 const missionPath = pathResolver.missionDir(missionId, 'public');
+
+interface MissionTaskSnapshot {
+  task_id?: string;
+  status?: string;
+  artifact_review_receipt?: string;
+  last_review_invalidation?: { reason?: string };
+}
 
 function prepareMissionState(
   status: 'completed' | 'distilling' | 'active' = 'completed',
@@ -187,7 +195,7 @@ describe('mission lifecycle finish gate', () => {
     expect(nextTasks.some((task: any) => task.task_id === 'repair-intent-drift')).toBe(true);
   });
 
-  it('keeps a mission in validating when pending tasks remain, then realigns on repeated failure', async () => {
+  it('resumes existing pending work without creating a synthetic finish repair loop', async () => {
     prepareMissionState('completed');
     safeWriteFile(
       `${missionPath}/NEXT_TASKS.json`,
@@ -220,37 +228,27 @@ describe('mission lifecycle finish gate', () => {
     let state = JSON.parse(
       safeReadFile(`${missionPath}/mission-state.json`, { encoding: 'utf8' }) as string
     );
-    expect(state.status).toBe('validating');
+    expect(state.status).toBe('active');
     expect(state.context.mission_finish_gate_failure_count).toBe(1);
     const nextTasksAfterFirstFailure = JSON.parse(
       safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }) as string
-    );
-    expect(
-      nextTasksAfterFirstFailure.some((task: any) => task.task_id === 'repair-finish-exit')
-    ).toBe(true);
+    ) as MissionTaskSnapshot[];
+    expect(nextTasksAfterFirstFailure.map((task) => task.task_id)).toEqual(['task-1']);
 
     await finishMission(missionId, false, args);
     state = JSON.parse(
       safeReadFile(`${missionPath}/mission-state.json`, { encoding: 'utf8' }) as string
     );
     expect(state.status).toBe('active');
-    expect(state.context.mission_finish_gate_failure_count).toBe(2);
+    expect(state.context.mission_finish_gate_failure_count).toBe(1);
     expect(state.context.mission_finish_gate_last_reason).toContain('Pending tasks remain');
     expect(safeExistsSync(`${missionPath}/gates`)).toBe(true);
     const gateFiles = safeReaddir(`${missionPath}/gates`);
     expect(gateFiles.some((name: string) => name.startsWith('finish-exit-'))).toBe(true);
-    const nextTasksAfterSecondFailure = JSON.parse(
+    const nextTasksAfterSecondAttempt = JSON.parse(
       safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }) as string
-    );
-    expect(
-      nextTasksAfterSecondFailure.filter((task: any) => task.task_id === 'repair-finish-exit')
-    ).toHaveLength(1);
-    expect(
-      nextTasksAfterSecondFailure.find(
-        (task: { task_id?: string; dependencies?: string[] }) =>
-          task.task_id === 'repair-finish-exit'
-      )?.dependencies
-    ).not.toContain('repair-finish-exit');
+    ) as MissionTaskSnapshot[];
+    expect(nextTasksAfterSecondAttempt.map((task) => task.task_id)).toEqual(['task-1']);
   });
 
   it('closes system repair and goal-gap tasks after dependencies and evidence are complete', () => {
@@ -514,7 +512,7 @@ describe('mission lifecycle finish gate', () => {
     expect(state.context.mission_finish_gate_failure_count).toBe(failureCount);
   });
 
-  it('creates a repair task when finish quality validation fails', async () => {
+  it('pauses for operator action when lifecycle bookkeeping fails quality validation', async () => {
     prepareMissionState('completed', undefined, undefined, {
       requested_result: 'Mission closeout complete.',
       success_criteria: ['The closeout note is saved'],
@@ -561,15 +559,111 @@ describe('mission lifecycle finish gate', () => {
     const updatedState = JSON.parse(
       safeReadFile(`${missionPath}/mission-state.json`, { encoding: 'utf8' }) as string
     );
-    expect(updatedState.status).toBe('validating');
+    expect(updatedState.status).toBe('paused');
     expect(updatedState.context.mission_finish_gate_last_reason).toContain('latest_commit');
+    expect(updatedState.context.mission_finish_gate_requires_operator).toBe(true);
     const nextTasks = JSON.parse(
       safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }) as string
-    );
-    expect(nextTasks.some((task: any) => task.task_id === 'repair-finish-quality')).toBe(true);
+    ) as MissionTaskSnapshot[];
+    expect(nextTasks.some((task) => task.task_id === 'repair-finish-quality')).toBe(false);
     expect(safeExistsSync(`${missionPath}/gates`)).toBe(true);
     const gateFiles = safeReaddir(`${missionPath}/gates`);
     expect(gateFiles.some((name: string) => name.startsWith('finish-quality-'))).toBe(true);
+  });
+
+  it('reopens only the invalidated artifact review task when its artifact hash changes', async () => {
+    prepareMissionState('completed');
+    const artifactPath = `${missionPath}/deliverables/reviewed.md`;
+    const receiptPath = `${missionPath}/evidence/reviews/review-content-r1.json`;
+    safeMkdir(path.dirname(artifactPath), { recursive: true });
+    safeMkdir(path.dirname(receiptPath), { recursive: true });
+    safeWriteFile(artifactPath, '# Reviewed content');
+    const artifactReference = pathResolver.toRepoRelative(artifactPath);
+    const reviewedHash = hashArtifactForReview(artifactPath);
+    safeWriteFile(
+      receiptPath,
+      JSON.stringify(
+        {
+          kind: 'artifact-review-receipt',
+          version: '1.0.0',
+          review_id: 'review-content-r1',
+          mission_id: missionId,
+          review_task_id: 'review-content',
+          review_target_task_id: 'implementation',
+          artifact: { path: artifactReference, sha256: reviewedHash, kind: 'doc' },
+          reviewer: {
+            agent_id: 'independent-reviewer',
+            team_role: 'reviewer',
+            specialist_roles: ['content-reviewer'],
+            independent_from: ['implementation-agent'],
+            independence_verified: true,
+          },
+          verdict: 'approved',
+          findings: [],
+          acceptance_criteria: ['The artifact content is acceptable.'],
+          reviewed_at: '2026-07-13T00:00:00.000Z',
+        },
+        null,
+        2
+      )
+    );
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify(
+        [
+          {
+            task_id: 'implementation',
+            status: 'completed',
+            assigned_to: { role: 'implementer', agent_id: 'implementation-agent' },
+            deliverable: 'deliverables/reviewed.md',
+          },
+          {
+            task_id: 'review-content',
+            status: 'completed',
+            assigned_to: { role: 'reviewer', agent_id: 'independent-reviewer' },
+            review_target: 'implementation',
+            artifact_review_receipt: 'evidence/reviews/review-content-r1.json',
+            artifact_review_profile: {
+              artifact_path: artifactReference,
+              artifact_sha256: reviewedHash,
+              required_reviewer_roles: ['content-reviewer'],
+              independence_required: true,
+              implementer_agent_ids: ['implementation-agent'],
+            },
+          },
+        ],
+        null,
+        2
+      )
+    );
+    safeWriteFile(artifactPath, '# Content changed after review');
+    const args = {
+      archiveDir: pathResolver.rootResolve('active/shared/tmp/mission-archives'),
+      agentRuntimeEventPath: `${missionPath}/runtime-events.jsonl`,
+      getGitHash: (cwd: string) => safeExec('git', ['rev-parse', 'HEAD'], { cwd }).trim(),
+      sealMission: async () => undefined,
+      syncProjectLedgerIfLinked: async () => undefined,
+      transitionStatus,
+    };
+
+    await finishMission(missionId, false, args);
+
+    const updatedState = JSON.parse(
+      safeReadFile(`${missionPath}/mission-state.json`, { encoding: 'utf8' }) as string
+    );
+    const tasks = JSON.parse(
+      safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }) as string
+    ) as MissionTaskSnapshot[];
+    expect(updatedState.status).toBe('active');
+    expect(tasks.find((task) => task.task_id === 'implementation')?.status).toBe('completed');
+    const reviewTask = tasks.find((task) => task.task_id === 'review-content');
+    expect(reviewTask).toBeDefined();
+    expect(reviewTask?.status).toBe('planned');
+    expect(reviewTask?.artifact_review_receipt).toBeUndefined();
+    expect(reviewTask?.last_review_invalidation?.reason).toContain(
+      'invalidated by artifact change'
+    );
+    expect(tasks.some((task) => task.task_id === 'repair-finish-quality')).toBe(false);
   });
 
   it('publishes meeting_facilitation deliverables into the active customer root on finish', async () => {

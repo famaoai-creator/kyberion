@@ -21,6 +21,15 @@ import {
   renderStructuredOutputSchemaPrompt,
 } from './structured-output-contracts.js';
 import { evaluateMissionGate, type MissionGateDefinition } from './mission-gate-engine.js';
+import {
+  resolveArtifactReviewerProfile,
+  type ArtifactReviewerProfile,
+} from './mission-review-gates.js';
+import {
+  hashArtifactForReview,
+  inferArtifactReviewKind,
+  type ArtifactReviewReceipt,
+} from './artifact-review.js';
 import { draftRefine } from './draft-refine.js';
 import {
   ensureMissionTeamRuntimeViaSupervisor,
@@ -191,6 +200,12 @@ interface PlannedNextTask {
   estimated_scope?: 'S' | 'M' | 'L';
   review_target?: string;
   review_round?: number;
+  artifact_review_profile?: ArtifactReviewerProfile & {
+    artifact_path?: string;
+    artifact_sha256?: string;
+    implementer_agent_ids: string[];
+  };
+  artifact_review_receipt?: string;
   last_result?: TaskResultBlock;
   review_findings?: Array<{
     severity: 'must_fix' | 'should_fix' | 'nit';
@@ -331,6 +346,15 @@ function validatePlannedNextTasks(rawTasks: unknown, missionId: string): Planned
       ...(typeof task.review_round === 'number' && Number.isFinite(task.review_round)
         ? { review_round: task.review_round }
         : {}),
+      ...(task.artifact_review_profile && typeof task.artifact_review_profile === 'object'
+        ? {
+            artifact_review_profile:
+              task.artifact_review_profile as PlannedNextTask['artifact_review_profile'],
+          }
+        : {}),
+      ...(typeof task.artifact_review_receipt === 'string' && task.artifact_review_receipt.trim()
+        ? { artifact_review_receipt: task.artifact_review_receipt.trim() }
+        : {}),
       ...(task.last_result && typeof task.last_result === 'object'
         ? { last_result: task.last_result as PlannedNextTask['last_result'] }
         : {}),
@@ -463,6 +487,14 @@ function missionClassOf(missionId: string): string | undefined {
   return missionClass || undefined;
 }
 
+function missionRiskProfileOf(missionId: string): string | undefined {
+  const state = loadMissionStateSnapshot(missionId);
+  const riskProfile = String(
+    (state?.classification as Record<string, unknown> | undefined)?.risk_profile || ''
+  ).trim();
+  return riskProfile || undefined;
+}
+
 interface DispatchMissionTaskOutcome {
   task_id: string;
   team_role: string;
@@ -502,6 +534,169 @@ function resolveReviewTargetForTask(task: PlannedNextTask): string | undefined {
   const deliverable = String(task.deliverable || '').trim();
   const match = deliverable.match(/(?:^|\/)REVIEW-(.+)\.md$/u);
   return match?.[1] ? match[1] : undefined;
+}
+
+function resolveReviewArtifact(input: {
+  missionId: string;
+  reviewTask: PlannedNextTask;
+  tasks: PlannedNextTask[];
+}): {
+  targetTask: PlannedNextTask;
+  absolutePath?: string;
+  repositoryPath?: string;
+  kind: 'doc' | 'deck' | 'code' | 'media';
+  sha256?: string;
+  implementerAgentIds: string[];
+} | null {
+  const reviewTarget = resolveReviewTargetForTask(input.reviewTask);
+  if (!reviewTarget) return null;
+  const targetTask = input.tasks.find((task) => task.task_id === reviewTarget);
+  if (!targetTask) return null;
+  const missionPath = missionDir(input.missionId, 'public');
+  const diffPath = nodePath.join(missionPath, 'evidence', 'prs', reviewTarget, 'diff.patch');
+  const resultArtifacts = (targetTask.last_result?.artifacts || [])
+    .map((artifact) => String(artifact?.path || '').trim())
+    .filter(Boolean);
+  const candidates = [
+    diffPath,
+    ...resultArtifacts,
+    String(targetTask.target_path || '').trim(),
+    String(targetTask.deliverable || '').trim(),
+  ].filter(Boolean);
+  let absolutePath: string | undefined;
+  for (const candidate of candidates) {
+    const possiblePaths = nodePath.isAbsolute(candidate)
+      ? [candidate]
+      : [nodePath.join(missionPath, candidate), pathResolver.rootResolve(candidate)];
+    absolutePath = possiblePaths.find((possible) => safeExistsSync(possible));
+    if (absolutePath) break;
+  }
+  const kind = inferArtifactReviewKind(
+    String(targetTask.target_path || targetTask.deliverable || absolutePath || '')
+  );
+  const targetRole = String(targetTask.assigned_to?.role || '').trim();
+  const resolvedAgent =
+    targetRole && !targetTask.assigned_to?.agent_id
+      ? resolveMissionTeamReceiver({ missionId: input.missionId, teamRole: targetRole })?.agent_id
+      : undefined;
+  const implementerAgentIds = Array.from(
+    new Set(
+      [targetTask.assigned_to?.agent_id, resolvedAgent].filter((value): value is string =>
+        Boolean(value)
+      )
+    )
+  );
+  return {
+    targetTask,
+    ...(absolutePath
+      ? {
+          absolutePath,
+          repositoryPath: pathResolver.toRepoRelative(absolutePath),
+          sha256: hashArtifactForReview(absolutePath),
+        }
+      : {}),
+    kind,
+    implementerAgentIds,
+  };
+}
+
+function prepareArtifactReviewTask(input: {
+  missionId: string;
+  reviewTask: PlannedNextTask;
+  tasks: PlannedNextTask[];
+}): ReturnType<typeof resolveReviewArtifact> {
+  const artifact = resolveReviewArtifact(input);
+  if (!artifact) return null;
+  input.reviewTask.artifact_review_profile = {
+    ...resolveArtifactReviewerProfile({
+      artifactKind: artifact.kind,
+      missionClass: missionClassOf(input.missionId),
+      riskProfile:
+        missionRiskProfileOf(input.missionId) || artifact.targetTask.risk || input.reviewTask.risk,
+    }),
+    ...(artifact.repositoryPath ? { artifact_path: artifact.repositoryPath } : {}),
+    ...(artifact.sha256 ? { artifact_sha256: artifact.sha256 } : {}),
+    implementer_agent_ids: artifact.implementerAgentIds,
+  };
+  return artifact;
+}
+
+function buildArtifactReviewLines(task: PlannedNextTask): string[] {
+  const profile = task.artifact_review_profile;
+  if (!profile) return [];
+  return [
+    '## Artifact quality review mandate',
+    `- Specialist perspectives: ${profile.required_reviewer_roles.join(', ')}`,
+    `- Independence required: ${profile.independence_required}`,
+    profile.implementer_agent_ids.length > 0
+      ? `- Must be independent from: ${profile.implementer_agent_ids.join(', ')}`
+      : '- Implementer identity unavailable; explicitly report any independence uncertainty.',
+    profile.artifact_path ? `- Artifact: ${profile.artifact_path}` : '- Artifact path unavailable.',
+    profile.artifact_sha256 ? `- Artifact SHA-256: ${profile.artifact_sha256}` : '',
+    `- ${profile.rationale}`,
+    '- Try to falsify every acceptance criterion. Report concrete defects rather than affirming the author.',
+    '- Use must_fix only for defects that block acceptance; should_fix and nit do not block completion.',
+    '',
+  ].filter(Boolean);
+}
+
+function persistArtifactReviewReceipt(input: {
+  missionId: string;
+  reviewTask: PlannedNextTask;
+  teamRole: 'reviewer' | 'qa';
+  reviewerAgentId: string;
+  artifact: NonNullable<ReturnType<typeof resolveReviewArtifact>>;
+  findings: Array<{
+    severity: 'must_fix' | 'should_fix' | 'nit';
+    location: string;
+    instruction: string;
+  }>;
+  reviewRound: number;
+}): string | null {
+  const profile = input.reviewTask.artifact_review_profile;
+  if (!profile || !input.artifact.repositoryPath || !input.artifact.sha256) return null;
+  const blocking = input.findings.some((finding) => finding.severity === 'must_fix');
+  const missionPath = missionDir(input.missionId, 'public');
+  const relativePath = `evidence/reviews/${input.reviewTask.task_id}-r${input.reviewRound}.json`;
+  const receiptPath = nodePath.join(missionPath, relativePath);
+  const receipt: ArtifactReviewReceipt = {
+    kind: 'artifact-review-receipt',
+    version: '1.0.0',
+    review_id: `${input.reviewTask.task_id}-r${input.reviewRound}`,
+    mission_id: input.missionId,
+    review_task_id: input.reviewTask.task_id,
+    review_target_task_id: input.artifact.targetTask.task_id,
+    artifact: {
+      path: input.artifact.repositoryPath,
+      sha256: input.artifact.sha256,
+      kind: input.artifact.kind,
+    },
+    reviewer: {
+      agent_id: input.reviewerAgentId,
+      team_role: input.teamRole,
+      specialist_roles: profile.required_reviewer_roles,
+      independent_from: profile.implementer_agent_ids,
+      independence_verified:
+        profile.implementer_agent_ids.length > 0 &&
+        !profile.implementer_agent_ids.includes(input.reviewerAgentId),
+    },
+    verdict: blocking ? 'changes_requested' : 'approved',
+    findings: input.findings.map((finding) => ({
+      severity: finding.severity === 'must_fix' ? 'blocking' : 'suggestion',
+      category: 'artifact_quality',
+      description: finding.instruction,
+      ...(finding.severity === 'must_fix' ? { required_action: finding.instruction } : {}),
+      location: finding.location,
+    })),
+    acceptance_criteria: input.reviewTask.acceptance_criteria?.length
+      ? input.reviewTask.acceptance_criteria
+      : [input.reviewTask.description || `Review ${input.artifact.targetTask.task_id}`],
+    reviewed_at: new Date().toISOString(),
+  };
+  safeMkdir(nodePath.dirname(receiptPath), { recursive: true });
+  safeWriteFile(receiptPath, JSON.stringify(receipt, null, 2));
+  input.reviewTask.artifact_review_receipt = relativePath;
+  return relativePath;
 }
 
 function normalizeReviewFindings(
@@ -749,6 +944,7 @@ function buildTaskExecutionPrompt(input: {
   upstreamResultLines: string[];
   teamSnapshotLines: string[];
   reviewFindingsLines: string[];
+  artifactReviewLines: string[];
   targetPath?: string;
 }): string {
   const lines = [
@@ -779,6 +975,7 @@ function buildTaskExecutionPrompt(input: {
     !(input.reviewFindingsLines.length === 1 && input.reviewFindingsLines[0] === '- none')
       ? ['## Review findings to address', ...input.reviewFindingsLines, '']
       : []),
+    ...input.artifactReviewLines,
     input.missionContextPack,
     '',
     'Return exactly one ```task_result``` block and nothing else structured.',
@@ -1031,10 +1228,19 @@ async function buildTaskDispatchContext(input: {
   ];
   const teamSnapshotLines = buildTeamSnapshotLines(input.allTasks);
   const reviewFindingsLines = buildReviewFindingsLines(input.task);
+  if (input.teamRole === 'reviewer' || input.teamRole === 'qa') {
+    prepareArtifactReviewTask({
+      missionId: input.missionId,
+      reviewTask: input.task,
+      tasks: input.allTasks,
+    });
+  }
+  const artifactReviewLines = buildArtifactReviewLines(input.task);
   const promptSupplementChars =
     upstreamResultLines.join('\n').length +
     teamSnapshotLines.join('\n').length +
     reviewFindingsLines.join('\n').length +
+    artifactReviewLines.join('\n').length +
     256;
   const prompt = buildTaskExecutionPrompt({
     missionId: input.missionId,
@@ -1047,6 +1253,7 @@ async function buildTaskDispatchContext(input: {
     upstreamResultLines,
     teamSnapshotLines,
     reviewFindingsLines,
+    artifactReviewLines,
     targetPath: input.task.target_path || input.task.deliverable,
   });
   const missionContextPackPruningSummary = missionContextPack?.pruning
@@ -1416,18 +1623,44 @@ async function dispatchPlannedMissionTask(input: {
   }
 
   const reviewTarget = resolveReviewTargetForTask(input.task);
+  const isArtifactReview = input.teamRole === 'reviewer' || input.teamRole === 'qa';
   const targetTask =
-    (input.teamRole === 'reviewer' || input.teamRole === 'qa') && reviewTarget
+    isArtifactReview && reviewTarget
       ? input.allTasks.find((task) => task.task_id === reviewTarget)
       : undefined;
+  const reviewArtifact = isArtifactReview
+    ? prepareArtifactReviewTask({
+        missionId: input.missionId,
+        reviewTask: input.task,
+        tasks: input.allTasks,
+      })
+    : null;
+  if (isArtifactReview && targetTask && !reviewArtifact?.absolutePath) {
+    reviewFindings.push({
+      severity: 'must_fix',
+      location: reviewTarget || input.task.task_id,
+      instruction: 'Review target artifact is unavailable for hash-bound quality review.',
+    });
+  }
   const hasMustFixFindings = reviewFindings.some((finding) => finding.severity === 'must_fix');
-  if ((input.teamRole === 'reviewer' || input.teamRole === 'qa') && reviewTarget) {
+  if (isArtifactReview && reviewTarget) {
     input.task.review_findings = reviewFindings;
     const currentReviewRound = Math.max(
       Number(input.task.review_round || 0),
       Number(input.task.rework_count || 0)
     );
     const nextReviewRound = currentReviewRound + 1;
+    if (reviewArtifact?.absolutePath) {
+      persistArtifactReviewReceipt({
+        missionId: input.missionId,
+        reviewTask: input.task,
+        teamRole: input.teamRole as 'reviewer' | 'qa',
+        reviewerAgentId: input.assignment.agent_id,
+        artifact: reviewArtifact,
+        findings: reviewFindings,
+        reviewRound: nextReviewRound,
+      });
+    }
     if (!targetTask) {
       updateWorkItem({
         itemId: claimed.item.item_id,
@@ -2994,7 +3227,61 @@ export async function dispatchMissionNextTasks(
         });
         continue;
       }
-      const assignment = resolveMissionTeamReceiver({ missionId, teamRole });
+      const reviewArtifact =
+        teamRole === 'reviewer' || teamRole === 'qa'
+          ? prepareArtifactReviewTask({ missionId, reviewTask: task, tasks: allTasks })
+          : null;
+      const assignment = resolveMissionTeamReceiver({
+        missionId,
+        teamRole,
+        ...(reviewArtifact && task.artifact_review_profile
+          ? {
+              excludedAgentIds: task.artifact_review_profile.implementer_agent_ids,
+              requiredCapabilities: task.artifact_review_profile.required_reviewer_capabilities,
+            }
+          : {}),
+      });
+      const reviewProfile = task.artifact_review_profile;
+      const reviewerIndependenceFailure =
+        assignment &&
+        reviewProfile?.independence_required &&
+        (reviewProfile.implementer_agent_ids.length === 0 ||
+          reviewProfile.implementer_agent_ids.includes(assignment.agent_id || ''));
+      if (reviewerIndependenceFailure) {
+        task.status = 'blocked';
+        waveMadeProgress = true;
+        const summary =
+          reviewProfile.implementer_agent_ids.length === 0
+            ? 'Artifact review blocked because the implementation agent identity is unavailable.'
+            : `Artifact review blocked because ${assignment.agent_id} also implemented the target artifact.`;
+        emitMissionTaskEvent({
+          event_type: 'task_reviewed',
+          mission_id: missionId,
+          task_id: task.task_id,
+          agent_id: assignment.agent_id || 'mission-orchestration-worker',
+          team_role: teamRole,
+          decision: 'task_reviewed',
+          why: summary,
+          policy_used: 'artifact_review_independence_v1',
+          evidence: reviewProfile.artifact_path ? [reviewProfile.artifact_path] : [],
+          payload: {
+            description: task.description,
+            review_target: resolveReviewTargetForTask(task),
+            implementer_agent_ids: reviewProfile.implementer_agent_ids,
+            required_reviewer_roles: reviewProfile.required_reviewer_roles,
+            reason: 'blocked(reviewer_independence)',
+          },
+        });
+        recordMissionContextTask(missionId, `Blocked artifact review ${task.task_id}`, {
+          summary,
+          next_step: 'assign an independent capable reviewer before retrying the review task',
+          work_item_id: task.task_id,
+          team_role: teamRole,
+          assignee_peer_id: assignment.agent_id || undefined,
+          reason: 'blocked(reviewer_independence)',
+        });
+        continue;
+      }
       // Fill in a routed model hint only when the team plan did not already
       // pin one — plan-level hints stay authoritative (MO-05 shadow routing).
       if (assignment && !assignment.model_hint) {

@@ -71,7 +71,29 @@ type ReviewGateRegistry = {
   };
   gates: GateRecord[];
   mode_rules: ModeRule[];
+  artifact_review?: {
+    defaults: {
+      independence_required: boolean;
+    };
+    profiles: Array<{
+      id: string;
+      artifact_kinds: DeliverableKind[];
+      required_reviewer_roles: string[];
+      required_capabilities?: string[];
+      mission_classes?: string[];
+      risk_profiles?: string[];
+    }>;
+  };
 };
+
+export interface ArtifactReviewerProfile {
+  artifact_kind: DeliverableKind;
+  required_reviewer_roles: string[];
+  required_reviewer_capabilities: string[];
+  matched_profile_ids: string[];
+  independence_required: boolean;
+  rationale: string;
+}
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
@@ -175,6 +197,52 @@ export function resolveMissionReviewDesign(
     rationale: modeRule
       ? `Review mode ${reviewMode} selected by rule ${modeRule.id}.`
       : `Review mode ${reviewMode} selected by registry default.`,
+  };
+}
+
+export function resolveArtifactReviewerProfile(input: {
+  artifactKind: DeliverableKind;
+  missionClass?: MissionClass | string;
+  riskProfile?: MissionRiskProfile | string;
+}): ArtifactReviewerProfile {
+  const registry = loadRegistry();
+  const artifactReview = registry.artifact_review;
+  const missionClass = String(input.missionClass || '').toLowerCase();
+  const rawRisk = String(input.riskProfile || '').toLowerCase();
+  const riskProfile =
+    rawRisk === 'high' || rawRisk === 'critical'
+      ? 'high_stakes'
+      : rawRisk === 'medium'
+        ? 'review_required'
+        : rawRisk || 'low';
+  const profiles = (artifactReview?.profiles || []).filter((profile) => {
+    if (!profile.artifact_kinds.includes(input.artifactKind)) return false;
+    if (profile.mission_classes?.length && !profile.mission_classes.includes(missionClass)) {
+      return false;
+    }
+    if (profile.risk_profiles?.length && !profile.risk_profiles.includes(riskProfile)) {
+      return false;
+    }
+    return true;
+  });
+  const requiredReviewerRoles = Array.from(
+    new Set(profiles.flatMap((profile) => profile.required_reviewer_roles))
+  );
+  const requiredReviewerCapabilities = Array.from(
+    new Set(profiles.flatMap((profile) => profile.required_capabilities || []))
+  );
+  if (requiredReviewerRoles.length === 0) requiredReviewerRoles.push('general-reviewer');
+  if (requiredReviewerCapabilities.length === 0) requiredReviewerCapabilities.push('review');
+  return {
+    artifact_kind: input.artifactKind,
+    required_reviewer_roles: requiredReviewerRoles,
+    required_reviewer_capabilities: requiredReviewerCapabilities,
+    matched_profile_ids: profiles.map((profile) => profile.id),
+    independence_required: artifactReview?.defaults.independence_required ?? true,
+    rationale:
+      profiles.length > 0
+        ? `Artifact review profiles matched: ${profiles.map((profile) => profile.id).join(', ')}.`
+        : 'No specialized artifact review profile matched; general reviewer required.',
   };
 }
 

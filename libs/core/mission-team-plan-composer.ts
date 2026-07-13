@@ -435,12 +435,71 @@ export function getMissionTeamAssignment(
 export function resolveMissionTeamReceiver(input: {
   missionId: string;
   teamRole: string;
+  excludedAgentIds?: string[];
+  requiredCapabilities?: string[];
 }): MissionTeamAssignment | null {
   const plan = loadMissionTeamPlan(input.missionId);
   if (!plan) return null;
   const assignment = getMissionTeamAssignment(plan, input.teamRole);
   if (!assignment || assignment.status !== 'assigned' || !assignment.agent_id) return null;
-  return assignment;
+  const excludedAgentIds = new Set(
+    (input.excludedAgentIds || []).map((entry) => entry.trim().toLowerCase()).filter(Boolean)
+  );
+  const requiredCapabilities = Array.from(
+    new Set(
+      (input.requiredCapabilities || []).map((entry) => entry.trim().toLowerCase()).filter(Boolean)
+    )
+  );
+  if (excludedAgentIds.size === 0 && requiredCapabilities.length === 0) return assignment;
+
+  const agents = loadAgentProfileIndex();
+  const currentProfile = agents[assignment.agent_id];
+  const currentCapabilities = new Set(
+    (currentProfile?.capabilities || []).map((entry) => entry.trim().toLowerCase())
+  );
+  if (
+    !excludedAgentIds.has(assignment.agent_id.toLowerCase()) &&
+    requiredCapabilities.every((capability) => currentCapabilities.has(capability))
+  ) {
+    return assignment;
+  }
+
+  const roleRecord = loadTeamRoleIndex()[input.teamRole];
+  if (!roleRecord) return null;
+  const eligibleAgents = Object.fromEntries(
+    Object.entries(agents).filter(([agentId]) => !excludedAgentIds.has(agentId.toLowerCase()))
+  );
+  const selected = selectAgentForTeamRole(
+    input.teamRole,
+    {
+      ...roleRecord,
+      required_capabilities: Array.from(
+        new Set([...(roleRecord.required_capabilities || []), ...requiredCapabilities])
+      ),
+    },
+    loadAuthorityRoleIndex(),
+    eligibleAgents,
+    assignment.model_hint
+  );
+  if (selected.status !== 'assigned' || !selected.agent_id) return null;
+  const selectedCapabilities = new Set(
+    (eligibleAgents[selected.agent_id]?.capabilities || []).map((entry) =>
+      entry.trim().toLowerCase()
+    )
+  );
+  if (!requiredCapabilities.every((capability) => selectedCapabilities.has(capability))) {
+    return null;
+  }
+  return enrichAssignmentContext({
+    assignment: {
+      ...selected,
+      model_hint: assignment.model_hint,
+    },
+    missionId: plan.mission_id,
+    tier: plan.tier as 'personal' | 'confidential' | 'public',
+    tenantId: plan.organization_profile?.organization_id || 'default',
+    risk: plan.mission_classification?.risk_profile || 'low',
+  });
 }
 
 export type {
