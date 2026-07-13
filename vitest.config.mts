@@ -62,6 +62,9 @@ export default defineConfig({
       '**/docs/**',
       '**/knowledge/**',
       '**/.pnpm-store/**',
+      // Not in pnpm-workspace.yaml's packages list - archived code kept for
+      // reference, with no guaranteed-valid tsconfig for vitest to resolve.
+      '**/retired/**',
     ],
     // Process-isolated workers: many suites mutate process.env
     // (KYBERION_ROOT tmp roots, MISSION_ROLE, personas). worker_threads share
