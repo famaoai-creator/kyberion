@@ -193,9 +193,9 @@ describe('mission work item dispatch', () => {
     });
     const delegateTask = vi.fn(async () =>
       makeTaskResultText({
-        summary: 'Reviewed the reconciled implementation; no blocking defects remain.',
+        summary: 'Reviewed the reconciled implementation and recorded the structured verdict.',
         artifacts: [{ path: 'evidence/REVIEW-implementation.md', kind: 'markdown' }],
-        verification_done: ['no blocking defects remain'],
+        verification_done: ['Checked the current artifact hash and regression tests.'],
         gaps: [],
         needs: [],
         review_findings: [],
@@ -214,6 +214,9 @@ describe('mission work item dispatch', () => {
       artifact_review_receipt: expect.stringMatching(/^evidence\/reviews\//u),
       assignee_peer_id: 'implementation-architect',
     });
+    expect(manifest.records[0].notes.join('\n')).toContain(
+      'acceptance criteria satisfied by approved artifact review receipt'
+    );
     const delegateCall = delegateTask.mock.calls[0] as unknown as [string];
     const prompt = String(delegateCall?.[0] || '');
     expect(prompt).toContain('deliverables/reconciled.ts');

@@ -1024,6 +1024,10 @@ async function reflectTicketOutcome(input: {
   reviewerStatus?: 'approved' | 'refuted' | 'blocked';
   reviewerPath?: string;
   reviewerExcerpt?: string;
+  artifactReviewReceipt?: {
+    relativePath: string;
+    receipt: ArtifactReviewReceipt;
+  };
   executionMode: 'agent' | 'subagent';
   taskModelHint?: TaskModelHint;
 }): Promise<{
@@ -1044,6 +1048,9 @@ async function reflectTicketOutcome(input: {
     responseText: input.responseText,
     responseExcerpt: input.responseExcerpt,
   });
+  const approvedArtifactReview = input.artifactReviewReceipt?.receipt.verdict === 'approved';
+  const acceptanceSatisfied = acceptanceCheck.satisfied || approvedArtifactReview;
+  const acceptanceMissing = approvedArtifactReview ? [] : acceptanceCheck.missing;
   const fastTierVerificationSatisfied =
     !isFastTierTaskModelHint(input.taskModelHint) ||
     ((input.taskResult?.verification_done?.length || 0) > 0 &&
@@ -1052,18 +1059,18 @@ async function reflectTicketOutcome(input: {
   if (!fastTierVerificationSatisfied) {
     notes.push('fast-tier verification incomplete');
   }
-  if (!acceptanceCheck.satisfied) {
-    notes.push(`acceptance criteria not met: ${acceptanceCheck.missing.join('; ')}`);
+  if (approvedArtifactReview && !acceptanceCheck.satisfied) {
+    notes.push(
+      `acceptance criteria satisfied by approved artifact review receipt: ${input.artifactReviewReceipt?.relativePath}`
+    );
+  } else if (!acceptanceSatisfied) {
+    notes.push(`acceptance criteria not met: ${acceptanceMissing.join('; ')}`);
   }
   if (!taskId) {
     notes.push('missing task_id for ticket reflection');
     return {
       ticketState: deriveTicketState(
-        acceptanceCheck.satisfied
-          ? input.finalStatus
-          : input.responseText.trim()
-            ? 'review'
-            : 'blocked',
+        acceptanceSatisfied ? input.finalStatus : input.responseText.trim() ? 'review' : 'blocked',
         notes
       ),
       reflectionPath: '',
@@ -1072,7 +1079,7 @@ async function reflectTicketOutcome(input: {
   }
 
   const effectiveFinalStatus =
-    acceptanceCheck.satisfied && fastTierVerificationSatisfied
+    acceptanceSatisfied && fastTierVerificationSatisfied
       ? input.finalStatus
       : input.responseText.trim()
         ? 'review'
@@ -1119,8 +1126,8 @@ async function reflectTicketOutcome(input: {
     cognitive_route_summary: cognitiveRouteSummary,
     drift_watchdog_summary: input.driftWatchdogSummary,
     acceptance_criteria: acceptanceCriteria,
-    acceptance_criteria_satisfied: acceptanceCheck.satisfied,
-    acceptance_criteria_missing: acceptanceCheck.missing,
+    acceptance_criteria_satisfied: acceptanceSatisfied,
+    acceptance_criteria_missing: acceptanceMissing,
     clarification_packet: input.clarificationPacket,
     clarification_packet_path: input.clarificationPacketPath,
     execution_mode: input.executionMode,
@@ -1163,8 +1170,8 @@ async function reflectTicketOutcome(input: {
       cognitive_route: cognitiveRouteSummary,
       drift_watchdog_summary: input.driftWatchdogSummary,
       acceptance_criteria: acceptanceCriteria,
-      acceptance_criteria_satisfied: acceptanceCheck.satisfied,
-      acceptance_criteria_missing: acceptanceCheck.missing,
+      acceptance_criteria_satisfied: acceptanceSatisfied,
+      acceptance_criteria_missing: acceptanceMissing,
       reviewer_status: input.reviewerStatus,
       reviewer_path: input.reviewerPath,
       reviewer_excerpt: input.reviewerExcerpt,
@@ -2351,6 +2358,7 @@ async function dispatchMissionWorkItemsRound(
       reviewerStatus: record.reviewer_status,
       reviewerPath: record.reviewer_path,
       reviewerExcerpt: record.reviewer_excerpt,
+      artifactReviewReceipt: artifactReviewReceipt || undefined,
       taskResult: response.taskResult,
       clarificationPacket,
       clarificationPacketPath,
