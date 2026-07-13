@@ -4,7 +4,6 @@ import mammoth from 'mammoth';
 import Tesseract from 'tesseract.js';
 import { safeWriteFile, safeReadFile, safeUnlink, pathResolver } from '@agent/core';
 import AdmZip from 'adm-zip';
-// @ts-ignore
 import * as PDFJS from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { distillPdfDesign, distillPptxDesign } from '@agent/core/media-contracts';
 import { distillExcelDesign } from '@agent/shared-media';
@@ -161,11 +160,17 @@ async function processPDF(buffer: Buffer, mode: ExtractionMode, result: Extracti
   }
 }
 
+// mammoth's bundled .d.ts predates its own convertToMarkdown export (present in
+// lib/index.js since 1.x) — augment locally instead of losing type coverage on
+// the whole module.
+type MammothWithMarkdown = typeof mammoth & {
+  convertToMarkdown: (input: { buffer: Buffer }) => Promise<{ value: string; messages: unknown[] }>;
+};
+
 async function processDocx(buffer: Buffer, mode: ExtractionMode, result: ExtractionResult) {
   if (mode === 'content' || mode === 'all') {
     try {
-      // @ts-ignore
-      const data = await mammoth.convertToMarkdown({ buffer });
+      const data = await (mammoth as MammothWithMarkdown).convertToMarkdown({ buffer });
       result.layers.content = data.value;
     } catch (_) {
       const data = await mammoth.extractRawText({ buffer });

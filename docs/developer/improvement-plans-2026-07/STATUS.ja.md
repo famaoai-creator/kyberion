@@ -1,6 +1,6 @@
 # 改善計画 実装状況正本(STATUS)
 
-> **監査日**: 2026-07-05(全93計画を実コードと突き合わせて検証)/ 2026-07-06 MO-01 を DONE に更新 / 2026-07-11 IP-07・AA-02 行の陳腐化を再突合で訂正 / 同日 TODO 全18行を機械突合し 11 ID(SA-03/OP-01/IL-01/02/03/05/AO-04/AA-04/CO-01〜04)を PARTIAL へ訂正(実装+緑テストを確認。KM-02/DS-04/HO-02/CO-05/AC-05/IP-10 は真に未了と再確認)/ 2026-07-12 SA-02 行の陳腐化を再突合で訂正(残とされた3点は実装済み・19テスト緑を確認)/ 2026-07-13 DS-01・UX-05 を DONE に更新(UI/UX governance audit、CI/validate、operator surface token 化を実証)/ 同日 IP-09 を DONE に更新(残 slugify 6箇所の正本化+再発防止文書化)
+> **監査日**: 2026-07-05(全93計画を実コードと突き合わせて検証)/ 2026-07-06 MO-01 を DONE に更新 / 2026-07-11 IP-07・AA-02 行の陳腐化を再突合で訂正 / 同日 TODO 全18行を機械突合し 11 ID(SA-03/OP-01/IL-01/02/03/05/AO-04/AA-04/CO-01〜04)を PARTIAL へ訂正(実装+緑テストを確認。KM-02/DS-04/HO-02/CO-05/AC-05/IP-10 は真に未了と再確認)/ 2026-07-12 SA-02 行の陳腐化を再突合で訂正(残とされた3点は実装済み・19テスト緑を確認)/ 2026-07-13 DS-01・UX-05 を DONE に更新(UI/UX governance audit、CI/validate、operator surface token 化を実証)/ 同日 IP-09 を DONE に更新(残 slugify 6箇所の正本化+再発防止文書化)/ 同日 IP-11 の Task 3(@ts-ignore 6箇所解消)完了を反映(PARTIAL のまま、残タスクは別増分) / 同日 MO-08 を DONE に更新(hash-bound 成果物 review、独立 reviewer routing、reconcile/finish の品質 gate 分離を実証) / 2026-07-14 AC-06 を DONE に更新(陳腐化していた能力境界表を生成元スクリプトへ追加し再生成、GLOSSARY 断リンク解消)/ 同日 CO-01 を DONE に更新(getGoldenRule のテナント対応は実装済み・未検証だった — フォールバック経路をテストで固定)
 > **更新規約**: 計画の実装・レビュー完了時に本表を更新する。各計画文書内の「実装状況」節と矛盾する場合は本表を正とし、文書側を追従させる。
 > **判定基準**: DONE = 受入条件を実コードで検証済 / PARTIAL = 一部充足 / TODO = 実質未着手。
 
@@ -8,8 +8,8 @@
 
 | 判定    | 件数 |
 | ------- | ---- |
-| DONE    | 55   |
-| PARTIAL | 38   |
+| DONE    | 57   |
+| PARTIAL | 36   |
 | TODO    | 0    |
 
 ## P0 残作業(プロダクション化のクリティカルパス)
@@ -34,22 +34,22 @@
 
 ### IP(コード品質)
 
-| ID    | 状態    | 残作業(PARTIAL/TODO のみ)                                                                                                                                                                                                                                                                                     |
-| ----- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| IP-01 | DONE    |                                                                                                                                                                                                                                                                                                               |
-| IP-02 | DONE    |                                                                                                                                                                                                                                                                                                               |
-| IP-03 | DONE    |                                                                                                                                                                                                                                                                                                               |
-| IP-04 | DONE    | 2026-07-12 完了: 再監査で「参照ゼロ6本」は陳腐化(大半は manifest の contract_schema 正規参照)。真の未参照2本(ingestion/super-nerve)のみ削除、契約チェック緑。同名別契約の browser-pipeline は二重定義に非ず                                                                                                   |
-| IP-05 | DONE    |                                                                                                                                                                                                                                                                                                               |
-| IP-06 | DONE    |                                                                                                                                                                                                                                                                                                               |
-| IP-07 | PARTIAL | 2026-07-11 突合: backend/orchestrator/operator-learning のテストは実在し緑。残: 受入条件全体との網羅精査                                                                                                                                                                                                      |
-| IP-08 | DONE    | 2026-07-12 完了: 台帳(a32/b49/c13)→ (c) 実バグ根治(tier-guard 破損ポリシー fail-open)、(b) 49箇所 logger.warn、(a)+残余48箇所へ理由コメント、console→logger(除外一覧文書化)、errorHandler の process.exit を throw 化、eslint で no-empty + process.exit 制限を恒久化                                         |
-| IP-09 | DONE    | 2026-07-13 完了: 残っていた slugify ローカル定義6箇所(voice-hub/campaign-suite/modeling-actuator/scripts3本)を正本 `@agent/core` slugify() へ移行(挙動一致をスクリプト検証+回帰テスト2本で確認)。再発防止は EXTENSION_POINTS.md §8 に文書化(retry は識別子が汎用的で lint 誤検知リスクが高いため文書化を採用) |
-| IP-10 | PARTIAL | 2026-07-11: check_contract_schemas から policy/manifest 系46チェック(1,170行)を \_policy_checks へ抽出(4,684→3,527行、check:contract-schemas 実走で同一動作を確認)。残: 同ファイルの継続分割と他の巨大ファイル                                                                                                |
-| IP-11 | PARTIAL | strict 系フラグ有効化、@ts-ignore 残6、media-actuator any 半減                                                                                                                                                                                                                                                |
-| IP-12 | DONE    |                                                                                                                                                                                                                                                                                                               |
-| IP-13 | DONE    |                                                                                                                                                                                                                                                                                                               |
-| IP-14 | DONE    |                                                                                                                                                                                                                                                                                                               |
+| ID    | 状態    | 残作業(PARTIAL/TODO のみ)                                                                                                                                                                                                                                                                                           |
+| ----- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| IP-01 | DONE    |                                                                                                                                                                                                                                                                                                                     |
+| IP-02 | DONE    |                                                                                                                                                                                                                                                                                                                     |
+| IP-03 | DONE    |                                                                                                                                                                                                                                                                                                                     |
+| IP-04 | DONE    | 2026-07-12 完了: 再監査で「参照ゼロ6本」は陳腐化(大半は manifest の contract_schema 正規参照)。真の未参照2本(ingestion/super-nerve)のみ削除、契約チェック緑。同名別契約の browser-pipeline は二重定義に非ず                                                                                                         |
+| IP-05 | DONE    |                                                                                                                                                                                                                                                                                                                     |
+| IP-06 | DONE    |                                                                                                                                                                                                                                                                                                                     |
+| IP-07 | PARTIAL | 2026-07-11 突合: backend/orchestrator/operator-learning のテストは実在し緑。残: 受入条件全体との網羅精査                                                                                                                                                                                                            |
+| IP-08 | DONE    | 2026-07-12 完了: 台帳(a32/b49/c13)→ (c) 実バグ根治(tier-guard 破損ポリシー fail-open)、(b) 49箇所 logger.warn、(a)+残余48箇所へ理由コメント、console→logger(除外一覧文書化)、errorHandler の process.exit を throw 化、eslint で no-empty + process.exit 制限を恒久化                                               |
+| IP-09 | DONE    | 2026-07-13 完了: 残っていた slugify ローカル定義6箇所(voice-hub/campaign-suite/modeling-actuator/scripts3本)を正本 `@agent/core` slugify() へ移行(挙動一致をスクリプト検証+回帰テスト2本で確認)。再発防止は EXTENSION_POINTS.md §8 に文書化(retry は識別子が汎用的で lint 誤検知リスクが高いため文書化を採用)       |
+| IP-10 | PARTIAL | 2026-07-11: check_contract_schemas から policy/manifest 系46チェック(1,170行)を \_policy_checks へ抽出(4,684→3,527行、check:contract-schemas 実走で同一動作を確認)。残: 同ファイルの継続分割と他の巨大ファイル                                                                                                      |
+| IP-11 | PARTIAL | 2026-07-13: Task 3(`@ts-ignore` 6箇所)完了 — 5箇所は死んだ抑制コメントで削除のみ、残1箇所(`mammoth.convertToMarkdown`)は呼び出し箇所限定の型拡張で解消。`ban-ts-comment` を error 化して再発防止。残: Task 2(strict系フラグ段階有効化)、Task 4(media-actuator any 半減)、Task 5(agent-adapter/voice-hub 境界型付け) |
+| IP-12 | DONE    |                                                                                                                                                                                                                                                                                                                     |
+| IP-13 | DONE    |                                                                                                                                                                                                                                                                                                                     |
+| IP-14 | DONE    |                                                                                                                                                                                                                                                                                                                     |
 
 ### QA(ソフトウェア品質ライフサイクル)
 
@@ -70,14 +70,14 @@
 
 ### AC(アクチュエータ能力)
 
-| ID    | 状態    | 残作業                                                                                                                                                                                                            |
-| ----- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| AC-01 | DONE    |                                                                                                                                                                                                                   |
-| AC-02 | PARTIAL | 2026-07-12: browser fill 多段フォールバック(label/placeholder/name + 候補一覧エラー)実装。残: 4系統 reconciled 化の E2E のみ                                                                                      |
-| AC-03 | DONE    |                                                                                                                                                                                                                   |
-| AC-04 | PARTIAL | gws/backend 抽象層(非 macOS 対応)、gws セッションプローブ                                                                                                                                                         |
-| AC-05 | PARTIAL | 2026-07-11: 保存時暗号化を実装(KYBERION_SECRET_ENCRYPTION=keychain、AES-256-GCM+keychain KEK、読込自動判別、pnpm secrets:encrypt/--decrypt、テスト付き)。残: OAuth プリセット拡大、kintone パイロット、age モード |
-| AC-06 | PARTIAL | 能力境界表の実体化(GLOSSARY 断リンク解消)                                                                                                                                                                         |
+| ID    | 状態    | 残作業                                                                                                                                                                                                                                                                                                      |
+| ----- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AC-01 | DONE    |                                                                                                                                                                                                                                                                                                             |
+| AC-02 | PARTIAL | 2026-07-12: browser fill 多段フォールバック(label/placeholder/name + 候補一覧エラー)実装。残: 4系統 reconciled 化の E2E のみ                                                                                                                                                                                |
+| AC-03 | DONE    |                                                                                                                                                                                                                                                                                                             |
+| AC-04 | PARTIAL | gws/backend 抽象層(非 macOS 対応)、gws セッションプローブ                                                                                                                                                                                                                                                   |
+| AC-05 | PARTIAL | 2026-07-11: 保存時暗号化を実装(KYBERION_SECRET_ENCRYPTION=keychain、AES-256-GCM+keychain KEK、読込自動判別、pnpm secrets:encrypt/--decrypt、テスト付き)。残: OAuth プリセット拡大、kintone パイロット、age モード                                                                                           |
+| AC-06 | DONE    | 2026-07-14 完了: 「完了」記載が陳腐化していた能力境界表を `scripts/sync_component_inventory.ts` の生成関数へ追加(直接ファイル編集ではなく生成元へ — 再生成で消えないよう修正)。`GLOSSARY.md#capability-boundaries` の断リンクを解消。副次的に AR-07 の `distill_dom`/`llm_decide` op のガイド反映漏れも解消 |
 
 ### KM(ナレッジ/メモリ)
 
@@ -207,11 +207,11 @@
 
 ### CO(Company OS)
 
-| ID    | 状態    | 残作業                                                                                                                                                                                                                                                                      |
-| ----- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| CO-01 | PARTIAL | 2026-07-11 突合: company.ts と vision-resolver.ts は実装・テスト済み。残: getGoldenRule のテナント対応精査                                                                                                                                                                  |
-| CO-02 | PARTIAL | 2026-07-11 突合: org-chart.ts + テスト実在・緑。残: カスタムロール作成フロー精査                                                                                                                                                                                            |
-| CO-03 | PARTIAL | 2026-07-11 突合: financial-model.ts / okr-tracker.ts + テスト実在・緑。残: 経営判断への接続精査                                                                                                                                                                             |
-| CO-04 | PARTIAL | 2026-07-11 突合: decision-rights.ts + テスト実在・緑。残: 承認ゲート統合精査                                                                                                                                                                                                |
-| CO-05 | PARTIAL | 2026-07-11 突合: カタログに35テンプレート(採用/決算/調達/取締役会/資金調達を完備)+専用契約テスト緑(#490 の負検証はキー名誤り)。残: 受入条件の粒度精査                                                                                                                       |
-| CO-06 | PARTIAL | 2026-07-12 新設・W0〜W5 実装済み(actor-neutral resource / human accountable owner / human-only approval / decision-rights human-final / usage ledger / workforce projection / acceptance→memory promotion guard)。残: 受入条件・成功指標(§8)との網羅突合と warning 期間運用 |
+| ID    | 状態    | 残作業                                                                                                                                                                                                                                                                                       |
+| ----- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CO-01 | DONE    | 2026-07-14 完了: `getGoldenRule` のテナント対応を精査 — `resolveVision()` の `activeCustomer()`(`KYBERION_CUSTOMER`)フォールバックは 2026-07-05 に実装済みだったが検証テストが皆無だった(実装済み・未検証)。フォールバック経路とテナント解決委譲の両方をテストで固定(2ファイル計4テスト追加) |
+| CO-02 | PARTIAL | 2026-07-11 突合: org-chart.ts + テスト実在・緑。残: カスタムロール作成フロー精査                                                                                                                                                                                                             |
+| CO-03 | PARTIAL | 2026-07-11 突合: financial-model.ts / okr-tracker.ts + テスト実在・緑。残: 経営判断への接続精査                                                                                                                                                                                              |
+| CO-04 | PARTIAL | 2026-07-11 突合: decision-rights.ts + テスト実在・緑。残: 承認ゲート統合精査                                                                                                                                                                                                                 |
+| CO-05 | PARTIAL | 2026-07-11 突合: カタログに35テンプレート(採用/決算/調達/取締役会/資金調達を完備)+専用契約テスト緑(#490 の負検証はキー名誤り)。残: 受入条件の粒度精査                                                                                                                                        |
+| CO-06 | PARTIAL | 2026-07-12 新設・W0〜W5 実装済み(actor-neutral resource / human accountable owner / human-only approval / decision-rights human-final / usage ledger / workforce projection / acceptance→memory promotion guard)。残: 受入条件・成功指標(§8)との網羅突合と warning 期間運用                  |
