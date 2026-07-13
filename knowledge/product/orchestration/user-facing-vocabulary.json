@@ -487,6 +487,10 @@
         "en": "needs external assets",
         "ja": "外部素材が必要"
       },
+      "readiness_setup": {
+        "en": "setup required",
+        "ja": "設定が必要"
+      },
       "readiness_runtime": {
         "en": "missing runtime prerequisites",
         "ja": "実行環境が不足"
@@ -531,6 +535,22 @@
         "en": "connecting",
         "ja": "接続中"
       },
+      "connection_pending": {
+        "en": "pending",
+        "ja": "確認待ち"
+      },
+      "connection_blocked": {
+        "en": "blocked",
+        "ja": "要対応"
+      },
+      "connection_missing": {
+        "en": "missing",
+        "ja": "未設定"
+      },
+      "connection_not_applicable": {
+        "en": "not required",
+        "ja": "不要"
+      },
       "connection_degraded": {
         "en": "degraded",
         "ja": "接続品質が低下"
@@ -554,6 +574,10 @@
       "provider_error": {
         "en": "error",
         "ja": "エラー"
+      },
+      "provider_missing": {
+        "en": "missing",
+        "ja": "未導入"
       },
       "mission_planned": {
         "en": "planned",
@@ -582,6 +606,30 @@
       "mission_recovered": {
         "en": "recovered",
         "ja": "復旧"
+      },
+      "mission_paused": {
+        "en": "paused",
+        "ja": "一時停止"
+      },
+      "mission_distilling": {
+        "en": "distilling",
+        "ja": "学習整理中"
+      },
+      "mission_archived": {
+        "en": "archived",
+        "ja": "保管済み"
+      },
+      "runtime_running": {
+        "en": "running",
+        "ja": "稼働中"
+      },
+      "runtime_stale": {
+        "en": "stale",
+        "ja": "応答遅延"
+      },
+      "runtime_stopped": {
+        "en": "stopped",
+        "ja": "停止"
       },
       "cli_readiness": {
         "en": "Readiness",
@@ -770,6 +818,22 @@
       "cli_help_intent": {
         "en": "  intent [--clarify] \"<utterance>\"   Resolve free text into an intent or clarification packet",
         "ja": "  intent [--clarify] \"<発話>\"   自由文を intent または明確化パケットへ解決"
+      },
+      "cli_help_task_summary": {
+        "en": "  task <plan|start> \"<request>\"  Plan a cross-tool task or create a governed task session",
+        "ja": "  task <plan|start> \"<依頼>\"  複数ツールのタスク計画、または governed task session を作成"
+      },
+      "cli_help_task_usage": {
+        "en": "Usage: npm run cli -- task <plan|start> \"<request>\" [--output <path>]",
+        "ja": "使い方: npm run cli -- task <plan|start> \"<依頼>\" [--output <path>]"
+      },
+      "cli_help_task_plan_short": {
+        "en": "  plan   Preview domains, effects, approvals, missing inputs, and evidence without execution",
+        "ja": "  plan   実行せずに対象領域、外部効果、承認、入力不足、Evidence を確認"
+      },
+      "cli_help_task_start_short": {
+        "en": "  start  Save the preview and create a governed task session; external effects remain blocked",
+        "ja": "  start  プレビューを保存して governed task session を作成。外部効果は引き続き停止"
       },
       "cli_help_sec_packets": {
         "en": "── Operator Packets ────────────────────────────────────────────────",

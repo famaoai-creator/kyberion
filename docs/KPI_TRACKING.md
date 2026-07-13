@@ -23,4 +23,4 @@
 2. cap の引き締め(warn → block、金額縮小)は warn での実測分布を確認してから行う(共通作業規約4: 観測→enforce)。
 3. テナント別の商談・請求根拠には `by_mission` を用い、ミッション ↔ テナントの対応は mission メタデータを正とする。
 
-→ 関連: [OP-01 計画](./improvement-plans-2026-07/OP-01_COST_ACCOUNTING.ja.md) · [CO-03 財務 KPI モデル](./improvement-plans-2026-07/CO-03_FINANCIAL_KPI_MODEL.ja.md)
+→ 関連: [OP-01 計画](./developer/improvement-plans-2026-07/OP-01_COST_ACCOUNTING.ja.md) · [CO-03 財務 KPI モデル](./developer/improvement-plans-2026-07/CO-03_FINANCIAL_KPI_MODEL.ja.md)

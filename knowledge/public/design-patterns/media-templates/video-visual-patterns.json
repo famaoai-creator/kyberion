@@ -1,0 +1,236 @@
+{
+  "version": "1.0.0",
+  "description": "Curated visual direction patterns for short-form video. The LLM selects a pattern id per story (never invents colors); the compiler resolves it deterministically. Portrait/landscape typography is pre-tuned per pattern.",
+  "patterns": {
+    "calm-tech": {
+      "name": "Calm Tech",
+      "description": "Dark navy, cool blue accents. Product updates, engineering stories, dashboards.",
+      "mood": "calm-tech",
+      "palette": {
+        "bg": "#0B1020",
+        "panel": "#0b1224",
+        "accent": "#60a5fa",
+        "accent_text": "#bfdbfe",
+        "text": "#f8fafc",
+        "subtext": "#94a3b8"
+      },
+      "typography": {
+        "portrait": {
+          "headline_px": 96,
+          "body_px": 34
+        },
+        "landscape": {
+          "headline_px": 68,
+          "body_px": 23
+        }
+      }
+    },
+    "warm-documentary": {
+      "name": "Warm Documentary",
+      "description": "Warm dark browns with amber accents. Human stories, interviews, retrospectives.",
+      "mood": "warm-documentary",
+      "palette": {
+        "bg": "#1a120b",
+        "panel": "#241a10",
+        "accent": "#f59e0b",
+        "accent_text": "#fde68a",
+        "text": "#fef3c7",
+        "subtext": "#d6bfa3"
+      },
+      "typography": {
+        "portrait": {
+          "headline_px": 100,
+          "body_px": 36
+        },
+        "landscape": {
+          "headline_px": 72,
+          "body_px": 24
+        }
+      }
+    },
+    "bold-pop": {
+      "name": "Bold Pop",
+      "description": "High-energy near-black with vivid pink accents. Announcements, launches, hype shorts.",
+      "mood": "bold-pop",
+      "palette": {
+        "bg": "#12061f",
+        "panel": "#1c0a2e",
+        "accent": "#ec4899",
+        "accent_text": "#fbcfe8",
+        "text": "#fdf4ff",
+        "subtext": "#c4b5fd"
+      },
+      "typography": {
+        "portrait": {
+          "headline_px": 112,
+          "body_px": 38
+        },
+        "landscape": {
+          "headline_px": 80,
+          "body_px": 26
+        }
+      }
+    },
+    "fresh-clarity": {
+      "name": "Fresh Clarity",
+      "description": "Light background with deep green accents. How-to guides, educational explainers.",
+      "mood": "fresh-clarity",
+      "palette": {
+        "bg": "#f8faf7",
+        "panel": "#eef4ec",
+        "accent": "#15803d",
+        "accent_text": "#14532d",
+        "text": "#111827",
+        "subtext": "#4b5563"
+      },
+      "typography": {
+        "portrait": {
+          "headline_px": 92,
+          "body_px": 34
+        },
+        "landscape": {
+          "headline_px": 64,
+          "body_px": 22
+        }
+      }
+    },
+    "midnight-executive": {
+      "name": "Midnight Executive",
+      "description": "Graphite and gold. Business results, strategy briefings, premium positioning.",
+      "mood": "midnight-executive",
+      "palette": {
+        "bg": "#0c0c0f",
+        "panel": "#17171c",
+        "accent": "#d4a843",
+        "accent_text": "#f3e3b3",
+        "text": "#fafaf9",
+        "subtext": "#a8a29e"
+      },
+      "typography": {
+        "portrait": {
+          "headline_px": 96,
+          "body_px": 34
+        },
+        "landscape": {
+          "headline_px": 70,
+          "body_px": 24
+        }
+      }
+    },
+    "sakura-lifestyle": {
+      "name": "Sakura Lifestyle",
+      "description": "Soft light pink and cream. Lifestyle, wellness, community and celebration stories.",
+      "mood": "sakura-lifestyle",
+      "palette": {
+        "bg": "#fdf2f4",
+        "panel": "#fce7eb",
+        "accent": "#db2777",
+        "accent_text": "#831843",
+        "text": "#1f2937",
+        "subtext": "#6b7280"
+      },
+      "typography": {
+        "portrait": {
+          "headline_px": 92,
+          "body_px": 34
+        },
+        "landscape": {
+          "headline_px": 64,
+          "body_px": 22
+        }
+      }
+    },
+    "ocean-depth": {
+      "name": "Ocean Depth",
+      "description": "Deep teal with aqua accents. Research, data stories, environment, exploration.",
+      "mood": "ocean-depth",
+      "palette": {
+        "bg": "#042f2e",
+        "panel": "#0a3d3b",
+        "accent": "#2dd4bf",
+        "accent_text": "#99f6e4",
+        "text": "#f0fdfa",
+        "subtext": "#7ea8a4"
+      },
+      "typography": {
+        "portrait": {
+          "headline_px": 96,
+          "body_px": 34
+        },
+        "landscape": {
+          "headline_px": 68,
+          "body_px": 23
+        }
+      }
+    },
+    "mono-editorial": {
+      "name": "Mono Editorial",
+      "description": "Black-and-white editorial with a single red accent. Opinion pieces, manifestos, bold statements.",
+      "mood": "mono-editorial",
+      "palette": {
+        "bg": "#fafafa",
+        "panel": "#f0f0f0",
+        "accent": "#dc2626",
+        "accent_text": "#7f1d1d",
+        "text": "#0a0a0a",
+        "subtext": "#525252"
+      },
+      "typography": {
+        "portrait": {
+          "headline_px": 104,
+          "body_px": 36
+        },
+        "landscape": {
+          "headline_px": 76,
+          "body_px": 24
+        }
+      }
+    },
+    "citrus-energy": {
+      "name": "Citrus Energy",
+      "description": "Bright warm yellow-orange on cream. Campaigns, events, upbeat product stories.",
+      "mood": "citrus-energy",
+      "palette": {
+        "bg": "#fffbeb",
+        "panel": "#fef3c7",
+        "accent": "#ea580c",
+        "accent_text": "#7c2d12",
+        "text": "#292524",
+        "subtext": "#78716c"
+      },
+      "typography": {
+        "portrait": {
+          "headline_px": 100,
+          "body_px": 36
+        },
+        "landscape": {
+          "headline_px": 72,
+          "body_px": 24
+        }
+      }
+    },
+    "neon-cyber": {
+      "name": "Neon Cyber",
+      "description": "Dark violet with electric cyan. Gaming, AI/tech hype, night-time launches.",
+      "mood": "neon-cyber",
+      "palette": {
+        "bg": "#0f0524",
+        "panel": "#1a0b38",
+        "accent": "#22d3ee",
+        "accent_text": "#a5f3fc",
+        "text": "#f5f3ff",
+        "subtext": "#a78bfa"
+      },
+      "typography": {
+        "portrait": {
+          "headline_px": 108,
+          "body_px": 38
+        },
+        "landscape": {
+          "headline_px": 78,
+          "body_px": 26
+        }
+      }
+    }
+  }
+}

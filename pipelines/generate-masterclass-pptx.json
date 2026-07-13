@@ -1,0 +1,37 @@
+{
+  "id": "generate-masterclass-pptx",
+  "version": "1.0.0",
+  "description": "Generate premium masterclass PPTX via media-actuator pipeline",
+  "steps": [
+    {
+      "name": "Execute Media Sub-Pipeline",
+      "op": "media:pipeline",
+      "params": {
+        "steps": [
+          {
+            "type": "capture",
+            "op": "json_read",
+            "params": {
+              "path": "pipelines/fragments/masterclass_design_protocol.json",
+              "export_as": "last_pptx_design"
+            }
+          },
+          {
+            "type": "apply",
+            "op": "pptx_render",
+            "params": {
+              "path": "active/shared/tmp/all_objects_layout_sample.pptx"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Export to Output Directory",
+      "op": "system:shell",
+      "params": {
+        "command": "mkdir -p active/shared/exports && cp active/shared/tmp/all_objects_layout_sample.pptx active/shared/exports/all_objects_layout_sample.pptx"
+      }
+    }
+  ]
+}

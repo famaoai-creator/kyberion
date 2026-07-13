@@ -6,6 +6,8 @@ import {
 } from './structured-output-contracts.js';
 import { safeExistsSync, safeExec, safeReadFile } from './secure-io.js';
 import { safeWriteFile, safeMkdir } from './secure-io.js';
+import { signA2AContent, verifyA2AContent } from './a2a-envelope-signature.js';
+import { createLogger } from './logger.js';
 import {
   evaluateDeliverableQuality,
   inferDeliverableKind,
@@ -41,6 +43,42 @@ export type MissionGateCheckKind =
   | 'test_traceability'
   | 'quality_release_allowed'
   | 'custom';
+
+const gateLogger = createLogger('mission-gate-engine');
+
+export type GateOverrideSignatureMode = 'warn' | 'enforce';
+
+/** MO-02: staged enforcement for human_override signatures (warn -> enforce). */
+export function resolveGateOverrideSignatureMode(): GateOverrideSignatureMode {
+  return process.env.KYBERION_GATE_OVERRIDE_SIGNATURE === 'enforce' ? 'enforce' : 'warn';
+}
+
+function overrideSignatureContent(gateId: string, approvedBy: string, approvedAt: string): string {
+  return `human_override:${gateId}:${approvedBy}:${approvedAt}`;
+}
+
+/**
+ * Produce signed human_override params for a gate. Operators (or the CLI)
+ * call this so the recorded override carries an HMAC bound to the gate id,
+ * approver, and timestamp — evaluateMissionGate verifies it.
+ */
+export function signHumanOverride(input: {
+  gateId: string;
+  approvedBy: string;
+  approvedAt?: string;
+  reason?: string;
+}): Record<string, unknown> {
+  const approvedAt = input.approvedAt ?? new Date().toISOString();
+  const { signature } = signA2AContent(
+    overrideSignatureContent(input.gateId, input.approvedBy, approvedAt)
+  );
+  return {
+    approved_by: input.approvedBy,
+    approved_at: approvedAt,
+    signature,
+    ...(input.reason ? { reason: input.reason } : {}),
+  };
+}
 
 export interface MissionGateCheck {
   kind: MissionGateCheckKind;
@@ -141,7 +179,10 @@ export function recordMissionGateOverride(input: MissionGateOverrideInput): stri
   });
 }
 
-async function evaluateGateCheck(check: MissionGateCheck): Promise<{
+async function evaluateGateCheck(
+  check: MissionGateCheck,
+  context?: { gateId?: string }
+): Promise<{
   passed: boolean;
   reason?: string;
 }> {
@@ -234,12 +275,36 @@ async function evaluateGateCheck(check: MissionGateCheck): Promise<{
     case 'human_override': {
       const params = check.params || {};
       const allowed = params.allow !== false;
-      return allowed
-        ? { passed: true }
-        : {
-            passed: false,
-            reason: firstString(params.reason, params.message) ?? 'Human override denied.',
-          };
+      if (!allowed) {
+        return {
+          passed: false,
+          reason: firstString(params.reason, params.message) ?? 'Human override denied.',
+        };
+      }
+      // MO-02: overrides must be attributable. warn mode preserves the old
+      // pass-through while logging what enforce would reject.
+      const mode = resolveGateOverrideSignatureMode();
+      const gateId = context?.gateId ?? 'unknown-gate';
+      const approvedBy = firstString(params.approved_by, params.approvedBy);
+      const approvedAt = firstString(params.approved_at, params.approvedAt);
+      const signature = firstString(params.signature);
+      const problem = !approvedBy
+        ? 'human_override is missing approved_by'
+        : !approvedAt
+          ? 'human_override is missing approved_at'
+          : !signature
+            ? 'human_override is missing signature'
+            : !verifyA2AContent(overrideSignatureContent(gateId, approvedBy, approvedAt), signature)
+                  .valid
+              ? 'human_override signature does not verify for this gate/approver/timestamp'
+              : null;
+      if (problem) {
+        if (mode === 'enforce') {
+          return { passed: false, reason: `${problem} (KYBERION_GATE_OVERRIDE_SIGNATURE=enforce)` };
+        }
+        gateLogger.warn(`${problem} — passing in warn mode (gate ${gateId})`);
+      }
+      return { passed: true };
     }
     case 'deliverable_quality': {
       // Deterministic per-kind rubric gate (MO-01/MO-07 seam): reads the
@@ -457,7 +522,7 @@ export async function evaluateMissionGate(input: {
   const checks: MissionGateEvaluation['checks'] = [];
   const reasons: string[] = [];
   for (const check of input.gate.checks) {
-    const result = await evaluateGateCheck(check);
+    const result = await evaluateGateCheck(check, { gateId: input.gate.id });
     checks.push({
       kind: check.kind,
       passed: result.passed,

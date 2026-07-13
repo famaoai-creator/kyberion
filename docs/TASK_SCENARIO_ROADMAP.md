@@ -3,7 +3,7 @@ title: Task Scenario Roadmap
 category: Product
 tags: [taskscenario, roadmap, automation, operations]
 importance: 6
-last_updated: 2026-06-21
+last_updated: 2026-07-13
 ---
 
 # Task Scenario Roadmap
@@ -100,3 +100,19 @@ last_updated: 2026-06-21
 3. `pnpm task:list` の追加
 4. `pnpm task:init` の追加
 5. `pnpm task:run` の追加
+
+# Marketing Workload Track
+
+- Available: domain contract, risk policy, claim/review/approval binding, completion evidence evaluation.
+- Available: local video package, publication review, and YouTube dry-run ADF templates.
+- Available: customer policy, brand, design token, and marketing Mission seed templates.
+- Next: governed production connectors for YouTube/CMS/social, ffprobe-based media inspection, PII/secret scanning, screenshots, analytics ingestion, and UI.
+
+# Cross-tool Productivity Track
+
+- Available: deterministic planning across calendar, meeting, email, document, presentation, browser, and connected-system domains.
+- Available: effect classification (`read`, `draft`, `external_write`, `financial_commit`) with explicit missing-input and approval boundaries.
+- Available: `pnpm cli -- task plan` for read-only previews and `pnpm cli -- task start` for governed Task Session creation.
+- Available: `productivity-task-orchestration.json` dry-run template that emits a review package and receipt with no external effects or network access.
+- Next: bind calendar mutation, meeting participation, email delivery, and browser checkout executors to authenticated approval records and effect payload hashes.
+- Next: add customer-overlay defaults for preferred calendars, meeting providers, service bindings, document themes, and payment limits.

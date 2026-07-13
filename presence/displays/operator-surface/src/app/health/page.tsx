@@ -10,23 +10,31 @@ export default async function HealthPage() {
   return (
     <section>
       <h1 style={{ marginBottom: 4 }}>Health</h1>
-      <p style={{ color: '#9aa0aa', marginTop: 0, fontSize: 13 }}>
-        Mission counts and recent audit volume{scope ? <> for tenant <code>{scope}</code></> : null}.
-        Refreshes on each navigation; no polling.
+      <p style={{ color: 'var(--kb-muted-text)', marginTop: 0, fontSize: 13 }}>
+        Mission counts and recent audit volume
+        {scope ? (
+          <>
+            {' '}
+            for tenant <code>{scope}</code>
+          </>
+        ) : null}
+        . Refreshes on each navigation; no polling.
       </p>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginTop: 12 }}>
-        <Card label="Active missions" value={h.active_missions} accent="#9be3a8" />
-        <Card label="Completed" value={h.completed_missions} accent="#8ec3ff" />
-        <Card label="Failed" value={h.failed_missions} accent="#ff8fa3" />
+      <div
+        style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginTop: 12 }}
+      >
+        <Card label="Active missions" value={h.active_missions} accent="var(--kb-success)" />
+        <Card label="Completed" value={h.completed_missions} accent="var(--kb-accent-text)" />
+        <Card label="Failed" value={h.failed_missions} accent="var(--kb-danger)" />
         <Card
           label="Audit events (24h)"
           value={h.recent_audit_events_24h}
-          accent="#c08eff"
+          accent="var(--kb-accent)"
         />
         <Card
           label="Rubric overrides (lifetime)"
           value={h.recent_override_events}
-          accent="#ffd57e"
+          accent="var(--kb-warning)"
         />
       </div>
 
@@ -53,14 +61,14 @@ function Card({ label, value, accent }: { label: string; value: number; accent: 
   return (
     <div
       style={{
-        background: '#15171c',
+        background: 'var(--kb-surface)',
         borderLeft: `3px solid ${accent}`,
         padding: '12px 16px',
         borderRadius: 4,
       }}
     >
       <div style={{ fontSize: 28, fontWeight: 600, color: accent }}>{value}</div>
-      <div style={{ fontSize: 12, color: '#9aa0aa', marginTop: 4 }}>{label}</div>
+      <div style={{ fontSize: 12, color: 'var(--kb-muted-text)', marginTop: 4 }}>{label}</div>
     </div>
   );
 }

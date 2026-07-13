@@ -396,6 +396,12 @@ Legacy or conceptual capability names are intentionally excluded here. If a comp
 | `setup_passkey_authenticator`  | browser                                                |
 | `while`                        | browser, code, file, modeling, network, system, wisdom |
 
+## Governed Core Workloads
+
+`@agent/core` also exposes the additive marketing workload contract for G0 intake, G1 data classification, G2 claims, G3 video/text/image validation, G4 independent review, G5 shared human approval binding, G6 publication verification, risk-policy resolution, and evidence-aware Mission completion.
+
+The workload composes the existing approval, artifact, media generation, video composition, browser, customer overlay, and Mission evidence capabilities. It does not register a marketing-specific Actuator or grant Strategy, Creative, or Review roles external publication authority.
+
 See also:
 
 - Source manifests: `libs/actuators/*/manifest.json`

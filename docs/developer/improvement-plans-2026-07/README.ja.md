@@ -6,6 +6,7 @@
 > **登録**: [docs/ROADMAP.md](../../ROADMAP.md) §1 に登録済み。
 > **実装状況の正本**: [STATUS.ja.md](./STATUS.ja.md)(2026-07-05 全計画をコード実態と突合して監査)。各計画文書内の記述と矛盾する場合は STATUS を正とする。
 > **最新の横断レビュー**: [REVIEW_CODEX_2026-07-11.ja.md](./REVIEW_CODEX_2026-07-11.ja.md)(UX・拡張性・セキュリティ・運用の再監査と優先バックログ)。
+> **UI/UX 持続運営レビュー**: [UI_UX_DESIGN_SYSTEM_SUSTAINABILITY_PLAN_2026-07-13.ja.md](./UI_UX_DESIGN_SYSTEM_SUSTAINABILITY_PLAN_2026-07-13.ja.md)(DS-01/UX-05 の完了と週次 drift audit)。
 
 ## 1. 目的
 
