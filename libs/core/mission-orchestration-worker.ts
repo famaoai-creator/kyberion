@@ -26,9 +26,9 @@ import {
   type ArtifactReviewerProfile,
 } from './mission-review-gates.js';
 import {
+  buildArtifactReviewReceipt,
   hashArtifactForReview,
   inferArtifactReviewKind,
-  type ArtifactReviewReceipt,
 } from './artifact-review.js';
 import { draftRefine } from './draft-refine.js';
 import {
@@ -670,32 +670,23 @@ function persistArtifactReviewReceipt(input: {
 }): string | null {
   const profile = input.reviewTask.artifact_review_profile;
   if (!profile || !input.artifact.repositoryPath || !input.artifact.sha256) return null;
-  const blocking = input.findings.some((finding) => finding.severity === 'must_fix');
   const missionPath = missionDir(input.missionId, 'public');
   const relativePath = `evidence/reviews/${input.reviewTask.task_id}-r${input.reviewRound}.json`;
   const receiptPath = nodePath.join(missionPath, relativePath);
-  const receipt: ArtifactReviewReceipt = {
-    kind: 'artifact-review-receipt',
-    version: '1.0.0',
-    review_id: `${input.reviewTask.task_id}-r${input.reviewRound}`,
-    mission_id: input.missionId,
-    review_task_id: input.reviewTask.task_id,
-    review_target_task_id: input.artifact.targetTask.task_id,
+  const receipt = buildArtifactReviewReceipt({
+    reviewId: `${input.reviewTask.task_id}-r${input.reviewRound}`,
+    missionId: input.missionId,
+    reviewTaskId: input.reviewTask.task_id,
+    reviewTargetTaskId: input.artifact.targetTask.task_id,
     artifact: {
       path: input.artifact.repositoryPath,
       sha256: input.artifact.sha256,
       kind: input.artifact.kind,
     },
-    reviewer: {
-      agent_id: input.reviewerAgentId,
-      team_role: input.teamRole,
-      specialist_roles: profile.required_reviewer_roles,
-      independent_from: profile.implementer_agent_ids,
-      independence_verified:
-        profile.implementer_agent_ids.length > 0 &&
-        !profile.implementer_agent_ids.includes(input.reviewerAgentId),
-    },
-    verdict: blocking ? 'changes_requested' : 'approved',
+    reviewerAgentId: input.reviewerAgentId,
+    reviewerTeamRole: input.teamRole,
+    specialistRoles: profile.required_reviewer_roles,
+    independentFrom: profile.implementer_agent_ids,
     findings: input.findings.map((finding) => ({
       severity: finding.severity === 'must_fix' ? 'blocking' : 'suggestion',
       category: 'artifact_quality',
@@ -703,11 +694,10 @@ function persistArtifactReviewReceipt(input: {
       ...(finding.severity === 'must_fix' ? { required_action: finding.instruction } : {}),
       location: finding.location,
     })),
-    acceptance_criteria: input.reviewTask.acceptance_criteria?.length
+    acceptanceCriteria: input.reviewTask.acceptance_criteria?.length
       ? input.reviewTask.acceptance_criteria
       : [input.reviewTask.description || `Review ${input.artifact.targetTask.task_id}`],
-    reviewed_at: new Date().toISOString(),
-  };
+  });
   safeMkdir(nodePath.dirname(receiptPath), { recursive: true });
   safeWriteFile(receiptPath, JSON.stringify(receipt, null, 2));
   input.reviewTask.artifact_review_receipt = relativePath;

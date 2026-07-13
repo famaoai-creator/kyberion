@@ -88,6 +88,7 @@ interface PlannedTask {
   risk?: 'low' | 'medium' | 'high' | 'approval_required' | 'high_stakes';
   expected_output_format?: 'text' | 'files' | 'structured';
   estimated_scope?: 'S' | 'M' | 'L';
+  review_target?: string;
   [key: string]: unknown;
 }
 
@@ -352,6 +353,7 @@ export async function dispatchMissionTickets(
           acceptance_criteria: task.acceptance_criteria || [],
           expected_output_format: task.expected_output_format || null,
           dependencies: task.dependencies || [],
+          review_target: task.review_target || null,
           ...(typeof task.phase === 'string' && task.phase ? { phase: task.phase } : {}),
           ...(typeof task.origin === 'string' && task.origin ? { origin: task.origin } : {}),
         },

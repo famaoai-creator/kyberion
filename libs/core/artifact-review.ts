@@ -60,6 +60,21 @@ export interface ArtifactReviewEvaluation {
   review_ids: string[];
 }
 
+export interface ArtifactReviewReceiptInput {
+  reviewId: string;
+  missionId: string;
+  reviewTaskId: string;
+  reviewTargetTaskId: string;
+  artifact: ArtifactReviewBinding & { kind: DeliverableKind };
+  reviewerAgentId: string;
+  reviewerTeamRole: 'reviewer' | 'qa';
+  specialistRoles: string[];
+  independentFrom: string[];
+  findings: ArtifactReviewFinding[];
+  acceptanceCriteria: string[];
+  reviewedAt?: string;
+}
+
 const ajv = new Ajv({ allErrors: true });
 const RECEIPT_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/artifact-review-receipt.schema.json'
@@ -95,6 +110,37 @@ export function inferArtifactReviewKind(path: string): DeliverableKind {
     return 'media';
   }
   return 'doc';
+}
+
+export function buildArtifactReviewReceipt(
+  input: ArtifactReviewReceiptInput
+): ArtifactReviewReceipt {
+  const independentFrom = Array.from(
+    new Set(input.independentFrom.map((agentId) => String(agentId || '').trim()).filter(Boolean))
+  );
+  const findings = input.findings.map((finding) => ({ ...finding }));
+  const blocking = findings.some((finding) => finding.severity === 'blocking');
+  return {
+    kind: 'artifact-review-receipt',
+    version: '1.0.0',
+    review_id: input.reviewId,
+    mission_id: input.missionId,
+    review_task_id: input.reviewTaskId,
+    review_target_task_id: input.reviewTargetTaskId,
+    artifact: { ...input.artifact },
+    reviewer: {
+      agent_id: input.reviewerAgentId,
+      team_role: input.reviewerTeamRole,
+      specialist_roles: Array.from(new Set(input.specialistRoles)),
+      independent_from: independentFrom,
+      independence_verified:
+        independentFrom.length > 0 && !independentFrom.includes(input.reviewerAgentId),
+    },
+    verdict: blocking ? 'changes_requested' : 'approved',
+    findings,
+    acceptance_criteria: [...input.acceptanceCriteria],
+    reviewed_at: input.reviewedAt || new Date().toISOString(),
+  };
 }
 
 export function validateArtifactReviewReceipt(value: unknown): {

@@ -99,7 +99,7 @@
 | MO-05 | DONE    | (軽微: 集計スクリプト)                                                                                                                                                                                                                 |
 | MO-06 | DONE    |                                                                                                                                                                                                                                        |
 | MO-07 | PARTIAL | 2026-07-12: draft→refine エンジン + worker 配線(高リスク文書 deliverable、受入前1パス、KYBERION_DRAFT_REFINE=0 で無効)。task-session 側配線済み(document 出力へ受入前1パス、800字未満/失敗はスキップ)。残: tier 昇格連動(MO-05 と設計) |
-| MO-08 | DONE    | 2026-07-13 完了: hash-bound artifact review receipt、専門 role/capability reviewer routing、worker Evidence、reconcile/finish 再検証、review task 限定 reopen、synthetic finish repair loop 廃止を実装。                               |
+| MO-08 | DONE    | 2026-07-13 完了: hash-bound artifact review receipt、専門 role/capability reviewer routing、通常 dispatch と reconcile の共通 Evidence、finish 再検証、review task 限定 reopen、synthetic finish repair loop 廃止を実装。              |
 
 ### DS(デザインシステム)
 
