@@ -6,13 +6,19 @@
 import * as nodePath from 'node:path';
 import {
   a2aBridge,
+  buildArtifactReviewReceipt,
   executeServicePreset,
   getReasoningBackend,
+  hashArtifactForReview,
+  inferArtifactReviewKind,
   ledger,
+  loadAgentProfileIndex,
   logger,
   pathResolver,
+  resolveArtifactReviewerProfile,
   resolveMissionTeamReceiver,
   safeExistsSync,
+  safeStat,
   listWorkItems,
   updateWorkItem,
   buildCognitiveRouteDecision,
@@ -28,6 +34,9 @@ import {
   resolveTaskModelHint,
   resolveQuestionInteractionPacket,
   type TaskResultBlock,
+  type ArtifactReviewFinding,
+  type ArtifactReviewReceipt,
+  type ArtifactReviewerProfile,
   type CognitiveRouteDecision,
   type A2AMessage,
   type WorkItem,
@@ -95,6 +104,7 @@ export interface MissionWorkItemDispatchRecord {
   reviewer_path?: string;
   reviewer_excerpt?: string;
   reviewer_notes?: string[];
+  artifact_review_receipt?: string;
   drift_watchdog?: Record<string, unknown>;
   drift_watchdog_summary?: string;
   notes: string[];
@@ -155,6 +165,323 @@ function ticketReplyPath(missionPath: string, taskId: string): string {
 
 function missionNextTasksPath(missionPath: string): string {
   return nodePath.join(missionPath, 'NEXT_TASKS.json');
+}
+
+interface WorkItemReviewPlannedTask extends Record<string, unknown> {
+  task_id?: string;
+  status?: string;
+  assigned_to?: { role?: string; agent_id?: string };
+  description?: string;
+  deliverable?: string;
+  target_path?: string;
+  dependencies?: string[];
+  acceptance_criteria?: string[];
+  risk?: string;
+  review_target?: string;
+  last_result?: TaskResultBlock;
+  reconciliation?: {
+    evidence?: Array<{
+      path?: string;
+      kind?: string;
+    }>;
+  };
+}
+
+interface WorkItemArtifactReviewContext {
+  reviewTaskId: string;
+  reviewerTeamRole: 'reviewer' | 'qa';
+  targetTaskId?: string;
+  artifactAbsolutePath?: string;
+  artifactPath?: string;
+  artifactSha256?: string;
+  artifactKind?: 'doc' | 'deck' | 'code' | 'media';
+  profile?: ArtifactReviewerProfile;
+  implementerAgentIds: string[];
+  acceptanceCriteria: string[];
+  reviewerAgentId?: string;
+  blockingReason?: string;
+}
+
+type ResolvedWorkItemArtifactReviewContext = WorkItemArtifactReviewContext & {
+  targetTaskId: string;
+  artifactAbsolutePath: string;
+  artifactPath: string;
+  artifactSha256: string;
+  artifactKind: 'doc' | 'deck' | 'code' | 'media';
+  profile: ArtifactReviewerProfile;
+  reviewerAgentId: string;
+  blockingReason?: undefined;
+};
+
+function resolveWorkItemArtifactReviewContext(input: {
+  missionPath: string;
+  missionId: string;
+  missionState: MissionState;
+  item: WorkItem;
+  teamRole?: string;
+}): WorkItemArtifactReviewContext | null {
+  const taskId = getWorkItemTaskId(input.item);
+  if (!taskId || (input.teamRole !== 'reviewer' && input.teamRole !== 'qa')) return null;
+  const reviewerTeamRole = input.teamRole;
+  const tasks =
+    readJsonFileFromDispatchIO<WorkItemReviewPlannedTask[]>(
+      missionNextTasksPath(input.missionPath)
+    ) || [];
+  const reviewTask = tasks.find((task) => String(task.task_id || '') === taskId);
+  const metadata = (input.item.metadata || {}) as Record<string, unknown>;
+  const reviewTarget = String(reviewTask?.review_target || metadata.review_target || '').trim();
+  const acceptanceCriteria = Array.isArray(reviewTask?.acceptance_criteria)
+    ? reviewTask.acceptance_criteria.map((entry) => String(entry || '').trim()).filter(Boolean)
+    : [];
+  if (!reviewTarget) return null;
+  const targetTask = tasks.find((task) => String(task.task_id || '') === reviewTarget);
+  if (!targetTask) {
+    return {
+      reviewTaskId: taskId,
+      reviewerTeamRole,
+      targetTaskId: reviewTarget,
+      implementerAgentIds: [],
+      acceptanceCriteria,
+      blockingReason: `review target ${reviewTarget} does not exist`,
+    };
+  }
+
+  const diffPath = nodePath.join(input.missionPath, 'evidence', 'prs', reviewTarget, 'diff.patch');
+  const resultArtifacts = (targetTask.last_result?.artifacts || [])
+    .map((artifact) => String(artifact?.path || '').trim())
+    .filter(Boolean);
+  const reconciledArtifacts = (targetTask.reconciliation?.evidence || [])
+    .filter((evidence) => evidence.kind === 'artifact')
+    .map((evidence) => String(evidence.path || '').trim())
+    .filter(Boolean);
+  const candidates = [
+    diffPath,
+    ...resultArtifacts,
+    ...reconciledArtifacts,
+    String(targetTask.target_path || '').trim(),
+    String(targetTask.deliverable || '').trim(),
+  ].filter(Boolean);
+  let artifactAbsolutePath: string | undefined;
+  for (const candidate of candidates) {
+    const possiblePaths = nodePath.isAbsolute(candidate)
+      ? [candidate]
+      : [nodePath.join(input.missionPath, candidate), pathResolver.rootResolve(candidate)];
+    artifactAbsolutePath = possiblePaths.find(
+      (possiblePath) => safeExistsSync(possiblePath) && safeStat(possiblePath).isFile()
+    );
+    if (artifactAbsolutePath) break;
+  }
+  if (!artifactAbsolutePath) {
+    return {
+      reviewTaskId: taskId,
+      reviewerTeamRole,
+      targetTaskId: reviewTarget,
+      implementerAgentIds: [],
+      acceptanceCriteria,
+      blockingReason: `review target artifact is unavailable for ${reviewTarget}`,
+    };
+  }
+
+  const artifactPath = pathResolver.toRepoRelative(artifactAbsolutePath);
+  const artifactKind = inferArtifactReviewKind(artifactPath);
+  const profile = resolveArtifactReviewerProfile({
+    artifactKind,
+    missionClass: input.missionState.mission_type,
+    riskProfile: reviewTask?.risk || targetTask.risk || String(metadata.risk || ''),
+  });
+  const implementerRole = String(targetTask.assigned_to?.role || '').trim();
+  const resolvedImplementer = implementerRole
+    ? resolveMissionTeamReceiver({ missionId: input.missionId, teamRole: implementerRole })
+        ?.agent_id
+    : undefined;
+  const implementerAgentIds = Array.from(
+    new Set(
+      [targetTask.assigned_to?.agent_id, resolvedImplementer].filter((agentId): agentId is string =>
+        Boolean(agentId)
+      )
+    )
+  );
+  const reviewerAssignment = resolveMissionTeamReceiver({
+    missionId: input.missionId,
+    teamRole: input.teamRole,
+    excludedAgentIds: implementerAgentIds,
+    requiredCapabilities: profile.required_reviewer_capabilities,
+  });
+  const ticketAssignee = String(
+    metadata.resolved_agent_id || input.item.assignee_peer_id || ''
+  ).trim();
+  const ticketAssigneeProfile = ticketAssignee
+    ? loadAgentProfileIndex()[ticketAssignee]
+    : undefined;
+  const ticketAssigneeCapabilities = new Set(ticketAssigneeProfile?.capabilities || []);
+  const eligibleTicketAssignee =
+    ticketAssignee &&
+    !implementerAgentIds.includes(ticketAssignee) &&
+    profile.required_reviewer_capabilities.every((capability) =>
+      ticketAssigneeCapabilities.has(capability)
+    )
+      ? ticketAssignee
+      : undefined;
+  const reviewerAgentId = reviewerAssignment?.agent_id || eligibleTicketAssignee;
+  const blockingReason =
+    implementerAgentIds.length === 0
+      ? 'implementer identity is unavailable for independent review'
+      : !reviewerAgentId
+        ? `no independent reviewer satisfies capabilities: ${profile.required_reviewer_capabilities.join(', ')}`
+        : implementerAgentIds.includes(reviewerAgentId)
+          ? `reviewer ${reviewerAgentId} is also an implementer`
+          : undefined;
+  return {
+    reviewTaskId: taskId,
+    reviewerTeamRole,
+    targetTaskId: reviewTarget,
+    artifactAbsolutePath,
+    artifactPath,
+    artifactSha256: hashArtifactForReview(artifactAbsolutePath),
+    artifactKind,
+    profile,
+    implementerAgentIds,
+    acceptanceCriteria,
+    reviewerAgentId,
+    ...(blockingReason ? { blockingReason } : {}),
+  };
+}
+
+function isResolvedArtifactReviewContext(
+  context: WorkItemArtifactReviewContext | null
+): context is ResolvedWorkItemArtifactReviewContext {
+  return Boolean(
+    context &&
+    !context.blockingReason &&
+    context.targetTaskId &&
+    context.artifactAbsolutePath &&
+    context.artifactPath &&
+    context.artifactSha256 &&
+    context.artifactKind &&
+    context.profile &&
+    context.reviewerAgentId
+  );
+}
+
+function buildArtifactReviewPromptLines(context: ResolvedWorkItemArtifactReviewContext): string[] {
+  return [
+    '',
+    'Artifact quality review mandate:',
+    `- Artifact: ${context.artifactPath}`,
+    `- Artifact SHA-256: ${context.artifactSha256}`,
+    `- Specialist perspectives: ${context.profile.required_reviewer_roles.join(', ')}`,
+    `- Independent from: ${context.implementerAgentIds.join(', ')}`,
+    '- Try to falsify every acceptance criterion and inspect the artifact itself.',
+    '- Put defects in task_result.review_findings using severity=must_fix|should_fix|nit, location, and instruction.',
+    '- Use must_fix only for defects that block acceptance. An empty review_findings array means no defect was found.',
+  ];
+}
+
+function normalizeArtifactReviewFindings(
+  taskResult: TaskResultBlock | undefined,
+  artifactPath: string
+): Array<{
+  severity: 'must_fix' | 'should_fix' | 'nit';
+  location: string;
+  instruction: string;
+}> {
+  const findings = Array.isArray(taskResult?.review_findings)
+    ? taskResult.review_findings
+        .map((finding) => {
+          const severity = String(finding?.severity || '').trim();
+          const location = String(finding?.location || '').trim();
+          const instruction = String(finding?.instruction || '').trim();
+          if (
+            (severity !== 'must_fix' && severity !== 'should_fix' && severity !== 'nit') ||
+            !location ||
+            !instruction
+          ) {
+            return null;
+          }
+          return { severity, location, instruction };
+        })
+        .filter(
+          (
+            finding
+          ): finding is {
+            severity: 'must_fix' | 'should_fix' | 'nit';
+            location: string;
+            instruction: string;
+          } => Boolean(finding)
+        )
+    : [];
+  for (const gap of taskResult?.gaps || []) {
+    findings.push({ severity: 'must_fix', location: artifactPath, instruction: gap });
+  }
+  return findings;
+}
+
+function persistWorkItemArtifactReviewReceipt(input: {
+  missionPath: string;
+  missionId: string;
+  item: WorkItem;
+  context: ResolvedWorkItemArtifactReviewContext;
+  taskResult?: TaskResultBlock;
+}): { relativePath: string; receipt: ArtifactReviewReceipt } {
+  const findings = normalizeArtifactReviewFindings(input.taskResult, input.context.artifactPath);
+  const reviewId = `${input.context.reviewTaskId}-${input.item.item_id}-v${input.item.version}`;
+  const relativePath = `evidence/reviews/${reviewId}.json`;
+  const receipt = buildArtifactReviewReceipt({
+    reviewId,
+    missionId: input.missionId,
+    reviewTaskId: input.context.reviewTaskId,
+    reviewTargetTaskId: input.context.targetTaskId,
+    artifact: {
+      path: input.context.artifactPath,
+      sha256: input.context.artifactSha256,
+      kind: input.context.artifactKind,
+    },
+    reviewerAgentId: input.context.reviewerAgentId,
+    reviewerTeamRole: input.context.reviewerTeamRole,
+    specialistRoles: input.context.profile.required_reviewer_roles,
+    independentFrom: input.context.implementerAgentIds,
+    findings: findings.map<ArtifactReviewFinding>((finding) => ({
+      severity: finding.severity === 'must_fix' ? 'blocking' : 'suggestion',
+      category: 'artifact_quality',
+      description: finding.instruction,
+      ...(finding.severity === 'must_fix' ? { required_action: finding.instruction } : {}),
+      location: finding.location,
+    })),
+    acceptanceCriteria: input.context.acceptanceCriteria.length
+      ? input.context.acceptanceCriteria
+      : [`Review ${input.context.targetTaskId}`],
+  });
+  writeDispatchArtifact(
+    nodePath.join(input.missionPath, relativePath),
+    receipt as unknown as Record<string, unknown>
+  );
+
+  const taskPath = missionNextTasksPath(input.missionPath);
+  const tasks = readJsonFileFromDispatchIO<Array<Record<string, unknown>>>(taskPath) || [];
+  const index = tasks.findIndex(
+    (task) => String(task.task_id || '') === input.context.reviewTaskId
+  );
+  if (index >= 0) {
+    const task = tasks[index];
+    const assignedTo =
+      task.assigned_to && typeof task.assigned_to === 'object'
+        ? (task.assigned_to as Record<string, unknown>)
+        : {};
+    tasks[index] = {
+      ...task,
+      assigned_to: { ...assignedTo, agent_id: input.context.reviewerAgentId },
+      artifact_review_profile: {
+        ...input.context.profile,
+        artifact_path: input.context.artifactPath,
+        artifact_sha256: input.context.artifactSha256,
+        implementer_agent_ids: input.context.implementerAgentIds,
+      },
+      artifact_review_receipt: relativePath,
+      review_findings: findings,
+    };
+    writeJsonFileFromDispatchIO(taskPath, tasks);
+  }
+  return { relativePath, receipt };
 }
 
 function readManifest(missionPath: string): MissionWorkItemDispatchManifest | null {
@@ -697,6 +1024,10 @@ async function reflectTicketOutcome(input: {
   reviewerStatus?: 'approved' | 'refuted' | 'blocked';
   reviewerPath?: string;
   reviewerExcerpt?: string;
+  artifactReviewReceipt?: {
+    relativePath: string;
+    receipt: ArtifactReviewReceipt;
+  };
   executionMode: 'agent' | 'subagent';
   taskModelHint?: TaskModelHint;
 }): Promise<{
@@ -717,6 +1048,9 @@ async function reflectTicketOutcome(input: {
     responseText: input.responseText,
     responseExcerpt: input.responseExcerpt,
   });
+  const approvedArtifactReview = input.artifactReviewReceipt?.receipt.verdict === 'approved';
+  const acceptanceSatisfied = acceptanceCheck.satisfied || approvedArtifactReview;
+  const acceptanceMissing = approvedArtifactReview ? [] : acceptanceCheck.missing;
   const fastTierVerificationSatisfied =
     !isFastTierTaskModelHint(input.taskModelHint) ||
     ((input.taskResult?.verification_done?.length || 0) > 0 &&
@@ -725,18 +1059,18 @@ async function reflectTicketOutcome(input: {
   if (!fastTierVerificationSatisfied) {
     notes.push('fast-tier verification incomplete');
   }
-  if (!acceptanceCheck.satisfied) {
-    notes.push(`acceptance criteria not met: ${acceptanceCheck.missing.join('; ')}`);
+  if (approvedArtifactReview && !acceptanceCheck.satisfied) {
+    notes.push(
+      `acceptance criteria satisfied by approved artifact review receipt: ${input.artifactReviewReceipt?.relativePath}`
+    );
+  } else if (!acceptanceSatisfied) {
+    notes.push(`acceptance criteria not met: ${acceptanceMissing.join('; ')}`);
   }
   if (!taskId) {
     notes.push('missing task_id for ticket reflection');
     return {
       ticketState: deriveTicketState(
-        acceptanceCheck.satisfied
-          ? input.finalStatus
-          : input.responseText.trim()
-            ? 'review'
-            : 'blocked',
+        acceptanceSatisfied ? input.finalStatus : input.responseText.trim() ? 'review' : 'blocked',
         notes
       ),
       reflectionPath: '',
@@ -745,7 +1079,7 @@ async function reflectTicketOutcome(input: {
   }
 
   const effectiveFinalStatus =
-    acceptanceCheck.satisfied && fastTierVerificationSatisfied
+    acceptanceSatisfied && fastTierVerificationSatisfied
       ? input.finalStatus
       : input.responseText.trim()
         ? 'review'
@@ -792,8 +1126,8 @@ async function reflectTicketOutcome(input: {
     cognitive_route_summary: cognitiveRouteSummary,
     drift_watchdog_summary: input.driftWatchdogSummary,
     acceptance_criteria: acceptanceCriteria,
-    acceptance_criteria_satisfied: acceptanceCheck.satisfied,
-    acceptance_criteria_missing: acceptanceCheck.missing,
+    acceptance_criteria_satisfied: acceptanceSatisfied,
+    acceptance_criteria_missing: acceptanceMissing,
     clarification_packet: input.clarificationPacket,
     clarification_packet_path: input.clarificationPacketPath,
     execution_mode: input.executionMode,
@@ -836,8 +1170,8 @@ async function reflectTicketOutcome(input: {
       cognitive_route: cognitiveRouteSummary,
       drift_watchdog_summary: input.driftWatchdogSummary,
       acceptance_criteria: acceptanceCriteria,
-      acceptance_criteria_satisfied: acceptanceCheck.satisfied,
-      acceptance_criteria_missing: acceptanceCheck.missing,
+      acceptance_criteria_satisfied: acceptanceSatisfied,
+      acceptance_criteria_missing: acceptanceMissing,
       reviewer_status: input.reviewerStatus,
       reviewer_path: input.reviewerPath,
       reviewer_excerpt: input.reviewerExcerpt,
@@ -1025,6 +1359,37 @@ function resolveWorkItemProjectId(state: MissionState): string {
   return String(state.relationships?.project?.project_id || state.mission_id || '').trim();
 }
 
+const TERMINAL_MISSION_TASK_STATUSES = new Set(['done', 'completed', 'accepted', 'reviewed']);
+
+function areMissionTaskDependenciesSatisfied(state: MissionState, item: WorkItem): boolean {
+  const missionPath =
+    findMissionPath(state.mission_id.toUpperCase()) ||
+    pathResolver.missionDir(state.mission_id.toUpperCase(), state.tier);
+  const taskId = getWorkItemTaskId(item);
+  if (!missionPath || !taskId) return true;
+  const tasks =
+    readJsonFileFromDispatchIO<WorkItemReviewPlannedTask[]>(missionNextTasksPath(missionPath)) ||
+    [];
+  const task = tasks.find((candidate) => String(candidate.task_id || '') === taskId);
+  if (!task) return true;
+  const metadata = (item.metadata || {}) as Record<string, unknown>;
+  const dependencies = Array.isArray(task.dependencies)
+    ? task.dependencies
+    : Array.isArray(metadata.dependencies)
+      ? metadata.dependencies.map((dependency) => String(dependency || '').trim()).filter(Boolean)
+      : [];
+  if (dependencies.length === 0) return true;
+  const statusByTaskId = new Map(
+    tasks.map((candidate) => [
+      String(candidate.task_id || ''),
+      String(candidate.status || 'planned').toLowerCase(),
+    ])
+  );
+  return dependencies.every((dependency) =>
+    TERMINAL_MISSION_TASK_STATUSES.has(statusByTaskId.get(dependency) || '')
+  );
+}
+
 function selectWorkItems(state: MissionState, options: MissionWorkItemDispatchOptions): WorkItem[] {
   const missionId = state.mission_id.toUpperCase();
   const projectId = resolveWorkItemProjectId(state);
@@ -1042,7 +1407,10 @@ function selectWorkItems(state: MissionState, options: MissionWorkItemDispatchOp
     source: sources,
     status: statuses,
     labels,
-  }).filter((item) => getMissionLabel(item) === missionId);
+  }).filter(
+    (item) =>
+      getMissionLabel(item) === missionId && areMissionTaskDependenciesSatisfied(state, item)
+  );
 }
 
 function resolveAssigneePeerId(input: {
@@ -1682,7 +2050,16 @@ async function dispatchMissionWorkItemsRound(
 
   for (const item of workItems.slice(0, limit)) {
     const teamRole = getTeamRole(item);
-    const assigneePeerId = resolveAssigneePeerId({ missionId, item, teamRole });
+    const artifactReviewContext = resolveWorkItemArtifactReviewContext({
+      missionPath,
+      missionId,
+      missionState: state,
+      item,
+      teamRole,
+    });
+    const assigneePeerId = isResolvedArtifactReviewContext(artifactReviewContext)
+      ? artifactReviewContext.reviewerAgentId
+      : resolveAssigneePeerId({ missionId, item, teamRole });
     const taskModelHint = getTaskModelHint(item);
     const validation = validateWorkItemGranularity(item, assigneePeerId);
     const record: MissionWorkItemDispatchRecord = {
@@ -1696,6 +2073,42 @@ async function dispatchMissionWorkItemsRound(
       task_model_hint: taskModelHint,
       notes: [...validation.notes],
     };
+
+    if (artifactReviewContext?.blockingReason) {
+      record.status = 'failed';
+      record.work_item_status_after = 'blocked';
+      record.notes.push(artifactReviewContext.blockingReason);
+      updateWorkItem({
+        itemId: item.item_id,
+        status: 'blocked',
+        assigneePeerId: assigneePeerId || item.assignee_peer_id,
+        metadata: {
+          ...(item.metadata || {}),
+          artifact_review_blocked_reason: artifactReviewContext.blockingReason,
+        },
+      });
+      updateNextTasksReflection(
+        missionPath,
+        artifactReviewContext.reviewTaskId,
+        {
+          result_status: 'blocked',
+          blocked: true,
+          review_required: true,
+          artifact_review_blocked_reason: artifactReviewContext.blockingReason,
+        },
+        'blocked'
+      );
+      records.push(record);
+      appendDispatchEvent(dispatchEventPath(missionPath), {
+        event_type: 'workitem_dispatch_blocked',
+        mission_id: missionId,
+        item_id: item.item_id,
+        team_role: teamRole,
+        reason: artifactReviewContext.blockingReason,
+        policy_used: 'artifact_review_independence_v1',
+      });
+      continue;
+    }
 
     if (!validation.ok) {
       records.push(record);
@@ -1744,13 +2157,18 @@ async function dispatchMissionWorkItemsRound(
       assigneePeerId,
       taskModelHint,
     });
+    const dispatchPrompt = isResolvedArtifactReviewContext(artifactReviewContext)
+      ? [dispatchContext.prompt, ...buildArtifactReviewPromptLines(artifactReviewContext)].join(
+          '\n'
+        )
+      : dispatchContext.prompt;
 
     const response = await obtainTaskResultResponse({
       missionId,
       item,
       teamRole,
       assigneePeerId,
-      prompt: dispatchContext.prompt,
+      prompt: dispatchPrompt,
       taskModelHint,
       mode,
       adapters,
@@ -1820,19 +2238,34 @@ async function dispatchMissionWorkItemsRound(
     const driftWatchdog = evaluateWorkItemDrift({
       missionId,
       item,
-      prompt: dispatchContext.prompt,
+      prompt: dispatchPrompt,
       responseText: response.responseText,
       cognitiveRouteSummary,
       executionMode: response.executionMode,
       ticketState: finalStatus,
     });
+    const artifactReviewReceipt = isResolvedArtifactReviewContext(artifactReviewContext)
+      ? persistWorkItemArtifactReviewReceipt({
+          missionPath,
+          missionId,
+          item,
+          context: artifactReviewContext,
+          taskResult: response.taskResult,
+        })
+      : null;
+    if (artifactReviewReceipt) {
+      record.artifact_review_receipt = artifactReviewReceipt.relativePath;
+      record.notes.push(`artifact review receipt: ${artifactReviewReceipt.relativePath}`);
+    }
     const effectiveFinalStatus = driftWatchdog.shouldStop
       ? 'blocked'
       : !response.taskResult || response.parseErrors.length > 0 || taskResultNeeds.length > 0
         ? 'blocked'
-        : independentReviewRequired && reviewerResult && !reviewerResult.verdict.approved
+        : artifactReviewReceipt && artifactReviewReceipt.receipt.verdict !== 'approved'
           ? 'review'
-          : finalStatus;
+          : independentReviewRequired && reviewerResult && !reviewerResult.verdict.approved
+            ? 'review'
+            : finalStatus;
     record.execution_mode = response.executionMode;
     record.notes.push(...response.notes);
     if (response.taskResult) {
@@ -1898,7 +2331,7 @@ async function dispatchMissionWorkItemsRound(
       clarificationPacketPath,
       executionMode: response.executionMode,
       responseText: response.responseText,
-      prompt: dispatchContext.prompt,
+      prompt: dispatchPrompt,
     });
     writeDispatchArtifact(artifact.filePath, artifact.payload);
     record.response_path = artifact.filePath;
@@ -1925,6 +2358,7 @@ async function dispatchMissionWorkItemsRound(
       reviewerStatus: record.reviewer_status,
       reviewerPath: record.reviewer_path,
       reviewerExcerpt: record.reviewer_excerpt,
+      artifactReviewReceipt: artifactReviewReceipt || undefined,
       taskResult: response.taskResult,
       clarificationPacket,
       clarificationPacketPath,
@@ -1951,6 +2385,7 @@ async function dispatchMissionWorkItemsRound(
         last_dispatch_mission_id: missionId,
         last_dispatch_response_path: artifact.filePath,
         last_dispatch_response_excerpt: record.response_excerpt,
+        resolved_agent_id: assigneePeerId,
         last_context_pack_id: dispatchContext.contextPackId,
         last_context_pack_path: dispatchContext.contextPackPath,
         last_cognitive_route_tier: dispatchContext.cognitiveRoute.tier,
@@ -1960,6 +2395,9 @@ async function dispatchMissionWorkItemsRound(
         last_task_result_needs: taskResultNeeds,
         last_clarification_packet_path: clarificationPacketPath,
         needs_input: Boolean(clarificationPacket),
+        ...(artifactReviewReceipt
+          ? { last_artifact_review_receipt: artifactReviewReceipt.relativePath }
+          : {}),
         ...(reviewerResult
           ? {
               last_independent_reviewer_status: record.reviewer_status,
@@ -1986,6 +2424,7 @@ async function dispatchMissionWorkItemsRound(
       ticket_reflection_path: reflection.reflectionPath || undefined,
       reviewer_status: record.reviewer_status,
       reviewer_path: record.reviewer_path,
+      artifact_review_receipt: record.artifact_review_receipt,
       context_pack_id: dispatchContext.contextPackId,
       context_pack_path: dispatchContext.contextPackPath,
       ...taskResultObservability,

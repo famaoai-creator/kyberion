@@ -152,15 +152,15 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
       assignments: [],
     });
     mocks.buildMissionTeamView.mockReturnValue({ planner: 'nerve-agent' });
-    mocks.resolveMissionTeamReceiver.mockReturnValue({
-      agent_id: 'implementation-architect',
+    mocks.resolveMissionTeamReceiver.mockImplementation(({ teamRole }: { teamRole: string }) => ({
+      agent_id: teamRole === 'reviewer' ? 'independent-reviewer' : 'implementation-architect',
       model_hint: {
         tier: 'small',
         effort: 'low',
         model_id: 'openai:gpt-5.4-mini',
         route_reason: 'phase_kind=mechanical -> small/low',
       },
-    });
+    }));
   });
 
   afterEach(async () => {
@@ -209,7 +209,7 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
           {
             task_id: 'task-2',
             status: 'planned',
-            assigned_to: { role: 'reviewer', agent_id: 'implementation-architect' },
+            assigned_to: { role: 'reviewer', agent_id: 'independent-reviewer' },
             description: 'Review the deck',
             deliverable: 'deliverables/REVIEW-task-1.md',
             dependencies: ['task-1'],
@@ -258,7 +258,7 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
         },
       })
       .mockReturnValueOnce({
-        agent_id: 'implementation-architect',
+        agent_id: 'independent-reviewer',
         model_hint: {
           tier: 'small',
           effort: 'low',
@@ -305,7 +305,7 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
     expect(prompt).toContain('Return exactly one ```task_result``` block');
     expect(dispatched).toEqual([
       { task_id: 'task-1', team_role: 'implementer', agent_id: 'implementation-architect' },
-      { task_id: 'task-2', team_role: 'reviewer', agent_id: 'implementation-architect' },
+      { task_id: 'task-2', team_role: 'reviewer', agent_id: 'independent-reviewer' },
     ]);
 
     const stored = JSON.parse(
@@ -326,6 +326,163 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
         result_schema_ok_rate: 1,
       })
     );
+  });
+
+  it('blocks a self-review assignment without reopening the completed implementation', async () => {
+    const { missionDir } = await import('./path-resolver.js');
+    const { safeReadFile, safeWriteFile } = await import('./secure-io.js');
+    const { dispatchMissionNextTasks } = await import('./mission-orchestration-worker.js');
+    const missionPath = missionDir('MSN-FOLLOWUP', 'public');
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify(
+        [
+          {
+            task_id: 'task-implementation',
+            status: 'completed',
+            assigned_to: { role: 'implementer', agent_id: 'implementation-architect' },
+            description: 'Implement the artifact',
+            deliverable: 'deliverables/task-a.md',
+          },
+          {
+            task_id: 'task-review',
+            status: 'planned',
+            assigned_to: { role: 'reviewer', agent_id: 'implementation-architect' },
+            description: 'Review the artifact',
+            deliverable: 'deliverables/REVIEW-task-implementation.md',
+            dependencies: ['task-implementation'],
+            review_target: 'task-implementation',
+          },
+        ],
+        null,
+        2
+      )
+    );
+    mocks.resolveMissionTeamReceiver.mockReturnValue({
+      agent_id: 'implementation-architect',
+      model_hint: {
+        tier: 'small',
+        effort: 'low',
+        model_id: 'openai:gpt-5.4-mini',
+        route_reason: 'phase_kind=review -> small/low',
+      },
+    });
+
+    const dispatched = await dispatchMissionNextTasks('MSN-FOLLOWUP');
+
+    const tasks = JSON.parse(
+      String(safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }))
+    ) as Array<{ task_id: string; status: string; rework_packet?: unknown }>;
+    expect(dispatched).toEqual([]);
+    expect(mocks.route).not.toHaveBeenCalled();
+    expect(tasks.find((task) => task.task_id === 'task-implementation')).toMatchObject({
+      status: 'completed',
+    });
+    expect(
+      tasks.find((task) => task.task_id === 'task-implementation')?.rework_packet
+    ).toBeUndefined();
+    expect(tasks.find((task) => task.task_id === 'task-review')).toMatchObject({
+      status: 'blocked',
+    });
+    expect(mocks.emitMissionTaskEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        task_id: 'task-review',
+        policy_used: 'artifact_review_independence_v1',
+        payload: expect.objectContaining({ reason: 'blocked(reviewer_independence)' }),
+      })
+    );
+  });
+
+  it('reviews a reconciled implementation artifact and preserves its reconciliation evidence', async () => {
+    const { missionDir } = await import('./path-resolver.js');
+    const { safeReadFile, safeWriteFile } = await import('./secure-io.js');
+    const { dispatchMissionNextTasks } = await import('./mission-orchestration-worker.js');
+    const missionPath = missionDir('MSN-FOLLOWUP', 'public');
+    safeWriteFile(
+      `${missionPath}/deliverables/REVIEW-task-implementation.md`,
+      '# reconciled implementation review'
+    );
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify(
+        [
+          {
+            task_id: 'task-implementation',
+            status: 'completed',
+            assigned_to: { role: 'implementer', agent_id: 'implementation-architect' },
+            description: 'Implement the artifact',
+            deliverable: 'deliverables/task-a.md',
+            reconciliation: {
+              manifest_sha256: 'a'.repeat(64),
+              evidence: [
+                {
+                  path: 'libs/core/artifact-review.ts',
+                  sha256: 'b'.repeat(64),
+                  kind: 'artifact',
+                },
+              ],
+            },
+          },
+          {
+            task_id: 'task-review',
+            status: 'planned',
+            assigned_to: { role: 'reviewer', agent_id: 'independent-reviewer' },
+            description: 'Review the reconciled artifact',
+            deliverable: 'deliverables/REVIEW-task-implementation.md',
+            dependencies: ['task-implementation'],
+            review_target: 'task-implementation',
+            acceptance_criteria: ['The reconciled artifact has no blocking defects.'],
+          },
+        ],
+        null,
+        2
+      )
+    );
+    mocks.resolveMissionTeamReceiver.mockReturnValue({
+      agent_id: 'independent-reviewer',
+      model_hint: {
+        tier: 'small',
+        effort: 'low',
+        model_id: 'openai:gpt-5.4-mini',
+        route_reason: 'phase_kind=review -> small/low',
+      },
+    });
+    mocks.route.mockResolvedValue({
+      payload: {
+        text: makeTaskResultText({
+          summary: 'The reconciled implementation passes review.',
+          artifacts: [{ path: 'deliverables/REVIEW-task-implementation.md', kind: 'markdown' }],
+          verification_done: [
+            'Reviewed the commit-bound implementation artifact.',
+            'The reconciled artifact has no blocking defects.',
+          ],
+          gaps: [],
+          needs: [],
+        }),
+      },
+    });
+
+    const dispatched = await dispatchMissionNextTasks('MSN-FOLLOWUP');
+
+    const prompt = String(mocks.route.mock.calls[0]?.[0]?.payload?.text || '');
+    const tasks = JSON.parse(
+      String(safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }))
+    ) as Array<{
+      task_id: string;
+      status: string;
+      reconciliation?: { evidence?: Array<{ path: string }> };
+      artifact_review_receipt?: string;
+    }>;
+    expect(dispatched).toEqual([
+      { task_id: 'task-review', team_role: 'reviewer', agent_id: 'independent-reviewer' },
+    ]);
+    expect(prompt).toContain('libs/core/artifact-review.ts');
+    expect(prompt).toContain('code-reviewer');
+    expect(tasks[0].reconciliation?.evidence?.[0]?.path).toBe('libs/core/artifact-review.ts');
+    expect(tasks[1]).toMatchObject({
+      status: 'completed',
+      artifact_review_receipt: 'evidence/reviews/task-review-r1.json',
+    });
   });
 
   it('dispatches dependency-ready tasks in task_id order up to the parallel cap', async () => {
@@ -386,15 +543,15 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
       assignments: [],
     });
     mocks.buildMissionTeamView.mockReturnValue({ planner: 'nerve-agent' });
-    mocks.resolveMissionTeamReceiver.mockReturnValue({
-      agent_id: 'implementation-architect',
+    mocks.resolveMissionTeamReceiver.mockImplementation(({ teamRole }: { teamRole: string }) => ({
+      agent_id: teamRole === 'reviewer' ? 'independent-reviewer' : 'implementation-architect',
       model_hint: {
         tier: 'small',
         effort: 'low',
         model_id: 'openai:gpt-5.4-mini',
         route_reason: 'phase_kind=mechanical -> small/low',
       },
-    });
+    }));
 
     const pendingResponses: Array<{ resolve: (value: any) => void }> = [];
     mocks.route.mockImplementation(
@@ -497,15 +654,15 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
       assignments: [],
     });
     mocks.buildMissionTeamView.mockReturnValue({ planner: 'nerve-agent' });
-    mocks.resolveMissionTeamReceiver.mockReturnValue({
-      agent_id: 'implementation-architect',
+    mocks.resolveMissionTeamReceiver.mockImplementation(({ teamRole }: { teamRole: string }) => ({
+      agent_id: teamRole === 'reviewer' ? 'independent-reviewer' : 'implementation-architect',
       model_hint: {
         tier: 'small',
         effort: 'low',
         model_id: 'openai:gpt-5.4-mini',
         route_reason: 'phase_kind=mechanical -> small/low',
       },
-    });
+    }));
     mocks.route.mockResolvedValue({
       payload: {
         text: makeTaskResultText({
@@ -583,15 +740,15 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
       assignments: [],
     });
     mocks.buildMissionTeamView.mockReturnValue({ planner: 'nerve-agent' });
-    mocks.resolveMissionTeamReceiver.mockReturnValue({
-      agent_id: 'implementation-architect',
+    mocks.resolveMissionTeamReceiver.mockImplementation(({ teamRole }: { teamRole: string }) => ({
+      agent_id: teamRole === 'reviewer' ? 'independent-reviewer' : 'implementation-architect',
       model_hint: {
         tier: 'small',
         effort: 'low',
         model_id: 'openai:gpt-5.4-mini',
         route_reason: 'phase_kind=mechanical -> small/low',
       },
-    });
+    }));
     mocks.route
       .mockResolvedValueOnce({ payload: { text: 'plain response' } })
       .mockResolvedValueOnce({
@@ -1315,7 +1472,7 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
           {
             task_id: 'task-followup',
             status: 'planned',
-            assigned_to: { role: 'reviewer', agent_id: 'implementation-architect' },
+            assigned_to: { role: 'reviewer', agent_id: 'independent-reviewer' },
             description: 'Use the prerequisite output',
             dependencies: ['task-bootstrap'],
             deliverable: 'deliverables/REVIEW-task-bootstrap.md',
@@ -1358,15 +1515,15 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
       assignments: [],
     });
     mocks.buildMissionTeamView.mockReturnValue({ planner: 'nerve-agent' });
-    mocks.resolveMissionTeamReceiver.mockReturnValue({
-      agent_id: 'implementation-architect',
+    mocks.resolveMissionTeamReceiver.mockImplementation(({ teamRole }: { teamRole: string }) => ({
+      agent_id: teamRole === 'reviewer' ? 'independent-reviewer' : 'implementation-architect',
       model_hint: {
         tier: 'small',
         effort: 'low',
         model_id: 'openai:gpt-5.4-mini',
         route_reason: 'phase_kind=mechanical -> small/low',
       },
-    });
+    }));
     const pendingResponses: Array<{ resolve: (value: any) => void }> = [];
     mocks.route.mockImplementation(
       () =>
@@ -1418,7 +1575,7 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
 
     expect(dispatched).toEqual([
       { task_id: 'task-bootstrap', team_role: 'implementer', agent_id: 'implementation-architect' },
-      { task_id: 'task-followup', team_role: 'reviewer', agent_id: 'implementation-architect' },
+      { task_id: 'task-followup', team_role: 'reviewer', agent_id: 'independent-reviewer' },
     ]);
   });
 
@@ -1478,15 +1635,15 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
       assignments: [],
     });
     mocks.buildMissionTeamView.mockReturnValue({ planner: 'nerve-agent' });
-    mocks.resolveMissionTeamReceiver.mockReturnValue({
-      agent_id: 'implementation-architect',
+    mocks.resolveMissionTeamReceiver.mockImplementation(({ teamRole }: { teamRole: string }) => ({
+      agent_id: teamRole === 'reviewer' ? 'independent-reviewer' : 'implementation-architect',
       model_hint: {
         tier: 'small',
         effort: 'low',
         model_id: 'openai:gpt-5.4-mini',
         route_reason: 'phase_kind=mechanical -> small/low',
       },
-    });
+    }));
     mocks.route.mockImplementation(async (envelope: any) => {
       const taskId = String(envelope?.payload?.context?.task_id || '');
       const prompt = String(envelope?.payload?.text || '');
@@ -1558,17 +1715,27 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
     expect(prompts[1]).toContain('## Upstream results (inputs you MUST build on)');
     expect(prompts[1]).toContain('Completed the base implementation.');
     expect(prompts[1]).toContain('deliverables/task-a.md');
+    expect(prompts[1]).toContain('## Artifact quality review mandate');
+    expect(prompts[1]).toContain('content-reviewer');
     expect(prompts[1]).toContain(
       '## Team snapshot (do not duplicate; stay consistent with completed work)'
     );
     expect(prompts[2]).toContain('## Review findings to address');
     expect(prompts[2]).toContain('must_fix @ deliverables/task-a.md');
+    expect(mocks.resolveMissionTeamReceiver).toHaveBeenCalledWith(
+      expect.objectContaining({
+        missionId: 'MSN-FOLLOWUP',
+        teamRole: 'reviewer',
+        excludedAgentIds: ['implementation-architect'],
+        requiredCapabilities: expect.arrayContaining(['review', 'documentation', 'analysis']),
+      })
+    );
 
     expect(dispatched).toEqual([
       { task_id: 'task-1', team_role: 'implementer', agent_id: 'implementation-architect' },
-      { task_id: 'task-2', team_role: 'reviewer', agent_id: 'implementation-architect' },
+      { task_id: 'task-2', team_role: 'reviewer', agent_id: 'independent-reviewer' },
       { task_id: 'task-1', team_role: 'implementer', agent_id: 'implementation-architect' },
-      { task_id: 'task-2', team_role: 'reviewer', agent_id: 'implementation-architect' },
+      { task_id: 'task-2', team_role: 'reviewer', agent_id: 'independent-reviewer' },
     ]);
 
     const stored = JSON.parse(
@@ -1578,6 +1745,23 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
     expect(stored[0].rework_count).toBe(1);
     expect(stored[0].last_result.summary).toContain('Reworked the implementation.');
     expect(stored[1].review_target).toBe('task-1');
+    expect(stored[1].artifact_review_receipt).toBe('evidence/reviews/task-2-r2.json');
+    const receipt = JSON.parse(
+      safeReadFile(`${missionPath}/${stored[1].artifact_review_receipt}`, {
+        encoding: 'utf8',
+      }) as string
+    );
+    expect(receipt).toMatchObject({
+      kind: 'artifact-review-receipt',
+      review_target_task_id: 'task-1',
+      verdict: 'approved',
+      reviewer: {
+        agent_id: 'independent-reviewer',
+        specialist_roles: ['content-reviewer'],
+        independence_verified: true,
+      },
+    });
+    expect(receipt.artifact.sha256).toMatch(/^[a-f0-9]{64}$/u);
   });
 
   it('retries a busy task on the next wave when another task makes progress', async () => {
@@ -1900,7 +2084,7 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
             {
               task_id: 'task-followup',
               status: 'planned',
-              assigned_to: { role: 'reviewer', agent_id: 'implementation-architect' },
+              assigned_to: { role: 'reviewer', agent_id: 'independent-reviewer' },
               description: 'Use the prerequisite output',
               dependencies: ['task-bootstrap'],
               deliverable: 'deliverables/REVIEW-task-bootstrap.md',
@@ -1940,15 +2124,15 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
       runtime_plan: { mission_id: 'MSN-FOLLOWUP', assignments: [] },
     });
     mocks.buildMissionTeamView.mockReturnValue({ planner: 'nerve-agent' });
-    mocks.resolveMissionTeamReceiver.mockReturnValue({
-      agent_id: 'implementation-architect',
+    mocks.resolveMissionTeamReceiver.mockImplementation(({ teamRole }: { teamRole: string }) => ({
+      agent_id: teamRole === 'reviewer' ? 'independent-reviewer' : 'implementation-architect',
       model_hint: {
         tier: 'small',
         effort: 'low',
         model_id: 'openai:gpt-5.4-mini',
         route_reason: 'phase_kind=mechanical -> small/low',
       },
-    });
+    }));
 
     writeFixture(1);
     await dispatchMissionNextTasks('MSN-FOLLOWUP');

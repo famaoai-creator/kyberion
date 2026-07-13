@@ -1,0 +1,31 @@
+{
+  "kind": "artifact-review-receipt",
+  "version": "1.0.0",
+  "review_id": "review-task-review-r1",
+  "mission_id": "MSN-EXAMPLE",
+  "review_task_id": "task-review",
+  "review_target_task_id": "task-implement",
+  "artifact": {
+    "path": "evidence/prs/task-implement/diff.patch",
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "kind": "code"
+  },
+  "reviewer": {
+    "agent_id": "independent-review-agent",
+    "team_role": "reviewer",
+    "specialist_roles": ["code-reviewer", "security-reviewer"],
+    "independent_from": ["implementation-agent"],
+    "independence_verified": true
+  },
+  "verdict": "approved",
+  "findings": [
+    {
+      "severity": "suggestion",
+      "category": "maintainability",
+      "description": "Consider extracting the validation message into a named constant.",
+      "location": "src/example.ts:42"
+    }
+  ],
+  "acceptance_criteria": ["The implementation satisfies the declared behavior."],
+  "reviewed_at": "2026-07-13T00:00:00.000Z"
+}

@@ -65,6 +65,50 @@
           }
         }
       }
+    },
+    "artifact_review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["defaults", "profiles"],
+      "properties": {
+        "defaults": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["independence_required"],
+          "properties": {
+            "independence_required": { "type": "boolean" }
+          }
+        },
+        "profiles": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "artifact_kinds", "required_reviewer_roles"],
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "artifact_kinds": {
+                "type": "array",
+                "minItems": 1,
+                "items": { "type": "string", "enum": ["doc", "deck", "code", "media"] }
+              },
+              "required_reviewer_roles": {
+                "type": "array",
+                "minItems": 1,
+                "items": { "type": "string", "minLength": 1 }
+              },
+              "required_capabilities": {
+                "type": "array",
+                "minItems": 1,
+                "items": { "type": "string", "minLength": 1 }
+              },
+              "mission_classes": { "type": "array", "items": { "type": "string" } },
+              "risk_profiles": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
+      }
     }
   }
 }

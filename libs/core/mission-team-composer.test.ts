@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { composeMissionTeamPlan } from './mission-team-plan-composer.js';
+import { pathResolver } from './path-resolver.js';
+import { safeMkdir, safeRmSync } from './secure-io.js';
+import {
+  composeMissionTeamPlan,
+  resolveMissionTeamReceiver,
+  writeMissionTeamPlan,
+} from './mission-team-plan-composer.js';
 
 describe('mission-team-composer classification integration', () => {
   it('derives mission type from mission classification when missionType is omitted', () => {
@@ -148,5 +154,56 @@ describe('mission-team-composer classification integration', () => {
     expect(
       plan.assignments.find((assignment) => assignment.team_role === 'defender')?.agent_id
     ).toBe('sovereign-brain');
+  });
+
+  it('selects a capable reviewer while excluding the implementation agent', () => {
+    const missionId = 'MSN-INDEPENDENT-REVIEWER-001';
+    const missionPath = pathResolver.missionDir(missionId, 'public');
+    const previousRole = process.env.MISSION_ROLE;
+    const previousPersona = process.env.KYBERION_PERSONA;
+    process.env.MISSION_ROLE = 'mission_controller';
+    process.env.KYBERION_PERSONA = 'mission-controller-test';
+    try {
+      safeMkdir(missionPath, { recursive: true });
+      const plan = composeMissionTeamPlan({
+        missionId,
+        missionType: 'product_development',
+        intentId: 'bootstrap-project',
+        shape: 'project_bootstrap',
+        progressSignals: ['classified'],
+        tier: 'public',
+      });
+      const reviewer = plan.assignments.find((assignment) => assignment.team_role === 'reviewer');
+      expect(reviewer?.agent_id).toBeTruthy();
+      const implementationAgentId = reviewer!.agent_id!;
+      writeMissionTeamPlan(missionPath, plan);
+
+      const selected = resolveMissionTeamReceiver({
+        missionId,
+        teamRole: 'reviewer',
+        excludedAgentIds: [implementationAgentId],
+        requiredCapabilities: ['review', 'documentation', 'analysis'],
+      });
+
+      expect(selected?.agent_id).toBe('reasoning-worker');
+      expect(selected?.agent_id).not.toBe(implementationAgentId);
+      expect(selected?.required_capabilities).toEqual(
+        expect.arrayContaining(['review', 'documentation', 'analysis'])
+      );
+
+      const codeReviewer = resolveMissionTeamReceiver({
+        missionId,
+        teamRole: 'reviewer',
+        excludedAgentIds: ['reasoning-worker'],
+        requiredCapabilities: ['review', 'code', 'testing'],
+      });
+      expect(codeReviewer?.agent_id).toBe('implementation-architect');
+    } finally {
+      safeRmSync(missionPath, { recursive: true, force: true });
+      if (previousRole === undefined) delete process.env.MISSION_ROLE;
+      else process.env.MISSION_ROLE = previousRole;
+      if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
+      else process.env.KYBERION_PERSONA = previousPersona;
+    }
   });
 });
