@@ -156,6 +156,20 @@ describe('mission_controller argument parsing', () => {
     expect(positionalArgs).toEqual(['record-evidence', 'MSN-2D', 'review', 'Evidence recorded']);
   });
 
+  it('treats reconcile-work manifest and dry-run options as named options', () => {
+    const positionalArgs = extractMissionControllerPositionalArgs([
+      'node',
+      'dist/scripts/mission_controller.js',
+      'reconcile-work',
+      'MSN-2E',
+      '--manifest',
+      'active/shared/tmp/reconciliation.json',
+      '--dry-run',
+    ]);
+
+    expect(positionalArgs).toEqual(['reconcile-work', 'MSN-2E']);
+  });
+
   it('treats memory queue control options as named options', () => {
     const positionalArgs = extractMissionControllerPositionalArgs([
       'node',
@@ -424,6 +438,7 @@ describe('mission_controller argument parsing', () => {
     expect(help).toContain('organization-profiles --json --summary');
     expect(help).toContain('organization-profile --json --summary');
     expect(help).toContain('organization-catalogs --json --selected-only --summary');
+    expect(help).toContain('reconcile-work <ID> --manifest <PATH> [--dry-run]');
     expect(help).toContain(
       'resume   [ID]                  Resume the last active mission and replay orchestration journal (or specify ID)'
     );

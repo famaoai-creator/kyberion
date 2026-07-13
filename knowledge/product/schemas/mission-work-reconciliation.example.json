@@ -1,0 +1,41 @@
+{
+  "kind": "mission-work-reconciliation",
+  "version": "1.0.0",
+  "mission_id": "MSN-EXAMPLE-20260713",
+  "source": {
+    "repository": ".",
+    "branch": "feat/example-existing-work",
+    "commit": "0123456789abcdef0123456789abcdef01234567"
+  },
+  "adopted_by": "mission-controller",
+  "reason": "Adopt verified implementation completed before work-item dispatch.",
+  "tasks": [
+    {
+      "task_id": "implementation",
+      "evidence": [
+        {
+          "path": "evidence/implementation.patch",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "kind": "artifact"
+        },
+        {
+          "path": "evidence/unit-tests.json",
+          "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "kind": "test_report"
+        }
+      ],
+      "criteria": [
+        {
+          "criterion": "Implementation satisfies the agreed task contract.",
+          "evidence_refs": ["evidence/implementation.patch"]
+        }
+      ],
+      "verification": {
+        "command": "pnpm vitest run scripts/refactor/mission-work-reconciliation.test.ts",
+        "status": "passed",
+        "exit_code": 0,
+        "evidence_refs": ["evidence/unit-tests.json"]
+      }
+    }
+  ]
+}
