@@ -463,6 +463,12 @@
       "type": "md"
     },
     {
+      "path": "product/architecture/marketing-video-workload.md",
+      "tier": "public",
+      "size": 6072,
+      "type": "md"
+    },
+    {
       "path": "product/architecture/media-document-generation-boundary.md",
       "tier": "public",
       "size": 3026,
@@ -975,7 +981,7 @@
     {
       "path": "product/governance/actuator-op-registry.json",
       "tier": "public",
-      "size": 13531,
+      "size": 13568,
       "type": "json"
     },
     {
@@ -1215,7 +1221,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 50897,
+      "size": 51089,
       "type": "json"
     },
     {
@@ -1456,6 +1462,12 @@
       "path": "product/governance/maintenance-schedule.json",
       "tier": "public",
       "size": 241,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/marketing-risk-policy.json",
+      "tier": "public",
+      "size": 1322,
       "type": "json"
     },
     {
@@ -2193,7 +2205,7 @@
     {
       "path": "product/governance/surface-provider-manifests.json",
       "tier": "public",
-      "size": 30901,
+      "size": 32855,
       "type": "json"
     },
     {
@@ -2367,7 +2379,7 @@
     {
       "path": "product/governance/video-composition-template-registry.json",
       "tier": "public",
-      "size": 2494,
+      "size": 2943,
       "type": "json"
     },
     {
@@ -2913,7 +2925,7 @@
     {
       "path": "product/orchestration/actuator-op-discovery.json",
       "tier": "public",
-      "size": 59304,
+      "size": 59465,
       "type": "json"
     },
     {
@@ -4461,7 +4473,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 46286,
+      "size": 47382,
       "type": "json"
     },
     {
@@ -5059,9 +5071,27 @@
       "type": "json"
     },
     {
+      "path": "product/pipeline-templates/productivity-task-orchestration.json",
+      "tier": "public",
+      "size": 3352,
+      "type": "json"
+    },
+    {
       "path": "product/pipeline-templates/project-kickstart.json",
       "tier": "public",
       "size": 3691,
+      "type": "json"
+    },
+    {
+      "path": "product/pipeline-templates/publication-review.json",
+      "tier": "public",
+      "size": 866,
+      "type": "json"
+    },
+    {
+      "path": "product/pipeline-templates/publish-youtube-dry-run.json",
+      "tier": "public",
+      "size": 1549,
       "type": "json"
     },
     {
@@ -5152,6 +5182,12 @@
       "path": "product/pipeline-templates/ui-voice-browser-smoke.json",
       "tier": "public",
       "size": 2224,
+      "type": "json"
+    },
+    {
+      "path": "product/pipeline-templates/video-production.json",
+      "tier": "public",
+      "size": 977,
       "type": "json"
     },
     {
@@ -6301,6 +6337,24 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/marketing-video-local-dry-run.example.json",
+      "tier": "public",
+      "size": 594,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/marketing-workload.example.json",
+      "tier": "public",
+      "size": 818,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/marketing-workload.schema.json",
+      "tier": "public",
+      "size": 7848,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/media-aws-icon-rules.schema.json",
       "tier": "public",
       "size": 952,
@@ -6901,6 +6955,18 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/productivity-task-plan.example.json",
+      "tier": "public",
+      "size": 1641,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/productivity-task-plan.schema.json",
+      "tier": "public",
+      "size": 3223,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/project-mission-ledger.schema.json",
       "tier": "public",
       "size": 1369,
@@ -7239,7 +7305,7 @@
     {
       "path": "product/schemas/task-session.schema.json",
       "tier": "public",
-      "size": 13905,
+      "size": 13966,
       "type": "json"
     },
     {
@@ -8080,6 +8146,12 @@
       "path": "public/design-patterns/media-templates/themes/themes.json",
       "tier": "public",
       "size": 4756,
+      "type": "json"
+    },
+    {
+      "path": "public/design-patterns/media-templates/video-visual-patterns.json",
+      "tier": "public",
+      "size": 6281,
       "type": "json"
     },
     {

@@ -23,7 +23,16 @@ describe('surface-provider-policy', () => {
     const ids = listSurfaceProviderManifestRecords()
       .map((entry) => entry.id)
       .sort();
-    expect(ids).toEqual(['chronos', 'cli', 'discord', 'imessage', 'presence', 'slack', 'telegram']);
+    expect(ids).toEqual([
+      'chronos',
+      'cli',
+      'cowork',
+      'discord',
+      'imessage',
+      'presence',
+      'slack',
+      'telegram',
+    ]);
   });
 
   it('derives delegation receivers per provider policy', () => {

@@ -15,6 +15,7 @@ import {
   retry,
   classifyError,
   processUntrustedContent,
+  decideFromObservation,
 } from '@agent/core';
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
 import { chromium, type CDPSession, type Page } from '@playwright/test';
@@ -788,6 +789,38 @@ async function opCapture(
         { kind: 'capture', op: 'query_elements', tab_id: runtime.activeTabId, selector }
       );
     }
+    case 'distill_dom': {
+      // AR-07: deterministic interactive-element inventory for in-loop
+      // decisions (same DOM -> same output; capped).
+      const inventory = await distillDomInventory(page, {
+        maxElements: typeof params.max_elements === 'number' ? params.max_elements : undefined,
+      });
+      return browserRuntimeHelpers.recordBrowserAction(
+        { ...ctx, [params.export_as || 'dom_distillate']: inventory },
+        { kind: 'capture', op: 'distill_dom', tab_id: runtime.activeTabId }
+      );
+    }
+    case 'llm_decide': {
+      // AR-07: one in-loop decision about a distilled observation. With
+      // params.options the reply must be a member (selection mode); a null
+      // decision exports null and downstream `if` conditions handle it —
+      // the op itself never throws on model failure.
+      const goal = String(resolve(params.goal) || '');
+      if (!goal) throw new Error('llm_decide requires params.goal');
+      const fromKey = String(params.from || 'dom_distillate');
+      const observationRaw =
+        params.observation != null ? resolve(params.observation) : ctx[fromKey];
+      const observation =
+        typeof observationRaw === 'string' ? observationRaw : JSON.stringify(observationRaw ?? '');
+      const options = Array.isArray(params.options)
+        ? params.options.map((option: unknown) => String(resolve(option)))
+        : undefined;
+      const decision = await decideFromObservation({ goal, observation, options });
+      return browserRuntimeHelpers.recordBrowserAction(
+        { ...ctx, [params.export_as || 'llm_decision']: decision },
+        { kind: 'capture', op: 'llm_decide', tab_id: runtime.activeTabId }
+      );
+    }
     case 'passkey_credentials': {
       const credentials = await getVirtualPasskeyCredentials(runtime, page);
       return browserRuntimeHelpers.recordBrowserAction(
@@ -920,6 +953,62 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
  * Total failure throws an error that lists the visible input candidates so
  * the operator/repair agent can correct the step without reopening the page.
  */
+// AR-07: deterministic DOM distillation — an interactive-element inventory
+// small enough for in-loop LLM decisions. Same DOM, same output; capped.
+export async function distillDomInventory(
+  page: Page,
+  options: { maxElements?: number } = {}
+): Promise<Array<{ selector: string; tag: string; role: string; text: string; visible: boolean }>> {
+  const maxElements = Math.min(options.maxElements ?? 120, 300);
+  return page.evaluate((cap: number) => {
+    const nodes = Array.from(
+      document.querySelectorAll(
+        'a[href], button, input, textarea, select, [role="button"], [role="link"], [role="tab"], [role="menuitem"], [contenteditable="true"], [onclick]'
+      )
+    ) as HTMLElement[];
+    const cssPath = (el: HTMLElement): string => {
+      if (el.id) return `#${CSS.escape(el.id)}`;
+      const name = (el as HTMLInputElement).name;
+      if (name) return `${el.tagName.toLowerCase()}[name="${name}"]`;
+      const parts: string[] = [];
+      let node: HTMLElement | null = el;
+      let depth = 0;
+      while (node && node.tagName !== 'BODY' && depth < 5) {
+        const parent: HTMLElement | null = node.parentElement;
+        const siblings = parent
+          ? (Array.from(parent.children) as HTMLElement[]).filter(
+              (c) => c.tagName === node!.tagName
+            )
+          : [];
+        const index = siblings.indexOf(node) + 1;
+        parts.unshift(
+          siblings.length > 1
+            ? `${node.tagName.toLowerCase()}:nth-of-type(${index})`
+            : node.tagName.toLowerCase()
+        );
+        node = parent;
+        depth += 1;
+      }
+      return parts.join(' > ');
+    };
+    return nodes.slice(0, cap).map((el) => ({
+      selector: cssPath(el),
+      tag: el.tagName.toLowerCase(),
+      role: el.getAttribute('role') || (el as HTMLInputElement).type || el.tagName.toLowerCase(),
+      text: (
+        el.textContent ||
+        (el as HTMLInputElement).value ||
+        (el as HTMLInputElement).placeholder ||
+        el.getAttribute('aria-label') ||
+        ''
+      )
+        .trim()
+        .slice(0, 80),
+      visible: el.offsetParent !== null,
+    }));
+  }, maxElements);
+}
+
 export async function fillWithFallback(
   page: Page,
   input: { selector: string; text: string; timeoutMs: number; fieldHint?: string }
@@ -987,6 +1076,32 @@ export async function fillWithFallback(
     candidates = found.length > 0 ? ` Visible input candidates: ${found.join(' | ')}` : '';
   } catch {
     /* candidate enumeration is best-effort context for the error */
+  }
+
+  // AR-07 final rung: let the reasoning backend PICK among real candidate
+  // selectors (selection, not generation). Any failure falls through to the
+  // legacy error so LLM unavailability never changes the failure contract.
+  try {
+    const inventory = (await distillDomInventory(page, { maxElements: 60 })).filter(
+      (entry) => entry.visible && ['input', 'textarea', 'select'].includes(entry.tag)
+    );
+    if (inventory.length > 0) {
+      const decision = await decideFromObservation({
+        goal: `Pick the selector of the form field to fill${hint ? ` for "${hint}"` : ''} with the provided text.`,
+        observation: inventory
+          .map((entry) => `${entry.selector} [${entry.role}] ${entry.text}`)
+          .join('\n'),
+        options: inventory.map((entry) => entry.selector),
+      });
+      if (decision) {
+        const llmPick = await tryStrategy('llm_pick', () =>
+          page.fill(decision.decision, input.text, { timeout: input.timeoutMs })
+        );
+        if (llmPick) return llmPick;
+      }
+    }
+  } catch (err: any) {
+    attempts.push(`llm_pick: ${String(err?.message || err).split('\n')[0]}`);
   }
 
   throw new Error(

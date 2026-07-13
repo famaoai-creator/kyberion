@@ -12,6 +12,7 @@ describe('channel-directory', () => {
     expect(entries.map((entry) => entry.channel)).toEqual([
       'chronos',
       'cli',
+      'cowork',
       'discord',
       'imessage',
       'presence',

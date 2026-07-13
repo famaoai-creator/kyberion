@@ -1,0 +1,7 @@
+{
+  "mission_type": "marketing-video-production",
+  "pipeline": "knowledge/product/pipeline-templates/video-production.json",
+  "publication_intent": "none",
+  "risk_level": 0,
+  "brand_profile": "customer/_template/brand/brand-guidelines.md"
+}

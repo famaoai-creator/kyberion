@@ -1,0 +1,29 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "publication-review",
+  "version": "1.0.0",
+  "description": "Build a local review result; blocking findings prevent approval readiness.",
+  "context": {
+    "output_path": "active/shared/tmp/marketing-video-dry-run/publication-review.json",
+    "claim_register": "knowledge/product/schemas/marketing-workload.example.json",
+    "risk_level": 2
+  },
+  "steps": [
+    {
+      "id": "write_review_result",
+      "role": "gate",
+      "op": "system:write_file",
+      "params": {
+        "path": "{{output_path}}",
+        "format": "json",
+        "content": {
+          "reviews": [],
+          "blocking_findings": ["independent reviews have not been supplied"],
+          "ready_for_approval": false,
+          "claim_register": "{{claim_register}}",
+          "risk_level": "{{risk_level}}"
+        }
+      }
+    }
+  ]
+}

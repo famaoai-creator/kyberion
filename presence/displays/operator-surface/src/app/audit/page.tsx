@@ -10,15 +10,20 @@ export default async function AuditPage() {
   return (
     <section>
       <h1 style={{ marginBottom: 4 }}>Audit Chain</h1>
-      <p style={{ color: '#9aa0aa', marginTop: 0, fontSize: 13 }}>
+      <p style={{ color: 'var(--kb-muted-text)', marginTop: 0, fontSize: 13 }}>
         Most recent {events.length} events
-        {scope ? <> filtered to tenant <code>{scope}</code></> : null}.
-        Source: <code>active/audit/*.jsonl</code>. Hash chain integrity is
-        verified at write time; this page renders raw entries.
+        {scope ? (
+          <>
+            {' '}
+            filtered to tenant <code>{scope}</code>
+          </>
+        ) : null}
+        . Source: <code>active/audit/*.jsonl</code>. Hash chain integrity is verified at write time;
+        this page renders raw entries.
       </p>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
         <thead>
-          <tr style={{ background: '#15171c', textAlign: 'left' }}>
+          <tr style={{ background: 'var(--kb-surface)', textAlign: 'left' }}>
             <th style={th}>Time</th>
             <th style={th}>Action</th>
             <th style={th}>Operation</th>
@@ -30,13 +35,13 @@ export default async function AuditPage() {
         </thead>
         <tbody>
           {events.map((e) => (
-            <tr key={e.id} style={{ borderBottom: '1px solid #1a1c22' }}>
+            <tr key={e.id} style={{ borderBottom: '1px solid var(--kb-border)' }}>
               <td style={td}>{e.timestamp?.slice(0, 19)}</td>
               <td style={td}>
                 <code>{e.action}</code>
               </td>
               <td style={td}>
-                <code style={{ color: '#9aa0aa' }}>{e.operation}</code>
+                <code style={{ color: 'var(--kb-muted-text)' }}>{e.operation}</code>
               </td>
               <td style={td}>{resultBadge(e.result)}</td>
               <td style={td}>
@@ -56,16 +61,20 @@ export default async function AuditPage() {
   );
 }
 
-const th: React.CSSProperties = { padding: '8px 12px', borderBottom: '1px solid #2a2c33', fontWeight: 600 };
+const th: React.CSSProperties = {
+  padding: '8px 12px',
+  borderBottom: '1px solid var(--kb-border)',
+  fontWeight: 600,
+};
 const td: React.CSSProperties = { padding: '6px 12px', verticalAlign: 'top' };
 
 function resultBadge(result: string) {
   const colors: Record<string, string> = {
-    allowed: '#9be3a8',
-    denied: '#ff8fa3',
-    error: '#ff8fa3',
-    completed: '#8ec3ff',
-    failed: '#ff8fa3',
+    allowed: 'var(--kb-success)',
+    denied: 'var(--kb-danger)',
+    error: 'var(--kb-danger)',
+    completed: 'var(--kb-accent-text)',
+    failed: 'var(--kb-danger)',
   };
-  return <code style={{ color: colors[result] ?? '#e4e6eb' }}>{result || '—'}</code>;
+  return <code style={{ color: colors[result] ?? 'var(--kb-text-primary)' }}>{result || '—'}</code>;
 }

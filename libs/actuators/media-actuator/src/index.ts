@@ -1,3 +1,4 @@
+import { draftDeckSectionBodies, selectDeckTheme } from '@agent/core';
 import {
   logger,
   safeReadFile,
@@ -499,21 +500,12 @@ function buildPptxSlideFromPattern(
   const bodyText = bodyLines.join('\n');
   const elements: any[] = [];
 
-  // Resolve logo from branding > theme assets with fallback to nested structures and defaults
-  let rawLogoPath =
+  // Resolve logo from branding > theme assets. No cross-tenant fallback: a
+  // hardcoded default tenant's logo must never render on another tenant's
+  // deck, and reading another tenant's confidential/ path is a tier-guard
+  // violation anyway. Absent an explicit logo_url, render without a logo.
+  const rawLogoPath =
     data.branding?.logo_url || theme?.assets?.logo_url || theme?.theme?.assets?.logo_url || null;
-  if (!rawLogoPath) {
-    const fallbackPaths = [
-      'knowledge/confidential/sbijsm/design/assets/logo.png',
-      'knowledge/confidential/sbijsm/assets/logo.png',
-    ];
-    for (const p of fallbackPaths) {
-      if (safeExistsSync(path.resolve(rootDir, p))) {
-        rawLogoPath = p;
-        break;
-      }
-    }
-  }
   const logoPath = rawLogoPath ? path.resolve(rootDir, rawLogoPath) : null;
   const logoExists = logoPath ? safeExistsSync(logoPath) : false;
   const brandName = data.branding?.brand_name || theme?.name || theme?.theme?.name || '';
@@ -1645,7 +1637,31 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
         logger.warn('[MEDIA_TRANSFORM] theme catalog not found, skipping theme application');
         return ctx;
       }
-      const themeName = resolve(params.theme) || themes.default_theme || 'kyberion-standard';
+      let themeName = resolve(params.theme) || themes.default_theme || 'kyberion-standard';
+      // LLM-boundary audit fix A: theme: 'auto' selects a story-matched theme
+      // from the governed catalog (selection only — never invents colors);
+      // failure or an empty story keeps the catalog default.
+      if (themeName === 'auto') {
+        const fallbackTheme = themes.default_theme || 'kyberion-standard';
+        const storySource =
+          ctx.document_outline ||
+          ctx.last_brief ||
+          ctx.brief ||
+          params.story ||
+          ctx.last_json ||
+          {};
+        themeName = await selectDeckTheme({
+          title: String(
+            (storySource as any).title || (storySource as any).document_type || 'Document'
+          ),
+          summary: JSON.stringify(storySource).slice(0, 1500),
+          catalog: Object.entries(themes.themes).map(([id, record]: [string, any]) => ({
+            id,
+            name: record?.name ? String(record.name) : undefined,
+          })),
+          defaultTheme: fallbackTheme,
+        });
+      }
       const theme = themes.themes[themeName];
       const confidentialPack = theme ? null : resolveConfidentialThemePack(rootDir, themeName);
       const resolvedTheme =
@@ -1860,6 +1876,59 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
       const category = resolveMediaBriefCategory(rawBrief);
       const brief = normalizeBriefForCategory(rootDir, rawBrief);
       const outline = buildOutlineFromNormalizedBrief(rootDir, category, brief);
+
+      // Story-matched theme (deck counterpart of video-visual-direction):
+      // only when the brief did not explicitly choose one — operator intent
+      // always wins, and failure keeps the preset default.
+      const explicitTheme = (brief as any).theme || (brief as any).payload?.theme;
+      if (!explicitTheme && outline?.recommended_theme) {
+        const catalogRaw = loadThemeCatalog(rootDir)?.themes || {};
+        const catalog = Object.entries(catalogRaw).map(([id, record]: [string, any]) => ({
+          id,
+          name: record?.name ? String(record.name) : undefined,
+        }));
+        outline.recommended_theme = await selectDeckTheme({
+          title: String((brief as any).title || outline.document_type || 'Document'),
+          summary: JSON.stringify(
+            (brief as any).sections ?? (brief as any).objective ?? brief
+          ).slice(0, 1500),
+          tone: (brief as any).tone ? String((brief as any).tone) : undefined,
+          audience: (brief as any).audience ? String((brief as any).audience) : undefined,
+          catalog,
+          defaultTheme: String(outline.recommended_theme),
+        });
+      }
+
+      // LLM-boundary audit fix B: fill ONLY empty section bodies (the
+      // llm_zone declared draft_body_content but nothing implemented it —
+      // body-less briefs rendered heading-only decks). Existing bodies and
+      // failures leave the outline untouched.
+      const outlineSections = Array.isArray((outline as any)?.sections)
+        ? ((outline as any).sections as any[])
+        : [];
+      const draftTargets = outlineSections.map((section: any) => ({
+        id: String(section.section_id || section.id || section.title || 'section'),
+        title: String(section.title || section.section_id || 'Section'),
+        body: Array.isArray(section.body) ? section.body.join(' ') : section.body,
+      }));
+      if (draftTargets.some((section) => !String(section.body ?? '').trim())) {
+        const drafts = await draftDeckSectionBodies({
+          title: String((brief as any).title || outline.document_type || 'Document'),
+          tone: (brief as any).tone ? String((brief as any).tone) : undefined,
+          audience: (brief as any).audience ? String((brief as any).audience) : undefined,
+          locale: (brief as any).locale ? String((brief as any).locale) : undefined,
+          sections: draftTargets,
+        });
+        for (const section of outlineSections) {
+          const key = String(section.section_id || section.id || section.title || 'section');
+          const hasBody = Array.isArray(section.body)
+            ? section.body.some((value: any) => String(value ?? '').trim())
+            : Boolean(String(section.body ?? '').trim());
+          if (!hasBody && drafts[key]) {
+            section.body = Array.isArray(section.body) ? [drafts[key]] : drafts[key];
+          }
+        }
+      }
 
       return {
         ...ctx,

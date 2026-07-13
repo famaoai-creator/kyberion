@@ -82,6 +82,7 @@
 - [Kyberion コンセプト評価と実装改善計画](./product/architecture/kyberion-concept-evaluation-2026-04-26.md) (public | Codex)
 - [LLM Execution Boundary](./product/architecture/llm-execution-boundary.md) (public | Unknown)
 - [Management Control Plane](./product/architecture/management-control-plane.md) (public | Ecosystem Architect)
+- [Marketing And Video Workload](./product/architecture/marketing-video-workload.md) (public | Unknown)
 - [Media Document Generation Boundary](./product/architecture/media-document-generation-boundary.md) (public | Unknown)
 - [Media Execution Backend Abstraction](./product/architecture/media-execution-backend-abstraction.md) (public | Unknown)
 - [Microservices Design Patterns](./product/architecture/microservices-patterns.md) (public | Ecosystem Architect)

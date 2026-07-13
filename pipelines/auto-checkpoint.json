@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "description": "Daily automatic checkpoint pass for active missions.",
   "_refs": {
-    "plan": "docs/improvement-plans-2026-07/AO-01_AUTONOMOUS_MAINTENANCE_LOOP.ja.md",
+    "plan": "docs/developer/improvement-plans-2026-07/AO-01_AUTONOMOUS_MAINTENANCE_LOOP.ja.md",
     "implementation": "scripts/auto_checkpoint.ts"
   },
   "schedule": {

@@ -5,7 +5,11 @@
  * _shared / _evidence_checks / _service_checks extractions.
  */
 
-import { createDistillCandidateRecord, createTaskSession } from '@agent/core';
+import {
+  buildProductivityTaskPlan,
+  createDistillCandidateRecord,
+  createTaskSession,
+} from '@agent/core';
 import {
   ContractCheck,
   readGovernanceJson,
@@ -682,6 +686,20 @@ export function createPolicyAndManifestChecks(deps: PolicyCheckDeps): ContractCh
         {
           device_preference: 'rear-camera',
           save_path: 'active/shared/tmp/photo.jpg',
+        },
+      ],
+    },
+    {
+      id: 'productivity-task-plan',
+      schemaPath: 'knowledge/product/schemas/productivity-task-plan.schema.json',
+      validPayloads: [buildProductivityTaskPlan('会議の日程を変更して参加者にメールを送って')],
+      invalidPayloads: [
+        {
+          ...buildProductivityTaskPlan('ブラウザで購入して決済して'),
+          execution: {
+            mode: 'dry_run',
+            external_effects_executed: true,
+          },
         },
       ],
     },

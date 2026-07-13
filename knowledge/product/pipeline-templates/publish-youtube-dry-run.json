@@ -1,0 +1,48 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "publish-youtube-dry-run",
+  "version": "1.0.0",
+  "description": "Render an unapproved local YouTube preview fixture. It never represents G5 approval or publication. Use scripts/marketing_publish_dry_run.ts with a human approval record for the governed G5/G6 path.",
+  "context": {
+    "output_path": "active/shared/tmp/marketing-video-dry-run/youtube-publication-preview.json",
+    "verification_path": "active/shared/tmp/marketing-video-dry-run/publication-verification.json",
+    "visibility": "unlisted",
+    "dry_run": true
+  },
+  "steps": [
+    {
+      "id": "write_publication_preview",
+      "role": "sink",
+      "op": "system:write_file",
+      "params": {
+        "path": "{{output_path}}",
+        "format": "json",
+        "content": {
+          "status": "dry_run_completed",
+          "service": "youtube",
+          "visibility": "{{visibility}}",
+          "external_effects": false,
+          "publication_url": "local://youtube-preview",
+          "approval_required_for_live_execution": true,
+          "approval_gate_status": "not_evaluated_fixture_only"
+        }
+      }
+    },
+    {
+      "id": "write_verification",
+      "role": "gate",
+      "op": "system:write_file",
+      "params": {
+        "path": "{{verification_path}}",
+        "format": "json",
+        "content": {
+          "status": "passed",
+          "dry_run": true,
+          "counts_as_publication": false,
+          "network_access": false,
+          "visibility_check": "passed"
+        }
+      }
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 # 改善計画 実装状況正本(STATUS)
 
-> **監査日**: 2026-07-05(全93計画を実コードと突き合わせて検証)/ 2026-07-06 MO-01 を DONE に更新 / 2026-07-11 IP-07・AA-02 行の陳腐化を再突合で訂正 / 同日 TODO 全18行を機械突合し 11 ID(SA-03/OP-01/IL-01/02/03/05/AO-04/AA-04/CO-01〜04)を PARTIAL へ訂正(実装+緑テストを確認。KM-02/DS-04/HO-02/CO-05/AC-05/IP-10 は真に未了と再確認)/ 2026-07-12 SA-02 行の陳腐化を再突合で訂正(残とされた3点は実装済み・19テスト緑を確認)
+> **監査日**: 2026-07-05(全93計画を実コードと突き合わせて検証)/ 2026-07-06 MO-01 を DONE に更新 / 2026-07-11 IP-07・AA-02 行の陳腐化を再突合で訂正 / 同日 TODO 全18行を機械突合し 11 ID(SA-03/OP-01/IL-01/02/03/05/AO-04/AA-04/CO-01〜04)を PARTIAL へ訂正(実装+緑テストを確認。KM-02/DS-04/HO-02/CO-05/AC-05/IP-10 は真に未了と再確認)/ 2026-07-12 SA-02 行の陳腐化を再突合で訂正(残とされた3点は実装済み・19テスト緑を確認)/ 2026-07-13 DS-01・UX-05 を DONE に更新(UI/UX governance audit、CI/validate、operator surface token 化を実証)
 > **更新規約**: 計画の実装・レビュー完了時に本表を更新する。各計画文書内の「実装状況」節と矛盾する場合は本表を正とし、文書側を追従させる。
 > **判定基準**: DONE = 受入条件を実コードで検証済 / PARTIAL = 一部充足 / TODO = 実質未着手。
 
@@ -8,8 +8,8 @@
 
 | 判定    | 件数 |
 | ------- | ---- |
-| DONE    | 51   |
-| PARTIAL | 41   |
+| DONE    | 53   |
+| PARTIAL | 39   |
 | TODO    | 0    |
 
 ## P0 残作業(プロダクション化のクリティカルパス)
@@ -18,7 +18,7 @@
 | ----- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | IP-07 | DONE    | 2026-07-12 網羅精査で完了確認: 受入1(adf-repair カスケード5本)/受入2(3アダプタのトランスポートモック)/受入3(ゲート2script の golden)/受入4(orchestrator 特性化 — mission昇格・pipeline実行・直接応答3系統を含む fastpath 18本 + delegation + intent-context)/受入5(stub 決定論)すべて充足。47本一括緑                                                                                                                                                                                                     |
 | MO-01 | DONE    | 2026-07-06 完了: phaseSpec スキーマ(catalog v1.1.0)+タスク展開(plan-tasks/createMission)+3プロセステンプレート追加。worker イベント連鎖のフェーズ駆動化は計画どおり MO-02 に委譲                                                                                                                                                                                                                                                                                                                          |
-| MO-02 | PARTIAL | 2026-07-12 再突合+実装: gate-engine/計画・受入ゲート/finish 修復ループ/override 記録は実装済みだった。フェーズ exit ゲートの実行時評価を新設(completion 前、既定 warn → KYBERION_PHASE_GATE_MODE=enforce でブロック、3回失敗で circuit breaker 通知)。残: warn 観測→enforce 昇格、human_override の署名強制、realign 自動再計画                                                                                                                                                                           |
+| MO-02 | PARTIAL | 2026-07-12 再突合+実装: gate-engine/計画・受入ゲート/finish 修復ループ/override 記録は実装済みだった。フェーズ exit ゲートの実行時評価を新設(completion 前、既定 warn → KYBERION_PHASE_GATE_MODE=enforce でブロック、3回失敗で circuit breaker 通知)。human_override 署名強制実装(HMAC、warn→enforce 段階、KYBERION_GATE_OVERRIDE_SIGNATURE)。残: warn 観測→enforce 昇格(運用)、realign 自動再計画                                                                                                        |
 | AA-02 | DONE    | 2026-07-11 完了: driver/dispatchToPeer/writer fencing に加え、2-peer E2E(実 HTTP+HMAC、正常配送・復帰再配送・dead-letter・dedup)を実装。物理2プロセス実証のみ E3 パイロットへ                                                                                                                                                                                                                                                                                                                             |
 | SA-02 | DONE    | 2026-07-12 再突合: 「残」とされた3点は実装済みだった — execution-bounds.ts(system-actuator 移行済み)/ SECURITY.md「Shell & ADF Execution Guardrails」節 / enforce は全経路で既定(warn 段階を経ず fail-closed、KYBERION_SHELL_POLICY 変数は不要と判断され不存在)。受入条件5点をコード+19テスト緑で確認。HMAC 署名は 2026-07-11 実装済み                                                                                                                                                                    |
 | SA-05 | DONE    | 2026-07-12 完了: Task 2(dormant enforcement 2重バグ根治: YAML パーサ不全で全ポリシー無効 + `(?i)` 不発、発火文脈接続)/ Task 1(policy violation・actuator dispatch の kill-switch 供給。monitor 起動・graduated response・閾値外出しは実装済みを確認)/ Task 3.3(require_approval を requireApprovalForOp へ統一 — pending 承認リクエスト作成、承認後に再試行可)/ Task 4(統制サマリへ policies declared/loaded と anomalies 追加)。rapid-fire 閾値の実運用調整のみ trust-policy.json で運用対応             |
@@ -64,7 +64,7 @@
 | UX-02 | DONE    | 2026-07-12 完了: 4ブリッジ typing 表示(discord sendTyping / telegram sendChatAction / slack 👀 リアクション / imessage 先行一言)を共通ヘルパーで実装。chronos キャンセル+フェーズ表示は 07-11 済み                                                                                                       |
 | UX-03 | DONE    | 2026-07-12 完了: locale-resolver 一元化、cli help/主要エラー62キー、onboarding(flow-policy {en,ja} + wizard + TTY拒否文)、chronos 言語トグル(localStorage 永続)、uxText fallback 撤去 + 契約テスト、hero/ヘッダ/FirstRunBanner/QuickAction/StatusCard 両対応(計106+キー)。未対応面リストは計画文書に記録 |
 | UX-04 | PARTIAL | 2026-07-12: CLI 承認動詞統一(approve/reject + 名前付きフラグ、旧形式は警告エイリアス)・decidedBy の identity 化・chronos 番号選択+拒否経路を実装。残: slack-bridge 提案の Block Kit ボタン化のみ                                                                                                         |
-| UX-05 | PARTIAL | 契約スナップショットテスト+CI ゲート、dashboard の renderStatus 経由化                                                                                                                                                                                                                                   |
+| UX-05 | DONE    | 2026-07-13 完了: operator output の契約 fixture、dashboard の connection/provider/mission/runtime `renderStatus()` 配線、`check:ui-ux` の validate/CI/週次 pipeline 接続を実装                                                                                                                           |
 | UX-06 | DONE    | (軽微: 3面バナーの版数統一)                                                                                                                                                                                                                                                                              |
 
 ### AC(アクチュエータ能力)
@@ -101,13 +101,13 @@
 
 ### DS(デザインシステム)
 
-| ID    | 状態    | 残作業                                                                                                                                                                        |
-| ----- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| DS-01 | PARTIAL | 生成ゲートの validate チェーン接続、operator-surface 残り約124 hex の変換                                                                                                     |
-| DS-02 | DONE    | 2026-07-12 完了: tier 隔離テスト3本(無文脈= default・フォールスルー無し)+ chronos /api/tenant-design の認証ガード欠落を発見・修正 + DESIGN_SYSTEM.md テナント節               |
-| DS-03 | DONE    | pptx ea 日本語フォント、PDF サブセット埋め込み、日本語ゴールデン                                                                                                              |
-| DS-04 | PARTIAL | 2026-07-11 突合: Task 1〜3 実装済み(compiler に 98 トークン、共有変数 54、テスト16件緑 — #490 の負検証は対象ディレクトリ誤り)。残: Task 4 テナント実写検証(DS-02 Task 3 依存) |
-| DS-05 | DONE    | reduced-motion、コントラストゲート、light/dark トグル、ARIA                                                                                                                   |
+| ID    | 状態    | 残作業                                                                                                                                                                                                                                                                                                                                                                             |
+| ----- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| DS-01 | DONE    | 2026-07-13 完了: semantic token を4面CSS/Tailwindへ生成、明示 light/dark selector を正準化、operator-surface の raw 色を0件化、`check:ui-ux` を validate/CI/週次 pipeline へ接続                                                                                                                                                                                                   |
+| DS-02 | DONE    | 2026-07-12 完了: tier 隔離テスト3本(無文脈= default・フォールスルー無し)+ chronos /api/tenant-design の認証ガード欠落を発見・修正 + DESIGN_SYSTEM.md テナント節                                                                                                                                                                                                                    |
+| DS-03 | DONE    | pptx ea 日本語フォント、PDF サブセット埋め込み、日本語ゴールデン                                                                                                                                                                                                                                                                                                                   |
+| DS-04 | PARTIAL | 2026-07-13: agy 縦型ショートの品質修復 — **キュレーション済み pattern pack(video-visual-patterns.json、5パターン)から LLM が選択**(色の発明はさせない、pptx themes.json と同型)+ scene CSS トークン注入、プレースホルダ工程図全廃、縦型タイポスケール対応。pptx 側も themes.json からのストーリー適合テーマ選択を配線(deck-theme-direction.ts)。残: motion/transition のトークン化 |
+| DS-05 | DONE    | reduced-motion、コントラストゲート、light/dark トグル、ARIA                                                                                                                                                                                                                                                                                                                        |
 
 ### AA(エージェント間通信)
 
@@ -121,14 +121,15 @@
 
 ### AR(アクチュエータリファクタリング/使いやすさ)
 
-| ID    | 状態    | 残作業                                                                                                                                                                                    |
-| ----- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| AR-01 | PARTIAL | 残: run_pipeline ループの機械的委譲のみ(意味論分岐は 2026-07-12 までに全解消: budget 執行・on_error・repair 統合・subprocess 廃止)                                                        |
-| AR-02 | PARTIAL | 残: ロングテール(非 pipeline 系)アクチュエータの self-describe、CAPABILITIES op 表の生成切替(主要7アクチュエータの self-describe 生成は 2026-07-12 完了)                                  |
-| AR-03 | PARTIAL | write_artifact/path 前倒し検証、notify/read_file/read_json/open_file 含む op_input_contracts、generate_op_registry/discovery 反映、browser/file/system の契約 coverage 検査、主要 op 検証 |
-| AR-04 | PARTIAL | canonical op family 定義、browser alias 共通化、browser/system の正規化と警告                                                                                                             |
-| AR-05 | PARTIAL | system file I/O の file-actuator forward、観察/変更・ドメイン境界の分割準備                                                                                                               |
-| AR-06 | PARTIAL | teach message(shared helper で network/orchestrator/file/system へ展開)、skipped 明示化(run_pipeline 含む)、silent default 回帰検知、AR-01 集約                                           |
+| ID    | 状態    | 残作業                                                                                                                                                                                                                                                                                                                                 |
+| ----- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AR-01 | PARTIAL | 残: run_pipeline ループの機械的委譲のみ(意味論分岐は 2026-07-12 までに全解消: budget 執行・on_error・repair 統合・subprocess 廃止)                                                                                                                                                                                                     |
+| AR-02 | PARTIAL | 残: ロングテール(非 pipeline 系)アクチュエータの self-describe、CAPABILITIES op 表の生成切替(主要7アクチュエータの self-describe 生成は 2026-07-12 完了)                                                                                                                                                                               |
+| AR-03 | PARTIAL | write_artifact/path 前倒し検証、notify/read_file/read_json/open_file 含む op_input_contracts、generate_op_registry/discovery 反映、browser/file/system の契約 coverage 検査、主要 op 検証                                                                                                                                              |
+| AR-04 | PARTIAL | canonical op family 定義、browser alias 共通化、browser/system の正規化と警告                                                                                                                                                                                                                                                          |
+| AR-05 | PARTIAL | system file I/O の file-actuator forward、観察/変更・ドメイン境界の分割準備                                                                                                                                                                                                                                                            |
+| AR-06 | PARTIAL | teach message(shared helper で network/orchestrator/file/system へ展開)、skipped 明示化(run_pipeline 含む)、silent default 回帰検知、AR-01 集約                                                                                                                                                                                        |
+| AR-07 | PARTIAL | 2026-07-13 新設+初期実装: T1〜T4 の連携層タクソノミと actuator 全体監査を計画化。core `decideFromObservation`(選択>生成、options 外は拒否)、browser `distill_dom`(決定論蒸留)+ `llm_decide` op、fillWithFallback の llm_pick 最終段(LLM 不調でも従来エラー契約維持)。残: android/terminal への横展開、蒸留ヘルパの system/network 適用 |
 
 ### SA(セキュリティ・監査)
 
