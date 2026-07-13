@@ -201,6 +201,12 @@ export interface MissionState {
       confidence: number;
       evidence_refs?: string[];
     };
+    existing_work_reconciliation_summary?: {
+      manifest_sha256: string;
+      source_commit: string;
+      task_ids: string[];
+      receipt_path: string;
+    };
     intent_delta_summary?: {
       checked_at: string;
       passed: boolean;
@@ -304,6 +310,7 @@ export const VALUE_FLAGS = new Set([
   '--owner',
   '--reason',
   '--severity',
+  '--manifest',
 ]);
 
 export const ACTIVE_TIERS: readonly string[] = ['personal', 'confidential', 'public'];

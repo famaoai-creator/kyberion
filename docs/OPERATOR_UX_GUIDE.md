@@ -552,12 +552,33 @@ MC="node dist/scripts/mission_controller.js"
 $MC start MY-TASK --tier confidential --persona ecosystem_architect
 $MC status MY-TASK
 $MC checkpoint MY-TASK step-1 "Progress note"
+$MC reconcile-work MY-TASK --manifest active/shared/tmp/reconciliation.json --dry-run
+$MC reconcile-work MY-TASK --manifest active/shared/tmp/reconciliation.json
 $MC verify MY-TASK verified "Verification summary"
 $MC finish MY-TASK
 ```
 
 Direct mission commands are for operators.
 They are not the primary UX you should teach first.
+
+Normally, execute generated tasks with `dispatch-tickets` followed by
+`dispatch-workitems`. Use `reconcile-work` only when work was already completed
+through another governed path, such as a feature branch created before the
+Mission tasks were dispatched. Start from
+`knowledge/product/schemas/mission-work-reconciliation.example.json` and map
+every task acceptance criterion to hash-bound Evidence plus a passed
+verification record.
+
+Always run `--dry-run` first. Reconciliation fails without changing Mission
+state when the source commit is not on the declared branch, an artifact hash
+changed, Evidence is not tracked unchanged by that commit, Evidence escapes
+the source repository, a criterion is unmapped, a dependency remains
+unresolved, or `adopted_by` differs from the execution actor. A successful
+apply writes a receipt under
+`evidence/work-reconciliation/`, appends the execution ledger and audit trail,
+marks only listed tasks completed, and synchronizes an existing local WorkItem.
+It never closes GitHub or Jira tickets and never executes the recorded test
+command.
 
 ### Reasoning policy
 
