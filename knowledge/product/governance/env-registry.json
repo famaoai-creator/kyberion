@@ -180,6 +180,14 @@
       "documented": false
     },
     {
+      "name": "KYBERION_ALLOW_STUB_FALLBACK",
+      "category": "flag",
+      "type": "boolean",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_ALLOW_TEST_NOTIFICATIONS",
       "category": "flag",
       "type": "boolean",
