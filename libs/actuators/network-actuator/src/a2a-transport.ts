@@ -6,6 +6,7 @@ import {
   safeExistsSync,
   safeReaddir,
   safeUnlinkSync,
+  safeMoveSync,
   pathResolver,
   safeExec,
 } from '@agent/core';
@@ -19,6 +20,7 @@ import * as crypto from 'node:crypto';
 
 const A2A_INBOX = pathResolver.rootResolve('active/shared/runtime/a2a/inbox');
 const A2A_OUTBOX = pathResolver.rootResolve('active/shared/runtime/a2a/outbox');
+const A2A_QUARANTINE = path.join(A2A_INBOX, '.quarantine');
 
 interface TransportOptions {
   method: 'local';
@@ -69,7 +71,16 @@ export async function pollA2AInbox(): Promise<any[]> {
       // Move to processed or delete
       safeUnlinkSync(filePath);
     } catch (err) {
-      logger.error(`Failed to parse A2A message ${file}: ${err}`);
+      // AA-05 Task 1.3: a poisoned message must not be retried forever (it
+      // would otherwise sit in the inbox and get re-read, re-fail, and
+      // re-log on every poll). Quarantine it once instead of losing or
+      // looping on it.
+      if (!safeExistsSync(A2A_QUARANTINE)) safeMkdir(A2A_QUARANTINE, { recursive: true });
+      const quarantinePath = path.join(A2A_QUARANTINE, file);
+      safeMoveSync(filePath, quarantinePath);
+      logger.warn(
+        `[A2A_Transport] Failed to parse A2A message ${file}, quarantined to ${quarantinePath}: ${err}`
+      );
     }
   }
 
