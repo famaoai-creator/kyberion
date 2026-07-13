@@ -53,3 +53,7 @@
 
 - リネームは semver 上の破壊的変更になり得る(op 名)。互換エイリアスを 1 リリース維持し、`check:contract-semver` の判定に従う。
 - 相関 ID の伝搬は複数モジュールを横断する薄い変更の集合で、コンフリクトしやすい。AA-01〜04 の実装が落ち着いた後に実施する(Wave 上も後段に置く)。
+
+## 実装メモ
+
+- 2026-07-14: Task 1.3(ファイル版の堅牢化)を実装。従来の `pollA2AInbox` は parse 失敗時に unlink しないだけで、同じ壊れたファイルを毎回再読込・再度 parse 失敗・再度エラーログ、という無限リトライになっていた(黙って消える訳ではないが、実質的に detectable でも回復不能だった)。`inbox/.quarantine/` へ1回だけ `safeMoveSync` で退避し `logger.warn` するよう変更(専用テスト0本だったため `a2a-transport.test.ts` を新設、送信/正常消費/quarantine/混在ポーリングの4本)。Task 1.1/1.2(二重実装の処置判断・リネーム方針)、Task 2(相関ID貫通)、Task 3(mission flowコマンド)は未着手のまま。

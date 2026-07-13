@@ -136,10 +136,20 @@ describe.sequential('code_change PR collaboration (E2E-03 Task 6)', () => {
       mission_type: 'code_change',
       assignments: [],
     });
-    mocks.resolveMissionTeamReceiver.mockReturnValue({
-      agent_id: 'implementation-architect',
-      model_hint: { tier: 'small', effort: 'low', model_id: 'openai:gpt-5.4-mini' },
-    });
+    // A fixed agent_id regardless of teamRole would assign the reviewer to
+    // the same agent that implemented the change, tripping the (correct)
+    // reviewer-independence check and silently blocking the review task.
+    // Real resolveMissionTeamReceiver respects excludedAgentIds; mirror that
+    // here so the review task actually gets dispatched.
+    mocks.resolveMissionTeamReceiver.mockImplementation(
+      ({ teamRole }: { teamRole: string; excludedAgentIds?: string[] }) => ({
+        agent_id:
+          teamRole === 'reviewer' || teamRole === 'qa'
+            ? 'review-architect'
+            : 'implementation-architect',
+        model_hint: { tier: 'small', effort: 'low', model_id: 'openai:gpt-5.4-mini' },
+      })
+    );
   });
 
   afterEach(async () => {
