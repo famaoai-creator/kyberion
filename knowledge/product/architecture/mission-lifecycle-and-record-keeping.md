@@ -58,6 +58,7 @@ Create mission
 | Context pack | mission owner / planner | `coordination/context-packs/**` | Compiles a scoped mission context pack from mission / project / task / role state before execution. |
 | Ticket dispatch | mission owner / planner | `coordination/tickets/**`, `coordination/events/ticket-events.jsonl`, `NEXT_TASKS.json` ticket annotations | Registers mission tasks as durable WorkItem records and optional GitHub / Jira payload artifacts before live routing. |
 | Work item dispatch | mission owner / planner | `coordination/tickets/replies/**`, ticket manifest updates, mission evidence response artifacts | Routes registered WorkItems to a live agent or subagent and writes the completion / review result back to the ticket records. |
+| Existing work reconciliation | `mission_controller` | reconciliation manifest, `evidence/work-reconciliation/**`, `execution-ledger.jsonl`, `NEXT_TASKS.json` reconciliation annotations | Exception path for adopting hash-bound, verified work completed before dispatch. It is not a replacement for normal work-item dispatch. |
 | Board update | Work Coordination Platform | `WorkItem`, board view, claim/handoff/release state | Durable work tracking; not runtime ownership. |
 | A2A / transport | agents | A2A messages, peer transport, short-lived coordination logs | Used for short instructions or branching work, not lifecycle authority. |
 | Fanout / critique | `wisdom` ops | `hypothesis-tree*.json`, `dissent-log.json` | Divergent reasoning and review. |
@@ -121,6 +122,47 @@ Operational rule:
 - do not rely on the runtime supervisor snapshot as the only source of truth
   for the response body
 
+## Existing work reconciliation
+
+Mission evidence and task completion are intentionally separate. The
+`record-evidence` command appends proof to the execution ledger, but it does not
+change `NEXT_TASKS.json`; otherwise an unrelated or incomplete Evidence record
+could silently bypass the finish exit gate.
+
+When implementation was completed outside `dispatch-workitems`, use the
+explicit reconciliation contract:
+
+```bash
+MC="node dist/scripts/mission_controller.js"
+$MC reconcile-work <MISSION_ID> --manifest <PATH> --dry-run
+$MC reconcile-work <MISSION_ID> --manifest <PATH>
+```
+
+The manifest schema is
+`knowledge/product/schemas/mission-work-reconciliation.schema.json`. Each task
+must bind all of its declared acceptance criteria to existing Evidence files,
+record SHA-256 for every Evidence file, prove every Evidence file is tracked
+unchanged by the source commit, include a passed verification record, and
+identify a source commit contained by the declared branch. The execution actor
+must match `adopted_by`, and only the `mission_controller` role or SUDO may
+apply the manifest.
+
+Application is deterministic and idempotent for the same manifest hash. It:
+
+- marks only explicitly listed, non-terminal Mission tasks as `completed`
+- resolves dependencies only when they were already terminal or are included
+  in the same validated manifest
+- updates a linked local WorkItem to `done` without performing external writes
+- writes a reconciliation receipt and task annotations containing the manifest
+  hash, source commit, Evidence hashes, criterion mappings, and verification
+- appends Mission execution-ledger and global audit-chain events
+- resolves `repair-finish-exit` only after every dependency of that generated
+  repair task is terminal
+
+It does not execute the recorded verification command, infer completion from a
+Git diff, close external tickets, or accept changed artifacts. Operators must
+run the verification first and preserve its result as Evidence.
+
 ## Persona and authority split
 
 - `KYBERION_PERSONA` describes the display / reasoning persona.
@@ -144,12 +186,13 @@ For a new team-composing mission, the stable operator sequence is:
 5. `mission_controller record-task <MISSION_ID> <DESCRIPTION>`
 6. `mission_controller dispatch-tickets <MISSION_ID>`
 7. `mission_controller dispatch-workitems <MISSION_ID>`
-8. Update the board or work item view
-9. Use `a2a_fanout` for divergent analysis or critique
-10. `mission_controller checkpoint <MISSION_ID> <TASK_ID> <NOTE>`
-11. `mission_controller verify <MISSION_ID> verified <NOTE>`
-12. `mission_controller distill <MISSION_ID>`
-13. `mission_controller finish <MISSION_ID>`
+8. If work already exists outside dispatch, dry-run and apply `reconcile-work`
+9. Update the board or work item view
+10. Use `a2a_fanout` for divergent analysis or critique
+11. `mission_controller checkpoint <MISSION_ID> <TASK_ID> <NOTE>`
+12. `mission_controller verify <MISSION_ID> verified <NOTE>`
+13. `mission_controller distill <MISSION_ID>`
+14. `mission_controller finish <MISSION_ID>`
 
 Each step should leave a durable artifact or audit trail.
 
