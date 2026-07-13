@@ -58,3 +58,7 @@
 - express の既定 identity(「Sovereign/KYBERION-PRIME」等)が本番運用にそのまま残ると没個性になる。express 完了後に「後で `pnpm onboard` で調整を」を明示し、dashboard 等に「既定 identity のままです」の軽い注意を出す。
 - reset は削除操作。customer オーバーレイ/confidential 配下の識別情報を誤って消さないよう、対象を onboarding 成果物に限定し、確認を必須にする。
 - vital/identity route の overlay 対応は UX-06 の resolver 抽出に依存。実施順は UX-06 → ONB-03 Task 5。
+
+## 実装メモ(続き)
+
+- 2026-07-14: Task 5 前半(Chronos identity route)を実装。UX-06 が想定した専用 resolver 抽出は行われていなかったが、`libs/core/customer-resolver.ts` の `resolveOverlay()`(operator-identity.ts が既に使っている解決順: `customer/{slug}/{file}` → `knowledge/personal/{file}`)がそのまま使えたため、`api/identity/route.ts` の `pathResolver.knowledge("personal/...")` 直参照をこれに置換。`FirstRunBanner`/`IdentityBadge` はどちらも `/api/identity` を叩くため副次的に修正される。テスト3本新設(未オンボード / personal フォールバック / customer overlay 優先、overlay 存在時に personal 側データを無視することを固定)。残: `pipelines/vital-check.json` の `p_identity`/`p_vision` ステップは静的 JSON のため同じ置換ができない — テンプレート変数(`{{active_profile_root}}` 等)を run_pipeline エンジンに追加するか、overlay 解決済みの新 op を作る設計判断が必要で、本セッションのスコープ外とした。
