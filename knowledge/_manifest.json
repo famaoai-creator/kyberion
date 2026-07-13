@@ -507,7 +507,7 @@
     {
       "path": "product/architecture/mission-lifecycle-and-record-keeping.md",
       "tier": "public",
-      "size": 7184,
+      "size": 9568,
       "type": "md"
     },
     {
@@ -4473,7 +4473,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 47382,
+      "size": 48430,
       "type": "json"
     },
     {
@@ -6604,6 +6604,18 @@
       "path": "product/schemas/mission-team-templates.schema.json",
       "tier": "public",
       "size": 1711,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/mission-work-reconciliation.example.json",
+      "tier": "public",
+      "size": 1254,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/mission-work-reconciliation.schema.json",
+      "tier": "public",
+      "size": 3020,
       "type": "json"
     },
     {
