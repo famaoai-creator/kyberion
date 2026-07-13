@@ -102,6 +102,29 @@ describe('artifact review contract', () => {
     expect(result.reasons).toContain('review review-1 was invalidated by artifact change');
   });
 
+  it('blocks when any artifact lacks a hash-matching review', () => {
+    const result = evaluateArtifactReviews({
+      artifacts: [
+        { path: 'video.mp4', sha256: 'a'.repeat(64) },
+        { path: 'thumbnail.png', sha256: 'b'.repeat(64) },
+      ],
+      reviews: [
+        {
+          review_id: 'review-video',
+          artifact_path: 'video.mp4',
+          artifact_sha256: 'a'.repeat(64),
+          reviewer_role: 'content-reviewer',
+          verdict: 'approved',
+          findings: [],
+        },
+      ],
+      requiredReviewerRoles: ['content-reviewer'],
+    });
+
+    expect(result.ready).toBe(false);
+    expect(result.reasons).toContain('artifact has no current review: thumbnail.png');
+  });
+
   it('blocks missing specialist roles, implementation-agent review, and blocking findings', () => {
     const result = evaluateArtifactReviews({
       artifacts: [{ path: 'out.md', sha256: 'a'.repeat(64) }],
