@@ -62,3 +62,10 @@
 ## 実装メモ 追記 (2026-07-06)
 
 - 業態別会社テンプレート(`templates/companies/`、CO-02 追記参照)が Company 集約の構成ファイル(customer.json / identity.json / vision.md / organization-profile.json / org-chart.json)を一式で生成するようになった。`pnpm company:bootstrap` 後に `resolveCompany(tenantSlug)` がそのまま集約可能。
+
+## 実装メモ 追記 (2026-07-14): `getGoldenRule` テナント対応精査(STATUS.ja.md 残作業)
+
+- コード精査: `fileUtils.getGoldenRule()`(`libs/core/core.ts:440`)は `resolveVision()` を**引数なしで**呼ぶ。`resolveVision(tenantSlug?, rootDir?)`(`libs/core/vision-resolver.ts:200-201`)側が `tenantSlug?.trim() || customerResolver.activeCustomer() || null` という内部フォールバックを持ち、`KYBERION_CUSTOMER` 環境変数からテナントを解決する実装は 2026-07-05 の時点で**既に実装済みだった**。
+- ただし当時はこのフォールバック経路(`getGoldenRule` → `resolveVision()` 引数なし → `activeCustomer()`)を通しで検証するテストが一切無かった(`vision-resolver.test.ts` は `resolveVision('acme', tmpRoot)` と明示 tenantSlug を渡すケースのみ、`getGoldenRule` 自体には直接のテストが皆無)。「実装済みだが未検証」という状態で、STATUS.ja.md の「残: getGoldenRule のテナント対応精査」は正しい指摘だった(AC-06 のような完全な陳腐化ではなく、検証の欠落)。
+- 対応: 2点のテストを追加。(1) `vision-resolver.test.ts` に `KYBERION_CUSTOMER` 環境変数を実際に設定/削除して `resolveVision(undefined, tmpRoot)` を呼ぶテスト(tenant 解決とグローバルフォールバック両方を実ファイルで固定)。(2) `core.test.ts` に `resolveVision` をモックして `fileUtils.getGoldenRule()` が引数なしでそれを呼ぶこと(= テナント解決の責務を `resolveVision` 側に委譲していること)を固定するテスト。
+- 検証: `npx tsc --noEmit` 緑、`vision-resolver.test.ts` + `core.test.ts` 計22本緑、`libs/core` 全体 2754/2755 緑(残る1件は node_modules シンボリックリンクループという環境要因で無関係)。

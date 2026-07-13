@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import path from 'node:path';
-import { ui } from './core.js';
+import { ui, fileUtils } from './core.js';
 import {
   detectTier,
   scanForConfidentialMarkers,
@@ -27,6 +27,18 @@ const readlineMock = vi.hoisted(() => ({
 vi.mock('node:readline', () => ({
   createInterface: readlineMock.createInterface,
 }));
+
+const visionResolverMock = vi.hoisted(() => ({
+  resolveVision: vi.fn(),
+}));
+
+vi.mock('./vision-resolver.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./vision-resolver.js')>();
+  return {
+    ...actual,
+    resolveVision: visionResolverMock.resolveVision,
+  };
+});
 
 describe('core library bundle', () => {
   beforeEach(() => {
@@ -173,6 +185,48 @@ describe('core library bundle', () => {
       process.argv = ['node', 'test', '-y'];
       await expect(ui.confirm('delete everything?', { destructive: true })).resolves.toBe(true);
       expect(readlineMock.createInterface).toHaveBeenCalled();
+    });
+  });
+
+  // CO-01: getGoldenRule() must be tenant-aware. It delegates to resolveVision()
+  // with no explicit tenantSlug, which is only correct because resolveVision()
+  // itself falls back to customerResolver.activeCustomer() (the KYBERION_CUSTOMER
+  // env var) when no tenantSlug is passed. That fallback wiring was previously
+  // unverified by any test — this locks in the delegation contract.
+  describe('fileUtils.getGoldenRule (CO-01 tenant awareness)', () => {
+    afterEach(() => {
+      visionResolverMock.resolveVision.mockReset();
+    });
+
+    it('returns the resolved vision text when the active tenant has one', () => {
+      visionResolverMock.resolveVision.mockReturnValue({
+        tenant_slug: 'acme',
+        source_path: '/customer/acme/vision.md',
+        source_kind: 'customer',
+        title: 'ACME Vision',
+        raw: '# ACME Vision\n\n## Steering\n- Tenant priority first\n',
+        sections: { soul: [], steering: ['Tenant priority first'], destination: [] },
+      });
+
+      expect(fileUtils.getGoldenRule()).toContain('Tenant priority first');
+      // No tenantSlug argument: tenant resolution is resolveVision's job (via
+      // customerResolver.activeCustomer()), not getGoldenRule's.
+      expect(visionResolverMock.resolveVision).toHaveBeenCalledWith();
+    });
+
+    it('falls back to the global default when resolveVision has no tenant/global content', () => {
+      visionResolverMock.resolveVision.mockReturnValue({
+        tenant_slug: null,
+        source_path: '/vision/_default.md',
+        source_kind: 'global',
+        title: null,
+        raw: '',
+        sections: { soul: [], steering: [], destination: [] },
+      });
+
+      const rule = fileUtils.getGoldenRule();
+      expect(typeof rule).toBe('string');
+      expect(rule.length).toBeGreaterThan(0);
     });
   });
 });
