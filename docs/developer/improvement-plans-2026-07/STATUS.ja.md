@@ -1,6 +1,6 @@
 # 改善計画 実装状況正本(STATUS)
 
-> **監査日**: 2026-07-05(全93計画を実コードと突き合わせて検証)/ 2026-07-06 MO-01 を DONE に更新 / 2026-07-11 IP-07・AA-02 行の陳腐化を再突合で訂正 / 同日 TODO 全18行を機械突合し 11 ID(SA-03/OP-01/IL-01/02/03/05/AO-04/AA-04/CO-01〜04)を PARTIAL へ訂正(実装+緑テストを確認。KM-02/DS-04/HO-02/CO-05/AC-05/IP-10 は真に未了と再確認)/ 2026-07-12 SA-02 行の陳腐化を再突合で訂正(残とされた3点は実装済み・19テスト緑を確認)/ 2026-07-13 DS-01・UX-05 を DONE に更新(UI/UX governance audit、CI/validate、operator surface token 化を実証)/ 同日 IP-09 を DONE に更新(残 slugify 6箇所の正本化+再発防止文書化)/ 同日 IP-11 の Task 3(@ts-ignore 6箇所解消)完了を反映(PARTIAL のまま、残タスクは別増分) / 同日 MO-08 を DONE に更新(hash-bound 成果物 review、独立 reviewer routing、reconcile/finish の品質 gate 分離を実証) / 2026-07-14 AC-06 を DONE に更新(陳腐化していた能力境界表を生成元スクリプトへ追加し再生成、GLOSSARY 断リンク解消)/ 同日 CO-01 を DONE に更新(getGoldenRule のテナント対応は実装済み・未検証だった — フォールバック経路をテストで固定)/ 同日 CO-02 を DONE に更新(カスタムロール作成フロー精査 — 全4タスク実装・テスト済みを再突合、真の陳腐化)
+> **監査日**: 2026-07-05(全93計画を実コードと突き合わせて検証)/ 2026-07-06 MO-01 を DONE に更新 / 2026-07-11 IP-07・AA-02 行の陳腐化を再突合で訂正 / 同日 TODO 全18行を機械突合し 11 ID(SA-03/OP-01/IL-01/02/03/05/AO-04/AA-04/CO-01〜04)を PARTIAL へ訂正(実装+緑テストを確認。KM-02/DS-04/HO-02/CO-05/AC-05/IP-10 は真に未了と再確認)/ 2026-07-12 SA-02 行の陳腐化を再突合で訂正(残とされた3点は実装済み・19テスト緑を確認)/ 2026-07-13 DS-01・UX-05 を DONE に更新(UI/UX governance audit、CI/validate、operator surface token 化を実証)/ 同日 IP-09 を DONE に更新(残 slugify 6箇所の正本化+再発防止文書化)/ 同日 IP-11 の Task 3(@ts-ignore 6箇所解消)完了を反映(PARTIAL のまま、残タスクは別増分) / 同日 MO-08 を DONE に更新(hash-bound 成果物 review、独立 reviewer routing、reconcile/finish の品質 gate 分離を実証) / 2026-07-14 AC-06 を DONE に更新(陳腐化していた能力境界表を生成元スクリプトへ追加し再生成、GLOSSARY 断リンク解消)/ 同日 CO-01 を DONE に更新(getGoldenRule のテナント対応は実装済み・未検証だった — フォールバック経路をテストで固定)/ 同日 CO-02 を DONE に更新(カスタムロール作成フロー精査 — 全4タスク実装・テスト済みを再突合、真の陳腐化) / 同日 IP 節の IP-07 行を DONE に訂正(P0表は 2026-07-12 に DONE 更新済みだったが IP 節側が未反映のまま陳腐化していた。サマリ件数も 58/35 → 59/34 へ補正)
 > **更新規約**: 計画の実装・レビュー完了時に本表を更新する。各計画文書内の「実装状況」節と矛盾する場合は本表を正とし、文書側を追従させる。
 > **判定基準**: DONE = 受入条件を実コードで検証済 / PARTIAL = 一部充足 / TODO = 実質未着手。
 
@@ -8,8 +8,8 @@
 
 | 判定    | 件数 |
 | ------- | ---- |
-| DONE    | 58   |
-| PARTIAL | 35   |
+| DONE    | 59   |
+| PARTIAL | 34   |
 | TODO    | 0    |
 
 ## P0 残作業(プロダクション化のクリティカルパス)
@@ -42,7 +42,7 @@
 | IP-04 | DONE    | 2026-07-12 完了: 再監査で「参照ゼロ6本」は陳腐化(大半は manifest の contract_schema 正規参照)。真の未参照2本(ingestion/super-nerve)のみ削除、契約チェック緑。同名別契約の browser-pipeline は二重定義に非ず                                                                                                         |
 | IP-05 | DONE    |                                                                                                                                                                                                                                                                                                                     |
 | IP-06 | DONE    |                                                                                                                                                                                                                                                                                                                     |
-| IP-07 | PARTIAL | 2026-07-11 突合: backend/orchestrator/operator-learning のテストは実在し緑。残: 受入条件全体との網羅精査                                                                                                                                                                                                            |
+| IP-07 | DONE    | 2026-07-12 網羅精査で完了確認(P0表参照): 受入1〜5(adf-repair カスケード/3アダプタのトランスポートモック/ゲート2scriptのgolden/orchestrator特性化/stub決定論)すべて充足、47本一括緑                                                                                                                                                                                                            |
 | IP-08 | DONE    | 2026-07-12 完了: 台帳(a32/b49/c13)→ (c) 実バグ根治(tier-guard 破損ポリシー fail-open)、(b) 49箇所 logger.warn、(a)+残余48箇所へ理由コメント、console→logger(除外一覧文書化)、errorHandler の process.exit を throw 化、eslint で no-empty + process.exit 制限を恒久化                                               |
 | IP-09 | DONE    | 2026-07-13 完了: 残っていた slugify ローカル定義6箇所(voice-hub/campaign-suite/modeling-actuator/scripts3本)を正本 `@agent/core` slugify() へ移行(挙動一致をスクリプト検証+回帰テスト2本で確認)。再発防止は EXTENSION_POINTS.md §8 に文書化(retry は識別子が汎用的で lint 誤検知リスクが高いため文書化を採用)       |
 | IP-10 | PARTIAL | 2026-07-11: check_contract_schemas から policy/manifest 系46チェック(1,170行)を \_policy_checks へ抽出(4,684→3,527行、check:contract-schemas 実走で同一動作を確認)。残: 同ファイルの継続分割と他の巨大ファイル                                                                                                      |
