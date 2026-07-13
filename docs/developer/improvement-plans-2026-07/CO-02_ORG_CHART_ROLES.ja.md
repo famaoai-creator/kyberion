@@ -61,3 +61,14 @@
 - 業態別チームテンプレートカタログ 5 種を `organization-team-template-catalogs/` に追加し、各プロファイルの `team_defaults.team_template_catalog_id` から参照。
 - 実体化 CLI `pnpm company:bootstrap --vertical <id> --slug <slug> --name "<会社名>"`(`scripts/company_bootstrap.ts`)を追加。プレースホルダ置換で `customer/<slug>/` に生成し、`resolveOrganizationOrgChart` / `loadOrganizationProfile` / `composeMissionTeamPlan`(organization_chart summary)まで E2E 確認済み。
 - 契約テスト `tests/company-vertical-templates-contract.test.ts` がスキーマ適合・ロール/権限の実在・レポートライン解決・「root は human 1 名」を全業態に対して固定。
+
+## 実装メモ 追記 (2026-07-14): カスタムロール作成フロー精査(STATUS.ja.md 残作業)
+
+STATUS.ja.md の「残: カスタムロール作成フロー精査」を実コード・実テストで再突合。CO-01(getGoldenRule)と異なり、今回は**全4タスクとも実装・テストの両方が既に揃っていた**(真の陳腐化、追加実装は不要):
+
+- Task 1(組織図データ化): `knowledge/product/schemas/org-chart.schema.json` 実在、`libs/core/org-chart.ts` が既定編成を提供。
+- Task 2(カスタムロール作成フロー): `scripts/org.ts`(`pnpm org role create` / `pnpm org role promote`)+ `scripts/org.test.ts`(2テスト: 作成時の authority/team/policy/role doc 整合、既存 role の act 昇格)を確認・実行し緑。
+- Task 3(ビジネスロールの act 化): `tests/governance-policy.test.ts` が `finance_controller` を財務ドメイン配下の書き込みは許可・無関係な procedure ファイルへの書き込みは拒否、と scope 限定を固定していることを確認(「advise だけでなく限定的に act」の受入条件と一致)。
+- Task 4(Company への紐付け): `libs/core/company.ts` の `org_chart_ref` + `libs/core/company.test.ts` の該当アサーションで紐付けとテスト済みを確認。
+
+検証: `scripts/org.test.ts` + `libs/core/company.test.ts` + `tests/company-vertical-templates-contract.test.ts` + `tests/governance-policy.test.ts` 計26テスト緑(既存テストの再実行、コード変更なし)。
