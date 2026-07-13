@@ -249,7 +249,6 @@ export class ACPMediator {
     const targetModel = this.options.modelId || resolveRuntimeModelId('gemini-default');
     try {
       logger.info(`[ACP_MEDIATOR] Setting model to: ${targetModel}`);
-      // @ts-ignore
       await this.connection.unstable_setSessionModel({
         sessionId: this.acpSessionId,
         modelId: targetModel,
