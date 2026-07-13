@@ -174,6 +174,7 @@ interface WorkItemReviewPlannedTask extends Record<string, unknown> {
   description?: string;
   deliverable?: string;
   target_path?: string;
+  dependencies?: string[];
   acceptance_criteria?: string[];
   risk?: string;
   review_target?: string;
@@ -1351,6 +1352,37 @@ function resolveWorkItemProjectId(state: MissionState): string {
   return String(state.relationships?.project?.project_id || state.mission_id || '').trim();
 }
 
+const TERMINAL_MISSION_TASK_STATUSES = new Set(['done', 'completed', 'accepted', 'reviewed']);
+
+function areMissionTaskDependenciesSatisfied(state: MissionState, item: WorkItem): boolean {
+  const missionPath =
+    findMissionPath(state.mission_id.toUpperCase()) ||
+    pathResolver.missionDir(state.mission_id.toUpperCase(), state.tier);
+  const taskId = getWorkItemTaskId(item);
+  if (!missionPath || !taskId) return true;
+  const tasks =
+    readJsonFileFromDispatchIO<WorkItemReviewPlannedTask[]>(missionNextTasksPath(missionPath)) ||
+    [];
+  const task = tasks.find((candidate) => String(candidate.task_id || '') === taskId);
+  if (!task) return true;
+  const metadata = (item.metadata || {}) as Record<string, unknown>;
+  const dependencies = Array.isArray(task.dependencies)
+    ? task.dependencies
+    : Array.isArray(metadata.dependencies)
+      ? metadata.dependencies.map((dependency) => String(dependency || '').trim()).filter(Boolean)
+      : [];
+  if (dependencies.length === 0) return true;
+  const statusByTaskId = new Map(
+    tasks.map((candidate) => [
+      String(candidate.task_id || ''),
+      String(candidate.status || 'planned').toLowerCase(),
+    ])
+  );
+  return dependencies.every((dependency) =>
+    TERMINAL_MISSION_TASK_STATUSES.has(statusByTaskId.get(dependency) || '')
+  );
+}
+
 function selectWorkItems(state: MissionState, options: MissionWorkItemDispatchOptions): WorkItem[] {
   const missionId = state.mission_id.toUpperCase();
   const projectId = resolveWorkItemProjectId(state);
@@ -1368,7 +1400,10 @@ function selectWorkItems(state: MissionState, options: MissionWorkItemDispatchOp
     source: sources,
     status: statuses,
     labels,
-  }).filter((item) => getMissionLabel(item) === missionId);
+  }).filter(
+    (item) =>
+      getMissionLabel(item) === missionId && areMissionTaskDependenciesSatisfied(state, item)
+  );
 }
 
 function resolveAssigneePeerId(input: {

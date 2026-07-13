@@ -192,6 +192,10 @@ mandate to the selected reviewer, and writes the receipt into
 `evidence/reviews/` while annotating `NEXT_TASKS.json`. Blocking findings keep
 the ticket and Mission task in review. `reconcile-work` applies the same
 contract only when the review was completed outside this dispatch path.
+Work-item eligibility is resolved from the current `NEXT_TASKS.json`
+dependency statuses, not registration order. Delivery and retrospective work
+therefore remain ineligible until their reviewer and delivery prerequisites
+are terminal.
 
 If a reviewed artifact changes, `finish` reopens only its review task and
 keeps the implementation task completed. If ordinary work remains, `finish`
