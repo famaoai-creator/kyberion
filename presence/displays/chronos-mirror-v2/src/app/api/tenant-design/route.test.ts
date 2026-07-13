@@ -1,6 +1,15 @@
 import path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { safeMkdir, safeRmSync, safeWriteFile } from '@agent/core';
+
+// route.ts calls guardRequest(req), which needs a NextRequest (cookies API
+// etc.) that a plain Request doesn't implement. Bypass it here (this test
+// is about tenant design resolution, not auth) the same way
+// operator-home/route.test.ts does.
+vi.mock('../../../lib/api-guard', () => ({
+  guardRequest: vi.fn(() => null),
+}));
+
 import { GET } from './route.js';
 
 describe('tenant-design route', () => {

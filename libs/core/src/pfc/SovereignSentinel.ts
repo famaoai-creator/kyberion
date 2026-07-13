@@ -24,8 +24,8 @@ export class SovereignSentinel {
   }
 
   public async run(): Promise<SentinelResult> {
-    // 実行順序 (L0 -> L5)
-    const ORDER: Layer[] = ['L0', 'L1', 'L2', 'L3', 'L4', 'L5'];
+    // 実行順序 (L0 -> L7)
+    const ORDER: Layer[] = ['L0', 'L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7'];
 
     for (const layer of ORDER) {
       if (this.registry.has(layer)) {
@@ -36,7 +36,7 @@ export class SovereignSentinel {
           return {
             success: false,
             failedLayer: layer,
-            circuitBroken: result.circuit_broken
+            circuitBroken: result.circuit_broken,
           };
         }
       }
@@ -44,7 +44,7 @@ export class SovereignSentinel {
 
     return {
       success: true,
-      circuitBroken: false
+      circuitBroken: false,
     };
   }
 

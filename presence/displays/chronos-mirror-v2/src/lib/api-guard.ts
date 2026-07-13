@@ -60,7 +60,11 @@ function getRateLimitKey(req: NextRequest): string {
 export function resolveChronosAccessRole(req: NextRequest): ChronosAccessRole | null {
   const token = resolveToken(req);
   const ip = getClientIP(req);
-  const isLocal = isLoopback(ip);
+  // 'unknown' means the runtime couldn't determine a real IP (common on
+  // self-hosted Node.js, where NextRequest.ip is often unpopulated) - it
+  // must never be treated as a trusted loopback signal, or every request
+  // with an undetermined IP would silently get localadmin.
+  const isLocal = ip !== 'unknown' && isLoopback(ip);
 
   if (LOCALADMIN_TOKEN && token === LOCALADMIN_TOKEN) {
     return 'localadmin';

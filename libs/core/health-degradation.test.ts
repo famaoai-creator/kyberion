@@ -5,6 +5,7 @@ import {
   runDegradationWatch,
   type LatencyRegression,
 } from './health-degradation.js';
+import type { FinanceControllerDecision } from './finance-controller.js';
 
 const REGRESSION: LatencyRegression = {
   skill: 'pdf-render',
@@ -12,6 +13,37 @@ const REGRESSION: LatencyRegression = {
   historicalAvg: 3000,
   increaseRate: 3,
 };
+
+function financeDecision(
+  mode: FinanceControllerDecision['mode'],
+  reasons: string[]
+): FinanceControllerDecision {
+  return {
+    mode,
+    shouldCutCosts: mode === 'cost_cutting',
+    reasons,
+    signals: {
+      revenueJpy: null,
+      operatingCostJpy: null,
+      grossProfitJpy: null,
+      budgetJpy: null,
+      budgetUtilization: null,
+      okrProgressPercent: null,
+      costReportTotalUsd: null,
+      costReportTotalTokens: null,
+    },
+    thresholds: {
+      budgetUtilizationWarning: 0.75,
+      budgetUtilizationCritical: 0.9,
+      negativeGrossProfitBudgetMode: true,
+      lowOkrProgressWarning: 75,
+      lowOkrProgressCritical: 50,
+      highTokenUsageWarning: 5000,
+      highTokenUsageCritical: 20000,
+    },
+    sources: { financialPath: 'test', okrPath: 'test', costReportPath: null },
+  };
+}
 
 describe('loadHealthThresholds', () => {
   it('loads the governed thresholds file', () => {
@@ -52,6 +84,45 @@ describe('evaluateDegradation', () => {
     });
     expect(manyDemotions.verdict).toBe('red');
   });
+
+  it('ignores a growth-mode finance decision', () => {
+    const report = evaluateDegradation({
+      regressions: [],
+      demotedProviders: [],
+      financeDecision: financeDecision('growth', []),
+    });
+    expect(report.verdict).toBe('green');
+    expect(report.findings).toHaveLength(0);
+  });
+
+  it('warns on a budget/KPI signal in monitor mode', () => {
+    const report = evaluateDegradation({
+      regressions: [],
+      demotedProviders: [],
+      financeDecision: financeDecision('monitor', ['OKR progress is behind (60%)']),
+    });
+    expect(report.verdict).toBe('yellow');
+    expect(report.findings).toEqual([
+      {
+        kind: 'budget_or_kpi_signal',
+        severity: 'warning',
+        detail: 'OKR progress is behind (60%)',
+      },
+    ]);
+  });
+
+  it('escalates a budget overrun in cost_cutting mode to critical', () => {
+    const report = evaluateDegradation({
+      regressions: [],
+      demotedProviders: [],
+      financeDecision: financeDecision('cost_cutting', ['Budget utilization is 95.0%']),
+    });
+    expect(report.verdict).toBe('red');
+    expect(report.findings[0]).toMatchObject({
+      kind: 'budget_or_kpi_signal',
+      severity: 'critical',
+    });
+  });
 });
 
 describe('runDegradationWatch', () => {
@@ -88,6 +159,19 @@ describe('runDegradationWatch', () => {
       demotedProviders: ['codex', 'gemini'],
       alert: alert as never,
     });
+    expect(alert.mock.calls[0][0].severity).toBe('critical');
+  });
+
+  it('escalates a cost_cutting finance decision to a critical ops-alert', () => {
+    const alert = vi.fn().mockReturnValue({ id: 'A-3' });
+    const { report } = runDegradationWatch({
+      regressions: [],
+      demotedProviders: [],
+      financeDecision: financeDecision('cost_cutting', ['Gross profit is negative']),
+      alert: alert as never,
+    });
+    expect(report.verdict).toBe('red');
+    expect(alert).toHaveBeenCalledOnce();
     expect(alert.mock.calls[0][0].severity).toBe('critical');
   });
 });

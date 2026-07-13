@@ -1,6 +1,6 @@
 import { safeExistsSync, safeReadFile, safeWriteFile } from '../../secure-io.js';
 
-export type Layer = 'L0' | 'L1' | 'L2' | 'L3' | 'L4' | 'L5' | 'L6';
+export type Layer = 'L0' | 'L1' | 'L2' | 'L3' | 'L4' | 'L5' | 'L6' | 'L7';
 
 export interface LayerState {
   status: 'pending' | 'passed' | 'failed';
@@ -29,14 +29,15 @@ export class PfcController {
   private getDefaultState(): PfcState {
     return {
       layers: {
-        'L0': { status: 'pending', attempt_count: 0 },
-        'L1': { status: 'pending', attempt_count: 0 },
-        'L2': { status: 'pending', attempt_count: 0 },
-        'L3': { status: 'pending', attempt_count: 0 },
-        'L4': { status: 'pending', attempt_count: 0 },
-        'L5': { status: 'pending', attempt_count: 0 },
-        'L6': { status: 'pending', attempt_count: 0 },
-      }
+        L0: { status: 'pending', attempt_count: 0 },
+        L1: { status: 'pending', attempt_count: 0 },
+        L2: { status: 'pending', attempt_count: 0 },
+        L3: { status: 'pending', attempt_count: 0 },
+        L4: { status: 'pending', attempt_count: 0 },
+        L5: { status: 'pending', attempt_count: 0 },
+        L6: { status: 'pending', attempt_count: 0 },
+        L7: { status: 'pending', attempt_count: 0 },
+      },
     };
   }
 
@@ -44,7 +45,11 @@ export class PfcController {
     if (safeExistsSync(this.stateFilePath)) {
       try {
         const raw = safeReadFile(this.stateFilePath, { encoding: 'utf8' }) as string;
-        return JSON.parse(raw) as PfcState;
+        const parsed = JSON.parse(raw) as PfcState;
+        // Forward-compat: a state file persisted before a new layer was
+        // added won't have that layer's key. Backfill defaults rather than
+        // crash the first time the new layer runs.
+        return { layers: { ...this.getDefaultState().layers, ...parsed.layers } };
       } catch (err) {
         return this.getDefaultState();
       }
@@ -85,7 +90,8 @@ export class PfcController {
 
     return {
       passed: layerState.status === 'passed',
-      circuit_broken: layerState.status === 'failed' && layerState.attempt_count >= this.MAX_ATTEMPTS
+      circuit_broken:
+        layerState.status === 'failed' && layerState.attempt_count >= this.MAX_ATTEMPTS,
     };
   }
 }

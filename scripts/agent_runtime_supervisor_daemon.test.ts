@@ -188,6 +188,61 @@ describe('agent_runtime_supervisor_daemon', () => {
     });
   }, 90000);
 
+  it('rejects ask requests over the per-agent inflight limit and admits again once slots free up', async () => {
+    // AGENT_LIMIT defaults to 2 (KYBERION_AGENT_INFLIGHT_LIMIT unset in test env).
+    instance = await startAgentRuntimeSupervisorDaemon({
+      transport: 'unix',
+      socketPath,
+      lockPath,
+      exitOnFatalError: false,
+      exitOnExistingHealthyDaemon: false,
+    });
+
+    // Track resolvers in invocation order rather than assuming which of the
+    // two concurrent requests below wins the race to be admitted first.
+    const resolvers: Array<(value: string) => void> = [];
+    mocks.askAgentRuntime.mockImplementation(
+      () =>
+        new Promise<string>((resolve) => {
+          resolvers.push(resolve);
+        })
+    );
+
+    const askAgent1 = (id: string) =>
+      sendRequest(socketPath, {
+        id,
+        method: 'ask',
+        payload: { agentId: 'agent-1', prompt: 'hello', requestedBy: 'test' },
+      });
+
+    const pending1 = askAgent1('a');
+    const pending2 = askAgent1('b');
+    // Give both requests a tick to be admitted and increment inflight before the third arrives.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(resolvers).toHaveLength(2);
+
+    const rejected = await askAgent1('c');
+    expect(rejected).toMatchObject({
+      ok: false,
+      errorDetail: { type: 'busy' },
+    });
+
+    resolvers[0]('released-1');
+    const firstSettled = await Promise.race([pending1, pending2]);
+    expect(firstSettled).toMatchObject({ ok: true, result: { text: 'released-1' } });
+
+    // A freed slot admits a new request immediately.
+    mocks.askAgentRuntime.mockResolvedValueOnce('admitted-after-release');
+    const admittedAfterRelease = await askAgent1('d');
+    expect(admittedAfterRelease).toMatchObject({
+      ok: true,
+      result: { text: 'admitted-after-release' },
+    });
+
+    resolvers[1]('released-2');
+    await Promise.all([pending1, pending2]);
+  }, 90000);
+
   it('returns a typed error for malformed JSON requests', async () => {
     instance = await startAgentRuntimeSupervisorDaemon({
       transport: 'unix',

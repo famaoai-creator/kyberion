@@ -1419,11 +1419,16 @@ export async function POST(req: NextRequest) {
   } catch (err: any) {
     clearChronosCache();
     console.error('[CHRONOS_API_AGENT] Error in POST:', err);
+    const envelope = buildUserFacingError(err, { surface: 'chronos' });
     return NextResponse.json(
       {
+        // SovereignChat re-derives its own envelope from `error` (falling
+        // back to a generic "No response" message when it's absent) - give
+        // it the already-sanitized category text, never the raw err.message.
+        error: envelope.body,
         debugError: err.message,
         debugStack: err.stack,
-        ...buildUserFacingError(err, { surface: 'chronos' }),
+        ...envelope,
       },
       { status: 500 }
     );

@@ -50,3 +50,7 @@
 - 会話履歴の再注入は**古い文脈の混入**(すでに無効な指示の再適用)リスクがある。注入は要約 + 「これは復元された文脈であり、最新の指示を優先せよ」の定型前置きを必ず付ける。
 - 会話ストアにはプロンプト要約が入るため tier 的には mission/runtime 領域(shared)。confidential ミッションの会話が要約経由で漏れないよう、記録時に mission tier を確認し、confidential 文脈ではプロンプト要約を省略(メタのみ記録)する。
 - inflight 上限は小さすぎると MO-03 の並列化を殺す。既定値は MO-03 の `max_parallel_members`(3)と整合させ、双方の文書に相互参照を明記する。
+
+## 実装メモ
+
+- 2026-07-14 精査: STATUS の「残: inflight admission」は陳腐化と判明。`scripts/agent_runtime_supervisor_daemon.ts` の `ask` ハンドラは既に `GLOBAL_LIMIT`(既定8)/`AGENT_LIMIT`(既定2、env: `KYBERION_GLOBAL_INFLIGHT_LIMIT`/`KYBERION_AGENT_INFLIGHT_LIMIT`)超過を同期チェックし、超過時は `{ok:false, errorDetail:{type:'busy', retry_after_ms}}` を即返す。`a2a-bridge.ts` はこれを `AgentBusyError` に変換済み。`control_plane_cli` の status/A2A表示にも `threadCount`/`inflightCount` 行が実装済み。ただしこの admission 経路には単体テストが1本も無かったため、`scripts/agent_runtime_supervisor_daemon.test.ts` に「2並列 ask は許可・3並列目は busy 拒否・解放後に再許可」を検証するテストを追加(3回連続実行で安定を確認、typecheck/lint 緑)。残(軽微): `control_plane_cli` の inflight 表示行自体の単体テストは未着手。
