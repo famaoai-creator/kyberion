@@ -232,7 +232,14 @@ describe('marketing workload gates', () => {
       ],
     });
     expect(result.status).toBe('failed');
-    expect(result.reasons).toHaveLength(3);
+    expect(result.reasons).toEqual(
+      expect.arrayContaining([
+        'review review-001 was invalidated by artifact change',
+        'review review-001 has blocking findings',
+        'required reviewer role is missing: legal-reviewer',
+        `artifact has no current review: ${artifact.path}`,
+      ])
+    );
   });
 
   it('allows suggestion-only review for the same artifact hash', () => {
