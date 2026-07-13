@@ -270,6 +270,39 @@ function buildCapabilitiesGuide(current: CurrentIndexRecord[]): string {
   lines.push('');
   lines.push(...buildOpKindTable('control'));
   lines.push('');
+  lines.push('## Capability Boundaries');
+  lines.push('');
+  lines.push(
+    'Several use cases map to more than one actuator by name alone. This table is the tie-breaker (AC-06).'
+  );
+  lines.push('');
+  lines.push('| Use case | Use this | Avoid / why |');
+  lines.push('| :--- | :--- | :--- |');
+  lines.push(
+    "| Screen capture (general purpose) | `system-actuator` (`test_screen_stream`, `test_screen_mp4_roundtrip`) | `media-generation-actuator`'s `capture_screen`/`record_screen` are scoped to generation workflows that need a recording bundled with generated output, not standalone capture. |"
+  );
+  lines.push(
+    '| Document rendering from a template (pptx/docx/pdf, partial updates) | `media-actuator` | Deterministic rendering, not generative — use `media-generation-actuator` for content that has to be authored/synthesized. |'
+  );
+  lines.push(
+    '| Generative image, video, or music | `media-generation-actuator` | `media-actuator` only renders from existing templates/content; it does not generate. |'
+  );
+  lines.push(
+    "| Assembling a narrated video from scenes/briefs | `video-composition-actuator` | Distinct from `media-generation-actuator`'s `generate_video`, which produces a single generative video clip rather than composing a narrated sequence. |"
+  );
+  lines.push(
+    '| Image perception (OCR, layout/content inspection) | `vision-actuator` (`inspect_image`, `ocr_image`) | `vision-actuator` is perception-only; its generation-shaped ops are compatibility facades that forward to `media-generation-actuator`. |'
+  );
+  lines.push(
+    '| One-shot OS command / shell | `system-actuator` (`pipeline` → `system:exec`, `system:shell`) | Use `process-actuator` instead if the command must be supervised or outlive the calling step. |'
+  );
+  lines.push(
+    '| Supervised, long-lived process (start/stop/status) | `process-actuator` | `system-actuator` and `terminal-actuator` do not track process lifecycle across steps. |'
+  );
+  lines.push(
+    "| Interactive terminal session (PTY, read/write a running shell) | `terminal-actuator` | `system-actuator`'s `pipeline` ops run a command to completion; they do not expose an interactive PTY. |"
+  );
+  lines.push('');
   lines.push('## Governed Core Workloads');
   lines.push('');
   lines.push(
