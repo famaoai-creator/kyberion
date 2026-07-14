@@ -69,6 +69,7 @@ export const WISDOM_ACTUATOR_APPLY_OPS = [
   'recommend',
   'register_presentation_preference_profile',
   'render_hypothesis_report',
+  'resolve_hypothesis_conflict',
   'simulate_all',
   'simulate_all_ensemble',
   'stakeholder_grid_sort',
