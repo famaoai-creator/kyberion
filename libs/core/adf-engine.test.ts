@@ -100,6 +100,22 @@ describe('executeAdfSteps', () => {
     expect(result.results).toEqual([{ op: 'if', status: 'skipped' }]);
   });
 
+  it('records skipped apply steps (AR-01 Phase C: run_pipeline routes non-control ops through apply)', async () => {
+    const result = await executeAdfSteps(
+      [{ type: 'apply', op: 'maybe_run', params: {} }],
+      {},
+      { maxSteps: 10, timeoutMs: 10_000 },
+      {
+        capture: async (_op, _params, ctx) => ctx,
+        transform: async (_op, _params, ctx) => ctx,
+        apply: async (_op, _params, ctx) => skipAdfStep(ctx, 'rejected by before hook'),
+      }
+    );
+
+    expect(result.status).toBe('succeeded');
+    expect(result.results).toEqual([{ op: 'maybe_run', status: 'skipped' }]);
+  });
+
   it('propagates nested control failures to the parent pipeline', async () => {
     const result = await executeAdfSteps(
       [

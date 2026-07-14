@@ -469,6 +469,45 @@ describe('run_pipeline compatibility', () => {
     });
   });
 
+  it('runs core:include fragments and flattens their results (AR-01 Phase C)', async () => {
+    const result = await runSteps(
+      [
+        { op: 'system:log', params: { message: 'before include' } },
+        {
+          op: 'core:include',
+          params: {
+            fragment: 'fragments/_test-run-pipeline-include.json',
+            context: { greeting: '{{name}}' },
+          },
+        },
+      ],
+      { name: 'world' }
+    );
+
+    expect(result.status).toBe('succeeded');
+    expect(result.context.fragment_result).toBe('world from fragment');
+    expect(result.results).toEqual([
+      { op: 'system:log', status: 'success' },
+      { op: 'core:transform', status: 'success' },
+      { op: 'core:include', status: 'success' },
+    ]);
+  });
+
+  it('detects circular core:include references', async () => {
+    const result = await runSteps([
+      {
+        op: 'core:include',
+        params: { fragment: 'fragments/_test-run-pipeline-include-cycle.json' },
+      },
+    ]);
+
+    expect(result.status).toBe('failed');
+    const failed = result.results.find(
+      (entry: { status: string; error?: string }) => entry.status === 'failed'
+    );
+    expect(failed?.error).toContain('circular reference detected');
+  });
+
   it('passes effort and budget through reasoning steps', () => {
     const policy = normalizeReasoningPolicy({
       op: 'reasoning:synthesize',
