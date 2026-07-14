@@ -33,7 +33,12 @@ export interface AdfSkippedStep {
 export interface AdfStepHandlers<Ctx extends AdfEngineContext = AdfEngineContext> {
   capture: (op: string, params: any, ctx: Ctx, resolve: (value: any) => any) => Promise<Ctx>;
   transform: (op: string, params: any, ctx: Ctx, resolve: (value: any) => any) => Promise<Ctx>;
-  apply: (op: string, params: any, ctx: Ctx, resolve: (value: any) => any) => Promise<void | Ctx>;
+  apply: (
+    op: string,
+    params: any,
+    ctx: Ctx,
+    resolve: (value: any) => any
+  ) => Promise<void | Ctx | AdfSkippedStep>;
   control?: (
     op: string,
     params: any,
@@ -150,6 +155,13 @@ async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineC
         ctx = await handlers.transform(step.op, step.params, ctx, resolve);
       } else if (step.type === 'apply') {
         const nextCtx = await handlers.apply(step.op, step.params, ctx, resolve);
+        if (isSkippedStep(nextCtx)) {
+          ctx = nextCtx.context as Ctx;
+          results.push({ op: step.op, status: 'skipped' });
+          logger.info(`  ${label} Step skipped (${step.op}): ${nextCtx.reason}`);
+          hooks?.afterStep?.(step, state.stepCount, ctx, { status: 'skipped' });
+          continue;
+        }
         if (nextCtx !== undefined) {
           ctx = nextCtx as Ctx;
         }
