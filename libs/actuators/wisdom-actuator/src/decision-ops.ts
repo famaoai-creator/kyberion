@@ -56,6 +56,9 @@ import {
   validateContextOutputTier,
   type GovernedContextFragment,
   type ReasoningParticipant,
+  resolveGoldenRulePriorityOrder,
+  resolveVision,
+  type GoldenRulePriority,
 } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
 import * as path from 'node:path';
@@ -864,6 +867,53 @@ export function recommend(input: { readiness_ref: string; options?: string[] }):
     };
   }
   return { choice, reason: `readiness_score=${score}` };
+}
+
+/**
+ * CO-04 Task 3: when hypothesis-tree convergence (hypothesis-tree-protocol.md
+ * Phase C) leaves more than one hypothesis surviving critique, decide between
+ * them deterministically using the vision's golden-rule priority order
+ * (Logical Integrity > Vision Alignment > Execution Speed > Adaptive
+ * Resilience by default) instead of an arbitrary pick. A candidate without a
+ * declared golden_rule_dimension ranks last — omission must not win a
+ * tie-break by default.
+ */
+export function resolveHypothesisConflict(input: {
+  source_path: string;
+  tenant_slug?: string | null;
+  output_path: string;
+}): {
+  winner_id: string | null;
+  conflict: boolean;
+  survivor_count: number;
+  golden_rule_priority: GoldenRulePriority[];
+  written_to: string;
+} {
+  const src = readJSON<any>(input.source_path);
+  const hypotheses: any[] = Array.isArray(src.hypotheses) ? src.hypotheses : [];
+  const survivors = hypotheses.filter((h) => h.survived === true);
+
+  const priority = resolveGoldenRulePriorityOrder(resolveVision(input.tenant_slug ?? null));
+  const dimensionRank = (h: any): number => {
+    const dimension = typeof h.golden_rule_dimension === 'string' ? h.golden_rule_dimension : null;
+    const idx = dimension ? priority.indexOf(dimension as GoldenRulePriority) : -1;
+    return idx === -1 ? priority.length : idx;
+  };
+
+  const conflict = survivors.length > 1;
+  const winner = conflict
+    ? [...survivors].sort((a, b) => dimensionRank(a) - dimensionRank(b))[0]
+    : (survivors[0] ?? null);
+
+  const result = {
+    winner_id: winner?.id ?? null,
+    conflict,
+    survivor_count: survivors.length,
+    golden_rule_priority: priority,
+    resolved_at: nowIso(),
+  };
+  writeJSON(input.output_path, result);
+  return { ...result, written_to: input.output_path };
 }
 
 /**
@@ -2838,6 +2888,15 @@ export async function dispatchDecisionOp(
       const result = recommend({
         readiness_ref: resolved('readiness_ref'),
         options: params.options,
+      });
+      return { handled: true, ctx: assign(result) };
+    }
+
+    case 'resolve_hypothesis_conflict': {
+      const result = resolveHypothesisConflict({
+        source_path: resolved('source_path'),
+        tenant_slug: params.tenant_slug ? resolved('tenant_slug') : null,
+        output_path: resolved('output_path'),
       });
       return { handled: true, ctx: assign(result) };
     }
