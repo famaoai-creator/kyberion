@@ -203,6 +203,7 @@ export * from './financial-model.js';
 export * from './finance-controller.js';
 export * from './okr-tracker.js';
 export * from './decision-rights.js';
+export * from './vision-resolver.js';
 export * from './approval-audit.js';
 export * from './org-chart.js';
 export * from './daemon-heartbeat.js';
