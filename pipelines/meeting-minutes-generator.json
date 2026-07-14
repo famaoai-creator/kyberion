@@ -38,7 +38,7 @@
       "name": "Export Minutes and Requirements Summary",
       "op": "system:shell",
       "params": {
-        "command": "mkdir -p active/shared/exports && cp active/shared/tmp/meeting-recording.wav.transcript.txt active/shared/exports/meeting_minutes_raw.txt && echo '[Success] Meeting Transcription and Analysis Pipeline completed. Artifacts exported to active/shared/exports/'"
+        "cmd": "mkdir -p active/shared/exports && cp active/shared/tmp/meeting-recording.wav.transcript.txt active/shared/exports/meeting_minutes_raw.txt && echo '[Success] Meeting Transcription and Analysis Pipeline completed. Artifacts exported to active/shared/exports/'"
       }
     }
   ]

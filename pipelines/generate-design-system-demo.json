@@ -1,0 +1,36 @@
+{
+  "id": "generate-design-system-demo",
+  "version": "1.0.0",
+  "description": "Diagnostic PPTX exercising all 11 slide-layout-presets and 5 core element types (shape/line/table/image/text) via media:pptx_render.",
+  "steps": [
+    {
+      "id": "read-design-protocol",
+      "role": "source",
+      "op": "system:read_json",
+      "produces": {
+        "channel": "last_pptx_design",
+        "type": "PptxDesignProtocol"
+      },
+      "params": {
+        "path": "pipelines/fragments/design_system_demo_protocol.json"
+      }
+    },
+    {
+      "id": "render-pptx",
+      "role": "sink",
+      "op": "media:pptx_render",
+      "consumes": "last_pptx_design",
+      "params": {
+        "path": "active/shared/tmp/design_system_demo.pptx"
+      }
+    },
+    {
+      "id": "export",
+      "role": "sink",
+      "op": "system:shell",
+      "params": {
+        "cmd": "mkdir -p active/shared/exports && cp active/shared/tmp/design_system_demo.pptx active/shared/exports/design_system_demo.pptx"
+      }
+    }
+  ]
+}
