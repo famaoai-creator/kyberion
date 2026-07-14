@@ -381,6 +381,15 @@ function resolveParamsRecursive(params: any, ctx: any): any {
   return resolveVars(params, ctx);
 }
 
+// Marks a genuine step failure inside an actuator's internal multi-step
+// engine (handleAction returned status:'failed' rather than throwing). Kept
+// distinct from a plain Error so the catch block below can always rethrow it
+// immediately — the underlying failure message can legitimately contain
+// words like "unsupported" or "not a function", which would otherwise be
+// misread as the actuator not supporting the 'pipeline' action and trigger
+// an unwanted second dispatch attempt via the legacy direct-action fallback.
+class ActuatorStepFailedError extends Error {}
+
 async function loadActuatorDispatch(domain: string): Promise<DispatchFunc> {
   if (dispatchCache[domain]) return dispatchCache[domain];
 
@@ -525,7 +534,13 @@ async function loadActuatorDispatch(domain: string): Promise<DispatchFunc> {
             ...(trace ? { pipelineTrace: trace } : {}),
           });
           // A sub-pipeline that reports failed steps must fail this step —
-          // "did not throw" is not success (MO-07 §14 / AR-06).
+          // "did not throw" is not success (MO-07 §14 / AR-06). Use a marker
+          // Error subclass, not a plain Error: the underlying failure message
+          // can legitimately contain words like "unsupported" or "not a
+          // function" (e.g. "color.replace is not a function"), which the
+          // catch block below would otherwise misread as a signal that the
+          // actuator doesn't support the 'pipeline' action and retry via the
+          // legacy direct-action fallback instead of propagating the failure.
           if (
             actionResult &&
             typeof actionResult === 'object' &&
@@ -534,7 +549,7 @@ async function loadActuatorDispatch(domain: string): Promise<DispatchFunc> {
             const failedEntry = Array.isArray((actionResult as any).results)
               ? (actionResult as any).results.find((entry: any) => entry.status === 'failed')
               : undefined;
-            throw new Error(
+            throw new ActuatorStepFailedError(
               failedEntry?.error || `Actuator sub-pipeline reported failure for ${domain}:${op}`
             );
           }
@@ -550,8 +565,9 @@ async function loadActuatorDispatch(domain: string): Promise<DispatchFunc> {
           // throw it immediately to trigger autonomous repair.
           // Only fallback to legacy direct action if the actuator doesn't support 'pipeline' action.
           if (
-            !err.message.toLowerCase().includes('unsupported') &&
-            !err.message.toLowerCase().includes('not a function')
+            err instanceof ActuatorStepFailedError ||
+            (!err.message.toLowerCase().includes('unsupported') &&
+              !err.message.toLowerCase().includes('not a function'))
           ) {
             throw err;
           }
@@ -821,7 +837,12 @@ async function runInlineSystemShell(
   rootDir: string,
   shellBin: string
 ): Promise<Record<string, unknown>> {
-  const cmd = String(resolveVars(params.cmd || '', ctx));
+  // Accept "command" as well as "cmd" (system:exec already does this) — 3
+  // pipelines authored with "command" silently ran an empty shell command
+  // that trivially "succeeded" while doing nothing, because this only ever
+  // read "cmd". Fixed in the pipeline JSON too; kept forgiving here so a
+  // future author can't fall into the same silent no-op.
+  const cmd = String(resolveVars((params.cmd ?? params.command) || '', ctx));
   const env = Object.fromEntries(
     Object.entries((params.env || {}) as Record<string, unknown>).map(([key, value]) => [
       key,
