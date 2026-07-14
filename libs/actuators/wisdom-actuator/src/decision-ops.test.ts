@@ -17,6 +17,7 @@ import {
   emitDissentLog,
   computeReadinessMatrix,
   recommend,
+  resolveHypothesisConflict,
   findSlidesByOwner,
   pptxDiff,
   evaluateSimulationQuality,
@@ -208,6 +209,69 @@ describe('computeReadinessMatrix + recommend', () => {
     write('z', 'neutral');
     const result = computeReadinessMatrix({ visits_dir: opposedDir, output_path: opposedMatrix });
     expect(result.recommendation).toBe('redesign');
+  });
+});
+
+// CO-04 Task 3: hypothesis-tree convergence (hypothesis-tree-protocol.md Phase
+// C) must tie-break surviving hypotheses using the vision's golden-rule
+// priority order, not an arbitrary pick.
+describe('resolveHypothesisConflict', () => {
+  const writeTree = (hypotheses: any[]) => {
+    const { rel, abs } = tmpPath(`hypothesis-tree-${Date.now()}-${Math.random()}.json`);
+    safeWriteFile(abs, JSON.stringify({ topic: 'test', hypotheses }));
+    return rel;
+  };
+
+  it('passes through the sole survivor without flagging a conflict', () => {
+    const sourceRel = writeTree([
+      { id: 'H1', survived: true, golden_rule_dimension: 'execution_speed' },
+      { id: 'H2', survived: false },
+    ]);
+    const { rel: outputRel } = tmpPath(`conflict-${Date.now()}.json`);
+    const result = resolveHypothesisConflict({ source_path: sourceRel, output_path: outputRel });
+    expect(result.conflict).toBe(false);
+    expect(result.survivor_count).toBe(1);
+    expect(result.winner_id).toBe('H1');
+  });
+
+  it('tie-breaks multiple survivors using the default golden-rule priority order', () => {
+    const sourceRel = writeTree([
+      { id: 'H-SPEED', survived: true, golden_rule_dimension: 'execution_speed' },
+      { id: 'H-INTEGRITY', survived: true, golden_rule_dimension: 'logical_integrity' },
+      { id: 'H-VISION', survived: true, golden_rule_dimension: 'vision_alignment' },
+    ]);
+    const { rel: outputRel, abs: outputAbs } = tmpPath(`conflict-${Date.now()}.json`);
+    const result = resolveHypothesisConflict({ source_path: sourceRel, output_path: outputRel });
+    expect(result.conflict).toBe(true);
+    expect(result.survivor_count).toBe(3);
+    // Logical Integrity outranks Vision Alignment and Execution Speed by default.
+    expect(result.winner_id).toBe('H-INTEGRITY');
+    expect(result.golden_rule_priority[0]).toBe('logical_integrity');
+    const written = JSON.parse(safeReadFile(outputAbs, { encoding: 'utf8' }) as string);
+    expect(written.winner_id).toBe('H-INTEGRITY');
+  });
+
+  it('ranks an untagged survivor last so omission cannot win by default', () => {
+    const sourceRel = writeTree([
+      { id: 'H-UNTAGGED', survived: true },
+      { id: 'H-RESILIENCE', survived: true, golden_rule_dimension: 'adaptive_resilience' },
+    ]);
+    const { rel: outputRel } = tmpPath(`conflict-${Date.now()}.json`);
+    const result = resolveHypothesisConflict({ source_path: sourceRel, output_path: outputRel });
+    expect(result.conflict).toBe(true);
+    // adaptive_resilience is the lowest ranked *named* dimension, but an
+    // untagged candidate still ranks below it.
+    expect(result.winner_id).toBe('H-RESILIENCE');
+  });
+
+  it("is deterministic for same-dimension ties (stable on the source array's order)", () => {
+    const sourceRel = writeTree([
+      { id: 'H-FIRST', survived: true, golden_rule_dimension: 'logical_integrity' },
+      { id: 'H-SECOND', survived: true, golden_rule_dimension: 'logical_integrity' },
+    ]);
+    const { rel: outputRel } = tmpPath(`conflict-${Date.now()}.json`);
+    const result = resolveHypothesisConflict({ source_path: sourceRel, output_path: outputRel });
+    expect(result.winner_id).toBe('H-FIRST');
   });
 });
 
