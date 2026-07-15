@@ -5,23 +5,27 @@ function read(relativePath: string): string {
   return String(safeReadFile(pathResolver.rootResolve(relativePath), { encoding: 'utf8' }) || '');
 }
 
+function readJson(relativePath: string): { steps?: Array<{ op?: string; consumes?: string }> } {
+  return JSON.parse(read(relativePath)) as { steps?: Array<{ op?: string; consumes?: string }> };
+}
+
 describe('voice and browser smoke contract', () => {
   it('keeps the presence-studio voice surface wired to the current voice runtime endpoints', () => {
     const server = read('presence/displays/presence-studio/server.ts');
     const page = read('presence/displays/presence-studio/static/index.html');
-    const pipeline = read('pipelines/voice-hello.json');
+    const pipeline = readJson('pipelines/voice-hello.json');
 
-    expect(server).toContain("/health");
-    expect(server).toContain("/api/voice/native-listen");
-    expect(server).toContain("/api/voice/input-devices");
-    expect(server).toContain("/api/voice/stt-backends");
-    expect(server).toContain("/api/voice/speech-state");
-    expect(server).toContain("/api/voice/stop-speaking");
-    expect(server).toContain("/api/voice/minutes");
-    expect(server).toContain("/api/email-triage");
-    expect(server).toContain("/api/email-draft");
-    expect(server).toContain("/api/email-auth-status");
-    expect(server).toContain("/api/email-deliver");
+    expect(server).toContain('/health');
+    expect(server).toContain('/api/voice/native-listen');
+    expect(server).toContain('/api/voice/input-devices');
+    expect(server).toContain('/api/voice/stt-backends');
+    expect(server).toContain('/api/voice/speech-state');
+    expect(server).toContain('/api/voice/stop-speaking');
+    expect(server).toContain('/api/voice/minutes');
+    expect(server).toContain('/api/email-triage');
+    expect(server).toContain('/api/email-draft');
+    expect(server).toContain('/api/email-auth-status');
+    expect(server).toContain('/api/email-deliver');
 
     expect(page).toContain('Hold To Talk');
     expect(page).toContain('Start Native Mic');
@@ -38,7 +42,9 @@ describe('voice and browser smoke contract', () => {
     expect(page).toContain('Send Approved Email');
     expect(page).toContain('Confirm email send');
     expect(page).toContain('Send Email');
-    expect(page).toContain('This send will be recorded in Gmail and the local Presence Studio event flow.');
+    expect(page).toContain(
+      'This send will be recorded in Gmail and the local Presence Studio event flow.'
+    );
     expect(page).toContain('click outside the dialog to cancel.');
     expect(page).toContain('Refresh Auth');
     expect(page).toContain('Reload Draft');
@@ -49,10 +55,13 @@ describe('voice and browser smoke contract', () => {
     expect(page).toContain('Voice state: idle');
     expect(page).toContain('voice-hub');
 
-    expect(pipeline).toContain('system:check_native_tts');
-    expect(pipeline).toContain('system:native_tts_speak');
-    expect(pipeline).toContain('voice-hello.user-spoke');
-    expect(pipeline).toContain('wait_for');
+    expect(pipeline.steps).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ op: 'system:check_native_tts' }),
+        expect.objectContaining({ op: 'system:native_tts_speak', consumes: 'tts_ready' }),
+      ])
+    );
+    expect(pipeline.steps?.some((step) => step.op === 'system:wait_for')).toBe(false);
   });
 
   it('keeps the browser and voice smoke pipelines pointed at the current health checks', () => {
@@ -77,7 +86,7 @@ describe('voice and browser smoke contract', () => {
     expect(smokePipeline).toContain('presence/displays/presence-studio/server.ts');
     expect(smokePipeline).toContain('pipelines/voice-hello.json');
     expect(smokePipeline).toContain('pipelines/verify-session.json');
-    expect(smokePipeline).toContain('libs/actuators/meeting-actuator/src/index.ts');
+    expect(smokePipeline).toContain('libs/actuators/meeting-actuator/src/index.js');
     expect(smokePipeline).toContain('meeting consent gate');
   });
 });
