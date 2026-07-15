@@ -60,11 +60,28 @@
       }
     },
     {
+      "id": "evaluate_decision_rights",
+      "role": "transform",
+      "op": "wisdom:evaluate_decision_rights_approval",
+      "produces": { "channel": "decision_rights_result", "type": "DecisionRightsApprovalResult" },
+      "params": {
+        "operation_id": "procurement-vendor:{{vendor_name}}",
+        "correlation_id": "procurement-vendor:{{mission_id}}:{{vendor_name}}",
+        "decision_type": "operational_spend",
+        "tenant_slug": "{{tenant_slug}}",
+        "mission_id": "{{mission_id}}",
+        "channel": "mission",
+        "title": "Procurement approval: {{vendor_name}}",
+        "summary": "Vendor {{vendor_name}} ({{vendor_category}}) procurement requires finance_controller review before contract execution. See {{comparison_memo_path}}."
+      }
+    },
+    {
       "id": "write_decision_note",
       "role": "sink",
       "op": "system:write_file",
+      "consumes": "decision_rights_result",
       "params": {
-        "path": "{{decision_note_path}}",
+        "path": "active/shared/tmp/procurement-vendor-decision-{{mission_id}}.json",
         "content": {
           "kind": "procurement-vendor-decision",
           "mission_id": "{{mission_id}}",
@@ -73,9 +90,28 @@
           "vendor_category": "{{vendor_category}}",
           "comparison_memo_path": "{{comparison_memo_path}}",
           "approval_boundary": "requires_finance_controller_review",
+          "decision_rights_status": "{{decision_rights_result.status}}",
+          "decision_rights_allowed": "{{decision_rights_result.allowed}}",
+          "decision_rights_request_id": "{{decision_rights_result.request_id}}",
           "contract_review_pipeline": "knowledge/product/pipeline-templates/contract-review.json"
         },
         "format": "json"
+      }
+    },
+    {
+      "id": "log_pending_approval",
+      "role": "gate",
+      "op": "core:if",
+      "params": {
+        "condition": { "from": "decision_rights_result.allowed", "operator": "eq", "value": false },
+        "then": [
+          {
+            "op": "system:log",
+            "params": {
+              "message": "⏸️ Procurement blocked pending finance_controller approval (request {{decision_rights_result.request_id}}): {{decision_rights_result.message}}"
+            }
+          }
+        ]
       }
     },
     {

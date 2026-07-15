@@ -74,6 +74,15 @@
       "intent_ids": ["feature-expansion-delivery", "feature-expansion:release"],
       "requires_approval": true,
       "missing_requirements": ["approval_confirmation"]
+    },
+    {
+      "id": "decision-rights-escalation",
+      "when": {
+        "payload_field": "decision_type",
+        "any_of": ["operational_spend", "contract_signature", "headcount_expansion"]
+      },
+      "requires_approval": true,
+      "missing_requirements": ["approval_confirmation"]
     }
   ],
   "defaults": {

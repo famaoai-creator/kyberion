@@ -1,0 +1,13 @@
+{
+  "description": "Test-only fixture for scripts/run_pipeline.test.ts core:include coverage. Not a production fragment.",
+  "steps": [
+    {
+      "op": "core:transform",
+      "params": {
+        "input": "{{greeting}}",
+        "script": "return String(input) + ' from fragment';",
+        "export_as": "fragment_result"
+      }
+    }
+  ]
+}
