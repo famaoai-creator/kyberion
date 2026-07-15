@@ -987,7 +987,7 @@
     {
       "path": "product/governance/actuator-op-registry.json",
       "tier": "public",
-      "size": 13755,
+      "size": 13800,
       "type": "json"
     },
     {
@@ -1017,7 +1017,7 @@
     {
       "path": "product/governance/approval-policy.json",
       "tier": "public",
-      "size": 2419,
+      "size": 2715,
       "type": "json"
     },
     {
@@ -2937,7 +2937,7 @@
     {
       "path": "product/orchestration/actuator-op-discovery.json",
       "tier": "public",
-      "size": 60055,
+      "size": 60155,
       "type": "json"
     },
     {
@@ -4827,7 +4827,7 @@
     {
       "path": "product/pipeline-templates/hiring-workflow.json",
       "tier": "public",
-      "size": 5192,
+      "size": 7426,
       "type": "json"
     },
     {
@@ -5079,7 +5079,7 @@
     {
       "path": "product/pipeline-templates/procurement-vendor.json",
       "tier": "public",
-      "size": 3516,
+      "size": 5137,
       "type": "json"
     },
     {

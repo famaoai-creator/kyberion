@@ -13,7 +13,8 @@
     "candidate_profile_path": "active/shared/tmp/hiring-candidate-profile-{{mission_id}}.json",
     "jd_draft_path": "active/shared/tmp/hiring-jd-draft-{{mission_id}}.md",
     "interview_schedule_path": "active/shared/tmp/hiring-interview-schedule-{{mission_id}}.json",
-    "evaluation_path": "active/shared/tmp/hiring-evaluation-{{mission_id}}.md"
+    "evaluation_path": "active/shared/tmp/hiring-evaluation-{{mission_id}}.md",
+    "decision_note_path": "active/shared/tmp/hiring-decision-{{mission_id}}.json"
   },
   "steps": [
     {
@@ -117,6 +118,60 @@
       "params": {
         "path": "{{evaluation_path}}",
         "content": "{{evaluation_memo}}"
+      }
+    },
+    {
+      "id": "evaluate_decision_rights",
+      "role": "transform",
+      "op": "wisdom:evaluate_decision_rights_approval",
+      "produces": { "channel": "decision_rights_result", "type": "DecisionRightsApprovalResult" },
+      "params": {
+        "operation_id": "hiring-workflow:{{role_name}}",
+        "correlation_id": "hiring-workflow:{{mission_id}}:{{role_name}}",
+        "decision_type": "headcount_expansion",
+        "tenant_slug": "{{tenant_slug}}",
+        "mission_id": "{{mission_id}}",
+        "channel": "mission",
+        "title": "Headcount approval: {{role_name}}",
+        "summary": "Hiring for {{role_name}} ({{role_domain}}) requires talent_culture / line_manager review before an offer is made. See {{evaluation_path}}."
+      }
+    },
+    {
+      "id": "write_decision_note",
+      "role": "sink",
+      "op": "system:write_file",
+      "consumes": "decision_rights_result",
+      "params": {
+        "path": "active/shared/tmp/hiring-decision-{{mission_id}}.json",
+        "content": {
+          "kind": "hiring-workflow-decision",
+          "mission_id": "{{mission_id}}",
+          "tenant_slug": "{{tenant_slug}}",
+          "role_name": "{{role_name}}",
+          "role_domain": "{{role_domain}}",
+          "evaluation_path": "{{evaluation_path}}",
+          "approval_boundary": "requires_talent_culture_review",
+          "decision_rights_status": "{{decision_rights_result.status}}",
+          "decision_rights_allowed": "{{decision_rights_result.allowed}}",
+          "decision_rights_request_id": "{{decision_rights_result.request_id}}"
+        },
+        "format": "json"
+      }
+    },
+    {
+      "id": "log_pending_approval",
+      "role": "gate",
+      "op": "core:if",
+      "params": {
+        "condition": { "from": "decision_rights_result.allowed", "operator": "eq", "value": false },
+        "then": [
+          {
+            "op": "system:log",
+            "params": {
+              "message": "⏸️ Hiring blocked pending talent_culture/line_manager approval (request {{decision_rights_result.request_id}}): {{decision_rights_result.message}}"
+            }
+          }
+        ]
       }
     },
     {

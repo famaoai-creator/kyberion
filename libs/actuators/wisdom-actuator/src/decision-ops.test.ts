@@ -18,6 +18,7 @@ import {
   computeReadinessMatrix,
   recommend,
   resolveHypothesisConflict,
+  evaluateDecisionRightsApprovalOp,
   findSlidesByOwner,
   pptxDiff,
   evaluateSimulationQuality,
@@ -272,6 +273,77 @@ describe('resolveHypothesisConflict', () => {
     const { rel: outputRel } = tmpPath(`conflict-${Date.now()}.json`);
     const result = resolveHypothesisConflict({ source_path: sourceRel, output_path: outputRel });
     expect(result.winner_id).toBe('H-FIRST');
+  });
+});
+
+describe('evaluateDecisionRightsApprovalOp (CO-05)', () => {
+  it('requires operation_id, correlation_id, and decision_type', () => {
+    expect(() =>
+      evaluateDecisionRightsApprovalOp({
+        operation_id: '',
+        correlation_id: 'corr-1',
+        decision_type: 'operational_spend',
+      })
+    ).toThrow('requires operation_id, correlation_id, and decision_type');
+  });
+
+  it('blocks operational_spend behind a real pending approval (knowledge/product/governance/decision-rights.json requires_human_acceptance)', () => {
+    const correlationId = `co05-procurement-test-${Date.now()}-${Math.random()}`;
+    const result = evaluateDecisionRightsApprovalOp({
+      operation_id: 'procurement:test-vendor',
+      correlation_id: correlationId,
+      decision_type: 'operational_spend',
+      channel: 'wisdom-decision-ops-test',
+      amount: 100,
+      title: 'Approval required: test-vendor procurement',
+    });
+    expect(result.allowed).toBe(false);
+    expect(result.status).toBe('pending');
+    expect(result.request_id).toBeTruthy();
+  });
+
+  it('blocks headcount_expansion behind a real pending approval', () => {
+    const correlationId = `co05-hiring-test-${Date.now()}-${Math.random()}`;
+    const result = evaluateDecisionRightsApprovalOp({
+      operation_id: 'hiring:test-role',
+      correlation_id: correlationId,
+      decision_type: 'headcount_expansion',
+      channel: 'wisdom-decision-ops-test',
+      amount: 1,
+    });
+    expect(result.allowed).toBe(false);
+    expect(result.status).toBe('pending');
+    expect(result.request_id).toBeTruthy();
+  });
+
+  it('reuses the same pending request for a repeated correlation_id instead of creating a duplicate', () => {
+    const correlationId = `co05-repeat-test-${Date.now()}-${Math.random()}`;
+    const first = evaluateDecisionRightsApprovalOp({
+      operation_id: 'procurement:repeat-vendor',
+      correlation_id: correlationId,
+      decision_type: 'operational_spend',
+      channel: 'wisdom-decision-ops-test',
+    });
+    const second = evaluateDecisionRightsApprovalOp({
+      operation_id: 'procurement:repeat-vendor',
+      correlation_id: correlationId,
+      decision_type: 'operational_spend',
+      channel: 'wisdom-decision-ops-test',
+    });
+    expect(second.allowed).toBe(false);
+    expect(second.request_id).toBe(first.request_id);
+  });
+
+  it('allows an unregistered decision_type through when no policy or matrix entry matches', () => {
+    const correlationId = `co05-unregistered-test-${Date.now()}-${Math.random()}`;
+    const result = evaluateDecisionRightsApprovalOp({
+      operation_id: 'noop:unregistered-decision-type',
+      correlation_id: correlationId,
+      decision_type: 'not-a-registered-decision-type',
+      channel: 'wisdom-decision-ops-test',
+    });
+    expect(result.allowed).toBe(true);
+    expect(result.status).toBe('not_required');
   });
 });
 

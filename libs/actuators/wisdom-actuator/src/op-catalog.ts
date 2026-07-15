@@ -41,6 +41,7 @@ export const WISDOM_ACTUATOR_APPLY_OPS = [
   'escalate_for_review',
   'evaluate_architecture_ready',
   'evaluate_customer_signoff',
+  'evaluate_decision_rights_approval',
   'evaluate_ensemble_convergence',
   'evaluate_qa_ready',
   'evaluate_requirements_completeness',
