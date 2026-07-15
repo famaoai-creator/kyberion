@@ -2564,6 +2564,10 @@
           "kind": "apply"
         },
         {
+          "op": "evaluate_decision_rights_approval",
+          "kind": "apply"
+        },
+        {
           "op": "evaluate_ensemble_convergence",
           "kind": "apply"
         },
