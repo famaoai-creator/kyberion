@@ -442,6 +442,23 @@ export { distillXlsxDesign } from './src/xlsx-utils.js';
 export { distillDocxDesign } from './src/docx-utils.js';
 export { generateNativePdf } from './src/native-pdf-engine/engine.js';
 export { generateNativePptx, patchPptxText } from './src/native-pptx-engine/engine.js';
+export {
+  applyPptxDesignDefaults,
+  resolvePptxDesignDefaults,
+  designDefaultsFromMediaTheme,
+  type PptxDesignDefaults,
+  type PptxDesignDefaultsInput,
+} from './src/native-pptx-engine/design-cascade.js';
+export {
+  PPTX_PALETTE,
+  textElement,
+  shapeElement,
+  lineElement,
+  sectionHeaderElements,
+  footerElements,
+  type SectionHeaderOptions,
+  type FooterOptions,
+} from './src/native-pptx-engine/layout-primitives.js';
 export type { PptxDesignProtocol, PptxElement, PptxSlide } from './src/types/pptx-protocol.js';
 export { generateNativeXlsx } from './src/native-xlsx-engine/engine.js';
 export { generateNativeDocx } from './src/native-docx-engine/engine.js';
@@ -561,6 +578,8 @@ export {
 } from './secret-guard.js';
 export * from './shell-command-policy.js';
 export * from './adf-guardrails.js';
+export * from './reconcile-ops.js';
+export * from './report-ops.js';
 export * from './execution-bounds.js';
 export * from './intent-handoff.js';
 export * from './mesh-message-broker.js';

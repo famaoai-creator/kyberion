@@ -157,12 +157,37 @@ Assume the persona of a "Sovereign System Recovery Agent".
 Once finished, provide a brief summary of the changes you applied to fix the pipeline.
 `.trim();
 
+    // Snapshot before the subagent runs so we can tell whether it actually
+    // changed anything — a subagent that (correctly) declines to touch a
+    // security-gated file still returns a report, and re-validating an
+    // untouched file trivially passes, which previously got reported as a
+    // successful repair regardless of what the subagent's own verdict said
+    // (found via live loop simulation: a subagent explicitly halted with
+    // "CHANGES APPLIED: None" on a tier-isolation violation, yet the caller
+    // logged "Repair successful" and retried the step anyway).
+    const beforeContent =
+      pipelinePath && safeExistsSync(pipelinePath)
+        ? String(safeReadFile(pipelinePath, { encoding: 'utf8' }))
+        : undefined;
+
     const report = await backend.delegateTask(
       instruction,
       `Self-Healing Mission for ${step.op}`,
       policy ? ({ effort: policy.effort, budget: policy.budget } as any) : undefined
     );
     logger.info(`  ${prefix} Sub-agent report: ${report}`);
+
+    if (pipelinePath && beforeContent !== undefined) {
+      const afterContent = safeExistsSync(pipelinePath)
+        ? String(safeReadFile(pipelinePath, { encoding: 'utf8' }))
+        : undefined;
+      if (afterContent === beforeContent) {
+        logger.warn(
+          `  ${prefix} Sub-agent made no change to ${pipelinePath} — treating as an unresolved failure, not a successful repair.`
+        );
+        return false;
+      }
+    }
 
     if (validate) {
       try {

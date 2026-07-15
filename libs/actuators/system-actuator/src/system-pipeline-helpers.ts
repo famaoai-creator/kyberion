@@ -42,6 +42,13 @@ import {
   DEFAULT_MAX_PIPELINE_STEPS,
   DEFAULT_PIPELINE_TIMEOUT_MS,
   DEFAULT_MAX_LOOP_ITERATIONS,
+  reconcileConfigFallbacks,
+  reconcileUnclassifiedErrors,
+  reconcileUnhandledIntents,
+  buildCostReportFromHistory,
+  collectAuditVerifyReport,
+  runMemoryPromotionQueueSummary,
+  runTaskModelRoutingSummary,
 } from '@agent/core';
 import { handleAction as handleFileAction } from '../../file-actuator/src/file-pipeline-helpers.js';
 import { getAllFiles } from '@agent/core/fs-utils';
@@ -579,6 +586,61 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
             }).trim(),
           buildRetryOptions(params.retry)
         ),
+      };
+    // LE-03: registry reconcile sweeps as in-process typed ops (formerly
+    // `system:shell` wrappers around dist/scripts/reconcile_*.js). Structured
+    // results land directly in ctx — no stdout parsing, no silent `|| echo` fallback.
+    case 'reconcile_config_fallbacks':
+      return { ...ctx, [params.export_as || 'reconcile_result']: reconcileConfigFallbacks() };
+    case 'reconcile_unclassified_errors':
+      return { ...ctx, [params.export_as || 'reconcile_result']: reconcileUnclassifiedErrors() };
+    case 'reconcile_unhandled_intents':
+      return { ...ctx, [params.export_as || 'reconcile_result']: reconcileUnhandledIntents() };
+    // LE-03 rollout batch 2: report/verify sweeps as in-process typed ops
+    // (formerly system:shell/system:exec wrappers around dist/scripts/*.js).
+    case 'cost_report': {
+      const lastDays = Number(params.last_days);
+      const since = params.since
+        ? String(resolve(params.since))
+        : Number.isFinite(lastDays) && lastDays > 0
+          ? new Date(Date.now() - lastDays * 24 * 60 * 60 * 1000).toISOString()
+          : undefined;
+      return {
+        ...ctx,
+        [params.export_as || 'cost_report']: buildCostReportFromHistory({
+          since,
+          until: params.until ? String(resolve(params.until)) : undefined,
+        }),
+      };
+    }
+    case 'audit_verify':
+      return {
+        ...ctx,
+        [params.export_as || 'audit_report']: collectAuditVerifyReport({
+          since: params.since ? String(resolve(params.since)) : undefined,
+          ledgers: Array.isArray(params.ledgers) ? params.ledgers.map(String) : undefined,
+        }),
+      };
+    case 'summarize_memory_promotion_queue':
+      return {
+        ...ctx,
+        [params.export_as || 'memory_queue_summary']: runMemoryPromotionQueueSummary({
+          status: params.status ? String(resolve(params.status)) : undefined,
+          output_path: params.output_path ? String(resolve(params.output_path)) : undefined,
+        }),
+      };
+    case 'summarize_task_model_routing':
+      return {
+        ...ctx,
+        [params.export_as || 'task_model_routing_summary']: runTaskModelRoutingSummary({
+          task_events_path: params.task_events_path
+            ? String(resolve(params.task_events_path))
+            : undefined,
+          supervisor_events_path: params.supervisor_events_path
+            ? String(resolve(params.supervisor_events_path))
+            : undefined,
+          output_path: params.output_path ? String(resolve(params.output_path)) : undefined,
+        }),
       };
     case 'cli_health_check': {
       const command = resolve(params.command);

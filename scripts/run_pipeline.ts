@@ -1184,10 +1184,41 @@ async function dispatchLeafOp(
 }
 
 /**
- * AR-01 Phase B (kept for Phase C): retry + autonomous-repair as a
- * higher-order function wrapping a single step-execution attempt. Only used
- * for steps WITHOUT on_error — a step that declares on_error relies on the
- * engine's native recovery exclusively (see file-level comment above).
+ * Recursively re-locate a step by `id` through every nested-step location the
+ * engine itself recurses into (core:if then/else, core:while/loop_until/
+ * retry_until_quality's pipeline body, core:foreach/parallel_foreach/
+ * accumulate's do body, on_error.fallback). Matches by id ONLY — never by
+ * op — because multiple steps commonly share the same op (e.g. several
+ * system:shell/system:log steps in one pipeline), and matching by op alone
+ * can silently substitute an unrelated step (found via live loop simulation:
+ * a repair targeting a nested system:shell step re-matched an earlier,
+ * already-succeeded top-level system:shell step instead).
+ */
+export function findStepByIdRecursive(steps: unknown, id: string): PipelineAdfStep | undefined {
+  if (!Array.isArray(steps)) return undefined;
+  for (const raw of steps) {
+    if (!raw || typeof raw !== 'object') continue;
+    const s = raw as PipelineAdfStep & { on_error?: { fallback?: PipelineAdfStep[] } };
+    if (s.id === id) return s;
+    const params = (s.params || {}) as Record<string, unknown>;
+    const found =
+      findStepByIdRecursive(params.then, id) ||
+      findStepByIdRecursive(params.else, id) ||
+      findStepByIdRecursive(params.pipeline, id) ||
+      findStepByIdRecursive(params.do, id) ||
+      findStepByIdRecursive(s.on_error?.fallback, id);
+    if (found) return found;
+  }
+  return undefined;
+}
+
+/**
+ * AR-01 Phase B: retry + autonomous-repair extracted into a higher-order
+ * function that wraps a single step-execution attempt, instead of being
+ * loop machinery inlined in runSteps. The canonical engine
+ * (executeAdfSteps) has no built-in retry, so Phase C delegation needs
+ * retry/repair as something a handler opts into, not something the engine
+ * itself does — this is the shape that opt-in takes.
  */
 async function runWithRepair(
   step: PipelineAdfStep,
@@ -1229,11 +1260,14 @@ async function runWithRepair(
             );
           }
           try {
-            // Reload fully from disk to get the REPAIRED definition
+            // Reload fully from disk to get the REPAIRED definition. Search
+            // recursively — the failing step may be nested inside
+            // core:if/foreach/while/on_error.fallback — and match by id only.
             const refreshedPipeline = await readValidatedWorkflowAdf(opts.pipelinePath!);
-            const refreshedStep = refreshedPipeline.steps?.find(
-              (s: any) => s.id === step.id || s.op === step.op
-            );
+            const refreshedStep = step.id
+              ? findStepByIdRecursive(refreshedPipeline.steps, step.id)
+              : undefined;
+
             if (refreshedStep) {
               // Update the step object in place so the next attempt picks it up
               step.op = refreshedStep.op;
@@ -1241,9 +1275,14 @@ async function runWithRepair(
               logger.info(
                 `  [SYS_PIPELINE] Step definition refreshed for ${step.id || step.op}. New path: ${(step.params as any).path}`
               );
-              attempt++;
-              continue; // Re-evaluate normalizedOp/domain/action/params with NEW values
+            } else if (!opts.quiet) {
+              logger.warn(
+                `  [SYS_PIPELINE] Could not uniquely re-locate step "${step.id || step.op}" in the repaired ADF (missing/unmatched id) — retrying with the original step definition unchanged.`
+              );
             }
+
+            attempt++;
+            continue; // Re-evaluate normalizedOp/domain/action/params with the (possibly unchanged) values
           } catch (reloadErr: any) {
             logger.warn(
               `  [SYS_PIPELINE] Failed to reload ADF after repair: ${reloadErr.message}.`
