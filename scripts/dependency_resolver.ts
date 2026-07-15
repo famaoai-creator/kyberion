@@ -227,7 +227,7 @@ const PNPM: Dependency = {
     const r = checkBinary('pnpm');
     return { ok: r.ok, version: r.version, detail: r.ok ? undefined : 'pnpm not in PATH' };
   },
-  installCommand: 'corepack enable && corepack prepare pnpm@10 --activate',
+  installCommand: 'corepack enable && corepack prepare pnpm@11.13.0 --activate',
 };
 
 const DEPENDENCY_BY_ID: Record<string, Dependency> = {
