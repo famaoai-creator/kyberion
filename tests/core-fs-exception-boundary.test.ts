@@ -8,6 +8,7 @@ const allowedCoreFsImports = [
   'libs/core/action-item-store.test.ts',
   'libs/core/approval-rejection-reason.test.ts',
   'libs/core/reasoning-degradation.test.ts',
+  'libs/core/reconcile-ops.test.ts',
   'libs/core/review-reentry.test.ts',
   'libs/core/audit-chain-tenant.test.ts',
   'libs/core/browser-extension-bridge.test.ts',

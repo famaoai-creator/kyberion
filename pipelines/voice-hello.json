@@ -3,33 +3,25 @@
   "pipeline_id": "voice-hello",
   "name": "Voice Hello (First-Win)",
   "version": "1.0.0",
-  "description": "Minimal voice first-win pipeline: check TTS, wait for user input, speak a greeting.",
+  "description": "Minimal voice first-win pipeline: check TTS, speak a greeting.",
+  "_migration_note": "Removed the wait_for_user step: it called system:wait_for, an event/webhook-based wait that was never implemented anywhere in the codebase (system:wait only supports a fixed duration_ms sleep), and its output was never consumed downstream anyway — the greeting text below is static. Re-add a real wait step here only once an actual speech-triggered wake mechanism exists.",
   "labels": ["first-win", "tier-0"],
   "steps": [
     {
       "id": "check_tts",
       "role": "source",
       "op": "system:check_native_tts",
-      "produces": { "channel": "tts_ready", "type": "ProbeResult" },
+      "produces": {
+        "channel": "tts_ready",
+        "type": "ProbeResult"
+      },
       "params": {}
-    },
-    {
-      "id": "wait_for_user",
-      "role": "source",
-      "op": "system:wait_for",
-      "consumes": "tts_ready",
-      "produces": { "channel": "user_input", "type": "EventResult" },
-      "params": {
-        "event": "voice-hello.user-spoke",
-        "endpoint": "http://127.0.0.1:3031/voice-hello",
-        "timeout_ms": 30000
-      }
     },
     {
       "id": "speak",
       "role": "sink",
       "op": "system:native_tts_speak",
-      "consumes": "user_input",
+      "consumes": "tts_ready",
       "params": {
         "text": "こんにちは。Kyberion が聴いています。",
         "language": "ja"

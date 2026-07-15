@@ -26,6 +26,7 @@ interface AdfExecutionPolicy {
     max_hooks_per_step: number;
     max_foreach_items: number;
     max_branch_depth: number;
+    max_transform_script_chars: number;
   };
   network: {
     allow_local_network: boolean;
@@ -38,6 +39,7 @@ const DEFAULT_POLICY: AdfExecutionPolicy = {
     max_hooks_per_step: 8,
     max_foreach_items: 100,
     max_branch_depth: 16,
+    max_transform_script_chars: 400,
   },
   network: {
     allow_local_network: false,
@@ -78,6 +80,10 @@ function loadAdfExecutionPolicy(): AdfExecutionPolicy {
         max_branch_depth: coercePositiveInt(
           parsed?.limits?.max_branch_depth,
           DEFAULT_POLICY.limits.max_branch_depth
+        ),
+        max_transform_script_chars: coercePositiveInt(
+          parsed?.limits?.max_transform_script_chars,
+          DEFAULT_POLICY.limits.max_transform_script_chars
         ),
       },
       network: {
@@ -184,6 +190,22 @@ export function validatePipelineGuardrails(
         }
       }
 
+      // LE-04: logic-layering lint. core:transform JS-in-a-string is an escape
+      // hatch for small glue; substantial logic belongs in a typed actuator op
+      // (docs/developer/improvement-plans-2026-07/LAYERED_EXECUTION_PLAN_2026-07-15.ja.md).
+      if (opName === 'core:transform') {
+        const params = (step.params ?? {}) as Record<string, unknown>;
+        const script = typeof params.script === 'string' ? params.script : '';
+        if (script.length > policy.limits.max_transform_script_chars) {
+          findings.push({
+            code: 'transform-script-oversized',
+            severity: 'warn',
+            message: `core:transform script is ${script.length} chars (limit ${policy.limits.max_transform_script_chars}) — move this logic into a typed actuator op instead of JS-in-a-string`,
+            path: stepPath,
+          });
+        }
+      }
+
       inspectStep(step, stepPath, depth);
     }
   }
@@ -261,6 +283,16 @@ export function validatePipelineGuardrails(
     const nestedPipeline = extractNestedPipeline(step);
     if (nestedPipeline) {
       visitSteps(nestedPipeline, `${stepPath}.params.pipeline`, depth + 1);
+    }
+
+    // LE-05 (AR-08 blind spot): media:pipeline embeds a nested steps array that
+    // the schema does not see — walk it so budgets/lints apply there too.
+    if (step.op === 'media:pipeline') {
+      const params = step.params as Record<string, unknown> | undefined;
+      const embedded = Array.isArray(params?.steps)
+        ? (params?.steps as PipelineAdfStep[])
+        : undefined;
+      if (embedded) visitSteps(embedded, `${stepPath}.params.steps`, depth + 1);
     }
 
     const fallback = step.on_error?.fallback;

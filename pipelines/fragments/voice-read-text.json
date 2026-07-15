@@ -8,7 +8,7 @@
     {
       "id": "speak_text",
       "role": "sink",
-      "action": "speak_local",
+      "op": "voice:speak_local",
       "params": {
         "text": "テキストの音声読み上げテストを完了しました。パスキーパイプラインとともに堅牢化されています。",
         "style": "neutral",

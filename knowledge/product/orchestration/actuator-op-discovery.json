@@ -1887,6 +1887,184 @@
           "kind": "capture"
         },
         {
+          "op": "reconcile_config_fallbacks",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "export_as": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "export_as": "reconcile_result"
+            }
+          ]
+        },
+        {
+          "op": "reconcile_unclassified_errors",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "export_as": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "export_as": "reconcile_result"
+            }
+          ]
+        },
+        {
+          "op": "reconcile_unhandled_intents",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "export_as": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "export_as": "reconcile_result"
+            }
+          ]
+        },
+        {
+          "op": "cost_report",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "since": {
+                "type": "string",
+                "minLength": 1
+              },
+              "until": {
+                "type": "string",
+                "minLength": 1
+              },
+              "last_days": {
+                "type": "number",
+                "minimum": 1
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "last_days": 7,
+              "export_as": "weekly_cost_report"
+            }
+          ]
+        },
+        {
+          "op": "audit_verify",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "since": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "ledgers": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "export_as": "audit_report"
+            }
+          ]
+        },
+        {
+          "op": "summarize_memory_promotion_queue",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "minLength": 1
+              },
+              "output_path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "status": "queued",
+              "output_path": "active/shared/tmp/memory-promotion-queue-summary.md"
+            }
+          ]
+        },
+        {
+          "op": "summarize_task_model_routing",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "task_events_path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "supervisor_events_path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "output_path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "output_path": "active/shared/tmp/task-model-routing-summary.json"
+            }
+          ]
+        },
+        {
           "op": "vision_consult",
           "kind": "capture"
         },

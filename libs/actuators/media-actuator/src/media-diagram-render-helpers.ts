@@ -791,6 +791,79 @@ function normalizeHexColor(value: string | undefined, fallback: string): string 
   return fallback;
 }
 
+function parseHexOrNull(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim().replace(/^#/, '');
+  if (/^[0-9a-fA-F]{6}$/.test(normalized)) return `#${normalized.toUpperCase()}`;
+  if (/^[0-9a-fA-F]{8}$/.test(normalized)) return `#${normalized.slice(2).toUpperCase()}`;
+  return null;
+}
+
+function hexToRgb(hex: string): [number, number, number] {
+  const n = parseInt(hex.replace('#', ''), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+// Rough saturation proxy: the spread between the strongest and weakest channel.
+// Grayscale colors (including near-white/near-black) have a spread near zero.
+function colorSpread(hex: string): number {
+  const [r, g, b] = hexToRgb(hex);
+  return Math.max(r, g, b) - Math.min(r, g, b);
+}
+
+function isNearWhiteOrBlack(hex: string): boolean {
+  const [r, g, b] = hexToRgb(hex);
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  return max > 235 || max < 25;
+}
+
+function isReddish(hex: string): boolean {
+  const [r, g, b] = hexToRgb(hex);
+  return r - Math.max(g, b) > 40;
+}
+
+// Counts how often each hex color actually appears on rendered content (shape fills,
+// text colors, line colors, inline text-run colors) across every slide. This is the
+// deck's real visual evidence — distinct from `design.theme`, which only reflects the
+// OOXML clrScheme and is frequently just the unmodified default Office palette even
+// when the deck itself consistently uses a completely different set of colors.
+function collectContentColorCounts(slideElements: any[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  const bump = (raw: unknown) => {
+    const hex = parseHexOrNull(raw);
+    if (!hex) return;
+    counts.set(hex, (counts.get(hex) || 0) + 1);
+  };
+  for (const el of slideElements) {
+    if (!el || typeof el !== 'object') continue;
+    bump(el.style?.fill);
+    bump(el.style?.color);
+    bump(el.style?.line);
+    if (Array.isArray(el.textRuns)) {
+      for (const run of el.textRuns) bump(run?.options?.color);
+    }
+  }
+  return counts;
+}
+
+function pickMostFrequent(
+  counts: Map<string, number>,
+  filter: (hex: string) => boolean
+): { hex: string; count: number } | null {
+  let best: { hex: string; count: number } | null = null;
+  for (const [hex, count] of counts) {
+    if (!filter(hex)) continue;
+    if (!best || count > best.count) best = { hex, count };
+  }
+  return best;
+}
+
+// A color counts as "evidenced" once it shows up more than once — a single stray
+// occurrence (e.g. one manually-tinted cell) shouldn't override the theme's own
+// declared palette, but a color repeated across the deck clearly is the real one.
+const MIN_CONTENT_EVIDENCE = 2;
+
 function deriveThemeFromPptxDesign(design: any, explicitName?: string): Record<string, any> {
   const palette = design?.theme || {};
   const slideElements = Array.isArray(design?.slides)
@@ -801,6 +874,29 @@ function deriveThemeFromPptxDesign(design: any, explicitName?: string): Record<s
   const slideTitleFont = pickFontFromElements(slideElements, ['title', 'ctrTitle']);
   const slideBodyFont = pickFontFromElements(slideElements, ['body', 'subTitle']);
   const fallbackFont = pickFontFromElements(slideElements, []);
+
+  const contentColorCounts = collectContentColorCounts(slideElements);
+  const chromaticCounts = new Map(
+    [...contentColorCounts].filter(([hex]) => !isNearWhiteOrBlack(hex) && colorSpread(hex) >= 20)
+  );
+  // Prefer a non-reddish brand candidate — reds recur mainly as emphasis/warning
+  // markup in this kind of document, not as the deck's identity color.
+  const brandCandidate = pickMostFrequent(chromaticCounts, (hex) => !isReddish(hex));
+
+  // Trust the theme's declared accent only if the deck actually uses it anywhere;
+  // a theme that declares one accent but never draws with it (e.g. an unmodified
+  // default Office theme) is not evidence of the deck's real visual identity.
+  const themeAccent = normalizeHexColor(
+    palette.accent1 || palette.hlink || palette.accent2,
+    '#2563EB'
+  );
+  const themeAccentEvidence = contentColorCounts.get(themeAccent) || 0;
+  const accent =
+    themeAccentEvidence < MIN_CONTENT_EVIDENCE &&
+    brandCandidate &&
+    brandCandidate.count >= MIN_CONTENT_EVIDENCE
+      ? brandCandidate.hex
+      : themeAccent;
 
   const pptxHeritage = {
     canvas: design?.canvas || null,
@@ -825,7 +921,7 @@ function deriveThemeFromPptxDesign(design: any, explicitName?: string): Record<s
         palette.dk2 || palette.tx2 || palette.accent2 || palette.accent3,
         '#4B5563'
       ),
-      accent: normalizeHexColor(palette.accent1 || palette.hlink || palette.accent2, '#2563EB'),
+      accent,
       background: normalizeHexColor(palette.lt1 || palette.bg1 || palette.lt2, '#FFFFFF'),
       text: normalizeHexColor(palette.tx1 || palette.dk1 || palette.dk2, '#111827'),
     },
