@@ -1,0 +1,11 @@
+{
+  "description": "Test-only fixture for scripts/run_pipeline.test.ts core:include circular-reference coverage. Not a production fragment.",
+  "steps": [
+    {
+      "op": "core:include",
+      "params": {
+        "fragment": "fragments/_test-run-pipeline-include-cycle.json"
+      }
+    }
+  ]
+}
