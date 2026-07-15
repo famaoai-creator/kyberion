@@ -4,7 +4,11 @@
   "version": "1.0.0",
   "description": "End-to-end smoke test: launches presence-studio, runs voice-hello pipeline, verifies browser session, and checks meeting consent gate.",
   "steps": [
-    { "role": "sink", "op": "system:log", "params": { "message": "🔬 UI Voice Browser Smoke — starting..." } },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "params": { "message": "🔬 UI Voice Browser Smoke — starting..." }
+    },
     {
       "id": "start_presence_studio",
       "role": "source",
@@ -32,7 +36,7 @@
       "op": "system:shell",
       "produces": { "channel": "consent_result", "type": "ShellResult" },
       "params": {
-        "cmd": "node dist/libs/actuators/meeting-actuator/src/index.ts --check-consent",
+        "cmd": "node dist/libs/actuators/meeting-actuator/src/index.js --check-consent",
         "gate": "meeting consent gate"
       }
     },

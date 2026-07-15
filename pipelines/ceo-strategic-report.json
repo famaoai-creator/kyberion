@@ -4,12 +4,21 @@
   "version": "1.0.0",
   "description": "Generates a strategic executive report for CEO decision-making: code analysis, multi-scenario reasoning, and PPTX output.",
   "steps": [
-    { "role": "sink", "op": "system:log", "params": { "message": "🏛️ CEO Strategic Report — starting..." } },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "params": { "message": "🏛️ CEO Strategic Report — starting..." }
+    },
     {
       "role": "source",
-      "op": "code:analyze",
-      "produces": { "channel": "codebase_summary", "type": "CodeAnalysisResult" },
-      "params": { "target": ".", "depth": "surface", "output_format": "json" }
+      "op": "reasoning:analyze",
+      "produces": { "channel": "codebase_summary", "type": "ReasoningResult" },
+      "params": {
+        "instruction": "Produce a surface-level summary of this codebase's architecture, main components, and recent activity, suitable as input to a CEO-level strategic report.",
+        "context": ".",
+        "use_subagent": true,
+        "export_as": "codebase_summary"
+      }
     },
     {
       "role": "transform",
@@ -18,7 +27,8 @@
       "produces": { "channel": "strategic_views", "type": "FanoutResult" },
       "params": {
         "personas": ["growth", "stability", "hybrid"],
-        "prompt_template": "Analyze from the {{persona}} perspective: {{codebase_summary}}"
+        "topic": "Analyze this codebase summary from a strategic business perspective: {{codebase_summary}}",
+        "output_path": "active/shared/tmp/reports/ceo-strategic-fanout.json"
       }
     },
     {
@@ -26,13 +36,19 @@
       "op": "wisdom:cross_critique",
       "consumes": "strategic_views",
       "produces": { "channel": "synthesis", "type": "CrossCritiqueResult" },
-      "params": {}
+      "params": {
+        "source_path": "active/shared/tmp/reports/ceo-strategic-fanout.json",
+        "personas": ["growth", "stability", "hybrid"],
+        "output_path": "active/shared/tmp/reports/ceo-strategic-report.json"
+      }
     },
     {
       "role": "sink",
-      "op": "system:checkpoint",
+      "op": "system:log",
       "consumes": "synthesis",
-      "params": { "label": "strategic-synthesis" }
+      "params": {
+        "message": "✅ CEO strategic report saved to active/shared/tmp/reports/ceo-strategic-report.json"
+      }
     }
   ]
 }

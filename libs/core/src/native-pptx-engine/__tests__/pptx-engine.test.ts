@@ -9,6 +9,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import AdmZip from 'adm-zip';
+import { DOMParser } from '@xmldom/xmldom';
 import { generateNativePptx } from '../engine.js';
 import { buildShape, buildConnector, buildTable } from '../builders.js';
 import { distillPptxDesign } from '../../pptx-utils.js';
@@ -561,6 +562,107 @@ describe('Native PPTX Engine', () => {
         expect(xml).toContain('</a:p><a:p>');
       });
 
+      it('should not emit an empty run for a trailing newline at the end of a textRun', () => {
+        const el: PptxElement = {
+          type: 'text',
+          pos: { x: 0, y: 0, w: 5, h: 2 },
+          textRuns: [{ text: 'Line1\n' }],
+        };
+        const xml = buildShape(el, 7);
+        expect(xml).not.toMatch(/<a:r>[^<]*(<a:rPr[^>]*\/>|<a:rPr[^>]*>[\s\S]*?<\/a:rPr>)<a:t\/>/);
+        expect(xml).toContain('<a:t>Line1</a:t>');
+      });
+
+      it('should order rPr children per ECMA-376 regardless of which style options are set', () => {
+        const el: PptxElement = {
+          type: 'text',
+          pos: { x: 0, y: 0, w: 5, h: 2 },
+          textRuns: [
+            {
+              text: 'Styled run',
+              options: { color: '#112233', highlight: '#FFFF00', fontFamily: 'Meiryo UI' },
+            },
+          ],
+        };
+        const xml = buildShape(el, 10);
+        const rPrMatch = xml.match(/<a:rPr[^>]*>[\s\S]*?<\/a:rPr>/);
+        expect(rPrMatch).not.toBeNull();
+        const rPrXml = rPrMatch![0];
+        // CT_TextCharacterProperties order: fill, then highlight, then latin/ea.
+        expect(rPrXml.indexOf('<a:solidFill>')).toBeLessThan(rPrXml.indexOf('<a:highlight>'));
+        expect(rPrXml.indexOf('<a:highlight>')).toBeLessThan(rPrXml.indexOf('<a:latin'));
+        expect(rPrXml.indexOf('<a:latin')).toBeLessThan(rPrXml.indexOf('<a:ea'));
+      });
+
+      it('should render a blank-line gap ("\\n\\n") as an empty paragraph, not a stray empty run', () => {
+        const el: PptxElement = {
+          type: 'text',
+          pos: { x: 0, y: 0, w: 5, h: 2 },
+          textRuns: [{ text: 'First point.\n\n' }, { text: 'Second point.' }],
+        };
+        const xml = buildShape(el, 9);
+        expect(xml).toContain('<a:t>First point.</a:t>');
+        expect(xml).toContain('<a:t>Second point.</a:t>');
+        expect((xml.match(/<a:t\/>|<a:t><\/a:t>/g) || []).length).toBe(0);
+        expect((xml.match(/<a:p>/g) || []).length).toBe(3);
+        expect((xml.match(/<a:endParaRPr/g) || []).length).toBe(2);
+      });
+
+      it('should still start a fresh paragraph when the NEXT textRun begins after a trailing newline', () => {
+        const el: PptxElement = {
+          type: 'text',
+          pos: { x: 0, y: 0, w: 5, h: 2 },
+          textRuns: [{ text: 'Line1\n' }, { text: 'Line2\n' }, { text: 'Line3' }],
+        };
+        const xml = buildShape(el, 8);
+        expect(xml).toContain('<a:t>Line1</a:t>');
+        expect(xml).toContain('<a:t>Line2</a:t>');
+        expect(xml).toContain('<a:t>Line3</a:t>');
+        expect((xml.match(/<a:p>/g) || []).length).toBe(3);
+        expect((xml.match(/<a:t><\/a:t>/g) || []).length).toBe(0);
+      });
+
+      it('should produce well-formed pPr when bullet color and lineSpacing/spaceBefore/spaceAfter combine', () => {
+        const el: PptxElement = {
+          type: 'text',
+          pos: { x: 0, y: 0, w: 5, h: 2 },
+          text: 'Item one',
+          style: {
+            lineSpacing: 1.35,
+            spaceBefore: 8,
+            spaceAfter: 8,
+            bullet: {
+              type: 'char',
+              char: '■',
+              color: '#000000',
+              size: 100,
+              indent: 0.25,
+              level: 0,
+            },
+          },
+        };
+        const xml = buildShape(el, 8);
+        // Every self-closing color/size tag must actually be self-closed — a bare
+        // `.replace('/>', ...)` bug once turned the bullet's <a:srgbClr .../> into an
+        // unclosed <a:srgbClr> by matching the wrong "/>" in the accumulated string.
+        expect(xml).not.toMatch(/<a:srgbClr val="[0-9A-Fa-f]{6}">(?!<\/a:srgbClr>)/);
+        expect((xml.match(/<a:pPr[^/]*?>/g) || []).length).toBe(
+          (xml.match(/<\/a:pPr>/g) || []).length
+        );
+        expect(xml).toContain('<a:buChar char="■"/>');
+        expect(xml).toContain('<a:lnSpc><a:spcPct val="1350"/></a:lnSpc>');
+        expect(xml).toContain('<a:spcBef><a:spcPts val="800"/></a:spcBef>');
+        expect(xml).toContain('<a:spcAft><a:spcPts val="800"/></a:spcAft>');
+        // ECMA-376 CT_TextParagraphProperties requires lnSpc/spcBef/spcAft to
+        // precede the bullet properties — PowerPoint's repair pass silently
+        // drops the spacing elements entirely when they trail the bullet block.
+        const pPrMatch = xml.match(/<a:pPr[^>]*>[\s\S]*?<\/a:pPr>/);
+        expect(pPrMatch).not.toBeNull();
+        const pPrXml = pPrMatch![0];
+        expect(pPrXml.indexOf('<a:lnSpc>')).toBeLessThan(pPrXml.indexOf('<a:buClr>'));
+        expect(pPrXml.indexOf('<a:spcAft>')).toBeLessThan(pPrXml.indexOf('<a:buChar'));
+      });
+
       it('should use preset geometry from shapeType', () => {
         const el: PptxElement = {
           type: 'shape',
@@ -723,6 +825,145 @@ describe('Native PPTX Engine', () => {
       expect(fs.existsSync(regenPath)).toBe(true);
       const stat = fs.statSync(regenPath);
       expect(stat.size).toBeGreaterThan(1000);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  // Delivery Gate — every emitted XML part must actually parse
+  // ═══════════════════════════════════════════════════════════
+  //
+  // Every prior test in this file asserts on substrings/tag counts, which is
+  // exactly why the pPr-ordering and empty-run bugs shipped undetected — the
+  // substrings were all present, just assembled into unclosed or malformed XML.
+  // This block generates one deck that deliberately combines the trickiest
+  // real-world style combinations (matching OfficeCLI's `validate` command /
+  // "Delivery Gate" concept: a generate-time correctness check independent of
+  // what any individual builder function claims to produce) and parses every
+  // single part of the resulting archive, failing on the first parser error.
+  describe('Delivery Gate — well-formed XML', () => {
+    it('produces a fully well-formed archive across bullets+spacing, multi-run newlines, tables, and rich rPr', async () => {
+      const protocol: PptxDesignProtocol = {
+        version: '3.0.0',
+        generatedAt: new Date().toISOString(),
+        canvas: { w: 10, h: 5.63 },
+        theme: {
+          dk1: '000000',
+          lt1: 'FFFFFF',
+          dk2: '44546A',
+          lt2: 'E7E6E6',
+          accent1: '1155CC',
+          accent2: 'CC0000',
+          accent3: 'A5A5A5',
+          accent4: 'FFC000',
+          accent5: '4472C4',
+          accent6: '70AD47',
+          hlink: '0563C1',
+          folHlink: '954F72',
+        },
+        master: { elements: [] },
+        slides: [
+          {
+            id: 'slide1.xml',
+            backgroundFill: '#FFFFFF',
+            elements: [
+              // The exact combination that produced the unclosed-tag bug.
+              {
+                type: 'text',
+                pos: { x: 0.5, y: 0.5, w: 5, h: 2 },
+                textRuns: [{ text: '■ Item one\n' }, { text: '■ Item two' }],
+                style: {
+                  lineSpacing: 1.4,
+                  spaceBefore: 6,
+                  spaceAfter: 6,
+                  bullet: {
+                    type: 'char',
+                    char: '■',
+                    color: '#1155CC',
+                    size: 100,
+                    indent: 0.25,
+                    level: 0,
+                  },
+                },
+              },
+              // Multi-run text mixing "\n", "\n\n", bold/italic/underline/strike,
+              // highlight, and fontFamily — the exact combination that produced
+              // the spurious-empty-run bug and the rPr child-order dependency.
+              {
+                type: 'text',
+                pos: { x: 0.5, y: 3, w: 5, h: 2 },
+                textRuns: [
+                  { text: 'First point.\n\n' },
+                  { text: 'Bold', options: { bold: true, color: '#CC0000' } },
+                  { text: ' and ' },
+                  { text: 'italic', options: { italic: true, highlight: '#FFFF00' } },
+                  { text: '.\nSecond line.\n' },
+                  {
+                    text: 'Third line.',
+                    options: { fontFamily: 'Meiryo UI', underline: true, strike: true },
+                  },
+                ],
+                style: { fontSize: 14 },
+              },
+              // Auto-numbered list — the other bullet variant.
+              {
+                type: 'text',
+                pos: { x: 6, y: 0.5, w: 3.5, h: 2 },
+                textRuns: [{ text: 'Step one\n' }, { text: 'Step two\n' }, { text: 'Step three' }],
+                style: { bullet: { type: 'autoNum', numFormat: 'arabicPeriod' }, lineSpacing: 1.2 },
+              },
+            ],
+          },
+          {
+            id: 'slide2.xml',
+            backgroundFill: '#FFFFFF',
+            elements: [
+              {
+                type: 'table',
+                pos: { x: 0.5, y: 0.5, w: 8, h: 3 },
+                rows: [
+                  ['Header A', 'Header B'],
+                  ['Line1\nLine2', 'Value'],
+                ],
+                colWidths: [4, 4],
+              },
+              {
+                type: 'shape',
+                shapeType: 'roundRect',
+                pos: { x: 0.5, y: 4, w: 2, h: 1 },
+                text: 'Box',
+              },
+              {
+                type: 'line',
+                pos: { x: 3, y: 4.5, w: 2, h: 0 },
+                style: { line: '#1155CC', headArrow: true },
+              },
+            ],
+          },
+        ],
+      };
+
+      const outPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'pptx-gate-')), 'gate.pptx');
+      await generateNativePptx(protocol, outPath);
+      const parts = extractPptx(outPath);
+
+      const failures: string[] = [];
+      for (const [name, content] of parts) {
+        if (!name.endsWith('.xml') && !name.endsWith('.rels')) continue;
+        // xmldom auto-repairs and merely *warns* on a mismatched/unclosed tag
+        // (e.g. content from a later sibling silently absorbed into an
+        // unclosed <a:srgbClr>, exactly the shape of the real corruption this
+        // gate exists to catch) rather than raising 'error'/'fatalError' — so
+        // 'warning' must count as a failure here too, unlike a typical parser use.
+        const partErrors: string[] = [];
+        const parser = new DOMParser({
+          errorHandler: (level: string, msg: string) => {
+            partErrors.push(`${level}: ${msg}`);
+          },
+        });
+        parser.parseFromString(content, 'text/xml');
+        if (partErrors.length > 0) failures.push(`${name}: ${partErrors.join('; ')}`);
+      }
+      expect(failures).toEqual([]);
     });
   });
 });

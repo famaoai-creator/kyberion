@@ -15,23 +15,28 @@
       "id": "log_start",
       "role": "sink",
       "op": "system:log",
-      "params": { "message": "[UNHANDLED-INTENT] Starting reconcile cycle..." }
+      "params": {
+        "message": "[UNHANDLED-INTENT] Starting reconcile cycle..."
+      }
     },
     {
       "id": "run_reconciler",
       "role": "source",
-      "op": "system:shell",
-      "produces": { "channel": "reconcile_result", "type": "ShellResult" },
-      "params": {
-        "cmd": "node dist/scripts/reconcile_unhandled_intents.js 2>/dev/null || echo '{\"proposals_written\":[],\"skipped\":[],\"total_unreconciled\":0}'"
-      }
+      "op": "system:reconcile_unhandled_intents",
+      "produces": {
+        "channel": "reconcile_result",
+        "type": "UnhandledIntentReconcileResult"
+      },
+      "params": {}
     },
     {
       "id": "log_result",
       "role": "sink",
       "op": "system:log",
       "consumes": "reconcile_result",
-      "params": { "message": "{{reconcile_result.summary_line}}" }
+      "params": {
+        "message": "{{reconcile_result.summary_line}}"
+      }
     },
     {
       "id": "write_summary",
@@ -52,7 +57,9 @@
       "role": "sink",
       "op": "system:log",
       "consumes": "reconcile_result",
-      "params": { "message": "{{reconcile_result.summary_line}}" }
+      "params": {
+        "message": "{{reconcile_result.summary_line}}"
+      }
     }
   ]
 }

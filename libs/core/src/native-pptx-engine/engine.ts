@@ -13,6 +13,7 @@ import {
 import { generatePresentation } from './presentation.js';
 import { generateTheme } from './theme.js';
 import { buildShape, buildConnector, buildImage, buildTable, buildSmartArt } from './builders.js';
+import { applyPptxDesignDefaults } from './design-cascade.js';
 
 export async function generateNativePptx(
   protocol: PptxDesignProtocol,
@@ -21,6 +22,7 @@ export async function generateNativePptx(
   if (!protocol?.slides?.length) {
     throw new Error('generateNativePptx: protocol must have at least one slide');
   }
+  protocol = applyPptxDesignDefaults(protocol);
   const dir = path.dirname(outputPath);
   if (!safeExistsSync(dir)) {
     throw new Error(`generateNativePptx: output directory does not exist: ${dir}`);

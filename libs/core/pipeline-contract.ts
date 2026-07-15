@@ -52,6 +52,10 @@ export interface PipelineAdfStep {
   op: string;
   params: Record<string, unknown>;
   id?: string;
+  /** Display name / documentation only. */
+  name?: string;
+  /** Author note; ignored by the runtime. */
+  comment?: string;
   effort?: 'low' | 'medium' | 'high';
   budget?: PipelineStepBudget;
   /** Typed Flow node role. Preferred over `type`. */
@@ -67,6 +71,8 @@ export interface PipelineAdfStep {
     fallback?: PipelineAdfStep[];
     ref?: string;
     bind?: Record<string, unknown>;
+    /** Operator-facing hint shown when the step fails; ignored by the runtime. */
+    remediation?: string;
   };
   hooks?: {
     before?: StepHook[];
@@ -86,6 +92,12 @@ export interface PipelineAdf {
   name?: string;
   description?: string;
   context?: Record<string, unknown>;
+  /** Knowledge tier/customer scope propagated to wisdom:* ops (run_pipeline). */
+  knowledge_scope?: unknown;
+  /** Env vars applied when a template is executed (e.g. persona/role). */
+  env?: Record<string, string>;
+  /** Browser/session pipelines: logical session identifier. */
+  session_id?: string;
   options?: {
     max_steps?: number;
     timeout_ms?: number;

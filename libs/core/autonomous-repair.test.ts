@@ -101,6 +101,12 @@ describe('attemptAutonomousRepair (AR-01 Task 4)', () => {
 
   it('skips deterministic repair for parseable JSON and escalates to the LLM (LC-01)', async () => {
     adfFiles.set('pipelines/semantic.json', '{"id": "demo", "steps": [{"op": "unknown:op"}]}');
+    // A real repair subagent has file-editing tools; simulate it actually
+    // fixing the op as a side effect of the delegated task.
+    delegateTask.mockImplementation(async () => {
+      adfFiles.set('pipelines/semantic.json', '{"id": "demo", "steps": [{"op": "system:log"}]}');
+      return 'fixed the unknown op';
+    });
 
     const repaired = await attemptAutonomousRepair({
       step: { op: 'unknown:op' },
@@ -110,6 +116,24 @@ describe('attemptAutonomousRepair (AR-01 Task 4)', () => {
 
     expect(repaired).toBe(true);
     expect(delegateTask).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns false when the subagent reports success but leaves the file unchanged', async () => {
+    // Regression test: a subagent that (correctly) declines to touch a
+    // security-gated file still returns a report; re-validating an untouched
+    // file trivially passes, so "the file still parses" must not be treated
+    // as "the subagent repaired it" (found via live loop simulation — a
+    // subagent explicitly halted with "CHANGES APPLIED: None" on a
+    // tier-isolation violation, yet the caller logged a successful repair).
+    adfFiles.set('pipelines/untouched.json', '{"id": "demo", "steps": [{"op": "unknown:op"}]}');
+
+    const repaired = await attemptAutonomousRepair({
+      step: { op: 'unknown:op' },
+      failure: { category: 'validation_error', detail: 'unknown op' },
+      pipelinePath: 'pipelines/untouched.json',
+    });
+
+    expect(repaired).toBe(false);
   });
 
   it('returns false when the repair subagent itself fails', async () => {

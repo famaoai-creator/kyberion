@@ -1,10 +1,16 @@
-import { runActuatorCli } from '@agent/core';
+import { runActuatorCli, safeReadFile, pathResolver } from '@agent/core';
 import { fileURLToPath } from 'node:url';
 import * as path from 'node:path';
 import { handleAction } from './process-actuator-helpers.js';
-import processActionSchema from '../../../../schemas/process-action.schema.json';
 
 async function main() {
+  const processActionSchema = JSON.parse(
+    String(
+      safeReadFile(pathResolver.rootResolve('schemas/process-action.schema.json'), {
+        encoding: 'utf8',
+      })
+    )
+  );
   await runActuatorCli({
     name: 'process-actuator',
     handleAction,

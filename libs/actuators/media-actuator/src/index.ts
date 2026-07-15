@@ -2220,7 +2220,13 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       break;
     }
     case 'pptx_render': {
-      const protocol = ctx[params.design_from || 'last_pptx_design'];
+      const baseProtocol = ctx[params.design_from || 'last_pptx_design'];
+      // LE-01: a pipeline can opt the protocol into the engine design cascade
+      // (or override per-key defaults) without editing the protocol JSON.
+      const protocol =
+        params.design_defaults !== undefined
+          ? { ...baseProtocol, designDefaults: params.design_defaults }
+          : baseProtocol;
       const outPath = path.resolve(rootDir, resolve(params.path || params.output_path));
 
       if (!safeExistsSync(path.dirname(outPath)))

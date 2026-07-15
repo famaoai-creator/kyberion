@@ -2,6 +2,7 @@
   "version": "3.0.0",
   "generatedAt": "2026-07-03T13:30:00.000Z",
   "canvas": { "w": 10, "h": 7.5 },
+  "designDefaults": { "fontFamily": "Yu Gothic" },
   "theme": {
     "dk1": "0F1F33",
     "lt1": "FFFFFF",

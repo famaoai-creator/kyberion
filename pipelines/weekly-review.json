@@ -30,36 +30,20 @@
     {
       "id": "reconcile_unhandled_intents",
       "role": "source",
-      "op": "system:shell",
+      "op": "system:reconcile_unhandled_intents",
       "produces": {
         "channel": "reconcile_result",
-        "type": "ShellResult"
+        "type": "UnhandledIntentReconcileResult"
       },
-      "params": {
-        "cmd": "node dist/scripts/reconcile_unhandled_intents.js",
-        "export_as": "reconcile_result"
-      }
-    },
-    {
-      "id": "log_unhandled_intents",
-      "role": "source",
-      "op": "system:shell",
-      "produces": {
-        "channel": "reconcile_summary",
-        "type": "ShellResult"
-      },
-      "params": {
-        "cmd": "cat active/shared/tmp/unhandled-intent-last-run.summary.txt",
-        "export_as": "reconcile_summary"
-      }
+      "params": {}
     },
     {
       "id": "emit_unhandled_intents_summary",
       "role": "sink",
       "op": "system:log",
-      "consumes": "reconcile_summary",
+      "consumes": "reconcile_result",
       "params": {
-        "message": "{{reconcile_summary}}"
+        "message": "{{reconcile_result.summary_line}}"
       }
     },
     {
@@ -79,13 +63,13 @@
     {
       "id": "summarize_task_model_routing",
       "role": "source",
-      "op": "system:shell",
+      "op": "system:summarize_task_model_routing",
       "produces": {
         "channel": "task_model_routing_summary",
-        "type": "ShellResult"
+        "type": "TaskModelRoutingSummaryResult"
       },
       "params": {
-        "cmd": "node dist/scripts/summarize_task_model_routing.js --output active/shared/tmp/task-model-routing-summary.json"
+        "output_path": "active/shared/tmp/task-model-routing-summary.json"
       }
     },
     {
@@ -100,13 +84,14 @@
     {
       "id": "summarize_memory_queue",
       "role": "source",
-      "op": "system:shell",
+      "op": "system:summarize_memory_promotion_queue",
       "produces": {
         "channel": "memory_queue_summary",
-        "type": "ShellResult"
+        "type": "MemoryPromotionQueueSummaryResult"
       },
       "params": {
-        "cmd": "node dist/scripts/summarize_memory_promotion_queue.js --status queued --output active/shared/tmp/memory-promotion-queue-summary.md"
+        "status": "queued",
+        "output_path": "active/shared/tmp/memory-promotion-queue-summary.md"
       }
     },
     {
@@ -121,15 +106,13 @@
     {
       "id": "cost_report_weekly",
       "role": "source",
-      "op": "system:exec",
+      "op": "system:cost_report",
       "produces": {
         "channel": "weekly_cost_report",
-        "type": "CommandResult"
+        "type": "CostReport"
       },
       "params": {
-        "command": "node",
-        "args": ["dist/scripts/cost_report.js", "--last-days", "7"],
-        "timeout_ms": 60000
+        "last_days": 7
       }
     }
   ]

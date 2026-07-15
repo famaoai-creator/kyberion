@@ -10,7 +10,7 @@
       "params": { "message": "📣 Marketing Content Pipeline — starting..." }
     },
     {
-      "role": "source",
+      "role": "transform",
       "op": "media:document_diagram_asset_from_brief",
       "produces": { "channel": "diagram_asset", "type": "DiagramAsset" },
       "params": {

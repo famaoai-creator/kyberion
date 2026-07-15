@@ -36,7 +36,7 @@
       "params": {
         "use_subagent": true,
         "effort": "high",
-        "input": "{{change_plan_raw}}",
+        "context": "{{change_plan_raw}}",
         "instruction": "You are an AWS operations simulator. DO NOT execute anything; produce a deterministic DRY-RUN of the change plan as a single JSON object with this shape: { \"summary\": string, \"target_environment\": string, \"planned_changes\": [ { \"service\": string, \"action\": \"create\"|\"modify\"|\"destroy\"|\"no-op\", \"resource\": string, \"details\": string } ], \"iam_permission_checks\": [ { \"principal\": string, \"action\": string, \"verdict\": \"allow\"|\"deny\"|\"needs-review\" } ], \"blast_radius\": { \"scope\": string, \"affected_resources\": number, \"risk\": \"low\"|\"medium\"|\"high\" }, \"preconditions\": [ { \"check\": string, \"status\": \"pass\"|\"fail\"|\"unknown\" } ], \"rollback_plan\": [ string ], \"verdict\": \"safe-to-apply\"|\"apply-with-conditions\"|\"blocked\", \"conditions\": [ string ] }. Model realistic AWS primitives (terraform plan / CloudFormation change set / aws-cli --dry-run style): IAM, VPC/SG, EC2/EKS/Lambda, RDS/Aurora, S3, ALB, WAF, CloudWatch. Base the plan strictly on the input change plan. Output ONLY the JSON object.",
         "export_as": "aws_simulation"
       }

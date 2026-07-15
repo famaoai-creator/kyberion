@@ -7,17 +7,35 @@ const mocks = vi.hoisted(() => ({
   safeExistsSync: vi.fn(),
 }));
 
-vi.mock('@agent/core', async (importOriginal) => {
+// LE-03: collectAuditVerifyReport moved into @agent/core report-ops, which
+// imports its collaborators via relative module paths — mock the resolved
+// modules via package subpaths (relative imports into libs/core are forbidden
+// by the package-boundary contract).
+vi.mock('@agent/core/audit-chain', async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...(actual as any),
-    safeExistsSync: mocks.safeExistsSync,
     auditChain: {
       verify: mocks.auditVerify,
       verifyTenantMirrors: mocks.auditVerifyTenantMirrors,
     },
+  };
+});
+
+vi.mock('@agent/core/ledger', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...(actual as any),
     GLOBAL_LEDGER_PATH: 'active/audit/system-ledger.jsonl',
     verifyLedgerIntegrityDetailed: mocks.ledgerVerify,
+  };
+});
+
+vi.mock('@agent/core/secure-io', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...(actual as any),
+    safeExistsSync: mocks.safeExistsSync,
   };
 });
 

@@ -5,22 +5,36 @@
     {
       "id": "check-login",
       "role": "source",
-      "op": "evaluate",
+      "op": "browser:evaluate",
       "produces": { "channel": "login_status", "type": "EvalResult" },
-      "params": { "script": "(() => document.querySelector(\"input[name='_account']\") ? 'need_login' : 'already_logged_in')()" }
+      "params": {
+        "script": "(() => document.querySelector(\"input[name='_account']\") ? 'need_login' : 'already_logged_in')()"
+      }
     },
     {
       "id": "login-if-needed",
       "role": "gate",
-      "op": "if",
+      "op": "core:if",
       "consumes": "login_status",
       "params": {
         "condition": { "from": "login_status", "operator": "eq", "value": "need_login" },
         "then": [
-          { "role": "sink", "op": "fill", "params": { "selector": "input[name='_account']", "text": "{{login_user}}" } },
-          { "role": "sink", "op": "fill", "params": { "selector": "input[name='_password']", "text": "{{login_password}}" } },
-          { "role": "sink", "op": "click", "params": { "selector": "input.login-button, input[type='submit']" } },
-          { "role": "sink", "op": "wait", "params": { "duration": 3000 } }
+          {
+            "role": "sink",
+            "op": "browser:fill",
+            "params": { "selector": "input[name='_account']", "text": "{{login_user}}" }
+          },
+          {
+            "role": "sink",
+            "op": "browser:fill",
+            "params": { "selector": "input[name='_password']", "text": "{{login_password}}" }
+          },
+          {
+            "role": "sink",
+            "op": "browser:click",
+            "params": { "selector": "input.login-button, input[type='submit']" }
+          },
+          { "role": "sink", "op": "browser:wait", "params": { "duration": 3000 } }
         ]
       }
     }

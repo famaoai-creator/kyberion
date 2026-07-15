@@ -157,7 +157,21 @@
               "distill_output",
               "llm_decide",
               "system:distill_output",
-              "system:llm_decide"
+              "system:llm_decide",
+              "reconcile_config_fallbacks",
+              "system:reconcile_config_fallbacks",
+              "reconcile_unclassified_errors",
+              "system:reconcile_unclassified_errors",
+              "reconcile_unhandled_intents",
+              "system:reconcile_unhandled_intents",
+              "cost_report",
+              "system:cost_report",
+              "audit_verify",
+              "system:audit_verify",
+              "summarize_memory_promotion_queue",
+              "system:summarize_memory_promotion_queue",
+              "summarize_task_model_routing",
+              "system:summarize_task_model_routing"
             ]
           },
           "params": {

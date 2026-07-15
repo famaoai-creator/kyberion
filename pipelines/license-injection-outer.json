@@ -17,16 +17,23 @@
         "cmd": "echo 'console.log(\"Hello world\");' > active/shared/tmp/license-test.ts"
       }
     },
-    { "role": "sink", "op": "system:log", "params": { "message": "📄 Processing {{target_file}}..." } },
     {
-      "role": "source",
-      "op": "system:shell",
-      "produces": { "channel": "inner_status", "type": "ShellResult" },
+      "role": "sink",
+      "op": "system:log",
+      "params": { "message": "📄 Processing {{target_file}}..." }
+    },
+    {
+      "role": "gate",
+      "op": "core:include",
       "params": {
-        "cmd": "node dist/libs/actuators/code-actuator/src/index.js --input pipelines/license-injection-inner.json"
+        "fragment": "license-injection-inner.json"
       }
     },
-    { "role": "sink", "op": "system:log", "params": { "message": "✅ License injection attempted." } },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "params": { "message": "✅ License injection attempted." }
+    },
     {
       "role": "source",
       "op": "system:shell",
@@ -35,6 +42,11 @@
         "cmd": "cat active/shared/tmp/license-test.ts"
       }
     },
-    { "role": "sink", "op": "system:log", "consumes": "file_content", "params": { "message": "📝 Resulting content:\n{{file_content}}" } }
+    {
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "file_content",
+      "params": { "message": "📝 Resulting content:\n{{file_content}}" }
+    }
   ]
 }

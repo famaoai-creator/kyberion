@@ -3,7 +3,7 @@
   "pipeline_id": "knowledge-sync",
   "version": "2.0.0",
   "name": "Knowledge & Documentation Sync",
-  "description": "Reads knowledge/governance/knowledge-sync-rules.json and runs each configured sync job via wisdom-actuator. Replaces scripts/run_knowledge_sync.ts.",
+  "description": "Reads knowledge/product/governance/knowledge-sync-rules.json and runs each configured sync job via wisdom-actuator. Replaces scripts/run_knowledge_sync.ts.",
   "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
   "steps": [
     {
@@ -17,7 +17,7 @@
       "op": "system:read_file",
       "produces": { "channel": "sync_config", "type": "SyncConfig" },
       "params": {
-        "path": "knowledge/governance/knowledge-sync-rules.json",
+        "path": "knowledge/product/governance/knowledge-sync-rules.json",
         "format": "json"
       }
     },

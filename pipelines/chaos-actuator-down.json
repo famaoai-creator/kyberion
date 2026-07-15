@@ -26,9 +26,9 @@
     {
       "id": "attempt-browser-op",
       "role": "gate",
-      "op": "ref",
+      "op": "core:include",
       "params": {
-        "ref": "pipelines/fragments/intra-login.json"
+        "fragment": "fragments/intra-login.json"
       },
       "on_error": {
         "strategy": "fallback",
