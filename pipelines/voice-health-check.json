@@ -4,26 +4,45 @@
   "version": "1.0.0",
   "description": "Verifies the governed voice toolchain: tool runtime inventory, mlx_audio_tts_bridge.py, native TTS, and STT bridge availability.",
   "steps": [
-    { "role": "sink", "op": "system:log", "params": { "message": "🎙️ Voice Health Check — starting..." } },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "🎙️ Voice Health Check — starting..."
+      }
+    },
     {
       "id": "list_tool_runtimes",
       "role": "source",
       "op": "system:list_tool_runtimes",
-      "produces": { "channel": "tool_runtimes", "type": "ToolRuntimeInventory" },
-      "params": { "requested_mode": "trial" }
+      "produces": {
+        "channel": "tool_runtimes",
+        "type": "ToolRuntimeInventory"
+      },
+      "params": {
+        "requested_mode": "trial"
+      }
     },
     {
       "id": "check_tts_bridge",
       "role": "source",
       "op": "system:probe",
-      "produces": { "channel": "tts_bridge", "type": "ProbeResult" },
-      "params": { "path": "libs/actuators/voice-actuator/scripts/mlx_audio_tts_bridge.py" }
+      "produces": {
+        "channel": "tts_bridge",
+        "type": "ProbeResult"
+      },
+      "params": {
+        "path": "libs/actuators/voice-actuator/scripts/mlx_audio_tts_bridge.py"
+      }
     },
     {
       "id": "check_native_tts",
-      "role": "apply",
+      "role": "source",
       "op": "system:check_native_tts",
-      "produces": { "channel": "native_tts", "type": "ProbeResult" },
+      "produces": {
+        "channel": "native_tts",
+        "type": "ProbeResult"
+      },
       "params": {}
     },
     {

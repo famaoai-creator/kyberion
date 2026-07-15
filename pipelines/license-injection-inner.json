@@ -9,7 +9,7 @@
   "steps": [
     {
       "role": "source",
-      "op": "read_file",
+      "op": "system:read_file",
       "produces": { "channel": "content", "type": "ReadResult" },
       "params": {
         "path": "{{target_file}}"
@@ -17,7 +17,7 @@
     },
     {
       "role": "transform",
-      "op": "run_js",
+      "op": "system:run_js",
       "consumes": "content",
       "produces": { "channel": "new_content", "type": "TransformResult" },
       "params": {
@@ -26,7 +26,7 @@
     },
     {
       "role": "sink",
-      "op": "write_file",
+      "op": "system:write_file",
       "consumes": "new_content",
       "params": {
         "path": "{{target_file}}",

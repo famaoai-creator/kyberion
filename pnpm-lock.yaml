@@ -93,6 +93,9 @@ importers:
       '@types/ws':
         specifier: ^8.18.1
         version: 8.18.1
+      '@xmldom/xmldom':
+        specifier: 0.8.13
+        version: 0.8.13
       adm-zip:
         specifier: ^0.5.16
         version: 0.5.16

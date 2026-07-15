@@ -4,12 +4,16 @@
   "version": "1.0.0",
   "description": "Bridges raw analysis into executive-grade narrative: reasoning synthesis, multi-perspective wisdom, and system logging.",
   "steps": [
-    { "role": "sink", "op": "system:log", "params": { "message": "🎙️ Executive Narrative Bridge — starting..." } },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "params": { "message": "🎙️ Executive Narrative Bridge — starting..." }
+    },
     {
       "role": "source",
       "op": "reasoning:analyze",
       "produces": { "channel": "analysis", "type": "ReasoningResult" },
-      "params": { "context": "{{input.context}}", "depth": "executive" }
+      "params": { "context": "{{input.context}}", "depth": "executive", "export_as": "analysis" }
     },
     {
       "role": "transform",
@@ -18,7 +22,8 @@
       "produces": { "channel": "narrative_views", "type": "FanoutResult" },
       "params": {
         "personas": ["ceo", "ruthless_auditor"],
-        "prompt_template": "Reframe for {{persona}}: {{analysis}}"
+        "topic": "Reframe this analysis for executive narrative purposes: {{analysis}}",
+        "output_path": "active/shared/tmp/reports/executive-narrative-fanout.json"
       }
     },
     {
@@ -26,13 +31,19 @@
       "op": "wisdom:cross_critique",
       "consumes": "narrative_views",
       "produces": { "channel": "narrative_synthesis", "type": "CrossCritiqueResult" },
-      "params": {}
+      "params": {
+        "source_path": "active/shared/tmp/reports/executive-narrative-fanout.json",
+        "personas": ["ceo", "ruthless_auditor"],
+        "output_path": "active/shared/tmp/reports/executive-narrative.json"
+      }
     },
     {
       "role": "sink",
-      "op": "system:checkpoint",
+      "op": "system:log",
       "consumes": "narrative_synthesis",
-      "params": { "label": "executive-narrative" }
+      "params": {
+        "message": "✅ Executive narrative saved to active/shared/tmp/reports/executive-narrative.json"
+      }
     }
   ]
 }

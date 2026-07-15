@@ -8,12 +8,24 @@
       "type": "string",
       "enum": ["pipeline"]
     },
+    "id": { "type": "string" },
+    "pipeline_id": { "type": "string" },
     "name": {
       "type": "string"
     },
+    "version": { "type": "string" },
     "description": {
       "type": "string"
     },
+    "labels": {},
+    "expected_outcome": {},
+    "parameters": {},
+    "variables": {},
+    "inputs": {},
+    "fallback_pipeline": { "type": "string" },
+    "knowledge_scope": {},
+    "env": { "type": "object" },
+    "session_id": { "type": "string" },
     "context": {
       "type": "object"
     },
@@ -32,43 +44,7 @@
     "steps": {
       "type": "array",
       "minItems": 1,
-      "items": {
-        "type": "object",
-        "required": ["op"],
-        "properties": {
-          "id": { "type": "string" },
-          "type": {
-            "type": "string",
-            "enum": ["capture", "transform", "apply", "control"]
-          },
-          "op": { "type": "string", "minLength": 1 },
-          "effort": {
-            "type": "string",
-            "enum": ["low", "medium", "high"]
-          },
-          "budget": {
-            "type": "object",
-            "properties": {
-              "cost_cap_tokens": { "type": "number", "minimum": 1 },
-              "max_prompt_chars": { "type": "number", "minimum": 1 },
-              "max_response_chars": { "type": "number", "minimum": 1 },
-              "max_combined_chars": { "type": "number", "minimum": 1 },
-              "approval_required": { "type": "boolean" }
-            },
-            "additionalProperties": false
-          },
-          "params": { "type": "object" },
-          "hooks": {
-            "type": "object",
-            "properties": {
-              "before": { "$ref": "#/definitions/hookList" },
-              "after": { "$ref": "#/definitions/hookList" }
-            },
-            "additionalProperties": false
-          }
-        },
-        "additionalProperties": true
-      }
+      "items": { "$ref": "#/definitions/step" }
     },
     "schedule": {
       "type": "object",
@@ -83,6 +59,87 @@
     }
   },
   "definitions": {
+    "step": {
+      "type": "object",
+      "required": ["op"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "comment": { "type": "string" },
+        "type": {
+          "type": "string",
+          "enum": ["capture", "transform", "apply", "control"]
+        },
+        "role": {
+          "type": "string",
+          "enum": ["source", "transform", "sink", "gate"]
+        },
+        "op": { "type": "string", "minLength": 1 },
+        "effort": {
+          "type": "string",
+          "enum": ["low", "medium", "high"]
+        },
+        "budget": {
+          "type": "object",
+          "properties": {
+            "cost_cap_tokens": { "type": "number", "minimum": 1 },
+            "max_prompt_chars": { "type": "number", "minimum": 1 },
+            "max_response_chars": { "type": "number", "minimum": 1 },
+            "max_combined_chars": { "type": "number", "minimum": 1 },
+            "approval_required": { "type": "boolean" }
+          },
+          "additionalProperties": false
+        },
+        "params": { "type": "object" },
+        "produces": {
+          "oneOf": [
+            { "type": "string", "minLength": 1 },
+            {
+              "type": "object",
+              "required": ["channel"],
+              "properties": {
+                "channel": { "type": "string", "minLength": 1 },
+                "type": { "type": "string" }
+              },
+              "additionalProperties": false
+            }
+          ]
+        },
+        "consumes": {
+          "oneOf": [
+            { "type": "string", "minLength": 1 },
+            { "type": "array", "items": { "type": "string", "minLength": 1 } }
+          ]
+        },
+        "on_error": {
+          "type": "object",
+          "required": ["strategy"],
+          "properties": {
+            "strategy": { "type": "string", "enum": ["skip", "abort", "fallback"] },
+            "fallback": {
+              "type": "array",
+              "items": { "$ref": "#/definitions/step" }
+            },
+            "ref": { "type": "string" },
+            "bind": { "type": "object" },
+            "remediation": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        "hooks": {
+          "type": "object",
+          "properties": {
+            "before": { "$ref": "#/definitions/hookList" },
+            "after": { "$ref": "#/definitions/hookList" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "patternProperties": {
+        "^_": {}
+      },
+      "additionalProperties": false
+    },
     "hookList": {
       "type": "array",
       "items": {
@@ -104,5 +161,8 @@
       }
     }
   },
-  "additionalProperties": true
+  "patternProperties": {
+    "^_": {}
+  },
+  "additionalProperties": false
 }

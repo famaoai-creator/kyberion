@@ -987,7 +987,7 @@
     {
       "path": "product/governance/actuator-op-registry.json",
       "tier": "public",
-      "size": 13800,
+      "size": 14049,
       "type": "json"
     },
     {
@@ -2049,7 +2049,7 @@
     {
       "path": "product/governance/security-policy.json",
       "tier": "public",
-      "size": 18526,
+      "size": 18690,
       "type": "json"
     },
     {
@@ -2937,7 +2937,7 @@
     {
       "path": "product/orchestration/actuator-op-discovery.json",
       "tier": "public",
-      "size": 60155,
+      "size": 64787,
       "type": "json"
     },
     {
@@ -3267,7 +3267,7 @@
     {
       "path": "product/orchestration/global_actuator_index.json",
       "tier": "public",
-      "size": 15467,
+      "size": 15716,
       "type": "json"
     },
     {
@@ -6909,7 +6909,7 @@
     {
       "path": "product/schemas/pipeline-adf.schema.json",
       "tier": "public",
-      "size": 3050,
+      "size": 4813,
       "type": "json"
     },
     {

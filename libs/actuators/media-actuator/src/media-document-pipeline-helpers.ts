@@ -6,6 +6,7 @@ import {
   pathResolver,
   resolveVars,
   retry,
+  designDefaultsFromMediaTheme,
 } from '@agent/core';
 import {
   generateNativeDocx,
@@ -143,6 +144,13 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
         accent2: (themeColors.secondary || '#334155').replace('#', ''),
       },
       master: { elements: [] },
+      // LE-01/LE-02: brief-driven protocols opt into the engine design cascade
+      // with tenant/theme-derived defaults, so elements the slide builder
+      // leaves unstyled get the same fills as every other render path.
+      designDefaults: designDefaultsFromMediaTheme({
+        colors: themeColors,
+        fonts: theme?.fonts || theme?.theme?.fonts || {},
+      }),
       slides: contentData.map((data: any, idx: number) =>
         deps.buildPptxSlideFromPattern(
           rootDir,

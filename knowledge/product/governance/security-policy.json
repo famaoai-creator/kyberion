@@ -240,6 +240,7 @@
         "active/audit/",
         "active/shared/logs/process/",
         "active/shared/data-vault/",
+        "active/shared/observability/ops-alerts.jsonl",
         "active/missions/${MISSION_ID}/evidence/",
         "active/missions/confidential/${MISSION_ID}/evidence/",
         "active/missions/personal/${MISSION_ID}/evidence/",
@@ -469,6 +470,9 @@
         "knowledge/public/design-patterns/media-templates/themes.json",
         "knowledge/public/design-patterns/media-templates/themes/themes.json"
       ]
+    },
+    "reconcile_config_fallbacks": {
+      "allow_write": ["knowledge/public/", "active/shared/tmp/"]
     },
     "register_workflow": {
       "allow_write": [
