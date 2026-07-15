@@ -36,6 +36,24 @@ node dist/scripts/run_pipeline.js --input knowledge/product/pipeline-templates/<
 
 ---
 
+## What logic belongs in a pipeline
+
+Pipelines are declarative wiring plus a governance envelope (trace, replay, budgets, guardrails). Keep logic in the layer that owns it (→ [LAYERED_EXECUTION_PLAN](../docs/developer/improvement-plans-2026-07/LAYERED_EXECUTION_PLAN_2026-07-15.ja.md)):
+
+| Belongs in the pipeline                                  | Belongs in a typed actuator op (TypeScript)                                   |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Sequential step wiring, `produces`/`consumes` channels   | State-driven loops (repeat until a computed condition, accumulate-and-decide) |
+| Data-driven `core:foreach` over a known list             | Computation, data shaping, sorting/dedup                                      |
+| Scenario-level `core:if` (e.g. include a login fragment) | Result verification ("did the actuator really succeed?")                      |
+| Approval gates, budgets, `on_error` strategy             | Waiting/retry semantics (auto-wait belongs to the op, like browser ops)       |
+| Semantic briefs handed to `reasoning:*`/`wisdom:*`       | Anything you are tempted to write inside `core:transform` `script`            |
+
+Rules of thumb:
+
+- `core:transform` is for small glue only. Scripts longer than the governance limit (default 400 chars) trigger the `transform-script-oversized` guardrail warning — move that logic into a typed op with an input/output contract.
+- Do not wrap a script with a `system:exec` step just to give it a pipeline name. Expose the script's logic as an actuator op so trace spans, budgets, and error classification reach inside it.
+- For visual artifacts (PPTX/doc/video), author semantic content and set `designDefaults` / theme on the protocol — never inline per-element style literals.
+
 ## System Pipelines
 
 ### Health & Diagnostics

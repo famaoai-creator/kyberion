@@ -16,9 +16,24 @@
     "retryable_categories": ["network", "timeout", "resource_unavailable"]
   },
   "capabilities": [
-    { "op": "pipeline", "schema_ref": "schemas/system-pipeline.schema.json", "platforms": ["darwin", "linux", "win32"] },
+    {
+      "op": "pipeline",
+      "schema_ref": "schemas/system-pipeline.schema.json",
+      "platforms": ["darwin", "linux", "win32"]
+    },
     { "op": "reconcile", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "computer_interaction", "schema_ref": "schemas/computer-interaction.schema.json", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "reconcile_config_fallbacks", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "reconcile_unclassified_errors", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "reconcile_unhandled_intents", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "cost_report", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "audit_verify", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "summarize_memory_promotion_queue", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "summarize_task_model_routing", "platforms": ["darwin", "linux", "win32"] },
+    {
+      "op": "computer_interaction",
+      "schema_ref": "schemas/computer-interaction.schema.json",
+      "platforms": ["darwin", "linux", "win32"]
+    },
     { "op": "list_input_devices", "platforms": ["darwin", "linux", "win32"] },
     { "op": "list_displays", "platforms": ["darwin", "linux", "win32"] },
     { "op": "list_media_devices", "platforms": ["darwin", "linux", "win32"] },

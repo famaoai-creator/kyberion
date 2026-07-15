@@ -270,6 +270,7 @@
     "@types/marked": "^6.0.0",
     "@types/pdf-parse": "^1.1.5",
     "@types/ws": "^8.18.1",
+    "@xmldom/xmldom": "0.8.13",
     "adm-zip": "^0.5.16",
     "ajv": "8.18.0",
     "ajv-formats": "^3.0.1",

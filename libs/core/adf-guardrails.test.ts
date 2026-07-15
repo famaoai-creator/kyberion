@@ -146,3 +146,48 @@ describe('semantic-op placement lint (LC-05)', () => {
     expect(report.findings).toHaveLength(0);
   });
 });
+
+describe('logic-layering lint (LE-04/LE-05)', () => {
+  it('warns on an oversized core:transform script without flipping ok', () => {
+    const report = validatePipelineGuardrails({
+      id: 'lint-transform',
+      steps: [
+        {
+          op: 'core:transform',
+          params: { script: 'x'.repeat(401), export_as: 'out' },
+        },
+      ],
+    } as any);
+    expect(report.ok).toBe(true);
+    const finding = report.findings.find((f) => f.code === 'transform-script-oversized');
+    expect(finding?.severity).toBe('warn');
+  });
+
+  it('accepts small core:transform glue scripts silently', () => {
+    const report = validatePipelineGuardrails({
+      id: 'lint-transform-small',
+      steps: [{ op: 'core:transform', params: { script: 'return ctx.value;' } }],
+    } as any);
+    expect(report.findings).toHaveLength(0);
+  });
+
+  it('walks media:pipeline embedded steps for budgets and lints', () => {
+    const report = validatePipelineGuardrails({
+      id: 'lint-media-embedded',
+      options: { max_steps: 2 },
+      steps: [
+        {
+          op: 'media:pipeline',
+          params: {
+            steps: [
+              { op: 'media:json_read', params: {} },
+              { op: 'core:transform', params: { script: 'y'.repeat(401) } },
+            ],
+          },
+        },
+      ],
+    } as any);
+    expect(report.findings.some((f) => f.code === 'step-budget-exceeded')).toBe(true);
+    expect(report.findings.some((f) => f.code === 'transform-script-oversized')).toBe(true);
+  });
+});

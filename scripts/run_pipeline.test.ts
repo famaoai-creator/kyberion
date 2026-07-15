@@ -16,7 +16,58 @@ const {
   normalizeReasoningPolicy,
   buildReasoningPolicyNote,
   isReasoningBudgetExceeded,
+  findStepByIdRecursive,
 } = await import(new URL('./run_pipeline.js', import.meta.url).href);
+
+describe('findStepByIdRecursive', () => {
+  it('finds a step nested inside core:if/core:foreach/on_error.fallback by id', () => {
+    const steps = [
+      { id: 'top-shell', op: 'system:shell', params: {} },
+      {
+        id: 'gate',
+        op: 'core:if',
+        params: {
+          condition: {},
+          then: [
+            {
+              id: 'nested-shell',
+              op: 'system:shell',
+              params: { cmd: 'echo nested' },
+              on_error: { fallback: [{ id: 'fallback-shell', op: 'system:shell', params: {} }] },
+            },
+          ],
+        },
+      },
+    ];
+
+    expect(findStepByIdRecursive(steps, 'nested-shell')).toMatchObject({
+      id: 'nested-shell',
+      params: { cmd: 'echo nested' },
+    });
+    expect(findStepByIdRecursive(steps, 'fallback-shell')).toMatchObject({ id: 'fallback-shell' });
+  });
+
+  it('does not match a same-op step in an unrelated location (regression)', () => {
+    // Two steps share the op "system:shell" but only one has the id we're
+    // looking for — matching by op alone (the pre-fix behavior) would have
+    // returned the wrong one.
+    const steps = [
+      { id: 'top-shell', op: 'system:shell', params: { cmd: 'echo unrelated' } },
+      {
+        id: 'gate',
+        op: 'core:if',
+        params: {
+          condition: {},
+          then: [{ id: 'nested-shell', op: 'system:shell', params: { cmd: 'echo target' } }],
+        },
+      },
+    ];
+
+    const found = findStepByIdRecursive(steps, 'nested-shell');
+    expect(found?.params).toMatchObject({ cmd: 'echo target' });
+    expect(findStepByIdRecursive(steps, 'missing-id')).toBeUndefined();
+  });
+});
 
 describe('run_pipeline compatibility', () => {
   it('persists a recovered fallback as one successful causal trace', () => {

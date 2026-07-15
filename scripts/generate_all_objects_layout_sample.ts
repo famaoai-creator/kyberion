@@ -1,97 +1,27 @@
-import { generateNativePptx } from '@agent/core';
+import {
+  generateNativePptx,
+  PPTX_PALETTE as C,
+  textElement as txt,
+  shapeElement as shape,
+  lineElement as line,
+  sectionHeaderElements,
+  footerElements,
+} from '@agent/core';
 import type { PptxDesignProtocol, PptxElement, PptxSlide } from '@agent/core';
-
-// ─── Color Palette ──────────────────────────────────────────
-const C = {
-  navy: '#1E3A5F',
-  navyDark: '#0F1F33',
-  blue: '#3B82F6',
-  blueLight: '#DBEAFE',
-  green: '#10B981',
-  greenLight: '#D1FAE5',
-  orange: '#F59E0B',
-  orangeLight: '#FEF3C7',
-  purple: '#8B5CF6',
-  purpleLight: '#EDE9FE',
-  red: '#EF4444',
-  redLight: '#FEE2E2',
-  gray50: '#F9FAFB',
-  gray100: '#F3F4F6',
-  gray200: '#E5E7EB',
-  gray400: '#9CA3AF',
-  gray600: '#4B5563',
-  gray700: '#374151',
-  gray800: '#1F2937',
-  white: '#FFFFFF',
-  black: '#000000',
-};
 
 const TOTAL_PAGES = 16;
 
-// ─── Helper Functions ───────────────────────────────────────
-function txt(
-  text: string,
-  pos: { x: number; y: number; w: number; h: number },
-  style: any = {}
-): PptxElement {
-  return {
-    type: 'text',
-    pos,
-    text,
-    style: { fontFamily: 'Yu Gothic', fontSize: 14, color: C.gray800, ...style },
-  };
-}
+// LE-02: layout primitives live in the engine (@agent/core layout-primitives);
+// per-element font/size/color defaults come from the designDefaults cascade on
+// the protocol below, so every render path shares the same fills.
+const sectionHeader = (title: string): PptxElement[] => sectionHeaderElements(title);
 
-function shape(
-  shapeType: string,
-  pos: { x: number; y: number; w: number; h: number },
-  text: string,
-  style: any = {}
-): PptxElement {
-  return {
-    type: 'shape',
-    shapeType,
-    pos,
-    text,
-    style: { fontFamily: 'Yu Gothic', fontSize: 12, ...style },
-  };
-}
-
-function line(pos: { x: number; y: number; w: number; h: number }, style: any = {}): PptxElement {
-  return {
-    type: 'line',
-    pos,
-    style: { line: C.gray400, lineWidth: 1, ...style },
-  };
-}
-
-function sectionHeader(title: string): PptxElement[] {
-  return [
-    shape('rect', { x: 0, y: 0, w: 10, h: 0.9 }, '', { fill: C.navy }),
-    txt(
-      title,
-      { x: 0.5, y: 0.15, w: 9, h: 0.6 },
-      { fontSize: 22, bold: true, color: C.white, valign: 'middle' }
-    ),
-    shape('rect', { x: 0, y: 0.9, w: 10, h: 0.05 }, '', { fill: C.blue }),
-  ];
-}
-
-function footer(pageNum: number): PptxElement[] {
-  return [
-    line({ x: 0.5, y: 7.0, w: 9.0, h: 0 }, { line: C.navy, lineWidth: 0.5 }),
-    txt(
-      'Kyberion OS Sovereign Presentation Engine Showcase',
-      { x: 0.5, y: 7.05, w: 5, h: 0.35 },
-      { fontSize: 8, color: C.gray400 }
-    ),
-    txt(
-      `Page ${pageNum} / ${TOTAL_PAGES}`,
-      { x: 7.5, y: 7.05, w: 2.0, h: 0.35 },
-      { fontSize: 8, color: C.gray400, align: 'right' }
-    ),
-  ];
-}
+const footer = (pageNum: number): PptxElement[] =>
+  footerElements({
+    pageNum,
+    totalPages: TOTAL_PAGES,
+    label: 'Kyberion OS Sovereign Presentation Engine Showcase',
+  });
 
 // ═══════════════════════════════════════════════════════════
 // SLIDES DEFINITION
@@ -1487,6 +1417,13 @@ const protocol: PptxDesignProtocol = {
   version: '3.0.0',
   generatedAt: new Date().toISOString(),
   canvas: { w: 10, h: 7.5 },
+  // Same values the local txt()/shape()/line() helpers used to inject — now
+  // supplied once by the engine cascade instead of per-element.
+  designDefaults: {
+    fontFamily: 'Yu Gothic',
+    textColor: C.gray800,
+    lineColor: C.gray400,
+  },
   theme: {
     dk1: '0F1F33',
     lt1: 'FFFFFF',
