@@ -5,6 +5,10 @@ function read(relativePath: string): string {
   return String(safeReadFile(pathResolver.rootResolve(relativePath), { encoding: 'utf8' }) || '');
 }
 
+function readJson(relativePath: string): { steps?: Array<{ op?: string; consumes?: string }> } {
+  return JSON.parse(read(relativePath)) as { steps?: Array<{ op?: string; consumes?: string }> };
+}
+
 describe('surface smoke contract', () => {
   it('keeps the Chronos first-run surface and operator controls in place', () => {
     const page = read('presence/displays/chronos-mirror-v2/src/app/page.tsx');
@@ -34,13 +38,17 @@ describe('surface smoke contract', () => {
 
   it('keeps the browser recording example catalog and voice first-win pipeline in place', () => {
     const browserCatalog = read('libs/actuators/browser-actuator/examples/catalog.json');
-    const voicePipeline = read('pipelines/voice-hello.json');
+    const voicePipeline = readJson('pipelines/voice-hello.json');
 
     expect(browserCatalog).toContain('test-session-recording');
     expect(browserCatalog).toContain('Playwright trace and video recording');
-    expect(voicePipeline).toContain('"pipeline_id": "voice-hello"');
-    expect(voicePipeline).toContain('system:native_tts_speak');
-    expect(voicePipeline).toContain('http://127.0.0.1:3031/voice-hello');
+    expect(voicePipeline.steps).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ op: 'system:check_native_tts' }),
+        expect.objectContaining({ op: 'system:native_tts_speak', consumes: 'tts_ready' }),
+      ])
+    );
+    expect(voicePipeline.steps?.some((step) => step.op === 'system:wait_for')).toBe(false);
   });
 
   it('keeps the operator-facing computer and presence surfaces visibly ready', () => {
