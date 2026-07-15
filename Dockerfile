@@ -5,7 +5,7 @@ ENV NODE_ENV=production
 
 # Enable corepack and install pnpm
 ENV COREPACK_ENABLE_STRICT=0
-RUN corepack enable && corepack prepare pnpm@10.30.3 --activate
+RUN corepack enable && corepack prepare pnpm@11.13.0 --activate
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
