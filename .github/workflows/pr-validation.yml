@@ -71,7 +71,7 @@ jobs:
         run: pnpm run check:golden
 
       - name: Security scan
-        run: pnpm audit --audit-level=moderate
+        run: pnpm dlx --config.minimumReleaseAge=0 pnpm@11.12.0 --config.manage-package-manager-versions=false audit --audit-level=moderate
         continue-on-error: true
 
       - name: Vital check
