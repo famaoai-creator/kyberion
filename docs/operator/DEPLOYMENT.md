@@ -35,9 +35,9 @@ For: Founders, FDE engineers running Kyberion on their own laptop, single-user p
 # Required:
 brew install node@24 git
 corepack enable
-corepack prepare pnpm@10 --activate
+corepack prepare pnpm@11.13.0 --activate
 node --version   # must be >= 24.0.0
-pnpm --version   # must be >= 10.x
+pnpm --version   # must be 11.13.0
 
 # Optional, only if you'll use these actuators:
 brew install --cask google-chrome   # for browser-actuator (Playwright also installs Chromium)
@@ -147,7 +147,7 @@ sudo apt-get install -y curl git build-essential
 curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
 sudo apt-get install -y nodejs
 corepack enable
-corepack prepare pnpm@10 --activate
+corepack prepare pnpm@11.13.0 --activate
 
 # Optional (only for actuators that need them)
 sudo apt-get install -y python3.11 python3-pip ffmpeg tesseract-ocr

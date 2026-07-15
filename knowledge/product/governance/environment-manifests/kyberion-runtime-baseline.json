@@ -26,7 +26,7 @@
         "operator_confirmed": true,
         "command": "corepack",
         "args": ["enable", "pnpm"],
-        "instruction": "Use Corepack (`corepack enable pnpm`) or `npm i -g pnpm`. Pinned major: `pnpm@10`.",
+        "instruction": "Use Corepack (`corepack enable pnpm`) or `npm i -g pnpm`. Pinned version: `pnpm@11.13.0` (Node.js 24+ required).",
         "docs_url": "https://pnpm.io/installation",
         "retry_after_install": true
       }
