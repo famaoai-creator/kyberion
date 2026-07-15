@@ -1239,7 +1239,7 @@
     {
       "path": "product/governance/environment-manifests/kyberion-runtime-baseline.json",
       "tier": "public",
-      "size": 3024,
+      "size": 3054,
       "type": "json"
     },
     {
