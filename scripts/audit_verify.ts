@@ -1,24 +1,15 @@
 #!/usr/bin/env node
-import { safeExistsSync } from '@agent/core';
+// LE-03: the report collection/formatting now lives in @agent/core report-ops
+// and is exposed in-process as the `system:audit_verify` op. This shell
+// remains for direct CLI use and the SA-01 warn-observation exit-code policy.
 import { createStandardYargs } from '@agent/core';
-import { auditChain } from '@agent/core';
-import { GLOBAL_LEDGER_PATH, verifyLedgerIntegrityDetailed } from '@agent/core';
+import {
+  collectAuditVerifyReport,
+  formatAuditVerifyReport,
+  type AuditVerifyCliReport,
+} from '@agent/core';
 
-export interface AuditVerifyCliReport {
-  ok: boolean;
-  audit: ReturnType<typeof auditChain.verify>;
-  ledgers: Array<{
-    path: string;
-    ok: boolean;
-    total: number;
-    corrupted: string[];
-    missingKey: boolean;
-  }>;
-  tenantMirrors: {
-    ok: boolean;
-    findings: string[];
-  };
-}
+export { collectAuditVerifyReport, formatAuditVerifyReport, type AuditVerifyCliReport };
 
 function parseLedgerArgs(value: unknown): string[] {
   if (value === undefined || value === null) return [];
@@ -57,64 +48,6 @@ function hasArg(name: string): boolean {
   return process.argv.includes(name) || process.argv.some((arg) => arg.startsWith(`${name}=`));
 }
 
-export function collectAuditVerifyReport(
-  input: {
-    since?: string;
-    ledgers?: string[];
-  } = {}
-): AuditVerifyCliReport {
-  const audit = auditChain.verify({ since: input.since });
-  const ledgerPaths = [GLOBAL_LEDGER_PATH, ...(input.ledgers ?? [])].filter(
-    (item, index, all) => all.indexOf(item) === index
-  );
-  const ledgers = ledgerPaths.map((ledgerPath) => {
-    const report = verifyLedgerIntegrityDetailed(ledgerPath);
-    return {
-      path: ledgerPath,
-      ok: report.ok,
-      total: report.total,
-      corrupted: report.corrupted,
-      missingKey: report.missingKey,
-      ...(safeExistsSync(ledgerPath) ? {} : { missing: true }),
-    };
-  });
-  const tenantMirrors = auditChain.verifyTenantMirrors();
-  return {
-    ok: audit.corrupted.length === 0 && ledgers.every((ledger) => ledger.ok) && tenantMirrors.ok,
-    audit,
-    ledgers,
-    tenantMirrors,
-  };
-}
-
-export function formatAuditVerifyReport(report: AuditVerifyCliReport): string[] {
-  const lines = [
-    `Audit chain: ${report.audit.corrupted.length === 0 ? 'ok' : 'failed'}; entries=${report.audit.total}; corrupted=${report.audit.corrupted.length}`,
-  ];
-  if (report.audit.boundaryLimited) {
-    lines.push('  - since-boundary: earlier chain continuity was not checked');
-  }
-  if (report.audit.corrupted.length > 0) {
-    lines.push(`  - findings: ${report.audit.corrupted.join(', ')}`);
-  }
-  for (const ledger of report.ledgers) {
-    lines.push(
-      `Ledger: ${ledger.ok ? 'ok' : 'failed'}; entries=${ledger.total}; path=${ledger.path}`
-    );
-    if (ledger.corrupted.length > 0) {
-      lines.push(`  - findings: ${ledger.corrupted.join(', ')}`);
-    }
-    if (ledger.missingKey) {
-      lines.push('  - missing HMAC key for one or more ledger entries');
-    }
-  }
-  lines.push(`Tenant mirrors: ${report.tenantMirrors.ok ? 'ok' : 'failed'}`);
-  if (report.tenantMirrors.findings.length > 0) {
-    lines.push(`  - findings: ${report.tenantMirrors.findings.join(', ')}`);
-  }
-  return lines;
-}
-
 async function main(): Promise<void> {
   const argv = await createStandardYargs()
     .option('json', { type: 'boolean', default: false })
@@ -132,7 +65,14 @@ async function main(): Promise<void> {
     .parseSync();
 
   const report = collectAuditVerifyReport({
-    since: validateSince(argv.since ?? readArgValue('--since'), argv.days ? Number(argv.days) : (readArgValue('--days') ? Number(readArgValue('--days')) : undefined)),
+    since: validateSince(
+      argv.since ?? readArgValue('--since'),
+      argv.days
+        ? Number(argv.days)
+        : readArgValue('--days')
+          ? Number(readArgValue('--days'))
+          : undefined
+    ),
     ledgers: parseLedgerArgs(argv.ledger ?? readArgValue('--ledger')),
   });
   if (argv.json || hasArg('--json')) {

@@ -357,6 +357,102 @@ const INPUT_CONTRACTS: ContractCatalog = {
         additionalProperties: true,
       },
     },
+    reconcile_config_fallbacks: {
+      summary:
+        'Sweep the config-fallback registry: recreate missing public-tier knowledge JSON from defaults, write parse-error proposals. Returns { repaired, proposals_written, skipped, pruned }.',
+      examples: [{ export_as: 'reconcile_result' }],
+      schema: {
+        type: 'object',
+        properties: {
+          export_as: { type: 'string', minLength: 1 },
+        },
+        additionalProperties: true,
+      },
+    },
+    reconcile_unclassified_errors: {
+      summary:
+        'Sweep the unclassified-error registry and write rule-proposal stubs. Returns { proposals_written, skipped, total_unreconciled }.',
+      examples: [{ export_as: 'reconcile_result' }],
+      schema: {
+        type: 'object',
+        properties: {
+          export_as: { type: 'string', minLength: 1 },
+        },
+        additionalProperties: true,
+      },
+    },
+    reconcile_unhandled_intents: {
+      summary:
+        'Sweep the unhandled-intent registry and write routing/intent proposal stubs. Returns { proposals_written, skipped, total_unreconciled, top_unreconciled, summary_line }.',
+      examples: [{ export_as: 'reconcile_result' }],
+      schema: {
+        type: 'object',
+        properties: {
+          export_as: { type: 'string', minLength: 1 },
+        },
+        additionalProperties: true,
+      },
+    },
+    cost_report: {
+      summary:
+        'Aggregate the usage ledger into per-mission/per-model/per-day cost views (OP-01). Returns the structured report object.',
+      examples: [{ last_days: 7, export_as: 'weekly_cost_report' }],
+      schema: {
+        type: 'object',
+        properties: {
+          since: { type: 'string', minLength: 1 },
+          until: { type: 'string', minLength: 1 },
+          last_days: { type: 'number', minimum: 1 },
+          export_as: { type: 'string', minLength: 1 },
+        },
+        additionalProperties: true,
+      },
+    },
+    audit_verify: {
+      summary:
+        'Verify audit-chain continuity, ledger HMAC integrity, and tenant mirrors (SA-01). Returns { ok, audit, ledgers, tenantMirrors }.',
+      examples: [{ export_as: 'audit_report' }],
+      schema: {
+        type: 'object',
+        properties: {
+          since: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' },
+          ledgers: { type: 'array', items: { type: 'string', minLength: 1 } },
+          export_as: { type: 'string', minLength: 1 },
+        },
+        additionalProperties: true,
+      },
+    },
+    summarize_memory_promotion_queue: {
+      summary:
+        'Summarize the memory promotion queue (KM-03); optionally persist markdown to output_path. Returns { rows, markdown, output_path? }.',
+      examples: [
+        { status: 'queued', output_path: 'active/shared/tmp/memory-promotion-queue-summary.md' },
+      ],
+      schema: {
+        type: 'object',
+        properties: {
+          status: { type: 'string', minLength: 1 },
+          output_path: { type: 'string', minLength: 1 },
+          export_as: { type: 'string', minLength: 1 },
+        },
+        additionalProperties: true,
+      },
+    },
+    summarize_task_model_routing: {
+      summary:
+        'Aggregate task-model routing telemetry (MO-05) from observability JSONL streams; optionally persist JSON to output_path. Returns { samples, rows, output_path? }.',
+      examples: [{ output_path: 'active/shared/tmp/task-model-routing-summary.json' }],
+      schema: {
+        type: 'object',
+        properties: {
+          task_events_path: { type: 'string', minLength: 1 },
+          supervisor_events_path: { type: 'string', minLength: 1 },
+          output_path: { type: 'string', minLength: 1 },
+          export_as: { type: 'string', minLength: 1 },
+        },
+        additionalProperties: true,
+      },
+    },
     open_url: {
       summary: 'Open a URL on the host.',
       examples: [{ url: 'https://example.com' }],

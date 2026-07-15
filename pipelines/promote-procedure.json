@@ -4,10 +4,23 @@
   "description": "Pattern A → B 昇格: 記録した手順を ProcedureCatalog に登録し、次回から Pattern B で自動実行できるようにする。入力は scripts/promote_procedure.ts 内部で検証・secure-io 経由で書き込み（shell へ untrusted 値を展開しない）。",
   "action": "pipeline",
   "parameters": {
-    "recording_ref": { "type": "string", "description": "昇格対象の BrowserExtensionRecording（active/shared/runtime/recordings/ 配下のみ許可）" },
-    "procedure_id": { "type": "string", "description": "付与する procedure_id（[a-z0-9._-] のみ）" },
-    "intent_phrases": { "type": "string", "description": "意図フレーズの JSON 配列文字列（例: [\"勤怠の承認\"]）" },
-    "status": { "type": "string", "description": "active | deprecated（既定 active）", "optional": true }
+    "recording_ref": {
+      "type": "string",
+      "description": "昇格対象の BrowserExtensionRecording（active/shared/runtime/recordings/ 配下のみ許可）"
+    },
+    "procedure_id": {
+      "type": "string",
+      "description": "付与する procedure_id（[a-z0-9._-] のみ）"
+    },
+    "intent_phrases": {
+      "type": "string",
+      "description": "意図フレーズの JSON 配列文字列（例: [\"勤怠の承認\"]）"
+    },
+    "status": {
+      "type": "string",
+      "description": "active | deprecated（既定 active）",
+      "optional": true
+    }
   },
   "steps": [
     {
@@ -15,7 +28,8 @@
       "role": "transform",
       "op": "system:shell",
       "params": {
-        "cmd": "pnpm build"
+        "cmd": "pnpm build",
+        "timeout_ms": 600000
       }
     },
     {

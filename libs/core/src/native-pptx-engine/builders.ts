@@ -30,6 +30,87 @@ function buildLine(style?: PptxStyle): string {
   return `<a:ln w="${w}">${buildColorFill(style.line)}${dash}</a:ln>`;
 }
 
+// Canonical child-element order for the two composite OOXML types we mutate
+// piecemeal from independent call sites (ECMA-376 §21.1.2.2.7 CT_TextParagraphProperties
+// and §21.1.2.3.9 CT_TextCharacterProperties). PowerPoint silently drops — rather
+// than errors on — a child that appears out of this order, which is what made the
+// pPr bullet/spacing bug so easy to reintroduce: correctness depended on which
+// order the mutation blocks happened to run in, not on anything the type system
+// or a test enforced. Inserting through `insertInSchemaOrder` below instead of a
+// bare "append before the closing tag" makes the position correct regardless of
+// call order. (Same class of fix as OfficeCLI's SchemaOrder.cs, adapted for
+// string-based XML assembly instead of a typed SDK with its own particle model.)
+const PPR_CHILD_ORDER = [
+  'a:lnSpc',
+  'a:spcBef',
+  'a:spcAft',
+  'a:buClrTx',
+  'a:buClr',
+  'a:buSzTx',
+  'a:buSzPct',
+  'a:buSzPts',
+  'a:buFontTx',
+  'a:buFont',
+  'a:buNone',
+  'a:buAutoNum',
+  'a:buChar',
+  'a:tabLst',
+  'a:defRPr',
+  'a:extLst',
+];
+
+const RPR_CHILD_ORDER = [
+  'a:ln',
+  'a:noFill',
+  'a:solidFill',
+  'a:gradFill',
+  'a:blipFill',
+  'a:pattFill',
+  'a:grpFill',
+  'a:effectLst',
+  'a:effectDag',
+  'a:highlight',
+  'a:uLnTx',
+  'a:uLn',
+  'a:uFillTx',
+  'a:uFill',
+  'a:latin',
+  'a:ea',
+  'a:cs',
+  'a:sym',
+  'a:hlinkClick',
+  'a:hlinkMouseOver',
+  'a:rtl',
+  'a:extLst',
+];
+
+/**
+ * Inserts a NEW child element into a composite container (pPr/rPr) at the slot
+ * dictated by `order`, instead of blindly appending before the closing tag.
+ * Only for children not already present — callers that need to update an
+ * existing child's value should keep doing an in-place replace, since the
+ * child is already correctly positioned from when it was first inserted.
+ * Opens a self-closed container (`<a:pPr/>`) into open/close form if needed.
+ */
+function insertInSchemaOrder(
+  containerXml: string,
+  containerTag: string,
+  childXml: string,
+  childTag: string,
+  order: string[]
+): string {
+  let xml = containerXml.includes(`</${containerTag}>`)
+    ? containerXml
+    : containerXml.replace(/\/>\s*$/, `></${containerTag}>`);
+  const rank = order.indexOf(childTag);
+  let insertBeforeIdx = xml.lastIndexOf(`</${containerTag}>`);
+  for (let r = rank + 1; r < order.length; r++) {
+    const idx = xml.indexOf(`<${order[r]}`);
+    if (idx !== -1 && idx < insertBeforeIdx) insertBeforeIdx = idx;
+  }
+  return xml.slice(0, insertBeforeIdx) + childXml + xml.slice(insertBeforeIdx);
+}
+
 /**
  * Ensure <a:rPr> is in open/close form (not self-closing) so child elements can be injected.
  * Also ensures lang attribute is present.
@@ -147,6 +228,13 @@ export function buildShape(el: PptxElement, id: number, rIdLink?: string): strin
 
     const runs = el.textRuns || [{ text: el.text || '' }];
     let pContent = '';
+    // Counts paragraph breaks owed across run boundaries — needed because a
+    // multi-run textRuns array commonly has each run's text end with "\n" (or
+    // "\n\n" for a deliberate blank line) to mark end-of-line, and that break
+    // may need to land between two separate run objects, not just inside a
+    // single run's own newline splitting.
+    let pendingBreaks = 0;
+    let hasEmittedContent = false;
 
     runs.forEach((run) => {
       let rPr = ensureOpenRPr(baseRPr); // Start with the original exact font/style (always open form)
@@ -188,7 +276,7 @@ export function buildShape(el: PptxElement, id: number, rIdLink?: string): strin
         if (rPr.includes('<a:solidFill')) {
           rPr = rPr.replace(/<a:solidFill[\s\S]*?<\/a:solidFill>/, fillXml);
         } else {
-          rPr = rPr.replace('</a:rPr>', `${fillXml}</a:rPr>`);
+          rPr = insertInSchemaOrder(rPr, 'a:rPr', fillXml, 'a:solidFill', RPR_CHILD_ORDER);
         }
       }
       if (run.options?.highlight) {
@@ -196,28 +284,39 @@ export function buildShape(el: PptxElement, id: number, rIdLink?: string): strin
         if (rPr.includes('<a:highlight')) {
           rPr = rPr.replace(/<a:highlight[\s\S]*?<\/a:highlight>/, hlXml);
         } else {
-          rPr = rPr.replace('</a:rPr>', `${hlXml}</a:rPr>`);
+          rPr = insertInSchemaOrder(rPr, 'a:rPr', hlXml, 'a:highlight', RPR_CHILD_ORDER);
         }
       }
       if (run.options?.fontFamily || el.style?.fontFamily) {
         const font = run.options?.fontFamily || el.style?.fontFamily;
-        const fontXml = `<a:latin typeface="${resolveLatinFontFamily(font)}"/><a:ea typeface="${resolveEastAsianFontFamily(font)}"/>`;
-        if (rPr.includes('<a:latin') || rPr.includes('<a:ea')) {
-          rPr = rPr
-            .replace(/<a:latin[^>]*\/>/g, '')
-            .replace(/<a:ea[^>]*\/>/g, '')
-            .replace('</a:rPr>', `${fontXml}</a:rPr>`);
-        } else {
-          rPr = rPr.replace('</a:rPr>', `${fontXml}</a:rPr>`);
-        }
+        const latinXml = `<a:latin typeface="${resolveLatinFontFamily(font)}"/>`;
+        const eaXml = `<a:ea typeface="${resolveEastAsianFontFamily(font)}"/>`;
+        // Strip any existing latin/ea first (simplest way to "replace" a child
+        // whose position must already be schema-correct), then reinsert.
+        rPr = rPr.replace(/<a:latin[^>]*\/>/g, '').replace(/<a:ea[^>]*\/>/g, '');
+        rPr = insertInSchemaOrder(rPr, 'a:rPr', latinXml, 'a:latin', RPR_CHILD_ORDER);
+        rPr = insertInSchemaOrder(rPr, 'a:rPr', eaXml, 'a:ea', RPR_CHILD_ORDER);
       }
 
-      // If the text contains newlines, split it into multiple <a:p> tags
+      // If the text contains newlines, split it into multiple <a:p> tags. Any
+      // empty segment produced by the split (trailing "\n", or a blank line
+      // from "\n\n") owes a paragraph break but must not emit an empty <a:r> —
+      // it may need to land before the NEXT run object instead of immediately,
+      // since consecutive textRuns entries each ending in "\n" is the common
+      // way to author one line per run.
       const lines = (run.text || '').split('\n');
       lines.forEach((line, idx) => {
-        if (idx > 0) {
-          pContent += `</a:p><a:p>${basePPr}`;
+        if (idx > 0) pendingBreaks += 1;
+        if (lines.length > 1 && line === '') return;
+        if (pendingBreaks > 0 && hasEmittedContent) {
+          pContent += '</a:p>';
+          for (let i = 0; i < pendingBreaks - 1; i++) {
+            pContent += `<a:p>${basePPr}<a:endParaRPr lang="ja-JP"/></a:p>`;
+          }
+          pContent += `<a:p>${basePPr}`;
         }
+        pendingBreaks = 0;
+        hasEmittedContent = true;
         const safeText = sanitizeXmlText(line);
         let textNode = `<a:t>${safeText}</a:t>`;
         if (el.placeholderType === 'sldNum') {
@@ -232,6 +331,22 @@ export function buildShape(el: PptxElement, id: number, rIdLink?: string): strin
       finalPPr = finalPPr.includes(' algn="')
         ? finalPPr.replace(/ algn="[^"]*"/, ` algn="${align}"`)
         : finalPPr.replace('<a:pPr', `<a:pPr algn="${align}"`);
+    }
+    // Each child below is inserted at its schema-correct slot via
+    // insertInSchemaOrder rather than a bare append, so the result is correct
+    // regardless of which of these blocks happens to run first \u2014 see the
+    // PPR_CHILD_ORDER comment above for why call-order was never safe to rely on.
+    if (el.style?.lineSpacing && !finalPPr.includes('<a:lnSpc>')) {
+      const spcXml = `<a:lnSpc><a:spcPct val="${Math.round(el.style.lineSpacing * 1000)}"/></a:lnSpc>`;
+      finalPPr = insertInSchemaOrder(finalPPr, 'a:pPr', spcXml, 'a:lnSpc', PPR_CHILD_ORDER);
+    }
+    if (el.style?.spaceBefore && !finalPPr.includes('<a:spcBef>')) {
+      const spcXml = `<a:spcBef><a:spcPts val="${Math.round(el.style.spaceBefore * 100)}"/></a:spcBef>`;
+      finalPPr = insertInSchemaOrder(finalPPr, 'a:pPr', spcXml, 'a:spcBef', PPR_CHILD_ORDER);
+    }
+    if (el.style?.spaceAfter && !finalPPr.includes('<a:spcAft>')) {
+      const spcXml = `<a:spcAft><a:spcPts val="${Math.round(el.style.spaceAfter * 100)}"/></a:spcAft>`;
+      finalPPr = insertInSchemaOrder(finalPPr, 'a:pPr', spcXml, 'a:spcAft', PPR_CHILD_ORDER);
     }
     // Add bullet properties if specified and not already in pPr
     if (
@@ -249,45 +364,40 @@ export function buildShape(el: PptxElement, id: number, rIdLink?: string): strin
       if (bu.indent !== undefined && !finalPPr.includes(' marL="')) {
         finalPPr = finalPPr.replace('<a:pPr', `<a:pPr marL="${inToEmu(bu.indent)}"`);
       }
-      // Ensure pPr is in open form
-      if (finalPPr.includes('/>')) {
-        finalPPr = finalPPr.replace('/>', '>');
-        finalPPr += '</a:pPr>';
-      }
-      // Build bullet child elements
-      let buXml = '';
       if (bu.color) {
-        buXml += `<a:buClr><a:srgbClr val="${bu.color.replace('#', '')}"/></a:buClr>`;
+        const buClrXml = `<a:buClr><a:srgbClr val="${bu.color.replace('#', '')}"/></a:buClr>`;
+        finalPPr = insertInSchemaOrder(finalPPr, 'a:pPr', buClrXml, 'a:buClr', PPR_CHILD_ORDER);
       }
       if (bu.size !== undefined) {
-        buXml += `<a:buSzPct val="${Math.round(bu.size * 1000)}"/>`;
+        const buSzXml = `<a:buSzPct val="${Math.round(bu.size * 1000)}"/>`;
+        finalPPr = insertInSchemaOrder(finalPPr, 'a:pPr', buSzXml, 'a:buSzPct', PPR_CHILD_ORDER);
       }
       if (bu.font) {
-        buXml += `<a:buFont typeface="${bu.font}"/>`;
+        const buFontXml = `<a:buFont typeface="${bu.font}"/>`;
+        finalPPr = insertInSchemaOrder(finalPPr, 'a:pPr', buFontXml, 'a:buFont', PPR_CHILD_ORDER);
       }
       if (bu.type === 'char') {
-        buXml += `<a:buChar char="${bu.char || '\u2022'}"/>`;
+        const buCharXml = `<a:buChar char="${bu.char || '\u2022'}"/>`;
+        finalPPr = insertInSchemaOrder(finalPPr, 'a:pPr', buCharXml, 'a:buChar', PPR_CHILD_ORDER);
       } else if (bu.type === 'autoNum') {
         const startAttr = bu.startAt !== undefined ? ` startAt="${bu.startAt}"` : '';
-        buXml += `<a:buAutoNum type="${bu.numFormat || 'arabicPeriod'}"${startAttr}/>`;
+        const buAutoNumXml = `<a:buAutoNum type="${bu.numFormat || 'arabicPeriod'}"${startAttr}/>`;
+        finalPPr = insertInSchemaOrder(
+          finalPPr,
+          'a:pPr',
+          buAutoNumXml,
+          'a:buAutoNum',
+          PPR_CHILD_ORDER
+        );
       } else if (bu.type === 'none') {
-        buXml += '<a:buNone/>';
+        finalPPr = insertInSchemaOrder(
+          finalPPr,
+          'a:pPr',
+          '<a:buNone/>',
+          'a:buNone',
+          PPR_CHILD_ORDER
+        );
       }
-      finalPPr = finalPPr.replace('</a:pPr>', `${buXml}</a:pPr>`);
-    }
-    // Add paragraph spacing if specified and not already in pPr
-    if (el.style?.lineSpacing && !finalPPr.includes('<a:lnSpc>')) {
-      const spcXml = `<a:lnSpc><a:spcPct val="${Math.round(el.style.lineSpacing * 1000)}"/></a:lnSpc>`;
-      finalPPr = finalPPr.replace('</a:pPr>', `${spcXml}</a:pPr>`);
-      if (finalPPr.includes('/>')) finalPPr = finalPPr.replace('/>', `>${spcXml}</a:pPr>`);
-    }
-    if (el.style?.spaceBefore && !finalPPr.includes('<a:spcBef>')) {
-      const spcXml = `<a:spcBef><a:spcPts val="${Math.round(el.style.spaceBefore * 100)}"/></a:spcBef>`;
-      finalPPr = finalPPr.replace('</a:pPr>', `${spcXml}</a:pPr>`);
-    }
-    if (el.style?.spaceAfter && !finalPPr.includes('<a:spcAft>')) {
-      const spcXml = `<a:spcAft><a:spcPts val="${Math.round(el.style.spaceAfter * 100)}"/></a:spcAft>`;
-      finalPPr = finalPPr.replace('</a:pPr>', `${spcXml}</a:pPr>`);
     }
 
     textBody = `<p:txBody>${bodyPr}${lstStyle}<a:p>${finalPPr}${pContent}<a:endParaRPr lang="ja-JP"/></a:p></p:txBody>`;

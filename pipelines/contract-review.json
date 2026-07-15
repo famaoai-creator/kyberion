@@ -4,12 +4,16 @@
   "version": "1.0.0",
   "description": "Multi-perspective contract review: digest extraction, multi-agent critique, dissent logging, and written output.",
   "steps": [
-    { "role": "sink", "op": "system:log", "params": { "message": "📄 Contract Review Pipeline — starting..." } },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "params": { "message": "📄 Contract Review Pipeline — starting..." }
+    },
     {
       "role": "source",
       "op": "media:document_digest",
       "produces": { "channel": "contract_digest", "type": "DocumentDigest" },
-      "params": { "path": "{{input.contract_path}}", "extract": ["clauses", "obligations", "risks"] }
+      "params": { "path": "{{input.contract_path}}", "export_as": "contract_digest" }
     },
     {
       "role": "transform",
@@ -18,7 +22,8 @@
       "produces": { "channel": "review_perspectives", "type": "FanoutResult" },
       "params": {
         "personas": ["legal_strategist", "finance_controller", "cyber_security"],
-        "prompt_template": "Review this contract from the {{persona}} perspective: {{contract_digest}}"
+        "topic": "Review this contract from multiple professional perspectives: {{contract_digest}}",
+        "output_path": "active/shared/tmp/reports/contract-review-fanout.json"
       }
     },
     {
@@ -26,19 +31,30 @@
       "op": "wisdom:cross_critique",
       "consumes": "review_perspectives",
       "produces": { "channel": "critique_result", "type": "CrossCritiqueResult" },
-      "params": {}
+      "params": {
+        "source_path": "active/shared/tmp/reports/contract-review-fanout.json",
+        "personas": ["legal_strategist", "finance_controller", "cyber_security"],
+        "output_path": "active/shared/tmp/reports/contract-review-critique.json"
+      }
     },
     {
       "role": "sink",
       "op": "wisdom:emit_dissent_log",
       "consumes": "critique_result",
-      "params": { "output_path": "active/audit/contract-review-dissent.jsonl" }
+      "params": {
+        "source_path": "active/shared/tmp/reports/contract-review-critique.json",
+        "output_path": "active/audit/contract-review-dissent.jsonl"
+      }
     },
     {
       "role": "sink",
-      "op": "media:write_file",
+      "op": "wisdom:render_hypothesis_report",
       "consumes": "critique_result",
-      "params": { "output_path": "{{input.output_path | default: 'active/shared/tmp/contract-review.md'}}" }
+      "params": {
+        "source_path": "active/shared/tmp/reports/contract-review-critique.json",
+        "output_path": "active/shared/tmp/reports/contract-review.md",
+        "title": "Contract Review"
+      }
     }
   ]
 }
