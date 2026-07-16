@@ -93,6 +93,10 @@ export interface SlackApprovalActionPayload {
   decision: 'approved' | 'rejected';
 }
 
+export interface SlackMissionProposalActionPayload {
+  decision: 'approved' | 'rejected';
+}
+
 export interface SlackOutboxMessage extends SurfaceOutboxMessage {}
 
 // ─── Onboarding ───────────────────────────────────────────────────────────────

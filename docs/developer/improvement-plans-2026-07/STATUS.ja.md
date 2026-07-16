@@ -8,8 +8,8 @@
 
 | 判定    | 件数 |
 | ------- | ---- |
-| DONE    | 64   |
-| PARTIAL | 29   |
+| DONE    | 65   |
+| PARTIAL | 28   |
 | TODO    | 0    |
 
 ## P0 残作業(プロダクション化のクリティカルパス)
@@ -59,14 +59,14 @@
 
 ### UX(ユーザー接点)
 
-| ID    | 状態    | 残作業                                                                                                                                                                                                                                                                                                   |
-| ----- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| UX-01 | DONE    |                                                                                                                                                                                                                                                                                                          |
-| UX-02 | DONE    | 2026-07-12 完了: 4ブリッジ typing 表示(discord sendTyping / telegram sendChatAction / slack 👀 リアクション / imessage 先行一言)を共通ヘルパーで実装。chronos キャンセル+フェーズ表示は 07-11 済み                                                                                                       |
-| UX-03 | DONE    | 2026-07-12 完了: locale-resolver 一元化、cli help/主要エラー62キー、onboarding(flow-policy {en,ja} + wizard + TTY拒否文)、chronos 言語トグル(localStorage 永続)、uxText fallback 撤去 + 契約テスト、hero/ヘッダ/FirstRunBanner/QuickAction/StatusCard 両対応(計106+キー)。未対応面リストは計画文書に記録 |
-| UX-04 | PARTIAL | 2026-07-12: CLI 承認動詞統一(approve/reject + 名前付きフラグ、旧形式は警告エイリアス)・decidedBy の identity 化・chronos 番号選択+拒否経路を実装。残: slack-bridge 提案の Block Kit ボタン化のみ                                                                                                         |
-| UX-05 | DONE    | 2026-07-13 完了: operator output の契約 fixture、dashboard の connection/provider/mission/runtime `renderStatus()` 配線、`check:ui-ux` の validate/CI/週次 pipeline 接続を実装                                                                                                                           |
-| UX-06 | DONE    | (軽微: 3面バナーの版数統一)                                                                                                                                                                                                                                                                              |
+| ID    | 状態 | 残作業                                                                                                                                                                                                                                                                                                   |
+| ----- | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| UX-01 | DONE |                                                                                                                                                                                                                                                                                                          |
+| UX-02 | DONE | 2026-07-12 完了: 4ブリッジ typing 表示(discord sendTyping / telegram sendChatAction / slack 👀 リアクション / imessage 先行一言)を共通ヘルパーで実装。chronos キャンセル+フェーズ表示は 07-11 済み                                                                                                       |
+| UX-03 | DONE | 2026-07-12 完了: locale-resolver 一元化、cli help/主要エラー62キー、onboarding(flow-policy {en,ja} + wizard + TTY拒否文)、chronos 言語トグル(localStorage 永続)、uxText fallback 撤去 + 契約テスト、hero/ヘッダ/FirstRunBanner/QuickAction/StatusCard 両対応(計106+キー)。未対応面リストは計画文書に記録 |
+| UX-04 | DONE | 2026-07-16 完了: Slack mission proposal を Block Kit の「実行する/やめる」ボタンへ統一し、action payload検証、thread stateの単回消費、期限切れ応答、番号/yes/no fallbackを実装。関連26テスト・build・catalog/op-registry/ui-ux checks 緑                                                                 |
+| UX-05 | DONE | 2026-07-13 完了: operator output の契約 fixture、dashboard の connection/provider/mission/runtime `renderStatus()` 配線、`check:ui-ux` の validate/CI/週次 pipeline 接続を実装                                                                                                                           |
+| UX-06 | DONE | (軽微: 3面バナーの版数統一)                                                                                                                                                                                                                                                                              |
 
 ### AC(アクチュエータ能力)
 
