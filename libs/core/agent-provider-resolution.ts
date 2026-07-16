@@ -1,5 +1,6 @@
 import { discoverProviders, type ProviderInfo } from './provider-discovery.js';
 import { loadProviderConfig } from './provider-config.js';
+import { listDemotedProviders } from './provider-health-registry.js';
 import { resolveRuntimeModelId } from './runtime-model-defaults.js';
 import { loadOperatorProviderPreferences } from './browser-onboarding.js';
 
@@ -122,9 +123,18 @@ export function resolveAgentProviderTarget(
   options: ResolveAgentProviderOptions,
   discoveredProviders = discoverProviders()
 ): ResolvedAgentProviderTarget {
-  const installedProviders = discoveredProviders.filter(
-    (entry) => entry.installed && entry.healthy
+  // Dynamic-selection alignment: providers whose whole instance pool is
+  // demoted (rate limit / repeated failure, reported into the shared
+  // provider-health registry) drop out of candidacy so adaptive profiles
+  // fail over instead of re-staffing onto a degraded backend. Demotion must
+  // degrade, not disable — with everything demoted, ignore it.
+  const demotedProviders = new Set(listDemotedProviders(discoveredProviders));
+  let installedProviders = discoveredProviders.filter(
+    (entry) => entry.installed && entry.healthy && !demotedProviders.has(entry.provider)
   );
+  if (installedProviders.length === 0) {
+    installedProviders = discoveredProviders.filter((entry) => entry.installed && entry.healthy);
+  }
   const availableProviders = installedProviders.map((entry) => entry.provider);
   const preferredProvider = options.preferredProvider;
   const requiredCapabilities = (options.requiredCapabilities || [])

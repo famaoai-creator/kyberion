@@ -11,6 +11,8 @@ import {
   loadAgentManifests,
   resolveAgentSelectionHints,
 } from './agent-manifest.js';
+import { resolveAgentProviderTarget } from './agent-provider-resolution.js';
+import { listDemotedProviders } from './provider-health-registry.js';
 import { auditChain } from './audit-chain.js';
 import { isA2ATaskContractLike, validateA2ATaskContract } from './a2a-task-contract.js';
 import { recordGovernanceAction } from './kill-switch.js';
@@ -477,8 +479,24 @@ class A2ABridgeImpl {
     if (existing && this.runtimeContexts.get(agentId) === runtimeContextKey) {
       const record = agentRegistry.get(agentId);
       if (record && ['ready', 'busy', 'booting'].includes(record.status)) {
-        this.handles.set(agentId, existing);
-        return existing;
+        // A live runtime on a demoted provider (rate limit / repeated failure)
+        // must not be reused — fall through to the recreate path so the spawn
+        // below re-resolves the provider dynamically.
+        const providerDemoted = listDemotedProviders().includes(record.provider);
+        if (!providerDemoted) {
+          this.handles.set(agentId, existing);
+          return existing;
+        }
+        logger.info(
+          `[A2A_BRIDGE] Not reusing ${agentId}: provider ${record.provider} is demoted — recreating with dynamic provider resolution.`
+        );
+        try {
+          await shutdownAgentRuntimeViaDaemon(agentId, 'a2a_bridge');
+        } catch (_) {
+          await stopAgentRuntime(agentId, 'a2a_bridge');
+        }
+        this.handles.delete(agentId);
+        this.runtimeContexts.delete(agentId);
       }
     }
 
@@ -502,10 +520,25 @@ class A2ABridgeImpl {
       );
     }
 
-    const { provider: resolvedProvider, modelId: resolvedModelId } = resolveAgentSelectionHints(
-      manifest,
-      provider
-    );
+    const hinted = resolveAgentSelectionHints(manifest, provider);
+    // Dynamic-selection alignment: run the static hint through the provider
+    // resolver so a demoted backend (rate limit reported into the shared
+    // provider-health registry) fails over per the profile's strategy instead
+    // of being spawned verbatim.
+    const dynamicTarget = resolveAgentProviderTarget({
+      preferredProvider: hinted.provider,
+      preferredModelId: hinted.modelId,
+      providerStrategy: manifest.selection_hints?.provider_strategy,
+      fallbackProviders: manifest.selection_hints?.fallback_providers,
+      requiredCapabilities: manifest.capabilities,
+    });
+    const resolvedProvider = dynamicTarget.provider as AgentProvider;
+    const resolvedModelId = dynamicTarget.modelId;
+    if (resolvedProvider !== hinted.provider) {
+      logger.info(
+        `[A2A_BRIDGE] Provider failover for ${agentId}: ${hinted.provider} → ${resolvedProvider} (${dynamicTarget.strategy})`
+      );
+    }
     const cwd = this.resolveSpawnCwd(
       agentId,
       resolvedProvider,
