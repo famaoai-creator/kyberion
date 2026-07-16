@@ -73,3 +73,7 @@ export function rawUnlinkSync(targetPath: string): void {
 export function rawStatSync(targetPath: string): fs.Stats {
   return fs.statSync(targetPath);
 }
+
+export function rawReaddir(targetPath: string): string[] {
+  return fs.readdirSync(targetPath);
+}
