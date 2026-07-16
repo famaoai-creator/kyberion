@@ -21,7 +21,9 @@ import {
   persistTrace,
   type MissionActorType,
   loadMissionOrchestrationReplayPlan,
+  startMissionOrchestrationWorker,
   recoverMissionRequestedTasks,
+  reissueBlockedMissionTasks,
 } from '@agent/core';
 import { recordApprovedIntentScopeChange } from '@agent/core/intent-snapshot-store';
 import {
@@ -381,6 +383,13 @@ export async function resumeMission(
     logger.info(
       `journal から再開: 次イベント=${replayPlan.next_event.event_type} (${replayPlan.next_event.event_id}) / 回収タスク=${replayPlan.replay_count} 件`
     );
+    // Restart the detached worker for the pending event. The replay plan used
+    // to be display-only, so a failed chain stayed stalled until a surface
+    // re-enqueued it by hand — resume is the operator's retry lever.
+    const replayEventPath = startMissionOrchestrationWorker(replayPlan.next_event);
+    logger.info(
+      `orchestration worker を再起動しました: ${replayPlan.next_event.event_id} (${replayEventPath})`
+    );
   } else {
     logger.info('journal から再開: 再開対象の orchestration event はありません。');
   }
@@ -388,6 +397,12 @@ export async function resumeMission(
   logger.info(
     `lease 回収: requested=${recovery.requested_count} / waiting=${recovery.waiting_count} / reissued=${recovery.reissued_count}`
   );
+  const blockedRetry = reissueBlockedMissionTasks(targetId);
+  if (blockedRetry.reissued_task_ids.length > 0) {
+    logger.info(
+      `blocked タスクを planned に戻しました (再preflight対象): ${blockedRetry.reissued_task_ids.join(', ')}`
+    );
+  }
 
   const currentBranch = args.getCurrentBranch(missionPath);
   if (currentBranch !== preState.git.branch) {

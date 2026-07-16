@@ -9,7 +9,7 @@
         "preferred_provider": "agy",
         "preferred_modelId": "auto-gemini-3"
       },
-      "provider_strategy": "strict"
+      "provider_strategy": "adaptive"
     }
   }
 }
