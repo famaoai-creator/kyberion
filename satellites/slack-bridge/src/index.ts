@@ -22,6 +22,7 @@ import {
   saveSlackMissionProposalState,
   clearSlackMissionProposalState,
   isSlackMissionConfirmation,
+  isSlackMissionRejection,
   issueSlackMissionFromProposal,
   handleSlackOnboardingTurn,
   buildSlackOnboardingBlocks,
@@ -32,6 +33,9 @@ import {
   parseSlackApprovalAction,
   applySlackApprovalDecision,
   buildSlackApprovalAskWhyBlocks,
+  buildSlackMissionProposalBlocks,
+  parseSlackMissionProposalAction,
+  slackMissionProposalFallbackText,
   parseSlackAskWhyAction,
   applySlackApprovalRejectionReason,
   dispatchPresenceFrame,
@@ -135,6 +139,25 @@ async function reflectSlackPresence(params: {
   } catch (error: any) {
     logger.warn(`⚠️ [SlackBridge] Presence reflect failed: ${error?.message || error}`);
   }
+}
+
+function formatSlackMissionIssuedReply(
+  issued: Awaited<ReturnType<typeof issueSlackMissionFromProposal>>
+): string {
+  return [
+    `Mission ${issued.missionId} started.`,
+    `Type: ${issued.missionType}`,
+    `Tier: ${issued.tier}`,
+    `Persona: ${issued.persona}`,
+    issued.routingDecision
+      ? `Routing: ${issued.routingDecision.mode}${issued.routingDecision.owner ? ` (${issued.routingDecision.owner})` : ''}`
+      : undefined,
+    issued.orchestrationStatus === 'queued'
+      ? 'Background orchestration has been queued.'
+      : 'Background orchestration could not be queued.',
+  ]
+    .filter(Boolean)
+    .join('\n');
 }
 
 async function processSlackOutbox(client: any) {
@@ -290,6 +313,22 @@ async function start() {
       }
 
       const pendingMissionProposal = getSlackMissionProposalState(message.channel, threadTs);
+      if (pendingMissionProposal && isSlackMissionRejection(message.text)) {
+        clearSlackMissionProposalState(message.channel, threadTs);
+        const response = await client.chat.postMessage({
+          channel: message.channel,
+          thread_ts: threadTs,
+          text: 'ミッション提案をキャンセルしました。必要になったら、いつでも再提案できます。',
+        });
+        recordSlackDelivery(
+          artifact.correlationId,
+          message.channel,
+          threadTs,
+          response.ts,
+          'system'
+        );
+        return;
+      }
       if (pendingMissionProposal && isSlackMissionConfirmation(message.text)) {
         const issued = await issueSlackMissionFromProposal({
           channel: message.channel,
@@ -302,20 +341,7 @@ async function start() {
         const response = await client.chat.postMessage({
           channel: message.channel,
           thread_ts: threadTs,
-          text: [
-            `Mission ${issued.missionId} started.`,
-            `Type: ${issued.missionType}`,
-            `Tier: ${issued.tier}`,
-            `Persona: ${issued.persona}`,
-            issued.routingDecision
-              ? `Routing: ${issued.routingDecision.mode}${issued.routingDecision.owner ? ` (${issued.routingDecision.owner})` : ''}`
-              : undefined,
-            issued.orchestrationStatus === 'queued'
-              ? 'Background orchestration has been queued.'
-              : 'Background orchestration could not be queued.',
-          ]
-            .filter(Boolean)
-            .join('\n'),
+          text: formatSlackMissionIssuedReply(issued),
         });
         recordSlackDelivery(
           artifact.correlationId,
@@ -452,13 +478,8 @@ async function start() {
         const response = await client.chat.postMessage({
           channel: message.channel,
           thread_ts: threadTs,
-          text: [
-            conversation.text || 'I can turn this into a mission.',
-            '',
-            'If you want me to proceed, reply with `はい` or `お願いします` in this thread.',
-          ]
-            .join('\n')
-            .trim(),
+          text: slackMissionProposalFallbackText(proposal),
+          blocks: buildSlackMissionProposalBlocks(proposal),
         });
         recordSlackDelivery(artifact.correlationId, message.channel, threadTs, response.ts, route);
         return;
@@ -552,6 +573,53 @@ async function start() {
       }
     } catch (err: any) {
       logger.error(`❌ [SlackBridge] Approval decision handling failed: ${err.message}`);
+    }
+  });
+
+  app.action('slack_mission_proposal_decide', async ({ ack, action, body, client }) => {
+    await ack();
+    try {
+      const payload = parseSlackMissionProposalAction((action as any).value);
+      const channel = (body as any).channel?.id;
+      const threadTs = (body as any).message?.thread_ts || (body as any).message?.ts;
+      const actorId = (body as any).user?.id || 'unknown';
+      if (!channel || !threadTs)
+        throw new Error('Slack mission proposal action is missing channel/thread');
+
+      const pending = getSlackMissionProposalState(channel, threadTs);
+      if (!pending) {
+        await client.chat.postMessage({
+          channel,
+          thread_ts: threadTs,
+          text: 'このミッション提案はすでに処理済みか期限切れです。',
+        });
+        return;
+      }
+
+      clearSlackMissionProposalState(channel, threadTs);
+      if (payload.decision === 'rejected') {
+        await client.chat.postMessage({
+          channel,
+          thread_ts: threadTs,
+          text: `ミッション提案をキャンセルしました（<@${actorId}>）。`,
+        });
+        return;
+      }
+
+      const issued = await issueSlackMissionFromProposal({
+        channel,
+        threadTs,
+        proposal: pending.proposal,
+        sourceText: pending.sourceText,
+        routingDecision: pending.routingDecision,
+      });
+      await client.chat.postMessage({
+        channel,
+        thread_ts: threadTs,
+        text: formatSlackMissionIssuedReply(issued),
+      });
+    } catch (err: any) {
+      logger.error(`❌ [SlackBridge] Mission proposal decision handling failed: ${err.message}`);
     }
   });
 
