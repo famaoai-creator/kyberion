@@ -131,7 +131,8 @@ export function createBrowserInteractionHelpers(deps: {
       interaction.type === 'fill_ref' ||
       interaction.type === 'press_ref' ||
       interaction.type === 'wait_for_ref' ||
-      interaction.type === 'extract_text_ref';
+      interaction.type === 'extract_text_ref' ||
+      (interaction.type === 'scroll' && Boolean(interaction.ref));
     if (requiresRefSnapshot) {
       steps.push({ type: 'capture', op: 'snapshot', params: { export_as: 'last_snapshot' } });
     }
@@ -200,8 +201,17 @@ export function createBrowserInteractionHelpers(deps: {
       case 'extract_text_ref':
         steps.push({
           type: 'capture',
-          op: 'content',
-          params: { selector: `{{ref_map.${interaction.ref}}}`, export_as: 'last_capture' },
+          op: 'extract_text_ref',
+          params: { ref: interaction.ref, export_as: 'last_capture' },
+        });
+        break;
+      case 'scroll':
+        steps.push({
+          type: 'apply',
+          op: interaction.ref ? 'scroll_ref' : 'scroll',
+          params: interaction.ref
+            ? { ref: interaction.ref, timeout: interaction.timeout_ms }
+            : { delta: interaction.scroll_delta, timeout: interaction.timeout_ms },
         });
         break;
       case 'capture_console':
