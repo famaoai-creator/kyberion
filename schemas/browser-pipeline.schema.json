@@ -28,6 +28,15 @@
         "launch_args": {
           "type": "array",
           "items": { "type": "string" }
+        },
+        "navigation_policy": {
+          "type": "object",
+          "properties": {
+            "allowed_origins": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+            "allow_private_network": { "type": "boolean", "default": false },
+            "allow_data_url": { "type": "boolean", "default": true }
+          },
+          "additionalProperties": false
         }
       }
     },
@@ -39,23 +48,64 @@
         "properties": {
           "id": { "type": "string" },
           "type": { "enum": ["capture", "transform", "apply", "control"] },
-          "op": { 
+          "op": {
             "enum": [
-              "goto", "screenshot", "content", "evaluate",
-              "regex_extract", "json_query",
-              "click", "fill", "press", "wait", "log", "extension_session",
-              "if", "while",
-              "setup_passkey_authenticator",
-              "remove_passkey_authenticator",
-              "register_passkey",
-              "authenticate_passkey",
-              "delete_passkey",
+              "distill_dom",
+              "goto",
+              "screenshot",
+              "content",
+              "evaluate",
+              "snapshot",
+              "tabs",
+              "console",
+              "network",
+              "query_elements",
+              "extract_text_ref",
+              "session_health",
+              "action_trail",
+              "title",
+              "url",
+              "export_session_handoff",
               "passkey_credentials",
               "passkey_events",
-              "set_passkey_user_verified",
-              "set_passkey_presence",
+              "llm_decide",
+              "regex_extract",
+              "json_query",
+              "export_failure_bundle",
+              "export_adf",
+              "export_playwright",
+              "click",
+              "click_first_match",
+              "click_ref",
+              "fill",
+              "fill_ref",
+              "fill_secret_ref",
+              "press",
+              "press_ref",
+              "scroll",
+              "scroll_ref",
+              "wait",
+              "wait_ref",
+              "log",
+              "extension_session",
+              "import_session_handoff",
+              "authenticate_passkey",
               "clear_passkey_credentials",
-              "list_profiles"
+              "delete_passkey",
+              "list_profiles",
+              "register_passkey",
+              "set_passkey_presence",
+              "set_passkey_user_verified",
+              "close_session",
+              "if",
+              "open_tab",
+              "pause_for_operator",
+              "ref",
+              "select_tab",
+              "select_tab_matching",
+              "while",
+              "setup_passkey_authenticator",
+              "remove_passkey_authenticator"
             ]
           },
           "params": { "type": "object" }

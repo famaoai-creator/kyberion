@@ -107,6 +107,79 @@ const INPUT_CONTRACTS: ContractCatalog = {
         additionalProperties: true,
       },
     },
+    extract_text_ref: {
+      summary: 'Extract text from a captured browser ref.',
+      examples: [{ ref: '@e1' }],
+      schema: {
+        type: 'object',
+        required: ['ref'],
+        properties: { ref: { type: 'string', minLength: 1 }, export_as: { type: 'string' } },
+        additionalProperties: true,
+      },
+    },
+    session_health: {
+      summary: 'Inspect browser lease and session health.',
+      examples: [{}],
+      schema: {
+        type: 'object',
+        properties: { export_as: { type: 'string' } },
+        additionalProperties: true,
+      },
+    },
+    action_trail: {
+      summary: 'Capture bounded redacted browser actions.',
+      examples: [{ limit: 20 }],
+      schema: {
+        type: 'object',
+        properties: {
+          limit: { type: 'integer', minimum: 1, maximum: 2000 },
+          from: { type: 'string' },
+          export_as: { type: 'string' },
+        },
+        additionalProperties: true,
+      },
+    },
+    scroll_ref: {
+      summary: 'Scroll a captured browser ref into view.',
+      examples: [{ ref: '@e1' }],
+      schema: {
+        type: 'object',
+        required: ['ref'],
+        properties: { ref: { type: 'string', minLength: 1 } },
+        additionalProperties: true,
+      },
+    },
+    scroll: {
+      summary: 'Scroll the active viewport by a bounded delta.',
+      examples: [{ delta: { y: 600 } }],
+      schema: {
+        type: 'object',
+        properties: { delta: { type: 'object' }, x: { type: 'number' }, y: { type: 'number' } },
+        additionalProperties: true,
+      },
+    },
+    fill_secret_ref: {
+      summary: 'Fill from SecretResolver without recording the value.',
+      examples: [{ ref: '@e1', secret_ref: 'TOKEN' }],
+      schema: {
+        type: 'object',
+        required: ['ref', 'secret_ref'],
+        properties: {
+          ref: { type: 'string', minLength: 1 },
+          secret_ref: { type: 'string', minLength: 1 },
+        },
+        additionalProperties: true,
+      },
+    },
+    export_failure_bundle: {
+      summary: 'Export redacted browser failure evidence.',
+      examples: [{ path: 'active/shared/tmp/browser/failure.json' }],
+      schema: {
+        type: 'object',
+        properties: { path: { type: 'string' }, export_as: { type: 'string' } },
+        additionalProperties: true,
+      },
+    },
     content: {
       summary: 'Assert that content is visible at a selector.',
       examples: [{ selector: '#status', content_excerpt: 'Ready' }],

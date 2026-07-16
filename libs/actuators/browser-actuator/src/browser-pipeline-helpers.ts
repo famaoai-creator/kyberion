@@ -17,6 +17,7 @@ import {
   processUntrustedContent,
   decideFromObservation,
   executeLlmDecideOp,
+  getSecret,
 } from '@agent/core';
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
 import { chromium, type CDPSession, type Page } from '@playwright/test';
@@ -50,6 +51,12 @@ interface BrowserAction {
     cdp_url?: string;
     cdp_port?: number;
     video_artifact_dir?: string;
+    action_trail_max?: number;
+    navigation_policy?: {
+      allowed_origins?: string[];
+      allow_private_network?: boolean;
+      allow_data_url?: boolean;
+    };
   };
   context?: Record<string, any>;
 }
@@ -68,6 +75,11 @@ interface BrowserRuntime {
     resourceType: string;
     ts: string;
   }>;
+  navigationPolicy?: {
+    allowed_origins?: string[];
+    allow_private_network?: boolean;
+    allow_data_url?: boolean;
+  };
   webAuthn?: {
     authenticatorId?: string;
     enabled: boolean;
@@ -237,6 +249,7 @@ export async function executePipeline(
     userDataDir,
     sessionMetadataPath
   );
+  runtime.navigationPolicy = options.navigation_policy;
   const activeLease = browserRuntimeHelpers.findBrowserRuntimeLease(runtime) as
     | BrowserRuntimeLeaseLike
     | undefined;
@@ -250,7 +263,10 @@ export async function executePipeline(
     session_id: sessionId,
     active_tab_id: runtime.activeTabId,
     browser_tabs: await browserRuntimeHelpers.summarizeTabs(runtime),
-    action_trail: Array.isArray(initialCtx?.action_trail) ? initialCtx.action_trail : [],
+    action_trail: Array.isArray(initialCtx?.action_trail)
+      ? initialCtx.action_trail
+      : browserRuntimeHelpers.loadBrowserActionTrail(sessionId),
+    action_trail_max: Math.max(1, Math.min(2000, Number(options.action_trail_max || 200))),
     timestamp: new Date().toISOString(),
   };
 
@@ -299,6 +315,10 @@ export async function executePipeline(
           if (act.url) attrs.url = String(act.url).slice(0, 200);
           if (act.title) attrs.title = String(act.title).slice(0, 120);
           if (act.selector) attrs.selector = String(act.selector).slice(0, 200);
+          if (act.ref) attrs.ref = String(act.ref).slice(0, 80);
+          if (act.redacted) attrs.redacted = true;
+          if (act.approval_request_id) attrs.approval_request_id = String(act.approval_request_id);
+          if (act.resume_status) attrs.resume_status = String(act.resume_status);
           traceCtx.addEvent('browser.action', attrs);
         }
       }
@@ -324,6 +344,29 @@ export async function executePipeline(
       hooks
     );
     ctx = engineResult.context;
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    ctx = {
+      ...ctx,
+      error: message,
+      console_events: runtime.consoleEvents.slice(-50),
+      network_events: runtime.networkEvents.slice(-50),
+    };
+    ctx.failure_bundle_path = browserRuntimeHelpers.saveFailureBundle(sessionId, {
+      schema_version: 'browser-failure-bundle.v1',
+      session_id: sessionId,
+      created_at: new Date().toISOString(),
+      error: ctx.error,
+      url: ctx.last_url || null,
+      title: ctx.last_snapshot?.title || null,
+      snapshot: ctx.last_snapshot || null,
+      screenshot: ctx.last_screenshot || null,
+      trace_path: ctx.last_trace_path || null,
+      console_events: ctx.console_events,
+      network_events: ctx.network_events,
+      action_trail: browserRuntimeHelpers.readRecordedActions(ctx).slice(-200),
+    });
+    throw error;
   } finally {
     const videoRecordingEnabled = options.record_video === true;
     let finalizedVideoPaths: string[] | undefined;
@@ -333,6 +376,25 @@ export async function executePipeline(
       logger.info(`🎞️ [BROWSER] Trace recorded at: ${tracePath}`);
       ctx.last_trace_path = tracePath;
       traceCtx.addArtifact('log', tracePath, 'playwright-trace');
+    }
+    // A failed pipeline enters this finally block before the trace is
+    // finalized. Refresh the failure bundle after tracing stops so the
+    // automatic evidence artifact contains the trace path as promised.
+    if (ctx.error) {
+      ctx.failure_bundle_path = browserRuntimeHelpers.saveFailureBundle(sessionId, {
+        schema_version: 'browser-failure-bundle.v1',
+        session_id: sessionId,
+        created_at: new Date().toISOString(),
+        error: ctx.error,
+        url: ctx.last_url || null,
+        title: ctx.last_snapshot?.title || null,
+        snapshot: ctx.last_snapshot || null,
+        screenshot: ctx.last_screenshot || null,
+        trace_path: ctx.last_trace_path || (options.record_trace ? tracePath : null),
+        console_events: runtime.consoleEvents.slice(-50),
+        network_events: runtime.networkEvents.slice(-50),
+        action_trail: browserRuntimeHelpers.readRecordedActions(ctx).slice(-200),
+      });
     }
     ctx.browser_tabs = await browserRuntimeHelpers.summarizeTabs(runtime);
     ctx.active_tab_id = runtime.activeTabId;
@@ -358,6 +420,7 @@ export async function executePipeline(
       cdp_url: activeLease?.cdpUrl,
       cdp_port: activeLease?.cdpPort,
       action_trail_count: Array.isArray(ctx.action_trail) ? ctx.action_trail.length : 0,
+      action_trail_path: browserRuntimeHelpers.saveBrowserActionTrail(sessionId, ctx.action_trail),
       recent_actions: browserRuntimeHelpers.summarizeRecentActions(ctx.action_trail),
     } as any);
     if (shouldClose) {
@@ -386,6 +449,10 @@ export async function executePipeline(
         cdp_url: activeLease?.cdpUrl,
         cdp_port: activeLease?.cdpPort,
         action_trail_count: Array.isArray(ctx.action_trail) ? ctx.action_trail.length : 0,
+        action_trail_path: browserRuntimeHelpers.saveBrowserActionTrail(
+          sessionId,
+          ctx.action_trail
+        ),
         recent_actions: browserRuntimeHelpers.summarizeRecentActions(ctx.action_trail),
       } as any);
       await browserContext.close();
@@ -439,7 +506,9 @@ async function opControl(
       const tabId = params.tab_id || `tab-${runtime.tabs.size + 1}`;
       browserRuntimeHelpers.registerBrowserPage(runtime, page, tabId);
       if (params.url) {
-        await page.goto(resolve(params.url), { waitUntil: params.waitUntil || 'networkidle' });
+        const url = resolve(params.url);
+        browserRuntimeHelpers.assertNavigationAllowed(url, runtime.navigationPolicy);
+        await page.goto(url, { waitUntil: params.waitUntil || 'networkidle' });
       }
       if (params.select !== false) runtime.activeTabId = tabId;
       return browserRuntimeHelpers.recordBrowserAction(
@@ -530,23 +599,39 @@ async function opControl(
         }
       );
     case 'pause_for_operator': {
+      const sessionId = ctx.session_id || 'default';
       const message = resolve(
         params.message || 'Operator input required. Press Enter to continue.'
       );
-      await browserRuntimeHelpers.waitForOperatorContinue({
-        sessionId: ctx.session_id || 'default',
+      const continueFile = params.continue_file
+        ? pathResolver.rootResolve(resolve(params.continue_file))
+        : pathResolver.shared(`runtime/browser/${sessionId}.continue`);
+      const approval = browserRuntimeHelpers.beginOperatorApproval({
+        sessionId,
         message,
-        continueFile: params.continue_file
-          ? pathResolver.rootResolve(resolve(params.continue_file))
-          : undefined,
-        pollMs: Number(params.poll_ms || 250),
+        continueFile,
         timeoutMs: params.timeout_ms ? Number(params.timeout_ms) : undefined,
       });
-      return browserRuntimeHelpers.recordBrowserAction(ctx, {
-        kind: 'control',
-        op: 'pause_for_operator',
-        tab_id: runtime.activeTabId,
-      });
+      try {
+        await browserRuntimeHelpers.waitForOperatorContinue({
+          sessionId,
+          message,
+          continueFile,
+          pollMs: Number(params.poll_ms || 250),
+          timeoutMs: params.timeout_ms ? Number(params.timeout_ms) : undefined,
+        });
+        browserRuntimeHelpers.completeOperatorApproval(sessionId, 'approved');
+        return browserRuntimeHelpers.recordBrowserAction(ctx, {
+          kind: 'control',
+          op: 'pause_for_operator',
+          tab_id: runtime.activeTabId,
+          approval_request_id: approval.request_id,
+          resume_status: 'approved',
+        });
+      } catch (error) {
+        browserRuntimeHelpers.completeOperatorApproval(sessionId, 'expired');
+        throw error;
+      }
     }
     case 'if':
       if (evaluateCondition(params.condition, ctx)) {
@@ -637,6 +722,7 @@ async function opCapture(
   switch (op) {
     case 'goto': {
       const url = resolve(params.url);
+      browserRuntimeHelpers.assertNavigationAllowed(url, runtime.navigationPolicy);
       await page.goto(url, { waitUntil: params.waitUntil || 'networkidle' });
       return browserRuntimeHelpers.recordBrowserAction(
         { ...ctx, last_url: page.url() },
@@ -685,6 +771,42 @@ async function opCapture(
           url: snapshot.url,
           title: snapshot.title,
         }
+      );
+    }
+    case 'extract_text_ref': {
+      const ref = resolve(params.ref);
+      const selector = browserRuntimeHelpers.resolveRefSelector(ctx, ref);
+      const rawContent = await page.innerText(selector);
+      const content = processUntrustedContent(rawContent, `web:${page.url()}`).wrapped;
+      return browserRuntimeHelpers.recordBrowserAction(
+        { ...ctx, last_capture: content, [params.export_as || 'last_capture']: content },
+        {
+          kind: 'capture',
+          op: 'extract_text_ref',
+          tab_id: runtime.activeTabId,
+          ref,
+          selector,
+          content_excerpt: rawContent.trim().slice(0, 120),
+        }
+      );
+    }
+    case 'session_health': {
+      const health = await browserRuntimeHelpers.getSessionHealth(
+        ctx.session_id || 'default',
+        runtime,
+        ctx.action_trail
+      );
+      return browserRuntimeHelpers.recordBrowserAction(
+        { ...ctx, last_capture: health, [params.export_as || 'browser_health']: health },
+        { kind: 'capture', op: 'session_health', tab_id: runtime.activeTabId }
+      );
+    }
+    case 'action_trail': {
+      const source = browserRuntimeHelpers.readRecordedActions(ctx, params.from);
+      const trail = source.slice(-Math.max(1, Math.min(2000, Number(params.limit || 50))));
+      return browserRuntimeHelpers.recordBrowserAction(
+        { ...ctx, last_capture: trail, [params.export_as || 'action_trail']: trail },
+        { kind: 'capture', op: 'action_trail', tab_id: runtime.activeTabId }
       );
     }
     case 'console':
@@ -937,6 +1059,33 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
       safeWriteFile(outPath, JSON.stringify(adf, null, 2));
       return { ...ctx, [params.export_as || 'adf_path']: outPath };
     }
+    case 'export_failure_bundle': {
+      const trail = browserRuntimeHelpers.readRecordedActions(ctx, params.from).slice(-200);
+      const bundle = {
+        schema_version: 'browser-failure-bundle.v1',
+        session_id: ctx.session_id || 'default',
+        created_at: new Date().toISOString(),
+        error: ctx.error || ctx.last_error || null,
+        url: ctx.last_url || ctx.last_snapshot?.url || null,
+        title: ctx.last_snapshot?.title || null,
+        snapshot: ctx.last_snapshot || null,
+        screenshot: ctx.last_screenshot || null,
+        trace_path: ctx.last_trace_path || ctx.trace_persisted_path || null,
+        console_events: Array.isArray(ctx.console_events) ? ctx.console_events.slice(-50) : [],
+        network_events: Array.isArray(ctx.network_events) ? ctx.network_events.slice(-50) : [],
+        action_trail: trail,
+      };
+      const outPath = browserRuntimeHelpers.saveFailureBundle(
+        ctx.session_id || 'default',
+        bundle,
+        params.path ? resolve(params.path) : undefined
+      );
+      return {
+        ...ctx,
+        failure_bundle: bundle,
+        [params.export_as || 'failure_bundle_path']: outPath,
+      };
+    }
     default:
       throw new Error(`Unsupported transform operator in Browser-Actuator: ${op}`);
   }
@@ -1117,6 +1266,7 @@ async function opApply(
   switch (op) {
     case 'goto': {
       const url = resolve(params.url);
+      browserRuntimeHelpers.assertNavigationAllowed(url, runtime.navigationPolicy);
       await retry(async () => {
         await page.goto(url, { waitUntil: params.waitUntil || 'networkidle' });
       }, buildRetryOptions(params));
@@ -1231,11 +1381,18 @@ async function opApply(
     }
     case 'fill_ref': {
       const ref = resolve(params.ref);
-      const text = resolve(params.text);
       const selector = browserRuntimeHelpers.resolveRefSelector(ctx, ref);
       const element = browserRuntimeHelpers.findSnapshotElement(ctx, ref);
+      const secretKey = params.secret_ref
+        ? String(resolve(params.secret_ref))
+        : params.classification === 'secret_ref' && params.variable?.name
+          ? String(resolve(params.variable.name))
+          : undefined;
+      const text = secretKey ? getSecret(secretKey) : resolve(params.text);
+      if (secretKey && text == null)
+        throw new Error(`[BROWSER_SECRET_MISSING] SecretResolver could not resolve ${secretKey}`);
       await retry(async () => {
-        await page.fill(selector, text, { timeout: params.timeout || 5000 });
+        await page.fill(selector, String(text ?? ''), { timeout: params.timeout || 5000 });
       }, buildRetryOptions(params));
       return browserRuntimeHelpers.recordBrowserAction(ctx, {
         kind: 'apply',
@@ -1243,7 +1400,33 @@ async function opApply(
         tab_id: runtime.activeTabId,
         ref,
         selector,
-        text,
+        ...(secretKey
+          ? { classification: 'secret_ref' as const, secret_ref: secretKey }
+          : { text }),
+        element_name: element?.name,
+        element_role: element?.role,
+      });
+    }
+    case 'fill_secret_ref': {
+      const ref = resolve(params.ref);
+      const secretKey = String(resolve(params.secret_ref));
+      const secret = getSecret(secretKey);
+      if (secret == null)
+        throw new Error(`[BROWSER_SECRET_MISSING] SecretResolver could not resolve ${secretKey}`);
+      const selector = browserRuntimeHelpers.resolveRefSelector(ctx, ref);
+      const element = browserRuntimeHelpers.findSnapshotElement(ctx, ref);
+      await retry(
+        async () => page.fill(selector, secret, { timeout: params.timeout || 5000 }),
+        buildRetryOptions(params)
+      );
+      return browserRuntimeHelpers.recordBrowserAction(ctx, {
+        kind: 'apply',
+        op: 'fill_secret_ref',
+        tab_id: runtime.activeTabId,
+        ref,
+        selector,
+        secret_ref: secretKey,
+        classification: 'secret_ref',
         element_name: element?.name,
         element_role: element?.role,
       });
@@ -1265,6 +1448,37 @@ async function opApply(
         key,
         element_name: element?.name,
         element_role: element?.role,
+      });
+    }
+    case 'scroll_ref': {
+      const ref = resolve(params.ref);
+      const selector = browserRuntimeHelpers.resolveRefSelector(ctx, ref);
+      const element = browserRuntimeHelpers.findSnapshotElement(ctx, ref);
+      await retry(
+        async () =>
+          page.locator(selector).scrollIntoViewIfNeeded({ timeout: params.timeout || 5000 }),
+        buildRetryOptions(params)
+      );
+      return browserRuntimeHelpers.recordBrowserAction(ctx, {
+        kind: 'apply',
+        op: 'scroll_ref',
+        tab_id: runtime.activeTabId,
+        ref,
+        selector,
+        element_name: element?.name,
+        element_role: element?.role,
+      });
+    }
+    case 'scroll': {
+      const delta = params.delta || {};
+      const x = Math.max(-5000, Math.min(5000, Number(params.x ?? delta.x ?? 0)));
+      const y = Math.max(-5000, Math.min(5000, Number(params.y ?? delta.y ?? 0)));
+      await page.mouse.wheel(x, y);
+      return browserRuntimeHelpers.recordBrowserAction(ctx, {
+        kind: 'apply',
+        op: 'scroll',
+        tab_id: runtime.activeTabId,
+        content_excerpt: `delta(${x},${y})`,
       });
     }
     case 'wait':
@@ -1447,6 +1661,7 @@ async function opApply(
       }
       const targetUrl = String(handoff.target_url || resolve(params.target_url || '')).trim();
       if (!targetUrl) throw new Error('import_session_handoff requires a target_url');
+      browserRuntimeHelpers.assertNavigationAllowed(targetUrl, runtime.navigationPolicy);
       await page.goto(targetUrl, { waitUntil: params.waitUntil || 'domcontentloaded' });
       if (
         (handoff.local_storage && Object.keys(handoff.local_storage).length > 0) ||
@@ -1722,7 +1937,9 @@ async function registerPasskey(
   const username = String(resolve(params.username ?? ctx.username ?? 'kyberion_passkey_user'));
   const waitMs = Number(params.wait_ms || 1500);
   if (params.navigate !== false) {
-    await page.goto(String(resolve(params.url || preset.baseUrl)), {
+    const targetUrl = String(resolve(params.url || preset.baseUrl));
+    browserRuntimeHelpers.assertNavigationAllowed(targetUrl, runtime.navigationPolicy);
+    await page.goto(targetUrl, {
       waitUntil: params.waitUntil || 'networkidle',
     });
   }
@@ -1773,7 +1990,9 @@ async function authenticatePasskey(
     authPage = await openFreshPasskeyPage(runtime);
   }
   if (params.navigate !== false) {
-    await authPage.goto(String(resolve(params.url || preset.baseUrl)), {
+    const targetUrl = String(resolve(params.url || preset.baseUrl));
+    browserRuntimeHelpers.assertNavigationAllowed(targetUrl, runtime.navigationPolicy);
+    await authPage.goto(targetUrl, {
       waitUntil: params.waitUntil || 'networkidle',
     });
   }

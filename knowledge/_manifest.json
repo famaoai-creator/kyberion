@@ -189,7 +189,7 @@
     {
       "path": "product/architecture/browser-actuator-v3.md",
       "tier": "public",
-      "size": 6522,
+      "size": 7211,
       "type": "md"
     },
     {
@@ -987,7 +987,7 @@
     {
       "path": "product/governance/actuator-op-registry.json",
       "tier": "public",
-      "size": 14049,
+      "size": 14275,
       "type": "json"
     },
     {
@@ -2937,7 +2937,7 @@
     {
       "path": "product/orchestration/actuator-op-discovery.json",
       "tier": "public",
-      "size": 64787,
+      "size": 68489,
       "type": "json"
     },
     {
