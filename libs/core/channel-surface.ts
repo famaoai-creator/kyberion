@@ -63,6 +63,11 @@ export {
   parseSlackApprovalAction,
 } from './slack-approval-ui.js';
 export {
+  buildSlackMissionProposalBlocks,
+  parseSlackMissionProposalAction,
+  slackMissionProposalFallbackText,
+} from './slack-mission-proposal-ui.js';
+export {
   buildSlackOnboardingBlocks,
   buildSlackOnboardingModal,
   buildSlackOnboardingPrompt,
@@ -107,6 +112,7 @@ export type {
   SurfaceOutboxMessage,
   SlackMissionIssuanceResult,
   SlackApprovalActionPayload,
+  SlackMissionProposalActionPayload,
   SlackOnboardingPrompt,
   SlackOnboardingActionPayload,
   OnboardingTurnResult,
