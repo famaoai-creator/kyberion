@@ -237,7 +237,7 @@ function markJanitorSubmission(): void {
       {
         submitted_at: new Date().toISOString(),
         pipeline_id: 'storage-janitor',
-        dry_run: true,
+        dry_run: false,
       },
       null,
       2
@@ -264,6 +264,9 @@ function maybeSubmitJanitorMaintenanceJob(): {
     };
   }
 
+  // Real run (not dry_run): the janitor only writes its completion marker on a
+  // real run, so a dry-run submission can never satisfy readJanitorLastRunMs()
+  // and would leave the baseline stuck at needs_attention for every TTL window.
   spawnManagedProcess({
     resourceId: `baseline-check:storage-janitor:${Date.now().toString(36)}`,
     kind: 'service',
@@ -275,7 +278,7 @@ function maybeSubmitJanitorMaintenanceJob(): {
       '--input',
       'pipelines/storage-janitor.json',
       '--context',
-      JSON.stringify({ dry_run: true }),
+      JSON.stringify({ dry_run: false }),
     ],
     spawnOptions: {
       cwd: pathResolver.rootDir(),
@@ -286,7 +289,7 @@ function maybeSubmitJanitorMaintenanceJob(): {
     shutdownPolicy: 'detached',
     metadata: {
       pipelineId: 'storage-janitor',
-      dryRun: true,
+      dryRun: false,
       source: 'baseline-check',
     },
   });
@@ -295,7 +298,7 @@ function maybeSubmitJanitorMaintenanceJob(): {
   return {
     submitted: true,
     pending: true,
-    reason: 'storage janitor dry-run job submitted',
+    reason: 'storage janitor job submitted',
   };
 }
 
@@ -328,7 +331,7 @@ async function main() {
     janitorMaintenance = maybeSubmitJanitorMaintenanceJob();
     if (janitorMaintenance.submitted) {
       logger.info(
-        `[BASELINE] storage janitor maintenance job submitted: ${janitorMaintenance.reason || 'storage janitor dry-run job submitted'}`
+        `[BASELINE] storage janitor maintenance job submitted: ${janitorMaintenance.reason || 'storage janitor job submitted'}`
       );
     } else if (janitorMaintenance.pending) {
       logger.info(
