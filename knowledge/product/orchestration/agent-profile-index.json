@@ -1,6 +1,23 @@
 {
   "version": "1.0.0",
   "agents": {
+    "mission-orchestrator": {
+      "authority_roles": ["mission_controller", "ecosystem_architect"],
+      "team_roles": ["orchestrator"],
+      "capabilities": [
+        "reasoning",
+        "coordination",
+        "routing",
+        "monitoring",
+        "planning",
+        "analysis"
+      ],
+      "selection_hints": {
+        "preferred_provider": "agy",
+        "preferred_modelId": "auto-gemini-3"
+      },
+      "provider_strategy": "adaptive"
+    },
     "control-plane-agent": {
       "authority_roles": ["mission_controller", "ecosystem_architect", "knowledge_steward"],
       "team_roles": [
@@ -35,7 +52,7 @@
         "preferred_provider": "agy",
         "preferred_modelId": "auto-gemini-3"
       },
-      "provider_strategy": "strict"
+      "provider_strategy": "adaptive"
     },
     "chronos-mirror": {
       "authority_roles": ["chronos_operator", "chronos_gateway"],
@@ -56,7 +73,7 @@
         "preferred_provider": "agy",
         "preferred_modelId": "auto-gemini-3"
       },
-      "provider_strategy": "strict"
+      "provider_strategy": "adaptive"
     },
     "implementation-architect": {
       "authority_roles": ["ecosystem_architect", "software_developer"],
@@ -77,7 +94,7 @@
         "preferred_provider": "agy",
         "preferred_modelId": "auto-gemini-3"
       },
-      "provider_strategy": "strict"
+      "provider_strategy": "adaptive"
     },
     "operations-agent": {
       "authority_roles": ["chronos_operator", "chronos_gateway"],
@@ -108,7 +125,7 @@
         "preferred_provider": "agy",
         "preferred_modelId": "auto-gemini-3"
       },
-      "provider_strategy": "strict"
+      "provider_strategy": "adaptive"
     },
     "presence-surface-agent": {
       "authority_roles": ["surface_runtime", "chronos_operator"],
@@ -200,7 +217,7 @@
         "preferred_provider": "agy",
         "preferred_modelId": "auto-gemini-3"
       },
-      "provider_strategy": "strict"
+      "provider_strategy": "adaptive"
     },
     "telegram-surface-agent": {
       "authority_roles": ["surface_runtime"],
