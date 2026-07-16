@@ -721,7 +721,8 @@ export function buildOrganizationWorkLoopSummary(input: {
       requires_approval: Boolean(input.requiresApproval),
     },
     learning: {
-      reusable_refs: design.reusable_refs.map((ref) => ref.promoted_ref || ref.title),
+      // Distinct candidates can promote the same ref; the contract wants refs, not candidates.
+      reusable_refs: [...new Set(design.reusable_refs.map((ref) => ref.promoted_ref || ref.title))],
     },
     work_scope_decision: workScopeDecision,
   };
