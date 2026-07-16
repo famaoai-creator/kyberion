@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
+import * as nodePath from 'node:path';
 import { missionDir, pathResolver } from './path-resolver.js';
+import { resolveSharedObservabilityDir } from './observability-gate.js';
 import { safeAppendFileSync, safeMkdir } from './secure-io.js';
 import { appendMissionExecutionLedgerEntry } from './mission-team-binding.js';
 
@@ -49,7 +51,13 @@ export function emitMissionTaskEvent(input: MissionTaskEventInput): void {
   const { missionEventPath, globalEventPath } = ensureTaskEventDirs(input.mission_id);
   const line = `${JSON.stringify(event)}\n`;
   safeAppendFileSync(missionEventPath, line);
-  safeAppendFileSync(globalEventPath, line);
+  // The mission-local stream always records; the shared cross-mission stream
+  // goes through the hermetic-test gate.
+  const globalDir = resolveSharedObservabilityDir(nodePath.dirname(globalEventPath));
+  if (globalDir) {
+    safeMkdir(globalDir);
+    safeAppendFileSync(`${globalDir}/task-events.jsonl`, line);
+  }
   appendMissionExecutionLedgerEntry({
     mission_id: input.mission_id,
     source_event_id: event.event_id,

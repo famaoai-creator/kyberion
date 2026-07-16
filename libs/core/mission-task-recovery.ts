@@ -200,3 +200,35 @@ export function recoverMissionRequestedTasks(
     return summary;
   });
 }
+
+/**
+ * Operator-initiated retry for blocked tasks (resume path only): flip
+ * `blocked` back to `planned` so the next followup re-runs delegation
+ * preflight. Blocked is otherwise terminal, which is right for automated
+ * chains, but resume is the operator's explicit retry lever — after fixing
+ * the cause (staffing, path scopes) the tasks must be dispatchable again.
+ */
+export function reissueBlockedMissionTasks(missionId: string): {
+  mission_id: string;
+  reissued_task_ids: string[];
+} {
+  const upperMissionId = String(missionId || '')
+    .trim()
+    .toUpperCase();
+  if (!upperMissionId) return { mission_id: upperMissionId, reissued_task_ids: [] };
+
+  return withExecutionContext('mission_controller', () => {
+    const tasks = readNextTasks(upperMissionId);
+    const reissued: string[] = [];
+    const nextTasks = tasks.map((task) => {
+      if (String(task.status || 'planned') !== 'blocked') return task;
+      const taskId = String(task.task_id || '').trim();
+      if (taskId) reissued.push(taskId);
+      return { ...task, status: 'planned' };
+    });
+    if (reissued.length > 0) {
+      writeNextTasks(upperMissionId, nextTasks);
+    }
+    return { mission_id: upperMissionId, reissued_task_ids: reissued };
+  });
+}
