@@ -14,15 +14,17 @@ import type { AgentProvider } from './agent-registry.js';
  */
 
 export interface AgentRequirements {
-  env?: string[];             // Required environment variables
-  services?: string[];        // Required services (slack, etc.)
-  actuators?: string[];       // Required actuators
-  files?: string[];           // Required files (relative to project root)
+  env?: string[]; // Required environment variables
+  services?: string[]; // Required services (slack, etc.)
+  actuators?: string[]; // Required actuators
+  files?: string[]; // Required files (relative to project root)
 }
 
 export interface AgentSelectionHints {
   preferred_provider?: AgentProvider;
   preferred_modelId?: string;
+  provider_strategy?: 'strict' | 'preferred' | 'adaptive';
+  fallback_providers?: string[];
 }
 
 export interface AgentManifest {
@@ -32,8 +34,8 @@ export interface AgentManifest {
   autoSpawn: boolean;
   trustRequired: number;
   requires: AgentRequirements;
-  allowedActuators: string[];   // Whitelist — only these actuators can be used (empty = all)
-  deniedActuators: string[];    // Blacklist — these actuators are explicitly blocked
+  allowedActuators: string[]; // Whitelist — only these actuators can be used (empty = all)
+  deniedActuators: string[]; // Blacklist — these actuators are explicitly blocked
   systemPrompt: string;
   filePath: string;
 }
@@ -80,7 +82,11 @@ function parseFrontmatter(content: string): { meta: Record<string, any>; body: s
 function parseValue(raw: string): any {
   // Arrays: [a, b, c]
   if (raw.startsWith('[') && raw.endsWith(']')) {
-    return raw.slice(1, -1).split(',').map(s => s.trim()).filter(Boolean);
+    return raw
+      .slice(1, -1)
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
   }
   if (raw === 'true') return true;
   if (raw === 'false') return false;
@@ -104,18 +110,22 @@ function loadAgentProfileSelectionHints(rootDir: string): Record<string, AgentSe
       result[agentId] = {
         preferred_provider: entry.selection_hints?.preferred_provider,
         preferred_modelId: entry.selection_hints?.preferred_modelId,
+        provider_strategy: entry.provider_strategy,
+        fallback_providers: entry.fallback_providers,
       };
     }
     return result;
   } catch (error: any) {
-    logger.warn(`[AGENT_MANIFEST] Failed to load profile selection hints: ${error?.message || error}`);
+    logger.warn(
+      `[AGENT_MANIFEST] Failed to load profile selection hints: ${error?.message || error}`
+    );
     return {};
   }
 }
 
 export function resolveAgentSelectionHints(
   manifest: AgentManifest,
-  fallbackProvider?: AgentProvider,
+  fallbackProvider?: AgentProvider
 ): { provider: AgentProvider; modelId: string } {
   const legacyProvider = (manifest as AgentManifest & { provider?: AgentProvider }).provider;
   const legacyModelId = (manifest as AgentManifest & { modelId?: string }).modelId;
@@ -131,7 +141,7 @@ export function resolveSelectionHints(
   selectionHints: AgentSelectionHints | undefined,
   fallbackProvider?: AgentProvider,
   fallbackModelId?: string,
-  agentId = 'unknown-agent',
+  agentId = 'unknown-agent'
 ): { provider: AgentProvider; modelId: string } {
   const provider = selectionHints?.preferred_provider || fallbackProvider;
   const modelId = selectionHints?.preferred_modelId || fallbackModelId;
@@ -177,7 +187,11 @@ export function loadAgentManifests(rootDir?: string): AgentManifest[] {
   const cached = manifestCache.get(agentsDir);
   const now = Date.now();
   const currentMtime = readDirMtime(agentsDir);
-  if (cached && now - cached.loadedAt < MANIFEST_CACHE_TTL_MS && cached.dirMtimeMs === currentMtime) {
+  if (
+    cached &&
+    now - cached.loadedAt < MANIFEST_CACHE_TTL_MS &&
+    cached.dirMtimeMs === currentMtime
+  ) {
     return cached.manifests;
   }
 
@@ -188,7 +202,7 @@ export function loadAgentManifests(rootDir?: string): AgentManifest[] {
     return [];
   }
 
-  const files = safeReaddir(agentsDir).filter(f => f.endsWith('.agent.md'));
+  const files = safeReaddir(agentsDir).filter((f) => f.endsWith('.agent.md'));
   const manifests: AgentManifest[] = [];
 
   for (const file of files) {
@@ -215,7 +229,9 @@ export function loadAgentManifests(rootDir?: string): AgentManifest[] {
 
       // Validate agentId format
       if (!/^[a-z][a-z0-9-]*$/.test(meta.agentId)) {
-        logger.warn(`[AGENT_MANIFEST] Skipping ${file}: invalid agentId "${meta.agentId}" (must be lowercase, hyphens only)`);
+        logger.warn(
+          `[AGENT_MANIFEST] Skipping ${file}: invalid agentId "${meta.agentId}" (must be lowercase, hyphens only)`
+        );
         continue;
       }
 
@@ -244,7 +260,9 @@ export function loadAgentManifests(rootDir?: string): AgentManifest[] {
     }
   }
 
-  logger.info(`[AGENT_MANIFEST] Loaded ${manifests.length} agent definitions: ${manifests.map(m => m.agentId).join(', ')}`);
+  logger.info(
+    `[AGENT_MANIFEST] Loaded ${manifests.length} agent definitions: ${manifests.map((m) => m.agentId).join(', ')}`
+  );
   manifestCache.set(agentsDir, { manifests, loadedAt: now, dirMtimeMs: currentMtime });
   return manifests;
 }
@@ -258,7 +276,7 @@ export function clearAgentManifestCache(): void {
  * Get a single agent manifest by ID.
  */
 export function getAgentManifest(agentId: string, rootDir?: string): AgentManifest | undefined {
-  return loadAgentManifests(rootDir).find(m => m.agentId === agentId);
+  return loadAgentManifests(rootDir).find((m) => m.agentId === agentId);
 }
 
 /**
@@ -312,7 +330,9 @@ export function validateRequirements(
   }
 
   if (reasons.length > 0) {
-    logger.warn(`[AGENT_MANIFEST] Requirements not met for ${manifest.agentId}: ${reasons.join(', ')}`);
+    logger.warn(
+      `[AGENT_MANIFEST] Requirements not met for ${manifest.agentId}: ${reasons.join(', ')}`
+    );
   }
 
   return { ok: reasons.length === 0, reasons };

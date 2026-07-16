@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { pathResolver, rootDir } from './path-resolver.js';
+import { resolveSharedObservabilityDir } from './observability-gate.js';
 import {
   ensureMissionTeamRuntime,
   type EnsureMissionTeamRuntimeOptions,
@@ -76,9 +77,11 @@ function ensureEventDir(): void {
 
 export function appendSupervisorEvent(event: Record<string, unknown>): void {
   try {
-    ensureEventDir();
+    const obsDir = resolveSharedObservabilityDir(EVENTS_DIR);
+    if (!obsDir) return;
+    safeMkdir(obsDir);
     safeAppendFileSync(
-      EVENTS_PATH,
+      `${obsDir}/agent-runtime-supervisor-events.jsonl`,
       `${JSON.stringify({
         ts: new Date().toISOString(),
         ...event,

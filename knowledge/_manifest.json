@@ -3003,7 +3003,7 @@
     {
       "path": "product/orchestration/agent-profile-index.json",
       "tier": "public",
-      "size": 7226,
+      "size": 7697,
       "type": "json"
     },
     {
@@ -3015,7 +3015,7 @@
     {
       "path": "product/orchestration/agent-profiles/attacker.json",
       "tier": "public",
-      "size": 389,
+      "size": 391,
       "type": "json"
     },
     {
@@ -3033,7 +3033,7 @@
     {
       "path": "product/orchestration/agent-profiles/defender.json",
       "tier": "public",
-      "size": 389,
+      "size": 391,
       "type": "json"
     },
     {
@@ -3043,9 +3043,15 @@
       "type": "json"
     },
     {
+      "path": "product/orchestration/agent-profiles/mission-orchestrator.json",
+      "tier": "public",
+      "size": 504,
+      "type": "json"
+    },
+    {
       "path": "product/orchestration/agent-profiles/nerve-agent.json",
       "tier": "public",
-      "size": 475,
+      "size": 477,
       "type": "json"
     },
     {
@@ -3063,7 +3069,7 @@
     {
       "path": "product/orchestration/agent-profiles/planner-agent.json",
       "tier": "public",
-      "size": 413,
+      "size": 415,
       "type": "json"
     },
     {
@@ -3087,7 +3093,7 @@
     {
       "path": "product/orchestration/agent-profiles/sovereign-brain.json",
       "tier": "public",
-      "size": 510,
+      "size": 512,
       "type": "json"
     },
     {
@@ -4341,7 +4347,7 @@
     {
       "path": "product/orchestration/team-role-index.json",
       "tier": "public",
-      "size": 15015,
+      "size": 13833,
       "type": "json"
     },
     {
@@ -4396,6 +4402,12 @@
       "path": "product/orchestration/team-roles/operator.json",
       "tier": "public",
       "size": 784,
+      "type": "json"
+    },
+    {
+      "path": "product/orchestration/team-roles/orchestrator.json",
+      "tier": "public",
+      "size": 885,
       "type": "json"
     },
     {

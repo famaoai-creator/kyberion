@@ -24,7 +24,8 @@ type SupervisorMethod =
   | 'touch'
   | 'shutdown'
   | 'refresh'
-  | 'restart';
+  | 'restart'
+  | 'terminate';
 
 interface SupervisorRequest<T = Record<string, unknown>> {
   id: string;
@@ -44,6 +45,22 @@ export interface AgentRuntimeSupervisorHealth {
   ok: true;
   pid: number;
   socket_path: string;
+  /** mtime of the core dist the daemon loaded at startup — stale-code detection. */
+  code_stamp?: number;
+}
+
+/**
+ * Code stamp for the supervisor runtime: mtime of the built core the daemon
+ * serves behavior from. A daemon whose stamp is older than the caller's was
+ * started before the last rebuild and must be recycled — a live one observed
+ * in production kept serving pre-fix runtimes after several rebuilds.
+ */
+export function computeSupervisorCodeStamp(): number {
+  try {
+    return Math.floor(safeStat(`${rootDir()}/libs/core/dist/index.js`).mtimeMs);
+  } catch {
+    return 0;
+  }
 }
 
 export interface AgentRuntimeSupervisorEnsurePayload {
@@ -177,7 +194,23 @@ async function waitForSupervisorHealth(
 
 export async function ensureAgentRuntimeSupervisorDaemon(): Promise<AgentRuntimeSupervisorHealth> {
   try {
-    return await waitForSupervisorHealth(750);
+    const health = await waitForSupervisorHealth(750);
+    const currentStamp = computeSupervisorCodeStamp();
+    const daemonStamp = Number(health.code_stamp || 0);
+    if (currentStamp > 0 && daemonStamp > 0 && daemonStamp < currentStamp) {
+      logger.info(
+        `[supervisor-client] daemon pid=${health.pid} runs stale code (stamp ${daemonStamp} < ${currentStamp}); terminating it for a fresh spawn.`
+      );
+      try {
+        await sendSupervisorRequest(makeRequest('terminate'), HEALTH_TIMEOUT_MS);
+      } catch (_) {
+        /* daemon may exit before replying — the spawn flow below recovers */
+      }
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      // fall through to the spawn flow
+    } else {
+      return health;
+    }
   } catch (err) {
     logger.warn(`suppressed error in ensureAgentRuntimeSupervisorDaemon: ${err}`);
   }

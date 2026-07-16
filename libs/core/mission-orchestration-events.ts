@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { pathResolver, rootDir } from './path-resolver.js';
 import { safeAppendFileSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import { resolveSharedObservabilityDir } from './observability-gate.js';
 import { spawnManagedProcess } from './managed-process.js';
 import { appendMissionOrchestrationJournalEntry } from './mission-orchestration-journal.js';
 
@@ -27,11 +28,11 @@ export interface MissionOrchestrationEvent<TPayload = Record<string, unknown>> {
 }
 
 const EVENTS_DIR = pathResolver.shared('coordination/orchestration/events');
-const OBS_PATH = pathResolver.shared('observability/mission-control/orchestration-events.jsonl');
+const OBS_DIR = pathResolver.shared('observability/mission-control');
 
 function ensureDirs(): void {
   safeMkdir(EVENTS_DIR);
-  safeMkdir(pathResolver.shared('observability/mission-control'));
+  safeMkdir(OBS_DIR);
 }
 
 export function getMissionOrchestrationEventPath(eventId: string): string {
@@ -40,9 +41,12 @@ export function getMissionOrchestrationEventPath(eventId: string): string {
 }
 
 export function emitMissionOrchestrationObservation(event: Record<string, unknown>): void {
-  ensureDirs();
+  const obsDir = resolveSharedObservabilityDir(OBS_DIR);
+  if (!obsDir) return;
+  safeMkdir(EVENTS_DIR);
+  safeMkdir(obsDir);
   safeAppendFileSync(
-    OBS_PATH,
+    `${obsDir}/orchestration-events.jsonl`,
     `${JSON.stringify({
       ts: new Date().toISOString(),
       ...event,

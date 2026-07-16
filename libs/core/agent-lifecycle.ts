@@ -250,7 +250,16 @@ class AgentLifecycleManagerImpl {
         existingRecord?.status === 'busy' ||
         existingRecord?.status === 'booting')
     ) {
-      return existingHandle;
+      // Only reuse a live runtime when it matches the requested provider.
+      // Dynamic provider failover (demoted backend → new provider) must not
+      // be silently satisfied by a runtime still bound to the old backend.
+      if (!options.provider || existingRecord?.provider === options.provider) {
+        return existingHandle;
+      }
+      logger.info(
+        `[AGENT_LIFECYCLE] Recreating ${agentId}: held provider ${existingRecord?.provider} != requested ${options.provider}`
+      );
+      await this.shutdown(agentId);
     }
     const pending = this.pendingSpawns.get(agentId);
     if (pending) {

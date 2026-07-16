@@ -1,10 +1,17 @@
 {
   "version": "1.0.0",
   "agents": {
-    "attacker": {
+    "mission-orchestrator": {
       "authority_roles": ["mission_controller", "ecosystem_architect"],
-      "team_roles": ["attacker"],
-      "capabilities": ["reasoning", "security", "analysis"],
+      "team_roles": ["orchestrator"],
+      "capabilities": [
+        "reasoning",
+        "coordination",
+        "routing",
+        "monitoring",
+        "planning",
+        "analysis"
+      ],
       "selection_hints": {
         "preferred_provider": "agy",
         "preferred_modelId": "auto-gemini-3"

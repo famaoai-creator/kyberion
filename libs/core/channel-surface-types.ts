@@ -199,6 +199,12 @@ export interface A2ATaskContext {
   user_language?: string;
   task_model_hint?: Record<string, unknown>;
   model_hint?: Record<string, unknown>;
+  // Set by dispatchMissionNextTasks so the worker runtime can attribute the
+  // ask to a NEXT_TASKS entry; consumed by the a2a bridge for scoping.
+  task_id?: string;
+  // ContextSecurityScope object from the mission context pack; the a2a bridge
+  // uses it to fingerprint conversation storage and validate egress.
+  security_scope?: Record<string, unknown>;
 }
 
 export interface A2ATaskContract {
