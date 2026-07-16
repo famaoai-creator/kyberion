@@ -355,6 +355,69 @@
           "kind": "capture"
         },
         {
+          "op": "extract_text_ref",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "required": ["ref"],
+            "properties": {
+              "ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "export_as": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "ref": "@e1"
+            }
+          ]
+        },
+        {
+          "op": "session_health",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "export_as": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [{}]
+        },
+        {
+          "op": "action_trail",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 2000
+              },
+              "from": {
+                "type": "string"
+              },
+              "export_as": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "limit": 20
+            }
+          ]
+        },
+        {
           "op": "screenshot",
           "kind": "capture"
         },
@@ -405,6 +468,27 @@
         {
           "op": "export_playwright",
           "kind": "transform"
+        },
+        {
+          "op": "export_failure_bundle",
+          "kind": "transform",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "export_as": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "path": "active/shared/tmp/browser/failure.json"
+            }
+          ]
         },
         {
           "op": "json_query",
@@ -515,6 +599,31 @@
           "kind": "apply"
         },
         {
+          "op": "fill_secret_ref",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "required": ["ref", "secret_ref"],
+            "properties": {
+              "ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "secret_ref": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "ref": "@e1",
+              "secret_ref": "TOKEN"
+            }
+          ]
+        },
+        {
           "op": "import_session_handoff",
           "kind": "apply"
         },
@@ -565,6 +674,52 @@
         {
           "op": "press_ref",
           "kind": "apply"
+        },
+        {
+          "op": "scroll",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "delta": {
+                "type": "object"
+              },
+              "x": {
+                "type": "number"
+              },
+              "y": {
+                "type": "number"
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "delta": {
+                "y": 600
+              }
+            }
+          ]
+        },
+        {
+          "op": "scroll_ref",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "required": ["ref"],
+            "properties": {
+              "ref": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "ref": "@e1"
+            }
+          ]
         },
         {
           "op": "register_passkey",

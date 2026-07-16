@@ -63,6 +63,12 @@ interface BrowserAction {
     connect_over_cdp?: boolean;
     cdp_url?: string;
     cdp_port?: number;
+    action_trail_max?: number;
+    navigation_policy?: {
+      allowed_origins?: string[];
+      allow_private_network?: boolean;
+      allow_data_url?: boolean;
+    };
   };
   context?: Record<string, any>;
 }
@@ -138,6 +144,8 @@ interface BrowserSnapshotElement {
   value: string | null;
   visible: boolean;
   editable: boolean;
+  focused?: boolean;
+  value_redacted?: boolean;
   selector: string;
 }
 
@@ -148,6 +156,9 @@ interface BrowserSnapshot {
   title: string;
   captured_at: string;
   element_count: number;
+  viewport?: { width: number; height: number; scale: number };
+  focused_ref?: string | null;
+  ready_state?: string;
   elements: BrowserSnapshotElement[];
 }
 

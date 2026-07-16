@@ -35,8 +35,9 @@ Browser Actuator v3 separates three layers.
 3. **Export Layer**
    - recorded browser actions can be exported to:
      - ADF
-  - browser procedures
-  - generated Playwright test skeletons
+
+- browser procedures
+- generated Playwright test skeletons
 
 Above these layers, Kyberion should add a provider-independent **computer interaction loop**:
 
@@ -59,6 +60,10 @@ See [`computer-use-runtime-model.md`](computer-use-runtime-model.md).
 - compatible with multi-tab and approval-driven operation
 
 The browser engine still resolves refs into Playwright locators internally.
+
+The canonical v3 surface includes `extract_text_ref`, `scroll_ref`, `scroll`,
+`session_health`, `action_trail`, `fill_secret_ref`, and
+`export_failure_bundle`. Raw selectors remain runtime-internal.
 
 ## Browser Runtime Model
 
@@ -226,6 +231,11 @@ Required safeguards:
 - domain-aware risk classification
 - operator approval on sensitive domains or sensitive actions
 
+Both `goto` and `open_tab` run a navigation policy preflight. Private/loopback
+literal hosts and unsupported protocols are rejected by default; an origin
+allowlist can further restrict a session. Secret fills use `SecretResolver`
+and never persist the resolved value.
+
 ## Testing Strategy
 
 Future test automation is a first-class goal.
@@ -255,6 +265,10 @@ Useful panels:
 - network stream
 - action trail
 - pending approvals
+
+The action trail is bounded, redacted, persisted under the governed runtime
+directory, and emitted as `browser.action` Trace events. Operator pauses write
+pending/approved/expired approval artifacts for surface rendering.
 
 This fits the current control-plane model better than opaque one-shot browser jobs.
 
