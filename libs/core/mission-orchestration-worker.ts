@@ -8,7 +8,10 @@ import {
 import { resolveTaskModelHint } from './reasoning-model-routing.js';
 import { type TaskModelPhaseKind } from './reasoning-level-policy.js';
 import { resolveQuestionInteractionPacket } from './question-resolver.js';
-import { validateDelegatedTaskPreflight } from './delegation-preflight.js';
+import { inferTaskTargetPath, validateDelegatedTaskPreflight } from './delegation-preflight.js';
+import { notifyOperator } from './operator-notifications.js';
+import { agentRegistry } from './agent-registry.js';
+import { reportProviderTemporarilyUnhealthy } from './provider-health-registry.js';
 import {
   emitChannelSurfaceEvent,
   enqueueChronosOutboxMessage,
@@ -46,7 +49,7 @@ import {
 import { logger } from './core.js';
 import { buildWorkingPrinciplesLines } from './working-principles.js';
 import { buildExecutionEnv } from './authority.js';
-import { missionDir, missionEvidenceDir } from './path-resolver.js';
+import { missionDir, missionEvidenceDir, rootDir } from './path-resolver.js';
 import { pathResolver } from './path-resolver.js';
 import {
   renderMissionContextPack,
@@ -983,6 +986,12 @@ function buildTaskExecutionPrompt(input: {
       ? `Review target: ${resolveReviewTargetForTask(input.task)}`
       : '',
     input.targetPath ? `Target path: ${input.targetPath}` : '',
+    // Workers run with the repository root as cwd, so a bare relative
+    // deliverable ('evidence/…') used to land at the repo root. Anchor all
+    // artifact IO to the mission directory; the acceptance gate resolves
+    // reported artifact paths against this same root.
+    `Artifact root: ${missionDir(input.missionId, 'public')}`,
+    'Write every artifact under the artifact root; deliverable and target paths are relative to it. Report artifact paths relative to the artifact root. Never write to the repository root or outside the mission directory.',
     '',
     ...input.missionGoalLines,
     ...buildWorkingPrinciplesLines(input.teamRole),
@@ -1170,6 +1179,107 @@ async function evaluateTaskAcceptanceGate(input: {
     reasons: [...gate.reasons, ...reasons],
     recordPath: gate.evidence_path,
   };
+}
+
+interface IndependentAcceptanceReview {
+  approve: boolean;
+  gaps: string[];
+  rationale?: string;
+  reviewerAgentId: string;
+}
+
+/**
+ * Ask the mission's reviewer runtime for a semantic accept/reject verdict on
+ * a task result. Returns null when separation of duties cannot be satisfied
+ * (no reviewer staffed, reviewer is the same actor as the worker, or the
+ * worker itself holds a review role) or when the reviewer ask fails — the
+ * caller then falls back to the deterministic gate verdict.
+ */
+async function requestIndependentAcceptanceReview(input: {
+  missionId: string;
+  task: PlannedNextTask;
+  taskResult?: unknown;
+  workerAgentId: string;
+  workerTeamRole: string;
+  securityScope?: unknown;
+}): Promise<IndependentAcceptanceReview | null> {
+  if (input.workerTeamRole === 'reviewer' || input.workerTeamRole === 'qa') return null;
+  const reviewerAssignment = resolveMissionTeamReceiver({
+    missionId: input.missionId,
+    teamRole: 'reviewer',
+  });
+  const reviewerAgentId = reviewerAssignment?.agent_id;
+  if (!reviewerAgentId || reviewerAgentId === input.workerAgentId) {
+    logger.info(
+      `[MISSION_WORKER] Independent acceptance review skipped for ${input.task.task_id}: ${
+        reviewerAgentId ? 'reviewer is the same actor as the worker' : 'no reviewer staffed'
+      }.`
+    );
+    return null;
+  }
+
+  const prompt = [
+    `You are the independent reviewer for mission ${input.missionId}.`,
+    `Judge whether the following task result satisfies the task and its acceptance criteria.`,
+    `Task: ${input.task.description || input.task.task_id}`,
+    input.task.deliverable ? `Deliverable: ${input.task.deliverable}` : '',
+    input.task.acceptance_criteria?.length
+      ? `Acceptance criteria:\n- ${input.task.acceptance_criteria.join('\n- ')}`
+      : '',
+    '',
+    'Task result:',
+    JSON.stringify(input.taskResult ?? null, null, 2).slice(0, 6000),
+    '',
+    'Return JSON only: { "approve": boolean, "gaps": string[], "rationale": string }',
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  try {
+    const response = await a2aBridge.route({
+      a2a_version: '1.0',
+      header: {
+        msg_id: `REQ-${Date.now().toString(36).toUpperCase()}-${input.task.task_id}-acceptance`,
+        sender: 'kyberion:mission-orchestrator',
+        receiver: reviewerAgentId,
+        performative: 'request',
+        timestamp: new Date().toISOString(),
+      },
+      payload: {
+        intent: 'mission_task_execution',
+        text: prompt,
+        objective: `Independent acceptance review for ${input.task.task_id}`,
+        context: {
+          mission_id: input.missionId,
+          team_role: 'reviewer',
+          task_id: `${input.task.task_id}-acceptance-review`,
+          execution_mode: 'task',
+          security_scope: input.securityScope,
+        },
+      },
+    });
+    const verdict = parsePlanningReviewVerdict(String(response.payload?.text || ''));
+    // Only a schema-valid verdict counts. A missing or malformed verdict is
+    // reviewer unavailability, not a rejection — degrade to the deterministic
+    // gate instead of failing work on a broken review response.
+    if (!verdict.parsed) {
+      logger.warn(
+        `[MISSION_WORKER] Independent acceptance review for ${input.task.task_id} returned no valid verdict (${verdict.gaps.join('; ')}); falling back to the deterministic gate.`
+      );
+      return null;
+    }
+    return {
+      approve: verdict.approve,
+      gaps: verdict.gaps,
+      ...(verdict.rationale ? { rationale: verdict.rationale } : {}),
+      reviewerAgentId,
+    };
+  } catch (err: any) {
+    logger.warn(
+      `[MISSION_WORKER] Independent acceptance review failed for ${input.task.task_id}: ${err?.message || err}`
+    );
+    return null;
+  }
 }
 
 async function buildTaskDispatchContext(input: {
@@ -1893,6 +2003,37 @@ async function dispatchPlannedMissionTask(input: {
     taskResult: response.taskResult,
   });
 
+  // Separation of duties: the deterministic gate only checks structure and
+  // evidence presence, so a passing result additionally needs a semantic
+  // verdict from an independent reviewer runtime (different actor than the
+  // worker). Tasks that already have a dedicated reviewer task in the plan
+  // (a task whose review_target points at them) are skipped — their review
+  // happens through that task. Reviewer outage degrades to the deterministic
+  // verdict rather than blocking the loop.
+  let independentReview: IndependentAcceptanceReview | null = null;
+  const hasDedicatedReviewTask = loadAllNextTasks(input.missionId).some(
+    (task) => String(task.review_target || '') === input.task.task_id
+  );
+  if (acceptance.passed && !hasDedicatedReviewTask) {
+    independentReview = await requestIndependentAcceptanceReview({
+      missionId: input.missionId,
+      task: input.task,
+      taskResult: response.taskResult,
+      workerAgentId: input.assignment.agent_id,
+      workerTeamRole: input.teamRole,
+      securityScope: dispatchContext.securityScope,
+    });
+    if (independentReview && !independentReview.approve) {
+      acceptance.passed = false;
+      acceptance.reasons = [
+        ...acceptance.reasons,
+        `Independent reviewer ${independentReview.reviewerAgentId} rejected: ${
+          independentReview.gaps.join('; ') || independentReview.rationale || 'no gaps returned'
+        }`,
+      ];
+    }
+  }
+
   if (!acceptance.passed) {
     const currentReworkCount = Number(input.task.rework_count || 0);
     const nextReworkCount = currentReworkCount + 1;
@@ -2018,6 +2159,18 @@ async function dispatchPlannedMissionTask(input: {
       gate_reasons: acceptance.reasons,
       gate_record_path: acceptance.recordPath,
     });
+    // Escalation (escalation_parent_team_role): the observability record above
+    // reaches no one by itself — deliver the rework-limit failure to the
+    // operator so the cascade block is a decision point, not a silent stall.
+    void notifyOperator('approval_required', {
+      title: `Mission ${input.missionId}: task ${input.task.task_id} blocked at rework limit`,
+      body: [
+        `Acceptance gate failed twice for ${input.task.task_id} (role: ${input.teamRole}).`,
+        `Reasons: ${acceptance.reasons.join('; ') || 'unspecified'}.`,
+        `Dependent tasks are cascade-blocked. Options: replan via mission_controller resume ${input.missionId} after adjusting the task, or accept-with-override.`,
+      ].join('\n'),
+      correlation_id: `${input.missionId}:${input.task.task_id}:rework-limit`,
+    });
     recordMissionContextTask(input.missionId, `Blocked work item ${input.task.task_id}`, {
       next_step: 'notify owner and request human intervention',
       work_item_id: input.task.task_id,
@@ -2092,6 +2245,15 @@ async function dispatchPlannedMissionTask(input: {
       task_result: response.taskResult,
       task_result_retried: response.retried,
       gate_record_path: acceptance.recordPath,
+      ...(independentReview
+        ? {
+            independent_acceptance_review: {
+              reviewer_agent_id: independentReview.reviewerAgentId,
+              approve: independentReview.approve,
+              ...(independentReview.rationale ? { rationale: independentReview.rationale } : {}),
+            },
+          }
+        : {}),
       ...(prRef ? { pr_ref: prRef } : {}),
       ...taskResultObservability,
     },
@@ -3368,7 +3530,14 @@ export async function dispatchMissionNextTasks(
           task_id: task.task_id,
           team_role: teamRole,
           deliverable: task.deliverable,
-          target_path: task.target_path,
+          // Planner tasks use mission-relative targets ('evidence/…') while
+          // allowed_write_scopes are repo-relative prefixes ('active/missions/…')
+          // — anchor the effective target (explicit target_path, or the path
+          // inferred from deliverable) to the mission directory beforehand.
+          target_path: resolveMissionRelativeTargetPath(
+            missionId,
+            inferTaskTargetPath({ target_path: task.target_path, deliverable: task.deliverable })
+          ),
         },
         assignment,
       });
@@ -3823,6 +3992,127 @@ async function requestPlanningReviewText(
   return String(response.payload?.text || '');
 }
 
+// Top-level repo roots a task target may address directly; anything else
+// relative is treated as mission-relative and anchored to the mission dir.
+const REPO_RELATIVE_TARGET_ROOTS =
+  /^(active|knowledge|outputs|customer|vault|work|pipelines|templates)\//;
+
+/**
+ * Anchor a mission-relative task target ('evidence/…') to the mission
+ * directory as a repo-relative path so it is comparable with
+ * allowed_write_scopes prefixes ('active/missions/…'). Absolute and
+ * repo-relative targets pass through unchanged (absolute paths outside the
+ * repo are then blocked by the scope check, which is the intent).
+ */
+function resolveMissionRelativeTargetPath(missionId: string, value?: string): string | undefined {
+  const trimmed = typeof value === 'string' ? value.trim() : '';
+  if (!trimmed) return undefined;
+  const normalized = trimmed.replace(/\\/g, '/');
+  if (normalized.startsWith('/') || /^[A-Za-z]:\//.test(normalized)) return normalized;
+  if (REPO_RELATIVE_TARGET_ROOTS.test(normalized)) return normalized;
+  const missionRepoRelative = nodePath
+    .relative(rootDir(), missionDir(missionId, 'public'))
+    .replace(/\\/g, '/');
+  return `${missionRepoRelative}/${normalized.replace(/^\.\/+/, '')}`;
+}
+
+/**
+ * Intra-packet task-contract rules the planner can repair in its retry loop:
+ * unique/present task ids and the reviewer contract (dependencies present,
+ * review_target set and depended on, REVIEW-<target>.md deliverable). These
+ * mirror validatePlannedNextTasks, which used to run only when NEXT_TASKS.json
+ * was re-read after persist — where a violation killed the kickoff with no
+ * repair chance. Cross-task rules (dependency existence, cycles) stay in the
+ * post-persist validation because they depend on the merged on-disk state.
+ */
+function collectPlanningPacketTaskContractErrors(
+  missionId: string,
+  packet: PlanningPacket
+): string[] {
+  const packetTasks = Array.isArray(packet.next_tasks) ? packet.next_tasks : [];
+  const errors: string[] = [];
+  const seenIds = new Set<string>();
+  packetTasks.forEach((entry, index) => {
+    const task = entry as unknown as Record<string, unknown>;
+    const taskId = String(task?.task_id ?? '').trim();
+    if (!taskId) {
+      errors.push(`task ${index + 1} is missing task_id`);
+      return;
+    }
+    if (seenIds.has(taskId)) {
+      errors.push(`duplicate task_id ${taskId}`);
+      return;
+    }
+    seenIds.add(taskId);
+
+    const assignedRole =
+      typeof (task.assigned_to as Record<string, unknown> | undefined)?.role === 'string'
+        ? String((task.assigned_to as Record<string, unknown>).role || '').trim()
+        : '';
+    if (assignedRole !== 'reviewer' && assignedRole !== 'qa') return;
+
+    const dependencies = Array.isArray(task.dependencies)
+      ? task.dependencies.map((dependency) => String(dependency || '').trim()).filter(Boolean)
+      : [];
+    const reviewTarget =
+      typeof task.review_target === 'string' && task.review_target.trim()
+        ? task.review_target.trim()
+        : '';
+    const deliverable =
+      typeof task.deliverable === 'string' && task.deliverable.trim()
+        ? task.deliverable.trim()
+        : '';
+    if (dependencies.length === 0) {
+      errors.push(`reviewer task ${taskId} must depend on at least one completed task`);
+    }
+    if (!reviewTarget) {
+      errors.push(`reviewer task ${taskId} is missing review_target`);
+    } else if (!dependencies.includes(reviewTarget)) {
+      errors.push(`reviewer task ${taskId} must depend on review_target ${reviewTarget}`);
+    }
+    if (reviewTarget) {
+      const expectedDeliverable = `REVIEW-${reviewTarget}.md`;
+      if (!deliverable || nodePath.basename(deliverable) !== expectedDeliverable) {
+        errors.push(`reviewer task ${taskId} must use deliverable ${expectedDeliverable}`);
+      }
+    }
+  });
+  return errors.map((message) => `Planning packet for ${missionId}: ${message}`);
+}
+
+/**
+ * Best-effort demotion of the backend behind a planner that failed to produce
+ * a planning packet even after a retry. The provider comes from the live
+ * agent registry when available, falling back to the staffed assignment.
+ */
+function reportDegradedPlannerBackend(
+  missionId: string,
+  plannerAgentId: string,
+  reason: string
+): void {
+  try {
+    const liveProvider = agentRegistry.get(plannerAgentId)?.provider;
+    const staffedProvider = resolveMissionTeamReceiver({
+      missionId,
+      teamRole: 'planner',
+    })?.provider;
+    const provider = liveProvider || staffedProvider;
+    if (!provider) return;
+    reportProviderTemporarilyUnhealthy(provider, {
+      reason:
+        `planner ${plannerAgentId} on ${provider} returned no planning_packet after retry: ${reason}`.slice(
+          0,
+          200
+        ),
+    });
+    logger.warn(
+      `[MISSION_WORKER] Demoted provider ${provider} after degraded planner responses for ${missionId}.`
+    );
+  } catch {
+    // Health reporting must never mask the original planner failure.
+  }
+}
+
 async function requestPlanningPacketText(
   missionId: string,
   payload: SlackPayload,
@@ -3886,13 +4176,47 @@ export async function resolveMissionPlanningPacket(
   }
 
   if (!planningPacket) {
+    const failureDetail =
+      kickoffBlocks.planningPacketErrors.length > 0
+        ? kickoffBlocks.planningPacketErrors.join('; ')
+        : 'no planning_packet block returned';
+    // A planner that cannot produce a packet even after a retry is a degraded
+    // backend signal (observed live as instant non-answers from a rate-limited
+    // CLI). Report it into the shared provider-health registry so the next
+    // resume/staffing fails over dynamically instead of retrying the same
+    // backend forever.
+    reportDegradedPlannerBackend(missionId, plannerAgentId, failureDetail);
     throw new Error(
-      `Planner response for ${missionId} failed planning_packet validation after retry: ${
-        kickoffBlocks.planningPacketErrors.length > 0
-          ? kickoffBlocks.planningPacketErrors.join('; ')
-          : 'no planning_packet block returned'
-      }`
+      `Planner response for ${missionId} failed planning_packet validation after retry: ${failureDetail}`
     );
+  }
+
+  // Task-contract rules (reviewer review_target / dependency / deliverable) used to be
+  // enforced only when NEXT_TASKS.json was re-read after persist, so a violation killed
+  // the kickoff with no repair chance. Enforce them here so the planner gets one retry
+  // with the concrete contract error before the packet is reviewed or persisted.
+  const contractErrors = collectPlanningPacketTaskContractErrors(missionId, planningPacket);
+  if (contractErrors.length > 0) {
+    const contractRetryPrompt = buildPlannerRetryPrompt(missionId, contractErrors, kickoffText);
+    kickoffText = await requestPlanningPacketText(
+      missionId,
+      payload,
+      plannerAgentId,
+      contractRetryPrompt
+    );
+    kickoffBlocks = extractPlanningPacketBlocks(kickoffText);
+    const retriedPacket = kickoffBlocks.planningPackets[0];
+    const retriedErrors = retriedPacket
+      ? collectPlanningPacketTaskContractErrors(missionId, retriedPacket)
+      : kickoffBlocks.planningPacketErrors.length > 0
+        ? kickoffBlocks.planningPacketErrors
+        : ['no planning_packet block returned'];
+    if (!retriedPacket || retriedErrors.length > 0) {
+      throw new Error(
+        `Planner packet for ${missionId} violated the task contract after retry: ${retriedErrors.join('; ')}`
+      );
+    }
+    planningPacket = retriedPacket;
   }
 
   let reviewerAgentId: string | undefined;
@@ -3935,6 +4259,15 @@ export async function resolveMissionPlanningPacket(
               ? kickoffBlocks.planningPacketErrors.join('; ')
               : 'no planning_packet block returned'
           }`
+        );
+      }
+      const reviewRetryContractErrors = collectPlanningPacketTaskContractErrors(
+        missionId,
+        planningPacket
+      );
+      if (reviewRetryContractErrors.length > 0) {
+        throw new Error(
+          `Planner packet for ${missionId} violated the task contract after review retry: ${reviewRetryContractErrors.join('; ')}`
         );
       }
 
@@ -4050,9 +4383,25 @@ async function handleMissionTeamPrewarmRequested(event: MissionOrchestrationEven
     'Background mission orchestration started.'
   );
 
+  // Prewarm the whole required team, not just the planner: lazily-spawned
+  // roles used to pay their spawn latency inside the first work dispatch.
+  let prewarmRoles = payload.teamRoles?.length ? payload.teamRoles : [];
+  if (prewarmRoles.length === 0 || (prewarmRoles.length === 1 && prewarmRoles[0] === 'planner')) {
+    try {
+      const teamPlan = resolveMissionTeamPlan({ missionId });
+      const requiredRoles = teamPlan.assignments
+        .filter((assignment) => assignment.required && assignment.agent_id)
+        .map((assignment) => assignment.team_role);
+      if (requiredRoles.length > 0) prewarmRoles = requiredRoles;
+    } catch (error: any) {
+      logger.warn(
+        `[worker] team plan resolution for prewarm failed (falling back to planner): ${error?.message ?? error}`
+      );
+    }
+  }
   const runtimePlan = await ensureMissionTeamRuntimeViaSupervisor({
     missionId,
-    teamRoles: payload.teamRoles?.length ? payload.teamRoles : ['planner'],
+    teamRoles: prewarmRoles.length > 0 ? prewarmRoles : ['planner'],
     requestedBy: 'mission_orchestration_worker',
     reason: 'Prewarm agent runtime before kickoff.',
     timeoutMs: MISSION_CONTROLLER_TIMEOUT_MS,
@@ -4225,23 +4574,38 @@ async function handleMissionReconciliationRequested(
       ...(gateSummary.lines.length > 0 ? ['Gate status:', ...gateSummary.lines] : []),
     ].join('\n'),
   });
-  enqueueChronosOutboxMessage({
-    correlationId: missionId,
-    threadTs: missionId,
-    source: 'system',
-    text: [
-      `Mission ${missionId} progress update.`,
-      `Accepted: ${summary.acceptedCount}`,
-      `Reviewed: ${summary.reviewedCount}`,
-      `Completed: ${summary.completedCount}`,
-      `Requested: ${summary.requestedCount}`,
-      `Gate rework count: ${gateSummary.reworkCount}`,
-      ...(gateSummary.lines.length > 0 ? ['Gate status:', ...gateSummary.lines] : []),
-    ].join('\n'),
-  });
-  // Continue lifecycle: enqueue distillation
+  // Surface notification is best-effort: a denied outbox write (e.g. the
+  // worker identity lacking the chronos_gateway write scope) must not stall
+  // the mission lifecycle before distillation is enqueued.
+  try {
+    enqueueChronosOutboxMessage({
+      correlationId: missionId,
+      threadTs: missionId,
+      source: 'system',
+      text: [
+        `Mission ${missionId} progress update.`,
+        `Accepted: ${summary.acceptedCount}`,
+        `Reviewed: ${summary.reviewedCount}`,
+        `Completed: ${summary.completedCount}`,
+        `Requested: ${summary.requestedCount}`,
+        `Gate rework count: ${gateSummary.reworkCount}`,
+        ...(gateSummary.lines.length > 0 ? ['Gate status:', ...gateSummary.lines] : []),
+      ].join('\n'),
+    });
+  } catch (error: any) {
+    logger.warn(
+      `[worker] chronos outbox notification skipped for ${missionId}: ${error?.message ?? error}`
+    );
+  }
+  // Work-loop closure: while dispatchable work remains, loop back to followup
+  // instead of racing ahead to distillation. This converges: acceptance-gate
+  // rework is requested at most once per task, and undispatchable tasks are
+  // marked blocked (terminal for the automated chain), so the planned/rework
+  // pool strictly shrinks.
+  const remainingPlanned = loadPlannedNextTasks(missionId).length;
   const nextEvent = enqueueMissionOrchestrationEvent({
-    eventType: 'mission_distillation_requested',
+    eventType:
+      remainingPlanned > 0 ? 'mission_followup_requested' : 'mission_distillation_requested',
     missionId,
     requestedBy: 'mission_orchestration_worker',
     correlationId: event.correlation_id || event.event_id,
@@ -4358,21 +4722,38 @@ async function handleMissionCompletionRequested(event: MissionOrchestrationEvent
       'mission_completion_failed',
       `Completion failed: ${error.message}. Manual intervention required.`
     );
+    // finish requires the owner's verify — surface the pending decision to
+    // the operator instead of leaving the mission silently unfinishable.
+    void notifyOperator('approval_required', {
+      title: `Mission ${missionId}: completion blocked — owner action needed`,
+      body: [
+        `mission_controller finish failed: ${error.message}`,
+        `If work is done, verify first: pnpm mission verify ${missionId} verified "<note>" then finish.`,
+      ].join('\n'),
+      correlation_id: `${missionId}:completion-blocked`,
+    });
   }
 
-  enqueueSlackOutboxMessage({
-    correlationId: missionId,
-    channel: payload.channel,
-    threadTs: payload.threadTs,
-    source: 'system',
-    text: `Mission ${missionId} lifecycle completed.`,
-  });
-  enqueueChronosOutboxMessage({
-    correlationId: missionId,
-    threadTs: missionId,
-    source: 'system',
-    text: `Mission ${missionId} lifecycle completed.`,
-  });
+  // Surface notifications are best-effort — see the reconciliation handler.
+  try {
+    enqueueSlackOutboxMessage({
+      correlationId: missionId,
+      channel: payload.channel,
+      threadTs: payload.threadTs,
+      source: 'system',
+      text: `Mission ${missionId} lifecycle completed.`,
+    });
+    enqueueChronosOutboxMessage({
+      correlationId: missionId,
+      threadTs: missionId,
+      source: 'system',
+      text: `Mission ${missionId} lifecycle completed.`,
+    });
+  } catch (error: any) {
+    logger.warn(
+      `[worker] completion surface notification skipped for ${missionId}: ${error?.message ?? error}`
+    );
+  }
   await shutdownAllAgentRuntimes('mission_orchestration_worker');
 }
 

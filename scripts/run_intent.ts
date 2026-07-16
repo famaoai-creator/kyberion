@@ -2,16 +2,108 @@ import {
   compileUserIntentFlow,
   createAssistantCompilerRequest,
   createAssistantDelegationRequest,
+  createTaskSession,
+  executeApprovedClaudeTaskSession,
   formatClarificationPacket,
+  getTaskIntentBuilder,
+  installReasoningBackends,
   logger,
   safeExistsSync,
+  saveTaskSession,
   resolveIntentResolutionPacket,
   chooseExecutionIntent,
   gatherImprovementHints,
+  validateTaskSession,
 } from '@agent/core';
+import type { IntentResolutionPacket } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { resolveAndExecuteIntent } from '../libs/actuators/orchestrator-actuator/src/super-nerve/resolver.js';
 import { readJsonInput, resolveAdfInputPath } from './refactor/adf-input.js';
+
+// Task types executeApprovedClaudeTaskSession can run; others stop at session creation.
+const CLAUDE_TASK_SESSION_TYPES = new Set(['browser', 'report_document', 'document_generation']);
+
+/**
+ * Dispatch a catalog intent whose resolution shape is `task_session` to the
+ * governed task-session route (same one the surface orchestrator uses).
+ * Returns true when the intent was handled here; false hands control back to
+ * the LLM-compile fallback.
+ */
+async function tryTaskSessionDispatch(
+  packet: IntentResolutionPacket,
+  utterance: string
+): Promise<boolean> {
+  if (packet.selected_resolution?.shape !== 'task_session' || !packet.selected_intent_id) {
+    return false;
+  }
+  const builder = getTaskIntentBuilder(packet.selected_intent_id);
+  if (!builder) return false;
+
+  const sessionIntent = builder(utterance.trim());
+  const missing = sessionIntent.requirements?.missing || [];
+  const session = createTaskSession({
+    surface: 'terminal',
+    taskType: sessionIntent.taskType,
+    status: missing.length ? 'collecting_requirements' : 'planning',
+    intentId: sessionIntent.intentId || packet.selected_intent_id,
+    goal: sessionIntent.goal,
+    projectContext: sessionIntent.projectContext,
+    requirements: sessionIntent.requirements,
+    payload: sessionIntent.payload,
+  });
+  const validation = validateTaskSession(session);
+  if (!validation.valid) {
+    throw new Error(`generated task session is invalid: ${validation.errors.join('; ')}`);
+  }
+  const sessionPath = saveTaskSession(session);
+
+  if (missing.length || !CLAUDE_TASK_SESSION_TYPES.has(session.task_type)) {
+    console.log(
+      JSON.stringify(
+        {
+          status: missing.length ? 'collecting_requirements' : 'task_session_created',
+          session_id: session.session_id,
+          session_path: sessionPath,
+          intent_id: packet.selected_intent_id,
+          task_type: session.task_type,
+          missing_inputs: missing,
+        },
+        null,
+        2
+      )
+    );
+    logger.info(
+      missing.length
+        ? `📝 [GATEWAY] Task session ${session.session_id} needs ${missing.length} input(s) before execution: ${missing.join(', ')}`
+        : `📝 [GATEWAY] Task session ${session.session_id} created; continue it on a surface to execute.`
+    );
+    return true;
+  }
+
+  logger.info(
+    `🚚 [GATEWAY] Dispatching ${packet.selected_intent_id} to the governed task-session executor (session ${session.session_id}).`
+  );
+  const result = await executeApprovedClaudeTaskSession({
+    session,
+    queryText: utterance,
+    agentId: 'run-intent-gateway',
+    channel: 'terminal',
+  });
+  console.log(
+    JSON.stringify(
+      {
+        status: 'completed',
+        session_id: result.session.session_id,
+        kind: result.kind,
+        output_path: result.outputPath,
+        output_preview: result.output.slice(0, 500),
+      },
+      null,
+      2
+    )
+  );
+  return true;
+}
 
 async function main() {
   const argv = await createStandardYargs()
@@ -68,6 +160,10 @@ async function main() {
     logger.error('Usage: node dist/scripts/run_intent.js <intent_id> [--input context.json]');
     process.exit(1);
   }
+
+  // Bootstrap the reasoning backend before any compile/clarification step, so
+  // the gateway degrades loudly (LC-08) instead of silently serving stub output.
+  installReasoningBackends();
 
   let context = {};
   if (argv.input && safeExistsSync(resolveAdfInputPath(argv.input as string))) {
@@ -215,7 +311,7 @@ async function main() {
       : runtimeContext;
     if (improvementHints.length) {
       logger.info(
-        `🧠 [GATEWAY] Applied ${improvementHints.length} learned hint(s) from the knowledge base to the execution context.`,
+        `🧠 [GATEWAY] Applied ${improvementHints.length} learned hint(s) from the knowledge base to the execution context.`
       );
     }
     const result = await resolveAndExecuteIntent(executionIntent, executionContext);
@@ -223,6 +319,13 @@ async function main() {
     logger.success(`✅ [GATEWAY] Goal achieved for intent: ${intent}`);
   } catch (err: any) {
     logger.warn(`⚠️ [GATEWAY] Deterministic intent execution unavailable: ${err.message}`);
+    // Catalog intents shaped `task_session` (e.g. generate-report) have no
+    // pipeline steps by design — run them through the governed task-session
+    // route instead of degrading to a compile-only contract.
+    if (await tryTaskSessionDispatch(packet, intent)) {
+      logger.success(`✅ [GATEWAY] Goal routed via task session for intent: ${intent}`);
+      return;
+    }
     const compiled = await compileFlow();
     if (compiled.clarificationPacket) {
       console.log(formatClarificationPacket(compiled.clarificationPacket));

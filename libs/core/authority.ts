@@ -1,5 +1,10 @@
 import * as path from 'node:path';
-import { safeExistsSync, safeReaddir, safeReadFile } from './secure-io.js';
+// Identity resolution must not depend on policy-enforced IO: secure-io's
+// guards consult the identity this module computes, so importing secure-io
+// here created a cycle (secure-io → tier-guard/policy-engine → authority →
+// secure-io) that hit TDZ errors during module evaluation and silently broke
+// resolveIdentityContext. Read-only bootstrap IO goes through fs-primitives.
+import { rawExistsSync, rawReaddir, rawReadTextFile } from './fs-primitives.js';
 import * as pathResolver from './path-resolver.js';
 import { Persona, Authority, ExecutionMode, IdentityContext } from './types.js';
 import { getServiceAuthorities } from './service-authority-map.js';
@@ -80,13 +85,11 @@ function loadRoleAuthorityMapPersonas(): Record<string, Persona> {
   if (cachedRoleAuthorityMap) return cachedRoleAuthorityMap;
   const filePath = pathResolver.knowledge('product/governance/role-authority-map.json');
   try {
-    if (!safeExistsSync(filePath)) {
+    if (!rawExistsSync(filePath)) {
       cachedRoleAuthorityMap = {};
       return cachedRoleAuthorityMap;
     }
-    const raw = JSON.parse(
-      safeReadFile(filePath, { encoding: 'utf8' }) as string
-    ) as RoleAuthorityMap;
+    const raw = JSON.parse(rawReadTextFile(filePath)) as RoleAuthorityMap;
     const result: Record<string, Persona> = {};
     for (const entry of [
       ...(raw.system_roles ?? []),
@@ -104,11 +107,11 @@ function loadRoleAuthorityMapPersonas(): Record<string, Persona> {
 
 function loadRolePersonaIndexDirectory(): RolePersonaIndex | null {
   const directoryPath = pathResolver.knowledge('product/governance/authority-roles');
-  if (!safeExistsSync(directoryPath)) {
+  if (!rawExistsSync(directoryPath)) {
     return null;
   }
 
-  const files = safeReaddir(directoryPath)
+  const files = rawReaddir(directoryPath)
     .filter((entry) => entry.endsWith('.json'))
     .sort();
   if (!files.length) {
@@ -118,9 +121,7 @@ function loadRolePersonaIndexDirectory(): RolePersonaIndex | null {
   const authority_roles: Record<string, { default_persona?: Persona }> = {};
   for (const file of files) {
     const filePath = pathResolver.knowledge(`product/governance/authority-roles/${file}`);
-    const payload = JSON.parse(
-      safeReadFile(filePath, { encoding: 'utf8' }) as string
-    ) as AuthorityRoleFile;
+    const payload = JSON.parse(rawReadTextFile(filePath)) as AuthorityRoleFile;
     const role = String(payload.role || '').trim();
     if (!role) {
       throw new Error(`Authority role file ${file} must declare a role id`);
@@ -146,9 +147,7 @@ function loadRolePersonaIndex(): RolePersonaIndex {
 
   const indexPath = pathResolver.knowledge('product/governance/authority-role-index.json');
   try {
-    cachedRolePersonaIndex = JSON.parse(
-      safeReadFile(indexPath, { encoding: 'utf8' }) as string
-    ) as RolePersonaIndex;
+    cachedRolePersonaIndex = JSON.parse(rawReadTextFile(indexPath)) as RolePersonaIndex;
   } catch {
     cachedRolePersonaIndex = {};
   }
@@ -277,8 +276,8 @@ export function resolveIdentityContext(): IdentityContext {
     if (tierPath) candidates.push(`${tierPath}/mission-state.json`);
     for (const statePath of candidates) {
       try {
-        if (safeExistsSync(statePath)) {
-          const state = JSON.parse(safeReadFile(statePath, { encoding: 'utf8' }) as string);
+        if (rawExistsSync(statePath)) {
+          const state = JSON.parse(rawReadTextFile(statePath));
           if (persona === 'unknown') persona = normalizePersona(state.assigned_persona);
           if (!tenantSlug) tenantSlug = normalizeTenantSlug(state.tenant_slug);
           const brokered = state.cross_tenant_brokerage?.source_tenants;
@@ -326,9 +325,9 @@ export function resolveIdentityContext(): IdentityContext {
 
   // B. Temporal Grants (Role-based)
   const grantsPath = pathResolver.active('shared/auth-grants.json');
-  if (safeExistsSync(grantsPath) && missionId) {
+  if (rawExistsSync(grantsPath) && missionId) {
     try {
-      const grants = JSON.parse(safeReadFile(grantsPath, { encoding: 'utf8' }) as string);
+      const grants = JSON.parse(rawReadTextFile(grantsPath));
       const activeGrants = grants.filter(
         (g: any) => g.missionId === missionId && g.expiresAt > Date.now()
       );

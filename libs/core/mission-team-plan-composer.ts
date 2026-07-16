@@ -6,6 +6,7 @@ import {
   type AuthorityRoleRecord,
   type AgentProfileRecord,
   type MissionTeamAssignment,
+  type RoleSeparationConstraints,
   type TeamRoleRecord,
 } from './team-role-assignment-selection.js';
 import { resolveTaskModelHint } from './reasoning-model-routing.js';
@@ -243,6 +244,38 @@ export function composeMissionTeamPlan(input: {
     risk: missionClassification.risk_profile,
   });
 
+  // Separation-of-duties constraints derived from roles already assigned in
+  // this plan: the reviewer must be a different actor than the implementer
+  // (hard, with staffing fallback) and prefers a different provider so a
+  // different model family reviews the work; the tester prefers a different
+  // actor than the reviewer.
+  const assignedByRole = new Map<string, { agentId: string | null; provider: string | null }>();
+  const separationForRole = (role: string): RoleSeparationConstraints | undefined => {
+    if (role === 'reviewer') {
+      const implementer = assignedByRole.get('implementer');
+      if (!implementer) return undefined;
+      return {
+        excludeAgents: [implementer.agentId],
+        avoidProviders: [implementer.provider],
+      };
+    }
+    if (role === 'tester') {
+      const reviewer = assignedByRole.get('reviewer');
+      if (!reviewer) return undefined;
+      return { avoidAgents: [reviewer.agentId] };
+    }
+    return undefined;
+  };
+  const recordAssignment = (
+    role: string,
+    assignment: { agent_id: string | null; provider: string | null }
+  ): void => {
+    assignedByRole.set(role, {
+      agentId: assignment.agent_id,
+      provider: assignment.provider,
+    });
+  };
+
   for (const role of template.required_roles) {
     const roleRecord = teamRoles[role];
     if (!roleRecord) {
@@ -261,30 +294,32 @@ export function composeMissionTeamPlan(input: {
       });
       continue;
     }
+    const selectedRequired = selectAgentForTeamRole(
+      role,
+      preferredAgentId && !roleRecord.selection_hints?.preferred_agents?.includes(preferredAgentId)
+        ? {
+            ...roleRecord,
+            selection_hints: {
+              ...(roleRecord.selection_hints || {}),
+              preferred_agents: [
+                preferredAgentId,
+                ...(roleRecord.selection_hints?.preferred_agents || []).filter(
+                  (agent) => agent !== preferredAgentId
+                ),
+              ],
+            },
+          }
+        : roleRecord,
+      authorityRoles,
+      agents,
+      missionTaskModelHint,
+      separationForRole(role)
+    );
+    recordAssignment(role, selectedRequired);
     assignments.push(
       enrichAssignmentContext({
         assignment: {
-          ...selectAgentForTeamRole(
-            role,
-            preferredAgentId &&
-              !roleRecord.selection_hints?.preferred_agents?.includes(preferredAgentId)
-              ? {
-                  ...roleRecord,
-                  selection_hints: {
-                    ...(roleRecord.selection_hints || {}),
-                    preferred_agents: [
-                      preferredAgentId,
-                      ...(roleRecord.selection_hints?.preferred_agents || []).filter(
-                        (agent) => agent !== preferredAgentId
-                      ),
-                    ],
-                  },
-                }
-              : roleRecord,
-            authorityRoles,
-            agents,
-            missionTaskModelHint
-          ),
+          ...selectedRequired,
           model_hint: missionTaskModelHint,
         },
         missionId: input.missionId,
@@ -316,8 +351,10 @@ export function composeMissionTeamPlan(input: {
         : roleRecord,
       authorityRoles,
       agents,
-      missionTaskModelHint
+      missionTaskModelHint,
+      separationForRole(role)
     );
+    recordAssignment(role, assignment);
     assignment.required = false;
     assignment.model_hint = missionTaskModelHint;
     assignments.push(

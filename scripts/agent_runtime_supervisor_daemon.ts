@@ -23,7 +23,9 @@ import {
   safeUnlinkSync,
   safeCreateExclusiveFileSync,
   sendOpsAlert,
+  shutdownAllAgentRuntimes,
   stopAgentRuntime,
+  computeSupervisorCodeStamp,
 } from '@agent/core';
 import type { TaskModelHint } from '@agent/core/reasoning-model-routing';
 import { installProcessGuards, recordRuntimeHealthSample } from '@agent/core';
@@ -40,6 +42,9 @@ const runtimeHealthSampler = setInterval(
 );
 runtimeHealthSampler.unref?.();
 
+// Captured once at startup: the core build this daemon's behavior comes from.
+const DAEMON_CODE_STAMP = computeSupervisorCodeStamp();
+
 type SupervisorMethod =
   | 'health'
   | 'ensure'
@@ -49,7 +54,8 @@ type SupervisorMethod =
   | 'touch'
   | 'shutdown'
   | 'refresh'
-  | 'restart';
+  | 'restart'
+  | 'terminate';
 
 interface SupervisorRequest {
   id: string;
@@ -218,8 +224,30 @@ async function handleRequest(
             ok: true,
             pid: process.pid,
             socket_path: socketLabel,
+            code_stamp: DAEMON_CODE_STAMP,
           },
         };
+      case 'terminate': {
+        // Stale-code recycle: the client detected a newer core build than the
+        // one this daemon loaded. Drain runtimes and exit; the client spawns
+        // a fresh daemon against the current dist.
+        logger.info(
+          '[agent-runtime-supervisor-daemon] terminate requested (stale code stamp); shutting down.'
+        );
+        setImmediate(async () => {
+          try {
+            await shutdownAllAgentRuntimes('supervisor_daemon_terminate');
+          } catch (_) {
+            /* best-effort drain */
+          }
+          process.exit(0);
+        });
+        return {
+          id: request.id,
+          ok: true,
+          result: { terminating: true },
+        };
+      }
       case 'ensure': {
         const payload = request.payload || {};
         const agentId = String(payload.agentId || '');
