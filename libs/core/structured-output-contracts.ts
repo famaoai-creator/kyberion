@@ -73,6 +73,8 @@ export const A2ATaskContextSchema: z.ZodType<A2ATaskContext> = z
     user_language: z.string().optional(),
     task_model_hint: z.record(z.string(), z.unknown()).optional(),
     model_hint: z.record(z.string(), z.unknown()).optional(),
+    task_id: z.string().optional(),
+    security_scope: z.record(z.string(), z.unknown()).optional(),
   })
   .strict();
 

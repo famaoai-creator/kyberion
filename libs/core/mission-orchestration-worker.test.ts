@@ -594,6 +594,13 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
       },
     });
 
+    // Each accepted work result triggers an independent acceptance review ask.
+    await new Promise((resolve) => setImmediate(resolve));
+    const approveText = JSON.stringify({ approve: true, gaps: [], rationale: 'ok' });
+    pendingResponses[2]?.resolve({ payload: { text: approveText } });
+    await new Promise((resolve) => setImmediate(resolve));
+    pendingResponses[3]?.resolve({ payload: { text: approveText } });
+
     const dispatched = await dispatchedPromise;
     const stored = JSON.parse(
       safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }) as string
@@ -761,11 +768,17 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
             needs: [],
           }),
         },
+      })
+      // Independent acceptance review (separation of duties) approves.
+      .mockResolvedValueOnce({
+        payload: {
+          text: JSON.stringify({ approve: true, gaps: [], rationale: 'Meets the criteria.' }),
+        },
       });
 
     const dispatched = await dispatchMissionNextTasks('MSN-FOLLOWUP');
 
-    expect(mocks.route).toHaveBeenCalledTimes(2);
+    expect(mocks.route).toHaveBeenCalledTimes(3);
     expect(dispatched).toEqual([
       { task_id: 'task-retry', team_role: 'implementer', agent_id: 'implementation-architect' },
     ]);
