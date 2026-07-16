@@ -94,13 +94,38 @@ function selectedModelHasHint(modelId: string, preferredModels: Set<string>): bo
   );
 }
 
+export interface RoleSeparationConstraints {
+  /** Hard separation-of-duties: these actors must not take this role (falls back if it would leave the role unstaffed). */
+  excludeAgents?: Array<string | null | undefined>;
+  /** Soft: penalize these actors so independent alternatives win when available. */
+  avoidAgents?: Array<string | null | undefined>;
+  /** Soft: penalize these providers (heterogeneous review — a different model family reviews the work). */
+  avoidProviders?: Array<string | null | undefined>;
+}
+
+// Outweighs the operator preferred_agents bonus (20) so independence beats
+// habit, but stays under two capability hits (2×10 + provider bonus) so a
+// clearly better-qualified duplicate actor can still win.
+const SOD_AVOID_AGENT_PENALTY = 24;
+const SOD_AVOID_PROVIDER_PENALTY = 6;
+
 export function selectAgentForTeamRole(
   teamRole: string,
   teamRoleRecord: TeamRoleRecord,
   authorityRoles: Record<string, AuthorityRoleRecord>,
   agents: Record<string, AgentProfileRecord>,
-  routingHint?: { model_id: string }
+  routingHint?: { model_id: string },
+  separation?: RoleSeparationConstraints
 ): MissionTeamAssignment {
+  const hardExcludedAgents = new Set(
+    (separation?.excludeAgents || []).filter((entry): entry is string => Boolean(entry))
+  );
+  const softAvoidAgents = new Set(
+    (separation?.avoidAgents || []).filter((entry): entry is string => Boolean(entry))
+  );
+  const softAvoidProviders = new Set(
+    (separation?.avoidProviders || []).filter((entry): entry is string => Boolean(entry))
+  );
   const requiredCapabilities = new Set(
     (teamRoleRecord.required_capabilities || [])
       .map((entry) => entry.trim().toLowerCase())
@@ -143,13 +168,17 @@ export function selectAgentForTeamRole(
       // Retrospective feedback: measured agent×role outcomes adjust the
       // score within ±8 (operator preferred_agents bonus of 20 still wins).
       const performanceBonus = performanceScoreAdjustment(agentId, teamRole);
+      const separationPenalty =
+        (softAvoidAgents.has(agentId) ? SOD_AVOID_AGENT_PENALTY : 0) +
+        (softAvoidProviders.has(resolvedTarget.provider) ? SOD_AVOID_PROVIDER_PENALTY : 0);
       const score =
         capabilityHits * 10 -
         capabilityPenalty +
         preferredAgentBonus +
         preferredModelBonus +
         providerBonus +
-        performanceBonus;
+        performanceBonus -
+        separationPenalty;
 
       const requiredScopes = new Set(teamRoleRecord.required_scope_classes || []);
       const compatibleAuthorityRoles = profile.authority_roles.filter((role) =>
@@ -177,7 +206,14 @@ export function selectAgentForTeamRole(
     .filter((entry): entry is SelectionCandidate => Boolean(entry))
     .sort((left, right) => right.score - left.score || left.agentId.localeCompare(right.agentId));
 
-  const winner = candidates[0];
+  // Hard SoD exclusion: prefer any independent candidate; only when the pool
+  // has no alternative does the excluded actor win (a staffed role with a
+  // recorded SoD gap beats an unstaffed role).
+  const independentWinner = candidates.find(
+    (candidate) => !hardExcludedAgents.has(candidate.agentId)
+  );
+  const winner = independentWinner || candidates[0];
+  const separationFallback = Boolean(winner && !independentWinner && hardExcludedAgents.size > 0);
   if (winner) {
     return {
       team_role: teamRole,
@@ -196,7 +232,11 @@ export function selectAgentForTeamRole(
       provider: winner.resolvedTarget.provider,
       modelId: winner.resolvedTarget.modelId,
       required_capabilities: teamRoleRecord.required_capabilities,
-      notes: `${teamRoleRecord.autonomy_level} autonomy; capability-first match (${winner.resolvedTarget.strategy})`,
+      notes: `${teamRoleRecord.autonomy_level} autonomy; capability-first match (${winner.resolvedTarget.strategy})${
+        separationFallback
+          ? '; WARNING separation-of-duties fallback — no independent actor available'
+          : ''
+      }`,
     };
   }
 
