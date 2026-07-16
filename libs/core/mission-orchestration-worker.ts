@@ -10,6 +10,8 @@ import { type TaskModelPhaseKind } from './reasoning-level-policy.js';
 import { resolveQuestionInteractionPacket } from './question-resolver.js';
 import { inferTaskTargetPath, validateDelegatedTaskPreflight } from './delegation-preflight.js';
 import { notifyOperator } from './operator-notifications.js';
+import { agentRegistry } from './agent-registry.js';
+import { reportProviderTemporarilyUnhealthy } from './provider-health-registry.js';
 import {
   emitChannelSurfaceEvent,
   enqueueChronosOutboxMessage,
@@ -984,6 +986,12 @@ function buildTaskExecutionPrompt(input: {
       ? `Review target: ${resolveReviewTargetForTask(input.task)}`
       : '',
     input.targetPath ? `Target path: ${input.targetPath}` : '',
+    // Workers run with the repository root as cwd, so a bare relative
+    // deliverable ('evidence/…') used to land at the repo root. Anchor all
+    // artifact IO to the mission directory; the acceptance gate resolves
+    // reported artifact paths against this same root.
+    `Artifact root: ${missionDir(input.missionId, 'public')}`,
+    'Write every artifact under the artifact root; deliverable and target paths are relative to it. Report artifact paths relative to the artifact root. Never write to the repository root or outside the mission directory.',
     '',
     ...input.missionGoalLines,
     ...buildWorkingPrinciplesLines(input.teamRole),
@@ -4072,6 +4080,39 @@ function collectPlanningPacketTaskContractErrors(
   return errors.map((message) => `Planning packet for ${missionId}: ${message}`);
 }
 
+/**
+ * Best-effort demotion of the backend behind a planner that failed to produce
+ * a planning packet even after a retry. The provider comes from the live
+ * agent registry when available, falling back to the staffed assignment.
+ */
+function reportDegradedPlannerBackend(
+  missionId: string,
+  plannerAgentId: string,
+  reason: string
+): void {
+  try {
+    const liveProvider = agentRegistry.get(plannerAgentId)?.provider;
+    const staffedProvider = resolveMissionTeamReceiver({
+      missionId,
+      teamRole: 'planner',
+    })?.provider;
+    const provider = liveProvider || staffedProvider;
+    if (!provider) return;
+    reportProviderTemporarilyUnhealthy(provider, {
+      reason:
+        `planner ${plannerAgentId} on ${provider} returned no planning_packet after retry: ${reason}`.slice(
+          0,
+          200
+        ),
+    });
+    logger.warn(
+      `[MISSION_WORKER] Demoted provider ${provider} after degraded planner responses for ${missionId}.`
+    );
+  } catch {
+    // Health reporting must never mask the original planner failure.
+  }
+}
+
 async function requestPlanningPacketText(
   missionId: string,
   payload: SlackPayload,
@@ -4135,12 +4176,18 @@ export async function resolveMissionPlanningPacket(
   }
 
   if (!planningPacket) {
+    const failureDetail =
+      kickoffBlocks.planningPacketErrors.length > 0
+        ? kickoffBlocks.planningPacketErrors.join('; ')
+        : 'no planning_packet block returned';
+    // A planner that cannot produce a packet even after a retry is a degraded
+    // backend signal (observed live as instant non-answers from a rate-limited
+    // CLI). Report it into the shared provider-health registry so the next
+    // resume/staffing fails over dynamically instead of retrying the same
+    // backend forever.
+    reportDegradedPlannerBackend(missionId, plannerAgentId, failureDetail);
     throw new Error(
-      `Planner response for ${missionId} failed planning_packet validation after retry: ${
-        kickoffBlocks.planningPacketErrors.length > 0
-          ? kickoffBlocks.planningPacketErrors.join('; ')
-          : 'no planning_packet block returned'
-      }`
+      `Planner response for ${missionId} failed planning_packet validation after retry: ${failureDetail}`
     );
   }
 
