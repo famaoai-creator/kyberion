@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { findMissionPath, missionDir } from './path-resolver.js';
-import type { MissionTeamPlan } from './mission-team-plan-composer.js';
+import type { MissionTeamAssignment, MissionTeamPlan } from './mission-team-plan-composer.js';
 import {
   safeAppendFileSync,
   safeExistsSync,
@@ -68,6 +68,8 @@ export interface MissionStaffingAssignment {
   reasoning_route_id?: string;
   security_scope?: import('./context-security-scope.js').ContextSecurityScope;
   selection_reason_codes?: string[];
+  /** Delegation contract carried over from the team plan so staffing records are self-describing for audits. */
+  delegation_contract?: MissionTeamAssignment['delegation_contract'];
   /** Actor-neutral resource contract. Legacy agent_id fields remain for readers during migration. */
   resource: WorkforceResourceRef;
 }
@@ -220,6 +222,7 @@ export function buildMissionStaffingAssignments(plan: MissionTeamPlan): MissionS
           reasoning_route_id: assignment.reasoning_route_id,
           security_scope: assignment.security_scope,
           selection_reason_codes: assignment.selection_reason_codes,
+          delegation_contract: assignment.delegation_contract,
           resource,
         },
       ];
