@@ -94,7 +94,12 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
     vi.resetModules();
     vi.resetAllMocks();
     process.env.MISSION_ROLE = 'mission_controller';
-    const { missionDir } = await import('./path-resolver.js');
+    const { missionDir, pathResolver } = await import('./path-resolver.js');
+    // Shared observability streams are gated off under vitest; suites that
+    // assert on them opt into a redirect under the governed tmp root.
+    process.env.KYBERION_TEST_OBSERVABILITY_DIR = pathResolver.shared(
+      `tmp/vitest-observability/mission-orchestration-worker-${process.pid}`
+    );
     const { clearWorkCoordinationStore, setWorkCoordinationNamespace } =
       await import('./work-coordination.js');
     const { safeMkdir, safeWriteFile } = await import('./secure-io.js');
@@ -170,6 +175,9 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
     const { safeExistsSync, safeRmSync } = await import('./secure-io.js');
     const missionPath = missionDir('MSN-FOLLOWUP', 'public');
     if (safeExistsSync(missionPath)) safeRmSync(missionPath);
+    const observabilityDir = process.env.KYBERION_TEST_OBSERVABILITY_DIR;
+    if (observabilityDir && safeExistsSync(observabilityDir)) safeRmSync(observabilityDir);
+    delete process.env.KYBERION_TEST_OBSERVABILITY_DIR;
     clearWorkCoordinationStore();
     clearWorkCoordinationNamespace();
   });
@@ -968,7 +976,7 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
     expect(stored[0].status).toBe('blocked');
     expect(stored[0].rework_count).toBe(2);
 
-    const obsPath = pathResolver.shared('observability/mission-control/orchestration-events.jsonl');
+    const obsPath = `${process.env.KYBERION_TEST_OBSERVABILITY_DIR}/orchestration-events.jsonl`;
     const obsText = safeReadFile(obsPath, { encoding: 'utf8' }) as string;
     expect(obsText).toContain('mission_owner_notified');
     expect(obsText).toContain('task-rework');
