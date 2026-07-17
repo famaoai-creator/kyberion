@@ -1905,6 +1905,14 @@
       "documented": false
     },
     {
+      "name": "KYBERION_TEST_OBSERVABILITY_DIR",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_TIMEOUT_MS",
       "category": "tuning",
       "type": "number",
