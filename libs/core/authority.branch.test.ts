@@ -1,18 +1,23 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  safeExistsSync: vi.fn(),
-  safeReaddir: vi.fn(),
-  safeReadFile: vi.fn(),
+  rawExistsSync: vi.fn(),
+  rawReaddir: vi.fn(),
+  rawReadTextFile: vi.fn(),
   active: vi.fn((p: string) => `/repo/active/${p}`),
   knowledge: vi.fn((p: string) => `/repo/knowledge/${p}`),
   findMissionPath: vi.fn((_id: string) => null as string | null),
 }));
 
+vi.mock('./fs-primitives.js', () => ({
+  rawExistsSync: mocks.rawExistsSync,
+  rawReaddir: mocks.rawReaddir,
+  rawReadTextFile: mocks.rawReadTextFile,
+}));
+
 vi.mock('./secure-io.js', () => ({
-  safeExistsSync: mocks.safeExistsSync,
-  safeReaddir: mocks.safeReaddir,
-  safeReadFile: mocks.safeReadFile,
+  safeExistsSync: mocks.rawExistsSync,
+  safeReadFile: mocks.rawReadTextFile,
 }));
 
 vi.mock('./path-resolver.js', () => ({
@@ -32,18 +37,18 @@ describe('authority branch coverage', () => {
 
   beforeEach(() => {
     vi.resetModules();
-    mocks.safeExistsSync.mockReset();
-    mocks.safeReaddir.mockReset();
-    mocks.safeReadFile.mockReset();
+    mocks.rawExistsSync.mockReset();
+    mocks.rawReaddir.mockReset();
+    mocks.rawReadTextFile.mockReset();
     mocks.active.mockReset();
     mocks.active.mockImplementation((p: string) => `/repo/active/${p}`);
     mocks.knowledge.mockReset();
     mocks.knowledge.mockImplementation((p: string) => `/repo/knowledge/${p}`);
     mocks.findMissionPath.mockReset();
     mocks.findMissionPath.mockReturnValue(null);
-    mocks.safeExistsSync.mockReturnValue(false);
-    mocks.safeReaddir.mockReturnValue([]);
-    mocks.safeReadFile.mockReturnValue('{}');
+    mocks.rawExistsSync.mockReturnValue(false);
+    mocks.rawReaddir.mockReturnValue([]);
+    mocks.rawReadTextFile.mockReturnValue('{}');
 
     delete process.env.KYBERION_PERSONA;
     delete process.env.MISSION_ROLE;
@@ -69,8 +74,10 @@ describe('authority branch coverage', () => {
     process.env.MISSION_ID = 'MSN-1';
     process.env.MISSION_ROLE = 'chronos_gateway';
     process.env.KYBERION_PERSONA = 'mystery';
-    mocks.safeExistsSync.mockImplementation((p: string) => p.endsWith('/missions/MSN-1/mission-state.json'));
-    mocks.safeReadFile.mockImplementation((p: string) => {
+    mocks.rawExistsSync.mockImplementation((p: string) =>
+      p.endsWith('/missions/MSN-1/mission-state.json')
+    );
+    mocks.rawReadTextFile.mockImplementation((p: string) => {
       if (p.endsWith('/missions/MSN-1/mission-state.json')) {
         return JSON.stringify({ assigned_persona: 'Ecosystem Architect' });
       }
@@ -94,8 +101,10 @@ describe('authority branch coverage', () => {
   it('adds persona intrinsic authorities and mission temporal grants', async () => {
     process.env.KYBERION_PERSONA = 'ecosystem_architect';
     process.env.MISSION_ID = 'MSN-42';
-    mocks.safeExistsSync.mockImplementation((p: string) => p.endsWith('/active/shared/auth-grants.json'));
-    mocks.safeReadFile.mockImplementation((p: string) => {
+    mocks.rawExistsSync.mockImplementation((p: string) =>
+      p.endsWith('/active/shared/auth-grants.json')
+    );
+    mocks.rawReadTextFile.mockImplementation((p: string) => {
       if (p.endsWith('/active/shared/auth-grants.json')) {
         return JSON.stringify([
           { missionId: 'MSN-42', serviceId: 'github', expiresAt: Date.now() + 60_000 },
@@ -117,9 +126,9 @@ describe('authority branch coverage', () => {
 
   it('prefers the canonical authority-role directory over the snapshot', async () => {
     process.env.MISSION_ROLE = 'mission_controller';
-    mocks.safeExistsSync.mockImplementation((p: string) => p.endsWith('/authority-roles'));
-    mocks.safeReaddir.mockReturnValue(['mission_controller.json']);
-    mocks.safeReadFile.mockImplementation((p: string) => {
+    mocks.rawExistsSync.mockImplementation((p: string) => p.endsWith('/authority-roles'));
+    mocks.rawReaddir.mockReturnValue(['mission_controller.json']);
+    mocks.rawReadTextFile.mockImplementation((p: string) => {
       if (p.endsWith('/authority-roles/mission_controller.json')) {
         return JSON.stringify({
           role: 'mission_controller',
@@ -148,8 +157,10 @@ describe('authority branch coverage', () => {
   it('handles malformed grants file without throwing', async () => {
     process.env.KYBERION_PERSONA = 'worker';
     process.env.MISSION_ID = 'MSN-9';
-    mocks.safeExistsSync.mockImplementation((p: string) => p.endsWith('/active/shared/auth-grants.json'));
-    mocks.safeReadFile.mockReturnValue('{bad json');
+    mocks.rawExistsSync.mockImplementation((p: string) =>
+      p.endsWith('/active/shared/auth-grants.json')
+    );
+    mocks.rawReadTextFile.mockReturnValue('{bad json');
 
     const { resolveIdentityContext } = await import('./authority.js');
     const ctx = resolveIdentityContext();
@@ -186,10 +197,14 @@ describe('authority branch coverage', () => {
     expect(mod.hasAuthority('SECRET_READ')).toBe(true);
 
     delete process.env.KYBERION_SUDO;
-    mocks.safeExistsSync.mockImplementation((p: string) => p.endsWith('/active/shared/auth-grants.json'));
-    mocks.safeReadFile.mockImplementation((p: string) => {
+    mocks.rawExistsSync.mockImplementation((p: string) =>
+      p.endsWith('/active/shared/auth-grants.json')
+    );
+    mocks.rawReadTextFile.mockImplementation((p: string) => {
       if (p.endsWith('/active/shared/auth-grants.json')) {
-        return JSON.stringify([{ missionId: 'MSN-SUDO', authority: 'SECRET_READ', expiresAt: Date.now() + 10_000 }]);
+        return JSON.stringify([
+          { missionId: 'MSN-SUDO', authority: 'SECRET_READ', expiresAt: Date.now() + 10_000 },
+        ]);
       }
       return '{}';
     });
