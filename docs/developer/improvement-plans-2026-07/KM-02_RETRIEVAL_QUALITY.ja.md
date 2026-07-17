@@ -60,3 +60,10 @@
 - **before/after 命中率 fixture 完了(2026-07-12)**: 代表20クエリ(`tests/fixtures/km02-retrieval-queries.json`、うち10本は本文にのみ答えがある)を fixture 化。チャンク無し(旧: 300字要約のみ)では body-only が **0/10**、チャンク有りで **20/20**(top-3)をテストで固定 — チャンク化の後退はこのテストで即検出される。
 - **ランカー統合 第一歩 完了(2026-07-12, Task 4.1)**: スコアリング定義(scope 適合行列 / doc-authority 階段 / recency 減衰)を `libs/core/ranking-signals.ts` へ抽出し、context_ranker は同モジュールを消費(既存11テストで出力パリティ確認。副作用として不正日付で total が NaN になるバグも解消 — 非有限は 0 点)。
 - **次の一手(Task 4.2 の記録)**: knowledge-index 側が同シグナルを使うには hint スキーマに last_updated / doc-authority メタが必要(現状の markdown スキャナは title/tags/excerpt のみ抽出)。メタ付与 → `queryKnowledgeHybrid` の並べ替えに recency/authority を合成 → その後に context_ranker を knowledge-index の CLI ラッパー化、の順で段階統合する。完全統合は本 IP のスコープ外(計画どおり)。
+
+## 実装状況 追記 (2026-07-18)
+
+- hint に `last_updated` / `doc_authority` / `scope` を追加し、Markdown frontmatterとknowledge taxonomyのディレクトリ既定値から抽出するようにした。本文チャンクにも同じメタデータを継承する。
+- `knowledgeMetadataScore()` を `libs/core/ranking-signals.ts` の共通信号として追加し、runtimeのlexical検索とhybrid RRFへ適用した。context rankerと同じauthority/scope/recency定義を使うため、調整が片側だけに漂流しない。
+- metadataのない既存JSON hintはスコア0で従来順を維持し、互換性を保った。20テスト(既存+追加)で metadata抽出・同率順位・共通信号を固定した。
+- Task 4.2のruntime側を完了。CLIラッパー化は計画どおり別スコープとする。

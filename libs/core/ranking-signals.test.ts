@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_SCOPE_AFFINITY,
   docAuthorityScore,
+  knowledgeMetadataScore,
   recencyDecayScore,
   scopeAffinityScore,
 } from './ranking-signals.js';
@@ -50,5 +51,26 @@ describe('ranking-signals (KM-02)', () => {
 
   it('exposes the affinity matrix for callers that need to extend it', () => {
     expect(DEFAULT_SCOPE_AFFINITY.repository.mission).toBe(0.8);
+  });
+
+  it('scores runtime knowledge metadata with the same authority, scope, and recency signals', () => {
+    const now = Date.UTC(2026, 6, 12);
+    const policy = knowledgeMetadataScore(
+      { doc_authority: 'policy', scope: 'repository', last_updated: '2026-07-12' },
+      'repository',
+      {},
+      now
+    );
+    const advisory = knowledgeMetadataScore(
+      { doc_authority: 'advisory', scope: 'repository', last_updated: '2026-07-12' },
+      'repository',
+      {},
+      now
+    );
+    expect(policy).toBeGreaterThan(advisory);
+  });
+
+  it('keeps legacy hints neutral when metadata is absent', () => {
+    expect(knowledgeMetadataScore({}, 'mission', {}, Date.UTC(2026, 6, 12))).toBe(0);
   });
 });
