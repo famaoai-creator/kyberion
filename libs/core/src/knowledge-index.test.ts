@@ -86,6 +86,30 @@ describe('knowledge-index', () => {
       expect(browserHint!.confidence).toBe(0.9);
       expect(browserHint!.tags).toEqual(['browser']);
     });
+
+    it('promotes markdown frontmatter and taxonomy defaults into ranking metadata', async () => {
+      const proceduresDir = path.join(TEST_ROOT, 'public/procedures');
+      ensureDir(proceduresDir);
+      fs.writeFileSync(
+        path.join(proceduresDir, 'ranking.md'),
+        [
+          '---',
+          'title: Ranking standard',
+          'last_updated: 2026-07-12',
+          '---',
+          '',
+          'Use the shared ranking signals for runtime retrieval.',
+        ].join('\n')
+      );
+
+      const index = await buildKnowledgeIndex(TEST_ROOT);
+      const rankingHint = index.hints.find((hint) => hint.source.endsWith('procedures/ranking.md'));
+      expect(rankingHint).toMatchObject({
+        last_updated: '2026-07-12',
+        doc_authority: 'recipe',
+        scope: 'global',
+      });
+    });
   });
 
   describe('queryKnowledge', () => {
@@ -144,6 +168,31 @@ describe('knowledge-index', () => {
 
       expect(results.length).toBeGreaterThan(0);
       expect(results[0].topic).toContain('browser');
+    });
+
+    it('uses shared metadata signals to break lexical ties', () => {
+      const tied = new KnowledgeHintIndex([
+        {
+          topic: 'governance search',
+          hint: 'shared query term',
+          source: 'governance.md',
+          confidence: 0.8,
+          doc_authority: 'policy',
+          scope: 'global',
+          last_updated: '2026-07-12',
+        },
+        {
+          topic: 'governance search',
+          hint: 'shared query term',
+          source: 'advisory.md',
+          confidence: 0.8,
+          doc_authority: 'advisory',
+          scope: 'global',
+          last_updated: '2026-07-12',
+        },
+      ]);
+      const results = queryKnowledge(tied, 'shared query', { scope: 'global' });
+      expect(results[0].source).toBe('governance.md');
     });
 
     it('returns empty array for unmatched topic', () => {
@@ -257,6 +306,44 @@ describe('knowledge-index', () => {
         expect(results).toHaveLength(1);
         expect(results[0].source).toBe('public/deploy.md');
         expect(results[0].embeddingBackend).toBe('unit-test-embedding');
+      } finally {
+        registerEmbeddingBackend(null as never);
+      }
+    });
+
+    it('applies shared metadata ranking as a third hybrid signal', async () => {
+      registerEmbeddingBackend({
+        name: 'unit-test-embedding',
+        async embed() {
+          return new Float32Array([1, 0]);
+        },
+        async embedBatch(texts: string[]) {
+          return texts.map(() => new Float32Array([1, 0]));
+        },
+      });
+      try {
+        const index = new KnowledgeHintIndex([
+          {
+            topic: 'governance search',
+            hint: 'shared query term',
+            source: 'advisory.md',
+            confidence: 0.8,
+            doc_authority: 'advisory',
+            scope: 'global',
+            last_updated: '2026-07-12',
+          },
+          {
+            topic: 'governance search',
+            hint: 'shared query term',
+            source: 'governance.md',
+            confidence: 0.8,
+            doc_authority: 'policy',
+            scope: 'global',
+            last_updated: '2026-07-12',
+          },
+        ]);
+        const results = await queryKnowledgeHybrid(index, 'shared query', { scope: 'global' });
+        expect(results[0].source).toBe('governance.md');
       } finally {
         registerEmbeddingBackend(null as never);
       }

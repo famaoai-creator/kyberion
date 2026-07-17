@@ -15,6 +15,7 @@ import {
   cosineSimilarity,
   reciprocalRankFusion,
 } from '../embedding-backend.js';
+import { knowledgeMetadataScore, type KnowledgeRankingMetadata } from '../ranking-signals.js';
 
 /**
  * Reactive Knowledge Index v3.0
@@ -48,12 +49,18 @@ export interface KnowledgeHint {
   matchedChunkIndex?: number;
   /** Which embedding backend ranked this result (degraded-mode visibility). */
   embeddingBackend?: string;
+  /** Shared ranking metadata sourced from markdown frontmatter or taxonomy defaults. */
+  last_updated?: string;
+  doc_authority?: string;
+  scope?: string;
 }
 
 export interface KnowledgeQueryOptions {
   actuator?: string;
   op?: string;
   maxResults?: number;
+  /** Scope used by the shared metadata ranker; defaults to global. */
+  scope?: string;
 }
 
 /**
@@ -569,6 +576,9 @@ function _loadJsonHints(
             confidence: typeof e.confidence === 'number' ? (e.confidence as number) : 0.5,
             tags: Array.isArray(e.tags) ? (e.tags as string[]) : undefined,
             tier,
+            ...(typeof e.last_updated === 'string' ? { last_updated: e.last_updated } : {}),
+            ...(typeof e.doc_authority === 'string' ? { doc_authority: e.doc_authority } : {}),
+            ...(typeof e.scope === 'string' ? { scope: e.scope } : {}),
             ...(customerId ? { customerId } : {}),
           });
         }
@@ -606,6 +616,7 @@ function _scanMarkdownHints(
           const relSource = path.relative(knowledgeBase, fullPath);
           const tags = _extractFrontmatterTags(content);
           const excerpt = _extractFirstParagraph(content);
+          const rankingMetadata = _extractRankingMetadata(content, relSource);
           hints.push({
             topic: title,
             hint: excerpt ? `${title}. ${excerpt.slice(0, 200)}` : `See ${relSource} for details.`,
@@ -613,6 +624,7 @@ function _scanMarkdownHints(
             confidence: 0.6,
             tags,
             tier,
+            ...rankingMetadata,
             ...(customerId ? { customerId } : {}),
           });
           // KM-02 Task 1: index the document body as chunks so terms that
@@ -628,6 +640,7 @@ function _scanMarkdownHints(
               confidence: 0.55,
               tags,
               tier,
+              ...rankingMetadata,
               ...(customerId ? { customerId } : {}),
             });
           });
@@ -678,6 +691,71 @@ function _extractFrontmatterTags(content: string): string[] | undefined {
       .filter(Boolean);
   }
   return undefined;
+}
+
+function _extractFrontmatterValue(content: string, key: string): string | undefined {
+  const fmMatch = content.match(/^---\n([\s\S]*?)\n---/m);
+  if (!fmMatch) return undefined;
+  const line = fmMatch[1]
+    .split('\n')
+    .find((candidate) => candidate.trimStart().startsWith(`${key}:`));
+  if (!line) return undefined;
+  const value = line
+    .slice(line.indexOf(':') + 1)
+    .trim()
+    .replace(/^['"]|['"]$/g, '');
+  return value || undefined;
+}
+
+function _defaultRankingMetadata(relSource: string, kind?: string): KnowledgeRankingMetadata {
+  const normalized = relSource.replace(/\\/g, '/');
+  const kindDefaults: Record<string, KnowledgeRankingMetadata> = {
+    governance: { doc_authority: 'policy', scope: 'global' },
+    standard: { doc_authority: 'standard', scope: 'repository' },
+    architecture: { doc_authority: 'reference', scope: 'repository' },
+    capability: { doc_authority: 'recipe', scope: 'global' },
+    role: { doc_authority: 'advisory', scope: 'global' },
+    playbook: { doc_authority: 'recipe', scope: 'mission' },
+    incident: { doc_authority: 'reference', scope: 'repository' },
+    reference: { doc_authority: 'reference', scope: 'global' },
+  };
+  if (kind && kindDefaults[kind]) return kindDefaults[kind];
+  if (normalized.includes('product/governance/'))
+    return { doc_authority: 'policy', scope: 'global' };
+  if (normalized.includes('public/standards/')) {
+    return { doc_authority: 'standard', scope: 'repository' };
+  }
+  if (normalized.includes('product/architecture/')) {
+    return { doc_authority: 'reference', scope: 'repository' };
+  }
+  if (normalized.includes('public/procedures/')) {
+    return { doc_authority: 'recipe', scope: 'global' };
+  }
+  if (normalized.includes('product/roles/')) return { doc_authority: 'advisory', scope: 'global' };
+  if (normalized.includes('product/incidents/')) {
+    return { doc_authority: 'reference', scope: 'repository' };
+  }
+  return {};
+}
+
+function _extractRankingMetadata(content: string, relSource: string): KnowledgeRankingMetadata {
+  const defaults = _defaultRankingMetadata(relSource, _extractFrontmatterValue(content, 'kind'));
+  const lastUpdated =
+    _extractFrontmatterValue(content, 'last_updated') ??
+    _extractFrontmatterValue(content, 'audit_date');
+  const authority =
+    _extractFrontmatterValue(content, 'doc_authority') ??
+    _extractFrontmatterValue(content, 'authority');
+  const scope = _extractFrontmatterValue(content, 'scope');
+  return {
+    ...(lastUpdated ? { last_updated: lastUpdated } : {}),
+    ...(authority
+      ? { doc_authority: authority }
+      : defaults.doc_authority
+        ? { doc_authority: defaults.doc_authority }
+        : {}),
+    ...(scope ? { scope } : defaults.scope ? { scope: defaults.scope } : {}),
+  };
 }
 
 function _extractFirstParagraph(content: string): string {
@@ -813,7 +891,11 @@ export function queryKnowledge(
     }
   }
 
-  scored.sort((a, b) => b.score - a.score);
+  scored.sort(
+    (a, b) =>
+      b.score - a.score ||
+      knowledgeMetadataScore(b.hint, options.scope) - knowledgeMetadataScore(a.hint, options.scope)
+  );
   return _aggregateByDocument(scored.map((s) => s.hint)).slice(0, maxResults);
 }
 
@@ -863,6 +945,16 @@ export async function queryKnowledgeHybrid(
   lexicalScored.sort((a, b) => b.score - a.score);
   const lexicalRanked = lexicalScored.map((s) => s.hint);
 
+  const metadataRanked = pool
+    .map((hint, index) => ({
+      hint,
+      index,
+      score: knowledgeMetadataScore(hint, options.scope),
+    }))
+    .filter((entry) => entry.score > 0)
+    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .map((entry) => entry.hint);
+
   const backend = getEmbeddingBackend();
   if (!backend) return queryKnowledge(index, topic, options);
 
@@ -898,14 +990,25 @@ export async function queryKnowledgeHybrid(
     .map((x) => x.hint);
 
   // ── RRF fusion ──────────────────────────────────────────────────────────
-  const rrfScores = reciprocalRankFusion([
+  const rankedLists: Array<Array<{ path: string }>> = [
     lexicalRanked.map((h) => ({ ...h, path: h.source })),
     semanticRanked.map((h) => ({ ...h, path: h.source })),
-  ]);
+  ];
+  if (metadataRanked.length > 0) {
+    rankedLists.push(metadataRanked.map((h) => ({ ...h, path: h.source })));
+  }
+  const rrfScores = reciprocalRankFusion(rankedLists);
+  const metadataScores = new Map(
+    pool.map((hint) => [hint.source, knowledgeMetadataScore(hint, options.scope)])
+  );
 
   const fused = pool
     .filter((h) => rrfScores.has(h.source))
-    .sort((a, b) => (rrfScores.get(b.source) ?? 0) - (rrfScores.get(a.source) ?? 0));
+    .sort((a, b) => {
+      const scoreA = (rrfScores.get(a.source) ?? 0) + (metadataScores.get(a.source) ?? 0) / 1000;
+      const scoreB = (rrfScores.get(b.source) ?? 0) + (metadataScores.get(b.source) ?? 0) / 1000;
+      return scoreB - scoreA;
+    });
 
   // Degraded-mode visibility (KM-02 Task 2): callers can tell whether the
   // "semantic" leg was real (mlx) or the hash-bucket approximation.

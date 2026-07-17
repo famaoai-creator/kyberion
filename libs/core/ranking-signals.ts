@@ -70,3 +70,41 @@ export function recencyDecayScore(
   const daysSince = Math.max(0, (nowMs - lastUpdatedMs) / (1000 * 60 * 60 * 24));
   return Math.max(0, maxScore - daysSince / decayDaysPerPoint);
 }
+
+export interface KnowledgeRankingMetadata {
+  last_updated?: string;
+  doc_authority?: string;
+  scope?: string;
+}
+
+export interface KnowledgeRankingWeights {
+  scope?: number;
+  authority?: number;
+  recency?: number;
+}
+
+/**
+ * Score the metadata signals shared by runtime knowledge retrieval and the
+ * alignment ranker. Missing metadata contributes zero so legacy JSON hints
+ * keep their historical ordering until they opt into the richer contract.
+ */
+export function knowledgeMetadataScore(
+  metadata: KnowledgeRankingMetadata,
+  currentScope = 'global',
+  weights: KnowledgeRankingWeights = {},
+  nowMs = Date.now()
+): number {
+  const scopeWeight = weights.scope ?? 12;
+  const authorityWeight = weights.authority ?? 8;
+  const recencyWeight = weights.recency ?? 10;
+  const scopeScore = metadata.scope
+    ? scopeAffinityScore(currentScope, metadata.scope, scopeWeight)
+    : 0;
+  const authorityScore = metadata.doc_authority
+    ? docAuthorityScore(metadata.doc_authority, authorityWeight)
+    : 0;
+  const recencyScore = metadata.last_updated
+    ? recencyDecayScore(Date.parse(metadata.last_updated), nowMs, { maxScore: recencyWeight })
+    : 0;
+  return scopeScore + authorityScore + recencyScore;
+}
