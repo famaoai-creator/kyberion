@@ -5,6 +5,7 @@ import { pathResolver } from './path-resolver.js';
 import { safeExec, safeExistsSync, safeReadFile, safeRmSync } from './secure-io.js';
 import { buildExecutionEnv, withExecutionContext } from './authority.js';
 import {
+  emitMissionOrchestrationObservation,
   enqueueMissionOrchestrationEvent,
   startMissionOrchestrationWorker,
 } from './mission-orchestration-events.js';
@@ -221,16 +222,34 @@ export function isSlackMissionRejection(text: string): boolean {
   ].some((pattern) => pattern.test(normalized));
 }
 
-export async function issueSlackMissionFromProposal(params: {
+export interface MissionIssuanceParams {
+  /** Originating surface ('slack' | 'chronos' | 'terminal' | 'telegram' | …). */
+  surface: string;
+  /** Reply channel on that surface ('terminal' for CLI sessions). */
   channel: string;
-  threadTs: string;
+  /** Thread / session / correlation key on that surface. */
+  thread: string;
   proposal: MissionProposal;
   sourceText?: string;
   routingDecision?: AgentRoutingDecision;
-}): Promise<SlackMissionIssuanceResult> {
+  /** Authority role recorded on the orchestration event (default `<surface>_bridge`). */
+  requestedBy?: string;
+}
+
+/**
+ * SN-01: canonical, surface-neutral mission issuance. Every ingress surface
+ * (Slack, Chronos, terminal/CLI, messaging bridges) converges here so the
+ * orchestration chain and the result-return payload are identical regardless
+ * of where the request arrived. The payload carries `surface` so downstream
+ * workers can route observability and result outboxes back to the requester.
+ */
+export async function issueMissionFromProposal(
+  params: MissionIssuanceParams
+): Promise<SlackMissionIssuanceResult> {
+  const surface = params.surface.trim().toLowerCase() || 'slack';
   const missionId = buildSurfaceMissionId(
-    'SLACK',
-    params.threadTs,
+    surface.toUpperCase(),
+    params.thread,
     params.proposal,
     params.sourceText
   );
@@ -242,8 +261,10 @@ export async function issueSlackMissionFromProposal(params: {
     ? ['--routing-decision', JSON.stringify(params.routingDecision)]
     : [];
 
+  // process.execPath, not 'node': PATH lookup breaks (ELOOP) when any PATH
+  // entry is a looping symlink — observed live with a broken CLI install dir.
   const startOutput = safeExec(
-    'node',
+    process.execPath,
     [
       'dist/scripts/mission_controller.js',
       'start',
@@ -260,36 +281,42 @@ export async function issueSlackMissionFromProposal(params: {
   let orchestrationJobPath: string | undefined;
   let orchestrationError: string | undefined;
   try {
-    const orchestrationEvent = enqueueMissionOrchestrationEvent({
-      eventType: 'mission_issue_requested',
-      missionId,
-      requestedBy: 'slack_bridge',
-      correlationId: randomUUID(),
-      payload: {
-        channel: params.channel,
-        threadTs: params.threadTs,
-        proposal: params.proposal,
-        sourceText: params.sourceText,
-        tier,
-        persona,
-        missionType,
-      },
+    // The issuance ceremony itself is the governed writer: surfaces without
+    // their own orchestration write scope (terminal, messaging bridges) still
+    // enqueue through the mission_controller execution context.
+    orchestrationJobPath = withExecutionContext('mission_controller', () => {
+      const orchestrationEvent = enqueueMissionOrchestrationEvent({
+        eventType: 'mission_issue_requested',
+        missionId,
+        requestedBy: params.requestedBy || `${surface}_bridge`,
+        correlationId: randomUUID(),
+        payload: {
+          surface,
+          channel: params.channel,
+          threadTs: params.thread,
+          proposal: params.proposal,
+          sourceText: params.sourceText,
+          tier,
+          persona,
+          missionType,
+        },
+      });
+      return startMissionOrchestrationWorker(orchestrationEvent);
     });
-    orchestrationJobPath = startMissionOrchestrationWorker(orchestrationEvent);
   } catch (error) {
     orchestrationStatus = 'failed';
     orchestrationError = error instanceof Error ? error.message : String(error);
   }
 
-  emitSlackMissionEvent({
+  emitSurfaceMissionIssueEvent(surface, {
     correlation_id: randomUUID(),
     decision: 'mission_issued',
-    why: 'A confirmed Slack mission proposal was deterministically issued through mission_controller.',
-    policy_used: 'slack_mission_issue_v1',
+    why: `A confirmed ${surface} mission proposal was deterministically issued through mission_controller.`,
+    policy_used: `${surface}_mission_issue_v1`,
     agent_id: 'mission_controller',
     resource_id: missionId,
-    thread_ts: params.threadTs,
-    slack_channel: params.channel,
+    thread_ts: params.thread,
+    surface_channel: params.channel,
     mission_type: missionType,
     tier,
     routing_decision_summary: formatRoutingDecisionSummary(params.routingDecision),
@@ -310,91 +337,53 @@ export async function issueSlackMissionFromProposal(params: {
   };
 }
 
+function emitSurfaceMissionIssueEvent(surface: string, event: Record<string, unknown>): void {
+  if (surface === 'slack') {
+    emitSlackMissionEvent({ ...event, slack_channel: event.surface_channel });
+    return;
+  }
+  if (surface === 'chronos') {
+    emitChronosMissionEvent(event);
+    return;
+  }
+  // Surfaces without a dedicated channel stream record into the shared
+  // mission-control observability stream (mission_controller-writable).
+  withExecutionContext('mission_controller', () =>
+    emitMissionOrchestrationObservation({ surface_channel: surface, ...event })
+  );
+}
+
+export async function issueSlackMissionFromProposal(params: {
+  channel: string;
+  threadTs: string;
+  proposal: MissionProposal;
+  sourceText?: string;
+  routingDecision?: AgentRoutingDecision;
+}): Promise<SlackMissionIssuanceResult> {
+  return issueMissionFromProposal({
+    surface: 'slack',
+    channel: params.channel,
+    thread: params.threadTs,
+    proposal: params.proposal,
+    sourceText: params.sourceText,
+    routingDecision: params.routingDecision,
+    requestedBy: 'slack_bridge',
+  });
+}
+
 export async function issueChronosMissionFromProposal(params: {
   sessionId: string;
   proposal: MissionProposal;
   sourceText?: string;
   routingDecision?: AgentRoutingDecision;
 }): Promise<SlackMissionIssuanceResult> {
-  const missionId = buildSurfaceMissionId(
-    'CHRONOS',
-    params.sessionId,
-    params.proposal,
-    params.sourceText
-  );
-  const tier = params.proposal.tier || 'public';
-  const missionType = params.proposal.mission_type || 'development';
-  const persona = params.proposal.assigned_persona || 'Ecosystem Architect';
-  const env = buildExecutionEnv(process.env, 'mission_controller');
-  const routingDecisionArg = params.routingDecision
-    ? ['--routing-decision', JSON.stringify(params.routingDecision)]
-    : [];
-
-  const startOutput = safeExec(
-    'node',
-    [
-      'dist/scripts/mission_controller.js',
-      'start',
-      missionId,
-      tier,
-      persona,
-      'default',
-      missionType,
-      ...routingDecisionArg,
-    ],
-    { env, cwd: pathResolver.rootDir() }
-  );
-
-  let orchestrationStatus: SlackMissionIssuanceResult['orchestrationStatus'] = 'queued';
-  let orchestrationJobPath: string | undefined;
-  let orchestrationError: string | undefined;
-  try {
-    const orchestrationEvent = enqueueMissionOrchestrationEvent({
-      eventType: 'mission_issue_requested',
-      missionId,
-      requestedBy: 'chronos_gateway',
-      correlationId: randomUUID(),
-      payload: {
-        sessionId: params.sessionId,
-        proposal: params.proposal,
-        sourceText: params.sourceText,
-        tier,
-        persona,
-        missionType,
-        channel: 'chronos',
-        threadTs: params.sessionId,
-      },
-    });
-    orchestrationJobPath = startMissionOrchestrationWorker(orchestrationEvent);
-  } catch (error) {
-    orchestrationStatus = 'failed';
-    orchestrationError = error instanceof Error ? error.message : String(error);
-  }
-
-  emitChronosMissionEvent({
-    correlation_id: randomUUID(),
-    decision: 'mission_issued',
-    why: 'A confirmed Chronos mission proposal was deterministically issued through mission_controller.',
-    policy_used: 'chronos_mission_issue_v1',
-    agent_id: 'mission_controller',
-    resource_id: missionId,
-    mission_type: missionType,
-    tier,
-    session_id: params.sessionId,
-    routing_decision_summary: formatRoutingDecisionSummary(params.routingDecision),
-    orchestration_status: orchestrationStatus,
-    orchestration_job_path: orchestrationJobPath,
-  });
-
-  return {
-    missionId,
-    tier,
-    missionType,
-    persona,
-    startOutput,
-    orchestrationStatus,
-    orchestrationJobPath,
-    orchestrationError,
+  return issueMissionFromProposal({
+    surface: 'chronos',
+    channel: 'chronos',
+    thread: params.sessionId,
+    proposal: params.proposal,
+    sourceText: params.sourceText,
     routingDecision: params.routingDecision,
-  };
+    requestedBy: 'chronos_gateway',
+  });
 }
