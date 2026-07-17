@@ -14,7 +14,7 @@
 - `video-composition-compiler.ts` のシーン HTML は `--kb-*` 系トークンへ置換済みで、既定値は fallback に保持している。
 - `video-design-system.ts` へ動画向けの共有 CSS 変数群を追加済みで、`visual-workflow-compiler.ts` も同じ変数セットを返す。
 - `video-composition-compiler.test.ts` と `visual-workflow-compiler.test.ts` で、トークン化出力と共有 CSS 変数を検証済み。
-- 残作業は Task 4 の実写/スクリーンショット検証のみ。
+- Task 4 の実写/スクリーンショット検証まで完了し、受入条件を満たした。
 
 ## ゴール(受入条件)
 
@@ -71,3 +71,10 @@
 - **per_scene レイアウト割当の実配線**: visual direction の per_scene は従来 compiler 未消費(選択が化粧だった)。ADF が template を明示しないシーンに限り適用し、対象テンプレの role / format / required_content_fields を満たす場合のみ上書き(**レイアウト選択は決して有効なコンパイルを壊さない**)。
 - **pattern pack 5 → 10**: sakura-lifestyle / ocean-depth / mono-editorial / citrus-energy / neon-cyber を追加(ライト背景系3種を含む — 従来はダーク系のみだった)。
 - **選択メニューを実 registry と同期**(basic-title-card / howto-guide / split-highlight / promo-spot / quote-card)。
+
+### 追記(2026-07-17 — DS-04 Task 4 実写証跡)
+
+- `pnpm media:visual-proof:ds04` を追加し、ダミーテナント **client-a** の palette を埋めた単一シーン ADF を `writeVideoCompositionBundle` で生成する再実行可能な proof runner を用意した。
+- `split-highlight` を HyperFrames で 1280x720 / 24fps / 3秒の MP4 にレンダリングし、同じ bundle から `snapshots/frame-00-at-0.0s.png` を取得した。実行時の成果物は `active/shared/tmp/ds04-video-visual-proof/client-a/` に出力する。
+- スクリーンショットを目視確認し、`--kb-bg-main` の濃紺背景、`--kb-accent` のマゼンタ色の eyebrow、`--kb-panel-bg` の紫パネル、`--kb-accent-blue-soft` の工程バッジが同一シーン内へ反映されることを確認した。テンプレート構造を変えずに palette だけで見た目が変わることを実証した。
+- `scripts/ds04_video_visual_proof.test.ts` で ADF の単一シーン・template・palette token を固定し、既存 compiler / visual-workflow のテストと合わせて回帰確認する。これで DS-04 は DONE とする。
