@@ -23,6 +23,12 @@ import {
   runCustomerConversation,
   listSurfaceOutboxMessages,
   clearSurfaceOutboxMessage,
+  getMissionProposalState,
+  saveMissionProposalState,
+  clearMissionProposalState,
+  isMissionConfirmation,
+  isMissionRejection,
+  issueMissionFromProposal,
 } from '@agent/core';
 
 export interface TelegramUser {
@@ -374,6 +380,47 @@ export async function handleTelegramUpdate(
   logger.info(
     `📥 [TelegramBridge] Message from ${message.from?.username || message.from?.id || chatId}: ${text}`
   );
+
+  // SN-01 Phase 2: numbered-choice mission-proposal confirmation, same UX
+  // contract as Slack ('1 / 作成する' issues, '2 / やめる' cancels).
+  const pendingProposal = getMissionProposalState('telegram', chatId, threadTs);
+  if (pendingProposal && isMissionRejection(text)) {
+    clearMissionProposalState('telegram', chatId, threadTs);
+    const reply = await sendTelegramMessage(
+      {
+        chatId,
+        text: 'ミッション提案をキャンセルしました。必要になったら、いつでも再提案できます。',
+      },
+      options
+    );
+    return { ok: true, chatId, messageId: String(message.message_id), threadTs, reply };
+  }
+  if (pendingProposal && isMissionConfirmation(text)) {
+    const issued = await issueMissionFromProposal({
+      surface: 'telegram',
+      channel: chatId,
+      thread: threadTs,
+      proposal: pendingProposal.proposal,
+      sourceText: pendingProposal.sourceText,
+      routingDecision: pendingProposal.routingDecision,
+    });
+    clearMissionProposalState('telegram', chatId, threadTs);
+    const reply = await sendTelegramMessage(
+      {
+        chatId,
+        text: [
+          `Mission ${issued.missionId} started.`,
+          `Type: ${issued.missionType} / Tier: ${issued.tier}`,
+          issued.orchestrationStatus === 'queued'
+            ? 'Background orchestration has been queued. 結果はこのチャットに届きます。'
+            : `Background orchestration could not be queued: ${issued.orchestrationError || 'unknown'}`,
+        ].join('\n'),
+      },
+      options
+    );
+    return { ok: true, chatId, messageId: String(message.message_id), threadTs, reply };
+  }
+
   const threadContext = buildTelegramThreadContext(threadTs);
   appendTelegramThreadHistory({
     role: 'user',
@@ -427,6 +474,36 @@ export async function handleTelegramUpdate(
       threadTs,
       reason: 'conversation_failed',
     };
+  }
+
+  // SN-01 Phase 2: a mission proposal from the orchestrator becomes a pending
+  // numbered-choice confirmation, exactly like the Slack flow.
+  const missionProposal = conversation.missionProposals?.[0];
+  if (missionProposal) {
+    saveMissionProposalState({
+      surface: 'telegram',
+      channel: chatId,
+      threadTs,
+      proposal: missionProposal,
+      sourceText: text,
+      routingDecision: conversation.routingDecision,
+    });
+    const summary =
+      String(missionProposal.summary || conversation.text || '').trim() || 'Mission proposal';
+    const reply = await sendTelegramMessage(
+      { chatId, text: `${summary}\n1) 作成する 2) やめる` },
+      options
+    );
+    appendTelegramThreadHistory({
+      role: 'assistant',
+      authorLabel: TELEGRAM_SURFACE_AGENT_ID,
+      text: `${summary}\n1) 作成する 2) やめる`,
+      messageId: `reply-${message.message_id}`,
+      threadTs,
+      chatId,
+      receivedAt: new Date().toISOString(),
+    });
+    return { ok: true, chatId, messageId: String(message.message_id), threadTs, reply };
   }
 
   let reply: TelegramSendReceipt | undefined;
