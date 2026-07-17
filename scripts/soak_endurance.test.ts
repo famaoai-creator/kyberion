@@ -8,7 +8,11 @@ import {
   safeRmSync,
   safeWriteFile,
 } from '@agent/core';
-import { detectResourceRegressions, runSoakEnduranceHarness } from './soak_endurance.js';
+import {
+  detectResourceRegressions,
+  runSoakEnduranceHarness,
+  validateSoakEvidence,
+} from './soak_endurance.js';
 
 describe('soak_endurance', () => {
   it('captures a time series with sampled file sizes', async () => {
@@ -37,6 +41,13 @@ describe('soak_endurance', () => {
     expect(report.samples[0].sampled_files[samplePath]).toBeGreaterThan(0);
     expect(report.maintenance_summary.tenant_drift_findings).toBeGreaterThanOrEqual(0);
     expect(safeExistsSync(pathResolver.sharedTmp('soak-endurance-tests/report.json'))).toBe(true);
+    expect(report.evidence.window_mode).toBe('compressed');
+    expect(report.evidence.window_days_equivalent).toBe(4);
+    const validation = validateSoakEvidence(report);
+    expect(validation.evidence_files).toHaveLength(2);
+    expect(validation.issues.filter((issue) => issue.includes('artifact is missing'))).toHaveLength(
+      0
+    );
   });
 
   it('detects monotonic growth in resource samples', () => {
@@ -129,5 +140,38 @@ describe('soak_endurance', () => {
     expect(safeReadFile(report.evidence.summary_path, { encoding: 'utf8' })).toContain(
       '# 30-day soak run summary'
     );
+    expect(safeReadFile(report.evidence.summary_path, { encoding: 'utf8' })).toContain(
+      'window mode: compressed'
+    );
+  });
+
+  it('turns detected regressions into a failing evidence validation result', async () => {
+    const report = await runSoakEnduranceHarness({
+      cycles: 4,
+      reportPath: pathResolver.sharedTmp('soak-endurance-tests/validation-report.json'),
+      metricsDir: pathResolver.sharedTmp('soak-endurance-tests/validation-metrics'),
+      metricsFile: 'history.jsonl',
+      exercise: async () => {},
+    });
+
+    report.resource_regressions.push({
+      resource: 'open_handles',
+      slope_per_cycle: 1,
+      first_value: 1,
+      last_value: 4,
+      growth: 3,
+      sample_count: 4,
+      suspected_source: 'unreleased_handles',
+      threshold_per_cycle: 0.15,
+    });
+
+    const validation = validateSoakEvidence(report);
+    expect(validation.ok).toBe(false);
+    expect(validation.regression_count).toBeGreaterThanOrEqual(1);
+    expect(
+      validation.issues.some((issue) =>
+        issue.includes('resource or latency regression(s) detected')
+      )
+    ).toBe(true);
   });
 });
