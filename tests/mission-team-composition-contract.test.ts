@@ -205,7 +205,7 @@ describe('Mission team composition contract', () => {
       'reasoning-worker'
     );
     expect(plan.assignments.find((entry) => entry.team_role === 'implementer')?.provider).toMatch(
-      /^(gemini|codex|agy)$/
+      /^(gemini|codex|agy|claude)$/
     );
     expect(plan.assignments.find((entry) => entry.team_role === 'surface_liaison')?.required).toBe(
       false
@@ -261,7 +261,7 @@ describe('Mission team composition contract', () => {
       plan.assignments.find((entry) => entry.team_role === 'experience_designer')?.required
     ).toBe(false);
     expect(plan.assignments.find((entry) => entry.team_role === 'operator')?.provider).toMatch(
-      /^(gemini|codex|agy)$/
+      /^(gemini|codex|agy|claude)$/
     );
     expect(plan.assignments.find((entry) => entry.team_role === 'operator')?.modelId).toBeTruthy();
   });
