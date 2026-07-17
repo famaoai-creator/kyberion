@@ -135,6 +135,7 @@
     "deps:check:voice": "node dist/scripts/dependency_resolver.js --actuator voice",
     "deps:check:media": "node dist/scripts/dependency_resolver.js --actuator media-generation",
     "media:preflight": "node dist/scripts/media_runtime_preflight.js",
+    "media:visual-proof:ds04": "node --import ./scripts/ts-loader.mjs scripts/ds04_video_visual_proof.ts",
     "service:preflight": "node dist/scripts/service_preflight.js",
     "generate-index": "node dist/scripts/cli.js list > /dev/null",
     "cli": "node dist/scripts/cli.js",

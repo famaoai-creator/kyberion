@@ -32,7 +32,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_SUDO_KEY`                   | string | no       | _undocumented_                                                                                                                                                         |
 | `KYBERION_TERMINAL_TOKEN`             | string | no       | _undocumented_                                                                                                                                                         |
 
-## path (63)
+## path (64)
 
 | Variable                                                         | Type | Required | Description                                                                                                                   |
 | ---------------------------------------------------------------- | ---- | -------- | ----------------------------------------------------------------------------------------------------------------------------- |
@@ -85,6 +85,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_SURFACE_QUERY_CONFIG_PATH`                             | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_TASK_SCENARIO_DIR`                                     | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_TENANT_DESIGN_ROOT`                                    | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_TEST_OBSERVABILITY_DIR`                                | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_TOOL_ACTUATOR_ROUTING_POLICY_PATH`                     | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_TOOL_RUNTIME_POLICY_PATH`                              | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_TOOL_RUNTIME_REGISTRY_PATH`                            | path | no       | _undocumented_                                                                                                                |
