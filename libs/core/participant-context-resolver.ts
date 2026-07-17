@@ -102,6 +102,11 @@ const TEAM_ROLE_DEFAULTS: Record<string, TeamRoleResolutionDefault> = {
     perspective_ids: ['calm_responder'],
     organization_role_id: 'reliability_engineer',
   },
+  orchestrator: {
+    authority_role_id: 'mission_controller',
+    perspective_ids: ['governance_sentinel'],
+    organization_role_id: 'pmo_governance',
+  },
   surface_liaison: {
     authority_role_id: 'surface_runtime',
     perspective_ids: ['sovereign_concierge'],
