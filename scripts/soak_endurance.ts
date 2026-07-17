@@ -49,7 +49,30 @@ export interface SoakReport {
   evidence: {
     run_log_path: string;
     summary_path: string;
+    window_mode: 'compressed';
+    window_days_equivalent: number;
   };
+}
+
+export interface SoakEvidenceValidation {
+  ok: boolean;
+  issues: string[];
+  regression_count: number;
+  evidence_files: string[];
+}
+
+function isActionableRegression(finding: SoakRegressionFinding): boolean {
+  if (finding.suspected_source === 'history_bloat' || finding.suspected_source === 'cache_growth') {
+    return true;
+  }
+  if (finding.suspected_source === 'unreleased_handles') return finding.growth >= 1;
+  if (finding.suspected_source === 'heap_growth' || finding.suspected_source === 'process_growth') {
+    // A runtime warm-up can add a small amount of heap/RSS over the first few
+    // cycles. Require a sustained five-percent increase before failing the
+    // autonomous gate; larger leaks still fail well before a 30-day window.
+    return finding.growth > Math.max(1, finding.first_value * 0.05);
+  }
+  return true;
 }
 
 export interface SoakHarnessOptions {
@@ -60,6 +83,7 @@ export interface SoakHarnessOptions {
   metricsDir?: string;
   metricsFile?: string;
   evidenceRetentionCount?: number;
+  failOnRegression?: boolean;
   quiet?: boolean;
   exercise?: (cycle: number) => Promise<void> | void;
 }
@@ -242,12 +266,40 @@ function renderEvidenceSummary(report: SoakReport): string {
     '',
     `- timestamp: ${report.timestamp}`,
     `- cycles: ${report.cycles}`,
+    `- window mode: compressed (not a production 30-day window)`,
+    `- equivalent days: ${report.evidence.window_days_equivalent}`,
     `- auto-checkpoint runs: ${report.maintenance_summary.auto_checkpoint_runs}`,
     `- tenant drift findings: ${report.maintenance_summary.tenant_drift_findings}`,
     `- resource regressions: ${report.resource_regressions.length}`,
     `- latency regressions: ${report.latency_regressions.length}`,
     `- status: ${regressions}`,
   ].join('\n');
+}
+
+export function validateSoakEvidence(report: SoakReport): SoakEvidenceValidation {
+  const issues: string[] = [];
+  const actionableResourceRegressions = report.resource_regressions.filter(isActionableRegression);
+  const regressionCount = actionableResourceRegressions.length + report.latency_regressions.length;
+
+  if (report.cycles < 4) {
+    issues.push('at least 4 cycles are required for a meaningful trend');
+  }
+  if (!report.evidence.run_log_path || !safeExistsSync(report.evidence.run_log_path)) {
+    issues.push('30-day run log artifact is missing');
+  }
+  if (!report.evidence.summary_path || !safeExistsSync(report.evidence.summary_path)) {
+    issues.push('30-day run summary artifact is missing');
+  }
+  if (regressionCount > 0) {
+    issues.push(`${regressionCount} resource or latency regression(s) detected`);
+  }
+
+  return {
+    ok: issues.length === 0,
+    issues,
+    regression_count: regressionCount,
+    evidence_files: [report.evidence.run_log_path, report.evidence.summary_path].filter(Boolean),
+  };
 }
 
 function sanitizeEvidenceLabel(input: string): string {
@@ -390,6 +442,8 @@ export async function runSoakEnduranceHarness(
     evidence: {
       run_log_path: '',
       summary_path: '',
+      window_mode: 'compressed',
+      window_days_equivalent: cycles,
     },
   };
 
@@ -437,6 +491,9 @@ function parseArgs(argv: string[]): SoakHarnessOptions & { json: boolean } {
       case '--quiet':
         options.quiet = true;
         break;
+      case '--fail-on-regression':
+        options.failOnRegression = true;
+        break;
       case '--json':
         options.json = true;
         break;
@@ -451,14 +508,19 @@ function parseArgs(argv: string[]): SoakHarnessOptions & { json: boolean } {
 async function main(): Promise<number> {
   const options = parseArgs(process.argv.slice(2));
   const report = await runSoakEnduranceHarness(options);
+  const validation = validateSoakEvidence(report);
 
   if (!options.quiet) {
     logger.info(
-      `[soak-endurance] completed ${report.cycles} cycle(s); regressions=${report.resource_regressions.length}; latency=${report.latency_regressions.length}`
+      `[soak-endurance] completed ${report.cycles} cycle(s); regressions=${report.resource_regressions.length}; latency=${report.latency_regressions.length}; evidence=${validation.ok ? 'valid' : 'invalid'}`
     );
   }
   if (options.json) {
     console.log(JSON.stringify(report, null, 2));
+  }
+  if (options.failOnRegression && !validation.ok) {
+    for (const issue of validation.issues) logger.error(`[soak-endurance] ${issue}`);
+    return 1;
   }
   return 0;
 }
