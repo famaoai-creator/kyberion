@@ -272,7 +272,7 @@ function maybeSubmitJanitorMaintenanceJob(): {
     kind: 'service',
     ownerId: 'baseline-check',
     ownerType: 'baseline-check-maintenance',
-    command: 'node',
+    command: process.execPath,
     args: [
       'dist/scripts/run_pipeline.js',
       '--input',
