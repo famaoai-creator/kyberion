@@ -407,6 +407,17 @@ export interface OnboardingState {
   updatedAt: string;
 }
 
+/** SN-01 Phase 2: surface-neutral pending-proposal state (any ingress surface). */
+export interface SurfaceMissionProposalState {
+  surface: string;
+  channel: string;
+  threadTs: string;
+  proposal: MissionProposal;
+  sourceText?: string;
+  routingDecision?: AgentRoutingDecision;
+  createdAt: string;
+}
+
 export interface SlackMissionProposalState {
   surface?: 'slack';
   channel: string;

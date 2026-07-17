@@ -20,6 +20,21 @@
       "surface": "terminal",
       "role": "mission_controller",
       "summary": "Terminal/CLI surface records coordination artifacts under the mission-controller identity that issued the mission (SN-01)."
+    },
+    {
+      "surface": "telegram",
+      "role": "surface_runtime",
+      "summary": "Telegram surface records coordination artifacts under the shared surface runtime identity."
+    },
+    {
+      "surface": "imessage",
+      "role": "surface_runtime",
+      "summary": "iMessage surface records coordination artifacts under the shared surface runtime identity."
+    },
+    {
+      "surface": "discord",
+      "role": "surface_runtime",
+      "summary": "Discord surface records coordination artifacts under the shared surface runtime identity."
     }
   ]
 }
