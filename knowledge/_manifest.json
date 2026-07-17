@@ -1023,7 +1023,7 @@
     {
       "path": "product/governance/authority-role-index.json",
       "tier": "public",
-      "size": 7524,
+      "size": 7580,
       "type": "json"
     },
     {
@@ -1035,7 +1035,7 @@
     {
       "path": "product/governance/authority-roles/chronos_gateway.json",
       "tier": "public",
-      "size": 706,
+      "size": 734,
       "type": "json"
     },
     {
@@ -1047,7 +1047,7 @@
     {
       "path": "product/governance/authority-roles/chronos_mirror_v2.json",
       "tier": "public",
-      "size": 419,
+      "size": 459,
       "type": "json"
     },
     {
@@ -2031,7 +2031,7 @@
     {
       "path": "product/governance/role-write-access.json",
       "tier": "public",
-      "size": 3314,
+      "size": 3370,
       "type": "json"
     },
     {
@@ -2049,7 +2049,7 @@
     {
       "path": "product/governance/security-policy.json",
       "tier": "public",
-      "size": 18690,
+      "size": 18802,
       "type": "json"
     },
     {
@@ -2151,7 +2151,7 @@
     {
       "path": "product/governance/surface-coordination-role-map.json",
       "tier": "public",
-      "size": 537,
+      "size": 1310,
       "type": "json"
     },
     {
