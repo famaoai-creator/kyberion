@@ -1,8 +1,14 @@
 import * as path from 'node:path';
 
-import { pathResolver, safeExec, safeExistsSync, safeReaddir, safeStat } from '@agent/core';
-import { writeVideoCompositionBundle } from '../libs/core/video-composition-compiler.js';
-import type { VideoCompositionADF } from '../libs/core/video-composition-contract.js';
+import {
+  pathResolver,
+  safeExec,
+  safeExistsSync,
+  safeReaddir,
+  safeStat,
+  writeVideoCompositionBundle,
+} from '@agent/core';
+import type { VideoCompositionADF } from '@agent/core';
 
 const PROOF_ROOT = 'active/shared/tmp/ds04-video-visual-proof/client-a';
 
