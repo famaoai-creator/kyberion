@@ -1310,6 +1310,7 @@ Visibility Commands:
   list     [status]              List all missions (optionally filter by status)
   status   <ID> [--refresh-providers]
                                  Show detailed status of a specific mission and backend availability
+  outbox   [ID] [--ack]          Show mission results delivered to the terminal surface (--ack to clear)
   sync-project-ledger <ID>       Upsert this mission into the related project mission-ledger
   team     <ID> [--refresh]      Show or regenerate mission team composition
   staff    <ID>                  Spawn or verify runtime instances for assigned mission team roles
