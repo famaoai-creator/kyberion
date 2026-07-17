@@ -168,12 +168,12 @@
 
 ### AO(自律運用・保守)
 
-| ID    | 状態    | 残作業                                                                                                                                                                                                                                         |
-| ----- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| AO-01 | PARTIAL | scheduler run-lock/missed-run catch-up、autonomous-ops-policy/gate、auto-checkpoint                                                                                                                                                            |
-| AO-02 | PARTIAL | 2026-07-11: scan/台帳/ルーブリック実装済み + §3.3 unit test + 適用フロー(propose 既定・--apply で backup→bump→install/typecheck/smoke→再スキャン→確定/ロールバック)。適用フロー・--override・defer 再評価まで実装済み。残: カナリア監視(OP-04) |
-| AO-03 | DONE    |                                                                                                                                                                                                                                                |
-| AO-04 | PARTIAL | 2026-07-11 突合: scripts/soak_restart_e2e.ts と pipelines/soak-endurance.json は実在。残: リーク検出、30日エビデンス                                                                                                                           |
+| ID    | 状態    | 残作業                                                                                                                                                                                                                                           |
+| ----- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| AO-01 | PARTIAL | scheduler run-lock/missed-run catch-up、autonomous-ops-policy/gate、auto-checkpoint                                                                                                                                                              |
+| AO-02 | PARTIAL | 2026-07-11: scan/台帳/ルーブリック実装済み + §3.3 unit test + 適用フロー(propose 既定・--apply で backup→bump→install/typecheck/smoke→再スキャン→確定/ロールバック)。適用フロー・--override・defer 再評価まで実装済み。残: カナリア監視(OP-04)   |
+| AO-03 | DONE    |                                                                                                                                                                                                                                                  |
+| AO-04 | PARTIAL | 2026-07-18: `validateSoakEvidence()` と `--fail-on-regression` を実装し、soak のリーク/肥大・latency回帰をスケジュール実行でfail-closed化。圧縮窓をサマリに明示。残: 実30日運用の成功率・human intervention・unknown errorを含む外部証跡レビュー |
 
 ### IL(インテントライフサイクル)
 
