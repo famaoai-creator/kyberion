@@ -13,6 +13,7 @@ import {
   resolveIntentResolutionPacket,
   chooseExecutionIntent,
   gatherImprovementHints,
+  issueMissionFromProposal,
   validateTaskSession,
 } from '@agent/core';
 import type { IntentResolutionPacket } from '@agent/core';
@@ -336,6 +337,45 @@ async function main() {
       logger.info(
         `[GATEWAY] Routing decision: ${compiled.routingDecision.mode} (${compiled.routingDecision.rationale})`
       );
+    }
+    // SN-01: mission-shaped requests from the CLI ride the same orchestration
+    // chain as Slack/Chronos instead of stopping at a compile-only contract.
+    const executionShape =
+      compiled.workLoop?.work_scope_decision?.execution_shape ||
+      compiled.workLoop?.resolution?.execution_shape;
+    if (executionShape === 'mission') {
+      const issued = await issueMissionFromProposal({
+        surface: 'terminal',
+        channel: 'terminal',
+        thread: Date.now().toString(),
+        proposal: {
+          intent: 'create_mission',
+          summary: compiled.intentContract?.goal?.summary || intent,
+          mission_type: 'development',
+          tier,
+          why: 'CLI request classified as mission-shaped by the intent compiler.',
+        },
+        sourceText: intent,
+        routingDecision: compiled.routingDecision,
+        requestedBy: 'mission_controller',
+      });
+      console.log(
+        JSON.stringify(
+          {
+            status: 'mission_issued',
+            mission_id: issued.missionId,
+            orchestration_status: issued.orchestrationStatus,
+            orchestration_job_path: issued.orchestrationJobPath,
+            follow: `node dist/scripts/mission_controller.js status ${issued.missionId}`,
+          },
+          null,
+          2
+        )
+      );
+      logger.success(
+        `🚀 [GATEWAY] Mission ${issued.missionId} issued via the surface-neutral orchestration chain.`
+      );
+      return;
     }
     console.log(JSON.stringify(compiled, null, 2));
   }

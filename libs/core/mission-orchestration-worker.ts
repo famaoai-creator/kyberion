@@ -15,9 +15,9 @@ import { reportProviderTemporarilyUnhealthy } from './provider-health-registry.j
 import {
   emitChannelSurfaceEvent,
   enqueueChronosOutboxMessage,
-  enqueueSlackOutboxMessage,
   type PlanningPacket,
 } from './channel-surface.js';
+import { enqueueSurfaceOutboxMessage } from './surface-coordination-store.js';
 import { extractPlanningPacketBlocks, validatePlanningPacket } from './planning-packet-contract.js';
 import { extractSurfaceBlocks } from './surface-response-blocks.js';
 import {
@@ -158,6 +158,8 @@ async function emitWorkerKickoffSnapshot(missionId: string, payload: SlackPayloa
 const MISSION_CONTROLLER_TIMEOUT_MS = 600_000;
 
 interface SlackPayload {
+  /** Originating surface (SN-01); absent on legacy events, treated as 'slack'. */
+  surface?: string;
   channel: string;
   threadTs: string;
   sourceText?: string;
@@ -166,6 +168,13 @@ interface SlackPayload {
   persona?: string;
   missionType?: string;
   teamRoles?: string[];
+}
+
+function payloadSurface(payload: SlackPayload): string {
+  const surface = String(payload.surface || '')
+    .trim()
+    .toLowerCase();
+  return surface || 'slack';
 }
 
 interface MissionControlPayload {
@@ -3674,17 +3683,31 @@ function emitSlackMissionEvent(
   why: string,
   extra: Record<string, unknown> = {}
 ): void {
-  emitChannelSurfaceEvent('slack_bridge', 'slack', 'missions', {
+  // SN-01: slack keeps its dedicated channel stream; other surfaces record
+  // into the mission-control stream (the only one the worker's
+  // mission_controller identity may write). The historical name stays because
+  // every orchestration handler calls through here.
+  const surface = payloadSurface(payload);
+  const event = {
     correlation_id: missionId,
     decision,
     why,
     policy_used: 'mission_orchestration_control_plane_v1',
     agent_id: 'mission_controller',
     resource_id: missionId,
-    slack_channel: payload.channel,
+    surface,
+    surface_channel: payload.channel,
     thread_ts: payload.threadTs,
     ...extra,
-  });
+  };
+  if (surface === 'slack') {
+    emitChannelSurfaceEvent('slack_bridge', 'slack', 'missions', {
+      ...event,
+      slack_channel: payload.channel,
+    });
+    return;
+  }
+  emitMissionOrchestrationObservation(event);
 }
 
 /**
@@ -4559,12 +4582,10 @@ async function handleMissionReconciliationRequested(
       gate_statuses: gateSummary.lines,
     }
   );
-  enqueueSlackOutboxMessage({
-    correlationId: missionId,
-    channel: payload.channel,
-    threadTs: payload.threadTs,
-    source: 'system',
-    text: [
+  notifyRequestingSurface(
+    payload,
+    missionId,
+    [
       `Mission ${missionId} progress update.`,
       `Accepted: ${summary.acceptedCount}`,
       `Reviewed: ${summary.reviewedCount}`,
@@ -4572,31 +4593,8 @@ async function handleMissionReconciliationRequested(
       `Requested: ${summary.requestedCount}`,
       `Gate rework count: ${gateSummary.reworkCount}`,
       ...(gateSummary.lines.length > 0 ? ['Gate status:', ...gateSummary.lines] : []),
-    ].join('\n'),
-  });
-  // Surface notification is best-effort: a denied outbox write (e.g. the
-  // worker identity lacking the chronos_gateway write scope) must not stall
-  // the mission lifecycle before distillation is enqueued.
-  try {
-    enqueueChronosOutboxMessage({
-      correlationId: missionId,
-      threadTs: missionId,
-      source: 'system',
-      text: [
-        `Mission ${missionId} progress update.`,
-        `Accepted: ${summary.acceptedCount}`,
-        `Reviewed: ${summary.reviewedCount}`,
-        `Completed: ${summary.completedCount}`,
-        `Requested: ${summary.requestedCount}`,
-        `Gate rework count: ${gateSummary.reworkCount}`,
-        ...(gateSummary.lines.length > 0 ? ['Gate status:', ...gateSummary.lines] : []),
-      ].join('\n'),
-    });
-  } catch (error: any) {
-    logger.warn(
-      `[worker] chronos outbox notification skipped for ${missionId}: ${error?.message ?? error}`
-    );
-  }
+    ].join('\n')
+  );
   // Work-loop closure: while dispatchable work remains, loop back to followup
   // instead of racing ahead to distillation. This converges: acceptance-gate
   // rework is requested at most once per task, and undispatchable tasks are
@@ -4734,27 +4732,52 @@ async function handleMissionCompletionRequested(event: MissionOrchestrationEvent
     });
   }
 
-  // Surface notifications are best-effort — see the reconciliation handler.
+  notifyRequestingSurface(payload, missionId, `Mission ${missionId} lifecycle completed.`);
+  // Completion is high-signal for every surface: push it to the operator's
+  // configured channel too (deduped by correlation id; best-effort).
+  void notifyOperator('mission_completed', {
+    title: `Mission ${missionId} lifecycle completed`,
+    body: `Requested via ${payloadSurface(payload)} (${payload.channel}). Artifacts and learnings are archived.`,
+    correlation_id: `${missionId}:completed`,
+  });
+  await shutdownAllAgentRuntimes('mission_orchestration_worker');
+}
+
+/**
+ * SN-01: deliver a mission progress/result message back to the surface the
+ * request originated from, plus the Chronos mirror. Best-effort on both legs —
+ * a denied outbox write must never stall the mission lifecycle.
+ */
+function notifyRequestingSurface(payload: SlackPayload, missionId: string, text: string): void {
+  const surface = payloadSurface(payload);
   try {
-    enqueueSlackOutboxMessage({
+    enqueueSurfaceOutboxMessage({
+      surface,
       correlationId: missionId,
       channel: payload.channel,
       threadTs: payload.threadTs,
+      text,
       source: 'system',
-      text: `Mission ${missionId} lifecycle completed.`,
-    });
-    enqueueChronosOutboxMessage({
-      correlationId: missionId,
-      threadTs: missionId,
-      source: 'system',
-      text: `Mission ${missionId} lifecycle completed.`,
     });
   } catch (error: any) {
     logger.warn(
-      `[worker] completion surface notification skipped for ${missionId}: ${error?.message ?? error}`
+      `[worker] ${surface} outbox notification skipped for ${missionId}: ${error?.message ?? error}`
     );
   }
-  await shutdownAllAgentRuntimes('mission_orchestration_worker');
+  if (surface !== 'chronos') {
+    try {
+      enqueueChronosOutboxMessage({
+        correlationId: missionId,
+        threadTs: missionId,
+        source: 'system',
+        text,
+      });
+    } catch (error: any) {
+      logger.warn(
+        `[worker] chronos outbox notification skipped for ${missionId}: ${error?.message ?? error}`
+      );
+    }
+  }
 }
 
 async function handleMissionControlRequested(

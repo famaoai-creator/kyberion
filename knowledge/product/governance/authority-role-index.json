@@ -6,6 +6,7 @@
       "default_persona": "worker",
       "write_scopes": [
         "active/shared/coordination/chronos/",
+        "active/shared/coordination/channels/chronos/",
         "active/shared/coordination/orchestration/",
         "active/shared/observability/chronos/",
         "active/shared/observability/mission-control/",

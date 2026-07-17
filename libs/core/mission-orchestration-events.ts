@@ -111,7 +111,7 @@ export function startMissionOrchestrationWorker<TPayload = Record<string, unknow
     kind: 'service',
     ownerId: event.mission_id,
     ownerType: 'mission-orchestration-worker',
-    command: 'node',
+    command: process.execPath,
     args: ['dist/scripts/run_mission_orchestration_event_worker.js', '--event', eventPath],
     spawnOptions: {
       cwd: rootDir(),

@@ -3,7 +3,14 @@
  * Command routing for the Mission Controller CLI.
  */
 
-import { logger, auditChain, resolveIntentTrackGate, saveProjectTrackRecord } from '@agent/core';
+import {
+  logger,
+  auditChain,
+  clearSurfaceOutboxMessage,
+  listSurfaceOutboxMessages,
+  resolveIntentTrackGate,
+  saveProjectTrackRecord,
+} from '@agent/core';
 import { getOptionValue, parseCsvOption } from './mission-cli-args.js';
 import { parseMissionVisionRef } from './mission-creation.js';
 import type { MissionRelationships } from './mission-types.js';
@@ -186,6 +193,53 @@ export interface MissionControllerRoutingContext {
   gatePass: (missionId: string, gateId: string, note?: string) => Awaitable<void>;
   gateFail: (missionId: string, gateId: string, note?: string) => Awaitable<void>;
   showHelp: () => void;
+}
+
+/**
+ * SN-01 Phase 2: terminal is a first-class result surface. Mission workers
+ * enqueue progress/result messages into the terminal outbox; these helpers
+ * are the CLI's read side (durable until acknowledged with --ack).
+ */
+function showTerminalOutbox(options: { ack: boolean; missionId?: string }): void {
+  const messages = listSurfaceOutboxMessages('terminal').filter(
+    (message) => !options.missionId || message.correlation_id === options.missionId.toUpperCase()
+  );
+  if (messages.length === 0) {
+    logger.info(
+      options.missionId
+        ? `No terminal outbox messages for ${options.missionId}.`
+        : 'The terminal outbox is empty.'
+    );
+    return;
+  }
+  for (const message of messages) {
+    console.log(
+      [`── ${message.created_at}  ${message.correlation_id}`, message.text, ''].join('\n')
+    );
+  }
+  if (options.ack) {
+    for (const message of messages) {
+      clearSurfaceOutboxMessage('terminal', message.message_id);
+    }
+    logger.info(`Acknowledged ${messages.length} terminal outbox message(s).`);
+  } else {
+    logger.info(
+      `${messages.length} message(s). Acknowledge with: mission_controller outbox${options.missionId ? ` ${options.missionId}` : ''} --ack`
+    );
+  }
+}
+
+function showTerminalOutboxHint(): void {
+  try {
+    const pending = listSurfaceOutboxMessages('terminal').length;
+    if (pending > 0) {
+      logger.info(
+        `📬 ${pending} unread mission result(s) in the terminal outbox — view with: mission_controller outbox`
+      );
+    }
+  } catch {
+    // The hint must never break status output.
+  }
 }
 
 function parseRoutingDecision(raw?: string): Record<string, unknown> | null {
@@ -674,6 +728,13 @@ export async function runMissionControllerAction(
     case 'status':
       context.showMissionStatus(arg1!, context.argv.includes('--follow'));
       context.showReasoningBackendStatus();
+      showTerminalOutboxHint();
+      break;
+    case 'outbox':
+      showTerminalOutbox({
+        ack: context.argv.includes('--ack'),
+        missionId: arg1 && !arg1.startsWith('--') ? arg1 : undefined,
+      });
       break;
     case 'sync-project-ledger':
       await context.syncProjectLedger(arg1!);

@@ -4,6 +4,7 @@
   "default_persona": "worker",
   "write_scopes": [
     "active/shared/coordination/chronos/",
+    "active/shared/coordination/channels/chronos/",
     "active/shared/coordination/orchestration/",
     "active/shared/observability/chronos/",
     "active/shared/observability/mission-control/",
@@ -17,12 +18,6 @@
     "operations_runtime",
     "audit"
   ],
-  "allowed_actuators": [
-    "presence-actuator",
-    "artifact-actuator"
-  ],
-  "tier_access": [
-    "public",
-    "confidential"
-  ]
+  "allowed_actuators": ["presence-actuator", "artifact-actuator"],
+  "tier_access": ["public", "confidential"]
 }
