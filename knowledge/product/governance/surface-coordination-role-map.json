@@ -15,6 +15,11 @@
       "surface": "presence",
       "role": "surface_runtime",
       "summary": "Presence requests and notifications are stored as runtime-owned artifacts."
+    },
+    {
+      "surface": "terminal",
+      "role": "mission_controller",
+      "summary": "Terminal/CLI surface records coordination artifacts under the mission-controller identity that issued the mission (SN-01)."
     }
   ]
 }
