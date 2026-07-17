@@ -27,6 +27,13 @@
 - Task 4: `30day-run-log.jsonl` / `30day-run-summary.md` を `runSoakEnduranceHarness()` から自動生成するようにした。
 - Task 5: evidence log の rollover/TTL を実装し、保持件数を超えたログが切り詰められることを確認した。
 
+### 2026-07-18 追補: 自律運用ゲート
+
+- `validateSoakEvidence()` を追加し、soak report が trend 判定・run log・summary をすべて持つかを機械検証するようにした。
+- `--fail-on-regression` を `pipelines/soak-endurance.json` に接続し、RSS/heap/open handles/履歴ファイルまたは latency の回帰を検出した場合はスケジュール実行を失敗扱いにする(fail-closed)。
+- 生成サマリには `window mode: compressed` と相当日数を明示し、圧縮CI証跡を実30日運用証跡と誤認しないようにした。
+- 残: 実ユーザー環境での30日連続運用と、成功率・human intervention・unknown error を含む外部証跡のレビュー。
+
 ## 実装タスク
 
 ### Task 1: soak テストハーネス — `claude-sonnet-4`
