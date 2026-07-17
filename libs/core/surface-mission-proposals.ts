@@ -12,11 +12,14 @@ import {
 import { appendGovernedArtifactJsonl, writeGovernedArtifactJson } from './artifact-store.js';
 import type { AgentRoutingDecision } from './intent-contract.js';
 
+import { getSurfaceCoordinationRole } from './surface-coordination-role-map.js';
+
 import type {
   ChronosMissionProposalState,
   MissionProposal,
   SlackMissionIssuanceResult,
   SlackMissionProposalState,
+  SurfaceMissionProposalState,
 } from './channel-surface-types.js';
 
 type SurfaceProposalRole = 'slack_bridge' | 'chronos_gateway';
@@ -56,12 +59,72 @@ function emitChronosMissionEvent(event: Record<string, unknown>): string {
 }
 
 function missionProposalStateLogicalPath(
-  surface: 'slack' | 'chronos',
+  surface: string,
   channel: string,
   threadTs: string
 ): string {
   const safeThread = threadTs.replace(/[^a-zA-Z0-9._-]/g, '_');
   return `active/shared/coordination/channels/${surface}/mission-proposals/${channel}-${safeThread}.json`;
+}
+
+/**
+ * SN-01 Phase 2: surface-neutral pending-proposal store. Any ingress surface
+ * (telegram, iMessage, terminal, …) can persist a proposal awaiting the
+ * user's numbered-choice confirmation and later confirm/reject it with the
+ * same UX contract Slack uses. Writes run under the surface's coordination
+ * role from the shared role map.
+ */
+export function saveMissionProposalState(params: {
+  surface: string;
+  channel: string;
+  threadTs: string;
+  proposal: MissionProposal;
+  sourceText?: string;
+  routingDecision?: AgentRoutingDecision;
+}): string {
+  const surface = params.surface.trim().toLowerCase();
+  return writeGovernedArtifactJson(
+    getSurfaceCoordinationRole(surface),
+    missionProposalStateLogicalPath(surface, params.channel, params.threadTs),
+    {
+      surface,
+      channel: params.channel,
+      threadTs: params.threadTs,
+      proposal: params.proposal,
+      sourceText: params.sourceText,
+      routingDecision: params.routingDecision,
+      createdAt: new Date().toISOString(),
+    } satisfies SurfaceMissionProposalState
+  );
+}
+
+export function getMissionProposalState(
+  surface: string,
+  channel: string,
+  threadTs: string
+): SurfaceMissionProposalState | null {
+  const resolved = pathResolver.resolve(
+    missionProposalStateLogicalPath(surface.trim().toLowerCase(), channel, threadTs)
+  );
+  if (!safeExistsSync(resolved)) return null;
+  return JSON.parse(
+    safeReadFile(resolved, { encoding: 'utf8' }) as string
+  ) as SurfaceMissionProposalState;
+}
+
+export function clearMissionProposalState(
+  surface: string,
+  channel: string,
+  threadTs: string
+): void {
+  const normalized = surface.trim().toLowerCase();
+  const resolved = pathResolver.resolve(
+    missionProposalStateLogicalPath(normalized, channel, threadTs)
+  );
+  if (!safeExistsSync(resolved)) return;
+  withExecutionContext(getSurfaceCoordinationRole(normalized), () => {
+    safeRmSync(resolved, { force: true });
+  });
 }
 
 function sanitizeMissionSlug(value: string): string {
@@ -179,6 +242,19 @@ export function clearChronosMissionProposalState(sessionId: string): void {
   withSurfaceRole('chronos_gateway', () => {
     safeRmSync(resolved, { force: true });
   });
+}
+
+/**
+ * SN-01 Phase 2: the numbered-choice confirmation UX ('1 / 実行する / yes' vs
+ * '2 / やめる / cancel') is surface-neutral — these are the canonical names.
+ * The Slack-named exports below remain for existing callers.
+ */
+export function isMissionConfirmation(text: string): boolean {
+  return isSlackMissionConfirmation(text);
+}
+
+export function isMissionRejection(text: string): boolean {
+  return isSlackMissionRejection(text);
 }
 
 export function isSlackMissionConfirmation(text: string): boolean {
