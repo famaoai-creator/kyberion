@@ -89,9 +89,16 @@ let request = VNRecognizeTextRequest { (request, error) in
 // Swift's Vision handles language selection if requested
 if CommandLine.arguments.count > 2 {
     let lang = CommandLine.arguments[2]
-    // Translate e.g., 'jpn' to 'ja-JP'
-    let resolvedLang = lang == "jpn" || lang.contains("jp") ? "ja-JP" : "en-US"
-    request.recognitionLanguages = [resolvedLang]
+    // Translate common Tesseract-style language names while retaining both
+    // Japanese and English for the document defaults (e.g. jpn+eng).
+    var languages: [String] = []
+    if lang.contains("jpn") || lang.contains("ja") || lang.contains("jp") {
+        languages.append("ja-JP")
+    }
+    if lang.contains("eng") || lang.contains("en") {
+        languages.append("en-US")
+    }
+    request.recognitionLanguages = languages.isEmpty ? ["en-US"] : languages
 }
 
 request.recognitionLevel = .accurate
