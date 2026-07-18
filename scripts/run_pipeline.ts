@@ -31,6 +31,7 @@ import {
   formatNextAction,
   runJanitor,
   checkActuatorCapabilities,
+  compactStepOutputContext,
   killSwitch,
   validateOpInput,
   resolveIdentityContext,
@@ -1699,15 +1700,40 @@ export async function runSteps(
           `[step ${stepNumber}/${totalTopLevelSteps}] ${normalizedOp} ${outcome.status} in ${Math.round(durationMs / 1000)}s`
         );
       }
-      opts.trace?.endSpan(
-        outcome.status === 'failed' ? 'error' : 'ok',
-        outcome.status === 'failed' ? (failureInfo?.summary ?? outcome.error) : undefined
-      );
       results.push({
         op: normalizedOp,
         status: outcome.status,
         ...(outcome.error && outcome.status === 'failed' ? { error: outcome.error } : {}),
       });
+      const outputKeys = [
+        resolveExportKey(step, 'last_output'),
+        'last_output',
+        'last_result',
+        'stdout',
+        'stderr',
+        'output',
+        'result',
+        'response',
+      ];
+      let nextCtx = ctx;
+      try {
+        nextCtx = compactStepOutputContext(ctx, outputKeys, {
+          maxInlineChars: Number((initialCtx.__pipeline_options as any)?.max_inline_output_chars),
+          missionId: String(ctx.mission_id || process.env.MISSION_ID || 'shared'),
+          stepOp: normalizedOp,
+          stepNumber,
+          recordArtifact: (artifactPath, description) => {
+            opts.trace?.addArtifact('log', artifactPath, description);
+          },
+        });
+      } catch (err) {
+        logger.warn(`[OH-04] output offload skipped for ${normalizedOp}: ${String(err)}`);
+      }
+      opts.trace?.endSpan(
+        outcome.status === 'failed' ? 'error' : 'ok',
+        outcome.status === 'failed' ? (failureInfo?.summary ?? outcome.error) : undefined
+      );
+      return nextCtx;
     },
   };
 
