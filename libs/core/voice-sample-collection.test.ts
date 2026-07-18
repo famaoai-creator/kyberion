@@ -40,6 +40,7 @@ describe('voice-sample-collection', () => {
     );
     process.env.KYBERION_VOICE_SAMPLE_INGESTION_POLICY_PATH = policyPath;
     safeWriteFile(sample1, Buffer.from('12345678901234567890'));
+    safeWriteFile(`${sample1}.transcript.txt`, 'こんにちは。');
     safeWriteFile(sample2, Buffer.from('abcdefghijklmnopqrstuvwxyz'));
 
     const result = collectVoiceSamples({
@@ -61,6 +62,7 @@ describe('voice-sample-collection', () => {
     expect(result.status).toBe('succeeded');
     expect(result.staged_samples).toHaveLength(2);
     expect(result.registration_candidate.samples[0]?.path).toContain('voice-sample-collection/collect-1');
+    expect(safeReadFile(`${result.registration_candidate.samples[0]?.path}.transcript.txt`, { encoding: 'utf8' })).toBe('こんにちは。');
     const manifest = JSON.parse(safeReadFile(result.collection_manifest_path, { encoding: 'utf8' }) as string) as {
       kind?: string;
       samples?: Array<{ staged_path?: string }>;

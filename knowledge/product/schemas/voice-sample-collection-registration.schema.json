@@ -44,7 +44,8 @@
       "properties": {
         "strict_personal_voice": { "type": "boolean" }
       }
-    }
+    },
+    "dry_run": { "type": "boolean" }
   },
   "required": ["action", "request_id", "profile", "samples"]
 }

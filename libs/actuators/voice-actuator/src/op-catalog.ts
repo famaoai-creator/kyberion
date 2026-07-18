@@ -20,6 +20,7 @@ export const VOICE_ACTUATOR_APPLY_OPS = [
   'generate_voice',
   'record_interaction',
   'record_voice_sample',
+  'record_verify_repair_voice_sample',
   'register_voice_profile',
   'speak_local',
 ] as const;

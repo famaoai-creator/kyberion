@@ -10,6 +10,8 @@
     "duration_sec": { "type": "number", "exclusiveMinimum": 0 },
     "language": { "type": "string", "minLength": 2 },
     "prompt_text": { "type": "string" },
+    "recording_countdown_sec": { "type": "number", "minimum": 0, "maximum": 10 },
+    "prompt_display_hold_ms": { "type": "number", "minimum": 0, "maximum": 60000 },
     "output_path": { "type": "string", "minLength": 1 },
     "input_device_preference": { "type": "string", "minLength": 1 }
   },
