@@ -17,7 +17,7 @@ For development setup, see [`../QUICKSTART.md`](../QUICKSTART.md). This document
 Before installing on any environment:
 
 - [ ] Decide single-user vs. customer-overlay (FDE) mode. Customer-overlay = define `KYBERION_CUSTOMER` and prepare `customer/{slug}/`.
-- [ ] Decide reasoning backend: `claude-cli` (preferred when CLI is authenticated), `anthropic` (API key), `codex-cli`, `gemini-cli`, `nemotron-api` (OpenAI-compatible endpoint), or `stub` (offline).
+- [ ] Decide reasoning backend: `claude-cli` (preferred when CLI is authenticated), `anthropic` (API key), `codex-cli`, `gemini-cli`, `agy-cli`, `copilot` (GitHub Copilot CLI via ACP), `nemotron-api` (OpenAI-compatible endpoint), or `stub` (offline).
 - [ ] Decide voice tier: tier 0 (browser + native TTS, no install), tier 1 (cloud), tier 2 (local Style-Bert-VITS2).
 - [ ] Identify which actuators the use case needs (browser? voice? media? meeting?). Heavy ones (Playwright, Style-Bert-VITS2) only install if needed.
 - [ ] Identify secrets storage strategy: OS keychain (preferred), env vars, or `customer/{slug}/secrets.json` (dev only).

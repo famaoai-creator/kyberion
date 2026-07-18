@@ -10,6 +10,7 @@ const REASONING_SETUP_GUIDANCE = [
   '  - Codex CLI: authenticate `codex`, then set `KYBERION_REASONING_BACKEND=codex-cli`',
   '  - Gemini CLI: authenticate `gemini`, then set `KYBERION_REASONING_BACKEND=gemini-cli`',
   '  - AGY CLI: authenticate `agy`, then set `KYBERION_REASONING_BACKEND=agy-cli`',
+  '  - GitHub Copilot CLI: authenticate Copilot CLI, then set `KYBERION_REASONING_BACKEND=copilot`',
   '  - Anthropic API: set `ANTHROPIC_API_KEY`, then set `KYBERION_REASONING_BACKEND=anthropic`',
   '  - OpenAI-compatible local/Nemotron: set `KYBERION_LOCAL_LLM_URL` or `KYBERION_NEMOTRON_URL`',
   'Use `KYBERION_REASONING_BACKEND=stub` only when you intentionally want offline deterministic placeholders.',
