@@ -1601,7 +1601,7 @@
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "Reasoning backend selector. Common values: claude-cli (local claude CLI, no API key), anthropic (ANTHROPIC_API_KEY), codex-cli, gemini-cli, agy-cli, openrouter (OPENROUTER_API_KEY or KYBERION_OPENROUTER_KEY), stub (offline/deterministic tests).",
+      "description": "Reasoning backend selector. Common values: claude-cli (local claude CLI, no API key), anthropic (ANTHROPIC_API_KEY), codex-cli, agy-cli (Antigravity CLI), openrouter (OPENROUTER_API_KEY or KYBERION_OPENROUTER_KEY), stub (offline/deterministic tests). gemini-cli remains available for explicit Enterprise configurations.",
       "documented": true,
       "subsystem": "reasoning"
     },

@@ -38,17 +38,18 @@ const FALLBACK: ProviderConfigFile = {
   default_priority: ['gemini', 'claude', 'codex', 'copilot'],
   default_models: {
     gemini: 'gemini-3.5-flash',
-    claude: 'claude-opus-4-8',
-    codex: 'gpt-5.5',
+    claude: 'claude-fable-5',
+    agy: 'Gemini 3.5 Flash (Medium)',
+    codex: 'gpt-5.6-sol',
     copilot: 'claude-sonnet-4-6',
   },
   runtime_defaults: {
-    'anthropic-default': 'claude-opus-4-8',
-    'anthropic-fast': 'claude-sonnet-5',
+    'anthropic-default': 'claude-fable-5',
+    'anthropic-fast': 'claude-haiku-4-5-20251001',
     'gemini-default': 'gemini-3.5-flash',
     'gemini-fast': 'gemini-3.1-flash-lite',
     'openai-vision': 'gpt-5.5',
-    'codex-default': 'gpt-5.5',
+    'codex-default': 'gpt-5.6-sol',
     'copilot-default': 'claude-sonnet-4-6',
   },
   lifecycle: {

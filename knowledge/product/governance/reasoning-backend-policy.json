@@ -23,10 +23,6 @@
       "mode": "anthropic"
     },
     {
-      "env": "GEMINI_API_KEY",
-      "mode": "gemini-cli"
-    },
-    {
       "env": "KYBERION_NEMOTRON_URL",
       "mode": "nemotron-api"
     },
@@ -57,11 +53,6 @@
       "mode": "codex-cli"
     },
     {
-      "env_any": ["GEMINI_CLI"],
-      "provider": "gemini",
-      "mode": "gemini-cli"
-    },
-    {
       "env_any": ["AGY_CLI", "ANTIGRAVITY_CLI"],
       "provider": "agy",
       "mode": "agy-cli"
@@ -71,10 +62,6 @@
     {
       "provider": "codex",
       "mode": "codex-cli"
-    },
-    {
-      "provider": "gemini",
-      "mode": "gemini-cli"
     },
     {
       "provider": "agy",
