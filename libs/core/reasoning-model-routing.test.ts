@@ -33,7 +33,7 @@ describe('reasoning-model-routing', () => {
         },
         { policy, registry }
       ).recommended_model_id
-    ).toBe('openai:gpt-5.5');
+    ).toBe('openai:gpt-5.6-sol');
 
     expect(
       resolveReasoningModelRoute(
@@ -46,7 +46,7 @@ describe('reasoning-model-routing', () => {
         },
         { policy, registry }
       ).recommended_model_id
-    ).toBe('openai:gpt-5.5');
+    ).toBe('openai:gpt-5.6-sol');
 
     expect(
       resolveReasoningModelRoute(
@@ -59,7 +59,7 @@ describe('reasoning-model-routing', () => {
         },
         { policy, registry }
       ).recommended_model_id
-    ).toBe('openai:gpt-5.4-mini');
+    ).toBe('openai:gpt-5.6-luna');
 
     expect(
       resolveReasoningModelRoute(
@@ -114,10 +114,10 @@ describe('reasoning-model-routing', () => {
   });
 
   it('centralizes runtime model defaults and respects env overrides', () => {
-    expect(resolveRuntimeModelId('anthropic-default', {})).toBe('claude-opus-4-8');
+    expect(resolveRuntimeModelId('anthropic-default', {})).toBe('claude-fable-5');
     expect(resolveRuntimeModelId('gemini-default', {})).toBe('gemini-3.5-flash');
     expect(resolveRuntimeModelId('openai-vision', {})).toBe('gpt-5.5');
-    expect(resolveRuntimeModelId('codex-default', {})).toBe('gpt-5.5');
+    expect(resolveRuntimeModelId('codex-default', {})).toBe('gpt-5.6-sol');
     expect(resolveRuntimeModelId('copilot-default', {})).toBe('claude-sonnet-4-6');
 
     expect(
@@ -149,7 +149,7 @@ describe('reasoning-model-routing', () => {
         tier: 'standard',
         execution_tier: 'standard',
         effort: 'medium',
-        model_id: 'openai:gpt-5.5',
+        model_id: 'openai:gpt-5.6-terra',
       })
     );
 
@@ -167,7 +167,7 @@ describe('reasoning-model-routing', () => {
         tier: 'small',
         execution_tier: 'fast',
         effort: 'low',
-        model_id: 'openai:gpt-5.4-mini',
+        model_id: 'openai:gpt-5.6-luna',
       })
     );
 
@@ -184,7 +184,7 @@ describe('reasoning-model-routing', () => {
         tier: 'standard',
         execution_tier: 'standard',
         effort: 'medium',
-        model_id: 'openai:gpt-5.5',
+        model_id: 'openai:gpt-5.6-terra',
       })
     );
 
@@ -202,7 +202,7 @@ describe('reasoning-model-routing', () => {
         tier: 'large',
         execution_tier: 'deep',
         effort: 'high',
-        model_id: 'openai:gpt-5.5',
+        model_id: 'openai:gpt-5.6-sol',
       })
     );
   });

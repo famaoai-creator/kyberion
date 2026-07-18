@@ -14,7 +14,7 @@
       ],
       "selection_hints": {
         "preferred_provider": "agy",
-        "preferred_modelId": "auto-gemini-3"
+        "preferred_modelId": "Gemini 3.5 Flash (Medium)"
       },
       "provider_strategy": "adaptive"
     },
@@ -40,7 +40,7 @@
       ],
       "selection_hints": {
         "preferred_provider": "agy",
-        "preferred_modelId": "auto-gemini-3"
+        "preferred_modelId": "Gemini 3.5 Flash (Medium)"
       },
       "provider_strategy": "adaptive"
     },
@@ -50,7 +50,7 @@
       "capabilities": ["reasoning", "security", "analysis"],
       "selection_hints": {
         "preferred_provider": "agy",
-        "preferred_modelId": "auto-gemini-3"
+        "preferred_modelId": "Gemini 3.5 Flash (Medium)"
       },
       "provider_strategy": "adaptive"
     },
@@ -71,7 +71,7 @@
       "capabilities": ["reasoning", "security", "critique"],
       "selection_hints": {
         "preferred_provider": "agy",
-        "preferred_modelId": "auto-gemini-3"
+        "preferred_modelId": "Gemini 3.5 Flash (Medium)"
       },
       "provider_strategy": "adaptive"
     },
@@ -81,7 +81,7 @@
       "capabilities": ["architecture", "code", "review", "testing", "planning", "a2a"],
       "selection_hints": {
         "preferred_provider": "agy",
-        "preferred_modelId": "auto-gemini-3"
+        "preferred_modelId": "Gemini 3.5 Flash (Medium)"
       },
       "provider_strategy": "preferred",
       "fallback_providers": ["claude", "codex"]
@@ -92,7 +92,7 @@
       "capabilities": ["reasoning", "coordination", "routing", "analysis", "security"],
       "selection_hints": {
         "preferred_provider": "agy",
-        "preferred_modelId": "auto-gemini-3"
+        "preferred_modelId": "Gemini 3.5 Flash (Medium)"
       },
       "provider_strategy": "adaptive"
     },
@@ -123,7 +123,7 @@
       "capabilities": ["planning", "strategy", "decomposition", "coordination"],
       "selection_hints": {
         "preferred_provider": "agy",
-        "preferred_modelId": "auto-gemini-3"
+        "preferred_modelId": "Gemini 3.5 Flash (Medium)"
       },
       "provider_strategy": "adaptive"
     },
@@ -175,7 +175,7 @@
       ],
       "selection_hints": {
         "preferred_provider": "agy",
-        "preferred_modelId": "auto-gemini-3"
+        "preferred_modelId": "Gemini 3.5 Flash (Medium)"
       },
       "provider_strategy": "adaptive"
     },
@@ -215,7 +215,7 @@
       "capabilities": ["reasoning", "strategy", "coordination", "analysis", "security"],
       "selection_hints": {
         "preferred_provider": "agy",
-        "preferred_modelId": "auto-gemini-3"
+        "preferred_modelId": "Gemini 3.5 Flash (Medium)"
       },
       "provider_strategy": "adaptive"
     },

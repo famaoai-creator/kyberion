@@ -983,7 +983,7 @@ describe('intent-contract compiler', () => {
     expect(events[0]?.attributes?.source).toBe('llm');
     expect(events[0]?.attributes?.fallback_reason).toBe('none');
     expect(events[0]?.attributes?.reasoning_level).toBe(llmFlow.reasoningDecision?.level);
-    expect(events[0]?.attributes?.recommended_model_id).toBe('openai:gpt-5.5');
+    expect(events[0]?.attributes?.recommended_model_id).toBe('openai:gpt-5.6-sol');
     expect(events[0]?.attributes?.model_route_status).toBe('shadow');
 
     events.length = 0;
