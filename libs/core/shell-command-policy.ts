@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { isInjectionSuspected } from './untrusted-content.js';
+import { findSensitivePathInText } from './sensitive-path-policy.js';
 
 export type ShellCommandVerdict = 'allow' | 'deny' | 'require_approval';
 
@@ -130,6 +131,17 @@ export function evaluateShellCommandPolicy(
     .replace(/\s+/g, ' ');
   const tokens = tokenizeCommand(normalized);
   const { executable, args } = resolveExecutable(tokens);
+  const sensitivePath = findSensitivePathInText(normalized);
+  if (sensitivePath) {
+    return {
+      verdict: 'deny',
+      command: normalized,
+      executable,
+      args,
+      matchedRuleId: sensitivePath.ruleId,
+      reason: `[SENSITIVE_PATH_DENIED] ${sensitivePath.description} is protected from shell access.`,
+    };
+  }
   const denyRule = (policy.denylist || []).find((rule) =>
     matchesRule(rule, normalized, executable, args)
   );

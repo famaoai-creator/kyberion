@@ -675,6 +675,10 @@
       "types": "./dist/shell-command-policy.d.ts",
       "default": "./dist/shell-command-policy.js"
     },
+    "./sensitive-path-policy": {
+      "types": "./dist/sensitive-path-policy.d.ts",
+      "default": "./dist/sensitive-path-policy.js"
+    },
     "./adf-guardrails": {
       "types": "./dist/adf-guardrails.d.ts",
       "default": "./dist/adf-guardrails.js"

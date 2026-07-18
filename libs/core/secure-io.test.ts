@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import {
   validateFileSize,
@@ -58,6 +59,15 @@ describe('secure-io core', () => {
 
     it('should throw for empty path', () => {
       expect(() => safeReadFile('')).toThrow('Missing required');
+    });
+
+    it('denies credential and Kyberion connection paths before filesystem access', () => {
+      expect(() => safeReadFile(path.join(os.homedir(), '.ssh/id_ed25519'))).toThrow(
+        '[SENSITIVE_PATH_DENIED]'
+      );
+      expect(() =>
+        safeReadFile(path.join(process.cwd(), 'knowledge/personal/connections/slack.json'))
+      ).toThrow('[SENSITIVE_PATH_DENIED]');
     });
   });
 
@@ -124,6 +134,16 @@ describe('secure-io core', () => {
 
       expect(() => safeWriteFile(link, 'replacement')).toThrow('Refusing to replace symbolic link');
       expect(fs.readFileSync(target, 'utf8')).toBe('original');
+    });
+
+    it('denies credential paths for writes and command execution', () => {
+      expect(() => safeWriteFile(path.join(os.homedir(), '.aws/credentials'), 'token')).toThrow(
+        '[SENSITIVE_PATH_DENIED]'
+      );
+      expect(() => safeExec('cat', ['~/.ssh/id_ed25519'])).toThrow('[SENSITIVE_PATH_DENIED]');
+      expect(() => safeExecResult('cat', ['$HOME/.codex/auth.json'])).toThrow(
+        '[SENSITIVE_PATH_DENIED]'
+      );
     });
   });
 
