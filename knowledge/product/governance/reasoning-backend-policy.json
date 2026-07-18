@@ -11,6 +11,7 @@
     "anthropic",
     "gemini-cli",
     "agy-cli",
+    "copilot",
     "local",
     "nemotron-api",
     "openrouter",
@@ -44,10 +45,7 @@
   ],
   "cli_preference_rules": [
     {
-      "env_any": [
-        "CODEX_CLI",
-        "CODEX_VERSION"
-      ],
+      "env_any": ["CODEX_CLI", "CODEX_VERSION"],
       "env_equals": {
         "TERM_PROGRAM": "codex"
       },
@@ -55,17 +53,12 @@
       "mode": "codex-cli"
     },
     {
-      "env_any": [
-        "GEMINI_CLI"
-      ],
+      "env_any": ["GEMINI_CLI"],
       "provider": "gemini",
       "mode": "gemini-cli"
     },
     {
-      "env_any": [
-        "AGY_CLI",
-        "ANTIGRAVITY_CLI"
-      ],
+      "env_any": ["AGY_CLI", "ANTIGRAVITY_CLI"],
       "provider": "agy",
       "mode": "agy-cli"
     }
@@ -82,6 +75,10 @@
     {
       "provider": "agy",
       "mode": "agy-cli"
+    },
+    {
+      "provider": "copilot",
+      "mode": "copilot"
     }
   ],
   "default_mode": "codex-cli"
