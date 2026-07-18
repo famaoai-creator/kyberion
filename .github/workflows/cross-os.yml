@@ -35,9 +35,10 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           brew install sqlite
-          echo "$(brew --prefix sqlite)/bin" >> "$GITHUB_PATH"
-          sqlite3 --version
-          test "$(sqlite3 ':memory:' "select sqlite_compileoption_used('ENABLE_FTS5');")" = "1"
+          sqlite_bin="$(brew --prefix sqlite)/bin"
+          echo "$sqlite_bin" >> "$GITHUB_PATH"
+          "$sqlite_bin/sqlite3" --version
+          "$sqlite_bin/sqlite3" ':memory:' 'pragma compile_options;' | grep -qx 'ENABLE_FTS5'
 
       # The native PDF engine embeds a CJK subset font; macOS ships Hiragino,
       # Linux runners need Noto CJK installed for parity.
