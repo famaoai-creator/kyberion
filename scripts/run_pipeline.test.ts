@@ -166,6 +166,43 @@ describe('run_pipeline compatibility', () => {
     expect(result.results).toEqual([{ op: 'system:shell', status: 'success' }]);
   });
 
+  it('dispatches core:ptc through typed ops and records the call trace', async () => {
+    const trace = new TraceContext('pipeline:ha04-ptc', { pipelineId: 'ha04-ptc' });
+    const result = await runSteps(
+      [
+        {
+          id: 'ptc-step',
+          op: 'core:ptc',
+          params: {
+            code: `
+              const value = await callOp('system:json_query', { from: 'seed_data', path: 'status' });
+              console.log(JSON.stringify({ status: value }));
+            `,
+            allowed_ops: ['system:json_query'],
+            granted_ops: ['system:json_query'],
+            export_as: 'ptc_stdout',
+          },
+        },
+      ],
+      { seed_data: { status: 'accepted' } },
+      { trace, quiet: true }
+    );
+
+    expect(result.status).toBe('succeeded');
+    expect(result.context.ptc_stdout).toBe('{"status":"accepted"}');
+    const finalized = trace.finalize();
+    const ptcSpan = finalized.rootSpan.children.find((span) => span.name === 'core:ptc');
+    expect(ptcSpan?.events).toContainEqual(
+      expect.objectContaining({
+        name: 'ptc.op_call',
+        attributes: expect.objectContaining({
+          op: 'system:json_query',
+          status: 'succeeded',
+        }),
+      })
+    );
+  });
+
   it('executes direct commands without shell expansion', async () => {
     const result = await runSteps([
       {

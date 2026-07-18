@@ -183,12 +183,19 @@ export interface TaskReviewFinding {
   instruction: string;
 }
 
+export interface TaskAcceptanceEvidence {
+  criterion: string;
+  status: 'passed' | 'failed';
+  evidence: string;
+}
+
 export interface TaskResultBlock {
   summary: string;
   artifacts: TaskResultArtifact[];
   verification_done: string[];
   gaps: string[];
   needs: string[];
+  acceptance_evidence?: TaskAcceptanceEvidence[];
   review_findings?: TaskReviewFinding[];
 }
 
@@ -309,6 +316,8 @@ interface SurfaceConversationMessageInputBase {
   forcedReceiver?: string;
   missionId?: string;
   teamRole?: string;
+  /** Deterministic local E2E hook; production callers leave this unset. */
+  awaitBackgroundReviewFork?: boolean;
 }
 
 export type SurfaceConversationMessageInput = SurfaceConversationMessageInputBase & {
@@ -375,6 +384,21 @@ export interface SurfaceNotificationRecord {
   created_at: string;
 }
 
+export type SurfaceDeliveryErrorKind =
+  | 'too_long'
+  | 'bad_format'
+  | 'forbidden'
+  | 'not_found'
+  | 'rate_limited'
+  | 'transient';
+
+export interface SurfaceDeliveryFailure {
+  kind: SurfaceDeliveryErrorKind;
+  retryable: boolean;
+  reason: string;
+  retry_after_ms?: number;
+}
+
 export interface SurfaceOutboxMessage {
   message_id: string;
   surface: SurfaceAsyncChannel;
@@ -384,6 +408,31 @@ export interface SurfaceOutboxMessage {
   text: string;
   source: 'surface' | 'nerve' | 'system';
   created_at: string;
+  /** Stable producer key used to collapse retries while the outbox record exists. */
+  deduplication_key?: string;
+  attempt_count?: number;
+  next_attempt_at?: string;
+  last_error_kind?: SurfaceDeliveryErrorKind;
+  last_error?: string;
+}
+
+export interface SurfaceDeadLetterRecord extends SurfaceOutboxMessage {
+  kind: 'surface-dead-letter';
+  dead_letter_id: string;
+  failure: SurfaceDeliveryFailure;
+  dead_lettered_at: string;
+  replay_count?: number;
+  last_replayed_at?: string;
+  last_replay_message_id?: string;
+  last_replayed_by?: string;
+}
+
+export interface SurfaceDeadTargetRecord {
+  surface: SurfaceAsyncChannel;
+  channel: string;
+  failure: SurfaceDeliveryFailure;
+  consecutive_failures: number;
+  marked_at: string;
 }
 
 export interface SlackOutboxMessage extends SurfaceOutboxMessage {}

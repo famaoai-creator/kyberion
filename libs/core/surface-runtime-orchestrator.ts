@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { queryKnowledge, queryKnowledgeHybrid } from './src/knowledge-index.js';
 
 import { pathResolver } from './path-resolver.js';
@@ -22,6 +22,7 @@ import {
   formatClarificationPacketConcise,
 } from './intent-contract.js';
 import { logger } from './core.js';
+import { triggerBackgroundReviewFork } from './background-review-runner.js';
 import { repairSurfaceUxContractText, validateSurfaceUxContract } from './surface-ux-contract.js';
 import {
   resolveFallbackLocationCoordinates,
@@ -2272,6 +2273,63 @@ export async function runSurfaceConversation(
 export async function runSurfaceMessageConversation(
   input: SurfaceConversationMessageInput
 ): Promise<SurfaceConversationResult> {
+  // HA-01: count one non-blocking worker turn per surface thread. The
+  // correlation id is per message, so derive the stable session key from the
+  // surface/channel/thread tuple instead.
+  try {
+    const sessionKey = [
+      input.surface,
+      input.channel || 'default',
+      input.threadTs || 'default',
+    ].join(':');
+    const sessionId = `surface-${createHash('sha256').update(sessionKey).digest('hex').slice(0, 32)}`;
+    const trigger = triggerBackgroundReviewFork({
+      sessionId,
+      nudgeConfig: { turnThreshold: 10, toolThreshold: 10 },
+      surface: input.surface,
+      missionId: input.missionId,
+      approvalChannel: input.channel,
+      approvalThreadTs: input.threadTs,
+      snapshot: [
+        `surface=${input.surface}`,
+        `channel=${input.channel || 'default'}`,
+        `thread=${input.threadTs || 'default'}`,
+        `message:\n${input.text}`,
+        input.threadContext ? `thread_context:\n${input.threadContext}` : '',
+      ]
+        .filter(Boolean)
+        .join('\n\n'),
+    });
+    if (trigger.review_due && trigger.fork) {
+      logger.info(
+        `[HA-01] Background review reserved for surface session ${sessionId}; main response remains non-blocking.`
+      );
+      const fork = trigger.fork;
+      const handleForkFailure = (error: unknown) => {
+        // The runner normally converts failures to a result, but this final
+        // guard keeps a backend/serialization defect from becoming an
+        // unhandled rejection on the surface process.
+        logger.warn(
+          `[HA-01] Background review fork detached failure: ${
+            error instanceof Error ? error.message : String(error)
+          }`
+        );
+      };
+      if (input.awaitBackgroundReviewFork) {
+        // Local mission E2E may await the detached result to prove the full
+        // nudge→fork→approval path. Normal surface traffic remains detached.
+        await fork;
+      } else {
+        void fork.catch(handleForkFailure);
+      }
+    }
+  } catch (error) {
+    logger.warn(
+      `[HA-01] Background review nudge unavailable; continuing surface response: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+  }
   const result = await runSurfaceConversation(buildSurfaceConversationInput(input));
   // Enforce the surface UX contract on the outbound user-facing text. This is
   // the single chokepoint for all surface responses; validation is non-blocking

@@ -483,7 +483,15 @@
       ]
     },
     "wisdom": {
-      "capture": ["glob_files", "knowledge_search", "query", "read_file", "read_json", "shell"],
+      "capture": [
+        "glob_files",
+        "history_search",
+        "knowledge_search",
+        "query",
+        "read_file",
+        "read_json",
+        "shell"
+      ],
       "transform": ["array_count", "json_query", "regex_extract", "regex_replace", "yaml_update"],
       "apply": [
         "a2a_fanout",
@@ -494,6 +502,7 @@
         "compute_readiness_matrix",
         "conduct_1on1",
         "cross_critique",
+        "curate_background_review",
         "decompose_into_tasks",
         "deploy_release",
         "derive_test_inventory",

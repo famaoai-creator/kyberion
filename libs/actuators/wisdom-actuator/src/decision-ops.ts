@@ -62,6 +62,7 @@ import {
   enforceApprovalGate,
   evaluateDecisionRights,
   resolveDecisionRightsMatrix,
+  curateBackgroundReviewProposals,
 } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
 import * as path from 'node:path';
@@ -2665,6 +2666,20 @@ export async function dispatchDecisionOp(
         source_path: resolved('source') || resolved('source_path'),
         output_path: resolved('output_path'),
         title: resolved('title'),
+      });
+      return { handled: true, ctx: assign(result) };
+    }
+
+    case 'curate_background_review': {
+      const maxAgeDays = Number(resolved('max_age_days'));
+      const rawDryRun = resolved('dry_run');
+      const result = curateBackgroundReviewProposals({
+        maxAgeMs:
+          Number.isFinite(maxAgeDays) && maxAgeDays >= 0
+            ? maxAgeDays * 24 * 60 * 60 * 1000
+            : undefined,
+        limit: Number(resolved('limit')) || undefined,
+        dryRun: rawDryRun === true || String(rawDryRun).toLowerCase() === 'true',
       });
       return { handled: true, ctx: assign(result) };
     }

@@ -15,6 +15,8 @@ import { z } from 'zod';
 
 describe('reasoning-backend', () => {
   afterEach(() => {
+    delete process.env.KYBERION_REASONING_IN_PLACE_RETRIES;
+    delete process.env.KYBERION_REASONING_RETRY_BASE_MS;
     resetReasoningBackend();
     clearProviderHealth();
   });
@@ -71,6 +73,71 @@ describe('reasoning-backend', () => {
 
     await expect(backend.prompt('hello')).resolves.toBe('ok');
     expect(calls).toEqual(['primary', 'fallback']);
+  });
+
+  it('retries transient failures in place before demoting the provider', async () => {
+    process.env.KYBERION_REASONING_RETRY_BASE_MS = '0';
+    clearProviderHealth();
+    const calls: string[] = [];
+    const backend = buildFailoverReasoningBackend([
+      {
+        label: 'primary',
+        provider: 'codex',
+        backend: {
+          ...stubReasoningBackend,
+          prompt: async () => {
+            calls.push('primary');
+            if (calls.length < 3) throw new Error('429 rate limit exceeded');
+            return 'recovered';
+          },
+        },
+      },
+      {
+        label: 'fallback',
+        provider: 'gemini',
+        backend: { ...stubReasoningBackend, prompt: async () => 'fallback' },
+      },
+    ]);
+
+    await expect(backend.prompt('hello')).resolves.toBe('recovered');
+    expect(calls).toEqual(['primary', 'primary', 'primary']);
+  });
+
+  it('honors Retry-After and does not retry authentication failures', async () => {
+    process.env.KYBERION_REASONING_IN_PLACE_RETRIES = '2';
+    process.env.KYBERION_REASONING_RETRY_BASE_MS = '0';
+    clearProviderHealth();
+    const calls: string[] = [];
+    const transient = Object.assign(new Error('503 service unavailable'), {
+      headers: { 'retry-after': '0' },
+    });
+    const backend = buildFailoverReasoningBackend([
+      {
+        label: 'primary',
+        provider: 'codex',
+        backend: {
+          ...stubReasoningBackend,
+          prompt: async () => {
+            calls.push('primary');
+            throw transient;
+          },
+        },
+      },
+      {
+        label: 'fallback',
+        provider: 'gemini',
+        backend: {
+          ...stubReasoningBackend,
+          prompt: async () => {
+            calls.push('fallback');
+            throw new Error('authentication failed: invalid api key');
+          },
+        },
+      },
+    ]);
+
+    await expect(backend.prompt('hello')).rejects.toThrow('failed across 2 candidate');
+    expect(calls).toEqual(['primary', 'primary', 'primary', 'fallback']);
   });
 
   it('delegates structured output with retry-on-mismatch', async () => {

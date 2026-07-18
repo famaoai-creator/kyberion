@@ -381,6 +381,38 @@
       "documented": false
     },
     {
+      "name": "KYBERION_BLUEBUBBLES_PASSWORD",
+      "category": "secret",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_BLUEBUBBLES_SEND_METHOD",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_BLUEBUBBLES_URL",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_BLUEBUBBLES_WEBHOOK_SECRET",
+      "category": "secret",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_BRAND_FONT_STACK",
       "category": "runtime",
       "type": "string",
@@ -831,7 +863,23 @@
       "documented": false
     },
     {
+      "name": "KYBERION_HISTORY_SEARCH_DB",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_HOST_AGENT_ACTIVE",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_IMESSAGE_WAKE_WORD",
       "category": "runtime",
       "type": "string",
       "required": false,
@@ -1462,6 +1510,14 @@
       "documented": false
     },
     {
+      "name": "KYBERION_PTC_CHILD",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_PTY_IDLE_TIMEOUT_MS",
       "category": "tuning",
       "type": "number",
@@ -1497,9 +1553,25 @@
       "subsystem": "reasoning"
     },
     {
+      "name": "KYBERION_REASONING_IN_PLACE_RETRIES",
+      "category": "tuning",
+      "type": "number",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_REASONING_MODEL",
       "category": "provider",
       "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_REASONING_RETRY_BASE_MS",
+      "category": "tuning",
+      "type": "number",
       "required": false,
       "description": "",
       "documented": false
@@ -1782,6 +1854,14 @@
       "description": "Path scope restriction for KYBERION_SUDO escalation.",
       "documented": true,
       "subsystem": "governance"
+    },
+    {
+      "name": "KYBERION_SURFACE_ALLOWLISTS",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
     },
     {
       "name": "KYBERION_SURFACE_QUERY_CONFIG_PATH",

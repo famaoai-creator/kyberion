@@ -110,6 +110,14 @@ describe('run_doctor', () => {
     expect(mocks.loadEnvironmentManifest).toHaveBeenCalledWith('meeting-participation-runtime');
   });
 
+  it('reports surface outbox and dead-letter state in the doctor report', async () => {
+    const { collectDoctorReport } = await import('./run_doctor.js');
+
+    const report = await collectDoctorReport({});
+
+    expect(report.surfaceDeliveryLines[0]).toContain('Surface delivery:');
+  });
+
   it('includes the on-demand pull resolver for browser runtime doctor output', async () => {
     const yargsStub = {
       option: vi.fn(() => yargsStub),

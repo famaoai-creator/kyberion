@@ -109,6 +109,7 @@
     "libs/core/native-speech-listen-bridge.ts",
     "libs/core/native-tts.ts",
     "libs/core/orchestrator.ts",
+    "libs/core/programmatic-tool-calling.ts",
     "libs/core/provider-discovery.ts",
     "libs/core/pty-engine.ts",
     "libs/core/pulse-audio-bus.ts",

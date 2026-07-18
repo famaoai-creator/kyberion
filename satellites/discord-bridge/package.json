@@ -6,7 +6,7 @@
   "main": "../../dist/satellites/discord-bridge/src/index.js",
   "types": "../../dist/satellites/discord-bridge/src/index.d.ts",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc --build",
     "test": "vitest run src/"
   },
   "dependencies": {

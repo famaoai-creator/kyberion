@@ -1,17 +1,14 @@
 import { randomUUID } from 'node:crypto';
 
-import {
-  annotateApprovalRejectionReason,
-  createApprovalRequest,
-  decideApprovalRequest,
-  loadApprovalRequest,
-} from './approval-store.js';
-import {
-  REJECTION_REASON_CATEGORIES,
-  normalizeRejectionReasonCategory,
-  type RejectionReasonCategory,
-} from './rejection-reason.js';
+import { createApprovalRequest, loadApprovalRequest } from './approval-store.js';
+import type { RejectionReasonCategory } from './rejection-reason.js';
 import { appendGovernedArtifactJsonl } from './artifact-store.js';
+import {
+  applySurfaceApprovalDecision,
+  applySurfaceApprovalRejectionReason,
+  buildSurfaceApprovalAskWhyActions,
+  normalizeSurfaceApprovalAskWhyCategory,
+} from './surface-approval-ui.js';
 
 import type {
   SlackApprovalActionPayload,
@@ -137,16 +134,13 @@ export function applySlackApprovalDecision(params: {
 }): SlackApprovalRequestRecord {
   const record = loadApprovalRequest('slack', params.requestId);
   if (!record) throw new Error(`Approval request not found: slack/${params.requestId}`);
-  const updated = decideApprovalRequest('slack_bridge', {
-    channel: 'slack',
-    storageChannel: 'slack',
+  const updated = applySurfaceApprovalDecision({
+    surface: 'slack',
     requestId: params.requestId,
     decision: params.decision,
+    channel: record.channel,
+    threadTs: record.threadTs,
     decidedBy: params.decidedBy,
-    decidedByType: 'human',
-    authenticated: true,
-    payloadHash: record.accountability?.payloadHash,
-    effectBinding: record.accountability?.effectBinding,
   });
   emitSlackApprovalEvent({
     correlation_id: updated.correlationId,
@@ -166,14 +160,6 @@ export function applySlackApprovalDecision(params: {
 // A rejection decided by button gets ONE skippable follow-up question. Buttons
 // (not free text) keep the reply deterministic — no conversation state needed.
 
-const ASK_WHY_LABELS: Record<RejectionReasonCategory, string> = {
-  incorrect_content: '内容が誤り',
-  wrong_direction: '方向が違う',
-  quality: '品質不足',
-  scope: 'スコープ過不足',
-  other: 'その他',
-};
-
 export interface SlackAskWhyActionPayload {
   requestId: string;
   category: RejectionReasonCategory | 'skip';
@@ -190,42 +176,42 @@ export function buildSlackApprovalAskWhyBlocks(requestId: string): any[] {
     },
     {
       type: 'actions',
-      elements: [
-        ...REJECTION_REASON_CATEGORIES.map((category) => ({
-          type: 'button',
-          text: { type: 'plain_text', text: ASK_WHY_LABELS[category] },
-          action_id: 'slack_approval_askwhy',
-          value: JSON.stringify({ requestId, category } satisfies SlackAskWhyActionPayload),
-        })),
-        {
-          type: 'button',
-          text: { type: 'plain_text', text: 'スキップ' },
-          action_id: 'slack_approval_askwhy',
-          value: JSON.stringify({ requestId, category: 'skip' } satisfies SlackAskWhyActionPayload),
-        },
-      ],
+      elements: buildSurfaceApprovalAskWhyActions(requestId).map((action) => ({
+        type: 'button',
+        text: { type: 'plain_text', text: action.label },
+        action_id: 'slack_approval_askwhy',
+        value: JSON.stringify({
+          requestId: action.requestId,
+          category: action.category,
+        } satisfies SlackAskWhyActionPayload),
+      })),
     },
   ];
 }
 
 export function parseSlackAskWhyAction(value: string): SlackAskWhyActionPayload {
-  const parsed = JSON.parse(value) as SlackAskWhyActionPayload;
-  if (parsed.category !== 'skip' && !normalizeRejectionReasonCategory(parsed.category)) {
-    return { requestId: parsed.requestId, category: 'skip' };
+  const parsed = JSON.parse(value) as Partial<SlackAskWhyActionPayload>;
+  const category = normalizeSurfaceApprovalAskWhyCategory(parsed.category);
+  if (!parsed.requestId || !category) {
+    return { requestId: String(parsed.requestId || ''), category: 'skip' };
   }
-  return parsed;
+  return { requestId: parsed.requestId, category };
 }
 
+/** @deprecated Use applySurfaceApprovalRejectionReason with explicit scope. */
 export function applySlackApprovalRejectionReason(params: {
   requestId: string;
   category: RejectionReasonCategory;
   annotatedBy: string;
+  channel: string;
+  threadTs: string;
 }): SlackApprovalRequestRecord {
-  return annotateApprovalRejectionReason('slack_bridge', {
-    channel: 'slack',
-    storageChannel: 'slack',
+  return applySurfaceApprovalRejectionReason({
+    surface: 'slack',
     requestId: params.requestId,
-    reasonCategory: params.category,
+    category: params.category,
     annotatedBy: params.annotatedBy,
+    channel: params.channel,
+    threadTs: params.threadTs,
   });
 }

@@ -231,8 +231,8 @@
       "path": "libs/actuators/wisdom-actuator",
       "d": "Knowledge-tier search, injection, import/export, and decision-support operations",
       "s": "implemented",
-      "version": "1.2.1",
-      "capability_count": 37
+      "version": "1.3.0",
+      "capability_count": 39
     },
     {
       "n": "working-memory-actuator",

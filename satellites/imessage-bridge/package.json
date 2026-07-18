@@ -6,7 +6,7 @@
   "main": "../../dist/satellites/imessage-bridge/src/index.js",
   "types": "../../dist/satellites/imessage-bridge/src/index.d.ts",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc --build",
     "start": "node ../../dist/satellites/imessage-bridge/src/index.js"
   },
   "dependencies": {
