@@ -32,6 +32,7 @@ import {
   safeMkdir,
   safeReaddir,
   safeReadFile,
+  safeStat,
   safeRmSync,
   safeWriteFile,
   recordMissionGateOverride,
@@ -53,18 +54,23 @@ import {
   evaluateMissionIntentDrift,
 } from './mission-intent-delta.js';
 
-function collectMissionEvidence(missionDir: string): Array<{ ref: string; text?: string }> {
+export function collectMissionEvidence(missionDir: string): Array<{ ref: string; text?: string }> {
   const evidenceDir = path.join(missionDir, 'evidence');
   if (!safeExistsSync(evidenceDir)) return [];
   return safeReaddir(evidenceDir)
     .filter((entry) => entry !== '.gitkeep')
-    .map((entry) => {
-      const ref = path.join(missionDir, 'evidence', entry);
+    .map((entry) => path.join(missionDir, 'evidence', entry))
+    .filter((ref) => {
+      try {
+        return safeStat(ref).isFile();
+      } catch {
+        return false;
+      }
+    })
+    .map((ref) => {
       let text: string | undefined;
       try {
-        if (safeExistsSync(ref)) {
-          text = String(safeReadFile(ref, { encoding: 'utf8' })).slice(0, 2000);
-        }
+        text = String(safeReadFile(ref, { encoding: 'utf8' })).slice(0, 2000);
       } catch (err) {
         logger.warn(`[mission-lifecycle] suppressed error in collectMissionEvidence: ${err}`);
       }
