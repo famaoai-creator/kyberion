@@ -8,12 +8,14 @@ import {
   appleFmPrompt,
   classifyLocallyWithAppleFm,
   probeAppleIntelligence,
+  probeAppleImageGeneration,
   createAppleSpeechToTextBridge,
   generateImageLocallyWithApplePlayground,
   recognizeImageLocallyWithAppleVision,
   transcribeAudioLocallyWithAppleSpeech,
   verifyRenderedTextWithAppleVision,
   resetAppleIntelligenceAvailabilityCache,
+  resetAppleImageGenerationAvailabilityCache,
   setAfmRunnerForTests,
   summarizeLocallyWithAppleFm,
   type AfmRunner,
@@ -35,6 +37,7 @@ describe('apple intelligence bridge', () => {
   beforeEach(() => {
     calls.length = 0;
     resetAppleIntelligenceAvailabilityCache();
+    resetAppleImageGenerationAvailabilityCache();
     delete process.env.KYBERION_APPLE_FM;
   });
 
@@ -158,6 +161,22 @@ describe('apple intelligence bridge', () => {
     });
     expect(generated).toEqual({ path: '/tmp/x.png', style: 'illustration' });
     expect(calls.at(-1)!.args).toContain('--style');
+  });
+
+  it('probes Image Playground independently from Foundation Models availability', async () => {
+    if (process.platform !== 'darwin') return;
+    installRunner((command, args) => {
+      if (command === 'swiftc') return { ok: true, stdout: '', stderr: '' };
+      if (args[0] === 'imagine-availability') {
+        return { ok: true, stdout: '{"available":false,"reason":"notSupported"}\n', stderr: '' };
+      }
+      return { ok: true, stdout: '{"available":true}', stderr: '' };
+    });
+    await expect(probeAppleImageGeneration()).resolves.toEqual({
+      available: false,
+      reason: 'notSupported',
+    });
+    expect(calls.at(-1)?.args).toEqual(['imagine-availability']);
   });
 
   it('SpeechToTextBridge adapter maps language to locale and writes the sidecar', async () => {

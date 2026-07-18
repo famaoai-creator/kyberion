@@ -19,6 +19,9 @@
 //     → generates one image via Image Playground (ImageCreator) and writes
 //       PNG to <path>; prints {"path":"...","style":"..."}. Exits 1 with
 //       ERROR: notSupported when Image Playground is unavailable.
+//   afm imagine-availability
+//     → probes Image Playground without generating an image and prints
+//       {"available":true} or {"available":false,"reason":"..."}.
 //
 // Keep this file dependency-free (no SwiftPM) so it compiles with a single
 // `swiftc -O afm.swift -o afm` and stays trivially auditable.
@@ -234,6 +237,35 @@ func runImagine(prompt: String, outPath: String, styleId: String?, timeoutSecond
     print("{\"path\":\"\(jsonEscape(outPath))\",\"style\":\"\(jsonEscape(usedStyle))\"}")
 }
 
+func runImagineAvailability(timeoutSeconds: Double) {
+    let semaphore = DispatchSemaphore(value: 0)
+    var available = false
+    var reason = "Image Playground unavailable"
+    Task {
+        do {
+            let creator = try await ImageCreator()
+            if creator.availableStyles.isEmpty {
+                reason = "no Image Playground styles available"
+            } else {
+                available = true
+                reason = ""
+            }
+        } catch {
+            reason = String(describing: error)
+        }
+        semaphore.signal()
+    }
+    if semaphore.wait(timeout: .now() + timeoutSeconds) == .timedOut {
+        FileHandle.standardError.write("ERROR: image generation availability timed out\n".data(using: .utf8)!)
+        exit(1)
+    }
+    if available {
+        print("{\"available\":true}")
+    } else {
+        print("{\"available\":false,\"reason\":\"\(jsonEscape(reason))\"}")
+    }
+}
+
 // ---- arg parsing ----
 
 var args = Array(CommandLine.arguments.dropFirst())
@@ -299,6 +331,8 @@ case "imagine":
         exit(2)
     }
     runImagine(prompt: promptArg, outPath: outPath, styleId: styleId, timeoutSeconds: timeoutSeconds == 60.0 ? 300.0 : timeoutSeconds)
+case "imagine-availability":
+    runImagineAvailability(timeoutSeconds: timeoutSeconds)
 default:
     FileHandle.standardError.write("ERROR: unknown command \(command)\n".data(using: .utf8)!)
     exit(2)
