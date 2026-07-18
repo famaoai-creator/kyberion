@@ -23,6 +23,12 @@ export interface ScheduledPipeline {
   lastRun?: string;
   lastStatus?: 'succeeded' | 'failed';
   context?: Record<string, any>; // additional context to inject
+  deliver_to?: {
+    surface: string;
+    channel: string;
+    thread_ts?: string;
+    template?: string;
+  };
   runLock?: ScheduledPipelineRunLock;
 }
 

@@ -281,6 +281,39 @@ export function createApprovalRequest(
   return record;
 }
 
+/** Treat a malformed expiry as expired so approval cannot fail open. */
+export function isApprovalRequestExpired(
+  record: Pick<ApprovalRequestRecord, 'expiresAt'>,
+  now = Date.now()
+): boolean {
+  if (typeof record.expiresAt !== 'string' || record.expiresAt.trim() === '') return false;
+  const expiresAt = Date.parse(record.expiresAt);
+  return !Number.isFinite(expiresAt) || expiresAt <= now;
+}
+
+/** Persist the terminal expiry transition exactly once. */
+export function expireApprovalRequest(
+  role: GovernedArtifactRole,
+  params: { channel: string; storageChannel?: string; requestId: string }
+): ApprovalRequestRecord {
+  const storageChannel = normalizeApprovalChannel(params.storageChannel || params.channel);
+  const record = loadApprovalRequest(storageChannel, params.requestId);
+  if (!record) throw new Error(`Approval request not found: ${params.channel}/${params.requestId}`);
+  if (record.status !== 'pending') return record;
+
+  const updated: ApprovalRequestRecord = { ...record, status: 'expired' };
+  writeGovernedArtifactJson(role, approvalRequestLogicalPath(storageChannel, updated.id), updated);
+  appendGovernedArtifactJsonl(role, approvalEventLogicalPath(storageChannel), {
+    ts: new Date().toISOString(),
+    event: 'expired',
+    request_id: updated.id,
+    correlation_id: updated.correlationId,
+    channel: updated.channel,
+    thread_ts: updated.threadTs,
+  });
+  return updated;
+}
+
 /**
  * LC-10 (bridge ask-why): attach a rejection reason AFTER the decision was
  * recorded — bridges decide via a button first and ask "why" as a follow-up.
@@ -404,6 +437,15 @@ export function decideApprovalRequest(
   const storageChannel = params.storageChannel || params.channel;
   const record = loadApprovalRequest(normalizeApprovalChannel(storageChannel), params.requestId);
   if (!record) throw new Error(`Approval request not found: ${params.channel}/${params.requestId}`);
+
+  if (record.status === 'pending' && isApprovalRequestExpired(record)) {
+    expireApprovalRequest(role, {
+      channel: record.channel,
+      storageChannel,
+      requestId: record.id,
+    });
+    throw new Error(`[POLICY_VIOLATION] Approval request has expired: ${record.id}`);
+  }
 
   validateHumanFinalDecision({
     accountability: record.accountability,

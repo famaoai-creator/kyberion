@@ -63,6 +63,17 @@ export {
   parseSlackApprovalAction,
 } from './slack-approval-ui.js';
 export {
+  applySurfaceApprovalDecision,
+  applySurfaceApprovalRejectionReason,
+  buildSurfaceApprovalAskWhyActions,
+  buildSurfaceApprovalActions,
+  buildSurfaceApprovalText,
+  createSurfaceApprovalRequest,
+  normalizeSurfaceApprovalAskWhyCategory,
+  resolveSurfaceApprovalAskWhy,
+  resolveSurfaceApprovalReply,
+} from './surface-approval-ui.js';
+export {
   buildSlackMissionProposalBlocks,
   parseSlackMissionProposalAction,
   slackMissionProposalFallbackText,

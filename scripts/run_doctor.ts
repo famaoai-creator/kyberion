@@ -10,6 +10,10 @@ import {
   safeExistsSync,
   safeReadFile,
   inspectMeshHub,
+  isSurfaceOutboxDue,
+  listSurfaceDeadLetters,
+  listSurfaceDeadTargets,
+  listSurfaceOutboxMessages,
 } from '@agent/core';
 import { buildNextAction, formatNextAction } from '@agent/core';
 import { formatEnvValidationReport, validateEnv } from '@agent/core';
@@ -57,6 +61,7 @@ export interface DoctorRunReport {
   governanceLines: string[];
   backupLines: string[];
   meshDeliveryLines: string[];
+  surfaceDeliveryLines: string[];
   localCapabilityLines: string[];
 }
 
@@ -182,6 +187,38 @@ export async function collectMeshDeliveryDoctorLines(): Promise<string[]> {
     const message = err instanceof Error ? err.message : String(err);
     return [`Mesh delivery: inspection unavailable (${message})`];
   }
+}
+
+const DOCTOR_SURFACES = ['slack', 'telegram', 'imessage', 'discord', 'chronos'];
+
+export function collectSurfaceDeliveryDoctorLines(): string[] {
+  const summaries = DOCTOR_SURFACES.map((surface) => {
+    const messages = listSurfaceOutboxMessages(surface);
+    const due = messages.filter((message) => isSurfaceOutboxDue(message)).length;
+    const deferred = messages.length - due;
+    const deadLetters = listSurfaceDeadLetters(surface).length;
+    const deadTargets = listSurfaceDeadTargets(surface).length;
+    return { surface, pending: messages.length, due, deferred, deadLetters, deadTargets };
+  });
+  const pending = summaries.reduce((sum, item) => sum + item.pending, 0);
+  const deadLetters = summaries.reduce((sum, item) => sum + item.deadLetters, 0);
+  const deadTargets = summaries.reduce((sum, item) => sum + item.deadTargets, 0);
+  const lines = [
+    `Surface delivery: pending=${pending}; dead_letter=${deadLetters}; dead_target=${deadTargets}`,
+  ];
+  for (const item of summaries.filter(
+    (summary) => summary.pending || summary.deadLetters || summary.deadTargets
+  )) {
+    lines.push(
+      `  - ${item.surface}: pending=${item.pending} due=${item.due} deferred=${item.deferred} dead_letter=${item.deadLetters} dead_target=${item.deadTargets}`
+    );
+  }
+  if (deadLetters > 0 || deadTargets > 0) {
+    lines.push(
+      '  - inspect surface dead-letter/dead-target records under active/shared/coordination/channels'
+    );
+  }
+  return lines;
 }
 
 export function collectBackupDoctorLines(): string[] {
@@ -322,6 +359,7 @@ export async function collectDoctorReport(argv: {
     governanceLines,
     backupLines: collectBackupDoctorLines(),
     meshDeliveryLines: await collectMeshDeliveryDoctorLines(),
+    surfaceDeliveryLines: collectSurfaceDeliveryDoctorLines(),
     localCapabilityLines: await collectLocalCapabilityDoctorLines(),
   };
 }
@@ -390,6 +428,9 @@ async function main(): Promise<void> {
     console.log(line);
   }
   for (const line of report.meshDeliveryLines) {
+    console.log(line);
+  }
+  for (const line of report.surfaceDeliveryLines) {
     console.log(line);
   }
   console.log('');

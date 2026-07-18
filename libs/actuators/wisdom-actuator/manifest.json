@@ -1,6 +1,6 @@
 {
   "actuator_id": "wisdom-actuator",
-  "version": "1.2.1",
+  "version": "1.3.0",
   "description": "Knowledge-tier search, injection, import/export, and decision-support operations",
   "contract_schema": "schemas/wisdom-action.schema.json",
   "resilience_tier": "adaptive_retry",
@@ -16,6 +16,12 @@
     "retryable_categories": ["resource_unavailable", "timeout", "network"]
   },
   "capabilities": [
+    {
+      "op": "history_search",
+      "platforms": ["darwin", "linux", "win32"],
+      "implementation": "full",
+      "note": "Zero-LLM search over the public history index; optional refresh scans public runtime sources only."
+    },
     { "op": "knowledge_search", "platforms": ["darwin", "linux", "win32"] },
     { "op": "knowledge_inject", "platforms": ["darwin", "linux", "win32"] },
     { "op": "knowledge_export", "platforms": ["darwin", "linux", "win32"] },
@@ -225,6 +231,12 @@
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "full",
       "note": "Drives DeploymentAdapter under the config:update approval gate. Stub=dry-run; register ShellDeploymentAdapter via KYBERION_DEPLOY_COMMAND for real CI/CD dispatch."
+    },
+    {
+      "op": "curate_background_review",
+      "platforms": ["darwin", "linux", "win32"],
+      "implementation": "full",
+      "note": "Archive-only curator for stale background-review proposals; bundled and manually authored records are protected by provenance."
     }
   ]
 }

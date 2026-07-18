@@ -744,6 +744,22 @@ describe("dispatchDecisionOp 'distill' (memory-distillation op)", () => {
   });
 });
 
+describe("dispatchDecisionOp 'curate_background_review'", () => {
+  it('routes the archive-only curator through the typed wisdom op', async () => {
+    const result = await dispatchDecisionOp(
+      'curate_background_review',
+      { max_age_days: 7, limit: 1, dry_run: true, export_as: 'curator_result' },
+      {}
+    );
+    expect(result.handled).toBe(true);
+    expect(result.ctx.curator_result).toMatchObject({
+      scanned: expect.any(Number),
+      archived: [],
+      would_archive: expect.any(Array),
+    });
+  });
+});
+
 describe("dispatchDecisionOp 'peer_advice'", () => {
   it('uses a peer backend when a failover candidate is available', async () => {
     const calls: string[] = [];
