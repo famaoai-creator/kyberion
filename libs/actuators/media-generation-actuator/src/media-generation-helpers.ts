@@ -5,6 +5,9 @@ import {
   safeExistsSync,
   safeMkdir,
   pathResolver,
+  buildGovernedRetryOptions,
+  loadRecoveryPolicy as loadCoreRecoveryPolicy,
+  isTerminalJobStatus,
   classifyError,
   secureFetch,
   retry,
@@ -38,7 +41,6 @@ const DEFAULT_COMFY_BASE_URL = process.env.KYBERION_COMFY_BASE_URL || 'http://12
 const DEFAULT_COMFY_OUTPUT_DIR =
   process.env.KYBERION_COMFY_OUTPUT_DIR || pathResolver.sharedTmp('comfy/output');
 const GENERATION_JOB_DIR = 'active/shared/runtime/media-generation/jobs';
-const TERMINAL_JOB_STATUSES = new Set(['succeeded', 'failed', 'timed_out', 'canceled']);
 const MEDIA_GENERATION_MANIFEST_PATH = pathResolver.rootResolve(
   'libs/actuators/media-generation-actuator/manifest.json'
 );
@@ -49,8 +51,6 @@ const DEFAULT_MEDIA_RETRY = {
   factor: 2,
   jitter: true,
 };
-
-let cachedRecoveryPolicy: Record<string, any> | undefined;
 
 function resolveGenerationBackend(action: string, params: any) {
   const backendId =
@@ -74,46 +74,16 @@ function isPlainObject(value: unknown): value is Record<string, any> {
 }
 
 function loadRecoveryPolicy(): Record<string, any> {
-  if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
-  try {
-    const manifest = JSON.parse(
-      safeReadFile(MEDIA_GENERATION_MANIFEST_PATH, { encoding: 'utf8' }) as string
-    );
-    cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
-    return cachedRecoveryPolicy ?? {};
-  } catch (_) {
-    cachedRecoveryPolicy = {};
-    return cachedRecoveryPolicy ?? {};
-  }
+  return loadCoreRecoveryPolicy(MEDIA_GENERATION_MANIFEST_PATH);
 }
 
 function buildRetryOptions(override?: Record<string, any>) {
-  const manifestRetry = isPlainObject(loadRecoveryPolicy().retry) ? loadRecoveryPolicy().retry : {};
-  const retryableCategories = new Set<string>(
-    Array.isArray(loadRecoveryPolicy().retryable_categories)
-      ? loadRecoveryPolicy().retryable_categories.map(String)
-      : []
-  );
-  const resolved = {
-    ...DEFAULT_MEDIA_RETRY,
-    ...manifestRetry,
-    ...(override || {}),
-  };
-  return {
-    ...resolved,
-    shouldRetry: (error: Error) => {
-      const classification = classifyError(error);
-      if (retryableCategories.size > 0) {
-        return retryableCategories.has(classification.category);
-      }
-      return (
-        classification.category === 'network' ||
-        classification.category === 'rate_limit' ||
-        classification.category === 'timeout' ||
-        classification.category === 'resource_unavailable'
-      );
-    },
-  };
+  return buildGovernedRetryOptions({
+    manifestPath: MEDIA_GENERATION_MANIFEST_PATH,
+    defaults: DEFAULT_MEDIA_RETRY,
+    override: override,
+    fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+  });
 }
 
 function ensureGenerationJobDir(): void {
@@ -171,7 +141,7 @@ function extractArtifacts(history: any): GeneratedArtifact[] {
 }
 
 function isTerminalStatus(status?: string): boolean {
-  return status ? TERMINAL_JOB_STATUSES.has(status) : false;
+  return isTerminalJobStatus(status);
 }
 
 function maybeCopyArtifact(sourcePath: string, targetPath?: string): string | undefined {

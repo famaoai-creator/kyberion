@@ -6,12 +6,7 @@ import { getAllFiles } from '@agent/core/fs-utils';
 const rootDir = process.cwd();
 
 const allowedRuntimeChildProcessConsumers = [
-  'libs/actuators/browser-actuator/src/index.ts',
-  'libs/actuators/code-actuator/src/code-pipeline-helpers.ts',
-  'libs/actuators/media-actuator/src/artisan/pptx-extraction.ts',
-  'libs/actuators/media-actuator/src/artisan/xlsx-extraction.ts',
   'libs/actuators/media-actuator/src/index.test.ts',
-  'libs/actuators/modeling-actuator/src/modeling-pipeline-helpers.ts',
   'libs/actuators/video-composition-actuator/src/video-composition-action-helpers.ts',
   'libs/core/acp-mediator.ts',
   'libs/core/agent-adapter.test.ts',
@@ -34,7 +29,6 @@ const allowedRuntimeChildProcessConsumers = [
   'libs/core/mlx-embedding-backend.ts',
   'libs/core/native-speech-listen-bridge.ts',
   'libs/core/native-tts.ts',
-  'libs/core/ocr-bridge.ts',
   'libs/core/orchestrator.ts',
   'libs/core/provider-discovery.ts',
   'libs/core/pty-engine.ts',

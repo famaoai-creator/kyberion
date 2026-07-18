@@ -11,11 +11,12 @@ import {
   getPathValue,
   resolveWriteArtifactSpec,
   retry,
+  buildGovernedRetryOptions,
+  runGovernedCommand,
   classifyError,
 } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
 import * as path from 'node:path';
-import { execSync } from 'node:child_process';
 import * as AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import { terraformToArchitectureAdf } from './terraform-architecture.js';
@@ -32,40 +33,12 @@ const DEFAULT_MODEL_RETRY = {
   jitter: true,
 };
 
-let cachedRecoveryPolicy: Record<string, any> | null = null;
-
-function isPlainObject(value: unknown): value is Record<string, any> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
-function loadRecoveryPolicy(): Record<string, any> {
-  if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
-  try {
-    const manifest = JSON.parse(safeReadFile(MODEL_MANIFEST_PATH, { encoding: 'utf8' }) as string);
-    cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
-  } catch {
-    cachedRecoveryPolicy = {};
-  }
-  return cachedRecoveryPolicy;
-}
-
 export function buildRetryOptions() {
-  const policy = loadRecoveryPolicy();
-  const retry = isPlainObject(policy.retry) ? policy.retry : DEFAULT_MODEL_RETRY;
-  const retryableCategories = new Set<string>(
-    Array.isArray(policy.retryable_categories) ? policy.retryable_categories.map(String) : []
-  );
-  return {
-    ...DEFAULT_MODEL_RETRY,
-    ...retry,
-    shouldRetry: (error: Error) => {
-      const classification = classifyError(error);
-      return retryableCategories.size > 0
-        ? retryableCategories.has(classification.category)
-        : classification.category === 'resource_unavailable' ||
-            classification.category === 'timeout';
-    },
-  };
+  return buildGovernedRetryOptions({
+    manifestPath: MODEL_MANIFEST_PATH,
+    defaults: DEFAULT_MODEL_RETRY,
+    fallbackCategories: ['resource_unavailable', 'timeout'],
+  });
 }
 
 const AjvCtor = (AjvModule as any).default ?? AjvModule;
@@ -227,10 +200,16 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
     case 'shell':
       return {
         ...ctx,
-        [params.export_as || 'last_capture']: await retry(
-          async () => execSync(resolve(params.cmd), { encoding: 'utf8' }).trim(),
-          buildRetryOptions()
-        ),
+        [params.export_as || 'last_capture']: await retry(async () => {
+          const result = runGovernedCommand('/bin/sh', ['-c', resolve(params.cmd)]);
+          if (result.error || result.status !== 0) {
+            throw (
+              result.error ||
+              new Error(result.stderr || `Command failed with exit code ${result.status}`)
+            );
+          }
+          return result.stdout.trim();
+        }, buildRetryOptions()),
       };
     default:
       throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);

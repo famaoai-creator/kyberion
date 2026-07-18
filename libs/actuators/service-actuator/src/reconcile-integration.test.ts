@@ -30,6 +30,11 @@ vi.mock('@agent/core', () => ({
   safeExistsSync: mocks.safeExistsSync,
   safeWriteFile: mocks.safeWriteFile,
   derivePipelineStatus: mocks.derivePipelineStatus,
+  buildGovernedRetryOptions: vi.fn(({ defaults, override }: any) => ({
+    ...defaults,
+    ...(override || {}),
+    shouldRetry: vi.fn(() => true),
+  })),
   retry: mocks.retry,
   executeServicePreset: mocks.executeServicePreset,
   safeAppendFile: vi.fn(), // Added

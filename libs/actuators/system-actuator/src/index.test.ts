@@ -908,6 +908,11 @@ vi.mock('@agent/core', () => ({
   buildUnknownActuatorOpError,
   safeExec,
   classifyError,
+  buildGovernedRetryOptions: vi.fn(({ defaults, override }: any) => ({
+    ...defaults,
+    ...(override || {}),
+    shouldRetry: vi.fn(() => true),
+  })),
   retry,
   emitComputerSurfacePatch,
   activateApplication,
