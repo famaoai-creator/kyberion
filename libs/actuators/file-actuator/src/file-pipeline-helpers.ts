@@ -12,6 +12,7 @@ import {
   safeMoveSync,
   safeRmSync,
   retry,
+  buildGovernedRetryOptions,
   classifyError,
   pathResolver,
   resolveVars,
@@ -37,40 +38,12 @@ const DEFAULT_FILE_RETRY = {
   jitter: true,
 };
 
-let cachedRecoveryPolicy: Record<string, any> | null = null;
-
-function isPlainObject(value: unknown): value is Record<string, any> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
-function loadRecoveryPolicy(): Record<string, any> {
-  if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
-  try {
-    const manifest = JSON.parse(safeReadFile(FILE_MANIFEST_PATH, { encoding: 'utf8' }) as string);
-    cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
-  } catch {
-    cachedRecoveryPolicy = {};
-  }
-  return cachedRecoveryPolicy;
-}
-
 function buildRetryOptions() {
-  const policy = loadRecoveryPolicy();
-  const retry = isPlainObject(policy.retry) ? policy.retry : DEFAULT_FILE_RETRY;
-  const retryableCategories = new Set<string>(
-    Array.isArray(policy.retryable_categories) ? policy.retryable_categories.map(String) : []
-  );
-  return {
-    ...DEFAULT_FILE_RETRY,
-    ...retry,
-    shouldRetry: (error: Error) => {
-      const classification = classifyError(error);
-      return retryableCategories.size > 0
-        ? retryableCategories.has(classification.category)
-        : classification.category === 'resource_unavailable' ||
-            classification.category === 'timeout';
-    },
-  };
+  return buildGovernedRetryOptions({
+    manifestPath: FILE_MANIFEST_PATH,
+    defaults: DEFAULT_FILE_RETRY,
+    fallbackCategories: ['resource_unavailable', 'timeout'],
+  });
 }
 
 function buildUnknownFileOpMessage(op: string): string {

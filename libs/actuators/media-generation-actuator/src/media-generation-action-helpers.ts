@@ -10,6 +10,7 @@ import {
   safeMkdir,
   pathResolver,
   platform,
+  waitForJob,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
@@ -32,7 +33,6 @@ import {
   isPlainObject,
   loadRecoveryPolicy,
   resolveArtifactPath,
-  sleep,
 } from './media-generation-helpers.js';
 
 const PROMPT_BASED_ACTIONS = new Set([
@@ -41,10 +41,6 @@ const PROMPT_BASED_ACTIONS = new Set([
   'generate_music',
   'run_workflow',
 ]);
-const TERMINAL_JOB_STATUSES = new Set(['succeeded', 'failed', 'timed_out', 'canceled']);
-
-let cachedRecoveryPolicy: Record<string, any> | undefined;
-
 async function retryGenerationJob(job: GenerationJob): Promise<GenerationJob> {
   const maxAttempts = Number(job.retry_policy?.max_attempts || 1);
   if ((job.attempts || 1) >= maxAttempts) {
@@ -384,15 +380,15 @@ async function waitGenerationJob(params: any) {
     if (!jobId) throw new Error('wait_generation_job requires job_id');
     const timeoutMs = Number(params.timeout_ms || 15 * 60 * 1000);
     const pollIntervalMs = Number(params.poll_interval_ms || 5_000);
-    const startedAt = Date.now();
-
-    while (Date.now() - startedAt < timeoutMs) {
-      const job = await getGenerationJob({ job_id: jobId });
-      if (isTerminalStatus(job.status)) {
-        traceCtx.endSpan('ok');
-        return { ...job, ...finalizeActuatorTrace(traceCtx) };
-      }
-      await sleep(pollIntervalMs);
+    const waited = await waitForJob({
+      getStatus: () => getGenerationJob({ job_id: jobId }),
+      isTerminal: (job: any) => isTerminalStatus(job.status),
+      timeoutMs,
+      pollIntervalMs,
+    });
+    if (waited.status === 'completed') {
+      traceCtx.endSpan('ok');
+      return { ...waited.value, ...finalizeActuatorTrace(traceCtx) };
     }
 
     const timedOut = {

@@ -4,14 +4,22 @@ import {
   logger,
   pathResolver,
   safeReadFile,
+  buildGovernedRetryOptions,
+  loadRecoveryPolicy as loadRecoveryPolicyFromManifest,
+  waitForJob,
   classifyError,
   VideoRenderRuntime,
 } from '@agent/core';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
-export const videoCompositionActionValidate = compileSchemaFromPath(ajv, pathResolver.rootResolve('schemas/video-composition-action.schema.json'));
-export const VIDEO_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/video-composition-actuator/manifest.json');
+export const videoCompositionActionValidate = compileSchemaFromPath(
+  ajv,
+  pathResolver.rootResolve('schemas/video-composition-action.schema.json')
+);
+export const VIDEO_MANIFEST_PATH = pathResolver.rootResolve(
+  'libs/actuators/video-composition-actuator/manifest.json'
+);
 export const DEFAULT_VIDEO_RETRY = {
   maxRetries: 2,
   initialDelayMs: 250,
@@ -19,8 +27,6 @@ export const DEFAULT_VIDEO_RETRY = {
   factor: 2,
   jitter: true,
 };
-
-let cachedRecoveryPolicy: Record<string, any> | null = null;
 
 export const runtime = new VideoRenderRuntime();
 export const packetHistory = new Map<string, any[]>();
@@ -46,32 +52,15 @@ export function isPlainObject(value: unknown): value is Record<string, any> {
 }
 
 export function loadRecoveryPolicy(): Record<string, any> {
-  if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
-  try {
-    const manifest = JSON.parse(safeReadFile(VIDEO_MANIFEST_PATH, { encoding: 'utf8' }) as string);
-    cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
-  } catch {
-    cachedRecoveryPolicy = {};
-  }
-  return cachedRecoveryPolicy;
+  return loadRecoveryPolicyFromManifest(VIDEO_MANIFEST_PATH);
 }
 
 export function buildRetryOptions(defaultRetry: Record<string, any>) {
-  const policy = loadRecoveryPolicy();
-  const retry = isPlainObject(policy.retry) ? policy.retry : defaultRetry;
-  const retryableCategories = new Set<string>(
-    Array.isArray(policy.retryable_categories) ? policy.retryable_categories.map(String) : [],
-  );
-  return {
-    ...defaultRetry,
-    ...retry,
-    shouldRetry: (error: Error) => {
-      const classification = classifyError(error);
-      return retryableCategories.size > 0
-        ? retryableCategories.has(classification.category)
-        : classification.category === 'resource_unavailable' || classification.category === 'timeout';
-    },
-  };
+  return buildGovernedRetryOptions({
+    manifestPath: VIDEO_MANIFEST_PATH,
+    defaults: defaultRetry,
+    fallbackCategories: ['resource_unavailable', 'timeout'],
+  });
 }
 
 export function deepResolve(val: any, ctx: any): any {
@@ -115,13 +104,18 @@ export function validateVideoCompositionAction(input: unknown): void {
   throw new Error(`Invalid video composition action: ${detail}`);
 }
 
-export function resolveAwaitCompletion(adf: { output?: { await_completion?: boolean } }, policy: { render?: { enable_backend_rendering?: boolean } }): boolean {
+export function resolveAwaitCompletion(
+  adf: { output?: { await_completion?: boolean } },
+  policy: { render?: { enable_backend_rendering?: boolean } }
+): boolean {
   if (adf.output?.await_completion === true) return true;
   if (adf.output?.await_completion === false) return false;
   return !policy.render?.enable_backend_rendering;
 }
 
-export function computeAwaitTimeoutMs(policy: { render?: { command_timeout_ms?: number } }): number {
+export function computeAwaitTimeoutMs(policy: {
+  render?: { command_timeout_ms?: number };
+}): number {
   return Math.max(30_000, Number(policy.render?.command_timeout_ms || 0) + 60_000);
 }
 
@@ -131,7 +125,10 @@ export function normalizeAwaitTimeoutMs(value: unknown): number {
   return Math.max(10, Math.min(3_600_000, Math.floor(raw)));
 }
 
-export function upsertJobDiagnostics(jobId: string, patch: Partial<VideoCompositionJobDiagnostics>): VideoCompositionJobDiagnostics {
+export function upsertJobDiagnostics(
+  jobId: string,
+  patch: Partial<VideoCompositionJobDiagnostics>
+): VideoCompositionJobDiagnostics {
   const current = jobDiagnostics.get(jobId) || {};
   const next = { ...current, ...patch };
   jobDiagnostics.set(jobId, next);
@@ -165,7 +162,9 @@ export function trackLifecycleDiagnostics(packet: any): void {
   }
 }
 
-export function extractBackendTerminationState(error: any): Partial<VideoCompositionJobDiagnostics> | null {
+export function extractBackendTerminationState(
+  error: any
+): Partial<VideoCompositionJobDiagnostics> | null {
   if (!error || typeof error !== 'object') return null;
   const hasSignal = Object.prototype.hasOwnProperty.call(error, 'signal');
   const hasExitCode = Object.prototype.hasOwnProperty.call(error, 'exit_code');
@@ -195,15 +194,17 @@ export async function waitForRenderJob(
   runtime: typeof import('./video-composition-helpers.js').runtime,
   jobId: string,
   timeoutMs = 30_000,
-  returnNullOnTimeout = false,
+  returnNullOnTimeout = false
 ): Promise<any> {
-  const startedAt = Date.now();
-  while (Date.now() - startedAt < timeoutMs) {
-    const packet = runtime.getPacket(jobId);
-    if (packet && ['completed', 'failed', 'cancelled'].includes(packet.status)) {
-      return packet;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 10));
+  const waited = await waitForJob({
+    getStatus: async () => runtime.getPacket(jobId),
+    isTerminal: (packet: any) =>
+      Boolean(packet && ['completed', 'failed', 'cancelled'].includes(packet.status)),
+    timeoutMs,
+    pollIntervalMs: 10,
+  });
+  if (waited.status === 'completed' && waited.value) {
+    return waited.value;
   }
   if (returnNullOnTimeout) return null;
   throw new Error(`video composition job timed out: ${jobId}`);

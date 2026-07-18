@@ -1,4 +1,4 @@
-import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import type { ChildProcess } from 'node:child_process';
 import { generateVideoVisualDirection } from '@agent/core';
 import {
   compileNarratedVideoBriefToCompositionADF,
@@ -17,6 +17,7 @@ import {
   safeReadFile,
   safeStat,
   safeWriteFile,
+  spawnManagedProcess,
   retry,
   writeVideoCompositionBundle,
 } from '@agent/core';
@@ -146,21 +147,29 @@ function readVideoCompositionJobTicket(ticketPath: string): VideoCompositionJobT
   }
 }
 
-function spawnDetachedVideoCompositionWorker(
-  inputPath: string
-): ChildProcessWithoutNullStreams | null {
+function spawnDetachedVideoCompositionWorker(inputPath: string): ChildProcess | null {
   if (!safeExistsSync(DETACHED_WORKER_SCRIPT)) {
     return null;
   }
-  const child = spawn(process.execPath, [DETACHED_WORKER_SCRIPT, '--input', inputPath], {
-    cwd: pathResolver.rootDir(),
-    env: {
-      ...process.env,
-      KYBERION_VIDEO_RENDER_RUN_MODE: 'in-process',
+  const handle = spawnManagedProcess({
+    resourceId: `video-composition-worker:${path.basename(inputPath)}`,
+    kind: 'service',
+    ownerId: 'video-composition-actuator',
+    ownerType: 'actuator',
+    command: process.execPath,
+    args: [DETACHED_WORKER_SCRIPT, '--input', inputPath],
+    spawnOptions: {
+      cwd: pathResolver.rootDir(),
+      env: {
+        ...process.env,
+        KYBERION_VIDEO_RENDER_RUN_MODE: 'in-process',
+      },
+      detached: true,
+      stdio: 'ignore',
     },
-    detached: true,
-    stdio: 'ignore',
+    shutdownPolicy: 'detached',
   });
+  const child = handle.child;
   child.unref();
   return child;
 }

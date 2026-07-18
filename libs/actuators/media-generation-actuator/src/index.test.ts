@@ -34,6 +34,16 @@ vi.mock('@agent/core', async () => {
     compileVideoGenerationADF: mocks.compileVideoGenerationADF,
     generateImage: mocks.generateImage,
     secureFetch: mocks.secureFetch,
+    buildGovernedRetryOptions: vi.fn(({ manifestPath, defaults, override }: any) => {
+      let retryPolicy = {};
+      try {
+        const manifest = JSON.parse(String(mocks.safeReadFile(manifestPath)));
+        retryPolicy = manifest?.recovery_policy?.retry || {};
+      } catch {
+        retryPolicy = {};
+      }
+      return { ...defaults, ...retryPolicy, ...(override || {}), shouldRetry: vi.fn() };
+    }),
     retry: mocks.retry,
     safeCopyFileSync: mocks.safeCopyFileSync,
     safeExistsSync: mocks.safeExistsSync,

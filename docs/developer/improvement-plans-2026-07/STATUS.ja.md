@@ -4,14 +4,15 @@
 > **更新規約**: 計画の実装・レビュー完了時に本表を更新する。各計画文書内の「実装状況」節と矛盾する場合は本表を正とし、文書側を追従させる。
 > **2026-07-18追記**: KM-02 Task 4.2(runtime側)を完了。共通ranking signalをknowledge-indexのlexical/hybrid検索へ接続し、DONE 67 / PARTIAL 26へ更新。
 > **2026-07-18追記**: OpenHarness概念取り込み OH-02(資格情報パス常時deny)を実装・検証済み。OH-04(大きなADF step出力のartifact退避)も実装・検証済み。OH-01/03/05/06/07/08は未着手のためTODOとして追加し、DONE 69 / PARTIAL 26 / TODO 6へ更新。
+> **2026-07-18追記**: AR-09 を DONE に更新。actuator 横断の recovery policy / managed process / voice capability / job lifecycle / secure HTTP boundary を `libs/core` に正本化し、actuator 全体テスト(589 passed / 11 skipped)、typecheck、build、op registry、lint を確認。DONE 70 / PARTIAL 25 / TODO 6へ更新。
 > **判定基準**: DONE = 受入条件を実コードで検証済 / PARTIAL = 一部充足 / TODO = 実質未着手。
 
 ## サマリ
 
 | 判定    | 件数 |
 | ------- | ---- |
-| DONE    | 69   |
-| PARTIAL | 26   |
+| DONE    | 70   |
+| PARTIAL | 25   |
 | TODO    | 6    |
 
 ## P0 残作業(プロダクション化のクリティカルパス)
@@ -135,6 +136,7 @@
 | AR-06 | PARTIAL | teach message(shared helper で network/orchestrator/file/system へ展開)、skipped 明示化(run_pipeline 含む)、silent default 回帰検知、AR-01 集約                                                                                                                                                                                                                                                                                                                                                                                                  |
 | AR-07 | DONE    | 2026-07-13 完了: `llm_decide` を android/terminal/system/network へ横展開(全5実装が共通ヘルパ `executeLlmDecideOp` を使用、LC-09 縮退処理込み)。蒸留段も全観測ファミリで決定論化 — browser `distill_dom` / android `summarize_ui_tree` / system `distill_output`(head/tail/error行、`libs/core/observation-distill.ts`)/ network `distill_response`(JSON shape・HTML title+links・text preview)。op-catalog/registry/CAPABILITIES_GUIDE/schema 登録済み                                                                                          |
 | AR-08 | PARTIAL | 2026-07-14: pipeline カタログ(77件)の静的+実行監査を実施、55件を実行検証。共有 ADF 修復エンジンの false-success バグ(nested step 誤マッチ + 未変更ファイルを「修復成功」と誤判定)を修正、`process-actuator` の全 op を機能不全にしていた ESM import バグを修正、16 pipeline JSON の実バグを修正(詳細: [AR-08](./AR-08_PIPELINE_CATALOG_AUDIT.ja.md))。残: corpus-wide 静的検証テストの恒久化、marketing-content.json の brief スキーマ、personal tier ミッションパス二重規約の解消、未実行 22 pipeline の検証、audit chain 破損(48/50)の原因調査 |
+| AR-09 | DONE    | 2026-07-18 完了: actuator 横断の recovery policy / managed process / voice capability / job lifecycle / secure HTTP boundary を `libs/core` に正本化。全 actuator テスト589本(11 skipped)、typecheck/build/op registry/lintを確認。                                                                                                                                                                                                                                                                                                              |
 
 ### LE(実行レイヤリング)
 
