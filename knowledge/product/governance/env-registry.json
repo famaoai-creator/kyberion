@@ -574,6 +574,14 @@
       "documented": false
     },
     {
+      "name": "KYBERION_COPILOT_CLI_BIN",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_COPILOT_MODEL",
       "category": "provider",
       "type": "string",
