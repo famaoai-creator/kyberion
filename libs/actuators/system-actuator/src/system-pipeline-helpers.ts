@@ -49,6 +49,7 @@ import {
   collectAuditVerifyReport,
   runMemoryPromotionQueueSummary,
   runTaskModelRoutingSummary,
+  macosAutomationBridge,
 } from '@agent/core';
 import { handleAction as handleFileAction } from '../../file-actuator/src/file-pipeline-helpers.js';
 import { getAllFiles } from '@agent/core/fs-utils';
@@ -214,6 +215,7 @@ const SYSTEM_ACTUATOR_CAPTURE_ALIAS_OPS = new Set<string>([
   'clipboard_read',
   'get_focused_input',
   'get_screen_size',
+  'macos_automation_probe',
   'window_list',
   'chrome_tab_list',
   'read_file',
@@ -427,6 +429,14 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
         screenshot_window_candidates: windowCandidates || [],
       };
     }
+    case 'macos_automation_probe':
+      return {
+        ...ctx,
+        [params.export_as || 'macos_automation']: {
+          ...macosAutomationBridge.probe(),
+          capabilities: macosAutomationBridge.listCapabilities(),
+        },
+      };
     case 'window_list': {
       const application =
         typeof params.application === 'string' && params.application.trim()

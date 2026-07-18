@@ -1871,6 +1871,25 @@
           "kind": "capture"
         },
         {
+          "op": "macos_automation_probe",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "export_as": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "export_as": "macos_automation"
+            }
+          ]
+        },
+        {
           "op": "window_list",
           "kind": "capture"
         },
