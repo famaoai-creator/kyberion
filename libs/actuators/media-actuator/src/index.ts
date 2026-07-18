@@ -80,6 +80,7 @@ import {
   type MediaAction,
   type MediaPipelineStep,
 } from './media-pipeline-helpers.js';
+import { recognizeDocumentImage } from './media-ocr.js';
 import { createProposalPptxFlow } from './proposal-pptx-helpers.js';
 import { createMediaDocumentPipelineHelpers } from './media-document-pipeline-helpers.js';
 import {
@@ -1194,15 +1195,36 @@ async function opCapture(op: string, params: any, ctx: any, resolve: Function) {
       const sourcePath = path.resolve(rootDir, resolve(params.path));
       const assetsDir = pathResolver.sharedTmp(`actuators/media-actuator/assets_${Date.now()}`);
       const design = await pptxUtils.distillPptxDesign(sourcePath, assetsDir);
+      const ocrEnabled = params.ocr === true || params.ocr?.enabled === true;
+      const output = ocrEnabled
+        ? await augmentPptxDesignWithImageOcr(design, {
+            language: params.ocr?.language,
+            mode: params.ocr?.mode,
+          })
+        : design;
       return {
         ...ctx,
-        [params.export_as || 'last_pptx_design']: design,
+        [params.export_as || 'last_pptx_design']: output,
         last_assets_dir: assetsDir,
       };
     }
     case 'pptx_slide_text': {
       const sourcePath = path.resolve(rootDir, resolve(params.path));
-      const slides = extractPptxSlides(sourcePath);
+      let slides: any[] = extractPptxSlides(sourcePath);
+      if (params.ocr === true || params.ocr?.enabled === true) {
+        const assetsDir = pathResolver.sharedTmp(
+          `actuators/media-actuator/ocr_assets_${Date.now()}`
+        );
+        const design = await pptxUtils.distillPptxDesign(sourcePath, assetsDir);
+        const ocrBySlide = await collectPptxImageOcr(design, {
+          language: params.ocr?.language,
+          mode: params.ocr?.mode,
+        });
+        slides = slides.map((slide) => ({
+          ...slide,
+          ...(ocrBySlide.get(slide.slide_index) || {}),
+        }));
+      }
       return { ...ctx, [params.export_as || 'last_pptx_slides']: slides };
     }
     case 'xlsx_extract': {
@@ -3602,14 +3624,6 @@ async function maybeAugmentPdfDesignWithImageOcr(
   if (!Array.isArray(pdfDesign.content?.pages) || pdfDesign.content.pages.length === 0)
     return pdfDesign;
 
-  let Tesseract: any;
-  try {
-    ({ default: Tesseract } = await import('tesseract.js'));
-  } catch (error: any) {
-    logger.warn(`[MEDIA_TRANSFORM] fullPageImageOcrOverlay unavailable: ${error.message}`);
-    return pdfDesign;
-  }
-
   const cloned = cloneJsonValue(pdfDesign as any) as PdfDesignProtocol;
   for (const page of cloned.content.pages as any[]) {
     const pageWidth = page?.width || 960;
@@ -3634,25 +3648,88 @@ async function maybeAugmentPdfDesignWithImageOcr(
     if (!dominantImage || !dominantImage.path || !shouldRunOcr) continue;
     try {
       const requestedLanguage = resolvedHints.ocr?.language || 'jpn+eng';
-      let ocr: any;
-      try {
-        ocr = await Tesseract.recognize(dominantImage.path, requestedLanguage);
-      } catch (error: any) {
-        if (requestedLanguage !== 'eng') {
-          logger.warn(
-            `[MEDIA_TRANSFORM] OCR fallback to eng on page ${page.pageNumber}: ${error.message}`
-          );
-          ocr = await Tesseract.recognize(dominantImage.path, 'eng');
-        } else {
-          throw error;
-        }
-      }
-      page.ocrLines = mediaPdfHelpers.buildPdfPageOcrOverlayLines(page, dominantImage, ocr);
+      const ocr = await recognizeDocumentImage({
+        path: dominantImage.path,
+        language: requestedLanguage,
+        mode: 'local_only',
+      });
+      page.ocrProvider = ocr.provider;
+      page.ocrConfidence = ocr.confidence;
+      page.ocrLines = mediaPdfHelpers.buildPdfPageOcrOverlayLinesFromResult(
+        page,
+        dominantImage,
+        ocr
+      );
     } catch (error: any) {
       logger.warn(
         `[MEDIA_TRANSFORM] fullPageImageOcrOverlay failed on page ${page.pageNumber}: ${error.message}`
       );
     }
+  }
+  return cloned;
+}
+
+interface DocumentOcrOptions {
+  language?: string;
+  mode?: 'fast' | 'accurate' | 'balanced' | 'local_only' | 'privacy_first';
+}
+
+async function collectPptxImageOcr(
+  design: any,
+  options: DocumentOcrOptions = {}
+): Promise<Map<number, any>> {
+  const bySlide = new Map<number, any>();
+  const slides = Array.isArray(design?.slides) ? design.slides : [];
+  for (const [index, slide] of slides.entries()) {
+    const imageElements = Array.isArray(slide?.elements)
+      ? slide.elements.filter((element: any) => element?.type === 'image' && element?.imagePath)
+      : [];
+    const results: any[] = [];
+    for (const image of imageElements) {
+      try {
+        const result = await recognizeDocumentImage({
+          path: image.imagePath,
+          language: options.language || 'jpn+eng',
+          mode: options.mode || 'local_only',
+        });
+        if (result.text.trim()) {
+          results.push({
+            provider: result.provider,
+            confidence: result.confidence,
+            text: result.text.trim(),
+            lines: result.lines,
+            imagePath: image.imagePath,
+          });
+        }
+      } catch (error: any) {
+        logger.warn(
+          `[MEDIA_CAPTURE] PPTX image OCR failed on slide ${index + 1}: ${error.message}`
+        );
+      }
+    }
+    if (results.length === 0) continue;
+    const ocrText = Array.from(new Set(results.map((result) => result.text))).join('\n\n');
+    bySlide.set(index + 1, {
+      ocr_text: ocrText,
+      ocr_results: results,
+      ocr_provider: results.map((result) => result.provider).join(','),
+      ocr_confidence: Math.round(
+        results.reduce((sum, result) => sum + Number(result.confidence || 0), 0) / results.length
+      ),
+    });
+  }
+  return bySlide;
+}
+
+async function augmentPptxDesignWithImageOcr(
+  design: any,
+  options: DocumentOcrOptions = {}
+): Promise<any> {
+  const cloned = cloneJsonValue(design);
+  const ocrBySlide = await collectPptxImageOcr(design, options);
+  for (const [index, slide] of (cloned.slides || []).entries()) {
+    const ocr = ocrBySlide.get(index + 1);
+    if (ocr) slide.ocr = ocr;
   }
   return cloned;
 }
