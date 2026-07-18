@@ -19,6 +19,8 @@ import {
   buildBridgeEmptyReplyText,
   chunkBridgeMessage,
   postBridgeError,
+  resolveMissionProposalReply,
+  stashMissionProposalForConfirmation,
 } from '@agent/core';
 
 const DISCORD_SURFACE_AGENT_ID = 'discord-surface-agent';
@@ -133,6 +135,20 @@ async function handleDiscordMessage(message: Message) {
 
   logger.info(`📥 [DiscordBridge] Message from ${message.author.tag}: ${message.content}`);
   const threadTs = message.channelId;
+
+  // SN-01 Phase 2: numbered-choice mission-proposal confirmation, same UX
+  // contract as Slack ('1 / 作成する' issues, '2 / やめる' cancels).
+  const proposalReply = await resolveMissionProposalReply({
+    surface: 'discord',
+    channel: message.channelId,
+    thread: threadTs,
+    text: message.content,
+  });
+  if (proposalReply.handled) {
+    await message.reply(proposalReply.reply);
+    return;
+  }
+
   const threadContext = await collectDiscordThreadContext(message);
   appendDiscordThreadHistory({
     role: 'user',
@@ -165,6 +181,32 @@ async function handleDiscordMessage(message: Message) {
       delegationSummaryInstruction:
         'Produce a concise Discord reply. Use markdown if appropriate. Do not use A2A blocks.',
     } as any);
+
+    // SN-01 Phase 2: a mission proposal becomes a pending numbered-choice
+    // confirmation instead of a plain reply.
+    const missionProposal = result.missionProposals?.[0];
+    if (missionProposal) {
+      const prompt = stashMissionProposalForConfirmation({
+        surface: 'discord',
+        channel: message.channelId,
+        thread: threadTs,
+        proposal: missionProposal,
+        sourceText: message.content,
+        routingDecision: result.routingDecision,
+        fallbackSummary: result.text,
+      });
+      await message.reply(prompt);
+      appendDiscordThreadHistory({
+        role: 'assistant',
+        authorLabel: DISCORD_SURFACE_AGENT_ID,
+        text: prompt,
+        messageId: `reply-${message.id}`,
+        threadTs,
+        channelId: message.channelId,
+        receivedAt: new Date().toISOString(),
+      });
+      return;
+    }
 
     if (result.text) {
       logger.info(`📤 [DiscordBridge] Replying to ${message.author.tag}`);
