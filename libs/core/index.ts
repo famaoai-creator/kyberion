@@ -577,6 +577,7 @@ export {
   isSecretPath,
 } from './secret-guard.js';
 export * from './shell-command-policy.js';
+export * from './sensitive-path-policy.js';
 export * from './adf-guardrails.js';
 export * from './reconcile-ops.js';
 export * from './report-ops.js';

@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('./secure-io.js', () => ({
+  withSensitivePathMediation: <T>(fn: () => T) => fn(),
   safeReadFile: mocks.safeReadFile,
   safeWriteFile: mocks.safeWriteFile,
   safeReaddir: mocks.safeReaddir,
@@ -68,7 +69,8 @@ describe('secret-guard branch coverage', () => {
 
   it('loads nested personal secrets on module init and resolves from cache', async () => {
     mocks.safeReaddir.mockImplementation((p: string) => {
-      if (p.endsWith('/knowledge/personal/connections')) return ['slack.json', 'github', 'README.txt'];
+      if (p.endsWith('/knowledge/personal/connections'))
+        return ['slack.json', 'github', 'README.txt'];
       if (p.endsWith('/knowledge/personal/connections/github')) return ['main.json'];
       return [];
     });
@@ -76,8 +78,10 @@ describe('secret-guard branch coverage', () => {
       isDirectory: () => p.endsWith('/github'),
     }));
     mocks.safeReadFile.mockImplementation((p: string) => {
-      if (p.endsWith('/knowledge/personal/connections/slack.json')) return JSON.stringify({ bot_token: 'xoxb-from-file' });
-      if (p.endsWith('/knowledge/personal/connections/github/main.json')) return JSON.stringify({ nested: { token: 'gh-from-file' } });
+      if (p.endsWith('/knowledge/personal/connections/slack.json'))
+        return JSON.stringify({ bot_token: 'xoxb-from-file' });
+      if (p.endsWith('/knowledge/personal/connections/github/main.json'))
+        return JSON.stringify({ nested: { token: 'gh-from-file' } });
       return '{}';
     });
 
@@ -99,7 +103,9 @@ describe('secret-guard branch coverage', () => {
   });
 
   it('getSecret accepts authorized scope and active grant, and tracks long secrets only', async () => {
-    mocks.safeExistsSync.mockImplementation((p: string) => p.endsWith('/active/shared/auth-grants.json'));
+    mocks.safeExistsSync.mockImplementation((p: string) =>
+      p.endsWith('/active/shared/auth-grants.json')
+    );
     mocks.safeReadFile.mockImplementation((p: string) => {
       if (p.endsWith('/active/shared/auth-grants.json')) {
         return JSON.stringify([
@@ -140,9 +146,11 @@ describe('secret-guard branch coverage', () => {
   });
 
   it('grantAccess/checkAuthority/storeConnectionDocument and loadConnectionDocument branches', async () => {
-    mocks.safeExistsSync.mockImplementation((p: string) => (
-      p.endsWith('/active/shared/auth-grants.json') || p.endsWith('/knowledge/personal/connections/slack.json')
-    ));
+    mocks.safeExistsSync.mockImplementation(
+      (p: string) =>
+        p.endsWith('/active/shared/auth-grants.json') ||
+        p.endsWith('/knowledge/personal/connections/slack.json')
+    );
     mocks.safeReadFile.mockImplementation((p: string) => {
       if (p.endsWith('/active/shared/auth-grants.json')) {
         return JSON.stringify([
@@ -161,13 +169,13 @@ describe('secret-guard branch coverage', () => {
     mod.grantAccess('MSN-B', 'slack', 1, false);
     expect(mocks.safeWriteFile).toHaveBeenCalledWith(
       '/repo/active/shared/auth-grants.json',
-      expect.stringContaining('"serviceId": "slack"'),
+      expect.stringContaining('"serviceId": "slack"')
     );
 
     mod.grantAccess('MSN-C', 'secrets:admin', 1, true);
     expect(mocks.safeWriteFile).toHaveBeenCalledWith(
       '/repo/active/shared/auth-grants.json',
-      expect.stringContaining('"authority": "secrets:admin"'),
+      expect.stringContaining('"authority": "secrets:admin"')
     );
 
     expect(mod.checkAuthority('MSN-A', 'secrets:rotate')).toBe(true);
@@ -176,13 +184,13 @@ describe('secret-guard branch coverage', () => {
     const stored = mod.storeConnectionDocument(
       'Slack',
       { token: 'new-token', nested: { a: 1 } },
-      { missionId: 'MSN-B', actor: 'tester' },
+      { missionId: 'MSN-B', actor: 'tester' }
     );
     expect(stored.path.endsWith('knowledge/personal/connections/slack.json')).toBe(true);
     expect(stored.changedKeys).toEqual(['nested', 'token']);
     expect(mocks.safeWriteFile).toHaveBeenCalledWith(
       expect.stringContaining('.bak'),
-      expect.any(String),
+      expect.any(String)
     );
     expect(mocks.ledgerRecord).toHaveBeenCalledWith(
       'CONFIG_CHANGE',
@@ -190,7 +198,7 @@ describe('secret-guard branch coverage', () => {
         mission_id: 'MSN-B',
         role: 'tester',
         service_id: 'Slack',
-      }),
+      })
     );
 
     expect(mod.loadConnectionDocument('Slack')).toEqual({ token: 'old-token' });
@@ -199,9 +207,9 @@ describe('secret-guard branch coverage', () => {
   });
 
   it('clears existing service cache entries when storing a connection document', async () => {
-    mocks.safeReaddir.mockImplementation((p: string) => (
+    mocks.safeReaddir.mockImplementation((p: string) =>
       p.endsWith('/knowledge/personal/connections') ? ['slack.json', 'github.json'] : []
-    ));
+    );
     mocks.safeStat.mockReturnValue({ isDirectory: () => false });
     mocks.safeReadFile.mockImplementation((p: string) => {
       if (p.endsWith('/knowledge/personal/connections/slack.json')) {
@@ -223,10 +231,12 @@ describe('secret-guard branch coverage', () => {
   });
 
   it('returns false from checkAuthority when grants file is invalid JSON', async () => {
-    mocks.safeExistsSync.mockImplementation((p: string) => p.endsWith('/active/shared/auth-grants.json'));
-    mocks.safeReadFile.mockImplementation((p: string) => (
+    mocks.safeExistsSync.mockImplementation((p: string) =>
+      p.endsWith('/active/shared/auth-grants.json')
+    );
+    mocks.safeReadFile.mockImplementation((p: string) =>
       p.endsWith('/active/shared/auth-grants.json') ? '{not-json' : '{}'
-    ));
+    );
 
     const mod = await import('./secret-guard.js');
     expect(mod.checkAuthority('MSN-X', 'secrets:rotate')).toBe(false);
