@@ -28,7 +28,7 @@ describe('mission-team-composer classification integration', () => {
       expect.objectContaining({
         tier: 'small',
         effort: 'low',
-        model_id: 'openai:gpt-5.4-mini',
+        model_id: 'openai:gpt-5.6-luna',
       })
     );
     expect(owner?.delegation_contract?.ownership_scope).toContain('end-to-end mission objective');

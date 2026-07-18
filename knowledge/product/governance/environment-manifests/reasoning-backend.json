@@ -2,7 +2,7 @@
   "$schema": "https://kyberion.local/schemas/environment-capability-manifest.schema.json",
   "manifest_id": "reasoning-backend",
   "version": "2026-04-29",
-  "description": "At least one reasoning backend is reachable through a policy-driven adapter: codex-cli, gemini-cli, agy-cli, anthropic, nemotron-api, local, or any future adapter registered in wisdom policy. Stub backend is always available; this manifest distinguishes 'real backend present' from 'falling back to stub'.",
+  "description": "At least one reasoning backend is reachable through a policy-driven adapter: codex-cli, agy-cli, anthropic, openrouter, nemotron-api, local, or any future adapter registered in wisdom policy. The legacy gemini-cli adapter remains available for explicit Enterprise configurations. Stub backend is always available; this manifest distinguishes 'real backend present' from 'falling back to stub'.",
   "capabilities": [
     {
       "capability_id": "reasoning-backend.any-real",
@@ -12,7 +12,7 @@
       "probe": { "kind": "probe", "probe_id": "reasoning-backend.any-real" },
       "install": {
         "operator_confirmed": true,
-        "instruction": "Pick one and authenticate it. Recommended: configure a policy-backed adapter for `codex`, `gemini`, `agy`, or an OpenAI-compatible endpoint such as Nemotron. Alternates: set `ANTHROPIC_API_KEY`. Then set `KYBERION_REASONING_BACKEND` to the corresponding id (`codex-cli` / `gemini-cli` / `agy-cli` / `anthropic` / `nemotron-api` / `local`). Setting it to `stub` is also valid for offline / deterministic-test deployments."
+        "instruction": "Pick one and authenticate it. Recommended for personal use: configure `codex` or `agy` (Antigravity CLI). Other supported choices are OpenRouter (`OPENROUTER_API_KEY` or `KYBERION_OPENROUTER_KEY`), an OpenAI-compatible endpoint such as Nemotron, or `ANTHROPIC_API_KEY`. Gemini CLI remains an explicit Enterprise option. Then set `KYBERION_REASONING_BACKEND` to the corresponding id (`codex-cli` / `agy-cli` / `anthropic` / `openrouter` / `nemotron-api` / `local`; use `gemini-cli` only when intentionally configured). Setting it to `stub` is also valid for offline / deterministic-test deployments."
       }
     },
     {
@@ -24,7 +24,7 @@
       "probe": { "kind": "env", "name": "KYBERION_REASONING_BACKEND", "require_non_empty": true },
       "install": {
         "operator_confirmed": false,
-      "instruction": "Set `KYBERION_REASONING_BACKEND` to one of `codex-cli` / `gemini-cli` / `agy-cli` / `anthropic` / `claude-agent` / `nemotron-api` / `local` / `stub`. Without it, the bootstrap auto-discovers from registered adapters and may pick a different backend across runs."
+        "instruction": "Set `KYBERION_REASONING_BACKEND` to one of `codex-cli` / `gemini-cli` / `agy-cli` / `anthropic` / `claude-agent` / `openrouter` / `nemotron-api` / `local` / `stub`. Without it, the bootstrap auto-discovers from registered adapters and may pick a different backend across runs."
       }
     }
   ]

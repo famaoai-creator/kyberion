@@ -16,6 +16,11 @@ describe('reasoning-backend-policy', () => {
     expect(policy.allowed_modes).toContain('copilot');
     expect(policy.mode_aliases['gemini-api']).toBe('gemini-cli');
     expect(policy.mode_aliases.nemotron).toBe('nemotron-api');
+    expect(policy.openrouter).toEqual({
+      default_profile: 'free-router',
+      default_cost_policy: 'free-only',
+      required_parameters: ['tools', 'tool_choice'],
+    });
   });
 
   it('normalizes deprecated mode aliases', () => {
@@ -65,7 +70,35 @@ describe('reasoning-backend-policy', () => {
           { provider: 'gemini', installed: true, healthy: true },
         ],
       })
-    ).toBe('gemini-cli');
+    ).toBe('codex-cli');
+
+    expect(
+      resolveReasoningBackendModeFromContext({
+        policy,
+        env: {},
+        providers: [
+          { provider: 'codex', installed: false, healthy: false },
+          { provider: 'gemini', installed: true, healthy: true },
+          { provider: 'agy', installed: true, healthy: true },
+        ],
+      })
+    ).toBe('agy-cli');
+
+    expect(
+      resolveReasoningBackendModeFromContext({
+        policy,
+        env: { GEMINI_API_KEY: 'legacy-key', GEMINI_CLI: '1' },
+        providers: [{ provider: 'gemini', installed: true, healthy: true }],
+      })
+    ).toBe('codex-cli');
+
+    expect(
+      resolveReasoningBackendModeFromContext({
+        policy,
+        env: { AGY_CLI: '1' },
+        providers: [{ provider: 'agy', installed: true, healthy: true }],
+      })
+    ).toBe('agy-cli');
 
     expect(
       resolveReasoningBackendModeFromContext({
@@ -80,6 +113,16 @@ describe('reasoning-backend-policy', () => {
         policy,
         env: {
           OPENROUTER_API_KEY: 'or-key',
+        },
+        providers: [],
+      })
+    ).toBe('openrouter');
+
+    expect(
+      resolveReasoningBackendModeFromContext({
+        policy,
+        env: {
+          KYBERION_OPENROUTER_KEY: 'or-key',
         },
         providers: [],
       })

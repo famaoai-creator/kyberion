@@ -113,6 +113,10 @@
         "haiku",
         "claude-sonnet-4-6",
         "claude-opus-4-6",
+        "fable",
+        "claude-fable-5",
+        "claude-opus-4-8",
+        "claude-sonnet-5",
         "claude-sonnet-4-20250514",
         "claude-haiku-4-5-20251001"
       ],
@@ -153,6 +157,61 @@
           "long_context",
           "structured_json",
           "deep_reasoning",
+          "managed_workflow",
+          "can_fanout",
+          "can_subagent"
+        ],
+        "fable": [
+          "reasoning",
+          "planning",
+          "coordination",
+          "analysis",
+          "review",
+          "code",
+          "long_context",
+          "structured_json",
+          "deep_reasoning",
+          "managed_workflow",
+          "can_fanout",
+          "can_subagent"
+        ],
+        "claude-fable-5": [
+          "reasoning",
+          "planning",
+          "coordination",
+          "analysis",
+          "review",
+          "code",
+          "long_context",
+          "structured_json",
+          "deep_reasoning",
+          "managed_workflow",
+          "can_fanout",
+          "can_subagent"
+        ],
+        "claude-opus-4-8": [
+          "reasoning",
+          "planning",
+          "coordination",
+          "analysis",
+          "review",
+          "code",
+          "long_context",
+          "structured_json",
+          "deep_reasoning",
+          "managed_workflow",
+          "can_fanout",
+          "can_subagent"
+        ],
+        "claude-sonnet-5": [
+          "reasoning",
+          "planning",
+          "coordination",
+          "analysis",
+          "review",
+          "code",
+          "long_context",
+          "structured_json",
           "managed_workflow",
           "can_fanout",
           "can_subagent"
@@ -276,7 +335,16 @@
       }
     },
     "agy": {
-      "models": ["agy", "gemini-2.5-flash"],
+      "models": [
+        "Gemini 3.5 Flash (Medium)",
+        "Gemini 3.5 Flash (High)",
+        "Gemini 3.5 Flash (Low)",
+        "Gemini 3.1 Pro (Low)",
+        "Gemini 3.1 Pro (High)",
+        "Claude Sonnet 4.6 (Thinking)",
+        "Claude Opus 4.6 (Thinking)",
+        "GPT-OSS 120B (Medium)"
+      ],
       "capabilities": [
         "reasoning",
         "planning",
@@ -293,7 +361,7 @@
         "gateway"
       ],
       "modelCapabilities": {
-        "agy": [
+        "Gemini 3.5 Flash (Medium)": [
           "reasoning",
           "planning",
           "coordination",
@@ -304,7 +372,7 @@
           "structured_json",
           "sandboxed_parallel"
         ],
-        "gemini-2.5-flash": [
+        "Gemini 3.5 Flash (High)": [
           "reasoning",
           "planning",
           "coordination",
@@ -313,12 +381,53 @@
           "review",
           "architecture",
           "structured_json",
-          "sandboxed_parallel",
-          "a2ui",
-          "dashboard",
-          "commands",
-          "gateway"
-        ]
+          "sandboxed_parallel"
+        ],
+        "Gemini 3.5 Flash (Low)": [
+          "reasoning",
+          "analysis",
+          "code",
+          "structured_json",
+          "low_latency"
+        ],
+        "Gemini 3.1 Pro (Low)": [
+          "reasoning",
+          "analysis",
+          "code",
+          "review",
+          "architecture",
+          "structured_json"
+        ],
+        "Gemini 3.1 Pro (High)": [
+          "reasoning",
+          "planning",
+          "coordination",
+          "analysis",
+          "code",
+          "review",
+          "architecture",
+          "structured_json",
+          "sandboxed_parallel"
+        ],
+        "Claude Sonnet 4.6 (Thinking)": [
+          "reasoning",
+          "analysis",
+          "code",
+          "review",
+          "structured_json"
+        ],
+        "Claude Opus 4.6 (Thinking)": [
+          "reasoning",
+          "planning",
+          "coordination",
+          "analysis",
+          "code",
+          "review",
+          "architecture",
+          "structured_json",
+          "sandboxed_parallel"
+        ],
+        "GPT-OSS 120B (Medium)": ["reasoning", "analysis", "code", "structured_json"]
       }
     }
   }

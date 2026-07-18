@@ -66,6 +66,9 @@ describe('reasoning-bootstrap', () => {
     delete process.env.KYBERION_OPENROUTER_KEY;
     delete process.env.OPENROUTER_API_KEY;
     delete process.env.KYBERION_OPENROUTER_MODEL;
+    delete process.env.KYBERION_OPENROUTER_PROFILE;
+    delete process.env.KYBERION_OPENROUTER_COST_POLICY;
+    delete process.env.KYBERION_OPENROUTER_REQUIRED_PARAMETERS;
     delete process.env.KYBERION_OPENROUTER_URL;
     mockProviders.setProviders(mockProviders.defaultProviders);
   });
@@ -115,6 +118,7 @@ describe('reasoning-bootstrap', () => {
   it('installs the OpenRouter backend when configured', () => {
     process.env.OPENROUTER_API_KEY = 'or-test-key';
     process.env.KYBERION_OPENROUTER_MODEL = 'meta-llama/llama-3-70b-instruct';
+    process.env.KYBERION_OPENROUTER_COST_POLICY = 'paid-allowed';
 
     const installed = installReasoningBackends({ mode: 'openrouter' });
 
@@ -125,6 +129,15 @@ describe('reasoning-bootstrap', () => {
 
   it('auto-selects OpenRouter when its API key is present', () => {
     process.env.OPENROUTER_API_KEY = 'or-test-key';
+    const installed = installReasoningBackends({ refreshProviders: true });
+
+    expect(installed).toBe(true);
+    expect(getInstalledReasoningMode()).toBe('openrouter');
+    expect(getReasoningBackend().name).toBe('openrouter');
+  });
+
+  it('auto-selects OpenRouter when its namespaced API key is present', () => {
+    process.env.KYBERION_OPENROUTER_KEY = 'or-test-key';
     const installed = installReasoningBackends({ refreshProviders: true });
 
     expect(installed).toBe(true);

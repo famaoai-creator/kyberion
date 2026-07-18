@@ -3,6 +3,11 @@ import { pathResolver } from './path-resolver.js';
 import { safeExec, safeReadFile, safeReaddir, safeWriteFile } from './secure-io.js';
 import { redactSensitiveObject } from './network.js';
 import { advanceToolLoopGuardrail, createToolLoopGuardrailState } from './tool-loop-guardrail.js';
+import {
+  resolveOpenRouterModelPolicy,
+  validateOpenRouterModelRecord,
+  type OpenRouterModelRecord,
+} from './openrouter-model-policy.js';
 import type {
   ReasoningBackend,
   DivergeHypothesisInput,
@@ -186,7 +191,7 @@ export class OpenRouterBackend implements ReasoningBackend {
 
   private async fetchChatCompletion(
     messages: ChatMessage[],
-    opts: { useTools?: boolean } = {},
+    opts: { useTools?: boolean } = {}
   ): Promise<ChatCompletionResponse> {
     const headers: Record<string, string> = {
       'content-type': 'application/json',
@@ -198,7 +203,7 @@ export class OpenRouterBackend implements ReasoningBackend {
     const body: ChatCompletionRequest = {
       model: this.model,
       messages: redactSensitiveObject(messages),
-      ...(opts.useTools ?? true ? { tools: createToolDefinitions(), tool_choice: 'auto' } : {}),
+      ...((opts.useTools ?? true) ? { tools: createToolDefinitions(), tool_choice: 'auto' } : {}),
     };
 
     const response = await fetch(joinEndpoint(this.baseURL, 'chat/completions'), {
@@ -229,12 +234,17 @@ export class OpenRouterBackend implements ReasoningBackend {
         case 'read_file':
           return String(safeReadFile(String(args.path ?? '')));
         case 'write_file':
-          safeWriteFile(String(args.path ?? ''), String(args.content ?? ''), { mkdir: true, encoding: 'utf8' });
+          safeWriteFile(String(args.path ?? ''), String(args.content ?? ''), {
+            mkdir: true,
+            encoding: 'utf8',
+          });
           return 'Success: File written.';
         case 'list_directory':
           return JSON.stringify(safeReaddir(String(args.path ?? '')));
         case 'shell_exec':
-          return safeExec('bash', ['-lc', String(args.command ?? '')], { cwd: pathResolver.rootDir() });
+          return safeExec('bash', ['-lc', String(args.command ?? '')], {
+            cwd: pathResolver.rootDir(),
+          });
         default:
           return `Error: Unknown tool ${name}`;
       }
@@ -276,19 +286,19 @@ export class OpenRouterBackend implements ReasoningBackend {
         tool_calls: message.tool_calls,
       });
       for (const toolCall of message.tool_calls) {
-        const guardrailDecision = advanceToolLoopGuardrail(
-          guardrailState,
-          {
-            name: toolCall.function.name,
-            arguments: toolCall.function.arguments,
-          },
-        );
+        const guardrailDecision = advanceToolLoopGuardrail(guardrailState, {
+          name: toolCall.function.name,
+          arguments: toolCall.function.arguments,
+        });
         guardrailState = guardrailDecision.state;
         if (guardrailDecision.shouldStop) {
           logger.warn(`[OPENROUTER] Tool loop guardrail triggered: ${guardrailDecision.reason}`);
           return `${extractTextContent(message.content)}\n\n${guardrailDecision.reason}`.trim();
         }
-        const result = await this.handleToolCall(toolCall.function.name, toolCall.function.arguments);
+        const result = await this.handleToolCall(
+          toolCall.function.name,
+          toolCall.function.arguments
+        );
         messages.push({
           role: 'tool',
           tool_call_id: toolCall.id,
@@ -309,7 +319,7 @@ export class OpenRouterBackend implements ReasoningBackend {
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
       ],
-      { useTools: false },
+      { useTools: false }
     );
     return extractTextContent(response.choices[0].message.content);
   }
@@ -318,39 +328,75 @@ export class OpenRouterBackend implements ReasoningBackend {
     this.completeStructured(systemPrompt, userPrompt);
 
   async divergePersonas(input: DivergeHypothesisInput): Promise<HypothesisSketch[]> {
-    return runStructuredReasoningOp(structuredReasoningSpecs.divergePersonas, input, this.runStructured);
+    return runStructuredReasoningOp(
+      structuredReasoningSpecs.divergePersonas,
+      input,
+      this.runStructured
+    );
   }
 
   async crossCritique(input: CritiqueInput): Promise<CritiqueResult> {
-    return runStructuredReasoningOp(structuredReasoningSpecs.crossCritique, input, this.runStructured);
+    return runStructuredReasoningOp(
+      structuredReasoningSpecs.crossCritique,
+      input,
+      this.runStructured
+    );
   }
 
   async synthesizePersona(input: PersonaSynthesisInput): Promise<SynthesizedPersona> {
-    return runStructuredReasoningOp(structuredReasoningSpecs.synthesizePersona, input, this.runStructured);
+    return runStructuredReasoningOp(
+      structuredReasoningSpecs.synthesizePersona,
+      input,
+      this.runStructured
+    );
   }
 
   async forkBranches(input: BranchForkInput): Promise<ForkedBranch[]> {
-    return runStructuredReasoningOp(structuredReasoningSpecs.forkBranches, input, this.runStructured);
+    return runStructuredReasoningOp(
+      structuredReasoningSpecs.forkBranches,
+      input,
+      this.runStructured
+    );
   }
 
   async simulateBranches(input: SimulationInput): Promise<SimulationResult> {
-    return runStructuredReasoningOp(structuredReasoningSpecs.simulateBranches, input, this.runStructured);
+    return runStructuredReasoningOp(
+      structuredReasoningSpecs.simulateBranches,
+      input,
+      this.runStructured
+    );
   }
 
   async extractRequirements(input: ExtractRequirementsInput): Promise<ExtractedRequirements> {
-    return runStructuredReasoningOp(structuredReasoningSpecs.extractRequirements, input, this.runStructured);
+    return runStructuredReasoningOp(
+      structuredReasoningSpecs.extractRequirements,
+      input,
+      this.runStructured
+    );
   }
 
   async extractDesignSpec(input: ExtractDesignSpecInput): Promise<ExtractedDesignSpec> {
-    return runStructuredReasoningOp(structuredReasoningSpecs.extractDesignSpec, input, this.runStructured);
+    return runStructuredReasoningOp(
+      structuredReasoningSpecs.extractDesignSpec,
+      input,
+      this.runStructured
+    );
   }
 
   async extractTestPlan(input: ExtractTestPlanInput): Promise<ExtractedTestPlan> {
-    return runStructuredReasoningOp(structuredReasoningSpecs.extractTestPlan, input, this.runStructured);
+    return runStructuredReasoningOp(
+      structuredReasoningSpecs.extractTestPlan,
+      input,
+      this.runStructured
+    );
   }
 
   async decomposeIntoTasks(input: DecomposeIntoTasksInput): Promise<DecomposedTaskPlan> {
-    return runStructuredReasoningOp(structuredReasoningSpecs.decomposeIntoTasks, input, this.runStructured);
+    return runStructuredReasoningOp(
+      structuredReasoningSpecs.decomposeIntoTasks,
+      input,
+      this.runStructured
+    );
   }
 
   async delegateTask(instruction: string, context?: string): Promise<string> {
@@ -360,11 +406,73 @@ export class OpenRouterBackend implements ReasoningBackend {
 
 export function buildOpenRouterBackendFromEnv(
   env: NodeJS.ProcessEnv = process.env,
-  modelOverride?: string,
+  modelOverride?: string
 ): OpenRouterBackend | null {
   const apiKey = env.KYBERION_OPENROUTER_KEY?.trim() || env.OPENROUTER_API_KEY?.trim();
   if (!apiKey) return null;
-  const model = modelOverride?.trim() || env.KYBERION_OPENROUTER_MODEL?.trim() || 'meta-llama/llama-3-70b-instruct';
+  const model = resolveOpenRouterModelPolicy(env, modelOverride).model;
   const baseURL = env.KYBERION_OPENROUTER_URL?.trim();
   return new OpenRouterBackend({ apiKey, model, baseURL });
+}
+
+/** Probe OpenRouter without consuming model tokens. */
+export async function probeOpenRouterBackendAvailability(
+  env: NodeJS.ProcessEnv = process.env
+): Promise<{ available: boolean; reason?: string }> {
+  const apiKey = env.KYBERION_OPENROUTER_KEY?.trim() || env.OPENROUTER_API_KEY?.trim();
+  if (!apiKey) {
+    return {
+      available: false,
+      reason: 'OPENROUTER_API_KEY or KYBERION_OPENROUTER_KEY is not set',
+    };
+  }
+
+  const baseURL = env.KYBERION_OPENROUTER_URL?.trim() || 'https://openrouter.ai/api/v1';
+  try {
+    const normalizedBaseURL = baseURL.endsWith('/') ? baseURL : `${baseURL}/`;
+    const modelsURL = new URL('models', normalizedBaseURL);
+    if (modelsURL.protocol !== 'https:' && modelsURL.protocol !== 'http:') {
+      return {
+        available: false,
+        reason: `unsupported OpenRouter URL protocol: ${modelsURL.protocol}`,
+      };
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 4_000);
+    try {
+      const response = await fetch(modelsURL, {
+        method: 'GET',
+        headers: { authorization: `Bearer ${apiKey}` },
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        return { available: false, reason: `OpenRouter probe returned HTTP ${response.status}` };
+      }
+      const body = safeJsonParse(await response.text()) as {
+        data?: OpenRouterModelRecord[];
+      } | null;
+      if (!body || !Array.isArray(body.data)) {
+        return { available: false, reason: 'OpenRouter probe returned an invalid models response' };
+      }
+      const modelPolicy = resolveOpenRouterModelPolicy(env);
+      const modelRecord = body.data.find(
+        (record) => record.id === modelPolicy.model || record.canonical_slug === modelPolicy.model
+      );
+      if (!modelRecord) {
+        return {
+          available: false,
+          reason: `OpenRouter model is unavailable: ${modelPolicy.model}`,
+        };
+      }
+      const failures = validateOpenRouterModelRecord(modelRecord, modelPolicy);
+      if (failures.length > 0) {
+        return { available: false, reason: failures.join('; ') };
+      }
+      return { available: true };
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch (error) {
+    return { available: false, reason: error instanceof Error ? error.message : String(error) };
+  }
 }
