@@ -19,7 +19,7 @@ describe('reasoning-level-policy', () => {
     expect(policy.thresholds.low_confidence).toBe(0.65);
     expect(policy.fast_shapes).toEqual(['direct_reply', 'task_session']);
     expect(policy.task_model_routing?.phases.mechanical?.default.model_id).toBe(
-      'openai:gpt-5.4-mini'
+      'openai:gpt-5.6-luna'
     );
     expect(policy.task_model_routing?.phases.plan?.scope?.S?.tier).toBe('standard');
   });

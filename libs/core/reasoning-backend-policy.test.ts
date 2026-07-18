@@ -70,7 +70,35 @@ describe('reasoning-backend-policy', () => {
           { provider: 'gemini', installed: true, healthy: true },
         ],
       })
-    ).toBe('gemini-cli');
+    ).toBe('codex-cli');
+
+    expect(
+      resolveReasoningBackendModeFromContext({
+        policy,
+        env: {},
+        providers: [
+          { provider: 'codex', installed: false, healthy: false },
+          { provider: 'gemini', installed: true, healthy: true },
+          { provider: 'agy', installed: true, healthy: true },
+        ],
+      })
+    ).toBe('agy-cli');
+
+    expect(
+      resolveReasoningBackendModeFromContext({
+        policy,
+        env: { GEMINI_API_KEY: 'legacy-key', GEMINI_CLI: '1' },
+        providers: [{ provider: 'gemini', installed: true, healthy: true }],
+      })
+    ).toBe('codex-cli');
+
+    expect(
+      resolveReasoningBackendModeFromContext({
+        policy,
+        env: { AGY_CLI: '1' },
+        providers: [{ provider: 'agy', installed: true, healthy: true }],
+      })
+    ).toBe('agy-cli');
 
     expect(
       resolveReasoningBackendModeFromContext({

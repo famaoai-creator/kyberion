@@ -4,8 +4,10 @@
   "unit": "per_1k_tokens",
   "note": "Fallback per-1k-token prompt/completion rates used when the primary registry is absent or malformed.",
   "models": {
-    "claude-opus-4-8": { "prompt": 0.015, "completion": 0.075 },
-    "claude-sonnet-4-6": { "prompt": 0.003, "completion": 0.015 },
+    "claude-fable-5": { "prompt": 0.01, "completion": 0.05 },
+    "claude-opus-4-8": { "prompt": 0.005, "completion": 0.025 },
+    "claude-sonnet-5": { "prompt": 0.003, "completion": 0.015 },
+    "claude-haiku-4-5-20251001": { "prompt": 0.001, "completion": 0.005 },
     "claude-haiku-4-5": { "prompt": 0.001, "completion": 0.005 },
     "claude-3-5-sonnet": { "prompt": 0.003, "completion": 0.015 },
     "gpt-4o": { "prompt": 0.005, "completion": 0.015 },
@@ -16,9 +18,10 @@
     "gemini-1.5-flash": { "prompt": 0.000075, "completion": 0.0003 }
   },
   "aliases": {
+    "fable": "claude-fable-5",
     "opus": "claude-opus-4-8",
-    "sonnet": "claude-sonnet-4-6",
-    "haiku": "claude-haiku-4-5"
+    "sonnet": "claude-sonnet-5",
+    "haiku": "claude-haiku-4-5-20251001"
   },
   "default": { "prompt": 0.001, "completion": 0.003 }
 }

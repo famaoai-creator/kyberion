@@ -1227,7 +1227,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 55464,
+      "size": 55539,
       "type": "json"
     },
     {
@@ -1263,7 +1263,7 @@
     {
       "path": "product/governance/environment-manifests/reasoning-backend.json",
       "tier": "public",
-      "size": 2305,
+      "size": 2480,
       "type": "json"
     },
     {
@@ -1653,19 +1653,19 @@
     {
       "path": "product/governance/model-cost-registry.fallback.json",
       "tier": "public",
-      "size": 1026,
+      "size": 1199,
       "type": "json"
     },
     {
       "path": "product/governance/model-cost-registry.json",
       "tier": "public",
-      "size": 1305,
+      "size": 1478,
       "type": "json"
     },
     {
       "path": "product/governance/model-registry.json",
       "tier": "public",
-      "size": 5539,
+      "size": 10079,
       "type": "json"
     },
     {
@@ -1965,7 +1965,7 @@
     {
       "path": "product/governance/provider-config.json",
       "tier": "public",
-      "size": 1157,
+      "size": 1195,
       "type": "json"
     },
     {
@@ -1983,13 +1983,13 @@
     {
       "path": "product/governance/reasoning-backend-policy.json",
       "tier": "public",
-      "size": 1782,
+      "size": 1542,
       "type": "json"
     },
     {
       "path": "product/governance/reasoning-level-policy.json",
       "tier": "public",
-      "size": 3866,
+      "size": 3958,
       "type": "json"
     },
     {
@@ -3015,7 +3015,7 @@
     {
       "path": "product/orchestration/agent-profiles/attacker.json",
       "tier": "public",
-      "size": 391,
+      "size": 403,
       "type": "json"
     },
     {
@@ -3027,31 +3027,31 @@
     {
       "path": "product/orchestration/agent-profiles/control-plane-agent.json",
       "tier": "public",
-      "size": 699,
+      "size": 711,
       "type": "json"
     },
     {
       "path": "product/orchestration/agent-profiles/defender.json",
       "tier": "public",
-      "size": 391,
+      "size": 403,
       "type": "json"
     },
     {
       "path": "product/orchestration/agent-profiles/implementation-architect.json",
       "tier": "public",
-      "size": 543,
+      "size": 555,
       "type": "json"
     },
     {
       "path": "product/orchestration/agent-profiles/mission-orchestrator.json",
       "tier": "public",
-      "size": 504,
+      "size": 516,
       "type": "json"
     },
     {
       "path": "product/orchestration/agent-profiles/nerve-agent.json",
       "tier": "public",
-      "size": 477,
+      "size": 489,
       "type": "json"
     },
     {
@@ -3069,7 +3069,7 @@
     {
       "path": "product/orchestration/agent-profiles/planner-agent.json",
       "tier": "public",
-      "size": 415,
+      "size": 427,
       "type": "json"
     },
     {
@@ -3081,7 +3081,7 @@
     {
       "path": "product/orchestration/agent-profiles/reasoning-worker.json",
       "tier": "public",
-      "size": 1024,
+      "size": 1036,
       "type": "json"
     },
     {
@@ -3093,7 +3093,7 @@
     {
       "path": "product/orchestration/agent-profiles/sovereign-brain.json",
       "tier": "public",
-      "size": 512,
+      "size": 524,
       "type": "json"
     },
     {
@@ -3723,13 +3723,13 @@
     {
       "path": "product/orchestration/provider-capabilities.fallback.json",
       "tier": "public",
-      "size": 8196,
+      "size": 8500,
       "type": "json"
     },
     {
       "path": "product/orchestration/provider-capabilities.json",
       "tier": "public",
-      "size": 8015,
+      "size": 10740,
       "type": "json"
     },
     {
@@ -4503,7 +4503,7 @@
     {
       "path": "product/orchestration/voice-interface-protocol.md",
       "tier": "public",
-      "size": 6352,
+      "size": 8396,
       "type": "md"
     },
     {
