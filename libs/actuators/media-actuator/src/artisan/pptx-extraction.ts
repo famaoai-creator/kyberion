@@ -1,5 +1,4 @@
-import { execFileSync } from 'node:child_process';
-import { pptxUtils } from '@agent/core';
+import { pptxUtils, runGovernedCommand } from '@agent/core';
 import type { ExtractionMode, ExtractionOptions, ExtractionResult } from './extraction-engine.js';
 import { collectXmlCaptures } from './xml-utils.js';
 
@@ -7,7 +6,7 @@ export async function processPptx(
   filePath: string,
   mode: ExtractionMode,
   result: ExtractionResult,
-  options: ExtractionOptions = {},
+  options: ExtractionOptions = {}
 ) {
   try {
     if (mode === 'content' || mode === 'all') {
@@ -34,8 +33,8 @@ export async function processPptx(
 
 function extractContent(filePath: string): string {
   const content = listZipEntries(filePath)
-    .filter(entry => /^ppt\/slides\/slide\d+\.xml$/.test(entry))
-    .map(entry => readZipEntryText(filePath, entry))
+    .filter((entry) => /^ppt\/slides\/slide\d+\.xml$/.test(entry))
+    .map((entry) => readZipEntryText(filePath, entry))
     .flatMap(extractSlideText)
     .join('\n\n')
     .trim();
@@ -73,8 +72,8 @@ function collectTableStyles(filePath: string): Set<string> {
   }
 
   for (const slideXml of listZipEntries(filePath)
-    .filter(entry => /^ppt\/slides\/slide\d+\.xml$/.test(entry))
-    .map(entry => readZipEntryText(filePath, entry))) {
+    .filter((entry) => /^ppt\/slides\/slide\d+\.xml$/.test(entry))
+    .map((entry) => readZipEntryText(filePath, entry))) {
     for (const styleId of collectXmlCaptures(slideXml, /<a:tblStyleId>([^<]+)<\/a:tblStyleId>/g)) {
       tableStyles.add(styleId);
     }
@@ -91,14 +90,11 @@ function extractSlideText(xml: string): string[] {
 
 function listZipEntries(filePath: string): string[] {
   try {
-    return execFileSync('unzip', ['-Z1', filePath], {
-      encoding: 'utf8',
-      maxBuffer: 20 * 1024 * 1024,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    })
-      .toString()
+    const result = runGovernedCommand('unzip', ['-Z1', filePath], { maxOutputMB: 20 });
+    if (result.status !== 0) throw result.error || new Error(result.stderr);
+    return result.stdout
       .split(/\r?\n/)
-      .map(line => line.trim())
+      .map((line) => line.trim())
       .filter(Boolean);
   } catch {
     return [];
@@ -107,11 +103,9 @@ function listZipEntries(filePath: string): string[] {
 
 function readZipEntryText(filePath: string, entryName: string): string {
   try {
-    return execFileSync('unzip', ['-p', filePath, entryName], {
-      encoding: 'utf8',
-      maxBuffer: 20 * 1024 * 1024,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    }).toString();
+    const result = runGovernedCommand('unzip', ['-p', filePath, entryName], { maxOutputMB: 20 });
+    if (result.status !== 0) throw result.error || new Error(result.stderr);
+    return result.stdout;
   } catch {
     return '';
   }

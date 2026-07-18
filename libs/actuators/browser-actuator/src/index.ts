@@ -15,6 +15,7 @@ import {
   resolveVars,
   evaluateCondition,
   getPathValue,
+  buildGovernedRetryOptions,
   classifyError,
   buildBrowserExtensionPipelineCandidate,
   preflightBrowserExtensionSession,
@@ -25,7 +26,6 @@ import { createBrowserInteractionHelpers } from './browser-interaction-helpers.j
 import { executePipeline as executeBrowserPipeline } from './browser-pipeline-helpers.js';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { execSync } from 'node:child_process';
 import { chromium, Browser, BrowserContext, CDPSession, Page } from '@playwright/test';
 import { runActuatorCli } from '@agent/core';
 
@@ -276,76 +276,28 @@ const DEFAULT_BROWSER_RETRY = {
   factor: 2,
   jitter: true,
 };
-let cachedRecoveryPolicy: Record<string, any> | null = null;
 const browserInteractionHelpers = createBrowserInteractionHelpers({
   executePipeline: (...args) => executeBrowserPipeline(...args),
   emitComputerSurfacePatch,
 });
 
-function isPlainObject(value: unknown): value is Record<string, any> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
-function loadRecoveryPolicy(): Record<string, any> {
-  if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
-  try {
-    const manifest = JSON.parse(
-      safeReadFile(BROWSER_MANIFEST_PATH, { encoding: 'utf8' }) as string
-    );
-    cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
-    return cachedRecoveryPolicy;
-  } catch (_) {
-    cachedRecoveryPolicy = {};
-    return cachedRecoveryPolicy;
-  }
-}
-
 function buildRetryOptions(stepParams: Record<string, any>) {
-  const recoveryPolicy = loadRecoveryPolicy();
-  const manifestRetry = isPlainObject(recoveryPolicy.retry) ? recoveryPolicy.retry : {};
-  const retryableCategories = new Set<string>(
-    Array.isArray(recoveryPolicy.retryable_categories)
-      ? recoveryPolicy.retryable_categories.map(String)
-      : []
-  );
-  const explicitRetry = isPlainObject(stepParams.retry) ? stepParams.retry : {};
-  const resolved = {
-    ...DEFAULT_BROWSER_RETRY,
-    ...manifestRetry,
-    ...explicitRetry,
-    maxRetries: Number(
-      stepParams.max_retries ??
-        explicitRetry.maxRetries ??
-        manifestRetry.maxRetries ??
-        DEFAULT_BROWSER_RETRY.maxRetries
-    ),
-    initialDelayMs: Number(
-      stepParams.retry_delay_ms ??
-        explicitRetry.initialDelayMs ??
-        manifestRetry.initialDelayMs ??
-        DEFAULT_BROWSER_RETRY.initialDelayMs
-    ),
-  };
-
-  return {
-    ...resolved,
-    shouldRetry: (error: Error) => {
-      const classification = classifyError(error);
-      if (retryableCategories.size > 0) {
-        return retryableCategories.has(classification.category);
-      }
-      const message = error.message?.toLowerCase?.() || '';
-      return (
-        classification.category === 'timeout' ||
-        classification.category === 'network' ||
-        classification.category === 'resource_unavailable' ||
-        message.includes('selector') ||
-        message.includes('not visible') ||
-        message.includes('strict mode violation') ||
-        message.includes('detached')
-      );
-    },
-  };
+  const explicitRetry =
+    stepParams && typeof stepParams.retry === 'object' && !Array.isArray(stepParams.retry)
+      ? { ...(stepParams.retry as Record<string, any>) }
+      : {};
+  if (stepParams?.max_retries !== undefined)
+    explicitRetry.maxRetries = Number(stepParams.max_retries);
+  if (stepParams?.retry_delay_ms !== undefined)
+    explicitRetry.initialDelayMs = Number(stepParams.retry_delay_ms);
+  return buildGovernedRetryOptions({
+    manifestPath: BROWSER_MANIFEST_PATH,
+    defaults: DEFAULT_BROWSER_RETRY,
+    override: explicitRetry,
+    fallbackCategories: ['network', 'timeout', 'resource_unavailable'],
+    additionalShouldRetry: (error) =>
+      /selector|not visible|strict mode violation|detached/i.test(error.message),
+  });
 }
 
 /**

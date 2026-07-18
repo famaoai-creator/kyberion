@@ -23,6 +23,7 @@ import {
   refreshAgentRuntimeViaDaemon,
   restartAgentRuntimeViaDaemon,
   pathResolver,
+  buildGovernedRetryOptions,
   classifyError,
   retry,
 } from '@agent/core';
@@ -39,8 +40,6 @@ const DEFAULT_AGENT_RETRY = {
   factor: 2,
   jitter: true,
 };
-
-let cachedRecoveryPolicy: Record<string, any> | null = null;
 
 export interface AgentAction {
   action:
@@ -84,50 +83,13 @@ export interface AgentPipelineDispatch {
   context?: Record<string, unknown>;
 }
 
-function isPlainObject(value: unknown): value is Record<string, any> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
-function loadRecoveryPolicy(): Record<string, any> {
-  if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
-  try {
-    const manifest = JSON.parse(safeReadFile(AGENT_MANIFEST_PATH, { encoding: 'utf8' }) as string);
-    cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
-    return cachedRecoveryPolicy;
-  } catch (_) {
-    cachedRecoveryPolicy = {};
-    return cachedRecoveryPolicy;
-  }
-}
-
 function buildRetryOptions(override?: Record<string, any>) {
-  const recoveryPolicy = loadRecoveryPolicy();
-  const manifestRetry = isPlainObject(recoveryPolicy.retry) ? recoveryPolicy.retry : {};
-  const retryableCategories = new Set<string>(
-    Array.isArray(recoveryPolicy.retryable_categories)
-      ? recoveryPolicy.retryable_categories.map(String)
-      : []
-  );
-  const resolved = {
-    ...DEFAULT_AGENT_RETRY,
-    ...manifestRetry,
-    ...(override || {}),
-  };
-  return {
-    ...resolved,
-    shouldRetry: (error: Error) => {
-      const classification = classifyError(error);
-      if (retryableCategories.size > 0) {
-        return retryableCategories.has(classification.category);
-      }
-      return (
-        classification.category === 'network' ||
-        classification.category === 'rate_limit' ||
-        classification.category === 'timeout' ||
-        classification.category === 'resource_unavailable'
-      );
-    },
-  };
+  return buildGovernedRetryOptions({
+    manifestPath: AGENT_MANIFEST_PATH,
+    defaults: DEFAULT_AGENT_RETRY,
+    override: override,
+    fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+  });
 }
 
 export async function handleAction(input: AgentAction | AgentPipelineDispatch) {

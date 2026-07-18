@@ -14,6 +14,8 @@ import {
   loadCapabilityRegistry,
   scanProviderCapabilities,
   retry,
+  buildGovernedRetryOptions,
+  runGovernedCommand,
   classifyError,
   createActuatorTrace,
   finalizeActuatorTrace,
@@ -21,7 +23,6 @@ import {
 import { getAllFiles } from '@agent/core/fs-utils';
 import * as path from 'node:path';
 import * as vm from 'node:vm';
-import { spawnSync } from 'node:child_process';
 
 const CODE_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/code-actuator/manifest.json');
 const DEFAULT_CODE_RETRY = {
@@ -32,40 +33,12 @@ const DEFAULT_CODE_RETRY = {
   jitter: true,
 };
 
-let cachedRecoveryPolicy: Record<string, any> | null = null;
-
-function isPlainObject(value: unknown): value is Record<string, any> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
-function loadRecoveryPolicy(): Record<string, any> {
-  if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
-  try {
-    const manifest = JSON.parse(safeReadFile(CODE_MANIFEST_PATH, { encoding: 'utf8' }) as string);
-    cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
-  } catch {
-    cachedRecoveryPolicy = {};
-  }
-  return cachedRecoveryPolicy;
-}
-
 export function buildRetryOptions() {
-  const policy = loadRecoveryPolicy();
-  const retry = isPlainObject(policy.retry) ? policy.retry : DEFAULT_CODE_RETRY;
-  const retryableCategories = new Set<string>(
-    Array.isArray(policy.retryable_categories) ? policy.retryable_categories.map(String) : []
-  );
-  return {
-    ...DEFAULT_CODE_RETRY,
-    ...retry,
-    shouldRetry: (error: Error) => {
-      const classification = classifyError(error);
-      return retryableCategories.size > 0
-        ? retryableCategories.has(classification.category)
-        : classification.category === 'resource_unavailable' ||
-            classification.category === 'timeout';
-    },
-  };
+  return buildGovernedRetryOptions({
+    manifestPath: CODE_MANIFEST_PATH,
+    defaults: DEFAULT_CODE_RETRY,
+    fallbackCategories: ['resource_unavailable', 'timeout'],
+  });
 }
 
 /**
@@ -296,9 +269,8 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
       return {
         ...ctx,
         [params.export_as || 'last_capture']: await retry(async () => {
-          const result = spawnSync('/bin/sh', ['-c', resolve(params.cmd)], {
-            encoding: 'utf8',
-            maxBuffer: 10 * 1024 * 1024,
+          const result = runGovernedCommand('/bin/sh', ['-c', resolve(params.cmd)], {
+            maxOutputMB: 10,
           });
           if (result.error) throw result.error;
           if (result.status !== 0) {
@@ -335,10 +307,7 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
           const target = path.resolve(rootDir, resolve(params.target_dir));
           const config = String(resolve(params.config) || 'auto');
           const args = ['--config', config, target, '--json'];
-          const result = spawnSync('semgrep', args, {
-            encoding: 'utf8',
-            maxBuffer: 10 * 1024 * 1024,
-          });
+          const result = runGovernedCommand('semgrep', args, { maxOutputMB: 10 });
           if (result.error) {
             throw result.error;
           }

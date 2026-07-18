@@ -5,8 +5,10 @@ import {
   safeReadFile,
   validatePresenceTimeline,
   pathResolver,
+  buildGovernedRetryOptions,
   classifyError,
   retry,
+  secureFetch,
 } from '@agent/core';
 import { WebClient } from '@slack/web-api';
 
@@ -20,8 +22,6 @@ const DEFAULT_PRESENCE_RETRY = {
   factor: 2,
   jitter: true,
 };
-
-let cachedRecoveryPolicy: Record<string, any> | null = null;
 
 /**
  * Helper to safely access global ptyEngine
@@ -61,52 +61,13 @@ interface PresenceAction {
   };
 }
 
-function isPlainObject(value: unknown): value is Record<string, any> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
-function loadRecoveryPolicy(): Record<string, any> {
-  if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
-  try {
-    const manifest = JSON.parse(
-      safeReadFile(PRESENCE_MANIFEST_PATH, { encoding: 'utf8' }) as string
-    );
-    cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
-    return cachedRecoveryPolicy;
-  } catch (_) {
-    cachedRecoveryPolicy = {};
-    return cachedRecoveryPolicy;
-  }
-}
-
 function buildRetryOptions(override?: Record<string, any>) {
-  const recoveryPolicy = loadRecoveryPolicy();
-  const manifestRetry = isPlainObject(recoveryPolicy.retry) ? recoveryPolicy.retry : {};
-  const retryableCategories = new Set<string>(
-    Array.isArray(recoveryPolicy.retryable_categories)
-      ? recoveryPolicy.retryable_categories.map(String)
-      : []
-  );
-  const resolved = {
-    ...DEFAULT_PRESENCE_RETRY,
-    ...manifestRetry,
-    ...(override || {}),
-  };
-  return {
-    ...resolved,
-    shouldRetry: (error: Error) => {
-      const classification = classifyError(error);
-      if (retryableCategories.size > 0) {
-        return retryableCategories.has(classification.category);
-      }
-      return (
-        classification.category === 'network' ||
-        classification.category === 'rate_limit' ||
-        classification.category === 'timeout' ||
-        classification.category === 'resource_unavailable'
-      );
-    },
-  };
+  return buildGovernedRetryOptions({
+    manifestPath: PRESENCE_MANIFEST_PATH,
+    defaults: DEFAULT_PRESENCE_RETRY,
+    override: override,
+    fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+  });
 }
 
 export async function handleAction(input: PresenceAction) {
@@ -194,19 +155,17 @@ export async function handleAction(input: PresenceAction) {
     case 'dispatch_timeline': {
       const timeline = validatePresenceTimeline(params.payload.timeline);
       const bridgeUrl = process.env.KYBERION_A2UI_BRIDGE_URL || 'http://127.0.0.1:3031';
-      const response = await retry(
+      const body = await retry(
         async () =>
-          fetch(`${bridgeUrl}/api/timeline/dispatch`, {
+          secureFetch({
             method: 'POST',
+            url: `${bridgeUrl}/api/timeline/dispatch`,
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(timeline),
+            data: timeline,
+            kyberion_allow_local_network: true,
           }),
         buildRetryOptions()
       );
-      if (!response.ok) {
-        throw new Error(`Presence timeline dispatch failed: HTTP ${response.status}`);
-      }
-      const body = await response.json();
       return { status: 'timeline_dispatched', ...body };
     }
 

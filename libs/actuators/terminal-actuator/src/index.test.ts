@@ -24,6 +24,11 @@ vi.mock('@agent/core', () => ({
   encodeTerminalInput: vi.fn((keys: string[]) => keys.join('+')),
   emitComputerSurfacePatch: vi.fn(),
   classifyError: mocks.classifyError,
+  buildGovernedRetryOptions: vi.fn(({ defaults, override }: any) => ({
+    ...defaults,
+    ...(override || {}),
+    shouldRetry: vi.fn(() => true),
+  })),
   retry: mocks.retry,
   executeLlmDecideOp: mocks.executeLlmDecideOp,
   ptyEngine: {
