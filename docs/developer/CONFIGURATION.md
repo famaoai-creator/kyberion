@@ -32,7 +32,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_SUDO_KEY`                   | string | no       | _undocumented_                                                                                                                                                         |
 | `KYBERION_TERMINAL_TOKEN`             | string | no       | _undocumented_                                                                                                                                                         |
 
-## path (64)
+## path (65)
 
 | Variable                                                         | Type | Required | Description                                                                                                                   |
 | ---------------------------------------------------------------- | ---- | -------- | ----------------------------------------------------------------------------------------------------------------------------- |
@@ -48,6 +48,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_CONFIDENTIAL_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH` | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_CONTEXTUAL_INTENT_LEARNING_PATH`                       | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_CONTEXTUAL_INTENT_MEMORY_PATH`                         | path | no       | _undocumented_                                                                                                                |
+| `KYBERION_COPILOT_CLI_BIN`                                       | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_DEPLOY_CONFIG_PATH`                                    | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_EGRESS_POLICY_PATH`                                    | path | no       | _undocumented_                                                                                                                |
 | `KYBERION_GEMINI_CLI_BIN`                                        | path | no       | _undocumented_                                                                                                                |

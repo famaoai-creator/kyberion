@@ -738,6 +738,7 @@ export * from './pty-engine.js';
 export * from './terminal-keys.js';
 export * from './agent-mediator.js';
 export * from './acp-mediator.js';
+export * from './copilot-acp-reasoning-backend.js';
 export * from './agent-adapter.js';
 
 // Agent Registry & Lifecycle
