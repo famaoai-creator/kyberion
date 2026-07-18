@@ -89,6 +89,16 @@ describe('reasoning-backend-policy', () => {
       resolveReasoningBackendModeFromContext({
         policy,
         env: {
+          KYBERION_OPENROUTER_KEY: 'or-key',
+        },
+        providers: [],
+      })
+    ).toBe('openrouter');
+
+    expect(
+      resolveReasoningBackendModeFromContext({
+        policy,
+        env: {
           KYBERION_NEMOTRON_URL: 'https://integrate.api.nvidia.com/v1',
         },
         providers: [],

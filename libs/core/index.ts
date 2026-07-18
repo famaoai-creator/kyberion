@@ -1224,7 +1224,11 @@ export type {
   OpenAiCompatibleBackendOptions,
   OpenAiCompatibleBackendAvailability,
 } from './openai-compatible-backend.js';
-export { OpenRouterBackend, buildOpenRouterBackendFromEnv } from './openrouter-backend.js';
+export {
+  OpenRouterBackend,
+  buildOpenRouterBackendFromEnv,
+  probeOpenRouterBackendAvailability,
+} from './openrouter-backend.js';
 export type { OpenRouterBackendOptions } from './openrouter-backend.js';
 export { runGeminiCliQuery, buildGeminiCliBackendFromEnv } from './gemini-cli-backend.js';
 export { GeminiCliIntentExtractor } from './gemini-cli-intent-extractor.js';
