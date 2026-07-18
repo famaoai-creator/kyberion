@@ -13,6 +13,9 @@ export interface ConversationTurn {
   prompt?: string; // Omitted if confidential/personal context
   result?: string; // Omitted if confidential/personal context
   provider_session_id?: string;
+  /** Explicit mission binding for governed tier-scoped history collection. */
+  mission_id?: string;
+  tier?: 'public' | 'confidential' | 'personal';
 }
 
 const MAX_TURNS = 500;
@@ -45,6 +48,15 @@ function resolveConversationFilePath(conversationId: string): string {
   return filePath;
 }
 
+function resolveMissionTier(
+  missionId: string | undefined
+): 'public' | 'confidential' | 'personal' | undefined {
+  if (!missionId) return undefined;
+  const missionPath = findMissionPath(missionId)?.toLowerCase() || '';
+  const match = missionPath.match(/\/(public|confidential|personal)\//u);
+  return match?.[1] as 'public' | 'confidential' | 'personal' | undefined;
+}
+
 /**
  * Checks if a mission has confidential or personal tier constraints.
  */
@@ -70,6 +82,7 @@ export async function appendConversationTurn(
 
   await lock.run(async () => {
     const isConfidential = isConfidentialMission(turnData.missionId);
+    const tier = resolveMissionTier(turnData.missionId);
 
     const turn: ConversationTurn = {
       ts: new Date().toISOString(),
@@ -79,6 +92,8 @@ export async function appendConversationTurn(
       prompt: isConfidential ? undefined : turnData.prompt?.slice(0, 200),
       result: isConfidential ? undefined : turnData.result?.slice(0, 200),
       provider_session_id: turnData.provider_session_id,
+      ...(turnData.missionId ? { mission_id: turnData.missionId } : {}),
+      ...(tier ? { tier } : {}),
     };
 
     let lines: string[] = [];

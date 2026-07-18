@@ -1,0 +1,59 @@
+{
+  "action": "pipeline",
+  "name": "Surface Capability Contract Check",
+  "version": "1.0.0",
+  "description": "Verify the governed surface capability layer and bridge integrations are present before delivery tests run.",
+  "steps": [
+    {
+      "role": "source",
+      "op": "system:probe",
+      "produces": { "channel": "core_capability", "type": "ProbeResult" },
+      "params": { "path": "libs/core/bridge-error-reply.ts" }
+    },
+    {
+      "role": "source",
+      "op": "system:probe",
+      "produces": { "channel": "surface_manifest", "type": "ProbeResult" },
+      "params": { "path": "knowledge/product/governance/surface-provider-manifests.json" }
+    },
+    {
+      "role": "source",
+      "op": "system:probe",
+      "produces": { "channel": "slack_bridge", "type": "ProbeResult" },
+      "params": { "path": "satellites/slack-bridge/src/index.ts" }
+    },
+    {
+      "role": "source",
+      "op": "system:probe",
+      "produces": { "channel": "telegram_bridge", "type": "ProbeResult" },
+      "params": { "path": "satellites/telegram-bridge/src/index.ts" }
+    },
+    {
+      "role": "source",
+      "op": "system:probe",
+      "produces": { "channel": "discord_bridge", "type": "ProbeResult" },
+      "params": { "path": "satellites/discord-bridge/src/index.ts" }
+    },
+    {
+      "role": "source",
+      "op": "system:probe",
+      "produces": { "channel": "imessage_bridge", "type": "ProbeResult" },
+      "params": { "path": "satellites/imessage-bridge/src/index.ts" }
+    },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "consumes": [
+        "core_capability",
+        "surface_manifest",
+        "slack_bridge",
+        "telegram_bridge",
+        "discord_bridge",
+        "imessage_bridge"
+      ],
+      "params": {
+        "message": "Surface capability contract artifacts: core={{core_capability.exists}}, manifest={{surface_manifest.exists}}, slack={{slack_bridge.exists}}, telegram={{telegram_bridge.exists}}, discord={{discord_bridge.exists}}, imessage={{imessage_bridge.exists}}"
+      }
+    }
+  ]
+}

@@ -85,6 +85,12 @@ export interface PipelineSchedule {
   timezone?: string;
   enabled?: boolean;
   id?: string;
+  deliver_to?: {
+    surface: string;
+    channel: string;
+    thread_ts?: string;
+    template?: string;
+  };
 }
 
 export interface PipelineAdf {

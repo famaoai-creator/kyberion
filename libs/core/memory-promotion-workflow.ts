@@ -27,6 +27,7 @@ import {
 import { logger } from './core.js';
 import { assessMissionMemoryCandidate } from './mission-assessment.js';
 import { listInboxEntries } from './deliverable-inbox.js';
+import { evaluateBackgroundReviewText } from './background-review-policy.js';
 
 type PromotedMemoryExecutionRole = 'mission_controller' | 'chronos_gateway';
 
@@ -342,6 +343,17 @@ export async function promotePersonalMemoryCandidates(
   const skipped: Array<{ candidate_id: string; reason: string }> = [];
 
   for (const candidate of candidates) {
+    const policy = evaluateBackgroundReviewText(candidate.summary);
+    if (!policy.allowed) {
+      const reason = policy.reason || 'Background review policy rejected the candidate.';
+      updateMemoryPromotionCandidateStatus({
+        candidateId: candidate.candidate_id,
+        status: 'rejected',
+        ratificationNote: `Background review policy: ${reason}`,
+      });
+      skipped.push({ candidate_id: candidate.candidate_id, reason });
+      continue;
+    }
     const eligibility = assessPersonalAutopromoteEligibility(candidate);
     if (!eligibility.eligible) {
       skipped.push({ candidate_id: candidate.candidate_id, reason: eligibility.reason });
@@ -403,6 +415,18 @@ export async function promoteMemoryCandidateToKnowledge(input: {
           ? (storedReview as PromotionReview)
           : defaultPromotionReview(),
     };
+  }
+  const policy = evaluateBackgroundReviewText(candidate.summary);
+  if (!policy.allowed) {
+    const reason = policy.reason || 'Background review policy rejected the candidate.';
+    updateMemoryPromotionCandidateStatus({
+      candidateId: candidate.candidate_id,
+      status: 'rejected',
+      ratificationNote: `Background review policy: ${reason}`,
+    });
+    throw new Error(
+      `[POLICY_VIOLATION] Memory promotion suppressed for ${candidate.candidate_id}: ${reason}`
+    );
   }
   if (candidate.ratification_required && candidate.status !== 'approved') {
     throw new Error(

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { indexHistoryEntry } from '@agent/core';
 
 const mocks = vi.hoisted(() => ({
   safeReadFile: vi.fn(),
@@ -151,5 +152,39 @@ describe('wisdom-actuator handleAction', () => {
     });
 
     expect(result.status).toBe('succeeded');
+  });
+
+  it('exposes public history search through the capture pipeline op', async () => {
+    process.env.KYBERION_HISTORY_SEARCH_DB = 'active/shared/tmp/wisdom-history-search.test.sqlite';
+    indexHistoryEntry({
+      entryId: 'wisdom-history-hit',
+      sourceType: 'conversation',
+      sourceId: 'test-session',
+      sessionId: 'test-session',
+      timestamp: '2026-07-18T00:00:00.000Z',
+      content: '公開履歴の請求書を確認しました。',
+      tier: 'public',
+    });
+
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'pipeline',
+      steps: [
+        {
+          type: 'capture',
+          op: 'history_search',
+          params: { query: '請求書' },
+        },
+      ],
+      context: {},
+    });
+
+    expect(result.status).toBe('succeeded');
+    expect(result.context.history_search_results.results).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ entryId: 'wisdom-history-hit', tier: 'public' }),
+      ])
+    );
+    delete process.env.KYBERION_HISTORY_SEARCH_DB;
   });
 });

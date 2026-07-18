@@ -2804,6 +2804,10 @@
           "kind": "capture"
         },
         {
+          "op": "history_search",
+          "kind": "capture"
+        },
+        {
           "op": "knowledge_search",
           "kind": "capture"
         },
@@ -2873,6 +2877,10 @@
         },
         {
           "op": "conduct_1on1",
+          "kind": "apply"
+        },
+        {
+          "op": "curate_background_review",
           "kind": "apply"
         },
         {

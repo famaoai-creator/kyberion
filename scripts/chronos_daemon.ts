@@ -20,6 +20,7 @@ import {
   getSchedulesDueNow,
   claimScheduledPipelineRun,
   completeScheduledPipelineRun,
+  enqueueChronosDelivery,
 } from '@agent/core';
 import { readValidatedPipelineAdf } from './refactor/adf-input.js';
 import { runSteps } from './run_pipeline.js';
@@ -71,6 +72,7 @@ function syncSchedulesFromAdf(): void {
         },
         enabled: sched.enabled !== false,
         context: adf.context ?? {},
+        deliver_to: sched.deliver_to,
       });
       registered++;
     } catch (err: any) {
@@ -118,10 +120,42 @@ async function tick(): Promise<void> {
         { pipelinePath: scheduled.pipelinePath }
       );
 
+      let deliverySucceeded = true;
+      if (result.status === 'succeeded' && scheduled.deliver_to) {
+        try {
+          const messageId = enqueueChronosDelivery({
+            scheduleId: scheduled.id,
+            pipelineName: scheduled.name,
+            runId: runToken,
+            status: result.status,
+            context: result.context,
+            target: scheduled.deliver_to,
+          });
+          logger.info(`[CHRONOS] ✓ ${scheduled.id}: direct delivery queued (${messageId})`);
+        } catch (deliveryError: any) {
+          deliverySucceeded = false;
+          logger.error(
+            `[CHRONOS] ✗ ${scheduled.id}: direct delivery failed: ${deliveryError.message}`
+          );
+          sendOpsAlert({
+            severity: 'warning',
+            title: 'Scheduled pipeline delivery failed',
+            context: {
+              daemon_id: 'chronos-daemon',
+              schedule_id: scheduled.id,
+              delivery: scheduled.deliver_to,
+              error: deliveryError?.message ?? String(deliveryError),
+            },
+            recommendation: 'Inspect the target surface outbox and schedule deliver_to contract.',
+            dedupe_key: `chronos:${scheduled.id}:delivery-failed`,
+          });
+        }
+      }
+
       completeScheduledPipelineRun(
         scheduled.id,
         runToken,
-        result.status === 'succeeded' ? 'succeeded' : 'failed',
+        result.status === 'succeeded' && deliverySucceeded ? 'succeeded' : 'failed',
         { now }
       );
 

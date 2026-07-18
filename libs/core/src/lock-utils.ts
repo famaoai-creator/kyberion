@@ -1,7 +1,13 @@
 import * as path from 'node:path';
 import { logger } from '../core.js';
 import { pathResolver } from '../path-resolver.js';
-import { safeCreateExclusiveFileSync, safeExistsSync, safeMkdir, safeReadFile, safeUnlinkSync } from '../secure-io.js';
+import {
+  safeCreateExclusiveFileSync,
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeUnlinkSync,
+} from '../secure-io.js';
 
 /**
  * Lock Utilities for Autonomous Resource Arbitration.
@@ -30,7 +36,7 @@ export async function acquireLock(resourceId: string, timeoutMs = 5000): Promise
           pid: process.pid,
           ts: new Date().toISOString(),
           id: resourceId,
-        }),
+        })
       );
       return true;
     } catch (err: any) {
@@ -42,7 +48,7 @@ export async function acquireLock(resourceId: string, timeoutMs = 5000): Promise
           continue; // Retry immediately
         }
         // Wait a bit before retrying (exponential backoff or simple delay)
-        await new Promise(res => setTimeout(res, 100 + Math.random() * 200));
+        await new Promise((res) => setTimeout(res, 100 + Math.random() * 200));
       } else {
         throw err;
       }
@@ -76,22 +82,39 @@ export function releaseLock(resourceId: string): void {
 function _isLockStale(lockFile: string): boolean {
   try {
     const content = JSON.parse(safeReadFile(lockFile, { encoding: 'utf8' }) as string);
-    // Check if PID is still running (signal 0 doesn't kill but checks existence)
-    process.kill(content.pid, 0);
-    return false; // Still running
+    const pid = Number(content?.pid);
+    // A partially-written or hand-edited lock must never become a permanent
+    // delivery fence. Only a positive integer PID is meaningful ownership
+    // metadata; malformed records are safe to reclaim.
+    if (!Number.isInteger(pid) || pid <= 0) return true;
+
+    // Check if PID is still running (signal 0 doesn't kill but checks
+    // existence). EPERM means the process exists but is not inspectable, so
+    // keep the lock rather than allowing two writers to enter concurrently.
+    process.kill(pid, 0);
+    return false;
   } catch (err: any) {
-    // ESRCH means process not found
-    return err.code === 'ESRCH';
+    // A missing/corrupt lock record is stale. ESRCH means the recorded
+    // process no longer exists. Other process errors (for example EPERM)
+    // conservatively retain the lock.
+    if (err?.code === 'EPERM') return false;
+    return err?.code === 'ESRCH' || err?.name === 'SyntaxError' || err?.code === 'ENOENT';
   }
 }
 
 /**
  * Executes a function with an exclusive lock.
  */
-export async function withLock<T>(resourceId: string, fn: () => Promise<T>, timeoutMs = 5000): Promise<T> {
+export async function withLock<T>(
+  resourceId: string,
+  fn: () => Promise<T>,
+  timeoutMs = 5000
+): Promise<T> {
   const acquired = await acquireLock(resourceId, timeoutMs);
   if (!acquired) {
-    throw new Error(`[LOCK_TIMEOUT] Failed to acquire lock for resource: ${resourceId} within ${timeoutMs}ms`);
+    throw new Error(
+      `[LOCK_TIMEOUT] Failed to acquire lock for resource: ${resourceId} within ${timeoutMs}ms`
+    );
   }
   try {
     return await fn();

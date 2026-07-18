@@ -17,14 +17,53 @@ import {
   safeReadFile,
   runSurfaceMessageConversation,
   buildBridgeEmptyReplyText,
-  chunkBridgeMessage,
+  chunkSurfaceMessage,
   postBridgeError,
+  listSurfaceOutboxMessages,
+  clearSurfaceOutboxMessage,
+  createSurfaceOutboxDrainGuard,
+  isSurfaceOutboxDue,
+  recordSurfaceDeliverySuccess,
+  settleSurfaceOutboxFailure,
   resolveMissionProposalReply,
   stashMissionProposalForConfirmation,
+  evaluateSurfaceActorAccess,
+  sendSurfaceTextWithFallback,
+  buildSurfaceApprovalActions,
+  buildSurfaceApprovalText,
+  createSurfaceApprovalRequest,
+  resolveSurfaceApprovalReply,
 } from '@agent/core';
 
 const DISCORD_SURFACE_AGENT_ID = 'discord-surface-agent';
 const DISCORD_THREAD_HISTORY_ROOT = 'active/shared/runtime/discord-bridge/thread-history';
+
+async function replyDiscordText(message: Message, text: string): Promise<void> {
+  for (const chunk of chunkSurfaceMessage(text, 'discord')) {
+    await sendSurfaceTextWithFallback({
+      surface: 'discord',
+      text: chunk,
+      send: ({ text: plainOrRichText }) => message.reply(plainOrRichText),
+    });
+  }
+}
+
+async function replyDiscordApproval(
+  message: Message,
+  text: string,
+  record: Awaited<ReturnType<typeof createSurfaceApprovalRequest>>
+): Promise<void> {
+  const buttons = buildSurfaceApprovalActions(record).map((action) => ({
+    type: 2,
+    style: action.decision === 'approved' ? 3 : 4,
+    label: action.decision === 'approved' ? '承認' : '却下',
+    custom_id: action.callbackData,
+  }));
+  await message.reply({
+    content: text,
+    components: [{ type: 1, components: buttons }],
+  } as any);
+}
 
 export interface DiscordThreadHistoryEntry {
   role: 'user' | 'assistant';
@@ -133,8 +172,28 @@ async function collectDiscordThreadContext(message: Message): Promise<string | u
 async function handleDiscordMessage(message: Message) {
   if (message.author.bot) return;
 
+  const access = evaluateSurfaceActorAccess('discord', message.author.id);
+  if (!access.allowed) {
+    logger.warn(
+      `[DiscordBridge] Ignored unauthorized message from sender: ${message.author.id} (${access.reason})`
+    );
+    return;
+  }
+
   logger.info(`📥 [DiscordBridge] Message from ${message.author.tag}: ${message.content}`);
   const threadTs = message.channelId;
+
+  const approvalReply = resolveSurfaceApprovalReply({
+    surface: 'discord',
+    channel: message.channelId,
+    threadTs,
+    text: message.content,
+    decidedBy: message.author.id,
+  });
+  if (approvalReply.handled) {
+    await replyDiscordText(message, approvalReply.reply || '');
+    return;
+  }
 
   // SN-01 Phase 2: numbered-choice mission-proposal confirmation, same UX
   // contract as Slack ('1 / 作成する' issues, '2 / やめる' cancels).
@@ -145,7 +204,7 @@ async function handleDiscordMessage(message: Message) {
     text: message.content,
   });
   if (proposalReply.handled) {
-    await message.reply(proposalReply.reply);
+    await replyDiscordText(message, proposalReply.reply);
     return;
   }
 
@@ -195,7 +254,7 @@ async function handleDiscordMessage(message: Message) {
         routingDecision: result.routingDecision,
         fallbackSummary: result.text,
       });
-      await message.reply(prompt);
+      await replyDiscordText(message, prompt);
       appendDiscordThreadHistory({
         role: 'assistant',
         authorLabel: DISCORD_SURFACE_AGENT_ID,
@@ -208,14 +267,27 @@ async function handleDiscordMessage(message: Message) {
       return;
     }
 
+    if (result.approvalRequests.length > 0) {
+      for (const draft of result.approvalRequests) {
+        const record = createSurfaceApprovalRequest({
+          surface: 'discord',
+          channel: message.channelId,
+          threadTs,
+          correlationId: `discord-${message.id}`,
+          requestedBy: DISCORD_SURFACE_AGENT_ID,
+          draft,
+          sourceText: message.content,
+        });
+        await replyDiscordApproval(message, buildSurfaceApprovalText('discord', record), record);
+      }
+      return;
+    }
+
     if (result.text) {
       logger.info(`📤 [DiscordBridge] Replying to ${message.author.tag}`);
       // Discord rejects messages over 2,000 chars — long replies used to
       // throw here and vanish into the catch below (UX-01).
-      const chunks = chunkBridgeMessage(result.text, 1900);
-      for (const chunk of chunks) {
-        await message.reply(chunk);
-      }
+      await replyDiscordText(message, result.text);
       appendDiscordThreadHistory({
         role: 'assistant',
         authorLabel: DISCORD_SURFACE_AGENT_ID,
@@ -227,7 +299,10 @@ async function handleDiscordMessage(message: Message) {
       });
     } else {
       // UX-01: an empty agent reply must not read as silence.
-      await message.reply(buildBridgeEmptyReplyText({ locale: resolveOperatorLocale() }));
+      await replyDiscordText(
+        message,
+        buildBridgeEmptyReplyText({ locale: resolveOperatorLocale() })
+      );
     }
   } catch (err: any) {
     logger.error(`❌ [DiscordBridge] Conversation failed: ${err.message}`);
@@ -237,12 +312,57 @@ async function handleDiscordMessage(message: Message) {
       err,
       surface: 'discord',
       locale: resolveOperatorLocale(),
-      post: (errorText) => message.reply(errorText),
+      post: (errorText) => replyDiscordText(message, errorText),
     });
   } finally {
     typing.stop();
   }
 }
+
+export async function handleDiscordInteraction(interaction: any): Promise<void> {
+  if (!interaction?.isButton?.()) return;
+  const actorId = String(interaction.user?.id || '');
+  const access = evaluateSurfaceActorAccess('discord', actorId);
+  if (!access.allowed) {
+    await interaction.reply({ content: 'この操作は許可されていません。', ephemeral: true });
+    return;
+  }
+  const channel = String(interaction.channelId || '');
+  const approvalReply = resolveSurfaceApprovalReply({
+    surface: 'discord',
+    channel,
+    threadTs: channel,
+    text: String(interaction.customId || ''),
+    decidedBy: actorId,
+  });
+  if (!approvalReply.handled) {
+    await interaction.reply({ content: '未対応の操作です。', ephemeral: true });
+    return;
+  }
+  await interaction.reply({ content: approvalReply.reply || '', ephemeral: true });
+}
+
+async function drainDiscordOutbox(client: Client): Promise<void> {
+  for (const message of listSurfaceOutboxMessages('discord')) {
+    if (!isSurfaceOutboxDue(message)) continue;
+    try {
+      const channel = await (client as any).channels.fetch(message.channel);
+      if (!channel || typeof channel.send !== 'function') {
+        throw Object.assign(new Error('channel_not_found'), { status: 404 });
+      }
+      await channel.send(message.text);
+      recordSurfaceDeliverySuccess('discord', message.channel);
+      clearSurfaceOutboxMessage('discord', message.message_id);
+    } catch (error) {
+      const decision = settleSurfaceOutboxFailure('discord', message, error);
+      logger.error(
+        `❌ [DiscordBridge] Outbox delivery failed for ${message.message_id}: ${error instanceof Error ? error.message : String(error)} (${decision.failure.kind}${decision.dead_letter ? ', dead-lettered' : `, retry at ${decision.next_attempt_at}`})`
+      );
+    }
+  }
+}
+
+const runDiscordOutbox = createSurfaceOutboxDrainGuard('discord');
 
 async function main() {
   const argv = await createStandardYargs()
@@ -270,6 +390,7 @@ async function main() {
   });
 
   client.on(Events.MessageCreate, handleDiscordMessage);
+  client.on(Events.InteractionCreate, handleDiscordInteraction);
 
   try {
     await client.login(token);
@@ -277,6 +398,16 @@ async function main() {
     logger.error(`❌ [DiscordBridge] Login failed: ${err.message}`);
     process.exit(1);
   }
+
+  const outboxTimer = setInterval(() => {
+    runDiscordOutbox(() => drainDiscordOutbox(client)).catch((error) => {
+      logger.error(
+        `❌ [DiscordBridge] Outbox poll failed: ${error instanceof Error ? error.message : String(error)}`
+      );
+    });
+  }, 15_000);
+  outboxTimer.unref?.();
+  void runDiscordOutbox(() => drainDiscordOutbox(client));
 }
 
 if (!process.env.VITEST) {

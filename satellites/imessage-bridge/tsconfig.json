@@ -4,15 +4,14 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "outDir": "dist",
+    "composite": true,
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "baseUrl": ".",
-    "paths": {
-      "@agent/core": ["../../libs/core/index.ts"]
-    }
+    "baseUrl": "."
   },
+  "references": [{ "path": "../../libs/core" }],
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
 }

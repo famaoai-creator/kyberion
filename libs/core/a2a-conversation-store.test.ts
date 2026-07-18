@@ -4,14 +4,17 @@ import { pathResolver, safeExistsSync, safeRmSync, withExecutionContext } from '
 
 const CONVERSATION_ID = `CONV-STORE-${Date.now()}`;
 const CONVERSATION_FILE = pathResolver.shared(`runtime/a2a-conversations/${CONVERSATION_ID}.jsonl`);
+const CONCURRENT_CONVERSATION_FILE = pathResolver.shared(
+  `runtime/a2a-conversations/${CONVERSATION_ID}-CONCURRENT.jsonl`
+);
 
 afterEach(() => {
   withExecutionContext('mission_controller', () => {
     const previousSudo = process.env.KYBERION_SUDO;
     process.env.KYBERION_SUDO = 'true';
     try {
-      if (safeExistsSync(CONVERSATION_FILE)) {
-        safeRmSync(CONVERSATION_FILE, { force: true });
+      for (const file of [CONVERSATION_FILE, CONCURRENT_CONVERSATION_FILE]) {
+        if (safeExistsSync(file)) safeRmSync(file, { force: true });
       }
     } finally {
       if (previousSudo === undefined) delete process.env.KYBERION_SUDO;
@@ -52,6 +55,7 @@ describe('a2a conversation store', () => {
       prompt: 'hello',
       result: 'world',
     });
+    expect(history[0]).toHaveProperty('mission_id', 'MSN-1');
   });
 
   it('preserves concurrent appends to the same conversation', async () => {

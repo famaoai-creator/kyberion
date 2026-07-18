@@ -636,6 +636,8 @@ export * from './voice-profile-promotion.js';
 export * from './presentation-preference-registry.js';
 export * from './imessage-bridge.js';
 export * from './imessage-utils.js';
+export * from './bluebubbles-adapter.js';
+export * from './history-search-index.js';
 export * from './voice-engine-registry.js';
 export * from './media-backend-registry.js';
 export * from './intent-execution-profile-registry.js';
@@ -1575,6 +1577,15 @@ export * from './distill-candidate-registry.js';
 export * from './promoted-memory.js';
 export * from './memory-promotion-queue.js';
 export * from './memory-promotion-workflow.js';
+export * from './background-review-policy.js';
+export * from './background-review-curator.js';
+export * from './background-review-patch.js';
+export * from './background-review-runner.js';
+export * from './background-review-nudge.js';
+export * from './chronos-delivery.js';
+export * from './automation-blueprint.js';
+export * from './automation-blueprint-slack.js';
+export * from './programmatic-tool-calling.js';
 export * from './managed-process.js';
 export * from './mission-seed-registry.js';
 export * from './mission-working-memory.js';
@@ -1603,6 +1614,7 @@ export * from './worker-assignment-policy.js';
 export * from './pipeline-contract.js';
 export * from './realtime-voice-conversation.js';
 export * from './surface-coordination-store.js';
+export * from './surface-delivery.js';
 export * from './surface-mutation-guard.js';
 export * from './ceo-surface-summary.js';
 export * from './mic-capture.js';
@@ -1617,6 +1629,8 @@ export * from './surface-ux.js';
 export * from './surface-provider-manifest.js';
 export * from './surface-query-overlay-catalog.js';
 export * from './surface-provider-manifest-catalog.js';
+export * from './surface-access-policy.js';
+export * from './surface-approval-ui.js';
 export * from './service-bootstrap-catalog.js';
 export * from './service-onboarding-catalog.js';
 export * from './surface-provider-policy.js';
@@ -1709,6 +1723,12 @@ export {
   resetBridgeErrorRateLimiter,
   postBridgeError,
   chunkBridgeMessage,
+  chunkSurfaceMessage,
+  getSurfaceCapability,
+  listSurfaceCapabilities,
+  isSurfaceFormatError,
+  stripSurfaceMarkup,
+  sendSurfaceTextWithFallback,
 } from './bridge-error-reply.js';
 export {
   recordConfigFallback,
