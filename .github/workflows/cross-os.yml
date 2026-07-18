@@ -28,6 +28,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # GitHub's macOS runner SQLite may not include the FTS5 extension used by
+      # the history search index. SQLite is keg-only in Homebrew, so add its
+      # bin directory explicitly instead of relying on brew link.
+      - name: Install SQLite with FTS5 (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install sqlite
+          echo "$(brew --prefix sqlite)/bin" >> "$GITHUB_PATH"
+          sqlite3 --version
+          test "$(sqlite3 ':memory:' "select sqlite_compileoption_used('ENABLE_FTS5');")" = "1"
+
       # The native PDF engine embeds a CJK subset font; macOS ships Hiragino,
       # Linux runners need Noto CJK installed for parity.
       - name: Install CJK fonts (Linux)
