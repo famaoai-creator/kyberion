@@ -5,6 +5,7 @@ export const SYSTEM_ACTUATOR_CAPTURE_OPS = [
   'clipboard_read',
   'get_focused_input',
   'get_screen_size',
+  'macos_automation_probe',
   'window_list',
   'chrome_tab_list',
   'read_file',

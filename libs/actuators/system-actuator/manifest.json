@@ -35,6 +35,7 @@
       "platforms": ["darwin", "linux", "win32"]
     },
     { "op": "list_input_devices", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "macos_automation_probe", "platforms": ["darwin", "linux", "win32"] },
     { "op": "list_displays", "platforms": ["darwin", "linux", "win32"] },
     { "op": "list_media_devices", "platforms": ["darwin", "linux", "win32"] },
     { "op": "list_tool_runtimes", "platforms": ["darwin", "linux", "win32"] },

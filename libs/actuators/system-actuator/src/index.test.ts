@@ -248,6 +248,23 @@ const listKnownAppCapabilities = vi.fn(() => [
   },
   { application: 'Finder', adapter: 'file_manager', capabilities: ['empty_trash'] },
 ]);
+const macosAutomationBridge = {
+  probe: vi.fn(() => ({
+    bridge_id: 'macos-automation-bridge',
+    platform: 'darwin',
+    available: true,
+    permissions: {
+      automation: 'granted',
+      accessibility: 'granted',
+      screen_recording: 'unknown',
+    },
+    known_applications: [],
+    reason: 'screen_recording_probe_not_attempted',
+  })),
+  listCapabilities: vi.fn(() => [
+    { application: 'Finder', adapter: 'file_manager', capabilities: ['open_path'] },
+  ]),
+};
 const listTerminalTargets = vi.fn(() => [
   {
     application: 'Terminal',
@@ -926,6 +943,7 @@ vi.mock('@agent/core', () => ({
   rightClickAt,
   moveMouse,
   listKnownAppCapabilities,
+  macosAutomationBridge,
   listTerminalTargets,
   listChromeTabs,
   activateChromeTabByTitle,
@@ -2318,6 +2336,25 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
       expect(result.status).toBe('succeeded');
       expect((result.context.wins as string[]).length).toBe(2);
       expect(getWindowList).toHaveBeenCalledWith('Finder');
+    });
+
+    it('macos_automation_probe: returns the shared capability and app catalog', async () => {
+      const { handleAction } = await import('./index');
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'capture', op: 'macos_automation_probe', params: { export_as: 'macos' } }],
+      } as any);
+
+      expect(result.status).toBe('succeeded');
+      expect(result.context.macos).toMatchObject({
+        bridge_id: 'macos-automation-bridge',
+        available: true,
+        permissions: { automation: 'granted', accessibility: 'granted' },
+        capabilities: [{ application: 'Finder', adapter: 'file_manager' }],
+      });
+      expect(macosAutomationBridge.probe).toHaveBeenCalled();
+      expect(macosAutomationBridge.listCapabilities).toHaveBeenCalled();
     });
 
     it('window_list: throws when application param is missing', async () => {

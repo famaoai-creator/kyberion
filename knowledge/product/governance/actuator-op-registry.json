@@ -377,6 +377,7 @@
         "list_running_apps",
         "list_service_runtimes",
         "list_tool_runtimes",
+        "macos_automation_probe",
         "probe",
         "pulse_status",
         "read_file",
