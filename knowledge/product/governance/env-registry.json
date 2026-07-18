@@ -1340,6 +1340,16 @@
       "documented": false
     },
     {
+      "name": "KYBERION_OPENROUTER_COST_POLICY",
+      "category": "provider",
+      "type": "enum",
+      "enum": ["free-only", "paid-allowed"],
+      "required": false,
+      "default": "free-only",
+      "description": "OpenRouter cost guard. `free-only` is the safe default; `paid-allowed` explicitly opts into paid inference.",
+      "documented": true
+    },
+    {
       "name": "KYBERION_OPENROUTER_KEY",
       "category": "secret",
       "type": "string",
@@ -1352,7 +1362,26 @@
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "OpenRouter model id sent to the chat completions endpoint.",
+      "description": "OpenRouter model id sent to the chat completions endpoint. Defaults to the free model router when omitted.",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_OPENROUTER_PROFILE",
+      "category": "provider",
+      "type": "enum",
+      "enum": ["free-router", "free-pinned", "explicit"],
+      "required": false,
+      "default": "free-router",
+      "description": "OpenRouter model selection profile: free-router, pinned :free model, or explicit model.",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_OPENROUTER_REQUIRED_PARAMETERS",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "default": "tools,tool_choice",
+      "description": "Comma-separated OpenRouter supported parameters required by the selected model.",
       "documented": true
     },
     {

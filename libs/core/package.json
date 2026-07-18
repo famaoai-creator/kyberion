@@ -507,6 +507,10 @@
       "types": "./dist/openrouter-backend.d.ts",
       "default": "./dist/openrouter-backend.js"
     },
+    "./openrouter-model-policy": {
+      "types": "./dist/openrouter-model-policy.d.ts",
+      "default": "./dist/openrouter-model-policy.js"
+    },
     "./reasoning-bootstrap": {
       "types": "./dist/reasoning-bootstrap.d.ts",
       "default": "./dist/reasoning-bootstrap.js"

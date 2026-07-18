@@ -10,7 +10,11 @@ vi.mock('./secure-io.js', async (importOriginal) => {
   return {
     ...actual,
     safeExec: vi.fn(() => 'shell-ok'),
-    safeReadFile: vi.fn(() => 'file contents'),
+    safeReadFile: vi.fn((filePath: string, options?: Parameters<typeof actual.safeReadFile>[1]) => {
+      if (filePath.includes('reasoning-backend-policy.json'))
+        return actual.safeReadFile(filePath, options);
+      return 'file contents';
+    }),
     safeReaddir: vi.fn(() => ['a.txt', 'b.txt']),
     safeWriteFile: vi.fn(),
   };
@@ -23,12 +27,16 @@ describe('openrouter-backend', () => {
     delete process.env.KYBERION_OPENROUTER_KEY;
     delete process.env.OPENROUTER_API_KEY;
     delete process.env.KYBERION_OPENROUTER_MODEL;
+    delete process.env.KYBERION_OPENROUTER_PROFILE;
+    delete process.env.KYBERION_OPENROUTER_COST_POLICY;
+    delete process.env.KYBERION_OPENROUTER_REQUIRED_PARAMETERS;
     delete process.env.KYBERION_OPENROUTER_URL;
   });
 
   it('builds from env when an OpenRouter API key is configured', () => {
     process.env.OPENROUTER_API_KEY = 'or-test-key';
     process.env.KYBERION_OPENROUTER_MODEL = 'meta-llama/llama-3-70b-instruct';
+    process.env.KYBERION_OPENROUTER_COST_POLICY = 'paid-allowed';
 
     const backend = buildOpenRouterBackendFromEnv();
     expect(backend?.name).toBe('openrouter');
@@ -78,7 +86,20 @@ describe('openrouter-backend', () => {
   });
 
   it('probes the authenticated models endpoint without making a completion request', async () => {
-    const fetchMock = vi.fn().mockResolvedValueOnce(new Response('{}', { status: 200 }));
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          data: [
+            {
+              id: 'openrouter/free',
+              pricing: { prompt: '0', completion: '0', request: '0' },
+              supported_parameters: ['tools', 'tool_choice'],
+            },
+          ],
+        }),
+        { status: 200 }
+      )
+    );
     vi.stubGlobal('fetch', fetchMock);
 
     const result = await probeOpenRouterBackendAvailability({
