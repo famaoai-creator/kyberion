@@ -11,7 +11,10 @@ describe('wisdom-actuator schema', () => {
   it('accepts supported wisdom actions', () => {
     const ajv = new Ajv({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.join(pathResolver.rootDir(), 'schemas/wisdom-action.schema.json'));
+    const validate = compileSchemaFromPath(
+      ajv,
+      path.join(pathResolver.rootDir(), 'schemas/wisdom-action.schema.json')
+    );
 
     expect(
       validate({
@@ -20,7 +23,7 @@ describe('wisdom-actuator schema', () => {
           query: 'voice generation',
         },
       }),
-      JSON.stringify(validate.errors || []),
+      JSON.stringify(validate.errors || [])
     ).toBe(true);
 
     expect(
@@ -30,20 +33,34 @@ describe('wisdom-actuator schema', () => {
           source_path: 'knowledge/public/tmp/import.json',
         },
       }),
-      JSON.stringify(validate.errors || []),
+      JSON.stringify(validate.errors || [])
+    ).toBe(true);
+
+    expect(
+      validate({
+        action: 'history_search',
+        params: {
+          query: '請求書',
+          max_results: 5,
+        },
+      }),
+      JSON.stringify(validate.errors || [])
     ).toBe(true);
   });
 
   it('rejects unsupported wisdom actions', () => {
     const ajv = new Ajv({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.join(pathResolver.rootDir(), 'schemas/wisdom-action.schema.json'));
+    const validate = compileSchemaFromPath(
+      ajv,
+      path.join(pathResolver.rootDir(), 'schemas/wisdom-action.schema.json')
+    );
 
     expect(
       validate({
         action: 'unsupported',
         params: {},
-      }),
+      })
     ).toBe(false);
   });
 });

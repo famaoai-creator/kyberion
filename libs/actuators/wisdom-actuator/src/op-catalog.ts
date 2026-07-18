@@ -7,6 +7,7 @@ type OpSpecKind = 'capture' | 'transform' | 'apply' | 'control';
 
 export const WISDOM_ACTUATOR_CAPTURE_OPS = [
   'glob_files',
+  'history_search',
   'knowledge_search',
   'query',
   'read_file',
@@ -31,6 +32,7 @@ export const WISDOM_ACTUATOR_APPLY_OPS = [
   'capture_intuition',
   'compute_readiness_matrix',
   'conduct_1on1',
+  'curate_background_review',
   'cross_critique',
   'typed_cross_critique',
   'decompose_into_tasks',

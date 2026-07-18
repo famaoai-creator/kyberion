@@ -1,0 +1,43 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "history-search-refresh",
+  "name": "Public History Search Refresh",
+  "version": "1.0.0",
+  "description": "Refreshes the public zero-LLM history index from public A2A, mission, channel, and non-mission trace sources.",
+  "_refs": {
+    "plan": "docs/developer/improvement-plans-2026-07/HERMES_AGENT_ADOPTION_PLAN_2026-07-18.ja.md",
+    "implementation": "libs/core/history-search-index.ts"
+  },
+  "schedule": {
+    "id": "history-search-refresh-quarter-hourly",
+    "cron": "*/15 * * * *",
+    "timezone": "Asia/Tokyo",
+    "enabled": true
+  },
+  "steps": [
+    {
+      "id": "refresh-public-history-index",
+      "role": "source",
+      "op": "wisdom:history_search",
+      "produces": {
+        "channel": "history_refresh_report",
+        "type": "HistorySearchReport"
+      },
+      "params": {
+        "mode": "browse",
+        "refresh_public_index": true,
+        "max_results": 1,
+        "export_as": "history_refresh_report"
+      }
+    },
+    {
+      "id": "log-refresh",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "history_refresh_report",
+      "params": {
+        "message": "Public history search index refresh completed."
+      }
+    }
+  ]
+}

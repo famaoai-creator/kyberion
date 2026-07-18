@@ -5,6 +5,7 @@ import type {
   A2ATaskContext,
   PlanningPacket,
   PlanningPacketTask,
+  TaskAcceptanceEvidence,
   TaskResultBlock,
   TaskResultArtifact,
   TaskReviewFinding,
@@ -50,6 +51,14 @@ export const TaskReviewFindingSchema: z.ZodType<TaskReviewFinding> = z
   })
   .strict();
 
+export const TaskAcceptanceEvidenceSchema: z.ZodType<TaskAcceptanceEvidence> = z
+  .object({
+    criterion: z.string().min(1),
+    status: z.enum(['passed', 'failed']),
+    evidence: z.string().min(1),
+  })
+  .strict();
+
 export const TaskResultSchema: z.ZodType<TaskResultBlock> = z
   .object({
     summary: z.string().min(1).max(800),
@@ -57,6 +66,7 @@ export const TaskResultSchema: z.ZodType<TaskResultBlock> = z
     verification_done: z.array(z.string().min(1)),
     gaps: z.array(z.string().min(1)),
     needs: z.array(z.string().min(1)),
+    acceptance_evidence: z.array(TaskAcceptanceEvidenceSchema).optional(),
     review_findings: z.array(TaskReviewFindingSchema).optional(),
   })
   .strict();
