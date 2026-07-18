@@ -25,6 +25,10 @@ const ENV_WHITELIST = [
   'GOOGLE_API_KEY',
   'GEMINI_API_KEY',
   'ANTHROPIC_API_KEY',
+  'GH_TOKEN',
+  'GITHUB_TOKEN',
+  'COPILOT_PROVIDER_BASE_URL',
+  'COPILOT_PROVIDER_API_KEY',
   'MISSION_ID',
   'MISSION_ROLE',
   // SSL/Proxy
@@ -73,6 +77,8 @@ export interface ACPMediatorOptions {
   systemPrompt?: string;
   cwd?: string;
   turnTimeoutMs?: number;
+  /** Set to null for ACP providers that authenticate before spawning the client. */
+  authenticateMethod?: string | null;
   onCrash?: (info: {
     agentId: string;
     exitCode?: number | null;
@@ -499,10 +505,12 @@ export class ACPMediator {
       clientInfo: { name: 'Kyberion', version: '1.0.0' },
     } as any);
 
-    logger.info('[ACP_MEDIATOR] Authenticating...');
-    await this.connection.authenticate({
-      methodId: 'oauth-personal',
-    });
+    if (this.options.authenticateMethod !== null) {
+      logger.info('[ACP_MEDIATOR] Authenticating...');
+      await this.connection.authenticate({
+        methodId: this.options.authenticateMethod || 'oauth-personal',
+      });
+    }
 
     await this.establishSession();
 
