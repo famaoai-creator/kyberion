@@ -84,6 +84,7 @@ describe.sequential('best-of-2 + judge (E2E-03 Task 5)', () => {
     vi.resetModules();
     vi.resetAllMocks();
     process.env.MISSION_ROLE = 'mission_controller';
+    process.env.KYBERION_DRAFT_REFINE = '0';
     delete process.env.KYBERION_BEST_OF_N;
     const { clearWorkCoordinationStore, setWorkCoordinationNamespace } =
       await import('../libs/core/work-coordination.js');
@@ -114,6 +115,7 @@ describe.sequential('best-of-2 + judge (E2E-03 Task 5)', () => {
     clearWorkCoordinationStore();
     clearWorkCoordinationNamespace();
     delete process.env.KYBERION_BEST_OF_N;
+    delete process.env.KYBERION_DRAFT_REFINE;
   });
 
   it('runs two candidates + judge for high-risk tasks and adopts the winner', async () => {
