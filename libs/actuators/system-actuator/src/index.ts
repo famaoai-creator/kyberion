@@ -15,6 +15,7 @@ import {
   resolveWriteArtifactSpec,
   nativeTtsSpeak,
   probeNativeTts,
+  buildGovernedRetryOptions,
   classifyError,
   createVirtualMediaDeviceControlBridge,
   createVirtualDeviceInventoryBridge,
@@ -119,8 +120,6 @@ const DEFAULT_SYSTEM_RETRY = {
   jitter: true,
 };
 
-let cachedRecoveryPolicy: Record<string, any> | undefined;
-
 function assertUnsafeShellAllowed() {
   if (!ALLOW_UNSAFE_SHELL) {
     throw new Error(
@@ -137,50 +136,13 @@ function assertUnsafeJsAllowed() {
   }
 }
 
-function isPlainObject(value: unknown): value is Record<string, any> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
-function loadRecoveryPolicy(): Record<string, any> {
-  if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
-  try {
-    const manifest = JSON.parse(safeReadFile(SYSTEM_MANIFEST_PATH, { encoding: 'utf8' }) as string);
-    cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
-    return cachedRecoveryPolicy ?? {};
-  } catch (_) {
-    cachedRecoveryPolicy = {};
-    return cachedRecoveryPolicy ?? {};
-  }
-}
-
 function buildRetryOptions(override?: Record<string, any>) {
-  const recoveryPolicy = loadRecoveryPolicy();
-  const manifestRetry = isPlainObject(recoveryPolicy.retry) ? recoveryPolicy.retry : {};
-  const retryableCategories = new Set<string>(
-    Array.isArray(recoveryPolicy.retryable_categories)
-      ? recoveryPolicy.retryable_categories.map(String)
-      : []
-  );
-  const resolved = {
-    ...DEFAULT_SYSTEM_RETRY,
-    ...manifestRetry,
-    ...(override || {}),
-  };
-  return {
-    ...resolved,
-    shouldRetry: (error: Error) => {
-      const classification = classifyError(error);
-      if (retryableCategories.size > 0) {
-        return retryableCategories.has(classification.category);
-      }
-      return (
-        classification.category === 'network' ||
-        classification.category === 'rate_limit' ||
-        classification.category === 'timeout' ||
-        classification.category === 'resource_unavailable'
-      );
-    },
-  };
+  return buildGovernedRetryOptions({
+    manifestPath: SYSTEM_MANIFEST_PATH,
+    defaults: DEFAULT_SYSTEM_RETRY,
+    override: override,
+    fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+  });
 }
 
 function normalizeDisplayName(value: unknown): string | undefined {

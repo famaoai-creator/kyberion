@@ -15,8 +15,8 @@ import {
   evaluateCondition,
   getPathValue,
   resolveWriteArtifactSpec,
-  nativeTtsSpeak,
-  probeNativeTts,
+  createVoiceCapabilityBridge,
+  buildGovernedRetryOptions,
   classifyError,
   retry,
   createVirtualMediaDeviceControlBridge,
@@ -110,8 +110,6 @@ const DEFAULT_SYSTEM_RETRY = {
 };
 const warnedSystemOpAliases = new Set<string>();
 
-let cachedRecoveryPolicy: Record<string, any> | undefined;
-
 interface PipelineStep {
   type: 'capture' | 'transform' | 'apply' | 'control';
   op: string;
@@ -134,50 +132,13 @@ function assertUnsafeJsAllowed() {
   }
 }
 
-function isPlainObject(value: unknown): value is Record<string, any> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
-function loadRecoveryPolicy(): Record<string, any> {
-  if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
-  try {
-    const manifest = JSON.parse(safeReadFile(SYSTEM_MANIFEST_PATH, { encoding: 'utf8' }) as string);
-    cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
-    return cachedRecoveryPolicy ?? {};
-  } catch (_) {
-    cachedRecoveryPolicy = {};
-    return cachedRecoveryPolicy ?? {};
-  }
-}
-
 function buildRetryOptions(override?: Record<string, any>) {
-  const recoveryPolicy = loadRecoveryPolicy();
-  const manifestRetry = isPlainObject(recoveryPolicy.retry) ? recoveryPolicy.retry : {};
-  const retryableCategories = new Set<string>(
-    Array.isArray(recoveryPolicy.retryable_categories)
-      ? recoveryPolicy.retryable_categories.map(String)
-      : []
-  );
-  const resolved = {
-    ...DEFAULT_SYSTEM_RETRY,
-    ...manifestRetry,
-    ...(override || {}),
-  };
-  return {
-    ...resolved,
-    shouldRetry: (error: Error) => {
-      const classification = classifyError(error);
-      if (retryableCategories.size > 0) {
-        return retryableCategories.has(classification.category);
-      }
-      return (
-        classification.category === 'network' ||
-        classification.category === 'rate_limit' ||
-        classification.category === 'timeout' ||
-        classification.category === 'resource_unavailable'
-      );
-    },
-  };
+  return buildGovernedRetryOptions({
+    manifestPath: SYSTEM_MANIFEST_PATH,
+    defaults: DEFAULT_SYSTEM_RETRY,
+    override: override,
+    fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+  });
 }
 
 async function delegateToFilePipeline(step: PipelineStep, ctx: any): Promise<any> {
@@ -1470,7 +1431,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       const text = String(resolve(params.text || '{{last_capture}}'));
       const result = await retry(
         async () =>
-          nativeTtsSpeak(text, {
+          createVoiceCapabilityBridge().speak(text, {
             voice: params.voice ? String(resolve(params.voice)) : undefined,
             rate: typeof params.rate === 'number' ? params.rate : undefined,
             timeoutMs: typeof params.timeout_ms === 'number' ? params.timeout_ms : undefined,
@@ -1485,7 +1446,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
       break;
     }
     case 'check_native_tts': {
-      const status = await probeNativeTts();
+      const status = await createVoiceCapabilityBridge().probe();
       ctx = { ...ctx, [params.export_as || 'tts_status']: status };
       if (!status.available) {
         logger.warn(`[NATIVE_TTS] ${status.reason ?? 'native TTS unavailable'}`);

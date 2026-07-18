@@ -11,6 +11,7 @@ import {
   resolveVars,
   assertValidMobileAppProfile,
   retry,
+  buildGovernedRetryOptions,
   classifyError,
   sleep,
 } from '@agent/core';
@@ -30,8 +31,6 @@ const DEFAULT_ANDROID_RETRY = {
   factor: 2,
   jitter: true,
 };
-
-let cachedRecoveryPolicy: Record<string, any> | null = null;
 
 export interface PipelineStep {
   type: 'capture' | 'transform' | 'apply' | 'control';
@@ -67,41 +66,12 @@ interface AndroidTapTarget extends AndroidUiNode {
   center: { x: number; y: number };
 }
 
-function isPlainObject(value: unknown): value is Record<string, any> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
-function loadRecoveryPolicy(): Record<string, any> {
-  if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
-  try {
-    const manifest = JSON.parse(
-      safeReadFile(ANDROID_MANIFEST_PATH, { encoding: 'utf8' }) as string
-    );
-    cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
-  } catch {
-    cachedRecoveryPolicy = {};
-  }
-  return cachedRecoveryPolicy;
-}
-
 export function buildRetryOptions() {
-  const policy = loadRecoveryPolicy();
-  const retry = isPlainObject(policy.retry) ? policy.retry : DEFAULT_ANDROID_RETRY;
-  const retryableCategories = new Set<string>(
-    Array.isArray(policy.retryable_categories) ? policy.retryable_categories.map(String) : []
-  );
-  return {
-    ...DEFAULT_ANDROID_RETRY,
-    ...retry,
-    shouldRetry: (error: Error) => {
-      const classification = classifyError(error);
-      return retryableCategories.size > 0
-        ? retryableCategories.has(classification.category)
-        : classification.category === 'resource_unavailable' ||
-            classification.category === 'timeout' ||
-            classification.category === 'network';
-    },
-  };
+  return buildGovernedRetryOptions({
+    manifestPath: ANDROID_MANIFEST_PATH,
+    defaults: DEFAULT_ANDROID_RETRY,
+    fallbackCategories: ['resource_unavailable', 'timeout'],
+  });
 }
 
 export async function handleAction(input: AndroidAction) {

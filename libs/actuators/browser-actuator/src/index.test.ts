@@ -81,6 +81,7 @@ const mocks = vi.hoisted(() => {
     fileStore.delete(filePath);
   });
   const safeExec = vi.fn(() => '');
+  const secureFetch = vi.fn();
   const retry = vi.fn(async (fn: () => Promise<unknown>, _options?: unknown) => fn());
 
   const context = {
@@ -148,6 +149,7 @@ const mocks = vi.hoisted(() => {
     safeWriteFile,
     safeRmSync,
     safeExec,
+    secureFetch,
     retry,
     fileStore,
     repoRoot,
@@ -164,6 +166,7 @@ vi.mock('@agent/core', async (importOriginal) => {
     safeWriteFile: mocks.safeWriteFile,
     safeRmSync: mocks.safeRmSync,
     safeExec: mocks.safeExec,
+    secureFetch: mocks.secureFetch,
     retry: mocks.retry,
   };
 });
@@ -838,20 +841,15 @@ describe('browser-actuator v3 contract', () => {
       '12345 /Applications/Google Chrome.app/Contents/MacOS/Google Chrome --remote-debugging-port=9555 --user-data-dir=/tmp/kyberion-chrome'
     );
 
-    const originalFetch = globalThis.fetch;
-    const fetchStub = vi.fn(async (url: string) => {
+    mocks.secureFetch.mockImplementation(async ({ url }: { url?: string }) => {
       if (!String(url).includes(':9555/')) {
-        return { ok: false, json: async () => ({}) } as Response;
+        return {};
       }
       return {
-        ok: true,
-        json: async () => ({
-          Browser: 'Chrome/125.0.0.0',
-          webSocketDebuggerUrl: 'ws://127.0.0.1:9555/devtools/browser/abc',
-        }),
-      } as Response;
+        Browser: 'Chrome/125.0.0.0',
+        webSocketDebuggerUrl: 'ws://127.0.0.1:9555/devtools/browser/abc',
+      };
     });
-    vi.stubGlobal('fetch', fetchStub);
 
     try {
       await handleAction({
@@ -875,7 +873,7 @@ describe('browser-actuator v3 contract', () => {
       expect(await closeBrowserSession('browser-auto-cdp')).toBe(true);
       expect(mocks.connectedBrowser.close).toHaveBeenCalledTimes(1);
     } finally {
-      vi.stubGlobal('fetch', originalFetch);
+      mocks.secureFetch.mockReset();
     }
   });
 
@@ -909,20 +907,15 @@ describe('browser-actuator v3 contract', () => {
       '67890 /Applications/Google Chrome.app/Contents/MacOS/Google Chrome --remote-debugging-port=9555 --user-data-dir=/tmp/kyberion-chrome'
     );
 
-    const originalFetch = globalThis.fetch;
-    const fetchStub = vi.fn(async (url: string) => {
+    mocks.secureFetch.mockImplementation(async ({ url }: { url?: string }) => {
       if (!String(url).includes(':9555/')) {
-        return { ok: false, json: async () => ({}) } as Response;
+        return {};
       }
       return {
-        ok: true,
-        json: async () => ({
-          Browser: 'Chrome/125.0.0.0',
-          webSocketDebuggerUrl: 'ws://127.0.0.1:9555/devtools/browser/abc',
-        }),
-      } as Response;
+        Browser: 'Chrome/125.0.0.0',
+        webSocketDebuggerUrl: 'ws://127.0.0.1:9555/devtools/browser/abc',
+      };
     });
-    vi.stubGlobal('fetch', fetchStub);
 
     try {
       await handleAction({
@@ -942,7 +935,7 @@ describe('browser-actuator v3 contract', () => {
       expect(await closeBrowserSession(sessionId)).toBe(true);
       expect(mocks.connectedBrowser.close).toHaveBeenCalledTimes(1);
     } finally {
-      vi.stubGlobal('fetch', originalFetch);
+      mocks.secureFetch.mockReset();
     }
   });
 

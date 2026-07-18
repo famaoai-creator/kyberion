@@ -1,9 +1,9 @@
-/* eslint-disable no-restricted-imports -- IP-08 で managed-process 経由へ移行予定 (docs/developer/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
-import { spawn } from 'node:child_process';
 import * as path from 'node:path';
 import { logger } from './core.js';
+import { secureFetch } from './network.js';
 import { pathResolver } from './path-resolver.js';
 import { safeReadFile } from './secure-io.js';
+import { spawnManagedProcess } from './managed-process.js';
 import { resolveRuntimeModelId } from './runtime-model-defaults.js';
 import { OcrRequest, OcrResult, OcrProvider } from './ocr-types.js';
 
@@ -100,10 +100,19 @@ export class AppleVisionOcrProvider implements OcrProvider {
         args.push(request.language);
       }
 
-      const child = spawn('swift', args, {
-        cwd: pathResolver.rootDir(),
-        env: process.env,
-        stdio: ['ignore', 'pipe', 'pipe'],
+      const child = spawnManagedProcess({
+        resourceId: `ocr-apple-vision:${Date.now()}`,
+        kind: 'service',
+        ownerId: 'ocr-bridge',
+        ownerType: 'core-bridge',
+        command: 'swift',
+        args,
+        spawnOptions: {
+          cwd: pathResolver.rootDir(),
+          env: process.env,
+          stdio: ['ignore', 'pipe', 'pipe'],
+        },
+        shutdownPolicy: 'manual',
       });
 
       let stdout = '';
@@ -115,7 +124,7 @@ export class AppleVisionOcrProvider implements OcrProvider {
         if (completed) return;
         completed = true;
         try {
-          child.kill('SIGKILL');
+          child.child.kill('SIGKILL');
         } catch {
           // ignore
         }
@@ -127,25 +136,25 @@ export class AppleVisionOcrProvider implements OcrProvider {
         clearTimeout(timer);
       };
 
-      child.stdout.on('data', (chunk) => {
+      child.child.stdout?.on('data', (chunk) => {
         stdout += String(chunk);
       });
-      child.stderr.on('data', (chunk) => {
+      child.child.stderr?.on('data', (chunk) => {
         stderr += String(chunk);
       });
 
-      child.on('error', (err) => {
+      child.child.on('error', (err) => {
         if (completed) return;
         cleanup();
         try {
-          child.kill();
+          child.child.kill();
         } catch {
           // ignore
         }
         reject(err);
       });
 
-      child.on('close', (code) => {
+      child.child.on('close', (code) => {
         if (completed) return;
         cleanup();
 
@@ -223,7 +232,7 @@ export class LlmApiOcrProvider implements OcrProvider {
     startedAt: number
   ): Promise<OcrResult> {
     const model = resolveRuntimeModelId('gemini-default');
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
     const payload = {
       contents: [
         {
@@ -242,17 +251,14 @@ export class LlmApiOcrProvider implements OcrProvider {
       ],
     };
 
-    const res = await fetch(url, {
+    const data = await secureFetch<any>({
       method: 'POST',
+      url,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      data: payload,
+      params: { key: apiKey },
+      authenticateRequest: true,
     });
-
-    if (!res.ok) {
-      throw new Error(`Gemini API error: ${res.statusText} (${res.status})`);
-    }
-
-    const data = (await res.json()) as any;
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
     return {
       status: 'succeeded',
@@ -294,21 +300,17 @@ export class LlmApiOcrProvider implements OcrProvider {
       ],
     };
 
-    const res = await fetch(url, {
+    const data = await secureFetch<any>({
       method: 'POST',
+      url,
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': apiKey,
         'anthropic-version': '2023-06-01',
       },
-      body: JSON.stringify(payload),
+      data: payload,
+      authenticateRequest: true,
     });
-
-    if (!res.ok) {
-      throw new Error(`Claude API error: ${res.statusText} (${res.status})`);
-    }
-
-    const data = (await res.json()) as any;
     const text = data.content?.[0]?.text || '';
     return {
       status: 'succeeded',
@@ -347,20 +349,16 @@ export class LlmApiOcrProvider implements OcrProvider {
       ],
     };
 
-    const res = await fetch(url, {
+    const data = await secureFetch<any>({
       method: 'POST',
+      url,
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${apiKey}`,
       },
-      body: JSON.stringify(payload),
+      data: payload,
+      authenticateRequest: true,
     });
-
-    if (!res.ok) {
-      throw new Error(`OpenAI API error: ${res.statusText} (${res.status})`);
-    }
-
-    const data = (await res.json()) as any;
     const text = data.choices?.[0]?.message?.content || '';
     return {
       status: 'succeeded',
@@ -387,8 +385,13 @@ export class LocalVlmOcrProvider implements OcrProvider {
   async isAvailable(): Promise<boolean> {
     try {
       const pingUrl = this.endpoint.replace('/api/generate', '/api/tags');
-      const res = await fetch(pingUrl, { signal: AbortSignal.timeout(1000) });
-      return res.ok;
+      await secureFetch({
+        method: 'GET',
+        url: pingUrl,
+        timeout: 1000,
+        kyberion_allow_local_network: true,
+      });
+      return true;
     } catch (_) {
       return false;
     }
@@ -408,17 +411,13 @@ export class LocalVlmOcrProvider implements OcrProvider {
       stream: false,
     };
 
-    const res = await fetch(this.endpoint, {
+    const data = await secureFetch<any>({
       method: 'POST',
+      url: this.endpoint,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      data: payload,
+      kyberion_allow_local_network: true,
     });
-
-    if (!res.ok) {
-      throw new Error(`Ollama VLM error: ${res.statusText} (${res.status})`);
-    }
-
-    const data = (await res.json()) as any;
     const text = data.response || '';
     return {
       status: 'succeeded',
