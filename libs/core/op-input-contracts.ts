@@ -430,6 +430,18 @@ const INPUT_CONTRACTS: ContractCatalog = {
         additionalProperties: true,
       },
     },
+    macos_automation_probe: {
+      summary:
+        'Probe macOS Automation and Accessibility availability without changing host state. Screen Recording remains unknown unless a separate safe probe is available.',
+      examples: [{ export_as: 'macos_automation' }],
+      schema: {
+        type: 'object',
+        properties: {
+          export_as: { type: 'string', minLength: 1 },
+        },
+        additionalProperties: true,
+      },
+    },
     reconcile_config_fallbacks: {
       summary:
         'Sweep the config-fallback registry: recreate missing public-tier knowledge JSON from defaults, write parse-error proposals. Returns { repaired, proposals_written, skipped, pruned }.',
