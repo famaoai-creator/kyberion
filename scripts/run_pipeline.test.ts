@@ -187,6 +187,31 @@ describe('run_pipeline compatibility', () => {
     expect(result.results).toEqual([{ op: 'system:exec', status: 'success' }]);
   });
 
+  it('offloads oversized ADF step output and records it on the step trace', async () => {
+    const trace = new TraceContext('pipeline:oh04-test', { pipelineId: 'oh04-test' });
+    const result = await runSteps(
+      [
+        {
+          op: 'system:exec',
+          params: {
+            command: 'node',
+            args: ['-e', 'process.stdout.write("z".repeat(20000))'],
+            export_as: 'exec_result',
+          },
+        },
+      ],
+      { __pipeline_options: { max_inline_output_chars: 1000 } },
+      { trace, quiet: true }
+    );
+
+    expect(result.status).toBe('succeeded');
+    expect(result.context.exec_result).toMatchObject({ truncated: true });
+    expect((result.context.exec_result as any).artifact_path).toMatch(
+      /^active\/shared\/tmp\/tool-output\//
+    );
+    expect(trace.summary().artifacts).toBe(1);
+  });
+
   it('parses JSON shell output into structured context when possible', async () => {
     const result = await runSteps([
       {

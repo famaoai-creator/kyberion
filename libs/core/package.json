@@ -679,6 +679,10 @@
       "types": "./dist/sensitive-path-policy.d.ts",
       "default": "./dist/sensitive-path-policy.js"
     },
+    "./output-artifacts": {
+      "types": "./dist/output-artifacts.d.ts",
+      "default": "./dist/output-artifacts.js"
+    },
     "./adf-guardrails": {
       "types": "./dist/adf-guardrails.d.ts",
       "default": "./dist/adf-guardrails.js"
