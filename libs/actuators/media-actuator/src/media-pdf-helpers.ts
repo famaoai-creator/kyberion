@@ -1,4 +1,5 @@
 import type { PdfDesignProtocol } from '@agent/core/media-contracts';
+import type { OcrResult } from '@agent/core';
 
 export interface PdfToPptxHints {
   canvas?: { fallbackW?: number; fallbackH?: number };
@@ -22,7 +23,14 @@ export interface PdfToPptxHints {
     pageTitlePos?: { x: number; y: number; w: number; h: number };
     bodyPos?: { x: number; y: number; w: number; h: number };
   };
-  theme?: { dk1?: string; dk2?: string; lt1?: string; lt2?: string; accent1?: string; accent2?: string };
+  theme?: {
+    dk1?: string;
+    dk2?: string;
+    lt1?: string;
+    lt2?: string;
+    accent1?: string;
+    accent2?: string;
+  };
 }
 
 export interface PdfToXlsxHints {
@@ -71,14 +79,34 @@ export interface PdfToXlsxHints {
     accent2?: string;
   };
   alignment?: {
-    horizontal?: 'general' | 'left' | 'center' | 'right' | 'fill' | 'justify' | 'centerContinuous' | 'distributed';
+    horizontal?:
+      | 'general'
+      | 'left'
+      | 'center'
+      | 'right'
+      | 'fill'
+      | 'justify'
+      | 'centerContinuous'
+      | 'distributed';
     vertical?: 'top' | 'center' | 'bottom' | 'justify' | 'distributed';
     wrapText?: boolean;
   };
   border?: {
-    style?: 'thin' | 'medium' | 'thick' | 'double' | 'dotted' | 'dashed'
-      | 'dashDot' | 'dashDotDot' | 'mediumDashed' | 'mediumDashDot'
-      | 'mediumDashDotDot' | 'slantDashDot' | 'hair' | 'none';
+    style?:
+      | 'thin'
+      | 'medium'
+      | 'thick'
+      | 'double'
+      | 'dotted'
+      | 'dashed'
+      | 'dashDot'
+      | 'dashDotDot'
+      | 'mediumDashed'
+      | 'mediumDashDot'
+      | 'mediumDashDotDot'
+      | 'slantDashDot'
+      | 'hair'
+      | 'none';
     color?: string;
   };
   subMerge?: {
@@ -88,7 +116,9 @@ export interface PdfToXlsxHints {
 }
 
 export function isLikelyReliablePdfText(text: string): boolean {
-  const value = String(text || '').replace(/\s+/g, ' ').trim();
+  const value = String(text || '')
+    .replace(/\s+/g, ' ')
+    .trim();
   if (value.length < 2) return false;
   if (/[\u0000-\u001f\u007f-\u009f]/u.test(value)) return false;
 
@@ -108,8 +138,15 @@ export function isLikelyReliablePdfText(text: string): boolean {
   return true;
 }
 
-export function mapOcrLineToPdfOverlay(page: any, line: any, index: number, fallbackConfidence: number): any | null {
-  const text = String(line?.text || '').replace(/\s+/g, ' ').trim();
+export function mapOcrLineToPdfOverlay(
+  page: any,
+  line: any,
+  index: number,
+  fallbackConfidence: number
+): any | null {
+  const text = String(line?.text || '')
+    .replace(/\s+/g, ' ')
+    .trim();
   if (!text || text.length < 2) return null;
   const bbox = line?.bbox || {};
   const x0 = Number(bbox.x0 ?? 0);
@@ -136,7 +173,9 @@ export function mapOcrLineToPdfOverlay(page: any, line: any, index: number, fall
 export function buildPdfPageOcrOverlayLines(page: any, dominantImage: any, ocr: any): any[] {
   const ocrLines = Array.isArray(ocr?.data?.lines) ? ocr.data.lines : [];
   const fromLines = ocrLines
-    .map((line: any, index: number) => mapOcrLineToPdfOverlay(page, line, index, ocr?.data?.confidence ?? 0))
+    .map((line: any, index: number) =>
+      mapOcrLineToPdfOverlay(page, line, index, ocr?.data?.confidence ?? 0)
+    )
     .filter(Boolean);
   if (fromLines.length > 0) return fromLines;
 
@@ -149,7 +188,13 @@ export function buildPdfPageOcrOverlayLines(page: any, dominantImage: any, ocr: 
 
   const baseX = Math.max(12, Number(dominantImage?.x ?? 0) + 18);
   const baseY = Math.max(12, Number(dominantImage?.y ?? 0) + 18);
-  const maxWidth = Math.max(60, Math.min(Number(dominantImage?.width ?? page?.width ?? 960) - 36, (page?.width || 960) - baseX - 12));
+  const maxWidth = Math.max(
+    60,
+    Math.min(
+      Number(dominantImage?.width ?? page?.width ?? 960) - 36,
+      (page?.width || 960) - baseX - 12
+    )
+  );
   const lineHeight = 18;
   const maxLines = 18;
   const fallbackConfidence = Number(ocr?.data?.confidence ?? 0);
@@ -166,7 +211,54 @@ export function buildPdfPageOcrOverlayLines(page: any, dominantImage: any, ocr: 
   }));
 }
 
-export function buildPositionedSlideOcrElementsFromPdfPage(page: any, canvas: { w: number; h: number }) {
+/** Convert a shared OCR result into the legacy PDF overlay shape. */
+export function buildPdfPageOcrOverlayLinesFromResult(
+  page: any,
+  dominantImage: any,
+  result: OcrResult
+): any[] {
+  const imageX = Number(dominantImage?.x ?? 0);
+  const imageY = Number(dominantImage?.y ?? 0);
+  const imageWidth = Math.max(1, Number(dominantImage?.width ?? page?.width ?? 960));
+  const imageHeight = Math.max(1, Number(dominantImage?.height ?? page?.height ?? 540));
+  const sourceLines = Array.isArray(result.lines) ? result.lines : [];
+  const normalizedProvider = result.provider === 'apple_vision';
+
+  const lines = sourceLines.map((line) => {
+    const box = line.boundingBox;
+    if (!box) return { text: line.text, confidence: line.confidence };
+    const normalized =
+      normalizedProvider ||
+      [box.x, box.y, box.width, box.height].every((value) => value >= 0 && value <= 1);
+    const x = normalized ? box.x * imageWidth : box.x;
+    const y = normalized ? box.y * imageHeight : box.y;
+    const width = normalized ? box.width * imageWidth : box.width;
+    const height = normalized ? box.height * imageHeight : box.height;
+    return {
+      text: line.text,
+      confidence: line.confidence,
+      bbox: {
+        x0: imageX + x,
+        y0: imageY + y,
+        x1: imageX + x + width,
+        y1: imageY + y + height,
+      },
+    };
+  });
+
+  return buildPdfPageOcrOverlayLines(page, dominantImage, {
+    data: {
+      text: result.text,
+      confidence: result.confidence,
+      lines,
+    },
+  });
+}
+
+export function buildPositionedSlideOcrElementsFromPdfPage(
+  page: any,
+  canvas: { w: number; h: number }
+) {
   const pageWidth = page?.width || 960;
   const pageHeight = page?.height || 540;
   const lines = Array.isArray(page?.ocrLines) ? page.ocrLines : [];
@@ -176,8 +268,8 @@ export function buildPositionedSlideOcrElementsFromPdfPage(page: any, canvas: { 
     pos: {
       x: Number((((line.x || 0) / pageWidth) * canvas.w).toFixed(3)),
       y: Number((((line.y || 0) / pageHeight) * canvas.h).toFixed(3)),
-      w: Number((Math.max(0.4, ((line.width || 0) / pageWidth) * canvas.w)).toFixed(3)),
-      h: Number((Math.max(0.24, ((line.height || 0) / pageHeight) * canvas.h)).toFixed(3)),
+      w: Number(Math.max(0.4, ((line.width || 0) / pageWidth) * canvas.w).toFixed(3)),
+      h: Number(Math.max(0.24, ((line.height || 0) / pageHeight) * canvas.h).toFixed(3)),
     },
     text: line.text,
     style: {
@@ -203,7 +295,9 @@ export function chunkTextToBullets(input: string, maxItems = 5): string[] {
     .slice(0, maxItems);
 }
 
-export function splitCleanPdfTextIntoPages(input: string): Array<{ pageNumber: number; text: string }> {
+export function splitCleanPdfTextIntoPages(
+  input: string
+): Array<{ pageNumber: number; text: string }> {
   const lines = String(input || '').split(/\n/);
   const pages: Array<{ pageNumber: number; text: string }> = [];
   let currentPage = 1;
@@ -251,23 +345,26 @@ export function buildGridPageSummary(pageText: string, maxItems = 8): string[] {
     '(参考)プログラム内容や運営への学び・改善点 全体 人事担当者向け',
   ]);
 
-  const transientPattern = /^(?:\d+|✓|自由回答|1~[256]|1~5|\+|\/|Skill-?|input|Ment|oring|#\d+|キック|オフ後|クロー|ジン|グ後|タイミング|カテゴリ|選択肢|回答方法|質問文|後)$/;
-  const continuationPattern = /^(?:どの|程度|ですか|すか|そう答えた理由|ください|ない|役立つ|感じた|感じなかった|自由回答|✓|1~[256]|1~5|\+|\/|次の|本日の|また、|（|大変満足|かなり達成)/;
+  const transientPattern =
+    /^(?:\d+|✓|自由回答|1~[256]|1~5|\+|\/|Skill-?|input|Ment|oring|#\d+|キック|オフ後|クロー|ジン|グ後|タイミング|カテゴリ|選択肢|回答方法|質問文|後)$/;
+  const continuationPattern =
+    /^(?:どの|程度|ですか|すか|そう答えた理由|ください|ない|役立つ|感じた|感じなかった|自由回答|✓|1~[256]|1~5|\+|\/|次の|本日の|また、|（|大変満足|かなり達成)/;
 
   const mergedLines: string[] = [];
   for (const raw of rawLines) {
-    const line = raw.replace(/\t+/g, '\t').replace(/[ ]{2,}/g, ' ').trim();
+    const line = raw
+      .replace(/\t+/g, '\t')
+      .replace(/[ ]{2,}/g, ' ')
+      .trim();
     if (!line) continue;
 
     const prev = mergedLines[mergedLines.length - 1];
     const isContinuation =
       prev &&
-      (
-        !prev.includes('。') &&
-        !prev.includes('？') &&
-        !prev.includes('?') &&
-        (line.length <= 14 || continuationPattern.test(line))
-      );
+      !prev.includes('。') &&
+      !prev.includes('？') &&
+      !prev.includes('?') &&
+      (line.length <= 14 || continuationPattern.test(line));
 
     if (isContinuation) {
       mergedLines[mergedLines.length - 1] = `${prev} ${line}`.replace(/\s+/g, ' ').trim();
@@ -293,9 +390,18 @@ export function buildGridPageSummary(pageText: string, maxItems = 8): string[] {
 
     let summary = line;
     if (cols.length >= 2) {
-      const question = cols.find((part) => /[。？?]|ですか|教えてください|ご記入ください|感じましたか|満足度/.test(part)) || cols[cols.length - 1];
-      const option = cols.find((part) => /(?:1~[256]|1~5|自由回答|役立つ\/特に役立たない|感じた\/感じなかった|大変満足)/.test(part));
-      const category = cols.find((part) => /(キックオフ|クロージング|メンタリング|スキルインプット|ラウンドテーブル|人事担当者|全体)/.test(part));
+      const question =
+        cols.find((part) =>
+          /[。？?]|ですか|教えてください|ご記入ください|感じましたか|満足度/.test(part)
+        ) || cols[cols.length - 1];
+      const option = cols.find((part) =>
+        /(?:1~[256]|1~5|自由回答|役立つ\/特に役立たない|感じた\/感じなかった|大変満足)/.test(part)
+      );
+      const category = cols.find((part) =>
+        /(キックオフ|クロージング|メンタリング|スキルインプット|ラウンドテーブル|人事担当者|全体)/.test(
+          part
+        )
+      );
       summary = [category, question, option].filter(Boolean).join(' / ');
     }
 
@@ -311,7 +417,10 @@ export function buildGridPageSummary(pageText: string, maxItems = 8): string[] {
   return Array.from(new Set(summaries)).slice(0, maxItems);
 }
 
-export function mergeCleanerPdfText(pdfDesign: PdfDesignProtocol, extractedText: string): PdfDesignProtocol {
+export function mergeCleanerPdfText(
+  pdfDesign: PdfDesignProtocol,
+  extractedText: string
+): PdfDesignProtocol {
   const cleanText = String(extractedText || '')
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g, '')
     .replace(/\r/g, '')
@@ -442,13 +551,17 @@ export function isRenderablePdfLineText(text: string): boolean {
 export function buildRenderablePdfLines(page: any) {
   const pageElements = Array.isArray(page?.elements) ? page.elements : [];
   const sorted = pageElements
-    .filter((element: any) => (element.type === 'text' || element.type === 'heading') && isRenderablePdfElementText(element.text))
+    .filter(
+      (element: any) =>
+        (element.type === 'text' || element.type === 'heading') &&
+        isRenderablePdfElementText(element.text)
+    )
     .map((element: any) => ({
       ...element,
       text: normalizePdfElementText(element.text),
     }))
     .filter((element: any) => element.text)
-    .sort((a: any, b: any) => (a.y - b.y) || (a.x - b.x));
+    .sort((a: any, b: any) => a.y - b.y || a.x - b.x);
 
   const lines: any[] = [];
   for (const element of sorted) {
@@ -470,7 +583,7 @@ export function buildRenderablePdfLines(page: any) {
     previous.parts.push(element);
     previous.y = Math.min(previous.y, element.y);
     previous.x = Math.min(previous.x, element.x);
-    previous.width = Math.max(previous.width, (element.x + (element.width || 0)) - previous.x);
+    previous.width = Math.max(previous.width, element.x + (element.width || 0) - previous.x);
     previous.height = Math.max(previous.height, element.height || 0);
     previous.fontSize = Math.max(previous.fontSize, element.fontSize || 12);
     if (element.type === 'heading') previous.type = 'heading';
@@ -479,9 +592,7 @@ export function buildRenderablePdfLines(page: any) {
   return lines
     .map((line) => {
       const text = finalizePdfLineText(
-        line.parts
-        .sort((a: any, b: any) => a.x - b.x)
-        .map((part: any) => part.text),
+        line.parts.sort((a: any, b: any) => a.x - b.x).map((part: any) => part.text)
       );
       return { ...line, text };
     })
@@ -499,7 +610,9 @@ export function isGridLikePdfPage(page: any): boolean {
 
   const xBuckets = new Set(pageElements.map((element: any) => Math.round((element.x || 0) / 20)));
   const undefinedFontCount = pageElements.filter((element: any) => !element.fontName).length;
-  const shortCount = pageElements.filter((element: any) => normalizePdfElementText(element.text).length <= 4).length;
+  const shortCount = pageElements.filter(
+    (element: any) => normalizePdfElementText(element.text).length <= 4
+  ).length;
   const shortRatio = pageElements.length > 0 ? shortCount / pageElements.length : 0;
   const undefinedFontRatio = pageElements.length > 0 ? undefinedFontCount / pageElements.length : 0;
 
@@ -508,7 +621,10 @@ export function isGridLikePdfPage(page: any): boolean {
 
 function getPdfPageClips(page: any) {
   return Array.isArray(page?.elements)
-    ? page.elements.filter((element: any) => element?.type === 'clip' && (element.width || 0) > 8 && (element.height || 0) > 8)
+    ? page.elements.filter(
+        (element: any) =>
+          element?.type === 'clip' && (element.width || 0) > 8 && (element.height || 0) > 8
+      )
     : [];
 }
 
@@ -517,7 +633,7 @@ function intersectsPdfRegion(
   top: number,
   width: number,
   height: number,
-  region: { x?: number; y?: number; width?: number; height?: number },
+  region: { x?: number; y?: number; width?: number; height?: number }
 ): boolean {
   const right = left + width;
   const bottom = top + height;
@@ -525,28 +641,43 @@ function intersectsPdfRegion(
   const regionTop = region.y || 0;
   const regionRight = regionLeft + (region.width || 0);
   const regionBottom = regionTop + (region.height || 0);
-  return Math.min(right, regionRight) > Math.max(left, regionLeft)
-    && Math.min(bottom, regionBottom) > Math.max(top, regionTop);
+  return (
+    Math.min(right, regionRight) > Math.max(left, regionLeft) &&
+    Math.min(bottom, regionBottom) > Math.max(top, regionTop)
+  );
 }
 
-export function buildPositionedSlideClipBlocksFromPdfPage(page: any, canvas: { w: number; h: number }) {
+export function buildPositionedSlideClipBlocksFromPdfPage(
+  page: any,
+  canvas: { w: number; h: number }
+) {
   const pageWidth = page?.width || 960;
   const pageHeight = page?.height || 540;
   const clips = getPdfPageClips(page);
-  const rects = Array.isArray(page?.elements) ? page.elements.filter((element: any) => element?.type === 'rect') : [];
-  const borders = Array.isArray(page?.elements) ? page.elements.filter((element: any) => element?.type === 'border') : [];
+  const rects = Array.isArray(page?.elements)
+    ? page.elements.filter((element: any) => element?.type === 'rect')
+    : [];
+  const borders = Array.isArray(page?.elements)
+    ? page.elements.filter((element: any) => element?.type === 'border')
+    : [];
   const pageArea = pageWidth * pageHeight;
 
   return clips
-    .filter((clip: any) => ((clip.width || 0) * (clip.height || 0)) < pageArea * 0.92)
+    .filter((clip: any) => (clip.width || 0) * (clip.height || 0) < pageArea * 0.92)
     .map((clip: any, index: number) => {
       let bestRect: any = null;
       let bestArea = 0;
       for (const rect of rects) {
         const overlapLeft = Math.max(clip.x || 0, rect.x || 0);
         const overlapTop = Math.max(clip.y || 0, rect.y || 0);
-        const overlapRight = Math.min((clip.x || 0) + (clip.width || 0), (rect.x || 0) + (rect.width || 0));
-        const overlapBottom = Math.min((clip.y || 0) + (clip.height || 0), (rect.y || 0) + (rect.height || 0));
+        const overlapRight = Math.min(
+          (clip.x || 0) + (clip.width || 0),
+          (rect.x || 0) + (rect.width || 0)
+        );
+        const overlapBottom = Math.min(
+          (clip.y || 0) + (clip.height || 0),
+          (rect.y || 0) + (rect.height || 0)
+        );
         const overlapWidth = overlapRight - overlapLeft;
         const overlapHeight = overlapBottom - overlapTop;
         if (overlapWidth <= 0 || overlapHeight <= 0) continue;
@@ -568,10 +699,26 @@ export function buildPositionedSlideClipBlocksFromPdfPage(page: any, canvas: { w
         const clipTop = clip.y || 0;
         const clipRight = clipLeft + (clip.width || 0);
         const clipBottom = clipTop + (clip.height || 0);
-        const nearTop = horizontal && Math.abs(borderTop - clipTop) <= 2 && borderRight > clipLeft && borderLeft < clipRight;
-        const nearBottom = horizontal && Math.abs(borderTop - clipBottom) <= 2 && borderRight > clipLeft && borderLeft < clipRight;
-        const nearLeft = !horizontal && Math.abs(borderLeft - clipLeft) <= 2 && borderBottom > clipTop && borderTop < clipBottom;
-        const nearRight = !horizontal && Math.abs(borderLeft - clipRight) <= 2 && borderBottom > clipTop && borderTop < clipBottom;
+        const nearTop =
+          horizontal &&
+          Math.abs(borderTop - clipTop) <= 2 &&
+          borderRight > clipLeft &&
+          borderLeft < clipRight;
+        const nearBottom =
+          horizontal &&
+          Math.abs(borderTop - clipBottom) <= 2 &&
+          borderRight > clipLeft &&
+          borderLeft < clipRight;
+        const nearLeft =
+          !horizontal &&
+          Math.abs(borderLeft - clipLeft) <= 2 &&
+          borderBottom > clipTop &&
+          borderTop < clipBottom;
+        const nearRight =
+          !horizontal &&
+          Math.abs(borderLeft - clipRight) <= 2 &&
+          borderBottom > clipTop &&
+          borderTop < clipBottom;
         if (!(nearTop || nearBottom || nearLeft || nearRight)) continue;
         const score = Math.max(border.width || 0, border.height || 0);
         if (score > bestBorderScore) {
@@ -586,72 +733,98 @@ export function buildPositionedSlideClipBlocksFromPdfPage(page: any, canvas: { w
         pos: {
           x: Number((((clip.x || 0) / pageWidth) * canvas.w).toFixed(3)),
           y: Number((((clip.y || 0) / pageHeight) * canvas.h).toFixed(3)),
-          w: Number((Math.max(0.2, ((clip.width || 0) / pageWidth) * canvas.w)).toFixed(3)),
-          h: Number((Math.max(0.2, ((clip.height || 0) / pageHeight) * canvas.h)).toFixed(3)),
+          w: Number(Math.max(0.2, ((clip.width || 0) / pageWidth) * canvas.w).toFixed(3)),
+          h: Number(Math.max(0.2, ((clip.height || 0) / pageHeight) * canvas.h).toFixed(3)),
         },
         style: {
           fill: (bestRect?.fillColor || 'F8FAFC').replace('#', ''),
           line: (bestBorder?.strokeColor || bestRect?.strokeColor || 'E2E8F0').replace('#', ''),
           lineWidth: bestBorder?.lineWidth || bestRect?.lineWidth || 1,
-          opacity: bestRect?.opacity !== undefined ? Math.max(1, Math.min(100, Math.round(bestRect.opacity * 100))) : 16,
+          opacity:
+            bestRect?.opacity !== undefined
+              ? Math.max(1, Math.min(100, Math.round(bestRect.opacity * 100)))
+              : 16,
         },
       };
     });
 }
 
-export function buildPositionedSlideElementsFromPdfPage(page: any, canvas: { w: number; h: number }) {
+export function buildPositionedSlideElementsFromPdfPage(
+  page: any,
+  canvas: { w: number; h: number }
+) {
   const pageWidth = page?.width || 960;
   const pageHeight = page?.height || 540;
   if (Array.isArray(page?.elements) && page.elements.length >= 60) {
-    const xBuckets = new Set(page.elements.map((element: any) => Math.round((element.x || 0) / 20)));
+    const xBuckets = new Set(
+      page.elements.map((element: any) => Math.round((element.x || 0) / 20))
+    );
     const undefinedFontCount = page.elements.filter((element: any) => !element.fontName).length;
-    const shortCount = page.elements.filter((element: any) => normalizePdfElementText(element.text).length <= 4).length;
+    const shortCount = page.elements.filter(
+      (element: any) => normalizePdfElementText(element.text).length <= 4
+    ).length;
     const shortRatio = page.elements.length > 0 ? shortCount / page.elements.length : 0;
-    const undefinedFontRatio = page.elements.length > 0 ? undefinedFontCount / page.elements.length : 0;
+    const undefinedFontRatio =
+      page.elements.length > 0 ? undefinedFontCount / page.elements.length : 0;
     if (xBuckets.size >= 18 && (shortRatio > 0.35 || undefinedFontRatio > 0.2)) return [];
   }
   const clips = getPdfPageClips(page);
-  const filteredPage = clips.length === 0 ? page : {
-    ...page,
-    elements: (Array.isArray(page?.elements) ? page.elements : []).filter((element: any) => (
-      !['text', 'heading'].includes(element?.type)
-      || clips.some((clip: any) => intersectsPdfRegion(element.x || 0, element.y || 0, element.width || 0, element.height || 0, clip))
-    )),
-  };
+  const filteredPage =
+    clips.length === 0
+      ? page
+      : {
+          ...page,
+          elements: (Array.isArray(page?.elements) ? page.elements : []).filter(
+            (element: any) =>
+              !['text', 'heading'].includes(element?.type) ||
+              clips.some((clip: any) =>
+                intersectsPdfRegion(
+                  element.x || 0,
+                  element.y || 0,
+                  element.width || 0,
+                  element.height || 0,
+                  clip
+                )
+              )
+          ),
+        };
   const lines = buildRenderablePdfLines(filteredPage);
-  const noisyPage = lines.length > 0 && lines.filter((line) => line.text.length < 6).length / lines.length > 0.45;
+  const noisyPage =
+    lines.length > 0 && lines.filter((line) => line.text.length < 6).length / lines.length > 0.45;
   if (noisyPage) return [];
 
-  return lines
-    .slice(0, 12)
-    .map((line: any, index: number) => {
-      const x = Number(((line.x / pageWidth) * canvas.w).toFixed(3));
-      const y = Number(((line.y / pageHeight) * canvas.h).toFixed(3));
-      const w = Number((Math.min(canvas.w - x - 0.2, Math.max(1.6, (line.width / pageWidth) * canvas.w))).toFixed(3));
-      const h = Number((Math.max(0.32, (line.height / pageHeight) * canvas.h)).toFixed(3));
-      const fontSize = Math.max(12, Math.min(24, Math.round((line.fontSize || 12) * 1.18)));
-      return {
-        type: 'text',
-        id: `pdf-line-${page.pageNumber || 0}-${index + 1}`,
-        pos: { x, y, w, h },
-        text: line.text,
-        style: {
-          fontSize,
-          bold: line.type === 'heading' || fontSize >= 18,
-          color: line.type === 'heading' ? '1F2937' : '334155',
-          fontFamily: 'Aptos',
-          align: 'left',
-          valign: 'top',
-        },
-      };
-    });
+  return lines.slice(0, 12).map((line: any, index: number) => {
+    const x = Number(((line.x / pageWidth) * canvas.w).toFixed(3));
+    const y = Number(((line.y / pageHeight) * canvas.h).toFixed(3));
+    const w = Number(
+      Math.min(canvas.w - x - 0.2, Math.max(1.6, (line.width / pageWidth) * canvas.w)).toFixed(3)
+    );
+    const h = Number(Math.max(0.32, (line.height / pageHeight) * canvas.h).toFixed(3));
+    const fontSize = Math.max(12, Math.min(24, Math.round((line.fontSize || 12) * 1.18)));
+    return {
+      type: 'text',
+      id: `pdf-line-${page.pageNumber || 0}-${index + 1}`,
+      pos: { x, y, w, h },
+      text: line.text,
+      style: {
+        fontSize,
+        bold: line.type === 'heading' || fontSize >= 18,
+        color: line.type === 'heading' ? '1F2937' : '334155',
+        fontFamily: 'Aptos',
+        align: 'left',
+        valign: 'top',
+      },
+    };
+  });
 }
 
 export function buildPositionedSlideImagesFromPdfPage(page: any, canvas: { w: number; h: number }) {
   const pageWidth = page?.width || 960;
   const pageHeight = page?.height || 540;
   const images = Array.isArray(page?.images) ? page.images : [];
-  const clips = Array.isArray(page?.elements) ? page.elements.filter((element: any) => element?.type === 'clip') : [];
+  const clips = Array.isArray(page?.elements)
+    ? page.elements.filter((element: any) => element?.type === 'clip')
+    : [];
 
   const findBestClip = (image: any) => {
     const imageLeft = image.x || 0;
@@ -693,8 +866,8 @@ export function buildPositionedSlideImagesFromPdfPage(page: any, canvas: { w: nu
       const visible = clip || image;
       const x = Number((((visible.x || 0) / pageWidth) * canvas.w).toFixed(3));
       const y = Number((((visible.y || 0) / pageHeight) * canvas.h).toFixed(3));
-      const w = Number((Math.max(0.3, ((visible.width || 0) / pageWidth) * canvas.w)).toFixed(3));
-      const h = Number((Math.max(0.3, ((visible.height || 0) / pageHeight) * canvas.h)).toFixed(3));
+      const w = Number(Math.max(0.3, ((visible.width || 0) / pageWidth) * canvas.w).toFixed(3));
+      const h = Number(Math.max(0.3, ((visible.height || 0) / pageHeight) * canvas.h).toFixed(3));
       const result: any = {
         type: 'image',
         id: `pdf-image-${page.pageNumber || 0}-${index + 1}`,
@@ -705,10 +878,14 @@ export function buildPositionedSlideImagesFromPdfPage(page: any, canvas: { w: nu
         const baseWidth = Math.max(1, image.width || 0);
         const baseHeight = Math.max(1, image.height || 0);
         result.crop = {
-          left: Math.round((((clip.x - (image.x || 0)) / baseWidth) * 100000)),
-          top: Math.round((((clip.y - (image.y || 0)) / baseHeight) * 100000)),
-          right: Math.round(((((image.x || 0) + baseWidth - (clip.x + clip.width)) / baseWidth) * 100000)),
-          bottom: Math.round(((((image.y || 0) + baseHeight - (clip.y + clip.height)) / baseHeight) * 100000)),
+          left: Math.round(((clip.x - (image.x || 0)) / baseWidth) * 100000),
+          top: Math.round(((clip.y - (image.y || 0)) / baseHeight) * 100000),
+          right: Math.round(
+            (((image.x || 0) + baseWidth - (clip.x + clip.width)) / baseWidth) * 100000
+          ),
+          bottom: Math.round(
+            (((image.y || 0) + baseHeight - (clip.y + clip.height)) / baseHeight) * 100000
+          ),
         };
       }
       return result;

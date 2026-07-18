@@ -14,6 +14,7 @@ import {
   safeWriteFile,
   saveProjectRecord,
   saveServiceBindingRecord,
+  pptxUtils,
   withExecutionContext,
 } from '@agent/core';
 
@@ -21,6 +22,7 @@ const ROOT = rootDir();
 
 const mocks = vi.hoisted(() => ({
   recognize: vi.fn(),
+  documentOcr: vi.fn(),
 }));
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
@@ -30,6 +32,10 @@ vi.mock('tesseract.js', () => ({
     recognize: mocks.recognize,
   },
   recognize: mocks.recognize,
+}));
+
+vi.mock('./media-ocr.js', () => ({
+  recognizeDocumentImage: mocks.documentOcr,
 }));
 
 import { handleAction } from './index.js';
@@ -62,6 +68,7 @@ describe('media-actuator pdf to pptx bridge', () => {
   const tenantOverridePath = path.join(tenantOverrideRoot, 'tenant-override.json');
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.documentOcr.mockReset();
     prevPersona = process.env.KYBERION_PERSONA;
     process.env.KYBERION_PERSONA = 'ecosystem_architect';
     safeMkdir(tenantOverrideRoot, { recursive: true });
@@ -102,6 +109,67 @@ describe('media-actuator pdf to pptx bridge', () => {
         else process.env.KYBERION_SUDO = previousSudo;
       }
     });
+  });
+
+  it('attaches local OCR results to PPTX image slides when explicitly enabled', async () => {
+    const distillSpy = vi.spyOn(pptxUtils, 'distillPptxDesign').mockResolvedValue({
+      version: '3.0.0',
+      generatedAt: '2026-07-18T00:00:00.000Z',
+      canvas: { w: 10, h: 5.625 },
+      theme: {},
+      master: { elements: [] },
+      slides: [
+        {
+          id: 'slide1.xml',
+          elements: [
+            {
+              type: 'image',
+              imagePath: '/tmp/pptx-slide-image.png',
+              pos: { x: 0, y: 0, w: 10, h: 5.625 },
+            },
+          ],
+        },
+      ],
+    } as any);
+    mocks.documentOcr.mockResolvedValue({
+      status: 'succeeded',
+      provider: 'apple_vision',
+      text: '画像内の見出し',
+      confidence: 96,
+      lines: [],
+      elapsedMs: 5,
+    });
+
+    try {
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [
+          {
+            type: 'capture',
+            op: 'pptx_extract',
+            params: {
+              path: 'active/shared/tmp/ocr-presentation.pptx',
+              ocr: { enabled: true, language: 'jpn+eng' },
+            },
+          },
+        ],
+      } as any);
+
+      expect(result.status).toBe('succeeded');
+      expect(mocks.documentOcr).toHaveBeenCalledWith({
+        path: '/tmp/pptx-slide-image.png',
+        language: 'jpn+eng',
+        mode: 'local_only',
+      });
+      expect(result.context.last_pptx_design.slides[0].ocr).toEqual(
+        expect.objectContaining({
+          ocr_text: '画像内の見出し',
+          ocr_provider: 'apple_vision',
+        })
+      );
+    } finally {
+      distillSpy.mockRestore();
+    }
   });
 
   it('resolves tenant branding from project and service binding metadata', async () => {
@@ -2340,17 +2408,19 @@ describe('media-actuator pdf to pptx bridge', () => {
   });
 
   it('runs OCR overlay for full-page image pages when extracted pdf text is mostly unreliable', async () => {
-    mocks.recognize.mockResolvedValue({
-      data: {
-        confidence: 92,
-        lines: [
-          {
-            text: 'OCR Restored Title',
-            confidence: 92,
-            bbox: { x0: 24, y0: 28, x1: 168, y1: 48 },
-          },
-        ],
-      },
+    mocks.documentOcr.mockResolvedValue({
+      status: 'succeeded',
+      provider: 'apple_vision',
+      text: 'OCR Restored Title',
+      confidence: 92,
+      lines: [
+        {
+          text: 'OCR Restored Title',
+          confidence: 92,
+          boundingBox: { x: 0.12, y: 0.28, width: 0.72, height: 0.2 },
+        },
+      ],
+      elapsedMs: 4,
     });
 
     const unreliableElements = Array.from({ length: 12 }, (_, index) => ({
@@ -2409,7 +2479,11 @@ describe('media-actuator pdf to pptx bridge', () => {
     } as any);
 
     expect(result.status).toBe('succeeded');
-    expect(mocks.recognize).toHaveBeenCalledWith('/tmp/full-page.png', 'jpn');
+    expect(mocks.documentOcr).toHaveBeenCalledWith({
+      path: '/tmp/full-page.png',
+      language: 'jpn',
+      mode: 'local_only',
+    });
     const pageSlide = result.context.last_pptx_design.slides.find(
       (slide: any) => slide.id === 'pdf-page-1'
     );
@@ -2426,12 +2500,13 @@ describe('media-actuator pdf to pptx bridge', () => {
   });
 
   it('falls back to OCR text blocks when tesseract returns text without line boxes', async () => {
-    mocks.recognize.mockResolvedValue({
-      data: {
-        confidence: 88,
-        text: '最終報告書\nクロスカンパニーメンタリング',
-        lines: [],
-      },
+    mocks.documentOcr.mockResolvedValue({
+      status: 'succeeded',
+      provider: 'tesseract',
+      confidence: 88,
+      text: '最終報告書\nクロスカンパニーメンタリング',
+      lines: [],
+      elapsedMs: 4,
     });
 
     const result = await handleAction({
