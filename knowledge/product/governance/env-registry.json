@@ -590,6 +590,30 @@
       "documented": false
     },
     {
+      "name": "KYBERION_CONTEXT_BUFFER_TOKENS",
+      "category": "secret",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_CONTEXT_RESERVE_TOKENS",
+      "category": "secret",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_CONTEXT_WINDOW_TOKENS",
+      "category": "secret",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_CONTEXTUAL_INTENT_LEARNING_PATH",
       "category": "path",
       "type": "path",
