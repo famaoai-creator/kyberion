@@ -154,7 +154,7 @@ describe('mission ticket dispatch', () => {
       estimated_scope: 'S',
       review_target: 'task-0',
       task_model_hint: expect.objectContaining({
-        model_id: 'openai:gpt-5.4-mini',
+        model_id: 'openai:gpt-5.6-luna',
         tier: 'small',
         effort: 'low',
       }),
@@ -183,14 +183,14 @@ describe('mission ticket dispatch', () => {
       targets: ['workitem', 'github', 'jira'],
       live_targets: [],
       task_model_hint: expect.objectContaining({
-        model_id: 'openai:gpt-5.4-mini',
+        model_id: 'openai:gpt-5.6-luna',
         tier: 'small',
         effort: 'low',
       }),
     });
     expect(manifest.records[0]).toMatchObject({
       task_model_hint: expect.objectContaining({
-        model_id: 'openai:gpt-5.4-mini',
+        model_id: 'openai:gpt-5.6-luna',
         tier: 'small',
         effort: 'low',
       }),
@@ -204,7 +204,7 @@ describe('mission ticket dispatch', () => {
       manifest.records[0].work_item_id
     );
     expect(missionState.context?.ticket_dispatch_summary?.task_model_hint).toMatchObject({
-      model_id: 'openai:gpt-5.4-mini',
+      model_id: 'openai:gpt-5.6-luna',
       tier: 'small',
       effort: 'low',
     });
