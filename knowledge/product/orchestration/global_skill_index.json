@@ -224,7 +224,7 @@
       "d": "Governed local voice generation actuator with native playback and artifact fallback",
       "s": "implemented",
       "version": "1.2.0",
-      "capability_count": 8
+      "capability_count": 9
     },
     {
       "n": "wisdom-actuator",

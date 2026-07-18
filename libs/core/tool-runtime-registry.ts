@@ -270,8 +270,8 @@ const FALLBACK_REGISTRY: ToolRuntimeRegistry = {
       install_backend: {
         kind: 'uv',
         command: 'uv',
-        args: ['pip', 'install', 'mlx-audio'],
-        description: 'Install mlx-audio into the managed Python runtime.',
+        args: ['pip', 'install', 'mlx-audio[tts]'],
+        description: 'Install the current mlx-audio TTS extras into the managed Python runtime.',
       },
       installed_backend: {
         kind: 'system',

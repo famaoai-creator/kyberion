@@ -30,32 +30,98 @@ export interface TranscribeInput {
   outputPath?: string;
 }
 
+export interface SpeechToTextCapabilities {
+  /** Whether the backend returns time ranges for transcript segments. */
+  timestamps: boolean;
+  /** The finest timestamp granularity available from the backend. */
+  granularity: 'none' | 'segment' | 'word';
+  /** Whether audio remains on the local machine during transcription. */
+  local_only?: boolean;
+  /** Whether the backend exposes a confidence score for its output. */
+  confidence?: boolean;
+}
+
+export interface TranscriptSegment {
+  start_sec: number;
+  end_sec: number;
+  text: string;
+}
+
 export interface TranscribeResult {
   text: string;
   language?: string;
   written_to?: string;
   backend: string;
+  capabilities?: SpeechToTextCapabilities;
+  segments?: TranscriptSegment[];
   /** True when the result came from a fallback (e.g. sidecar) rather than real STT. */
   synthetic?: boolean;
 }
 
 export interface SpeechToTextBridge {
   name: string;
+  capabilities?: SpeechToTextCapabilities;
+  /** Stable tie-breaker; higher values are preferred when capabilities match. */
+  priority?: number;
   transcribe(input: TranscribeInput): Promise<TranscribeResult>;
 }
 
-let registered: SpeechToTextBridge | null = null;
+export const NO_TIMESTAMP_STT_CAPABILITIES: SpeechToTextCapabilities = {
+  timestamps: false,
+  granularity: 'none',
+};
+
+export function getSpeechToTextCapabilities(
+  bridge: Pick<SpeechToTextBridge, 'capabilities'>,
+): SpeechToTextCapabilities {
+  return bridge.capabilities ?? NO_TIMESTAMP_STT_CAPABILITIES;
+}
+
+const registered = new Map<string, SpeechToTextBridge>();
 
 export function registerSpeechToTextBridge(bridge: SpeechToTextBridge): void {
-  registered = bridge;
+  const name = String(bridge.name || '').trim();
+  if (!name) throw new Error('SpeechToTextBridge.name is required');
+  registered.set(name, bridge);
 }
 
 export function getSpeechToTextBridge(): SpeechToTextBridge {
-  return registered ?? stubSpeechToTextBridge;
+  return getSpeechToTextBridges()[0] || stubSpeechToTextBridge;
+}
+
+export function getSpeechToTextBridges(): SpeechToTextBridge[] {
+  return registered.size > 0 ? [...registered.values()] : [stubSpeechToTextBridge];
 }
 
 export function resetSpeechToTextBridge(): void {
-  registered = null;
+  registered.clear();
+}
+
+export function normalizeSpeechToTextResult(
+  bridge: Pick<SpeechToTextBridge, 'name' | 'capabilities'>,
+  result: TranscribeResult,
+): TranscribeResult {
+  const validSegments = (result.segments || []).filter((segment) => {
+    return (
+      Number.isFinite(segment.start_sec) &&
+      Number.isFinite(segment.end_sec) &&
+      segment.start_sec >= 0 &&
+      segment.end_sec > segment.start_sec &&
+      Boolean(String(segment.text || '').trim())
+    );
+  });
+  const declared = result.capabilities || getSpeechToTextCapabilities(bridge);
+  const hasTimestamps = declared.timestamps && validSegments.length > 0;
+  return {
+    ...result,
+    backend: result.backend || bridge.name,
+    capabilities: {
+      ...declared,
+      timestamps: hasTimestamps,
+      granularity: hasTimestamps ? declared.granularity : 'none',
+    },
+    ...(result.segments ? { segments: validSegments } : {}),
+  };
 }
 
 function deriveSidecar(audioAbs: string): string {
@@ -74,6 +140,7 @@ function defaultTranscriptPath(audioAbs: string): string {
  */
 export const stubSpeechToTextBridge: SpeechToTextBridge = {
   name: 'stub',
+  capabilities: NO_TIMESTAMP_STT_CAPABILITIES,
   async transcribe(input) {
     const audioAbs = rootResolve(input.audioPath);
     const sidecar = deriveSidecar(audioAbs);
@@ -87,6 +154,7 @@ export const stubSpeechToTextBridge: SpeechToTextBridge = {
         language: input.language,
         written_to: sidecar,
         backend: 'stub-sidecar',
+        capabilities: NO_TIMESTAMP_STT_CAPABILITIES,
         synthetic: true,
       };
     }
@@ -113,11 +181,24 @@ export interface ShellSpeechToTextBridgeOptions {
   shell?: string;
   /** Timeout ms. Defaults to 5 minutes (audio files can be long). */
   timeoutMs?: number;
+  /** Parse stdout as structured JSON with text/capabilities/segments. */
+  structuredOutput?: boolean;
+  capabilities?: SpeechToTextCapabilities;
+  priority?: number;
 }
 
 export class ShellSpeechToTextBridge implements SpeechToTextBridge {
   readonly name = 'shell';
-  constructor(private readonly options: ShellSpeechToTextBridgeOptions) {}
+  readonly capabilities: SpeechToTextCapabilities;
+  readonly priority: number;
+  constructor(private readonly options: ShellSpeechToTextBridgeOptions) {
+    this.capabilities = options.capabilities || NO_TIMESTAMP_STT_CAPABILITIES;
+    this.priority = Number(options.priority || 0);
+  }
+
+  private getCapabilities(): SpeechToTextCapabilities {
+    return this.capabilities;
+  }
 
   async transcribe(input: TranscribeInput): Promise<TranscribeResult> {
     const audioAbs = rootResolve(input.audioPath);
@@ -134,7 +215,15 @@ export class ShellSpeechToTextBridge implements SpeechToTextBridge {
       stdio: ['ignore', 'pipe', 'pipe'],
       maxBuffer: 64 * 1024 * 1024,
     });
-    const text = stdout.trim();
+    let structured: Partial<TranscribeResult> = {};
+    if (this.options.structuredOutput) {
+      try {
+        structured = JSON.parse(stdout) as Partial<TranscribeResult>;
+      } catch (error: any) {
+        throw new Error(`[stt-bridge:shell] structured output was not valid JSON: ${error.message}`);
+      }
+    }
+    const text = String(structured.text || stdout).trim();
     const outputPath = input.outputPath
       ? rootResolve(input.outputPath)
       : defaultTranscriptPath(audioAbs);
@@ -144,6 +233,8 @@ export class ShellSpeechToTextBridge implements SpeechToTextBridge {
       language: input.language,
       written_to: outputPath,
       backend: 'shell',
+      capabilities: structured.capabilities || this.getCapabilities(),
+      ...(structured.segments ? { segments: structured.segments } : {}),
     };
   }
 }
@@ -158,9 +249,20 @@ export function installShellSpeechToTextBridgeIfAvailable(
 ): boolean {
   const command = env.KYBERION_STT_COMMAND?.trim();
   if (!command) return false;
+  let capabilities: SpeechToTextCapabilities | undefined;
+  if (env.KYBERION_STT_CAPABILITIES?.trim()) {
+    try {
+      capabilities = JSON.parse(env.KYBERION_STT_CAPABILITIES) as SpeechToTextCapabilities;
+    } catch (error: any) {
+      logger.warn(`[stt-bridge] ignored invalid KYBERION_STT_CAPABILITIES: ${error.message}`);
+    }
+  }
   registerSpeechToTextBridge(
     new ShellSpeechToTextBridge({
       command,
+      ...(env.KYBERION_STT_OUTPUT_FORMAT === 'json' ? { structuredOutput: true } : {}),
+      ...(capabilities ? { capabilities } : {}),
+      ...(env.KYBERION_STT_PRIORITY ? { priority: parseInt(env.KYBERION_STT_PRIORITY, 10) } : {}),
       ...(env.KYBERION_STT_TIMEOUT_MS
         ? { timeoutMs: parseInt(env.KYBERION_STT_TIMEOUT_MS, 10) }
         : {}),
