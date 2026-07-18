@@ -3,6 +3,11 @@ import { pathResolver } from './path-resolver.js';
 import { safeExec, safeReadFile, safeReaddir, safeWriteFile } from './secure-io.js';
 import { redactSensitiveObject } from './network.js';
 import { advanceToolLoopGuardrail, createToolLoopGuardrailState } from './tool-loop-guardrail.js';
+import {
+  resolveOpenRouterModelPolicy,
+  validateOpenRouterModelRecord,
+  type OpenRouterModelRecord,
+} from './openrouter-model-policy.js';
 import type {
   ReasoningBackend,
   DivergeHypothesisInput,
@@ -405,10 +410,7 @@ export function buildOpenRouterBackendFromEnv(
 ): OpenRouterBackend | null {
   const apiKey = env.KYBERION_OPENROUTER_KEY?.trim() || env.OPENROUTER_API_KEY?.trim();
   if (!apiKey) return null;
-  const model =
-    modelOverride?.trim() ||
-    env.KYBERION_OPENROUTER_MODEL?.trim() ||
-    'meta-llama/llama-3-70b-instruct';
+  const model = resolveOpenRouterModelPolicy(env, modelOverride).model;
   const baseURL = env.KYBERION_OPENROUTER_URL?.trim();
   return new OpenRouterBackend({ apiKey, model, baseURL });
 }
@@ -445,6 +447,26 @@ export async function probeOpenRouterBackendAvailability(
       });
       if (!response.ok) {
         return { available: false, reason: `OpenRouter probe returned HTTP ${response.status}` };
+      }
+      const body = safeJsonParse(await response.text()) as {
+        data?: OpenRouterModelRecord[];
+      } | null;
+      if (!body || !Array.isArray(body.data)) {
+        return { available: false, reason: 'OpenRouter probe returned an invalid models response' };
+      }
+      const modelPolicy = resolveOpenRouterModelPolicy(env);
+      const modelRecord = body.data.find(
+        (record) => record.id === modelPolicy.model || record.canonical_slug === modelPolicy.model
+      );
+      if (!modelRecord) {
+        return {
+          available: false,
+          reason: `OpenRouter model is unavailable: ${modelPolicy.model}`,
+        };
+      }
+      const failures = validateOpenRouterModelRecord(modelRecord, modelPolicy);
+      if (failures.length > 0) {
+        return { available: false, reason: failures.join('; ') };
       }
       return { available: true };
     } finally {
