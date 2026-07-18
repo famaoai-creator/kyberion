@@ -40,14 +40,22 @@ export function loadConnectionWithFallback(serviceId: string): Record<string, an
       logger.warn(`suppressed error in loadConnectionWithFallback: ${err}`);
     }
   }
+  // Keep the legacy fallback observable to callers/tests, but let secure-io's
+  // deny layer reject personal credential paths before any filesystem access.
+  // The mediated secret-guard read below is the only permitted recovery path.
+  const fallbackPath = pathResolver.resolve(`knowledge/personal/connections/${serviceId}.json`);
   try {
-    const fallbackPath = pathResolver.resolve(`knowledge/personal/connections/${serviceId}.json`);
-    return JSON.parse(safeReadFile(fallbackPath, { encoding: 'utf8' }) as string);
-  } catch (_) {
-    const primary = secretGuard.loadConnectionDocument(serviceId);
-    if (primary && typeof primary === 'object' && Object.keys(primary).length > 0) return primary;
-    return {};
+    const fallback = JSON.parse(safeReadFile(fallbackPath, { encoding: 'utf8' }) as string);
+    if (fallback && typeof fallback === 'object' && Object.keys(fallback).length > 0)
+      return fallback;
+  } catch (err) {
+    if (!(err instanceof Error && err.message.startsWith('[SENSITIVE_PATH_DENIED]'))) {
+      logger.warn(`suppressed error in loadConnectionWithFallback: ${err}`);
+    }
   }
+  const primary = secretGuard.loadConnectionDocument(serviceId);
+  if (primary && typeof primary === 'object' && Object.keys(primary).length > 0) return primary;
+  return {};
 }
 
 function isUnresolvedTemplateString(value: unknown): value is string {
