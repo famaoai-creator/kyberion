@@ -9,8 +9,10 @@ describe('model-cost registry — data-driven (not source-hardcoded)', () => {
     // claude-haiku-4-5 lives only in the file (not in the built-in fallback) —
     // its presence proves the registry was read from disk, not hardcoded.
     expect(reg.models['claude-haiku-4-5']).toBeDefined();
-    expect(reg.models['claude-opus-4-8']).toEqual({ prompt: 0.015, completion: 0.075 });
+    expect(reg.models['claude-opus-4-8']).toEqual({ prompt: 0.005, completion: 0.025 });
+    expect(reg.models['claude-fable-5']).toEqual({ prompt: 0.01, completion: 0.05 });
     expect(reg.aliases?.opus).toBe('claude-opus-4-8');
+    expect(reg.aliases?.fable).toBe('claude-fable-5');
   });
 });
 
@@ -30,6 +32,9 @@ describe('resolveCostRates — per-model cost resolution', () => {
   });
 
   it('falls back to default for unknown models', () => {
-    expect(resolveCostRates('totally-unknown-model-xyz')).toEqual({ prompt: 0.001 / 1000, completion: 0.003 / 1000 });
+    expect(resolveCostRates('totally-unknown-model-xyz')).toEqual({
+      prompt: 0.001 / 1000,
+      completion: 0.003 / 1000,
+    });
   });
 });

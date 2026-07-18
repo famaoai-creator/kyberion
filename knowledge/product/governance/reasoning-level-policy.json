@@ -7,45 +7,45 @@
   "fast_shapes": ["direct_reply", "task_session"],
   "cache_ttl_hours": 24,
   "shadow_model_map": {
-    "COGNITIVE_EXPLORATORY": "openai:gpt-5.5",
-    "COGNITIVE_STANDARD": "openai:gpt-5.5",
-    "REACTION_FAST": "openai:gpt-5.4-mini"
+    "COGNITIVE_EXPLORATORY": "openai:gpt-5.6-sol",
+    "COGNITIVE_STANDARD": "openai:gpt-5.6-terra",
+    "REACTION_FAST": "openai:gpt-5.6-luna"
   },
   "task_model_routing": {
     "default": {
       "tier": "standard",
       "effort": "medium",
-      "model_id": "openai:gpt-5.5"
+      "model_id": "openai:gpt-5.6-terra"
     },
     "phases": {
       "mechanical": {
         "default": {
           "tier": "small",
           "effort": "low",
-          "model_id": "openai:gpt-5.4-mini"
+          "model_id": "openai:gpt-5.6-luna"
         }
       },
       "plan": {
         "default": {
           "tier": "large",
           "effort": "high",
-          "model_id": "openai:gpt-5.5"
+          "model_id": "openai:gpt-5.6-sol"
         },
         "scope": {
           "S": {
             "tier": "standard",
             "effort": "medium",
-            "model_id": "openai:gpt-5.5"
+            "model_id": "openai:gpt-5.6-terra"
           },
           "M": {
             "tier": "standard",
             "effort": "medium",
-            "model_id": "openai:gpt-5.5"
+            "model_id": "openai:gpt-5.6-terra"
           },
           "L": {
             "tier": "large",
             "effort": "high",
-            "model_id": "openai:gpt-5.5"
+            "model_id": "openai:gpt-5.6-sol"
           }
         }
       },
@@ -53,50 +53,50 @@
         "default": {
           "tier": "standard",
           "effort": "medium",
-          "model_id": "openai:gpt-5.5"
+          "model_id": "openai:gpt-5.6-terra"
         },
         "scope": {
           "S": {
             "tier": "small",
             "effort": "low",
-            "model_id": "openai:gpt-5.4-mini"
+            "model_id": "openai:gpt-5.6-luna"
           },
           "M": {
             "tier": "standard",
             "effort": "medium",
-            "model_id": "openai:gpt-5.5"
+            "model_id": "openai:gpt-5.6-terra"
           },
           "L": {
             "tier": "large",
             "effort": "high",
-            "model_id": "openai:gpt-5.5"
+            "model_id": "openai:gpt-5.6-sol"
           }
         },
         "risk": {
           "low": {
             "tier": "small",
             "effort": "low",
-            "model_id": "openai:gpt-5.4-mini"
+            "model_id": "openai:gpt-5.6-luna"
           },
           "medium": {
             "tier": "standard",
             "effort": "medium",
-            "model_id": "openai:gpt-5.5"
+            "model_id": "openai:gpt-5.6-sol"
           },
           "high": {
             "tier": "large",
             "effort": "high",
-            "model_id": "openai:gpt-5.5"
+            "model_id": "openai:gpt-5.6-sol"
           },
           "approval_required": {
             "tier": "large",
             "effort": "high",
-            "model_id": "openai:gpt-5.5"
+            "model_id": "openai:gpt-5.6-sol"
           },
           "high_stakes": {
             "tier": "large",
             "effort": "high",
-            "model_id": "openai:gpt-5.5"
+            "model_id": "openai:gpt-5.6-sol"
           }
         }
       },
@@ -104,33 +104,33 @@
         "default": {
           "tier": "large",
           "effort": "high",
-          "model_id": "openai:gpt-5.5"
+          "model_id": "openai:gpt-5.6-sol"
         },
         "risk": {
           "low": {
             "tier": "large",
             "effort": "high",
-            "model_id": "openai:gpt-5.5"
+            "model_id": "openai:gpt-5.6-sol"
           },
           "medium": {
             "tier": "large",
             "effort": "high",
-            "model_id": "openai:gpt-5.5"
+            "model_id": "openai:gpt-5.6-sol"
           },
           "high": {
             "tier": "large",
             "effort": "high",
-            "model_id": "openai:gpt-5.5"
+            "model_id": "openai:gpt-5.6-sol"
           },
           "approval_required": {
             "tier": "large",
             "effort": "high",
-            "model_id": "openai:gpt-5.5"
+            "model_id": "openai:gpt-5.6-sol"
           },
           "high_stakes": {
             "tier": "large",
             "effort": "high",
-            "model_id": "openai:gpt-5.5"
+            "model_id": "openai:gpt-5.6-sol"
           }
         }
       }

@@ -84,7 +84,6 @@ const FALLBACK_POLICY: ReasoningBackendPolicy = {
   ],
   auto_select_env_priority: [
     { env: 'ANTHROPIC_API_KEY', mode: 'anthropic' },
-    { env: 'GEMINI_API_KEY', mode: 'gemini-cli' },
     { env: 'KYBERION_NEMOTRON_URL', mode: 'nemotron-api' },
     { env: 'KYBERION_LOCAL_LLM_URL', mode: 'local' },
     { env: 'KYBERION_OPENROUTER_KEY', mode: 'openrouter' },
@@ -101,12 +100,10 @@ const FALLBACK_POLICY: ReasoningBackendPolicy = {
       provider: 'codex',
       mode: 'codex-cli',
     },
-    { env_any: ['GEMINI_CLI'], provider: 'gemini', mode: 'gemini-cli' },
     { env_any: ['AGY_CLI', 'ANTIGRAVITY_CLI'], provider: 'agy', mode: 'agy-cli' },
   ],
   provider_fallback_order: [
     { provider: 'codex', mode: 'codex-cli' },
-    { provider: 'gemini', mode: 'gemini-cli' },
     { provider: 'agy', mode: 'agy-cli' },
     { provider: 'copilot', mode: 'copilot' },
   ],

@@ -627,15 +627,26 @@ export function replaySurfaceDeadLetter(
     options.deduplicationKey?.trim() ||
     record.deduplication_key ||
     `surface-replay:${surface}:${deadLetterId}`;
-  const messagePath = enqueueSurfaceOutboxMessage({
-    surface,
-    correlationId: record.correlation_id,
-    channel: record.channel,
-    threadTs: record.thread_ts,
-    text: record.text,
-    source: record.source,
-    deduplicationKey,
-  });
+  // Prefer the persisted replay target when this dead letter has already
+  // been replayed. This keeps replay idempotent even if the outbox scan used
+  // for producer deduplication races with another writer or misses the
+  // record during recovery.
+  const existingReplay = record.last_replay_message_id
+    ? listSurfaceOutboxMessages(surface).find(
+        (message) => message.message_id === record.last_replay_message_id
+      )
+    : undefined;
+  const messagePath = existingReplay
+    ? pathResolver.resolve(surfaceOutboxLogicalPath(surface, existingReplay.message_id))
+    : enqueueSurfaceOutboxMessage({
+        surface,
+        correlationId: record.correlation_id,
+        channel: record.channel,
+        threadTs: record.thread_ts,
+        text: record.text,
+        source: record.source,
+        deduplicationKey,
+      });
   const messageId = path.basename(messagePath, '.json');
   writeJsonAs(
     surfaceCoordinationRole(surface),
