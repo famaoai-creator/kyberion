@@ -1,4 +1,5 @@
 import {
+  buildGovernedRetryOptions,
   classifyError,
   createVirtualAudioOutputPlaybackBridge,
   createVirtualDeviceInventoryBridge,
@@ -21,6 +22,7 @@ import {
   splitVoiceTextIntoChunks,
   retry,
   VoiceGenerationRuntime,
+  waitForJob,
 } from '@agent/core';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
@@ -40,52 +42,13 @@ const ESPEAK_NG_CANDIDATES = [
   '/usr/local/bin/espeak',
 ];
 
-let cachedRecoveryPolicy: Record<string, any> | null = null;
-
-function isPlainObject(value: unknown): value is Record<string, any> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
-function loadRecoveryPolicy(): Record<string, any> {
-  if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
-  try {
-    const manifest = JSON.parse(safeReadFile(VOICE_MANIFEST_PATH, { encoding: 'utf8' }) as string);
-    cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
-    return cachedRecoveryPolicy;
-  } catch (_) {
-    cachedRecoveryPolicy = {};
-    return cachedRecoveryPolicy;
-  }
-}
-
 export function buildRetryOptions(override?: Record<string, any>) {
-  const recoveryPolicy = loadRecoveryPolicy();
-  const manifestRetry = isPlainObject(recoveryPolicy.retry) ? recoveryPolicy.retry : {};
-  const retryableCategories = new Set<string>(
-    Array.isArray(recoveryPolicy.retryable_categories)
-      ? recoveryPolicy.retryable_categories.map(String)
-      : []
-  );
-  const resolved = {
-    ...DEFAULT_VOICE_RETRY,
-    ...manifestRetry,
-    ...(override || {}),
-  };
-  return {
-    ...resolved,
-    shouldRetry: (error: Error) => {
-      const classification = classifyError(error);
-      if (retryableCategories.size > 0) {
-        return retryableCategories.has(classification.category);
-      }
-      return (
-        classification.category === 'network' ||
-        classification.category === 'rate_limit' ||
-        classification.category === 'timeout' ||
-        classification.category === 'resource_unavailable'
-      );
-    },
-  };
+  return buildGovernedRetryOptions({
+    manifestPath: VOICE_MANIFEST_PATH,
+    defaults: DEFAULT_VOICE_RETRY,
+    override: override,
+    fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+  });
 }
 
 function resolvePythonBin(): string {
@@ -616,13 +579,15 @@ async function renderVoicePlaybackSource(
 }
 
 async function waitForVoiceJob(runtime: VoiceGenerationRuntime, jobId: string): Promise<any> {
-  const startedAt = Date.now();
-  while (Date.now() - startedAt < 30_000) {
-    const packet = runtime.getPacket(jobId);
-    if (packet && ['completed', 'failed', 'cancelled'].includes(packet.status)) {
-      return packet;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 10));
+  const waited = await waitForJob({
+    getStatus: async () => runtime.getPacket(jobId),
+    isTerminal: (packet: any) =>
+      Boolean(packet && ['completed', 'failed', 'cancelled'].includes(packet.status)),
+    timeoutMs: 30_000,
+    pollIntervalMs: 10,
+  });
+  if (waited.status === 'completed' && waited.value) {
+    return waited.value;
   }
   throw new Error(`voice job timed out: ${jobId}`);
 }

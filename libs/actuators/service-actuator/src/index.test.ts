@@ -22,6 +22,16 @@ vi.mock('@agent/core', async () => {
     safeReadFile: mocks.safeReadFile,
     executeServicePreset: mocks.executeServicePreset,
     executeMcp: mocks.executeMcp,
+    buildGovernedRetryOptions: vi.fn(({ manifestPath, defaults, override }: any) => {
+      let retryPolicy = {};
+      try {
+        const manifest = JSON.parse(String(mocks.safeReadFile(manifestPath)));
+        retryPolicy = manifest?.recovery_policy?.retry || {};
+      } catch {
+        retryPolicy = {};
+      }
+      return { ...defaults, ...retryPolicy, ...(override || {}), shouldRetry: vi.fn() };
+    }),
     retry: mocks.retry,
   };
 });

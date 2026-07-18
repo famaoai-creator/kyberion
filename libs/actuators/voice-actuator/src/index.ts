@@ -30,6 +30,7 @@ import {
   finalizeActuatorTrace,
   resolveVoiceEngineForPlatform,
   resolveVoiceBackend,
+  createVoiceCapabilityBridge,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { randomUUID } from 'node:crypto';
@@ -220,6 +221,7 @@ async function voiceHealth(input: {
     status: 'succeeded',
     action: 'health',
     requested_mode: requestedMode,
+    native_voice_capability: await createVoiceCapabilityBridge().probe(),
     voice_engine_registry: {
       version: voiceEngineRegistry.version,
       default_engine_id: voiceEngineRegistry.default_engine_id,

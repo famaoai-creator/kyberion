@@ -6,6 +6,7 @@ import {
   TraceContext,
   persistTrace,
   retry,
+  buildGovernedRetryOptions,
   classifyError,
   formatClassification,
   compileSchemaFromPath,
@@ -55,7 +56,6 @@ const DEFAULT_CALENDAR_RETRY = {
 };
 
 let cachedValidator: ValidateFunction | null = null;
-let cachedRecoveryPolicy: Record<string, any> | null = null;
 
 function getValidator(): ValidateFunction {
   if (cachedValidator) return cachedValidator;
@@ -89,53 +89,13 @@ function parseISODate(value: string | undefined, label: string): Date | null {
   return d;
 }
 
-function isPlainObject(value: unknown): value is Record<string, any> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
-function loadRecoveryPolicy(): Record<string, any> {
-  if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
-  try {
-    const manifest = JSON.parse(
-      safeReadFile(CALENDAR_MANIFEST_PATH, { encoding: 'utf8' }) as string
-    );
-    const policy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
-    cachedRecoveryPolicy = policy;
-    return policy;
-  } catch (_) {
-    cachedRecoveryPolicy = {};
-    return cachedRecoveryPolicy;
-  }
-}
-
 function buildRetryOptions(override?: Record<string, any>) {
-  const recoveryPolicy = loadRecoveryPolicy();
-  const manifestRetry = isPlainObject(recoveryPolicy.retry) ? recoveryPolicy.retry : {};
-  const retryableCategories = new Set<string>(
-    Array.isArray(recoveryPolicy.retryable_categories)
-      ? recoveryPolicy.retryable_categories.map(String)
-      : []
-  );
-  const resolved = {
-    ...DEFAULT_CALENDAR_RETRY,
-    ...manifestRetry,
-    ...(override || {}),
-  };
-  return {
-    ...resolved,
-    shouldRetry: (error: Error) => {
-      const classification = classifyError(error);
-      if (retryableCategories.size > 0) {
-        return retryableCategories.has(classification.category);
-      }
-      return (
-        classification.category === 'network' ||
-        classification.category === 'rate_limit' ||
-        classification.category === 'timeout' ||
-        classification.category === 'resource_unavailable'
-      );
-    },
-  };
+  return buildGovernedRetryOptions({
+    manifestPath: CALENDAR_MANIFEST_PATH,
+    defaults: DEFAULT_CALENDAR_RETRY,
+    override: override,
+    fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+  });
 }
 
 async function runJxa<T>(scriptBody: string, params: Record<string, unknown>): Promise<T> {

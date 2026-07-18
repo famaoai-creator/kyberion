@@ -14,6 +14,7 @@ import {
   getPathValue,
   resolveWriteArtifactSpec,
   retry,
+  buildGovernedRetryOptions,
   classifyError,
   buildUnknownActuatorOpError,
   executeAdfSteps,
@@ -36,7 +37,6 @@ const DEFAULT_RETRY_POLICY = {
   factor: 2,
   jitter: true,
 };
-let cachedRecoveryPolicy: Record<string, any> | null = null;
 
 function assertUnsafeShellAllowed() {
   if (!ALLOW_UNSAFE_SHELL) {
@@ -46,66 +46,21 @@ function assertUnsafeShellAllowed() {
   }
 }
 
-function isPlainObject(value: unknown): value is Record<string, any> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
-function loadRecoveryPolicy(): Record<string, any> {
-  if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
-  try {
-    const manifest = JSON.parse(
-      safeReadFile(NETWORK_MANIFEST_PATH, { encoding: 'utf8' }) as string
-    );
-    cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
-    return cachedRecoveryPolicy;
-  } catch (_) {
-    cachedRecoveryPolicy = {};
-    return cachedRecoveryPolicy;
-  }
-}
-
 function buildRetryOptions(stepParams: Record<string, any>) {
-  const recoveryPolicy = loadRecoveryPolicy();
-  const manifestRetry = isPlainObject(recoveryPolicy.retry) ? recoveryPolicy.retry : {};
-  const retryableCategories = new Set<string>(
-    Array.isArray(recoveryPolicy.retryable_categories)
-      ? recoveryPolicy.retryable_categories.map(String)
-      : []
-  );
-  const explicitRetry = isPlainObject(stepParams.retry) ? stepParams.retry : {};
-  const resolved = {
-    ...DEFAULT_RETRY_POLICY,
-    ...manifestRetry,
-    ...explicitRetry,
-    maxRetries: Number(
-      stepParams.max_retries ??
-        explicitRetry.maxRetries ??
-        manifestRetry.maxRetries ??
-        DEFAULT_RETRY_POLICY.maxRetries
-    ),
-    initialDelayMs: Number(
-      stepParams.retry_delay_ms ??
-        explicitRetry.initialDelayMs ??
-        manifestRetry.initialDelayMs ??
-        DEFAULT_RETRY_POLICY.initialDelayMs
-    ),
-  };
-
-  return {
-    ...resolved,
-    shouldRetry: (error: Error) => {
-      const classification = classifyError(error);
-      if (retryableCategories.size > 0) {
-        return retryableCategories.has(classification.category);
-      }
-      return (
-        classification.category === 'network' ||
-        classification.category === 'rate_limit' ||
-        classification.category === 'timeout' ||
-        classification.category === 'resource_unavailable'
-      );
-    },
-  };
+  const explicitRetry =
+    stepParams && typeof stepParams.retry === 'object' && !Array.isArray(stepParams.retry)
+      ? { ...(stepParams.retry as Record<string, any>) }
+      : {};
+  if (stepParams?.max_retries !== undefined)
+    explicitRetry.maxRetries = Number(stepParams.max_retries);
+  if (stepParams?.retry_delay_ms !== undefined)
+    explicitRetry.initialDelayMs = Number(stepParams.retry_delay_ms);
+  return buildGovernedRetryOptions({
+    manifestPath: NETWORK_MANIFEST_PATH,
+    defaults: DEFAULT_RETRY_POLICY,
+    override: explicitRetry,
+    fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+  });
 }
 
 function buildUnknownNetworkOpError(op: string): Error {
