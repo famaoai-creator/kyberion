@@ -261,16 +261,17 @@ surface が提供する UI の機能的アフォーダンスの調査(2026-07-03
 
 各アクチュエータのリファクタリング・使いやすさの調査(2026-07-03、実コード検証済み)に基づく。AC 系(能力)・IP-05(CLI runner)・IP-10(巨大ファイル)とは**別軸**(op 設計・ADFスキーマ・エンジン一貫性)。**検証で判明した構造的問題: 3つの非互換パイプラインエンジン、op 真実源の4系統ドリフト、未知 op の silent no-op(`file-pipeline-helpers.ts:178/237/249`)、op 命名の乱れ、per-op 入力契約の欠如。**
 
-| ID                                               | タイトル                                                                          | 優先度 | 規模 | 依存        |
-| ------------------------------------------------ | --------------------------------------------------------------------------------- | ------ | ---- | ----------- |
-| [AR-01](./AR-01_UNIFY_ADF_ENGINE.ja.md)          | ADF 実行エンジンの統合(3非互換エンジン→1、意味論一致)                             | **P0** | L    | なし        |
-| [AR-02](./AR-02_OP_REGISTRY_SINGLE_SOURCE.ja.md) | op レジストリの単一真実源化(dispatch から生成・4系統ドリフト解消)                 | **P0** | M    | なし        |
-| [AR-03](./AR-03_PER_OP_INPUT_CONTRACTS.ja.md)    | per-op 入力契約(`params:any` → 検証付き契約・必須/例)                             | P1     | M〜L | AR-02       |
-| [AR-04](./AR-04_SHARED_OP_VOCABULARY.ja.md)      | 共有 op 語彙(io/capture/net/transform/core・命名エイリアス整理)                   | P1     | M    | AR-01,AR-02 |
-| [AR-05](./AR-05_ACTUATOR_COHERENCE_SPLIT.ja.md)  | 不整合アクチュエータの分割(観察/変更・ドメイン境界、IP-10 と統合)                 | P2     | L    | AR-01,AR-02 |
-| [AR-06](./AR-06_NO_SILENT_NOOP.ja.md)            | silent no-op の撲滅(未知 op を成功でなくエラーに)                                 | P1     | S    | AR-02推奨   |
-| [AR-08](./AR-08_PIPELINE_CATALOG_AUDIT.ja.md)    | pipeline カタログ全数監査(77件・実行検証55件・ADF修復エンジンのfalse-success修正) | P1     | M    | AR-01,AR-02 |
-| [AR-09](./AR-09_ACTUATOR_COMMONIZATION.ja.md)    | actuator 共通能力の正本化(recovery/process/voice/job/HTTP)                        | P1     | L    | AR-02,AR-03 |
+| ID                                                  | タイトル                                                                          | 優先度 | 規模 | 依存              |
+| --------------------------------------------------- | --------------------------------------------------------------------------------- | ------ | ---- | ----------------- |
+| [AR-01](./AR-01_UNIFY_ADF_ENGINE.ja.md)             | ADF 実行エンジンの統合(3非互換エンジン→1、意味論一致)                             | **P0** | L    | なし              |
+| [AR-02](./AR-02_OP_REGISTRY_SINGLE_SOURCE.ja.md)    | op レジストリの単一真実源化(dispatch から生成・4系統ドリフト解消)                 | **P0** | M    | なし              |
+| [AR-03](./AR-03_PER_OP_INPUT_CONTRACTS.ja.md)       | per-op 入力契約(`params:any` → 検証付き契約・必須/例)                             | P1     | M〜L | AR-02             |
+| [AR-04](./AR-04_SHARED_OP_VOCABULARY.ja.md)         | 共有 op 語彙(io/capture/net/transform/core・命名エイリアス整理)                   | P1     | M    | AR-01,AR-02       |
+| [AR-05](./AR-05_ACTUATOR_COHERENCE_SPLIT.ja.md)     | 不整合アクチュエータの分割(観察/変更・ドメイン境界、IP-10 と統合)                 | P2     | L    | AR-01,AR-02       |
+| [AR-06](./AR-06_NO_SILENT_NOOP.ja.md)               | silent no-op の撲滅(未知 op を成功でなくエラーに)                                 | P1     | S    | AR-02推奨         |
+| [AR-08](./AR-08_PIPELINE_CATALOG_AUDIT.ja.md)       | pipeline カタログ全数監査(77件・実行検証55件・ADF修復エンジンのfalse-success修正) | P1     | M    | AR-01,AR-02       |
+| [AR-09](./AR-09_ACTUATOR_COMMONIZATION.ja.md)       | actuator 共通能力の正本化(recovery/process/voice/job/HTTP)                        | P1     | L    | AR-02,AR-03       |
+| [AR-10](./AR-10_MACOS_AUTOMATION_INTEGRATION.ja.md) | macOS automation capability の共通 facade と system probe                         | P1     | M    | AR-02,AR-03,AR-09 |
 
 ### 実行レイヤリング(pipeline / typed ops / デザインシステムの3層分離)
 

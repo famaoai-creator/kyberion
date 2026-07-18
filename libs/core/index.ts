@@ -1686,6 +1686,7 @@ export * from './control-plane-client.js';
 export * from './computer-surface.js';
 export * from './apple-event-bridge.js';
 export * from './os-automation-bridge.js';
+export * from './macos-automation-bridge.js';
 export * from './os-app-adapters.js';
 export * from './service-binding.js';
 export * from './oauth-broker.js';
