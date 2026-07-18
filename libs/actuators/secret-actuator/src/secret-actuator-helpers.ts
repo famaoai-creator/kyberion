@@ -13,6 +13,7 @@ import {
   removeSecret,
   listSecrets as coreListSecrets,
   pathResolver,
+  secureIo,
 } from '@agent/core';
 import * as path from 'node:path';
 
@@ -25,6 +26,13 @@ const SECRET_MANIFEST_PATH = pathResolver.rootResolve(
   'libs/actuators/secret-actuator/manifest.json'
 );
 const KEYCHAIN_REGISTRY_PATH = pathResolver.vault('secrets/keychain-registry.json');
+
+// The registry is secret-adjacent metadata stored under vault/secrets.  Keep
+// the global sensitive-path deny layer intact for callers, but mediate this
+// actuator's own deliberate registry access explicitly.
+function withVaultIo<T>(operation: () => T): T {
+  return secureIo.withSensitivePathMediation(operation);
+}
 
 const DEFAULT_SECRET_RETRY = {
   maxRetries: 2,
@@ -57,10 +65,12 @@ interface SecretAction {
 }
 
 function loadRegistry(): KeychainRegistry {
-  if (!safeExistsSync(KEYCHAIN_REGISTRY_PATH)) return { entries: [] };
+  if (!withVaultIo(() => safeExistsSync(KEYCHAIN_REGISTRY_PATH))) {
+    return { entries: [] };
+  }
   try {
     return JSON.parse(
-      safeReadFile(KEYCHAIN_REGISTRY_PATH, { encoding: 'utf8' }) as string
+      withVaultIo(() => safeReadFile(KEYCHAIN_REGISTRY_PATH, { encoding: 'utf8' })) as string
     ) as KeychainRegistry;
   } catch {
     return { entries: [] };
@@ -69,8 +79,10 @@ function loadRegistry(): KeychainRegistry {
 
 function saveRegistry(registry: KeychainRegistry): void {
   const dir = path.dirname(KEYCHAIN_REGISTRY_PATH);
-  if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-  safeWriteFile(KEYCHAIN_REGISTRY_PATH, JSON.stringify(registry, null, 2));
+  if (!withVaultIo(() => safeExistsSync(dir))) {
+    withVaultIo(() => safeMkdir(dir, { recursive: true }));
+  }
+  withVaultIo(() => safeWriteFile(KEYCHAIN_REGISTRY_PATH, JSON.stringify(registry, null, 2)));
 }
 
 function registryAdd(service: string, account: string): void {
