@@ -197,6 +197,9 @@ function resolveImageProviderPreference(params: any): string[] | undefined {
     const backendTokens = explicitBackendId.split('.').filter(Boolean);
     const tail = backendTokens[backendTokens.length - 1] || explicitBackendId;
     if (tail === 'local_flux' || explicitBackendId === 'local_flux') return ['local_flux'];
+    if (tail === 'apple_playground' || explicitBackendId === 'apple_playground') {
+      return ['apple_playground', 'local_flux', 'comfyui'];
+    }
     if (tail === 'comfyui' || explicitBackendId === 'media-generation.comfyui') return ['comfyui'];
     if (tail === 'llm_api') return ['llm_api'];
   }
