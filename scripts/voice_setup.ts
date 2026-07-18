@@ -12,6 +12,7 @@ import {
 } from '@agent/core';
 
 const VOICE_TOOL_IDS = ['mlx_audio', 'mlx_whisper'] as const;
+const MANAGED_PYTHON_VERSION = process.env.KYBERION_MANAGED_PYTHON_VERSION?.trim() || '3.11';
 
 type VoiceToolId = (typeof VOICE_TOOL_IDS)[number];
 
@@ -53,6 +54,16 @@ function resolveManagedPythonBin(toolId: VoiceToolId): string | null {
   return null;
 }
 
+function isManagedPythonCurrent(pythonBin: string | null): boolean {
+  if (!pythonBin) return false;
+  const result = safeExecResult(
+    pythonBin,
+    ['-c', 'import sys; print(f"{sys.version_info[0]}.{sys.version_info[1]}")'],
+    { timeoutMs: 10_000, maxOutputMB: 1 },
+  );
+  return result.status === 0 && result.stdout.trim() === MANAGED_PYTHON_VERSION;
+}
+
 function installManagedVoiceRuntime(toolId: VoiceToolId): VoiceSetupRow {
   const resolution = probeToolRuntime(toolId, 'approved_install');
   const backend = resolution.install_backend;
@@ -76,7 +87,13 @@ function installManagedVoiceRuntime(toolId: VoiceToolId): VoiceSetupRow {
     const rootDir = pathResolver.rootDir();
     safeMkdir(resolution.managed_env_path, { recursive: true });
 
-    const venvResult = safeExecResult('uv', ['venv', resolution.managed_env_path], {
+    const venvArgs = ['venv', '--python', MANAGED_PYTHON_VERSION];
+    // An existing runtime may have been created with the old system Python.
+    // Recreate only this narrow managed runtime so the TTS package can use its
+    // current Qwen3-TTS implementation.
+    if (safeExistsSync(resolution.managed_env_path)) venvArgs.push('--clear');
+    venvArgs.push(resolution.managed_env_path);
+    const venvResult = safeExecResult('uv', venvArgs, {
       cwd: rootDir,
       timeoutMs: 120_000,
       maxOutputMB: 8,
@@ -157,14 +174,17 @@ function inspectVoiceRuntime(toolId: VoiceToolId): VoiceSetupRow {
     };
   }
   if (pythonBin) {
+    const current = isManagedPythonCurrent(pythonBin);
     return {
       toolId,
       managedEnvPath: installedResolution.managed_env_path,
-      installed: true,
-      installAction: 'none',
+      installed: current,
+      installAction: current ? 'none' : 'pending',
       pythonBin,
-      status: 'ready',
-      detail: `Managed python found at ${pythonBin}`,
+      status: current ? 'ready' : 'needs_install',
+      detail: current
+        ? `Managed Python ${MANAGED_PYTHON_VERSION} found at ${pythonBin}`
+        : `Managed Python upgrade required: ${MANAGED_PYTHON_VERSION} (found at ${pythonBin})`,
     };
   }
   return {

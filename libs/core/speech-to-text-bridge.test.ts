@@ -21,8 +21,11 @@ vi.mock('./policy-engine.js', () => ({
 import { rootResolve } from './path-resolver.js';
 import {
   getSpeechToTextBridge,
+  getSpeechToTextBridges,
+  getSpeechToTextCapabilities,
   registerSpeechToTextBridge,
   resetSpeechToTextBridge,
+  normalizeSpeechToTextResult,
   stubSpeechToTextBridge,
   type SpeechToTextBridge,
 } from './speech-to-text-bridge.js';
@@ -44,6 +47,10 @@ describe('speech-to-text-bridge', () => {
 
   it('defaults to the stub bridge', () => {
     expect(getSpeechToTextBridge().name).toBe('stub');
+    expect(getSpeechToTextCapabilities(getSpeechToTextBridge())).toEqual({
+      timestamps: false,
+      granularity: 'none',
+    });
   });
 
   it('stub falls back to a sidecar transcript when available', async () => {
@@ -71,5 +78,48 @@ describe('speech-to-text-bridge', () => {
     };
     registerSpeechToTextBridge(fake);
     expect(getSpeechToTextBridge().name).toBe('fake');
+  });
+
+  it('exposes timestamp capability for a timestamped backend', () => {
+    const fake: SpeechToTextBridge = {
+      name: 'timestamped-fake',
+      capabilities: { timestamps: true, granularity: 'segment' },
+      transcribe: async () => ({
+        text: 'x',
+        backend: 'timestamped-fake',
+        capabilities: { timestamps: true, granularity: 'segment' },
+        segments: [{ start_sec: 0, end_sec: 1, text: 'x' }],
+      }),
+    };
+    registerSpeechToTextBridge(fake);
+    expect(getSpeechToTextCapabilities(getSpeechToTextBridge())).toEqual({
+      timestamps: true,
+      granularity: 'segment',
+    });
+  });
+
+  it('keeps multiple registered bridges available for capability-based selection', () => {
+    registerSpeechToTextBridge({ name: 'plain', priority: 1, transcribe: async () => ({ text: 'plain', backend: 'plain' }) });
+    registerSpeechToTextBridge({
+      name: 'timestamped',
+      priority: 2,
+      capabilities: { timestamps: true, granularity: 'segment' },
+      transcribe: async () => ({
+        text: 'timestamped',
+        backend: 'timestamped',
+        capabilities: { timestamps: true, granularity: 'segment' },
+        segments: [{ start_sec: 0, end_sec: 1, text: 'timestamped' }],
+      }),
+    });
+    expect(getSpeechToTextBridges().map((bridge) => bridge.name)).toEqual(['plain', 'timestamped']);
+  });
+
+  it('downgrades a falsely declared timestamp capability when no valid segments are returned', () => {
+    const result = normalizeSpeechToTextResult(
+      { name: 'bad-backend', capabilities: { timestamps: true, granularity: 'segment' } },
+      { text: 'x', backend: 'bad-backend', segments: [{ start_sec: -1, end_sec: 0, text: 'x' }] },
+    );
+    expect(result.capabilities).toEqual({ timestamps: false, granularity: 'none' });
+    expect(result.segments).toEqual([]);
   });
 });

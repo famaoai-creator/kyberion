@@ -23,6 +23,7 @@
     { "op": "register_voice_profile", "platforms": ["darwin", "linux", "win32"] },
     { "op": "collect_voice_samples", "platforms": ["darwin", "linux", "win32"] },
     { "op": "collect_and_register_voice_profile", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "record_voice_sample", "platforms": ["darwin", "linux", "win32"] }
+    { "op": "record_voice_sample", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "record_verify_repair_voice_sample", "platforms": ["darwin", "linux", "win32"] }
   ]
 }

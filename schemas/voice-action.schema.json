@@ -16,13 +16,16 @@
       "$ref": "../knowledge/product/schemas/voice-sample-recording.schema.json"
     },
     {
+      "$ref": "../knowledge/product/schemas/voice-sample-verification.schema.json"
+    },
+    {
       "$ref": "../knowledge/product/schemas/voice-sample-collection-registration.schema.json"
     },
     {
       "type": "object",
       "required": ["action", "params"],
       "properties": {
-        "action": { "enum": ["health", "speak_local", "list_voices", "record_voice_sample", "collect_voice_samples", "collect_and_register_voice_profile", "register_voice_profile", "transcribe_voice_sample"] },
+        "action": { "enum": ["health", "speak_local", "list_voices", "record_voice_sample", "record_verify_repair_voice_sample", "collect_voice_samples", "collect_and_register_voice_profile", "register_voice_profile", "transcribe_voice_sample"] },
         "params": { "type": "object" }
       }
     },
@@ -49,13 +52,16 @@
                 "$ref": "../knowledge/product/schemas/voice-sample-recording.schema.json"
               },
               {
+                "$ref": "../knowledge/product/schemas/voice-sample-verification.schema.json"
+              },
+              {
                 "$ref": "../knowledge/product/schemas/voice-sample-collection-registration.schema.json"
               },
               {
                 "type": "object",
                 "required": ["action", "params"],
                 "properties": {
-                "action": { "enum": ["health", "speak_local", "list_voices", "record_voice_sample", "collect_voice_samples", "collect_and_register_voice_profile", "register_voice_profile", "transcribe_voice_sample"] },
+                "action": { "enum": ["health", "speak_local", "list_voices", "record_voice_sample", "record_verify_repair_voice_sample", "collect_voice_samples", "collect_and_register_voice_profile", "register_voice_profile", "transcribe_voice_sample"] },
                   "params": { "type": "object" }
                 }
               }

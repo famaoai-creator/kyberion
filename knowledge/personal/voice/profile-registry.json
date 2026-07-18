@@ -1,20 +1,54 @@
 {
   "version": "1.0.0",
-  "default_profile_id": "user-cloned",
+  "default_profile_id": "operator-personal-voice-v5",
   "profiles": [
     {
-      "profile_id": "user-cloned",
-      "display_name": "User Cloned Voice",
+      "profile_id": "operator-personal-voice-v1",
+      "display_name": "Operator Personal Voice v1",
       "tier": "personal",
       "languages": [
         "ja"
       ],
       "sample_refs": [
-        "active/shared/runtime/voice-profiles/user-cloned/sample-01.wav"
+        "/Volumes/data/kyberion/active/shared/runtime/voice-profiles/operator-personal-voice-v1/sample-01.wav",
+        "/Volumes/data/kyberion/active/shared/runtime/voice-profiles/operator-personal-voice-v1/sample-02.wav",
+        "/Volumes/data/kyberion/active/shared/runtime/voice-profiles/operator-personal-voice-v1/sample-03.wav"
       ],
-      "default_engine_id": "open_voice_clone",
+      "default_engine_id": "mlx_audio_qwen3",
       "status": "active",
-      "notes": "Custom voice cloned via zero-shot voice training bridge."
+      "notes": "ICL voice clone via mlx-audio Qwen3-TTS. clone-my-voice pipeline."
+    },
+    {
+      "profile_id": "operator-personal-voice-v2",
+      "display_name": "Operator Personal Voice v2",
+      "tier": "personal",
+      "languages": [
+        "ja"
+      ],
+      "sample_refs": [
+        "/Volumes/data/kyberion/active/shared/runtime/voice-profiles/operator-personal-voice-v2/sample-01.wav",
+        "/Volumes/data/kyberion/active/shared/runtime/voice-profiles/operator-personal-voice-v2/sample-02.wav",
+        "/Volumes/data/kyberion/active/shared/runtime/voice-profiles/operator-personal-voice-v2/sample-03.wav"
+      ],
+      "default_engine_id": "mlx_audio_qwen3",
+      "status": "shadow",
+      "notes": "ICL voice clone via mlx-audio Qwen3-TTS. clone-my-voice pipeline."
+    },
+    {
+      "profile_id": "operator-personal-voice-v5",
+      "display_name": "Operator Personal Voice v5",
+      "tier": "personal",
+      "languages": [
+        "ja"
+      ],
+      "sample_refs": [
+        "/Volumes/data/kyberion/active/shared/runtime/voice-profiles/operator-personal-voice-v5/sample-01.wav",
+        "/Volumes/data/kyberion/active/shared/runtime/voice-profiles/operator-personal-voice-v5/sample-02.wav",
+        "/Volumes/data/kyberion/active/shared/runtime/voice-profiles/operator-personal-voice-v5/sample-03.wav"
+      ],
+      "default_engine_id": "mlx_audio_qwen3",
+      "status": "active",
+      "notes": "ICL voice clone via mlx-audio Qwen3-TTS. clone-my-voice pipeline."
     },
     {
       "profile_id": "sovereign-personal",
@@ -31,6 +65,20 @@
       "default_engine_id": "open_voice_clone",
       "status": "active",
       "notes": "Primary cloned voice for the Sovereign."
+    },
+    {
+      "profile_id": "user-cloned",
+      "display_name": "User Cloned Voice",
+      "tier": "personal",
+      "languages": [
+        "ja"
+      ],
+      "sample_refs": [
+        "active/shared/runtime/voice-profiles/user-cloned/sample-01.wav"
+      ],
+      "default_engine_id": "open_voice_clone",
+      "status": "active",
+      "notes": "Custom voice cloned via zero-shot voice training bridge."
     }
   ]
 }

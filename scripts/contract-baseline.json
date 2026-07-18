@@ -304,6 +304,7 @@
         "generate_voice",
         "list_voices",
         "record_voice_sample",
+        "record_verify_repair_voice_sample",
         "register_voice_profile",
         "speak_local"
       ],

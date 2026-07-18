@@ -1,19 +1,22 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "voice-sample-recording.schema.json",
+  "$id": "voice-sample-verification.schema.json",
   "type": "object",
   "additionalProperties": false,
   "properties": {
-    "action": { "const": "record_voice_sample" },
+    "action": { "const": "record_verify_repair_voice_sample" },
     "request_id": { "type": "string", "minLength": 1 },
     "sample_id": { "type": "string", "minLength": 1 },
     "duration_sec": { "type": "number", "exclusiveMinimum": 0 },
     "language": { "type": "string", "minLength": 2 },
-    "prompt_text": { "type": "string" },
+    "prompt_text": { "type": "string", "minLength": 1 },
     "recording_countdown_sec": { "type": "number", "minimum": 0, "maximum": 10 },
     "prompt_display_hold_ms": { "type": "number", "minimum": 0, "maximum": 60000 },
     "output_path": { "type": "string", "minLength": 1 },
-    "input_device_preference": { "type": "string", "minLength": 1 }
+    "max_repair_attempts": { "type": "integer", "minimum": 1, "maximum": 5 },
+    "repair_duration_sec": { "type": "number", "exclusiveMinimum": 0 },
+    "resume_session_path": { "type": "string", "minLength": 1 },
+    "dry_run": { "type": "boolean" }
   },
-  "required": ["action", "request_id", "sample_id", "duration_sec"]
+  "required": ["action", "request_id", "sample_id", "duration_sec", "prompt_text", "output_path"]
 }
