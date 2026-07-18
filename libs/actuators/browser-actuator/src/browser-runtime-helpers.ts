@@ -7,6 +7,8 @@ import {
   safeReaddir,
   safeRmSync,
   safeExec,
+  secureFetch,
+  buildGovernedRetryOptions,
   pathResolver,
   normalizeBrowserPipelineOp,
   validateOpInput,
@@ -189,64 +191,23 @@ const DEFAULT_BROWSER_RETRY = {
   jitter: true,
 };
 
-let cachedRecoveryPolicy: Record<string, any> | null = null;
-
-function isPlainObject(value: unknown): value is Record<string, any> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
-function loadRecoveryPolicy(): Record<string, any> {
-  if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
-  try {
-    const manifest = JSON.parse(
-      safeReadFile(BROWSER_MANIFEST_PATH, { encoding: 'utf8' }) as string
-    );
-    cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
-    return cachedRecoveryPolicy;
-  } catch (_) {
-    cachedRecoveryPolicy = {};
-    return cachedRecoveryPolicy;
-  }
-}
-
 function buildRetryOptions(stepParams: Record<string, any>) {
-  const recoveryPolicy = loadRecoveryPolicy();
-  const manifestRetry = isPlainObject(recoveryPolicy.retry) ? recoveryPolicy.retry : {};
-  const retryableCategories = new Set<string>(
-    Array.isArray(recoveryPolicy.retryable_categories)
-      ? recoveryPolicy.retryable_categories.map(String)
-      : []
-  );
-  const explicitRetry = isPlainObject(stepParams.retry) ? stepParams.retry : {};
-  const resolved = {
-    ...DEFAULT_BROWSER_RETRY,
-    ...manifestRetry,
-    ...explicitRetry,
-    maxRetries: Number(
-      stepParams.max_retries ??
-        explicitRetry.maxRetries ??
-        manifestRetry.maxRetries ??
-        DEFAULT_BROWSER_RETRY.maxRetries
-    ),
-    initialDelayMs: Number(
-      stepParams.retry_delay_ms ??
-        explicitRetry.initialDelayMs ??
-        manifestRetry.initialDelayMs ??
-        DEFAULT_BROWSER_RETRY.initialDelayMs
-    ),
-  };
-  return {
-    ...resolved,
-    shouldRetry: (error: Error) => {
-      const message = String(error?.message || '').toLowerCase();
-      if (retryableCategories.size > 0) {
-        return [...retryableCategories].some((category) =>
-          message.includes(category.toLowerCase())
-        );
-      }
-      return /timeout|network|rate limit|ECONNRESET|ETIMEDOUT/i.test(message);
-    },
-  };
+  const explicitRetry =
+    stepParams && typeof stepParams.retry === 'object' && !Array.isArray(stepParams.retry)
+      ? { ...(stepParams.retry as Record<string, any>) }
+      : {};
+  if (stepParams?.max_retries !== undefined)
+    explicitRetry.maxRetries = Number(stepParams.max_retries);
+  if (stepParams?.retry_delay_ms !== undefined)
+    explicitRetry.initialDelayMs = Number(stepParams.retry_delay_ms);
+  return buildGovernedRetryOptions({
+    manifestPath: BROWSER_MANIFEST_PATH,
+    defaults: DEFAULT_BROWSER_RETRY,
+    override: explicitRetry,
+    fallbackCategories: ['network', 'timeout', 'resource_unavailable'],
+    additionalShouldRetry: (error) =>
+      /selector|not visible|strict mode violation|detached/i.test(error.message),
+  });
 }
 
 function createBrowserRuntime(
@@ -464,14 +425,13 @@ async function probeChromeCdpPort(
   port: number,
   timeoutMs = 600
 ): Promise<ChromeCdpEndpoint | null> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetch(`http://127.0.0.1:${port}/json/version`, {
-      signal: controller.signal,
+    const payload = await secureFetch<Record<string, unknown>>({
+      method: 'GET',
+      url: `http://127.0.0.1:${port}/json/version`,
+      timeout: timeoutMs,
+      kyberion_allow_local_network: true,
     });
-    if (!response.ok) return null;
-    const payload = await response.json().catch(() => null);
     if (!payload || typeof payload !== 'object') return null;
     const webSocketDebuggerUrl = (payload as any).webSocketDebuggerUrl;
     const browser = (payload as any).Browser;
@@ -485,8 +445,6 @@ async function probeChromeCdpPort(
     return null;
   } catch {
     return null;
-  } finally {
-    clearTimeout(timeout);
   }
 }
 

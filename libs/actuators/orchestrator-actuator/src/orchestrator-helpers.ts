@@ -13,6 +13,7 @@ import {
   resolveVars,
   evaluateCondition,
   retry,
+  buildGovernedRetryOptions,
   derivePipelineStatus,
   pathResolver,
   buildUnknownActuatorOpError,
@@ -84,62 +85,17 @@ const DEFAULT_ORCHESTRATOR_RETRY = {
   jitter: true,
 };
 
-let cachedRecoveryPolicy: Record<string, any> | null = null;
-
-function isPlainObject(value: unknown): value is Record<string, any> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
-function loadRecoveryPolicy(): Record<string, any> {
-  if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
-  try {
-    const manifest = JSON.parse(
-      safeReadFile(ORCHESTRATOR_MANIFEST_PATH, { encoding: 'utf8' }) as string
-    );
-    cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
-    return cachedRecoveryPolicy;
-  } catch (_) {
-    cachedRecoveryPolicy = {};
-    return cachedRecoveryPolicy;
-  }
-}
-
 function buildUnknownOrchestratorOpError(op: string): Error {
   return buildUnknownActuatorOpError('orchestrator', op);
 }
 
 export function buildRetryOptions(override?: Record<string, any>) {
-  const recoveryPolicy = loadRecoveryPolicy();
-  const manifestRetry = isPlainObject(recoveryPolicy.retry) ? recoveryPolicy.retry : {};
-  const retryableCategories = new Set<string>(
-    Array.isArray(recoveryPolicy.retryable_categories)
-      ? recoveryPolicy.retryable_categories.map(String)
-      : []
-  );
-  const resolved = {
-    ...DEFAULT_ORCHESTRATOR_RETRY,
-    ...manifestRetry,
-    ...(override || {}),
-  };
-  return {
-    ...resolved,
-    shouldRetry: (error: Error) => {
-      const message = String(error?.message || '');
-      if (retryableCategories.size > 0) {
-        const category = /ETIMEDOUT|timeout|network/i.test(message)
-          ? 'timeout'
-          : /ECONNREFUSED|ECONNRESET|ENOTFOUND|EAI_AGAIN/i.test(message)
-            ? 'network'
-            : /EADDRINUSE|ENOSPC|resource unavailable|busy/i.test(message)
-              ? 'resource_unavailable'
-              : 'unknown';
-        return retryableCategories.has(category);
-      }
-      return /ETIMEDOUT|timeout|network|ECONNREFUSED|ECONNRESET|ENOTFOUND|EAI_AGAIN|EADDRINUSE|ENOSPC/i.test(
-        message
-      );
-    },
-  };
+  return buildGovernedRetryOptions({
+    manifestPath: ORCHESTRATOR_MANIFEST_PATH,
+    defaults: DEFAULT_ORCHESTRATOR_RETRY,
+    override: override,
+    fallbackCategories: ['resource_unavailable', 'timeout'],
+  });
 }
 
 /**

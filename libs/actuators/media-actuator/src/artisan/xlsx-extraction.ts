@@ -1,13 +1,17 @@
-import { execFileSync } from 'node:child_process';
-import { xlsxUtils } from '@agent/core';
-import type { Aesthetic, ExtractionMode, ExtractionOptions, ExtractionResult } from './extraction-engine.js';
+import { xlsxUtils, runGovernedCommand } from '@agent/core';
+import type {
+  Aesthetic,
+  ExtractionMode,
+  ExtractionOptions,
+  ExtractionResult,
+} from './extraction-engine.js';
 import { collectXmlCaptures } from './xml-utils.js';
 
 export async function processXlsx(
   filePath: string,
   mode: ExtractionMode,
   result: ExtractionResult,
-  options: ExtractionOptions = {},
+  options: ExtractionOptions = {}
 ) {
   const workbook = readWorkbook(filePath);
 
@@ -58,7 +62,9 @@ function readWorkbook(filePath: string): WorkbookInfo {
   const appPropsXml = readZipEntryText(filePath, 'docProps/app.xml');
 
   const relTargets = new Map<string, string>();
-  for (const match of workbookRelsXml.matchAll(/<Relationship[^>]*Id="([^"]+)"[^>]*Target="([^"]+)"/g)) {
+  for (const match of workbookRelsXml.matchAll(
+    /<Relationship[^>]*Id="([^"]+)"[^>]*Target="([^"]+)"/g
+  )) {
     relTargets.set(match[1], match[2]);
   }
 
@@ -75,7 +81,10 @@ function readWorkbook(filePath: string): WorkbookInfo {
   return {
     sheets,
     creator: firstCapture(corePropsXml, /<dc:creator>([\s\S]*?)<\/dc:creator>/),
-    lastModifiedBy: firstCapture(corePropsXml, /<cp:lastModifiedBy>([\s\S]*?)<\/cp:lastModifiedBy>/),
+    lastModifiedBy: firstCapture(
+      corePropsXml,
+      /<cp:lastModifiedBy>([\s\S]*?)<\/cp:lastModifiedBy>/
+    ),
     created: firstCapture(corePropsXml, /<dcterms:created[^>]*>([\s\S]*?)<\/dcterms:created>/),
     modified: firstCapture(corePropsXml, /<dcterms:modified[^>]*>([\s\S]*?)<\/dcterms:modified>/),
     company: firstCapture(appPropsXml, /<Company>([\s\S]*?)<\/Company>/),
@@ -86,7 +95,7 @@ function readWorkbook(filePath: string): WorkbookInfo {
 
 function extractContent(workbook: WorkbookInfo, filePath: string): string {
   return workbook.sheets
-    .map(sheet => {
+    .map((sheet) => {
       const parsed = parseSheet(filePath, sheet);
       return [`### Sheet: ${sheet.name}`, '', ...parsed.rows.map(rowToCsv)].join('\n');
     })
@@ -96,7 +105,7 @@ function extractContent(workbook: WorkbookInfo, filePath: string): string {
 
 function extractMetadata(workbook: WorkbookInfo, filePath: string) {
   return {
-    sheets: workbook.sheets.map(sheet => sheet.name),
+    sheets: workbook.sheets.map((sheet) => sheet.name),
     props: {
       creator: workbook.creator,
       lastModifiedBy: workbook.lastModifiedBy,
@@ -107,7 +116,10 @@ function extractMetadata(workbook: WorkbookInfo, filePath: string) {
       title: workbook.title,
     },
     workbook: {
-      definedNames: collectXmlCaptures(readZipEntryText(filePath, 'xl/workbook.xml'), /<definedName[^>]*>([\s\S]*?)<\/definedName>/g).map(decodeXmlText),
+      definedNames: collectXmlCaptures(
+        readZipEntryText(filePath, 'xl/workbook.xml'),
+        /<definedName[^>]*>([\s\S]*?)<\/definedName>/g
+      ).map(decodeXmlText),
     },
   };
 }
@@ -144,7 +156,7 @@ function parseSheet(filePath: string, sheet: WorkbookSheet): ParsedSheet {
 
   const sharedStrings = readSharedStrings(filePath);
   const rowMatches = [...sheetXml.matchAll(/<row[^>]*>([\s\S]*?)<\/row>/g)];
-  const rows = rowMatches.map(match => parseRow(match[1] ?? '', sharedStrings));
+  const rows = rowMatches.map((match) => parseRow(match[1] ?? '', sharedStrings));
 
   return { name: sheet.name, rows };
 }
@@ -153,7 +165,7 @@ function readSharedStrings(filePath: string): SharedStrings {
   const sharedXml = readZipEntryText(filePath, 'xl/sharedStrings.xml');
   if (!sharedXml) return [];
 
-  return [...sharedXml.matchAll(/<si[\s\S]*?<\/si>/g)].map(match => {
+  return [...sharedXml.matchAll(/<si[\s\S]*?<\/si>/g)].map((match) => {
     const block = match[0] ?? '';
     const textParts = collectXmlCaptures(block, /<t[^>]*>([\s\S]*?)<\/t>/g).map(decodeXmlText);
     return textParts.join('');
@@ -165,7 +177,8 @@ function parseRow(rowXml: string, sharedStrings: SharedStrings): string[] {
   for (const match of rowXml.matchAll(/<c([^>]*)>([\s\S]*?)<\/c>/g)) {
     const attrs = match[1] ?? '';
     const body = match[2] ?? '';
-    const ref = firstCapture(attrs, /r="([A-Z]+)(\d+)"/) ?? firstCapture(match[0] ?? '', /r="([A-Z]+)(\d+)"/);
+    const ref =
+      firstCapture(attrs, /r="([A-Z]+)(\d+)"/) ?? firstCapture(match[0] ?? '', /r="([A-Z]+)(\d+)"/);
     if (!ref) continue;
     const columnIndex = columnLettersToNumber(ref);
     cells.push({ index: columnIndex, value: parseCellValue(attrs, body, sharedStrings) });
@@ -181,12 +194,16 @@ function parseRow(rowXml: string, sharedStrings: SharedStrings): string[] {
 function parseCellValue(attrs: string, body: string, sharedStrings: SharedStrings): string {
   const cellType = firstCapture(attrs, /t="([^"]+)"/);
   if (cellType === 'inlineStr') {
-    return collectXmlCaptures(body, /<t[^>]*>([\s\S]*?)<\/t>/g).map(decodeXmlText).join('');
+    return collectXmlCaptures(body, /<t[^>]*>([\s\S]*?)<\/t>/g)
+      .map(decodeXmlText)
+      .join('');
   }
 
   const rawValue = firstCapture(body, /<v>([\s\S]*?)<\/v>/);
   if (rawValue === undefined) {
-    return collectXmlCaptures(body, /<t[^>]*>([\s\S]*?)<\/t>/g).map(decodeXmlText).join('');
+    return collectXmlCaptures(body, /<t[^>]*>([\s\S]*?)<\/t>/g)
+      .map(decodeXmlText)
+      .join('');
   }
 
   if (cellType === 's') {
@@ -198,7 +215,7 @@ function parseCellValue(attrs: string, body: string, sharedStrings: SharedString
 }
 
 function rowToCsv(cells: string[]): string {
-  return cells.map(cell => csvEscape(cell ?? '')).join(',');
+  return cells.map((cell) => csvEscape(cell ?? '')).join(',');
 }
 
 function csvEscape(value: string): string {
@@ -209,11 +226,9 @@ function csvEscape(value: string): string {
 
 function readZipEntryText(filePath: string, entryName: string): string {
   try {
-    return execFileSync('unzip', ['-p', filePath, entryName], {
-      encoding: 'utf8',
-      maxBuffer: 20 * 1024 * 1024,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    }).toString();
+    const result = runGovernedCommand('unzip', ['-p', filePath, entryName], { maxOutputMB: 20 });
+    if (result.status !== 0) throw result.error || new Error(result.stderr);
+    return result.stdout;
   } catch {
     return '';
   }

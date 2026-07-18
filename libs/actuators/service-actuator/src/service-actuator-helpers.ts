@@ -21,8 +21,8 @@ import {
   refreshServiceOAuthToken,
   validateServiceAuth,
   pathResolver,
+  buildGovernedRetryOptions,
   loadServiceEndpointsCatalog,
-  classifyError,
   getServicePresetRecord,
 } from '@agent/core';
 import { secureFetch } from '@agent/core/network';
@@ -62,8 +62,6 @@ const DEFAULT_PIPELINE_RETRY: Required<RetryPolicy> = {
   factor: 2,
   jitter: true,
 };
-let cachedPipelineRetryPolicy: RetryPolicy | null = null;
-
 const PID_FILE = pathResolver.shared('services-pids.json');
 const STIMULI_PATH = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');
 
@@ -115,38 +113,13 @@ function emitRecoveryStimulus(serviceId: string) {
   safeAppendFile(STIMULI_PATH, JSON.stringify(stimulus) + '\n');
 }
 
-function loadPipelineRetryPolicy(): RetryPolicy {
-  if (cachedPipelineRetryPolicy) return cachedPipelineRetryPolicy;
-  try {
-    const manifest = JSON.parse(
-      safeReadFile(SERVICE_ACTUATOR_MANIFEST_PATH, { encoding: 'utf8' }) as string
-    );
-    const policy =
-      manifest?.recovery_policy?.retry || manifest?.recovery_policy?.default_retry || {};
-    cachedPipelineRetryPolicy = policy;
-    return policy;
-  } catch (_) {
-    cachedPipelineRetryPolicy = {};
-    return {};
-  }
-}
-
 function buildPipelineRetryPolicy(stepRetry: RetryPolicy | undefined): Required<RetryPolicy> {
-  return {
-    ...DEFAULT_PIPELINE_RETRY,
-    ...loadPipelineRetryPolicy(),
-    ...(stepRetry || {}),
-  };
-}
-
-function shouldRetryServiceAction(error: Error): boolean {
-  const classification = classifyError(error);
-  return (
-    classification.category === 'network' ||
-    classification.category === 'rate_limit' ||
-    classification.category === 'timeout' ||
-    classification.category === 'resource_unavailable'
-  );
+  return buildGovernedRetryOptions({
+    manifestPath: SERVICE_ACTUATOR_MANIFEST_PATH,
+    defaults: DEFAULT_PIPELINE_RETRY,
+    override: stepRetry,
+    fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+  }) as Required<RetryPolicy>;
 }
 
 function resolveServiceBaseUrl(serviceId: string): string {
@@ -244,22 +217,16 @@ export async function handleAction(input: ServiceAction, onEvent?: (data: any) =
     const steps = input.steps || [];
     for (const step of steps) {
       logger.info(`🔌 [SERVICE] Executing step: ${step.op}`);
-      const stepResult = await retry(
-        async () => {
-          return await handleSingleAction({
-            service_id: step.params.service_id,
-            mode: step.op.toUpperCase() as ServiceAction['mode'],
-            action: step.params.action,
-            params: step.params.params,
-            auth: step.params.auth,
-            method: step.params.method,
-          });
-        },
-        {
-          ...buildPipelineRetryPolicy(step.params.retry),
-          shouldRetry: shouldRetryServiceAction,
-        }
-      );
+      const stepResult = await retry(async () => {
+        return await handleSingleAction({
+          service_id: step.params.service_id,
+          mode: step.op.toUpperCase() as ServiceAction['mode'],
+          action: step.params.action,
+          params: step.params.params,
+          auth: step.params.auth,
+          method: step.params.method,
+        });
+      }, buildPipelineRetryPolicy(step.params.retry));
 
       const exportKey = step.params.export_as || 'last_service_result';
       ctx[exportKey] = stepResult;
@@ -390,21 +357,15 @@ async function executeApiRequest(input: ServiceAction) {
   const token: string | null = binding.accessToken || null;
   const baseUrl = resolveServiceBaseUrl(input.service_id);
   const httpMethod = input.method || (input.params ? 'POST' : 'GET');
-  return await retry(
-    async () => {
-      return await secureFetch({
-        method: httpMethod,
-        url: `${baseUrl}/${input.action}`,
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        data: httpMethod !== 'GET' ? input.params : undefined,
-        params: httpMethod === 'GET' ? input.params : undefined,
-      });
-    },
-    {
-      ...buildPipelineRetryPolicy(input.params?.retry),
-      shouldRetry: shouldRetryServiceAction,
-    }
-  );
+  return await retry(async () => {
+    return await secureFetch({
+      method: httpMethod,
+      url: `${baseUrl}/${input.action}`,
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      data: httpMethod !== 'GET' ? input.params : undefined,
+      params: httpMethod === 'GET' ? input.params : undefined,
+    });
+  }, buildPipelineRetryPolicy(input.params?.retry));
 }
 
 async function executeCliRequest(input: ServiceAction) {

@@ -1,4 +1,10 @@
-import { classifyError, normalizeRejectionReasonCategory, safeReadFile, retry } from '@agent/core';
+import {
+  buildGovernedRetryOptions,
+  classifyError,
+  normalizeRejectionReasonCategory,
+  safeReadFile,
+  retry,
+} from '@agent/core';
 import {
   createApprovalRequest,
   decideApprovalRequest,
@@ -25,42 +31,12 @@ const DEFAULT_APPROVAL_RETRY = {
   jitter: true,
 };
 
-let cachedRecoveryPolicy: Record<string, any> | null = null;
-
-function isPlainObject(value: unknown): value is Record<string, any> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
-function loadRecoveryPolicy(): Record<string, any> {
-  if (cachedRecoveryPolicy) return cachedRecoveryPolicy;
-  try {
-    const manifest = JSON.parse(
-      safeReadFile(APPROVAL_MANIFEST_PATH, { encoding: 'utf8' }) as string
-    );
-    cachedRecoveryPolicy = isPlainObject(manifest?.recovery_policy) ? manifest.recovery_policy : {};
-  } catch {
-    cachedRecoveryPolicy = {};
-  }
-  return cachedRecoveryPolicy;
-}
-
 function buildRetryOptions() {
-  const policy = loadRecoveryPolicy();
-  const retry = isPlainObject(policy.retry) ? policy.retry : DEFAULT_APPROVAL_RETRY;
-  const retryableCategories = new Set<string>(
-    Array.isArray(policy.retryable_categories) ? policy.retryable_categories.map(String) : []
-  );
-  return {
-    ...DEFAULT_APPROVAL_RETRY,
-    ...retry,
-    shouldRetry: (error: Error) => {
-      const classification = classifyError(error);
-      return retryableCategories.size > 0
-        ? retryableCategories.has(classification.category)
-        : classification.category === 'resource_unavailable' ||
-            classification.category === 'timeout';
-    },
-  };
+  return buildGovernedRetryOptions({
+    manifestPath: APPROVAL_MANIFEST_PATH,
+    defaults: DEFAULT_APPROVAL_RETRY,
+    fallbackCategories: ['resource_unavailable', 'timeout'],
+  });
 }
 
 export interface ApprovalAction {

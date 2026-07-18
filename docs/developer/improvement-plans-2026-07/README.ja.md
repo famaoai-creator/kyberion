@@ -270,6 +270,7 @@ surface が提供する UI の機能的アフォーダンスの調査(2026-07-03
 | [AR-05](./AR-05_ACTUATOR_COHERENCE_SPLIT.ja.md)  | 不整合アクチュエータの分割(観察/変更・ドメイン境界、IP-10 と統合)                 | P2     | L    | AR-01,AR-02 |
 | [AR-06](./AR-06_NO_SILENT_NOOP.ja.md)            | silent no-op の撲滅(未知 op を成功でなくエラーに)                                 | P1     | S    | AR-02推奨   |
 | [AR-08](./AR-08_PIPELINE_CATALOG_AUDIT.ja.md)    | pipeline カタログ全数監査(77件・実行検証55件・ADF修復エンジンのfalse-success修正) | P1     | M    | AR-01,AR-02 |
+| [AR-09](./AR-09_ACTUATOR_COMMONIZATION.ja.md)    | actuator 共通能力の正本化(recovery/process/voice/job/HTTP)                        | P1     | L    | AR-02,AR-03 |
 
 ### 実行レイヤリング(pipeline / typed ops / デザインシステムの3層分離)
 

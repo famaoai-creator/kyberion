@@ -24,13 +24,22 @@ const tesseractMocks = vi.hoisted(() => {
   return { createWorker };
 });
 
+const networkMocks = vi.hoisted(() => {
+  const secureFetch = vi.fn();
+  return { secureFetch };
+});
+
 vi.mock('tesseract.js', () => ({
   createWorker: tesseractMocks.createWorker,
 }));
 
+vi.mock('./network.js', () => ({
+  secureFetch: networkMocks.secureFetch,
+}));
+
 // Mock secure-io dynamically so we don't hit the filesystem during test execution
 vi.mock('./secure-io.js', async () => {
-  const actual = await vi.importActual('./secure-io.js') as any;
+  const actual = (await vi.importActual('./secure-io.js')) as any;
   return {
     ...actual,
     safeReadFile: () => Buffer.from('dummy_png_bytes'),
@@ -91,7 +100,7 @@ describe('AdaptivePolicyRouter', () => {
     await expect(
       router.selectProvider({
         path: 'test.png',
-      }),
+      })
     ).rejects.toThrow('No available OCR provider could be resolved.');
   });
 
@@ -116,7 +125,7 @@ describe('AdaptivePolicyRouter', () => {
 
     const result = await ocrImageWithRouter(
       { path: 'test.png', providerPreference: ['apple_vision'] },
-      router,
+      router
     );
 
     expect(result.provider).toBe('tesseract');
@@ -172,7 +181,10 @@ describe('AppleVisionOcrProvider', () => {
     expect(result.confidence).toBe(98.5);
     expect(mocks.spawn).toHaveBeenCalledWith(
       'swift',
-      expect.arrayContaining([expect.stringContaining('native-ocr.swift'), expect.stringContaining('test.png')]),
+      expect.arrayContaining([
+        expect.stringContaining('native-ocr.swift'),
+        expect.stringContaining('test.png'),
+      ]),
       expect.any(Object)
     );
   });
@@ -220,7 +232,7 @@ describe('LlmApiOcrProvider', () => {
 
   beforeEach(() => {
     process.env = { ...originalEnv };
-    vi.stubGlobal('fetch', vi.fn());
+    networkMocks.secureFetch.mockReset();
   });
 
   afterEach(() => {
@@ -233,10 +245,7 @@ describe('LlmApiOcrProvider', () => {
     const mockResponse = {
       candidates: [{ content: { parts: [{ text: 'gemini ocr text' }] } }],
     };
-    (global.fetch as any).mockResolvedValue({
-      ok: true,
-      json: async () => mockResponse,
-    });
+    networkMocks.secureFetch.mockResolvedValue(mockResponse);
 
     const provider = new LlmApiOcrProvider();
     const result = await provider.recognize({ path: 'test.png' });
@@ -244,10 +253,11 @@ describe('LlmApiOcrProvider', () => {
     expect(result.status).toBe('succeeded');
     expect(result.text).toBe('gemini ocr text');
     expect(result.provider).toBe('gemini_api');
-    expect(global.fetch).toHaveBeenCalledWith(
-      expect.stringContaining('generativelanguage.googleapis.com'),
+    expect(networkMocks.secureFetch).toHaveBeenCalledWith(
       expect.objectContaining({
         method: 'POST',
+        url: expect.stringContaining('generativelanguage.googleapis.com'),
+        authenticateRequest: true,
       })
     );
   });
@@ -257,10 +267,7 @@ describe('LlmApiOcrProvider', () => {
     const mockResponse = {
       content: [{ text: 'claude ocr text' }],
     };
-    (global.fetch as any).mockResolvedValue({
-      ok: true,
-      json: async () => mockResponse,
-    });
+    networkMocks.secureFetch.mockResolvedValue(mockResponse);
 
     const provider = new LlmApiOcrProvider();
     const result = await provider.recognize({ path: 'test.png', providerPreference: ['claude'] });
@@ -268,13 +275,14 @@ describe('LlmApiOcrProvider', () => {
     expect(result.status).toBe('succeeded');
     expect(result.text).toBe('claude ocr text');
     expect(result.provider).toBe('claude_api');
-    expect(global.fetch).toHaveBeenCalledWith(
-      'https://api.anthropic.com/v1/messages',
+    expect(networkMocks.secureFetch).toHaveBeenCalledWith(
       expect.objectContaining({
+        url: 'https://api.anthropic.com/v1/messages',
         method: 'POST',
         headers: expect.objectContaining({
           'x-api-key': 'mock-claude-key',
         }),
+        authenticateRequest: true,
       })
     );
   });
@@ -284,10 +292,7 @@ describe('LlmApiOcrProvider', () => {
     const mockResponse = {
       choices: [{ message: { content: 'openai ocr text' } }],
     };
-    (global.fetch as any).mockResolvedValue({
-      ok: true,
-      json: async () => mockResponse,
-    });
+    networkMocks.secureFetch.mockResolvedValue(mockResponse);
 
     const provider = new LlmApiOcrProvider();
     const result = await provider.recognize({ path: 'test.png', providerPreference: ['openai'] });
@@ -295,13 +300,14 @@ describe('LlmApiOcrProvider', () => {
     expect(result.status).toBe('succeeded');
     expect(result.text).toBe('openai ocr text');
     expect(result.provider).toBe('openai_api');
-    expect(global.fetch).toHaveBeenCalledWith(
-      'https://api.openai.com/v1/chat/completions',
+    expect(networkMocks.secureFetch).toHaveBeenCalledWith(
       expect.objectContaining({
+        url: 'https://api.openai.com/v1/chat/completions',
         method: 'POST',
         headers: expect.objectContaining({
-          'Authorization': 'Bearer mock-openai-key',
+          Authorization: 'Bearer mock-openai-key',
         }),
+        authenticateRequest: true,
       })
     );
   });
@@ -309,7 +315,7 @@ describe('LlmApiOcrProvider', () => {
 
 describe('LocalVlmOcrProvider', () => {
   beforeEach(() => {
-    vi.stubGlobal('fetch', vi.fn());
+    networkMocks.secureFetch.mockReset();
   });
 
   afterEach(() => {
@@ -318,22 +324,23 @@ describe('LocalVlmOcrProvider', () => {
 
   it('calls local VLM endpoint', async () => {
     const mockResponse = { response: 'local vlm ocr text' };
-    (global.fetch as any).mockResolvedValue({
-      ok: true,
-      json: async () => mockResponse,
-    });
+    networkMocks.secureFetch.mockResolvedValue(mockResponse);
 
-    const provider = new LocalVlmOcrProvider('http://localhost:11434/api/generate', 'llama3-vision');
+    const provider = new LocalVlmOcrProvider(
+      'http://localhost:11434/api/generate',
+      'llama3-vision'
+    );
     const result = await provider.recognize({ path: 'test.png' });
 
     expect(result.status).toBe('succeeded');
     expect(result.text).toBe('local vlm ocr text');
     expect(result.provider).toBe('local_vlm');
-    expect(global.fetch).toHaveBeenCalledWith(
-      'http://localhost:11434/api/generate',
+    expect(networkMocks.secureFetch).toHaveBeenCalledWith(
       expect.objectContaining({
+        url: 'http://localhost:11434/api/generate',
         method: 'POST',
-        body: expect.stringContaining('llama3-vision'),
+        data: expect.objectContaining({ model: 'llama3-vision' }),
+        kyberion_allow_local_network: true,
       })
     );
   });
