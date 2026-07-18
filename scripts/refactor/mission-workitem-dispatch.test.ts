@@ -419,17 +419,17 @@ describe('mission work item dispatch', () => {
       last_dispatch_mode: 'agent',
       last_dispatch_mission_id: missionId,
       last_task_model_hint: expect.objectContaining({
-        model_id: 'openai:gpt-5.4-mini',
+        model_id: 'openai:gpt-5.6-luna',
         tier: 'small',
         effort: 'low',
       }),
     });
     const routeCall = routeA2A.mock.calls[0] as unknown as [any];
     expect(routeCall).toBeDefined();
-    expect(routeCall[0].payload.text).toContain('Model hint: openai:gpt-5.4-mini (small/low)');
+    expect(routeCall[0].payload.text).toContain('Model hint: openai:gpt-5.6-luna (small/low)');
     expect(routeCall[0].payload.context).toMatchObject({
       task_model_hint: expect.objectContaining({
-        model_id: 'openai:gpt-5.4-mini',
+        model_id: 'openai:gpt-5.6-luna',
         tier: 'small',
         effort: 'low',
       }),
@@ -443,12 +443,12 @@ describe('mission work item dispatch', () => {
       item_id: manifest.records[0].item_id,
       execution_mode: 'agent',
       task_model_hint: expect.objectContaining({
-        model_id: 'openai:gpt-5.4-mini',
+        model_id: 'openai:gpt-5.6-luna',
         tier: 'small',
         effort: 'low',
       }),
     });
-    expect(response.prompt).toContain('Model hint: openai:gpt-5.4-mini (small/low)');
+    expect(response.prompt).toContain('Model hint: openai:gpt-5.6-luna (small/low)');
     expect(response.context_pack_path).toContain('/coordination/context-packs/');
     expect(response.prompt).toContain('Mission context pack (scoped, minimal, role-specific).');
     expect(response.prompt).toContain('Fast-tier enforcement:');
