@@ -121,6 +121,10 @@ export function collectVoiceSamples(
     totalSampleBytes += stats.size;
     const stagedPath = path.join(collectionDir, `${sample.sample_id}.${extension}`);
     safeCopyFileSync(samplePath, stagedPath);
+    const transcriptPath = `${samplePath}.transcript.txt`;
+    if (safeExistsSync(transcriptPath)) {
+      safeCopyFileSync(transcriptPath, `${stagedPath}.transcript.txt`);
+    }
     return {
       ...sample,
       staged_path: stagedPath,

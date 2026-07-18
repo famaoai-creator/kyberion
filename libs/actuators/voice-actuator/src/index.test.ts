@@ -814,6 +814,30 @@ describe('voice actuator', () => {
     );
   });
 
+  it('supports a dry-run record, STT verification, and repair contract', async () => {
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'record_verify_repair_voice_sample',
+      request_id: 'verify-repair-1',
+      sample_id: 's1',
+      duration_sec: 20,
+      language: 'ja',
+      prompt_text: 'こんにちは。',
+      output_path: 'active/shared/tmp/voice-samples/verify-repair-1/sample-01.wav',
+      max_repair_attempts: 2,
+      dry_run: true,
+    } as any);
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'succeeded',
+        action: 'record_verify_repair_voice_sample',
+        training_path: expect.stringContaining('verify-repair-1/sample-01.wav'),
+        verification: expect.objectContaining({ status: 'passed', dry_run: true }),
+      }),
+    );
+  });
+
   it('collects and registers voice profile in one action', async () => {
     const { handleAction } = await import('./index.js');
     const result = await handleAction({

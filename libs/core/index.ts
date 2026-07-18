@@ -126,6 +126,7 @@ export * from './recovery-policy.js';
 export * from './command-runner.js';
 export * from './job-lifecycle.js';
 export * from './voice-capability-bridge.js';
+export * from './voice-path-policy.js';
 export * from './ledger.js';
 export * from './text-utils.js';
 export * from './src/logic-utils.js';
@@ -633,6 +634,7 @@ export * from './service-runtime-registry.js';
 export * from './voice-tts-config.js';
 export * from './voice-runtime-policy.js';
 export * from './voice-profile-registry.js';
+export * from './voice-transcript-alignment.js';
 export * from './voice-profile-promotion.js';
 export * from './presentation-preference-registry.js';
 export * from './imessage-bridge.js';
@@ -1265,15 +1267,21 @@ export { runClaudeAgentQuery, ClaudeAgentQueryError } from './claude-agent-query
 export type { ClaudeAgentQueryParams, ClaudeAgentQueryResult } from './claude-agent-query.js';
 export {
   getSpeechToTextBridge,
+  getSpeechToTextBridges,
+  getSpeechToTextCapabilities,
   installShellSpeechToTextBridgeIfAvailable,
+  NO_TIMESTAMP_STT_CAPABILITIES,
   registerSpeechToTextBridge,
+  normalizeSpeechToTextResult,
   resetSpeechToTextBridge,
   ShellSpeechToTextBridge,
   stubSpeechToTextBridge,
 } from './speech-to-text-bridge.js';
 export type {
   ShellSpeechToTextBridgeOptions,
+  SpeechToTextCapabilities,
   SpeechToTextBridge,
+  TranscriptSegment,
   TranscribeInput,
   TranscribeResult,
 } from './speech-to-text-bridge.js';

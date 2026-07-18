@@ -8,7 +8,9 @@
     "persona_name": "the operator",
     "profile_id": "operator-default-v1",
     "duration_sec": 10,
-    "script_text": "こんにちは。私は{{persona_name}}です。Kyberion のデジタルプロファイルを作成するための音声サンプルを録音しています。"
+    "script_display_hold_ms": 1000,
+    "script_text": "こんにちは。私は{{persona_name}}です。Kyberion のデジタルプロファイルを作成するための音声サンプルを録音しています。",
+    "output_path": "knowledge/personal/voice/samples/{{profile_id}}/sample_01.wav"
   },
   "steps": [
     {
@@ -26,18 +28,19 @@
       }
     },
     {
-      "role": "sink",
-      "op": "system:log",
-      "params": {
-        "message": "{{duration_sec}} 秒間の録音を行います。次の文章を読み上げてください:\n「{{script_text}}」"
-      }
-    },
-    {
       "role": "source",
-      "op": "system:shell",
-      "produces": { "channel": "recording_result", "type": "RecordingResult" },
+      "op": "voice:record_voice_sample",
+      "produces": { "channel": "recording_result", "type": "VoiceSampleRecordingResult" },
       "params": {
-        "cmd": "python3 libs/actuators/voice-actuator/scripts/record_bridge.py '{\"action\": \"record\", \"params\": {\"duration\": {{duration_sec}}, \"output_path\": \"knowledge/personal/voice/samples/{{profile_id}}/sample_01.wav\"}}'"
+        "action": "record_voice_sample",
+        "request_id": "voice-recording-{{profile_id}}",
+        "sample_id": "sample-01",
+        "duration_sec": "{{duration_sec}}",
+        "language": "ja",
+        "prompt_text": "{{script_text}}",
+        "recording_countdown_sec": 3,
+        "prompt_display_hold_ms": "{{script_display_hold_ms}}",
+        "output_path": "{{output_path}}"
       }
     },
     {

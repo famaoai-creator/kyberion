@@ -2785,6 +2785,10 @@
           "kind": "apply"
         },
         {
+          "op": "record_verify_repair_voice_sample",
+          "kind": "apply"
+        },
+        {
           "op": "register_voice_profile",
           "kind": "apply"
         },

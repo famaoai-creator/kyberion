@@ -237,7 +237,7 @@
     {
       "path": "product/architecture/component-lifecycle-inventory.md",
       "tier": "public",
-      "size": 6311,
+      "size": 6312,
       "type": "md"
     },
     {
@@ -987,7 +987,7 @@
     {
       "path": "product/governance/actuator-op-registry.json",
       "tier": "public",
-      "size": 14427,
+      "size": 14472,
       "type": "json"
     },
     {
@@ -1227,7 +1227,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 55539,
+      "size": 56458,
       "type": "json"
     },
     {
@@ -2361,7 +2361,7 @@
     {
       "path": "product/governance/tool-runtime-registry.json",
       "tier": "public",
-      "size": 8540,
+      "size": 8568,
       "type": "json"
     },
     {
@@ -2937,7 +2937,7 @@
     {
       "path": "product/orchestration/actuator-op-discovery.json",
       "tier": "public",
-      "size": 69130,
+      "size": 69230,
       "type": "json"
     },
     {
@@ -3273,7 +3273,7 @@
     {
       "path": "product/orchestration/global_actuator_index.json",
       "tier": "public",
-      "size": 15812,
+      "size": 16609,
       "type": "json"
     },
     {
@@ -4671,7 +4671,7 @@
     {
       "path": "product/pipeline-templates/clone-my-voice.json",
       "tier": "public",
-      "size": 16819,
+      "size": 13408,
       "type": "json"
     },
     {
@@ -5241,7 +5241,7 @@
     {
       "path": "product/pipeline-templates/voice-recording-session.json",
       "tier": "public",
-      "size": 1940,
+      "size": 2008,
       "type": "json"
     },
     {
@@ -7515,7 +7515,7 @@
     {
       "path": "product/schemas/voice-sample-collection-registration.schema.json",
       "tier": "public",
-      "size": 1660,
+      "size": 1698,
       "type": "json"
     },
     {
@@ -7533,7 +7533,13 @@
     {
       "path": "product/schemas/voice-sample-recording.schema.json",
       "tier": "public",
-      "size": 697,
+      "size": 863,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/voice-sample-verification.schema.json",
+      "tier": "public",
+      "size": 1110,
       "type": "json"
     },
     {
