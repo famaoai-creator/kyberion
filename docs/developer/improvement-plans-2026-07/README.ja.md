@@ -226,6 +226,37 @@ surface が提供する UI の機能的アフォーダンスの調査(2026-07-03
 | [HN-02](./HN-02_SCHEMA_FORCED_DELEGATION.ja.md)    | schema-forced 委譲(検証済みオブジェクト返却・retry-on-mismatch・出力契約検証)           | P1     | M    | なし        |
 | [HN-03](./HN-03_DETERMINISTIC_ORCHESTRATION.ja.md) | 決定論オーケストレーション強化(並列map・loop-until・workflow-as-code・無音打ち切り解消) | P1     | L    | MO-03       |
 
+### OpenHarness 概念取り込み(コンテキスト経済・ガバナンス硬化・実行前判定)
+
+[HKUDS/OpenHarness](https://github.com/HKUDS/OpenHarness) の実コード分析(2026-07-18)に基づく。正本は [OPENHARNESS_ADOPTION_PLAN_2026-07-18.ja.md](./OPENHARNESS_ADOPTION_PLAN_2026-07-18.ja.md)(OH-01〜08 は同文書内)。コードは取り込まず概念のみ既存契約へ昇華する(browser-cli 方式)。MO-04・SA-03・AC-01 の実装参照を与える。
+
+| ID    | タイトル                                                                   | 優先度 | 規模 | 依存         |
+| ----- | -------------------------------------------------------------------------- | ------ | ---- | ------------ |
+| OH-01 | ワーカーコンテキスト自動圧縮 + carryover(2段階圧縮・task-focus 構造化継承) | **P0** | M    | OH-04推奨    |
+| OH-02 | 資格情報パスの常時 deny 層(上書き不可・3経路適用)                          | **P0** | S    | なし         |
+| OH-03 | transient エラーの in-place backoff(Retry-After 尊重・demotion 前段)       | P1     | S    | なし         |
+| OH-04 | ツール出力のアーティファクト退避(inline preview + mission-local 保存)      | P1     | S    | なし         |
+| OH-05 | MCP クライアント成熟化(HTTP transport・schema inference・失敗隔離)         | P1     | M    | AC-01参照    |
+| OH-06 | リクエスト級 dry-run 判定(ready/warning/blocked + next_actions)            | P2     | S    | なし         |
+| OH-07 | チーム承認伝播(mission-scoped grant・TTL 付き)                             | P2     | M    | SA-01参照    |
+| OH-08 | チャネル拡張 Feishu/DingTalk(需要確定まで backlog)                         | P2     | L    | 需要トリガー |
+
+### Hermes Agent 概念取り込み(自律学習ループ・履歴全文検索・実行環境抽象)
+
+[NousResearch/hermes-agent](https://github.com/nousresearch/hermes-agent) の実コード分析(2026-07-18)に基づく。正本は [HERMES_AGENT_ADOPTION_PLAN_2026-07-18.ja.md](./HERMES_AGENT_ADOPTION_PLAN_2026-07-18.ja.md)(HA-01〜09 は同文書内)。同じく概念昇華方式。OH-01 への圧縮実装の補強詳細(aux model・token 予算尾部・filter-safe preamble 等)は同文書 §2.1、チャネル層(iMessage/承認/配信堅牢化)の診断は同文書 §1.4 に記載。
+
+| ID    | タイトル                                                                          | 優先度 | 規模 | 依存            |
+| ----- | --------------------------------------------------------------------------------- | ------ | ---- | --------------- |
+| HA-01 | 自律学習ループ(background review fork・記録禁止ポリシー・curator)                 | P1     | M    | KM-03,LC-02参照 |
+| HA-02 | 会話・ミッション履歴の FTS 検索(trigram CJK・ゼロ LLM 想起・tier フィルタ)        | P1     | M    | なし            |
+| HA-03 | Automation Blueprint(スロットスキーマ単一定義・deliver_to 一級化)                 | P2     | S〜M | AA-02参照       |
+| HA-04 | op 合成スクリプト実行 PTC(stdout のみ復帰・許可 op 交差・LE 整合)                 | P2     | M    | AR-02,AR-03推奨 |
+| HA-05 | 実行環境抽象 EnvironmentBackend(local/Docker/SSH・需要確定まで backlog)           | P2     | L    | 需要トリガー    |
+| HA-06 | チャネル承認 UI の contract 化(Slack 専用解消・テキスト fallback)                 | P1     | M    | なし            |
+| HA-07 | imessage-bridge 硬化(グループ返信バグ修正・mention gating・outbox 配線)           | P1     | M    | HA-06,HA-08連携 |
+| HA-08 | surface 配信の堅牢化(error 分類・dead-letter — mesh broker 状態機械の流用)        | P1     | S〜M | AA-02参照       |
+| HA-09 | surface capability 宣言と chunking 中央化(上限分割・markdown fallback・allowlist) | P2     | M    | なし            |
+
 ### Actuator リファクタリング/使いやすさ(ADFスキーマ・op)
 
 各アクチュエータのリファクタリング・使いやすさの調査(2026-07-03、実コード検証済み)に基づく。AC 系(能力)・IP-05(CLI runner)・IP-10(巨大ファイル)とは**別軸**(op 設計・ADFスキーマ・エンジン一貫性)。**検証で判明した構造的問題: 3つの非互換パイプラインエンジン、op 真実源の4系統ドリフト、未知 op の silent no-op(`file-pipeline-helpers.ts:178/237/249`)、op 命名の乱れ、per-op 入力契約の欠如。**
