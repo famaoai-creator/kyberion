@@ -295,7 +295,7 @@ function formatMissingCapabilityNextStep(
   if (isReasoningBackendSummary(firstMissingSummary)) {
     return {
       message:
-        'Next step: run `pnpm reasoning:setup`. Configure one real backend: Codex/Gemini/AGY CLI auth, `ANTHROPIC_API_KEY`, `KYBERION_NEMOTRON_URL`, or `KYBERION_LOCAL_LLM_URL`. Use `KYBERION_REASONING_BACKEND=stub` only for explicit offline test mode.',
+        'Next step: run `pnpm reasoning:setup`. Configure one real backend: Codex/Gemini/AGY CLI auth, `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY` (or `KYBERION_OPENROUTER_KEY`), `KYBERION_NEMOTRON_URL`, or `KYBERION_LOCAL_LLM_URL`. Use `KYBERION_REASONING_BACKEND=stub` only for explicit offline test mode.',
       title: 'Configure reasoning backend',
       reason: `Doctor reports ${firstMissingSummary.counts.must} must and ${firstMissingSummary.counts.should} should reasoning backend gaps.`,
       command: 'pnpm reasoning:setup',

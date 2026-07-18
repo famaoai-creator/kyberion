@@ -31,6 +31,12 @@ export interface ReasoningBackendEnvPriorityRule {
   mode: Exclude<ReasoningBackendMode, 'gemini-api'>;
 }
 
+export interface ReasoningBackendOpenRouterPolicy {
+  default_profile: 'free-router' | 'free-pinned' | 'explicit';
+  default_cost_policy: 'free-only' | 'paid-allowed';
+  required_parameters: string[];
+}
+
 export interface ReasoningBackendPolicy {
   version: string;
   mode_aliases: Record<string, Exclude<ReasoningBackendMode, 'gemini-api'>>;
@@ -42,6 +48,7 @@ export interface ReasoningBackendPolicy {
     mode: Exclude<ReasoningBackendMode, 'gemini-api'>;
   }>;
   default_mode: Exclude<ReasoningBackendMode, 'gemini-api'>;
+  openrouter?: ReasoningBackendOpenRouterPolicy;
 }
 
 export interface ReasoningBackendProviderSnapshot {
@@ -77,9 +84,9 @@ const FALLBACK_POLICY: ReasoningBackendPolicy = {
   ],
   auto_select_env_priority: [
     { env: 'ANTHROPIC_API_KEY', mode: 'anthropic' },
-    { env: 'GEMINI_API_KEY', mode: 'gemini-cli' },
     { env: 'KYBERION_NEMOTRON_URL', mode: 'nemotron-api' },
     { env: 'KYBERION_LOCAL_LLM_URL', mode: 'local' },
+    { env: 'KYBERION_OPENROUTER_KEY', mode: 'openrouter' },
     { env: 'OPENROUTER_API_KEY', mode: 'openrouter' },
     // Running inside a Claude Code harness: prefer the in-session claude-agent
     // sub-agent (inherits the host session's auth, no new CLI spawn) over the
@@ -93,16 +100,19 @@ const FALLBACK_POLICY: ReasoningBackendPolicy = {
       provider: 'codex',
       mode: 'codex-cli',
     },
-    { env_any: ['GEMINI_CLI'], provider: 'gemini', mode: 'gemini-cli' },
     { env_any: ['AGY_CLI', 'ANTIGRAVITY_CLI'], provider: 'agy', mode: 'agy-cli' },
   ],
   provider_fallback_order: [
     { provider: 'codex', mode: 'codex-cli' },
-    { provider: 'gemini', mode: 'gemini-cli' },
     { provider: 'agy', mode: 'agy-cli' },
     { provider: 'copilot', mode: 'copilot' },
   ],
   default_mode: 'codex-cli',
+  openrouter: {
+    default_profile: 'free-router',
+    default_cost_policy: 'free-only',
+    required_parameters: ['tools', 'tool_choice'],
+  },
 };
 
 let validateFn: ValidateFunction | null = null;

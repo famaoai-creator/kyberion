@@ -10,7 +10,7 @@
  *                     from the surrounding interactive session when available.
  *   `anthropic`     — use @anthropic-ai/sdk directly. Requires ANTHROPIC_API_KEY.
  *   `openrouter`    — use OpenRouter's OpenAI-compatible API. Requires
- *                     OPENROUTER_API_KEY.
+ *                     OPENROUTER_API_KEY or KYBERION_OPENROUTER_KEY.
  *   `nemotron-api`  — use an OpenAI-compatible Nemotron endpoint.
  *   `local`         — use a local OpenAI-compatible server on localhost.
  *   `stub`          — keep deterministic stubs. Offline/dev default.
@@ -21,11 +21,15 @@
  *
  * Auto-selection when mode is unset:
  *   - If ANTHROPIC_API_KEY / GEMINI_API_KEY / KYBERION_NEMOTRON_URL /
- *     KYBERION_LOCAL_LLM_URL / OPENROUTER_API_KEY are present, the first
+ *     KYBERION_LOCAL_LLM_URL / OPENROUTER_API_KEY / KYBERION_OPENROUTER_KEY are present, the first
  *     matching policy rule wins.
+ *   - OpenRouter model selection defaults to the zero-cost `openrouter/free`
+ *     router. Pinned free models or paid models must be declared through the
+ *     OpenRouter model policy; paid inference requires an explicit
+ *     `KYBERION_OPENROUTER_COST_POLICY=paid-allowed` opt-in.
  *   - Otherwise → prefer `codex-cli` when a healthy Codex CLI is present,
- *     then `gemini-cli`, then `agy-cli`, with `claude-agent` only when
- *     explicitly selected.
+ *     then `agy-cli`. The legacy `gemini-cli` adapter remains available for
+ *     explicit / Enterprise configurations but is not auto-selected.
  *
  * Override explicitly via env var to pin behavior:
  *   KYBERION_REASONING_BACKEND=codex-cli       (recommended in the Codex
@@ -63,7 +67,7 @@ import {
   buildOpenAiCompatibleBackendFromEnv,
   buildNemotronBackendFromEnv,
 } from './openai-compatible-backend.js';
-import { OpenRouterBackend, buildOpenRouterBackendFromEnv } from './openrouter-backend.js';
+import { buildOpenRouterBackendFromEnv } from './openrouter-backend.js';
 import { maybeWrapWithDispatcher } from './agent-dispatch.js';
 import {
   buildFailoverReasoningBackend,
@@ -369,19 +373,10 @@ function buildReasoningRuntimeBundle(
       const openrouterBackend = buildOpenRouterBackendFromEnv(process.env, options.model);
       if (!openrouterBackend && !options.force) return null;
       if (!openrouterBackend) return null;
-      const apiKey =
-        process.env.KYBERION_OPENROUTER_KEY?.trim() ||
-        process.env.OPENROUTER_API_KEY?.trim() ||
-        'not-needed';
-      const baseURL = process.env.KYBERION_OPENROUTER_URL?.trim();
-      const model =
-        options.model ||
-        process.env.KYBERION_OPENROUTER_MODEL?.trim() ||
-        'meta-llama/llama-3-70b-instruct';
       return {
         mode,
         backend: {
-          backend: openrouterBackend ?? new OpenRouterBackend({ baseURL, apiKey, model }),
+          backend: openrouterBackend,
           provider,
           label: mode,
         },
