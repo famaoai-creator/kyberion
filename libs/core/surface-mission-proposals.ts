@@ -257,6 +257,82 @@ export function isMissionRejection(text: string): boolean {
   return isSlackMissionRejection(text);
 }
 
+/**
+ * Shared ingress logic for messaging bridges: given an incoming message,
+ * resolve any pending mission proposal on (surface, channel, thread).
+ * Returns `handled: false` when there is no pending proposal or the text is
+ * neither a confirmation nor a rejection (the bridge should run its normal
+ * conversation flow); otherwise performs the cancel/issue and returns the
+ * reply text the bridge should send verbatim.
+ */
+export async function resolveMissionProposalReply(params: {
+  surface: string;
+  channel: string;
+  thread: string;
+  text: string;
+}): Promise<{ handled: false } | { handled: true; reply: string; missionId?: string }> {
+  const pending = getMissionProposalState(params.surface, params.channel, params.thread);
+  if (!pending) return { handled: false };
+
+  if (isMissionRejection(params.text)) {
+    clearMissionProposalState(params.surface, params.channel, params.thread);
+    return {
+      handled: true,
+      reply: 'ミッション提案をキャンセルしました。必要になったら、いつでも再提案できます。',
+    };
+  }
+  if (isMissionConfirmation(params.text)) {
+    const issued = await issueMissionFromProposal({
+      surface: params.surface,
+      channel: params.channel,
+      thread: params.thread,
+      proposal: pending.proposal,
+      sourceText: pending.sourceText,
+      routingDecision: pending.routingDecision,
+    });
+    clearMissionProposalState(params.surface, params.channel, params.thread);
+    return {
+      handled: true,
+      missionId: issued.missionId,
+      reply: [
+        `Mission ${issued.missionId} started.`,
+        `Type: ${issued.missionType} / Tier: ${issued.tier}`,
+        issued.orchestrationStatus === 'queued'
+          ? 'Background orchestration has been queued. 結果はこのチャットに届きます。'
+          : `Background orchestration could not be queued: ${issued.orchestrationError || 'unknown'}`,
+      ].join('\n'),
+    };
+  }
+  return { handled: false };
+}
+
+/**
+ * Companion to {@link resolveMissionProposalReply}: persist a proposal the
+ * surface orchestrator produced and return the numbered-choice prompt the
+ * bridge should send.
+ */
+export function stashMissionProposalForConfirmation(params: {
+  surface: string;
+  channel: string;
+  thread: string;
+  proposal: MissionProposal;
+  sourceText?: string;
+  routingDecision?: AgentRoutingDecision;
+  fallbackSummary?: string;
+}): string {
+  saveMissionProposalState({
+    surface: params.surface,
+    channel: params.channel,
+    threadTs: params.thread,
+    proposal: params.proposal,
+    sourceText: params.sourceText,
+    routingDecision: params.routingDecision,
+  });
+  const summary =
+    String(params.proposal.summary || params.fallbackSummary || '').trim() || 'Mission proposal';
+  return `${summary}\n1) 作成する 2) やめる`;
+}
+
 export function isSlackMissionConfirmation(text: string): boolean {
   const normalized = text.trim().toLowerCase();
   if (!normalized) return false;
