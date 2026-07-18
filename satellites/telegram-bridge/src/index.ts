@@ -18,13 +18,25 @@ import {
   runSurfaceMessageConversation,
   safeReadFile,
   buildBridgeEmptyReplyText,
+  chunkSurfaceMessage,
   postBridgeError,
   resolveCustomerBinding,
   runCustomerConversation,
   listSurfaceOutboxMessages,
   clearSurfaceOutboxMessage,
+  createSurfaceOutboxDrainGuard,
+  isSurfaceOutboxDue,
+  recordSurfaceDeliverySuccess,
+  settleSurfaceOutboxFailure,
   resolveMissionProposalReply,
   stashMissionProposalForConfirmation,
+  buildSurfaceApprovalActions,
+  buildSurfaceApprovalText,
+  createSurfaceApprovalRequest,
+  resolveSurfaceApprovalReply,
+  evaluateSurfaceActorAccess,
+  isSurfaceFormatError,
+  stripSurfaceMarkup,
 } from '@agent/core';
 
 export interface TelegramUser {
@@ -52,10 +64,18 @@ export interface TelegramMessage {
   message_thread_id?: number;
 }
 
+export interface TelegramCallbackQuery {
+  id: string;
+  from: TelegramUser;
+  message?: TelegramMessage;
+  data?: string;
+}
+
 export interface TelegramUpdate {
   update_id?: number;
   message?: TelegramMessage;
   edited_message?: TelegramMessage;
+  callback_query?: TelegramCallbackQuery;
 }
 
 export interface TelegramBridgeInput {
@@ -206,8 +226,13 @@ function resolveToken(input?: string): string | undefined {
   return input || process.env.TELEGRAM_BOT_TOKEN || undefined;
 }
 
-export async function sendTelegramMessage(
-  input: { chatId: string | number; text: string; parseMode?: string },
+async function sendTelegramMessageSingle(
+  input: {
+    chatId: string | number;
+    text: string;
+    parseMode?: string;
+    replyMarkup?: unknown;
+  },
   options: TelegramBridgeOptions = {}
 ): Promise<TelegramSendReceipt> {
   const token = resolveToken(options.token);
@@ -235,13 +260,19 @@ export async function sendTelegramMessage(
       chat_id: chatId,
       text: input.text,
       parse_mode: input.parseMode || options.parseMode || 'Markdown',
+      ...(input.replyMarkup ? { reply_markup: input.replyMarkup } : {}),
     }),
   });
   let body = (await response.json().catch(() => null)) as any;
 
   if (!response.ok || body?.ok === false) {
     const description = body?.description || response.statusText || '';
-    if (description.includes("can't parse entities") || response.status === 400) {
+    if (
+      isSurfaceFormatError(
+        { status: response.status, message: description },
+        { surface: 'telegram' }
+      )
+    ) {
       logger.warn(
         `⚠️ [TelegramBridge] Markdown parsing failed, retrying as plain text: ${description}`
       );
@@ -250,7 +281,8 @@ export async function sendTelegramMessage(
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           chat_id: chatId,
-          text: input.text,
+          text: stripSurfaceMarkup(input.text),
+          ...(input.replyMarkup ? { reply_markup: input.replyMarkup } : {}),
         }),
       });
       body = (await response.json().catch(() => null)) as any;
@@ -271,6 +303,33 @@ export async function sendTelegramMessage(
   };
 }
 
+/** Send a provider-sized sequence while keeping the public receipt contract. */
+export async function sendTelegramMessage(
+  input: {
+    chatId: string | number;
+    text: string;
+    parseMode?: string;
+    replyMarkup?: unknown;
+  },
+  options: TelegramBridgeOptions = {}
+): Promise<TelegramSendReceipt> {
+  const chunks = chunkSurfaceMessage(input.text, 'telegram');
+  let lastReceipt: TelegramSendReceipt | undefined;
+  for (const [index, chunk] of chunks.entries()) {
+    lastReceipt = await sendTelegramMessageSingle(
+      {
+        ...input,
+        text: chunk,
+        // Attach actions to the last chunk so long descriptions still have
+        // exactly one actionable message.
+        replyMarkup: index === chunks.length - 1 ? input.replyMarkup : undefined,
+      },
+      options
+    );
+  }
+  return { ...lastReceipt!, text: input.text };
+}
+
 /**
  * UX-02: fire-and-forget typing action. Dry-run / missing-token setups
  * no-op (same contract as sendTelegramMessage).
@@ -289,10 +348,74 @@ export async function sendTelegramTypingAction(
   });
 }
 
+async function answerTelegramCallbackQuery(
+  callbackQueryId: string,
+  options: TelegramBridgeOptions
+): Promise<void> {
+  const token = resolveToken(options.token);
+  if (options.dryRun || !token) return;
+  const apiBaseUrl = (options.apiBaseUrl || 'https://api.telegram.org').replace(/\/+$/, '');
+  await fetch(`${apiBaseUrl}/bot${token}/answerCallbackQuery`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ callback_query_id: callbackQueryId }),
+  });
+}
+
+function buildTelegramApprovalReplyMarkup(
+  record: Awaited<ReturnType<typeof createSurfaceApprovalRequest>>
+) {
+  return {
+    inline_keyboard: [
+      buildSurfaceApprovalActions(record).map((action) => ({
+        text: action.decision === 'approved' ? '承認' : '却下',
+        callback_data: action.callbackData,
+      })),
+    ],
+  };
+}
+
+export async function handleTelegramCallbackQuery(
+  callbackQuery: TelegramCallbackQuery,
+  options: TelegramBridgeOptions = {}
+): Promise<TelegramWebhookReceipt> {
+  const message = callbackQuery.message;
+  if (!message || !callbackQuery.data) {
+    await answerTelegramCallbackQuery(callbackQuery.id, options).catch(() => undefined);
+    return { ok: true, ignored: true, reason: 'invalid_callback_query' };
+  }
+  const senderId = String(callbackQuery.from?.id || '');
+  const access = evaluateSurfaceActorAccess('telegram', senderId);
+  if (!access.allowed) {
+    await answerTelegramCallbackQuery(callbackQuery.id, options).catch(() => undefined);
+    return { ok: true, ignored: true, reason: 'unauthorized_sender' };
+  }
+  const chatId = String(message.chat.id);
+  const threadTs = resolveTelegramThreadTs(message);
+  const approvalReply = resolveSurfaceApprovalReply({
+    surface: 'telegram',
+    channel: chatId,
+    threadTs,
+    text: callbackQuery.data,
+    decidedBy: senderId || chatId,
+  });
+  await answerTelegramCallbackQuery(callbackQuery.id, options).catch((error) => {
+    logger.warn(`⚠️ [TelegramBridge] Callback acknowledgement failed: ${String(error)}`);
+  });
+  if (!approvalReply.handled) {
+    return { ok: true, ignored: true, reason: 'unsupported_callback' };
+  }
+  const reply = await sendTelegramMessage({ chatId, text: approvalReply.reply || '' }, options);
+  return { ok: true, chatId, threadTs, reply };
+}
+
 export async function handleTelegramUpdate(
   update: TelegramUpdate,
   options: TelegramBridgeOptions = {}
 ): Promise<TelegramWebhookReceipt> {
+  if (update.callback_query) {
+    return handleTelegramCallbackQuery(update.callback_query, options);
+  }
   const message = pickMessage(update);
   if (!message) {
     return { ok: true, ignored: true, reason: 'no_message' };
@@ -342,21 +465,18 @@ export async function handleTelegramUpdate(
     }
   }
 
-  // TELEGRAM_ALLOWED_USER_IDS. Default-deny when unset: refuse all senders with a
-  // clear configuration hint rather than silently locking to one baked-in id.
-  const allowedUserIds = (process.env.TELEGRAM_ALLOWED_USER_IDS || '')
-    .split(',')
-    .map((id) => id.trim())
-    .filter(Boolean);
   const senderId = String(message.from?.id || '');
-  if (allowedUserIds.length === 0) {
+  const access = evaluateSurfaceActorAccess('telegram', senderId);
+  if (!access.configured && !access.allowed) {
     logger.warn(
-      '⚠️ [TelegramBridge] TELEGRAM_ALLOWED_USER_IDS is not set — denying all senders. Set it to a comma-separated list of authorized Telegram user ids.'
+      '⚠️ [TelegramBridge] Surface allowlist is not configured — denying all senders. Set KYBERION_SURFACE_ALLOWLISTS or TELEGRAM_ALLOWED_USER_IDS.'
     );
     return { ok: true, ignored: true, reason: 'allowlist_unconfigured' };
   }
-  if (!allowedUserIds.includes(senderId)) {
-    logger.warn(`⚠️ [TelegramBridge] Ignored unauthorized message from sender: ${senderId}`);
+  if (!access.allowed) {
+    logger.warn(
+      `⚠️ [TelegramBridge] Ignored unauthorized message from sender: ${senderId} (${access.reason})`
+    );
     return { ok: true, ignored: true, reason: 'unauthorized_sender' };
   }
 
@@ -376,6 +496,18 @@ export async function handleTelegramUpdate(
   logger.info(
     `📥 [TelegramBridge] Message from ${message.from?.username || message.from?.id || chatId}: ${text}`
   );
+
+  const approvalReply = resolveSurfaceApprovalReply({
+    surface: 'telegram',
+    channel: chatId,
+    threadTs,
+    text,
+    decidedBy: senderId || chatId,
+  });
+  if (approvalReply.handled) {
+    const reply = await sendTelegramMessage({ chatId, text: approvalReply.reply || '' }, options);
+    return { ok: true, chatId, messageId: String(message.message_id), threadTs, reply };
+  }
 
   // SN-01 Phase 2: numbered-choice mission-proposal confirmation, same UX
   // contract as Slack ('1 / 作成する' issues, '2 / やめる' cancels).
@@ -468,6 +600,30 @@ export async function handleTelegramUpdate(
       chatId,
       receivedAt: new Date().toISOString(),
     });
+    return { ok: true, chatId, messageId: String(message.message_id), threadTs, reply };
+  }
+
+  if (conversation.approvalRequests.length > 0) {
+    let reply: TelegramSendReceipt | undefined;
+    for (const draft of conversation.approvalRequests) {
+      const record = createSurfaceApprovalRequest({
+        surface: 'telegram',
+        channel: chatId,
+        threadTs,
+        correlationId: `telegram-${message.message_id}`,
+        requestedBy: TELEGRAM_SURFACE_AGENT_ID,
+        draft,
+        sourceText: text,
+      });
+      reply = await sendTelegramMessage(
+        {
+          chatId,
+          text: buildSurfaceApprovalText('telegram', record),
+          replyMarkup: buildTelegramApprovalReplyMarkup(record),
+        },
+        options
+      );
+    }
     return { ok: true, chatId, messageId: String(message.message_id), threadTs, reply };
   }
 
@@ -620,18 +776,22 @@ async function main(): Promise<void> {
   // enqueued by core, e.g. notifyOperator) — same shape as the Slack bridge.
   const drainOutbox = async () => {
     for (const message of listSurfaceOutboxMessages('telegram')) {
+      if (!isSurfaceOutboxDue(message)) continue;
       try {
         await sendTelegramMessage({ chatId: message.channel, text: message.text }, options);
+        recordSurfaceDeliverySuccess('telegram', message.channel);
         clearSurfaceOutboxMessage('telegram', message.message_id);
       } catch (err: any) {
+        const decision = settleSurfaceOutboxFailure('telegram', message, err);
         logger.error(
-          `❌ [TelegramBridge] Outbox delivery failed for ${message.message_id}: ${err?.message || err}`
+          `❌ [TelegramBridge] Outbox delivery failed for ${message.message_id}: ${err?.message || err} (${decision.failure.kind}${decision.dead_letter ? ', dead-lettered' : `, retry at ${decision.next_attempt_at}`})`
         );
       }
     }
   };
-  setInterval(() => void drainOutbox(), 15_000).unref();
-  void drainOutbox();
+  const runTelegramOutbox = createSurfaceOutboxDrainGuard('telegram');
+  setInterval(() => void runTelegramOutbox(drainOutbox), 15_000).unref();
+  void runTelegramOutbox(drainOutbox);
 }
 
 const directEntry = process.argv[1]

@@ -36,6 +36,8 @@ import {
   TenantRateLimitExceededError,
   findRelevantDistilledKnowledge,
   formatDistilledKnowledgeSummary,
+  rebuildPublicHistorySearchIndexFromLocalSources,
+  searchHistory,
   recordActionItem,
   listActionItems,
   listOthersPending,
@@ -259,6 +261,26 @@ async function opCapture(op: string, params: any, ctx: any) {
           .filter((f) => !params.ext || f.endsWith(params.ext))
           .map((f) => path.relative(pathResolver.rootDir(), f)),
       };
+    case 'history_search': {
+      if (params.refresh_public_index === true) {
+        rebuildPublicHistorySearchIndexFromLocalSources();
+      }
+      const query = params.query === undefined ? '' : resolveVars(params.query, ctx);
+      const sessionId =
+        params.session_id === undefined ? undefined : resolveVars(params.session_id, ctx);
+      const report = searchHistory({
+        query: String(query || ''),
+        mode: params.mode,
+        sessionId: sessionId ? String(sessionId) : undefined,
+        // This op is intentionally bound to the shared public index. A
+        // tier-specific collector must expose a separate governed entrypoint.
+        tiers: ['public'],
+        maxResults: params.max_results,
+        includeScheduled: params.include_scheduled,
+        includeSubagent: false,
+      });
+      return { ...ctx, [params.export_as || 'history_search_results']: report };
+    }
     case 'knowledge_search':
       const query = resolveVars(params.query, ctx).toLowerCase();
       const manifestPath = pathResolver.knowledge('_manifest.json');

@@ -1,0 +1,33 @@
+{
+  "name": "background-review-curator",
+  "version": "1.0.0",
+  "description": "Archive stale background-review proposals without deleting or mutating bundled/manual records.",
+  "schedule": {
+    "id": "background-review-curator",
+    "cron": "30 3 * * *",
+    "timezone": "Asia/Tokyo",
+    "enabled": true
+  },
+  "steps": [
+    {
+      "id": "curate",
+      "role": "source",
+      "op": "wisdom:curate_background_review",
+      "params": {
+        "max_age_days": 7,
+        "limit": 50,
+        "dry_run": false,
+        "export_as": "curator_result"
+      }
+    },
+    {
+      "id": "log",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": "curator_result",
+      "params": {
+        "message": "[HA-01] Background review curator: {{curator_result.archived.length}} archived, {{curator_result.protected_records.length}} protected."
+      }
+    }
+  ]
+}
