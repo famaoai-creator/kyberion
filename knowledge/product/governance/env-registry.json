@@ -1344,24 +1344,24 @@
       "category": "secret",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "OpenRouter API key. `OPENROUTER_API_KEY` is also accepted for compatibility.",
+      "documented": true
     },
     {
       "name": "KYBERION_OPENROUTER_MODEL",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "OpenRouter model id sent to the chat completions endpoint.",
+      "documented": true
     },
     {
       "name": "KYBERION_OPENROUTER_URL",
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional OpenRouter-compatible API base URL; defaults to https://openrouter.ai/api/v1.",
+      "documented": true
     },
     {
       "name": "KYBERION_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH",
@@ -1572,7 +1572,7 @@
       "category": "provider",
       "type": "string",
       "required": false,
-      "description": "Reasoning backend selector. Common values: claude-cli (local claude CLI, no API key), anthropic (ANTHROPIC_API_KEY), codex-cli, gemini-cli, agy-cli, stub (offline/deterministic tests).",
+      "description": "Reasoning backend selector. Common values: claude-cli (local claude CLI, no API key), anthropic (ANTHROPIC_API_KEY), codex-cli, gemini-cli, agy-cli, openrouter (OPENROUTER_API_KEY or KYBERION_OPENROUTER_KEY), stub (offline/deterministic tests).",
       "documented": true,
       "subsystem": "reasoning"
     },

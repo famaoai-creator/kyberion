@@ -80,6 +80,7 @@ const FALLBACK_POLICY: ReasoningBackendPolicy = {
     { env: 'GEMINI_API_KEY', mode: 'gemini-cli' },
     { env: 'KYBERION_NEMOTRON_URL', mode: 'nemotron-api' },
     { env: 'KYBERION_LOCAL_LLM_URL', mode: 'local' },
+    { env: 'KYBERION_OPENROUTER_KEY', mode: 'openrouter' },
     { env: 'OPENROUTER_API_KEY', mode: 'openrouter' },
     // Running inside a Claude Code harness: prefer the in-session claude-agent
     // sub-agent (inherits the host session's auth, no new CLI spawn) over the

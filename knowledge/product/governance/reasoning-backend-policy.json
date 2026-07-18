@@ -35,6 +35,10 @@
       "mode": "local"
     },
     {
+      "env": "KYBERION_OPENROUTER_KEY",
+      "mode": "openrouter"
+    },
+    {
       "env": "OPENROUTER_API_KEY",
       "mode": "openrouter"
     },
