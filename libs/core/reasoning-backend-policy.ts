@@ -31,6 +31,12 @@ export interface ReasoningBackendEnvPriorityRule {
   mode: Exclude<ReasoningBackendMode, 'gemini-api'>;
 }
 
+export interface ReasoningBackendOpenRouterPolicy {
+  default_profile: 'free-router' | 'free-pinned' | 'explicit';
+  default_cost_policy: 'free-only' | 'paid-allowed';
+  required_parameters: string[];
+}
+
 export interface ReasoningBackendPolicy {
   version: string;
   mode_aliases: Record<string, Exclude<ReasoningBackendMode, 'gemini-api'>>;
@@ -42,6 +48,7 @@ export interface ReasoningBackendPolicy {
     mode: Exclude<ReasoningBackendMode, 'gemini-api'>;
   }>;
   default_mode: Exclude<ReasoningBackendMode, 'gemini-api'>;
+  openrouter?: ReasoningBackendOpenRouterPolicy;
 }
 
 export interface ReasoningBackendProviderSnapshot {
@@ -104,6 +111,11 @@ const FALLBACK_POLICY: ReasoningBackendPolicy = {
     { provider: 'copilot', mode: 'copilot' },
   ],
   default_mode: 'codex-cli',
+  openrouter: {
+    default_profile: 'free-router',
+    default_cost_policy: 'free-only',
+    required_parameters: ['tools', 'tool_choice'],
+  },
 };
 
 let validateFn: ValidateFunction | null = null;

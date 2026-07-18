@@ -16,6 +16,11 @@ describe('reasoning-backend-policy', () => {
     expect(policy.allowed_modes).toContain('copilot');
     expect(policy.mode_aliases['gemini-api']).toBe('gemini-cli');
     expect(policy.mode_aliases.nemotron).toBe('nemotron-api');
+    expect(policy.openrouter).toEqual({
+      default_profile: 'free-router',
+      default_cost_policy: 'free-only',
+      required_parameters: ['tools', 'tool_choice'],
+    });
   });
 
   it('normalizes deprecated mode aliases', () => {
