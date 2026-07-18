@@ -171,7 +171,7 @@
     {
       "path": "product/architecture/apple-intelligence-native-capability-bridge.md",
       "tier": "public",
-      "size": 6416,
+      "size": 6603,
       "type": "md"
     },
     {
@@ -483,7 +483,7 @@
     {
       "path": "product/architecture/media-execution-backend-abstraction.md",
       "tier": "public",
-      "size": 2929,
+      "size": 3312,
       "type": "md"
     },
     {
@@ -1497,7 +1497,7 @@
     {
       "path": "product/governance/media-backend-registry.json",
       "tier": "public",
-      "size": 3533,
+      "size": 4150,
       "type": "json"
     },
     {
