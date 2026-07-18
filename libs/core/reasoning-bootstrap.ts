@@ -28,8 +28,8 @@
  *     OpenRouter model policy; paid inference requires an explicit
  *     `KYBERION_OPENROUTER_COST_POLICY=paid-allowed` opt-in.
  *   - Otherwise → prefer `codex-cli` when a healthy Codex CLI is present,
- *     then `gemini-cli`, then `agy-cli`, with `claude-agent` only when
- *     explicitly selected.
+ *     then `agy-cli`. The legacy `gemini-cli` adapter remains available for
+ *     explicit / Enterprise configurations but is not auto-selected.
  *
  * Override explicitly via env var to pin behavior:
  *   KYBERION_REASONING_BACKEND=codex-cli       (recommended in the Codex

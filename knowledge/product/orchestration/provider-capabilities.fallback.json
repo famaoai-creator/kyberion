@@ -129,6 +129,7 @@
         "sonnet",
         "opus",
         "haiku",
+        "fable",
         "claude-fable-5",
         "claude-sonnet-5",
         "claude-opus-4-8",
@@ -170,6 +171,17 @@
           "deep_reasoning"
         ],
         "haiku": ["conversation", "summarization", "low_latency", "structured_json"],
+        "fable": [
+          "reasoning",
+          "planning",
+          "coordination",
+          "analysis",
+          "review",
+          "code",
+          "long_context",
+          "structured_json",
+          "deep_reasoning"
+        ],
         "claude-fable-5": [
           "reasoning",
           "planning",
@@ -320,7 +332,7 @@
       }
     },
     "agy": {
-      "models": ["agy"],
+      "models": ["Gemini 3.5 Flash (Medium)"],
       "capabilities": [
         "reasoning",
         "planning",
@@ -332,7 +344,7 @@
         "structured_json"
       ],
       "modelCapabilities": {
-        "agy": [
+        "Gemini 3.5 Flash (Medium)": [
           "reasoning",
           "planning",
           "coordination",
