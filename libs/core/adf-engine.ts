@@ -61,7 +61,7 @@ export interface AdfStepOutcome {
  */
 export interface AdfStepHooks<Ctx extends AdfEngineContext = AdfEngineContext> {
   beforeStep?: (step: AdfStep, stepNumber: number, ctx: Ctx) => void;
-  afterStep?: (step: AdfStep, stepNumber: number, ctx: Ctx, outcome: AdfStepOutcome) => void;
+  afterStep?: (step: AdfStep, stepNumber: number, ctx: Ctx, outcome: AdfStepOutcome) => void | Ctx;
 }
 
 export interface AdfRunResult<Ctx extends AdfEngineContext = AdfEngineContext> {
@@ -145,7 +145,8 @@ async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineC
           ctx = controlResult.context as Ctx;
           results.push({ op: step.op, status: 'skipped' });
           logger.info(`  ${label} Step skipped (${step.op}): ${controlResult.reason}`);
-          hooks?.afterStep?.(step, state.stepCount, ctx, { status: 'skipped' });
+          ctx = (hooks?.afterStep?.(step, state.stepCount, ctx, { status: 'skipped' }) ||
+            ctx) as Ctx;
           continue;
         }
         ctx = controlResult;
@@ -159,7 +160,8 @@ async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineC
           ctx = nextCtx.context as Ctx;
           results.push({ op: step.op, status: 'skipped' });
           logger.info(`  ${label} Step skipped (${step.op}): ${nextCtx.reason}`);
-          hooks?.afterStep?.(step, state.stepCount, ctx, { status: 'skipped' });
+          ctx = (hooks?.afterStep?.(step, state.stepCount, ctx, { status: 'skipped' }) ||
+            ctx) as Ctx;
           continue;
         }
         if (nextCtx !== undefined) {
@@ -169,7 +171,7 @@ async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineC
         throw new Error(`[UNKNOWN_TYPE] Unknown step type: ${step.type}`);
       }
       results.push({ op: step.op, status: 'success' });
-      hooks?.afterStep?.(step, state.stepCount, ctx, { status: 'success' });
+      ctx = (hooks?.afterStep?.(step, state.stepCount, ctx, { status: 'success' }) || ctx) as Ctx;
     } catch (err: any) {
       // Native on_error support (skip / abort / fallback via handleStepError)
       // so every runner shares one recovery semantics instead of hand-rolled
@@ -198,10 +200,10 @@ async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineC
           if (recovery.recovered) {
             ctx = recovery.ctx as Ctx;
             results.push({ op: step.op, status: 'recovered' });
-            hooks?.afterStep?.(step, state.stepCount, ctx, {
+            ctx = (hooks?.afterStep?.(step, state.stepCount, ctx, {
               status: 'recovered',
               error: err.message,
-            });
+            }) || ctx) as Ctx;
             continue;
           }
         } catch (_) {
@@ -210,7 +212,10 @@ async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineC
       }
       logger.error(`  ${label} Step failed (${step.op}): ${err.message}`);
       results.push({ op: step.op, status: 'failed', error: err.message });
-      hooks?.afterStep?.(step, state.stepCount, ctx, { status: 'failed', error: err.message });
+      ctx = (hooks?.afterStep?.(step, state.stepCount, ctx, {
+        status: 'failed',
+        error: err.message,
+      }) || ctx) as Ctx;
       break;
     }
   }
