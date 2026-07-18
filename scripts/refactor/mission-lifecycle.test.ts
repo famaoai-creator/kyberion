@@ -24,6 +24,7 @@ import {
   transitionStatus,
 } from '@agent/core';
 import {
+  collectMissionEvidence,
   evaluateMissionFinishExitGate,
   finishMission,
   reconcileLifecycleClosureCriteria,
@@ -112,6 +113,16 @@ afterEach(() => {
 });
 
 describe('mission lifecycle finish gate', () => {
+  it('collects only top-level evidence files', () => {
+    seedMissionEvidence('report.md', '# Report');
+    safeMkdir(`${missionPath}/evidence/reviews`, { recursive: true });
+    safeWriteFile(`${missionPath}/evidence/reviews/review.json`, '{}');
+
+    expect(collectMissionEvidence(missionPath).map(({ ref }) => path.basename(ref))).toEqual([
+      'report.md',
+    ]);
+  });
+
   it('resolves circular lifecycle closure criteria from verify and distill history', () => {
     const reconciliation = reconcileLifecycleClosureCriteria(
       {
