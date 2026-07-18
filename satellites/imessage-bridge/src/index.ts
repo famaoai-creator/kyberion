@@ -17,6 +17,8 @@ import {
   runSurfaceMessageConversation,
   buildBridgeEmptyReplyText,
   postBridgeError,
+  resolveMissionProposalReply,
+  stashMissionProposalForConfirmation,
   type IMessageSendRequest,
 } from '@agent/core';
 
@@ -78,6 +80,21 @@ async function pollIMessages() {
       if (msg.isFromMe) continue;
 
       logger.info(`📥 [iMessageBridge] Message from ${msg.sender}: ${msg.text}`);
+
+      // SN-01 Phase 2: numbered-choice mission-proposal confirmation. The
+      // pending-state key uses chatId for BOTH channel and thread — iMessage
+      // row ids change per message, so they cannot key a pending proposal.
+      const proposalReply = await resolveMissionProposalReply({
+        surface: 'imessage',
+        channel: msg.chatId,
+        thread: msg.chatId,
+        text: msg.text,
+      });
+      if (proposalReply.handled) {
+        await sendIMessage({ recipient: msg.sender, text: proposalReply.reply });
+        continue;
+      }
+
       const threadContext = buildThreadContext(msg);
 
       // UX-02: iMessage has no typing API — send a one-time working note
@@ -103,6 +120,23 @@ async function pollIMessages() {
           delegationSummaryInstruction:
             'Produce a concise iMessage reply in the user language. Do not use A2A blocks.',
         } as any);
+
+        // SN-01 Phase 2: a mission proposal becomes a pending numbered-choice
+        // confirmation instead of a plain reply.
+        const missionProposal = conversation.missionProposals?.[0];
+        if (missionProposal) {
+          const prompt = stashMissionProposalForConfirmation({
+            surface: 'imessage',
+            channel: msg.chatId,
+            thread: msg.chatId,
+            proposal: missionProposal,
+            sourceText: msg.text,
+            routingDecision: conversation.routingDecision,
+            fallbackSummary: conversation.text,
+          });
+          await sendIMessage({ recipient: msg.sender, text: prompt });
+          continue;
+        }
 
         if (conversation.text) {
           logger.info(`📤 [iMessageBridge] Replying to ${msg.sender}: ${conversation.text}`);
