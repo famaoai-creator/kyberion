@@ -10,7 +10,7 @@
 
 Copy [`env.example`](./env.example) to `.env` at the repo root for local overrides (the example is generated here because root dotfiles are write-protected by the policy engine).
 
-## secret (19)
+## secret (22)
 
 | Variable                              | Type   | Required | Description                                                                                                                                                            |
 | ------------------------------------- | ------ | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -19,6 +19,9 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_AUDIT_CHAIN_KEY`            | string | no       | _undocumented_                                                                                                                                                         |
 | `KYBERION_BLUEBUBBLES_PASSWORD`       | string | no       | _undocumented_                                                                                                                                                         |
 | `KYBERION_BLUEBUBBLES_WEBHOOK_SECRET` | string | no       | _undocumented_                                                                                                                                                         |
+| `KYBERION_CONTEXT_BUFFER_TOKENS`      | string | no       | _undocumented_                                                                                                                                                         |
+| `KYBERION_CONTEXT_RESERVE_TOKENS`     | string | no       | _undocumented_                                                                                                                                                         |
+| `KYBERION_CONTEXT_WINDOW_TOKENS`      | string | no       | _undocumented_                                                                                                                                                         |
 | `KYBERION_LOCAL_LLM_KEY`              | string | no       | API key for the local LLM endpoint.                                                                                                                                    |
 | `KYBERION_LOCALADMIN_TOKEN`           | string | no       | Bearer token for the chronos localadmin control surface.                                                                                                               |
 | `KYBERION_MANIFEST_SIGNING_KEY`       | string | no       | HMAC-SHA256 key for environment manifest signatures. When set, loadEnvironmentManifest enforces valid signatures fail-closed; sign manifests with pnpm manifests:sign. |

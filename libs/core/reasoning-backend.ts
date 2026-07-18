@@ -594,54 +594,78 @@ export class FailoverReasoningBackend implements ReasoningBackend {
     for (const candidate of this.candidates) {
       const provider = normalizeProviderName(candidate.provider);
       if (provider && skippedProviders.has(provider)) continue;
-      const maxInPlaceRetries = resolveInPlaceRetryCount();
-      for (let retryAttempt = 0; ; retryAttempt++) {
-        try {
-          const result = await invoke(candidate.backend);
-          if (provider) reportProviderHealthy(provider);
-          return result;
-        } catch (error) {
-          const message = summarizeError(error);
-          if (isTransientFailure(error) && retryAttempt < maxInPlaceRetries) {
-            const nextAttempt = retryAttempt + 1;
-            const delayMs = resolveInPlaceRetryDelayMs(error, nextAttempt);
-            logger.warn(
-              `[reasoning-backend:retry] ${operation} transient failure on ${candidateLabel(candidate)}${provider ? ` (${provider})` : ''}; retry ${nextAttempt}/${maxInPlaceRetries} in ${delayMs}ms: ${message}`
-            );
-            try {
-              metrics.record('reasoning:in-place-retry', delayMs, 'success', {
-                operation,
-                provider: provider || undefined,
-                candidate: candidateLabel(candidate),
-                retry_attempt: nextAttempt,
-                retry_delay_ms: delayMs,
-                error: message,
-              });
-            } catch {
-              // Metrics are best-effort and must not alter retry behavior.
-            }
-            await sleep(delayMs);
-            continue;
-          }
-
-          errors.push(`${candidateLabel(candidate)}: ${message}`);
-          logger.warn(
-            `[reasoning-backend:failover] ${operation} failed on ${candidateLabel(candidate)}${provider ? ` (${provider})` : ''}; demoting for ${getProviderHealthDemotionTtlMs()}ms: ${message}`
-          );
-          if (provider) {
-            reportProviderTemporarilyUnhealthy(provider, {
-              reason: `${operation}:${message}`,
-              retryAfterMs: resolveDemotionRetryAfterMs(message),
-            });
-          }
-          break;
-        }
+      const attempt = await this.attemptCandidateWithRetries(
+        operation,
+        candidate,
+        provider,
+        invoke
+      );
+      if (attempt.ok === false) {
+        errors.push(`${candidateLabel(candidate)}: ${attempt.message}`);
+        continue;
       }
+      return attempt.result;
     }
 
     throw new Error(
       `[reasoning-backend:failover] ${operation} failed across ${errors.length} candidate(s): ${errors.join(' | ')}`
     );
+  }
+
+  /**
+   * Run one candidate with OH-03 in-place retries: transient failures
+   * (429/5xx/529) back off and retry on the same provider up to the configured
+   * cap; anything else (or retry exhaustion) demotes the provider and reports
+   * the failure so the caller can move to the next candidate.
+   */
+  private async attemptCandidateWithRetries<T>(
+    operation: string,
+    candidate: ReasoningBackendCandidate,
+    provider: string | undefined,
+    invoke: (backend: ReasoningBackend) => Promise<T>
+  ): Promise<{ ok: true; result: T } | { ok: false; message: string }> {
+    const maxInPlaceRetries = resolveInPlaceRetryCount();
+    for (let retryAttempt = 0; ; retryAttempt++) {
+      try {
+        const result = await invoke(candidate.backend);
+        if (provider) reportProviderHealthy(provider);
+        return { ok: true, result };
+      } catch (error) {
+        const message = summarizeError(error);
+        if (isTransientFailure(error) && retryAttempt < maxInPlaceRetries) {
+          const nextAttempt = retryAttempt + 1;
+          const delayMs = resolveInPlaceRetryDelayMs(error, nextAttempt);
+          logger.warn(
+            `[reasoning-backend:retry] ${operation} transient failure on ${candidateLabel(candidate)}${provider ? ` (${provider})` : ''}; retry ${nextAttempt}/${maxInPlaceRetries} in ${delayMs}ms: ${message}`
+          );
+          try {
+            metrics.record('reasoning:in-place-retry', delayMs, 'success', {
+              operation,
+              provider: provider || undefined,
+              candidate: candidateLabel(candidate),
+              retry_attempt: nextAttempt,
+              retry_delay_ms: delayMs,
+              error: message,
+            });
+          } catch {
+            // Metrics are best-effort and must not alter retry behavior.
+          }
+          await sleep(delayMs);
+          continue;
+        }
+
+        logger.warn(
+          `[reasoning-backend:failover] ${operation} failed on ${candidateLabel(candidate)}${provider ? ` (${provider})` : ''}; demoting for ${getProviderHealthDemotionTtlMs()}ms: ${message}`
+        );
+        if (provider) {
+          reportProviderTemporarilyUnhealthy(provider, {
+            reason: `${operation}:${message}`,
+            retryAfterMs: resolveDemotionRetryAfterMs(message),
+          });
+        }
+        return { ok: false, message };
+      }
+    }
   }
 
   divergePersonas(
@@ -742,23 +766,17 @@ export class FailoverReasoningBackend implements ReasoningBackend {
       const provider = normalizeProviderName(candidate.provider);
       if (provider && skippedProviders.has(provider)) continue;
       if (!candidate.backend.generateWithTools) continue;
-      try {
-        const result = await candidate.backend.generateWithTools(prompt, tools);
-        if (provider) reportProviderHealthy(provider);
-        return result;
-      } catch (error) {
-        const message = summarizeError(error);
-        errors.push(`${candidateLabel(candidate)}: ${message}`);
-        logger.warn(
-          `[reasoning-backend:failover] generateWithTools failed on ${candidateLabel(candidate)}${provider ? ` (${provider})` : ''}; demoting for ${getProviderHealthDemotionTtlMs()}ms: ${message}`
-        );
-        if (provider) {
-          reportProviderTemporarilyUnhealthy(provider, {
-            reason: `generateWithTools:${message}`,
-            retryAfterMs: resolveDemotionRetryAfterMs(message),
-          });
-        }
+      const attempt = await this.attemptCandidateWithRetries(
+        'generateWithTools',
+        candidate,
+        provider,
+        (backend) => backend.generateWithTools!(prompt, tools)
+      );
+      if (attempt.ok === false) {
+        errors.push(`${candidateLabel(candidate)}: ${attempt.message}`);
+        continue;
       }
+      return attempt.result;
     }
 
     throw new Error(

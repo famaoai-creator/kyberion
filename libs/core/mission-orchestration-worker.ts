@@ -85,6 +85,14 @@ import { emitIntentSnapshot, mapStageToLoopPhase } from './intent-snapshot-store
 import { summarizeHeuristics } from './heuristic-feedback.js';
 import { getIntentExtractor } from './intent-extractor.js';
 import { installAnthropicBackendsIfAvailable } from './reasoning-bootstrap.js';
+import { getReasoningBackend } from './reasoning-backend.js';
+import { MissionWorkingMemory } from './mission-working-memory.js';
+import {
+  WorkerContextCompactor,
+  isPromptTooLongError,
+  type CompactionCarryover,
+  type WorkerContextMessage,
+} from './worker-context-compaction.js';
 
 let workerBackendsInstalled = false;
 
@@ -840,6 +848,143 @@ function buildReviewFindingsLines(task: PlannedNextTask): string[] {
     .map((finding) => `- ${finding.severity} @ ${finding.location}: ${finding.instruction}`);
 }
 
+// ---------------------------------------------------------------------------
+// OH-01: dispatch-context auto-compaction. The mission loop's accumulating
+// sections (upstream task results, team snapshot) are treated as the worker
+// transcript; the mission context pack and goal are pinned and never elided.
+// ---------------------------------------------------------------------------
+
+const dispatchCompactors = new Map<string, WorkerContextCompactor>();
+const compactionWorkingMemory = new MissionWorkingMemory();
+
+export function buildDispatchCarryover(input: {
+  task: PlannedNextTask;
+  allTasks: PlannedNextTask[];
+  missionGoalLines: string[];
+}): CompactionCarryover {
+  const settled = input.allTasks.filter((task) =>
+    ['completed', 'accepted', 'reviewed'].includes(String(task.status || ''))
+  );
+  const activeArtifacts = Array.from(
+    new Set(
+      settled
+        .map((task) => task.deliverable || task.target_path || '')
+        .map((value) => value.trim())
+        .filter(Boolean)
+    )
+  ).slice(0, 10);
+  const verifiedState = settled
+    .slice(0, 10)
+    .map((task) => `${task.task_id}: ${String(task.status)}`);
+  return {
+    goal: input.missionGoalLines.filter(Boolean).join(' ').trim() || 'mission goal unavailable',
+    active_artifacts: activeArtifacts,
+    verified_state: verifiedState,
+    next_step: `${input.task.task_id}: ${input.task.description || input.task.deliverable || 'execute assigned task'}`,
+  };
+}
+
+export async function maybeCompactDispatchSections(input: {
+  missionId: string;
+  task: PlannedNextTask;
+  allTasks: PlannedNextTask[];
+  agentId: string;
+  missionContextPackText: string;
+  missionGoalLines: string[];
+  upstreamResultLines: string[];
+  teamSnapshotLines: string[];
+  force?: boolean;
+}): Promise<{ upstreamResultLines: string[]; teamSnapshotLines: string[] }> {
+  let compactor = dispatchCompactors.get(input.missionId);
+  if (!compactor) {
+    compactor = new WorkerContextCompactor({
+      missionId: input.missionId,
+      writerAgent: 'mission-orchestration-worker',
+      workingMemory: compactionWorkingMemory,
+      summarize: async (transcript) =>
+        getReasoningBackend().prompt(
+          [
+            'Summarize this mission worker history for a successor agent.',
+            'Keep: completed work, artifact paths, verified outcomes, unresolved blockers, and immediate next steps. Be concise and factual.',
+            '',
+            transcript,
+          ].join('\n')
+        ),
+    });
+    dispatchCompactors.set(input.missionId, compactor);
+  }
+  const TEAM_SNAPSHOT_SECTION = 'team-snapshot';
+  const messages: WorkerContextMessage[] = [
+    { role: 'system', content: input.missionContextPackText, pinned: true, pairId: 'context-pack' },
+    {
+      role: 'user',
+      content: input.missionGoalLines.join('\n'),
+      pinned: true,
+      pairId: 'mission-goal',
+    },
+    ...input.upstreamResultLines.map((line) => ({
+      role: 'tool_result' as const,
+      content: line,
+    })),
+    {
+      role: 'assistant' as const,
+      content: input.teamSnapshotLines.join('\n'),
+      pairId: TEAM_SNAPSHOT_SECTION,
+    },
+  ];
+  const evidenceDir = missionEvidenceDir(input.missionId);
+  const result = await compactor.maybeCompact(messages, {
+    carryover: buildDispatchCarryover(input),
+    taskId: input.task.task_id,
+    ...(evidenceDir ? { summaryDir: path.join(evidenceDir, 'compaction') } : {}),
+    ...(input.force ? { force: true } : {}),
+  });
+  if (!result.compacted) {
+    return {
+      upstreamResultLines: input.upstreamResultLines,
+      teamSnapshotLines: input.teamSnapshotLines,
+    };
+  }
+  try {
+    emitMissionTaskEvent({
+      event_type: 'participant_context_resolved',
+      mission_id: input.missionId,
+      task_id: input.task.task_id,
+      agent_id: input.agentId,
+      decision: 'context_compacted',
+      why: 'Dispatch context exceeded the token-window threshold; applied OH-01 auto-compaction.',
+      policy_used: 'worker_context_compaction_v1',
+      evidence: result.summaryArtifactPath ? [result.summaryArtifactPath] : [],
+      payload: {
+        stage: result.stage,
+        tokens_before: result.tokensBefore,
+        tokens_after: result.tokensAfter,
+        threshold_tokens: result.thresholdTokens,
+        ...(result.summaryError ? { summary_error: result.summaryError } : {}),
+      },
+    });
+  } catch (eventError) {
+    logger.warn(
+      `[MISSION_WORKER] context_compacted event emission failed (non-fatal): ${
+        eventError instanceof Error ? eventError.message : String(eventError)
+      }`
+    );
+  }
+  const survivingTeamSnapshot = result.messages.find(
+    (message) => message.pairId === TEAM_SNAPSHOT_SECTION
+  );
+  const pinnedSections = new Set(['context-pack', 'mission-goal', TEAM_SNAPSHOT_SECTION]);
+  const compactedUpstreamLines = result.messages
+    .filter((message) => !pinnedSections.has(message.pairId ?? ''))
+    .map((message) => message.content);
+  return {
+    upstreamResultLines: compactedUpstreamLines.length > 0 ? compactedUpstreamLines : ['- none'],
+    teamSnapshotLines: survivingTeamSnapshot
+      ? survivingTeamSnapshot.content.split('\n')
+      : ['- (older team activity included in the compaction summary above)'],
+  };
+}
+
 type TaskResultBlock = NonNullable<ReturnType<typeof extractSurfaceBlocks>['taskResults']>[number];
 type OperatorInteractionPacket = NonNullable<ReturnType<typeof resolveQuestionInteractionPacket>>;
 
@@ -1298,6 +1443,8 @@ async function buildTaskDispatchContext(input: {
   agentId: string;
   taskModelHint?: { model_id?: string; tier?: string; effort?: string; route_reason?: string };
   allTasks: PlannedNextTask[];
+  /** OH-01 reactive path: force compaction after a prompt-too-long dispatch failure. */
+  forceContextCompaction?: boolean;
 }): Promise<{
   prompt: string;
   missionContextPackId?: string;
@@ -1371,11 +1518,23 @@ async function buildTaskDispatchContext(input: {
       ]
         .filter(Boolean)
         .join('\n');
-  const upstreamResultLines = [
-    ...buildUpstreamResultLines(input.task, input.allTasks),
-    ...buildReviewDiffLines(input.missionId, input.task),
-  ];
-  const teamSnapshotLines = buildTeamSnapshotLines(input.allTasks);
+  const missionGoalLines = buildMissionGoalLines(missionState);
+  const compactedSections = await maybeCompactDispatchSections({
+    missionId: input.missionId,
+    task: input.task,
+    allTasks: input.allTasks,
+    agentId: input.agentId,
+    missionContextPackText,
+    missionGoalLines,
+    upstreamResultLines: [
+      ...buildUpstreamResultLines(input.task, input.allTasks),
+      ...buildReviewDiffLines(input.missionId, input.task),
+    ],
+    teamSnapshotLines: buildTeamSnapshotLines(input.allTasks),
+    force: input.forceContextCompaction,
+  });
+  const upstreamResultLines = compactedSections.upstreamResultLines;
+  const teamSnapshotLines = compactedSections.teamSnapshotLines;
   const reviewFindingsLines = buildReviewFindingsLines(input.task);
   if (input.teamRole === 'reviewer' || input.teamRole === 'qa') {
     prepareArtifactReviewTask({
@@ -1401,7 +1560,7 @@ async function buildTaskDispatchContext(input: {
     taskModelHint: input.taskModelHint,
     rejectionLessonLines,
     missionContextPack: missionContextPackText,
-    missionGoalLines: buildMissionGoalLines(missionState),
+    missionGoalLines,
     upstreamResultLines,
     teamSnapshotLines,
     reviewFindingsLines,
@@ -1547,27 +1706,44 @@ async function dispatchPlannedMissionTask(input: {
   });
   let dispatchContext;
   let response;
-  try {
-    dispatchContext = await buildTaskDispatchContext({
+  const buildContext = (forceContextCompaction?: boolean) =>
+    buildTaskDispatchContext({
       missionId: input.missionId,
       task: input.task,
       teamRole: input.teamRole,
       agentId: input.assignment.agent_id,
       taskModelHint: input.assignment.model_hint,
       allTasks: input.allTasks,
+      ...(forceContextCompaction ? { forceContextCompaction: true } : {}),
     });
+  const dispatchOnce = (context: Awaited<ReturnType<typeof buildTaskDispatchContext>>) => {
     const dispatchArgs = {
       missionId: input.missionId,
       task: input.task,
       teamRole: input.teamRole,
       agentId: input.assignment.agent_id,
       taskModelHint: input.assignment.model_hint,
-      prompt: dispatchContext.prompt,
-      securityScope: dispatchContext.securityScope,
+      prompt: context.prompt,
+      securityScope: context.securityScope,
     };
-    response = isBestOfNCandidate({ teamRole: input.teamRole, task: input.task })
-      ? await obtainBestOfTaskResultResponse(dispatchArgs)
-      : await obtainTaskResultResponse(dispatchArgs);
+    return isBestOfNCandidate({ teamRole: input.teamRole, task: input.task })
+      ? obtainBestOfTaskResultResponse(dispatchArgs)
+      : obtainTaskResultResponse(dispatchArgs);
+  };
+  try {
+    dispatchContext = await buildContext();
+    try {
+      response = await dispatchOnce(dispatchContext);
+    } catch (dispatchError: any) {
+      // OH-01 reactive compaction: a provider-side "prompt too long" gets one
+      // forced-compaction rebuild + retry before the failure propagates.
+      if (!isPromptTooLongError(dispatchError)) throw dispatchError;
+      logger.warn(
+        `[MISSION_WORKER] Dispatch prompt too long for ${input.task.task_id}; forcing context compaction and retrying once.`
+      );
+      dispatchContext = await buildContext(true);
+      response = await dispatchOnce(dispatchContext);
+    }
   } catch (err: any) {
     if (err instanceof AgentBusyError || err?.name === 'AgentBusyError') {
       logger.warn(
