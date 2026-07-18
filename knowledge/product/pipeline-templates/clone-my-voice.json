@@ -1,44 +1,22 @@
 {
   "action": "pipeline",
   "name": "clone-my-voice",
-  "version": "2.0.0",
-  "description": "声のクローン作成パイプライン。3サンプルを録音・トランスクリプト登録し、mlx_audio_qwen3 エンジンでの ICL クローンプロフィールを作成する。収録直後の staging は active/shared/tmp/voice-samples/<profile_id>/、登録後の参照先は active/shared/runtime/voice-profiles/<profile_id>/ に移る。必須 context vars: profile_id, display_name。オプション: duration_sec (default 12), language (default ja)。モデルダウンロード済みであること（HuggingFace 接続が必要、初回のみ）。",
+  "version": "3.0.0",
+  "description": "声のクローン作成パイプライン。各サンプルを最後まで録音した直後にローカルSTTで原稿照合し、ズレた文だけを再録音してから mlx_audio_qwen3 用 ICL クローンプロフィールを作成する。ズレが直らないサンプルは登録せず停止する。",
   "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
   "context": {
     "profile_id": "operator-personal-voice-v1",
     "display_name": "Operator Personal Voice v1",
-    "duration_sec": 12,
+    "duration_sec": 20,
     "language": "ja",
-    "script_display_hold_ms": 7000,
-    "allow_update": false
+    "recording_countdown_sec": 3,
+    "script_display_hold_ms": 1000,
+    "allow_update": false,
+    "dry_run": false,
+    "max_repair_attempts": 2,
+    "repair_duration_sec": 7
   },
   "steps": [
-    {
-      "id": "check_sox",
-      "role": "source",
-      "op": "system:cli_health_check",
-      "produces": { "channel": "sox_health", "type": "HealthCheck" },
-      "params": { "command": "sox", "args": ["--version"] }
-    },
-    {
-      "id": "gate_sox",
-      "role": "gate",
-      "op": "core:if",
-      "consumes": "sox_health",
-      "params": {
-        "condition": { "from": "sox_health.available", "operator": "eq", "value": false },
-        "then": [
-          {
-            "id": "warn_no_sox",
-            "role": "sink",
-            "op": "system:log",
-            "params": {
-              "message": "[clone-my-voice] sox が見つかりません。record_bridge.py が ffmpeg にフォールバックして続行します。"
-            }
-          }
-        ]
-      }
-    },
     {
       "id": "mkdir_samples",
       "role": "sink",
@@ -51,31 +29,7 @@
       "op": "system:write_artifact",
       "params": {
         "path": "active/shared/tmp/voice-samples/{{profile_id}}/recording-panel.md",
-        "content": "# 声のクローン録音ガイド\n\n- profile: `{{profile_id}}`\n- 表示保持: `{{script_display_hold_ms}}ms`\n- 録音開始の合図が出るまで、ここを見ながら待機してください。\n- 合図のあとに、読み上げを開始してください。\n\n## sample 1/3\n「こんにちは。私の名前は市村です。今日はKyberionの音声クローン機能をテストしています。よろしくお願いします。」\n\n## sample 2/3\n「Kyberionは自律型AIエージェントシステムです。音声、画像、ブラウザ操作など様々な機能を備えています。」\n\n## sample 3/3\n「本日の天気は晴れです。気温は二十五度で、過ごしやすい一日になりそうです。午後からは少し風が強くなる予報です。」\n"
-      }
-    },
-    {
-      "id": "open_recording_panel",
-      "role": "sink",
-      "op": "open_file",
-      "params": {
-        "path": "active/shared/tmp/voice-samples/{{profile_id}}/recording-panel.md"
-      }
-    },
-    {
-      "id": "focus_recording_panel",
-      "role": "sink",
-      "op": "activate_application",
-      "params": {
-        "application": "Visual Studio Code"
-      }
-    },
-    {
-      "id": "settle_recording_panel",
-      "role": "sink",
-      "op": "wait",
-      "params": {
-        "duration_ms": 500
+        "content": "# 声のクローン録音ガイド\n\n- profile: `{{profile_id}}`\n- 表示保持: `{{script_display_hold_ms}}ms`\n- 原稿を確認してから、3秒のカウントダウン後にマイクが ON になります。\n- 録音を最後まで完了した直後にローカルSTTで原稿を確認します。\n- ズレがあれば、その文だけ再録音して再度STT確認します（最大 `{{max_repair_attempts}}` 回）。\n- 録音中は進捗と入力レベルを確認できます。\n\n## sample 1/3\n「こんにちは。これは私の音声サンプルです。今日は音声クローンの録音をしています。よろしくお願いします。」\n\n## sample 2/3\n「Kyberionは自律型AIエージェントシステムです。音声、画像、ブラウザ操作など様々な機能を備えています。」\n\n## sample 3/3\n「本日の天気は晴れです。気温は二十五度で、過ごしやすい一日になりそうです。午後からは少し風が強くなる予報です。」\n"
       }
     },
     {
@@ -83,7 +37,7 @@
       "role": "sink",
       "op": "system:log",
       "params": {
-        "message": "[clone-my-voice] 録音ガイドを active/shared/tmp/voice-samples/{{profile_id}}/recording-panel.md に書き出して開きました。必要ならこのファイルを見ながら進めてください。"
+        "message": "[clone-my-voice] 録音ガイドを active/shared/tmp/voice-samples/{{profile_id}}/recording-panel.md に書き出しました。必要ならこのファイルを見ながら進めてください。"
       }
     },
     {
@@ -92,7 +46,7 @@
       "op": "system:system_notify",
       "params": {
         "title": "🎙 録音 1/3",
-        "message": "「こんにちは。私の名前は市村です。今日はKyberionの音声クローン機能をテストしています。よろしくお願いします。」",
+        "message": "「こんにちは。これは私の音声サンプルです。今日は音声クローンの録音をしています。よろしくお願いします。」",
         "subtitle": "合図の後に話し始めてください"
       }
     },
@@ -102,7 +56,7 @@
       "op": "system:write_artifact",
       "params": {
         "path": "active/shared/tmp/voice-samples/{{profile_id}}/sample-01.prompt.txt",
-        "content": "録音 1/3\n表示保持: {{script_display_hold_ms}}ms\n\nこの原稿を読み上げてください。\n「こんにちは。私の名前は市村です。今日はKyberionの音声クローン機能をテストしています。よろしくお願いします。」"
+        "content": "録音 1/3\n表示保持: {{script_display_hold_ms}}ms\n\nこの原稿を読み上げてください。\n「こんにちは。これは私の音声サンプルです。今日は音声クローンの録音をしています。よろしくお願いします。」"
       }
     },
     {
@@ -110,63 +64,36 @@
       "role": "sink",
       "op": "system:log",
       "params": {
-        "message": "[clone-my-voice] sample-01 原稿\n保存先: active/shared/tmp/voice-samples/{{profile_id}}/sample-01.prompt.txt\n表示保持: {{script_display_hold_ms}}ms\n\nこんにちは。私の名前は市村です。今日はKyberionの音声クローン機能をテストしています。よろしくお願いします。"
+        "message": "[clone-my-voice] sample-01 原稿\n保存先: active/shared/tmp/voice-samples/{{profile_id}}/sample-01.prompt.txt\n表示保持: {{script_display_hold_ms}}ms\n\nこんにちは。これは私の音声サンプルです。今日は音声クローンの録音をしています。よろしくお願いします。"
       }
-    },
-    {
-      "id": "hold_sample1_prompt",
-      "role": "sink",
-      "op": "system:wait",
-      "params": { "duration_ms": 7000 }
-    },
-    {
-      "id": "dialog_sample1_prompt",
-      "role": "sink",
-      "op": "run_applescript",
-      "params": {
-        "script": "display dialog \"録音 1/3\n\nこんにちは。私の名前は市村です。今日はKyberionの音声クローン機能をテストしています。よろしくお願いします。\n\nこのダイアログを閉じたら、録音開始の合図が続きます。\" buttons {\"OK\"} default button \"OK\" with title \"声のクローン録音\""
-      }
-    },
-    {
-      "id": "speak_sample1_cue",
-      "role": "sink",
-      "op": "system:voice",
-      "params": {
-        "text": "録音 1。いまから話してください。"
-      }
-    },
-    {
-      "id": "announce_sample1_recording",
-      "role": "sink",
-      "op": "system:log",
-      "params": {
-        "message": "[clone-my-voice] sample-01 録音開始。ここから {{duration_sec}} 秒間、原稿を読み上げてください。"
-      }
-    },
-    {
-      "id": "settle_sample1_recording",
-      "role": "sink",
-      "op": "system:wait",
-      "params": { "duration_ms": 2000 }
     },
     {
       "id": "record_sample1",
       "role": "source",
-      "op": "system:exec",
-      "produces": { "channel": "record1", "type": "RecordingResult" },
+      "op": "voice:record_verify_repair_voice_sample",
+      "produces": { "channel": "record1", "type": "VoiceSampleRecordingResult" },
       "params": {
-        "command": "python3",
-        "args": ["libs/actuators/voice-actuator/scripts/record_bridge.py", "{\"action\":\"record\",\"params\":{\"duration\":{{duration_sec}},\"output_path\":\"active/shared/tmp/voice-samples/{{profile_id}}/sample-01.wav\"}}"],
-        "timeout_ms": 25000
+        "action": "record_verify_repair_voice_sample",
+        "request_id": "clone-{{profile_id}}-{{language}}",
+        "sample_id": "sample-01",
+        "duration_sec": "{{duration_sec}}",
+        "language": "{{language}}",
+        "recording_countdown_sec": "{{recording_countdown_sec}}",
+        "prompt_display_hold_ms": "{{script_display_hold_ms}}",
+        "max_repair_attempts": "{{max_repair_attempts}}",
+        "repair_duration_sec": "{{repair_duration_sec}}",
+        "dry_run": "{{dry_run}}",
+        "prompt_text": "こんにちは。これは私の音声サンプルです。今日は音声クローンの録音をしています。よろしくお願いします。",
+        "output_path": "active/shared/tmp/voice-samples/{{profile_id}}/sample-01.wav"
       }
     },
     {
       "id": "transcript_sample1",
       "role": "sink",
-      "op": "system:write_artifact",
+      "op": "system:log",
+      "consumes": "record1",
       "params": {
-        "path": "active/shared/tmp/voice-samples/{{profile_id}}/sample-01.wav.transcript.txt",
-        "content": "こんにちは。私の名前は市村です。今日はKyberionの音声クローン機能をテストしています。よろしくお願いします。"
+        "message": "[clone-my-voice] sample-01 STT確認={{record1.verification.status}} / backend={{record1.stt_backend}} / timestamps={{record1.stt_capabilities.timestamps}} / 学習用={{record1.training_path}} / 再開={{record1.resume_session_path}}"
       }
     },
     {
@@ -197,59 +124,32 @@
       }
     },
     {
-      "id": "hold_sample2_prompt",
-      "role": "sink",
-      "op": "system:wait",
-      "params": { "duration_ms": 7000 }
-    },
-    {
-      "id": "dialog_sample2_prompt",
-      "role": "sink",
-      "op": "run_applescript",
-      "params": {
-        "script": "display dialog \"録音 2/3\n\nKyberionは自律型AIエージェントシステムです。音声、画像、ブラウザ操作など様々な機能を備えています。\n\nこのダイアログを閉じたら、録音開始の合図が続きます。\" buttons {\"OK\"} default button \"OK\" with title \"声のクローン録音\""
-      }
-    },
-    {
-      "id": "speak_sample2_cue",
-      "role": "sink",
-      "op": "system:voice",
-      "params": {
-        "text": "録音 2。いまから話してください。"
-      }
-    },
-    {
-      "id": "announce_sample2_recording",
-      "role": "sink",
-      "op": "system:log",
-      "params": {
-        "message": "[clone-my-voice] sample-02 録音開始。ここから {{duration_sec}} 秒間、原稿を読み上げてください。"
-      }
-    },
-    {
-      "id": "settle_sample2_recording",
-      "role": "sink",
-      "op": "system:wait",
-      "params": { "duration_ms": 2000 }
-    },
-    {
       "id": "record_sample2",
       "role": "source",
-      "op": "system:exec",
-      "produces": { "channel": "record2", "type": "RecordingResult" },
+      "op": "voice:record_verify_repair_voice_sample",
+      "produces": { "channel": "record2", "type": "VoiceSampleRecordingResult" },
       "params": {
-        "command": "python3",
-        "args": ["libs/actuators/voice-actuator/scripts/record_bridge.py", "{\"action\":\"record\",\"params\":{\"duration\":{{duration_sec}},\"output_path\":\"active/shared/tmp/voice-samples/{{profile_id}}/sample-02.wav\"}}"],
-        "timeout_ms": 25000
+        "action": "record_verify_repair_voice_sample",
+        "request_id": "clone-{{profile_id}}-{{language}}",
+        "sample_id": "sample-02",
+        "duration_sec": "{{duration_sec}}",
+        "language": "{{language}}",
+        "recording_countdown_sec": "{{recording_countdown_sec}}",
+        "prompt_display_hold_ms": "{{script_display_hold_ms}}",
+        "max_repair_attempts": "{{max_repair_attempts}}",
+        "repair_duration_sec": "{{repair_duration_sec}}",
+        "dry_run": "{{dry_run}}",
+        "prompt_text": "Kyberionは自律型AIエージェントシステムです。音声、画像、ブラウザ操作など様々な機能を備えています。",
+        "output_path": "active/shared/tmp/voice-samples/{{profile_id}}/sample-02.wav"
       }
     },
     {
       "id": "transcript_sample2",
       "role": "sink",
-      "op": "system:write_artifact",
+      "op": "system:log",
+      "consumes": "record2",
       "params": {
-        "path": "active/shared/tmp/voice-samples/{{profile_id}}/sample-02.wav.transcript.txt",
-        "content": "Kyberionは自律型AIエージェントシステムです。音声、画像、ブラウザ操作など様々な機能を備えています。"
+        "message": "[clone-my-voice] sample-02 STT確認={{record2.verification.status}} / backend={{record2.stt_backend}} / timestamps={{record2.stt_capabilities.timestamps}} / 学習用={{record2.training_path}} / 再開={{record2.resume_session_path}}"
       }
     },
     {
@@ -280,59 +180,32 @@
       }
     },
     {
-      "id": "hold_sample3_prompt",
-      "role": "sink",
-      "op": "system:wait",
-      "params": { "duration_ms": 7000 }
-    },
-    {
-      "id": "dialog_sample3_prompt",
-      "role": "sink",
-      "op": "run_applescript",
-      "params": {
-        "script": "display dialog \"録音 3/3\n\n本日の天気は晴れです。気温は二十五度で、過ごしやすい一日になりそうです。午後からは少し風が強くなる予報です。\n\nこのダイアログを閉じたら、録音開始の合図が続きます。\" buttons {\"OK\"} default button \"OK\" with title \"声のクローン録音\""
-      }
-    },
-    {
-      "id": "speak_sample3_cue",
-      "role": "sink",
-      "op": "system:voice",
-      "params": {
-        "text": "録音 3。いまから話してください。"
-      }
-    },
-    {
-      "id": "announce_sample3_recording",
-      "role": "sink",
-      "op": "system:log",
-      "params": {
-        "message": "[clone-my-voice] sample-03 録音開始。ここから {{duration_sec}} 秒間、原稿を読み上げてください。"
-      }
-    },
-    {
-      "id": "settle_sample3_recording",
-      "role": "sink",
-      "op": "system:wait",
-      "params": { "duration_ms": 2000 }
-    },
-    {
       "id": "record_sample3",
       "role": "source",
-      "op": "system:exec",
-      "produces": { "channel": "record3", "type": "RecordingResult" },
+      "op": "voice:record_verify_repair_voice_sample",
+      "produces": { "channel": "record3", "type": "VoiceSampleRecordingResult" },
       "params": {
-        "command": "python3",
-        "args": ["libs/actuators/voice-actuator/scripts/record_bridge.py", "{\"action\":\"record\",\"params\":{\"duration\":{{duration_sec}},\"output_path\":\"active/shared/tmp/voice-samples/{{profile_id}}/sample-03.wav\"}}"],
-        "timeout_ms": 25000
+        "action": "record_verify_repair_voice_sample",
+        "request_id": "clone-{{profile_id}}-{{language}}",
+        "sample_id": "sample-03",
+        "duration_sec": "{{duration_sec}}",
+        "language": "{{language}}",
+        "recording_countdown_sec": "{{recording_countdown_sec}}",
+        "prompt_display_hold_ms": "{{script_display_hold_ms}}",
+        "max_repair_attempts": "{{max_repair_attempts}}",
+        "repair_duration_sec": "{{repair_duration_sec}}",
+        "dry_run": "{{dry_run}}",
+        "prompt_text": "本日の天気は晴れです。気温は二十五度で、過ごしやすい一日になりそうです。午後からは少し風が強くなる予報です。",
+        "output_path": "active/shared/tmp/voice-samples/{{profile_id}}/sample-03.wav"
       }
     },
     {
       "id": "transcript_sample3",
       "role": "sink",
-      "op": "system:write_artifact",
+      "op": "system:log",
+      "consumes": "record3",
       "params": {
-        "path": "active/shared/tmp/voice-samples/{{profile_id}}/sample-03.wav.transcript.txt",
-        "content": "本日の天気は晴れです。気温は二十五度で、過ごしやすい一日になりそうです。午後からは少し風が強くなる予報です。"
+        "message": "[clone-my-voice] sample-03 STT確認={{record3.verification.status}} / backend={{record3.stt_backend}} / timestamps={{record3.stt_capabilities.timestamps}} / 学習用={{record3.training_path}} / 再開={{record3.resume_session_path}}"
       }
     },
     {
@@ -345,6 +218,7 @@
       "id": "register_profile",
       "role": "source",
       "op": "voice:collect_and_register_voice_profile",
+      "consumes": ["record1", "record2", "record3"],
       "produces": { "channel": "registration_result", "type": "VoiceRegistrationResult" },
       "params": {
         "action": "collect_and_register_voice_profile",
@@ -358,11 +232,12 @@
           "notes": "ICL voice clone via mlx-audio Qwen3-TTS. clone-my-voice pipeline."
         },
         "samples": [
-          { "sample_id": "sample-01", "path": "active/shared/tmp/voice-samples/{{profile_id}}/sample-01.wav", "language": "{{language}}" },
-          { "sample_id": "sample-02", "path": "active/shared/tmp/voice-samples/{{profile_id}}/sample-02.wav", "language": "{{language}}" },
-          { "sample_id": "sample-03", "path": "active/shared/tmp/voice-samples/{{profile_id}}/sample-03.wav", "language": "{{language}}" }
+          { "sample_id": "sample-01", "path": "{{record1.training_path}}", "language": "{{language}}" },
+          { "sample_id": "sample-02", "path": "{{record2.training_path}}", "language": "{{language}}" },
+          { "sample_id": "sample-03", "path": "{{record3.training_path}}", "language": "{{language}}" }
         ],
-        "policy": { "allow_update": "{{allow_update}}" }
+        "policy": { "allow_update": "{{allow_update}}" },
+        "dry_run": "{{dry_run}}"
       }
     },
     {

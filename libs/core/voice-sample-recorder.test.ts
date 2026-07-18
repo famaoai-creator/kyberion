@@ -69,7 +69,7 @@ describe('voice-sample-recorder', () => {
         sample_rate_hz: 16000,
         channels: 1,
       },
-      payload: new Uint8Array([1, 2, 3, 4]),
+      payload: new Uint8Array(256000).fill(0x7f),
       ts_ms: 0,
     };
     mocks.createVirtualDeviceInventoryBridge.mockReturnValue({
@@ -115,6 +115,7 @@ describe('voice-sample-recorder', () => {
       sample_id: 's1',
       duration_sec: 8,
       prompt_text: 'Tell me about Kyberion.',
+      recording_countdown_sec: 0,
     });
 
     expect(result.status).toBe('succeeded');

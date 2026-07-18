@@ -493,6 +493,7 @@ export async function generateImageLocallyWithApplePlayground(
 export function createAppleSpeechToTextBridge(): SpeechToTextBridge {
   return {
     name: 'apple-speech',
+    capabilities: { timestamps: false, granularity: 'none' },
     async transcribe(input: TranscribeInput): Promise<TranscribeResult> {
       const audioAbs = rootResolve(input.audioPath);
       if (!safeExistsSync(audioAbs)) {
@@ -515,6 +516,7 @@ export function createAppleSpeechToTextBridge(): SpeechToTextBridge {
         language,
         written_to: outputPath,
         backend: 'apple-speech',
+        capabilities: { timestamps: false, granularity: 'none' },
       };
     },
   };

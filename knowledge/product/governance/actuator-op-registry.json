@@ -477,6 +477,7 @@
         "collect_voice_samples",
         "generate_voice",
         "record_interaction",
+        "record_verify_repair_voice_sample",
         "record_voice_sample",
         "register_voice_profile",
         "speak_local"
