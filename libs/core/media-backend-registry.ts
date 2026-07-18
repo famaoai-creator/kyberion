@@ -3,7 +3,11 @@ import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { safeJsonParse } from './validators.js';
 import { getToolRuntimeRecord } from './tool-runtime-registry.js';
-import { getVoiceEngineRegistry, resolveVoiceEngineForPlatform, type VoiceEngineRecord } from './voice-engine-registry.js';
+import {
+  getVoiceEngineRegistry,
+  resolveVoiceEngineForPlatform,
+  type VoiceEngineRecord,
+} from './voice-engine-registry.js';
 
 export type MediaBackendModality = 'image' | 'voice' | 'video' | 'music';
 export type MediaBackendStatus = 'active' | 'shadow' | 'disabled';
@@ -38,7 +42,9 @@ export interface MediaBackendRegistry {
   backends: MediaBackendRecord[];
 }
 
-const DEFAULT_REGISTRY_PATH = pathResolver.knowledge('product/governance/media-backend-registry.json');
+const DEFAULT_REGISTRY_PATH = pathResolver.knowledge(
+  'product/governance/media-backend-registry.json'
+);
 const LOCAL_FLUX_TOOL_BACKEND = getToolRuntimeRecord('mflux').trial_backend;
 
 const FALLBACK_REGISTRY: MediaBackendRegistry = {
@@ -75,6 +81,18 @@ const FALLBACK_REGISTRY: MediaBackendRegistry = {
       args: LOCAL_FLUX_TOOL_BACKEND.args,
       fallback_backend_id: 'media-generation.comfyui',
       notes: 'Apple Silicon local FLUX generation via the governed tool runtime registry.',
+    },
+    {
+      backend_id: 'media-generation.apple_playground',
+      modality: 'image',
+      display_name: 'Apple Image Playground',
+      kind: 'local',
+      provider: 'apple_image_playground',
+      status: 'active',
+      platforms: ['darwin'],
+      supports: { artifact_formats: ['png'], async: false },
+      fallback_backend_id: 'media-generation.local_flux',
+      notes: 'macOS Apple Silicon Image Playground through the native capability bridge.',
     },
     {
       backend_id: 'voice.local_say',
@@ -130,7 +148,9 @@ function mapVoiceEngineToBackend(engine: VoiceEngineRecord): MediaBackendRecord 
       playback: engine.supports.playback,
       artifact_formats: engine.supports.artifact_formats,
     },
-    fallback_backend_id: engine.fallback_engine_id ? `voice.${engine.fallback_engine_id}` : undefined,
+    fallback_backend_id: engine.fallback_engine_id
+      ? `voice.${engine.fallback_engine_id}`
+      : undefined,
     notes: engine.notes,
   };
 }
@@ -147,8 +167,14 @@ function mergeVoiceBackends(backends: MediaBackendRecord[]): MediaBackendRecord[
   return merged;
 }
 
-function resolveVoiceBackendRecord(backendId?: string, platform: NodeJS.Platform = process.platform): MediaBackendRecord {
-  const engine = resolveVoiceEngineForPlatform(backendId?.replace(/^voice\./u, '') || undefined, platform);
+function resolveVoiceBackendRecord(
+  backendId?: string,
+  platform: NodeJS.Platform = process.platform
+): MediaBackendRecord {
+  const engine = resolveVoiceEngineForPlatform(
+    backendId?.replace(/^voice\./u, '') || undefined,
+    platform
+  );
   return mapVoiceEngineToBackend(engine);
 }
 
@@ -160,7 +186,7 @@ function getRegistry(): MediaBackendRegistry {
     cachedRegistryPath = registryPath;
     cachedRegistry = {
       ...FALLBACK_REGISTRY,
-      backends: mergeVoiceBackends([FALLBACK_REGISTRY.backends[0], FALLBACK_REGISTRY.backends[2]]),
+      backends: mergeVoiceBackends(FALLBACK_REGISTRY.backends),
     };
     return cachedRegistry;
   }
@@ -174,7 +200,9 @@ function getRegistry(): MediaBackendRegistry {
     };
     return cachedRegistry;
   } catch (error: any) {
-    logger.warn(`[MEDIA_BACKEND_REGISTRY] Failed to load registry at ${registryPath}: ${error.message}`);
+    logger.warn(
+      `[MEDIA_BACKEND_REGISTRY] Failed to load registry at ${registryPath}: ${error.message}`
+    );
     cachedRegistryPath = registryPath;
     cachedRegistry = FALLBACK_REGISTRY;
     return cachedRegistry;
@@ -192,15 +220,13 @@ export function getMediaBackendRegistry(): MediaBackendRegistry {
 
 export function listMediaBackends(modality?: MediaBackendModality): MediaBackendRecord[] {
   const registry = getRegistry();
-  const backends = registry.backends.length > 0
-    ? registry.backends
-    : mergeVoiceBackends([]);
+  const backends = registry.backends.length > 0 ? registry.backends : mergeVoiceBackends([]);
   return modality ? backends.filter((backend) => backend.modality === modality) : backends;
 }
 
 export function getMediaBackendRecord(
   backendId?: string,
-  modality?: MediaBackendModality,
+  modality?: MediaBackendModality
 ): MediaBackendRecord {
   const registry = getRegistry();
   const defaultBackendId = modality ? registry.default_backend_ids[modality] : undefined;
@@ -208,29 +234,38 @@ export function getMediaBackendRecord(
   const aliasId =
     modality === 'image' && resolvedId === 'local_flux'
       ? 'media-generation.local_flux'
-      : resolvedId;
+      : modality === 'image' && resolvedId === 'apple_playground'
+        ? 'media-generation.apple_playground'
+        : resolvedId;
 
-  const voiceBackendMatch = aliasId.startsWith('voice.') && !registry.backends.find((backend) => backend.backend_id === aliasId);
+  const voiceBackendMatch =
+    aliasId.startsWith('voice.') &&
+    !registry.backends.find((backend) => backend.backend_id === aliasId);
   if (voiceBackendMatch || modality === 'voice') {
     return resolveVoiceBackendRecord(aliasId);
   }
 
   return (
-    registry.backends.find((backend) => backend.backend_id === aliasId)
-    || registry.backends.find((backend) => modality ? backend.modality === modality && backend.backend_id === defaultBackendId : false)
-    || registry.backends[0]
-    || FALLBACK_REGISTRY.backends[0]
+    registry.backends.find((backend) => backend.backend_id === aliasId) ||
+    registry.backends.find((backend) =>
+      modality ? backend.modality === modality && backend.backend_id === defaultBackendId : false
+    ) ||
+    registry.backends[0] ||
+    FALLBACK_REGISTRY.backends[0]
   );
 }
 
 function isSupportedPlatform(backend: MediaBackendRecord, platform: NodeJS.Platform): boolean {
-  return backend.platforms.includes('any') || backend.platforms.includes(platform as MediaBackendPlatform);
+  return (
+    backend.platforms.includes('any') ||
+    backend.platforms.includes(platform as MediaBackendPlatform)
+  );
 }
 
 export function resolveMediaBackendForPlatform(
   modality: MediaBackendModality,
   backendId?: string,
-  platform: NodeJS.Platform = process.platform,
+  platform: NodeJS.Platform = process.platform
 ): MediaBackendRecord {
   const registry = getRegistry();
   const defaultBackendId = registry.default_backend_ids[modality];
@@ -255,17 +290,28 @@ export function resolveMediaBackendForPlatform(
     return defaultBackend;
   }
 
-  throw new Error(`No compatible active media backend found for modality=${modality} on platform ${platform}`);
+  throw new Error(
+    `No compatible active media backend found for modality=${modality} on platform ${platform}`
+  );
 }
 
-export function resolveImageBackend(backendId?: string, platform: NodeJS.Platform = process.platform): MediaBackendRecord {
+export function resolveImageBackend(
+  backendId?: string,
+  platform: NodeJS.Platform = process.platform
+): MediaBackendRecord {
   return resolveMediaBackendForPlatform('image', backendId, platform);
 }
 
-export function resolveVoiceBackend(backendId?: string, platform: NodeJS.Platform = process.platform): MediaBackendRecord {
+export function resolveVoiceBackend(
+  backendId?: string,
+  platform: NodeJS.Platform = process.platform
+): MediaBackendRecord {
   return resolveMediaBackendForPlatform('voice', backendId, platform);
 }
 
-export function resolveVideoBackend(backendId?: string, platform: NodeJS.Platform = process.platform): MediaBackendRecord {
+export function resolveVideoBackend(
+  backendId?: string,
+  platform: NodeJS.Platform = process.platform
+): MediaBackendRecord {
   return resolveMediaBackendForPlatform('video', backendId, platform);
 }
