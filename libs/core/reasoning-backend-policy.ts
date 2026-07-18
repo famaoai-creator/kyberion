@@ -12,6 +12,7 @@ export type ReasoningBackendMode =
   | 'gemini-cli'
   | 'gemini-api'
   | 'agy-cli'
+  | 'copilot'
   | 'local'
   | 'nemotron'
   | 'nemotron-api'
@@ -68,6 +69,7 @@ const FALLBACK_POLICY: ReasoningBackendPolicy = {
     'anthropic',
     'gemini-cli',
     'agy-cli',
+    'copilot',
     'local',
     'nemotron-api',
     'openrouter',
@@ -85,7 +87,12 @@ const FALLBACK_POLICY: ReasoningBackendPolicy = {
     { env: 'CLAUDECODE', mode: 'claude-agent' },
   ],
   cli_preference_rules: [
-    { env_any: ['CODEX_CLI', 'CODEX_VERSION'], env_equals: { TERM_PROGRAM: 'codex' }, provider: 'codex', mode: 'codex-cli' },
+    {
+      env_any: ['CODEX_CLI', 'CODEX_VERSION'],
+      env_equals: { TERM_PROGRAM: 'codex' },
+      provider: 'codex',
+      mode: 'codex-cli',
+    },
     { env_any: ['GEMINI_CLI'], provider: 'gemini', mode: 'gemini-cli' },
     { env_any: ['AGY_CLI', 'ANTIGRAVITY_CLI'], provider: 'agy', mode: 'agy-cli' },
   ],
@@ -93,6 +100,7 @@ const FALLBACK_POLICY: ReasoningBackendPolicy = {
     { provider: 'codex', mode: 'codex-cli' },
     { provider: 'gemini', mode: 'gemini-cli' },
     { provider: 'agy', mode: 'agy-cli' },
+    { provider: 'copilot', mode: 'copilot' },
   ],
   default_mode: 'codex-cli',
 };
@@ -116,14 +124,19 @@ function errorsFrom(validate: ValidateFunction): string[] {
 function validatePolicy(value: unknown, label: string): ReasoningBackendPolicy {
   const validate = ensureValidator();
   if (!validate(value)) {
-    throw new Error(`Invalid reasoning backend policy at ${label}: ${errorsFrom(validate).join('; ')}`);
+    throw new Error(
+      `Invalid reasoning backend policy at ${label}: ${errorsFrom(validate).join('; ')}`
+    );
   }
   return value as ReasoningBackendPolicy;
 }
 
 function loadPolicyFile(): ReasoningBackendPolicy | null {
   if (!safeExistsSync(POLICY_PATH)) return null;
-  return validatePolicy(JSON.parse(safeReadFile(POLICY_PATH, { encoding: 'utf8' }) as string), POLICY_PATH);
+  return validatePolicy(
+    JSON.parse(safeReadFile(POLICY_PATH, { encoding: 'utf8' }) as string),
+    POLICY_PATH
+  );
 }
 
 export function loadReasoningBackendPolicy(): ReasoningBackendPolicy {
@@ -135,14 +148,21 @@ export function loadReasoningBackendPolicy(): ReasoningBackendPolicy {
 
 export function normalizeReasoningBackendMode(
   mode: ReasoningBackendMode,
-  policy: ReasoningBackendPolicy = loadReasoningBackendPolicy(),
+  policy: ReasoningBackendPolicy = loadReasoningBackendPolicy()
 ): Exclude<ReasoningBackendMode, 'gemini-api'> {
   const normalized = policy.mode_aliases[mode] || mode;
   return normalized as Exclude<ReasoningBackendMode, 'gemini-api'>;
 }
 
-function matchesSelectionRule(env: NodeJS.ProcessEnv, rule: ReasoningBackendSelectionRule): boolean {
-  if (Array.isArray(rule.env_any) && rule.env_any.length > 0 && !rule.env_any.some((name) => Boolean(env[name]))) {
+function matchesSelectionRule(
+  env: NodeJS.ProcessEnv,
+  rule: ReasoningBackendSelectionRule
+): boolean {
+  if (
+    Array.isArray(rule.env_any) &&
+    rule.env_any.length > 0 &&
+    !rule.env_any.some((name) => Boolean(env[name]))
+  ) {
     return false;
   }
   if (rule.env_equals) {
@@ -155,7 +175,7 @@ function matchesSelectionRule(env: NodeJS.ProcessEnv, rule: ReasoningBackendSele
 
 function isHealthyProvider(
   providers: ReasoningBackendProviderSnapshot[],
-  provider: string,
+  provider: string
 ): boolean {
   return providers.some((entry) => entry.provider === provider && entry.installed && entry.healthy);
 }

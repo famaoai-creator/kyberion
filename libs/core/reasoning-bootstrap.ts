@@ -57,6 +57,7 @@ import { ClaudeCliVoiceBridge } from './claude-cli-voice-bridge.js';
 import { buildAgyCliBackendFromEnv } from './agy-cli-backend.js';
 import { AgyCliIntentExtractor } from './agy-cli-intent-extractor.js';
 import { AgyCliVoiceBridge } from './agy-cli-voice-bridge.js';
+import { buildCopilotAcpBackendFromEnv } from './copilot-acp-reasoning-backend.js';
 import {
   OpenAiCompatibleBackend,
   buildOpenAiCompatibleBackendFromEnv,
@@ -148,6 +149,8 @@ function providerForReasoningMode(mode: ReasoningBackendMode): string | undefine
       return 'gemini';
     case 'agy-cli':
       return 'agy';
+    case 'copilot':
+      return 'copilot';
     case 'anthropic':
       return 'anthropic';
     case 'openrouter':
@@ -355,6 +358,13 @@ function buildReasoningRuntimeBundle(
         },
       };
     }
+    case 'copilot': {
+      const copilotBackend = buildCopilotAcpBackendFromEnv(process.env, options.model);
+      return {
+        mode,
+        backend: { backend: copilotBackend, provider, label: mode },
+      };
+    }
     case 'openrouter': {
       const openrouterBackend = buildOpenRouterBackendFromEnv(process.env, options.model);
       if (!openrouterBackend && !options.force) return null;
@@ -410,6 +420,7 @@ const REASONING_BACKEND_MODES: ReadonlySet<ReasoningBackendMode> = new Set<Reaso
   'gemini-cli',
   'gemini-api',
   'agy-cli',
+  'copilot',
   'local',
   'nemotron',
   'nemotron-api',

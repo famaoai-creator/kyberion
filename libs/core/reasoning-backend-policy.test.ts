@@ -13,6 +13,7 @@ describe('reasoning-backend-policy', () => {
     expect(policy.allowed_modes).toContain('gemini-cli');
     expect(policy.allowed_modes).toContain('openrouter');
     expect(policy.allowed_modes).toContain('nemotron-api');
+    expect(policy.allowed_modes).toContain('copilot');
     expect(policy.mode_aliases['gemini-api']).toBe('gemini-cli');
     expect(policy.mode_aliases.nemotron).toBe('nemotron-api');
   });
@@ -31,7 +32,7 @@ describe('reasoning-backend-policy', () => {
         policy,
         env: {},
         providers: [],
-      }),
+      })
     ).toBe('claude-agent');
 
     expect(
@@ -41,7 +42,7 @@ describe('reasoning-backend-policy', () => {
           ANTHROPIC_API_KEY: 'x',
         },
         providers: [],
-      }),
+      })
     ).toBe('anthropic');
 
     expect(
@@ -52,7 +53,7 @@ describe('reasoning-backend-policy', () => {
           TERM_PROGRAM: 'codex',
         },
         providers: [{ provider: 'codex', installed: true, healthy: true }],
-      }),
+      })
     ).toBe('codex-cli');
 
     expect(
@@ -63,7 +64,7 @@ describe('reasoning-backend-policy', () => {
           { provider: 'codex', installed: false, healthy: false },
           { provider: 'gemini', installed: true, healthy: true },
         ],
-      }),
+      })
     ).toBe('gemini-cli');
 
     expect(
@@ -71,7 +72,7 @@ describe('reasoning-backend-policy', () => {
         policy,
         env: {},
         providers: [],
-      }),
+      })
     ).toBe('codex-cli');
 
     expect(
@@ -81,7 +82,7 @@ describe('reasoning-backend-policy', () => {
           OPENROUTER_API_KEY: 'or-key',
         },
         providers: [],
-      }),
+      })
     ).toBe('openrouter');
 
     expect(
@@ -91,7 +92,7 @@ describe('reasoning-backend-policy', () => {
           KYBERION_NEMOTRON_URL: 'https://integrate.api.nvidia.com/v1',
         },
         providers: [],
-      }),
+      })
     ).toBe('nemotron-api');
 
     expect(
@@ -102,8 +103,16 @@ describe('reasoning-backend-policy', () => {
           OPENROUTER_API_KEY: 'or-key',
         },
         providers: [],
-      }),
+      })
     ).toBe('local');
+
+    expect(
+      resolveReasoningBackendModeFromContext({
+        policy,
+        env: {},
+        providers: [{ provider: 'copilot', installed: true, healthy: true }],
+      })
+    ).toBe('copilot');
   });
 
   it('prefers the in-session claude-agent when inside a Claude Code harness (CLAUDECODE)', () => {
@@ -112,22 +121,31 @@ describe('reasoning-backend-policy', () => {
     // Inside Claude Code with no explicit API-key signal → in-session sub-agent
     // (instead of spawning a CLI / falling back to the default codex-cli).
     expect(
-      resolveReasoningBackendModeFromContext({ policy, env: { CLAUDECODE: '1' }, providers: [] }),
+      resolveReasoningBackendModeFromContext({ policy, env: { CLAUDECODE: '1' }, providers: [] })
     ).toBe('claude-agent');
 
     // Explicit API-key signals still win (conservative placement, last in priority).
     expect(
-      resolveReasoningBackendModeFromContext({ policy, env: { CLAUDECODE: '1', ANTHROPIC_API_KEY: 'x' }, providers: [] }),
+      resolveReasoningBackendModeFromContext({
+        policy,
+        env: { CLAUDECODE: '1', ANTHROPIC_API_KEY: 'x' },
+        providers: [],
+      })
     ).toBe('anthropic');
 
     // An explicit requested mode always overrides host detection.
     expect(
-      resolveReasoningBackendModeFromContext({ requestedMode: 'codex-cli', policy, env: { CLAUDECODE: '1' }, providers: [] }),
+      resolveReasoningBackendModeFromContext({
+        requestedMode: 'codex-cli',
+        policy,
+        env: { CLAUDECODE: '1' },
+        providers: [],
+      })
     ).toBe('codex-cli');
 
     // No CLAUDECODE → behavior unchanged (default).
-    expect(
-      resolveReasoningBackendModeFromContext({ policy, env: {}, providers: [] }),
-    ).toBe('codex-cli');
+    expect(resolveReasoningBackendModeFromContext({ policy, env: {}, providers: [] })).toBe(
+      'codex-cli'
+    );
   });
 });
