@@ -340,6 +340,10 @@ describe('mission existing work reconciliation', () => {
         dependencies: ['implementation'],
       },
     ]);
+    const statePath = nodePath.join(missionPath, 'mission-state.json');
+    const state = JSON.parse(String(safeReadFile(statePath, { encoding: 'utf8' })));
+    state.git.latest_commit = 'stale-before-reconciliation';
+    safeWriteFile(statePath, JSON.stringify(state, null, 2));
     writeManifest(buildManifest());
 
     const first = await reconcileMissionExistingWork({ missionId, manifestPath });
@@ -365,6 +369,8 @@ describe('mission existing work reconciliation', () => {
       'completed',
     ]);
     expect(tasks[0].reconciliation.manifest_sha256).toBe(first.manifest_sha256);
+    const reconciledState = JSON.parse(String(safeReadFile(statePath, { encoding: 'utf8' })));
+    expect(reconciledState.git.latest_commit).toBe(currentCommit());
     expect(getWorkItem(workItem.item_id)?.status).toBe('done');
     expect(first.receipt_path && safeExistsSync(pathResolver.rootResolve(first.receipt_path))).toBe(
       true
