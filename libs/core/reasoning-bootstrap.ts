@@ -10,7 +10,7 @@
  *                     from the surrounding interactive session when available.
  *   `anthropic`     — use @anthropic-ai/sdk directly. Requires ANTHROPIC_API_KEY.
  *   `openrouter`    — use OpenRouter's OpenAI-compatible API. Requires
- *                     OPENROUTER_API_KEY.
+ *                     OPENROUTER_API_KEY or KYBERION_OPENROUTER_KEY.
  *   `nemotron-api`  — use an OpenAI-compatible Nemotron endpoint.
  *   `local`         — use a local OpenAI-compatible server on localhost.
  *   `stub`          — keep deterministic stubs. Offline/dev default.
@@ -21,7 +21,7 @@
  *
  * Auto-selection when mode is unset:
  *   - If ANTHROPIC_API_KEY / GEMINI_API_KEY / KYBERION_NEMOTRON_URL /
- *     KYBERION_LOCAL_LLM_URL / OPENROUTER_API_KEY are present, the first
+ *     KYBERION_LOCAL_LLM_URL / OPENROUTER_API_KEY / KYBERION_OPENROUTER_KEY are present, the first
  *     matching policy rule wins.
  *   - Otherwise → prefer `codex-cli` when a healthy Codex CLI is present,
  *     then `gemini-cli`, then `agy-cli`, with `claude-agent` only when

@@ -17,7 +17,7 @@ For development setup, see [`../QUICKSTART.md`](../QUICKSTART.md). This document
 Before installing on any environment:
 
 - [ ] Decide single-user vs. customer-overlay (FDE) mode. Customer-overlay = define `KYBERION_CUSTOMER` and prepare `customer/{slug}/`.
-- [ ] Decide reasoning backend: `claude-cli` (preferred when CLI is authenticated), `anthropic` (API key), `codex-cli`, `gemini-cli`, `agy-cli`, `copilot` (GitHub Copilot CLI via ACP), `nemotron-api` (OpenAI-compatible endpoint), or `stub` (offline).
+- [ ] Decide reasoning backend: `claude-cli` (preferred when CLI is authenticated), `anthropic` (API key), `codex-cli`, `gemini-cli`, `agy-cli`, `copilot` (GitHub Copilot CLI via ACP), `openrouter` (OpenRouter API), `nemotron-api` (OpenAI-compatible endpoint), or `stub` (offline).
 - [ ] Decide voice tier: tier 0 (browser + native TTS, no install), tier 1 (cloud), tier 2 (local Style-Bert-VITS2).
 - [ ] Identify which actuators the use case needs (browser? voice? media? meeting?). Heavy ones (Playwright, Style-Bert-VITS2) only install if needed.
 - [ ] Identify secrets storage strategy: OS keychain (preferred), env vars, or `customer/{slug}/secrets.json` (dev only).
@@ -335,14 +335,14 @@ Mission state is forward-compatible by design (additive fields only). If a major
 
 ## 7. Troubleshooting
 
-| Symptom                                         | Likely cause                     | Action                                                                                                      |
-| ----------------------------------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `pnpm doctor` reports Playwright missing        | browser-actuator dependency      | `pnpm env:bootstrap --manifest meeting-participation-runtime --apply --force`                               |
-| `pnpm onboard` says "no reasoning backend"      | No CLI/API key configured        | Set `ANTHROPIC_API_KEY`, `KYBERION_NEMOTRON_URL`, `KYBERION_LOCAL_LLM_URL`, or run `claude` to authenticate |
-| Mission stuck in `active` after process crash   | Stale lock                       | Lock has PID-based stale detection; next command auto-recovers                                              |
-| `Trace persisted path` empty in pipeline output | Persistence policy denied        | Check `KYBERION_PERSONA` and `MISSION_ROLE` env vars                                                        |
-| Customer overlay not picked up                  | `KYBERION_CUSTOMER` not exported | `echo $KYBERION_CUSTOMER` — must show your slug                                                             |
-| Voice surface silent                            | OS TTS not installed             | Linux: `sudo apt-get install espeak`. macOS: built-in. Windows: built-in (SAPI)                             |
+| Symptom                                         | Likely cause                     | Action                                                                                                                                                           |
+| ----------------------------------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm doctor` reports Playwright missing        | browser-actuator dependency      | `pnpm env:bootstrap --manifest meeting-participation-runtime --apply --force`                                                                                    |
+| `pnpm onboard` says "no reasoning backend"      | No CLI/API key configured        | Set `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY` (or `KYBERION_OPENROUTER_KEY`), `KYBERION_NEMOTRON_URL`, `KYBERION_LOCAL_LLM_URL`, or run `claude` to authenticate |
+| Mission stuck in `active` after process crash   | Stale lock                       | Lock has PID-based stale detection; next command auto-recovers                                                                                                   |
+| `Trace persisted path` empty in pipeline output | Persistence policy denied        | Check `KYBERION_PERSONA` and `MISSION_ROLE` env vars                                                                                                             |
+| Customer overlay not picked up                  | `KYBERION_CUSTOMER` not exported | `echo $KYBERION_CUSTOMER` — must show your slug                                                                                                                  |
+| Voice surface silent                            | OS TTS not installed             | Linux: `sudo apt-get install espeak`. macOS: built-in. Windows: built-in (SAPI)                                                                                  |
 
 ---
 

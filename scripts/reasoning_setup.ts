@@ -12,6 +12,7 @@ const REASONING_SETUP_GUIDANCE = [
   '  - AGY CLI: authenticate `agy`, then set `KYBERION_REASONING_BACKEND=agy-cli`',
   '  - GitHub Copilot CLI: authenticate Copilot CLI, then set `KYBERION_REASONING_BACKEND=copilot`',
   '  - Anthropic API: set `ANTHROPIC_API_KEY`, then set `KYBERION_REASONING_BACKEND=anthropic`',
+  '  - OpenRouter API: set `OPENROUTER_API_KEY` (or `KYBERION_OPENROUTER_KEY`), then set `KYBERION_REASONING_BACKEND=openrouter`',
   '  - OpenAI-compatible local/Nemotron: set `KYBERION_LOCAL_LLM_URL` or `KYBERION_NEMOTRON_URL`',
   'Use `KYBERION_REASONING_BACKEND=stub` only when you intentionally want offline deterministic placeholders.',
 ];
@@ -69,10 +70,11 @@ async function main(): Promise<void> {
     logger.info('2. anthropic');
     logger.info('3. gemini-cli');
     logger.info('4. agy-cli');
-    logger.info('5. stub (Offline mock)');
+    logger.info('5. openrouter');
+    logger.info('6. stub (Offline mock)');
 
     const answer = await new Promise<string>((resolve) => {
-      rl.question('Select reasoning backend [1-5, or enter to skip]: ', resolve);
+      rl.question('Select reasoning backend [1-6, or enter to skip]: ', resolve);
     });
 
     rl.close();
@@ -82,7 +84,8 @@ async function main(): Promise<void> {
       '2': 'anthropic',
       '3': 'gemini-cli',
       '4': 'agy-cli',
-      '5': 'stub',
+      '5': 'openrouter',
+      '6': 'stub',
     };
 
     if (answer && choices[answer]) {

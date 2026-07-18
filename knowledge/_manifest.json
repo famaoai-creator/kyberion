@@ -1227,7 +1227,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 54090,
+      "size": 54367,
       "type": "json"
     },
     {
@@ -1263,7 +1263,7 @@
     {
       "path": "product/governance/environment-manifests/reasoning-backend.json",
       "tier": "public",
-      "size": 2197,
+      "size": 2305,
       "type": "json"
     },
     {
@@ -1983,7 +1983,7 @@
     {
       "path": "product/governance/reasoning-backend-policy.json",
       "tier": "public",
-      "size": 1549,
+      "size": 1629,
       "type": "json"
     },
     {

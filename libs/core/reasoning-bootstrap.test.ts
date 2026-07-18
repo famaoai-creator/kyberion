@@ -132,6 +132,15 @@ describe('reasoning-bootstrap', () => {
     expect(getReasoningBackend().name).toBe('openrouter');
   });
 
+  it('auto-selects OpenRouter when its namespaced API key is present', () => {
+    process.env.KYBERION_OPENROUTER_KEY = 'or-test-key';
+    const installed = installReasoningBackends({ refreshProviders: true });
+
+    expect(installed).toBe(true);
+    expect(getInstalledReasoningMode()).toBe('openrouter');
+    expect(getReasoningBackend().name).toBe('openrouter');
+  });
+
   it('auto-selects Nemotron before the generic local LLM when its URL is present', () => {
     process.env.KYBERION_NEMOTRON_URL = 'https://integrate.api.nvidia.com/v1';
     const installed = installReasoningBackends({ refreshProviders: true });
