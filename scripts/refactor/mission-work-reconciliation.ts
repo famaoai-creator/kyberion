@@ -211,7 +211,10 @@ function validateEvidence(input: {
       );
     }
     if (!safeExistsSync(evidencePath) || !safeStat(evidencePath).isFile()) {
-      throw new Error(`Task ${input.task.task_id} evidence file not found: ${evidence.path}`);
+      throw new Error(
+        `Task ${input.task.task_id} evidence file not found: ${evidence.path}. ` +
+          'Evidence paths must be relative to manifest.source.repository.'
+      );
     }
     const repositoryRelativePath = nodePath
       .relative(input.sourceRepository, evidencePath)
@@ -307,7 +310,10 @@ function assertCommitBoundSourceFile(input: {
     );
   }
   if (!safeExistsSync(input.absolutePath) || !safeStat(input.absolutePath).isFile()) {
-    throw new Error(`Task ${input.taskId} ${input.label} file not found: ${input.absolutePath}`);
+    throw new Error(
+      `Task ${input.taskId} ${input.label} file not found: ${input.absolutePath}. ` +
+        'Artifact paths in review receipts must be relative to manifest.source.repository.'
+    );
   }
   const repositoryRelativePath = nodePath
     .relative(input.sourceRepository, input.absolutePath)
@@ -770,6 +776,16 @@ export async function reconcileMissionExistingWork(input: {
         receipt_path: receiptRelative,
       },
     } as typeof currentState.context;
+    try {
+      const missionHead = safeExec('git', ['rev-parse', 'HEAD'], { cwd: missionPath }).trim();
+      if (missionHead) {
+        currentState.git.latest_commit = missionHead;
+      }
+    } catch (error) {
+      logger.warn(
+        `[mission-reconciliation] unable to refresh mission HEAD for ${missionId}: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
     currentState.history.push({
       ts: adoptedAt,
       event: 'RECONCILE_EXISTING_WORK',
