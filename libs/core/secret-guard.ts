@@ -1,11 +1,4 @@
-import {
-  safeReadFile,
-  safeWriteFile,
-  safeReaddir,
-  safeStat,
-  safeFsyncFile,
-  safeExistsSync,
-} from './secure-io.js';
+import * as secureIo from './secure-io.js';
 import { logger } from './core.js';
 import { ledger } from './ledger.js';
 import * as pathResolver from './path-resolver.js';
@@ -28,6 +21,20 @@ const PERSONAL_CONNECTIONS_DIR = pathResolver.resolve('knowledge/personal/connec
 const GRANTS_FILE = pathResolver.resolve('active/shared/auth-grants.json');
 const _activeSecrets = new Set<string>();
 const _cachedPersonalSecrets = new Map<string, string>();
+// Keep these as lazy wrappers: secure-io and audit-chain have a pre-existing
+// import cycle, so the mediation function cannot be invoked during module load.
+const safeReadFile = (...args: Parameters<typeof secureIo.safeReadFile>) =>
+  secureIo.withSensitivePathMediation(() => secureIo.safeReadFile(...args));
+const safeWriteFile = (...args: Parameters<typeof secureIo.safeWriteFile>) =>
+  secureIo.withSensitivePathMediation(() => secureIo.safeWriteFile(...args));
+const safeReaddir = (...args: Parameters<typeof secureIo.safeReaddir>) =>
+  secureIo.withSensitivePathMediation(() => secureIo.safeReaddir(...args));
+const safeStat = (...args: Parameters<typeof secureIo.safeStat>) =>
+  secureIo.withSensitivePathMediation(() => secureIo.safeStat(...args));
+const safeFsyncFile = (...args: Parameters<typeof secureIo.safeFsyncFile>) =>
+  secureIo.withSensitivePathMediation(() => secureIo.safeFsyncFile(...args));
+const safeExistsSync = (...args: Parameters<typeof secureIo.safeExistsSync>) =>
+  secureIo.withSensitivePathMediation(() => secureIo.safeExistsSync(...args));
 
 interface AuthGrant {
   missionId: string;

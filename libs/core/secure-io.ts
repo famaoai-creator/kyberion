@@ -4,6 +4,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { pipeline } from 'node:stream/promises';
 import { createHash } from 'node:crypto';
 import * as pathResolver from './path-resolver.js';
+import { assertSensitivePathAllowed, assertSensitiveTextAllowed } from './sensitive-path-policy.js';
 import { validateWritePermission, validateReadPermission, detectTier } from './tier-guard.js';
 import { policyEngine } from './policy-engine.js';
 import { auditChain } from './audit-chain.js';
@@ -59,6 +60,29 @@ const SAFE_EXEC_ENV_ALLOWLIST = [
   'HF_HOME',
 ] as const;
 
+// `var` is intentional: audit-chain constructs during the secure-io import
+// cycle, before lexical module bindings are initialized.
+// eslint-disable-next-line no-var
+var sensitivePathMediationDepth = 0;
+// eslint-disable-next-line no-var
+var secureIoInitialized = false;
+
+function isSensitivePathMediated(): boolean {
+  // audit-chain seeds its index while this module is still resolving a
+  // pre-existing import cycle. That bootstrap path only probes project-local
+  // audit files; defer the new deny layer until secure-io is initialized.
+  return sensitivePathMediationDepth > 0 || !secureIoInitialized;
+}
+
+export function withSensitivePathMediation<T>(fn: () => T): T {
+  sensitivePathMediationDepth += 1;
+  try {
+    return fn();
+  } finally {
+    sensitivePathMediationDepth -= 1;
+  }
+}
+
 export interface SafeReadOptions {
   maxSizeMB?: number;
   encoding?: BufferEncoding | null;
@@ -107,6 +131,7 @@ export function buildSafeExecEnv(
  * Validate that a file does not exceed a size limit.
  */
 export function validateFileSize(filePath: string, maxSizeMB = DEFAULT_MAX_FILE_SIZE_MB): number {
+  assertSensitivePathAllowed(filePath, 'read', isSensitivePathMediated());
   const resolved = pathResolver.resolve(filePath);
   const stat = fs.statSync(resolved);
   const sizeMB = stat.size / (1024 * 1024);
@@ -133,6 +158,7 @@ export function safeReadFile(filePath: string, options: SafeReadOptions = {}): s
     throw new Error(`Missing required ${label} file path`);
   }
 
+  assertSensitivePathAllowed(filePath, 'read', isSensitivePathMediated());
   const resolved = pathResolver.resolve(filePath);
   const guard = validateReadPermission(resolved);
   if (!guard.allowed) {
@@ -168,6 +194,7 @@ export function safeWriteFile(
   options: SafeWriteOptions = {}
 ): void {
   const { mkdir = true } = options;
+  assertSensitivePathAllowed(filePath, 'write', isSensitivePathMediated());
   const resolved = pathResolver.resolve(filePath);
 
   const guard = validateWritePermission(resolved);
@@ -293,6 +320,7 @@ export function safeAppendFileSync(
   data: string | Buffer,
   options: any = 'utf8'
 ): void {
+  assertSensitivePathAllowed(filePath, 'write', isSensitivePathMediated());
   const resolved = pathResolver.resolve(filePath);
   const guard = validateWritePermission(resolved);
   if (!guard.allowed) throw new Error(guard.reason);
@@ -303,6 +331,8 @@ export function safeAppendFileSync(
  * Copy a file safely with permission validation.
  */
 export function safeCopyFileSync(srcPath: string, destPath: string): void {
+  assertSensitivePathAllowed(srcPath, 'read', isSensitivePathMediated());
+  assertSensitivePathAllowed(destPath, 'write', isSensitivePathMediated());
   const resolvedSrc = pathResolver.resolve(srcPath);
   const resolvedDest = pathResolver.resolve(destPath);
   const readGuard = validateReadPermission(resolvedSrc);
@@ -320,6 +350,8 @@ export function safeCopyFileSync(srcPath: string, destPath: string): void {
  * Move a file or directory safely with permission validation.
  */
 export function safeMoveSync(srcPath: string, destPath: string): void {
+  assertSensitivePathAllowed(srcPath, 'read/write', isSensitivePathMediated());
+  assertSensitivePathAllowed(destPath, 'write', isSensitivePathMediated());
   const resolvedSrc = pathResolver.resolve(srcPath);
   const resolvedDest = pathResolver.resolve(destPath);
   const readGuard = validateReadPermission(resolvedSrc);
@@ -345,6 +377,8 @@ export function safeSymlinkSync(
   linkPath: string,
   type?: fs.symlink.Type
 ): void {
+  assertSensitivePathAllowed(targetPath, 'read', isSensitivePathMediated());
+  assertSensitivePathAllowed(linkPath, 'write', isSensitivePathMediated());
   const resolvedTarget = pathResolver.resolve(targetPath);
   const resolvedLink = pathResolver.resolve(linkPath);
   const targetGuard = validateReadPermission(resolvedTarget);
@@ -369,6 +403,7 @@ export function safeRmSync(
   targetPath: string,
   options: fs.RmOptions = { recursive: true, force: true }
 ): void {
+  assertSensitivePathAllowed(targetPath, 'write', isSensitivePathMediated());
   const resolved = pathResolver.resolve(targetPath);
   const guard = validateWritePermission(resolved);
   if (!guard.allowed) throw new Error(guard.reason);
@@ -381,6 +416,7 @@ export function safeRmSync(
  * Unlink a file safely.
  */
 export function safeUnlinkSync(filePath: string): void {
+  assertSensitivePathAllowed(filePath, 'write', isSensitivePathMediated());
   const resolved = pathResolver.resolve(filePath);
   const guard = validateWritePermission(resolved);
   if (!guard.allowed) throw new Error(guard.reason);
@@ -394,6 +430,7 @@ export function safeMkdir(
   dirPath: string,
   options: fs.MakeDirectoryOptions = { recursive: true }
 ): void {
+  assertSensitivePathAllowed(dirPath, 'write', isSensitivePathMediated());
   const resolved = pathResolver.resolve(dirPath);
   const guard = validateWritePermission(resolved);
   if (!guard.allowed) throw new Error(guard.reason);
@@ -416,6 +453,7 @@ export function ensureDir(
  * Open a file for append safely and return the file descriptor.
  */
 export function safeOpenAppendFile(filePath: string): number {
+  assertSensitivePathAllowed(filePath, 'write', isSensitivePathMediated());
   const resolved = pathResolver.resolve(filePath);
   const guard = validateWritePermission(resolved);
   if (!guard.allowed) throw new Error(guard.reason);
@@ -431,6 +469,7 @@ export function safeOpenAppendFile(filePath: string): number {
  * when another process already owns the path.
  */
 export function safeCreateExclusiveFileSync(filePath: string, data: string | Buffer = ''): void {
+  assertSensitivePathAllowed(filePath, 'write', isSensitivePathMediated());
   const resolved = pathResolver.resolve(filePath);
   const guard = validateWritePermission(resolved);
   if (!guard.allowed) throw new Error(guard.reason);
@@ -462,6 +501,7 @@ export function safeCreateExclusiveFileSync(filePath: string, data: string | Buf
  * Safely fsync an existing file for durability.
  */
 export function safeFsyncFile(filePath: string): void {
+  assertSensitivePathAllowed(filePath, 'write', isSensitivePathMediated());
   const resolved = pathResolver.resolve(filePath);
   const guard = validateWritePermission(resolved);
   if (!guard.allowed) throw new Error(guard.reason);
@@ -479,6 +519,7 @@ export function safeFsyncFile(filePath: string): void {
  * Only allowed within write-permitted paths.
  */
 export function safeChmodSync(filePath: string, mode: number): void {
+  assertSensitivePathAllowed(filePath, 'write', isSensitivePathMediated());
   const resolved = pathResolver.resolve(filePath);
   const guard = validateWritePermission(resolved);
   if (!guard.allowed) throw new Error(guard.reason);
@@ -490,6 +531,7 @@ export function safeChmodSync(filePath: string, mode: number): void {
  */
 export function safeExistsSync(filePath: string): boolean {
   if (!filePath) return false;
+  assertSensitivePathAllowed(filePath, 'read', isSensitivePathMediated());
   const resolved = pathResolver.resolve(filePath);
   return fs.existsSync(resolved);
 }
@@ -552,6 +594,7 @@ export function safeExecResult(
     input,
   } = options;
 
+  assertSensitiveTextAllowed(`${command} ${args.join(' ')}`, 'execute');
   assertExecPolicy(command);
   try {
     const result = spawnSync(command, args, {
@@ -593,6 +636,7 @@ export function safeExec(command: string, args: string[] = [], options: any = {}
     input,
   } = options;
 
+  assertSensitiveTextAllowed(`${command} ${args.join(' ')}`, 'execute');
   assertExecPolicy(command);
   return execFileSync(command, args, {
     encoding,
@@ -698,6 +742,7 @@ export const safeUnlink = safeUnlinkSync;
  * Safely read a directory with permission validation.
  */
 export function safeReaddir(dirPath: string): string[] {
+  assertSensitivePathAllowed(dirPath, 'read', isSensitivePathMediated());
   const resolved = pathResolver.resolve(dirPath);
   const check = validateReadPermission(resolved);
   if (!check.allowed) {
@@ -712,6 +757,7 @@ export function safeReaddir(dirPath: string): string[] {
  * Safely get file status with permission validation.
  */
 export function safeStat(filePath: string): fs.Stats {
+  assertSensitivePathAllowed(filePath, 'read', isSensitivePathMediated());
   const resolved = pathResolver.resolve(filePath);
   const check = validateReadPermission(resolved);
   if (!check.allowed) {
@@ -726,6 +772,7 @@ export function safeStat(filePath: string): fs.Stats {
  * Safely get symbolic-link-aware file status with permission validation.
  */
 export function safeLstat(filePath: string): fs.Stats {
+  assertSensitivePathAllowed(filePath, 'read', isSensitivePathMediated());
   const resolved = pathResolver.resolve(filePath);
   const check = validateReadPermission(resolved);
   if (!check.allowed) {
@@ -740,6 +787,7 @@ export function safeLstat(filePath: string): fs.Stats {
  * Safely read a symbolic link target with permission validation.
  */
 export function safeReadlink(filePath: string): string {
+  assertSensitivePathAllowed(filePath, 'read', isSensitivePathMediated());
   const resolved = pathResolver.resolve(filePath);
   const check = validateReadPermission(resolved);
   if (!check.allowed) {
@@ -749,3 +797,5 @@ export function safeReadlink(filePath: string): string {
   }
   return fs.readlinkSync(resolved);
 }
+
+secureIoInitialized = true;
