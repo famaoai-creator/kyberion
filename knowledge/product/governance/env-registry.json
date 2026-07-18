@@ -590,6 +590,30 @@
       "documented": false
     },
     {
+      "name": "KYBERION_CONTEXT_BUFFER_TOKENS",
+      "category": "secret",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_CONTEXT_RESERVE_TOKENS",
+      "category": "secret",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_CONTEXT_WINDOW_TOKENS",
+      "category": "secret",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_CONTEXTUAL_INTENT_LEARNING_PATH",
       "category": "path",
       "type": "path",
@@ -1075,6 +1099,14 @@
       "documented": false
     },
     {
+      "name": "KYBERION_MANAGED_PYTHON_VERSION",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_MANIFEST_SIGNING_KEY",
       "category": "secret",
       "type": "string",
@@ -1477,6 +1509,14 @@
       "documented": false
     },
     {
+      "name": "KYBERION_PROJECT_ROOT",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_PROVIDER_DEMOTION_TTL_MS",
       "category": "tuning",
       "type": "number",
@@ -1813,6 +1853,14 @@
       "documented": false
     },
     {
+      "name": "KYBERION_STT_CAPABILITIES",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_STT_COMMAND",
       "category": "provider",
       "type": "string",
@@ -1820,6 +1868,22 @@
       "description": "Speech-to-text bridge command override.",
       "documented": true,
       "subsystem": "voice"
+    },
+    {
+      "name": "KYBERION_STT_OUTPUT_FORMAT",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_STT_PRIORITY",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
     },
     {
       "name": "KYBERION_STT_TIMEOUT_MS",

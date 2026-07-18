@@ -11,10 +11,25 @@ Supported actions:
 
 import sys
 import json
+import os
 from pathlib import Path
 
 
 DEFAULT_MODEL = "mlx-community/whisper-large-v3-turbo"
+
+
+def _project_root() -> Path:
+    return Path(os.environ.get("KYBERION_PROJECT_ROOT") or Path.cwd()).resolve()
+
+
+def _guard_audio_path(raw_path: str) -> Path:
+    resolved = Path(raw_path).expanduser().resolve()
+    root = _project_root()
+    try:
+        resolved.relative_to(root)
+    except ValueError as exc:
+        raise ValueError("audio_path must stay inside the Kyberion project root") from exc
+    return resolved
 
 
 def _check_health() -> dict:
@@ -30,12 +45,17 @@ def _check_health() -> dict:
 
 
 def _transcribe(params: dict) -> dict:
-    audio_path = str(params.get("audio_path") or "").strip()
-    if not audio_path:
+    raw_audio_path = str(params.get("audio_path") or "").strip()
+    if not raw_audio_path:
         return {"status": "error", "error": "params.audio_path is required"}
 
-    if not Path(audio_path).exists():
-        return {"status": "error", "error": f"Audio file not found: {audio_path}"}
+    try:
+        audio_file = _guard_audio_path(raw_audio_path)
+    except ValueError as exc:
+        return {"status": "error", "error": str(exc)}
+
+    if not audio_file.exists():
+        return {"status": "error", "error": f"Audio file not found: {audio_file}"}
 
     model_id = str(params.get("model") or DEFAULT_MODEL).strip()
     language = str(params.get("language") or "").strip() or None
@@ -54,19 +74,34 @@ def _transcribe(params: dict) -> dict:
         if language:
             kwargs["language"] = language
 
-        result = mlx_whisper.transcribe(audio_path, **kwargs)
+        result = mlx_whisper.transcribe(str(audio_file), **kwargs)
     except Exception as exc:
         return {"status": "error", "error": str(exc)}
 
     text = (result.get("text") or "").strip()
     detected_lang = result.get("language") or language or "auto"
+    segments = []
+    for segment in result.get("segments") or []:
+        segment_text = str(segment.get("text") or "").strip()
+        if not segment_text:
+            continue
+        segments.append({
+            "start_sec": float(segment.get("start") or 0.0),
+            "end_sec": float(segment.get("end") or 0.0),
+            "text": segment_text,
+        })
 
     return {
         "status": "success",
         "text": text,
         "model": model_id,
         "language": detected_lang,
-        "audio_path": audio_path,
+        "audio_path": str(audio_file),
+        "capabilities": {
+            "timestamps": bool(segments),
+            "granularity": "segment" if segments else "none",
+        },
+        "segments": segments,
     }
 
 

@@ -3,6 +3,9 @@ import {
   collectVoiceSamples,
   compileSchemaFromPath,
   getVoiceSampleIngestionPolicy,
+  getSpeechToTextBridges,
+  getSpeechToTextCapabilities,
+  normalizeSpeechToTextResult,
   getVoiceEngineRecord,
   getVoiceEngineRegistry,
   getVoiceProfileRecord,
@@ -22,7 +25,10 @@ import {
   safeMkdir,
   safeReadFile,
   safeWriteFile,
+  safeUnlink,
   validateVoiceProfileRegistration,
+  verifyVoiceTranscript,
+  resolveVoicePath,
   VoiceGenerationRuntime,
   writeVoiceProfileRegistry,
   splitVoiceTextIntoChunks,
@@ -33,7 +39,7 @@ import {
   createVoiceCapabilityBridge,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -145,6 +151,12 @@ export async function handleSingleAction(input: VoiceAction) {
       };
     }
     return recordVoiceSample(payload as any);
+  }
+  if (input.action === 'record_verify_repair_voice_sample') {
+    const payload = (input as any).params
+      ? { action: 'record_verify_repair_voice_sample', ...((input as any).params || {}) }
+      : input;
+    return recordVerifyRepairVoiceSample(payload as any);
   }
   if (input.action === 'collect_voice_samples') {
     const payload = (input as any).params
@@ -267,6 +279,455 @@ async function voiceHealth(input: {
       },
     },
   };
+}
+
+async function recordVerifyRepairVoiceSample(input: {
+  action: 'record_verify_repair_voice_sample';
+  request_id: string;
+  sample_id: string;
+  duration_sec: number;
+  language?: string;
+  prompt_text: string;
+  recording_countdown_sec?: number;
+  prompt_display_hold_ms?: number;
+  output_path: string;
+  max_repair_attempts?: number;
+  repair_duration_sec?: number;
+  resume_session_path?: string;
+  dry_run?: boolean;
+}): Promise<any> {
+  const requestId = String(input.request_id || '').trim();
+  const sampleId = String(input.sample_id || '').trim();
+  const promptText = String(input.prompt_text || '').trim();
+  const outputPath = resolveVoicePath(String(input.output_path || '').trim(), 'recording-output');
+  if (!requestId || !sampleId || !promptText || !outputPath) {
+    throw new Error(
+      'record_verify_repair_voice_sample requires request_id, sample_id, prompt_text, and output_path'
+    );
+  }
+
+  if (input.dry_run) {
+    return {
+      status: 'succeeded',
+      action: 'record_verify_repair_voice_sample',
+      request_id: requestId,
+      sample_id: sampleId,
+      output_path: outputPath,
+      training_path: outputPath,
+      verification: { status: 'passed', dry_run: true },
+      repair_attempts: [],
+      dry_run: true,
+    };
+  }
+
+  const sessionPath = input.resume_session_path
+    ? resolveVoicePath(input.resume_session_path, 'transcript-output')
+    : pathResolver.sharedTmp(`voice-sample-repairs/${requestId}/${sampleId}/session.json`);
+  let initial: any;
+  let initialTranscript: any;
+  let initialVerification: any;
+  let repairAttempts: Array<Record<string, unknown>> = [];
+  let replacements: Array<{
+    start_sec: number;
+    end_sec: number;
+    path: string;
+    segment_id: string;
+  }> = [];
+
+  if (input.resume_session_path) {
+    let session: any;
+    try {
+      session = JSON.parse(safeReadFile(sessionPath, { encoding: 'utf8' }) as string);
+    } catch (error: any) {
+      throw new Error(
+        `voice repair session could not be resumed: ${error?.message || String(error)}`
+      );
+    }
+    if (
+      session.request_id !== requestId ||
+      session.sample_id !== sampleId ||
+      session.prompt_text !== promptText
+    ) {
+      throw new Error('voice repair session does not match request_id, sample_id, and prompt_text');
+    }
+    if (session.expires_at && Date.parse(session.expires_at) <= Date.now()) {
+      try {
+        safeUnlink(sessionPath);
+      } catch {
+        /* best effort cleanup of expired sensitive state */
+      }
+      throw new Error('voice repair session expired; start a new recording session');
+    }
+    initial = session.initial_recording;
+    initialTranscript = session.initial_transcript;
+    initialVerification = session.verification;
+    repairAttempts = Array.isArray(session.repair_attempts) ? session.repair_attempts : [];
+    replacements = Array.isArray(session.replacements) ? session.replacements : [];
+    logger.info(
+      `[VOICE] ↩️ ${sampleId} の修復セッションを再開します。初回録音と確認を再実行しません。`
+    );
+  } else {
+    initial = await recordVoiceSample({
+      action: 'record_voice_sample',
+      request_id: requestId,
+      sample_id: sampleId,
+      duration_sec: Number(input.duration_sec),
+      language: input.language,
+      prompt_text: promptText,
+      recording_countdown_sec: input.recording_countdown_sec,
+      prompt_display_hold_ms: input.prompt_display_hold_ms,
+      output_path: outputPath,
+    });
+    if (initial.status !== 'succeeded' || !initial.output_path) {
+      return {
+        ...initial,
+        action: 'record_verify_repair_voice_sample',
+        request_id: requestId,
+        sample_id: sampleId,
+        verification: { status: 'blocked', reason: initial.reason || 'initial recording failed' },
+        repair_attempts: [],
+      };
+    }
+
+    try {
+      logger.info(`[VOICE] 🔎 ${sampleId} のSTT確認中（タイムスタンプ付きバックエンドを優先）...`);
+      initialTranscript = await transcribeVoiceSample({
+        action: 'transcribe_voice_sample',
+        audio_path: initial.output_path,
+        language: input.language,
+        write_sidecar: false,
+        prefer_timestamps: true,
+      });
+    } catch (error: any) {
+      cleanupVoiceArtifact(initial.output_path);
+      return {
+        ...initial,
+        action: 'record_verify_repair_voice_sample',
+        request_id: requestId,
+        sample_id: sampleId,
+        verification: { status: 'blocked', reason: 'stt_unavailable' },
+        repair_attempts: [],
+        status: 'blocked',
+        reason: `STT確認を開始できませんでした: ${error?.message || String(error)}`,
+        data_retention: { raw_audio: 'deleted', resume_session: 'not_created' },
+      };
+    }
+    initialVerification = verifyVoiceTranscript(
+      promptText,
+      initialTranscript.transcript || '',
+      initialTranscript.segments || []
+    );
+  }
+  if (initialVerification.status === 'passed') {
+    logger.info(`[VOICE] ✅ ${sampleId} STT確認OK。再録音は不要です。`);
+    return {
+      ...initial,
+      action: 'record_verify_repair_voice_sample',
+      training_path: initial.output_path,
+      transcript: initialTranscript.transcript,
+      stt_backend: initialTranscript.selected_backend,
+      stt_capabilities: initialTranscript.selected_capabilities,
+      verification: initialVerification,
+      repair_attempts: [],
+      data_retention: { training_audio: 'retained_until_profile_promotion' },
+    };
+  }
+
+  const maxAttempts = Math.max(1, Math.floor(Number(input.max_repair_attempts) || 2));
+  const repairDurationSec = Math.max(5, Math.min(15, Number(input.repair_duration_sec) || 7));
+  const uniqueTimestampRanges = new Set(
+    initialVerification.segment_matches.map((match: any) => `${match.start_sec}:${match.end_sec}`)
+  );
+  if (
+    initialVerification.segment_matches.length < initialVerification.expected_segments.length ||
+    uniqueTimestampRanges.size < initialVerification.expected_segments.length
+  ) {
+    cleanupVoiceArtifact(initial.output_path);
+    return {
+      ...initial,
+      action: 'record_verify_repair_voice_sample',
+      request_id: requestId,
+      sample_id: sampleId,
+      transcript: initialTranscript.transcript,
+      stt_backend: initialTranscript.selected_backend,
+      stt_capabilities: initialTranscript.selected_capabilities,
+      verification: initialVerification,
+      repair_attempts: [],
+      status: 'blocked',
+      reason:
+        'タイムスタンプ付きSTTで文の位置を特定できないため、安全な部分置換を実行できません。STT設定を確認してから再試行してください。',
+      data_retention: { raw_audio: 'deleted', resume_session: 'not_created' },
+    };
+  }
+
+  safeMkdir(path.dirname(sessionPath), { recursive: true });
+  const persistRepairSession = (): void =>
+    safeWriteFile(
+      sessionPath,
+      JSON.stringify(
+        {
+          version: 1,
+          created_at: new Date().toISOString(),
+          expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+          request_id: requestId,
+          sample_id: sampleId,
+          prompt_text: promptText,
+          initial_recording: initial,
+          initial_transcript: initialTranscript,
+          verification: initialVerification,
+          repair_attempts: repairAttempts,
+          replacements,
+          next_action:
+            'record only the listed mismatched segments, then rerun with resume_session_path',
+        },
+        null,
+        2
+      )
+    );
+  persistRepairSession();
+
+  for (const [mismatchIndex, mismatch] of initialVerification.mismatches.entries()) {
+    let repaired = replacements.some(
+      (replacement) => replacement.segment_id === mismatch.segment_id
+    );
+    const previousAttempts = repairAttempts.filter(
+      (attempt) => attempt.segment_id === mismatch.segment_id
+    ).length;
+    for (let attempt = previousAttempts + 1; attempt <= maxAttempts && !repaired; attempt += 1) {
+      const repairPath = pathResolver.sharedTmp(
+        `voice-sample-repairs/${requestId}/${sampleId}/${mismatch.segment_id}-attempt-${attempt}.wav`
+      );
+      logger.warn(
+        `[VOICE] ⚠️ ${sampleId} 修復 ${mismatchIndex + 1}/${initialVerification.mismatches.length} ` +
+          `${mismatch.segment_id} が不一致。` +
+          `この文だけ再録音します (${attempt}/${maxAttempts})。\n原稿: 「${mismatch.text}」`
+      );
+      const repair = await recordVoiceSample({
+        action: 'record_voice_sample',
+        request_id: `${requestId}-repair-${mismatch.segment_id}-${attempt}`,
+        sample_id: `${sampleId}-${mismatch.segment_id}`,
+        duration_sec: repairDurationSec,
+        language: input.language,
+        prompt_text: mismatch.text,
+        recording_countdown_sec: input.recording_countdown_sec,
+        prompt_display_hold_ms: input.prompt_display_hold_ms,
+        output_path: repairPath,
+      });
+      if (repair.status !== 'succeeded' || !repair.output_path) {
+        repairAttempts.push({
+          segment_id: mismatch.segment_id,
+          attempt,
+          status: 'blocked',
+          reason: repair.reason || 'repair recording failed',
+        });
+        persistRepairSession();
+        continue;
+      }
+
+      let repairTranscript: any;
+      try {
+        repairTranscript = await transcribeVoiceSample({
+          action: 'transcribe_voice_sample',
+          audio_path: repair.output_path,
+          language: input.language,
+          write_sidecar: false,
+          prefer_timestamps: true,
+        });
+      } catch (error: any) {
+        repairAttempts.push({
+          segment_id: mismatch.segment_id,
+          attempt,
+          status: 'blocked',
+          reason: `STT確認に失敗: ${error?.message || String(error)}`,
+        });
+        cleanupVoiceArtifact(repair.output_path);
+        persistRepairSession();
+        continue;
+      }
+      const repairVerification = verifyVoiceTranscript(
+        mismatch.text,
+        repairTranscript.transcript || '',
+        repairTranscript.segments || []
+      );
+      logger.info(
+        `[VOICE] ${sampleId}/${mismatch.segment_id} STT結果: ` +
+          `${repairVerification.status}\n原稿: 「${mismatch.text}」\n認識: 「${repairTranscript.transcript || '(空)'}」`
+      );
+      repairAttempts.push({
+        segment_id: mismatch.segment_id,
+        attempt,
+        status: repairVerification.status,
+        expected: mismatch.text,
+        transcript: repairTranscript.transcript,
+        stt_backend: repairTranscript.selected_backend,
+        stt_capabilities: repairTranscript.selected_capabilities,
+      });
+      persistRepairSession();
+      if (repairVerification.status === 'passed') {
+        const originalRange = initialVerification.segment_matches.find(
+          (match) => match.segment_id === mismatch.segment_id
+        );
+        if (!originalRange) {
+          cleanupVoiceArtifact(repair.output_path);
+          return {
+            ...initial,
+            action: 'record_verify_repair_voice_sample',
+            request_id: requestId,
+            sample_id: sampleId,
+            transcript: initialTranscript.transcript,
+            stt_backend: initialTranscript.selected_backend,
+            stt_capabilities: initialTranscript.selected_capabilities,
+            verification: initialVerification,
+            repair_attempts: repairAttempts,
+            resume_session_path: sessionPath,
+            status: 'blocked',
+            reason: `${mismatch.segment_id} の元音声区間を特定できないため、部分置換を中止しました`,
+          };
+        }
+        replacements.push({
+          start_sec: originalRange.start_sec,
+          end_sec: originalRange.end_sec,
+          path: repair.output_path,
+          segment_id: mismatch.segment_id,
+        });
+        persistRepairSession();
+        repaired = true;
+        break;
+      }
+      cleanupVoiceArtifact(repair.output_path);
+    }
+    if (!repaired) {
+      return {
+        ...initial,
+        action: 'record_verify_repair_voice_sample',
+        request_id: requestId,
+        sample_id: sampleId,
+        transcript: initialTranscript.transcript,
+        stt_backend: initialTranscript.selected_backend,
+        stt_capabilities: initialTranscript.selected_capabilities,
+        training_path: undefined,
+        verification: initialVerification,
+        repair_attempts: repairAttempts,
+        resume_session_path: sessionPath,
+        status: 'blocked',
+        reason: `${mismatch.segment_id} could not be verified after ${maxAttempts} repair attempt(s)`,
+        data_retention: {
+          raw_audio: 'retained_for_resume',
+          failed_repair_audio: 'deleted_after_verification',
+          resume_session: 'retained',
+        },
+      };
+    }
+  }
+
+  const trainingPath = spliceVoiceRepairSegments(
+    initial.output_path,
+    replacements,
+    pathResolver.sharedTmp(`voice-sample-repairs/${requestId}/${sampleId}/training-sample.wav`),
+    promptText,
+    initialTranscript.transcript
+  );
+  cleanupVoiceArtifact(initial.output_path);
+  for (const replacement of replacements) cleanupVoiceArtifact(replacement.path);
+  try {
+    safeUnlink(sessionPath);
+  } catch {
+    logger.warn(`[VOICE] cleanup skipped for repair session ${sessionPath}`);
+  }
+  logger.info(`[VOICE] ✅ ${sampleId} のズレた文だけ再録音し、STT確認を通過しました。`);
+  return {
+    ...initial,
+    action: 'record_verify_repair_voice_sample',
+    request_id: requestId,
+    sample_id: sampleId,
+    training_path: trainingPath,
+    transcript: initialTranscript.transcript,
+    stt_backend: initialTranscript.selected_backend,
+    stt_capabilities: initialTranscript.selected_capabilities,
+    verification: {
+      ...initialVerification,
+      status: 'repaired',
+      repaired_segments: initialVerification.mismatches.map((segment) => segment.segment_id),
+    },
+    repair_attempts: repairAttempts,
+    data_retention: {
+      raw_audio: 'deleted_after_splice',
+      repair_audio: 'deleted_after_splice',
+      training_audio: 'retained_until_profile_promotion',
+      resume_session: 'deleted_after_success',
+    },
+  };
+}
+
+function cleanupVoiceArtifact(filePath: string | undefined): void {
+  if (!filePath) return;
+  for (const candidate of [filePath, `${filePath}.prompt.txt`, `${filePath}.transcript.txt`]) {
+    try {
+      if (safeExistsSync(candidate)) safeUnlink(candidate);
+    } catch {
+      logger.warn(`[VOICE] cleanup skipped for ${candidate}`);
+    }
+  }
+}
+
+function spliceVoiceRepairSegments(
+  originalPath: string,
+  replacements: Array<{ start_sec: number; end_sec: number; path: string; segment_id: string }>,
+  outputPath: string,
+  expectedTranscript: string,
+  sttTranscript: string
+): string {
+  if (replacements.length === 0) throw new Error('voice repair produced no verified segments');
+  const sorted = [...replacements].sort((left, right) => left.start_sec - right.start_sec);
+  safeMkdir(path.dirname(outputPath), { recursive: true });
+  const inputs = ['-i', originalPath, ...sorted.flatMap((replacement) => ['-i', replacement.path])];
+  const filters: string[] = [];
+  const labels: string[] = [];
+  let cursor = 0;
+  let outputIndex = 0;
+  for (let index = 0; index < sorted.length; index += 1) {
+    const replacement = sorted[index];
+    const start = Math.max(cursor, replacement.start_sec);
+    const end = Math.max(start, replacement.end_sec);
+    if (end <= start) continue;
+    if (start > cursor) {
+      const label = `[part${outputIndex}]`;
+      filters.push(`[0:a]atrim=start=${cursor}:end=${start},asetpts=PTS-STARTPTS${label}`);
+      labels.push(label);
+      outputIndex += 1;
+    }
+    const replacementLabel = `[part${outputIndex}]`;
+    filters.push(
+      `[${index + 1}:a]aformat=sample_rates=16000:channel_layouts=mono,asetpts=PTS-STARTPTS${replacementLabel}`
+    );
+    labels.push(replacementLabel);
+    outputIndex += 1;
+    cursor = end;
+  }
+  filters.push(`[0:a]atrim=start=${cursor},asetpts=PTS-STARTPTS[part${outputIndex}]`);
+  labels.push(`[part${outputIndex}]`);
+  const filter = `${filters.join(';')};${labels.join('')}concat=n=${labels.length}:v=0:a=1[out]`;
+  safeExec('ffmpeg', [
+    '-y',
+    '-hide_banner',
+    '-loglevel',
+    'error',
+    ...inputs,
+    '-filter_complex',
+    filter,
+    '-map',
+    '[out]',
+    '-ac',
+    '1',
+    '-ar',
+    '16000',
+    '-c:a',
+    'pcm_s16le',
+    outputPath,
+  ]);
+  safeWriteFile(`${outputPath}.transcript.txt`, `${expectedTranscript}\n`);
+  safeWriteFile(`${outputPath}.stt.transcript.txt`, `${sttTranscript}\n`);
+  return outputPath;
 }
 
 async function collectAndRegisterVoiceProfile(input: {
@@ -792,53 +1253,184 @@ async function transcribeVoiceSample(input: {
   language?: string;
   model?: string;
   write_sidecar?: boolean;
+  prefer_timestamps?: boolean;
+  backend?: 'auto' | 'bridge' | 'mlx_whisper';
+  allow_synthetic?: boolean;
 }): Promise<any> {
-  const audioPath = String(input.audio_path || '').trim();
-  if (!audioPath) throw new Error('transcribe_voice_sample requires audio_path');
+  const audioPath = resolveVoicePath(String(input.audio_path || '').trim(), 'audio-input');
+  const preferTimestamps = input.prefer_timestamps !== false;
+  const backendPreference = input.backend || 'auto';
+  const bridges = getSpeechToTextBridges();
+  const candidates: any[] = [];
+  const errors: Error[] = [];
 
-  const bridgeScript = pathResolver.rootResolve(
-    'libs/actuators/voice-actuator/scripts/mlx_audio_stt_bridge.py'
+  const transcribeWithBridge = async (bridge: any): Promise<any | null> => {
+    if (bridge.name === 'stub' && !input.allow_synthetic) return null;
+    try {
+      const result = normalizeSpeechToTextResult(
+        bridge,
+        await bridge.transcribe({
+          audioPath,
+          ...(input.language ? { language: input.language } : {}),
+        })
+      );
+      const candidate = {
+        status: 'succeeded',
+        action: 'transcribe_voice_sample',
+        audio_path: audioPath,
+        transcript: result.text,
+        language: result.language || input.language,
+        backend: result.backend || bridge.name,
+        capabilities: result.capabilities || getSpeechToTextCapabilities(bridge),
+        priority: Number(bridge.priority || 0),
+        ...(result.segments ? { segments: result.segments } : {}),
+        ...(result.synthetic ? { synthetic: true } : {}),
+      };
+      candidates.push(candidate);
+      return candidate;
+    } catch (error: any) {
+      const normalized = error instanceof Error ? error : new Error(String(error));
+      errors.push(normalized);
+      logger.warn(`[VOICE] STT bridge ${bridge.name} unavailable: ${normalized.message}`);
+      return null;
+    }
+  };
+
+  let mlxError: Error | null = null;
+
+  const transcribeWithMlxWhisper = (): any | null => {
+    const bridgeScript = pathResolver.rootResolve(
+      'libs/actuators/voice-actuator/scripts/mlx_audio_stt_bridge.py'
+    );
+    const payload = JSON.stringify({
+      action: 'transcribe',
+      params: {
+        audio_path: audioPath,
+        ...(input.language ? { language: input.language } : {}),
+        ...(input.model ? { model: input.model } : {}),
+      },
+    });
+    const commandResult = safeExecResult(resolvePythonBin('mlx_whisper'), [bridgeScript], {
+      input: payload,
+      env: { KYBERION_PROJECT_ROOT: pathResolver.rootResolve('.') },
+    });
+    if (commandResult.error || commandResult.status !== 0) {
+      mlxError = new Error(
+        `mlx_audio_stt_bridge failed: ${commandResult.stderr || commandResult.error?.message}`
+      );
+      return null;
+    }
+
+    let parsed: any;
+    try {
+      parsed = JSON.parse(commandResult.stdout);
+    } catch {
+      mlxError = new Error(`mlx_audio_stt_bridge returned non-JSON: ${commandResult.stdout}`);
+      return null;
+    }
+    if (parsed.status !== 'success') {
+      mlxError = new Error(`mlx_audio_stt_bridge error: ${parsed.error}`);
+      return null;
+    }
+    const segments = Array.isArray(parsed.segments) ? parsed.segments : [];
+    const result = normalizeSpeechToTextResult(
+      { name: 'mlx-whisper', capabilities: parsed.capabilities },
+      {
+        text: parsed.text,
+        language: parsed.language,
+        backend: 'mlx-whisper',
+        capabilities: parsed.capabilities || {
+          timestamps: segments.length > 0,
+          granularity: segments.length > 0 ? 'segment' : 'none',
+        },
+        segments,
+      }
+    );
+    const candidate = {
+      status: 'succeeded',
+      action: 'transcribe_voice_sample',
+      audio_path: audioPath,
+      model: parsed.model,
+      ...result,
+      priority: 100,
+    };
+    candidates.push(candidate);
+    return candidate;
+  };
+
+  const usableBridges = bridges.filter((bridge) => bridge.name !== 'stub' || input.allow_synthetic);
+  const timestampBridges = usableBridges.filter(
+    (bridge) => getSpeechToTextCapabilities(bridge).timestamps
   );
-  const payload = JSON.stringify({
-    action: 'transcribe',
-    params: {
-      audio_path: pathResolver.rootResolve(audioPath),
-      ...(input.language ? { language: input.language } : {}),
-      ...(input.model ? { model: input.model } : {}),
-    },
-  });
+  const textBridges = usableBridges.filter(
+    (bridge) => !getSpeechToTextCapabilities(bridge).timestamps
+  );
 
-  const result = safeExecResult(resolvePythonBin(), [bridgeScript], { input: payload });
-  if (result.error || result.status !== 0) {
-    throw new Error(`mlx_audio_stt_bridge failed: ${result.stderr || result.error?.message}`);
+  if (backendPreference === 'mlx_whisper') {
+    transcribeWithMlxWhisper();
+  } else if (backendPreference === 'bridge') {
+    for (const bridge of [...timestampBridges, ...textBridges]) {
+      await transcribeWithBridge(bridge);
+    }
+  } else if (preferTimestamps) {
+    for (const bridge of timestampBridges) {
+      const result = await transcribeWithBridge(bridge);
+      if (result?.capabilities?.timestamps) break;
+    }
+    if (!candidates.some((candidate) => candidate.capabilities?.timestamps)) {
+      transcribeWithMlxWhisper();
+    }
+    if (!candidates.some((candidate) => candidate.capabilities?.timestamps)) {
+      for (const bridge of textBridges) {
+        if (await transcribeWithBridge(bridge)) break;
+      }
+    }
+  } else {
+    for (const bridge of textBridges) {
+      if (await transcribeWithBridge(bridge)) break;
+    }
+    if (candidates.length === 0) transcribeWithMlxWhisper();
   }
 
-  let parsed: any;
-  try {
-    parsed = JSON.parse(result.stdout);
-  } catch {
-    throw new Error(`mlx_audio_stt_bridge returned non-JSON: ${result.stdout}`);
+  const selected = candidates.sort((left, right) => {
+    const leftTimestamped = left.capabilities?.timestamps ? 1 : 0;
+    const rightTimestamped = right.capabilities?.timestamps ? 1 : 0;
+    return (
+      rightTimestamped - leftTimestamped || Number(right.priority || 0) - Number(left.priority || 0)
+    );
+  })[0];
+  if (!selected) {
+    throw new Error(
+      `[VOICE] no usable STT backend: ${errors[0]?.message || mlxError?.message || 'unknown error'}`
+    );
   }
 
-  if (parsed.status !== 'success') {
-    throw new Error(`mlx_audio_stt_bridge error: ${parsed.error}`);
-  }
+  logger.info(
+    `[VOICE] STT確認完了: backend=${selected.backend}, ` +
+      `timestamps=${Boolean(selected.capabilities?.timestamps)}, ` +
+      `granularity=${selected.capabilities?.granularity || 'none'}`
+  );
 
   if (input.write_sidecar !== false) {
-    const sidecarPath = pathResolver.rootResolve(`${audioPath}.transcript.txt`);
+    const digest = createHash('sha256').update(audioPath).digest('hex').slice(0, 20);
+    const adjacentSidecar = `${audioPath}.transcript.txt`;
+    const sidecarPath = (() => {
+      try {
+        return resolveVoicePath(adjacentSidecar, 'transcript-output');
+      } catch {
+        return pathResolver.sharedTmp(`stt-sidecars/${digest}.transcript.txt`);
+      }
+    })();
     const sidecarDir = path.dirname(sidecarPath);
     safeMkdir(sidecarDir, { recursive: true });
-    safeWriteFile(sidecarPath, parsed.text);
+    safeWriteFile(sidecarPath, selected.transcript);
     logger.info(`[VOICE] transcript written to ${sidecarPath}`);
   }
 
   return {
-    status: 'succeeded',
-    action: 'transcribe_voice_sample',
-    audio_path: audioPath,
-    transcript: parsed.text,
-    language: parsed.language,
-    model: parsed.model,
+    ...selected,
+    selected_backend: selected.backend,
+    selected_capabilities: selected.capabilities,
   };
 }
 

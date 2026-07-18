@@ -51,13 +51,15 @@ export function buildRetryOptions(override?: Record<string, any>) {
   });
 }
 
-function resolvePythonBin(): string {
+type VoicePythonTool = 'mlx_audio' | 'mlx_whisper';
+
+function resolvePythonBin(preferredTool: VoicePythonTool = 'mlx_audio'): string {
   if (process.env.KYBERION_PYTHON_BIN) return process.env.KYBERION_PYTHON_BIN;
   if (process.env.KYBERION_PYTHON) return process.env.KYBERION_PYTHON;
-  const managedWhisperPython = resolveManagedToolPythonBin('mlx_whisper');
-  if (managedWhisperPython) return managedWhisperPython;
-  const managedAudioPython = resolveManagedToolPythonBin('mlx_audio');
-  if (managedAudioPython) return managedAudioPython;
+  for (const toolId of [preferredTool, preferredTool === 'mlx_audio' ? 'mlx_whisper' : 'mlx_audio'] as const) {
+    const managedPython = resolveManagedToolPythonBin(toolId);
+    if (managedPython) return managedPython;
+  }
   const venvPython = pathResolver.rootResolve('.venv/bin/python3');
   if (safeExistsSync(venvPython)) return venvPython;
   return 'python3';
@@ -136,7 +138,7 @@ async function runPythonTtsBridge(
     },
   });
 
-  const result = safeExecResult(resolvePythonBin(), [bridgeScript], { input: payload });
+  const result = safeExecResult(resolvePythonBin('mlx_audio'), [bridgeScript], { input: payload });
   if (result.error || result.status !== 0) {
     throw new Error(
       `${path.basename(bridgeScriptPath)} failed: ${result.stderr || result.error?.message}`
