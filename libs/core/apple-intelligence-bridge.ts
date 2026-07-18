@@ -33,6 +33,7 @@ import { safeWriteFile } from './secure-io.js';
 
 const BRIDGE_SOURCE = 'tools/apple-intelligence-bridge/afm.swift';
 const BINARY_CACHE_DIR = 'active/shared/runtime/apple-intelligence';
+const SWIFT_MODULE_CACHE_DIR = `${BINARY_CACHE_DIR}/module-cache`;
 
 export interface AppleIntelligenceAvailability {
   available: boolean;
@@ -142,13 +143,25 @@ async function ensureAfmBinary(): Promise<string | null> {
   if (!safeExistsSync(source)) return null;
   try {
     safeMkdir(path.dirname(binary), { recursive: true });
+    safeMkdir(pathResolver.rootResolve(SWIFT_MODULE_CACHE_DIR), { recursive: true });
   } catch (err) {
     logger.warn(
       `[apple-fm] cannot prepare binary cache dir: ${err instanceof Error ? err.message : String(err)}`
     );
     return null;
   }
-  const compile = await runner('swiftc', ['-O', source, '-o', binary], { timeoutMs: 120_000 });
+  const compile = await runner(
+    'swiftc',
+    [
+      '-O',
+      '-module-cache-path',
+      pathResolver.rootResolve(SWIFT_MODULE_CACHE_DIR),
+      source,
+      '-o',
+      binary,
+    ],
+    { timeoutMs: 120_000 }
+  );
   if (!compile.ok) {
     logger.warn(`[apple-fm] swiftc compile failed: ${compile.stderr.slice(0, 300)}`);
     return null;
@@ -369,6 +382,68 @@ export async function transcribeAudioLocallyWithAppleSpeech(
 export interface AppleImageGenerationResult {
   path: string;
   style: string;
+}
+
+export interface AppleImageGenerationAvailability {
+  available: boolean;
+  reason?: string;
+}
+
+let cachedImageGenerationAvailability: {
+  checkedAt: number;
+  value: AppleImageGenerationAvailability;
+} | null = null;
+
+export function resetAppleImageGenerationAvailabilityCache(): void {
+  cachedImageGenerationAvailability = null;
+}
+
+/**
+ * Probe Image Playground itself, separately from Foundation Models text
+ * availability. A Mac can expose the text model while Image Playground is
+ * still unavailable because its image model is not enabled for the device.
+ */
+export async function probeAppleImageGeneration(): Promise<AppleImageGenerationAvailability> {
+  if (
+    cachedImageGenerationAvailability &&
+    Date.now() - cachedImageGenerationAvailability.checkedAt < AVAILABILITY_TTL_MS
+  ) {
+    return cachedImageGenerationAvailability.value;
+  }
+
+  let value: AppleImageGenerationAvailability;
+  if (bridgeDisabledByEnv()) {
+    value = { available: false, reason: 'disabled via KYBERION_APPLE_FM' };
+  } else if (process.platform !== 'darwin' || os.arch() !== 'arm64') {
+    value = { available: false, reason: 'requires Apple Silicon macOS' };
+  } else {
+    const binary = await ensureAfmBinary();
+    if (!binary) {
+      value = { available: false, reason: 'bridge binary unavailable (swiftc/source missing)' };
+    } else {
+      const result = await runner(binary, ['imagine-availability'], { timeoutMs: 30_000 });
+      if (!result.ok) {
+        value = { available: false, reason: `probe failed: ${result.stderr.slice(0, 200)}` };
+      } else {
+        const parsed = parseLastJsonLine<AppleImageGenerationAvailability>(
+          result.stdout,
+          '{"available"'
+        );
+        value = parsed
+          ? {
+              available: Boolean(parsed.available),
+              ...(parsed.reason ? { reason: parsed.reason } : {}),
+            }
+          : {
+              available: false,
+              reason: `unparseable probe output: ${result.stdout.slice(0, 120)}`,
+            };
+      }
+    }
+  }
+
+  cachedImageGenerationAvailability = { checkedAt: Date.now(), value };
+  return value;
 }
 
 /**
