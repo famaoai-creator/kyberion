@@ -140,6 +140,41 @@ describe('reasoning-backend', () => {
     expect(calls).toEqual(['primary', 'primary', 'primary', 'fallback']);
   });
 
+  it('retries transient generateWithTools failures in place before demoting', async () => {
+    process.env.KYBERION_REASONING_RETRY_BASE_MS = '0';
+    clearProviderHealth();
+    const calls: string[] = [];
+    const backend = buildFailoverReasoningBackend([
+      {
+        label: 'primary',
+        provider: 'codex',
+        backend: {
+          ...stubReasoningBackend,
+          generateWithTools: async () => {
+            calls.push('primary');
+            if (calls.length < 3) throw new Error('529 overloaded');
+            return { text: 'recovered', toolCalls: [] };
+          },
+        },
+      },
+      {
+        label: 'fallback',
+        provider: 'gemini',
+        backend: {
+          ...stubReasoningBackend,
+          generateWithTools: async () => {
+            calls.push('fallback');
+            return { text: 'fallback', toolCalls: [] };
+          },
+        },
+      },
+    ]);
+
+    const result = await backend.generateWithTools!('hello', []);
+    expect(result.text).toBe('recovered');
+    expect(calls).toEqual(['primary', 'primary', 'primary']);
+  });
+
   it('delegates structured output with retry-on-mismatch', async () => {
     const calls: string[] = [];
     const backend = {

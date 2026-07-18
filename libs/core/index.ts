@@ -583,6 +583,7 @@ export {
 export * from './shell-command-policy.js';
 export * from './sensitive-path-policy.js';
 export * from './output-artifacts.js';
+export * from './worker-context-compaction.js';
 export * from './adf-guardrails.js';
 export * from './reconcile-ops.js';
 export * from './report-ops.js';
