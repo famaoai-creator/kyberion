@@ -23,7 +23,8 @@ describe('mission-orchestration-events', () => {
   });
 
   it('queues a mission orchestration event artifact', async () => {
-    const { enqueueMissionOrchestrationEvent, getMissionOrchestrationEventPath } = await import('./mission-orchestration-events.js');
+    const { enqueueMissionOrchestrationEvent, getMissionOrchestrationEventPath } =
+      await import('./mission-orchestration-events.js');
     const { safeExistsSync, safeReadFile } = await import('./secure-io.js');
 
     const event = enqueueMissionOrchestrationEvent({
@@ -41,7 +42,8 @@ describe('mission-orchestration-events', () => {
   });
 
   it('starts a detached worker for an orchestration event', async () => {
-    const { enqueueMissionOrchestrationEvent, startMissionOrchestrationWorker } = await import('./mission-orchestration-events.js');
+    const { enqueueMissionOrchestrationEvent, startMissionOrchestrationWorker } =
+      await import('./mission-orchestration-events.js');
 
     const event = enqueueMissionOrchestrationEvent({
       eventType: 'mission_issue_requested',
@@ -52,10 +54,12 @@ describe('mission-orchestration-events', () => {
 
     const eventPath = startMissionOrchestrationWorker(event);
     expect(eventPath).toContain(`${event.event_id}.json`);
-    expect(mocks.spawnManagedProcess).toHaveBeenCalledWith(expect.objectContaining({
-      command: 'node',
-      args: ['dist/scripts/run_mission_orchestration_event_worker.js', '--event', eventPath],
-    }));
+    expect(mocks.spawnManagedProcess).toHaveBeenCalledWith(
+      expect.objectContaining({
+        command: process.execPath,
+        args: ['dist/scripts/run_mission_orchestration_event_worker.js', '--event', eventPath],
+      })
+    );
   });
 
   it('emits mission orchestration events that satisfy the schema', async () => {
@@ -72,7 +76,13 @@ describe('mission-orchestration-events', () => {
     const stored = JSON.parse(safeReadFile(eventPath, { encoding: 'utf8' }) as string);
 
     const ajv = new Ajv({ allErrors: true });
-    const validate = compileSchemaFromPath(ajv, path.join(pathResolver.rootDir(), 'knowledge/product/schemas/mission-orchestration-event.schema.json'));
+    const validate = compileSchemaFromPath(
+      ajv,
+      path.join(
+        pathResolver.rootDir(),
+        'knowledge/product/schemas/mission-orchestration-event.schema.json'
+      )
+    );
     const valid = validate(stored);
     expect(valid, JSON.stringify(validate.errors || [])).toBe(true);
   });
