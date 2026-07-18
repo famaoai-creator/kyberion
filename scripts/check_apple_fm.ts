@@ -7,6 +7,7 @@
 import {
   classifyLocallyWithAppleFm,
   generateImageLocallyWithApplePlayground,
+  probeAppleImageGeneration,
   probeAppleIntelligence,
   recognizeImageLocallyWithAppleVision,
   summarizeLocallyWithAppleFm,
@@ -17,6 +18,10 @@ import { safeExistsSync } from '@agent/core';
 async function main(): Promise<void> {
   const availability = await probeAppleIntelligence();
   console.log(`[check:apple-fm] availability: ${JSON.stringify(availability)}`);
+  const imageAvailability = await probeAppleImageGeneration();
+  console.log(
+    `[check:apple-fm] Image Playground availability: ${JSON.stringify(imageAvailability)}`
+  );
   if (!availability.available) {
     console.log('[check:apple-fm] on-device model not usable here — all helpers degrade to null.');
     return;

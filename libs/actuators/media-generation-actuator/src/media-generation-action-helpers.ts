@@ -35,7 +35,12 @@ import {
   sleep,
 } from './media-generation-helpers.js';
 
-const PROMPT_BASED_ACTIONS = new Set(['generate_image', 'generate_video', 'generate_music', 'run_workflow']);
+const PROMPT_BASED_ACTIONS = new Set([
+  'generate_image',
+  'generate_video',
+  'generate_music',
+  'run_workflow',
+]);
 const TERMINAL_JOB_STATUSES = new Set(['succeeded', 'failed', 'timed_out', 'canceled']);
 
 let cachedRecoveryPolicy: Record<string, any> | undefined;
@@ -46,7 +51,7 @@ async function retryGenerationJob(job: GenerationJob): Promise<GenerationJob> {
     return writeJob(job);
   }
   const backoffSeconds = Number(job.retry_policy?.backoff_seconds || 0);
-  const nextRetryAt = new Date(Date.now() + (backoffSeconds * 1000)).toISOString();
+  const nextRetryAt = new Date(Date.now() + backoffSeconds * 1000).toISOString();
   const retryingJob: GenerationJob = {
     ...job,
     status: 'retrying',
@@ -101,17 +106,23 @@ async function handlePromptBasedGeneration(action: string, params: any) {
       params.await_completion ??
       params.music_adf?.output?.await_completion ??
       params.image_adf?.output?.await_completion ??
-      params.video_adf?.output?.await_completion,
+      params.video_adf?.output?.await_completion
     ),
   });
   let result: any = null;
   try {
-    if (action === 'generate_image' && !params.workflow && !params.workflow_path && !params.image_adf) {
+    if (
+      action === 'generate_image' &&
+      !params.workflow &&
+      !params.workflow_path &&
+      !params.image_adf
+    ) {
       const { generateImage } = await import('@agent/core');
       const bridgeRes = await generateImage({
         prompt: params.prompt || '',
         aspectRatio: params.aspect_ratio || params.aspectRatio,
         mode: params.mode,
+        style: typeof params.style === 'string' ? params.style : undefined,
         providerPreference: resolveImageProviderPreference(params),
         targetPath: params.target_path || params.targetPath,
         awaitCompletion: params.await_completion ?? true,
@@ -125,8 +136,22 @@ async function handlePromptBasedGeneration(action: string, params: any) {
         status: 'succeeded',
         action,
         prompt_id: bridgeRes.promptId || 'direct_api',
-        artifacts: bridgeRes.path ? [{ id: 'primary', format: resolveImageArtifactFormat(bridgeRes.path), path: bridgeRes.path }] : [],
-        artifact: bridgeRes.path ? { id: 'primary', format: resolveImageArtifactFormat(bridgeRes.path), path: bridgeRes.path } : null,
+        artifacts: bridgeRes.path
+          ? [
+              {
+                id: 'primary',
+                format: resolveImageArtifactFormat(bridgeRes.path),
+                path: bridgeRes.path,
+              },
+            ]
+          : [],
+        artifact: bridgeRes.path
+          ? {
+              id: 'primary',
+              format: resolveImageArtifactFormat(bridgeRes.path),
+              path: bridgeRes.path,
+            }
+          : null,
         copied_to: bridgeRes.path,
         backend_id: bridgeRes.provider,
       };
@@ -276,10 +301,12 @@ async function getGenerationJob(params: any) {
       return { ...currentJob, ...finalizeActuatorTrace(traceCtx) };
     }
 
-    const history = await import('@agent/core').then(({ secureFetch }) => secureFetch({
-      method: 'GET',
-      url: `${process.env.KYBERION_COMFY_BASE_URL || 'http://127.0.0.1:8188'}/history/${promptId}`,
-    }));
+    const history = await import('@agent/core').then(({ secureFetch }) =>
+      secureFetch({
+        method: 'GET',
+        url: `${process.env.KYBERION_COMFY_BASE_URL || 'http://127.0.0.1:8188'}/history/${promptId}`,
+      })
+    );
     if (!history || Object.keys(history).length === 0 || !history[promptId]) {
       if (currentJob.status !== 'running') {
         const runningJob = {
@@ -295,7 +322,12 @@ async function getGenerationJob(params: any) {
       return { ...currentJob, ...finalizeActuatorTrace(traceCtx) };
     }
 
-    const result = await collectGenerationResult(currentJob.action, currentJob.request || {}, promptId, { resolved: currentJob.result?.compiled_generation_request });
+    const result = await collectGenerationResult(
+      currentJob.action,
+      currentJob.request || {},
+      promptId,
+      { resolved: currentJob.result?.compiled_generation_request }
+    );
     const succeededJob: GenerationJob = {
       ...currentJob,
       kind: currentJob.kind || 'generation-job',
@@ -393,7 +425,9 @@ async function collectGenerationArtifact(params: any) {
     if (!jobId) throw new Error('collect_generation_artifact requires job_id');
     const job = readJob(jobId);
     if (job.status !== 'succeeded') {
-      throw new Error(`collect_generation_artifact requires succeeded job. Current status: ${job.status}`);
+      throw new Error(
+        `collect_generation_artifact requires succeeded job. Current status: ${job.status}`
+      );
     }
     const artifact = job.result?.artifact as GeneratedArtifact | undefined;
     if (!artifact?.path) {
@@ -433,7 +467,9 @@ async function handleSingleAction(input: any) {
   if (action === 'collect_generation_artifact') return collectGenerationArtifact(params);
 
   if (action === 'capture_screen' || action === 'capture_focused_window') {
-    const outputPath = pathResolver.rootResolve(params.output || `active/shared/tmp/capture-${Date.now()}.jpg`);
+    const outputPath = pathResolver.rootResolve(
+      params.output || `active/shared/tmp/capture-${Date.now()}.jpg`
+    );
     if (action === 'capture_screen') {
       await platform.captureScreen(outputPath);
     } else {
@@ -447,7 +483,10 @@ async function handleSingleAction(input: any) {
 }
 
 export async function handleAction(input: any) {
-  const traceCtx = createActuatorTrace('media-generation-actuator', String(input?.action || 'unknown'));
+  const traceCtx = createActuatorTrace(
+    'media-generation-actuator',
+    String(input?.action || 'unknown')
+  );
   traceCtx.startSpan(`media-generation:${String(input?.action || 'unknown')}`);
   if (input.action === 'pipeline') {
     try {
@@ -458,7 +497,10 @@ export async function handleAction(input: any) {
           const stepResult = await handleSingleAction(step);
           results.push(stepResult);
           if (stepResult?.status === 'failed' || stepResult?.status === 'error') {
-            traceCtx.endSpan('error', stepResult?.message ?? `step failed: ${String(step?.action || 'step')}`);
+            traceCtx.endSpan(
+              'error',
+              stepResult?.message ?? `step failed: ${String(step?.action || 'step')}`
+            );
           } else {
             traceCtx.endSpan('ok');
           }
@@ -473,8 +515,9 @@ export async function handleAction(input: any) {
         status: derivePipelineStatus(
           results.map((result: any) => ({
             op: String(result?.action || result?.job_id || result?.prompt_id || 'step'),
-            status: result?.status === 'failed' || result?.status === 'error' ? 'failed' : 'success',
-          })),
+            status:
+              result?.status === 'failed' || result?.status === 'error' ? 'failed' : 'success',
+          }))
         ),
         results,
         ...finalizeActuatorTrace(traceCtx),

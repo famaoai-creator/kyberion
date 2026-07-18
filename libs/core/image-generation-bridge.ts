@@ -8,6 +8,10 @@ import { resolveLocalFluxGenerationPolicy } from './image-generation-policy.js';
 import { probeToolRuntime } from './tool-runtime-registry.js';
 import { probeServiceRuntime } from './service-runtime-registry.js';
 import {
+  generateImageLocallyWithApplePlayground,
+  probeAppleImageGeneration,
+} from './apple-intelligence-bridge.js';
+import {
   ImageGenerationRequest,
   ImageGenerationResult,
   ImageGenerationProvider,
@@ -401,6 +405,57 @@ export class LocalFluxImageGenerationProvider implements ImageGenerationProvider
   }
 }
 
+function getApplePlaygroundTargetPath(request: ImageGenerationRequest): string {
+  const targetPath = getFallbackTargetPath(request);
+  const extension = path.extname(targetPath);
+  if (extension.toLowerCase() === '.png') return targetPath;
+  return extension ? `${targetPath.slice(0, -extension.length)}.png` : `${targetPath}.png`;
+}
+
+export class ApplePlaygroundImageGenerationProvider implements ImageGenerationProvider {
+  readonly id = 'apple_playground';
+
+  async isAvailable(): Promise<boolean> {
+    return (await probeAppleImageGeneration()).available;
+  }
+
+  async generate(request: ImageGenerationRequest): Promise<ImageGenerationResult> {
+    const startedAt = Date.now();
+    const targetPath = getApplePlaygroundTargetPath(request);
+    const outputDir = path.dirname(targetPath);
+    if (!safeExistsSync(outputDir)) {
+      safeMkdir(outputDir, { recursive: true });
+    }
+
+    try {
+      const generated = await generateImageLocallyWithApplePlayground(request.prompt, targetPath, {
+        ...(request.style ? { style: request.style } : {}),
+      });
+      if (!generated) {
+        return {
+          status: 'failed',
+          provider: this.id,
+          elapsedMs: Date.now() - startedAt,
+          error: 'apple_playground_generation_unavailable',
+        };
+      }
+      return {
+        status: 'succeeded',
+        provider: this.id,
+        path: generated.path,
+        elapsedMs: Date.now() - startedAt,
+      };
+    } catch (error: any) {
+      return {
+        status: 'failed',
+        provider: this.id,
+        elapsedMs: Date.now() - startedAt,
+        error: error?.message || 'apple_playground_generation_failed',
+      };
+    }
+  }
+}
+
 type HostBridgeVariant = 'host_agent' | 'codex_host_bridge' | 'agy_host_bridge';
 
 interface HostBridgeProviderConfig {
@@ -547,12 +602,13 @@ export class AdaptivePolicyRouter {
 
     let defaultChain: string[] = [];
     if (mode === 'local_only' || mode === 'privacy_first') {
-      defaultChain = ['local_flux', 'local_diffusion', 'comfyui'];
+      defaultChain = ['apple_playground', 'local_flux', 'local_diffusion', 'comfyui'];
     } else if (mode === 'artistic') {
       defaultChain = [
         'codex_host_bridge',
         'agy_host_bridge',
         'host_agent',
+        'apple_playground',
         'gemini_service',
         'llm_api',
         'local_flux',
@@ -564,6 +620,7 @@ export class AdaptivePolicyRouter {
         'codex_host_bridge',
         'agy_host_bridge',
         'host_agent',
+        'apple_playground',
         'local_flux',
         'comfyui',
         'gemini_service',
@@ -592,6 +649,7 @@ function getRouter(): AdaptivePolicyRouter {
       new LlmApiImageGenerationProvider(),
       new LocalFluxImageGenerationProvider(),
       new LocalDiffusionImageGenerationProvider(),
+      new ApplePlaygroundImageGenerationProvider(),
       new CodexHostBridgeImageGenerationProvider(),
       new AgyHostBridgeImageGenerationProvider(),
       new HostAgentImageGenerationProvider(),

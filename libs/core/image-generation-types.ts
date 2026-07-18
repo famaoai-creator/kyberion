@@ -5,6 +5,8 @@ export interface ImageGenerationRequest {
   width?: number;
   height?: number;
   aspectRatio?: string; // '1:1', '16:9', '3:2', etc.
+  /** Native backend style identifier, such as an Image Playground style. */
+  style?: string;
   mode?: ImageGenerationMode;
   providerPreference?: string[];
   outputDir?: string;

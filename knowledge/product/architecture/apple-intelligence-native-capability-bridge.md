@@ -166,7 +166,9 @@ Lane status (2026-07-09):
   `getSpeechToTextBridge().transcribe`). Voice OUTPUT stays with the
   existing voice-actuator engines (`local_say` etc.) — no duplication.
 - **Image Playground** — landed with probe-and-degrade
-  (`imagine` → ImageCreator). Currently `notSupported` on the dev machine
-  (Image Playground model not enabled); helpers return null and callers
-  keep the SVG-authoring / media-actuator path.
+  (`imagine-availability` / `imagine` → ImageCreator). It is now connected to
+  the governed `generate_image` provider as `apple_playground`; the provider
+  emits PNG artifacts and falls back to local FLUX/ComfyUI when the Image
+  Playground model is not enabled. The low-level helper still returns null on
+  unsupported devices so non-generation callers keep their existing path.
 - **App Intents** — future lane; must go through the approval gate.

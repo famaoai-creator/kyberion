@@ -13,12 +13,24 @@ describe('media backend registry', () => {
     expect(registry.default_backend_ids.image).toBe('media-generation.comfyui');
     expect(registry.default_backend_ids.voice).toBe('voice.local_say');
     expect(registry.default_backend_ids.video).toBe('video.hyperframes_cli');
-    expect(registry.backends.some((backend) => backend.backend_id === 'media-generation.local_flux')).toBe(true);
+    expect(
+      registry.backends.some((backend) => backend.backend_id === 'media-generation.local_flux')
+    ).toBe(true);
+    expect(
+      registry.backends.some(
+        (backend) => backend.backend_id === 'media-generation.apple_playground'
+      )
+    ).toBe(true);
   });
 
   it('resolves image, voice, and video backends through the same abstraction', () => {
     expect(resolveImageBackend().backend_id).toBe('media-generation.comfyui');
-    expect(resolveImageBackend('local_flux', 'darwin').backend_id).toBe('media-generation.local_flux');
+    expect(resolveImageBackend('local_flux', 'darwin').backend_id).toBe(
+      'media-generation.local_flux'
+    );
+    expect(resolveImageBackend('apple_playground', 'darwin').backend_id).toBe(
+      'media-generation.apple_playground'
+    );
     expect(resolveVoiceBackend().backend_id).toBe('voice.local_say');
     expect(resolveVideoBackend().backend_id).toBe('video.hyperframes_cli');
   });

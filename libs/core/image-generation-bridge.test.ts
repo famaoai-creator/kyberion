@@ -4,6 +4,7 @@ import {
   ComfyUiImageGenerationProvider,
   CodexHostBridgeImageGenerationProvider,
   AgyHostBridgeImageGenerationProvider,
+  ApplePlaygroundImageGenerationProvider,
   GeminiServiceImageGenerationProvider,
   LocalFluxImageGenerationProvider,
   LlmApiImageGenerationProvider,
@@ -19,6 +20,8 @@ const mocks = vi.hoisted(() => {
   const safeMkdir = vi.fn();
   const probeToolRuntime = vi.fn();
   const probeServiceRuntime = vi.fn();
+  const generateImageLocallyWithApplePlayground = vi.fn();
+  const probeAppleImageGeneration = vi.fn();
   return {
     executeServicePreset,
     safeExecResult,
@@ -26,8 +29,15 @@ const mocks = vi.hoisted(() => {
     safeMkdir,
     probeToolRuntime,
     probeServiceRuntime,
+    generateImageLocallyWithApplePlayground,
+    probeAppleImageGeneration,
   };
 });
+
+vi.mock('./apple-intelligence-bridge.js', () => ({
+  generateImageLocallyWithApplePlayground: mocks.generateImageLocallyWithApplePlayground,
+  probeAppleImageGeneration: mocks.probeAppleImageGeneration,
+}));
 
 vi.mock('./service-engine.js', () => ({
   executeServicePreset: mocks.executeServicePreset,
@@ -126,6 +136,17 @@ describe('AdaptivePolicyRouter', () => {
       prompt: 'a cat',
     });
     expect(provider.id).toBe('local_flux');
+  });
+
+  it('routes to Apple Image Playground before local engines when native is available', async () => {
+    const apple = {
+      id: 'apple_playground',
+      isAvailable: vi.fn().mockResolvedValue(true),
+      generate: vi.fn(),
+    };
+    const router = new AdaptivePolicyRouter([apple, mockLocalFlux, mockComfyUI]);
+    const provider = await router.selectProvider({ prompt: 'a cat' });
+    expect(provider.id).toBe('apple_playground');
   });
 
   it('routes to local_flux first in privacy_first mode', async () => {
@@ -394,6 +415,45 @@ describe('LocalFluxImageGenerationProvider', () => {
         maxOutputMB: 50,
       })
     );
+  });
+});
+
+describe('ApplePlaygroundImageGenerationProvider', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.safeExistsSync.mockReturnValue(false);
+    mocks.probeAppleImageGeneration.mockResolvedValue({ available: true });
+    mocks.generateImageLocallyWithApplePlayground.mockResolvedValue({
+      path: 'active/shared/exports/native.png',
+      style: 'illustration',
+    });
+  });
+
+  it('probes Image Playground availability independently', async () => {
+    const provider = new ApplePlaygroundImageGenerationProvider();
+    await expect(provider.isAvailable()).resolves.toBe(true);
+    expect(mocks.probeAppleImageGeneration).toHaveBeenCalledOnce();
+  });
+
+  it('generates a PNG through the native bridge and forwards the style', async () => {
+    const provider = new ApplePlaygroundImageGenerationProvider();
+    const result = await provider.generate({
+      prompt: 'a ceramic fox on a desk',
+      targetPath: 'active/shared/exports/native.jpg',
+      style: 'illustration',
+    });
+
+    expect(result).toMatchObject({
+      status: 'succeeded',
+      provider: 'apple_playground',
+      path: 'active/shared/exports/native.png',
+    });
+    expect(mocks.generateImageLocallyWithApplePlayground).toHaveBeenCalledWith(
+      'a ceramic fox on a desk',
+      'active/shared/exports/native.png',
+      { style: 'illustration' }
+    );
+    expect(mocks.safeMkdir).toHaveBeenCalled();
   });
 });
 

@@ -71,6 +71,21 @@
       "notes": "Apple Silicon local FLUX generation via the governed tool runtime registry. Tuned via KYBERION_MFLUX_* env policy."
     },
     {
+      "backend_id": "media-generation.apple_playground",
+      "modality": "image",
+      "display_name": "Apple Image Playground",
+      "kind": "local",
+      "provider": "apple_image_playground",
+      "status": "active",
+      "platforms": ["darwin"],
+      "supports": {
+        "artifact_formats": ["png"],
+        "async": false
+      },
+      "fallback_backend_id": "media-generation.local_flux",
+      "notes": "macOS Apple Silicon Image Playground via the governed native capability bridge. Availability is probed separately from Foundation Models and degrades to local FLUX when unavailable."
+    },
+    {
       "backend_id": "voice.local_say",
       "modality": "voice",
       "display_name": "Local System TTS",
