@@ -88,6 +88,24 @@
     },
     "default_mode": {
       "type": "string"
+    },
+    "openrouter": {
+      "type": "object",
+      "required": ["default_profile", "default_cost_policy", "required_parameters"],
+      "properties": {
+        "default_profile": {
+          "enum": ["free-router", "free-pinned", "explicit"]
+        },
+        "default_cost_policy": {
+          "enum": ["free-only", "paid-allowed"]
+        },
+        "required_parameters": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        }
+      },
+      "additionalProperties": false
     }
   },
   "additionalProperties": false

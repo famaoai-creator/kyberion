@@ -85,5 +85,10 @@
       "mode": "copilot"
     }
   ],
-  "default_mode": "codex-cli"
+  "default_mode": "codex-cli",
+  "openrouter": {
+    "default_profile": "free-router",
+    "default_cost_policy": "free-only",
+    "required_parameters": ["tools", "tool_choice"]
+  }
 }
