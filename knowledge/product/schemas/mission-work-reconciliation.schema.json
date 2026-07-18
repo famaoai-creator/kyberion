@@ -14,7 +14,11 @@
       "additionalProperties": false,
       "required": ["repository", "branch", "commit"],
       "properties": {
-        "repository": { "type": "string", "minLength": 1 },
+        "repository": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Repository path used as the base for every evidence and review-receipt path."
+        },
         "branch": { "type": "string", "minLength": 1 },
         "commit": { "type": "string", "pattern": "^[a-fA-F0-9]{7,64}$" }
       }
@@ -33,7 +37,11 @@
       "additionalProperties": false,
       "required": ["path", "sha256", "kind"],
       "properties": {
-        "path": { "type": "string", "minLength": 1 },
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Path relative to source.repository, never relative to the Kyberion root unless source.repository is '.'."
+        },
         "sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
         "kind": {
           "type": "string",
