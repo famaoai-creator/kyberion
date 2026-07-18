@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { OpenRouterBackend, buildOpenRouterBackendFromEnv } from './openrouter-backend.js';
+import {
+  OpenRouterBackend,
+  buildOpenRouterBackendFromEnv,
+  probeOpenRouterBackendAvailability,
+} from './openrouter-backend.js';
 
 vi.mock('./secure-io.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./secure-io.js')>();
@@ -71,5 +75,33 @@ describe('openrouter-backend', () => {
     expect((request.headers as Record<string, string>)['X-Title']).toBe('Kyberion');
     expect(String(request.body)).not.toContain('top-secret-token');
     expect(String(request.body)).not.toContain('or-secret-key');
+  });
+
+  it('probes the authenticated models endpoint without making a completion request', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(new Response('{}', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await probeOpenRouterBackendAvailability({
+      OPENROUTER_API_KEY: 'or-test-key',
+    });
+
+    expect(result).toEqual({ available: true });
+    expect(fetchMock).toHaveBeenCalledWith(
+      new URL('https://openrouter.ai/api/v1/models'),
+      expect.objectContaining({
+        method: 'GET',
+        headers: { authorization: 'Bearer or-test-key' },
+      })
+    );
+  });
+
+  it('does not probe OpenRouter when no API key is configured', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await probeOpenRouterBackendAvailability({});
+
+    expect(result.available).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

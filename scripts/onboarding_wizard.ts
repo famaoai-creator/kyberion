@@ -454,8 +454,8 @@ async function runReasoningPhase(state: OnboardingState): Promise<void> {
     );
     console.log(
       t(
-        '\nRun `pnpm reasoning:setup` to configure Codex/Gemini/AGY CLI, Anthropic API, or a local backend.',
-        '\n`pnpm reasoning:setup` で Codex/Gemini/AGY CLI・Anthropic API・ローカルバックエンドを設定できます。'
+        '\nRun `pnpm reasoning:setup` to configure Codex/Gemini/AGY CLI, Anthropic API, OpenRouter, or a local backend.',
+        '\n`pnpm reasoning:setup` で Codex/Gemini/AGY CLI・Anthropic API・OpenRouter・ローカルバックエンドを設定できます。'
       )
     );
     if (interactive) {
