@@ -261,6 +261,37 @@ describe('memory-promotion-workflow', () => {
     ).rejects.toThrow(/requires ratification/i);
   });
 
+  it('blocks environment-specific background review notes before knowledge promotion', async () => {
+    const queued = createMemoryPromotionCandidate({
+      sourceType: 'task_session',
+      sourceRef: 'task_session:TSK-TEST-BACKGROUND-REVIEW-1',
+      proposedMemoryKind: 'heuristic',
+      summary: 'The run failed with ECONNRESET; the provider is unreliable.',
+      evidenceRefs: ['artifact:ART-TEST-BACKGROUND-REVIEW-1'],
+      sensitivityTier: 'confidential',
+      ratificationRequired: true,
+    });
+    enqueueMemoryPromotionCandidate(queued);
+    updateMemoryPromotionCandidateStatus({
+      candidateId: queued.candidate_id,
+      status: 'approved',
+      ratificationNote: 'Approved for policy gate test.',
+    });
+
+    await expect(
+      promoteMemoryCandidateToKnowledge({
+        candidateId: queued.candidate_id,
+        executionRole: 'mission_controller',
+      })
+    ).rejects.toThrow(/Background review policy|POLICY_VIOLATION/);
+    expect(
+      (await import('./memory-promotion-queue.js')).loadMemoryPromotionCandidate(
+        queued.candidate_id
+      )
+    ).toMatchObject({ status: 'rejected' });
+    expect(loadDistillCandidateRecord(queued.candidate_id)).toBeNull();
+  });
+
   it('autopromotes eligible personal mission candidates when enabled', async () => {
     process.env.KYBERION_MEMORY_AUTOPROMOTE = 'personal';
     mockQueryKnowledgeHybrid.mockResolvedValue([] as any);

@@ -230,7 +230,9 @@ async function runProbe(
         };
       }
       try {
-        await import(probe.specifier);
+        // Module probes are intentionally runtime-selected from a signed manifest.
+        // Keep webpack from trying to statically bundle an arbitrary specifier.
+        await import(/* webpackIgnore: true */ probe.specifier);
         return { available: true };
       } catch (err: any) {
         return {

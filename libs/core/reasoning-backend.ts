@@ -32,6 +32,7 @@ import {
   reportProviderTemporarilyUnhealthy,
 } from './provider-health-registry.js';
 import { enforceSpendGuardForReasoning } from './spend-guard.js';
+import { metrics } from './metrics.js';
 import { z } from 'zod';
 
 // Auth/eligibility failures (dead credentials, retired tiers) do not heal in
@@ -39,9 +40,72 @@ import { z } from 'zod';
 const AUTH_FAILURE_PATTERN =
   /IneligibleTier|authenticat|unauthorized|invalid api key|login required|credential|permission denied/i;
 const AUTH_FAILURE_DEMOTION_MS = 6 * 60 * 60 * 1000;
+const DEFAULT_IN_PLACE_RETRIES = 3;
+const DEFAULT_RETRY_BASE_MS = 250;
+const TRANSIENT_FAILURE_PATTERN =
+  /(?:\b(?:429|500|502|503|504|529)\b|rate[ -]?limit|too many requests|overloaded|temporarily unavailable|service unavailable|gateway timeout)/i;
 
 function resolveDemotionRetryAfterMs(message: string): number | undefined {
   return AUTH_FAILURE_PATTERN.test(message) ? AUTH_FAILURE_DEMOTION_MS : undefined;
+}
+
+function isTransientFailure(error: unknown): boolean {
+  const message = summarizeError(error);
+  return !AUTH_FAILURE_PATTERN.test(message) && TRANSIENT_FAILURE_PATTERN.test(message);
+}
+
+function readRetryAfterMs(error: unknown): number | undefined {
+  if (!error || typeof error !== 'object') return undefined;
+  const candidate = error as {
+    retryAfterMs?: unknown;
+    retry_after_ms?: unknown;
+    retryAfter?: unknown;
+    response?: { headers?: Record<string, unknown> };
+    headers?: Record<string, unknown>;
+  };
+  const direct = candidate.retryAfterMs ?? candidate.retry_after_ms;
+  if (typeof direct === 'number' && Number.isFinite(direct) && direct >= 0) return direct;
+
+  const headerValue =
+    candidate.retryAfter ??
+    candidate.headers?.['retry-after'] ??
+    candidate.response?.headers?.['retry-after'];
+  if (typeof headerValue === 'number' && Number.isFinite(headerValue) && headerValue >= 0) {
+    return headerValue * 1000;
+  }
+  if (typeof headerValue !== 'string' || !headerValue.trim()) return undefined;
+  const seconds = Number(headerValue.trim());
+  if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1000;
+  const dateMs = Date.parse(headerValue);
+  return Number.isFinite(dateMs) ? Math.max(0, dateMs - Date.now()) : undefined;
+}
+
+function resolveInPlaceRetryCount(): number {
+  const raw = process.env.KYBERION_REASONING_IN_PLACE_RETRIES;
+  if (!raw?.trim()) return DEFAULT_IN_PLACE_RETRIES;
+  const configured = Number(raw);
+  return Number.isFinite(configured) && configured >= 0
+    ? Math.min(5, Math.floor(configured))
+    : DEFAULT_IN_PLACE_RETRIES;
+}
+
+function resolveRetryBaseMs(): number {
+  const raw = process.env.KYBERION_REASONING_RETRY_BASE_MS;
+  if (!raw?.trim()) return DEFAULT_RETRY_BASE_MS;
+  const configured = Number(raw);
+  return Number.isFinite(configured) && configured >= 0 ? configured : DEFAULT_RETRY_BASE_MS;
+}
+
+function resolveInPlaceRetryDelayMs(error: unknown, retryAttempt: number): number {
+  const retryAfterMs = readRetryAfterMs(error);
+  if (retryAfterMs !== undefined) return Math.round(retryAfterMs);
+  const exponential = resolveRetryBaseMs() * 2 ** Math.max(0, retryAttempt - 1);
+  const jitter = 0.75 + Math.random() * 0.5;
+  return Math.round(exponential * jitter);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export type PersonaLabel = string;
@@ -530,21 +594,47 @@ export class FailoverReasoningBackend implements ReasoningBackend {
     for (const candidate of this.candidates) {
       const provider = normalizeProviderName(candidate.provider);
       if (provider && skippedProviders.has(provider)) continue;
-      try {
-        const result = await invoke(candidate.backend);
-        if (provider) reportProviderHealthy(provider);
-        return result;
-      } catch (error) {
-        const message = summarizeError(error);
-        errors.push(`${candidateLabel(candidate)}: ${message}`);
-        logger.warn(
-          `[reasoning-backend:failover] ${operation} failed on ${candidateLabel(candidate)}${provider ? ` (${provider})` : ''}; demoting for ${getProviderHealthDemotionTtlMs()}ms: ${message}`
-        );
-        if (provider) {
-          reportProviderTemporarilyUnhealthy(provider, {
-            reason: `${operation}:${message}`,
-            retryAfterMs: resolveDemotionRetryAfterMs(message),
-          });
+      const maxInPlaceRetries = resolveInPlaceRetryCount();
+      for (let retryAttempt = 0; ; retryAttempt++) {
+        try {
+          const result = await invoke(candidate.backend);
+          if (provider) reportProviderHealthy(provider);
+          return result;
+        } catch (error) {
+          const message = summarizeError(error);
+          if (isTransientFailure(error) && retryAttempt < maxInPlaceRetries) {
+            const nextAttempt = retryAttempt + 1;
+            const delayMs = resolveInPlaceRetryDelayMs(error, nextAttempt);
+            logger.warn(
+              `[reasoning-backend:retry] ${operation} transient failure on ${candidateLabel(candidate)}${provider ? ` (${provider})` : ''}; retry ${nextAttempt}/${maxInPlaceRetries} in ${delayMs}ms: ${message}`
+            );
+            try {
+              metrics.record('reasoning:in-place-retry', delayMs, 'success', {
+                operation,
+                provider: provider || undefined,
+                candidate: candidateLabel(candidate),
+                retry_attempt: nextAttempt,
+                retry_delay_ms: delayMs,
+                error: message,
+              });
+            } catch {
+              // Metrics are best-effort and must not alter retry behavior.
+            }
+            await sleep(delayMs);
+            continue;
+          }
+
+          errors.push(`${candidateLabel(candidate)}: ${message}`);
+          logger.warn(
+            `[reasoning-backend:failover] ${operation} failed on ${candidateLabel(candidate)}${provider ? ` (${provider})` : ''}; demoting for ${getProviderHealthDemotionTtlMs()}ms: ${message}`
+          );
+          if (provider) {
+            reportProviderTemporarilyUnhealthy(provider, {
+              reason: `${operation}:${message}`,
+              retryAfterMs: resolveDemotionRetryAfterMs(message),
+            });
+          }
+          break;
         }
       }
     }

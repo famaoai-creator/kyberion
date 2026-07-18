@@ -42,6 +42,7 @@ import {
   type AdfStepHooks,
   type AdfRunResult,
   type AdfSkippedStep,
+  executeProgrammaticToolCall,
 } from '@agent/core';
 import { tryRepairJson } from '@agent/core/json-repair';
 import { installPythonVoiceBridgeIfAvailable } from '@agent/core/python-voice-bridge';
@@ -1085,7 +1086,65 @@ async function dispatchReasoningLeaf(
   return { ...ctx, [reasoningExportKey]: rawResponse };
 }
 
-/** All non-control ops (system:*, core:wait/run_janitor/transform, reasoning:*, actuator dispatch). */
+/**
+ * HA-04: route each child-script tool call back through the normal typed-op
+ * dispatch. The child receives only the returned value; its intermediate
+ * context never becomes the parent pipeline context.
+ */
+async function dispatchProgrammaticToolCall(
+  params: Record<string, unknown>,
+  ctx: Record<string, unknown>,
+  rootDir: string,
+  shellBin: string,
+  opts: RunStepsOptions,
+  stepPolicy: ReasoningStepPolicy
+): Promise<Record<string, unknown>> {
+  const resolveList = (value: unknown): unknown[] =>
+    Array.isArray(value)
+      ? value.map((item) => (typeof item === 'string' ? resolveVars(item, ctx) : item))
+      : [];
+  const allowedOps = resolveList(params.allowed_ops ?? params.allowedOps);
+  const grantedOps = resolveList(params.granted_ops ?? params.grantedOps ?? ctx.__ptc_granted_ops);
+  const result = await executeProgrammaticToolCall({
+    request: {
+      code: String(params.code || ''),
+      allowed_ops: allowedOps.map(String),
+      granted_ops: grantedOps.map(String),
+      ...(params.max_calls === undefined ? {} : { max_calls: Number(params.max_calls) }),
+      ...(params.timeout_ms === undefined ? {} : { timeout_ms: Number(params.timeout_ms) }),
+      ...(params.max_stdout_chars === undefined
+        ? {}
+        : { max_stdout_chars: Number(params.max_stdout_chars) }),
+    },
+    invoke: async ({ op, params: callParams, call_index }) => {
+      const normalizedOp = normalizePipelineOp(op);
+      if (normalizedOp === 'core:ptc' || normalizedOp === 'core:programmatic_tool_call') {
+        throw new Error('[PTC_POLICY] Nested PTC calls are not allowed.');
+      }
+      const exportKey = `__ptc_result_${call_index}`;
+      const callStep = {
+        id: `ptc-call-${call_index}`,
+        op: normalizedOp,
+        type: resolveStepType({ op: normalizedOp, params: callParams }),
+        params: { ...callParams, export_as: exportKey },
+      } as PipelineAdfStep;
+      const nextContext = await dispatchLeafOp(callStep, ctx, rootDir, shellBin, opts, stepPolicy);
+      return Object.hasOwn(nextContext, exportKey) ? nextContext[exportKey] : null;
+    },
+    on_call: (event) => {
+      opts.trace?.addEvent('ptc.op_call', {
+        op: event.op,
+        call_index: event.call_index,
+        status: event.status,
+        ...(event.error ? { error: event.error.slice(0, 500) } : {}),
+      });
+    },
+  });
+  const exportKey = String(params.export_as || 'ptc_stdout');
+  return { ...ctx, [exportKey]: result.stdout };
+}
+
+/** All non-control ops (system:*, core:wait/run_janitor/transform/ptc, reasoning:*, actuator dispatch). */
 async function dispatchLeafOp(
   step: PipelineAdfStep,
   ctx: Record<string, unknown>,
@@ -1106,6 +1165,10 @@ async function dispatchLeafOp(
     _producedChannel && !rawParams.export_as
       ? { ...rawParams, export_as: _producedChannel }
       : rawParams;
+
+  if (domain === 'core' && (action === 'ptc' || action === 'programmatic_tool_call')) {
+    return dispatchProgrammaticToolCall(params, ctx, rootDir, shellBin, opts, stepPolicy);
+  }
 
   if (domain === 'system' && action === 'log') {
     logger.info(resolveLogMessage(params, ctx));
