@@ -3,15 +3,16 @@
 > **監査日**: 2026-07-05(全93計画を実コードと突き合わせて検証)/ 2026-07-06 MO-01 を DONE に更新 / 2026-07-11 IP-07・AA-02 行の陳腐化を再突合で訂正 / 同日 TODO 全18行を機械突合し 11 ID(SA-03/OP-01/IL-01/02/03/05/AO-04/AA-04/CO-01〜04)を PARTIAL へ訂正(実装+緑テストを確認。KM-02/DS-04/HO-02/CO-05/AC-05/IP-10 は真に未了と再確認)/ 2026-07-12 SA-02 行の陳腐化を再突合で訂正(残とされた3点は実装済み・19テスト緑を確認)/ 2026-07-13 DS-01・UX-05 を DONE に更新(UI/UX governance audit、CI/validate、operator surface token 化を実証)/ 同日 IP-09 を DONE に更新(残 slugify 6箇所の正本化+再発防止文書化)/ 同日 IP-11 の Task 3(@ts-ignore 6箇所解消)完了を反映(PARTIAL のまま、残タスクは別増分) / 同日 MO-08 を DONE に更新(hash-bound 成果物 review、独立 reviewer routing、reconcile/finish の品質 gate 分離を実証) / 2026-07-14 AC-06 を DONE に更新(陳腐化していた能力境界表を生成元スクリプトへ追加し再生成、GLOSSARY 断リンク解消)/ 同日 CO-01 を DONE に更新(getGoldenRule のテナント対応は実装済み・未検証だった — フォールバック経路をテストで固定)/ 同日 CO-02 を DONE に更新(カスタムロール作成フロー精査 — 全4タスク実装・テスト済みを再突合、真の陳腐化) / 同日 IP 節の IP-07 行を DONE に訂正(P0表は 2026-07-12 に DONE 更新済みだったが IP 節側が未反映のまま陳腐化していた。サマリ件数も 58/35 → 59/34 へ補正) / 同日 CO-03 を DONE に更新(財務/KPI 信号を OP-04 劣化検知の ops-alert 経路へ実装・接続、サマリ 59/34 → 60/33) / 同日 AR 節の AR-02 行を DONE に訂正(P0表は 2026-07-12 に DONE 更新済みだったが AR 節側が旧ロングテールnoteのまま陳腐化していた。check:op-registry のドリフト0を実行確認。サマリ 60/33 → 61/32) / 同日 AA-04 を DONE に更新(inflight admission は既に実装済みだったがテスト0本だったため検証テスト1本を追加、サマリ 61/32 → 62/31) / 同日 DS-04 の残作業note を訂正(「motion/transitionのトークン化」は計画文書に該当箇所が無く陳腐化。実際の残は計画文書自身が明記するTask4の実写検証のみ。PARTIALのまま、件数変更なし) / 同日 AA-05 Task1.3(file版transportのquarantine化)を実装(parse失敗の無限リトライ/黙殺消失を解消、テスト4本新設)。PARTIALのまま(Task1.1/1.2/2/3残存)、件数変更なし / 同日 ONB-03 Task5前半(Chronos identity routeのoverlay対応)を実装(テスト3本新設)。PARTIALのまま(Task1/4/vital-check側残存)、件数変更なし / 同日 OP-05 のbaseline-check接続を実装(L7 Configuration Layer追加)。副次的にSovereignSentinelの`ORDER`配列がL6を3週間dead code化していたバグを発見・修正(テスト2本新設)。PARTIALのまま、件数変更なし / 同日 P0表のAR-01行を訂正(計画文書は2026-07-13にPhase B完了済みと記録済みだったがP0表が未反映。テスト36本+golden2本を実行確認、真の残はPhase Cのみ)。PARTIALのまま、件数変更なし / 同日 CO-04 Task3(黄金律のタイブレーク)を実装(vision-resolverの@agent/core公開export追加+wisdom-actuatorへresolveHypothesisConflict op新設、テスト4本新設)。CO-04を DONE に更新、サマリ 62/31 → 63/30 / 同日 AR-01 Phase C 完了(executeAdfSteps への run_pipeline ループ実委譲)により AR-01 を DONE に更新、サマリ 63/30 → 64/29 / 2026-07-15 CO-05 の受入2(procurement-vendor/hiring-workflow の decision-rights 接続)を実装。副次的に enforceApprovalGate の decision-rights エスカレーションが approval-policy.json 側の対応ルール欠如で一度も発火していなかった構造的欠落を発見・修正(decision-rights-escalation ルール追加)。PARTIAL のまま(残5テンプレート + 受入条件網羅突合) / 2026-07-17 DS-04 Task 4 完了(ダミーテナント client-a の ADF → HyperFrames MP4/PNG 実写を目視確認。サマリ 65/28 → 66/27)
 > **更新規約**: 計画の実装・レビュー完了時に本表を更新する。各計画文書内の「実装状況」節と矛盾する場合は本表を正とし、文書側を追従させる。
 > **2026-07-18追記**: KM-02 Task 4.2(runtime側)を完了。共通ranking signalをknowledge-indexのlexical/hybrid検索へ接続し、DONE 67 / PARTIAL 26へ更新。
+> **2026-07-18追記**: OpenHarness概念取り込み OH-02(資格情報パス常時deny)を実装・検証済み。OH-04(大きなADF step出力のartifact退避)も実装・検証済み。OH-01/03/05/06/07/08は未着手のためTODOとして追加し、DONE 69 / PARTIAL 26 / TODO 6へ更新。
 > **判定基準**: DONE = 受入条件を実コードで検証済 / PARTIAL = 一部充足 / TODO = 実質未着手。
 
 ## サマリ
 
 | 判定    | 件数 |
 | ------- | ---- |
-| DONE    | 67   |
+| DONE    | 69   |
 | PARTIAL | 26   |
-| TODO    | 0    |
+| TODO    | 6    |
 
 ## P0 残作業(プロダクション化のクリティカルパス)
 
@@ -218,6 +219,21 @@
 | HN-01 | DONE |                                                                                 |
 | HN-02 | DONE |                                                                                 |
 | HN-03 | DONE | workflow-as-code 第一級経路(run_pipeline の workflow module 入力化、SA-02 整合) |
+
+### OH(OpenHarness概念取り込み)
+
+正本: [OPENHARNESS_ADOPTION_PLAN_2026-07-18.ja.md](./OPENHARNESS_ADOPTION_PLAN_2026-07-18.ja.md)
+
+| ID    | 状態 | 残作業                                                                                                                                                                                                                          |
+| ----- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| OH-01 | TODO | ワーカーコンテキスト自動圧縮 + carryover                                                                                                                                                                                        |
+| OH-02 | DONE | 2026-07-18完了: sensitive-path registryをsecure-io/shell policyへ接続。read/write/execの無条件deny、secret-guard mediated access、理由付きエラー、境界テストを実装。                                                            |
+| OH-03 | TODO | transientエラーのin-place backoff                                                                                                                                                                                               |
+| OH-04 | DONE | 2026-07-18完了: ADF stepのexport出力を16,000文字既定で`active/shared/tmp/tool-output`へ退避。文脈にはpreview・artifact path・サイズを残し、trace current spanへlog artifactを登録。超過閾値・ADF実行・trace登録をテストで検証。 |
+| OH-05 | TODO | MCPクライアント成熟化                                                                                                                                                                                                           |
+| OH-06 | TODO | リクエスト級dry-run判定                                                                                                                                                                                                         |
+| OH-07 | TODO | チーム承認伝播                                                                                                                                                                                                                  |
+| OH-08 | TODO | Feishu / DingTalk（需要確定後）                                                                                                                                                                                                 |
 
 ### CO(Company OS)
 
