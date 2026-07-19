@@ -4,6 +4,7 @@ import { safeAppendFileSync, safeMkdir, safeReadFile, safeWriteFile } from './se
 import { resolveSharedObservabilityDir } from './observability-gate.js';
 import { spawnManagedProcess } from './managed-process.js';
 import { appendMissionOrchestrationJournalEntry } from './mission-orchestration-journal.js';
+import { getDefaultWorkerEventStream } from './worker-event-stream.js';
 
 export type MissionOrchestrationEventType =
   | 'mission_issue_requested'
@@ -41,6 +42,13 @@ export function getMissionOrchestrationEventPath(eventId: string): string {
 }
 
 export function emitMissionOrchestrationObservation(event: Record<string, unknown>): void {
+  try {
+    getDefaultWorkerEventStream().emit('mission_event', event, {
+      ...(typeof event.mission_id === 'string' ? { mission_id: event.mission_id } : {}),
+    });
+  } catch {
+    /* stream projection is best-effort; the jsonl observation below is the SSoT */
+  }
   const obsDir = resolveSharedObservabilityDir(OBS_DIR);
   if (!obsDir) return;
   safeMkdir(EVENTS_DIR);

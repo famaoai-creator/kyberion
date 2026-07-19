@@ -43,6 +43,9 @@ import {
   type AdfRunResult,
   type AdfSkippedStep,
   executeProgrammaticToolCall,
+  getDefaultWorkerEventStream,
+  getDefaultLifecycleHookEngine,
+  fireLifecycleHooks,
 } from '@agent/core';
 import { tryRepairJson } from '@agent/core/json-repair';
 import { installPythonVoiceBridgeIfAvailable } from '@agent/core/python-voice-bridge';
@@ -1699,10 +1702,16 @@ export async function runSteps(
     control: async (_op, _params, ctx, runNestedSteps) => runStepWithLifecycle(ctx, runNestedSteps),
   };
 
+  const eventStream = getDefaultWorkerEventStream();
   const hooks: AdfStepHooks = {
     beforeStep: (rawStep, stepNumber) => {
       const step = rawStep as unknown as PipelineAdfStep;
       stepRefStack.push(step);
+      eventStream.emit('step_begin', {
+        op: step.op,
+        step_number: stepNumber,
+        step_id: step.id || step.op,
+      });
       const stepPolicy = normalizeReasoningPolicy(step);
       const stepTraceBase = {
         step_index: results.length,
@@ -1757,6 +1766,28 @@ export async function runSteps(
               error_rule_id: failureInfo.classification.ruleId,
             }
           : {}),
+      });
+      eventStream.emit('step_end', {
+        op: normalizedOp,
+        step_number: stepNumber,
+        step_id: step.id || step.op,
+        status: outcome.status,
+        duration_ms: durationMs,
+        ...(outcome.error ? { error: outcome.error } : {}),
+      });
+      void fireLifecycleHooks(
+        getDefaultLifecycleHookEngine(),
+        outcome.status === 'failed' ? 'post_tool_use_failure' : 'post_tool_use',
+        {
+          matcher_value: normalizedOp,
+          op: normalizedOp,
+          status: outcome.status,
+          ...(outcome.error ? { error: outcome.error } : {}),
+        }
+      ).catch((error) => {
+        logger.error(
+          `[LIFECYCLE_HOOK] post-tool hook telemetry failed: ${error instanceof Error ? error.message : String(error)}`
+        );
       });
       if (!opts.quiet && (outcome.status === 'success' || outcome.status === 'failed')) {
         logger.info(
@@ -1823,7 +1854,20 @@ export async function runSteps(
     const engineResult = await executeAdfSteps(
       prepareEngineSteps(steps),
       initialCtx,
-      { maxSteps, timeoutMs, resolveVars: (value: any, c: any) => resolveVars(value, c) },
+      {
+        maxSteps,
+        timeoutMs,
+        resolveVars: (value: any, c: any) => resolveVars(value, c),
+        // KC-04: pre_tool_use hooks can block a step; a block aborts the run.
+        stepGate: async (step, _stepNumber) => {
+          const outcome = await fireLifecycleHooks(
+            getDefaultLifecycleHookEngine(),
+            'pre_tool_use',
+            { matcher_value: String(step.op), op: String(step.op) }
+          );
+          return outcome.blocked ? { blocked: true, reasons: outcome.reasons } : undefined;
+        },
+      },
       handlers,
       hooks
     );
@@ -1979,17 +2023,45 @@ export async function main() {
     pipelineId,
   });
   trace.addArtifact('file', String(argv.input), 'Pipeline ADF input');
+  getDefaultWorkerEventStream().emit(
+    'turn_begin',
+    { kind: 'pipeline', pipeline_id: pipelineId, input: String(argv.input) },
+    { pipeline_id: pipelineId, ...(missionId ? { mission_id: missionId } : {}) }
+  );
 
   try {
     const stepsToRun = (pipeline.steps || []).map((step) => ({
       ...step,
       params: step.params || {},
     }));
+    const sessionStart = await fireLifecycleHooks(
+      getDefaultLifecycleHookEngine(),
+      'session_start',
+      {
+        matcher_value: pipelineId,
+        pipeline_id: pipelineId,
+      }
+    );
+    if (sessionStart.blocked) {
+      throw new Error(
+        `[SAFETY_LIMIT][HOOK_BLOCKED] session_start blocked: ${sessionStart.reasons.join('; ')}`
+      );
+    }
     const result = await runValidatedSteps(stepsToRun, mergedContext, {
       trace,
       pipelinePath: argv.input as string,
       quiet: argv.quiet as boolean,
     });
+    const sessionEnd = await fireLifecycleHooks(getDefaultLifecycleHookEngine(), 'session_end', {
+      matcher_value: pipelineId,
+      pipeline_id: pipelineId,
+      status: result.status,
+    });
+    if (sessionEnd.blocked) {
+      throw new Error(
+        `[SAFETY_LIMIT][HOOK_BLOCKED] session_end blocked: ${sessionEnd.reasons.join('; ')}`
+      );
+    }
     const failed = result.results.find((entry) => entry.status === 'failed');
     const failure = failed ? formatPipelineFailure(failed.error || 'unknown error') : undefined;
     const recovered = failure ? tryPermissionFallback(pipeline, failure, trace) : false;
@@ -1999,6 +2071,11 @@ export async function main() {
       nodePath.relative(pathResolver.rootDir(), persisted.path) || persisted.path;
     logger.info(`   [PIPELINE] Trace: ${result.context.trace_persisted_path}`);
     const pipelineStatus = result.status === 'succeeded' || recovered ? 'succeeded' : 'failed';
+    getDefaultWorkerEventStream().emit(
+      'turn_end',
+      { kind: 'pipeline', pipeline_id: pipelineId, status: pipelineStatus, recovered },
+      { pipeline_id: pipelineId, ...(missionId ? { mission_id: missionId } : {}) }
+    );
     runFeedbackLoop(pipelineId, pipelineStatus, persisted.trace);
     // LC-09: surface semantic-decision degradations in the run summary —
     // a pipeline that "succeeded" on deterministic fallbacks every time is
@@ -2056,6 +2133,17 @@ export async function main() {
   } catch (err: any) {
     const failure = formatPipelineFailure(err);
     const recovered = tryPermissionFallback(pipeline, failure, trace);
+    getDefaultWorkerEventStream().emit(
+      'turn_end',
+      {
+        kind: 'pipeline',
+        pipeline_id: pipelineId,
+        status: recovered ? 'succeeded' : 'failed',
+        recovered,
+        error: err?.message ?? String(err),
+      },
+      { pipeline_id: pipelineId, ...(missionId ? { mission_id: missionId } : {}) }
+    );
     if (recovered) {
       const persisted = finalizePipelineTrace(trace, true);
       runFeedbackLoop(pipelineId, 'succeeded', persisted.trace);

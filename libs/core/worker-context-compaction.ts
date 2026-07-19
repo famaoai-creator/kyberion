@@ -22,6 +22,9 @@ import { metrics } from './metrics.js';
 import type { MissionWorkingMemory } from './mission-working-memory.js';
 import { pathResolver } from './path-resolver.js';
 import { safeMkdir, safeWriteFile } from './secure-io.js';
+import { notifyAllDynamicInjectionRegistries } from './dynamic-injection.js';
+import { fireLifecycleHooks, getDefaultLifecycleHookEngine } from './lifecycle-hook-engine.js';
+import { getDefaultWorkerEventStream } from './worker-event-stream.js';
 
 export type WorkerContextRole = 'system' | 'user' | 'assistant' | 'tool_use' | 'tool_result';
 
@@ -34,12 +37,24 @@ export interface WorkerContextMessage {
   pinned?: boolean;
 }
 
+/** KC-06: a still-running delegated background task surfaced across the compaction boundary. */
+export interface ActiveBackgroundTaskRef {
+  delegation_id: string;
+  instruction_excerpt: string;
+  started_at: string;
+}
+
+/** Bound for `active_background_tasks` in the carryover (kimi-cli `build_active_task_snapshot`). */
+export const MAX_CARRYOVER_BACKGROUND_TASKS = 8;
+
 /** Structured work state that must survive compaction independent of LLM quality. */
 export interface CompactionCarryover {
   goal: string;
   active_artifacts: string[];
   verified_state: string[];
   next_step: string;
+  /** KC-06: still-running delegated tasks re-injected post-compaction (≤8). */
+  active_background_tasks?: ActiveBackgroundTaskRef[];
 }
 
 export interface ContextWindowProfile {
@@ -101,7 +116,7 @@ const MAX_CONSECUTIVE_SUMMARY_FAILURES = 3;
 
 /** Provider "prompt too long" detection for the reactive compaction path. */
 export const PROMPT_TOO_LONG_PATTERN =
-  /prompt (?:is )?too long|context window|maximum context length|context_length_exceeded|input (?:is )?too (?:large|long)|too many tokens|exceeds? .*token/i;
+  /prompt (?:is )?too long|context window|maximum context length|context_length_exceeded|input (?:is )?too (?:large|long)|too many tokens|exceeds? .*token|\[CONTEXT_LIMIT\]/i;
 
 export function isPromptTooLongError(error: unknown): boolean {
   const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error ?? '');
@@ -153,6 +168,10 @@ export function estimateContextTokens(messages: readonly WorkerContextMessage[])
 export function renderCarryoverBlock(carryover: CompactionCarryover): string {
   const list = (values: string[]): string =>
     values.length > 0 ? values.map((value) => `  - ${value}`).join('\n') : '  - none';
+  const backgroundTasks = (carryover.active_background_tasks ?? []).slice(
+    0,
+    MAX_CARRYOVER_BACKGROUND_TASKS
+  );
   return [
     '<task_focus_state>',
     `goal: ${carryover.goal}`,
@@ -161,6 +180,17 @@ export function renderCarryoverBlock(carryover: CompactionCarryover): string {
     'verified_state:',
     list(carryover.verified_state),
     `next_step: ${carryover.next_step}`,
+    ...(backgroundTasks.length > 0
+      ? [
+          'active_background_tasks:',
+          list(
+            backgroundTasks.map(
+              (task) =>
+                `${task.delegation_id} (started ${task.started_at}): ${task.instruction_excerpt}`
+            )
+          ),
+        ]
+      : []),
     '</task_focus_state>',
   ].join('\n');
 }
@@ -343,6 +373,25 @@ export async function compactWorkerContext(
       ...(options.missionId ? { mission_id: options.missionId } : {}),
     },
   });
+  // KC-04 pre_compact hooks are observational: compaction is itself a safety
+  // mechanism, so a hook block verdict must not stop it. KC-02: mirror onto
+  // the worker event stream (best-effort).
+  await fireLifecycleHooks(getDefaultLifecycleHookEngine(), 'pre_compact', {
+    ...(options.missionId
+      ? { matcher_value: options.missionId, mission_id: options.missionId }
+      : {}),
+    tokens_before: tokensBefore,
+    threshold_tokens: thresholdTokens,
+  });
+  try {
+    getDefaultWorkerEventStream().emit(
+      'compaction_begin',
+      { tokens_before: tokensBefore, threshold_tokens: thresholdTokens },
+      options.missionId ? { mission_id: options.missionId } : undefined
+    );
+  } catch {
+    /* stream projection stays best-effort */
+  }
 
   // Stage 1 — microcompact (LLM-free).
   const keepRecent = options.keepRecentToolResults ?? DEFAULT_KEEP_RECENT_TOOL_RESULTS;
@@ -428,6 +477,30 @@ export async function compactWorkerContext(
       ...(options.missionId ? { mission_id: options.missionId } : {}),
     },
   });
+  await fireLifecycleHooks(getDefaultLifecycleHookEngine(), 'post_compact', {
+    ...(options.missionId
+      ? { matcher_value: options.missionId, mission_id: options.missionId }
+      : {}),
+    tokens_before: tokensBefore,
+    tokens_after: tokensAfter,
+    stage,
+  });
+  try {
+    getDefaultWorkerEventStream().emit(
+      'compaction_end',
+      { tokens_before: tokensBefore, tokens_after: tokensAfter, stage },
+      options.missionId ? { mission_id: options.missionId } : undefined
+    );
+  } catch {
+    /* stream projection stays best-effort */
+  }
+  // KC-08: the compacted transcript lost every earlier injection — reset the
+  // registry so one-shot reminders (working principles etc.) re-fire.
+  try {
+    notifyAllDynamicInjectionRegistries();
+  } catch {
+    /* injection bookkeeping must not alter compaction behavior */
+  }
   try {
     metrics.record('worker:context-compaction', tokensBefore - tokensAfter, 'success', {
       stage,

@@ -25,12 +25,21 @@ import type {
   DecomposedTaskPlan,
 } from './reasoning-backend.js';
 import { runStructuredReasoningOp, structuredReasoningSpecs } from './structured-reasoning.js';
+import {
+  computeCompletionTokenBudget,
+  estimateRequestInputTokens,
+  resolveConfiguredContextWindowTokens,
+} from './completion-token-budget.js';
 
 export interface OpenAiCompatibleBackendOptions {
   baseURL: string;
   apiKey: string;
   model: string;
   timeoutMs?: number;
+  /** KC-09: model context window in tokens; unset = unknown → no max_tokens sent. */
+  contextWindowTokens?: number;
+  /** KC-09: upper bound for the per-request completion budget. */
+  maxCompletionTokens?: number;
 }
 
 export interface OpenAiCompatibleBackendAvailability {
@@ -75,6 +84,7 @@ interface ChatCompletionRequest {
     };
   }>;
   tool_choice?: 'auto' | 'none';
+  max_tokens?: number;
 }
 
 interface ChatCompletionResponse {
@@ -94,7 +104,12 @@ function normalizeBaseUrl(baseURL: string): string {
 
 function isLocalHost(hostname: string): boolean {
   const normalized = hostname.toLowerCase();
-  if (normalized === 'localhost' || normalized === '0.0.0.0' || normalized === '::' || normalized === '::1') {
+  if (
+    normalized === 'localhost' ||
+    normalized === '0.0.0.0' ||
+    normalized === '::' ||
+    normalized === '::1'
+  ) {
     return true;
   }
   if (/^127\.\d+\.\d+\.\d+$/.test(normalized)) return true;
@@ -111,7 +126,9 @@ function assertLocalCompatibleEndpoint(baseURL: string): URL {
     throw new Error(`Unsupported local LLM protocol: ${url.protocol}`);
   }
   if (!isLocalHost(url.hostname)) {
-    throw new Error(`Local LLM endpoint must resolve to localhost or a private address: ${url.hostname}`);
+    throw new Error(
+      `Local LLM endpoint must resolve to localhost or a private address: ${url.hostname}`
+    );
   }
   return url;
 }
@@ -222,7 +239,7 @@ function firstConfiguredEnv(env: NodeJS.ProcessEnv, keys: string[]): string | un
 
 function buildBackendFromEnvNames(
   env: NodeJS.ProcessEnv,
-  names: OpenAiCompatibleBackendEnvNames,
+  names: OpenAiCompatibleBackendEnvNames
 ): OpenAiCompatibleBackend | null {
   const baseURL = firstConfiguredEnv(env, names.baseURL);
   if (!baseURL) return null;
@@ -234,7 +251,7 @@ function buildBackendFromEnvNames(
 async function probeBackendAvailabilityFromEnvNames(
   env: NodeJS.ProcessEnv,
   names: OpenAiCompatibleBackendEnvNames,
-  options: { allowPublicEndpoint: boolean },
+  options: { allowPublicEndpoint: boolean }
 ): Promise<OpenAiCompatibleBackendAvailability> {
   const baseURL = firstConfiguredEnv(env, names.baseURL);
   if (!baseURL) {
@@ -245,7 +262,9 @@ async function probeBackendAvailabilityFromEnvNames(
   }
 
   try {
-    const url = options.allowPublicEndpoint ? assertHttpEndpoint(baseURL) : assertLocalCompatibleEndpoint(baseURL);
+    const url = options.allowPublicEndpoint
+      ? assertHttpEndpoint(baseURL)
+      : assertLocalCompatibleEndpoint(baseURL);
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 4_000);
     try {
@@ -260,7 +279,10 @@ async function probeBackendAvailabilityFromEnvNames(
         headers,
       });
       if (!response.ok) {
-        return { available: false, reason: `${names.probeLabel} probe returned HTTP ${response.status}` };
+        return {
+          available: false,
+          reason: `${names.probeLabel} probe returned HTTP ${response.status}`,
+        };
       }
       return { available: true };
     } finally {
@@ -277,17 +299,38 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
   private readonly apiKey: string;
   private readonly model: string;
   private readonly timeoutMs: number;
+  private readonly contextWindowTokens: number | undefined;
+  private readonly maxCompletionTokens: number | undefined;
 
   constructor(options: OpenAiCompatibleBackendOptions) {
     this.baseURL = normalizeBaseUrl(options.baseURL);
     this.apiKey = options.apiKey;
     this.model = options.model;
     this.timeoutMs = options.timeoutMs ?? 60_000;
+    this.contextWindowTokens =
+      options.contextWindowTokens ?? resolveConfiguredContextWindowTokens();
+    this.maxCompletionTokens = options.maxCompletionTokens;
+  }
+
+  /** KC-09: budget only when a window is explicitly configured — unknown window leaves the request untouched. */
+  private completionBudget(body: ChatCompletionRequest): number | undefined {
+    if (this.contextWindowTokens === undefined) return undefined;
+    const budget = computeCompletionTokenBudget({
+      contextWindowTokens: this.contextWindowTokens,
+      estimatedInputTokens: estimateRequestInputTokens(body),
+      configuredMaxTokens: this.maxCompletionTokens ?? this.contextWindowTokens,
+    });
+    if (budget < 1) {
+      throw new Error(
+        '[CONTEXT_LIMIT] No completion tokens remain after input estimate; compact the context and retry.'
+      );
+    }
+    return budget;
   }
 
   private async fetchChatCompletion(
     messages: ChatMessage[],
-    opts: { useTools?: boolean } = {},
+    opts: { useTools?: boolean } = {}
   ): Promise<ChatCompletionResponse> {
     const headers: Record<string, string> = {
       'content-type': 'application/json',
@@ -299,8 +342,10 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
     const body: ChatCompletionRequest = {
       model: this.model,
       messages: redactSensitiveObject(messages),
-      ...(opts.useTools ?? true ? { tools: createToolDefinitions(), tool_choice: 'auto' } : {}),
+      ...((opts.useTools ?? true) ? { tools: createToolDefinitions(), tool_choice: 'auto' } : {}),
     };
+    const maxTokens = this.completionBudget(body);
+    if (maxTokens !== undefined) body.max_tokens = maxTokens;
 
     const response = await fetch(joinEndpoint(this.baseURL, 'chat/completions'), {
       method: 'POST',
@@ -316,7 +361,9 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
       throw new Error(`[openai-compatible] chat completion failed: ${message}`);
     }
     if (!parsed || !parsed.choices || parsed.choices.length === 0) {
-      throw new Error(`[openai-compatible] invalid chat completion response: ${text.slice(0, 500)}`);
+      throw new Error(
+        `[openai-compatible] invalid chat completion response: ${text.slice(0, 500)}`
+      );
     }
     return parsed;
   }
@@ -330,12 +377,17 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
         case 'read_file':
           return String(safeReadFile(String(args.path ?? '')));
         case 'write_file':
-          safeWriteFile(String(args.path ?? ''), String(args.content ?? ''), { mkdir: true, encoding: 'utf8' });
+          safeWriteFile(String(args.path ?? ''), String(args.content ?? ''), {
+            mkdir: true,
+            encoding: 'utf8',
+          });
           return 'Success: File written.';
         case 'list_directory':
           return JSON.stringify(safeReaddir(String(args.path ?? '')));
         case 'shell_exec':
-          return safeExec('bash', ['-lc', String(args.command ?? '')], { cwd: pathResolver.rootDir() });
+          return safeExec('bash', ['-lc', String(args.command ?? '')], {
+            cwd: pathResolver.rootDir(),
+          });
         default:
           return `Error: Unknown tool ${name}`;
       }
@@ -355,7 +407,12 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
       },
       {
         role: 'user',
-        content: [prompt, redactedContext ? `Context:\n${typeof redactedContext === 'string' ? redactedContext : JSON.stringify(redactedContext, null, 2)}` : '']
+        content: [
+          prompt,
+          redactedContext
+            ? `Context:\n${typeof redactedContext === 'string' ? redactedContext : JSON.stringify(redactedContext, null, 2)}`
+            : '',
+        ]
           .filter(Boolean)
           .join('\n\n'),
       },
@@ -372,19 +429,19 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
         tool_calls: message.tool_calls,
       });
       for (const toolCall of message.tool_calls) {
-        const guardrailDecision = advanceToolLoopGuardrail(
-          guardrailState,
-          {
-            name: toolCall.function.name,
-            arguments: toolCall.function.arguments,
-          },
-        );
+        const guardrailDecision = advanceToolLoopGuardrail(guardrailState, {
+          name: toolCall.function.name,
+          arguments: toolCall.function.arguments,
+        });
         guardrailState = guardrailDecision.state;
         if (guardrailDecision.shouldStop) {
           logger.warn(`[LOCAL_LLM] Tool loop guardrail triggered: ${guardrailDecision.reason}`);
           return `${extractTextContent(message.content)}\n\n${guardrailDecision.reason}`.trim();
         }
-        const result = await this.handleToolCall(toolCall.function.name, toolCall.function.arguments);
+        const result = await this.handleToolCall(
+          toolCall.function.name,
+          toolCall.function.arguments
+        );
         messages.push({
           role: 'tool',
           tool_call_id: toolCall.id,
@@ -405,7 +462,7 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
       ],
-      { useTools: false },
+      { useTools: false }
     );
     return extractTextContent(response.choices[0].message.content);
   }
@@ -414,39 +471,75 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
     this.completeStructured(systemPrompt, userPrompt);
 
   async divergePersonas(input: DivergeHypothesisInput): Promise<HypothesisSketch[]> {
-    return runStructuredReasoningOp(structuredReasoningSpecs.divergePersonas, input, this.runStructured);
+    return runStructuredReasoningOp(
+      structuredReasoningSpecs.divergePersonas,
+      input,
+      this.runStructured
+    );
   }
 
   async crossCritique(input: CritiqueInput): Promise<CritiqueResult> {
-    return runStructuredReasoningOp(structuredReasoningSpecs.crossCritique, input, this.runStructured);
+    return runStructuredReasoningOp(
+      structuredReasoningSpecs.crossCritique,
+      input,
+      this.runStructured
+    );
   }
 
   async synthesizePersona(input: PersonaSynthesisInput): Promise<SynthesizedPersona> {
-    return runStructuredReasoningOp(structuredReasoningSpecs.synthesizePersona, input, this.runStructured);
+    return runStructuredReasoningOp(
+      structuredReasoningSpecs.synthesizePersona,
+      input,
+      this.runStructured
+    );
   }
 
   async forkBranches(input: BranchForkInput): Promise<ForkedBranch[]> {
-    return runStructuredReasoningOp(structuredReasoningSpecs.forkBranches, input, this.runStructured);
+    return runStructuredReasoningOp(
+      structuredReasoningSpecs.forkBranches,
+      input,
+      this.runStructured
+    );
   }
 
   async simulateBranches(input: SimulationInput): Promise<SimulationResult> {
-    return runStructuredReasoningOp(structuredReasoningSpecs.simulateBranches, input, this.runStructured);
+    return runStructuredReasoningOp(
+      structuredReasoningSpecs.simulateBranches,
+      input,
+      this.runStructured
+    );
   }
 
   async extractRequirements(input: ExtractRequirementsInput): Promise<ExtractedRequirements> {
-    return runStructuredReasoningOp(structuredReasoningSpecs.extractRequirements, input, this.runStructured);
+    return runStructuredReasoningOp(
+      structuredReasoningSpecs.extractRequirements,
+      input,
+      this.runStructured
+    );
   }
 
   async extractDesignSpec(input: ExtractDesignSpecInput): Promise<ExtractedDesignSpec> {
-    return runStructuredReasoningOp(structuredReasoningSpecs.extractDesignSpec, input, this.runStructured);
+    return runStructuredReasoningOp(
+      structuredReasoningSpecs.extractDesignSpec,
+      input,
+      this.runStructured
+    );
   }
 
   async extractTestPlan(input: ExtractTestPlanInput): Promise<ExtractedTestPlan> {
-    return runStructuredReasoningOp(structuredReasoningSpecs.extractTestPlan, input, this.runStructured);
+    return runStructuredReasoningOp(
+      structuredReasoningSpecs.extractTestPlan,
+      input,
+      this.runStructured
+    );
   }
 
   async decomposeIntoTasks(input: DecomposeIntoTasksInput): Promise<DecomposedTaskPlan> {
-    return runStructuredReasoningOp(structuredReasoningSpecs.decomposeIntoTasks, input, this.runStructured);
+    return runStructuredReasoningOp(
+      structuredReasoningSpecs.decomposeIntoTasks,
+      input,
+      this.runStructured
+    );
   }
 
   async delegateTask(instruction: string, context?: string): Promise<string> {
@@ -473,19 +566,19 @@ const NEMOTRON_OPENAI_COMPATIBLE_ENV: OpenAiCompatibleBackendEnvNames = {
 };
 
 export function buildOpenAiCompatibleBackendFromEnv(
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = process.env
 ): OpenAiCompatibleBackend | null {
   return buildBackendFromEnvNames(env, LOCAL_OPENAI_COMPATIBLE_ENV);
 }
 
 export function buildNemotronBackendFromEnv(
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = process.env
 ): OpenAiCompatibleBackend | null {
   return buildBackendFromEnvNames(env, NEMOTRON_OPENAI_COMPATIBLE_ENV);
 }
 
 export async function probeOpenAiCompatibleBackendAvailability(
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = process.env
 ): Promise<OpenAiCompatibleBackendAvailability> {
   return probeBackendAvailabilityFromEnvNames(env, LOCAL_OPENAI_COMPATIBLE_ENV, {
     allowPublicEndpoint: false,
@@ -493,7 +586,7 @@ export async function probeOpenAiCompatibleBackendAvailability(
 }
 
 export async function probeNemotronBackendAvailability(
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = process.env
 ): Promise<OpenAiCompatibleBackendAvailability> {
   return probeBackendAvailabilityFromEnvNames(env, NEMOTRON_OPENAI_COMPATIBLE_ENV, {
     allowPublicEndpoint: true,
