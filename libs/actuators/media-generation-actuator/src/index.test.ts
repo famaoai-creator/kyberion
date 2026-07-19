@@ -18,6 +18,12 @@ const mocks = vi.hoisted(() => ({
   safeCopyFileSync: vi.fn(),
   safeExistsSync: vi.fn(),
   safeMkdir: vi.fn(),
+  handleSystemAction: vi.fn(async () => ({
+    media_recording: {
+      status: 'succeeded',
+      output_path: '/repo/capture.mp4',
+    },
+  })),
 }));
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
@@ -51,6 +57,10 @@ vi.mock('@agent/core', async () => {
     safeMkdir: mocks.safeMkdir,
   };
 });
+
+vi.mock('@actuator/system', () => ({
+  handleAction: mocks.handleSystemAction,
+}));
 
 describe('prompt style pack injection (E2E-02 Task 4)', () => {
   beforeEach(() => {
@@ -483,10 +493,6 @@ describe('media-generation-actuator', () => {
       status: 'failed',
       action: 'generate_image',
     });
-    mocks.executeServicePreset.mockResolvedValueOnce({
-      status: 'succeeded',
-      action: 'capture_screen',
-    });
     const { handleAction } = await import('./index.js');
 
     const result = await handleAction({
@@ -501,6 +507,11 @@ describe('media-generation-actuator', () => {
     expect(result.status).toBe('failed');
     expect(result.results).toHaveLength(2);
     expect(result.results[0]).toEqual(expect.objectContaining({ status: 'failed' }));
+    expect(mocks.handleSystemAction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        steps: [expect.objectContaining({ op: 'record_screen' })],
+      })
+    );
   });
 
   it('can await image generation completion and return the generated artifact', async () => {

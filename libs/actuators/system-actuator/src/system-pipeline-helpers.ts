@@ -370,6 +370,19 @@ async function opControl(
   }
 }
 
+function resolveCanonicalScreenRecordingPath(params: Record<string, unknown>): string {
+  const requested = typeof params.output === 'string' ? params.output.trim() : '';
+  const candidate = requested
+    ? pathResolver.rootResolve(requested)
+    : pathResolver.shared(`runtime/computer/screen-recording-${Date.now()}.mp4`);
+  const absolute = path.resolve(candidate);
+  const relative = path.relative(pathResolver.rootDir(), absolute);
+  if (relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+    throw new Error('record_screen output must remain within the Kyberion root');
+  }
+  return absolute;
+}
+
 async function opCapture(op: string, params: any, ctx: any, resolve: (value: any) => any) {
   const rootDir = pathResolver.rootDir();
   assertSystemOpInput(op, params);
@@ -429,6 +442,54 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
             ? 'application'
             : 'display',
         screenshot_window_candidates: windowCandidates || [],
+      };
+    }
+    case 'record_screen': {
+      const displaySelection = await systemDisplayHelpers.resolveScreenDisplaySelection(
+        params,
+        resolve
+      );
+      const bridge = createScreenRecordingBridge();
+      const probe = await bridge.probe();
+      if (!probe.available) {
+        throw new Error(
+          `record_screen unavailable: ${probe.capture_bridge?.reason || 'screen recording bridge unavailable'}`
+        );
+      }
+      const fpsValue = Number(resolve(params.fps || 30));
+      const fps = Number.isFinite(fpsValue) && fpsValue > 0 ? Math.min(120, fpsValue) : 30;
+      const intervalValue = Number(resolve(params.frame_interval_ms || 0));
+      const frameIntervalMs =
+        Number.isFinite(intervalValue) && intervalValue >= 0
+          ? intervalValue
+          : Math.max(1, Math.round(1000 / fps));
+      const durationValue = Number(resolve(params.duration || 0));
+      const explicitFrameCount = Number(resolve(params.max_frames || 0));
+      const frameCount =
+        Number.isInteger(explicitFrameCount) && explicitFrameCount > 0
+          ? explicitFrameCount
+          : Number.isFinite(durationValue) && durationValue > 0
+            ? Math.max(1, Math.ceil(durationValue * fps))
+            : 1;
+      const outputPath = resolveCanonicalScreenRecordingPath(params);
+      const result = await bridge.recordToMp4(outputPath, {
+        display_index: displaySelection.display_index,
+        capture_mode: params.capture_mode === 'focused_window' ? 'focused_window' : 'screen',
+        max_frames: frameCount,
+        frame_interval_ms: frameIntervalMs,
+        fps,
+        cleanup: true,
+      });
+      return {
+        ...ctx,
+        [params.export_as || 'screen_recording']: {
+          ...result,
+          status: 'succeeded',
+          bridge_id: bridge.bridge_id,
+          selected_display_index: displaySelection.display_index,
+          selected_display_name: displaySelection.display_name,
+          display_selection_source: displaySelection.selection_source,
+        },
       };
     }
     case 'macos_automation_probe':

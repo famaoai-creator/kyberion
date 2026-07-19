@@ -25,7 +25,7 @@
     { "op": "collect_generation_artifact", "platforms": ["darwin", "linux", "win32"] },
     { "op": "capture_screen", "platforms": ["darwin", "linux", "win32"] },
     { "op": "capture_focused_window", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "record_screen", "platforms": ["darwin"] },
+    { "op": "record_screen", "platforms": ["darwin", "linux"] },
     { "op": "run_workflow", "platforms": ["darwin", "linux", "win32"] },
     { "op": "pipeline", "platforms": ["darwin", "linux", "win32"] }
   ]

@@ -61,4 +61,34 @@ describe('media generation capture compatibility forwarding', () => {
       })
     );
   });
+
+  it('forwards recording to the canonical system recording op', async () => {
+    systemAction.mockResolvedValue({
+      media_recording: { status: 'succeeded', output_path: '/repo/recording.mp4' },
+    });
+
+    const result = await handleCaptureAction('record_screen', {
+      output: 'recording.mp4',
+      duration: 2,
+      fps: 10,
+    });
+
+    expect(systemAction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        steps: [
+          expect.objectContaining({
+            op: 'record_screen',
+            params: expect.objectContaining({ output: '/repo/recording.mp4' }),
+          }),
+        ],
+      })
+    );
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'succeeded',
+        path: '/repo/recording.mp4',
+        compatibility_forwarded_to: 'system-actuator:record_screen',
+      })
+    );
+  });
 });

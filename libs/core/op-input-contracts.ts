@@ -437,6 +437,27 @@ const INPUT_CONTRACTS: ContractCatalog = {
     },
   },
   system: {
+    record_screen: {
+      summary:
+        'Record a bounded screen stream to an MP4 artifact through the canonical system bridge.',
+      examples: [{ output: 'active/shared/tmp/screen-recording.mp4', duration: 3, fps: 30 }],
+      schema: {
+        type: 'object',
+        required: ['output'],
+        properties: {
+          output: { type: 'string', minLength: 1 },
+          duration: { type: 'number', minimum: 0 },
+          fps: { type: 'number', exclusiveMinimum: 0, maximum: 120 },
+          max_frames: { type: 'integer', minimum: 1 },
+          frame_interval_ms: { type: 'number', minimum: 0 },
+          display_index: { type: 'integer', minimum: 0 },
+          display_name: { type: 'string', minLength: 1 },
+          capture_mode: { enum: ['screen', 'focused_window'] },
+          export_as: { type: 'string', minLength: 1 },
+        },
+        additionalProperties: true,
+      },
+    },
     exec: {
       summary: 'Execute a host command under policy.',
       examples: [{ command: 'pnpm', args: ['build'] }],
