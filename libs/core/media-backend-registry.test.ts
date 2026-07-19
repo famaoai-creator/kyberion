@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import {
   getMediaBackendRecord,
   getMediaBackendRegistry,
@@ -7,10 +7,59 @@ import {
   resolveVideoBackend,
   resolveVoiceBackend,
   probeMediaBackendAvailability,
+  resetMediaBackendAvailabilityCache,
   resolveMediaBackendWithAvailability,
 } from './media-backend-registry.js';
 
 describe('media backend registry', () => {
+  beforeEach(() => {
+    resetMediaBackendAvailabilityCache();
+  });
+
+  it('caches availability probes and exposes bounded probe metadata', async () => {
+    const first = await probeMediaBackendAvailability('video.hyperframes_cli', 'video', 'linux', {
+      ttl_ms: 1_000,
+    });
+    const second = await probeMediaBackendAvailability('video.hyperframes_cli', 'video', 'linux', {
+      ttl_ms: 1_000,
+    });
+
+    expect(first.cache_hit).toBe(false);
+    expect(second.cache_hit).toBe(true);
+    expect(second.probe_id).toBe(first.probe_id);
+    expect(new Date(second.cache_expires_at).getTime()).toBeGreaterThan(
+      new Date(second.probed_at).getTime()
+    );
+  });
+
+  it('force bypasses the availability probe cache', async () => {
+    const first = await probeMediaBackendAvailability('video.hyperframes_cli', 'video', 'linux', {
+      ttl_ms: 1_000,
+    });
+    const forced = await probeMediaBackendAvailability('video.hyperframes_cli', 'video', 'linux', {
+      force: true,
+      ttl_ms: 1_000,
+    });
+
+    expect(forced.cache_hit).toBe(false);
+    expect(forced.probe_id).not.toBe(first.probe_id);
+  });
+
+  it('deduplicates concurrent availability probes', async () => {
+    const [first, second] = await Promise.all([
+      probeMediaBackendAvailability('video.hyperframes_cli', 'video', 'linux', {
+        ttl_ms: 1_000,
+      }),
+      probeMediaBackendAvailability('video.hyperframes_cli', 'video', 'linux', {
+        ttl_ms: 1_000,
+      }),
+    ]);
+
+    expect(second.probe_id).toBe(first.probe_id);
+    expect(first.cache_hit).toBe(false);
+    expect(second.cache_hit).toBe(false);
+  });
+
   it('loads the governed registry and resolves defaults', () => {
     const registry = getMediaBackendRegistry();
     expect(registry.default_backend_ids.image).toBe('media-generation.comfyui');
