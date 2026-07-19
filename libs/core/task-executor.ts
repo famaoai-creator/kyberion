@@ -1,10 +1,11 @@
 /**
  * Task Executor — carries a mission's task-plan.json through to completion
- * by spawning a Claude Code sub-agent per task with full tool access.
+ * through the AgentExecutionPort; the selected runtime provider owns the
+ * actual SDK/CLI execution boundary.
  *
  * Key distinction from the ReasoningBackend / IntentExtractor path: those
- * run with `tools: []` (pure reasoning). Here we give the sub-agent the
- * real `claude_code` tool preset so it can read, edit, run tests, etc.
+ * are pure cognition. Task execution carries a governed agent envelope and
+ * returns an agent_delegation receipt.
  *
  * Ordering: topological sort on task.depends_on. Cycles were already
  * rejected by evaluateTaskPlanReadyGate, but we re-check defensively.
@@ -17,16 +18,20 @@
  */
 
 import * as path from 'node:path';
-import { randomUUID } from 'node:crypto';
-import { query, type Options } from '@anthropic-ai/claude-agent-sdk';
 import { logger } from './core.js';
 import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
 import { missionEvidenceDir, rootResolve } from './path-resolver.js';
 import { readTaskPlan, type TaskPlan } from './sdlc-artifact-store.js';
+import { getAgentExecutionPort, type AgentExecutionPort } from './agent-execution-port.js';
 
 const LOG_FILE = 'task-execution-log.jsonl';
 
-export type TaskExecutionStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'skipped_upstream_failed';
+export type TaskExecutionStatus =
+  | 'pending'
+  | 'running'
+  | 'succeeded'
+  | 'failed'
+  | 'skipped_upstream_failed';
 
 export interface TaskExecutionRecord {
   task_id: string;
@@ -57,6 +62,8 @@ export interface ExecuteTaskPlanParams {
   abortController?: AbortController;
   /** If true, stop after the first failure instead of skipping downstream. */
   haltOnFailure?: boolean;
+  /** Runtime boundary used to execute tasks; defaults to the registered Agent port. */
+  executionPort?: AgentExecutionPort;
 }
 
 export interface ExecuteTaskPlanResult {
@@ -98,7 +105,9 @@ function topologicalOrder(plan: TaskPlan): string[] {
     }
   }
   if (out.length !== plan.tasks.length) {
-    throw new Error(`[task-executor] task-plan has a dependency cycle (ran topo sort, got ${out.length}/${plan.tasks.length})`);
+    throw new Error(
+      `[task-executor] task-plan has a dependency cycle (ran topo sort, got ${out.length}/${plan.tasks.length})`
+    );
   }
   return out;
 }
@@ -141,6 +150,7 @@ async function runOneTask(
   task: TaskPlan['tasks'][number],
   plan: TaskPlan,
   params: ExecuteTaskPlanParams,
+  executionPort: AgentExecutionPort
 ): Promise<TaskExecutionRecord> {
   const record: TaskExecutionRecord = {
     task_id: task.task_id,
@@ -148,43 +158,38 @@ async function runOneTask(
     started_at: new Date().toISOString(),
   };
 
-  const options: Options = {
-    model: params.model ?? 'opus',
-    tools: { type: 'preset', preset: 'claude_code' },
-    permissionMode: 'dontAsk',
-    maxTurns: 50,
-    cwd: params.cwd,
-    abortController: params.abortController,
-    allowedTools: params.allowedTools,
-  };
-
   try {
-    const iterator = query({ prompt: buildTaskPrompt(task, plan), options });
-    let lastAssistantText = '';
-    for await (const message of iterator) {
-      if (message.type === 'assistant') {
-        const content = (message as any).message?.content;
-        if (Array.isArray(content)) {
-          for (const block of content) {
-            if (block?.type === 'text' && typeof block.text === 'string') {
-              lastAssistantText = block.text;
-            }
-          }
-        }
-      } else if (message.type === 'result') {
-        record.session_id = (message as any).session_id;
-        record.total_cost_usd = (message as any).total_cost_usd ?? 0;
-        record.duration_ms = (message as any).duration_ms ?? 0;
-        if (message.subtype === 'success') {
-          record.status = 'succeeded';
-          record.summary = ((message as any).result as string | undefined) ?? lastAssistantText ?? '';
-        } else {
-          record.status = 'failed';
-          record.error = `result.subtype=${(message as any).subtype}`;
-          record.summary = lastAssistantText || record.error;
-        }
-        break;
-      }
+    const receipt = await executionPort.delegate({
+      task_id: task.task_id,
+      mission_id: params.missionId,
+      agent_id: `task-agent-${params.missionId}-${task.task_id}`,
+      agent_profile_id: 'reasoning-worker',
+      team_role_id: task.assigned_role,
+      security_scope: {
+        tenant_id: 'default',
+        mission_id: params.missionId,
+        read_tiers: ['public', 'confidential'],
+        write_tier: 'confidential',
+        purpose: 'task-plan-execution',
+      },
+      instruction: buildTaskPrompt(task, plan),
+      capabilities: params.allowedTools,
+      timeout_ms: 600_000,
+      idempotency_key: `task-plan:${params.missionId}:${task.task_id}`,
+      model_id: params.model,
+    });
+    record.session_id = receipt.runtime_id;
+    record.duration_ms =
+      receipt.started_at && receipt.completed_at
+        ? Date.parse(receipt.completed_at) - Date.parse(receipt.started_at)
+        : undefined;
+    if (receipt.status === 'succeeded') {
+      record.status = 'succeeded';
+      record.summary = receipt.output || receipt.output_ref || '';
+    } else {
+      record.status = 'failed';
+      record.error = receipt.error || `agent receipt status=${receipt.status}`;
+      record.summary = record.error;
     }
   } catch (err: any) {
     record.status = 'failed';
@@ -201,20 +206,22 @@ function appendLog(missionId: string, record: TaskExecutionRecord): string {
   const file = path.join(dir, LOG_FILE);
   const existing = safeExistsSync(file) ? (safeReadFile(file, { encoding: 'utf8' }) as string) : '';
   const line = JSON.stringify(record);
-  const next = existing.length > 0 && !existing.endsWith('\n')
-    ? `${existing}\n${line}\n`
-    : `${existing}${line}\n`;
+  const next =
+    existing.length > 0 && !existing.endsWith('\n')
+      ? `${existing}\n${line}\n`
+      : `${existing}${line}\n`;
   safeWriteFile(file, next, { encoding: 'utf8', mkdir: true });
   return file;
 }
 
 export async function executeTaskPlan(
-  params: ExecuteTaskPlanParams,
+  params: ExecuteTaskPlanParams
 ): Promise<ExecuteTaskPlanResult> {
   const plan = readTaskPlan(params.missionId);
   if (!plan) throw new Error(`[task-executor] no task-plan.json for ${params.missionId}`);
 
   const order = topologicalOrder(plan);
+  const executionPort = params.executionPort || getAgentExecutionPort();
   const taskById = new Map(plan.tasks.map((t) => [t.task_id, t]));
   const records = new Map<string, TaskExecutionRecord>();
 
@@ -228,7 +235,9 @@ export async function executeTaskPlan(
     const task = taskById.get(taskId)!;
     // Skip if any dependency failed
     const failedDeps = (task.depends_on ?? []).filter(
-      (dep) => records.get(dep)?.status === 'failed' || records.get(dep)?.status === 'skipped_upstream_failed',
+      (dep) =>
+        records.get(dep)?.status === 'failed' ||
+        records.get(dep)?.status === 'skipped_upstream_failed'
     );
     if (failedDeps.length > 0) {
       const record: TaskExecutionRecord = {
@@ -241,12 +250,14 @@ export async function executeTaskPlan(
       records.set(task.task_id, record);
       logPath = appendLog(params.missionId, record);
       skipped += 1;
-      logger.warn(`[task-executor] skipping ${task.task_id} — upstream failed: ${failedDeps.join(', ')}`);
+      logger.warn(
+        `[task-executor] skipping ${task.task_id} — upstream failed: ${failedDeps.join(', ')}`
+      );
       continue;
     }
 
     logger.info(`[task-executor] running ${task.task_id} (${task.title})`);
-    const record = await runOneTask(task, plan, params);
+    const record = await runOneTask(task, plan, params, executionPort);
     records.set(task.task_id, record);
     logPath = appendLog(params.missionId, record);
     if (record.status === 'succeeded') {

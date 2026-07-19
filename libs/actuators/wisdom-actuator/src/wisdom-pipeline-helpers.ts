@@ -61,6 +61,11 @@ import { getAllFiles } from '@agent/core/fs-utils';
 import * as path from 'node:path';
 import * as yaml from 'js-yaml';
 import { dispatchDecisionOp } from './decision-ops.js';
+import { createWisdomDispatcher } from './wisdom-dispatcher.js';
+import { getWisdomOperationSpec } from './op-catalog.js';
+import type { WisdomContext } from './contracts/wisdom-context.js';
+import type { WisdomReceipt } from './contracts/wisdom-result.js';
+import { validateWisdomRequest } from './contracts/wisdom-request.js';
 
 const WISDOM_MANIFEST_PATH = pathResolver.rootResolve(
   'libs/actuators/wisdom-actuator/manifest.json'
@@ -75,12 +80,50 @@ const DEFAULT_WISDOM_RETRY = {
   jitter: true,
 };
 
+const RECONCILE_ALLOWED_OPS = new Set([
+  'history_search',
+  'knowledge_search',
+  'query',
+  'distill',
+  'inject_prior_knowledge',
+  'knowledge_inject',
+  'knowledge_export',
+  'knowledge_import',
+]);
+
+function assertWisdomReconcileSteps(steps: PipelineStep[]): void {
+  for (const step of steps) {
+    if (step.type === 'control') {
+      const nested =
+        step.op === 'if'
+          ? [
+              ...((step.params.then as PipelineStep[] | undefined) || []),
+              ...((step.params.else as PipelineStep[] | undefined) || []),
+            ]
+          : (step.params.pipeline as PipelineStep[] | undefined) || [];
+      assertWisdomReconcileSteps(nested);
+      continue;
+    }
+    if (!RECONCILE_ALLOWED_OPS.has(step.op)) {
+      throw new Error(
+        `[RECONCILE_SCOPE_VIOLATION] reconcile cannot execute non-knowledge op: ${step.type}:${step.op}`
+      );
+    }
+  }
+}
+
 function buildRetryOptions() {
   return buildGovernedRetryOptions({
     manifestPath: WISDOM_MANIFEST_PATH,
     defaults: DEFAULT_WISDOM_RETRY,
     fallbackCategories: ['resource_unavailable', 'timeout'],
   });
+}
+
+export async function runWithOperationRetry<T>(op: string, task: () => Promise<T>): Promise<T> {
+  const idempotency = getWisdomOperationSpec(op)?.idempotency;
+  if (idempotency !== 'read' && idempotency !== 'idempotent_write') return task();
+  return retry(task, buildRetryOptions());
 }
 
 function normalizeKnowledgeTier(value: unknown): 'personal' | 'confidential' | 'public' {
@@ -104,25 +147,47 @@ function normalizeKnowledgePackageAgentId(value: unknown): string {
 export interface PipelineStep {
   type: 'capture' | 'transform' | 'apply' | 'control';
   op: string;
-  params: any;
+  params: Record<string, unknown>;
+}
+
+export interface WisdomDirectAction {
+  action:
+    | 'knowledge_search'
+    | 'history_search'
+    | 'knowledge_inject'
+    | 'knowledge_export'
+    | 'knowledge_import';
+  params: Record<string, unknown>;
 }
 
 export interface WisdomAction {
-  action: 'pipeline' | 'reconcile';
+  action: 'pipeline' | 'reconcile' | WisdomDirectAction['action'];
+  params?: Record<string, unknown>;
   steps?: PipelineStep[];
   strategy_path?: string;
-  context?: Record<string, any>;
+  context?: WisdomContext;
   options?: {
     max_steps?: number;
     timeout_ms?: number;
+    compatibility_mode?: boolean;
   };
 }
 
 export async function handleAction(input: WisdomAction) {
+  validateWisdomRequest(input);
   if (input.action === 'reconcile') {
     return await performReconcile(input);
   }
-  return await executePipeline(input.steps || [], input.context || {}, input.options);
+  if (input.action === 'pipeline') {
+    return await executePipeline(input.steps || [], input.context || {}, input.options);
+  }
+  const spec = getWisdomOperationSpec(input.action);
+  if (!spec) throw new Error(`[UNKNOWN_OP] Unknown direct wisdom action: ${input.action}`);
+  return await executePipeline(
+    [{ type: spec.kind, op: input.action, params: input.params || {} }],
+    {},
+    input.options
+  );
 }
 
 // AR-01 Task 2: hand-rolled loop replaced by the canonical engine
@@ -130,22 +195,29 @@ export async function handleAction(input: WisdomAction) {
 // silently absorbed (AR-06 no-silent-failure).
 export async function executePipeline(
   steps: PipelineStep[],
-  initialCtx: any = {},
-  options: any = {}
+  initialCtx: WisdomContext = {},
+  options: WisdomAction['options'] = {}
 ) {
   const MAX_STEPS = options.max_steps || 1000;
   const TIMEOUT = options.timeout_ms || 60000;
+  const contextPath =
+    typeof initialCtx.context_path === 'string' ? initialCtx.context_path : undefined;
 
-  let ctx = { ...initialCtx, today: new Date().toISOString().split('T')[0] };
+  let ctx: WisdomContext = { ...initialCtx, today: new Date().toISOString().split('T')[0] };
+  const receipts: WisdomReceipt[] = [];
+  const dispatcher = createWisdomDispatcher({
+    capture: (op, params, currentCtx) =>
+      opCapture(op, params, currentCtx, options.compatibility_mode),
+    transform: (op, params, currentCtx) =>
+      opTransform(op, params, currentCtx, options.compatibility_mode),
+    apply: (op, params, currentCtx) => opApply(op, params, currentCtx, options.compatibility_mode),
+  });
 
-  if (
-    initialCtx.context_path &&
-    safeExistsSync(pathResolver.rootResolve(initialCtx.context_path))
-  ) {
+  if (contextPath && safeExistsSync(pathResolver.rootResolve(contextPath))) {
     const saved = await retry(
       async () =>
         JSON.parse(
-          safeReadFile(pathResolver.rootResolve(initialCtx.context_path), {
+          safeReadFile(pathResolver.rootResolve(contextPath), {
             encoding: 'utf8',
           }) as string
         ),
@@ -159,28 +231,34 @@ export async function executePipeline(
     ctx,
     { maxSteps: MAX_STEPS, timeoutMs: TIMEOUT },
     {
-      capture: opCapture,
-      transform: opTransform,
+      capture: async (op, params, currentCtx) => {
+        const result = await dispatcher.dispatch('capture', op, params, currentCtx);
+        receipts.push(result.receipt);
+        return result.context;
+      },
+      transform: async (op, params, currentCtx) => {
+        const result = await dispatcher.dispatch('transform', op, params, currentCtx);
+        receipts.push(result.receipt);
+        return result.context;
+      },
       apply: async (op, params, currentCtx) => {
-        await opApply(op, params, currentCtx);
-        return currentCtx;
+        const result = await dispatcher.dispatch('apply', op, params, currentCtx);
+        receipts.push(result.receipt);
+        return result.context;
       },
       control: opControl,
     }
   );
   ctx = result.context;
 
-  if (initialCtx.context_path) {
+  if (contextPath) {
     await retry(async () => {
-      safeWriteFile(
-        pathResolver.rootResolve(initialCtx.context_path),
-        JSON.stringify(ctx, null, 2)
-      );
+      safeWriteFile(pathResolver.rootResolve(contextPath), JSON.stringify(ctx, null, 2));
       return undefined;
     }, buildRetryOptions());
   }
 
-  return result;
+  return { ...result, receipts };
 }
 
 async function opControl(
@@ -225,15 +303,19 @@ async function opControl(
   }
 }
 
-async function opCapture(op: string, params: any, ctx: any) {
+async function opCapture(
+  op: string,
+  params: any,
+  ctx: any,
+  _compatibilityMode = false
+): Promise<WisdomContext> {
   switch (op) {
     case 'shell':
       const cmd = resolveVars(params.cmd, ctx);
       return {
         ...ctx,
-        [params.export_as || 'last_capture']: await retry(
-          async () => safeExec(cmd).trim(),
-          buildRetryOptions()
+        [params.export_as || 'last_capture']: await runWithOperationRetry('shell', async () =>
+          safeExec(cmd).trim()
         ),
       };
     case 'read_file':
@@ -282,7 +364,7 @@ async function opCapture(op: string, params: any, ctx: any) {
       return { ...ctx, [params.export_as || 'history_search_results']: report };
     }
     case 'knowledge_search':
-      const query = resolveVars(params.query, ctx).toLowerCase();
+      const query = String(resolveVars(params.query ?? '', ctx)).toLowerCase();
       const manifestPath = pathResolver.knowledge('_manifest.json');
       const manifest = JSON.parse(safeReadFile(manifestPath, { encoding: 'utf8' }) as string);
       const items = manifest.files || manifest.documents || [];
@@ -317,7 +399,12 @@ async function opCapture(op: string, params: any, ctx: any) {
   }
 }
 
-async function opTransform(op: string, params: any, ctx: any) {
+async function opTransform(
+  op: string,
+  params: any,
+  ctx: any,
+  compatibilityMode = false
+): Promise<WisdomContext> {
   switch (op) {
     case 'regex_extract': {
       const input = String(ctx[params.from || 'last_capture'] || '');
@@ -366,13 +453,19 @@ async function opTransform(op: string, params: any, ctx: any) {
       return { ...ctx, [params.export_as]: count };
     }
     default: {
-      const decision = await dispatchDecisionOp(op, params, ctx);
-      return decision.handled ? decision.ctx : ctx;
+      const decision = await dispatchDecisionOp(op, params, ctx, { compatibilityMode });
+      if (!decision.handled) throw new Error(`[UNKNOWN_OP] Unknown transform op: ${op}`);
+      return decision.ctx;
     }
   }
 }
 
-async function opApply(op: string, params: any, ctx: any) {
+async function opApply(
+  op: string,
+  params: any,
+  ctx: any,
+  compatibilityMode = false
+): Promise<WisdomContext> {
   switch (op) {
     case 'write_file':
     case 'write_artifact':
@@ -400,7 +493,7 @@ async function opApply(op: string, params: any, ctx: any) {
       }
       break;
     case 'knowledge_inject':
-      await retry(async () => {
+      await runWithOperationRetry('knowledge_inject', async () => {
         const kPath = resolveVars(params.knowledge_path, ctx);
         const missionId = resolveVars(params.mission_id, ctx);
         const missionPath = (pathResolver as any).findMissionPath(missionId);
@@ -417,34 +510,50 @@ async function opApply(op: string, params: any, ctx: any) {
         } else {
           throw new Error(`Knowledge source not found: ${sourcePath}`);
         }
-      }, buildRetryOptions());
+      });
       break;
     case 'log':
       logger.info(`[WISDOM_LOG] ${resolveVars(params.message || 'Action completed', ctx)}`);
       break;
     case 'knowledge_export':
-      await retry(async () => {
+      await runWithOperationRetry('knowledge_export', async () => {
         const sourceFile = pathResolver.knowledge(resolveVars(params.path, ctx));
         if (!safeExistsSync(sourceFile))
           throw new Error(`Knowledge source not found: ${sourceFile}`);
 
-        const agentId = JSON.parse(
-          safeReadFile(pathResolver.knowledge('personal/agent-identity.json'), {
-            encoding: 'utf8',
-          }) as string
-        ).agent_id;
+        const agentId = normalizeKnowledgePackageAgentId(
+          params.origin_agent_id || ctx.agent_id || ctx.execution_context?.agent_id
+        );
+        const originTenantId = String(
+          params.origin_tenant_id || ctx.tenant_id || ctx.execution_context?.tenant_id || ''
+        ).trim();
+        if (!originTenantId)
+          throw new Error('[KNOWLEDGE_ORIGIN_SCOPE_REQUIRED] origin_tenant_id is required');
+        const sourceTier = normalizeKnowledgeTier(
+          params.source_tier || ctx.knowledge_tier || 'confidential'
+        );
         const rawData = safeReadFile(sourceFile, { encoding: 'utf8' }) as string;
         const { createHash } = await import('node:crypto');
         const hash = createHash('sha256').update(rawData).digest('hex');
+        const packageId = String(params.package_id || `KKP-${hash.slice(0, 16)}`);
 
         const kkp = {
           metadata: {
-            package_id: `KKP-${Date.now()}`,
+            package_version: '1.0.0',
+            package_id: packageId,
             origin_agent_id: agentId,
-            timestamp: new Date().toISOString(),
-            domain: params.domain || 'general',
-            hash: hash,
-            visibility: params.visibility || 'public',
+            origin_tenant_id: originTenantId,
+            origin_project_id: String(params.origin_project_id || ctx.project_id || ''),
+            source_tier: sourceTier,
+            requested_target_tier: normalizeKnowledgeTier(
+              params.requested_target_tier || params.visibility || sourceTier
+            ),
+            content_hash: hash,
+            created_at: new Date().toISOString(),
+            provenance: [resolveVars(params.path, ctx)],
+            trust_status: 'unverified',
+            signature: { status: 'absent' },
+            payload_encoding: 'utf8',
           },
           content: {
             path: resolveVars(params.path, ctx),
@@ -461,43 +570,58 @@ async function opApply(op: string, params: any, ctx: any) {
         );
         safeWriteFile(outPath, JSON.stringify(kkp, null, 2));
         logger.success(`📦 [Wisdom] Knowledge exported to ${outPath}`);
-      }, buildRetryOptions());
+      });
       break;
 
     case 'knowledge_import':
-      await retry(async () => {
+      await runWithOperationRetry('knowledge_import', async () => {
         const pkgPath = pathResolver.rootResolve(resolveVars(params.package_path, ctx));
         if (!safeExistsSync(pkgPath)) throw new Error(`Package not found: ${pkgPath}`);
 
         const pkg = JSON.parse(safeReadFile(pkgPath, { encoding: 'utf8' }) as string);
         const { createHash: vHash } = await import('node:crypto');
-        const actualHash = vHash('sha256').update(pkg.content.raw_data).digest('hex');
+        const rawData = pkg?.content?.raw_data;
+        if (typeof rawData !== 'string')
+          throw new Error('[KNOWLEDGE_PACKAGE_INVALID] content.raw_data is required');
+        const actualHash = vHash('sha256').update(rawData).digest('hex');
+        const expectedHash = pkg?.metadata?.content_hash || pkg?.metadata?.hash;
 
-        if (actualHash !== pkg.metadata.hash) {
+        if (actualHash !== expectedHash) {
           throw new Error(
-            `CRITICAL: Knowledge Package integrity check failed. Expected: ${pkg.metadata.hash}, Got: ${actualHash}`
+            `CRITICAL: Knowledge Package integrity check failed. Expected: ${expectedHash}, Got: ${actualHash}`
           );
         }
 
         const targetTier = normalizeKnowledgeTier(params.tier);
         const originAgentId = normalizeKnowledgePackageAgentId(pkg?.metadata?.origin_agent_id);
+        const originTenantId = String(pkg?.metadata?.origin_tenant_id || '').trim();
+        if (!originTenantId)
+          throw new Error('[KNOWLEDGE_ORIGIN_SCOPE_REQUIRED] origin_tenant_id is required');
+        const sourceTier = normalizeKnowledgeTier(
+          pkg?.metadata?.source_tier || pkg?.metadata?.visibility
+        );
+        if (sourceTier !== 'public' && targetTier === 'public' && !params.promotion_approval_id) {
+          throw new Error(
+            '[KNOWLEDGE_PROMOTION_APPROVAL_REQUIRED] promotion approval is required for public import'
+          );
+        }
         const importDir = pathResolver.knowledge(`${targetTier}/external/${originAgentId}`);
         if (!safeExistsSync(importDir)) safeMkdir(importDir, { recursive: true });
 
         const targetFile = path.join(importDir, path.basename(pkg.content.path));
-        safeWriteFile(targetFile, pkg.content.raw_data);
+        safeWriteFile(targetFile, rawData);
 
         logger.success(`📥 [Wisdom] Imported knowledge from ${originAgentId} to ${targetFile}`);
-      }, buildRetryOptions());
+      });
       break;
 
-    default: {
-      const decision = await dispatchDecisionOp(op, params, ctx);
-      if (!decision.handled) {
-        logger.warn(`[WISDOM] Unknown apply op: ${op}`);
+    default:
+      {
+        const decision = await dispatchDecisionOp(op, params, ctx, { compatibilityMode });
+        if (!decision.handled) throw new Error(`[UNKNOWN_OP] Unknown apply op: ${op}`);
+        return decision.ctx;
       }
-      break;
-    }
+      return ctx;
   }
 }
 
@@ -506,18 +630,33 @@ export async function performReconcile(input: WisdomAction) {
     input.strategy_path || 'governance/wisdom-reconcile-strategy.json'
   );
   if (!safeExistsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
-  const config = await retry(
+  const config = (await retry(
     async () => JSON.parse(safeReadFile(strategyPath, { encoding: 'utf8' }) as string),
     buildRetryOptions()
-  );
+  )) as {
+    strategies: Array<{
+      for_each?: { op: string; params: Record<string, unknown> };
+      pipeline: PipelineStep[];
+      params?: WisdomContext;
+    }>;
+  };
   for (const strategy of config.strategies) {
     if (strategy.for_each) {
+      if (!RECONCILE_ALLOWED_OPS.has(strategy.for_each.op)) {
+        throw new Error(
+          `[RECONCILE_SCOPE_VIOLATION] reconcile cannot collect with op: ${strategy.for_each.op}`
+        );
+      }
+      assertWisdomReconcileSteps(strategy.pipeline);
       const listCtx = await opCapture(strategy.for_each.op, strategy.for_each.params, {});
-      const list = listCtx[strategy.for_each.params.export_as] || [];
+      const exportKey = String(strategy.for_each.params.export_as || '');
+      const listValue = listCtx[exportKey];
+      const list = Array.isArray(listValue) ? listValue : [];
       for (const item of list) {
         await executePipeline(strategy.pipeline, { ...strategy.params, item }, input.options);
       }
     } else {
+      assertWisdomReconcileSteps(strategy.pipeline);
       await executePipeline(strategy.pipeline, strategy.params || {}, input.options);
     }
   }

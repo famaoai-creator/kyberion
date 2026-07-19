@@ -1,6 +1,6 @@
 {
   "actuator_id": "agent-actuator",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Meta-Actuator for Agent Lifecycle and A2A",
   "contract_schema": "schemas/agent-action.schema.json",
   "resilience_tier": "adaptive_retry",
@@ -18,6 +18,7 @@
   "capabilities": [
     { "op": "spawn", "platforms": ["darwin", "linux", "win32"] },
     { "op": "ask", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "delegate", "platforms": ["darwin", "linux", "win32"] },
     { "op": "list", "platforms": ["darwin", "linux", "win32"] },
     { "op": "health", "platforms": ["darwin", "linux", "win32"] },
     { "op": "a2a", "platforms": ["darwin", "linux", "win32"] },

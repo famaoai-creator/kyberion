@@ -24,5 +24,10 @@ if (entrypoint && modulePath === entrypoint) {
 
 export { handleAction } from './wisdom-pipeline-helpers.js';
 export { dispatchDecisionOp } from './decision-ops.js';
+export { createWisdomDispatcher } from './wisdom-dispatcher.js';
+export type { WisdomContext } from './contracts/wisdom-context.js';
+export type { ExecutionKind, WisdomReceipt } from './contracts/wisdom-result.js';
+export type { WisdomOperationSpec } from './contracts/wisdom-operation.js';
+export { validateWisdomRequest } from './contracts/wisdom-request.js';
 
 export { describeOps } from './op-catalog.js';
