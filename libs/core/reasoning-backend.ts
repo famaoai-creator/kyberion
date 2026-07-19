@@ -525,6 +525,59 @@ function summarizeError(error: unknown): string {
   return String(error);
 }
 
+// ---------------------------------------------------------------------------
+// KC-06: delegation summary hardening. A final delegation report shorter than
+// this (trimmed) triggers exactly one continuation retry; the second result
+// passes through unconditionally, so a genuinely terse sub-agent can never
+// cause an infinite retry loop.
+// ---------------------------------------------------------------------------
+
+export const DELEGATION_SUMMARY_MIN_CHARS = 200;
+
+/**
+ * Shared first line of every delegateStructured prompt. The summary-retry
+ * gate uses it to recognize structured delegations, which own their own
+ * schema-validation retry loop and are judged by schema fit, not report length.
+ */
+export const STRUCTURED_DELEGATION_PROMPT_HEADER =
+  'Return a single JSON object that satisfies the schema below.';
+
+export function delegationSummaryRetryEnabled(): boolean {
+  const raw = (process.env.KYBERION_DELEGATION_SUMMARY_RETRY || '').trim().toLowerCase();
+  return !(raw === '0' || raw === 'false' || raw === 'off');
+}
+
+export function buildDelegationSummaryContinuationPrompt(
+  instruction: string,
+  briefResult: string
+): string {
+  return [
+    'Your previous final report for the delegated task below was too brief to act on.',
+    'Continue the same task and produce a comprehensive final report with concrete',
+    'evidence: what was done, artifact/file paths, verification performed and its',
+    'results, and any unresolved gaps. Do not restart the task from scratch.',
+    '',
+    'Original instruction:',
+    instruction,
+    '',
+    'Your too-brief report:',
+    briefResult,
+  ].join('\n');
+}
+
+function shouldRetryShortDelegationSummary(input: {
+  instruction: string;
+  result: string;
+  servedBackendName: string;
+}): boolean {
+  if (!delegationSummaryRetryEnabled()) return false;
+  // The stub backend returns short deterministic placeholders by design —
+  // retrying would only duplicate them and destabilize hermetic tests.
+  if (input.servedBackendName === 'stub') return false;
+  if (input.instruction.startsWith(STRUCTURED_DELEGATION_PROMPT_HEADER)) return false;
+  return input.result.trim().length < DELEGATION_SUMMARY_MIN_CHARS;
+}
+
 function normalizeProviderName(value?: string): string | null {
   const provider = String(value || '')
     .trim()
@@ -741,14 +794,26 @@ export class FailoverReasoningBackend implements ReasoningBackend {
     );
   }
 
-  delegateTask(
+  async delegateTask(
     instruction: string,
     context?: string,
     options?: ReasoningCallOptions
   ): Promise<string> {
-    return this.runWithFailover('delegateTask', (backend) =>
-      backend.delegateTask(instruction, context, options)
+    let servedBackendName = '';
+    const run = (prompt: string): Promise<string> =>
+      this.runWithFailover('delegateTask', (backend) => {
+        servedBackendName = backend.name;
+        return backend.delegateTask(prompt, context, options);
+      });
+    const first = await run(instruction);
+    if (!shouldRetryShortDelegationSummary({ instruction, result: first, servedBackendName })) {
+      return first;
+    }
+    logger.warn(
+      `[reasoning-backend] delegation report too brief (${first.trim().length} chars < ${DELEGATION_SUMMARY_MIN_CHARS}); requesting one continuation`
     );
+    // KC-06: exactly one continuation — the second result passes through as-is.
+    return run(buildDelegationSummaryContinuationPrompt(instruction, first));
   }
 
   prompt(prompt: string, options?: ReasoningCallOptions): Promise<string> {
@@ -834,7 +899,7 @@ export async function delegateStructured<T>(
 
   const buildPrompt = (attempt: number, priorError?: string): string =>
     [
-      'Return a single JSON object that satisfies the schema below.',
+      STRUCTURED_DELEGATION_PROMPT_HEADER,
       'Do not wrap the JSON in markdown fences.',
       'Do not add explanatory prose.',
       attempt > 0 ? `Retry attempt ${attempt} after schema mismatch: ${priorError}` : '',

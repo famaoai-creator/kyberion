@@ -34,12 +34,24 @@ export interface WorkerContextMessage {
   pinned?: boolean;
 }
 
+/** KC-06: a still-running delegated background task surfaced across the compaction boundary. */
+export interface ActiveBackgroundTaskRef {
+  delegation_id: string;
+  instruction_excerpt: string;
+  started_at: string;
+}
+
+/** Bound for `active_background_tasks` in the carryover (kimi-cli `build_active_task_snapshot`). */
+export const MAX_CARRYOVER_BACKGROUND_TASKS = 8;
+
 /** Structured work state that must survive compaction independent of LLM quality. */
 export interface CompactionCarryover {
   goal: string;
   active_artifacts: string[];
   verified_state: string[];
   next_step: string;
+  /** KC-06: still-running delegated tasks re-injected post-compaction (≤8). */
+  active_background_tasks?: ActiveBackgroundTaskRef[];
 }
 
 export interface ContextWindowProfile {
@@ -153,6 +165,10 @@ export function estimateContextTokens(messages: readonly WorkerContextMessage[])
 export function renderCarryoverBlock(carryover: CompactionCarryover): string {
   const list = (values: string[]): string =>
     values.length > 0 ? values.map((value) => `  - ${value}`).join('\n') : '  - none';
+  const backgroundTasks = (carryover.active_background_tasks ?? []).slice(
+    0,
+    MAX_CARRYOVER_BACKGROUND_TASKS
+  );
   return [
     '<task_focus_state>',
     `goal: ${carryover.goal}`,
@@ -161,6 +177,17 @@ export function renderCarryoverBlock(carryover: CompactionCarryover): string {
     'verified_state:',
     list(carryover.verified_state),
     `next_step: ${carryover.next_step}`,
+    ...(backgroundTasks.length > 0
+      ? [
+          'active_background_tasks:',
+          list(
+            backgroundTasks.map(
+              (task) =>
+                `${task.delegation_id} (started ${task.started_at}): ${task.instruction_excerpt}`
+            )
+          ),
+        ]
+      : []),
     '</task_focus_state>',
   ].join('\n');
 }
