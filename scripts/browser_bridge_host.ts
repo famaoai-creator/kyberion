@@ -21,6 +21,7 @@ import {
   classifyFailure,
   compileBrowserRecording,
   compileBrowserRecordingToPipeline,
+  promoteBrowserProcedure,
   createProcedureDelta,
   dispatchProcedure,
   enforceBrowserExtensionApproval,
@@ -51,21 +52,37 @@ import {
 } from '@agent/core';
 
 /** Load + allowlist-guard + validate a browser procedure's backing recording. */
-function loadBrowserProcedure(procedureId: string): { entry?: ProcedureEntry; recording?: BrowserExtensionRecording; error?: string } {
-  const entry = loadProcedures().find((p) => p.procedure_id === procedureId);
-  if (!entry) return { error: `Procedure "${procedureId}" not found in catalog` };
-  if (entry.substrate !== 'browser') return { error: `only browser substrate supported (got: ${entry.substrate})` };
-  const recordingPath = resolveAllowlistedRecordingRef(entry.adapter.recording_ref);
-  if (!recordingPath) return { error: `Procedure "${procedureId}" has no allowlisted recording_ref (expected a path under active/shared/runtime/recordings/)` };
-  let raw: unknown;
-  try {
-    raw = JSON.parse(safeReadFile(recordingPath) as string);
-  } catch (err) {
-    return { error: `Failed to load recording: ${err instanceof Error ? err.message : String(err)}` };
-  }
-  const rec = validateBrowserExtensionRecording(raw);
-  if (!rec.value) return { error: rec.errors.join('; ') };
-  return { entry, recording: rec.value };
+function loadBrowserProcedure(procedureId: string): {
+  entry?: ProcedureEntry;
+  recording?: BrowserExtensionRecording;
+  error?: string;
+} {
+  return withExecutionContext(
+    'sovereign_concierge',
+    () => {
+      const entry = loadProcedures().find((p) => p.procedure_id === procedureId);
+      if (!entry) return { error: `Procedure "${procedureId}" not found in catalog` };
+      if (entry.substrate !== 'browser')
+        return { error: `only browser substrate supported (got: ${entry.substrate})` };
+      const recordingPath = resolveAllowlistedRecordingRef(entry.adapter.recording_ref);
+      if (!recordingPath)
+        return {
+          error: `Procedure "${procedureId}" has no allowlisted recording_ref (expected a path under an allowlisted shared or personal browser recordings store)`,
+        };
+      let raw: unknown;
+      try {
+        raw = JSON.parse(safeReadFile(recordingPath) as string);
+      } catch (err) {
+        return {
+          error: `Failed to load recording: ${err instanceof Error ? err.message : String(err)}`,
+        };
+      }
+      const rec = validateBrowserExtensionRecording(raw);
+      if (!rec.value) return { error: rec.errors.join('; ') };
+      return { entry, recording: rec.value };
+    },
+    'sovereign'
+  );
 }
 
 const HOST_VERSION = '0.1.0';
@@ -84,7 +101,12 @@ function handlePreflight(message: any): HostResponse {
     return { ok: false, status: 'blocked', errors: preflight.errors };
   }
   const candidate = buildBrowserExtensionPipelineCandidate(message.recording);
-  return { ok: true, status: preflight.status, approval_required: preflight.approvalRequired, candidate };
+  return {
+    ok: true,
+    status: preflight.status,
+    approval_required: preflight.approvalRequired,
+    candidate,
+  };
 }
 
 function handleRequestExecution(message: any): HostResponse {
@@ -101,7 +123,7 @@ function handleRequestExecution(message: any): HostResponse {
       recording: recording.value!,
       session: session.value!,
       agentId: typeof message.agentId === 'string' ? message.agentId : 'browser-extension',
-    }),
+    })
   );
   if (!approval.allowed) {
     return {
@@ -175,7 +197,7 @@ function handleSubmitReceipt(message: any): HostResponse {
   // fact (OP-H3). The mission lifecycle may later relocate/aggregate these.
   const receipt = result.value;
   const persisted = withExecutionContext('surface_runtime', () =>
-    persistBrowserExtensionReceipt(receipt),
+    persistBrowserExtensionReceipt(receipt)
   );
   if (persisted.errors.length > 0) {
     return { ok: false, error: persisted.errors.join('; ') };
@@ -193,7 +215,12 @@ function handleSubmitReceipt(message: any): HostResponse {
         agentId: 'browser-bridge',
         action: 'browser_execution',
         operation: `browser:execute:${receipt.recording_id}`,
-        result: receipt.status === 'completed' ? 'completed' : receipt.status === 'blocked' ? 'denied' : 'failed',
+        result:
+          receipt.status === 'completed'
+            ? 'completed'
+            : receipt.status === 'blocked'
+              ? 'denied'
+              : 'failed',
         reason: receipt.summary || `Browser execution ${receipt.status} on ${receipt.origin}`,
         metadata: {
           receipt_id: receipt.receipt_id,
@@ -203,7 +230,9 @@ function handleSubmitReceipt(message: any): HostResponse {
           evidence_ref: persisted.path,
         },
       });
-    } catch { /* audit enrichment is best-effort */ }
+    } catch {
+      /* audit enrichment is best-effort */
+    }
 
     if (receipt.status === 'completed') {
       try {
@@ -216,14 +245,25 @@ function handleSubmitReceipt(message: any): HostResponse {
             status: 'proposed',
             target_kind: 'sop_candidate',
             evidence_refs: [persisted.path || `receipt:${receipt.receipt_id}`],
-            metadata: { surface: 'browser-extension', origin: receipt.origin, recording_id: receipt.recording_id },
-          }),
+            metadata: {
+              surface: 'browser-extension',
+              origin: receipt.origin,
+              recording_id: receipt.recording_id,
+            },
+          })
         );
-      } catch { /* distill enrichment is best-effort */ }
+      } catch {
+        /* distill enrichment is best-effort */
+      }
     }
   });
 
-  return { ok: true, status: 'recorded', receipt_id: receipt.receipt_id, evidence_path: persisted.path };
+  return {
+    ok: true,
+    status: 'recorded',
+    receipt_id: receipt.receipt_id,
+    evidence_path: persisted.path,
+  };
 }
 
 async function handleDispatchProcedure(message: any): Promise<HostResponse> {
@@ -244,7 +284,10 @@ async function handleDispatchProcedure(message: any): Promise<HostResponse> {
     ...new Set(
       recording.value.actions
         .map((a) => a.op)
-        .filter((op): op is Exclude<typeof op, 'sensitive_input_omitted'> => op !== 'sensitive_input_omitted'),
+        .filter(
+          (op): op is Exclude<typeof op, 'sensitive_input_omitted'> =>
+            op !== 'sensitive_input_omitted'
+        )
     ),
   ];
   const session: BrowserExtensionSessionRequest = {
@@ -269,7 +312,7 @@ async function handleDispatchProcedure(message: any): Promise<HostResponse> {
       missionId: session.mission_id,
       pipelineId: session.pipeline_id,
       channel: 'browser-extension',
-    }),
+    })
   );
 
   if (dispatch.status === 'approval_required') {
@@ -281,7 +324,11 @@ async function handleDispatchProcedure(message: any): Promise<HostResponse> {
     };
   }
   if (dispatch.status !== 'lease_issued') {
-    return { ok: false, status: dispatch.status, error: dispatch.errors.join('; ') || 'dispatch failed' };
+    return {
+      ok: false,
+      status: dispatch.status,
+      error: dispatch.errors.join('; ') || 'dispatch failed',
+    };
   }
 
   const compiled = compileBrowserRecording(recording.value, {
@@ -378,9 +425,81 @@ function handleSaveRecording(message: any): HostResponse {
     safeMkdir(pathResolver.shared('runtime/recordings'), { recursive: true });
     safeWriteFile(abs, `${JSON.stringify(recording.value, null, 2)}\n`);
   } catch (err) {
-    return { ok: false, error: `failed to save recording: ${err instanceof Error ? err.message : String(err)}` };
+    return {
+      ok: false,
+      error: `failed to save recording: ${err instanceof Error ? err.message : String(err)}`,
+    };
   }
   return { ok: true, recording_ref: rel, recording_id: recording.value.recording_id };
+}
+
+/**
+ * Register a reviewed extension recording in the personal overlay. The
+ * extension never writes catalog files directly: native messaging validates,
+ * stores the recording under the personal tier, then promotes it through the
+ * shared compiler and trust boundary.
+ */
+function handlePromoteProcedure(message: any): HostResponse {
+  const procedureId = typeof message.procedure_id === 'string' ? message.procedure_id.trim() : '';
+  const intentPhrases = Array.isArray(message.intent_phrases) ? message.intent_phrases : [];
+  const recording = validateBrowserExtensionRecording(message.recording);
+  if (!procedureId) return { ok: false, error: 'promote_procedure requires procedure_id' };
+  if (!recording.value) return { ok: false, error: recording.errors.join('; ') };
+  if (recording.value.review?.status !== 'approved') {
+    return { ok: false, error: 'recording review must be approved before promotion' };
+  }
+  if (
+    intentPhrases.length === 0 ||
+    intentPhrases.some(
+      (phrase: unknown) => typeof phrase !== 'string' || phrase.trim().length === 0
+    )
+  ) {
+    return { ok: false, error: 'intent_phrases must contain at least one non-empty string' };
+  }
+
+  const id = recording.value.recording_id.replace(/[^A-Za-z0-9_.-]/g, '_');
+  const recordingRef = `knowledge/personal/browser-recordings/${id}.json`;
+  return withExecutionContext(
+    'sovereign_concierge',
+    () => {
+      try {
+        safeMkdir(pathResolver.knowledge('personal/browser-recordings'), { recursive: true });
+        safeWriteFile(
+          pathResolver.rootResolve(recordingRef),
+          `${JSON.stringify(recording.value, null, 2)}\n`
+        );
+        const promoted = promoteBrowserProcedure({
+          recordingRef,
+          procedureId,
+          intentPhrases,
+          catalogPath: pathResolver.knowledge('personal/browser-procedures.json'),
+          status: 'active',
+        });
+        try {
+          auditChain.record({
+            agentId: 'browser-extension',
+            action: 'procedure_promote',
+            operation: 'browser:procedure:promote',
+            result: 'allowed',
+            reason: `Registered personal browser procedure "${procedureId}"`,
+            metadata: { procedure_id: procedureId, recording_ref: recordingRef, scope: 'personal' },
+          });
+        } catch {
+          /* audit enrichment is best-effort */
+        }
+        return {
+          ok: true,
+          status: 'registered',
+          procedure_id: procedureId,
+          recording_ref: recordingRef,
+          procedure: promoted.procedureEntry,
+        };
+      } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : String(err) };
+      }
+    },
+    'sovereign'
+  );
 }
 
 /**
@@ -392,27 +511,38 @@ function handleSaveRecording(message: any): HostResponse {
 function handleApplyProcedureDelta(message: any): HostResponse {
   const procedureId = typeof message.procedure_id === 'string' ? message.procedure_id.trim() : '';
   const deltaPath = typeof message.delta_path === 'string' ? message.delta_path : '';
-  if (!procedureId || !deltaPath) return { ok: false, error: 'apply_procedure_delta requires procedure_id and delta_path' };
+  if (!procedureId || !deltaPath)
+    return { ok: false, error: 'apply_procedure_delta requires procedure_id and delta_path' };
 
   const delta = loadProcedureDelta(deltaPath);
   if (!delta) return { ok: false, error: `delta not found: ${deltaPath}` };
 
   const base = loadBrowserProcedure(procedureId);
-  if (base.error || !base.recording) return { ok: false, error: base.error ?? 'base procedure load failed' };
+  if (base.error || !base.recording)
+    return { ok: false, error: base.error ?? 'base procedure load failed' };
 
   const deltaRecAbs = resolveAllowlistedRecordingRef(delta.delta_recording_ref);
-  if (!deltaRecAbs) return { ok: false, error: 'delta_recording_ref is not in the allowlisted recordings store' };
+  if (!deltaRecAbs)
+    return { ok: false, error: 'delta_recording_ref is not in the allowlisted recordings store' };
   let deltaRecording;
   try {
-    const parsed = validateBrowserExtensionRecording(JSON.parse(safeReadFile(deltaRecAbs) as string));
-    if (!parsed.value) return { ok: false, error: `delta recording invalid: ${parsed.errors.join('; ')}` };
+    const parsed = validateBrowserExtensionRecording(
+      JSON.parse(safeReadFile(deltaRecAbs) as string)
+    );
+    if (!parsed.value)
+      return { ok: false, error: `delta recording invalid: ${parsed.errors.join('; ')}` };
     deltaRecording = parsed.value;
   } catch (err) {
-    return { ok: false, error: `failed to load delta recording: ${err instanceof Error ? err.message : String(err)}` };
+    return {
+      ok: false,
+      error: `failed to load delta recording: ${err instanceof Error ? err.message : String(err)}`,
+    };
   }
 
   const merged = applyProcedureDelta({ baseRecording: base.recording, deltaRecording, delta });
-  const saved = withExecutionContext('surface_runtime', () => handleSaveRecording({ recording: merged }));
+  const saved = withExecutionContext('surface_runtime', () =>
+    handleSaveRecording({ recording: merged })
+  );
   if (!saved.ok) return saved;
   return {
     ok: true,
@@ -435,25 +565,38 @@ function handleApplyProcedureDelta(message: any): HostResponse {
 function handleSaveProcedureDelta(message: any): HostResponse {
   const procedureId = typeof message.procedure_id === 'string' ? message.procedure_id.trim() : '';
   if (!procedureId) return { ok: false, error: 'save_procedure_delta requires procedure_id' };
-  const anchorStepIndex = Number.isInteger(message.anchor_step_index) ? message.anchor_step_index : 0;
+  const anchorStepIndex = Number.isInteger(message.anchor_step_index)
+    ? message.anchor_step_index
+    : 0;
   const step =
     message.step && typeof message.step === 'object'
-      ? { op: message.step.op, summary: typeof message.step.summary === 'string' ? message.step.summary : '' }
+      ? {
+          op: message.step.op,
+          summary: typeof message.step.summary === 'string' ? message.step.summary : '',
+        }
       : undefined;
-  const reason = classifyFailure(new Error(typeof message.error === 'string' ? message.error : ''), step);
+  const reason = classifyFailure(
+    new Error(typeof message.error === 'string' ? message.error : ''),
+    step
+  );
 
-  const deltaRef = typeof message.delta_recording_ref === 'string' ? message.delta_recording_ref : '';
+  const deltaRef =
+    typeof message.delta_recording_ref === 'string' ? message.delta_recording_ref : '';
   if (!deltaRef) {
     // Classification only — no corrective recording captured yet.
     return { ok: true, status: 'classified', reason };
   }
   if (!resolveAllowlistedRecordingRef(deltaRef)) {
-    return { ok: false, error: 'delta_recording_ref must be inside the allowlisted recordings store' };
+    return {
+      ok: false,
+      error: 'delta_recording_ref must be inside the allowlisted recordings store',
+    };
   }
   const delta = createProcedureDelta({
     procedureId,
     anchorStepIndex,
-    anchorSnapshotHash: typeof message.anchor_snapshot_hash === 'string' ? message.anchor_snapshot_hash : undefined,
+    anchorSnapshotHash:
+      typeof message.anchor_snapshot_hash === 'string' ? message.anchor_snapshot_hash : undefined,
     deltaRecordingRef: deltaRef,
     reason,
   });
@@ -469,9 +612,16 @@ function handleSaveProcedureDelta(message: any): HostResponse {
         operation: `browser:repair:${procedureId}`,
         result: 'completed',
         reason: `Self-repair delta captured (${reason}) at step ${anchorStepIndex}`,
-        metadata: { procedure_id: procedureId, reason, anchor_step_index: anchorStepIndex, delta_path: saved },
+        metadata: {
+          procedure_id: procedureId,
+          reason,
+          anchor_step_index: anchorStepIndex,
+          delta_path: saved,
+        },
       });
-    } catch { /* audit enrichment is best-effort */ }
+    } catch {
+      /* audit enrichment is best-effort */
+    }
     return saved;
   });
   return { ok: true, status: 'delta_saved', reason, delta_path: path };
@@ -482,7 +632,11 @@ async function handleResolveIntent(message: any): Promise<HostResponse> {
   if (!intent) return { ok: false, error: 'resolve_intent requires a non-empty intent string' };
   const origin = typeof message.origin === 'string' ? message.origin : undefined;
   const substrate = typeof message.substrate === 'string' ? message.substrate : undefined;
-  const resolution = await resolveProcedure(intent, { origin, substrate });
+  const resolution = await withExecutionContext(
+    'sovereign_concierge',
+    () => resolveProcedure(intent, { origin, substrate }),
+    'sovereign'
+  );
   return { ok: true, resolution };
 }
 
@@ -506,6 +660,8 @@ function handle(message: any): HostResponse | Promise<HostResponse> {
       return handlePrepareProcedure(message);
     case 'save_recording':
       return handleSaveRecording(message);
+    case 'promote_procedure':
+      return handlePromoteProcedure(message);
     case 'apply_procedure_delta':
       return handleApplyProcedureDelta(message);
     case 'save_procedure_delta':
@@ -517,14 +673,29 @@ function handle(message: any): HostResponse | Promise<HostResponse> {
   }
 }
 
-function writeFrame(payload: HostResponse): void {
+function writeFrame(payload: HostResponse): Promise<void> {
   const json = Buffer.from(JSON.stringify(payload), 'utf8');
   const header = Buffer.alloc(4);
   header.writeUInt32LE(json.length, 0);
-  process.stdout.write(Buffer.concat([header, json]));
+  return new Promise((resolve, reject) => {
+    process.stdout.write(Buffer.concat([header, json]), (error) => {
+      if (error) reject(error);
+      else resolve();
+    });
+  });
 }
 
 let inbox = Buffer.alloc(0);
+let inputEnded = false;
+let pendingResponses = 0;
+
+function exitWhenDrained(): void {
+  // Native Messaging one-shot calls may close stdin immediately after sending
+  // the request. Let stdout finish and allow Node to exit naturally; an
+  // explicit process.exit can make Chrome report "Native host has exited"
+  // before it has consumed the response frame.
+  if (inputEnded && pendingResponses === 0) process.stdin.pause();
+}
 
 function drain(): void {
   while (inbox.length >= 4) {
@@ -532,12 +703,17 @@ function drain(): void {
     if (inbox.length < 4 + length) return;
     const body = inbox.subarray(4, 4 + length);
     inbox = inbox.subarray(4 + length);
+    pendingResponses += 1;
     Promise.resolve()
       .then(() => handle(JSON.parse(body.toString('utf8'))))
       .then((response) => writeFrame(response))
       .catch((error) =>
-        writeFrame({ ok: false, error: error instanceof Error ? error.message : String(error) }),
-      );
+        writeFrame({ ok: false, error: error instanceof Error ? error.message : String(error) })
+      )
+      .finally(() => {
+        pendingResponses -= 1;
+        exitWhenDrained();
+      });
   }
 }
 
@@ -545,5 +721,8 @@ process.stdin.on('data', (chunk: Buffer) => {
   inbox = Buffer.concat([inbox, chunk]);
   drain();
 });
-process.stdin.on('end', () => process.exit(0));
+process.stdin.on('end', () => {
+  inputEnded = true;
+  exitWhenDrained();
+});
 process.stdin.on('error', () => process.exit(1));

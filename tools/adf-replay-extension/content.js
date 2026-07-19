@@ -96,30 +96,77 @@ function verifyGolden(conditions) {
 // DOM, and refuses to act when the target is missing or ambiguous.
 async function executeStep(step, value) {
   if (!step?.target?.ref) return { status: 'error', detail: 'ref がありません' };
-  await observePage();
-  // `submit_form` targets a <form>, which interactiveElements() deliberately
-  // excludes — include forms in the candidate pool for that op so the recorded
-  // ref can actually re-resolve at replay (otherwise every submit is not_found).
-  const candidates =
-    step.op === 'submit_form'
-      ? [...interactiveElements(), ...document.querySelectorAll('form')]
-      : interactiveElements();
-  const matches = candidates.filter(
-    (element) => semanticRef(element, roleOf(element), accessibleName(element)) === step.target.ref
-  );
-  if (matches.length === 0)
-    return { status: 'not_found', detail: `対象 ${step.target.ref} が見つかりません` };
-  if (matches.length > 1)
-    return { status: 'ambiguous', detail: `対象 ${step.target.ref} が複数あります` };
-  const element = matches[0];
-  if (roleOf(element) !== step.target.role || accessibleName(element) !== step.target.name) {
-    return { status: 'ambiguous', detail: '対象の役割または名称が記録時から変化しました' };
-  }
+  const resolved = await waitForTarget(step);
+  if (!resolved.element) return resolved.result;
+  const element = resolved.element;
   try {
     return await performAction(element, step, value);
   } catch (error) {
     return { status: 'error', detail: error instanceof Error ? error.message : String(error) };
   }
+}
+
+const TARGET_WAIT_TIMEOUT_MS = 10000;
+const TARGET_WAIT_INTERVAL_MS = 100;
+
+function candidatesFor(step) {
+  // `submit_form` targets a <form>, which interactiveElements() deliberately
+  // excludes — include forms in the candidate pool for that op.
+  return step.op === 'submit_form'
+    ? [...interactiveElements(), ...document.querySelectorAll('form')]
+    : interactiveElements();
+}
+
+function resolveTarget(step) {
+  const candidates = candidatesFor(step);
+  const exact = candidates.filter(
+    (element) => semanticRef(element, roleOf(element), accessibleName(element)) === step.target.ref
+  );
+  if (exact.length > 1) {
+    return { result: { status: 'ambiguous', detail: `対象 ${step.target.ref} が複数あります` } };
+  }
+  if (exact.length === 1) {
+    const element = exact[0];
+    if (roleOf(element) !== step.target.role || accessibleName(element) !== step.target.name) {
+      return {
+        result: { status: 'ambiguous', detail: '対象の役割または名称が記録時から変化しました' },
+      };
+    }
+    return { element };
+  }
+
+  // SPA updates can insert an earlier control and shift the occurrence-based
+  // semantic ref. A unique role+accessible-name match is a safe recovery;
+  // ambiguity still stops execution rather than guessing.
+  if (step.target.role && step.target.name) {
+    const fallback = candidates.filter(
+      (element) =>
+        roleOf(element) === step.target.role && accessibleName(element) === step.target.name
+    );
+    if (fallback.length > 1) {
+      return { result: { status: 'ambiguous', detail: '同じ役割と名称の対象が複数あります' } };
+    }
+    if (fallback.length === 1) return { element: fallback[0] };
+  }
+  return { result: { status: 'not_found', detail: `対象 ${step.target.ref} が見つかりません` } };
+}
+
+async function waitForTarget(step) {
+  const deadline = Date.now() + TARGET_WAIT_TIMEOUT_MS;
+  let lastResult = null;
+  while (Date.now() <= deadline) {
+    await observePage();
+    const resolved = resolveTarget(step);
+    if (resolved.element || resolved.result?.status === 'ambiguous') return resolved;
+    lastResult = resolved.result;
+    await new Promise((resolve) => setTimeout(resolve, TARGET_WAIT_INTERVAL_MS));
+  }
+  return {
+    result: {
+      ...lastResult,
+      detail: `${lastResult?.detail || '対象'}（${TARGET_WAIT_TIMEOUT_MS / 1000}秒待機後）`,
+    },
+  };
 }
 
 async function performAction(element, step, value) {
