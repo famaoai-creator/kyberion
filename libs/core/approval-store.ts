@@ -9,6 +9,7 @@ import {
 import { pathResolver } from './path-resolver.js';
 import type { RejectionReasonCategory } from './rejection-reason.js';
 import { safeExistsSync, safeReaddir } from './secure-io.js';
+import { getDefaultWorkerEventStream } from './worker-event-stream.js';
 import {
   buildOrganizationWorkLoopSummary,
   type OrganizationWorkLoopSummary,
@@ -377,7 +378,29 @@ export function createApprovalRequest(
     channel: record.channel,
     thread_ts: record.threadTs,
   });
+  projectApprovalWorkerEvent('approval_request', {
+    request_id: record.id,
+    correlation_id: record.correlationId,
+    requested_by: record.requestedBy,
+    channel: record.channel,
+  });
   return record;
+}
+
+/**
+ * KC-02: project approval lifecycle onto the worker event stream so every
+ * surface renders the same approval dialog from one contract. The jsonl
+ * event log above stays the SSoT; this projection is best-effort.
+ */
+function projectApprovalWorkerEvent(
+  type: 'approval_request' | 'approval_response',
+  payload: Record<string, unknown>
+): void {
+  try {
+    getDefaultWorkerEventStream().emit(type, payload);
+  } catch {
+    /* never let observability break the approval path */
+  }
 }
 
 /** Treat a malformed expiry as expired so approval cannot fail open. */
@@ -441,6 +464,13 @@ export function cancelApprovalRequest(
     source: updated.source,
     channel: updated.channel,
     thread_ts: updated.threadTs,
+  });
+  projectApprovalWorkerEvent('approval_response', {
+    request_id: updated.id,
+    correlation_id: updated.correlationId,
+    status: 'cancelled',
+    ...(params.cancelledBy ? { decided_by: params.cancelledBy } : {}),
+    channel: updated.channel,
   });
   return updated;
 }
@@ -715,6 +745,13 @@ export function decideApprovalRequest(
     // per-request workflow record.
     note: params.note,
     reason_category: params.reasonCategory,
+  });
+  projectApprovalWorkerEvent('approval_response', {
+    request_id: updated.id,
+    correlation_id: updated.correlationId,
+    status: params.decision,
+    decided_by: params.decidedBy,
+    channel: updated.channel,
   });
 
   if (cacheDescriptor) {

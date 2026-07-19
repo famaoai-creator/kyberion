@@ -43,6 +43,7 @@ import {
   type AdfRunResult,
   type AdfSkippedStep,
   executeProgrammaticToolCall,
+  getDefaultWorkerEventStream,
 } from '@agent/core';
 import { tryRepairJson } from '@agent/core/json-repair';
 import { installPythonVoiceBridgeIfAvailable } from '@agent/core/python-voice-bridge';
@@ -1699,10 +1700,16 @@ export async function runSteps(
     control: async (_op, _params, ctx, runNestedSteps) => runStepWithLifecycle(ctx, runNestedSteps),
   };
 
+  const eventStream = getDefaultWorkerEventStream();
   const hooks: AdfStepHooks = {
     beforeStep: (rawStep, stepNumber) => {
       const step = rawStep as unknown as PipelineAdfStep;
       stepRefStack.push(step);
+      eventStream.emit('step_begin', {
+        op: step.op,
+        step_number: stepNumber,
+        step_id: step.id || step.op,
+      });
       const stepPolicy = normalizeReasoningPolicy(step);
       const stepTraceBase = {
         step_index: results.length,
@@ -1757,6 +1764,14 @@ export async function runSteps(
               error_rule_id: failureInfo.classification.ruleId,
             }
           : {}),
+      });
+      eventStream.emit('step_end', {
+        op: normalizedOp,
+        step_number: stepNumber,
+        step_id: step.id || step.op,
+        status: outcome.status,
+        duration_ms: durationMs,
+        ...(outcome.error ? { error: outcome.error } : {}),
       });
       if (!opts.quiet && (outcome.status === 'success' || outcome.status === 'failed')) {
         logger.info(
@@ -1979,6 +1994,11 @@ export async function main() {
     pipelineId,
   });
   trace.addArtifact('file', String(argv.input), 'Pipeline ADF input');
+  getDefaultWorkerEventStream().emit(
+    'turn_begin',
+    { kind: 'pipeline', pipeline_id: pipelineId, input: String(argv.input) },
+    { pipeline_id: pipelineId, ...(missionId ? { mission_id: missionId } : {}) }
+  );
 
   try {
     const stepsToRun = (pipeline.steps || []).map((step) => ({
@@ -1999,6 +2019,11 @@ export async function main() {
       nodePath.relative(pathResolver.rootDir(), persisted.path) || persisted.path;
     logger.info(`   [PIPELINE] Trace: ${result.context.trace_persisted_path}`);
     const pipelineStatus = result.status === 'succeeded' || recovered ? 'succeeded' : 'failed';
+    getDefaultWorkerEventStream().emit(
+      'turn_end',
+      { kind: 'pipeline', pipeline_id: pipelineId, status: pipelineStatus, recovered },
+      { pipeline_id: pipelineId, ...(missionId ? { mission_id: missionId } : {}) }
+    );
     runFeedbackLoop(pipelineId, pipelineStatus, persisted.trace);
     // LC-09: surface semantic-decision degradations in the run summary —
     // a pipeline that "succeeded" on deterministic fallbacks every time is
@@ -2056,6 +2081,17 @@ export async function main() {
   } catch (err: any) {
     const failure = formatPipelineFailure(err);
     const recovered = tryPermissionFallback(pipeline, failure, trace);
+    getDefaultWorkerEventStream().emit(
+      'turn_end',
+      {
+        kind: 'pipeline',
+        pipeline_id: pipelineId,
+        status: recovered ? 'succeeded' : 'failed',
+        recovered,
+        error: err?.message ?? String(err),
+      },
+      { pipeline_id: pipelineId, ...(missionId ? { mission_id: missionId } : {}) }
+    );
     if (recovered) {
       const persisted = finalizePipelineTrace(trace, true);
       runFeedbackLoop(pipelineId, 'succeeded', persisted.trace);
