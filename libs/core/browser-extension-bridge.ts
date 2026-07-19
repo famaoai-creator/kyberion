@@ -1,9 +1,10 @@
 import AjvModule, { type ValidateFunction } from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
+import { Buffer } from 'node:buffer';
 import { createHash, randomUUID } from 'node:crypto';
 import { enforceApprovalGate, type ApprovalGateResult } from './approval-gate.js';
 import { pathResolver } from './path-resolver.js';
-import { safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import { safeAppendFile, safeMkdir, safeReadFile, safeStat, safeWriteFile } from './secure-io.js';
 import { validateOpInput } from './op-input-contracts.js';
 import { resolveBrowserRecordingPipelineOp, normalizeBrowserPipelineOp } from './op-vocabulary.js';
 
@@ -64,6 +65,7 @@ export type BrowserExtensionOperation =
   | 'select_tab'
   | 'navigate'
   | 'click_ref'
+  | 'click_if_present'
   | 'fill_ref'
   | 'select_ref'
   | 'press_ref'
@@ -88,6 +90,12 @@ export interface BrowserExtensionAction {
     role: string;
     name: string;
     snapshot_hash: string;
+    /**
+     * Structural anchor (stable-ancestor CSS path). Replay falls back to it for
+     * low-risk ops when name-based resolution fails — e.g. a news headline slot
+     * whose text rotates between recording and replay.
+     */
+    dom_path?: string;
   };
   variable?: {
     name: string;
@@ -147,6 +155,8 @@ export interface BrowserExtensionSessionRequest {
     issued_at: string;
     expires_at: string;
     approved_step_hashes: string[];
+    origin?: string;
+    segment_index?: number;
   };
 }
 
@@ -264,6 +274,9 @@ function validateRecordingSemantics(recording: BrowserExtensionRecording): strin
     if (action.op === 'select_ref' && !action.selection) {
       errors.push(`action ${action.action_id} must include a selection state`);
     }
+    if (action.op === 'click_if_present' && !action.target) {
+      errors.push(`action ${action.action_id} (click_if_present) requires a target`);
+    }
     if (action.selection && action.op !== 'select_ref') {
       errors.push(`action ${action.action_id} cannot attach a selection state to ${action.op}`);
     }
@@ -294,6 +307,15 @@ function validateRecordingSemantics(recording: BrowserExtensionRecording): strin
     }
     if (texts.some((text) => looksLikeSecretToken(text))) {
       errors.push(`action ${action.action_id} label looks like it echoes a secret/token value`);
+    }
+    if (action.target?.dom_path && !isSafeStructuralDomPath(action.target.dom_path)) {
+      errors.push(`action ${action.action_id} contains an unsafe structural DOM path`);
+    }
+    if (
+      action.target?.dom_path &&
+      PII_PATTERNS.some((pattern) => pattern.test(action.target.dom_path))
+    ) {
+      errors.push(`action ${action.action_id} structural DOM path contains PII-like text`);
     }
     // A real accessible name is short; a long one means the element's whole text
     // subtree (page body, other people's data) leaked into the label.
@@ -505,6 +527,10 @@ export interface RecordingSegment {
  * Segment 0's origin is the recording's tab.origin; each subsequent segment's
  * origin is the preceding navigate's `to_origin`. The navigate markers themselves
  * are boundaries and are not included in any segment's actions.
+ *
+ * Empty segments (e.g. a recording that ends on a navigate) ARE included so
+ * origin guards can vet every origin the recording touches; execution-side
+ * consumers (lease issuance) skip them — there is nothing to execute.
  */
 export function segmentRecording(recording: BrowserExtensionRecording): RecordingSegment[] {
   const segments: RecordingSegment[] = [];
@@ -567,6 +593,10 @@ export interface SegmentedLease {
  * recording. A single approval covers all high-risk steps across segments; each
  * lease only carries its own segment's approved high-risk hashes and is pinned to
  * that segment's origin. Returns all-or-nothing.
+ *
+ * Segments with no actionable steps (e.g. a trailing navigate) get no lease —
+ * an empty sub-recording would fail validation and there is nothing to execute.
+ * The returned leases' segment_index can therefore be non-contiguous.
  */
 export function issueSegmentedLeases(input: {
   recording: BrowserExtensionRecording;
@@ -578,6 +608,7 @@ export function issueSegmentedLeases(input: {
   const segments = segmentRecording(input.recording);
   const leases: SegmentedLease[] = [];
   for (const segment of segments) {
+    if (segment.actions.length === 0) continue;
     const sub = subRecordingForSegment(input.recording, segment);
     const subSession: BrowserExtensionSessionRequest = { ...input.session, origin: segment.origin };
     const issued = issueBrowserExtensionLease({
@@ -599,6 +630,9 @@ export function issueSegmentedLeases(input: {
       origin: segment.origin,
       lease: { ...issued.lease, origin: segment.origin, segment_index: segment.index },
     });
+  }
+  if (leases.length === 0) {
+    return { errors: ['segmented recording contains no actionable segment'] };
   }
   return { leases, errors: [] };
 }
@@ -926,4 +960,159 @@ export function persistBrowserExtensionReceipt(receipt: unknown): {
       errors: [`failed to persist receipt: ${err instanceof Error ? err.message : String(err)}`],
     };
   }
+}
+
+// ---------------------------------------------------------------------------
+// Observations — read-only data extracted from reviewed page regions
+// ---------------------------------------------------------------------------
+
+const OBSERVATION_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/browser-observation.schema.json'
+);
+const OBSERVATION_STORE = pathResolver.knowledge('personal/browser-observations');
+let observationValidator: ValidateFunction | null = null;
+
+export interface BrowserExtensionObservationField {
+  name: string;
+  text: string;
+  dom_path?: string;
+}
+
+export interface BrowserExtensionObservation {
+  schema_version: 'browser-observation.v1';
+  observation_id: string;
+  procedure_id: string;
+  recording_id: string;
+  lease_id: string;
+  origin: string;
+  captured_at: string;
+  source: 'chrome-extension';
+  fields: BrowserExtensionObservationField[];
+}
+
+const MAX_OBSERVATION_STORE_BYTES = 5 * 1024 * 1024;
+const MAX_OBSERVATION_LIMIT = 50;
+
+/** Only accept selectors emitted by content.js structuralPath(). */
+export function isSafeStructuralDomPath(value: string): boolean {
+  if (value.length === 0 || value.length > 600) return false;
+  const segment = '(?:[a-z][a-z0-9]*(?::nth-of-type\\(\\d+\\))?|#[A-Za-z][A-Za-z0-9_-]*)';
+  return new RegExp(`^${segment}(?: > ${segment})*$`, 'i').test(value);
+}
+
+/**
+ * Server-side redaction for extracted page text — mirrors content.js safeText.
+ * Observations legitimately carry page content, so unlike recordings we REDACT
+ * rather than reject: the data still flows, minus PII shapes.
+ */
+export function redactObservationText(value: string): string {
+  return String(value)
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[redacted-email]')
+    .replace(/\b(?:\d[ -]?){13,16}\b/g, '[redacted-card]')
+    .replace(/(?:\+?\d{1,3}[-\s]?)?\(?\d{2,4}\)?[-\s]?\d{2,4}[-\s]?\d{3,4}\b/g, '[redacted-phone]')
+    .replace(/〒?\s?\d{3}-\d{4}\b/g, '[redacted-postal]')
+    .replace(/\b\d{12,}\b/g, '[redacted-number]');
+}
+
+export function validateBrowserExtensionObservation(
+  input: unknown
+): BrowserExtensionValidationResult<BrowserExtensionObservation> {
+  observationValidator = schemaValidator(OBSERVATION_SCHEMA_PATH, observationValidator);
+  if (!observationValidator(input))
+    return { valid: false, errors: formatErrors(observationValidator) };
+  const value = input as BrowserExtensionObservation;
+  const origin = canonicalOrigin(value.origin);
+  if (!origin || origin !== value.origin)
+    return { valid: false, errors: ['observation origin must be an http(s) origin'] };
+  if (
+    value.fields.some(
+      (field) =>
+        (field.dom_path && !isSafeStructuralDomPath(field.dom_path)) ||
+        (field.dom_path && PII_PATTERNS.some((pattern) => pattern.test(field.dom_path)))
+    )
+  )
+    return { valid: false, errors: ['observation contains an unsafe structural DOM path'] };
+  return { valid: true, errors: [], value };
+}
+
+function sanitizeObservationFileName(procedureId: string): string {
+  return procedureId.replace(/[^A-Za-z0-9._-]/g, '_');
+}
+
+/**
+ * Append a validated observation to the per-procedure JSONL store (append-only,
+ * so point-in-time reports and time-series analysis share one source). Field
+ * text is re-redacted at this trust boundary regardless of client behavior.
+ */
+export function persistBrowserExtensionObservation(observation: unknown): {
+  path?: string;
+  errors: string[];
+} {
+  const validation = validateBrowserExtensionObservation(observation);
+  if (!validation.valid || !validation.value) return { errors: validation.errors };
+  const redacted: BrowserExtensionObservation = {
+    ...validation.value,
+    fields: validation.value.fields.map((field) => ({
+      ...field,
+      name: redactObservationText(field.name),
+      text: redactObservationText(field.text),
+    })),
+  };
+  try {
+    safeMkdir(OBSERVATION_STORE, { recursive: true });
+    const filePath = `${OBSERVATION_STORE}/${sanitizeObservationFileName(redacted.procedure_id)}.jsonl`;
+    try {
+      if (
+        safeStat(filePath).size + Buffer.byteLength(`${JSON.stringify(redacted)}\n`, 'utf8') >
+        MAX_OBSERVATION_STORE_BYTES
+      ) {
+        return {
+          errors: ['observation store limit reached; rotate or archive older observations'],
+        };
+      }
+    } catch {
+      // The per-procedure file does not exist yet.
+    }
+    safeAppendFile(filePath, `${JSON.stringify(redacted)}\n`);
+    return { path: filePath, errors: [] };
+  } catch (err) {
+    return {
+      errors: [
+        `failed to persist observation: ${err instanceof Error ? err.message : String(err)}`,
+      ],
+    };
+  }
+}
+
+/**
+ * Load the most recent observations for a procedure (oldest → newest within the
+ * returned window). Tolerates and skips corrupt JSONL lines.
+ */
+export function loadBrowserExtensionObservations(
+  procedureId: string,
+  options: { limit?: number } = {}
+): BrowserExtensionObservation[] {
+  const limit = Math.min(
+    MAX_OBSERVATION_LIMIT,
+    options.limit && options.limit > 0 ? Math.floor(options.limit) : MAX_OBSERVATION_LIMIT
+  );
+  const filePath = `${OBSERVATION_STORE}/${sanitizeObservationFileName(procedureId)}.jsonl`;
+  let raw: string;
+  try {
+    if (safeStat(filePath).size > MAX_OBSERVATION_STORE_BYTES) return [];
+    raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
+  } catch {
+    return [];
+  }
+  const observations: BrowserExtensionObservation[] = [];
+  for (const line of raw.split('\n')) {
+    if (!line.trim()) continue;
+    try {
+      const parsed = validateBrowserExtensionObservation(JSON.parse(line));
+      if (parsed.value) observations.push(parsed.value);
+    } catch {
+      // skip corrupt lines
+    }
+  }
+  return observations.slice(-limit);
 }

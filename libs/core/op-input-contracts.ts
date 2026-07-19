@@ -54,6 +54,38 @@ const INPUT_CONTRACTS: ContractCatalog = {
         additionalProperties: true,
       },
     },
+    query_elements: {
+      summary: 'Count visible browser elements matching a selector and optional text.',
+      examples: [{ selector: 'button', text: '承認', exact: true, export_as: 'approval_count' }],
+      schema: {
+        type: 'object',
+        required: ['selector'],
+        properties: {
+          selector: { type: 'string', minLength: 1 },
+          text: { type: 'string' },
+          text_match: { type: 'string' },
+          exact: { type: 'boolean' },
+          export_as: { type: 'string', minLength: 1 },
+        },
+        additionalProperties: true,
+      },
+    },
+    click_first_match: {
+      summary: 'Click the first visible browser element matching a selector and optional text.',
+      examples: [{ selector: 'button', text: '承認', export_as: 'clicked_match' }],
+      schema: {
+        type: 'object',
+        anyOf: [{ required: ['selector'] }, { required: ['selectors'] }],
+        properties: {
+          selector: { type: 'string', minLength: 1 },
+          selectors: { type: 'array', items: { type: 'string', minLength: 1 }, minItems: 1 },
+          text: { type: 'string' },
+          exact: { type: 'boolean' },
+          export_as: { type: 'string', minLength: 1 },
+        },
+        additionalProperties: true,
+      },
+    },
     fill: {
       summary: 'Fill a browser input by selector or ref.',
       examples: [{ selector: 'input[name="email"]', text: 'user@example.com' }],
