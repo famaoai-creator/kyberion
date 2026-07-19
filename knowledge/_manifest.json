@@ -237,7 +237,7 @@
     {
       "path": "product/architecture/component-lifecycle-inventory.md",
       "tier": "public",
-      "size": 6311,
+      "size": 6312,
       "type": "md"
     },
     {
@@ -483,7 +483,7 @@
     {
       "path": "product/architecture/media-execution-backend-abstraction.md",
       "tier": "public",
-      "size": 5137,
+      "size": 5216,
       "type": "md"
     },
     {
@@ -987,7 +987,7 @@
     {
       "path": "product/governance/actuator-op-registry.json",
       "tier": "public",
-      "size": 14573,
+      "size": 14598,
       "type": "json"
     },
     {
@@ -2937,7 +2937,7 @@
     {
       "path": "product/orchestration/actuator-op-discovery.json",
       "tier": "public",
-      "size": 71588,
+      "size": 73073,
       "type": "json"
     },
     {
@@ -3273,7 +3273,7 @@
     {
       "path": "product/orchestration/global_actuator_index.json",
       "tier": "public",
-      "size": 15911,
+      "size": 15936,
       "type": "json"
     },
     {

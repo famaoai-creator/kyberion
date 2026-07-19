@@ -258,7 +258,13 @@
           "required": ["output"],
           "properties": {
             "output": { "type": "string" },
-            "duration": { "type": "number", "minimum": 0 }
+            "duration": { "type": "number", "minimum": 0 },
+            "fps": { "type": "number", "exclusiveMinimum": 0, "maximum": 120 },
+            "max_frames": { "type": "integer", "minimum": 1 },
+            "frame_interval_ms": { "type": "number", "minimum": 0 },
+            "display_index": { "type": "integer", "minimum": 0 },
+            "display_name": { "type": "string" },
+            "capture_mode": { "enum": ["screen", "focused_window"] }
           },
           "additionalProperties": false
         }
