@@ -389,6 +389,7 @@
         "reconcile_config_fallbacks",
         "reconcile_unclassified_errors",
         "reconcile_unhandled_intents",
+        "record_screen",
         "sample_traces",
         "scan_directory",
         "screenshot",

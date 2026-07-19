@@ -52,5 +52,5 @@
 ## 進捗追記 (2026-07-20)
 
 - `media-generation-actuator` の capture 実装を `capture-actions.ts` に隔離し、生成 job の state/store 経路から直接依存しない構造にした。
-- system 側の canonical `screenshot` op が利用できるため、`capture_screen` / `capture_focused_window` は `system-actuator:screenshot` への compatibility forwarder として維持した。`record_screen` は canonical recording op がまだないため、既存の governed media service preset を利用する。
-- `record_screen` の実装は macOS `avfoundation` 固定なので、manifest の対応 platform は `darwin` のみに補正した。canonical recording op が追加された場合は同じ forwarding 方針へ移行する。
+- system 側の canonical `screenshot` / `record_screen` op が利用できるため、media-generation の `capture_screen` / `capture_focused_window` / `record_screen` は system actuator への compatibility forwarder として維持した。
+- canonical `record_screen` は secure screen-recording bridge を使い、現在の実装可能 platform は `darwin` / `linux` とする。旧 media service preset の macOS `avfoundation` 固定経路は canonical runtime から分離した。

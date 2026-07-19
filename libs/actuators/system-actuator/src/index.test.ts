@@ -1902,6 +1902,44 @@ describe('system-actuator new OS automation ops (pipeline mode)', () => {
       expect(result.context.screenshot_window_candidates).toContain('Window 1');
     });
 
+    it('record_screen: writes a bounded MP4 through the canonical recording bridge', async () => {
+      const { handleAction } = await import('./index');
+      const core = await import('@agent/core');
+      vi.mocked(core.safeExistsSync).mockReturnValue(true);
+
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [
+          {
+            type: 'capture',
+            op: 'record_screen',
+            params: {
+              output: 'active/shared/tmp/canonical-recording.mp4',
+              duration: 2,
+              fps: 10,
+              display_index: 0,
+              export_as: 'recording',
+            },
+          },
+        ],
+      });
+
+      expect(result.status).toBe('succeeded');
+      const recordingFactory = vi.mocked(createScreenRecordingBridge).mock.results.at(-1)?.value;
+      expect(recordingFactory?.probe).toHaveBeenCalled();
+      expect(recordingFactory?.recordToMp4).toHaveBeenCalledWith(
+        expect.stringContaining('canonical-recording.mp4'),
+        expect.objectContaining({
+          display_index: 0,
+          max_frames: 20,
+          fps: 10,
+        })
+      );
+      expect(result.context.recording).toEqual(
+        expect.objectContaining({ status: 'succeeded', output_path: expect.any(String) })
+      );
+    });
+
     it('screen_stream: captures repeated screen frames via bridge', async () => {
       const { handleAction } = await import('./index');
 
