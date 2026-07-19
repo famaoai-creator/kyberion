@@ -2937,7 +2937,7 @@
     {
       "path": "product/orchestration/actuator-op-discovery.json",
       "tier": "public",
-      "size": 69230,
+      "size": 71190,
       "type": "json"
     },
     {
@@ -5991,7 +5991,13 @@
     {
       "path": "product/schemas/browser-extension-session.schema.json",
       "tier": "public",
-      "size": 1979,
+      "size": 2149,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/browser-observation.schema.json",
+      "tier": "public",
+      "size": 1750,
       "type": "json"
     },
     {
@@ -6009,7 +6015,7 @@
     {
       "path": "product/schemas/browser-recording.schema.json",
       "tier": "public",
-      "size": 5236,
+      "size": 5332,
       "type": "json"
     },
     {

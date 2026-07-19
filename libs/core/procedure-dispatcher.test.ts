@@ -156,7 +156,11 @@ describe('dispatchProcedure', () => {
     const result = await dispatchProcedure({ ...BASE_INPUT, recording: undefined });
     expect(result.status).toBe('blocked');
     expect(result.errors[0]).toContain('recording');
-    expect(logSpy).toHaveBeenCalledWith('test-agent', 'procedure_dispatcher:missing_recording', true);
+    expect(logSpy).toHaveBeenCalledWith(
+      'test-agent',
+      'procedure_dispatcher:missing_recording',
+      true
+    );
   });
 
   it('returns blocked when session is missing', async () => {
@@ -204,6 +208,13 @@ describe('dispatchProcedure', () => {
       ...RECORDING,
       actions: [
         {
+          action_id: 'act-1',
+          op: 'snapshot',
+          summary: 'observe kingtime',
+          risk: 'observe',
+          captured_at: '2026-06-24T00:00:00Z',
+        },
+        {
           action_id: 'nav-1',
           op: 'navigate',
           summary: 'handoff',
@@ -214,7 +225,23 @@ describe('dispatchProcedure', () => {
             to_origin: 'https://news.yahoo.co.jp',
           },
         },
+        {
+          action_id: 'act-2',
+          op: 'snapshot',
+          summary: 'observe news',
+          risk: 'observe',
+          captured_at: '2026-06-24T00:00:02Z',
+        },
       ],
+      review: {
+        status: 'approved',
+        reviewed_at: '2026-06-24T00:00:03Z',
+        decisions: [
+          { action_id: 'act-1', status: 'approved' },
+          { action_id: 'nav-1', status: 'approved' },
+          { action_id: 'act-2', status: 'approved' },
+        ],
+      },
     };
     const result = await dispatchProcedure({
       ...BASE_INPUT,
