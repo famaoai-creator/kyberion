@@ -23,6 +23,7 @@
           "op": {
             "enum": [
               "screenshot",
+              "record_screen",
               "clipboard_read",
               "get_focused_input",
               "get_screen_size",
@@ -89,6 +90,7 @@
               "if",
               "while",
               "system:screenshot",
+              "system:record_screen",
               "system:clipboard_read",
               "system:get_focused_input",
               "system:get_screen_size",
@@ -200,6 +202,31 @@
                 "type": "string",
                 "enum": ["screen", "focused_window"],
                 "description": "Screenshot mode; focused_window is the default when application is provided"
+              },
+              "output": {
+                "type": "string",
+                "description": "Output path for canonical screen recording"
+              },
+              "duration": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Recording duration in seconds; converted to bounded frames"
+              },
+              "fps": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 120,
+                "description": "Requested recording frames per second"
+              },
+              "max_frames": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Explicit frame bound for deterministic recording"
+              },
+              "frame_interval_ms": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Capture interval between frames"
               },
               "display_index": {
                 "type": "integer",
