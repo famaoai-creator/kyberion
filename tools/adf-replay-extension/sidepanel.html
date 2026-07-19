@@ -1,16 +1,18 @@
 <!doctype html>
 <html lang="ja">
   <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Kyberion Browser Bridge</title>
-    <link rel="stylesheet" href="sidepanel.css">
+    <link rel="stylesheet" href="sidepanel.css" />
   </head>
   <body>
     <header class="masthead">
       <p class="eyebrow">KYBERION / BROWSER BRIDGE</p>
       <h1>Chrome の操作を、安全な下書きへ。</h1>
-      <p class="subhead">ページの文章は外部データです。実行する前に、Kyberion の review と承認を通します。</p>
+      <p class="subhead">
+        ページの文章は外部データです。実行する前に、Kyberion の review と承認を通します。
+      </p>
     </header>
 
     <nav class="tabs" aria-label="Browser Bridge sections">
@@ -27,7 +29,13 @@
         <h2>何をしたいか入力してください</h2>
         <p>自然言語でやりたいことを入力すると、登録済みの手順と照合します。</p>
         <div class="intent-input-row">
-          <input id="intent-input" type="text" class="intent-input" placeholder="例: 勤怠の承認をしておいて" autocomplete="off">
+          <input
+            id="intent-input"
+            type="text"
+            class="intent-input"
+            placeholder="例: 勤怠の承認をしておいて"
+            autocomplete="off"
+          />
           <button id="intent-resolve-button" class="primary" type="button">解決</button>
         </div>
         <div id="intent-result" class="intent-result" hidden>
@@ -38,8 +46,12 @@
           </div>
           <ol id="intent-candidates" class="action-list" hidden></ol>
           <div class="button-row" id="intent-action-row">
-            <button id="intent-execute-button" class="primary" type="button" hidden>Pattern B: このまま実行</button>
-            <button id="intent-record-button" class="secondary" type="button" hidden>Pattern A: 新しく記録する</button>
+            <button id="intent-execute-button" class="primary" type="button" hidden>
+              Pattern B: このまま実行
+            </button>
+            <button id="intent-record-button" class="secondary" type="button" hidden>
+              Pattern A: 新しく記録する
+            </button>
           </div>
           <div id="intent-inputs" class="execution-inputs" hidden>
             <p class="section-kicker">INPUT VALUES (記録されません)</p>
@@ -53,8 +65,12 @@
           <p class="section-kicker">SELF-REPAIR</p>
           <p id="intent-repair-reason"></p>
           <div class="button-row">
-            <button id="intent-repair-record-button" class="secondary" type="button">修正操作を記録する</button>
-            <button id="intent-repair-apply-button" class="primary" type="button" hidden>修正を手順に反映</button>
+            <button id="intent-repair-record-button" class="secondary" type="button">
+              修正操作を記録する
+            </button>
+            <button id="intent-repair-apply-button" class="primary" type="button" hidden>
+              修正を手順に反映
+            </button>
           </div>
         </div>
       </section>
@@ -67,27 +83,53 @@
           <p id="connection-origin">http(s) の通常タブだけを接続できます。</p>
           <div class="button-row">
             <button id="connect-button" class="primary" type="button">このタブを接続</button>
-            <button id="disconnect-button" class="secondary" type="button" disabled>接続を解除</button>
+            <button id="disconnect-button" class="secondary" type="button" disabled>
+              接続を解除
+            </button>
           </div>
         </div>
-        <p class="notice">接続は現在のタブと origin に限定されます。ページ遷移で origin が変わった場合は、記録を停止して再接続します。</p>
+        <p class="notice">
+          接続は現在のタブと origin に限定されます。ページ遷移で origin
+          が変わった場合は、記録を停止して再接続します。
+        </p>
       </section>
 
       <section class="panel" data-panel="record">
         <p class="section-kicker">CAPTURE INTENT, NOT DATA</p>
         <h2>操作を記録</h2>
-        <p>入力内容は保存しません。パスワード、OTP、token、Cookie、WebAuthn は記録から除外します。</p>
+        <p>
+          入力内容は保存しません。パスワード、OTP、token、Cookie、WebAuthn は記録から除外します。
+        </p>
+        <p>
+          <strong>Alt+クリック</strong
+          >で、ページ内の要素（表・価格・記事など）を「抽出対象」としてマークできます。実行時にその位置のテキストを読み取り、分析レポートに使えます。
+        </p>
         <div class="button-row">
           <button id="start-recording-button" class="primary" type="button">記録を開始</button>
-          <button id="resume-recording-button" class="secondary" type="button" disabled>再接続して続行</button>
-          <button id="stop-recording-button" class="secondary" type="button" disabled>記録を停止</button>
+          <button id="resume-recording-button" class="secondary" type="button" disabled>
+            再接続して続行
+          </button>
+          <button id="stop-recording-button" class="secondary" type="button" disabled>
+            記録を停止
+          </button>
+          <button id="extraction-mode-button" class="secondary" type="button" disabled>
+            分析対象モードを開始
+          </button>
+          <button id="conditional-mode-button" class="secondary" type="button" disabled>
+            条件付きクリック対象を選択
+          </button>
         </div>
+        <p class="mode-help">
+          条件付きクリック対象モードでは、ページ上の要素を選ぶだけで「表示されていればクリック」として記録します。選択時にページの操作は発生しません。
+        </p>
         <div class="recording-summary" aria-live="polite">
           <strong id="recording-count">0 操作</strong>
           <span id="omitted-count">秘密入力の除外: 0</span>
         </div>
         <ol id="recording-actions" class="action-list"></ol>
-        <button id="discard-last-button" class="text-button" type="button" disabled>直前の操作を破棄</button>
+        <button id="discard-last-button" class="text-button" type="button" disabled>
+          直前の操作を破棄
+        </button>
       </section>
 
       <section class="panel" data-panel="review">
@@ -96,8 +138,12 @@
         <p id="review-summary">記録を停止すると、ここに redaction 済みの下書きが表示されます。</p>
         <ol id="review-actions" class="action-list"></ol>
         <div class="button-row">
-          <button id="finalize-review-button" class="primary" type="button" disabled>承認済み操作を確定</button>
-          <button id="reject-draft-button" class="secondary" type="button" disabled>下書きを拒否</button>
+          <button id="finalize-review-button" class="primary" type="button" disabled>
+            承認済み操作を確定
+          </button>
+          <button id="reject-draft-button" class="secondary" type="button" disabled>
+            下書きを拒否
+          </button>
         </div>
         <pre id="draft-preview" class="draft-preview" aria-label="Browser recording draft"></pre>
       </section>
@@ -105,7 +151,9 @@
       <section class="panel" data-panel="run">
         <p class="section-kicker">GOVERNED EXECUTION</p>
         <h2>次に何が起きるか</h2>
-        <p id="handoff-status">Review を確定すると、承認済み操作だけを含む handoff 下書きが準備されます。</p>
+        <p id="handoff-status">
+          Review を確定すると、承認済み操作だけを含む handoff 下書きが準備されます。
+        </p>
         <ol id="handoff-steps" class="action-list"></ol>
         <div id="execution-inputs" class="execution-inputs" hidden>
           <p class="section-kicker">INPUT VALUES (記録されません)</p>
@@ -113,23 +161,58 @@
         </div>
         <div id="procedure-registration" class="execution-inputs" hidden>
           <p class="section-kicker">PERSONAL SCENARIO</p>
-          <p>承認済みの録音を、このブラウザだけで使う再利用シナリオとして登録します。ページの入力値は登録されません。</p>
+          <p>
+            承認済みの録音を、このブラウザだけで使う再利用シナリオとして登録します。ページの入力値は登録されません。
+          </p>
           <label class="execution-input">
             <span>シナリオ ID（例: attendance.approve）</span>
             <input id="procedure-id-input" type="text" autocomplete="off" spellcheck="false" />
           </label>
           <label class="execution-input">
             <span>呼び出し文（カンマまたは改行区切り）</span>
-            <textarea id="intent-phrases-input" rows="2" autocomplete="off" placeholder="勤怠を承認して\n勤怠承認"></textarea>
+            <textarea
+              id="intent-phrases-input"
+              rows="2"
+              autocomplete="off"
+              placeholder="勤怠を承認して\n勤怠承認"
+            ></textarea>
           </label>
-          <button id="register-procedure-button" class="secondary" type="button" disabled>個人用シナリオとして登録</button>
+          <button id="register-procedure-button" class="secondary" type="button" disabled>
+            個人用シナリオとして登録
+          </button>
           <small id="procedure-registration-status"></small>
         </div>
         <ol id="execution-results" class="action-list"></ol>
+        <div id="observation-block" class="execution-inputs" hidden>
+          <p class="section-kicker">EXTRACTED DATA</p>
+          <p id="observation-summary"></p>
+          <ol id="observation-preview" class="action-list" aria-label="抽出データのプレビュー"></ol>
+          <label class="execution-input">
+            <span>分析の観点（空欄なら「要点・変化・傾向」の標準レポート）</span>
+            <textarea
+              id="report-question-input"
+              rows="2"
+              autocomplete="off"
+              placeholder="例: 保有銘柄の評価損益の変化を表にまとめて、大きく動いた銘柄を指摘して"
+            ></textarea>
+          </label>
+          <div class="button-row">
+            <button id="generate-report-button" class="primary" type="button">
+              レポートを生成
+            </button>
+          </div>
+          <pre id="observation-report-body" class="draft-preview" hidden></pre>
+        </div>
         <div class="button-row">
-          <button id="preflight-button" class="secondary" type="button" disabled>Kyberion preflight</button>
-          <button id="request-execution-button" class="primary" type="button" disabled>承認済み操作を実行</button>
-          <button id="copy-draft-button" class="secondary" type="button" disabled>下書きをコピー</button>
+          <button id="preflight-button" class="secondary" type="button" disabled>
+            Kyberion preflight
+          </button>
+          <button id="request-execution-button" class="primary" type="button" disabled>
+            承認済み操作を実行
+          </button>
+          <button id="copy-draft-button" class="secondary" type="button" disabled>
+            下書きをコピー
+          </button>
         </div>
       </section>
     </main>

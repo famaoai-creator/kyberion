@@ -1,35 +1,7 @@
-const SAFE_OPERATIONS = new Set([
-  // observation (read-only)
-  'snapshot',
-  'screenshot',
-  'extract_text_ref',
-  'list_tabs',
-  // low-risk execution (spec §6)
-  'open_tab',
-  'select_tab',
-  'click_ref',
-  'fill_ref',
-  'select_ref',
-  'press_ref',
-  'wait_for_ref',
-  // high-risk execution (require approval; see HIGH_RISK_OPERATIONS)
-  'submit_form',
-  // recorder-only markers
-  'sensitive_input_omitted',
-]);
-// High-risk operations mirror libs/core/browser-extension-bridge.ts
-// HIGH_RISK_OPERATIONS (spec §6). Keep this set in sync — the bridge is the
-// authority; the extension enforces the same set locally against the lease's
-// approved_step_hashes so a high-risk op can never bypass approval client-side.
-const HIGH_RISK_OPERATIONS = new Set([
-  'submit_form',
-  'upload_file',
-  'download_file',
-  'delete',
-  'purchase',
-  'credential_submit',
-  'settings_change',
-]);
+import { BROWSER_OPERATION_POLICY } from './operation-policy.js';
+
+const SAFE_OPERATIONS = new Set(BROWSER_OPERATION_POLICY.safe);
+const HIGH_RISK_OPERATIONS = new Set(BROWSER_OPERATION_POLICY.highRisk);
 const STATE_KEY = 'browserBridgeState';
 const NATIVE_HOST = 'com.kyberion.browser_bridge';
 
@@ -90,10 +62,18 @@ async function maybeAutoResume(tabId, tab) {
   if (!recording || recording.tabId !== tabId || !recording.pausedReason) return;
   const origin = originOf(tab?.url || '');
   if (!origin) return;
-  if (!(await hasHostAccess())) return;
+  if (!(await hasHostAccess([origin]))) return;
   try {
     await ensureContentScript(tabId);
     await chrome.tabs.sendMessage(tabId, { type: 'bridge:set-recording', enabled: true });
+    await chrome.tabs.sendMessage(tabId, {
+      type: 'bridge:set-extraction-mode',
+      enabled: Boolean(state.extractionMode),
+    });
+    await chrome.tabs.sendMessage(tabId, {
+      type: 'bridge:set-conditional-mode',
+      enabled: Boolean(state.conditionalMode),
+    });
   } catch (_) {
     return;
   }
@@ -135,9 +115,29 @@ function hostLabel(origin) {
   return String(origin || '').replace(/^https?:\/\//, '');
 }
 
-async function hasHostAccess() {
+function hostPermissionPatterns(origins) {
+  return [
+    ...new Set(
+      (origins || [])
+        .map((origin) => {
+          try {
+            const url = new URL(origin);
+            if (!['http:', 'https:'].includes(url.protocol)) return null;
+            return `${url.protocol}//${url.host}/*`;
+          } catch {
+            return null;
+          }
+        })
+        .filter(Boolean)
+    ),
+  ];
+}
+
+async function hasHostAccess(origins) {
+  const requested = hostPermissionPatterns(origins);
+  if (requested.length === 0) return false;
   try {
-    return await chrome.permissions.contains({ origins: ['http://*/*', 'https://*/*'] });
+    return await chrome.permissions.contains({ origins: requested });
   } catch {
     return false;
   }
@@ -153,6 +153,10 @@ async function handleMessage(message, sender) {
       return disconnect();
     case 'bridge:start-recording':
       return startRecording();
+    case 'bridge:set-extraction-mode':
+      return setExtractionMode(Boolean(message.enabled));
+    case 'bridge:set-conditional-mode':
+      return setConditionalMode(Boolean(message.enabled));
     case 'bridge:resume-recording':
       return resumeRecording();
     case 'bridge:stop-recording':
@@ -183,6 +187,10 @@ async function handleMessage(message, sender) {
       return promoteProcedure(message.procedureId, message.intentPhrases || []);
     case 'bridge:execution-interrupted':
       return handleExecutionInterrupted(message.reason, message.detail);
+    case 'bridge:webauthn-phase':
+      return handleWebauthnPhase(message.phase, message.ok);
+    case 'bridge:analyze-observation':
+      return analyzeObservation(message.procedureId, message.question);
     case 'bridge:apply-repair':
       return applyRepair(message.procedureId);
     default:
@@ -191,7 +199,10 @@ async function handleMessage(message, sender) {
 }
 
 async function connectActiveTab() {
-  const tab = await activeTab();
+  return connectTab(await activeTab());
+}
+
+async function connectTab(tab) {
   const origin = assertSupportedTab(tab);
   await ensureContentScript(tab.id);
   const observation = await chrome.tabs.sendMessage(tab.id, { type: 'bridge:observe' });
@@ -214,6 +225,37 @@ async function connectActiveTab() {
   await saveState(state);
   await broadcastState();
   return { state, observation };
+}
+
+// Auto-connect for intent-driven execution: reuse the current connection if it
+// already points at `targetOrigin`, otherwise find an open tab on that origin
+// (or open a new one), focus it, and connect — no manual Live-tab step needed.
+async function ensureConnectedToOrigin(targetOrigin) {
+  const state = await loadState();
+  if (state.connected?.origin === targetOrigin) {
+    const tab = await chrome.tabs.get(state.connected.tabId).catch(() => null);
+    if (tab && originOf(tab.url || '') === targetOrigin) return state.connected;
+  }
+  if (!(await hasHostAccess([targetOrigin]))) {
+    throw new Error(
+      'サイトへのアクセス許可がありません。もう一度ボタンを押して許可するか、Live タブの「このタブを接続」から許可してください。'
+    );
+  }
+  const tabs = await chrome.tabs.query({});
+  let tab =
+    tabs.find((candidate) => candidate.active && originOf(candidate.url || '') === targetOrigin) ||
+    tabs.find((candidate) => originOf(candidate.url || '') === targetOrigin);
+  if (tab) {
+    await chrome.tabs.update(tab.id, { active: true }).catch(() => undefined);
+    if (tab.windowId !== undefined)
+      await chrome.windows.update(tab.windowId, { focused: true }).catch(() => undefined);
+  } else {
+    tab = await chrome.tabs.create({ url: `${targetOrigin}/`, active: true });
+  }
+  await waitForTabComplete(tab.id);
+  tab = await chrome.tabs.get(tab.id);
+  const connected = await connectTab(tab);
+  return connected.state.connected;
 }
 
 async function disconnect() {
@@ -255,6 +297,11 @@ async function startRecording() {
   state.notice = '記録中です。入力値は保存されません。';
   await saveState(state);
   await chrome.tabs.sendMessage(tab.id, { type: 'bridge:set-recording', enabled: true });
+  await chrome.tabs.sendMessage(tab.id, { type: 'bridge:set-extraction-mode', enabled: false });
+  await chrome.tabs.sendMessage(tab.id, { type: 'bridge:set-conditional-mode', enabled: false });
+  state.extractionMode = false;
+  state.conditionalMode = false;
+  await saveState(state);
   await broadcastState();
   return { state };
 }
@@ -284,6 +331,14 @@ async function resumeRecording() {
   state.notice = '記録を続行しました。';
   await saveState(state);
   await chrome.tabs.sendMessage(tab.id, { type: 'bridge:set-recording', enabled: true });
+  await chrome.tabs.sendMessage(tab.id, {
+    type: 'bridge:set-extraction-mode',
+    enabled: Boolean(state.extractionMode),
+  });
+  await chrome.tabs.sendMessage(tab.id, {
+    type: 'bridge:set-conditional-mode',
+    enabled: Boolean(state.conditionalMode),
+  });
   await broadcastState();
   return { state };
 }
@@ -333,11 +388,64 @@ async function stopRecording() {
   };
   state.lastDraft = draft;
   state.recording = null;
+  state.extractionMode = false;
+  state.conditionalMode = false;
   state.execution = null;
   state.notice = '下書きを生成しました。各操作を承認または除外してから確定してください。';
   await saveState(state);
   await broadcastState();
   return { state, draft };
+}
+
+async function setExtractionMode(enabled) {
+  const state = await loadState();
+  if (!state.recording || !state.connected) {
+    throw new Error('分析対象モードは記録中にのみ利用できます。');
+  }
+  await chrome.tabs.sendMessage(state.recording.tabId, {
+    type: 'bridge:set-extraction-mode',
+    enabled,
+  });
+  if (enabled) {
+    await chrome.tabs.sendMessage(state.recording.tabId, {
+      type: 'bridge:set-conditional-mode',
+      enabled: false,
+    });
+  }
+  state.extractionMode = enabled;
+  if (enabled) state.conditionalMode = false;
+  state.notice = enabled
+    ? '分析対象モードです。ページ上の要素をクリックすると抽出対象になります。'
+    : '分析対象モードを終了しました。Alt+クリックは引き続き利用できます。';
+  await saveState(state);
+  await broadcastState();
+  return { state };
+}
+
+async function setConditionalMode(enabled) {
+  const state = await loadState();
+  if (!state.recording || !state.connected) {
+    throw new Error('条件付きクリック対象の選択には、接続中の記録が必要です。');
+  }
+  await ensureContentScript(state.recording.tabId);
+  if (enabled) {
+    await chrome.tabs.sendMessage(state.recording.tabId, {
+      type: 'bridge:set-extraction-mode',
+      enabled: false,
+    });
+  }
+  await chrome.tabs.sendMessage(state.recording.tabId, {
+    type: 'bridge:set-conditional-mode',
+    enabled,
+  });
+  state.conditionalMode = enabled;
+  if (enabled) state.extractionMode = false;
+  state.notice = enabled
+    ? '条件付きクリック対象モードです。ページ上の対象をクリックしてください。通常のクリックは発生しません。'
+    : '条件付きクリック対象モードを終了しました。';
+  await saveState(state);
+  await broadcastState();
+  return { state };
 }
 
 async function discardLastAction() {
@@ -445,7 +553,7 @@ function nativeHostError(message) {
   return message || 'Native Bridge との通信に失敗しました。';
 }
 
-function callNativeHost(payload) {
+function callNativeHost(payload, timeoutMs = 30_000) {
   return new Promise((resolve, reject) => {
     let port;
     let settled = false;
@@ -458,7 +566,7 @@ function callNativeHost(payload) {
         // best-effort cleanup
       }
       reject(new Error('Native Bridge の応答がタイムアウトしました。'));
-    }, 30000);
+    }, timeoutMs);
 
     const finish = (callback) => {
       if (settled) return;
@@ -588,9 +696,11 @@ async function runApprovedExecution(draft, session, lease, values) {
   const steps = approvedActionableActions(draft);
   const tabId = session.tab_id;
   const connectedTabId = (await loadState()).connected?.tabId;
+  await waitForTabComplete(connectedTabId);
   await ensureContentScript(connectedTabId);
 
   const results = [];
+  const draftExtractions = [];
   let finalStatus = 'completed';
   for (const step of steps) {
     if (HIGH_RISK_OPERATIONS.has(step.op)) {
@@ -607,14 +717,42 @@ async function runApprovedExecution(draft, session, lease, values) {
       }
     }
     let outcome;
-    try {
-      outcome = await chrome.tabs.sendMessage(connectedTabId, {
-        type: 'bridge:execute-step',
-        step,
-        value: step.op === 'fill_ref' ? (values[step.variable?.name] ?? null) : null,
-      });
-    } catch (error) {
-      outcome = { status: 'error', detail: error instanceof Error ? error.message : String(error) };
+    if (step.op === 'navigate') {
+      // A navigate marker is not a DOM action: the preceding step triggers the
+      // navigation; here we wait for the recorded destination origin, then
+      // re-inject the content script on the new page.
+      const targetOrigin = step.navigation?.to_origin;
+      const reached = targetOrigin ? await waitForOrigin(connectedTabId, targetOrigin) : null;
+      if (!targetOrigin || reached !== targetOrigin) {
+        outcome = {
+          status: 'error',
+          detail: `遷移先 ${targetOrigin || '不明'} に到達できませんでした（現在: ${reached || '不明'}）`,
+        };
+      } else {
+        try {
+          await waitForTabComplete(connectedTabId);
+          await ensureContentScript(connectedTabId);
+          outcome = { status: 'done', detail: `${targetOrigin} への遷移を確認しました` };
+        } catch (error) {
+          outcome = {
+            status: 'error',
+            detail: error instanceof Error ? error.message : String(error),
+          };
+        }
+      }
+    } else {
+      try {
+        outcome = await chrome.tabs.sendMessage(connectedTabId, {
+          type: 'bridge:execute-step',
+          step,
+          value: step.op === 'fill_ref' ? (values[step.variable?.name] ?? null) : null,
+        });
+      } catch (error) {
+        outcome = {
+          status: 'error',
+          detail: error instanceof Error ? error.message : String(error),
+        };
+      }
     }
     results.push({
       action_id: step.action_id,
@@ -622,6 +760,17 @@ async function runApprovedExecution(draft, session, lease, values) {
       status: outcome?.status || 'error',
       detail: outcome?.detail,
     });
+    if (
+      step.op === 'extract_text_ref' &&
+      outcome?.status === 'done' &&
+      typeof outcome.text === 'string'
+    ) {
+      draftExtractions.push({
+        name: extractionFieldName({ summary: step.summary, name: step.target?.name }),
+        text: outcome.text.slice(0, 20000),
+        ...(step.target?.dom_path ? { dom_path: step.target.dom_path } : {}),
+      });
+    }
 
     const progress = await loadState();
     progress.execution = {
@@ -650,6 +799,13 @@ async function runApprovedExecution(draft, session, lease, values) {
     receiptAck = { ok: false, error: error instanceof Error ? error.message : String(error) };
   }
 
+  // Draft runs have no procedure yet — key the observation by recording_id so
+  // it can still be analyzed (and later inherited when the draft is promoted).
+  const observation =
+    finalStatus === 'completed' && draftExtractions.length > 0
+      ? await submitObservation(draft.recording_id, session, lease, draft, draftExtractions)
+      : null;
+
   const done = await loadState();
   done.execution = {
     status: finalStatus,
@@ -660,8 +816,9 @@ async function runApprovedExecution(draft, session, lease, values) {
     receipt,
     receiptAck,
     session,
+    ...(observation ? { observation } : {}),
   };
-  done.notice = `実行 ${finalStatus}: ${results.filter((entry) => entry.status === 'done').length}/${steps.length} 操作。receipt ${receipt.receipt_id} を生成しました。`;
+  done.notice = `実行 ${finalStatus}: ${results.filter((entry) => entry.status === 'done').length}/${steps.length} 操作。receipt ${receipt.receipt_id} を生成しました。${observation?.fieldCount ? `抽出データ ${observation.fieldCount} 件を保存しました。` : ''}`;
   await saveState(done);
   await broadcastState();
   return { state: done, status: finalStatus, receipt };
@@ -708,6 +865,10 @@ function normalizeRecordedAction(event) {
       name: String(event.target.name || '').slice(0, 500),
       snapshot_hash: String(event.target.snapshot_hash),
     };
+    // Structural anchor for positional replay fallback (volatile-content pages).
+    if (typeof event.target.dom_path === 'string' && event.target.dom_path.length <= 600) {
+      action.target.dom_path = event.target.dom_path;
+    }
   }
   if (event.variable) {
     if (!/^[a-z][a-z0-9_]{0,63}$/.test(String(event.variable.name || ''))) return null;
@@ -755,19 +916,55 @@ function originOf(value) {
 }
 
 async function ensureContentScript(tabId) {
+  let injected = false;
   try {
     const response = await chrome.tabs.sendMessage(tabId, { type: 'bridge:ping' });
-    if (response?.ok) return;
+    injected = Boolean(response?.ok);
   } catch (_) {
     // No content script yet — inject below (needs host access or an activeTab grant).
   }
-  try {
-    await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
-  } catch (_) {
-    throw new Error(
-      'このページにアクセスできません。Side Panel の「このタブを接続」でサイトへのアクセスを許可してください。許可後はページ遷移や再接続でも継続できます。'
-    );
+  if (!injected) {
+    try {
+      await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
+    } catch (_) {
+      throw new Error(
+        'このページにアクセスできません。Side Panel の「このタブを接続」でサイトへのアクセスを許可してください。許可後はページ遷移や再接続でも継続できます。'
+      );
+    }
   }
+  // Passkey (WebAuthn) awareness: wrap navigator.credentials in the page's MAIN
+  // world so the content script can pause execution while the OS passkey dialog
+  // is up. Idempotent; best-effort (a CSP-restricted page just skips it).
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      world: 'MAIN',
+      func: installWebauthnHook,
+    });
+  } catch (_) {
+    // best-effort
+  }
+}
+
+// Runs in the page's MAIN world (serialized by chrome.scripting) — wraps
+// navigator.credentials.get/create to broadcast passkey start/end markers.
+function installWebauthnHook() {
+  if (window.__kyberionWebauthnHooked) return;
+  window.__kyberionWebauthnHooked = true;
+  const wrap = (method) => {
+    const original = navigator.credentials?.[method]?.bind(navigator.credentials);
+    if (!original) return;
+    navigator.credentials[method] = (...args) => {
+      window.postMessage({ __kyberion: 'webauthn', phase: 'start' }, '*');
+      const pending = original(...args);
+      Promise.resolve(pending)
+        .then(() => window.postMessage({ __kyberion: 'webauthn', phase: 'end', ok: true }, '*'))
+        .catch(() => window.postMessage({ __kyberion: 'webauthn', phase: 'end', ok: false }, '*'));
+      return pending;
+    };
+  };
+  wrap('get');
+  wrap('create');
 }
 
 async function sha256(value) {
@@ -847,6 +1044,7 @@ async function prepareProcedure(procedureId, origin) {
   state.pendingProcedure = {
     procedureId,
     origin: origin || state.connected?.origin || null,
+    origins: response.origins || (response.origin ? [response.origin] : []),
     inputs: response.inputs || [],
   };
   state.notice = response.has_inputs
@@ -859,19 +1057,26 @@ async function prepareProcedure(procedureId, origin) {
 
 async function executeProcedure(procedureId, origin, values = {}) {
   if (!procedureId) throw new Error('procedureId が必要です。');
-  const state = await loadState();
-  if (!state.connected) throw new Error('実行対象のタブが接続されていません。');
-  const effectiveOrigin = origin || state.connected.origin;
+
+  // The host knows the procedure's start origin (the recording's initial tab
+  // origin) — authoritative over whatever tab happens to be connected. Auto-
+  // connect to it so intent-driven runs need no manual Live-tab step.
+  const info = await callNativeHost({ type: 'prepare_procedure', procedure_id: procedureId });
+  if (!info?.ok) throw new Error(info?.error || '手順情報の取得に失敗しました。');
+  const startOrigin = info.origin || info.origins?.[0] || origin;
+  if (!startOrigin) throw new Error('手順の対象 origin を特定できませんでした。');
+  const connected = await ensureConnectedToOrigin(startOrigin);
 
   const response = await callNativeHost({
     type: 'dispatch_procedure',
     procedure_id: procedureId,
-    origin: effectiveOrigin,
-    tab_id: String(state.connected.tabId),
+    origin: startOrigin,
+    tab_id: String(connected.tabId),
   });
   if (!response?.ok) throw new Error(response?.error || '手順の配信に失敗しました。');
 
   if (response.status === 'approval_required') {
+    const state = await loadState();
     state.execution = {
       status: 'approval_required',
       requestId: response.request_id || null,
@@ -1013,6 +1218,19 @@ async function applyRepair(procedureId) {
   return { state, merged_recording_ref: applied.merged_recording_ref };
 }
 
+// Wait until the tab reports status "complete" (page load finished) so step
+// execution never races a still-loading DOM. Cheap no-op when already loaded.
+async function waitForTabComplete(tabId, timeoutMs = 20000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const tab = await chrome.tabs.get(tabId).catch(() => null);
+    if (!tab) return false;
+    if (tab.status === 'complete') return true;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  return false;
+}
+
 // Poll until the connected tab's origin matches `expectedOrigin` (a cross-origin
 // handoff completing), or time out. Returns the live origin reached.
 async function waitForOrigin(tabId, expectedOrigin, timeoutMs = 15000) {
@@ -1044,6 +1262,7 @@ async function runSegmentedExecution(procedureId, segments, session, values) {
     // preceding segment's navigation to have landed on this origin.
     if (segment.segment_index > 0) {
       const reached = await waitForOrigin(connectedTabId, segment.origin);
+      if (reached === segment.origin) await waitForTabComplete(connectedTabId);
       if (reached !== segment.origin) {
         const s = await loadState();
         s.execution = {
@@ -1086,6 +1305,7 @@ async function runSegmentedExecution(procedureId, segments, session, values) {
 async function runCompiledSteps(procedureId, steps, session, lease, values, segmentInfo = null) {
   const connectedTabId = (await loadState()).connected?.tabId;
   if (!connectedTabId) throw new Error('実行対象のタブが接続されていません。');
+  await waitForTabComplete(connectedTabId);
   await ensureContentScript(connectedTabId);
 
   // Arm the popup sentinel in the content script
@@ -1094,6 +1314,7 @@ async function runCompiledSteps(procedureId, steps, session, lease, values, segm
     .catch(() => undefined);
 
   const results = [];
+  const extractions = [];
   let finalStatus = 'completed';
 
   try {
@@ -1107,6 +1328,7 @@ async function runCompiledSteps(procedureId, steps, session, lease, values, segm
               role: step.role || '',
               name: step.name || '',
               snapshot_hash: step.snapshot_hash || null,
+              ...(step.dom_path ? { dom_path: step.dom_path } : {}),
             }
           : undefined,
         variable: step.variable,
@@ -1132,6 +1354,17 @@ async function runCompiledSteps(procedureId, steps, session, lease, values, segm
         status: outcome?.status || 'error',
         detail: outcome?.detail,
       });
+      if (
+        step.op === 'extract_text_ref' &&
+        outcome?.status === 'done' &&
+        typeof outcome.text === 'string'
+      ) {
+        extractions.push({
+          name: extractionFieldName(step),
+          text: outcome.text.slice(0, 20000),
+          ...(step.dom_path ? { dom_path: step.dom_path } : {}),
+        });
+      }
 
       const progress = await loadState();
       progress.execution = {
@@ -1211,6 +1444,12 @@ async function runCompiledSteps(procedureId, steps, session, lease, values, segm
     /* best-effort */
   }
 
+  // Persist extracted data as a governed observation (host validates+redacts).
+  const observation =
+    finalStatus === 'completed' && extractions.length > 0
+      ? await submitObservation(procedureId, session, lease, null, extractions)
+      : null;
+
   const done = await loadState();
   done.execution = {
     status: finalStatus,
@@ -1221,9 +1460,12 @@ async function runCompiledSteps(procedureId, steps, session, lease, values, segm
     results,
     receipt,
     session,
+    ...(observation ? { observation } : {}),
   };
   if (finalStatus === 'completed') {
-    done.notice = `手順「${procedureId}」を正常に完了しました。`;
+    done.notice = observation?.fieldCount
+      ? `手順「${procedureId}」を完了し、抽出データ ${observation.fieldCount} 件を保存しました。レポートを生成できます。`
+      : `手順「${procedureId}」を正常に完了しました。`;
   } else if (!done.repairPending) {
     done.notice = `手順「${procedureId}」が ${finalStatus} で終了しました。`;
   }
@@ -1232,8 +1474,112 @@ async function runCompiledSteps(procedureId, steps, session, lease, values, segm
   return { state: done, status: finalStatus };
 }
 
+// Surface passkey (WebAuthn) progress while a run is active: the step executor
+// keeps waiting during authentication; this just tells the user what's
+// happening and why the run looks paused.
+async function handleWebauthnPhase(phase, ok) {
+  const state = await loadState();
+  const active = state.execution && ['running', 'mfa_in_progress'].includes(state.execution.status);
+  if (!active) return { ignored: true };
+  if (phase === 'start') {
+    state.execution.status = 'mfa_in_progress';
+    state.notice =
+      'パスキー認証が求められています。認証を完了すると実行を自動で続行します（自動入力はしません）。';
+  } else {
+    state.execution.status = 'running';
+    state.notice =
+      ok === false
+        ? 'パスキー認証がキャンセルまたは失敗しました。ページの状態を確認してください。'
+        : 'パスキー認証を確認しました。実行を続行します。';
+  }
+  await saveState(state);
+  await broadcastState();
+  return { state };
+}
+
+// Report-column name for an extraction step: prefer the label the user saw at
+// record time (「LABEL」のテキストを抽出), else the accessible name.
+function extractionFieldName(step) {
+  const fromSummary = /^「(.+)」のテキストを抽出$/.exec(step.summary || '');
+  return (fromSummary?.[1] || step.name || step.summary || 'field').slice(0, 200);
+}
+
+// Build + submit a browser-observation.v1 record from collected extract_text_ref
+// outcomes. Best-effort: an observation failure never fails the run itself.
+async function submitObservation(procedureId, session, lease, recording, extractions) {
+  if (!extractions.length) return null;
+  const observation = {
+    schema_version: 'browser-observation.v1',
+    observation_id: `OBS-${crypto.randomUUID()}`,
+    procedure_id: procedureId,
+    recording_id: session?.recording_id || '',
+    lease_id: lease?.lease_id || '',
+    origin: session?.origin || '',
+    captured_at: new Date().toISOString(),
+    source: 'chrome-extension',
+    fields: extractions,
+  };
+  try {
+    const ack = await callNativeHost(
+      {
+        type: 'submit_observation',
+        observation,
+        session,
+        lease,
+        ...(recording ? { recording } : {}),
+      },
+      30_000
+    );
+    if (!ack?.ok) return { observation_id: observation.observation_id, error: ack?.error };
+    return {
+      observation_id: observation.observation_id,
+      procedure_id: procedureId,
+      fieldCount: extractions.length,
+      path: ack.path,
+      preview: extractions.map((field) => ({
+        name: String(field.name || '').slice(0, 120),
+        text: String(field.text || '').slice(0, 240),
+      })),
+    };
+  } catch (error) {
+    return {
+      observation_id: observation.observation_id,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+// Ask the host to analyze stored observations for a procedure and produce a
+// Markdown report (analysis happens host-side, on redacted data, injection-
+// fenced — the extension only displays the result).
+async function analyzeObservation(procedureId, question) {
+  if (!procedureId) throw new Error('レポート対象の手順がありません。');
+  const response = await callNativeHost(
+    {
+      type: 'analyze_observation',
+      procedure_id: procedureId,
+      ...(question ? { question } : {}),
+    },
+    120_000
+  );
+  if (!response?.ok) throw new Error(response?.error || 'レポート生成に失敗しました。');
+  const state = await loadState();
+  state.lastReport = {
+    procedure_id: procedureId,
+    report_ref: response.report_ref,
+    report: String(response.report || '').slice(0, 20000),
+    observation_count: response.observation_count,
+    generated_at: new Date().toISOString(),
+  };
+  state.notice = `レポートを生成しました（観測 ${response.observation_count} 件 → ${response.report_ref}）。`;
+  await saveState(state);
+  await broadcastState();
+  return { state, report_ref: response.report_ref };
+}
+
 function classifyStepFailure(errorDetail, op) {
-  if (/mfa|otp|二段階|authenticat|ワンタイム/i.test(errorDetail)) return 'mfa';
+  if (/mfa|otp|二段階|authenticat|ワンタイム|passkey|パスキー|webauthn|生体認証/i.test(errorDetail))
+    return 'mfa';
   if (/modal|dialog|popup|ダイアログ|ポップアップ/i.test(errorDetail)) return 'new_popup';
   if (/origin|navigate|遷移|href/i.test(errorDetail)) return 'handoff';
   return 'ambiguity';

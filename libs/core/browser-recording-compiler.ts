@@ -27,6 +27,8 @@ export interface CompiledBrowserStep {
   role?: string;
   name?: string;
   snapshot_hash?: string;
+  /** Structural anchor for positional fallback (see BrowserExtensionAction.target.dom_path). */
+  dom_path?: string;
   variable?: { name: string; classification: 'user_input' | 'secret_ref' };
   selection?: { kind: 'option' | 'toggle'; label?: string; checked?: boolean };
   /** Set only for op=navigate: the origin transition this step represents. */
@@ -104,12 +106,12 @@ const HIGH_RISK_OPS = new Set<BrowserExtensionOperation>([
 function deriveRiskClass(recording: BrowserExtensionRecording): ProcedureRiskClass {
   if (recording.risk_summary.approval_required_count > 0) return 'high';
   const hasHighRisk = recording.actions.some(
-    (a) => a.risk === 'high' || a.risk === 'sensitive' || HIGH_RISK_OPS.has(a.op),
+    (a) => a.risk === 'high' || a.risk === 'sensitive' || HIGH_RISK_OPS.has(a.op)
   );
   if (hasHighRisk) return 'high';
   // Any non-read-only op (click, fill, select, etc.) → medium
   const hasWriteOp = recording.actions.some(
-    (a) => a.op !== 'sensitive_input_omitted' && !READ_ONLY_OPS.has(a.op),
+    (a) => a.op !== 'sensitive_input_omitted' && !READ_ONLY_OPS.has(a.op)
   );
   return hasWriteOp ? 'medium' : 'low';
 }
@@ -118,17 +120,12 @@ function deriveRiskClass(recording: BrowserExtensionRecording): ProcedureRiskCla
 function deriveProcedureId(recording: BrowserExtensionRecording): string {
   // e.g. "https://s2.kingtime.jp" → "s2.kingtime.jp"
   const host = recording.tab.origin.replace(/^https?:\/\//, '').replace(/[^a-z0-9.-]/gi, '_');
-  const shortHash = createHash('sha256')
-    .update(recording.recording_id)
-    .digest('hex')
-    .slice(0, 8);
+  const shortHash = createHash('sha256').update(recording.recording_id).digest('hex').slice(0, 8);
   return `browser.${host}.${shortHash}`;
 }
 
 /** Extract the last N actions that are good golden-scenario anchors. */
-function extractSuccessConditions(
-  actions: BrowserExtensionAction[],
-): GoldenSuccessCondition[] {
+function extractSuccessConditions(actions: BrowserExtensionAction[]): GoldenSuccessCondition[] {
   const conditions: GoldenSuccessCondition[] = [];
   // Walk from the end; collect the first few observation/text signals
   const reversed = [...actions].reverse();
@@ -197,7 +194,7 @@ export function isDryRunSafe(recording: BrowserExtensionRecording): boolean {
  */
 export function compileBrowserRecording(
   recording: BrowserExtensionRecording,
-  opts: CompileOptions,
+  opts: CompileOptions
 ): CompileRecordingResult {
   if (opts.intentPhrases.length === 0) {
     throw new Error('[browser-recording-compiler] intentPhrases must be non-empty');
@@ -212,13 +209,13 @@ export function compileBrowserRecording(
   if (!dryRunSafe) {
     warnings.push(
       `Recording contains write/high-risk ops — dry-run replay is NOT safe. ` +
-        `${recording.actions.filter((a) => !READ_ONLY_OPS.has(a.op)).length} non-read-only step(s).`,
+        `${recording.actions.filter((a) => !READ_ONLY_OPS.has(a.op)).length} non-read-only step(s).`
     );
   }
   if (recording.risk_summary.sensitive_input_omitted > 0) {
     warnings.push(
       `${recording.risk_summary.sensitive_input_omitted} sensitive input(s) were omitted from the recording. ` +
-        `Mark corresponding required_secrets before activating.`,
+        `Mark corresponding required_secrets before activating.`
     );
   }
 
@@ -236,6 +233,7 @@ export function compileBrowserRecording(
       step.role = action.target.role;
       step.name = action.target.name;
       step.snapshot_hash = action.target.snapshot_hash;
+      if (action.target.dom_path) step.dom_path = action.target.dom_path;
     }
     if (action.variable) step.variable = action.variable;
     if (action.selection) step.selection = action.selection;
@@ -252,14 +250,13 @@ export function compileBrowserRecording(
       ...recording.actions
         .filter((a) => a.op === 'navigate' && a.navigation)
         .map((a) => a.navigation!.to_origin),
-    ]),
+    ])
   );
 
   // --- ProcedureEntry (draft) -----------------------------------------------
-  const pipelineRef =
-    opts.pipelineRefPrefix
-      ? `${opts.pipelineRefPrefix.replace(/\/$/, '')}/${procedureId}.json`
-      : `pipelines/browser/${procedureId}.json`;
+  const pipelineRef = opts.pipelineRefPrefix
+    ? `${opts.pipelineRefPrefix.replace(/\/$/, '')}/${procedureId}.json`
+    : `pipelines/browser/${procedureId}.json`;
 
   const procedureEntry: ProcedureEntry = {
     procedure_id: procedureId,
