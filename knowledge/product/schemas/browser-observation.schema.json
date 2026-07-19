@@ -1,0 +1,52 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "kyberion://schemas/browser-observation.v1",
+  "title": "Kyberion Browser Observation v1",
+  "description": "Read-only data extracted from reviewed page regions during a governed browser run. Extracted text is external, untrusted data: it is redacted at capture, re-redacted at this trust boundary, and only ever analyzed — never executed.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "observation_id",
+    "procedure_id",
+    "recording_id",
+    "lease_id",
+    "origin",
+    "captured_at",
+    "source",
+    "fields"
+  ],
+  "properties": {
+    "schema_version": { "const": "browser-observation.v1" },
+    "observation_id": { "type": "string", "minLength": 1, "maxLength": 120 },
+    "procedure_id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9]+(?:[._-][a-zA-Z0-9]+)*$",
+      "maxLength": 120
+    },
+    "recording_id": { "type": "string", "minLength": 1, "maxLength": 120 },
+    "lease_id": {
+      "type": "string",
+      "pattern": "^LEASE(?:-MFA)?-[A-Za-z0-9_-]+$",
+      "maxLength": 120
+    },
+    "origin": { "type": "string", "minLength": 1 },
+    "captured_at": { "type": "string", "format": "date-time" },
+    "source": { "const": "chrome-extension" },
+    "fields": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "text"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "text": { "type": "string", "maxLength": 20000 },
+          "dom_path": { "type": "string", "maxLength": 600 }
+        }
+      }
+    }
+  }
+}

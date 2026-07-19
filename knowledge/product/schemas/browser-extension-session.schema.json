@@ -33,7 +33,9 @@
           "list_tabs",
           "open_tab",
           "select_tab",
+          "navigate",
           "click_ref",
+          "click_if_present",
           "fill_ref",
           "select_ref",
           "press_ref",
@@ -61,7 +63,9 @@
           "type": "array",
           "items": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
           "uniqueItems": true
-        }
+        },
+        "origin": { "type": "string", "minLength": 1 },
+        "segment_index": { "type": "integer", "minimum": 0 }
       }
     }
   }

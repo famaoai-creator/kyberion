@@ -92,6 +92,7 @@
             "select_tab",
             "navigate",
             "click_ref",
+            "click_if_present",
             "fill_ref",
             "select_ref",
             "press_ref",
@@ -117,7 +118,8 @@
             "ref": { "type": "string", "pattern": "^@[a-zA-Z0-9_-]+$" },
             "role": { "type": "string", "maxLength": 80 },
             "name": { "type": "string", "maxLength": 500 },
-            "snapshot_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+            "snapshot_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "dom_path": { "type": "string", "maxLength": 600 }
           }
         },
         "variable": {
