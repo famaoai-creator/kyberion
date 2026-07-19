@@ -58,6 +58,20 @@ export function createWisdomDispatcher(handlers: WisdomStepHandlers) {
         canonicalOp,
         executionKind: spec.execution_kind || 'deterministic',
         compatibility,
+        securityScope:
+          nextContext.security_scope && typeof nextContext.security_scope === 'object'
+            ? (nextContext.security_scope as WisdomReceipt['security_scope'])
+            : undefined,
+        retry: {
+          attempts: 1,
+          idempotency_class: spec.idempotency,
+          automatic_retry: spec.idempotency === 'read' || spec.idempotency === 'idempotent_write',
+        },
+        traceSummary: {
+          owner: spec.owner,
+          idempotency_class: spec.idempotency,
+          forwarded: Boolean(spec.forward_to),
+        },
       }),
     };
   };

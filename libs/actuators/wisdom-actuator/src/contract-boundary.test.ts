@@ -1,5 +1,10 @@
-import { describe, expect, it } from 'vitest';
-import { pathResolver, safeReadFile } from '@agent/core';
+import { describe, expect, it, vi } from 'vitest';
+import {
+  pathResolver,
+  safeReadFile,
+  registerActuatorForwardingPort,
+  resetActuatorForwardingPort,
+} from '@agent/core';
 import { describeOps } from './op-catalog.js';
 import { handleAction, runWithOperationRetry } from './wisdom-pipeline-helpers.js';
 import { createWisdomDispatcher } from './wisdom-dispatcher.js';
@@ -19,6 +24,29 @@ describe('wisdom public contract boundaries', () => {
 
     expect(result.status).toBe('succeeded');
     expect(result.context.found_knowledge).toBeDefined();
+    expect(result.context.found_knowledge).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source_ref: expect.any(String),
+          tier: expect.any(String),
+          title: expect.any(String),
+          tags: expect.any(Array),
+          score: expect.any(Number),
+          retrieval_reason: expect.any(String),
+          provenance: expect.any(Object),
+        }),
+      ])
+    );
+  });
+
+  it('fails closed when non-public knowledge is requested without a tenant scope', async () => {
+    const result = await handleAction({
+      action: 'knowledge_search',
+      params: { query: 'architecture', tier: 'confidential' },
+    });
+
+    expect(result.status).toBe('failed');
+    expect(JSON.stringify(result.results)).toContain('KNOWLEDGE_SCOPE_REQUIRED');
   });
 
   it('publishes pipeline and reconcile in the schema contract', () => {
@@ -180,6 +208,7 @@ describe('wisdom public contract boundaries', () => {
     }) as string;
 
     expect(wisdomSource).not.toContain('@anthropic-ai/claude-agent-sdk');
+    expect(wisdomSource).not.toContain('executeTaskPlan');
     expect(executorSource).not.toContain('@anthropic-ai/claude-agent-sdk');
   });
 
@@ -196,5 +225,43 @@ describe('wisdom public contract boundaries', () => {
         forward_to: expect.any(Object),
       });
     }
+  });
+
+  it('forwards a boundary operation through the typed port in canonical mode', async () => {
+    const forward = vi.fn().mockResolvedValue({
+      forwarded_to: 'terminal:shell_command',
+      status: 'succeeded',
+      result: { stdout: 'forwarded' },
+    });
+    registerActuatorForwardingPort({ forward });
+    try {
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'capture', op: 'shell', params: { cmd: 'printf forwarded' } }],
+        context: {},
+      });
+
+      expect(result.status).toBe('succeeded');
+      expect(result.context.last_capture).toEqual({ stdout: 'forwarded' });
+      expect(forward).toHaveBeenCalledWith(
+        expect.objectContaining({
+          source_actuator: 'wisdom-actuator',
+          target_actuator: 'terminal',
+          target_op: 'shell_command',
+        })
+      );
+    } finally {
+      resetActuatorForwardingPort();
+    }
+  });
+
+  it('keeps perspective fanout on reasoning backends and outside Agent runtime lifecycle', async () => {
+    const source = safeReadFile(
+      pathResolver.rootResolve('libs/actuators/wisdom-actuator/src/decision-ops.ts'),
+      { encoding: 'utf8' }
+    ) as string;
+    expect(source).toContain("case 'perspective_fanout'");
+    expect(source).not.toContain('ensureAgentRuntime');
+    expect(source).not.toContain('getAgentExecutionPort');
   });
 });

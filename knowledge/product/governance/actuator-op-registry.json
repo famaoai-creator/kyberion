@@ -336,7 +336,7 @@
     "orchestrator": {
       "capture": ["discover_capabilities", "discover_skills"],
       "transform": [],
-      "apply": ["deploy", "run_execution_plan_set"]
+      "apply": ["deploy", "execute_task_plan", "run_execution_plan_set"]
     },
     "presence": {
       "capture": [],

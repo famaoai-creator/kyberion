@@ -104,7 +104,7 @@ const FORWARD_TARGETS: Record<string, { actuator: string; op: string }> = {
   generate_facilitation_script: { actuator: 'meeting', op: 'generate_facilitation_script' },
   generate_reminder_message: { actuator: 'meeting', op: 'generate_reminder_message' },
   conduct_1on1: { actuator: 'meeting', op: 'conduct_1on1' },
-  execute_task_plan: { actuator: 'orchestrator', op: 'run_execution_plan_set' },
+  execute_task_plan: { actuator: 'orchestrator', op: 'execute_task_plan' },
   deploy_release: { actuator: 'deployment', op: 'deploy_release' },
   extract_requirements: { actuator: 'modeling', op: 'extract_requirements' },
   extract_design_spec: { actuator: 'modeling', op: 'extract_design_spec' },

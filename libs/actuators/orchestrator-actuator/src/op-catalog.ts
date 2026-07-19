@@ -14,7 +14,11 @@ export const ORCHESTRATOR_ACTUATOR_CAPTURE_OPS = [
 
 export const ORCHESTRATOR_ACTUATOR_TRANSFORM_OPS = [] as const;
 
-export const ORCHESTRATOR_ACTUATOR_APPLY_OPS = ['deploy', 'run_execution_plan_set'] as const;
+export const ORCHESTRATOR_ACTUATOR_APPLY_OPS = [
+  'deploy',
+  'execute_task_plan',
+  'run_execution_plan_set',
+] as const;
 
 function toSpec(op: string, kind: OpSpecKind) {
   return { op, kind };

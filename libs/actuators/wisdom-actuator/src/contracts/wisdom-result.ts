@@ -25,6 +25,11 @@ export interface WisdomReceipt<T = unknown> {
     deprecated_alias?: string;
     forwarded_to?: string;
   };
+  retry?: {
+    attempts: number;
+    idempotency_class: 'read' | 'idempotent_write' | 'non_idempotent';
+    automatic_retry: boolean;
+  };
   trace_summary?: Record<string, unknown>;
 }
 
@@ -34,6 +39,10 @@ export function makeWisdomReceipt(input: {
   executionKind: ExecutionKind;
   result?: unknown;
   compatibility?: WisdomReceipt['compatibility'];
+  retry?: WisdomReceipt['retry'];
+  securityScope?: WisdomReceipt['security_scope'];
+  reasoning?: WisdomReceipt['reasoning'];
+  traceSummary?: WisdomReceipt['trace_summary'];
 }): WisdomReceipt {
   return {
     actuator_id: 'wisdom-actuator',
@@ -43,5 +52,9 @@ export function makeWisdomReceipt(input: {
     status: 'succeeded',
     ...(input.result === undefined ? {} : { result: input.result }),
     ...(input.compatibility ? { compatibility: input.compatibility } : {}),
+    ...(input.retry ? { retry: input.retry } : {}),
+    ...(input.securityScope ? { security_scope: input.securityScope } : {}),
+    ...(input.reasoning ? { reasoning: input.reasoning } : {}),
+    ...(input.traceSummary ? { trace_summary: input.traceSummary } : {}),
   };
 }

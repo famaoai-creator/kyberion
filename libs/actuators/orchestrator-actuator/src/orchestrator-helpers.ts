@@ -907,6 +907,22 @@ async function opTransform(op: string, params: any, ctx: any) {
         [params.export_as || 'execution_run_report']: runReport,
       };
     }
+    case 'execute_task_plan': {
+      const missionId = String(resolveVars(params.mission_id || ctx.mission_id || '', ctx));
+      if (!missionId) throw new Error('execute_task_plan requires mission_id');
+      const { executeTaskPlan } = await import('@agent/core');
+      const result = await executeTaskPlan({
+        missionId,
+        maxTasks: typeof params.max_tasks === 'number' ? params.max_tasks : undefined,
+        haltOnFailure: Boolean(params.halt_on_failure),
+        model: params.model ? String(resolveVars(params.model, ctx)) : undefined,
+        cwd: params.cwd ? String(resolveVars(params.cwd, ctx)) : undefined,
+      });
+      return {
+        ...ctx,
+        [params.export_as || 'task_execution_report']: result,
+      };
+    }
     case 'preflight_execution_plan_set': {
       const planSet = ctx[params.from || 'execution_plan_set'];
       if (!planSet || typeof planSet !== 'object')
