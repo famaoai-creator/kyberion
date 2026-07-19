@@ -39,7 +39,18 @@ pnpm voice:conversation:turn \
   --personal-voice-mode require_personal_voice
 ```
 
-Interactive loop mode:
+Interactive loop mode (the default) runs the full-duplex realtime loop:
+each turn starts when you begin speaking and ends automatically after ~700ms of
+silence (VAD endpoint), the reply is synthesized **sentence-by-sentence** so the
+first audio starts fast, and per-turn latency metrics (stt/llm/first-audio) are
+printed for every exchange.
+
+Interactive recording requires a mission-scoped `voice-consent.json`; grant it
+before starting the microphone session:
+
+```bash
+pnpm meeting:consent grant --mission MSN-LIVE-VOICE-001
+```
 
 ```bash
 pnpm voice:conversation:turn -- \
@@ -47,13 +58,50 @@ pnpm voice:conversation:turn -- \
   --session-id user-voice-live \
   --profile-id your-active-voice-profile \
   --language ja \
+  --mission MSN-LIVE-VOICE-001 \
+  --turns 3
+```
+
+Realtime loop flags (all optional):
+
+- `--barge-in` — interrupt the assistant by speaking over it (opt-in; a headset
+  is recommended, speaker echo can false-trigger; detection uses an elevated
+  threshold + 250ms sustained-speech debounce)
+- `--vad-backend silero` — neural VAD via the Python bridge; requires
+  `KYBERION_SILERO_VAD_MODEL` (path to a silero_vad `.onnx`) and onnxruntime in
+  the Python env. Falls back to `energy` with an explicit warning. Also
+  selectable via `KYBERION_VAD`.
+- `--vad-endpoint-ms 700` — silence that ends an utterance
+- `--vad-threshold <rms>` — explicit speech threshold; omitted → auto-calibrated
+  from a ~500ms noise-floor sample
+- `--max-utterance-seconds 30` — safety cap per utterance
+- `--mic-device ":0"` — avfoundation index (macOS) / ALSA device (Linux)
+- `--no-streaming-stt` — disable in-utterance streaming transcription (used when
+  `KYBERION_STT_COMMAND` is configured; batch STT on the turn WAV is the fallback)
+- `--no-warm-actuator` — spawn the voice actuator per segment instead of keeping
+  one resident `--serve` process
+- `--mission MSN-...` — required recording consent gate (fail-closed, same
+  `voice-consent.json` evidence contract as meeting participation)
+- `--idle-timeout-seconds 120` — end the loop after continuous silence
+
+The VAD recorder needs `ffmpeg` (macOS) or `arecord` (Linux) on PATH, and
+playback is used only with `--delivery-mode artifact_and_playback` and needs
+`afplay` / `aplay`. `--delivery-mode artifact` writes audio without playing it.
+The legacy fixed-duration recorder remains available as a fallback:
+
+```bash
+pnpm voice:conversation:turn -- \
+  --interactive \
+  --recorder fixed \
   --record-seconds 8 \
+  --session-id user-voice-live \
+  --mission MSN-LIVE-VOICE-001 \
   --turns 3
 ```
 
 If you need the recorder to capture from a different local setup, set:
 
-- `KYBERION_PYTHON_BIN` for the Python bridge runner
+- `KYBERION_PYTHON_BIN` for the Python bridge runner (fixed recorder only)
 - `KYBERION_STT_COMMAND` for the speech-to-text backend
 
 ## Result
