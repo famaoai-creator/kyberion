@@ -2,7 +2,7 @@
   "action": "pipeline",
   "name": "Voice Health Check",
   "version": "1.0.0",
-  "description": "Verifies the governed voice toolchain: tool runtime inventory, mlx_audio_tts_bridge.py, native TTS, and STT bridge availability.",
+  "description": "Verifies the governed voice toolchain: tool runtime inventory, mlx_audio_tts_bridge.py, native TTS, STT bridge availability, and the realtime-loop surfaces (silero VAD bridge script).",
   "steps": [
     {
       "role": "sink",
@@ -37,7 +37,7 @@
     },
     {
       "id": "check_native_tts",
-      "role": "source",
+      "role": "sink",
       "op": "system:check_native_tts",
       "produces": {
         "channel": "native_tts",
@@ -46,12 +46,24 @@
       "params": {}
     },
     {
+      "id": "check_silero_vad_bridge",
+      "role": "source",
+      "op": "system:probe",
+      "produces": {
+        "channel": "silero_vad_bridge",
+        "type": "ProbeResult"
+      },
+      "params": {
+        "capability": "silero_vad"
+      }
+    },
+    {
       "id": "notify",
       "role": "sink",
       "op": "system:system_notify",
-      "consumes": ["tool_runtimes", "tts_bridge", "native_tts"],
+      "consumes": ["tool_runtimes", "tts_bridge", "native_tts", "silero_vad_bridge"],
       "params": {
-        "message": "Voice Health Check: runtimes={{tool_runtimes.default_tool_id}}/{{tool_runtimes.tools.length}} | TTS bridge={{tts_bridge.exists}} native={{native_tts.ready}}"
+        "message": "Voice Health Check: runtimes={{tool_runtimes.default_tool_id}}/{{tool_runtimes.tools.length}} | TTS bridge={{tts_bridge.exists}} native={{native_tts.ready}} sileroVAD={{silero_vad_bridge.available}} reason={{silero_vad_bridge.reason}}"
       }
     }
   ]
