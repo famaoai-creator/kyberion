@@ -100,6 +100,33 @@ describe('procedure-registry', () => {
       ]);
       expect(loadProcedures(true)).toHaveLength(1);
     });
+
+    it('merges the optional personal browser catalog before the public catalog', () => {
+      const personalEntry: ProcedureEntry = {
+        ...BROWSER_ENTRY,
+        procedure_id: 'personal.attendance.approve',
+        adapter: {
+          ...BROWSER_ENTRY.adapter,
+          recording_ref: 'knowledge/personal/browser-recordings/rec.json',
+        },
+        intent_phrases: ['自分の勤怠を承認'],
+      };
+      vi.spyOn(secureIo, 'safeExistsSync').mockImplementation((filePath) =>
+        filePath.includes('knowledge/personal/browser-procedures.json')
+      );
+      vi.spyOn(secureIo, 'safeReadFile').mockImplementation((filePath) => {
+        if (filePath.includes('knowledge/personal/browser-procedures.json')) {
+          return JSON.stringify({ schema_version: 'procedures.v1', procedures: [personalEntry] });
+        }
+        return JSON.stringify({ schema_version: 'procedures.v1', procedures: [BROWSER_ENTRY] });
+      });
+
+      const entries = loadProcedures(true);
+      expect(entries.map((entry) => entry.procedure_id)).toEqual([
+        'personal.attendance.approve',
+        BROWSER_ENTRY.procedure_id,
+      ]);
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -126,6 +153,20 @@ describe('procedure-registry', () => {
     it('rejects paths outside the store (e.g. knowledge/)', () => {
       expect(
         resolveAllowlistedRecordingRef('knowledge/product/orchestration/procedures.json')
+      ).toBeNull();
+    });
+
+    it('accepts a path inside the personal browser recordings store', () => {
+      expect(
+        resolveAllowlistedRecordingRef('knowledge/personal/browser-recordings/foo.json')
+      ).not.toBeNull();
+    });
+
+    it('rejects traversal out of the personal recordings store', () => {
+      expect(
+        resolveAllowlistedRecordingRef(
+          'knowledge/personal/browser-recordings/../../product/procedures.json'
+        )
       ).toBeNull();
     });
   });

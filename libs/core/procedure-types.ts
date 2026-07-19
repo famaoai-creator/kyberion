@@ -82,7 +82,8 @@ export interface ProcedureAdapter {
 }
 
 /**
- * One registry entry. Persisted in knowledge/product/orchestration/procedures.json.
+ * One registry entry. Persisted in the public catalog or a personal browser
+ * catalog overlay, depending on where the procedure was promoted.
  * `substrate`/`adapter`/`target` are the discriminator; every other field is common
  * to all substrates and is all the resolver (Layer ①) needs.
  */

@@ -111,6 +111,20 @@
           <p class="section-kicker">INPUT VALUES (記録されません)</p>
           <div id="execution-inputs-fields"></div>
         </div>
+        <div id="procedure-registration" class="execution-inputs" hidden>
+          <p class="section-kicker">PERSONAL SCENARIO</p>
+          <p>承認済みの録音を、このブラウザだけで使う再利用シナリオとして登録します。ページの入力値は登録されません。</p>
+          <label class="execution-input">
+            <span>シナリオ ID（例: attendance.approve）</span>
+            <input id="procedure-id-input" type="text" autocomplete="off" spellcheck="false" />
+          </label>
+          <label class="execution-input">
+            <span>呼び出し文（カンマまたは改行区切り）</span>
+            <textarea id="intent-phrases-input" rows="2" autocomplete="off" placeholder="勤怠を承認して\n勤怠承認"></textarea>
+          </label>
+          <button id="register-procedure-button" class="secondary" type="button" disabled>個人用シナリオとして登録</button>
+          <small id="procedure-registration-status"></small>
+        </div>
         <ol id="execution-results" class="action-list"></ol>
         <div class="button-row">
           <button id="preflight-button" class="secondary" type="button" disabled>Kyberion preflight</button>
