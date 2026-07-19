@@ -1839,6 +1839,10 @@
           "kind": "apply"
         },
         {
+          "op": "execute_task_plan",
+          "kind": "apply"
+        },
+        {
           "op": "run_execution_plan_set",
           "kind": "apply"
         }

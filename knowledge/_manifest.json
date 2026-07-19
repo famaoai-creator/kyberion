@@ -987,7 +987,7 @@
     {
       "path": "product/governance/actuator-op-registry.json",
       "tier": "public",
-      "size": 14618,
+      "size": 14639,
       "type": "json"
     },
     {
@@ -2937,7 +2937,7 @@
     {
       "path": "product/orchestration/actuator-op-discovery.json",
       "tier": "public",
-      "size": 73148,
+      "size": 73232,
       "type": "json"
     },
     {
@@ -4779,7 +4779,7 @@
     {
       "path": "product/pipeline-templates/execute-task-plan.json",
       "tier": "public",
-      "size": 1418,
+      "size": 1422,
       "type": "json"
     },
     {
@@ -4803,7 +4803,7 @@
     {
       "path": "product/pipeline-templates/faas-add-api.json",
       "tier": "public",
-      "size": 3961,
+      "size": 3965,
       "type": "json"
     },
     {
