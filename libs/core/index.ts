@@ -589,6 +589,7 @@ export * from './completion-token-budget.js';
 export * from './worker-event-stream.js';
 export * from './lifecycle-hook-engine.js';
 export * from './dynamic-injection.js';
+export * from './context-rewind.js';
 export * from './adf-guardrails.js';
 export * from './reconcile-ops.js';
 export * from './report-ops.js';
