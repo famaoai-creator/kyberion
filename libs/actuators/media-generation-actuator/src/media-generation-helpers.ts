@@ -8,7 +8,6 @@ import {
   pathResolver,
   buildGovernedRetryOptions,
   loadRecoveryPolicy as loadCoreRecoveryPolicy,
-  secureFetch,
   retry,
   compileMusicGenerationADF,
   compileImageGenerationADF,
@@ -27,6 +26,7 @@ import {
   modalityForGenerationAction,
   type ProviderHistory,
 } from './generation-artifact-adapters.js';
+import { createComfyUiProviderClient } from './comfyui-provider-client.js';
 
 export type GeneratedArtifact = {
   kind: string;
@@ -54,7 +54,6 @@ export type GenerationBackend = {
   supports?: { artifact_formats?: string[]; async?: boolean };
 };
 
-const DEFAULT_COMFY_BASE_URL = process.env.KYBERION_COMFY_BASE_URL || 'http://127.0.0.1:8188';
 // External, operator-configured ComfyUI output dir; KYBERION_COMFY_OUTPUT_DIR overrides this default.
 const DEFAULT_COMFY_OUTPUT_DIR =
   process.env.KYBERION_COMFY_OUTPUT_DIR || pathResolver.sharedTmp('comfy/output');
@@ -358,13 +357,11 @@ async function waitForPromptCompletion(
   modality: GenerationModality = 'workflow'
 ): Promise<ProviderHistory> {
   const adapter = getGenerationHistoryAdapter(modality);
+  const providerClient = createComfyUiProviderClient();
   const startedAt = Date.now();
   while (Date.now() - startedAt < timeoutMs) {
     const history = (await retry(async () => {
-      return await secureFetch({
-        method: 'GET',
-        url: `${DEFAULT_COMFY_BASE_URL}/history/${promptId}`,
-      });
+      return providerClient.history(promptId);
     }, buildRetryOptions())) as unknown;
     if (history && typeof history === 'object' && !Array.isArray(history)) {
       const promptHistory = (history as Record<string, unknown>)[promptId];

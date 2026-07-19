@@ -44,6 +44,7 @@ import {
   resolveArtifactPath,
 } from './media-generation-helpers.js';
 import { getGenerationHistoryAdapterForAction } from './generation-artifact-adapters.js';
+import { createComfyUiProviderClient } from './comfyui-provider-client.js';
 
 const PROMPT_BASED_ACTIONS = new Set([
   'generate_image',
@@ -353,12 +354,7 @@ async function getGenerationJob(params: any) {
       return { ...currentJob, ...finalizeActuatorTrace(traceCtx) };
     }
 
-    const history = (await import('@agent/core').then(({ secureFetch }) =>
-      secureFetch({
-        method: 'GET',
-        url: `${process.env.KYBERION_COMFY_BASE_URL || 'http://127.0.0.1:8188'}/history/${promptId}`,
-      })
-    )) as unknown;
+    const history = (await createComfyUiProviderClient().history(promptId)) as unknown;
     if (!history || typeof history !== 'object' || Array.isArray(history)) {
       if (currentJob.status !== 'running') {
         const runningJob = transitionGenerationJob(currentJob, 'running', {
