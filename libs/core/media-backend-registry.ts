@@ -56,6 +56,38 @@ export interface MediaBackendAvailability {
   available: boolean;
   probe_kind: MediaBackendProbeKind;
   reason: string;
+  probe_id: string;
+  probed_at: string;
+  cache_expires_at: string;
+  cache_hit: boolean;
+}
+
+export interface MediaBackendProbeOptions {
+  force?: boolean;
+  ttl_ms?: number;
+}
+
+type UncachedMediaBackendAvailability = Omit<
+  MediaBackendAvailability,
+  'probe_id' | 'probed_at' | 'cache_expires_at' | 'cache_hit'
+>;
+
+interface MediaBackendProbeCacheEntry {
+  value: MediaBackendAvailability;
+  expires_at_ms: number;
+  in_flight?: Promise<MediaBackendAvailability>;
+}
+
+const mediaBackendProbeCache = new Map<string, MediaBackendProbeCacheEntry>();
+let mediaBackendProbeSequence = 0;
+
+export function resetMediaBackendAvailabilityCache(): void {
+  mediaBackendProbeCache.clear();
+}
+
+function defaultMediaBackendProbeTtlMs(): number {
+  const configured = Number(process.env.KYBERION_MEDIA_BACKEND_PROBE_TTL_MS || 30_000);
+  return Number.isFinite(configured) ? Math.min(300_000, Math.max(1_000, configured)) : 30_000;
 }
 
 const DEFAULT_REGISTRY_PATH = pathResolver.knowledge(
@@ -316,12 +348,10 @@ function isSupportedPlatform(backend: MediaBackendRecord, platform: NodeJS.Platf
  * source of truth for identity and modality; governed runtime registries are
  * the source of truth for live service/tool probes.
  */
-export async function probeMediaBackendAvailability(
-  backendId?: string,
-  modality?: MediaBackendModality,
-  platform: NodeJS.Platform = process.platform
-): Promise<MediaBackendAvailability> {
-  const backend = getMediaBackendRecord(backendId, modality);
+async function probeMediaBackendAvailabilityUncached(
+  backend: MediaBackendRecord,
+  platform: NodeJS.Platform
+): Promise<UncachedMediaBackendAvailability> {
   if (backend.status !== 'active') {
     return {
       backend_id: backend.backend_id,
@@ -379,6 +409,62 @@ export async function probeMediaBackendAvailability(
     probe_kind: 'registry',
     reason: 'no live probe is registered; active registry record is usable',
   };
+}
+
+export async function probeMediaBackendAvailability(
+  backendId?: string,
+  modality?: MediaBackendModality,
+  platform: NodeJS.Platform = process.platform,
+  options: MediaBackendProbeOptions = {}
+): Promise<MediaBackendAvailability> {
+  const backend = getMediaBackendRecord(backendId, modality);
+  const key = `${backend.backend_id}:${backend.modality}:${platform}`;
+  const now = Date.now();
+  const cached = mediaBackendProbeCache.get(key);
+  if (!options.force && cached?.in_flight) return cached.in_flight;
+  if (!options.force && cached && cached.expires_at_ms > now) {
+    return { ...cached.value, cache_hit: true };
+  }
+
+  const ttlMs = Number.isFinite(options.ttl_ms)
+    ? Math.min(300_000, Math.max(1_000, Number(options.ttl_ms)))
+    : defaultMediaBackendProbeTtlMs();
+  const probedAt = new Date(now).toISOString();
+  const expiresAt = new Date(now + ttlMs).toISOString();
+  const probeId = `media-probe-${++mediaBackendProbeSequence}`;
+  const probe = probeMediaBackendAvailabilityUncached(backend, platform)
+    .then((value) => {
+      const result: MediaBackendAvailability = {
+        ...value,
+        probe_id: probeId,
+        probed_at: probedAt,
+        cache_expires_at: expiresAt,
+        cache_hit: false,
+      };
+      mediaBackendProbeCache.set(key, { value: result, expires_at_ms: now + ttlMs });
+      return result;
+    })
+    .catch((error: unknown) => {
+      const current = mediaBackendProbeCache.get(key);
+      if (current?.value.probe_id === probeId) mediaBackendProbeCache.delete(key);
+      throw error;
+    });
+  mediaBackendProbeCache.set(key, {
+    value: {
+      backend_id: backend.backend_id,
+      modality: backend.modality,
+      available: false,
+      probe_kind: 'registry',
+      reason: 'availability probe in flight',
+      probe_id: probeId,
+      probed_at: probedAt,
+      cache_expires_at: expiresAt,
+      cache_hit: false,
+    },
+    expires_at_ms: now + ttlMs,
+    in_flight: probe,
+  });
+  return probe;
 }
 
 /**
