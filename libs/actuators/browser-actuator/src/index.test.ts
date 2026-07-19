@@ -249,6 +249,42 @@ describe('browser-actuator v3 contract', () => {
     });
   });
 
+  it('skips the conditional branch when the target element is absent', async () => {
+    const { handleAction } = await import('./index');
+    mocks.page.evaluate.mockResolvedValueOnce(0);
+
+    const result = await handleAction({
+      action: 'pipeline',
+      session_id: 'browser-conditional-test',
+      steps: [
+        {
+          type: 'capture',
+          op: 'query_elements',
+          params: { selector: 'button', text: '承認', export_as: 'approval_count' },
+        },
+        {
+          type: 'control',
+          op: 'if',
+          params: {
+            condition: { from: 'approval_count', operator: 'gt', value: 0 },
+            then: [
+              {
+                type: 'apply',
+                op: 'click_first_match',
+                params: { selector: 'button', text: '承認' },
+              },
+            ],
+          },
+        },
+      ],
+      options: { headless: true },
+    });
+
+    expect(result.context.approval_count).toBe(0);
+    expect(mocks.page.evaluate).toHaveBeenCalledTimes(1);
+    expect(mocks.page.click).not.toHaveBeenCalled();
+  });
+
   it('accepts computer_interaction snapshot requests and enriches them with observation outputs', async () => {
     const { handleAction } = await import('./index');
 
