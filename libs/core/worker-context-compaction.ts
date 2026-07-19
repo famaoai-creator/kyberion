@@ -22,6 +22,9 @@ import { metrics } from './metrics.js';
 import type { MissionWorkingMemory } from './mission-working-memory.js';
 import { pathResolver } from './path-resolver.js';
 import { safeMkdir, safeWriteFile } from './secure-io.js';
+import { getDefaultDynamicInjectionRegistry } from './dynamic-injection.js';
+import { fireLifecycleHooks, getDefaultLifecycleHookEngine } from './lifecycle-hook-engine.js';
+import { getDefaultWorkerEventStream } from './worker-event-stream.js';
 
 export type WorkerContextRole = 'system' | 'user' | 'assistant' | 'tool_use' | 'tool_result';
 
@@ -370,6 +373,23 @@ export async function compactWorkerContext(
       ...(options.missionId ? { mission_id: options.missionId } : {}),
     },
   });
+  // KC-04 pre_compact hooks are observational: compaction is itself a safety
+  // mechanism, so a hook block verdict must not stop it. KC-02: mirror onto
+  // the worker event stream (best-effort).
+  await fireLifecycleHooks(getDefaultLifecycleHookEngine(), 'pre_compact', {
+    ...(options.missionId ? { matcher_value: options.missionId, mission_id: options.missionId } : {}),
+    tokens_before: tokensBefore,
+    threshold_tokens: thresholdTokens,
+  });
+  try {
+    getDefaultWorkerEventStream().emit(
+      'compaction_begin',
+      { tokens_before: tokensBefore, threshold_tokens: thresholdTokens },
+      options.missionId ? { mission_id: options.missionId } : undefined
+    );
+  } catch {
+    /* stream projection stays best-effort */
+  }
 
   // Stage 1 — microcompact (LLM-free).
   const keepRecent = options.keepRecentToolResults ?? DEFAULT_KEEP_RECENT_TOOL_RESULTS;
@@ -455,6 +475,28 @@ export async function compactWorkerContext(
       ...(options.missionId ? { mission_id: options.missionId } : {}),
     },
   });
+  await fireLifecycleHooks(getDefaultLifecycleHookEngine(), 'post_compact', {
+    ...(options.missionId ? { matcher_value: options.missionId, mission_id: options.missionId } : {}),
+    tokens_before: tokensBefore,
+    tokens_after: tokensAfter,
+    stage,
+  });
+  try {
+    getDefaultWorkerEventStream().emit(
+      'compaction_end',
+      { tokens_before: tokensBefore, tokens_after: tokensAfter, stage },
+      options.missionId ? { mission_id: options.missionId } : undefined
+    );
+  } catch {
+    /* stream projection stays best-effort */
+  }
+  // KC-08: the compacted transcript lost every earlier injection — reset the
+  // registry so one-shot reminders (working principles etc.) re-fire.
+  try {
+    getDefaultDynamicInjectionRegistry().notifyContextCompacted();
+  } catch {
+    /* injection bookkeeping must not alter compaction behavior */
+  }
   try {
     metrics.record('worker:context-compaction', tokensBefore - tokensAfter, 'success', {
       stage,
