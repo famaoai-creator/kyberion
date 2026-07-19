@@ -12,7 +12,11 @@ import {
   createApprovalRequest,
   computeApprovalPayloadHash,
   listApprovalRequests,
+  lookupSessionApprovalCache,
+  recordSessionCacheAutoApproval,
+  type ApprovalActionDescriptor,
   type ApprovalRequestRecord,
+  type ApprovalRequestSource,
 } from './approval-store.js';
 import type { GovernedArtifactRole } from './artifact-store.js';
 import { auditChain } from './audit-chain.js';
@@ -44,6 +48,14 @@ export interface ApprovalGateParams {
   };
   /** Pipeline trace context — when provided, decision events are emitted into the active span. */
   trace?: TraceContext;
+  /**
+   * KC-03: action descriptor consulted against the session approval cache.
+   * Only short-circuits require_approval -> approved; deny paths and hardened
+   * policies (dual-key, injection-suspected) never consult the cache.
+   */
+  actionDescriptor?: ApprovalActionDescriptor;
+  /** KC-03: originating mission/task/agent, persisted for source-scoped cancellation. */
+  source?: ApprovalRequestSource;
 }
 
 export interface ApprovalGateResult {
@@ -347,6 +359,65 @@ export function enforceApprovalGate(
     };
   }
 
+  // --- Step 2.5 (KC-03): session action cache ---
+  // Reached only when policy says require_approval and no existing request
+  // matches this correlationId — deny verdicts (rejected/expired/mismatched
+  // requests) returned above and are never short-circuited. Hardened policies
+  // (dual-key = tier-sensitive secrets, injection-suspected override) bypass
+  // the cache entirely, and the descriptor must name this exact operation.
+  const sessionCacheEligible =
+    policy.matchedRuleId !== 'injection-suspected-override' &&
+    !policy.missingRequirements.includes('dual_key_confirmation');
+  const descriptor = params.actionDescriptor;
+  const cached =
+    descriptor &&
+    sessionCacheEligible &&
+    descriptor.action.trim().toLowerCase() === operationId.trim().toLowerCase()
+      ? lookupSessionApprovalCache(descriptor, Date.now(), {
+          agentId,
+          payloadHash: computeApprovalPayloadHash(payload),
+          effectBinding: operationId,
+          source: params.source,
+        })
+      : null;
+  if (cached) {
+    auditChain.record({
+      agentId,
+      action: 'approval_gate',
+      operation: operationId,
+      result: 'allowed',
+      reason: 'auto_approved_via_session_cache',
+      metadata: {
+        correlationId,
+        intentId,
+        approvalId: cached.grantedByRequestId,
+        sessionCacheKey: cached.key,
+        grantedBy: cached.grantedBy,
+        grantedAt: cached.grantedAt,
+      },
+    });
+    recordSessionCacheAutoApproval(role, {
+      entry: cached,
+      operationId,
+      agentId,
+      correlationId,
+    });
+    trace?.addEvent('approval.auto_approved_via_session_cache', {
+      operation_id: operationId,
+      agent_id: agentId,
+      request_id: cached.grantedByRequestId,
+      granted_by: cached.grantedBy,
+      granted_at: cached.grantedAt,
+    });
+    recordGovernanceAction(agentId, 'approval_gate', `${operationId}:allowed`, false);
+    return {
+      allowed: true,
+      status: 'approved',
+      requestId: cached.grantedByRequestId,
+      message: `Auto-approved via session cache (granted by ${cached.grantedBy} at ${cached.grantedAt})`,
+    };
+  }
+
   // --- Step 3: Create a new approval request ---
   const draft =
     params.draft ?? buildApprovalDraft({ operationId, agentId, correlationId, payload, intentId });
@@ -357,6 +428,7 @@ export function enforceApprovalGate(
     correlationId,
     requestedBy: agentId,
     draft,
+    source: params.source,
     accountability: {
       finalDecision: 'human_only',
       payloadHash: computeApprovalPayloadHash(payload),
