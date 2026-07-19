@@ -22,6 +22,11 @@ const elements = {
   handoffSteps: document.querySelector('#handoff-steps'),
   executionInputs: document.querySelector('#execution-inputs'),
   executionInputsFields: document.querySelector('#execution-inputs-fields'),
+  procedureRegistration: document.querySelector('#procedure-registration'),
+  procedureIdInput: document.querySelector('#procedure-id-input'),
+  intentPhrasesInput: document.querySelector('#intent-phrases-input'),
+  registerProcedureButton: document.querySelector('#register-procedure-button'),
+  procedureRegistrationStatus: document.querySelector('#procedure-registration-status'),
   executionResults: document.querySelector('#execution-results'),
   preflightButton: document.querySelector('#preflight-button'),
   copyDraftButton: document.querySelector('#copy-draft-button'),
@@ -53,8 +58,12 @@ document.querySelectorAll('.tab').forEach((tab) => {
 
 // Intent tab wiring
 elements.intentResolveButton.addEventListener('click', resolveIntent);
-elements.intentInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') resolveIntent(); });
-elements.intentExecuteButton.addEventListener('click', () => startProcedure(state.current?.intentResolution?.best?.procedure_id));
+elements.intentInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') resolveIntent();
+});
+elements.intentExecuteButton.addEventListener('click', () =>
+  startProcedure(state.current?.intentResolution?.best?.procedure_id)
+);
 elements.intentRunButton.addEventListener('click', async () => {
   const procedureId = elements.intentInputs.dataset.procedureId;
   if (!procedureId) return showNotice('実行する手順が選択されていません。');
@@ -71,7 +80,9 @@ elements.intentRecordButton.addEventListener('click', () => {
 });
 elements.intentRepairRecordButton.addEventListener('click', () => {
   selectTab('record');
-  showNotice('修正操作を記録してください。記録停止後、Review で承認すると「修正を手順に反映」が押せます。');
+  showNotice(
+    '修正操作を記録してください。記録停止後、Review で承認すると「修正を手順に反映」が押せます。'
+  );
 });
 elements.intentRepairApplyButton.addEventListener('click', async () => {
   const procedureId = state.current?.repairPending?.procedure_id;
@@ -83,7 +94,10 @@ elements.intentRepairApplyButton.addEventListener('click', async () => {
 // fields and wait for the user before dispatching; otherwise execute directly.
 async function startProcedure(procedureId) {
   if (!procedureId) return showNotice('実行する手順が選択されていません。');
-  const prepared = await invoke('bridge:prepare-procedure', { procedureId, origin: state.current?.connected?.origin });
+  const prepared = await invoke('bridge:prepare-procedure', {
+    procedureId,
+    origin: state.current?.connected?.origin,
+  });
   if (!prepared) return;
   if (prepared.hasInputs) {
     renderIntentInputs(procedureId, prepared.inputs || []);
@@ -91,7 +105,11 @@ async function startProcedure(procedureId) {
     return;
   }
   selectTab('run');
-  await invoke('bridge:execute-procedure', { procedureId, origin: state.current?.connected?.origin, values: {} });
+  await invoke('bridge:execute-procedure', {
+    procedureId,
+    origin: state.current?.connected?.origin,
+    values: {},
+  });
 }
 
 function renderIntentInputs(procedureId, inputs) {
@@ -120,10 +138,16 @@ function collectIntentInputValues() {
   return values;
 }
 
-elements.connectButton.addEventListener('click', () => withHostPermission('bridge:connect-active-tab'));
+elements.connectButton.addEventListener('click', () =>
+  withHostPermission('bridge:connect-active-tab')
+);
 elements.disconnectButton.addEventListener('click', () => invoke('bridge:disconnect'));
-elements.startRecordingButton.addEventListener('click', () => withHostPermission('bridge:start-recording'));
-elements.resumeRecordingButton.addEventListener('click', () => withHostPermission('bridge:resume-recording'));
+elements.startRecordingButton.addEventListener('click', () =>
+  withHostPermission('bridge:start-recording')
+);
+elements.resumeRecordingButton.addEventListener('click', () =>
+  withHostPermission('bridge:resume-recording')
+);
 
 // Request site access from the side panel (a valid user gesture) before any
 // action that needs to inject the content script. Once granted, injection keeps
@@ -159,7 +183,10 @@ elements.finalizeReviewButton.addEventListener('click', async () => {
 elements.rejectDraftButton.addEventListener('click', () => invoke('bridge:reject-draft'));
 elements.copyDraftButton.addEventListener('click', copyApprovedDraft);
 elements.preflightButton.addEventListener('click', () => invoke('bridge:preflight-draft'));
-elements.requestExecutionButton.addEventListener('click', () => invoke('bridge:request-execution', { values: collectInputValues() }));
+elements.requestExecutionButton.addEventListener('click', () =>
+  invoke('bridge:request-execution', { values: collectInputValues() })
+);
+elements.registerProcedureButton.addEventListener('click', registerProcedure);
 
 chrome.runtime.onMessage.addListener((message) => {
   if (message?.type === 'bridge:state-changed') render(message.state);
@@ -233,12 +260,13 @@ function renderRepairStatus(state) {
     return;
   }
   elements.intentRepairStatus.hidden = false;
-  const reasonLabel = {
-    mfa: 'MFA チャレンジ',
-    new_popup: '新しいポップアップ',
-    handoff: 'タブ遷移',
-    ambiguity: 'UI 変更',
-  }[repair.reason] || repair.reason;
+  const reasonLabel =
+    {
+      mfa: 'MFA チャレンジ',
+      new_popup: '新しいポップアップ',
+      handoff: 'タブ遷移',
+      ambiguity: 'UI 変更',
+    }[repair.reason] || repair.reason;
   // The "apply repair" button appears once a corrective recording is finalized
   // (an approved draft) — it merges the correction into the failed procedure.
   const correctiveReady = state.lastDraft?.review?.status === 'approved';
@@ -252,7 +280,8 @@ refresh();
 
 async function refresh() {
   const response = await chrome.runtime.sendMessage({ type: 'bridge:get-state' });
-  if (!response?.ok) return showNotice(response?.error || 'Browser Bridge の状態を取得できません。');
+  if (!response?.ok)
+    return showNotice(response?.error || 'Browser Bridge の状態を取得できません。');
   render(response.state);
 }
 
@@ -277,9 +306,17 @@ function render(nextState) {
 
   elements.connectionStatus.textContent = paused ? '一時停止中' : connected ? '接続済み' : '未接続';
   elements.connectionStatus.classList.toggle('is-connected', Boolean(connected) && !paused);
-  elements.connectionTitle.textContent = connected ? connected.title || '名称のないタブ' : 'タブを接続してください';
-  elements.connectionOrigin.textContent = connected ? connected.origin : 'http(s) の通常タブだけを接続できます。';
-  elements.connectButton.textContent = paused ? 'このタブへ再接続' : connected ? '接続を更新' : 'このタブを接続';
+  elements.connectionTitle.textContent = connected
+    ? connected.title || '名称のないタブ'
+    : 'タブを接続してください';
+  elements.connectionOrigin.textContent = connected
+    ? connected.origin
+    : 'http(s) の通常タブだけを接続できます。';
+  elements.connectButton.textContent = paused
+    ? 'このタブへ再接続'
+    : connected
+      ? '接続を更新'
+      : 'このタブを接続';
   elements.disconnectButton.disabled = !connected || Boolean(recording);
   elements.startRecordingButton.disabled = !connected || Boolean(recording);
   elements.resumeRecordingButton.disabled = !paused;
@@ -304,22 +341,33 @@ function renderHandoff(draft) {
   elements.copyDraftButton.disabled = !approved;
   elements.preflightButton.disabled = !approved;
   elements.requestExecutionButton.disabled = !approved || execution?.status === 'running';
+  elements.procedureRegistration.hidden = !approved;
+  elements.registerProcedureButton.disabled = !approved;
+  const registration = state.current?.procedureRegistration;
+  elements.procedureRegistrationStatus.textContent = registration?.procedure_id
+    ? `登録済み: ${registration.procedure_id}（次回から Intent タブで呼び出せます）`
+    : '';
 
   renderInputFields(approvedActions);
   renderExecutionResults(execution);
 
   if (!draft) {
-    elements.handoffStatus.textContent = 'Review を確定すると、承認済み操作だけを含む handoff 下書きが準備されます。';
+    elements.handoffStatus.textContent =
+      'Review を確定すると、承認済み操作だけを含む handoff 下書きが準備されます。';
     appendHandoffStep('1. 操作を記録', 'pending');
     appendHandoffStep('2. Review で承認または除外', 'pending');
     appendHandoffStep('3. Kyberion preflight', 'blocked');
     return;
   }
   if (!approved) {
-    elements.handoffStatus.textContent = draft.review?.status === 'rejected'
-      ? 'この下書きは拒否済みです。実行・preflight には進みません。'
-      : 'Review が未確定です。承認済み操作をまだ Kyberion へ渡しません。';
-    appendHandoffStep('1. Review を確定', draft.review?.status === 'rejected' ? 'rejected' : 'pending');
+    elements.handoffStatus.textContent =
+      draft.review?.status === 'rejected'
+        ? 'この下書きは拒否済みです。実行・preflight には進みません。'
+        : 'Review が未確定です。承認済み操作をまだ Kyberion へ渡しません。';
+    appendHandoffStep(
+      '1. Review を確定',
+      draft.review?.status === 'rejected' ? 'rejected' : 'pending'
+    );
     appendHandoffStep('2. Kyberion preflight', 'blocked');
     return;
   }
@@ -327,9 +375,36 @@ function renderHandoff(draft) {
   const highRisk = approvedActions.filter((action) => action.risk === 'high').length;
   elements.handoffStatus.textContent = `${approvedActions.length} 件の操作を承認済み（高リスク ${highRisk} 件）。Native Bridge 経由で preflight → 承認 → lease → Chrome 実行へ進みます。`;
   appendHandoffStep('1. Review 確定', 'completed');
-  appendHandoffStep(`2. Kyberion preflight (${approvedActions.length} 操作)`, execution?.preflight ? 'completed' : 'ready');
+  appendHandoffStep(
+    `2. Kyberion preflight (${approvedActions.length} 操作)`,
+    execution?.preflight ? 'completed' : 'ready'
+  );
   appendHandoffStep('3. 承認 + lease 発行', executionLeaseStatus(execution));
   appendHandoffStep('4. Chrome 実行', executionRunStatus(execution));
+}
+
+async function registerProcedure() {
+  const procedureId = elements.procedureIdInput.value.trim();
+  const intentPhrases = elements.intentPhrasesInput.value
+    .split(/[\n,、]/)
+    .map((phrase) => phrase.trim())
+    .filter(Boolean);
+  if (!/^[a-z0-9]+(?:[._-][a-z0-9]+)*$/i.test(procedureId)) {
+    showNotice('シナリオ ID は英数字と . _ - の組み合わせで入力してください。');
+    return;
+  }
+  if (intentPhrases.length === 0) {
+    showNotice('呼び出し文を 1 件以上入力してください。');
+    return;
+  }
+  elements.registerProcedureButton.disabled = true;
+  const response = await invoke('bridge:promote-procedure', { procedureId, intentPhrases });
+  if (response?.registration?.procedure_id) {
+    showNotice(
+      `個人用シナリオ「${response.registration.procedure_id}」を登録しました。Intent タブから呼び出せます。`
+    );
+  }
+  elements.registerProcedureButton.disabled = false;
 }
 
 function executionLeaseStatus(execution) {
@@ -343,17 +418,25 @@ function executionRunStatus(execution) {
   if (!execution) return 'blocked';
   if (execution.status === 'running') return 'ready';
   if (execution.status === 'completed') return 'completed';
-  if (['failed', 'cancelled', 'blocked', 'verification_failed'].includes(execution.status)) return 'rejected';
+  if (['failed', 'cancelled', 'blocked', 'verification_failed'].includes(execution.status))
+    return 'rejected';
   return 'blocked';
 }
 
 function approvedActionableActions(draft) {
-  const decisions = new Map((draft.review?.decisions || []).map((entry) => [entry.action_id, entry.status]));
-  return draft.actions.filter((action) => action.op !== 'sensitive_input_omitted' && decisions.get(action.action_id) === 'approved');
+  const decisions = new Map(
+    (draft.review?.decisions || []).map((entry) => [entry.action_id, entry.status])
+  );
+  return draft.actions.filter(
+    (action) =>
+      action.op !== 'sensitive_input_omitted' && decisions.get(action.action_id) === 'approved'
+  );
 }
 
 function renderInputFields(approvedActions) {
-  const fillActions = approvedActions.filter((action) => action.op === 'fill_ref' && action.variable);
+  const fillActions = approvedActions.filter(
+    (action) => action.op === 'fill_ref' && action.variable
+  );
   elements.executionInputsFields.replaceChildren();
   if (fillActions.length === 0) {
     elements.executionInputs.hidden = true;
@@ -397,7 +480,9 @@ function renderExecutionResults(execution) {
     const t = document.createElement('strong');
     t.textContent = `セグメント ${execution.segment.segmentIndex + 1} / ${execution.segment.segmentCount}`;
     const d = document.createElement('small');
-    d.textContent = execution.session?.origin ? `実行中: ${execution.session.origin.replace(/^https?:\/\//, '')}` : 'クロスサイト手順';
+    d.textContent = execution.session?.origin
+      ? `実行中: ${execution.session.origin.replace(/^https?:\/\//, '')}`
+      : 'クロスサイト手順';
     seg.append(t, d);
     elements.executionResults.append(seg);
   }
@@ -420,7 +505,8 @@ function renderExecutionResults(execution) {
   if (!execution.results?.length) return;
   execution.results.forEach((result, index) => {
     const item = document.createElement('li');
-    item.className = result.status === 'done' ? 'is-done' : result.status === 'skipped' ? '' : 'is-high';
+    item.className =
+      result.status === 'done' ? 'is-done' : result.status === 'skipped' ? '' : 'is-high';
     const title = document.createElement('strong');
     title.textContent = `${index + 1}. ${result.op || ''}`;
     const detail = document.createElement('small');
@@ -435,7 +521,16 @@ function appendHandoffStep(label, status) {
   const title = document.createElement('strong');
   title.textContent = label;
   const detail = document.createElement('small');
-  detail.textContent = status === 'completed' ? '完了' : status === 'ready' ? '準備完了' : status === 'rejected' ? '拒否済み' : status === 'blocked' ? 'Native Bridge 待ち' : '未完了';
+  detail.textContent =
+    status === 'completed'
+      ? '完了'
+      : status === 'ready'
+        ? '準備完了'
+        : status === 'rejected'
+          ? '拒否済み'
+          : status === 'blocked'
+            ? 'Native Bridge 待ち'
+            : '未完了';
   item.append(title, detail);
   elements.handoffSteps.append(item);
 }
@@ -445,7 +540,9 @@ async function copyApprovedDraft() {
   if (draft?.review?.status !== 'approved') return showNotice('承認済みの下書きがありません。');
   try {
     await navigator.clipboard.writeText(JSON.stringify(draft, null, 2));
-    showNotice('承認済み下書きをクリップボードへコピーしました。Kyberion Bridge の preflight 入力として渡せます。');
+    showNotice(
+      '承認済み下書きをクリップボードへコピーしました。Kyberion Bridge の preflight 入力として渡せます。'
+    );
   } catch {
     showNotice('クリップボードへコピーできませんでした。Review の JSON 表示から確認してください。');
   }
@@ -461,7 +558,8 @@ function renderRecordingActions(actions) {
 function renderReview(draft) {
   elements.reviewActions.replaceChildren();
   if (!draft?.review) {
-    elements.reviewSummary.textContent = '記録を停止すると、ここに redaction 済みの下書きが表示されます。';
+    elements.reviewSummary.textContent =
+      '記録を停止すると、ここに redaction 済みの下書きが表示されます。';
     elements.draftPreview.textContent = '';
     elements.finalizeReviewButton.disabled = true;
     elements.rejectDraftButton.disabled = true;
@@ -470,8 +568,12 @@ function renderReview(draft) {
 
   const decisions = new Map(draft.review.decisions.map((entry) => [entry.action_id, entry]));
   const actionable = draft.actions.filter((action) => action.op !== 'sensitive_input_omitted');
-  const hasPending = actionable.some((action) => decisions.get(action.action_id)?.status === 'pending');
-  const hasApproved = actionable.some((action) => decisions.get(action.action_id)?.status === 'approved');
+  const hasPending = actionable.some(
+    (action) => decisions.get(action.action_id)?.status === 'pending'
+  );
+  const hasApproved = actionable.some(
+    (action) => decisions.get(action.action_id)?.status === 'approved'
+  );
   const final = ['approved', 'rejected'].includes(draft.review.status);
   elements.reviewSummary.textContent = reviewMessage(draft.review.status, hasPending, hasApproved);
   elements.finalizeReviewButton.disabled = final || hasPending || !hasApproved;
@@ -489,7 +591,7 @@ function renderReview(draft) {
       controls.className = 'review-controls';
       controls.append(
         decisionButton('承認', 'approved', action.action_id, decision.status === 'approved'),
-        decisionButton('除外', 'rejected', action.action_id, decision.status === 'rejected'),
+        decisionButton('除外', 'rejected', action.action_id, decision.status === 'rejected')
       );
       item.append(controls);
     }
@@ -499,7 +601,8 @@ function renderReview(draft) {
 
 function actionItem(action, label) {
   const item = document.createElement('li');
-  item.className = action.risk === 'sensitive' ? 'is-sensitive' : action.risk === 'high' ? 'is-high' : '';
+  item.className =
+    action.risk === 'sensitive' ? 'is-sensitive' : action.risk === 'high' ? 'is-high' : '';
   const title = document.createElement('strong');
   title.textContent = label;
   const detail = document.createElement('small');
@@ -518,15 +621,22 @@ function decisionButton(label, decision, actionId, selected) {
 }
 
 function reviewMessage(status, hasPending, hasApproved) {
-  if (status === 'approved') return '下書きを確定しました。承認済み操作だけが pipeline candidate に含まれます。';
+  if (status === 'approved')
+    return '下書きを確定しました。承認済み操作だけが pipeline candidate に含まれます。';
   if (status === 'rejected') return '下書きを拒否しました。実行対象にはなりません。';
   if (hasPending) return '各操作を承認または除外してください。値や秘密情報は記録されません。';
-  return hasApproved ? '確定すると、承認済み操作だけが candidate に残ります。' : '操作をすべて除外する場合は、下書きを拒否してください。';
+  return hasApproved
+    ? '確定すると、承認済み操作だけが candidate に残ります。'
+    : '操作をすべて除外する場合は、下書きを拒否してください。';
 }
 
 function selectTab(tabName) {
-  document.querySelectorAll('.tab').forEach((tab) => tab.classList.toggle('is-active', tab.dataset.tab === tabName));
-  document.querySelectorAll('.panel').forEach((panel) => panel.classList.toggle('is-active', panel.dataset.panel === tabName));
+  document
+    .querySelectorAll('.tab')
+    .forEach((tab) => tab.classList.toggle('is-active', tab.dataset.tab === tabName));
+  document
+    .querySelectorAll('.panel')
+    .forEach((panel) => panel.classList.toggle('is-active', panel.dataset.panel === tabName));
 }
 
 function showNotice(message) {

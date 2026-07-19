@@ -3,7 +3,7 @@ import { logger } from './core.js';
 import { matchesAllowedOrigin } from './origin-policy.js';
 import { pathResolver } from './path-resolver.js';
 import { delegateStructured, getReasoningBackend } from './reasoning-backend.js';
-import { safeReadFile } from './secure-io.js';
+import { safeExistsSync, safeReadFile } from './secure-io.js';
 import {
   PROCEDURE_RESOLUTION_THRESHOLDS,
   type ProcedureCatalog,
@@ -12,6 +12,8 @@ import {
 } from './procedure-types.js';
 
 const PROCEDURES_PATH = 'knowledge/product/orchestration/procedures.json';
+/** User-local overlay. This path is intentionally ignored by git. */
+const PERSONAL_PROCEDURES_PATH = pathResolver.knowledge('personal/browser-procedures.json');
 
 /**
  * Allowlisted store for recordings backing procedures. A catalog entry's
@@ -20,6 +22,7 @@ const PROCEDURES_PATH = 'knowledge/product/orchestration/procedures.json';
  * an arbitrary file in the repo.
  */
 const RECORDINGS_STORE = pathResolver.shared('runtime/recordings');
+const PERSONAL_RECORDINGS_STORE = pathResolver.knowledge('personal/browser-recordings');
 
 let catalogCache: ProcedureEntry[] | null = null;
 
@@ -46,33 +49,45 @@ function isStructurallyValid(entry: unknown): entry is ProcedureEntry {
  */
 export function loadProcedures(forceRefresh = false): ProcedureEntry[] {
   if (!forceRefresh && catalogCache !== null) return catalogCache;
-  try {
-    const raw = safeReadFile(pathResolver.rootResolve(PROCEDURES_PATH), {
-      encoding: 'utf8',
-    }) as string;
-    const parsed = JSON.parse(raw) as ProcedureCatalog;
-    const entries = Array.isArray(parsed.procedures) ? parsed.procedures : [];
-    const seen = new Set<string>();
-    const valid: ProcedureEntry[] = [];
-    for (const entry of entries) {
-      if (!isStructurallyValid(entry)) {
-        logger.warn('[procedure-registry] dropping structurally-invalid procedure entry');
-        continue;
+  const sources = [
+    // Personal procedures win on an ID collision: the public catalog remains
+    // unchanged while a user can intentionally override a product example.
+    { label: 'personal browser-procedures.json', file: PERSONAL_PROCEDURES_PATH, optional: true },
+    { label: 'procedures.json', file: pathResolver.rootResolve(PROCEDURES_PATH), optional: false },
+  ];
+  const seen = new Set<string>();
+  const valid: ProcedureEntry[] = [];
+  let loadedAny = false;
+  for (const source of sources) {
+    if (source.optional && !safeExistsSync(source.file)) continue;
+    try {
+      const raw = safeReadFile(source.file, { encoding: 'utf8' }) as string;
+      const parsed = JSON.parse(raw) as ProcedureCatalog;
+      const entries = Array.isArray(parsed.procedures) ? parsed.procedures : [];
+      loadedAny = true;
+      for (const entry of entries) {
+        if (!isStructurallyValid(entry)) {
+          logger.warn(
+            `[procedure-registry] dropping structurally-invalid entry from ${source.label}`
+          );
+          continue;
+        }
+        if (seen.has(entry.procedure_id)) {
+          logger.warn(
+            `[procedure-registry] duplicate procedure_id "${entry.procedure_id}" — keeping first`
+          );
+          continue;
+        }
+        seen.add(entry.procedure_id);
+        valid.push(entry);
       }
-      if (seen.has(entry.procedure_id)) {
-        logger.warn(
-          `[procedure-registry] duplicate procedure_id "${entry.procedure_id}" — keeping first`
-        );
-        continue;
+    } catch {
+      if (!source.optional) {
+        logger.info('[procedure-registry] procedures.json unavailable — returning empty catalog');
       }
-      seen.add(entry.procedure_id);
-      valid.push(entry);
     }
-    catalogCache = valid;
-  } catch {
-    logger.info('[procedure-registry] procedures.json unavailable — returning empty catalog');
-    catalogCache = [];
   }
+  catalogCache = loadedAny ? valid : [];
   return catalogCache;
 }
 
@@ -90,10 +105,9 @@ export function invalidateProcedureCache(): void {
 export function resolveAllowlistedRecordingRef(recordingRef: string | undefined): string | null {
   if (!recordingRef || typeof recordingRef !== 'string') return null;
   const abs = path.resolve(pathResolver.rootResolve(recordingRef));
-  const storeAbs = path.resolve(RECORDINGS_STORE);
-  // Must be strictly within the store (defends against ../ escape and prefix tricks).
-  if (abs !== storeAbs && !abs.startsWith(storeAbs + path.sep)) return null;
-  return abs;
+  const stores = [RECORDINGS_STORE, PERSONAL_RECORDINGS_STORE].map((store) => path.resolve(store));
+  // Must be strictly within a store (defends against ../ escape and prefix tricks).
+  return stores.some((store) => abs !== store && abs.startsWith(store + path.sep)) ? abs : null;
 }
 
 // ---------------------------------------------------------------------------
