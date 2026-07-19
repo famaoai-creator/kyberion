@@ -29,7 +29,7 @@ This inventory is generated from the filesystem. Manifest-backed actuators are t
 - `file-actuator`: Generic File-Actuator for Kyberion (1 ops, v1.1.0, schema schemas/file-pipeline.schema.json)
 - `ios-actuator`: simctl-driven iOS Simulator Actuator (1 ops, v1.1.0, schema schemas/mobile-device-pipeline.schema.json)
 - `media-actuator`: Document and asset generation engine. Includes document_digest, pptx_slide_text, and pptx_filter_slides for template-inheriting partial-update workflows. (1 ops, v1.1.0, schema schemas/media-pipeline.schema.json)
-- `media-generation-actuator`: Generative image, video, music, and screen capture actuator (10 ops, v1.1.0, schema schemas/media-generation-action.schema.json)
+- `media-generation-actuator`: Generative image, video, music, and screen capture actuator (12 ops, v1.1.0, schema schemas/media-generation-action.schema.json)
 - `meeting-actuator`: Abstracted online meeting bridge (Zoom, Teams, Google Meet) (6 ops, v1.1.0, schema schemas/meeting-action.schema.json)
 - `meeting-browser-driver`: Internal Playwright MeetingJoinDriver for Meet (primary) + Zoom/Teams (selectors-as-config). Exposes the meeting-browser-driver join_backend label and writes captured audio to an AudioBus. (2 ops, v1.0.0)
 - `modeling-actuator`: Architectural Analysis and ADF Transformation Engine (2 ops, v1.0.0, schema schemas/modeling-pipeline.schema.json)
@@ -51,7 +51,6 @@ This inventory is generated from the filesystem. Manifest-backed actuators are t
 
 - Source of truth: [legacy_component_index.json](knowledge/product/orchestration/legacy_component_index.json)
 - Count: 0
-
 
 ## Consolidation Recommendations
 

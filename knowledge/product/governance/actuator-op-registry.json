@@ -294,11 +294,15 @@
       ]
     },
     "media-generation": {
-      "capture": ["capture_focused_window", "capture_screen", "get_generation_job"],
+      "capture": ["capture_focused_window", "capture_screen", "record_screen"],
       "transform": [],
       "apply": [
         "collect_generation_artifact",
         "generate_image",
+        "generate_music",
+        "generate_video",
+        "get_generation_job",
+        "run_workflow",
         "submit_generation",
         "wait_generation_job"
       ]

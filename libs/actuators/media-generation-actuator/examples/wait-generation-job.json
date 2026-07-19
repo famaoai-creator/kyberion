@@ -1,0 +1,8 @@
+{
+  "action": "wait_generation_job",
+  "params": {
+    "job_id": "genjob-generate_image-example",
+    "timeout_ms": 30000,
+    "poll_interval_ms": 1000
+  }
+}

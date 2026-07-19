@@ -3,6 +3,9 @@ import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { safeJsonParse } from './validators.js';
 import { getToolRuntimeRecord } from './tool-runtime-registry.js';
+import { probeToolRuntime } from './tool-runtime-registry.js';
+import { probeServiceRuntime } from './service-runtime-registry.js';
+import { probeAppleImageGeneration } from './apple-intelligence-bridge.js';
 import {
   getVoiceEngineRegistry,
   resolveVoiceEngineForPlatform,
@@ -13,6 +16,11 @@ export type MediaBackendModality = 'image' | 'voice' | 'video' | 'music';
 export type MediaBackendStatus = 'active' | 'shadow' | 'disabled';
 export type MediaBackendKind = 'service_preset' | 'api' | 'cli' | 'local';
 export type MediaBackendPlatform = 'any' | 'darwin' | 'linux' | 'win32';
+export type MediaBackendProbeKind =
+  | 'service_runtime'
+  | 'tool_runtime'
+  | 'native_bridge'
+  | 'registry';
 
 export interface MediaBackendRecord {
   backend_id: string;
@@ -42,6 +50,14 @@ export interface MediaBackendRegistry {
   backends: MediaBackendRecord[];
 }
 
+export interface MediaBackendAvailability {
+  backend_id: string;
+  modality: MediaBackendModality;
+  available: boolean;
+  probe_kind: MediaBackendProbeKind;
+  reason: string;
+}
+
 const DEFAULT_REGISTRY_PATH = pathResolver.knowledge(
   'product/governance/media-backend-registry.json'
 );
@@ -53,7 +69,7 @@ const FALLBACK_REGISTRY: MediaBackendRegistry = {
     image: 'media-generation.comfyui',
     voice: 'voice.local_say',
     video: 'video.hyperframes_cli',
-    music: 'media-generation.comfyui',
+    music: 'media-generation.comfyui.music',
   },
   backends: [
     {
@@ -67,6 +83,31 @@ const FALLBACK_REGISTRY: MediaBackendRegistry = {
       supports: { artifact_formats: ['png', 'jpg', 'jpeg', 'webp'], async: true },
       service_id: 'media-generation',
       action: 'generate_image',
+    },
+    {
+      backend_id: 'media-generation.comfyui.video',
+      modality: 'video',
+      display_name: 'ComfyUI Video Generation',
+      kind: 'service_preset',
+      provider: 'comfyui',
+      status: 'active',
+      platforms: ['any'],
+      supports: { artifact_formats: ['mp4', 'mov', 'webm', 'gif'], async: true },
+      service_id: 'media-generation',
+      action: 'generate_video',
+      fallback_backend_id: 'video.hyperframes_cli',
+    },
+    {
+      backend_id: 'media-generation.comfyui.music',
+      modality: 'music',
+      display_name: 'ComfyUI Music Generation',
+      kind: 'service_preset',
+      provider: 'comfyui',
+      status: 'active',
+      platforms: ['any'],
+      supports: { artifact_formats: ['mp3', 'wav', 'flac'], async: true },
+      service_id: 'media-generation',
+      action: 'generate_music',
     },
     {
       backend_id: 'media-generation.local_flux',
@@ -232,11 +273,15 @@ export function getMediaBackendRecord(
   const defaultBackendId = modality ? registry.default_backend_ids[modality] : undefined;
   const resolvedId = backendId || defaultBackendId || registry.default_backend_ids.image;
   const aliasId =
-    modality === 'image' && resolvedId === 'local_flux'
-      ? 'media-generation.local_flux'
-      : modality === 'image' && resolvedId === 'apple_playground'
-        ? 'media-generation.apple_playground'
-        : resolvedId;
+    modality === 'video' && resolvedId === 'media-generation.comfyui'
+      ? 'media-generation.comfyui.video'
+      : modality === 'music' && resolvedId === 'media-generation.comfyui'
+        ? 'media-generation.comfyui.music'
+        : modality === 'image' && resolvedId === 'local_flux'
+          ? 'media-generation.local_flux'
+          : modality === 'image' && resolvedId === 'apple_playground'
+            ? 'media-generation.apple_playground'
+            : resolvedId;
 
   const voiceBackendMatch =
     aliasId.startsWith('voice.') &&
@@ -246,11 +291,15 @@ export function getMediaBackendRecord(
   }
 
   return (
-    registry.backends.find((backend) => backend.backend_id === aliasId) ||
+    registry.backends.find(
+      (backend) => backend.backend_id === aliasId && (!modality || backend.modality === modality)
+    ) ||
     registry.backends.find((backend) =>
       modality ? backend.modality === modality && backend.backend_id === defaultBackendId : false
     ) ||
-    registry.backends[0] ||
+    (modality
+      ? registry.backends.find((backend) => backend.modality === modality)
+      : registry.backends[0]) ||
     FALLBACK_REGISTRY.backends[0]
   );
 }
@@ -260,6 +309,115 @@ function isSupportedPlatform(backend: MediaBackendRecord, platform: NodeJS.Platf
     backend.platforms.includes('any') ||
     backend.platforms.includes(platform as MediaBackendPlatform)
   );
+}
+
+/**
+ * One availability contract for media backends. The registry remains the
+ * source of truth for identity and modality; governed runtime registries are
+ * the source of truth for live service/tool probes.
+ */
+export async function probeMediaBackendAvailability(
+  backendId?: string,
+  modality?: MediaBackendModality,
+  platform: NodeJS.Platform = process.platform
+): Promise<MediaBackendAvailability> {
+  const backend = getMediaBackendRecord(backendId, modality);
+  if (backend.status !== 'active') {
+    return {
+      backend_id: backend.backend_id,
+      modality: backend.modality,
+      available: false,
+      probe_kind: 'registry',
+      reason: `backend status is ${backend.status}`,
+    };
+  }
+  if (!isSupportedPlatform(backend, platform)) {
+    return {
+      backend_id: backend.backend_id,
+      modality: backend.modality,
+      available: false,
+      probe_kind: 'registry',
+      reason: `backend is not supported on platform ${platform}`,
+    };
+  }
+
+  if (backend.provider === 'comfyui') {
+    const resolution = await probeServiceRuntime('comfyui', 'trial', platform);
+    return {
+      backend_id: backend.backend_id,
+      modality: backend.modality,
+      available: resolution.available,
+      probe_kind: 'service_runtime',
+      reason: resolution.reason,
+    };
+  }
+  if (backend.provider === 'mflux') {
+    const resolution = probeToolRuntime('mflux', 'trial', platform);
+    return {
+      backend_id: backend.backend_id,
+      modality: backend.modality,
+      available: resolution.selected_action !== 'install',
+      probe_kind: 'tool_runtime',
+      reason: resolution.reason,
+    };
+  }
+  if (backend.provider === 'apple_image_playground') {
+    const resolution = await probeAppleImageGeneration();
+    return {
+      backend_id: backend.backend_id,
+      modality: backend.modality,
+      available: resolution.available,
+      probe_kind: 'native_bridge',
+      reason: resolution.reason || 'Image Playground probe completed',
+    };
+  }
+
+  return {
+    backend_id: backend.backend_id,
+    modality: backend.modality,
+    available: true,
+    probe_kind: 'registry',
+    reason: 'no live probe is registered; active registry record is usable',
+  };
+}
+
+/**
+ * Resolve an execution candidate using the same explicit-fallback policy as
+ * the synchronous resolver, while consulting live availability probes.
+ * An unavailable backend without a governed fallback is returned as-is so
+ * the caller can preserve provider-specific error semantics.
+ */
+export async function resolveMediaBackendWithAvailability(
+  modality: MediaBackendModality,
+  backendId?: string,
+  platform: NodeJS.Platform = process.platform
+): Promise<{
+  backend: MediaBackendRecord;
+  availability: MediaBackendAvailability;
+  fallback_used: boolean;
+}> {
+  const visited = new Set<string>();
+  let current = getMediaBackendRecord(backendId, modality);
+  let fallbackUsed = false;
+  while (!visited.has(current.backend_id)) {
+    visited.add(current.backend_id);
+    const availability = await probeMediaBackendAvailability(
+      current.backend_id,
+      modality,
+      platform
+    );
+    if (availability.available) {
+      return { backend: current, availability, fallback_used: fallbackUsed };
+    }
+    if (!current.fallback_backend_id) {
+      return { backend: current, availability, fallback_used: fallbackUsed };
+    }
+    current = getMediaBackendRecord(current.fallback_backend_id, modality);
+    fallbackUsed = true;
+  }
+  const backend = getMediaBackendRecord(backendId, modality);
+  const availability = await probeMediaBackendAvailability(backend.backend_id, modality, platform);
+  return { backend, availability, fallback_used: fallbackUsed };
 }
 
 export function resolveMediaBackendForPlatform(
@@ -314,4 +472,11 @@ export function resolveVideoBackend(
   platform: NodeJS.Platform = process.platform
 ): MediaBackendRecord {
   return resolveMediaBackendForPlatform('video', backendId, platform);
+}
+
+export function resolveMusicBackend(
+  backendId?: string,
+  platform: NodeJS.Platform = process.platform
+): MediaBackendRecord {
+  return resolveMediaBackendForPlatform('music', backendId, platform);
 }

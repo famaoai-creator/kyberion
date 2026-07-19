@@ -1,0 +1,4 @@
+{
+  "action": "get_generation_job",
+  "params": { "job_id": "genjob-generate_image-example" }
+}

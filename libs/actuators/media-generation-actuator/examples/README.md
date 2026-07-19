@@ -4,6 +4,8 @@
 
 - 実運用向けの共通 pipeline は `pipelines/` に置く
 - `media-generation-actuator` 専用の検証・再現・テンプレート入力は `libs/actuators/media-generation-actuator/examples/` に置く
+- `catalog.json` に登録された action fixture は `schemas/media-generation-action.schema.json` の discriminated contract で検証する
+- direct image と image/video/music ADF は同じ preparation/style/backend 境界を通り、job lifecycle fixture は submit → get → wait → collect の compatibility surface を示す
 - ジョブの既定 retry は `manifest.json` の `recovery_policy` と `retry_policy` で制御する
 - `secureFetch` 系の履歴取得は transient failure に対して自動再試行される
 
