@@ -166,7 +166,10 @@ export function resetDefaultWorkerEventStream(): void {
 
 function attachDefaultObservabilityRecorder(stream: WorkerEventStream): void {
   try {
-    const realDir = pathResolver.shared('observability/worker-events');
+    // Lives beside the trace jsonl under active/shared/logs/ — a
+    // default_allow path, so every persona can record its own events without
+    // a security-policy registration.
+    const realDir = pathResolver.shared('logs/worker-events');
     const dir = resolveSharedObservabilityDir(realDir);
     if (!dir) return;
     safeMkdir(dir);
