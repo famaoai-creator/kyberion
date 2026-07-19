@@ -15,20 +15,21 @@ preflight · approval gate · lease issuance · receipt validation
 
 ## Messages
 
-| type | input | output |
-| --- | --- | --- |
-| `ping` | – | `{ ok, pong, host_version }` |
-| `preflight` | `recording`, `session` | `{ ok, status, approval_required, candidate }` |
-| `request_execution` | `recording`, `session`, `agentId?` | `{ ok, status: 'authorized' \| 'approval_required', lease? }` |
-| `compile_pipeline` | `recording`, `pipelineId?` | `{ ok, status: 'draft', draft }` |
-| `extend_lease` | `lease`, `recording`, `session` | `{ ok, status: 'extended', lease }` |
-| `submit_receipt` | `receipt` | `{ ok, status: 'recorded', receipt_id, evidence_path }` |
-| `resolve_intent` | `intent`, `origin?`, `substrate?` | `{ ok, resolution }` |
-| `prepare_procedure` | `procedure_id` | `{ ok, inputs, has_inputs }` (no side effects) |
-| `dispatch_procedure` | `procedure_id`, `origin`, `tab_id` | `{ ok, status: 'dispatched' \| 'dispatched_segmented' \| 'approval_required', lease?/segments?, compiled_steps?, golden_scenario? }` |
-| `save_recording` | `recording` | `{ ok, recording_ref, recording_id }` |
-| `save_procedure_delta` | `procedure_id`, `anchor_step_index`, `error`, `step?`, `delta_recording_ref?` | `{ ok, status: 'classified' \| 'delta_saved', reason, delta_path? }` |
-| `apply_procedure_delta` | `procedure_id`, `delta_path` | `{ ok, status: 'merged', merged_recording_ref }` |
+| type                    | input                                                                         | output                                                                                                                               |
+| ----------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `ping`                  | –                                                                             | `{ ok, pong, host_version }`                                                                                                         |
+| `preflight`             | `recording`, `session`                                                        | `{ ok, status, approval_required, candidate }`                                                                                       |
+| `request_execution`     | `recording`, `session`, `agentId?`                                            | `{ ok, status: 'authorized' \| 'approval_required', lease? }`                                                                        |
+| `compile_pipeline`      | `recording`, `pipelineId?`                                                    | `{ ok, status: 'draft', draft }`                                                                                                     |
+| `extend_lease`          | `lease`, `recording`, `session`                                               | `{ ok, status: 'extended', lease }`                                                                                                  |
+| `submit_receipt`        | `receipt`                                                                     | `{ ok, status: 'recorded', receipt_id, evidence_path }`                                                                              |
+| `resolve_intent`        | `intent`, `origin?`, `substrate?`                                             | `{ ok, resolution }`                                                                                                                 |
+| `prepare_procedure`     | `procedure_id`                                                                | `{ ok, inputs, has_inputs }` (no side effects)                                                                                       |
+| `dispatch_procedure`    | `procedure_id`, `origin`, `tab_id`                                            | `{ ok, status: 'dispatched' \| 'dispatched_segmented' \| 'approval_required', lease?/segments?, compiled_steps?, golden_scenario? }` |
+| `save_recording`        | `recording`                                                                   | `{ ok, recording_ref, recording_id }`                                                                                                |
+| `promote_procedure`     | `recording`, `procedure_id`, `intent_phrases[]`                               | `{ ok, status: 'registered', procedure_id, recording_ref, procedure }`                                                               |
+| `save_procedure_delta`  | `procedure_id`, `anchor_step_index`, `error`, `step?`, `delta_recording_ref?` | `{ ok, status: 'classified' \| 'delta_saved', reason, delta_path? }`                                                                 |
+| `apply_procedure_delta` | `procedure_id`, `delta_path`                                                  | `{ ok, status: 'merged', merged_recording_ref }`                                                                                     |
 
 `request_execution` / `dispatch_procedure` return `approval_required` (with a
 `request_id`) when the recording contains high-risk actions that have no granted
@@ -37,7 +38,7 @@ approval yet. Once the approval is granted in Kyberion, calling again returns an
 
 `dispatch_procedure` is the Pattern B (resolve-and-execute) entry point: it loads
 the reviewed recording referenced by the catalog entry's `adapter.recording_ref`
-(which must resolve inside `active/shared/runtime/recordings/`), routes through
+(which must resolve inside an allowlisted shared or personal recording store), routes through
 the shared dispatcher (origin guard → approval gate → lease), and re-runs the
 authoritative execute-mode preflight before returning the lease + compiled steps.
 For multi-origin procedures it returns `dispatched_segmented` with one
@@ -70,6 +71,7 @@ Both directories are TTL-governed by `storage-janitor` (receipts ~90d, deltas ~1
 
 Edit `com.kyberion.browser_bridge.json` (`path` → absolute `native-host/launch.sh`,
 extension ID in `allowed_origins`) and copy it to:
+
 - macOS: `~/Library/Application Support/Google/Chrome/NativeMessagingHosts/`
 - Linux: `~/.config/google-chrome/NativeMessagingHosts/`
 

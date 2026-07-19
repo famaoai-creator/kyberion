@@ -179,6 +179,8 @@ async function handleMessage(message, sender) {
       return prepareProcedure(message.procedureId, message.origin);
     case 'bridge:execute-procedure':
       return executeProcedure(message.procedureId, message.origin, message.values || {});
+    case 'bridge:promote-procedure':
+      return promoteProcedure(message.procedureId, message.intentPhrases || []);
     case 'bridge:execution-interrupted':
       return handleExecutionInterrupted(message.reason, message.detail);
     case 'bridge:apply-repair':
@@ -445,14 +447,58 @@ function nativeHostError(message) {
 
 function callNativeHost(payload) {
   return new Promise((resolve, reject) => {
+    let port;
+    let settled = false;
+    const timeout = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      try {
+        port?.disconnect();
+      } catch (_) {
+        // best-effort cleanup
+      }
+      reject(new Error('Native Bridge の応答がタイムアウトしました。'));
+    }, 30000);
+
+    const finish = (callback) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      callback();
+    };
+
     try {
-      chrome.runtime.sendNativeMessage(NATIVE_HOST, payload, (response) => {
-        const lastError = chrome.runtime.lastError;
-        if (lastError) return reject(new Error(nativeHostError(lastError.message)));
-        resolve(response);
+      // Keep the native connection open until the response frame arrives.
+      // sendNativeMessage is convenient for one-shot hosts, but Chrome can
+      // report "Native host has exited" when the host drains stdin while the
+      // callback is still being delivered.
+      port = chrome.runtime.connectNative(NATIVE_HOST);
+      port.onMessage.addListener((response) => {
+        finish(() => {
+          resolve(response);
+          try {
+            port.disconnect();
+          } catch (_) {
+            // best-effort cleanup
+          }
+        });
       });
+      port.onDisconnect.addListener(() => {
+        if (settled) return;
+        const lastError = chrome.runtime.lastError;
+        finish(() =>
+          reject(
+            new Error(
+              nativeHostError(lastError?.message || 'Native host has exited before responding.')
+            )
+          )
+        );
+      });
+      port.postMessage(payload);
     } catch (error) {
-      reject(new Error(nativeHostError(error instanceof Error ? error.message : String(error))));
+      finish(() =>
+        reject(new Error(nativeHostError(error instanceof Error ? error.message : String(error))))
+      );
     }
   });
 }
@@ -863,6 +909,30 @@ async function executeProcedure(procedureId, origin, values = {}) {
   return out;
 }
 
+async function promoteProcedure(procedureId, intentPhrases) {
+  const state = await loadState();
+  const draft = state.lastDraft;
+  if (draft?.review?.status !== 'approved') {
+    throw new Error('承認済みの下書きがありません。先に Review を確定してください。');
+  }
+  const response = await callNativeHost({
+    type: 'promote_procedure',
+    procedure_id: procedureId,
+    intent_phrases: intentPhrases,
+    recording: draft,
+  });
+  if (!response?.ok) throw new Error(response?.error || '個人用シナリオの登録に失敗しました。');
+  state.procedureRegistration = {
+    procedure_id: response.procedure_id,
+    recording_ref: response.recording_ref,
+    registered_at: new Date().toISOString(),
+  };
+  state.notice = `個人用シナリオ「${response.procedure_id}」を登録しました。`;
+  await saveState(state);
+  await broadcastState();
+  return { state, registration: response };
+}
+
 // #3: after execution, verify the golden scenario's success conditions against
 // the live page (content script). Records the verdict on the execution state.
 async function verifyGoldenScenario(procedureId, golden, runStatus) {
@@ -1032,8 +1102,14 @@ async function runCompiledSteps(procedureId, steps, session, lease, values, segm
       const contentStep = {
         op: step.op,
         target: step.ref
-          ? { ref: step.ref, role: step.role || '', name: step.name || '' }
+          ? {
+              ref: step.ref,
+              role: step.role || '',
+              name: step.name || '',
+              snapshot_hash: step.snapshot_hash || null,
+            }
           : undefined,
+        variable: step.variable,
         selection: step.selection,
       };
       let outcome;

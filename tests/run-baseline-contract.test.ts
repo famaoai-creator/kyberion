@@ -8,13 +8,16 @@ function read(relPath: string): string {
   return String(safeReadFile(path.join(ROOT, relPath), { encoding: 'utf8' }) || '');
 }
 
-describe('run_baseline_check customer overlay contract', () => {
-  it('reads customer-aware profile paths for readiness checks', () => {
+describe('run_baseline_check connection readiness contract', () => {
+  it('uses the secret guard for profile connections and keeps identity customer-aware', () => {
     const script = read('scripts/run_baseline_check.ts');
-    // The script uses resolveActiveProfileRoot() via profileRoot() helper
+    // Identity still uses resolveActiveProfileRoot() via profileRoot(), while
+    // connection documents must go through secretGuard for encrypted-at-rest
+    // handling and sensitive-path mediation.
     expect(script).toContain('resolveActiveProfileRoot');
-    expect(script).toContain("profileRoot()");
-    expect(script).toContain("path.join(profileRoot(), 'connections'");
+    expect(script).toContain('profileRoot()');
     expect(script).toContain("path.join(profileRoot(), 'my-identity.json')");
+    expect(script).toContain('secretGuard.loadConnectionDocument(serviceId)');
+    expect(script).not.toContain("path.join(profileRoot(), 'connections'");
   });
 });
