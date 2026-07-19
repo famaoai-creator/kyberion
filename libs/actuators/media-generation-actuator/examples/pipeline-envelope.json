@@ -1,0 +1,10 @@
+{
+  "action": "pipeline",
+  "continue_on_error": true,
+  "steps": [
+    {
+      "action": "generate_image",
+      "params": { "prompt": "a small abstract brand mark", "await_completion": false }
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+{
+  "action": "capture_screen",
+  "params": { "output": "active/shared/exports/capture.jpg" }
+}

@@ -3,8 +3,11 @@ import {
   getMediaBackendRecord,
   getMediaBackendRegistry,
   resolveImageBackend,
+  resolveMusicBackend,
   resolveVideoBackend,
   resolveVoiceBackend,
+  probeMediaBackendAvailability,
+  resolveMediaBackendWithAvailability,
 } from './media-backend-registry.js';
 
 describe('media backend registry', () => {
@@ -33,6 +36,23 @@ describe('media backend registry', () => {
     );
     expect(resolveVoiceBackend().backend_id).toBe('voice.local_say');
     expect(resolveVideoBackend().backend_id).toBe('video.hyperframes_cli');
+    expect(resolveMusicBackend().backend_id).toBe('media-generation.comfyui.music');
+  });
+
+  it('does not return an exact backend record from a different modality', () => {
+    expect(getMediaBackendRecord('media-generation.comfyui.video', 'image').modality).toBe('image');
+    expect(getMediaBackendRecord('media-generation.comfyui', 'video')).toEqual(
+      expect.objectContaining({
+        backend_id: 'media-generation.comfyui.video',
+        modality: 'video',
+      })
+    );
+    expect(getMediaBackendRecord('media-generation.comfyui', 'music')).toEqual(
+      expect.objectContaining({
+        backend_id: 'media-generation.comfyui.music',
+        modality: 'music',
+      })
+    );
   });
 
   it('maps the voice engine registry into normalized backend metadata', () => {
@@ -40,5 +60,33 @@ describe('media backend registry', () => {
     expect(backend.modality).toBe('voice');
     expect(backend.kind).toBe('local');
     expect(backend.provider).toBe('system_tts');
+  });
+
+  it('uses a shared platform probe contract before live runtime probes', async () => {
+    const availability = await probeMediaBackendAvailability(
+      'media-generation.apple_playground',
+      'image',
+      'linux'
+    );
+    expect(availability).toEqual(
+      expect.objectContaining({
+        backend_id: 'media-generation.apple_playground',
+        modality: 'image',
+        available: false,
+        probe_kind: 'registry',
+      })
+    );
+  });
+
+  it('returns normalized availability metadata without changing modality', async () => {
+    const resolution = await resolveMediaBackendWithAvailability(
+      'video',
+      'video.hyperframes_cli',
+      'linux'
+    );
+    expect(resolution.backend.modality).toBe('video');
+    expect(resolution.backend.backend_id).toBe('video.hyperframes_cli');
+    expect(resolution.availability.probe_kind).toBe('registry');
+    expect(resolution.fallback_used).toBe(false);
   });
 });
