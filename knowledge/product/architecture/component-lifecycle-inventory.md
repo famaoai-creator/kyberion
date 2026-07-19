@@ -16,7 +16,7 @@ This inventory is generated from the filesystem. Manifest-backed actuators are t
 - Count: 30
 - Rule: If a component should be discoverable by the CLI or governance layer, it needs a `manifest.json`.
 
-- `agent-actuator`: Meta-Actuator for Agent Lifecycle and A2A (6 ops, v1.0.0, schema schemas/agent-action.schema.json)
+- `agent-actuator`: Meta-Actuator for Agent Lifecycle and A2A (7 ops, v1.1.0, schema schemas/agent-action.schema.json)
 - `android-actuator`: Android Device Actuator — ADB pipeline + Android CLI for AI agents (layout, screen capture/resolve, describe, docs search) (1 ops, v1.1.0, schema schemas/mobile-device-pipeline.schema.json)
 - `approval-actuator`: Human approval request state transitions and decision handling (4 ops, v1.0.0, schema schemas/approval-action.schema.json)
 - `artifact-actuator`: Governed Artifact and Delivery Pack Manager (4 ops, v1.0.0, schema schemas/artifact-action.schema.json)
@@ -44,14 +44,13 @@ This inventory is generated from the filesystem. Manifest-backed actuators are t
 - `video-composition-actuator`: Governed deterministic composed-video bundle preparation actuator (9 ops, v1.1.0)
 - `vision-actuator`: Perception-oriented compatibility facade; generation and screen capture live in media-generation-actuator (2 ops, v1.3.0, schema schemas/vision-action.schema.json)
 - `voice-actuator`: Governed local voice generation actuator with native playback and artifact fallback (9 ops, v1.2.0, schema schemas/voice-action.schema.json)
-- `wisdom-actuator`: Knowledge-tier search, injection, import/export, and decision-support operations (39 ops, v1.3.0, schema schemas/wisdom-action.schema.json)
+- `wisdom-actuator`: Knowledge-tier search, injection, import/export, and decision-support operations (74 ops, v1.3.0, schema schemas/wisdom-action.schema.json)
 - `working-memory-actuator`: Volatile Knowledge Layer — CRUD + GC + index for working-memory faces (MEMORY.md, NOW.md, daily journal, weekly review, TODO). Dispatched as domain 'working-memory' in pipelines (op: 'working-memory:<action>'). (14 ops, v1.1.0, schema schemas/working-memory-action.schema.json)
 
 ## Legacy Review Queue
 
 - Source of truth: [legacy_component_index.json](knowledge/product/orchestration/legacy_component_index.json)
 - Count: 0
-
 
 ## Consolidation Recommendations
 

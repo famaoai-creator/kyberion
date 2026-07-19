@@ -1,0 +1,73 @@
+import { buildWisdomOperationRegistry, getWisdomOperationSpec } from './op-catalog.js';
+import type { WisdomContext } from './contracts/wisdom-context.js';
+import { makeWisdomReceipt, type WisdomReceipt } from './contracts/wisdom-result.js';
+import type { WisdomOperationKind } from './contracts/wisdom-operation.js';
+
+export interface WisdomStepHandlers {
+  capture(op: string, params: unknown, context: WisdomContext): Promise<WisdomContext>;
+  transform(op: string, params: unknown, context: WisdomContext): Promise<WisdomContext>;
+  apply(op: string, params: unknown, context: WisdomContext): Promise<WisdomContext>;
+}
+
+export interface WisdomDispatchResult {
+  context: WisdomContext;
+  receipt: WisdomReceipt;
+}
+
+export interface WisdomDispatchOptions {
+  compatibilityMode?: boolean;
+}
+
+function assertOperationKind(op: string, requestedKind: WisdomOperationKind): void {
+  const spec = getWisdomOperationSpec(op);
+  if (!spec) throw new Error(`[UNKNOWN_OP] Unknown wisdom operation: ${op}`);
+  if (spec.kind !== requestedKind) {
+    throw new Error(
+      `[OP_KIND_MISMATCH] ${op} is registered as ${spec.kind}, but was invoked as ${requestedKind}`
+    );
+  }
+}
+
+export function createWisdomDispatcher(handlers: WisdomStepHandlers) {
+  const dispatch = async (
+    kind: WisdomOperationKind,
+    op: string,
+    params: unknown,
+    context: WisdomContext,
+    _options: WisdomDispatchOptions = {}
+  ): Promise<WisdomDispatchResult> => {
+    assertOperationKind(op, kind);
+    const spec = getWisdomOperationSpec(op);
+    if (!spec) throw new Error(`[UNKNOWN_OP] Unknown wisdom operation: ${op}`);
+
+    const nextContext = await handlers[kind](op, params, context);
+    const canonicalOp = spec.canonical_op || op;
+    const compatibility =
+      spec.deprecated || spec.forward_to
+        ? {
+            ...(spec.deprecated ? { deprecated_alias: op } : {}),
+            ...(spec.forward_to
+              ? { forwarded_to: `${spec.forward_to.actuator}:${spec.forward_to.op}` }
+              : {}),
+          }
+        : undefined;
+    return {
+      context: nextContext,
+      receipt: makeWisdomReceipt({
+        requestedOp: op,
+        canonicalOp,
+        executionKind: spec.execution_kind || 'deterministic',
+        compatibility,
+      }),
+    };
+  };
+
+  return {
+    dispatch,
+    registry: buildWisdomOperationRegistry(async (op, input, context) => {
+      const spec = getWisdomOperationSpec(op);
+      if (!spec) throw new Error(`[UNKNOWN_OP] Unknown wisdom operation: ${op}`);
+      return handlers[spec.kind](op, input, context);
+    }),
+  };
+}
