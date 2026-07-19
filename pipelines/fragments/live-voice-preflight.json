@@ -10,7 +10,7 @@
       "params": {
         "fragment": "fragments/runtime-preflight.json",
         "context": {
-          "preflight_cmd": "pnpm service:preflight -- --service voice && pnpm service:preflight -- --service meeting && command -v say >/dev/null && echo ok"
+          "preflight_cmd": "pnpm service:preflight -- --service voice && pnpm service:preflight -- --service meeting && case \"${OSTYPE:-}\" in darwin*) command -v say >/dev/null && command -v ffmpeg >/dev/null && command -v afplay >/dev/null ;; linux*) { command -v ffmpeg >/dev/null || command -v arecord >/dev/null; } && command -v aplay >/dev/null ;; *) echo 'unsupported host: microphone/playback preflight supports macOS and Linux' >&2; exit 1 ;; esac && echo ok"
         }
       }
     }

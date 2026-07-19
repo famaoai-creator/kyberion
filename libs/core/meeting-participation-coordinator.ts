@@ -25,6 +25,7 @@ import { auditChain } from './audit-chain.js';
 import * as pathResolver from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { TraceContext } from './src/trace.js';
+import { teeAudio } from './audio-tee.js';
 import type { AudioBus } from './audio-bus.js';
 import type { MeetingJoinDriver } from './meeting-join-driver.js';
 import type { StreamingSpeechToTextBridge } from './streaming-stt-bridge.js';
@@ -127,8 +128,9 @@ export function checkMeetingParticipationConsent(input: {
       return { allowed: false, reason: 'voice-consent.json is malformed: expected an object' };
     }
     raw = parsed;
-  } catch (err: any) {
-    return { allowed: false, reason: `failed to parse voice-consent.json: ${err?.message ?? err}` };
+  } catch (err: unknown) {
+    const reason = err instanceof Error ? err.message : String(err);
+    return { allowed: false, reason: `failed to parse voice-consent.json: ${reason}` };
   }
   if (raw.consent !== 'granted') {
     return {
@@ -143,7 +145,10 @@ export function checkMeetingParticipationConsent(input: {
     };
   }
   if (!normalizeOptionalString(raw.operator_handle)) {
-    return { allowed: false, reason: 'voice-consent.json is malformed: operator_handle is required' };
+    return {
+      allowed: false,
+      reason: 'voice-consent.json is malformed: operator_handle is required',
+    };
   }
   const expiresAt = normalizeOptionalString(raw.expires_at);
   if (expiresAt) {
@@ -175,12 +180,12 @@ export class MeetingParticipationCoordinator {
       vad: VoiceActivityDetector;
       agent: ConversationAgent;
       trace?: TraceContext;
-    },
+    }
   ) {}
 
   async run(
     target: MeetingTarget,
-    options: MeetingParticipationOptions,
+    options: MeetingParticipationOptions
   ): Promise<MeetingParticipationReport> {
     const startedAt = Date.now();
     const deadline = startedAt + options.max_minutes * 60_000;
@@ -219,7 +224,12 @@ export class MeetingParticipationCoordinator {
           ...(consent.reason ? { reason: consent.reason } : {}),
         });
         closeTrace('error', consent.reason);
-        this.recordAudit('meeting_participation.recording_denied', target, 'denied', consent.reason);
+        this.recordAudit(
+          'meeting_participation.recording_denied',
+          target,
+          'denied',
+          consent.reason
+        );
         throw new Error(`[meeting-participation] ${consent.reason}`);
       }
       this.deps.trace?.addEvent('meeting_participation.recording_consent_granted', {
@@ -325,6 +335,12 @@ export class MeetingParticipationCoordinator {
         session_id: session.state.session_id,
       });
       this.recordAudit('meeting_participation.leave', target, 'allowed');
+      try {
+        await this.deps.vad?.dispose?.();
+      } catch (err: unknown) {
+        const reason = err instanceof Error ? err.message : String(err);
+        logger.warn(`[participation-coordinator] VAD dispose failed: ${reason}`);
+      }
     }
 
     closeTrace('ok');
@@ -349,7 +365,7 @@ export class MeetingParticipationCoordinator {
     text: string,
     voiceProfileId: string,
     target: MeetingTarget,
-    options: MeetingParticipationOptions,
+    options: MeetingParticipationOptions
   ): Promise<void> {
     const requireVoiceConsent = options.require_voice_consent ?? Boolean(options.mission_id);
     if (requireVoiceConsent) {
@@ -389,7 +405,7 @@ export class MeetingParticipationCoordinator {
    */
   private async *driveVad(
     audio: AsyncIterable<AudioChunk>,
-    deadline: number,
+    deadline: number
   ): AsyncGenerator<{ endpoint: boolean; silence_ms: number }> {
     for await (const chunk of audio) {
       if (Date.now() > deadline) return;
@@ -402,7 +418,7 @@ export class MeetingParticipationCoordinator {
     action: string,
     target: MeetingTarget,
     result: 'allowed' | 'error' | 'denied',
-    reason?: string,
+    reason?: string
   ): void {
     try {
       auditChain.record({
@@ -437,54 +453,8 @@ function teeInbound(source: AsyncIterable<AudioChunk>): {
   toStt: AsyncIterable<AudioChunk>;
   toVad: AsyncIterable<AudioChunk>;
 } {
-  const queues: Array<AudioChunk[]> = [[], []];
-  const resolvers: Array<Array<(chunk: AudioChunk | null) => void>> = [[], []];
-  let drained = false;
-
-  (async () => {
-    for await (const chunk of source) {
-      for (let i = 0; i < 2; i++) {
-        if (resolvers[i].length > 0) {
-          const r = resolvers[i].shift()!;
-          r(chunk);
-        } else if (queues[i].length < 64) {
-          queues[i].push(chunk);
-        }
-        // else: drop on the floor under sustained backpressure
-      }
-    }
-    drained = true;
-    for (let i = 0; i < 2; i++) {
-      while (resolvers[i].length) resolvers[i].shift()!(null);
-    }
-  })().catch((err: any) => {
-    logger.warn(`[participation-coordinator] tee source failed: ${err?.message ?? err}`);
-    drained = true;
-    for (let i = 0; i < 2; i++) {
-      while (resolvers[i].length) resolvers[i].shift()!(null);
-    }
-  });
-
-  function makeIter(idx: number): AsyncIterable<AudioChunk> {
-    return {
-      async *[Symbol.asyncIterator]() {
-        while (true) {
-          if (queues[idx].length > 0) {
-            yield queues[idx].shift()!;
-            continue;
-          }
-          if (drained) return;
-          const chunk = await new Promise<AudioChunk | null>((resolve) => {
-            resolvers[idx].push(resolve);
-          });
-          if (chunk === null) return;
-          yield chunk;
-        }
-      },
-    };
-  }
-
-  return { toStt: makeIter(0), toVad: makeIter(1) };
+  const [toStt, toVad] = teeAudio(source, 2, { label: 'participation-coordinator' });
+  return { toStt, toVad };
 }
 
 async function consumeIterator(iter: AsyncIterable<unknown>): Promise<void> {

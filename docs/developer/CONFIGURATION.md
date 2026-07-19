@@ -164,7 +164,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_TERMINAL_SESSION_RETENTION_MS`   | number | no       | _undocumented_ |
 | `KYBERION_TIMEOUT_MS`                      | number | no       | _undocumented_ |
 
-## provider (46)
+## provider (47)
 
 | Variable                                  | Type                                         | Required | Description                                                                                                                                                                                                                                                                                                                     |
 | ----------------------------------------- | -------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -210,12 +210,13 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_PEER_HOST`                      | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
 | `KYBERION_REASONING_BACKEND`              | string                                       | no       | Reasoning backend selector. Common values: claude-cli (local claude CLI, no API key), anthropic (ANTHROPIC_API_KEY), codex-cli, agy-cli (Antigravity CLI), openrouter (OPENROUTER_API_KEY or KYBERION_OPENROUTER_KEY), stub (offline/deterministic tests). gemini-cli remains available for explicit Enterprise configurations. |
 | `KYBERION_REASONING_MODEL`                | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
+| `KYBERION_SILERO_VAD_MODEL`               | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
 | `KYBERION_SMTP_HOST`                      | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
 | `KYBERION_STT_COMMAND`                    | string                                       | no       | Speech-to-text bridge command override.                                                                                                                                                                                                                                                                                         |
 | `KYBERION_TERMINAL_HOST`                  | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
 | `KYBERION_TTS_COMMAND`                    | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
 
-## runtime (108)
+## runtime (110)
 
 | Variable                                      | Type   | Required | Description                                                                                             |
 | --------------------------------------------- | ------ | -------- | ------------------------------------------------------------------------------------------------------- |
@@ -294,6 +295,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_REMOVED`                            | string | no       | _undocumented_                                                                                          |
 | `KYBERION_RESTRICTED_ACTIONS_POLICY`          | string | no       | _undocumented_                                                                                          |
 | `KYBERION_RESTRICTED_APPROVED_ITEMS`          | string | no       | _undocumented_                                                                                          |
+| `KYBERION_SILERO_VAD_PYTHON`                  | string | no       | _undocumented_                                                                                          |
 | `KYBERION_SMTP_PASS`                          | string | no       | _undocumented_                                                                                          |
 | `KYBERION_SMTP_USER`                          | string | no       | _undocumented_                                                                                          |
 | `KYBERION_SOMETHING_ELSE`                     | string | no       | _undocumented_                                                                                          |
@@ -319,6 +321,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_TEST_MISSING_ENV`                   | string | no       | _undocumented_                                                                                          |
 | `KYBERION_TTS_ARGS`                           | string | no       | _undocumented_                                                                                          |
 | `KYBERION_UI_LOCALE`                          | string | no       | _undocumented_                                                                                          |
+| `KYBERION_VAD`                                | string | no       | _undocumented_                                                                                          |
 | `KYBERION_VIDEO_RENDER_RUN_MODE`              | string | no       | _undocumented_                                                                                          |
 | `KYBERION_VOICE_LANGUAGE`                     | string | no       | _undocumented_                                                                                          |
 | `KYBERION_VOICE_PLAY_BLACKHOLE`               | string | no       | _undocumented_                                                                                          |

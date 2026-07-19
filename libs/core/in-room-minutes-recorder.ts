@@ -15,6 +15,7 @@ import * as path from 'node:path';
 import { checkMeetingParticipationConsent } from './meeting-participation-coordinator.js';
 import { startMicCapture, type MicCaptureOptions, type MicCaptureSession } from './mic-capture.js';
 import { missionEvidenceDir, rootResolve } from './path-resolver.js';
+import { wavHeader } from './pcm-wav.js';
 import { getSpeechToTextBridge } from './speech-to-text-bridge.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
 import { EnergyVad, type EnergyVadOptions } from './voice-activity-detector.js';
@@ -42,24 +43,6 @@ export interface InRoomMinutesSession {
   /** Resolves when capture ends (stop() or stream end). */
   done: Promise<void>;
   stop(): Promise<{ minutesPath: string | null; transcriptPath: string; segments: number }>;
-}
-
-function wavHeader(pcmBytes: number, sampleRateHz: number): Buffer {
-  const header = Buffer.alloc(44);
-  header.write('RIFF', 0);
-  header.writeUInt32LE(36 + pcmBytes, 4);
-  header.write('WAVE', 8);
-  header.write('fmt ', 12);
-  header.writeUInt32LE(16, 16);
-  header.writeUInt16LE(1, 20); // PCM
-  header.writeUInt16LE(1, 22); // mono
-  header.writeUInt32LE(sampleRateHz, 24);
-  header.writeUInt32LE(sampleRateHz * 2, 28);
-  header.writeUInt16LE(2, 32);
-  header.writeUInt16LE(16, 34);
-  header.write('data', 36);
-  header.writeUInt32LE(pcmBytes, 40);
-  return header;
 }
 
 function defaultRunMinutesPipeline(input: {
