@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import { compileSchemaFromPath, pathResolver } from '@agent/core';
+import { describeOps, MEDIA_GENERATION_ACTIONS } from './op-catalog.js';
 
 const mocks = vi.hoisted(() => ({
   safeReadFile: vi.fn(),
@@ -212,6 +213,7 @@ describe('media-generation-actuator', () => {
   });
 
   it('uses the direct image bridge path and preserves the artifact format from the output path', async () => {
+    mocks.safeExistsSync.mockReturnValue(true);
     mocks.generateImage.mockResolvedValue({
       status: 'succeeded',
       provider: 'comfyui',
@@ -241,11 +243,264 @@ describe('media-generation-actuator', () => {
     );
     expect(mocks.generateImage).toHaveBeenCalledWith(
       expect.objectContaining({
-        prompt: 'country road',
+        prompt: expect.stringContaining('country road'),
         targetPath: 'active/shared/exports/country-cover.png',
       })
     );
     expect(mocks.executeServicePreset).not.toHaveBeenCalled();
+  });
+
+  it('injects the creative style pack before direct image bridge execution', async () => {
+    mocks.generateImage.mockResolvedValue({
+      status: 'submitted',
+      provider: 'comfyui',
+      promptId: 'bridge-submitted-1',
+    });
+    const { handleAction } = await import('./index.js');
+
+    await handleAction({
+      action: 'generate_image',
+      params: { prompt: 'direct hero image', await_completion: false },
+    });
+
+    expect(mocks.generateImage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prompt: expect.stringContaining('Style: palette='),
+      })
+    );
+  });
+
+  it('preserves a submitted bridge result and never fabricates a missing artifact', async () => {
+    mocks.generateImage.mockResolvedValue({
+      status: 'submitted',
+      provider: 'comfyui',
+      promptId: 'bridge-submitted-2',
+      path: 'active/shared/exports/not-created.png',
+    });
+    mocks.safeExistsSync.mockReturnValue(false);
+    const { handleAction } = await import('./index.js');
+
+    const result = await handleAction({
+      action: 'generate_image',
+      params: { prompt: 'submitted image', await_completion: false },
+    });
+
+    expect(result.status).toBe('submitted');
+    expect(result.artifact).toBeNull();
+    expect(result.artifacts).toEqual([]);
+    mocks.safeExistsSync.mockReturnValue(true);
+  });
+
+  it('resolves video and music backends with their requested modality', async () => {
+    const helpers = await import('./media-generation-helpers.js');
+
+    expect(helpers.resolveGenerationBackend('generate_video', {})).toEqual(
+      expect.objectContaining({ modality: 'video' })
+    );
+    expect(helpers.resolveGenerationBackend('generate_music', {})).toEqual(
+      expect.objectContaining({ modality: 'music' })
+    );
+  });
+
+  it('does not mark a job succeeded when artifact collection fails', async () => {
+    mocks.safeReadFile.mockReturnValue(
+      JSON.stringify({
+        kind: 'generation-job',
+        job_id: 'genjob-artifact-failure',
+        action: 'generate_image',
+        status: 'submitted',
+        provider: { engine: 'comfyui', prompt_id: 'artifact-failure-1' },
+        request: { workflow: { '1': { class_type: 'SaveImage' } } },
+        created_at: '2026-03-22T00:00:00.000Z',
+      })
+    );
+    mocks.secureFetch.mockResolvedValue({
+      'artifact-failure-1': {
+        status: { completed: true },
+        outputs: {},
+      },
+    });
+    const { handleAction } = await import('./index.js');
+
+    const result = await handleAction({
+      action: 'get_generation_job',
+      params: { job_id: 'genjob-artifact-failure' },
+    });
+
+    expect(result.status).toBe('failed');
+  });
+
+  it('keeps a client wait timeout refreshable', async () => {
+    mocks.safeReadFile.mockReturnValue(
+      JSON.stringify({
+        kind: 'generation-job',
+        job_id: 'genjob-timeout-refresh',
+        action: 'generate_image',
+        status: 'submitted',
+        provider: { engine: 'comfyui', prompt_id: 'timeout-refresh-1' },
+        request: { workflow: { '1': { class_type: 'SaveImage' } } },
+        created_at: '2026-03-22T00:00:00.000Z',
+      })
+    );
+    mocks.secureFetch.mockResolvedValue({});
+    const { handleAction } = await import('./index.js');
+
+    const timedOut = await handleAction({
+      action: 'wait_generation_job',
+      params: { job_id: 'genjob-timeout-refresh', timeout_ms: 1, poll_interval_ms: 1 },
+    });
+
+    expect(timedOut.wait_status).toBe('timed_out');
+    expect(timedOut.status).toBe('submitted');
+  });
+
+  it('rejects traversal in job and provider artifact paths', async () => {
+    const helpers = await import('./media-generation-helpers.js');
+
+    expect(() => helpers.generationJobPath('../outside')).toThrow();
+    expect(() => helpers.generationJobPath('valid/job\\name')).toThrow();
+    expect(() => helpers.resolveArtifactPath({ filename: '../outside.png' })).toThrow();
+    expect(() => helpers.resolveArtifactPath({ filename: '/tmp/outside.png' })).toThrow();
+  });
+
+  it('keeps schema, manifest, handler, and op catalog action sets aligned', async () => {
+    const actual = await vi.importActual<typeof import('@agent/core')>('@agent/core');
+    const manifest = JSON.parse(
+      String(
+        actual.safeReadFile(
+          pathResolver.rootResolve('libs/actuators/media-generation-actuator/manifest.json'),
+          { encoding: 'utf8' }
+        )
+      )
+    ) as { capabilities: Array<{ op: string }> };
+    const actions = manifest.capabilities.map((capability) => capability.op);
+    const catalogActions = describeOps().map((entry) => entry.op);
+
+    expect(catalogActions.sort()).toEqual(actions.sort());
+    expect([...MEDIA_GENERATION_ACTIONS].sort()).toEqual(actions.sort());
+    const fixtures: Record<string, Record<string, unknown>> = {
+      generate_image: { prompt: 'x' },
+      generate_video: { workflow: {} },
+      generate_music: { workflow: {} },
+      run_workflow: { workflow: {} },
+      submit_generation: { action: 'generate_image', params: { prompt: 'x' } },
+      get_generation_job: { job_id: 'genjob-test' },
+      wait_generation_job: { job_id: 'genjob-test' },
+      collect_generation_artifact: { job_id: 'genjob-test' },
+      capture_screen: { output: 'active/shared/tmp/capture.jpg' },
+      capture_focused_window: { output: 'active/shared/tmp/capture.jpg' },
+      record_screen: { output: 'active/shared/tmp/capture.mp4' },
+      pipeline: { steps: [] },
+    };
+    for (const action of actions) {
+      const request =
+        action === 'pipeline'
+          ? { action, ...fixtures[action] }
+          : { action, params: fixtures[action] };
+      expect(
+        compileSchemaFromPath(
+          new Ajv({ allErrors: true }),
+          pathResolver.rootResolve('schemas/media-generation-action.schema.json')
+        )(request),
+        action
+      ).toBe(true);
+    }
+  });
+
+  it('uses the same await_completion rule for image, video, and music ADFs', async () => {
+    const helpers = await import('./media-generation-helpers.js');
+    mocks.compileImageGenerationADF.mockReturnValue({ workflow: { nodes: [] }, resolved: {} });
+    mocks.compileVideoGenerationADF.mockReturnValue({ workflow: { nodes: [] }, resolved: {} });
+    mocks.compileMusicGenerationADF.mockReturnValue({ workflow: { nodes: [] }, resolved: {} });
+
+    for (const [action, key] of [
+      ['generate_image', 'image_adf'],
+      ['generate_video', 'video_adf'],
+      ['generate_music', 'music_adf'],
+    ] as const) {
+      const prepared = helpers.preparePromptBasedGeneration(action, {
+        [key]: { output: { await_completion: true } },
+      });
+      expect(helpers.resolveAwaitCompletion(action, prepared.params)).toBe(true);
+    }
+  });
+
+  it('does not automatically resubmit non-retryable errors', async () => {
+    mocks.safeReadFile.mockReturnValue(
+      JSON.stringify({
+        kind: 'generation-job',
+        job_id: 'genjob-policy-error',
+        action: 'generate_image',
+        status: 'submitted',
+        provider: { engine: 'comfyui', prompt_id: 'policy-error-1' },
+        request: { workflow: { '1': { class_type: 'SaveImage' } } },
+        retry_policy: { max_attempts: 3, backoff_seconds: 0 },
+        attempts: 1,
+        created_at: '2026-03-22T00:00:00.000Z',
+      })
+    );
+    mocks.secureFetch.mockRejectedValue(new Error('policy_denied'));
+    const { handleAction } = await import('./index.js');
+
+    const result = await handleAction({
+      action: 'get_generation_job',
+      params: { job_id: 'genjob-policy-error' },
+    });
+
+    expect(result.status).toBe('failed');
+    expect(result.retry_classification).toBe('policy_denied');
+  });
+
+  it('counts max_attempts as total attempts including the initial submission', async () => {
+    mocks.safeReadFile.mockReturnValue(
+      JSON.stringify({
+        kind: 'generation-job',
+        job_id: 'genjob-one-attempt',
+        action: 'generate_image',
+        status: 'submitted',
+        provider: { engine: 'comfyui', prompt_id: 'one-attempt-1' },
+        request: { workflow: { '1': { class_type: 'SaveImage' } } },
+        retry_policy: { max_attempts: 1, backoff_seconds: 0 },
+        attempts: 1,
+        created_at: '2026-03-22T00:00:00.000Z',
+      })
+    );
+    mocks.secureFetch.mockRejectedValue(new Error('provider unavailable'));
+    const { handleAction } = await import('./index.js');
+
+    const result = await handleAction({
+      action: 'get_generation_job',
+      params: { job_id: 'genjob-one-attempt' },
+    });
+
+    expect(result.status).toBe('failed');
+    expect(result.attempts).toBe(1);
+    expect(mocks.executeServicePreset).not.toHaveBeenCalled();
+  });
+
+  it('aggregates pipeline step failures with step results', async () => {
+    mocks.executeServicePreset.mockResolvedValueOnce({
+      status: 'failed',
+      action: 'generate_image',
+    });
+    mocks.executeServicePreset.mockResolvedValueOnce({
+      status: 'succeeded',
+      action: 'capture_screen',
+    });
+    const { handleAction } = await import('./index.js');
+
+    const result = await handleAction({
+      action: 'pipeline',
+      continue_on_error: true,
+      steps: [
+        { action: 'generate_image', params: { workflow_path: 'active/shared/tmp/a.json' } },
+        { action: 'record_screen', params: { output: 'active/shared/tmp/a.mp4' } },
+      ],
+    });
+
+    expect(result.status).toBe('failed');
+    expect(result.results).toHaveLength(2);
+    expect(result.results[0]).toEqual(expect.objectContaining({ status: 'failed' }));
   });
 
   it('can await image generation completion and return the generated artifact', async () => {
@@ -660,5 +915,35 @@ describe('media-generation-actuator', () => {
         },
       })
     ).toBe(true);
+  });
+
+  it('validates every action example fixture against the discriminated action schema', async () => {
+    const actual = await vi.importActual<typeof import('@agent/core')>('@agent/core');
+    const catalog = JSON.parse(
+      String(
+        actual.safeReadFile(
+          pathResolver.rootResolve(
+            'libs/actuators/media-generation-actuator/examples/catalog.json'
+          ),
+          { encoding: 'utf8' }
+        )
+      )
+    ) as { examples: Array<{ path: string; tags?: string[] }> };
+    const ajv = new Ajv({ allErrors: true });
+    addFormats(ajv);
+    const validate = compileSchemaFromPath(
+      ajv,
+      pathResolver.rootResolve('schemas/media-generation-action.schema.json')
+    );
+
+    for (const example of catalog.examples) {
+      if (example.tags?.includes('schedule')) continue;
+      const fixture = JSON.parse(
+        String(actual.safeReadFile(pathResolver.rootResolve(example.path), { encoding: 'utf8' }))
+      ) as Record<string, unknown>;
+      expect(validate(fixture), `${example.path}: ${JSON.stringify(validate.errors || [])}`).toBe(
+        true
+      );
+    }
   });
 });
