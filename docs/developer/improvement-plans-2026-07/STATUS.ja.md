@@ -33,15 +33,16 @@
 > **2026-07-18追記(最新 main 取り込み)**: AR-09/AR-10 の actuator 共通化・macOS automation capability の実装と検証記録を保持したまま、origin/main 最新版を作業ブランチへ取り込んだ。
 > **2026-07-18追記**: OpenHarness概念取り込み OH-01(ワーカーコンテキスト自動圧縮 + carryover)を実装・検証済み。token 窓ベース 2 段階圧縮(microcompact → LLM 要約)、pair 非分断、構造化 carryover の MissionWorkingMemory 永続化と再注入、要約 artifact 退避、`compact.before/after` 観測、prompt-too-long 反応的圧縮、3 連続失敗停止を `worker-context-compaction.ts` に実装し mission-orchestration-worker の dispatch へ接続。併せて OH-03 の generateWithTools 経路にも in-place retry を適用(リトライ共通化)。DONE 74 / PARTIAL 30 / TODO 6 へ更新。
 > **2026-07-20追記**: Kimi CLI概念取り込み KC-01〜10 を新設([KIMI_CLI_ADOPTION_PLAN_2026-07-20.ja.md](./KIMI_CLI_ADOPTION_PLAN_2026-07-20.ja.md)。MoonshotAI/kimi-cli の実コード分析に基づく概念昇華方式)。全件 TODO として追加し、DONE 74 / PARTIAL 30 / TODO 16 へ更新。
+> **2026-07-20追記**: KC-01(反復ガバナー)/KC-02(worker event stream)/KC-03(承認 session cache + source cancel)/KC-04(lifecycle hook engine)/KC-05(AI 監査テスト層)/KC-06(委譲ハードニング)/KC-08(dynamic injection 契約)/KC-09(completion token 動的予算)を実装し、各受入条件を hermetic テスト(計 100+ 件)・typecheck・境界テストで検証して DONE とした。KC-07 は rewind プリミティブ+安全ガード+観測を実装済(実ワーカー loop への配線が残るため PARTIAL)。DONE 82 / PARTIAL 31 / TODO 7 へ更新。
 > **判定基準**: DONE = 受入条件を実コードで検証済 / PARTIAL = 一部充足 / TODO = 実質未着手。
 
 ## サマリ
 
 | 判定    | 件数 |
 | ------- | ---- |
-| DONE    | 74   |
-| PARTIAL | 30   |
-| TODO    | 16   |
+| DONE    | 82   |
+| PARTIAL | 31   |
+| TODO    | 7    |
 
 ## P0 残作業(プロダクション化のクリティカルパス)
 
@@ -286,18 +287,18 @@
 
 正本: [KIMI_CLI_ADOPTION_PLAN_2026-07-20.ja.md](./KIMI_CLI_ADOPTION_PLAN_2026-07-20.ja.md)
 
-| ID    | 状態 | 残作業                                                                                             |
-| ----- | ---- | -------------------------------------------------------------------------------------------------- |
-| KC-01 | TODO | ツール呼び出し反復ガバナー(canonical 引数 streak・3/5/8 段階警告・12 で強制停止 + Trace)           |
-| KC-02 | TODO | ワーカーイベントストリーム契約(型付き envelope・SPMC・jsonl 記録/再生・イベント列 assert の e2e)   |
-| KC-03 | TODO | 承認ランタイム強化(セッション action キャッシュ・source 単位 cancel・envelope 投影)                |
-| KC-04 | TODO | ライフサイクルフックエンジン一般化(13 イベント語彙・並列 regex・fail-open + telemetry carve-out)   |
-| KC-05 | TODO | AI 監査テスト層(markdown 不変条件 → subagent fan-out → report.json、pipeline として dog-food)      |
-| KC-06 | TODO | 委譲ハードニング(要約最短長 retry・subagent 永続 store・完了通知 claim 注入・圧縮後 snapshot)      |
-| KC-07 | TODO | 文脈巻き戻し D-Mail(実験。checkpoint 記録・`context:rewind`・外部効果時は発火拒否)                 |
-| KC-08 | TODO | 動的注入 provider 契約(throttle・`onContextCompacted` リセット・history 正規化)                    |
-| KC-09 | TODO | completion token 動的予算(API 直叩き backend の max_completion 動的計算)                           |
-| KC-10 | TODO | Mermaid フロー → pipeline governed compiler(需要確定まで backlog)                                  |
+| ID    | 状態    | 残作業                                                                                                                                                                                             |
+| ----- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| KC-01 | DONE    | 2026-07-20 実装・検証済: `tool-call-repeat-governor.ts`(canonical 引数 streak・3/5/8 段階警告・12 強制停止)、adf-engine(明示ループ op 内は force-stop 免除)+ InSessionDispatcher に接続           |
+| KC-02 | DONE    | 2026-07-20 実装・検証済: `worker-event-stream.ts`(zod envelope・SPMC・jsonl 記録/再生・fail-open)。run_pipeline の turn/step、approval-store、orchestration observation、圧縮 begin/end を投影      |
+| KC-03 | DONE    | 2026-07-20 実装・検証済: セッション action キャッシュ(deny/硬化 policy 素通り不可・audit 記録)+ source 単位 cancel(`cancelApprovalRequestsBySource`)。human-only 契約維持                          |
+| KC-04 | DONE    | 2026-07-20 実装・検証済: `lifecycle-hook-engine.ts`(13 イベント・並列 regex・fail-open + block telemetry carve-out・コマンドフック stdin-JSON/exit-2)。pre_tool_use block は stepGate で run 中断    |
+| KC-05 | DONE    | 2026-07-20 実装・検証済: `tests_ai/` 不変条件 3 本 + `run_ai_audit.ts`(delegateStructured fan-out・report.json + Trace・stub は明示 skip)+ `ai-audit` pipeline(週次 schedule)。実 LLM での定期運用は今後 |
+| KC-06 | DONE    | 2026-07-20 実装・検証済: 要約最短長 retry(1 回・stub/structured 除外)、resumable 委譲 store + `resumeDelegatedTask`、claim-based 完了通知(≤4 件/step)、carryover に active_background_tasks         |
+| KC-07 | PARTIAL | 2026-07-20 プリミティブ実装・検証済: `context-rewind.ts`(checkpoint・外部効果ガード・1 turn 1 回・lesson 上限・pinned 生存・governance/event 記録)+ `context_rewind` tool 定義。実ワーカー loop への配線は generateWithTools 多段ループ導入時 |
+| KC-08 | DONE    | 2026-07-20 実装・検証済: `dynamic-injection.ts`(throttle・one-shot・圧縮後リセット・fail-open・history 正規化)。working-principles を初代 provider 化、圧縮から registry reset を接続                |
+| KC-09 | DONE    | 2026-07-20 実装・検証済: `completion-token-budget.ts` + anthropic(全経路)/openai-compatible(opt-in)接続。thinking budget は floor 引き上げ、window 不明時は passthrough                             |
+| KC-10 | TODO    | Mermaid フロー → pipeline governed compiler(需要確定まで backlog)                                                                                                                                   |
 
 ### CO(Company OS)
 
