@@ -67,6 +67,7 @@ import {
 import { getAllFiles } from '@agent/core/fs-utils';
 import * as path from 'node:path';
 import { z } from 'zod';
+import { assignWisdomContextValue, mergeWisdomContext } from './contracts/wisdom-context.js';
 
 /**
  * Decision-support operations for Kyberion.
@@ -2582,7 +2583,8 @@ const RATE_LIMITED_OPS = new Set([
 export async function dispatchDecisionOp(
   op: string,
   params: any,
-  ctx: Ctx
+  ctx: Ctx,
+  options: { compatibilityMode?: boolean } = {}
 ): Promise<{ handled: boolean; ctx: Ctx }> {
   const resolved = (k: string) => resolveVars(params[k], ctx);
   const exportAs = params.export_as;
@@ -2594,9 +2596,11 @@ export async function dispatchDecisionOp(
    * pipeline templating surprising; the merge is strictly additive.
    */
   const assign = (value: any): Ctx => {
-    if (exportAs) return { ...ctx, [exportAs]: value };
+    if (exportAs) {
+      return assignWisdomContextValue(ctx, String(exportAs), value, options);
+    }
     if (value && typeof value === 'object' && !Array.isArray(value)) {
-      return { ...ctx, ...(value as Record<string, unknown>) };
+      return mergeWisdomContext(ctx, value as Record<string, unknown>, options);
     }
     return ctx;
   };

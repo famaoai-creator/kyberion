@@ -237,7 +237,7 @@
     {
       "path": "product/architecture/component-lifecycle-inventory.md",
       "tier": "public",
-      "size": 6312,
+      "size": 6311,
       "type": "md"
     },
     {
@@ -987,7 +987,7 @@
     {
       "path": "product/governance/actuator-op-registry.json",
       "tier": "public",
-      "size": 14598,
+      "size": 14618,
       "type": "json"
     },
     {
@@ -2937,7 +2937,7 @@
     {
       "path": "product/orchestration/actuator-op-discovery.json",
       "tier": "public",
-      "size": 73073,
+      "size": 73148,
       "type": "json"
     },
     {
@@ -3273,7 +3273,7 @@
     {
       "path": "product/orchestration/global_actuator_index.json",
       "tier": "public",
-      "size": 15936,
+      "size": 16919,
       "type": "json"
     },
     {
@@ -8050,6 +8050,12 @@
       "path": "public/design-patterns/media-templates/document-composition-presets/document-profiles.json",
       "tier": "public",
       "size": 2807,
+      "type": "json"
+    },
+    {
+      "path": "public/design-patterns/media-templates/document-composition-presets/kyberion-overview-20pages.json",
+      "tier": "public",
+      "size": 3392,
       "type": "json"
     },
     {

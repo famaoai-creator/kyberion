@@ -847,6 +847,16 @@ export type {
   TaskExecutionStatus,
 } from './task-executor.js';
 export {
+  getAgentExecutionPort,
+  registerAgentExecutionPort,
+  SupervisorAgentExecutionPort,
+} from './agent-execution-port.js';
+export type {
+  AgentExecutionPort,
+  AgentExecutionReceipt,
+  AgentTaskEnvelope,
+} from './agent-execution-port.js';
+export {
   getDeploymentAdapter,
   installShellDeploymentAdapterIfAvailable,
   registerDeploymentAdapter,

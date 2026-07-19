@@ -78,6 +78,7 @@
       "apply": [
         "a2a",
         "ask",
+        "delegate",
         "prewarm_mission",
         "refresh",
         "restart",

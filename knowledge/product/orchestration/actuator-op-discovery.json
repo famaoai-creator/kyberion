@@ -43,6 +43,10 @@
           "kind": "apply"
         },
         {
+          "op": "delegate",
+          "kind": "apply"
+        },
+        {
           "op": "shutdown",
           "kind": "apply"
         },

@@ -1,0 +1,47 @@
+import type { ContextSecurityScope } from '@agent/core';
+
+export type ExecutionKind =
+  | 'reasoning_single'
+  | 'reasoning_ensemble'
+  | 'agent_delegation'
+  | 'agent_a2a'
+  | 'deterministic';
+
+export interface WisdomReceipt<T = unknown> {
+  actuator_id: 'wisdom-actuator';
+  requested_op: string;
+  canonical_op: string;
+  execution_kind: ExecutionKind;
+  status: 'succeeded' | 'failed' | 'blocked' | 'partial';
+  result?: T;
+  error?: { code: string; message: string; retryable: boolean };
+  security_scope?: ContextSecurityScope;
+  reasoning?: {
+    backend?: string;
+    mode?: 'model' | 'placeholder' | 'deterministic';
+    route_id?: string;
+  };
+  compatibility?: {
+    deprecated_alias?: string;
+    forwarded_to?: string;
+  };
+  trace_summary?: Record<string, unknown>;
+}
+
+export function makeWisdomReceipt(input: {
+  requestedOp: string;
+  canonicalOp: string;
+  executionKind: ExecutionKind;
+  result?: unknown;
+  compatibility?: WisdomReceipt['compatibility'];
+}): WisdomReceipt {
+  return {
+    actuator_id: 'wisdom-actuator',
+    requested_op: input.requestedOp,
+    canonical_op: input.canonicalOp,
+    execution_kind: input.executionKind,
+    status: 'succeeded',
+    ...(input.result === undefined ? {} : { result: input.result }),
+    ...(input.compatibility ? { compatibility: input.compatibility } : {}),
+  };
+}

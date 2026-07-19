@@ -1,6 +1,7 @@
 import { compileFromFile } from 'json-schema-to-typescript';
 import { pathResolver } from '@agent/core';
 import { safeWriteFile } from '@agent/core/secure-io';
+import { withExecutionContext } from '@agent/core/governance';
 
 interface GenerationTarget {
   schemaPath: string;
@@ -8,6 +9,10 @@ interface GenerationTarget {
 }
 
 const targets: GenerationTarget[] = [
+  {
+    schemaPath: 'schemas/wisdom-action.schema.json',
+    outputPath: 'libs/core/src/types/wisdom-action.ts',
+  },
   {
     schemaPath: 'schemas/bridge-request.schema.json',
     outputPath: 'libs/core/src/types/bridge-request.ts',
@@ -180,7 +185,7 @@ async function main(): Promise<void> {
         singleQuote: true,
       },
     });
-    safeWriteFile(outputPath, compiled);
+    withExecutionContext('ecosystem_architect', () => safeWriteFile(outputPath, compiled));
     console.log(`[generate:types] ${target.outputPath}`);
   }
 }
