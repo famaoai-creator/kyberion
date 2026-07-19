@@ -44,7 +44,7 @@ import {
   resolveArtifactPath,
 } from './media-generation-helpers.js';
 import { getGenerationHistoryAdapterForAction } from './generation-artifact-adapters.js';
-import { createComfyUiProviderClient } from './comfyui-provider-client.js';
+import { createGenerationProviderHistoryClient } from './generation-provider-clients.js';
 
 const PROMPT_BASED_ACTIONS = new Set([
   'generate_image',
@@ -354,7 +354,23 @@ async function getGenerationJob(params: any) {
       return { ...currentJob, ...finalizeActuatorTrace(traceCtx) };
     }
 
-    const history = (await createComfyUiProviderClient().history(promptId)) as unknown;
+    const provider = String(
+      currentJob.provider?.engine || currentJob.result?.backend_provider || 'comfyui'
+    );
+    const providerClient = createGenerationProviderHistoryClient(provider);
+    if (!providerClient) {
+      const message = `No generation history adapter registered for provider: ${provider}`;
+      traceCtx.endSpan('ok', message);
+      return {
+        ...currentJob,
+        provider_history_status: 'unsupported',
+        provider_history_provider: provider,
+        message,
+        ...finalizeActuatorTrace(traceCtx),
+      };
+    }
+
+    const history = (await providerClient.history(promptId)) as unknown;
     if (!history || typeof history !== 'object' || Array.isArray(history)) {
       if (currentJob.status !== 'running') {
         const runningJob = transitionGenerationJob(currentJob, 'running', {
