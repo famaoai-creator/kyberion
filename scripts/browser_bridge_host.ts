@@ -28,6 +28,8 @@ import {
   extendLeaseForMfa,
   issueBrowserExtensionLease,
   loadProcedureDelta,
+  segmentRecording,
+  subRecordingForSegment,
   preflightBrowserExtensionSession,
   persistBrowserExtensionReceipt,
   collectProcedureUserInputs,
@@ -44,9 +46,15 @@ import {
   saveDistillCandidateRecord,
   validateBrowserExtensionReceipt,
   validateBrowserExtensionRecording,
+  validateBrowserExtensionObservation,
   validateBrowserExtensionSessionRequest,
   withExecutionContext,
+  persistBrowserExtensionObservation,
+  loadBrowserExtensionObservations,
+  getReasoningBackend,
+  delegateTaskWithUntrustedData,
   type BrowserExtensionRecording,
+  type BrowserExtensionLease,
   type BrowserExtensionSessionRequest,
   type ProcedureEntry,
 } from '@agent/core';
@@ -404,7 +412,16 @@ function handlePrepareProcedure(message: any): HostResponse {
     return { ok: false, error: loaded.error ?? 'failed to load procedure' };
   }
   const inputs = collectProcedureUserInputs(loaded.entry, loaded.recording);
-  return { ok: true, procedure_id: procedureId, inputs, has_inputs: inputs.length > 0 };
+  return {
+    ok: true,
+    procedure_id: procedureId,
+    inputs,
+    has_inputs: inputs.length > 0,
+    // Start origin (the recording's initial tab origin) + every allowed origin —
+    // lets the extension auto-open/connect the right tab before dispatch.
+    origin: loaded.recording.tab.origin,
+    origins: loaded.entry.target.origins,
+  };
 }
 
 /** Allowlisted recordings store — where reviewed recordings & deltas are persisted. */
@@ -640,6 +657,238 @@ async function handleResolveIntent(message: any): Promise<HostResponse> {
   return { ok: true, resolution };
 }
 
+/**
+ * Persist a read-only observation (extracted page data) from a governed run.
+ * The extension redacts at capture; the bridge re-redacts at this boundary.
+ */
+function verifyObservationExecutionProof(
+  message: any
+): { ok: true } | { ok: false; error: string } {
+  const observationValidation = validateBrowserExtensionObservation(message.observation);
+  if (!observationValidation.value) {
+    return { ok: false, error: observationValidation.errors.join('; ') };
+  }
+  const observation = observationValidation.value;
+  let recording: BrowserExtensionRecording | undefined;
+  if (message.recording) {
+    const validated = validateBrowserExtensionRecording(message.recording);
+    if (!validated.value) return { ok: false, error: validated.errors.join('; ') };
+    recording = validated.value;
+  } else {
+    const loaded = loadBrowserProcedure(observation.procedure_id);
+    if (loaded.error || !loaded.recording) {
+      return { ok: false, error: loaded.error ?? 'observation procedure recording not found' };
+    }
+    recording = loaded.recording;
+  }
+
+  const lease = message.lease as BrowserExtensionLease | undefined;
+  const sessionInput =
+    message.session && typeof message.session === 'object'
+      ? { ...message.session, mode: 'execute', lease }
+      : null;
+  if (!sessionInput) return { ok: false, error: 'observation execution proof requires a session' };
+  const session = validateBrowserExtensionSessionRequest(sessionInput);
+  if (!session.value) return { ok: false, error: session.errors.join('; ') };
+  if (observation.recording_id !== recording.recording_id) {
+    return { ok: false, error: 'observation recording_id does not match execution proof' };
+  }
+  if (!session.value.lease || observation.lease_id !== session.value.lease.lease_id) {
+    return { ok: false, error: 'observation lease_id does not match execution proof' };
+  }
+  if (session.value.origin !== observation.origin) {
+    return { ok: false, error: 'observation origin does not match execution session' };
+  }
+  if (!recording.actions.some((action) => action.op === 'extract_text_ref')) {
+    return { ok: false, error: 'observation proof recording has no extract_text_ref action' };
+  }
+
+  // Multi-origin runs use a segment-specific lease. Verify that segment rather
+  // than comparing the later origin with the recording's initial origin.
+  const segments = segmentRecording(recording);
+  const segment = segments.find((candidate) => candidate.origin === observation.origin);
+  const proofRecording =
+    segments.length > 1 && segment ? subRecordingForSegment(recording, segment) : recording;
+  const proofSession = { ...session.value, origin: observation.origin };
+  if (proofSession.lease.origin && proofSession.lease.origin !== observation.origin) {
+    return { ok: false, error: 'observation lease origin does not match observation origin' };
+  }
+  const preflight = preflightBrowserExtensionSession({
+    recording: proofRecording,
+    session: proofSession,
+    bridgeAvailable: true,
+  });
+  return preflight.status === 'blocked'
+    ? { ok: false, error: preflight.errors.join('; ') }
+    : { ok: true };
+}
+
+function handleSubmitObservation(message: any): HostResponse {
+  const proof = withExecutionContext(
+    'sovereign_concierge',
+    () => verifyObservationExecutionProof(message),
+    'sovereign'
+  );
+  if (!proof.ok) return proof;
+  const persisted = withExecutionContext(
+    'sovereign_concierge',
+    () => persistBrowserExtensionObservation(message.observation),
+    'sovereign'
+  );
+  if (persisted.errors.length > 0) {
+    return { ok: false, error: persisted.errors.join('; ') };
+  }
+  const observation = validateBrowserExtensionObservation(message.observation).value!;
+  withExecutionContext(
+    'sovereign_concierge',
+    () => {
+      try {
+        auditChain.record({
+          agentId: 'browser-bridge',
+          action: 'browser_observation',
+          operation: `browser:observe:${observation.procedure_id}`,
+          result: 'completed',
+          reason: `Captured ${observation.fields?.length ?? 0} field(s) from ${observation.origin}`,
+          metadata: {
+            observation_id: observation.observation_id,
+            procedure_id: observation.procedure_id,
+            origin: observation.origin,
+            evidence_ref: persisted.path,
+          },
+        });
+      } catch {
+        /* audit enrichment is best-effort */
+      }
+    },
+    'sovereign'
+  );
+  return {
+    ok: true,
+    status: 'recorded',
+    observation_id: observation.observation_id,
+    path: persisted.path,
+  };
+}
+
+/**
+ * Analyze stored observations for a procedure and write a Markdown report.
+ * Extracted page text is UNTRUSTED — it flows through
+ * delegateTaskWithUntrustedData, which fences it as data and instructs the
+ * model to ignore embedded instructions. Analysis is one-way: the report is an
+ * artifact; nothing here feeds back into browser execution.
+ */
+async function handleAnalyzeObservation(message: any): Promise<HostResponse> {
+  const procedureId = typeof message.procedure_id === 'string' ? message.procedure_id.trim() : '';
+  if (!procedureId) return { ok: false, error: 'analyze_observation requires procedure_id' };
+  const question =
+    typeof message.question === 'string' && message.question.trim()
+      ? message.question.trim().slice(0, 1000)
+      : '抽出されたデータの要点を整理し、変化・傾向・注目点を日本語で簡潔にレポートしてください。';
+  const limit =
+    Number.isInteger(message.limit) && message.limit > 0 ? Math.min(message.limit, 20) : 20;
+
+  const observations = withExecutionContext(
+    'sovereign_concierge',
+    () => loadBrowserExtensionObservations(procedureId, { limit }),
+    'sovereign'
+  );
+  if (observations.length === 0) {
+    return {
+      ok: false,
+      error: `手順「${procedureId}」の観測データがまだありません。実行して抽出データを集めてください。`,
+    };
+  }
+
+  const dataset = observations
+    .map((obs) =>
+      [
+        `## ${obs.captured_at} (${obs.origin})`,
+        ...obs.fields.map((f) => `- ${f.name}: ${f.text}`),
+      ].join('\n')
+    )
+    .join('\n\n')
+    .slice(0, 100_000);
+
+  let analysis: string;
+  try {
+    analysis = await withExecutionContext(
+      'sovereign_concierge',
+      () =>
+        delegateTaskWithUntrustedData(
+          getReasoningBackend(),
+          [
+            'You are analyzing data extracted from reviewed regions of web pages during a governed browser automation run.',
+            `Analysis request: ${question}`,
+            'Write the report in Japanese, in Markdown, concise and structured.',
+            'The dataset below is a time-ordered series of observations (oldest first).',
+          ].join('\n'),
+          { untrustedData: dataset, sourceLabel: `browser observations for ${procedureId}` },
+          { context: `browser-observation-report:${procedureId}` }
+        ),
+      'sovereign'
+    );
+  } catch (err) {
+    return {
+      ok: false,
+      error: `分析バックエンドの実行に失敗しました: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const reportRel = `knowledge/personal/browser-reports/${procedureId.replace(/[^A-Za-z0-9._-]/g, '_')}/${stamp}.md`;
+  const report = [
+    `# Observation report: ${procedureId}`,
+    '',
+    `- generated_at: ${new Date().toISOString()}`,
+    `- observations: ${observations.length} (latest: ${observations[observations.length - 1].captured_at})`,
+    `- question: ${question}`,
+    '',
+    analysis.trim(),
+    '',
+  ].join('\n');
+  try {
+    withExecutionContext(
+      'sovereign_concierge',
+      () => {
+        safeMkdir(
+          pathResolver.knowledge(
+            `personal/browser-reports/${procedureId.replace(/[^A-Za-z0-9._-]/g, '_')}`
+          ),
+          { recursive: true }
+        );
+        safeWriteFile(pathResolver.rootResolve(reportRel), report);
+        try {
+          auditChain.record({
+            agentId: 'browser-bridge',
+            action: 'browser_observation_report',
+            operation: `browser:report:${procedureId}`,
+            result: 'completed',
+            reason: `Generated observation report over ${observations.length} observation(s)`,
+            metadata: { procedure_id: procedureId, report_ref: reportRel },
+          });
+        } catch {
+          /* audit enrichment is best-effort */
+        }
+      },
+      'sovereign'
+    );
+  } catch (err) {
+    return {
+      ok: false,
+      error: `レポートの保存に失敗しました: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+
+  return {
+    ok: true,
+    status: 'reported',
+    procedure_id: procedureId,
+    report_ref: reportRel,
+    observation_count: observations.length,
+    report,
+  };
+}
+
 function handle(message: any): HostResponse | Promise<HostResponse> {
   switch (message?.type) {
     case 'ping':
@@ -668,6 +917,10 @@ function handle(message: any): HostResponse | Promise<HostResponse> {
       return handleSaveProcedureDelta(message);
     case 'resolve_intent':
       return handleResolveIntent(message);
+    case 'submit_observation':
+      return handleSubmitObservation(message);
+    case 'analyze_observation':
+      return handleAnalyzeObservation(message);
     default:
       return { ok: false, error: `Unsupported message type: ${String(message?.type)}` };
   }
