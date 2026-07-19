@@ -1,0 +1,25 @@
+{
+  "pipeline_id": "ai-audit",
+  "version": "1.0.0",
+  "description": "AI audit test layer (KC-05): fan tests_ai/*.md semantic invariants out to the reasoning backend and aggregate report.json under active/shared/tmp/ai-audit/. Skips with an explicit report on stub backend; fails when any case fails.",
+  "action": "pipeline",
+  "schedule": {
+    "id": "ai-audit-weekly",
+    "cron": "30 5 * * 1",
+    "timezone": "Asia/Tokyo",
+    "enabled": true
+  },
+  "steps": [
+    {
+      "id": "run-ai-audit",
+      "role": "sink",
+      "op": "system:exec",
+      "comment": "safeExec scrubs env (SAFE_EXEC_ENV_ALLOWLIST), so the child resolves its own reasoning backend: real backend when one is available, explicit skip report when only the stub is. LLM fan-out needs more than the 30s exec default.",
+      "params": {
+        "command": "node",
+        "args": ["dist/scripts/run_ai_audit.js"],
+        "timeout_ms": 1200000
+      }
+    }
+  ]
+}
