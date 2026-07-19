@@ -28,9 +28,19 @@ Kyberion treats image, voice, music, and video as separate modalities, but they 
 
 ## Current Runtime Shape
 
+- media-generation requests now follow one governed boundary:
+  `request validation -> design/style resolution -> modality compilation -> backend resolution -> execution/submission -> job transition -> artifact collection -> trace/evidence`
+- direct image requests and ADF/workflow requests both pass through request normalization and style-pack injection before execution
 - `image-generation-adf` is compiled and handed to the `media-generation` service preset
+- `video-generation-adf` and `music-generation-adf` resolve ComfyUI through modality-specific contracts (`media-generation.comfyui.video` / `.music`); `media-generation.comfyui` remains the image compatibility alias
+- persisted jobs keep `backend_id`, `backend_kind`, `backend_provider`, and generic `provider_job_id`; `prompt_id` is retained as a compatibility field
+- client wait timeout is an observation result (`wait_status: timed_out`) and does not turn the persisted provider job into a terminal state
 - `voice-actuator` resolves the selected voice engine and normalizes it to backend metadata
 - `video-render-backend` resolves the render backend and records backend metadata with the render result
+
+Generation jobs use explicit transitions: `submitted -> running -> succeeded|failed|canceled`, `failed -> retrying -> submitted`, and no transition out of terminal success/cancel states. Artifact collection must find an existing, modality-compatible output before success is recorded.
+
+Screen capture and recording remain compatibility actions, but their implementation is isolated from generation job handling. `capture_screen` and `capture_focused_window` forward to the canonical system-actuator `screenshot` op; `record_screen` is declared only for macOS while its current service preset uses the macOS `avfoundation` input. Backend availability uses one media registry probe contract backed by the governed service runtime, tool runtime, or native Image Playground bridge. ComfyUI history/artifact extraction uses modality-specific adapters so image, video, music, and generic workflow outputs cannot silently cross modality boundaries.
 
 ## Governing Registry
 

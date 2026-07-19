@@ -48,3 +48,9 @@
 - **完了済み(一部)**: `system-pipeline-helpers.ts` の `write_file` / `write_artifact` / `mkdir` を file-actuator へ forward し、system の混載領域を少し縮めた。`read_json` は既存互換のため system 側に残した。
 - **完了済み(一部)**: `AR-03` で file/input contract を導入済みのため、system→file の forward でも前倒し検証が効くようになった。
 - **未完了**: wisdom/media の大きな分割、system 残りの OS-input/device-test 境界整理、file I/O の更なる切り出し。
+
+## 進捗追記 (2026-07-20)
+
+- `media-generation-actuator` の capture 実装を `capture-actions.ts` に隔離し、生成 job の state/store 経路から直接依存しない構造にした。
+- system 側の canonical `screenshot` op が利用できるため、`capture_screen` / `capture_focused_window` は `system-actuator:screenshot` への compatibility forwarder として維持した。`record_screen` は canonical recording op がまだないため、既存の governed media service preset を利用する。
+- `record_screen` の実装は macOS `avfoundation` 固定なので、manifest の対応 platform は `darwin` のみに補正した。canonical recording op が追加された場合は同じ forwarding 方針へ移行する。

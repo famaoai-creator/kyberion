@@ -3,21 +3,15 @@
   "title": "Generation Job",
   "description": "Long-running generation job contract for image, video, music, and workflow executions.",
   "type": "object",
-  "required": [
-    "kind",
-    "job_id",
-    "action",
-    "status",
-    "request",
-    "created_at"
-  ],
+  "required": ["kind", "job_id", "action", "status", "request", "created_at"],
   "properties": {
     "kind": {
       "type": "string",
       "const": "generation-job"
     },
     "job_id": {
-      "type": "string"
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$"
     },
     "action": {
       "type": "string",
@@ -31,6 +25,9 @@
       "type": "object",
       "properties": {
         "engine": {
+          "type": "string"
+        },
+        "provider_job_id": {
           "type": "string"
         },
         "prompt_id": {
@@ -74,6 +71,22 @@
         },
         "error": {
           "type": "string"
+        },
+        "retry_classification": {
+          "type": "string"
+        },
+        "backend_id": {
+          "type": "string"
+        },
+        "backend_kind": {
+          "type": "string"
+        },
+        "backend_provider": {
+          "type": "string"
+        },
+        "modality": {
+          "type": "string",
+          "enum": ["image", "video", "music", "workflow"]
         }
       },
       "additionalProperties": true
@@ -95,6 +108,10 @@
     "attempts": {
       "type": "integer",
       "minimum": 0
+    },
+    "modality": {
+      "type": "string",
+      "enum": ["image", "video", "music", "workflow"]
     },
     "created_at": {
       "type": "string"

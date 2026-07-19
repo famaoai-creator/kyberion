@@ -2,6 +2,13 @@
   "actuator": "media-generation-actuator",
   "examples": [
     {
+      "id": "direct-image-generation",
+      "title": "Direct Image Generation",
+      "path": "libs/actuators/media-generation-actuator/examples/direct-image-generation.json",
+      "description": "Runs the direct image bridge through the same governed preparation and backend resolution boundary.",
+      "tags": ["image", "direct", "example"]
+    },
+    {
       "id": "image-adf-country-cover",
       "title": "Country Cover Image From ADF",
       "path": "libs/actuators/media-generation-actuator/examples/image-adf-country-cover.json",
@@ -42,6 +49,41 @@
       "path": "libs/actuators/media-generation-actuator/examples/submit-music-generation-job.json",
       "description": "Submits a long-running music generation request as a first-class generation job for later status polling and artifact collection.",
       "tags": ["music", "job", "adf", "comfyui", "ace-step", "async", "example"]
+    },
+    {
+      "id": "get-generation-job",
+      "title": "Get Generation Job",
+      "path": "libs/actuators/media-generation-actuator/examples/get-generation-job.json",
+      "description": "Refreshes a persisted generation job from provider history.",
+      "tags": ["job", "get", "example"]
+    },
+    {
+      "id": "wait-generation-job",
+      "title": "Wait for Generation Job",
+      "path": "libs/actuators/media-generation-actuator/examples/wait-generation-job.json",
+      "description": "Waits for a job while preserving client timeout versus provider terminal state.",
+      "tags": ["job", "wait", "example"]
+    },
+    {
+      "id": "collect-generation-artifact",
+      "title": "Collect Generation Artifact",
+      "path": "libs/actuators/media-generation-actuator/examples/collect-generation-artifact.json",
+      "description": "Copies a verified primary artifact from a succeeded generation job.",
+      "tags": ["job", "artifact", "example"]
+    },
+    {
+      "id": "pipeline-envelope",
+      "title": "Media Pipeline Envelope",
+      "path": "libs/actuators/media-generation-actuator/examples/pipeline-envelope.json",
+      "description": "Compatibility sequential pipeline with continue-and-aggregate semantics.",
+      "tags": ["pipeline", "compatibility", "example"]
+    },
+    {
+      "id": "capture-screen",
+      "title": "Screen Capture",
+      "path": "libs/actuators/media-generation-actuator/examples/capture-screen.json",
+      "description": "Captures a screen image through the isolated capture boundary.",
+      "tags": ["capture", "screen", "example"]
     },
     {
       "id": "music-generation-schedule-anniversary",

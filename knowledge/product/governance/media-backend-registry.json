@@ -4,7 +4,7 @@
     "image": "media-generation.comfyui",
     "voice": "voice.local_say",
     "video": "video.hyperframes_cli",
-    "music": "media-generation.comfyui"
+    "music": "media-generation.comfyui.music"
   },
   "backends": [
     {
@@ -22,6 +22,39 @@
       "service_id": "media-generation",
       "action": "generate_image",
       "notes": "Routes governed image generation through the media-generation service preset. ComfyUI availability and managed location are also tracked via the service runtime abstraction."
+    },
+    {
+      "backend_id": "media-generation.comfyui.video",
+      "modality": "video",
+      "display_name": "ComfyUI Video Generation",
+      "kind": "service_preset",
+      "provider": "comfyui",
+      "status": "active",
+      "platforms": ["any"],
+      "supports": {
+        "artifact_formats": ["mp4", "mov", "webm", "gif"],
+        "async": true
+      },
+      "service_id": "media-generation",
+      "action": "generate_video",
+      "fallback_backend_id": "video.hyperframes_cli",
+      "notes": "Compatibility-specific video contract for the shared ComfyUI runtime."
+    },
+    {
+      "backend_id": "media-generation.comfyui.music",
+      "modality": "music",
+      "display_name": "ComfyUI Music Generation",
+      "kind": "service_preset",
+      "provider": "comfyui",
+      "status": "active",
+      "platforms": ["any"],
+      "supports": {
+        "artifact_formats": ["mp3", "wav", "flac"],
+        "async": true
+      },
+      "service_id": "media-generation",
+      "action": "generate_music",
+      "notes": "Compatibility-specific music contract for the shared ComfyUI runtime."
     },
     {
       "backend_id": "media-generation.gemini",

@@ -112,7 +112,7 @@
       "d": "Generative image, video, music, and screen capture actuator",
       "s": "implemented",
       "version": "1.1.0",
-      "capability_count": 10
+      "capability_count": 12
     },
     {
       "n": "meeting-actuator",

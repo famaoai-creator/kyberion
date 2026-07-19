@@ -16,6 +16,7 @@ export interface GenerationJob {
   status: 'submitted' | 'running' | 'retrying' | 'succeeded' | 'failed' | 'timed_out' | 'canceled';
   provider?: {
     engine?: string;
+    provider_job_id?: string;
     prompt_id?: string;
     [k: string]: unknown;
   };
@@ -39,6 +40,11 @@ export interface GenerationJob {
       [k: string]: unknown;
     };
     error?: string;
+    retry_classification?: string;
+    backend_id?: string;
+    backend_kind?: string;
+    backend_provider?: string;
+    modality?: 'image' | 'video' | 'music' | 'workflow';
     [k: string]: unknown;
   };
   retry_policy?: {
@@ -47,6 +53,7 @@ export interface GenerationJob {
     [k: string]: unknown;
   };
   attempts?: number;
+  modality?: 'image' | 'video' | 'music' | 'workflow';
   created_at: string;
   updated_at?: string;
   completed_at?: string;

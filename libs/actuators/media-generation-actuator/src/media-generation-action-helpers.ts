@@ -4,17 +4,24 @@ import {
   derivePipelineStatus,
   createActuatorTrace,
   finalizeActuatorTrace,
-  safeReadFile,
-  safeCopyFileSync,
   safeExistsSync,
-  safeMkdir,
-  pathResolver,
-  platform,
   waitForJob,
+  classifyError,
 } from '@agent/core';
-import { createStandardYargs } from '@agent/core/cli-utils';
-import * as path from 'node:path';
 import type { GenerationJob } from '@agent/core';
+import { handleCaptureAction } from './capture-actions.js';
+import { transitionGenerationJob } from './generation-job-state.js';
+import { MEDIA_GENERATION_ACTIONS } from './op-catalog.js';
+
+type MediaActionResult = Record<string, unknown> & Partial<GenerationJob>;
+type MediaActionInput = {
+  action?: string;
+  params?: Record<string, unknown>;
+  steps?: MediaActionInput[];
+  continue_on_error?: boolean;
+  [key: string]: unknown;
+};
+const SUPPORTED_ACTIONS = new Set<string>(MEDIA_GENERATION_ACTIONS);
 import {
   resolveGenerationBackend,
   buildRetryOptions,
@@ -28,12 +35,15 @@ import {
   resolveImageArtifactFormat,
   resolveImageProviderPreference,
   preparePromptBasedGeneration,
+  resolveAwaitCompletion,
+  executePreparedGeneration,
   collectGenerationResult,
   nowIso,
   isPlainObject,
   loadRecoveryPolicy,
   resolveArtifactPath,
 } from './media-generation-helpers.js';
+import { getGenerationHistoryAdapterForAction } from './generation-artifact-adapters.js';
 
 const PROMPT_BASED_ACTIONS = new Set([
   'generate_image',
@@ -42,18 +52,21 @@ const PROMPT_BASED_ACTIONS = new Set([
   'run_workflow',
 ]);
 async function retryGenerationJob(job: GenerationJob): Promise<GenerationJob> {
+  const classification = String(job.result?.retry_classification || 'unknown');
+  const retryableCategories = loadRecoveryPolicy().retryable_categories;
+  if (!Array.isArray(retryableCategories) || !retryableCategories.includes(classification)) {
+    return writeJob(job);
+  }
   const maxAttempts = Number(job.retry_policy?.max_attempts || 1);
   if ((job.attempts || 1) >= maxAttempts) {
     return writeJob(job);
   }
   const backoffSeconds = Number(job.retry_policy?.backoff_seconds || 0);
   const nextRetryAt = new Date(Date.now() + backoffSeconds * 1000).toISOString();
-  const retryingJob: GenerationJob = {
-    ...job,
-    status: 'retrying',
+  const retryingJob = transitionGenerationJob(job, 'retrying', {
     next_retry_at: nextRetryAt,
     updated_at: nowIso(),
-  };
+  });
   return writeJob(retryingJob);
 }
 
@@ -83,7 +96,7 @@ async function resumeRetriedGenerationJob(job: GenerationJob): Promise<Generatio
       completed_at: nowIso(),
     });
   }
-  return writeJob({
+  const resubmitted = transitionGenerationJob(job, 'submitted', {
     ...retried,
     result: {
       ...job.result,
@@ -91,6 +104,7 @@ async function resumeRetriedGenerationJob(job: GenerationJob): Promise<Generatio
     },
     next_retry_at: undefined,
   });
+  return writeJob(resubmitted);
 }
 
 async function handlePromptBasedGeneration(action: string, params: any) {
@@ -107,71 +121,96 @@ async function handlePromptBasedGeneration(action: string, params: any) {
   });
   let result: any = null;
   try {
+    const prepared = preparePromptBasedGeneration(action, params);
     if (
       action === 'generate_image' &&
-      !params.workflow &&
-      !params.workflow_path &&
-      !params.image_adf
+      !prepared.workflow &&
+      !prepared.params.workflow_path &&
+      !prepared.params.image_adf
     ) {
       const { generateImage } = await import('@agent/core');
+      const backend = resolveGenerationBackend(action, prepared.params);
       const bridgeRes = await generateImage({
-        prompt: params.prompt || '',
-        aspectRatio: params.aspect_ratio || params.aspectRatio,
-        mode: params.mode,
-        style: typeof params.style === 'string' ? params.style : undefined,
-        providerPreference: resolveImageProviderPreference(params),
-        targetPath: params.target_path || params.targetPath,
-        awaitCompletion: params.await_completion ?? true,
+        prompt: typeof prepared.params.prompt === 'string' ? prepared.params.prompt : '',
+        aspectRatio: prepared.params.aspect_ratio || prepared.params.aspectRatio,
+        mode: prepared.params.mode,
+        style: typeof prepared.params.style === 'string' ? prepared.params.style : undefined,
+        providerPreference: resolveImageProviderPreference(prepared.params),
+        targetPath: prepared.params.target_path || prepared.params.targetPath,
+        awaitCompletion: resolveAwaitCompletion(action, prepared.params),
       });
 
-      if (bridgeRes.status === 'failed') {
-        throw new Error(bridgeRes.error || 'generation_failed');
-      }
-
-      result = {
-        status: 'succeeded',
-        action,
-        prompt_id: bridgeRes.promptId || 'direct_api',
-        artifacts: bridgeRes.path
-          ? [
-              {
-                id: 'primary',
-                format: resolveImageArtifactFormat(bridgeRes.path),
-                path: bridgeRes.path,
-              },
-            ]
-          : [],
-        artifact: bridgeRes.path
+      const artifactExists = Boolean(
+        bridgeRes.status === 'succeeded' && bridgeRes.path && safeExistsSync(bridgeRes.path)
+      );
+      const status =
+        bridgeRes.status === 'submitted'
+          ? 'submitted'
+          : bridgeRes.status === 'succeeded' && artifactExists
+            ? 'succeeded'
+            : bridgeRes.status === 'failed'
+              ? 'failed'
+              : 'failed';
+      const artifact =
+        artifactExists && bridgeRes.path
           ? {
               id: 'primary',
               format: resolveImageArtifactFormat(bridgeRes.path),
               path: bridgeRes.path,
             }
-          : null,
-        copied_to: bridgeRes.path,
-        backend_id: bridgeRes.provider,
+          : null;
+
+      result = {
+        status,
+        action,
+        prompt_id: bridgeRes.promptId || 'direct_api',
+        provider_job_id: bridgeRes.promptId,
+        artifacts: artifact ? [artifact] : [],
+        artifact,
+        copied_to: artifact?.path,
+        backend_id: bridgeRes.provider || backend.backend_id,
+        resolved_backend_id: backend.backend_id,
+        backend_kind: backend.kind,
+        backend_provider: backend.provider,
+        modality: backend.modality,
+        error: bridgeRes.error,
       };
 
       traceCtx.endSpan('ok');
       return { ...result, ...finalizeActuatorTrace(traceCtx) };
     }
 
-    const { compiled, workflow } = preparePromptBasedGeneration(action, params);
-    result = await executeServicePreset('media-generation', action, {
-      ...params,
-      workflow,
-    });
+    const { compiled, workflow } = prepared;
+    result = await executePreparedGeneration(action, { ...prepared, workflow });
 
-    const promptId = result?.prompt_id;
+    const backend = resolveGenerationBackend(action, prepared.params);
+    result = {
+      ...result,
+      action,
+      modality: backend.modality,
+      backend_id: backend.backend_id,
+      backend_kind: backend.kind,
+      backend_provider: backend.provider,
+      provider_job_id:
+        typeof result?.provider_job_id === 'string'
+          ? result.provider_job_id
+          : typeof result?.prompt_id === 'string'
+            ? result.prompt_id
+            : undefined,
+    };
+
+    const promptId =
+      typeof result?.provider_job_id === 'string'
+        ? result.provider_job_id
+        : typeof result?.prompt_id === 'string'
+          ? result.prompt_id
+          : undefined;
     if (!promptId) {
       traceCtx.endSpan('ok');
       return { ...result, ...finalizeActuatorTrace(traceCtx) };
     }
 
-    const awaitCompletion =
-      params.await_completion ??
-      params.music_adf?.output?.await_completion ??
-      Boolean(params.music_adf);
+    const awaitCompletion = resolveAwaitCompletion(action, prepared.params);
 
     if (awaitCompletion && !workflow) {
       throw new Error(`${action} requires params.workflow when await_completion is enabled`);
@@ -218,8 +257,21 @@ async function submitGenerationJob(params: any) {
 
     const { compiled, workflow } = preparePromptBasedGeneration(action, params.params || {});
     const requestParams = { ...(params.params || {}), workflow };
-    const result = await executeServicePreset('media-generation', action, requestParams);
-    if (!result?.prompt_id) {
+    const result = await executePreparedGeneration(action, {
+      ...compiled,
+      action,
+      params: requestParams,
+      workflow,
+    });
+    const providerJobId =
+      typeof result.provider_job_id === 'string'
+        ? result.provider_job_id
+        : typeof result.prompt_id === 'string'
+          ? result.prompt_id
+          : typeof result.job_id === 'string'
+            ? result.job_id
+            : undefined;
+    if (!providerJobId) {
       throw new Error(`submit_generation failed to receive prompt_id for ${action}`);
     }
 
@@ -227,11 +279,12 @@ async function submitGenerationJob(params: any) {
     const job: GenerationJob = {
       kind: 'generation-job',
       job_id: params.existing_job_id || createGenerationJobId(action),
-      action: action as any,
+      action: action as GenerationJob['action'],
       status: 'submitted',
       provider: {
-        engine: 'comfyui',
-        prompt_id: String(result.prompt_id),
+        engine: backend.provider,
+        provider_job_id: providerJobId,
+        prompt_id: providerJobId,
       },
       request: {
         ...requestParams,
@@ -247,6 +300,7 @@ async function submitGenerationJob(params: any) {
         backend_id: backend.backend_id,
         backend_kind: backend.kind,
         backend_provider: backend.provider,
+        modality: backend.modality,
       },
       retry_policy: params.retry_policy || {
         max_attempts: Number(loadRecoveryPolicy().retry?.maxRetries || 1),
@@ -291,31 +345,50 @@ async function getGenerationJob(params: any) {
       return { ...currentJob, ...finalizeActuatorTrace(traceCtx) };
     }
 
-    const promptId = String(currentJob.provider?.prompt_id || '');
+    const promptId = String(
+      currentJob.provider?.provider_job_id || currentJob.provider?.prompt_id || ''
+    );
     if (!promptId) {
       traceCtx.endSpan('ok');
       return { ...currentJob, ...finalizeActuatorTrace(traceCtx) };
     }
 
-    const history = await import('@agent/core').then(({ secureFetch }) =>
+    const history = (await import('@agent/core').then(({ secureFetch }) =>
       secureFetch({
         method: 'GET',
         url: `${process.env.KYBERION_COMFY_BASE_URL || 'http://127.0.0.1:8188'}/history/${promptId}`,
       })
-    );
-    if (!history || Object.keys(history).length === 0 || !history[promptId]) {
+    )) as unknown;
+    if (!history || typeof history !== 'object' || Array.isArray(history)) {
       if (currentJob.status !== 'running') {
-        const runningJob = {
-          ...currentJob,
+        const runningJob = transitionGenerationJob(currentJob, 'running', {
           kind: currentJob.kind || 'generation-job',
-          status: 'running',
           updated_at: nowIso(),
-        } as GenerationJob;
+        });
         traceCtx.endSpan('ok');
         return { ...writeJob(runningJob), ...finalizeActuatorTrace(traceCtx) };
       }
       traceCtx.endSpan('ok');
       return { ...currentJob, ...finalizeActuatorTrace(traceCtx) };
+    }
+
+    const promptHistory = (history as Record<string, unknown>)[promptId];
+    if (!promptHistory) {
+      if (currentJob.status !== 'running') {
+        const runningJob = transitionGenerationJob(currentJob, 'running', {
+          kind: currentJob.kind || 'generation-job',
+          updated_at: nowIso(),
+        });
+        traceCtx.endSpan('ok');
+        return { ...writeJob(runningJob), ...finalizeActuatorTrace(traceCtx) };
+      }
+      traceCtx.endSpan('ok');
+      return { ...currentJob, ...finalizeActuatorTrace(traceCtx) };
+    }
+
+    const historyAdapter = getGenerationHistoryAdapterForAction(currentJob.action);
+    if (historyAdapter.is_failed(promptHistory)) {
+      throw new Error(`provider job ${promptId} failed or was canceled`);
     }
 
     const result = await collectGenerationResult(
@@ -324,10 +397,24 @@ async function getGenerationJob(params: any) {
       promptId,
       { resolved: currentJob.result?.compiled_generation_request }
     );
-    const succeededJob: GenerationJob = {
-      ...currentJob,
+    if (result.status !== 'succeeded' || !result.artifact) {
+      const failedJob = transitionGenerationJob(currentJob, 'failed', {
+        kind: currentJob.kind || 'generation-job',
+        result: {
+          ...currentJob.result,
+          artifacts: result.artifacts,
+          error: 'artifact_collection_failed',
+          retry_classification: 'resource_unavailable',
+        },
+        updated_at: nowIso(),
+        completed_at: nowIso(),
+      });
+      traceCtx.endSpan('error', 'artifact_collection_failed');
+      return { ...writeJob(failedJob), ...finalizeActuatorTrace(traceCtx) };
+    }
+
+    const succeededJob = transitionGenerationJob(currentJob, 'succeeded', {
       kind: currentJob.kind || 'generation-job',
-      status: 'succeeded',
       result: {
         ...currentJob.result,
         artifact: result.artifact || undefined,
@@ -340,26 +427,36 @@ async function getGenerationJob(params: any) {
       },
       updated_at: nowIso(),
       completed_at: nowIso(),
-    };
+    });
     traceCtx.endSpan('ok');
     return { ...writeJob(succeededJob), ...finalizeActuatorTrace(traceCtx) };
   } catch (err: any) {
     if (job) {
-      const failedJob: GenerationJob = {
-        ...job,
+      const classified = classifyError(err);
+      const detail = err?.message ?? String(err);
+      const retryClassification = detail.includes('policy_denied')
+        ? 'policy_denied'
+        : detail.toLowerCase().includes('unavailable')
+          ? 'resource_unavailable'
+          : classified.category;
+      const failedJob = transitionGenerationJob(job, 'failed', {
         kind: job.kind || 'generation-job',
-        status: 'failed',
         result: {
           ...job.result,
-          error: err?.message ?? String(err),
+          error: detail,
+          retry_classification: retryClassification,
         },
         updated_at: nowIso(),
         completed_at: nowIso(),
-      };
+      });
       writeJob(failedJob);
       const retried = await retryGenerationJob(failedJob);
-      traceCtx.endSpan('error', err?.message ?? String(err));
-      return { ...retried, ...finalizeActuatorTrace(traceCtx) };
+      traceCtx.endSpan('error', detail);
+      return {
+        ...retried,
+        retry_classification: retryClassification,
+        ...finalizeActuatorTrace(traceCtx),
+      };
     }
     traceCtx.endSpan('error', err?.message ?? String(err));
     return {
@@ -391,16 +488,15 @@ async function waitGenerationJob(params: any) {
       return { ...waited.value, ...finalizeActuatorTrace(traceCtx) };
     }
 
-    const timedOut = {
-      ...readJob(jobId),
-      kind: (readJob(jobId) as GenerationJob).kind || 'generation-job',
-      status: 'timed_out',
-      updated_at: nowIso(),
-      completed_at: nowIso(),
-      next_retry_at: undefined,
-    } as GenerationJob;
+    const current = readJob(jobId);
     traceCtx.endSpan('error', 'timed_out');
-    return { ...writeJob(timedOut), ...finalizeActuatorTrace(traceCtx) };
+    return {
+      ...current,
+      wait_status: 'timed_out',
+      status: current.status,
+      updated_at: nowIso(),
+      ...finalizeActuatorTrace(traceCtx),
+    };
   } catch (err: any) {
     traceCtx.endSpan('error', err?.message ?? String(err));
     return {
@@ -452,8 +548,12 @@ async function collectGenerationArtifact(params: any) {
   }
 }
 
-async function handleSingleAction(input: any) {
-  const { action, params } = input;
+async function handleSingleAction(input: MediaActionInput) {
+  const action = String(input.action || '');
+  const params = input.params || {};
+  if (!SUPPORTED_ACTIONS.has(String(action))) {
+    throw new Error(`Unsupported media generation action: ${String(action)}`);
+  }
   if (PROMPT_BASED_ACTIONS.has(action)) {
     return handlePromptBasedGeneration(action, params);
   }
@@ -462,37 +562,55 @@ async function handleSingleAction(input: any) {
   if (action === 'wait_generation_job') return waitGenerationJob(params);
   if (action === 'collect_generation_artifact') return collectGenerationArtifact(params);
 
-  if (action === 'capture_screen' || action === 'capture_focused_window') {
-    const outputPath = pathResolver.rootResolve(
-      params.output || `active/shared/tmp/capture-${Date.now()}.jpg`
-    );
-    if (action === 'capture_screen') {
-      await platform.captureScreen(outputPath);
-    } else {
-      await platform.captureFocusedWindow(outputPath);
-    }
-    return { status: 'succeeded', path: params.output || outputPath };
+  if (
+    action === 'capture_screen' ||
+    action === 'capture_focused_window' ||
+    action === 'record_screen'
+  ) {
+    return handleCaptureAction(action, params);
   }
 
   logger.info(`🎬 [MEDIA-GEN:PROXY] Dispatching "${action}" to Service Engine...`);
   return await executeServicePreset('media-generation', action, params);
 }
 
-export async function handleAction(input: any) {
+function mergeTraceEvidence(
+  result: Record<string, unknown>,
+  rootEvidence: ReturnType<typeof finalizeActuatorTrace>
+): Record<string, unknown> {
+  const childSummary = isPlainObject(result.trace_summary) ? result.trace_summary : undefined;
+  const childSpans = typeof childSummary?.spans === 'number' ? childSummary.spans : 0;
+  return {
+    ...result,
+    child_trace: result.trace,
+    child_trace_summary: childSummary,
+    trace: rootEvidence.trace,
+    trace_summary: {
+      ...rootEvidence.trace_summary,
+      spans: rootEvidence.trace_summary.spans + childSpans,
+    },
+    trace_persisted_path: rootEvidence.trace_persisted_path,
+  };
+}
+
+export async function handleAction(input: MediaActionInput): Promise<MediaActionResult> {
   const traceCtx = createActuatorTrace(
     'media-generation-actuator',
     String(input?.action || 'unknown')
   );
   traceCtx.startSpan(`media-generation:${String(input?.action || 'unknown')}`);
   if (input.action === 'pipeline') {
+    const continueOnError = input.continue_on_error !== false;
     try {
       const results: Array<Record<string, unknown>> = [];
-      for (const step of input.steps) {
+      let pipelineFailed = false;
+      for (const step of input.steps || []) {
         traceCtx.startSpan(`media-generation:${String(step?.action || 'step')}`);
         try {
           const stepResult = await handleSingleAction(step);
           results.push(stepResult);
           if (stepResult?.status === 'failed' || stepResult?.status === 'error') {
+            pipelineFailed = true;
             traceCtx.endSpan(
               'error',
               stepResult?.message ?? `step failed: ${String(step?.action || 'step')}`
@@ -502,11 +620,17 @@ export async function handleAction(input: any) {
           }
         } catch (err: unknown) {
           const error = err instanceof Error ? err : new Error(String(err));
+          pipelineFailed = true;
           traceCtx.endSpan('error', error.message);
-          throw error;
+          if (!continueOnError) throw error;
+          results.push({
+            action: String(step?.action || 'step'),
+            status: 'failed',
+            message: error.message,
+          });
         }
       }
-      traceCtx.endSpan('ok');
+      traceCtx.endSpan(pipelineFailed ? 'error' : 'ok');
       return {
         status: derivePipelineStatus(
           results.map((result: any) => ({
@@ -527,7 +651,7 @@ export async function handleAction(input: any) {
   try {
     const result = await handleSingleAction(input);
     traceCtx.endSpan('ok');
-    return { ...result, ...finalizeActuatorTrace(traceCtx) };
+    return mergeTraceEvidence(result, finalizeActuatorTrace(traceCtx));
   } catch (err: unknown) {
     const error = err instanceof Error ? err : new Error(String(err));
     traceCtx.endSpan('error', error.message);
