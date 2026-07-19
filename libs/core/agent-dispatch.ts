@@ -1,5 +1,10 @@
 import { a2aBridge } from './a2a-bridge.js';
 import { logger } from './core.js';
+import {
+  advanceToolCallRepeatGovernor,
+  createToolCallRepeatGovernorState,
+  type ToolCallRepeatGovernorState,
+} from './tool-call-repeat-governor.js';
 import type {
   ReasoningBackend,
   ToolDefinition,
@@ -51,6 +56,9 @@ export class ProcessSpawnDispatcher implements AgentDispatcher {
 export class InSessionDispatcher implements AgentDispatcher {
   readonly name = 'in-session';
   private readonly fallback = new ProcessSpawnDispatcher();
+  /** KC-01: consecutive identical invoke_agent calls across dispatches. */
+  private repeatGovernor: ToolCallRepeatGovernorState = createToolCallRepeatGovernorState();
+  private pendingRepeatReminder: string | undefined;
 
   async dispatch(instruction: string, context: string | undefined, backend: ReasoningBackend): Promise<string> {
     logger.info('[agent-dispatch:in-session] Initiating in-session delegation for task...');
@@ -81,12 +89,42 @@ export class InSessionDispatcher implements AgentDispatcher {
       'Do NOT attempt to solve it directly.',
     ].join('\n');
 
-    const fullPrompt = `${systemPrompt}\n\nTask: ${instruction}\nContext: ${context || 'none'}`;
+    const reminderBlock = this.pendingRepeatReminder
+      ? `\n\n<system-reminder>${this.pendingRepeatReminder}</system-reminder>`
+      : '';
+    const fullPrompt = `${systemPrompt}\n\nTask: ${instruction}\nContext: ${context || 'none'}${reminderBlock}`;
+    this.pendingRepeatReminder = undefined;
 
     try {
       const result = await backend.generateWithTools(fullPrompt, [invokeAgentTool]);
       const toolCall = result.toolCalls?.find((tc) => tc.name === 'invoke_agent');
       if (toolCall) {
+        const decision = advanceToolCallRepeatGovernor(
+          this.repeatGovernor,
+          'invoke_agent',
+          toolCall.input
+        );
+        this.repeatGovernor = decision.state;
+        if (decision.should_force_stop) {
+          // A dead-end delegation loop: break it with a fresh process-spawn
+          // child (new context, new judgment) instead of re-routing in-session.
+          logger.error(
+            `[agent-dispatch:in-session] invoke_agent repeated ${decision.streak}x with identical arguments — breaking the loop via process-spawn fallback.`,
+          );
+          const { recordGovernanceAction } = await import('./kill-switch.js');
+          recordGovernanceAction(
+            'agent-dispatch:in-session',
+            'tool_call_repeat_force_stop',
+            `invoke_agent streak=${decision.streak}`,
+            true,
+          );
+          this.repeatGovernor = createToolCallRepeatGovernorState();
+          return this.fallback.dispatch(instruction, context, backend);
+        }
+        if (decision.reminder) {
+          logger.warn(`[agent-dispatch:in-session] [repeat-governor] ${decision.reminder}`);
+          this.pendingRepeatReminder = decision.reminder;
+        }
         const agentName = String(toolCall.input.agent_name || 'generalist');
         const agentPrompt = String(toolCall.input.prompt || instruction);
         logger.info(`[agent-dispatch:in-session] LLM chose to invoke sub-agent: ${agentName}`);
