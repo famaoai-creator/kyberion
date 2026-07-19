@@ -13,7 +13,9 @@ pnpm pipeline --input pipelines/ai-audit.json  # pipeline 経由(週次 schedule
 - 各不変条件を reasoning backend(`delegateStructured`)へ fan-out して監査し、
   `active/shared/tmp/ai-audit/report.json` に `{file, name, cases:[{name, pass, reason?}]}` を集約する。
 - 1 件でも `pass: false` があれば exit 1。
+- reasoning backend が stub の場合は `skipped` として exit 2（監査未実行を成功扱いしない）。
 - **stub backend では skip**(`skipped: non-stub backend required`)— 偽の合格は返さない。
+- `tests_ai/fixtures/` の意図的な違反 fixture は通常の `pnpm ai-test` から除外する。監査層自身の fail 経路は hermetic test で `includeSelfTestFixtures: true` として検証する。
 - Trace は `active/shared/tmp/ai-audit/traces/` に JSONL で残る(report に trace_id / trace_path が入る)。
 
 ## 不変条件ファイルの書式

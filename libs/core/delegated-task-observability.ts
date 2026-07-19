@@ -28,6 +28,8 @@ export interface DelegatedTaskTrace {
   background?: boolean;
   /** KC-06: set when this delegation resumed an earlier one by id. */
   resumed_from?: string;
+  mission_id?: string;
+  task_id?: string;
 }
 
 /**
@@ -101,6 +103,8 @@ export function startDelegatedTaskTrace(input: {
   /** KC-06: background delegations enqueue a claim-based notification on completion. */
   background?: boolean;
   resumedFrom?: string;
+  missionId?: string;
+  taskId?: string;
 }): DelegatedTaskTrace {
   const trace: DelegatedTaskTrace = {
     trace_id: randomUUID(),
@@ -114,6 +118,8 @@ export function startDelegatedTaskTrace(input: {
     ...(input.backendName ? { backend_name: input.backendName } : {}),
     ...(input.background ? { background: true } : {}),
     ...(input.resumedFrom ? { resumed_from: input.resumedFrom } : {}),
+    ...(input.missionId ? { mission_id: input.missionId } : {}),
+    ...(input.taskId ? { task_id: input.taskId } : {}),
   };
   appendTrace(trace);
   persistRecord(trace);
@@ -122,7 +128,7 @@ export function startDelegatedTaskTrace(input: {
 
 export function completeDelegatedTaskTrace(
   trace: DelegatedTaskTrace,
-  outcome: { resultSummary?: string; error?: string },
+  outcome: { resultSummary?: string; error?: string }
 ): DelegatedTaskTrace {
   const completed: DelegatedTaskTrace = {
     ...trace,
@@ -140,6 +146,8 @@ export function completeDelegatedTaskTrace(
       enqueueDelegationNotification({
         delegationId: completed.trace_id,
         owner: completed.owner,
+        ...(completed.mission_id ? { missionId: completed.mission_id } : {}),
+        ...(completed.task_id ? { taskId: completed.task_id } : {}),
         status: completed.status === 'failed' ? 'failed' : 'completed',
         instruction: completed.instruction,
         result: completed.result_summary,
@@ -206,8 +214,7 @@ export async function resumeDelegatedTask(
   if (!record) {
     throw new Error(`Delegated task record not found for id "${delegationId}".`);
   }
-  const backend =
-    options.backend ?? (await import('./reasoning-backend.js')).getReasoningBackend();
+  const backend = options.backend ?? (await import('./reasoning-backend.js')).getReasoningBackend();
   const prompt = [
     'You previously executed a delegated task. Resume it with the follow-up below;',
     'do not restart the original work from scratch.',
@@ -230,6 +237,8 @@ export async function resumeDelegatedTask(
     ...(record.context ? { context: record.context } : {}),
     ...(record.context_ref ? { contextRef: record.context_ref } : {}),
     resumedFrom: record.delegation_id,
+    ...(record.mission_id ? { missionId: record.mission_id } : {}),
+    ...(record.task_id ? { taskId: record.task_id } : {}),
   });
   try {
     const result = await backend.delegateTask(prompt, record.context);

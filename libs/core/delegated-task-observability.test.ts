@@ -80,6 +80,8 @@ describe('KC-06 delegated-task-observability store', () => {
       owner: 'background-owner',
       instruction: 'Run the long background audit.',
       background: true,
+      missionId: 'M1',
+      taskId: 'T1',
     });
     expect(listDelegationNotifications()).toHaveLength(0);
     completeDelegatedTaskTrace(trace, { resultSummary: 'Audit finished; 0 findings.' });
@@ -89,6 +91,8 @@ describe('KC-06 delegated-task-observability store', () => {
     expect(notifications[0]?.delegation_id).toBe(trace.trace_id);
     expect(notifications[0]?.status).toBe('completed');
     expect(notifications[0]?.result_excerpt).toContain('Audit finished');
+    expect(notifications[0]?.mission_id).toBe('M1');
+    expect(notifications[0]?.task_id).toBe('T1');
     expect(notifications[0]?.claimed).toBe(false);
   });
 
