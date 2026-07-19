@@ -383,7 +383,8 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
       const windowTitle = typeof params.window_title === 'string' ? params.window_title.trim() : '';
       const windowMatchPolicy =
         typeof params.window_match_policy === 'string' ? params.window_match_policy : 'strict';
-      let captureMode: 'screen' | 'focused_window' = 'screen';
+      let captureMode: 'screen' | 'focused_window' =
+        params.capture_mode === 'focused_window' ? 'focused_window' : 'screen';
       let screenshotPath =
         typeof params.path === 'string' && params.path.trim()
           ? pathResolver.rootResolve(resolve(params.path))
