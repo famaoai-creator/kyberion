@@ -32,6 +32,7 @@
 > **2026-07-18追記**: HA-08 の dead-target registry も硬化した。破損 JSON または必須フィールド欠落の1件だけを `dead-targets/.quarantine/` へ governed move し、正常な target の enqueue 判定・self-heal・doctor 観測を継続する境界を回帰検証した。外部サービス E2E は引き続き残作業。
 > **2026-07-18追記(最新 main 取り込み)**: AR-09/AR-10 の actuator 共通化・macOS automation capability の実装と検証記録を保持したまま、origin/main 最新版を作業ブランチへ取り込んだ。
 > **2026-07-18追記**: OpenHarness概念取り込み OH-01(ワーカーコンテキスト自動圧縮 + carryover)を実装・検証済み。token 窓ベース 2 段階圧縮(microcompact → LLM 要約)、pair 非分断、構造化 carryover の MissionWorkingMemory 永続化と再注入、要約 artifact 退避、`compact.before/after` 観測、prompt-too-long 反応的圧縮、3 連続失敗停止を `worker-context-compaction.ts` に実装し mission-orchestration-worker の dispatch へ接続。併せて OH-03 の generateWithTools 経路にも in-place retry を適用(リトライ共通化)。DONE 74 / PARTIAL 30 / TODO 6 へ更新。
+> **2026-07-20追記**: Kimi CLI概念取り込み KC-01〜10 を新設([KIMI_CLI_ADOPTION_PLAN_2026-07-20.ja.md](./KIMI_CLI_ADOPTION_PLAN_2026-07-20.ja.md)。MoonshotAI/kimi-cli の実コード分析に基づく概念昇華方式)。全件 TODO として追加し、DONE 74 / PARTIAL 30 / TODO 16 へ更新。
 > **判定基準**: DONE = 受入条件を実コードで検証済 / PARTIAL = 一部充足 / TODO = 実質未着手。
 
 ## サマリ
@@ -40,7 +41,7 @@
 | ------- | ---- |
 | DONE    | 74   |
 | PARTIAL | 30   |
-| TODO    | 6    |
+| TODO    | 16   |
 
 ## P0 残作業(プロダクション化のクリティカルパス)
 
@@ -280,6 +281,23 @@
 | HA-07 | PARTIAL | グループ返信を受信 chatId 宛に固定し、wake word 無しの発言を無視して先頭 wake word を除去する gating、iMessage surface outbox drain、Messages DB の ROWID 差分ポーリング(1 tick 1 sqlite subprocess、長い SQL は stdin 渡し)と DB 不可時 fallback、処理失敗時の cursor 保持・次 tick 再試行、`imsg --attachments` による受信 path、`imsg send --file` による安全な attachment-only / text+attachment 転送、tapback の受信認識・model turn 抑止、回帰テストを追加。BlueBubbles の設定評価・text/webhook 境界・Private API multipart attachment transport・受信添付の bounded download・専用 temporary storage の 24時間 TTL / 512MB aggregate cap・health capability 観測と、secret fail-closed の `POST /webhooks/bluebubbles`、既存会話処理への接続、重複抑止を追加。4 satellite の strict build は core project reference 経由で検証可能にした。残: 実サーバー接続、添付実機確認、macOS Messages 実機 E2E。                                                                                                                                        |
 | HA-08 | PARTIAL | 共通 outbox に `too_long/bad_format/forbidden/not_found/rate_limited/transient` taxonomy、指数 backoff、attempt 上限、dead-letter 永続化、dead-target registry/self-heal、ops-alert、`pnpm doctor` 観測を追加し、Slack/Telegram/iMessage/Discord drain に接続。4 bridge の timer/初回 drain には process-local 再入防止 guard と surface 単位の governed durable mutex を追加し、同一 surface の複数プロセスによる重複配送を抑止する。lock record の破損・不正 PID は stale 回収し、実行中 PID は保持する fail-safe 判定も回帰検証済み。さらに破損 JSON/必須フィールド欠落の outbox・dead-letter・dead-target 各1件を対応する `.quarantine/` へ退避し、正常レコードの読み出し・enqueue 判定を継続する境界、`deduplication_key` による未配送 record の再利用、`surface-outbox list                                                                                                                                                                                                                                                                    | replay` による operator ID 付き明示 replay と dead-target fail-closed、replay 監査記録を追加した。Chronos の schedule/run token を producer dedup へ接続済み。残: 外部サービス E2E。 |
 | HA-09 | DONE    | 共通 capability（上限・形式・typing・button）、code fence 対応 chunking、rich-text 失敗時の plain-text fallback、`KYBERION_SURFACE_ALLOWLISTS` による共通 actor allowlist を実装。Discord/Telegram/Slack/iMessage の返信・outbox/受信 gating に接続し、関連テストと `surface-capability-check` pipeline で検証済み。                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+
+### KC(Kimi CLI概念取り込み)
+
+正本: [KIMI_CLI_ADOPTION_PLAN_2026-07-20.ja.md](./KIMI_CLI_ADOPTION_PLAN_2026-07-20.ja.md)
+
+| ID    | 状態 | 残作業                                                                                             |
+| ----- | ---- | -------------------------------------------------------------------------------------------------- |
+| KC-01 | TODO | ツール呼び出し反復ガバナー(canonical 引数 streak・3/5/8 段階警告・12 で強制停止 + Trace)           |
+| KC-02 | TODO | ワーカーイベントストリーム契約(型付き envelope・SPMC・jsonl 記録/再生・イベント列 assert の e2e)   |
+| KC-03 | TODO | 承認ランタイム強化(セッション action キャッシュ・source 単位 cancel・envelope 投影)                |
+| KC-04 | TODO | ライフサイクルフックエンジン一般化(13 イベント語彙・並列 regex・fail-open + telemetry carve-out)   |
+| KC-05 | TODO | AI 監査テスト層(markdown 不変条件 → subagent fan-out → report.json、pipeline として dog-food)      |
+| KC-06 | TODO | 委譲ハードニング(要約最短長 retry・subagent 永続 store・完了通知 claim 注入・圧縮後 snapshot)      |
+| KC-07 | TODO | 文脈巻き戻し D-Mail(実験。checkpoint 記録・`context:rewind`・外部効果時は発火拒否)                 |
+| KC-08 | TODO | 動的注入 provider 契約(throttle・`onContextCompacted` リセット・history 正規化)                    |
+| KC-09 | TODO | completion token 動的予算(API 直叩き backend の max_completion 動的計算)                           |
+| KC-10 | TODO | Mermaid フロー → pipeline governed compiler(需要確定まで backlog)                                  |
 
 ### CO(Company OS)
 
