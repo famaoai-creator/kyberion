@@ -1,7 +1,47 @@
-interface PipelineStep {
+export interface PipelineStep {
   type: 'capture' | 'transform' | 'apply' | 'control';
   op: string;
   params: any;
+}
+
+/**
+ * A DOM presence check that can be lowered to the existing browser pipeline
+ * vocabulary.  Keeping this as a compiler helper means conditional actions do
+ * not introduce a second, browser-actuator-specific control-flow op.
+ */
+export interface BrowserElementPresentCondition {
+  selector: string;
+  text?: string;
+  exact?: boolean;
+  export_as?: string;
+}
+
+export function buildBrowserElementPresentPipeline(input: {
+  condition: BrowserElementPresentCondition;
+  then: PipelineStep[];
+  else?: PipelineStep[];
+}): PipelineStep[] {
+  const selector = input.condition.selector.trim();
+  if (!selector) throw new Error('Browser element condition requires a non-empty selector');
+
+  const exportAs = input.condition.export_as?.trim() || 'browser_condition_match_count';
+  const queryParams: Record<string, unknown> = {
+    selector,
+    export_as: exportAs,
+  };
+  if (input.condition.text !== undefined) queryParams.text = input.condition.text;
+  if (input.condition.exact !== undefined) queryParams.exact = input.condition.exact;
+
+  const branch: Record<string, unknown> = {
+    condition: { from: exportAs, operator: 'gt', value: 0 },
+    then: input.then,
+  };
+  if (input.else) branch.else = input.else;
+
+  return [
+    { type: 'capture', op: 'query_elements', params: queryParams },
+    { type: 'control', op: 'if', params: branch },
+  ];
 }
 
 interface BrowserAction {
@@ -74,12 +114,15 @@ interface ComputerInteractionAction {
       | 'press_ref'
       | 'wait_for_ref'
       | 'extract_text_ref'
+      | 'click_if_present'
       | 'capture_console'
       | 'capture_network';
     coordinate?: { x: number; y: number };
     to_coordinate?: { x: number; y: number };
     button?: 'left' | 'right' | 'middle';
     text?: string;
+    selector?: string;
+    exact?: boolean;
     key?: string;
     ref?: string;
     url?: string;
@@ -168,6 +211,30 @@ export function createBrowserInteractionHelpers(deps: {
           op: 'click_ref',
           params: { ref: interaction.ref, timeout: interaction.timeout_ms },
         });
+        break;
+      case 'click_if_present':
+        steps.push(
+          ...buildBrowserElementPresentPipeline({
+            condition: {
+              selector: interaction.selector || '',
+              text: interaction.text,
+              exact: interaction.exact,
+              export_as: 'conditional_match_count',
+            },
+            then: [
+              {
+                type: 'apply',
+                op: 'click_first_match',
+                params: {
+                  selector: interaction.selector,
+                  text: interaction.text,
+                  exact: interaction.exact,
+                  export_as: 'conditional_click',
+                },
+              },
+            ],
+          })
+        );
         break;
       case 'fill_ref':
         steps.push({

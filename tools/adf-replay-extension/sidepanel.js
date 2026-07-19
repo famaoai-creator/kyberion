@@ -1,5 +1,39 @@
 const state = { current: null };
 
+// Single-flight guard: native-host calls take seconds (node cold start), and
+// without feedback users double-click — spawning concurrent hosts. One action
+// at a time; the active button shows a busy spinner and label.
+let actionBusy = false;
+// A failed action's message stays visible until the NEXT successful action —
+// re-renders from background broadcasts must not silently replace it with a
+// stale success notice.
+let lastError = null;
+
+function bindAction(button, handler, options = {}) {
+  button.addEventListener('click', async (event) => {
+    if (actionBusy) {
+      showNotice('処理中です。完了までお待ちください。', 'busy');
+      return;
+    }
+    actionBusy = true;
+    const originalLabel = button.textContent;
+    button.classList.add('is-busy');
+    button.disabled = true;
+    if (options.busyLabel) button.textContent = options.busyLabel;
+    showNotice(options.busyNotice || '実行しています…', 'busy');
+    try {
+      await handler(event);
+    } finally {
+      actionBusy = false;
+      button.classList.remove('is-busy');
+      button.disabled = false;
+      if (options.busyLabel) button.textContent = originalLabel;
+      // Recompute managed disabled states (and the notice) from current state.
+      render(state.current);
+    }
+  });
+}
+
 const elements = {
   connectionStatus: document.querySelector('#connection-status'),
   connectionTitle: document.querySelector('#connection-title'),
@@ -9,6 +43,8 @@ const elements = {
   startRecordingButton: document.querySelector('#start-recording-button'),
   resumeRecordingButton: document.querySelector('#resume-recording-button'),
   stopRecordingButton: document.querySelector('#stop-recording-button'),
+  extractionModeButton: document.querySelector('#extraction-mode-button'),
+  conditionalModeButton: document.querySelector('#conditional-mode-button'),
   discardLastButton: document.querySelector('#discard-last-button'),
   recordingCount: document.querySelector('#recording-count'),
   omittedCount: document.querySelector('#omitted-count'),
@@ -28,6 +64,12 @@ const elements = {
   registerProcedureButton: document.querySelector('#register-procedure-button'),
   procedureRegistrationStatus: document.querySelector('#procedure-registration-status'),
   executionResults: document.querySelector('#execution-results'),
+  observationBlock: document.querySelector('#observation-block'),
+  observationSummary: document.querySelector('#observation-summary'),
+  observationPreview: document.querySelector('#observation-preview'),
+  reportQuestionInput: document.querySelector('#report-question-input'),
+  generateReportButton: document.querySelector('#generate-report-button'),
+  observationReportBody: document.querySelector('#observation-report-body'),
   preflightButton: document.querySelector('#preflight-button'),
   copyDraftButton: document.querySelector('#copy-draft-button'),
   requestExecutionButton: document.querySelector('#request-execution-button'),
@@ -57,23 +99,42 @@ document.querySelectorAll('.tab').forEach((tab) => {
 });
 
 // Intent tab wiring
-elements.intentResolveButton.addEventListener('click', resolveIntent);
+bindAction(elements.intentResolveButton, resolveIntent, {
+  busyLabel: '照合中',
+  busyNotice: '登録済みの手順と照合しています…',
+});
 elements.intentInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') resolveIntent();
+  if (e.key === 'Enter' && !actionBusy) elements.intentResolveButton.click();
 });
-elements.intentExecuteButton.addEventListener('click', () =>
-  startProcedure(state.current?.intentResolution?.best?.procedure_id)
+bindAction(
+  elements.intentExecuteButton,
+  () => startProcedure(state.current?.intentResolution?.best?.procedure_id),
+  { busyLabel: '準備中…', busyNotice: '手順を準備しています…' }
 );
-elements.intentRunButton.addEventListener('click', async () => {
-  const procedureId = elements.intentInputs.dataset.procedureId;
-  if (!procedureId) return showNotice('実行する手順が選択されていません。');
-  selectTab('run');
-  await invoke('bridge:execute-procedure', {
-    procedureId,
-    origin: state.current?.connected?.origin,
-    values: collectIntentInputValues(),
-  });
-});
+bindAction(
+  elements.intentRunButton,
+  async () => {
+    const procedureId = elements.intentInputs.dataset.procedureId;
+    if (!procedureId) return showNotice('実行する手順が選択されていません。', 'error');
+    if (
+      !(await ensureHostPermission(
+        state.current?.pendingProcedure?.origins || [state.current?.pendingProcedure?.origin]
+      ))
+    ) {
+      return showNotice(
+        'サイトへのアクセスが許可されませんでした。実行にはアクセス許可が必要です。',
+        'error'
+      );
+    }
+    selectTab('run');
+    await invoke('bridge:execute-procedure', {
+      procedureId,
+      origin: state.current?.connected?.origin,
+      values: collectIntentInputValues(),
+    });
+  },
+  { busyLabel: '実行中…', busyNotice: '手順を実行しています…' }
+);
 elements.intentRecordButton.addEventListener('click', () => {
   selectTab('record');
   showNotice('Pattern A: 新しい操作を記録してください。');
@@ -84,21 +145,43 @@ elements.intentRepairRecordButton.addEventListener('click', () => {
     '修正操作を記録してください。記録停止後、Review で承認すると「修正を手順に反映」が押せます。'
   );
 });
-elements.intentRepairApplyButton.addEventListener('click', async () => {
-  const procedureId = state.current?.repairPending?.procedure_id;
-  if (!procedureId) return showNotice('反映対象の修復がありません。');
-  await invoke('bridge:apply-repair', { procedureId });
-});
+bindAction(
+  elements.intentRepairApplyButton,
+  async () => {
+    const procedureId = state.current?.repairPending?.procedure_id;
+    if (!procedureId) return showNotice('反映対象の修復がありません。', 'error');
+    await invoke('bridge:apply-repair', { procedureId });
+  },
+  { busyLabel: '反映中…', busyNotice: '修正を手順に反映しています…' }
+);
 
 // #1: Pattern B start — ask the host what inputs are needed; if any, render
 // fields and wait for the user before dispatching; otherwise execute directly.
 async function startProcedure(procedureId) {
-  if (!procedureId) return showNotice('実行する手順が選択されていません。');
+  if (!procedureId) return showNotice('実行する手順が選択されていません。', 'error');
+  // Request the currently visible origin while the click's user activation is
+  // definitely alive. A later target-origin request is only needed when the
+  // procedure intentionally starts elsewhere.
+  if (!(await ensureHostPermission())) {
+    return showNotice(
+      '現在のサイトへのアクセスが許可されませんでした。実行には許可が必要です。',
+      'error'
+    );
+  }
   const prepared = await invoke('bridge:prepare-procedure', {
     procedureId,
     origin: state.current?.connected?.origin,
   });
   if (!prepared) return;
+  const requestedOrigins = prepared.state?.pendingProcedure?.origins || [
+    prepared.state?.pendingProcedure?.origin || state.current?.connected?.origin,
+  ];
+  if (!(await ensureHostPermission(requestedOrigins))) {
+    return showNotice(
+      '対象サイトへのアクセスが許可されませんでした。実行には対象 origin の許可が必要です。',
+      'error'
+    );
+  }
   if (prepared.hasInputs) {
     renderIntentInputs(procedureId, prepared.inputs || []);
     showNotice('入力値を指定して「入力して実行」を押してください。');
@@ -138,26 +221,58 @@ function collectIntentInputValues() {
   return values;
 }
 
-elements.connectButton.addEventListener('click', () =>
-  withHostPermission('bridge:connect-active-tab')
-);
-elements.disconnectButton.addEventListener('click', () => invoke('bridge:disconnect'));
-elements.startRecordingButton.addEventListener('click', () =>
-  withHostPermission('bridge:start-recording')
-);
-elements.resumeRecordingButton.addEventListener('click', () =>
-  withHostPermission('bridge:resume-recording')
-);
+bindAction(elements.connectButton, () => withHostPermission('bridge:connect-active-tab'), {
+  busyLabel: '接続中…',
+  busyNotice: 'タブに接続しています…',
+});
+bindAction(elements.disconnectButton, () => invoke('bridge:disconnect'));
+bindAction(elements.startRecordingButton, () => withHostPermission('bridge:start-recording'), {
+  busyLabel: '開始中…',
+});
+bindAction(elements.resumeRecordingButton, () => withHostPermission('bridge:resume-recording'), {
+  busyLabel: '再開中…',
+});
 
 // Request site access from the side panel (a valid user gesture) before any
 // action that needs to inject the content script. Once granted, injection keeps
 // working across navigations and reconnects — without it, activeTab only grants
 // a single page and the connection breaks on the next navigation/tab switch.
-async function ensureHostPermission() {
-  const origins = ['http://*/*', 'https://*/*'];
+function permissionPatterns(origins) {
+  return [
+    ...new Set(
+      (origins || [])
+        .map((origin) => {
+          try {
+            const url = new URL(origin);
+            if (!['http:', 'https:'].includes(url.protocol)) return null;
+            return `${url.protocol}//${url.host}/*`;
+          } catch {
+            return null;
+          }
+        })
+        .filter(Boolean)
+    ),
+  ];
+}
+
+async function activeTabOrigins() {
   try {
-    if (await chrome.permissions.contains({ origins })) return true;
-    return await chrome.permissions.request({ origins });
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    const url = tabs[0]?.url;
+    if (!url) return [];
+    return [new URL(url).origin];
+  } catch {
+    return [];
+  }
+}
+
+async function ensureHostPermission(origins = []) {
+  const requestedOrigins = origins.filter(Boolean).length ? origins : await activeTabOrigins();
+  const patterns = permissionPatterns(requestedOrigins);
+  if (patterns.length === 0) return false;
+  try {
+    if (await chrome.permissions.contains({ origins: patterns })) return true;
+    return await chrome.permissions.request({ origins: patterns });
   } catch {
     return false;
   }
@@ -166,50 +281,84 @@ async function ensureHostPermission() {
 async function withHostPermission(type) {
   const granted = await ensureHostPermission();
   if (!granted) {
-    showNotice('サイトへのアクセスが許可されませんでした。記録・実行にはアクセス許可が必要です。');
+    showNotice(
+      '現在のサイトへのアクセスが許可されませんでした。記録・実行には許可が必要です。',
+      'error'
+    );
     return null;
   }
   return invoke(type);
 }
-elements.stopRecordingButton.addEventListener('click', async () => {
+bindAction(elements.stopRecordingButton, async () => {
   const result = await invoke('bridge:stop-recording');
   if (result?.draft) selectTab('review');
 });
-elements.discardLastButton.addEventListener('click', () => invoke('bridge:discard-last-action'));
-elements.finalizeReviewButton.addEventListener('click', async () => {
+bindAction(elements.extractionModeButton, async () => {
+  if (!(await ensureHostPermission())) {
+    return showNotice('現在のサイトへのアクセスが許可されませんでした。', 'error');
+  }
+  await invoke('bridge:set-extraction-mode', {
+    enabled: !state.current?.extractionMode,
+  });
+});
+bindAction(elements.conditionalModeButton, async () => {
+  if (!(await ensureHostPermission())) {
+    return showNotice('現在のサイトへのアクセスが許可されませんでした。', 'error');
+  }
+  await invoke('bridge:set-conditional-mode', {
+    enabled: !state.current?.conditionalMode,
+  });
+});
+bindAction(elements.discardLastButton, () => invoke('bridge:discard-last-action'));
+bindAction(elements.finalizeReviewButton, async () => {
   const result = await invoke('bridge:finalize-review');
   if (result?.state?.lastDraft?.review?.status === 'approved') selectTab('run');
 });
-elements.rejectDraftButton.addEventListener('click', () => invoke('bridge:reject-draft'));
-elements.copyDraftButton.addEventListener('click', copyApprovedDraft);
-elements.preflightButton.addEventListener('click', () => invoke('bridge:preflight-draft'));
-elements.requestExecutionButton.addEventListener('click', () =>
-  invoke('bridge:request-execution', { values: collectInputValues() })
+bindAction(elements.rejectDraftButton, () => invoke('bridge:reject-draft'));
+bindAction(elements.copyDraftButton, copyApprovedDraft);
+bindAction(elements.preflightButton, () => invoke('bridge:preflight-draft'), {
+  busyLabel: 'preflight 中…',
+  busyNotice: 'Kyberion preflight を実行しています（数秒かかります）…',
+});
+bindAction(
+  elements.requestExecutionButton,
+  () => invoke('bridge:request-execution', { values: collectInputValues() }),
+  { busyLabel: '実行中…', busyNotice: '承認済み操作を実行しています…' }
 );
-elements.registerProcedureButton.addEventListener('click', registerProcedure);
+bindAction(elements.registerProcedureButton, registerProcedure, {
+  busyLabel: '登録中…',
+  busyNotice: '個人用シナリオを登録しています…',
+});
+bindAction(
+  elements.generateReportButton,
+  async () => {
+    const current = state.current;
+    const procedureId =
+      current?.execution?.observation?.procedure_id || current?.lastReport?.procedure_id;
+    if (!procedureId) return showNotice('レポート対象の観測データがありません。', 'error');
+    const question = elements.reportQuestionInput.value.trim().slice(0, 1000);
+    await invoke('bridge:analyze-observation', {
+      procedureId,
+      ...(question ? { question } : {}),
+    });
+  },
+  {
+    busyLabel: '分析中…',
+    busyNotice: '観測データを分析してレポートを生成しています（数十秒かかることがあります）…',
+  }
+);
 
 chrome.runtime.onMessage.addListener((message) => {
   if (message?.type === 'bridge:state-changed') render(message.state);
 });
 
+// Busy/label handling comes from bindAction — resolution may call the LLM
+// (seconds of latency), so the button shows an explicit busy state.
 async function resolveIntent() {
   const intent = elements.intentInput.value.trim();
-  if (!intent) return showNotice('やりたいことを入力してください。');
-  // Resolution may call the LLM (seconds of latency) — show an explicit busy
-  // state so the panel never looks hung.
-  elements.intentResolveButton.disabled = true;
-  elements.intentResolveButton.classList.add('is-busy');
-  const originalLabel = elements.intentResolveButton.textContent;
-  elements.intentResolveButton.textContent = '照合中';
-  showNotice('登録済みの手順と照合しています…');
-  try {
-    const response = await invoke('bridge:resolve-intent', { intent });
-    if (response?.resolution) renderIntentResolution(intent, response.resolution);
-  } finally {
-    elements.intentResolveButton.disabled = false;
-    elements.intentResolveButton.classList.remove('is-busy');
-    elements.intentResolveButton.textContent = originalLabel;
-  }
+  if (!intent) return showNotice('やりたいことを入力してください。', 'error');
+  const response = await invoke('bridge:resolve-intent', { intent });
+  if (response?.resolution) renderIntentResolution(intent, response.resolution);
 }
 
 function renderIntentResolution(intent, resolution) {
@@ -241,7 +390,10 @@ function renderIntentResolution(intent, resolution) {
       btn.type = 'button';
       btn.className = 'decision-button';
       btn.textContent = 'この手順で実行';
-      btn.addEventListener('click', () => startProcedure(c.procedure_id));
+      bindAction(btn, () => startProcedure(c.procedure_id), {
+        busyLabel: '準備中…',
+        busyNotice: '手順を準備しています…',
+      });
       li.append(title, detail, btn);
       elements.intentCandidates.append(li);
     });
@@ -250,6 +402,43 @@ function renderIntentResolution(intent, resolution) {
     elements.intentOutcomeLabel.textContent = '✗ 一致する手順がありません（Pattern A: 新規記録）';
     elements.intentOutcomeLabel.className = 'intent-outcome is-unmatched';
     elements.intentRecordButton.hidden = false;
+  }
+}
+
+// Extracted-data block on the Run tab: shows what the last run captured and
+// offers report generation; displays the latest report inline.
+function renderObservation(current) {
+  const observation = current?.execution?.observation;
+  const report = current?.lastReport;
+  elements.observationPreview.replaceChildren();
+  if (!observation && !report) {
+    elements.observationBlock.hidden = true;
+    return;
+  }
+  elements.observationBlock.hidden = false;
+  if (observation?.error) {
+    elements.observationSummary.textContent = `抽出データの保存に失敗しました: ${observation.error}`;
+  } else if (observation?.fieldCount) {
+    elements.observationSummary.textContent = `抽出データ ${observation.fieldCount} 件を保存しました（${observation.procedure_id}）。蓄積された観測からレポートを生成できます。`;
+    (observation.preview || []).forEach((field) => {
+      const item = document.createElement('li');
+      const title = document.createElement('strong');
+      title.textContent = field.name || 'field';
+      const detail = document.createElement('small');
+      detail.textContent = field.text || '（空）';
+      item.append(title, detail);
+      elements.observationPreview.append(item);
+    });
+  } else if (report) {
+    elements.observationSummary.textContent = `最新レポート: ${report.procedure_id}（観測 ${report.observation_count} 件, ${report.report_ref}）`;
+  }
+  elements.generateReportButton.disabled = !(observation?.procedure_id || report?.procedure_id);
+  if (report?.report) {
+    elements.observationReportBody.hidden = false;
+    elements.observationReportBody.textContent = report.report;
+  } else {
+    elements.observationReportBody.hidden = true;
+    elements.observationReportBody.textContent = '';
   }
 }
 
@@ -281,7 +470,7 @@ refresh();
 async function refresh() {
   const response = await chrome.runtime.sendMessage({ type: 'bridge:get-state' });
   if (!response?.ok)
-    return showNotice(response?.error || 'Browser Bridge の状態を取得できません。');
+    return showNotice(response?.error || 'Browser Bridge の状態を取得できません。', 'error');
   render(response.state);
 }
 
@@ -289,10 +478,12 @@ async function invoke(type, payload = {}) {
   try {
     const response = await chrome.runtime.sendMessage({ type, ...payload });
     if (!response?.ok) throw new Error(response?.error || '操作を完了できませんでした。');
+    lastError = null;
     render(response.state || state.current);
     return response;
   } catch (error) {
-    showNotice(error instanceof Error ? error.message : String(error));
+    lastError = error instanceof Error ? error.message : String(error);
+    showNotice(lastError, 'error');
     return null;
   }
 }
@@ -321,6 +512,14 @@ function render(nextState) {
   elements.startRecordingButton.disabled = !connected || Boolean(recording);
   elements.resumeRecordingButton.disabled = !paused;
   elements.stopRecordingButton.disabled = !recording;
+  elements.extractionModeButton.disabled = !recording || !connected;
+  elements.extractionModeButton.textContent = state.current.extractionMode
+    ? '分析対象モードを終了'
+    : '分析対象モードを開始';
+  elements.conditionalModeButton.disabled = !recording || !connected;
+  elements.conditionalModeButton.textContent = state.current.conditionalMode
+    ? '条件付きクリック対象モードを終了'
+    : '条件付きクリック対象を選択';
   elements.discardLastButton.disabled = !recording?.actions?.length;
 
   const actions = recording?.actions || [];
@@ -330,7 +529,23 @@ function render(nextState) {
   renderReview(draft);
   renderHandoff(draft);
   renderRepairStatus(state.current);
-  showNotice(recording?.pausedReason || state.current.notice || '');
+  renderObservation(state.current);
+  if (lastError) {
+    showNotice(lastError, 'error');
+  } else if (recording?.pausedReason) {
+    showNotice(recording.pausedReason, 'warn');
+  } else {
+    showNotice(state.current.notice || '', noticeKindFor(state.current));
+  }
+}
+
+// Color the background-provided notice by the execution outcome it describes.
+function noticeKindFor(current) {
+  const status = current?.execution?.status;
+  if (['failed', 'blocked', 'verification_failed', 'interrupted'].includes(status)) return 'error';
+  if (status === 'completed') return 'success';
+  if (status === 'running') return 'busy';
+  return 'info';
 }
 
 function renderHandoff(draft) {
@@ -343,6 +558,13 @@ function renderHandoff(draft) {
   elements.requestExecutionButton.disabled = !approved || execution?.status === 'running';
   elements.procedureRegistration.hidden = !approved;
   elements.registerProcedureButton.disabled = !approved;
+  // Disabled buttons swallow clicks silently — say why via tooltip.
+  const disabledReason = approved ? '' : 'Review タブで下書きを確定すると押せます';
+  elements.copyDraftButton.title = disabledReason;
+  elements.preflightButton.title = disabledReason;
+  elements.requestExecutionButton.title =
+    execution?.status === 'running' ? '実行中です' : disabledReason;
+  elements.registerProcedureButton.title = disabledReason;
   const registration = state.current?.procedureRegistration;
   elements.procedureRegistrationStatus.textContent = registration?.procedure_id
     ? `登録済み: ${registration.procedure_id}（次回から Intent タブで呼び出せます）`
@@ -390,21 +612,20 @@ async function registerProcedure() {
     .map((phrase) => phrase.trim())
     .filter(Boolean);
   if (!/^[a-z0-9]+(?:[._-][a-z0-9]+)*$/i.test(procedureId)) {
-    showNotice('シナリオ ID は英数字と . _ - の組み合わせで入力してください。');
+    showNotice('シナリオ ID は英数字と . _ - の組み合わせで入力してください。', 'error');
     return;
   }
   if (intentPhrases.length === 0) {
-    showNotice('呼び出し文を 1 件以上入力してください。');
+    showNotice('呼び出し文を 1 件以上入力してください。', 'error');
     return;
   }
-  elements.registerProcedureButton.disabled = true;
   const response = await invoke('bridge:promote-procedure', { procedureId, intentPhrases });
   if (response?.registration?.procedure_id) {
     showNotice(
-      `個人用シナリオ「${response.registration.procedure_id}」を登録しました。Intent タブから呼び出せます。`
+      `個人用シナリオ「${response.registration.procedure_id}」を登録しました。Intent タブから呼び出せます。`,
+      'success'
     );
   }
-  elements.registerProcedureButton.disabled = false;
 }
 
 function executionLeaseStatus(execution) {
@@ -606,7 +827,9 @@ function actionItem(action, label) {
   const title = document.createElement('strong');
   title.textContent = label;
   const detail = document.createElement('small');
-  detail.textContent = `${action.op} / ${action.risk}`;
+  detail.textContent = `${action.op} / ${action.risk}${
+    action.target?.dom_path ? ' / 構造位置 fallback（読み取り専用）' : ''
+  }`;
   item.append(title, detail);
   return item;
 }
@@ -639,6 +862,9 @@ function selectTab(tabName) {
     .forEach((panel) => panel.classList.toggle('is-active', panel.dataset.panel === tabName));
 }
 
-function showNotice(message) {
+function showNotice(message, kind = 'info') {
+  if (kind === 'error') lastError = message;
+  else lastError = null;
   elements.notice.textContent = message;
+  elements.notice.className = `notice notice-${kind}${message ? '' : ' is-empty'}`;
 }
