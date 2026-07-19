@@ -34,6 +34,16 @@ export interface AdfRunOptions {
    * records a governance action on the kill switch; tests inject a spy.
    */
   onRepeatForceStop?: (step: AdfStep, decision: ToolCallRepeatDecision) => void | Promise<void>;
+  /**
+   * Pre-execution gate for non-control steps (KC-04 pre_tool_use hooks). A
+   * blocked verdict aborts the whole run — routing a security block through
+   * per-step on_error recovery would let a fallback bypass it.
+   */
+  stepGate?: (
+    step: AdfStep,
+    stepNumber: number,
+    ctx: AdfEngineContext
+  ) => Promise<{ blocked: boolean; reasons?: string[] } | void>;
 }
 
 export interface AdfSkippedStep {
@@ -195,6 +205,16 @@ async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineC
       }
       if (decision.reminder && decision.escalation !== 'force_stop') {
         logger.warn(`  ${label} [repeat-governor] ${decision.reminder}`);
+      }
+      if (options.stepGate) {
+        const verdict = (await options.stepGate(step, state.stepCount, ctx)) || undefined;
+        if (verdict?.blocked) {
+          throw new Error(
+            `[SAFETY_LIMIT][HOOK_BLOCKED] ${step.type}:${step.op} blocked by lifecycle hook: ${
+              verdict.reasons?.join('; ') || 'no reason given'
+            }`
+          );
+        }
       }
     }
 
