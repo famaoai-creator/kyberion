@@ -31,6 +31,7 @@ import {
   logger,
   pathResolver,
   safeExistsSync,
+  safeLstat,
   safeReadFile,
   safeReaddir,
   safeWriteFile,
@@ -98,6 +99,8 @@ export interface RunAiAuditOptions {
   auditFn?: AuditFn;
   /** Parallel invariant audits (default 3). */
   concurrency?: number;
+  /** Include the deliberately failing audit-layer self-test fixture. */
+  includeSelfTestFixtures?: boolean;
 }
 
 export const SKIP_REASON_STUB_BACKEND = 'skipped: non-stub backend required';
@@ -106,8 +109,38 @@ const DEFAULT_INVARIANTS_DIR = 'tests_ai';
 const DEFAULT_CONCURRENCY = 3;
 const MAX_SCOPE_FILE_CHARS = 40_000;
 
-function resolveFromRoot(target: string): string {
-  return path.isAbsolute(target) ? target : pathResolver.rootResolve(target);
+function isSelfTestFixture(invariant: AiAuditInvariant): boolean {
+  return (
+    invariant.file.startsWith('tests_ai/fixture-') ||
+    invariant.scope.some(
+      (entry) => entry === 'tests_ai/fixtures' || entry.startsWith('tests_ai/fixtures/')
+    )
+  );
+}
+
+function resolveFromRoot(target: string, label = 'path'): string {
+  const candidate = path.resolve(pathResolver.rootResolve(target));
+  const relative = path.relative(pathResolver.rootDir(), candidate);
+  if (path.isAbsolute(relative) || relative === '..' || relative.startsWith(`..${path.sep}`)) {
+    throw new Error(
+      `[POLICY_VIOLATION] AI audit ${label} must remain under the repository root: ${target}`
+    );
+  }
+  return candidate;
+}
+
+/** Reject symlinked scope paths so a repo-relative entry cannot escape the VFS. */
+function assertNoSymlinkPath(absolute: string): void {
+  const relative = path.relative(pathResolver.rootDir(), absolute);
+  let current = pathResolver.rootDir();
+  for (const segment of relative.split(path.sep).filter(Boolean)) {
+    current = path.join(current, segment);
+    if (safeExistsSync(current) && safeLstat(current).isSymbolicLink()) {
+      throw new Error(
+        `[POLICY_VIOLATION] AI audit scope cannot traverse a symbolic link: ${repoRelative(absolute)}`
+      );
+    }
+  }
 }
 
 function repoRelative(absolute: string): string {
@@ -179,6 +212,7 @@ export function resolveScopeFiles(scope: string[]): {
   const missing: string[] = [];
 
   const readScoped = (absolute: string): void => {
+    assertNoSymlinkPath(absolute);
     const raw = safeReadFile(absolute, { encoding: 'utf8' }) as string;
     const truncated = raw.length > MAX_SCOPE_FILE_CHARS;
     files.push({
@@ -342,7 +376,10 @@ export async function runAiAudit(options: RunAiAuditOptions = {}): Promise<{
   const runId = `ai-audit-${new Date().toISOString().replace(/[:.]/g, '-')}-${randomUUID().slice(0, 8)}`;
   const trace = new TraceContext('ai-audit', { correlationId: runId });
 
-  const invariants = enumerateInvariants(options.invariantsDir);
+  const enumerated = enumerateInvariants(options.invariantsDir);
+  const invariants = options.includeSelfTestFixtures
+    ? enumerated
+    : enumerated.filter((invariant) => !isSelfTestFixture(invariant));
   trace.addEvent('ai-audit.enumerated', { invariants: invariants.length });
 
   let auditFn = options.auditFn;
@@ -397,7 +434,7 @@ export async function runAiAudit(options: RunAiAuditOptions = {}): Promise<{
   };
   safeWriteFile(reportPath, JSON.stringify(report, null, 2));
 
-  return { report, reportPath, exitCode: status === 'failed' ? 1 : 0 };
+  return { report, reportPath, exitCode: status === 'failed' ? 1 : status === 'skipped' ? 2 : 0 };
 }
 
 export function renderReport(report: AiAuditReport, reportPath: string): string {

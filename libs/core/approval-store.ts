@@ -9,7 +9,11 @@ import {
 import { pathResolver } from './path-resolver.js';
 import type { RejectionReasonCategory } from './rejection-reason.js';
 import { safeExistsSync, safeReaddir } from './secure-io.js';
-import { getDefaultWorkerEventStream } from './worker-event-stream.js';
+import {
+  getDefaultWorkerEventStream,
+  type WorkerEventPayloadMap,
+  type WorkerEventSource,
+} from './worker-event-stream.js';
 import {
   buildOrganizationWorkLoopSummary,
   type OrganizationWorkLoopSummary,
@@ -177,11 +181,25 @@ export interface SessionApprovalCacheEntry {
   targetClass: string;
   grantedByRequestId: string;
   grantedBy: string;
+  /** The agent that requested the human-approved effect. */
+  grantedForAgent: string;
   grantedAt: string;
   channel: string;
   storageChannel: string;
   /** Mirrors the originating request's expiry: the cache never outlives the grant. */
   expiresAt?: string;
+  /** Exact-effect binding carried forward from the seed approval. */
+  payloadHash: string;
+  effectBinding: string;
+  /** Optional mission/task scope; when present it must match on lookup. */
+  source?: ApprovalRequestSource;
+}
+
+export interface SessionApprovalCacheLookupContext {
+  agentId: string;
+  payloadHash: string;
+  effectBinding: string;
+  source?: ApprovalRequestSource;
 }
 
 export function approvalActionCacheKey(descriptor: ApprovalActionDescriptor): string {
@@ -205,13 +223,32 @@ const sessionApprovalCache = new Map<string, SessionApprovalCacheEntry>();
 
 export function lookupSessionApprovalCache(
   descriptor: ApprovalActionDescriptor,
-  now = Date.now()
+  now = Date.now(),
+  context: SessionApprovalCacheLookupContext
 ): SessionApprovalCacheEntry | null {
   const key = approvalActionCacheKey(descriptor);
   const entry = sessionApprovalCache.get(key);
   if (!entry) return null;
   if (isApprovalRequestExpired(entry, now)) {
     sessionApprovalCache.delete(key);
+    return null;
+  }
+  if (
+    entry.grantedForAgent !== context.agentId ||
+    entry.payloadHash !== context.payloadHash ||
+    entry.effectBinding !== context.effectBinding
+  ) {
+    return null;
+  }
+  // A scoped request must never consume an unscoped cache entry, and a
+  // scoped seed must only be reused by the same source scope.
+  if (Boolean(entry.source) !== Boolean(context.source)) return null;
+  if (
+    entry.source &&
+    !(['missionId', 'taskId', 'agentId'] as const).every(
+      (field) => entry.source?.[field] === context.source?.[field]
+    )
+  ) {
     return null;
   }
   return entry;
@@ -378,12 +415,22 @@ export function createApprovalRequest(
     channel: record.channel,
     thread_ts: record.threadTs,
   });
-  projectApprovalWorkerEvent('approval_request', {
-    request_id: record.id,
-    correlation_id: record.correlationId,
-    requested_by: record.requestedBy,
-    channel: record.channel,
-  });
+  projectApprovalWorkerEvent(
+    'approval_request',
+    {
+      request_id: record.id,
+      correlation_id: record.correlationId,
+      requested_by: record.requestedBy,
+      channel: record.channel,
+      status: 'pending',
+      title: record.title,
+      summary: record.summary,
+      severity: record.severity || 'medium',
+      kind: record.kind,
+      ...(record.expiresAt ? { expires_at: record.expiresAt } : {}),
+    },
+    approvalWorkerEventSource(record)
+  );
   return record;
 }
 
@@ -392,15 +439,24 @@ export function createApprovalRequest(
  * surface renders the same approval dialog from one contract. The jsonl
  * event log above stays the SSoT; this projection is best-effort.
  */
-function projectApprovalWorkerEvent(
-  type: 'approval_request' | 'approval_response',
-  payload: Record<string, unknown>
+function projectApprovalWorkerEvent<K extends 'approval_request' | 'approval_response'>(
+  type: K,
+  payload: WorkerEventPayloadMap[K],
+  source?: WorkerEventSource
 ): void {
   try {
-    getDefaultWorkerEventStream().emit(type, payload);
+    getDefaultWorkerEventStream().emit(type, payload, source);
   } catch {
     /* never let observability break the approval path */
   }
+}
+
+function approvalWorkerEventSource(record: ApprovalRequestRecord): WorkerEventSource {
+  return {
+    ...(record.source?.missionId ? { mission_id: record.source.missionId } : {}),
+    ...(record.source?.taskId ? { task_id: record.source.taskId } : {}),
+    agent_id: record.source?.agentId || record.requestedBy,
+  };
 }
 
 /** Treat a malformed expiry as expired so approval cannot fail open. */
@@ -465,13 +521,17 @@ export function cancelApprovalRequest(
     channel: updated.channel,
     thread_ts: updated.threadTs,
   });
-  projectApprovalWorkerEvent('approval_response', {
-    request_id: updated.id,
-    correlation_id: updated.correlationId,
-    status: 'cancelled',
-    ...(params.cancelledBy ? { decided_by: params.cancelledBy } : {}),
-    channel: updated.channel,
-  });
+  projectApprovalWorkerEvent(
+    'approval_response',
+    {
+      request_id: updated.id,
+      correlation_id: updated.correlationId,
+      status: 'cancelled',
+      ...(params.cancelledBy ? { decided_by: params.cancelledBy } : {}),
+      channel: updated.channel,
+    },
+    approvalWorkerEventSource(updated)
+  );
   return updated;
 }
 
@@ -687,6 +747,15 @@ export function decideApprovalRequest(
       authenticated: params.authenticated,
     });
     approvalActionCacheKey(cacheDescriptor);
+    if (
+      record.accountability?.finalDecision !== 'human_only' ||
+      !record.accountability.payloadHash ||
+      !record.accountability.effectBinding
+    ) {
+      throw new Error(
+        '[POLICY_VIOLATION] Session approval cache requires an exact human effect binding'
+      );
+    }
   }
 
   const decidedAt = new Date().toISOString();
@@ -746,13 +815,18 @@ export function decideApprovalRequest(
     note: params.note,
     reason_category: params.reasonCategory,
   });
-  projectApprovalWorkerEvent('approval_response', {
-    request_id: updated.id,
-    correlation_id: updated.correlationId,
-    status: params.decision,
-    decided_by: params.decidedBy,
-    channel: updated.channel,
-  });
+  projectApprovalWorkerEvent(
+    'approval_response',
+    {
+      request_id: updated.id,
+      correlation_id: updated.correlationId,
+      status: params.decision,
+      decided_by: params.decidedBy,
+      channel: updated.channel,
+      ...(params.reasonCategory ? { reason_category: params.reasonCategory } : {}),
+    },
+    approvalWorkerEventSource(updated)
+  );
 
   if (cacheDescriptor) {
     const key = approvalActionCacheKey(cacheDescriptor);
@@ -762,10 +836,14 @@ export function decideApprovalRequest(
       targetClass: cacheDescriptor.targetClass.trim().toLowerCase(),
       grantedByRequestId: updated.id,
       grantedBy: params.decidedBy,
+      grantedForAgent: updated.requestedBy,
       grantedAt: decidedAt,
       channel: updated.channel,
       storageChannel: updated.storageChannel,
       expiresAt: updated.expiresAt,
+      payloadHash: updated.accountability!.payloadHash!,
+      effectBinding: updated.accountability!.effectBinding!,
+      ...(updated.source ? { source: updated.source } : {}),
     };
     sessionApprovalCache.set(key, entry);
     appendGovernedArtifactJsonl(role, approvalEventLogicalPath(storageChannel), {

@@ -1784,7 +1784,11 @@ export async function runSteps(
           status: outcome.status,
           ...(outcome.error ? { error: outcome.error } : {}),
         }
-      );
+      ).catch((error) => {
+        logger.error(
+          `[LIFECYCLE_HOOK] post-tool hook telemetry failed: ${error instanceof Error ? error.message : String(error)}`
+        );
+      });
       if (!opts.quiet && (outcome.status === 'success' || outcome.status === 'failed')) {
         logger.info(
           `[step ${stepNumber}/${totalTopLevelSteps}] ${normalizedOp} ${outcome.status} in ${Math.round(durationMs / 1000)}s`
@@ -2030,20 +2034,34 @@ export async function main() {
       ...step,
       params: step.params || {},
     }));
-    await fireLifecycleHooks(getDefaultLifecycleHookEngine(), 'session_start', {
-      matcher_value: pipelineId,
-      pipeline_id: pipelineId,
-    });
+    const sessionStart = await fireLifecycleHooks(
+      getDefaultLifecycleHookEngine(),
+      'session_start',
+      {
+        matcher_value: pipelineId,
+        pipeline_id: pipelineId,
+      }
+    );
+    if (sessionStart.blocked) {
+      throw new Error(
+        `[SAFETY_LIMIT][HOOK_BLOCKED] session_start blocked: ${sessionStart.reasons.join('; ')}`
+      );
+    }
     const result = await runValidatedSteps(stepsToRun, mergedContext, {
       trace,
       pipelinePath: argv.input as string,
       quiet: argv.quiet as boolean,
     });
-    await fireLifecycleHooks(getDefaultLifecycleHookEngine(), 'session_end', {
+    const sessionEnd = await fireLifecycleHooks(getDefaultLifecycleHookEngine(), 'session_end', {
       matcher_value: pipelineId,
       pipeline_id: pipelineId,
       status: result.status,
     });
+    if (sessionEnd.blocked) {
+      throw new Error(
+        `[SAFETY_LIMIT][HOOK_BLOCKED] session_end blocked: ${sessionEnd.reasons.join('; ')}`
+      );
+    }
     const failed = result.results.find((entry) => entry.status === 'failed');
     const failure = failed ? formatPipelineFailure(failed.error || 'unknown error') : undefined;
     const recovered = failure ? tryPermissionFallback(pipeline, failure, trace) : false;

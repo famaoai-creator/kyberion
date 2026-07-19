@@ -5,8 +5,8 @@
  *
  *   max_completion = context_window − estimated_input − safety_margin
  *
- * clamped to [floor, configured max], so a fixed max_tokens never overflows
- * the window and triggers avoidable "prompt too long" errors. CLI-bridge
+ * clamped to the safe remaining budget (the floor is advisory when there is
+ * not enough room), so a fixed max_tokens never overflows the window and triggers avoidable "prompt too long" errors. CLI-bridge
  * backends are out of scope — the CLI manages its own window. When the window
  * is unknown the configured max passes through unchanged.
  */
@@ -37,7 +37,12 @@ export function computeCompletionTokenBudget(input: CompletionTokenBudgetInput):
   const safetyMargin = input.safetyMarginTokens ?? DEFAULT_SAFETY_MARGIN_TOKENS;
   const floor = input.floorTokens ?? DEFAULT_COMPLETION_FLOOR_TOKENS;
   const remaining = Math.floor(contextWindowTokens - input.estimatedInputTokens - safetyMargin);
-  return Math.min(configuredMaxTokens, Math.max(floor, remaining));
+  if (remaining <= 0) return 0;
+  // Never let the quality floor exceed the hard context limit. A caller can
+  // decide whether zero means "compact/retry"; sending a too-large request is
+  // not a safe fallback. The floor still applies while it fits.
+  const bounded = Math.min(configuredMaxTokens, remaining);
+  return bounded < floor ? bounded : Math.max(floor, bounded);
 }
 
 /**

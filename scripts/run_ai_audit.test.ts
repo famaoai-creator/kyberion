@@ -80,6 +80,15 @@ describe('invariant markdown parsing', () => {
     expect(prompt).toContain('### a.ts');
     expect(prompt).toContain('const a = 1;');
   });
+
+  it('rejects scope paths outside the repository root', () => {
+    expect(() => resolveScopeFiles(['/tmp/kyberion-secret.txt'])).toThrow(
+      '[POLICY_VIOLATION] AI audit path'
+    );
+    expect(() => resolveScopeFiles(['../outside-secret.txt'])).toThrow(
+      '[POLICY_VIOLATION] AI audit path'
+    );
+  });
 });
 
 describe('runAiAudit fail path (KC-05 acceptance #1, injected decision fn)', () => {
@@ -101,6 +110,7 @@ describe('runAiAudit fail path (KC-05 acceptance #1, injected decision fn)', () 
     const { report, reportPath, exitCode } = await runAiAudit({
       outputDir,
       auditFn: fakeAudit,
+      includeSelfTestFixtures: true,
     });
 
     expect(exitCode).toBe(1);
@@ -133,7 +143,7 @@ describe('runAiAudit stub-backend skip', () => {
 
     const { report, reportPath, exitCode } = await runAiAudit({ outputDir });
 
-    expect(exitCode).toBe(0);
+    expect(exitCode).toBe(2);
     expect(report.status).toBe('skipped');
     expect(report.skip_reason).toContain(SKIP_REASON_STUB_BACKEND);
     expect(report.backend_mode).toBe('stub');

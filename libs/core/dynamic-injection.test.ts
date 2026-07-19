@@ -8,7 +8,9 @@ import {
   DynamicInjectionRegistry,
   buildWorkingPrinciplesInjectionProvider,
   getDefaultDynamicInjectionRegistry,
+  getMissionDynamicInjectionRegistry,
   mergeAdjacentSameRoleMessages,
+  notifyAllDynamicInjectionRegistries,
   renderInjectionsAsSystemReminders,
   resetDefaultDynamicInjectionRegistry,
 } from './dynamic-injection.js';
@@ -69,6 +71,20 @@ describe('DynamicInjectionRegistry', () => {
     unregister();
     expect(registry.providerCount).toBe(0);
   });
+
+  it('keeps one-shot state isolated per mission and resets all scopes on compaction', () => {
+    const missionA = getMissionDynamicInjectionRegistry('M-A');
+    const missionB = getMissionDynamicInjectionRegistry('M-B');
+    for (const registry of [missionA, missionB]) {
+      registry.register({ id: 'mission-reminder', oneShot: true, collect: () => 'reminder' });
+    }
+    expect(missionA.collect()).toHaveLength(1);
+    expect(missionA.collect()).toHaveLength(0);
+    expect(missionB.collect()).toHaveLength(1);
+    notifyAllDynamicInjectionRegistries();
+    expect(missionA.collect()).toHaveLength(1);
+    expect(missionB.collect()).toHaveLength(1);
+  });
 });
 
 describe('history normalization + rendering', () => {
@@ -89,16 +105,16 @@ describe('history normalization + rendering', () => {
       { providerId: 'a', text: 'one' },
       { providerId: 'b', text: 'two' },
     ]);
-    expect(rendered).toBe('<system-reminder>one</system-reminder>\n<system-reminder>two</system-reminder>');
+    expect(rendered).toBe(
+      '<system-reminder>one</system-reminder>\n<system-reminder>two</system-reminder>'
+    );
   });
 });
 
 describe('compaction integration (KC-08 acceptance)', () => {
   it('a forced compaction resets the default registry so one-shots re-fire', async () => {
     const registry = getDefaultDynamicInjectionRegistry();
-    registry.register(
-      buildWorkingPrinciplesInjectionProvider(() => buildWorkingPrinciplesLines())
-    );
+    registry.register(buildWorkingPrinciplesInjectionProvider(() => buildWorkingPrinciplesLines()));
     expect(registry.collect()).toHaveLength(1);
     expect(registry.collect()).toHaveLength(0);
 

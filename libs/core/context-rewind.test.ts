@@ -44,13 +44,16 @@ function seededContext(): { context: RewindableWorkerContext; checkpointId: stri
 describe('RewindableWorkerContext (KC-07 acceptance)', () => {
   it('rewinds a dead-end exploration: failed tool traffic gone, only the lesson remains', () => {
     const { context, checkpointId } = seededContext();
-    const result = context.rewindTo(checkpointId, 'Approach A cannot work: the config is generated.');
+    const result = context.rewindTo(
+      checkpointId,
+      'Approach A cannot work: the config is generated.'
+    );
 
     expect(result).toEqual({ rewound: true, droppedMessages: 4 });
     const contents = context.getMessages().map((message) => message.content);
     expect(contents.some((content) => content.includes('approach A failed'))).toBe(false);
     expect(contents.at(-1)).toContain('Approach A cannot work');
-    expect(contents.at(-1)).toContain('<system-reminder>');
+    expect(contents.at(-1)).toContain('CONTEXT_REWIND_LESSON_UNTRUSTED_DATA_START');
     expect(contents[0]).toContain('goal: fix the failing build');
   });
 
@@ -80,7 +83,11 @@ describe('RewindableWorkerContext (KC-07 acceptance)', () => {
 
   it('preserves pinned (carryover) messages through a rewind', () => {
     const { context, checkpointId } = seededContext();
-    context.append({ role: 'user', content: '<task_focus_state>carryover</task_focus_state>', pinned: true });
+    context.append({
+      role: 'user',
+      content: '<task_focus_state>carryover</task_focus_state>',
+      pinned: true,
+    });
 
     const result = context.rewindTo(checkpointId, 'lesson');
     expect(result.rewound).toBe(true);
