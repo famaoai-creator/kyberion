@@ -110,6 +110,10 @@ export class DynamicInjectionRegistry {
   get providerCount(): number {
     return this.providers.size;
   }
+
+  hasProvider(providerId: string): boolean {
+    return this.providers.has(providerId);
+  }
 }
 
 /**
@@ -117,9 +121,10 @@ export class DynamicInjectionRegistry {
  * same-role text messages so providers never fragment the visible history
  * (kimi-cli normalize_history).
  */
-export function mergeAdjacentSameRoleMessages<
-  T extends { role: string; content: string },
->(messages: readonly T[], separator = '\n\n'): T[] {
+export function mergeAdjacentSameRoleMessages<T extends { role: string; content: string }>(
+  messages: readonly T[],
+  separator = '\n\n'
+): T[] {
   const merged: T[] = [];
   for (const message of messages) {
     const previous = merged[merged.length - 1];
@@ -136,7 +141,9 @@ export function mergeAdjacentSameRoleMessages<
 }
 
 /** Render collected injections as system-reminder blocks for prompt assembly. */
-export function renderInjectionsAsSystemReminders(injections: readonly CollectedInjection[]): string {
+export function renderInjectionsAsSystemReminders(
+  injections: readonly CollectedInjection[]
+): string {
   return injections
     .map((injection) => `<system-reminder>${injection.text}</system-reminder>`)
     .join('\n');
@@ -162,6 +169,15 @@ export function buildWorkingPrinciplesInjectionProvider(
 }
 
 const GLOBAL_KEY = Symbol.for('kyberion.dynamicInjectionRegistry');
+const MISSION_REGISTRIES_KEY = Symbol.for('kyberion.dynamicInjectionMissionRegistries');
+
+function missionRegistries(): Map<string, DynamicInjectionRegistry> {
+  const holder = globalThis as Record<symbol, unknown>;
+  if (!holder[MISSION_REGISTRIES_KEY]) {
+    holder[MISSION_REGISTRIES_KEY] = new Map<string, DynamicInjectionRegistry>();
+  }
+  return holder[MISSION_REGISTRIES_KEY] as Map<string, DynamicInjectionRegistry>;
+}
 
 /**
  * Process-wide registry. Compaction (worker-context-compaction) notifies it
@@ -173,7 +189,27 @@ export function getDefaultDynamicInjectionRegistry(): DynamicInjectionRegistry {
   return holder[GLOBAL_KEY] as DynamicInjectionRegistry;
 }
 
+/** A persistent registry per mission; one-shot state must not leak between missions. */
+export function getMissionDynamicInjectionRegistry(missionId: string): DynamicInjectionRegistry {
+  const key = String(missionId || '').trim();
+  if (!key) throw new Error('[INJECTION_SCOPE] missionId is required');
+  const registries = missionRegistries();
+  let registry = registries.get(key);
+  if (!registry) {
+    registry = new DynamicInjectionRegistry();
+    registries.set(key, registry);
+  }
+  return registry;
+}
+
+/** Reset all live registries after compaction, including mission-scoped ones. */
+export function notifyAllDynamicInjectionRegistries(): void {
+  getDefaultDynamicInjectionRegistry().notifyContextCompacted();
+  for (const registry of missionRegistries().values()) registry.notifyContextCompacted();
+}
+
 /** Test seam. */
 export function resetDefaultDynamicInjectionRegistry(): void {
   delete (globalThis as Record<symbol, unknown>)[GLOBAL_KEY];
+  missionRegistries().clear();
 }

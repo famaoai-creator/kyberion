@@ -22,7 +22,7 @@ import { metrics } from './metrics.js';
 import type { MissionWorkingMemory } from './mission-working-memory.js';
 import { pathResolver } from './path-resolver.js';
 import { safeMkdir, safeWriteFile } from './secure-io.js';
-import { getDefaultDynamicInjectionRegistry } from './dynamic-injection.js';
+import { notifyAllDynamicInjectionRegistries } from './dynamic-injection.js';
 import { fireLifecycleHooks, getDefaultLifecycleHookEngine } from './lifecycle-hook-engine.js';
 import { getDefaultWorkerEventStream } from './worker-event-stream.js';
 
@@ -116,7 +116,7 @@ const MAX_CONSECUTIVE_SUMMARY_FAILURES = 3;
 
 /** Provider "prompt too long" detection for the reactive compaction path. */
 export const PROMPT_TOO_LONG_PATTERN =
-  /prompt (?:is )?too long|context window|maximum context length|context_length_exceeded|input (?:is )?too (?:large|long)|too many tokens|exceeds? .*token/i;
+  /prompt (?:is )?too long|context window|maximum context length|context_length_exceeded|input (?:is )?too (?:large|long)|too many tokens|exceeds? .*token|\[CONTEXT_LIMIT\]/i;
 
 export function isPromptTooLongError(error: unknown): boolean {
   const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error ?? '');
@@ -377,7 +377,9 @@ export async function compactWorkerContext(
   // mechanism, so a hook block verdict must not stop it. KC-02: mirror onto
   // the worker event stream (best-effort).
   await fireLifecycleHooks(getDefaultLifecycleHookEngine(), 'pre_compact', {
-    ...(options.missionId ? { matcher_value: options.missionId, mission_id: options.missionId } : {}),
+    ...(options.missionId
+      ? { matcher_value: options.missionId, mission_id: options.missionId }
+      : {}),
     tokens_before: tokensBefore,
     threshold_tokens: thresholdTokens,
   });
@@ -476,7 +478,9 @@ export async function compactWorkerContext(
     },
   });
   await fireLifecycleHooks(getDefaultLifecycleHookEngine(), 'post_compact', {
-    ...(options.missionId ? { matcher_value: options.missionId, mission_id: options.missionId } : {}),
+    ...(options.missionId
+      ? { matcher_value: options.missionId, mission_id: options.missionId }
+      : {}),
     tokens_before: tokensBefore,
     tokens_after: tokensAfter,
     stage,
@@ -493,7 +497,7 @@ export async function compactWorkerContext(
   // KC-08: the compacted transcript lost every earlier injection — reset the
   // registry so one-shot reminders (working principles etc.) re-fire.
   try {
-    getDefaultDynamicInjectionRegistry().notifyContextCompacted();
+    notifyAllDynamicInjectionRegistries();
   } catch {
     /* injection bookkeeping must not alter compaction behavior */
   }

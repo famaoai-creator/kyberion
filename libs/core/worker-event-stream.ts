@@ -45,6 +45,46 @@ export const WORKER_EVENT_TYPES = [
 
 export type WorkerEventType = (typeof WORKER_EVENT_TYPES)[number];
 
+/** Stable payload contract for UI/operator-critical events. */
+export interface WorkerEventPayloadMap {
+  turn_begin: Record<string, unknown>;
+  turn_end: Record<string, unknown>;
+  step_begin: Record<string, unknown>;
+  step_end: Record<string, unknown>;
+  compaction_begin: Record<string, unknown>;
+  compaction_end: Record<string, unknown>;
+  context_rewind: Record<string, unknown>;
+  status_update: Record<string, unknown>;
+  subagent_begin: Record<string, unknown>;
+  subagent_end: Record<string, unknown>;
+  approval_request: {
+    request_id: string;
+    correlation_id: string;
+    requested_by: string;
+    channel: string;
+    status: 'pending';
+    title: string;
+    summary: string;
+    severity: 'low' | 'medium' | 'high';
+    kind: 'channel-approval' | 'secret_mutation';
+    expires_at?: string;
+  };
+  approval_response: {
+    request_id: string;
+    correlation_id: string;
+    status: 'approved' | 'rejected' | 'cancelled';
+    channel: string;
+    decided_by?: string;
+    reason_category?: string;
+  };
+  governance_action: Record<string, unknown>;
+  notification: Record<string, unknown>;
+  mission_event: Record<string, unknown>;
+  phase_begin: Record<string, unknown>;
+  phase_end: Record<string, unknown>;
+  gate_evaluated: Record<string, unknown>;
+}
+
 export const workerEventSourceSchema = z
   .object({
     mission_id: z.string().optional(),
@@ -65,7 +105,13 @@ export const workerEventEnvelopeSchema = z
   .strict();
 
 export type WorkerEventSource = z.infer<typeof workerEventSourceSchema>;
-export type WorkerEventEnvelope = z.infer<typeof workerEventEnvelopeSchema>;
+export type WorkerEventEnvelope<K extends WorkerEventType = WorkerEventType> = Omit<
+  z.infer<typeof workerEventEnvelopeSchema>,
+  'type' | 'payload'
+> & {
+  type: K;
+  payload: WorkerEventPayloadMap[K];
+};
 
 export type WorkerEventListener = (event: WorkerEventEnvelope) => void;
 
@@ -89,19 +135,22 @@ export class WorkerEventStream {
    * Build, validate and broadcast an envelope. Listener failures are isolated
    * (fail-open): a broken consumer must never stop the worker.
    */
-  emit(
-    type: WorkerEventType,
-    payload: Record<string, unknown> = {},
+  emit<K extends WorkerEventType>(
+    type: K,
+    payload: WorkerEventPayloadMap[K] = {} as WorkerEventPayloadMap[K],
     source?: WorkerEventSource
-  ): WorkerEventEnvelope {
-    const mergedSource = source ?? this.defaultSource;
-    const envelope: WorkerEventEnvelope = workerEventEnvelopeSchema.parse({
+  ): WorkerEventEnvelope<K> {
+    const mergedSource =
+      this.defaultSource || source
+        ? { ...(this.defaultSource ?? {}), ...(source ?? {}) }
+        : undefined;
+    const envelope = workerEventEnvelopeSchema.parse({
       type,
       ts: new Date().toISOString(),
       seq: this.seq++,
       ...(mergedSource && Object.keys(mergedSource).length > 0 ? { source: mergedSource } : {}),
       payload,
-    });
+    }) as WorkerEventEnvelope<K>;
     for (const listener of this.listeners) {
       try {
         listener(envelope);
@@ -174,7 +223,26 @@ function attachDefaultObservabilityRecorder(stream: WorkerEventStream): void {
     if (!dir) return;
     safeMkdir(dir);
     const day = new Date().toISOString().slice(0, 10);
-    attachJsonlRecorder(stream, `${dir}/worker-events-${day}.jsonl`);
+    stream.subscribe((event) => {
+      const missionId = event.source?.mission_id?.trim();
+      if (missionId) {
+        // Mission ids are data-derived path segments. Reject rather than
+        // normalizing them, because normalization could silently merge two
+        // distinct mission scopes into one evidence file.
+        if (!/^[a-zA-Z0-9._-]+$/.test(missionId)) {
+          logger.warn(`[worker-event-stream] refusing unsafe mission event scope: ${missionId}`);
+          return;
+        }
+        const missionEventDir = `${pathResolver.missionDir(missionId, 'confidential')}/logs/worker-events`;
+        safeMkdir(missionEventDir, { recursive: true });
+        safeAppendFileSync(
+          `${missionEventDir}/worker-events-${day}.jsonl`,
+          `${JSON.stringify(event)}\n`
+        );
+        return;
+      }
+      safeAppendFileSync(`${dir}/worker-events-${day}.jsonl`, `${JSON.stringify(event)}\n`);
+    });
   } catch {
     // Observability wiring is best-effort; never block stream creation.
   }

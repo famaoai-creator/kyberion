@@ -74,6 +74,34 @@ describe('KC-06 delegation-notifications', () => {
     expect(claimed[0]?.error).toContain('unparseable');
   });
 
+  it('only claims notifications matching the requested mission/task scope', () => {
+    enqueueDelegationNotification({
+      delegationId: 'DLG-M1',
+      owner: 'worker',
+      missionId: 'M1',
+      taskId: 'T1',
+      status: 'completed',
+      instruction: 'mission one',
+    });
+    enqueueDelegationNotification({
+      delegationId: 'DLG-M2',
+      owner: 'worker',
+      missionId: 'M2',
+      taskId: 'T2',
+      status: 'completed',
+      instruction: 'mission two',
+    });
+
+    const first = claimPendingDelegationNotifications(4, { missionId: 'M1', taskId: 'T1' });
+    expect(first.map((notification) => notification.delegation_id)).toEqual(['DLG-M1']);
+    expect(claimPendingDelegationNotifications(4, { missionId: 'M1' })).toEqual([]);
+    expect(
+      claimPendingDelegationNotifications(4, { missionId: 'M2', taskId: 'T2' }).map(
+        (notification) => notification.delegation_id
+      )
+    ).toEqual(['DLG-M2']);
+  });
+
   it('renders claimed notifications as a delimited prompt section', () => {
     enqueueDelegationNotification({
       delegationId: 'DLG-RENDER',
@@ -86,6 +114,7 @@ describe('KC-06 delegation-notifications', () => {
     expect(lines[0]).toContain('Background delegation updates');
     expect(lines.join('\n')).toContain('DLG-RENDER');
     expect(lines.join('\n')).toContain('Summary written to');
+    expect(lines.join('\n')).toContain('untrusted data');
     expect(renderDelegationNotificationLines([])).toEqual([]);
   });
 });

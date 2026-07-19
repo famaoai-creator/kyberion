@@ -122,3 +122,44 @@ export async function withLock<T>(
     releaseLock(resourceId);
   }
 }
+
+/**
+ * Synchronous counterpart for small synchronous persistence primitives.
+ *
+ * Some governed stores intentionally expose a synchronous API because they
+ * are called from event/trace callbacks. They still need an inter-process
+ * fence; a plain read-rewrite sequence is not sufficient. Atomics.wait keeps
+ * the bounded retry deterministic without using direct filesystem I/O.
+ */
+export function withLockSync<T>(resourceId: string, fn: () => T, timeoutMs = 5000): T {
+  const lockFile = path.join(LOCK_ROOT, `${resourceId}.lock`);
+  const startTime = Date.now();
+  if (!safeExistsSync(LOCK_ROOT)) safeMkdir(LOCK_ROOT, { recursive: true });
+
+  while (Date.now() - startTime < timeoutMs) {
+    try {
+      safeCreateExclusiveFileSync(
+        lockFile,
+        JSON.stringify({ pid: process.pid, ts: new Date().toISOString(), id: resourceId })
+      );
+    } catch (err: any) {
+      if (err?.code !== 'EEXIST') throw err;
+      if (_isLockStale(lockFile)) {
+        safeUnlinkSync(lockFile);
+        continue;
+      }
+      const waitBuffer = new Int32Array(new SharedArrayBuffer(4));
+      Atomics.wait(waitBuffer, 0, 0, 50);
+      continue;
+    }
+    try {
+      return fn();
+    } finally {
+      releaseLock(resourceId);
+    }
+  }
+
+  throw new Error(
+    `[LOCK_TIMEOUT] Failed to acquire lock for resource: ${resourceId} within ${timeoutMs}ms`
+  );
+}

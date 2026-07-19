@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  DEFAULT_COMPLETION_FLOOR_TOKENS,
   DEFAULT_SAFETY_MARGIN_TOKENS,
   computeCompletionTokenBudget,
   estimateRequestInputTokens,
@@ -41,14 +40,14 @@ describe('computeCompletionTokenBudget', () => {
     }
   });
 
-  it('never drops below the floor', () => {
+  it('returns zero when no safe completion budget remains', () => {
     expect(
       computeCompletionTokenBudget({
         contextWindowTokens: 200_000,
         estimatedInputTokens: 250_000,
         configuredMaxTokens: 16_000,
       })
-    ).toBe(DEFAULT_COMPLETION_FLOOR_TOKENS);
+    ).toBe(0);
     expect(
       computeCompletionTokenBudget({
         contextWindowTokens: 200_000,
@@ -56,10 +55,10 @@ describe('computeCompletionTokenBudget', () => {
         configuredMaxTokens: 16_000,
         floorTokens: 4_096,
       })
-    ).toBe(4_096);
+    ).toBe(0);
   });
 
-  it('never exceeds the configured max even when the floor is higher', () => {
+  it('never exceeds the safe remaining budget even when the floor is higher', () => {
     expect(
       computeCompletionTokenBudget({
         contextWindowTokens: 200_000,
@@ -67,7 +66,7 @@ describe('computeCompletionTokenBudget', () => {
         configuredMaxTokens: 2_048,
         floorTokens: 8_000,
       })
-    ).toBe(2_048);
+    ).toBe(0);
   });
 
   it('honors a custom safety margin', () => {

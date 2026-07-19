@@ -48,6 +48,11 @@ import {
 } from './work-coordination.js';
 import { logger } from './core.js';
 import { buildWorkingPrinciplesLines } from './working-principles.js';
+import {
+  buildWorkingPrinciplesInjectionProvider,
+  getMissionDynamicInjectionRegistry,
+  renderInjectionsAsSystemReminders,
+} from './dynamic-injection.js';
 import { buildExecutionEnv } from './authority.js';
 import { missionDir, missionEvidenceDir, rootDir } from './path-resolver.js';
 import { pathResolver } from './path-resolver.js';
@@ -903,9 +908,7 @@ export function buildDispatchCarryover(input: {
     active_artifacts: activeArtifacts,
     verified_state: verifiedState,
     next_step: `${input.task.task_id}: ${input.task.description || input.task.deliverable || 'execute assigned task'}`,
-    ...(activeBackgroundTasks.length > 0
-      ? { active_background_tasks: activeBackgroundTasks }
-      : {}),
+    ...(activeBackgroundTasks.length > 0 ? { active_background_tasks: activeBackgroundTasks } : {}),
   };
 }
 
@@ -916,10 +919,11 @@ export function buildDispatchCarryover(input: {
  * store failure never blocks dispatch.
  */
 export function buildDelegationNotificationLines(
-  limit = DELEGATION_NOTIFICATION_CLAIM_LIMIT
+  limit = DELEGATION_NOTIFICATION_CLAIM_LIMIT,
+  filter: { missionId?: string; taskId?: string; owner?: string } = {}
 ): string[] {
   try {
-    return renderDelegationNotificationLines(claimPendingDelegationNotifications(limit));
+    return renderDelegationNotificationLines(claimPendingDelegationNotifications(limit, filter));
   } catch (error) {
     logger.warn(
       `[MISSION_WORKER] delegation notification claim failed (non-fatal): ${
@@ -1172,6 +1176,7 @@ function buildTaskExecutionPrompt(input: {
   artifactReviewLines: string[];
   rejectionLessonLines?: string[];
   delegationNotificationLines?: string[];
+  dynamicInjectionLines?: string[];
   targetPath?: string;
 }): string {
   const lines = [
@@ -1195,7 +1200,7 @@ function buildTaskExecutionPrompt(input: {
     'Write every artifact under the artifact root; deliverable and target paths are relative to it. Report artifact paths relative to the artifact root. Never write to the repository root or outside the mission directory.',
     '',
     ...input.missionGoalLines,
-    ...buildWorkingPrinciplesLines(input.teamRole),
+    ...(input.dynamicInjectionLines ?? []),
     '## Upstream results (inputs you MUST build on)',
     ...input.upstreamResultLines,
     '',
@@ -1594,7 +1599,22 @@ async function buildTaskDispatchContext(input: {
   const artifactReviewLines = buildArtifactReviewLines(input.task);
   const rejectionLessonLines = buildRejectionLessonLines();
   // KC-06: deliver claimed background-delegation completions into this dispatch.
-  const delegationNotificationLines = buildDelegationNotificationLines();
+  const delegationNotificationLines = buildDelegationNotificationLines(
+    DELEGATION_NOTIFICATION_CLAIM_LIMIT,
+    { missionId: input.missionId, taskId: input.task.task_id }
+  );
+  // KC-08: all runtime prompt injections pass through the provider contract.
+  // This keeps one-shot/throttle semantics testable and leaves room for repeat
+  // warnings and claimed notifications to join the same registry.
+  const injectionRegistry = getMissionDynamicInjectionRegistry(input.missionId);
+  if (!injectionRegistry.hasProvider('working-principles')) {
+    injectionRegistry.register(
+      buildWorkingPrinciplesInjectionProvider(buildWorkingPrinciplesLines, input.teamRole)
+    );
+  }
+  const dynamicInjectionLines = injectionRegistry
+    .collect({ step: 0 })
+    .map((injection) => renderInjectionsAsSystemReminders([injection]));
   const promptSupplementChars =
     upstreamResultLines.join('\n').length +
     teamSnapshotLines.join('\n').length +
@@ -1602,6 +1622,7 @@ async function buildTaskDispatchContext(input: {
     artifactReviewLines.join('\n').length +
     rejectionLessonLines.join('\n').length +
     delegationNotificationLines.join('\n').length +
+    dynamicInjectionLines.join('\n').length +
     256;
   const prompt = buildTaskExecutionPrompt({
     missionId: input.missionId,
@@ -1611,6 +1632,7 @@ async function buildTaskDispatchContext(input: {
     taskModelHint: input.taskModelHint,
     rejectionLessonLines,
     delegationNotificationLines,
+    dynamicInjectionLines,
     missionContextPack: missionContextPackText,
     missionGoalLines,
     upstreamResultLines,

@@ -399,6 +399,11 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
       configuredMaxTokens: params.max_tokens,
       ...(floorTokens === undefined ? {} : { floorTokens }),
     });
+    if (maxTokens < 1) {
+      throw new Error(
+        '[CONTEXT_LIMIT] No completion tokens remain after input estimate; compact the context and retry.'
+      );
+    }
     return maxTokens === params.max_tokens ? params : { ...params, max_tokens: maxTokens };
   }
 

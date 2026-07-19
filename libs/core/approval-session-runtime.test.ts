@@ -77,6 +77,11 @@ describe('approval runtime hardening (KC-03)', () => {
         correlationId: 'corr-cache',
         requestedBy: 'worker:test',
         draft: { title: 'cache seed', summary: 'approve and cache' },
+        accountability: {
+          finalDecision: 'human_only',
+          payloadHash: store.computeApprovalPayloadHash({ secret: 'approved' }),
+          effectBinding: 'secret:set',
+        },
       });
 
       store.decideApprovalRequest('mission_controller', {
@@ -86,13 +91,34 @@ describe('approval runtime hardening (KC-03)', () => {
         decidedBy: 'human:operator',
         decidedByType: 'human',
         authenticated: true,
+        payloadHash: store.computeApprovalPayloadHash({ secret: 'approved' }),
+        effectBinding: 'secret:set',
         sessionCache: descriptor,
       });
 
-      const entry = store.lookupSessionApprovalCache(descriptor);
+      const lookupContext = {
+        agentId: 'worker:test',
+        payloadHash: store.computeApprovalPayloadHash({ secret: 'approved' }),
+        effectBinding: 'secret:set',
+      };
+      const entry = store.lookupSessionApprovalCache(descriptor, Date.now(), lookupContext);
       expect(entry).not.toBeNull();
       expect(entry?.grantedByRequestId).toBe(created.id);
       expect(entry?.grantedBy).toBe('human:operator');
+      expect(
+        store.lookupSessionApprovalCache(descriptor, Date.now(), {
+          agentId: 'other-agent',
+          payloadHash: store.computeApprovalPayloadHash({ secret: 'approved' }),
+          effectBinding: 'secret:set',
+        })
+      ).toBeNull();
+      expect(
+        store.lookupSessionApprovalCache(descriptor, Date.now(), {
+          agentId: 'worker:test',
+          payloadHash: store.computeApprovalPayloadHash({ secret: 'changed' }),
+          effectBinding: 'secret:set',
+        })
+      ).toBeNull();
 
       const cacheEvent = readEvents(store, 'terminal').find(
         (event) => event.event === 'session_cache_written'
@@ -125,7 +151,13 @@ describe('approval runtime hardening (KC-03)', () => {
           sessionCache: descriptor,
         })
       ).toThrow('human decider');
-      expect(store.lookupSessionApprovalCache(descriptor)).toBeNull();
+      expect(
+        store.lookupSessionApprovalCache(descriptor, Date.now(), {
+          agentId: 'worker:test',
+          payloadHash: store.computeApprovalPayloadHash({ secret: 'approved' }),
+          effectBinding: 'secret:set',
+        })
+      ).toBeNull();
       // Fail-fast: the invalid opt-in must not persist the decision either.
       expect(store.loadApprovalRequest('terminal', created.id)?.status).toBe('pending');
 
@@ -140,7 +172,13 @@ describe('approval runtime hardening (KC-03)', () => {
           sessionCache: descriptor,
         })
       ).toThrow('authenticated human');
-      expect(store.lookupSessionApprovalCache(descriptor)).toBeNull();
+      expect(
+        store.lookupSessionApprovalCache(descriptor, Date.now(), {
+          agentId: 'worker:test',
+          payloadHash: store.computeApprovalPayloadHash({ secret: 'approved' }),
+          effectBinding: 'secret:set',
+        })
+      ).toBeNull();
     });
 
     it('never caches a rejection', async () => {
@@ -160,11 +198,19 @@ describe('approval runtime hardening (KC-03)', () => {
         decidedBy: 'human:operator',
         decidedByType: 'human',
         authenticated: true,
+        payloadHash: store.computeApprovalPayloadHash({ secret: 'approved' }),
+        effectBinding: 'secret:set',
         sessionCache: descriptor,
       });
 
       expect(decided.status).toBe('rejected');
-      expect(store.lookupSessionApprovalCache(descriptor)).toBeNull();
+      expect(
+        store.lookupSessionApprovalCache(descriptor, Date.now(), {
+          agentId: 'worker:test',
+          payloadHash: store.computeApprovalPayloadHash({ secret: 'approved' }),
+          effectBinding: 'secret:set',
+        })
+      ).toBeNull();
       expect(
         readEvents(store, 'terminal').some((event) => event.event === 'session_cache_written')
       ).toBe(false);
@@ -179,6 +225,11 @@ describe('approval runtime hardening (KC-03)', () => {
         requestedBy: 'worker:test',
         draft: { title: 'expiring grant', summary: 'cache dies with the grant' },
         expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
+        accountability: {
+          finalDecision: 'human_only',
+          payloadHash: store.computeApprovalPayloadHash({ secret: 'approved' }),
+          effectBinding: 'secret:set',
+        },
       });
       store.decideApprovalRequest('mission_controller', {
         channel: 'terminal',
@@ -187,13 +238,24 @@ describe('approval runtime hardening (KC-03)', () => {
         decidedBy: 'human:operator',
         decidedByType: 'human',
         authenticated: true,
+        payloadHash: store.computeApprovalPayloadHash({ secret: 'approved' }),
+        effectBinding: 'secret:set',
         sessionCache: descriptor,
       });
 
-      expect(store.lookupSessionApprovalCache(descriptor)).not.toBeNull();
-      expect(store.lookupSessionApprovalCache(descriptor, Date.now() + 7_200_000)).toBeNull();
+      const lookupContext = {
+        agentId: 'worker:test',
+        payloadHash: store.computeApprovalPayloadHash({ secret: 'approved' }),
+        effectBinding: 'secret:set',
+      };
+      expect(
+        store.lookupSessionApprovalCache(descriptor, Date.now(), lookupContext)
+      ).not.toBeNull();
+      expect(
+        store.lookupSessionApprovalCache(descriptor, Date.now() + 7_200_000, lookupContext)
+      ).toBeNull();
       // The expired entry is evicted, not just hidden.
-      expect(store.lookupSessionApprovalCache(descriptor)).toBeNull();
+      expect(store.lookupSessionApprovalCache(descriptor, Date.now(), lookupContext)).toBeNull();
     });
 
     it('records durable auto-approval events for cache hits', async () => {
@@ -205,9 +267,12 @@ describe('approval runtime hardening (KC-03)', () => {
           targetClass: 'service:github',
           grantedByRequestId: '123e4567-e89b-42d3-a456-426614174000',
           grantedBy: 'human:operator',
+          grantedForAgent: 'agent-1',
           grantedAt: '2026-07-20T00:00:00.000Z',
           channel: 'terminal',
           storageChannel: 'terminal',
+          payloadHash: 'payload-hash',
+          effectBinding: 'secret:set',
         },
         operationId: 'secret:set',
         agentId: 'agent-1',

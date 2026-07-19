@@ -420,9 +420,12 @@ describe('enforceApprovalGate', () => {
       targetClass: 'service:github',
       grantedByRequestId: 'req-human',
       grantedBy: 'human:operator',
+      grantedForAgent: 'agent-1',
       grantedAt: '2026-07-20T00:00:00Z',
       channel: 'terminal',
       storageChannel: 'terminal',
+      payloadHash: '{}',
+      effectBinding: 'secret:set',
     };
 
     beforeEach(() => {
@@ -441,6 +444,15 @@ describe('enforceApprovalGate', () => {
       expect(result.status).toBe('approved');
       expect(result.requestId).toBe('req-human');
       expect(mockCreateRequest).not.toHaveBeenCalled();
+      expect(mockLookupSessionCache).toHaveBeenCalledWith(
+        descriptor,
+        expect.any(Number),
+        expect.objectContaining({
+          agentId: 'agent-1',
+          payloadHash: '{}',
+          effectBinding: 'secret:set',
+        })
+      );
       expect(mockAuditRecord).toHaveBeenCalledWith(
         expect.objectContaining({
           result: 'allowed',

@@ -373,7 +373,12 @@ export function enforceApprovalGate(
     descriptor &&
     sessionCacheEligible &&
     descriptor.action.trim().toLowerCase() === operationId.trim().toLowerCase()
-      ? lookupSessionApprovalCache(descriptor)
+      ? lookupSessionApprovalCache(descriptor, Date.now(), {
+          agentId,
+          payloadHash: computeApprovalPayloadHash(payload),
+          effectBinding: operationId,
+          source: params.source,
+        })
       : null;
   if (cached) {
     auditChain.record({
