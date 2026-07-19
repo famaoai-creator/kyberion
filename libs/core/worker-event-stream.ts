@@ -233,7 +233,13 @@ function attachDefaultObservabilityRecorder(stream: WorkerEventStream): void {
           logger.warn(`[worker-event-stream] refusing unsafe mission event scope: ${missionId}`);
           return;
         }
-        const missionEventDir = `${pathResolver.missionDir(missionId, 'confidential')}/logs/worker-events`;
+        // Keep the event partition under shared observability. Creating a
+        // mission directory merely to record an event can shadow an existing
+        // public mission in findMissionPath(), causing context resolution to
+        // select an empty confidential directory. The mission id still gives
+        // consumers a physically separated replay stream without mutating
+        // mission lifecycle state.
+        const missionEventDir = `${dir}/missions/${missionId}`;
         safeMkdir(missionEventDir, { recursive: true });
         safeAppendFileSync(
           `${missionEventDir}/worker-events-${day}.jsonl`,
