@@ -10,8 +10,9 @@ import { getVoiceProfileRecord, type VoiceProfileRecord } from './voice-profile-
 import { getVoiceRuntimePolicy } from './voice-runtime-policy.js';
 import { getSpeechToTextBridge } from './speech-to-text-bridge.js';
 import { getReasoningBackend } from './reasoning-backend.js';
+import { createVoiceActuatorServeClient } from './actuator-serve-client.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeExec, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
 import { resolveVoiceEngineForPlatform } from './voice-engine-registry.js';
 
 export interface RealtimeVoiceConversationTurn {
@@ -74,30 +75,37 @@ function normalizeSessionId(sessionId: string): string {
 
 function assertRealtimeVoiceProfileReady(
   profileId: string | undefined,
-  personalVoiceMode: 'allow_fallback' | 'require_personal_voice',
+  personalVoiceMode: 'allow_fallback' | 'require_personal_voice'
 ): VoiceProfileRecord {
   const profile = getVoiceProfileRecord(profileId);
   if (profile.status !== 'active') {
     throw new Error(
-      `Voice profile ${profile.profile_id} is ${profile.status}; promotion to active is required before realtime conversation.`,
+      `Voice profile ${profile.profile_id} is ${profile.status}; promotion to active is required before realtime conversation.`
     );
   }
   if (personalVoiceMode !== 'require_personal_voice') {
     return profile;
   }
   const resolvedEngine = resolveVoiceEngineForPlatform(profile.default_engine_id);
-  if (resolvedEngine.engine_id !== profile.default_engine_id || resolvedEngine.kind !== 'voice_clone_service') {
+  if (
+    resolvedEngine.engine_id !== profile.default_engine_id ||
+    resolvedEngine.kind !== 'voice_clone_service'
+  ) {
     throw new Error(
-      `Voice profile ${profile.profile_id} cannot satisfy strict personal voice mode; requested ${profile.default_engine_id}, resolved ${resolvedEngine.engine_id}.`,
+      `Voice profile ${profile.profile_id} cannot satisfy strict personal voice mode; requested ${profile.default_engine_id}, resolved ${resolvedEngine.engine_id}.`
     );
   }
   return profile;
 }
 
-function loadRealtimeVoiceConversationSession(sessionId: string): RealtimeVoiceConversationSession | null {
+function loadRealtimeVoiceConversationSession(
+  sessionId: string
+): RealtimeVoiceConversationSession | null {
   const targetPath = sessionPath(sessionId);
   if (!safeExistsSync(targetPath)) return null;
-  return JSON.parse(safeReadFile(targetPath, { encoding: 'utf8' }) as string) as RealtimeVoiceConversationSession;
+  return JSON.parse(
+    safeReadFile(targetPath, { encoding: 'utf8' }) as string
+  ) as RealtimeVoiceConversationSession;
 }
 
 function writeRealtimeVoiceConversationSession(session: RealtimeVoiceConversationSession): string {
@@ -121,7 +129,7 @@ export function ensureRealtimeVoiceConversationSession(input: {
 
   const profile = assertRealtimeVoiceProfileReady(
     input.profileId,
-    input.personalVoiceMode || 'require_personal_voice',
+    input.personalVoiceMode || 'require_personal_voice'
   );
   const now = new Date().toISOString();
   const session: RealtimeVoiceConversationSession = {
@@ -138,7 +146,10 @@ export function ensureRealtimeVoiceConversationSession(input: {
   return session;
 }
 
-function buildConversationContext(session: RealtimeVoiceConversationSession, userText: string): string {
+function buildConversationContext(
+  session: RealtimeVoiceConversationSession,
+  userText: string
+): string {
   const recentTurns = session.transcript.slice(-8).map((turn) => {
     const speaker = turn.speaker === 'user' ? 'User' : session.assistant_name;
     return `${speaker}: ${turn.text}`;
@@ -156,72 +167,177 @@ function buildConversationContext(session: RealtimeVoiceConversationSession, use
     .join('\n');
 }
 
-function synthesizeAssistantVoice(input: {
+export interface RealtimeVoiceSynthesisInput {
   sessionId: string;
   profileId: string;
   language: string;
   text: string;
   deliveryMode: 'artifact' | 'artifact_and_playback';
   personalVoiceMode: 'allow_fallback' | 'require_personal_voice';
-}): Record<string, unknown> {
-  const requestId = `${input.sessionId}-${Date.now().toString(36)}-${randomUUID().slice(0, 8)}`;
-  const requestPath = pathResolver.sharedTmp(`realtime-voice-conversation/${requestId}.json`);
+  /** Extra request-id suffix (e.g. `turn3-seg0`) for traceable artifacts. */
+  requestTag?: string;
+}
+
+/**
+ * Executes a voice-actuator payload and returns its parsed JSON result.
+ * The default spawns the actuator one-shot; a warm serve-mode client
+ * (see actuator-serve-client.ts) can be injected to skip per-request
+ * process startup — the realtime loop uses that for sentence segments.
+ */
+export type VoiceActuatorExecutor = (
+  payload: Record<string, unknown>,
+  signal?: AbortSignal
+) => Promise<Record<string, unknown>>;
+
+async function defaultVoiceActuatorExecutor(
+  payload: Record<string, unknown>,
+  signal?: AbortSignal
+): Promise<Record<string, unknown>> {
+  if (signal?.aborted) throw new Error('voice synthesis aborted');
+  const client = createVoiceActuatorServeClient({ requestTimeoutMs: 120_000 });
+  try {
+    return await client.request(payload, signal);
+  } finally {
+    await client.dispose();
+  }
+}
+
+export function buildRealtimeVoiceGenerationPayload(input: RealtimeVoiceSynthesisInput): {
+  payload: Record<string, unknown>;
+  artifactPath: string;
+} {
+  const requestId = [
+    input.sessionId,
+    ...(input.requestTag ? [input.requestTag] : []),
+    Date.now().toString(36),
+    randomUUID().slice(0, 8),
+  ].join('-');
   const format = process.platform === 'darwin' ? 'aiff' : 'wav';
   const artifactPath = pathResolver.sharedTmp(`realtime-voice-conversation/${requestId}.${format}`);
 
   const profile = getVoiceProfileRecord(input.profileId);
   const policy = getVoiceRuntimePolicy();
 
-  safeWriteFile(
-    requestPath,
-    JSON.stringify(
-      {
-        action: 'generate_voice',
-        request_id: requestId,
-        text: input.text,
-        profile_ref: { profile_id: input.profileId },
-        engine: {
-          engine_id: profile.default_engine_id,
-        },
-        rendering: {
-          language: input.language,
-          chunking: {
-            max_chunk_chars: policy.chunking.default_max_chunk_chars,
-            crossfade_ms: policy.chunking.default_crossfade_ms,
-            preserve_paralinguistic_tags: true,
-          },
-        },
-        delivery: {
-          mode: input.deliveryMode,
-          format,
-          artifact_path: artifactPath,
-          emit_progress_packets: false,
-        },
-        routing: {
-          personal_voice_mode: input.personalVoiceMode,
+  return {
+    artifactPath,
+    payload: {
+      action: 'generate_voice',
+      request_id: requestId,
+      text: input.text,
+      profile_ref: { profile_id: input.profileId },
+      engine: {
+        engine_id: profile.default_engine_id,
+      },
+      rendering: {
+        language: input.language,
+        chunking: {
+          max_chunk_chars: policy.chunking.default_max_chunk_chars,
+          crossfade_ms: policy.chunking.default_crossfade_ms,
+          preserve_paralinguistic_tags: true,
         },
       },
-      null,
-      2,
-    ),
-  );
-  const raw = safeExec(
-    'node',
-    ['dist/libs/actuators/voice-actuator/src/index.js', '--input', requestPath],
-    { timeoutMs: 120_000 },
-  );
+      delivery: {
+        mode: input.deliveryMode,
+        format,
+        artifact_path: artifactPath,
+        emit_progress_packets: false,
+      },
+      routing: {
+        personal_voice_mode: input.personalVoiceMode,
+      },
+    },
+  };
+}
 
-  const lines = raw.split('\n');
-  const jsonStartIdx = lines.findIndex(l => l.trim().startsWith('{'));
-  if (jsonStartIdx === -1) {
-    throw new Error(`[voice-actuator] could not find JSON in output: ${raw}`);
+export async function synthesizeRealtimeVoice(
+  input: RealtimeVoiceSynthesisInput,
+  executor?: VoiceActuatorExecutor,
+  signal?: AbortSignal
+): Promise<{ result: Record<string, unknown>; artifactPath?: string }> {
+  const { payload, artifactPath } = buildRealtimeVoiceGenerationPayload(input);
+  const result = executor
+    ? await executor(payload, signal)
+    : await defaultVoiceActuatorExecutor(payload, signal);
+  if (signal?.aborted) throw new Error('voice synthesis aborted');
+  const artifacts = Array.isArray(result.artifact_refs) ? (result.artifact_refs as string[]) : [];
+  const resolvedArtifact =
+    artifacts[0] || (safeExistsSync(artifactPath) ? artifactPath : undefined);
+  return { result, ...(resolvedArtifact ? { artifactPath: resolvedArtifact } : {}) };
+}
+
+async function synthesizeAssistantVoice(input: {
+  sessionId: string;
+  profileId: string;
+  language: string;
+  text: string;
+  deliveryMode: 'artifact' | 'artifact_and_playback';
+  personalVoiceMode: 'allow_fallback' | 'require_personal_voice';
+}): Promise<Record<string, unknown>> {
+  const { payload } = buildRealtimeVoiceGenerationPayload(input);
+  return defaultVoiceActuatorExecutor(payload);
+}
+
+/**
+ * Generate the assistant reply for a user utterance in an existing
+ * session — the LLM step of a turn, extracted so the realtime voice
+ * loop can run STT / reply / TTS as separate pipeline stages.
+ */
+export async function generateRealtimeAssistantReply(
+  sessionId: string,
+  userText: string
+): Promise<string> {
+  const session = loadRealtimeVoiceConversationSession(normalizeSessionId(sessionId));
+  if (!session) {
+    throw new Error(`Realtime voice conversation session not found: ${sessionId}`);
   }
-  const cleanStdout = lines.slice(jsonStartIdx).join('\n');
-  return JSON.parse(cleanStdout) as Record<string, unknown>;
+  const backend = getReasoningBackend();
+  const assistantText = (
+    await backend.delegateTask(
+      `Respond to the user's spoken message in ${session.language}. Return only the assistant reply.`,
+      buildConversationContext(session, userText)
+    )
+  ).trim();
+  if (!assistantText) {
+    throw new Error(
+      `Reasoning backend returned an empty assistant reply for session ${session.session_id}`
+    );
+  }
+  return assistantText;
+}
+
+/** Append one completed user/assistant exchange to the session transcript. */
+export function recordRealtimeVoiceConversationExchange(input: {
+  sessionId: string;
+  userText: string;
+  assistantText: string;
+  userAudioRef?: string;
+  assistantAudioRef?: string;
+}): string {
+  const session = loadRealtimeVoiceConversationSession(normalizeSessionId(input.sessionId));
+  if (!session) {
+    throw new Error(`Realtime voice conversation session not found: ${input.sessionId}`);
+  }
+  const now = new Date().toISOString();
+  session.transcript.push(
+    {
+      speaker: 'user',
+      text: input.userText,
+      ts: now,
+      ...(input.userAudioRef ? { audio_ref: input.userAudioRef } : {}),
+    },
+    {
+      speaker: 'assistant',
+      text: input.assistantText,
+      ts: new Date().toISOString(),
+      ...(input.assistantAudioRef ? { audio_ref: input.assistantAudioRef } : {}),
+    }
+  );
+  session.updated_at = new Date().toISOString();
+  return writeRealtimeVoiceConversationSession(session);
 }
 
 export async function runRealtimeVoiceConversationTurn(
-  input: RealtimeVoiceConversationTurnInput,
+  input: RealtimeVoiceConversationTurnInput
 ): Promise<RealtimeVoiceConversationTurnResult> {
   const session = ensureRealtimeVoiceConversationSession({
     sessionId: input.sessionId,
@@ -242,12 +358,16 @@ export async function runRealtimeVoiceConversationTurn(
   }
 
   const backend = getReasoningBackend();
-  const assistantText = (await backend.delegateTask(
-    `Respond to the user's spoken message in ${session.language}. Return only the assistant reply.`,
-    buildConversationContext(session, userText),
-  )).trim();
+  const assistantText = (
+    await backend.delegateTask(
+      `Respond to the user's spoken message in ${session.language}. Return only the assistant reply.`,
+      buildConversationContext(session, userText)
+    )
+  ).trim();
   if (!assistantText) {
-    throw new Error(`Reasoning backend returned an empty assistant reply for session ${session.session_id}`);
+    throw new Error(
+      `Reasoning backend returned an empty assistant reply for session ${session.session_id}`
+    );
   }
 
   const now = new Date().toISOString();
@@ -269,7 +389,7 @@ export async function runRealtimeVoiceConversationTurn(
   let voiceGenerationResult: Record<string, unknown> | undefined;
   const deliveryMode = input.deliveryMode || 'artifact_and_playback';
   if (deliveryMode !== 'none') {
-    voiceGenerationResult = synthesizeAssistantVoice({
+    voiceGenerationResult = await synthesizeAssistantVoice({
       sessionId: session.session_id,
       profileId: session.profile_id,
       language: input.language || session.language,
@@ -295,7 +415,7 @@ export async function runRealtimeVoiceConversationTurn(
       text: assistantText,
       ts: new Date().toISOString(),
       ...(audioArtifactPath ? { audio_ref: audioArtifactPath } : {}),
-    },
+    }
   );
   session.updated_at = new Date().toISOString();
   const transcriptPath = writeRealtimeVoiceConversationSession(session);

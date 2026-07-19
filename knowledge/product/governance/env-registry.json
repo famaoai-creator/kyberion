@@ -1809,6 +1809,22 @@
       "documented": false
     },
     {
+      "name": "KYBERION_SILERO_VAD_MODEL",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_SILERO_VAD_PYTHON",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_SKIP_TYPE_RATCHET",
       "category": "flag",
       "type": "boolean",
@@ -2175,6 +2191,14 @@
     },
     {
       "name": "KYBERION_UI_LOCALE",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_VAD",
       "category": "runtime",
       "type": "string",
       "required": false,
