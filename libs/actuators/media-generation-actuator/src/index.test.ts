@@ -364,6 +364,31 @@ describe('media-generation-actuator', () => {
     expect(timedOut.status).toBe('submitted');
   });
 
+  it('does not query ComfyUI for a job owned by an unsupported provider', async () => {
+    mocks.safeReadFile.mockReturnValue(
+      JSON.stringify({
+        kind: 'generation-job',
+        job_id: 'genjob-provider-boundary',
+        action: 'generate_image',
+        status: 'submitted',
+        provider: { engine: 'mflux', provider_job_id: 'mflux-job-1' },
+        request: { workflow: { '1': { class_type: 'SaveImage' } } },
+        created_at: '2026-03-22T00:00:00.000Z',
+      })
+    );
+    const { handleAction } = await import('./index.js');
+
+    const result = await handleAction({
+      action: 'get_generation_job',
+      params: { job_id: 'genjob-provider-boundary' },
+    });
+
+    expect(result.status).toBe('submitted');
+    expect(result.provider_history_status).toBe('unsupported');
+    expect(result.provider_history_provider).toBe('mflux');
+    expect(mocks.secureFetch).not.toHaveBeenCalled();
+  });
+
   it('rejects traversal in job and provider artifact paths', async () => {
     const helpers = await import('./media-generation-helpers.js');
 
