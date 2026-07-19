@@ -31,6 +31,72 @@ export function createStandardYargs(args = process.argv) {
     .alias('h', 'help');
 }
 
+/**
+ * Serve-mode framing: every response line is `PREFIX + JSON`, so clients
+ * can pick results out of a stdout that also carries actuator logs.
+ */
+export const ACTUATOR_SERVE_RESULT_PREFIX = '@@kyberion-actuator-result@@';
+
+interface ActuatorServeRequest {
+  id?: unknown;
+  input?: unknown;
+}
+
+function formatUnknownError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * Warm serve loop: NDJSON requests on stdin (`{"id":"r1","input":{...}}`),
+ * one framed response line per request. Keeps the actuator process (and
+ * any lazily-loaded engines) alive across requests — per-request process
+ * startup is what makes one-shot voice synthesis slow.
+ */
+async function runActuatorServeLoop(opts: {
+  name: string;
+  handleAction: (input: unknown) => Promise<unknown> | unknown;
+  schema?: object;
+}): Promise<void> {
+  const validate = opts.schema
+    ? new Ajv({ allErrors: true, allowUnionTypes: true }).compile(opts.schema)
+    : null;
+  const emit = (response: Record<string, unknown>): void => {
+    process.stdout.write(`${ACTUATOR_SERVE_RESULT_PREFIX}${JSON.stringify(response)}\n`);
+  };
+
+  let buffer = '';
+  for await (const data of process.stdin) {
+    buffer += data.toString('utf8');
+    let nl: number;
+    while ((nl = buffer.indexOf('\n')) >= 0) {
+      const line = buffer.slice(0, nl).trim();
+      buffer = buffer.slice(nl + 1);
+      if (!line) continue;
+      let request: ActuatorServeRequest;
+      try {
+        request = JSON.parse(line) as ActuatorServeRequest;
+      } catch (err: unknown) {
+        emit({ ok: false, error: `invalid JSON request: ${formatUnknownError(err)}` });
+        continue;
+      }
+      const id = request.id ?? null;
+      if (validate && !validate(request.input)) {
+        const details = (validate.errors || [])
+          .map((error) => `${error.instancePath || '/'} ${error.message || 'is invalid'}`)
+          .join('; ');
+        emit({ id, ok: false, error: `invalid input: ${details}` });
+        continue;
+      }
+      try {
+        const result = await opts.handleAction(request.input);
+        emit({ id, ok: true, result });
+      } catch (err: unknown) {
+        emit({ id, ok: false, error: formatUnknownError(err) });
+      }
+    }
+  }
+}
+
 export async function runActuatorCli(opts: {
   name: string;
   handleAction: (input: unknown) => Promise<unknown> | unknown;
@@ -39,8 +105,28 @@ export async function runActuatorCli(opts: {
   args?: string[];
 }): Promise<void> {
   const argv = await createStandardYargs(opts.args || process.argv)
-    .option('input', { alias: 'i', type: 'string', required: true })
+    .option('input', { alias: 'i', type: 'string' })
+    .option('serve', {
+      type: 'boolean',
+      default: false,
+      description: 'Stay resident: read NDJSON requests from stdin (warm actuator mode)',
+    })
     .parse();
+
+  if (argv.serve) {
+    await runActuatorServeLoop({
+      name: opts.name,
+      handleAction: opts.handleAction,
+      ...(opts.schema ? { schema: opts.schema } : {}),
+    });
+    return;
+  }
+
+  if (!argv.input) {
+    console.error(`[${opts.name}] --input is required (or use --serve)`);
+    process.exit(1);
+    return;
+  }
   const inputPath = pathResolver.rootResolve(String(argv.input));
 
   let inputContent: string;

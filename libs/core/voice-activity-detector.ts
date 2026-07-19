@@ -21,6 +21,8 @@ export interface VoiceActivityDetector {
    */
   ingest(chunk: AudioChunk): VoiceActivityState;
   reset(): void;
+  /** Release subprocesses or other resources owned by the detector. */
+  dispose?(): void | Promise<void>;
 }
 
 export interface VoiceActivityState {
@@ -61,9 +63,9 @@ export class EnergyVad implements VoiceActivityDetector {
   }
 
   ingest(chunk: AudioChunk): VoiceActivityState {
-    const rms = computeRms(chunk);
+    const rms = computeChunkRms(chunk);
     const speaking = rms >= this.opts.rms_threshold;
-    const frameMs = chunkDurationMs(chunk);
+    const frameMs = computeChunkDurationMs(chunk);
     if (speaking) {
       this.silenceMs = 0;
       this.hadSpeechSinceEndpoint = true;
@@ -84,7 +86,13 @@ export class EnergyVad implements VoiceActivityDetector {
   }
 }
 
-function computeRms(chunk: AudioChunk): number {
+/**
+ * RMS of a PCM_S16LE chunk. Exported for callers that need the raw
+ * energy signal outside the VAD (e.g. noise-floor calibration).
+ * Non-PCM encodings return +Infinity so callers treat them as speech
+ * rather than spuriously endpointing.
+ */
+export function computeChunkRms(chunk: AudioChunk): number {
   if (chunk.format.encoding !== 'pcm_s16le') {
     // Other encodings: skip detection (return loud so the caller treats
     // it as speech rather than spuriously endpointing).
@@ -93,7 +101,7 @@ function computeRms(chunk: AudioChunk): number {
   const view = new DataView(
     chunk.payload.buffer,
     chunk.payload.byteOffset,
-    chunk.payload.byteLength,
+    chunk.payload.byteLength
   );
   const sampleCount = chunk.payload.byteLength / 2;
   if (sampleCount === 0) return 0;
@@ -105,7 +113,8 @@ function computeRms(chunk: AudioChunk): number {
   return Math.sqrt(sumSquares / sampleCount);
 }
 
-function chunkDurationMs(chunk: AudioChunk): number {
+/** Duration of an audio chunk in milliseconds, from its format + payload size. */
+export function computeChunkDurationMs(chunk: AudioChunk): number {
   const bytesPerSample =
     chunk.format.encoding === 'pcm_f32le' ? 4 : chunk.format.encoding === 'pcm_s16le' ? 2 : 2;
   const samples = chunk.payload.byteLength / (bytesPerSample * chunk.format.channels);
