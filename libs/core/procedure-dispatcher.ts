@@ -158,7 +158,12 @@ function dispatchExtensionSession(input: DispatchInput): DispatchResult {
     for (const segment of segments) {
       const allowed = procedure.target.origins.some((o) => matchesAllowedOrigin(o, segment.origin));
       if (!allowed) {
-        recordGovernanceAction(agentId, 'procedure_dispatcher', `origin_blocked:${procedure.procedure_id}`, true);
+        recordGovernanceAction(
+          agentId,
+          'procedure_dispatcher',
+          `origin_blocked:${procedure.procedure_id}`,
+          true
+        );
         return {
           status: 'blocked',
           errors: [
@@ -187,7 +192,12 @@ function dispatchExtensionSession(input: DispatchInput): DispatchResult {
       `[procedure-dispatcher] approval required for "${procedure.procedure_id}" ` +
         `— request_id=${approval.requestId ?? 'n/a'}`
     );
-    recordGovernanceAction(agentId, 'procedure_dispatcher', `approval_required:${procedure.procedure_id}`, true);
+    recordGovernanceAction(
+      agentId,
+      'procedure_dispatcher',
+      `approval_required:${procedure.procedure_id}`,
+      true
+    );
     return {
       status: 'approval_required',
       approvalRequestId: approval.requestId,
@@ -208,7 +218,16 @@ function dispatchExtensionSession(input: DispatchInput): DispatchResult {
     // sub-recording validated against its own origin-bound lease (origin /
     // recording_id / expiry / step-hash coverage). Any blocked segment fails all.
     for (const seg of issued.leases) {
-      const sub = subRecordingForSegment(recording, segments[seg.segment_index]);
+      const segment = segments.find((s) => s.index === seg.segment_index);
+      if (!segment) {
+        return {
+          status: 'blocked',
+          errors: [
+            `segment ${seg.segment_index} (${seg.origin}): segment not found for issued lease`,
+          ],
+        };
+      }
+      const sub = subRecordingForSegment(recording, segment);
       const verified = preflightBrowserExtensionSession({
         recording: sub,
         session: { ...session, origin: seg.origin, lease: seg.lease },
@@ -269,7 +288,12 @@ async function dispatchServiceSession(input: DispatchInput): Promise<DispatchRes
   if (allowedServices.length > 0) {
     for (const step of serviceRecording.steps) {
       if (!allowedServices.includes(step.service_id)) {
-        recordGovernanceAction(agentId, 'procedure_dispatcher', `service_blocked:${procedure.procedure_id}`, true);
+        recordGovernanceAction(
+          agentId,
+          'procedure_dispatcher',
+          `service_blocked:${procedure.procedure_id}`,
+          true
+        );
         return {
           status: 'blocked',
           errors: [

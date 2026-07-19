@@ -1,6 +1,23 @@
 let recordingEnabled = false;
+let extractionMode = false;
+let conditionalMode = false;
 let snapshotHash = null;
 const recordedFieldStates = new Set();
+let lastExtractionPointer = null;
+let lastConditionalPointer = null;
+
+// True while the page has a pending WebAuthn (passkey) request — the OS dialog
+// is up and the user is authenticating. Step waits extend instead of timing
+// out, and positional fallback holds off. Set via the MAIN-world hook
+// installed by the background script (installWebauthnHook).
+let webauthnActive = false;
+window.addEventListener('message', (event) => {
+  if (event.source !== window || event.data?.__kyberion !== 'webauthn') return;
+  webauthnActive = event.data.phase === 'start';
+  chrome.runtime
+    .sendMessage({ type: 'bridge:webauthn-phase', phase: event.data.phase, ok: event.data.ok })
+    .catch(() => undefined);
+});
 
 // Popup sentinel — armed during Pattern B execution to detect unexpected dialogs
 let executionSentinelActive = false;
@@ -17,11 +34,27 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
   if (message?.type === 'bridge:set-recording') {
     recordingEnabled = Boolean(message.enabled);
+    if (!recordingEnabled) {
+      extractionMode = false;
+      conditionalMode = false;
+    }
     if (recordingEnabled) {
       recordedFieldStates.clear();
       observePage();
     }
     sendResponse({ ok: true });
+    return;
+  }
+  if (message?.type === 'bridge:set-extraction-mode') {
+    extractionMode = recordingEnabled && Boolean(message.enabled);
+    if (extractionMode) conditionalMode = false;
+    sendResponse({ ok: true, enabled: extractionMode });
+    return;
+  }
+  if (message?.type === 'bridge:set-conditional-mode') {
+    conditionalMode = recordingEnabled && Boolean(message.enabled);
+    if (conditionalMode) extractionMode = false;
+    sendResponse({ ok: true, enabled: conditionalMode });
     return;
   }
   if (message?.type === 'bridge:execute-step') {
@@ -94,13 +127,49 @@ function verifyGolden(conditions) {
 // --- Approved-step executor (lease-bound replay) -------------------------------
 // Re-snapshots before every step, resolves the reviewed ref against the live
 // DOM, and refuses to act when the target is missing or ambiguous.
+// Wait for the initial page load before touching the DOM — target resolution
+// on a half-loaded page misses elements and can mislead the positional
+// fallback. Capped: SPAs may never fire load for in-app transitions.
+function pageReady(capMs = 15000) {
+  if (document.readyState === 'complete') return Promise.resolve();
+  return new Promise((resolve) => {
+    const cap = setTimeout(resolve, capMs);
+    window.addEventListener(
+      'load',
+      () => {
+        clearTimeout(cap);
+        resolve();
+      },
+      { once: true }
+    );
+  });
+}
+
 async function executeStep(step, value) {
   if (!step?.target?.ref) return { status: 'error', detail: 'ref がありません' };
-  const resolved = await waitForTarget(step);
-  if (!resolved.element) return resolved.result;
+  await pageReady();
+  let resolved;
+  if (step.op === 'click_if_present') {
+    // Presence checks are intentionally one-shot: an absent optional target
+    // should skip promptly instead of waiting the full ref-resolution timeout.
+    await observePage();
+    resolved = resolveTarget(step);
+  } else {
+    resolved = await waitForTarget(step);
+  }
+  if (!resolved.element) {
+    if (step.op === 'click_if_present' && resolved.result?.status === 'not_found') {
+      return { status: 'skipped', detail: '条件対象が表示されていないためスキップしました' };
+    }
+    return resolved.result;
+  }
   const element = resolved.element;
   try {
-    return await performAction(element, step, value);
+    const outcome = await performAction(element, step, value);
+    if (resolved.positionBased && outcome && outcome.status === 'done') {
+      outcome.detail = `${outcome.detail || ''}（記録時と内容が変わっていたため、同じ位置の要素を操作しました）`;
+    }
+    return outcome;
   } catch (error) {
     return { status: 'error', detail: error instanceof Error ? error.message : String(error) };
   }
@@ -148,23 +217,71 @@ function resolveTarget(step) {
     }
     if (fallback.length === 1) return { element: fallback[0] };
   }
+
   return { result: { status: 'not_found', detail: `対象 ${step.target.ref} が見つかりません` } };
 }
 
+// Positional fallback: on volatile-content pages (news feeds) the recorded
+// accessible name is often gone by replay time. For LOW-RISK ops only, accept
+// the element occupying the same structural slot when its role still matches —
+// i.e. "click today's headline in the same position". Form-mutating ops keep
+// the strict name match and stop instead of guessing.
+// Positional recovery is read-only only. Clicking a different same-role element
+// can navigate, submit, or trigger an external side effect, so clicks remain
+// strict even when a structural path is available.
+const POSITIONAL_FALLBACK_OPS = new Set(['wait_for_ref', 'extract_text_ref']);
+// Give the exact (name-based) target this long to appear before considering the
+// structural slot — avoids grabbing a placeholder on a still-loading page.
+const POSITIONAL_GRACE_MS = 3000;
+
+function positionalFallback(step) {
+  if (!step.target.dom_path || !POSITIONAL_FALLBACK_OPS.has(step.op)) return null;
+  let element = null;
+  try {
+    element = document.querySelector(step.target.dom_path);
+  } catch {
+    return null;
+  }
+  if (!(element instanceof HTMLElement) || !isVisible(element)) return null;
+  if (step.target.role && roleOf(element) !== step.target.role) return null;
+  return { element, positionBased: true };
+}
+
+// Absolute ceiling on a single step's wait, even across passkey pauses.
+const TARGET_WAIT_HARD_CAP_MS = 180000;
+
 async function waitForTarget(step) {
-  const deadline = Date.now() + TARGET_WAIT_TIMEOUT_MS;
+  // Extraction regions are often non-interactive containers (tables, panels)
+  // that name-based resolution can never find — go positional immediately.
+  const graceMs = step.op === 'extract_text_ref' ? 0 : POSITIONAL_GRACE_MS;
+  let deadline = Date.now() + TARGET_WAIT_TIMEOUT_MS;
+  let positionalAfter = Date.now() + graceMs;
+  const hardCap = Date.now() + TARGET_WAIT_HARD_CAP_MS;
   let lastResult = null;
   while (Date.now() <= deadline) {
+    // While a passkey/WebAuthn prompt is up the page is intentionally idle —
+    // keep pushing the deadline so the step resumes after authentication
+    // instead of timing out mid-login.
+    if (webauthnActive) {
+      deadline = Math.min(Date.now() + TARGET_WAIT_TIMEOUT_MS, hardCap);
+      positionalAfter = Math.min(Date.now() + graceMs, hardCap);
+    }
     await observePage();
     const resolved = resolveTarget(step);
     if (resolved.element || resolved.result?.status === 'ambiguous') return resolved;
     lastResult = resolved.result;
+    if (Date.now() >= positionalAfter && !webauthnActive) {
+      const positional = positionalFallback(step);
+      if (positional) return positional;
+    }
     await new Promise((resolve) => setTimeout(resolve, TARGET_WAIT_INTERVAL_MS));
   }
+  const positional = positionalFallback(step);
+  if (positional) return positional;
   return {
     result: {
       ...lastResult,
-      detail: `${lastResult?.detail || '対象'}（${TARGET_WAIT_TIMEOUT_MS / 1000}秒待機後）`,
+      detail: `${lastResult?.detail || '対象'}（${Math.round((TARGET_WAIT_TIMEOUT_MS / 1000) * 10) / 10}秒待機後）`,
     },
   };
 }
@@ -173,6 +290,7 @@ async function performAction(element, step, value) {
   element.scrollIntoView({ block: 'center' });
   switch (step.op) {
     case 'click_ref':
+    case 'click_if_present':
       element.click();
       return { status: 'done', detail: 'クリックしました' };
     case 'fill_ref':
@@ -258,10 +376,62 @@ function applySelection(element, selection) {
   return { status: 'error', detail: 'option 選択は select 要素のみ対応します' };
 }
 
+function isExtractionGesture(event) {
+  return extractionMode || Boolean(event.altKey || event.getModifierState?.('Alt'));
+}
+
+function isConditionalGesture() {
+  return conditionalMode;
+}
+
+function interceptExtractionGesture(event) {
+  if (!recordingEnabled) return;
+  if (isConditionalGesture()) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    lastConditionalPointer = { element: extractionElement(event.target), at: Date.now() };
+    recordConditionalClick(event.target);
+    return;
+  }
+  if (!isExtractionGesture(event)) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  lastExtractionPointer = { element: extractionElement(event.target), at: Date.now() };
+  recordExtraction(event.target);
+}
+
+// Capture before the browser turns an Alt/Option click into link navigation or
+// download behavior. The click listener below remains as a fallback for pages
+// that do not dispatch pointer events (and for keyboard-assisted test harnesses).
+document.addEventListener('pointerdown', interceptExtractionGesture, true);
 document.addEventListener(
   'click',
   (event) => {
     if (!recordingEnabled) return;
+    if (isConditionalGesture()) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      const element = extractionElement(event.target);
+      const duplicate =
+        lastConditionalPointer &&
+        lastConditionalPointer.element === element &&
+        Date.now() - lastConditionalPointer.at < 1000;
+      lastConditionalPointer = null;
+      if (!duplicate) recordConditionalClick(event.target);
+      return;
+    }
+    if (isExtractionGesture(event)) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      const element = extractionElement(event.target);
+      const duplicate =
+        lastExtractionPointer &&
+        lastExtractionPointer.element === element &&
+        Date.now() - lastExtractionPointer.at < 1000;
+      lastExtractionPointer = null;
+      if (!duplicate) recordExtraction(event.target);
+      return;
+    }
     const control = interactiveControl(event.target);
     if (isToggle(control)) {
       return;
@@ -281,6 +451,82 @@ document.addEventListener(
   },
   true
 );
+
+function recordExtraction(candidate) {
+  const element = extractionElement(candidate);
+  if (!element) return;
+  if (!snapshotHash) {
+    void observePage().then(() => recordExtraction(candidate));
+    return;
+  }
+  const role = roleOf(element);
+  const name = accessibleName(element);
+  const domPath = structuralPath(element);
+  if (!domPath || domPath.length > 600) return;
+  const label = safeText(name || element.innerText || role)
+    .trim()
+    .replace(/\s+/g, ' ')
+    .slice(0, 60);
+  const target = {
+    ref: semanticRef(element, role, name),
+    role,
+    name: name || role,
+    snapshot_hash: snapshotHash,
+    dom_path: domPath,
+  };
+  flashExtractionTarget(element);
+  record(
+    {
+      op: 'extract_text_ref',
+      summary: `「${label || role}」のテキストを抽出`,
+      target,
+    },
+    `extract:${domPath}`
+  );
+}
+
+function recordConditionalClick(candidate) {
+  const target = describeTarget(candidate);
+  if (!target) return;
+  const label = safeText(target.name || target.role)
+    .trim()
+    .replace(/\s+/g, ' ')
+    .slice(0, 60);
+  const element = extractionElement(candidate);
+  if (element) flashConditionalTarget(element);
+  record(
+    {
+      op: 'click_if_present',
+      summary: `「${label || target.role}」が表示されていればクリック`,
+      target,
+    },
+    `conditional-click:${target.dom_path || target.ref}`
+  );
+}
+
+function extractionElement(candidate) {
+  if (!(candidate instanceof Element)) return null;
+  let element = candidate;
+  while (element && !(element instanceof HTMLElement)) element = element.parentElement;
+  return element instanceof HTMLElement ? element : null;
+}
+
+// Brief visual confirmation that Alt+click registered the extraction region.
+function flashExtractionTarget(element) {
+  const previous = element.style.outline;
+  element.style.outline = '3px solid #dc7b34';
+  setTimeout(() => {
+    element.style.outline = previous;
+  }, 800);
+}
+
+function flashConditionalTarget(element) {
+  const previous = element.style.outline;
+  element.style.outline = '3px solid #3b82f6';
+  setTimeout(() => {
+    element.style.outline = previous;
+  }, 800);
+}
 
 document.addEventListener('input', handleFieldEvent, true);
 document.addEventListener('change', handleFieldEvent, true);
@@ -392,12 +638,50 @@ function describeTarget(candidate) {
   const role = roleOf(element);
   const name = accessibleName(element);
   if (!snapshotHash) return null;
-  return {
+  const target = {
     ref: semanticRef(element, role, name),
     role,
     name: name || role,
     snapshot_hash: snapshotHash,
   };
+  // Structural anchor: lets replay fall back to "the element in the same slot"
+  // when the accessible name is volatile (news headlines, timestamps, counters).
+  const domPath = structuralPath(element);
+  if (domPath && domPath.length <= 600) target.dom_path = domPath;
+  return target;
+}
+
+// Shortest structural CSS path from a stable ancestor (nearest sane id, else
+// body) using :nth-of-type steps. Content-independent by construction.
+function structuralPath(element) {
+  const parts = [];
+  let node = element;
+  while (node instanceof Element && parts.length < 14) {
+    if (node !== element && node.id && safeStructuralId(node.id)) {
+      parts.unshift(`#${CSS.escape(node.id)}`);
+      return parts.join(' > ');
+    }
+    const tag = node.tagName.toLowerCase();
+    if (tag === 'body' || tag === 'html') {
+      parts.unshift(tag);
+      break;
+    }
+    let selector = tag;
+    const parent = node.parentElement;
+    if (parent) {
+      const sameTag = [...parent.children].filter((child) => child.tagName === node.tagName);
+      if (sameTag.length > 1) selector += `:nth-of-type(${sameTag.indexOf(node) + 1})`;
+    }
+    parts.unshift(selector);
+    node = parent;
+  }
+  return parts.join(' > ');
+}
+
+function safeStructuralId(value) {
+  return (
+    /^[A-Za-z][\w-]*$/.test(value) && !/\d{12,}/.test(value) && !/(?:\+?\d[\d -]{8,}\d)/.test(value)
+  );
 }
 
 function roleOf(element) {
@@ -474,8 +758,8 @@ function safeText(value) {
   return String(value)
     .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[redacted-email]')
     .replace(/\b(?:\d[ -]?){13,16}\b/g, '[redacted-card]')
-    .replace(/〒?\s?\d{3}-\d{4}\b/g, '[redacted-postal]')
     .replace(/(?:\+?\d{1,3}[-\s]?)?\(?\d{2,4}\)?[-\s]?\d{2,4}[-\s]?\d{3,4}\b/g, '[redacted-phone]')
+    .replace(/〒?\s?\d{3}-\d{4}\b/g, '[redacted-postal]')
     .replace(/\b\d{12,}\b/g, '[redacted-number]')
     .replace(/\s+/g, ' ')
     .trim()
@@ -528,7 +812,9 @@ function isModalNode(el) {
 
 function isMfaNode(el) {
   if (!(el instanceof HTMLElement)) return false;
-  return /mfa|otp|二段階|authenticat|ワンタイム/i.test(el.textContent || '');
+  return /mfa|otp|二段階|authenticat|ワンタイム|passkey|パスキー|webauthn|生体認証/i.test(
+    el.textContent || ''
+  );
 }
 
 function semanticRef(element, role, name) {

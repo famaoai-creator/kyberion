@@ -22,7 +22,10 @@ import {
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
-import { createBrowserInteractionHelpers } from './browser-interaction-helpers.js';
+import {
+  buildBrowserElementPresentPipeline,
+  createBrowserInteractionHelpers,
+} from './browser-interaction-helpers.js';
 import { executePipeline as executeBrowserPipeline } from './browser-pipeline-helpers.js';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -118,12 +121,15 @@ interface ComputerInteractionAction {
       | 'press_ref'
       | 'wait_for_ref'
       | 'extract_text_ref'
+      | 'click_if_present'
       | 'capture_console'
       | 'capture_network';
     coordinate?: { x: number; y: number };
     to_coordinate?: { x: number; y: number };
     button?: 'left' | 'right' | 'middle';
     text?: string;
+    selector?: string;
+    exact?: boolean;
     key?: string;
     ref?: string;
     url?: string;
@@ -417,6 +423,7 @@ if (entrypoint && modulePath === entrypoint) {
 
 export {
   handleAction,
+  buildBrowserElementPresentPipeline,
   buildSnapshot,
   resolveRefSelector,
   renderPlaywrightSkeleton,
@@ -427,5 +434,10 @@ export {
   restartBrowserSession,
   waitForOperatorContinue,
 };
+
+export type {
+  BrowserElementPresentCondition,
+  PipelineStep as BrowserPipelineStep,
+} from './browser-interaction-helpers.js';
 
 export { describeOps } from './op-catalog.js';

@@ -88,6 +88,9 @@ async function createHarness() {
         },
       },
       query: vi.fn(async () => [tab]),
+      get: vi.fn(async (tabId: number) =>
+        tabId === tab.id ? { ...tab, status: 'complete' } : null
+      ),
       sendMessage: vi.fn(async (_tabId: number, message: any) => {
         if (message.type === 'bridge:ping') return { ok: true };
         if (message.type === 'bridge:observe')
@@ -194,6 +197,58 @@ describe('Browser Bridge extension state transitions', () => {
 
     expect(resumed.ok).toBe(true);
     expect(harness.store.browserBridgeState.recording.actions).toHaveLength(2);
+  });
+
+  it('toggles the explicit extraction mode while recording', async () => {
+    const harness = await createHarness();
+    await harness.send({ type: 'bridge:start-recording' });
+
+    const enabled = await harness.send({
+      type: 'bridge:set-extraction-mode',
+      enabled: true,
+    });
+    expect(enabled.state.extractionMode).toBe(true);
+
+    const disabled = await harness.send({
+      type: 'bridge:set-extraction-mode',
+      enabled: false,
+    });
+    expect(disabled.state.extractionMode).toBe(false);
+    expect(harness.store.browserBridgeState.notice).toContain('分析対象モードを終了しました');
+  });
+
+  it('toggles the conditional click target mode while recording', async () => {
+    const harness = await createHarness();
+    await harness.send({ type: 'bridge:start-recording' });
+
+    const enabled = await harness.send({
+      type: 'bridge:set-conditional-mode',
+      enabled: true,
+    });
+    expect(enabled.state.conditionalMode).toBe(true);
+    expect(enabled.state.extractionMode).toBe(false);
+
+    const recorded = await harness.send(
+      {
+        type: 'bridge:record-event',
+        event: {
+          ...recordedEvent('承認ボタンが表示されていればクリック'),
+          op: 'click_if_present',
+        },
+      },
+      { tab: harness.tab }
+    );
+    expect(recorded.ok).toBe(true);
+    expect(recorded.state.recording.actions[0].op).toBe('click_if_present');
+
+    const disabled = await harness.send({
+      type: 'bridge:set-conditional-mode',
+      enabled: false,
+    });
+    expect(disabled.state.conditionalMode).toBe(false);
+    expect(harness.store.browserBridgeState.notice).toContain(
+      '条件付きクリック対象モードを終了しました'
+    );
   });
 
   it('auto-resumes recording after a same-origin navigation completes', async () => {
@@ -367,6 +422,37 @@ describe('Browser Bridge extension state transitions', () => {
     expect(result.status).toBe('approval_required');
     expect(harness.store.browserBridgeState.execution.status).toBe('approval_required');
     expect(harness.store.browserBridgeState.execution.requestId).toBe('REQ-1');
+  });
+
+  it('surfaces approval_required for intent-driven procedure execution', async () => {
+    const harness = await createHarness();
+    harness.hooks.native = (payload: any) => {
+      if (payload.type === 'prepare_procedure') {
+        return {
+          ok: true,
+          origin: 'https://example.com',
+          origins: ['https://example.com'],
+          inputs: [],
+          has_inputs: false,
+        };
+      }
+      if (payload.type === 'dispatch_procedure')
+        return { ok: true, status: 'approval_required', request_id: 'REQ-PROC-1' };
+      return defaultNative(payload);
+    };
+    await harness.send({ type: 'bridge:connect-active-tab' });
+
+    const result = await harness.send({
+      type: 'bridge:execute-procedure',
+      procedureId: 'example.proc',
+    });
+
+    expect(result.status).toBe('approval_required');
+    expect(result.state.execution).toEqual({
+      status: 'approval_required',
+      requestId: 'REQ-PROC-1',
+      procedureId: 'example.proc',
+    });
   });
 
   it('reports a friendly error when the native host is not installed', async () => {

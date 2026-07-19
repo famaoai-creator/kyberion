@@ -96,6 +96,22 @@ describe('browser extension bridge contracts', () => {
     expect(buildBrowserExtensionPipelineCandidate(parsed.value!).requires_manual_review).toBe(true);
   });
 
+  it('accepts and compiles conditional click actions for extension replay', () => {
+    const conditional = recording({
+      actions: [
+        {
+          ...recording().actions[0],
+          op: 'click_if_present',
+          summary: '承認ボタンが表示されていればクリック',
+        },
+      ],
+    });
+    const parsed = validateBrowserExtensionRecording(conditional);
+    expect(parsed.valid).toBe(true);
+    const candidate = buildBrowserExtensionPipelineCandidate(parsed.value!);
+    expect(candidate.operations).toEqual(['click_if_present']);
+  });
+
   it('rejects recorded input values and raw selectors', () => {
     const withValue = recording({
       actions: [
@@ -652,5 +668,23 @@ describe('segmented (multi-origin) execution', () => {
     });
     expect(result.leases?.[1].lease.origin).toBe('https://news.example.com');
     expect(result.leases?.[1].lease.segment_index).toBe(1);
+  });
+
+  it('blocks a navigate-only recording instead of returning zero executable leases', () => {
+    const rec = recording({
+      actions: [navAction('https://example.com', 'https://news.example.com')],
+      review: {
+        status: 'approved',
+        reviewed_at: '2026-06-23T00:01:00.000Z',
+        decisions: [{ action_id: 'nav-https://news.example.com', status: 'approved' }],
+      },
+    });
+    const result = issueSegmentedLeases({
+      recording: rec as any,
+      session: session({ mode: 'execute', requested_operations: ['navigate'] }) as any,
+      approval: { allowed: true, status: 'not_required' },
+    });
+    expect(result.leases).toBeUndefined();
+    expect(result.errors[0]).toContain('no actionable segment');
   });
 });
