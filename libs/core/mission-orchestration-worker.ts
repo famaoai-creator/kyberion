@@ -48,6 +48,11 @@ import {
 } from './work-coordination.js';
 import { logger } from './core.js';
 import { buildWorkingPrinciplesLines } from './working-principles.js';
+import {
+  buildWorkingPrinciplesInjectionProvider,
+  getMissionDynamicInjectionRegistry,
+  renderInjectionsAsSystemReminders,
+} from './dynamic-injection.js';
 import { buildExecutionEnv } from './authority.js';
 import { missionDir, missionEvidenceDir, rootDir } from './path-resolver.js';
 import { pathResolver } from './path-resolver.js';
@@ -88,11 +93,19 @@ import { installAnthropicBackendsIfAvailable } from './reasoning-bootstrap.js';
 import { getReasoningBackend } from './reasoning-backend.js';
 import { MissionWorkingMemory } from './mission-working-memory.js';
 import {
+  MAX_CARRYOVER_BACKGROUND_TASKS,
   WorkerContextCompactor,
   isPromptTooLongError,
+  type ActiveBackgroundTaskRef,
   type CompactionCarryover,
   type WorkerContextMessage,
 } from './worker-context-compaction.js';
+import { listActiveDelegatedTaskRecords } from './delegated-task-observability.js';
+import {
+  claimPendingDelegationNotifications,
+  renderDelegationNotificationLines,
+  DELEGATION_NOTIFICATION_CLAIM_LIMIT,
+} from './delegation-notifications.js';
 
 let workerBackendsInstalled = false;
 
@@ -876,12 +889,49 @@ export function buildDispatchCarryover(input: {
   const verifiedState = settled
     .slice(0, 10)
     .map((task) => `${task.task_id}: ${String(task.status)}`);
+  // KC-06: still-running delegated tasks survive the compaction boundary as
+  // structured data, so the worker can still reference them post-compaction.
+  let activeBackgroundTasks: ActiveBackgroundTaskRef[] = [];
+  try {
+    activeBackgroundTasks = listActiveDelegatedTaskRecords(MAX_CARRYOVER_BACKGROUND_TASKS).map(
+      (record) => ({
+        delegation_id: record.delegation_id,
+        instruction_excerpt: record.instruction.replace(/\s+/g, ' ').trim().slice(0, 120),
+        started_at: record.created_at,
+      })
+    );
+  } catch {
+    // Snapshot is best-effort; carryover must never fail dispatch.
+  }
   return {
     goal: input.missionGoalLines.filter(Boolean).join(' ').trim() || 'mission goal unavailable',
     active_artifacts: activeArtifacts,
     verified_state: verifiedState,
     next_step: `${input.task.task_id}: ${input.task.description || input.task.deliverable || 'execute assigned task'}`,
+    ...(activeBackgroundTasks.length > 0 ? { active_background_tasks: activeBackgroundTasks } : {}),
   };
+}
+
+/**
+ * KC-06: claim up to 4 pending background-delegation completion notifications
+ * and render them as a delimited prompt section. Claiming marks them delivered,
+ * so each completion reaches worker context exactly once. Best-effort — a
+ * store failure never blocks dispatch.
+ */
+export function buildDelegationNotificationLines(
+  limit = DELEGATION_NOTIFICATION_CLAIM_LIMIT,
+  filter: { missionId?: string; taskId?: string; owner?: string } = {}
+): string[] {
+  try {
+    return renderDelegationNotificationLines(claimPendingDelegationNotifications(limit, filter));
+  } catch (error) {
+    logger.warn(
+      `[MISSION_WORKER] delegation notification claim failed (non-fatal): ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+    return [];
+  }
 }
 
 export async function maybeCompactDispatchSections(input: {
@@ -1125,6 +1175,8 @@ function buildTaskExecutionPrompt(input: {
   reviewFindingsLines: string[];
   artifactReviewLines: string[];
   rejectionLessonLines?: string[];
+  delegationNotificationLines?: string[];
+  dynamicInjectionLines?: string[];
   targetPath?: string;
 }): string {
   const lines = [
@@ -1148,7 +1200,7 @@ function buildTaskExecutionPrompt(input: {
     'Write every artifact under the artifact root; deliverable and target paths are relative to it. Report artifact paths relative to the artifact root. Never write to the repository root or outside the mission directory.',
     '',
     ...input.missionGoalLines,
-    ...buildWorkingPrinciplesLines(input.teamRole),
+    ...(input.dynamicInjectionLines ?? []),
     '## Upstream results (inputs you MUST build on)',
     ...input.upstreamResultLines,
     '',
@@ -1157,6 +1209,7 @@ function buildTaskExecutionPrompt(input: {
     'Already completed work must keep terminology, structure, and style aligned.',
     'Do not trespass into another task’s scope; if needed, put it in needs.',
     '',
+    ...(input.delegationNotificationLines ?? []),
     ...(input.reviewFindingsLines.length > 0 &&
     !(input.reviewFindingsLines.length === 1 && input.reviewFindingsLines[0] === '- none')
       ? ['## Review findings to address', ...input.reviewFindingsLines, '']
@@ -1545,12 +1598,31 @@ async function buildTaskDispatchContext(input: {
   }
   const artifactReviewLines = buildArtifactReviewLines(input.task);
   const rejectionLessonLines = buildRejectionLessonLines();
+  // KC-06: deliver claimed background-delegation completions into this dispatch.
+  const delegationNotificationLines = buildDelegationNotificationLines(
+    DELEGATION_NOTIFICATION_CLAIM_LIMIT,
+    { missionId: input.missionId, taskId: input.task.task_id }
+  );
+  // KC-08: all runtime prompt injections pass through the provider contract.
+  // This keeps one-shot/throttle semantics testable and leaves room for repeat
+  // warnings and claimed notifications to join the same registry.
+  const injectionRegistry = getMissionDynamicInjectionRegistry(input.missionId);
+  if (!injectionRegistry.hasProvider('working-principles')) {
+    injectionRegistry.register(
+      buildWorkingPrinciplesInjectionProvider(buildWorkingPrinciplesLines, input.teamRole)
+    );
+  }
+  const dynamicInjectionLines = injectionRegistry
+    .collect({ step: 0 })
+    .map((injection) => renderInjectionsAsSystemReminders([injection]));
   const promptSupplementChars =
     upstreamResultLines.join('\n').length +
     teamSnapshotLines.join('\n').length +
     reviewFindingsLines.join('\n').length +
     artifactReviewLines.join('\n').length +
     rejectionLessonLines.join('\n').length +
+    delegationNotificationLines.join('\n').length +
+    dynamicInjectionLines.join('\n').length +
     256;
   const prompt = buildTaskExecutionPrompt({
     missionId: input.missionId,
@@ -1559,6 +1631,8 @@ async function buildTaskDispatchContext(input: {
     agentId: input.agentId,
     taskModelHint: input.taskModelHint,
     rejectionLessonLines,
+    delegationNotificationLines,
+    dynamicInjectionLines,
     missionContextPack: missionContextPackText,
     missionGoalLines,
     upstreamResultLines,

@@ -14,6 +14,12 @@ import { z } from 'zod';
 import { llmSemaphore } from './semaphore.js';
 import { metrics } from './metrics.js';
 import { resolveRuntimeModelId } from './runtime-model-defaults.js';
+import {
+  DEFAULT_COMPLETION_FLOOR_TOKENS,
+  computeCompletionTokenBudget,
+  estimateRequestInputTokens,
+} from './completion-token-budget.js';
+import { resolveContextWindowProfile } from './worker-context-compaction.js';
 import type {
   BranchForkInput,
   CritiqueInput,
@@ -376,17 +382,43 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
     }
   }
 
+  /**
+   * KC-09: shrink max_tokens per request when the estimated input nears the
+   * context window, so a fixed configured max never overflows the window.
+   * With headroom the configured max passes through unchanged.
+   */
+  private applyCompletionBudget<T extends { max_tokens: number }>(params: T): T {
+    const thinking = (params as { thinking?: { type?: string; budget_tokens?: number } }).thinking;
+    const floorTokens =
+      thinking?.type === 'enabled' && typeof thinking.budget_tokens === 'number'
+        ? thinking.budget_tokens + DEFAULT_COMPLETION_FLOOR_TOKENS
+        : undefined;
+    const maxTokens = computeCompletionTokenBudget({
+      contextWindowTokens: resolveContextWindowProfile().contextWindowTokens,
+      estimatedInputTokens: estimateRequestInputTokens(params),
+      configuredMaxTokens: params.max_tokens,
+      ...(floorTokens === undefined ? {} : { floorTokens }),
+    });
+    if (maxTokens < 1) {
+      throw new Error(
+        '[CONTEXT_LIMIT] No completion tokens remain after input estimate; compact the context and retry.'
+      );
+    }
+    return maxTokens === params.max_tokens ? params : { ...params, max_tokens: maxTokens };
+  }
+
   /** Semaphore-guarded wrapper around messages.parse — prevents concurrent 429s. */
   private async callParse(
     params: Parameters<typeof this.client.messages.parse>[0]
   ): Promise<Awaited<ReturnType<typeof this.client.messages.parse>>> {
+    const budgeted = this.applyCompletionBudget(params);
     const started = Date.now();
     try {
-      const result = await llmSemaphore.run(() => this.client.messages.parse(params));
-      this.recordSdkUsage(started, 'success', params.model, result);
+      const result = await llmSemaphore.run(() => this.client.messages.parse(budgeted));
+      this.recordSdkUsage(started, 'success', budgeted.model, result);
       return result;
     } catch (err) {
-      this.recordSdkUsage(started, 'error', params.model);
+      this.recordSdkUsage(started, 'error', budgeted.model);
       throw err;
     }
   }
@@ -395,15 +427,16 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
   private async callCreate(
     params: Parameters<typeof this.client.messages.create>[0] & { stream?: false }
   ): Promise<Anthropic.Message> {
+    const budgeted = this.applyCompletionBudget(params);
     const started = Date.now();
     try {
       const result = await llmSemaphore.run(
-        () => this.client.messages.create(params) as Promise<Anthropic.Message>
+        () => this.client.messages.create(budgeted) as Promise<Anthropic.Message>
       );
-      this.recordSdkUsage(started, 'success', params.model, result);
+      this.recordSdkUsage(started, 'success', budgeted.model, result);
       return result;
     } catch (err) {
-      this.recordSdkUsage(started, 'error', params.model);
+      this.recordSdkUsage(started, 'error', budgeted.model);
       throw err;
     }
   }

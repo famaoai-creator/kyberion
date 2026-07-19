@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  approvalActionCacheKey,
   approvalEventLogicalPath,
   approvalRequestLogicalPath,
   computeApprovalPayloadHash,
@@ -55,6 +56,24 @@ describe('approval-store path normalization', () => {
   it('canonicalizes payload key order before hashing', () => {
     expect(computeApprovalPayloadHash({ b: 2, a: 1 })).toBe(
       computeApprovalPayloadHash({ a: 1, b: 2 })
+    );
+  });
+
+  it('normalizes session action cache keys by case and whitespace (KC-03)', () => {
+    expect(approvalActionCacheKey({ action: ' Secret:Set ', targetClass: 'Service:GitHub' })).toBe(
+      approvalActionCacheKey({ action: 'secret:set', targetClass: 'service:github' })
+    );
+    expect(approvalActionCacheKey({ action: 'secret:set', targetClass: 'service:github' })).toBe(
+      'secret:set::service:github'
+    );
+  });
+
+  it('rejects session action descriptors missing action or target class (KC-03)', () => {
+    expect(() => approvalActionCacheKey({ action: '', targetClass: 'service:github' })).toThrow(
+      'action and targetClass'
+    );
+    expect(() => approvalActionCacheKey({ action: 'secret:set', targetClass: '  ' })).toThrow(
+      'action and targetClass'
     );
   });
 });

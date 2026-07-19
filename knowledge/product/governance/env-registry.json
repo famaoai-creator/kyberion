@@ -671,6 +671,38 @@
       "documented": false
     },
     {
+      "name": "KYBERION_DELEGATION_NOTIFICATIONS_PATH",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_DELEGATION_STORE_DIR",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_DELEGATION_SUMMARY_RETRY",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_DELEGATION_TRACE_PATH",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_DEPLOY_COMMAND",
       "category": "provider",
       "type": "string",

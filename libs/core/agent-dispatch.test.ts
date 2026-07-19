@@ -8,6 +8,17 @@ import {
 } from './agent-dispatch.js';
 import type { ReasoningBackend } from './reasoning-backend.js';
 
+vi.mock('./a2a-bridge.js', () => ({
+  a2aBridge: {
+    route: vi.fn(async () => ({ payload: { content: 'sub-agent-result' } })),
+  },
+}));
+
+const recordGovernanceAction = vi.fn();
+vi.mock('./kill-switch.js', () => ({
+  recordGovernanceAction: (...args: unknown[]) => recordGovernanceAction(...args),
+}));
+
 /** Minimal fake backend that records delegation and supports tool-use opt-in. */
 function makeFakeBackend(opts: { withTools?: boolean } = {}): ReasoningBackend & {
   delegateTask: ReturnType<typeof vi.fn>;
@@ -69,6 +80,37 @@ describe('agent-dispatch', () => {
     expect(backend.prompt).toHaveBeenCalledWith('hi');
     await wrapped.extractRequirements({} as any);
     expect((backend as any).extractRequirements).toHaveBeenCalledTimes(1);
+  });
+
+  it('InSessionDispatcher breaks a dead-end invoke_agent loop via process-spawn fallback (KC-01)', async () => {
+    recordGovernanceAction.mockClear();
+    const backend = makeFakeBackend();
+    (backend as any).generateWithTools = vi.fn(async () => ({
+      toolCalls: [{ name: 'invoke_agent', input: { agent_name: 'generalist', prompt: 'same task' } }],
+    }));
+    const dispatcher = new InSessionDispatcher();
+
+    const results: string[] = [];
+    for (let i = 0; i < 12; i += 1) {
+      results.push(await dispatcher.dispatch('do W', undefined, backend));
+    }
+
+    // First 11 identical delegations still route in-session…
+    expect(results[10]).toContain('[In-Session Rollup]');
+    expect(backend.delegateTask).toHaveBeenCalledTimes(1);
+    // …the 12th breaks the loop with a fresh process-spawn child.
+    expect(results[11]).toBe('spawned:do W');
+    expect(recordGovernanceAction).toHaveBeenCalledWith(
+      'agent-dispatch:in-session',
+      'tool_call_repeat_force_stop',
+      expect.stringContaining('streak=12'),
+      true,
+    );
+
+    // Escalation reminder is injected into the next dispatch prompt after the 3rd repeat.
+    const prompts = (backend as any).generateWithTools.mock.calls.map((call: any[]) => call[0]);
+    expect(prompts[2]).not.toContain('<system-reminder>');
+    expect(prompts[3]).toContain('<system-reminder>');
   });
 
   it('selectAgentDispatcher / maybeWrapWithDispatcher honor KYBERION_IN_SESSION_SUBAGENT', () => {

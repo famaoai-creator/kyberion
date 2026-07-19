@@ -18,6 +18,8 @@ vi.mock('./decision-rights.js', () => ({
 vi.mock('./approval-store.js', () => ({
   createApprovalRequest: vi.fn(),
   listApprovalRequests: vi.fn(),
+  lookupSessionApprovalCache: vi.fn(() => null),
+  recordSessionCacheAutoApproval: vi.fn(),
   computeApprovalPayloadHash: (payload: Record<string, unknown> | undefined) =>
     JSON.stringify(payload || {}),
 }));
@@ -30,7 +32,12 @@ import { enforceApprovalGate } from './approval-gate.js';
 import { resolveApprovalPolicy } from './approval-policy.js';
 import { evaluateDecisionRights, resolveDecisionRightsMatrix } from './decision-rights.js';
 import type { DecisionRightsMatrix } from './decision-rights.js';
-import { createApprovalRequest, listApprovalRequests } from './approval-store.js';
+import {
+  createApprovalRequest,
+  listApprovalRequests,
+  lookupSessionApprovalCache,
+  recordSessionCacheAutoApproval,
+} from './approval-store.js';
 import { auditChain } from './audit-chain.js';
 
 const mockResolvePolicy = vi.mocked(resolveApprovalPolicy);
@@ -38,6 +45,8 @@ const mockResolveDecisionRightsMatrix = vi.mocked(resolveDecisionRightsMatrix);
 const mockEvaluateDecisionRights = vi.mocked(evaluateDecisionRights);
 const mockListRequests = vi.mocked(listApprovalRequests);
 const mockCreateRequest = vi.mocked(createApprovalRequest);
+const mockLookupSessionCache = vi.mocked(lookupSessionApprovalCache);
+const mockRecordSessionCacheAutoApproval = vi.mocked(recordSessionCacheAutoApproval);
 const mockAuditRecord = vi.mocked(auditChain.record);
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
@@ -401,5 +410,141 @@ describe('enforceApprovalGate', () => {
         reason: 'Decision rights allow operational_spend',
       })
     );
+  });
+
+  describe('session action cache (KC-03)', () => {
+    const descriptor = { action: 'secret:set', targetClass: 'service:github' };
+    const cacheEntry = {
+      key: 'secret:set::service:github',
+      action: 'secret:set',
+      targetClass: 'service:github',
+      grantedByRequestId: 'req-human',
+      grantedBy: 'human:operator',
+      grantedForAgent: 'agent-1',
+      grantedAt: '2026-07-20T00:00:00Z',
+      channel: 'terminal',
+      storageChannel: 'terminal',
+      payloadHash: '{}',
+      effectBinding: 'secret:set',
+    };
+
+    beforeEach(() => {
+      mockResolveDecisionRightsMatrix.mockReturnValue(null);
+      mockEvaluateDecisionRights.mockReturnValue(null);
+      mockListRequests.mockReturnValue([]);
+    });
+
+    it('auto-approves a repeat action without creating a pending request and audits it', () => {
+      mockResolvePolicy.mockReturnValue({ requiresApproval: true, missingRequirements: [] });
+      mockLookupSessionCache.mockReturnValueOnce(cacheEntry as any);
+
+      const result = enforceApprovalGate({ ...baseParams, actionDescriptor: descriptor });
+
+      expect(result.allowed).toBe(true);
+      expect(result.status).toBe('approved');
+      expect(result.requestId).toBe('req-human');
+      expect(mockCreateRequest).not.toHaveBeenCalled();
+      expect(mockLookupSessionCache).toHaveBeenCalledWith(
+        descriptor,
+        expect.any(Number),
+        expect.objectContaining({
+          agentId: 'agent-1',
+          payloadHash: '{}',
+          effectBinding: 'secret:set',
+        })
+      );
+      expect(mockAuditRecord).toHaveBeenCalledWith(
+        expect.objectContaining({
+          result: 'allowed',
+          reason: 'auto_approved_via_session_cache',
+          metadata: expect.objectContaining({
+            approvalId: 'req-human',
+            grantedBy: 'human:operator',
+          }),
+        })
+      );
+      expect(mockRecordSessionCacheAutoApproval).toHaveBeenCalledWith(
+        'mission_controller',
+        expect.objectContaining({
+          entry: cacheEntry,
+          operationId: 'secret:set',
+          correlationId: 'corr-123',
+        })
+      );
+    });
+
+    it('never short-circuits a deny verdict on an existing request', () => {
+      mockResolvePolicy.mockReturnValue({ requiresApproval: true, missingRequirements: [] });
+      mockLookupSessionCache.mockReturnValueOnce(cacheEntry as any);
+      mockListRequests.mockReturnValue([
+        { id: 'req-denied', correlationId: 'corr-123', status: 'rejected' } as any,
+      ]);
+
+      const result = enforceApprovalGate({ ...baseParams, actionDescriptor: descriptor });
+
+      expect(result.allowed).toBe(false);
+      expect(result.message).toContain('rejected');
+      expect(mockRecordSessionCacheAutoApproval).not.toHaveBeenCalled();
+      expect(mockAuditRecord).toHaveBeenCalledWith(expect.objectContaining({ result: 'denied' }));
+    });
+
+    it('bypasses the cache when the injection-suspected override fired', () => {
+      mockResolvePolicy.mockReturnValue({
+        requiresApproval: true,
+        missingRequirements: ['approval_confirmation'],
+        matchedRuleId: 'injection-suspected-override',
+      });
+      mockLookupSessionCache.mockReturnValueOnce(cacheEntry as any);
+      mockCreateRequest.mockReturnValue({ id: 'req-hardened', status: 'pending' } as any);
+
+      const result = enforceApprovalGate({ ...baseParams, actionDescriptor: descriptor });
+
+      expect(result.allowed).toBe(false);
+      expect(mockLookupSessionCache).not.toHaveBeenCalled();
+      expect(mockCreateRequest).toHaveBeenCalledTimes(1);
+    });
+
+    it('bypasses the cache when the policy requires dual-key confirmation', () => {
+      mockResolvePolicy.mockReturnValue({
+        requiresApproval: true,
+        missingRequirements: ['dual_key_confirmation'],
+        matchedRuleId: 'fallback-dangerous-secret',
+      });
+      mockLookupSessionCache.mockReturnValueOnce(cacheEntry as any);
+      mockCreateRequest.mockReturnValue({ id: 'req-dualkey', status: 'pending' } as any);
+
+      const result = enforceApprovalGate({ ...baseParams, actionDescriptor: descriptor });
+
+      expect(result.allowed).toBe(false);
+      expect(mockLookupSessionCache).not.toHaveBeenCalled();
+      expect(mockCreateRequest).toHaveBeenCalledTimes(1);
+    });
+
+    it('ignores a descriptor whose action does not name this operation', () => {
+      mockResolvePolicy.mockReturnValue({ requiresApproval: true, missingRequirements: [] });
+      mockLookupSessionCache.mockReturnValueOnce(cacheEntry as any);
+      mockCreateRequest.mockReturnValue({ id: 'req-mismatch', status: 'pending' } as any);
+
+      const result = enforceApprovalGate({
+        ...baseParams,
+        actionDescriptor: { action: 'other:op', targetClass: 'service:github' },
+      });
+
+      expect(result.allowed).toBe(false);
+      expect(mockLookupSessionCache).not.toHaveBeenCalled();
+      expect(mockCreateRequest).toHaveBeenCalledTimes(1);
+    });
+
+    it('forwards the request source for source-scoped cancellation', () => {
+      mockResolvePolicy.mockReturnValue({ requiresApproval: true, missingRequirements: [] });
+      mockCreateRequest.mockReturnValue({ id: 'req-sourced', status: 'pending' } as any);
+
+      enforceApprovalGate({ ...baseParams, source: { missionId: 'm1', taskId: 't1' } });
+
+      expect(mockCreateRequest).toHaveBeenCalledWith(
+        'mission_controller',
+        expect.objectContaining({ source: { missionId: 'm1', taskId: 't1' } })
+      );
+    });
   });
 });

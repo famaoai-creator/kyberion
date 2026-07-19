@@ -106,13 +106,14 @@ Rules of thumb:
 
 ### Verification
 
-| Pipeline                  | Description                               |
-| ------------------------- | ----------------------------------------- |
-| `verify-discovery-ops`    | Verify provider discovery and op registry |
-| `verify-session`          | Verify surface session lifecycle          |
-| `verify-session-fallback` | Verify session fallback behaviour         |
-| `service-lifecycle-smoke` | Service start/stop/health smoke test      |
-| `orchestration-jobs`      | Run scheduled orchestration batch         |
+| Pipeline                  | Description                                                                                                                                                                              |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `verify-discovery-ops`    | Verify provider discovery and op registry                                                                                                                                                |
+| `verify-session`          | Verify surface session lifecycle                                                                                                                                                         |
+| `verify-session-fallback` | Verify session fallback behaviour                                                                                                                                                        |
+| `service-lifecycle-smoke` | Service start/stop/health smoke test                                                                                                                                                     |
+| `orchestration-jobs`      | Run scheduled orchestration batch                                                                                                                                                        |
+| `ai-audit`                | AI audit test layer (KC-05): fan `tests_ai/*.md` semantic invariants out to the reasoning backend, aggregate `report.json` (run: `pnpm ai-test`; weekly schedule; skips on stub backend) |
 
 ### Chaos & Resilience
 
