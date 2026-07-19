@@ -14,6 +14,7 @@ import {
   readJanitorLastRunMs,
   readReasoningDegraded,
   validateEnv,
+  secretGuard,
 } from '@agent/core';
 import { spawnManagedProcess } from '@agent/core/managed-process';
 import { runCoworkHealthCheck } from '@agent/core/cowork-health-check';
@@ -168,37 +169,39 @@ function profileRoot(): string {
 function checkServiceConnectionReadiness(
   tenantDriftReport?: ReturnType<typeof scanTenantDrift>
 ): boolean {
-  return withExecutionContext('mission_controller', () => {
-    const endpoints = loadServiceEndpointsCatalog();
-    const services = endpoints?.services || {};
+  return withExecutionContext(
+    'mission_controller',
+    () => {
+      const endpoints = loadServiceEndpointsCatalog();
+      const services = endpoints?.services || {};
 
-    const readinessConfig = loadConnectionReadinessConfig();
-    if (readinessConfig.configDegraded) return false;
-    const readinessRules = readinessConfig.requiredServices;
-    if (Object.keys(readinessRules).length === 0) return false;
+      const readinessConfig = loadConnectionReadinessConfig();
+      if (readinessConfig.configDegraded) return false;
+      const readinessRules = readinessConfig.requiredServices;
+      if (Object.keys(readinessRules).length === 0) return false;
 
-    for (const [serviceId, rule] of Object.entries(readinessRules)) {
-      const service = services[serviceId];
-      if (!service?.preset_path) return false;
-      const presetPath = pathResolver.rootResolve(String(service.preset_path));
-      if (!safeExistsSync(presetPath)) return false;
+      for (const [serviceId, rule] of Object.entries(readinessRules)) {
+        const service = services[serviceId];
+        if (!service?.preset_path) return false;
+        const presetPath = pathResolver.rootResolve(String(service.preset_path));
+        if (!safeExistsSync(presetPath)) return false;
 
-      const connectionPath = path.join(profileRoot(), 'connections', `${serviceId}.json`);
-      if (!safeExistsSync(connectionPath)) return false;
-      const connection = JSON.parse(
-        safeReadFile(connectionPath, { encoding: 'utf8' }) as string
-      ) as Record<string, unknown>;
-      const requiredAny = Array.isArray(rule?.required_keys_any) ? rule.required_keys_any : [];
-      if (requiredAny.length > 0 && !hasAnyKey(connection, requiredAny)) return false;
-    }
+        const connection = secretGuard.loadConnectionDocument(serviceId);
+        if (Object.keys(connection).length === 0) return false;
 
-    if (readinessConfig.tenantGuard.requireZeroDrift) {
-      const drift = tenantDriftReport ?? scanTenantDrift();
-      if (drift.findings.length > 0) return false;
-    }
+        const requiredAny = Array.isArray(rule?.required_keys_any) ? rule.required_keys_any : [];
+        if (requiredAny.length > 0 && !hasAnyKey(connection, requiredAny)) return false;
+      }
 
-    return true;
-  });
+      if (readinessConfig.tenantGuard.requireZeroDrift) {
+        const drift = tenantDriftReport ?? scanTenantDrift();
+        if (drift.findings.length > 0) return false;
+      }
+
+      return true;
+    },
+    'ecosystem_architect'
+  );
 }
 
 function getCachedTenantDrift() {
