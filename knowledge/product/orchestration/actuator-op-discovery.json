@@ -1601,7 +1601,7 @@
           "kind": "capture"
         },
         {
-          "op": "get_generation_job",
+          "op": "record_screen",
           "kind": "capture"
         },
         {
@@ -1613,12 +1613,32 @@
           "kind": "apply"
         },
         {
+          "op": "generate_music",
+          "kind": "apply"
+        },
+        {
+          "op": "generate_video",
+          "kind": "apply"
+        },
+        {
+          "op": "get_generation_job",
+          "kind": "apply"
+        },
+        {
+          "op": "run_workflow",
+          "kind": "apply"
+        },
+        {
           "op": "submit_generation",
           "kind": "apply"
         },
         {
           "op": "wait_generation_job",
           "kind": "apply"
+        },
+        {
+          "op": "pipeline",
+          "kind": "control"
         }
       ]
     },

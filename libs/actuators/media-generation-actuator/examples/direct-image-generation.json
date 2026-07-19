@@ -1,0 +1,9 @@
+{
+  "action": "generate_image",
+  "params": {
+    "prompt": "a clean Kyberion product hero image",
+    "await_completion": false,
+    "backend_id": "media-generation.comfyui",
+    "target_path": "active/shared/exports/direct-image.png"
+  }
+}

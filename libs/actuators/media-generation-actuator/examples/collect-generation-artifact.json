@@ -1,0 +1,7 @@
+{
+  "action": "collect_generation_artifact",
+  "params": {
+    "job_id": "genjob-generate_image-example",
+    "target_path": "active/shared/exports/direct-image.png"
+  }
+}

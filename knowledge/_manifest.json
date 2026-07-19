@@ -237,7 +237,7 @@
     {
       "path": "product/architecture/component-lifecycle-inventory.md",
       "tier": "public",
-      "size": 6312,
+      "size": 6311,
       "type": "md"
     },
     {
@@ -483,7 +483,7 @@
     {
       "path": "product/architecture/media-execution-backend-abstraction.md",
       "tier": "public",
-      "size": 3312,
+      "size": 5137,
       "type": "md"
     },
     {
@@ -987,7 +987,7 @@
     {
       "path": "product/governance/actuator-op-registry.json",
       "tier": "public",
-      "size": 14472,
+      "size": 14573,
       "type": "json"
     },
     {
@@ -1497,7 +1497,7 @@
     {
       "path": "product/governance/media-backend-registry.json",
       "tier": "public",
-      "size": 4150,
+      "size": 5263,
       "type": "json"
     },
     {
@@ -2937,7 +2937,7 @@
     {
       "path": "product/orchestration/actuator-op-discovery.json",
       "tier": "public",
-      "size": 71190,
+      "size": 71588,
       "type": "json"
     },
     {
@@ -3273,7 +3273,7 @@
     {
       "path": "product/orchestration/global_actuator_index.json",
       "tier": "public",
-      "size": 16609,
+      "size": 15911,
       "type": "json"
     },
     {
@@ -6213,7 +6213,7 @@
     {
       "path": "product/schemas/generation-job.schema.json",
       "tier": "public",
-      "size": 2368,
+      "size": 2949,
       "type": "json"
     },
     {

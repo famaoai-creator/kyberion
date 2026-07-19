@@ -1,12 +1,281 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Media Generation Actuator Request",
-  "type": "object",
-  "required": ["action", "params"],
-  "properties": {
-    "action": {
-      "enum": ["generate_image", "generate_video", "generate_music", "submit_generation", "get_generation_job", "wait_generation_job", "collect_generation_artifact", "capture_screen", "capture_focused_window", "record_screen", "run_workflow"]
+  "description": "Discriminated action contract for governed media generation, jobs, capture, and compatibility pipelines.",
+  "oneOf": [
+    {
+      "title": "Direct image generation",
+      "type": "object",
+      "required": ["action", "params"],
+      "properties": {
+        "action": { "const": "generate_image" },
+        "params": {
+          "type": "object",
+          "required": ["prompt"],
+          "properties": {
+            "prompt": { "type": "string", "minLength": 1 },
+            "await_completion": { "type": "boolean" },
+            "backend_id": { "type": "string" },
+            "target_path": { "type": "string" },
+            "no_style_pack": { "type": "boolean" }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false
     },
-    "params": { "type": "object" }
-  }
+    {
+      "title": "Image ADF generation",
+      "type": "object",
+      "required": ["action", "params"],
+      "properties": {
+        "action": { "const": "generate_image" },
+        "params": {
+          "type": "object",
+          "required": ["image_adf"],
+          "properties": {
+            "image_adf": {
+              "$ref": "../knowledge/product/schemas/image-generation-adf.schema.json"
+            },
+            "workflow": { "type": "object" },
+            "workflow_path": { "type": "string" }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "title": "Video generation",
+      "type": "object",
+      "required": ["action", "params"],
+      "properties": {
+        "action": { "const": "generate_video" },
+        "params": {
+          "type": "object",
+          "anyOf": [
+            { "required": ["video_adf"] },
+            { "required": ["workflow"] },
+            { "required": ["workflow_path"] }
+          ],
+          "properties": {
+            "video_adf": {
+              "$ref": "../knowledge/product/schemas/video-generation-adf.schema.json"
+            },
+            "workflow": { "type": "object" },
+            "workflow_path": { "type": "string" },
+            "await_completion": { "type": "boolean" },
+            "backend_id": { "type": "string" }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "title": "Workflow-based image generation",
+      "type": "object",
+      "required": ["action", "params"],
+      "properties": {
+        "action": { "const": "generate_image" },
+        "params": {
+          "type": "object",
+          "anyOf": [{ "required": ["workflow"] }, { "required": ["workflow_path"] }],
+          "properties": {
+            "workflow": { "type": "object" },
+            "workflow_path": { "type": "string" },
+            "await_completion": { "type": "boolean" },
+            "backend_id": { "type": "string" }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "title": "Music generation",
+      "type": "object",
+      "required": ["action", "params"],
+      "properties": {
+        "action": { "const": "generate_music" },
+        "params": {
+          "type": "object",
+          "anyOf": [
+            { "required": ["music_adf"] },
+            { "required": ["workflow"] },
+            { "required": ["workflow_path"] }
+          ],
+          "properties": {
+            "music_adf": {
+              "$ref": "../knowledge/product/schemas/music-generation-adf.schema.json"
+            },
+            "workflow": { "type": "object" },
+            "workflow_path": { "type": "string" },
+            "await_completion": { "type": "boolean" },
+            "backend_id": { "type": "string" }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "title": "Generic workflow",
+      "type": "object",
+      "required": ["action", "params"],
+      "properties": {
+        "action": { "const": "run_workflow" },
+        "params": {
+          "type": "object",
+          "anyOf": [{ "required": ["workflow"] }, { "required": ["workflow_path"] }],
+          "properties": {
+            "workflow": { "type": "object" },
+            "workflow_path": { "type": "string" },
+            "backend_id": { "type": "string" }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "title": "Generation job submission",
+      "type": "object",
+      "required": ["action", "params"],
+      "properties": {
+        "action": { "const": "submit_generation" },
+        "params": {
+          "type": "object",
+          "required": ["action", "params"],
+          "properties": {
+            "action": {
+              "enum": ["generate_image", "generate_video", "generate_music", "run_workflow"]
+            },
+            "params": { "type": "object" },
+            "retry_policy": { "type": "object" },
+            "existing_job_id": { "type": "string" },
+            "next_attempt": { "type": "integer", "minimum": 1 },
+            "job": { "$ref": "../knowledge/product/schemas/generation-job.schema.json" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "title": "Generation job lookup",
+      "type": "object",
+      "required": ["action", "params"],
+      "properties": {
+        "action": { "const": "get_generation_job" },
+        "params": {
+          "type": "object",
+          "required": ["job_id"],
+          "properties": {
+            "job_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$" },
+            "job": { "$ref": "../knowledge/product/schemas/generation-job.schema.json" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "title": "Generation job wait",
+      "type": "object",
+      "required": ["action", "params"],
+      "properties": {
+        "action": { "const": "wait_generation_job" },
+        "params": {
+          "type": "object",
+          "required": ["job_id"],
+          "properties": {
+            "job_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$" },
+            "timeout_ms": { "type": "integer", "minimum": 1 },
+            "poll_interval_ms": { "type": "integer", "minimum": 1 }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "title": "Generation artifact collection",
+      "type": "object",
+      "required": ["action", "params"],
+      "properties": {
+        "action": { "const": "collect_generation_artifact" },
+        "params": {
+          "type": "object",
+          "required": ["job_id"],
+          "properties": {
+            "job_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$" },
+            "target_path": { "type": "string" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "title": "Screen capture",
+      "type": "object",
+      "required": ["action", "params"],
+      "properties": {
+        "action": { "const": "capture_screen" },
+        "params": {
+          "type": "object",
+          "required": ["output"],
+          "properties": { "output": { "type": "string" } },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "title": "Focused-window capture",
+      "type": "object",
+      "required": ["action", "params"],
+      "properties": {
+        "action": { "const": "capture_focused_window" },
+        "params": {
+          "type": "object",
+          "required": ["output"],
+          "properties": { "output": { "type": "string" } },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "title": "Screen recording",
+      "type": "object",
+      "required": ["action", "params"],
+      "properties": {
+        "action": { "const": "record_screen" },
+        "params": {
+          "type": "object",
+          "required": ["output"],
+          "properties": {
+            "output": { "type": "string" },
+            "duration": { "type": "number", "minimum": 0 }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "title": "Compatibility pipeline envelope",
+      "type": "object",
+      "required": ["action", "steps"],
+      "properties": {
+        "action": { "const": "pipeline" },
+        "steps": { "type": "array", "items": { "type": "object" } },
+        "continue_on_error": { "type": "boolean", "default": true },
+        "params": { "type": "object" }
+      },
+      "additionalProperties": false
+    }
+  ]
 }
