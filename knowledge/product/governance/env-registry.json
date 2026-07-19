@@ -1148,6 +1148,14 @@
       "subsystem": "governance"
     },
     {
+      "name": "KYBERION_MEDIA_BACKEND_PROBE_TTL_MS",
+      "category": "tuning",
+      "type": "number",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_MEDIA_BACKEND_REGISTRY_PATH",
       "category": "path",
       "type": "path",

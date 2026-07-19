@@ -130,7 +130,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_SKIP_TYPE_RATCHET`                       | boolean                | no       | _undocumented_                                                                                                                                                                                                                |
 | `KYBERION_SPEND_GUARD_TEST`                        | boolean                | no       | Test-only opt-in: lets vitest exercise the reasoning-path spend guard against real history/policy (normally disabled under VITEST).                                                                                           |
 
-## tuning (29)
+## tuning (30)
 
 | Variable                                   | Type   | Required | Description    |
 | ------------------------------------------ | ------ | -------- | -------------- |
@@ -149,6 +149,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_GENERATION_SCHEDULE_INTERVAL_MS` | number | no       | _undocumented_ |
 | `KYBERION_GLOBAL_INFLIGHT_LIMIT`           | number | no       | _undocumented_ |
 | `KYBERION_KILL_SWITCH_INTERVAL_MS`         | number | no       | _undocumented_ |
+| `KYBERION_MEDIA_BACKEND_PROBE_TTL_MS`      | number | no       | _undocumented_ |
 | `KYBERION_MFLUX_TIMEOUT_MS`                | number | no       | _undocumented_ |
 | `KYBERION_NEW_TIMEOUT_MS`                  | number | no       | _undocumented_ |
 | `KYBERION_OAUTH_CALLBACK_PORT`             | number | no       | _undocumented_ |
