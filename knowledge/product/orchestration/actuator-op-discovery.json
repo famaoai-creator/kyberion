@@ -352,7 +352,39 @@
         },
         {
           "op": "query_elements",
-          "kind": "capture"
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "required": ["selector"],
+            "properties": {
+              "selector": {
+                "type": "string",
+                "minLength": 1
+              },
+              "text": {
+                "type": "string"
+              },
+              "text_match": {
+                "type": "string"
+              },
+              "exact": {
+                "type": "boolean"
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "selector": "button",
+              "text": "承認",
+              "exact": true,
+              "export_as": "approval_count"
+            }
+          ]
         },
         {
           "op": "extract_text_ref",
@@ -545,7 +577,50 @@
         },
         {
           "op": "click_first_match",
-          "kind": "apply"
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "anyOf": [
+              {
+                "required": ["selector"]
+              },
+              {
+                "required": ["selectors"]
+              }
+            ],
+            "properties": {
+              "selector": {
+                "type": "string",
+                "minLength": 1
+              },
+              "selectors": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 1
+              },
+              "text": {
+                "type": "string"
+              },
+              "exact": {
+                "type": "boolean"
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "examples": [
+            {
+              "selector": "button",
+              "text": "承認",
+              "export_as": "clicked_match"
+            }
+          ]
         },
         {
           "op": "click_ref",
