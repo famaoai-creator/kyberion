@@ -25,12 +25,21 @@ import type {
   DecomposedTaskPlan,
 } from './reasoning-backend.js';
 import { runStructuredReasoningOp, structuredReasoningSpecs } from './structured-reasoning.js';
+import {
+  computeCompletionTokenBudget,
+  estimateRequestInputTokens,
+  resolveConfiguredContextWindowTokens,
+} from './completion-token-budget.js';
 
 export interface OpenAiCompatibleBackendOptions {
   baseURL: string;
   apiKey: string;
   model: string;
   timeoutMs?: number;
+  /** KC-09: model context window in tokens; unset = unknown → no max_tokens sent. */
+  contextWindowTokens?: number;
+  /** KC-09: upper bound for the per-request completion budget. */
+  maxCompletionTokens?: number;
 }
 
 export interface OpenAiCompatibleBackendAvailability {
@@ -75,6 +84,7 @@ interface ChatCompletionRequest {
     };
   }>;
   tool_choice?: 'auto' | 'none';
+  max_tokens?: number;
 }
 
 interface ChatCompletionResponse {
@@ -277,12 +287,26 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
   private readonly apiKey: string;
   private readonly model: string;
   private readonly timeoutMs: number;
+  private readonly contextWindowTokens: number | undefined;
+  private readonly maxCompletionTokens: number | undefined;
 
   constructor(options: OpenAiCompatibleBackendOptions) {
     this.baseURL = normalizeBaseUrl(options.baseURL);
     this.apiKey = options.apiKey;
     this.model = options.model;
     this.timeoutMs = options.timeoutMs ?? 60_000;
+    this.contextWindowTokens = options.contextWindowTokens ?? resolveConfiguredContextWindowTokens();
+    this.maxCompletionTokens = options.maxCompletionTokens;
+  }
+
+  /** KC-09: budget only when a window is explicitly configured — unknown window leaves the request untouched. */
+  private completionBudget(body: ChatCompletionRequest): number | undefined {
+    if (this.contextWindowTokens === undefined) return undefined;
+    return computeCompletionTokenBudget({
+      contextWindowTokens: this.contextWindowTokens,
+      estimatedInputTokens: estimateRequestInputTokens(body),
+      configuredMaxTokens: this.maxCompletionTokens ?? this.contextWindowTokens,
+    });
   }
 
   private async fetchChatCompletion(
@@ -301,6 +325,8 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
       messages: redactSensitiveObject(messages),
       ...(opts.useTools ?? true ? { tools: createToolDefinitions(), tool_choice: 'auto' } : {}),
     };
+    const maxTokens = this.completionBudget(body);
+    if (maxTokens !== undefined) body.max_tokens = maxTokens;
 
     const response = await fetch(joinEndpoint(this.baseURL, 'chat/completions'), {
       method: 'POST',

@@ -26,7 +26,14 @@ describe('openai-compatible-backend', () => {
     delete process.env.KYBERION_NEMOTRON_URL;
     delete process.env.KYBERION_NEMOTRON_KEY;
     delete process.env.KYBERION_NEMOTRON_MODEL;
+    delete process.env.KYBERION_CONTEXT_WINDOW_TOKENS;
   });
+
+  const okTextResponse = () =>
+    new Response(
+      JSON.stringify({ choices: [{ message: { role: 'assistant', content: 'ok' } }] }),
+      { status: 200, headers: { 'content-type': 'application/json' } }
+    );
 
   it('builds from env when a local llm url is configured', () => {
     process.env.KYBERION_LOCAL_LLM_URL = 'http://127.0.0.1:11434/v1';
@@ -155,5 +162,42 @@ describe('openai-compatible-backend', () => {
 
     expect(result).toContain('stopped after 3 repeated calls to read_file');
     expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('budgets max_tokens against a configured context window', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(okTextResponse());
+    vi.stubGlobal('fetch', fetchMock);
+
+    const backend = new OpenAiCompatibleBackend({
+      baseURL: 'http://127.0.0.1:11434/v1',
+      apiKey: 'not-needed',
+      model: 'llama3',
+      timeoutMs: 1_000,
+      contextWindowTokens: 16_000,
+      maxCompletionTokens: 8_000,
+    });
+
+    await backend.prompt('y'.repeat(24_000));
+
+    const body = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+    expect(body.max_tokens).toBeLessThan(8_000);
+    expect(body.max_tokens).toBeGreaterThanOrEqual(1_024);
+  });
+
+  it('sends no max_tokens when the context window is unknown', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(okTextResponse());
+    vi.stubGlobal('fetch', fetchMock);
+
+    const backend = new OpenAiCompatibleBackend({
+      baseURL: 'http://127.0.0.1:11434/v1',
+      apiKey: 'not-needed',
+      model: 'llama3',
+      timeoutMs: 1_000,
+    });
+
+    await backend.prompt('short prompt');
+
+    const body = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+    expect(body.max_tokens).toBeUndefined();
   });
 });
