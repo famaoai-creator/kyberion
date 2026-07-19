@@ -2,6 +2,13 @@ import { logger } from './core.js';
 import { derivePipelineStatus, type PipelineStepResult } from './pipeline-contract.js';
 import { handleStepError } from './src/pipeline-engine.js';
 import { resolveVars } from './src/logic-utils.js';
+import {
+  advanceToolCallRepeatGovernor,
+  buildToolCallRepeatForceStopMessage,
+  createToolCallRepeatGovernorState,
+  type ToolCallRepeatDecision,
+  type ToolCallRepeatGovernorState,
+} from './tool-call-repeat-governor.js';
 
 export type AdfStepType = 'capture' | 'transform' | 'apply' | 'control';
 
@@ -22,6 +29,11 @@ export interface AdfRunOptions {
   label?: string;
   /** Override the template resolver (default: shared resolveVars). */
   resolveVars?: (value: any, ctx: Record<string, any>) => any;
+  /**
+   * Called when the repeat governor force-stops the run (KC-01). Default
+   * records a governance action on the kill switch; tests inject a spy.
+   */
+  onRepeatForceStop?: (step: AdfStep, decision: ToolCallRepeatDecision) => void | Promise<void>;
 }
 
 export interface AdfSkippedStep {
@@ -74,6 +86,29 @@ export interface AdfRunResult<Ctx extends AdfEngineContext = AdfEngineContext> {
 interface AdfEngineState {
   stepCount: number;
   startTime: number;
+  repeatGovernor: ToolCallRepeatGovernorState;
+  /**
+   * Depth of enclosing explicit loop control ops. Inside a declared loop
+   * (while / loop_until / retry_until_quality / foreach / parallel_foreach /
+   * accumulate) identical repetition is intentional — soak runs and polling
+   * loops are governed by their own iteration caps — so the repeat governor
+   * warns but never force-stops there. Force stop applies only to unplanned
+   * repetition (linear step streams, repair re-execution).
+   */
+  loopDepth: number;
+}
+
+const LOOP_CONTROL_OPS = new Set([
+  'while',
+  'loop_until',
+  'retry_until_quality',
+  'foreach',
+  'parallel_foreach',
+  'accumulate',
+]);
+
+function isLoopControlOp(op: string): boolean {
+  return LOOP_CONTROL_OPS.has(op.replace(/^core:/u, ''));
 }
 
 export async function executeAdfSteps<Ctx extends AdfEngineContext = AdfEngineContext>(
@@ -91,6 +126,8 @@ export async function executeAdfSteps<Ctx extends AdfEngineContext = AdfEngineCo
     {
       stepCount: 0,
       startTime: Date.now(),
+      repeatGovernor: createToolCallRepeatGovernorState(),
+      loopDepth: 0,
     },
     hooks
   );
@@ -127,6 +164,40 @@ async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineC
       throw new Error(`[SAFETY_LIMIT] Pipeline execution timed out (${timeoutMs}ms)`);
     }
 
+    if (step.type !== 'control') {
+      // Signature over *resolved* params: template steps inside foreach resolve
+      // to different values per item and must not count as repeats.
+      let signatureArgs: unknown = step.params;
+      try {
+        signatureArgs = resolve(step.params);
+      } catch {
+        /* unresolvable templates — compare raw params instead */
+      }
+      const decision = advanceToolCallRepeatGovernor(
+        state.repeatGovernor,
+        `${step.type}:${step.op}`,
+        signatureArgs
+      );
+      state.repeatGovernor = decision.state;
+      if (decision.should_force_stop && state.loopDepth === 0) {
+        const message = buildToolCallRepeatForceStopMessage(
+          `${step.type}:${step.op}`,
+          decision.streak
+        );
+        try {
+          await (options.onRepeatForceStop
+            ? options.onRepeatForceStop(step, decision)
+            : recordRepeatForceStopGovernanceAction(label, step, decision));
+        } catch {
+          /* observability must not mask the stop itself */
+        }
+        throw new Error(message);
+      }
+      if (decision.reminder && decision.escalation !== 'force_stop') {
+        logger.warn(`  ${label} [repeat-governor] ${decision.reminder}`);
+      }
+    }
+
     hooks?.beforeStep?.(step, state.stepCount, ctx);
     try {
       logger.info(`  ${label} [Step ${state.stepCount}] ${step.type}:${step.op}...`);
@@ -134,13 +205,14 @@ async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineC
         if (!handlers.control) {
           throw new Error(`[UNKNOWN_TYPE] Unknown control step op: ${step.op}`);
         }
-        const controlResult = await handlers.control(
-          step.op,
-          step.params,
-          ctx,
-          runNestedSteps,
-          resolve
-        );
+        const loopOp = isLoopControlOp(step.op);
+        if (loopOp) state.loopDepth += 1;
+        let controlResult;
+        try {
+          controlResult = await handlers.control(step.op, step.params, ctx, runNestedSteps, resolve);
+        } finally {
+          if (loopOp) state.loopDepth -= 1;
+        }
         if (isSkippedStep(controlResult)) {
           ctx = controlResult.context as Ctx;
           results.push({ op: step.op, status: 'skipped' });
@@ -226,6 +298,25 @@ async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineC
     context: ctx,
     total_steps: state.stepCount,
   };
+}
+
+/**
+ * Dynamic import: kill-switch pulls in the agent-runtime plane, and this
+ * engine must stay statically dependency-light (it is imported by every
+ * runner, including boundary-tested ones).
+ */
+async function recordRepeatForceStopGovernanceAction(
+  label: string,
+  step: AdfStep,
+  decision: ToolCallRepeatDecision
+): Promise<void> {
+  const { recordGovernanceAction } = await import('./kill-switch.js');
+  recordGovernanceAction(
+    'adf-engine',
+    'tool_call_repeat_force_stop',
+    `${label} ${step.type}:${step.op} streak=${decision.streak}`,
+    true
+  );
 }
 
 export function skipAdfStep<Ctx extends AdfEngineContext>(

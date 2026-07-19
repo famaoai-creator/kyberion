@@ -310,4 +310,81 @@ describe('executeAdfSteps', () => {
       'after:boom:recovered',
     ]);
   });
+
+  describe('tool-call repeat governor (KC-01)', () => {
+    const passthroughHandlers = {
+      capture: async (_op: string, _params: any, ctx: any) => ctx,
+      transform: async (_op: string, _params: any, ctx: any) => ctx,
+      apply: async (_op: string, _params: any, ctx: any) => ctx,
+    };
+
+    it('force-stops a linear stream of identical calls and records the stop', async () => {
+      const onRepeatForceStop = vi.fn();
+      const steps = Array.from({ length: 15 }, () => ({
+        type: 'apply' as const,
+        op: 'notify',
+        params: { channel: 'ops', message: 'ping' },
+      }));
+
+      await expect(
+        executeAdfSteps(steps, {}, { maxSteps: 100, timeoutMs: 10_000, onRepeatForceStop }, passthroughHandlers)
+      ).rejects.toThrow('[TOOL_CALL_REPEAT]');
+      expect(onRepeatForceStop).toHaveBeenCalledTimes(1);
+      expect(onRepeatForceStop.mock.calls[0][1].streak).toBe(12);
+    });
+
+    it('does not force-stop identical calls declared inside an explicit loop op', async () => {
+      const result = await executeAdfSteps(
+        [
+          {
+            type: 'control',
+            op: 'core:while',
+            params: {
+              iterations: 20,
+              body: [{ type: 'capture', op: 'poll', params: { target: 'status' } }],
+            },
+          },
+        ],
+        {},
+        { maxSteps: 100, timeoutMs: 10_000 },
+        {
+          ...passthroughHandlers,
+          control: async (_op, params, ctx, runSteps) => {
+            let current = ctx;
+            for (let i = 0; i < params.iterations; i += 1) {
+              const nested = await runSteps(params.body, current);
+              if (nested.status === 'failed') throw new Error('nested failure');
+              current = nested.context;
+            }
+            return current;
+          },
+        }
+      );
+      expect(result.status).toBe('succeeded');
+    });
+
+    it('does not count template steps resolving to different values as repeats', async () => {
+      const steps = Array.from({ length: 15 }, () => ({
+        type: 'apply' as const,
+        op: 'notify',
+        params: { message: '{{tick}}' },
+      }));
+      let tick = 0;
+      const result = await executeAdfSteps(
+        steps,
+        {},
+        {
+          maxSteps: 100,
+          timeoutMs: 10_000,
+          resolveVars: (value) => {
+            tick += 1;
+            return { ...value, message: `tick-${tick}` };
+          },
+        },
+        passthroughHandlers
+      );
+      expect(result.status).toBe('succeeded');
+      expect(result.total_steps).toBe(15);
+    });
+  });
 });
