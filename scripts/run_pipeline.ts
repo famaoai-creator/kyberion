@@ -46,6 +46,7 @@ import {
   getDefaultWorkerEventStream,
   getDefaultLifecycleHookEngine,
   fireLifecycleHooks,
+  registerActuatorForwardingPort,
 } from '@agent/core';
 import { tryRepairJson } from '@agent/core/json-repair';
 import { installPythonVoiceBridgeIfAvailable } from '@agent/core/python-voice-bridge';
@@ -1380,6 +1381,34 @@ export async function runSteps(
   const stepRefStack: PipelineAdfStep[] = [];
   let includeStack: ReadonlySet<string> = opts._includeStack ?? new Set<string>();
   let lastKnownCtx: Record<string, unknown> = initialCtx;
+
+  // Cross-actuator compatibility forwarding is registered at the orchestration
+  // boundary. Wisdom only sees the port and never imports another actuator,
+  // which keeps the dependency graph acyclic while allowing legacy wisdom
+  // pipeline steps to execute at their canonical owner.
+  registerActuatorForwardingPort({
+    forward: async (request) => {
+      const targetOp = `${request.target_actuator}:${request.target_op}`;
+      const targetStep = {
+        op: targetOp,
+        type: resolveStepType({ op: targetOp, params: request.params }),
+        params: request.params,
+      } as PipelineAdfStep;
+      const nextContext = await dispatchLeafOp(
+        targetStep,
+        request.context,
+        rootDir,
+        shellBin,
+        opts,
+        normalizeReasoningPolicy(targetStep)
+      );
+      return {
+        forwarded_to: targetOp,
+        status: 'succeeded',
+        context: nextContext,
+      };
+    },
+  });
 
   // core:include mutates includeStack around its own nested body only; every
   // other control op just needs a nested run + throw-on-failure, so it's

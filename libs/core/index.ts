@@ -857,6 +857,17 @@ export type {
   AgentTaskEnvelope,
 } from './agent-execution-port.js';
 export {
+  getActuatorForwardingPort,
+  registerActuatorForwardingPort,
+  resetActuatorForwardingPort,
+} from './actuator-forwarding-port.js';
+export type {
+  ActuatorForwardingPort,
+  ActuatorForwardStatus,
+  ActuatorForwardRequest,
+  ActuatorForwardReceipt,
+} from './actuator-forwarding-port.js';
+export {
   getDeploymentAdapter,
   installShellDeploymentAdapterIfAvailable,
   registerDeploymentAdapter,

@@ -14,8 +14,8 @@
   "steps": [
     {
       "id": "execute",
-      "role": "source",
-      "op": "wisdom:execute_task_plan",
+      "role": "sink",
+      "op": "orchestrator:execute_task_plan",
       "produces": { "channel": "execution", "type": "TaskPlanExecution" },
       "params": {
         "mission_id": "{{mission_id}}",

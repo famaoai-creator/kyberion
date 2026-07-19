@@ -19,6 +19,7 @@ import {
   getReasoningBackend,
   getVoiceBridge,
   getSpeechToTextBridge,
+  getActuatorForwardingPort,
   saveRequirementsDraft,
   evaluateRequirementsCompletenessGate,
   evaluateCustomerSignoffGate,
@@ -54,6 +55,7 @@ import {
   type ActionItemModality,
   type ActionItemReviewState,
   type ActionItemProvenance,
+  type ContextSecurityScope,
   type MeetingFacilitatorPolicy,
   type PresentationPreferenceProfile,
 } from '@agent/core';
@@ -142,6 +144,43 @@ function normalizeKnowledgePackageAgentId(value: unknown): string {
     throw new Error(`Invalid knowledge package origin_agent_id: ${value}`);
   }
   return agentId;
+}
+
+async function forwardBoundaryOperation(
+  op: string,
+  params: Record<string, unknown>,
+  ctx: WisdomContext,
+  _compatibilityMode: boolean,
+  defaultExportKey: string
+): Promise<WisdomContext | undefined> {
+  const spec = getWisdomOperationSpec(op);
+  if (!spec?.forward_to) return undefined;
+
+  const forwarded = await getActuatorForwardingPort().forward({
+    source_actuator: 'wisdom-actuator',
+    requested_op: op,
+    target_actuator: spec.forward_to.actuator,
+    target_op: spec.forward_to.op,
+    params,
+    context: ctx,
+    security_scope:
+      ctx.security_scope && typeof ctx.security_scope === 'object'
+        ? (ctx.security_scope as ContextSecurityScope)
+        : undefined,
+    idempotency_key: String(
+      params.idempotency_key || ctx.idempotency_key || `wisdom:${op}:${Date.now()}`
+    ),
+  });
+
+  if (forwarded.status !== 'succeeded') {
+    throw new Error(
+      `[FORWARDED_OP_FAILED] ${op} -> ${spec.forward_to.actuator}:${spec.forward_to.op}: ${forwarded.error || forwarded.status}`
+    );
+  }
+  if (forwarded.context) return forwarded.context as WisdomContext;
+
+  const exportKey = String(params.export_as || defaultExportKey);
+  return { ...ctx, [exportKey]: forwarded.result };
 }
 
 export interface PipelineStep {
@@ -309,6 +348,15 @@ async function opCapture(
   ctx: any,
   _compatibilityMode = false
 ): Promise<WisdomContext> {
+  const forwarded = await forwardBoundaryOperation(
+    op,
+    params,
+    ctx,
+    _compatibilityMode,
+    'last_capture'
+  );
+  if (forwarded) return forwarded;
+
   switch (op) {
     case 'shell':
       const cmd = resolveVars(params.cmd, ctx);
@@ -363,17 +411,79 @@ async function opCapture(
       });
       return { ...ctx, [params.export_as || 'history_search_results']: report };
     }
-    case 'knowledge_search':
-      const query = String(resolveVars(params.query ?? '', ctx)).toLowerCase();
-      const manifestPath = pathResolver.knowledge('_manifest.json');
-      const manifest = JSON.parse(safeReadFile(manifestPath, { encoding: 'utf8' }) as string);
-      const items = manifest.files || manifest.documents || [];
-      const matched = items.filter((doc: any) => {
-        const title = (doc.title || doc.path || '').toLowerCase();
-        const tags = (doc.tags || []).some((t: string) => t.toLowerCase().includes(query));
-        return title.includes(query) || tags;
+    case 'knowledge_search': {
+      const { buildScopedIndex, queryKnowledgeHybrid, DEFAULT_SCOPE } = await import('@agent/core');
+      const securityScope =
+        ctx.security_scope && typeof ctx.security_scope === 'object'
+          ? (ctx.security_scope as Record<string, unknown>)
+          : undefined;
+      const requestedTier = params.tier ? normalizeKnowledgeTier(params.tier) : undefined;
+      const readTiers = Array.isArray(securityScope?.read_tiers)
+        ? securityScope.read_tiers.filter((tier): tier is 'personal' | 'confidential' | 'public' =>
+            KNOWLEDGE_TIER_PATTERN.test(String(tier))
+          )
+        : requestedTier
+          ? [requestedTier]
+          : DEFAULT_SCOPE.tiers;
+      if (requestedTier && !readTiers.includes(requestedTier)) {
+        throw new Error(
+          `[KNOWLEDGE_SCOPE_VIOLATION] requested tier ${requestedTier} is outside the read scope`
+        );
+      }
+      if (readTiers.some((tier) => tier !== 'public') && !securityScope?.tenant_id) {
+        throw new Error(
+          '[KNOWLEDGE_SCOPE_REQUIRED] tenant_id is required for non-public knowledge search'
+        );
+      }
+      const scope = {
+        tiers: readTiers,
+        ...(securityScope?.tenant_id || ctx.tenant_id
+          ? { customerId: String(securityScope?.tenant_id || ctx.tenant_id) }
+          : {}),
+      };
+      const scopeKey = JSON.stringify(scope);
+      let index = ctx._knowledgeIndex;
+      if (!index || ctx._knowledgeIndexScopeKey !== scopeKey) {
+        index = await buildScopedIndex(scope);
+      }
+      const query = String(resolveVars(params.query ?? '', ctx));
+      const results = await queryKnowledgeHybrid(index, query, {
+        maxResults: Number(params.limit || params.max_results || 5),
+        scope:
+          securityScope?.mission_id || securityScope?.project_id
+            ? String(securityScope.mission_id || securityScope.project_id)
+            : undefined,
       });
-      return { ...ctx, [params.export_as || 'found_knowledge']: matched };
+      const normalized = results.map((entry) => ({
+        source_ref: entry.source,
+        tier: entry.tier || 'public',
+        scope: {
+          ...(securityScope?.tenant_id ? { tenant_id: securityScope.tenant_id } : {}),
+          ...(securityScope?.project_id ? { project_id: securityScope.project_id } : {}),
+          ...(securityScope?.mission_id ? { mission_id: securityScope.mission_id } : {}),
+        },
+        title: entry.topic,
+        tags: entry.tags || [],
+        score: entry.confidence,
+        retrieval_reason: entry.embeddingBackend
+          ? 'scoped hybrid lexical-semantic retrieval'
+          : 'scoped lexical retrieval fallback',
+        provenance: {
+          source_ref: entry.source,
+          matched_chunk_index: entry.matchedChunkIndex,
+          embedding_backend: entry.embeddingBackend,
+          doc_authority: entry.doc_authority,
+          knowledge_scope: entry.scope,
+        },
+        hint: entry.hint,
+      }));
+      return {
+        ...ctx,
+        _knowledgeIndex: index,
+        _knowledgeIndexScopeKey: scopeKey,
+        [params.export_as || 'found_knowledge']: normalized,
+      };
+    }
     case 'query': {
       const { buildScopedIndex, queryKnowledgeHybrid, DEFAULT_SCOPE } = await import('@agent/core');
       const scope = ctx._knowledge_scope ?? DEFAULT_SCOPE;
@@ -466,6 +576,15 @@ async function opApply(
   ctx: any,
   compatibilityMode = false
 ): Promise<WisdomContext> {
+  const forwarded = await forwardBoundaryOperation(
+    op,
+    params,
+    ctx,
+    compatibilityMode,
+    'last_apply_result'
+  );
+  if (forwarded) return forwarded;
+
   switch (op) {
     case 'write_file':
     case 'write_artifact':
