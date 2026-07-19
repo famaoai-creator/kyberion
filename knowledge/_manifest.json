@@ -1227,7 +1227,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 57213,
+      "size": 57757,
       "type": "json"
     },
     {
@@ -9117,7 +9117,7 @@
     {
       "path": "public/procedures/media/realtime-voice-conversation.md",
       "tier": "public",
-      "size": 3230,
+      "size": 5572,
       "type": "md"
     },
     {

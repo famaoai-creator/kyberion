@@ -1117,7 +1117,7 @@ export {
   installShellStreamingTtsBridgeFromEnv,
 } from './shell-streaming-tts-bridge.js';
 export type { ShellStreamingTtsOptions } from './shell-streaming-tts-bridge.js';
-export { EnergyVad } from './voice-activity-detector.js';
+export { EnergyVad, computeChunkDurationMs, computeChunkRms } from './voice-activity-detector.js';
 export type {
   EnergyVadOptions,
   VoiceActivityDetector,
@@ -1131,7 +1131,10 @@ export {
   resetMeetingJoinDriverRegistry,
 } from './meeting-join-driver.js';
 export type { MeetingJoinDriver } from './meeting-join-driver.js';
-export { MeetingParticipationCoordinator } from './meeting-participation-coordinator.js';
+export {
+  MeetingParticipationCoordinator,
+  checkMeetingParticipationConsent,
+} from './meeting-participation-coordinator.js';
 export type {
   ConversationAgent,
   MeetingParticipationOptions,
@@ -1650,6 +1653,15 @@ export * from './surface-mutation-guard.js';
 export * from './ceo-surface-summary.js';
 export * from './mic-capture.js';
 export * from './in-room-minutes-recorder.js';
+export * from './pcm-wav.js';
+export * from './vad-turn-recorder.js';
+export * from './audio-playback.js';
+export * from './segmented-voice-playback.js';
+export * from './audio-tee.js';
+export * from './vad-registry.js';
+export * from './silero-vad-bridge.js';
+export * from './realtime-voice-loop.js';
+export * from './actuator-serve-client.js';
 export * from './in-room-meeting-driver.js';
 export * from './chrome-extension-meeting-driver.js';
 export * from './channel-directory.js';

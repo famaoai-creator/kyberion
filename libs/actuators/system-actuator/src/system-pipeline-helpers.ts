@@ -31,6 +31,7 @@ import {
   createScreenDisplayInventoryBridge,
   listToolRuntimeInventory,
   listServiceRuntimeInventory,
+  probeSileroVad,
   buildUnknownActuatorOpError,
   type ScreenDisplayInventory,
   type ScreenDisplayRecord,
@@ -680,6 +681,17 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
         ),
       };
     case 'probe': {
+      if (params.capability === 'silero_vad') {
+        const status = probeSileroVad();
+        return {
+          ...ctx,
+          [params.export_as || 'last_probe']: {
+            capability: 'silero_vad',
+            available: status.available,
+            ...(status.reason ? { reason: status.reason } : {}),
+          },
+        };
+      }
       const targetPath = pathResolver.rootResolve(resolve(params.path));
       let exists = false;
       let kind = 'unknown';
