@@ -44,6 +44,8 @@ import {
   type AdfSkippedStep,
   executeProgrammaticToolCall,
   getDefaultWorkerEventStream,
+  getDefaultLifecycleHookEngine,
+  fireLifecycleHooks,
 } from '@agent/core';
 import { tryRepairJson } from '@agent/core/json-repair';
 import { installPythonVoiceBridgeIfAvailable } from '@agent/core/python-voice-bridge';
@@ -1773,6 +1775,16 @@ export async function runSteps(
         duration_ms: durationMs,
         ...(outcome.error ? { error: outcome.error } : {}),
       });
+      void fireLifecycleHooks(
+        getDefaultLifecycleHookEngine(),
+        outcome.status === 'failed' ? 'post_tool_use_failure' : 'post_tool_use',
+        {
+          matcher_value: normalizedOp,
+          op: normalizedOp,
+          status: outcome.status,
+          ...(outcome.error ? { error: outcome.error } : {}),
+        }
+      );
       if (!opts.quiet && (outcome.status === 'success' || outcome.status === 'failed')) {
         logger.info(
           `[step ${stepNumber}/${totalTopLevelSteps}] ${normalizedOp} ${outcome.status} in ${Math.round(durationMs / 1000)}s`
@@ -1838,7 +1850,20 @@ export async function runSteps(
     const engineResult = await executeAdfSteps(
       prepareEngineSteps(steps),
       initialCtx,
-      { maxSteps, timeoutMs, resolveVars: (value: any, c: any) => resolveVars(value, c) },
+      {
+        maxSteps,
+        timeoutMs,
+        resolveVars: (value: any, c: any) => resolveVars(value, c),
+        // KC-04: pre_tool_use hooks can block a step; a block aborts the run.
+        stepGate: async (step, _stepNumber) => {
+          const outcome = await fireLifecycleHooks(
+            getDefaultLifecycleHookEngine(),
+            'pre_tool_use',
+            { matcher_value: String(step.op), op: String(step.op) }
+          );
+          return outcome.blocked ? { blocked: true, reasons: outcome.reasons } : undefined;
+        },
+      },
       handlers,
       hooks
     );
@@ -2005,10 +2030,19 @@ export async function main() {
       ...step,
       params: step.params || {},
     }));
+    await fireLifecycleHooks(getDefaultLifecycleHookEngine(), 'session_start', {
+      matcher_value: pipelineId,
+      pipeline_id: pipelineId,
+    });
     const result = await runValidatedSteps(stepsToRun, mergedContext, {
       trace,
       pipelinePath: argv.input as string,
       quiet: argv.quiet as boolean,
+    });
+    await fireLifecycleHooks(getDefaultLifecycleHookEngine(), 'session_end', {
+      matcher_value: pipelineId,
+      pipeline_id: pipelineId,
+      status: result.status,
     });
     const failed = result.results.find((entry) => entry.status === 'failed');
     const failure = failed ? formatPipelineFailure(failed.error || 'unknown error') : undefined;
