@@ -1870,6 +1870,11 @@ export type {
   CompileOptions,
   CompileRecordingResult,
 } from './browser-recording-compiler.js';
+export { promoteBrowserProcedure } from './browser-procedure-promotion.js';
+export type {
+  PromoteBrowserProcedureOptions,
+  PromoteBrowserProcedureResult,
+} from './browser-procedure-promotion.js';
 // dispatchProcedure — re-exports extendLeaseForMfa from browser-extension-bridge (already exported above)
 export { dispatchProcedure } from './procedure-dispatcher.js';
 export type { DispatchInput, DispatchResult, DispatchStatus } from './procedure-dispatcher.js';
