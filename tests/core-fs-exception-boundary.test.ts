@@ -7,6 +7,7 @@ const rootDir = process.cwd();
 const allowedCoreFsImports = [
   'libs/core/action-item-store.test.ts',
   'libs/core/approval-rejection-reason.test.ts',
+  'libs/core/approval-session-runtime.test.ts',
   'libs/core/reasoning-degradation.test.ts',
   'libs/core/reconcile-ops.test.ts',
   'libs/core/review-reentry.test.ts',
@@ -64,6 +65,7 @@ const allowedCoreFsImports = [
   'libs/core/tier-guard-tenant.test.ts',
   'libs/core/trust-engine.test.ts',
   'libs/core/validators.test.ts',
+  'libs/core/worker-event-stream.test.ts',
 ].sort((a, b) => a.localeCompare(b));
 
 function normalize(relPath: string): string {
