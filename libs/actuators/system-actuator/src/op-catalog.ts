@@ -2,6 +2,7 @@ import { getOpInputContract } from '@agent/core';
 
 export const SYSTEM_ACTUATOR_CAPTURE_OPS = [
   'screenshot',
+  'record_screen',
   'clipboard_read',
   'get_focused_input',
   'get_screen_size',
