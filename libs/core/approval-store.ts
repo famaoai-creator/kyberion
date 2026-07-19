@@ -129,8 +129,10 @@ export interface ApprovalRequestRecord extends ApprovalRequestDraft {
   requestedAt: string;
   decidedAt?: string;
   decidedBy?: string;
-  status: 'pending' | 'approved' | 'rejected' | 'expired' | 'applied' | 'failed';
+  status: 'pending' | 'approved' | 'rejected' | 'expired' | 'cancelled' | 'applied' | 'failed';
   sourceText?: string;
+  /** KC-03: origin of the request, for source-scoped cancellation. */
+  source?: ApprovalRequestSource;
   expiresAt?: string;
   requestedByContext?: ApprovalRequesterContext;
   target?: ApprovalTargetDescriptor;
@@ -147,6 +149,100 @@ export interface ApprovalRequestRecord extends ApprovalRequestDraft {
 export interface ApprovalDecisionPayload {
   requestId: string;
   decision: 'approved' | 'rejected';
+}
+
+/**
+ * KC-03: action descriptor for the session approval cache. Keys the cache by
+ * what the agent is doing (op + target class), never by the concrete payload —
+ * payload-hash binding stays the job of ApprovalAccountability.
+ */
+export interface ApprovalActionDescriptor {
+  /** Operation/action identifier, e.g. 'secret:set'. */
+  action: string;
+  /** Class of the target, e.g. 'service:github' — never a concrete payload. */
+  targetClass: string;
+}
+
+/** KC-03: originating mission/task/agent of an approval request. */
+export interface ApprovalRequestSource {
+  missionId?: string;
+  taskId?: string;
+  agentId?: string;
+}
+
+export interface SessionApprovalCacheEntry {
+  key: string;
+  action: string;
+  targetClass: string;
+  grantedByRequestId: string;
+  grantedBy: string;
+  grantedAt: string;
+  channel: string;
+  storageChannel: string;
+  /** Mirrors the originating request's expiry: the cache never outlives the grant. */
+  expiresAt?: string;
+}
+
+export function approvalActionCacheKey(descriptor: ApprovalActionDescriptor): string {
+  const action = String(descriptor?.action || '')
+    .trim()
+    .toLowerCase();
+  const targetClass = String(descriptor?.targetClass || '')
+    .trim()
+    .toLowerCase();
+  if (!action || !targetClass) {
+    throw new Error(
+      '[POLICY_VIOLATION] Session approval cache requires both action and targetClass'
+    );
+  }
+  return `${action}::${targetClass}`;
+}
+
+// Process-lifetime = session scope. Entries are only written by
+// decideApprovalRequest after validating a real, authenticated human approval.
+const sessionApprovalCache = new Map<string, SessionApprovalCacheEntry>();
+
+export function lookupSessionApprovalCache(
+  descriptor: ApprovalActionDescriptor,
+  now = Date.now()
+): SessionApprovalCacheEntry | null {
+  const key = approvalActionCacheKey(descriptor);
+  const entry = sessionApprovalCache.get(key);
+  if (!entry) return null;
+  if (isApprovalRequestExpired(entry, now)) {
+    sessionApprovalCache.delete(key);
+    return null;
+  }
+  return entry;
+}
+
+export function clearSessionApprovalCache(): void {
+  sessionApprovalCache.clear();
+}
+
+/** KC-03: make cache-based auto-approvals durable in the decision event stream. */
+export function recordSessionCacheAutoApproval(
+  role: GovernedArtifactRole,
+  params: {
+    entry: SessionApprovalCacheEntry;
+    operationId: string;
+    agentId: string;
+    correlationId: string;
+  }
+): void {
+  appendGovernedArtifactJsonl(role, approvalEventLogicalPath(params.entry.storageChannel), {
+    ts: new Date().toISOString(),
+    event: 'auto_approved_via_session_cache',
+    request_id: params.entry.grantedByRequestId,
+    correlation_id: params.correlationId,
+    operation_id: params.operationId,
+    agent_id: params.agentId,
+    action: params.entry.action,
+    target_class: params.entry.targetClass,
+    granted_by: params.entry.grantedBy,
+    granted_at: params.entry.grantedAt,
+    channel: params.entry.channel,
+  });
 }
 
 /** Stable SHA-256 fingerprint for binding an approval to its exact effect payload. */
@@ -226,6 +322,7 @@ export function createApprovalRequest(
     trackName?: string;
     workLoop?: OrganizationWorkLoopSummary;
     accountability?: ApprovalAccountability;
+    source?: ApprovalRequestSource;
   }
 ): ApprovalRequestRecord {
   const storageChannel = normalizeApprovalChannel(params.storageChannel || params.channel);
@@ -249,6 +346,7 @@ export function createApprovalRequest(
     details: params.draft.details,
     severity: params.draft.severity || 'medium',
     sourceText: params.sourceText,
+    source: params.source,
     expiresAt: params.expiresAt,
     requestedByContext: params.requestedByContext,
     target: params.target,
@@ -275,6 +373,7 @@ export function createApprovalRequest(
     request_id: record.id,
     correlation_id: record.correlationId,
     requested_by: record.requestedBy,
+    source: record.source,
     channel: record.channel,
     thread_ts: record.threadTs,
   });
@@ -312,6 +411,86 @@ export function expireApprovalRequest(
     thread_ts: updated.threadTs,
   });
   return updated;
+}
+
+/** KC-03: persist the terminal cancellation transition exactly once (mirrors expiry). */
+export function cancelApprovalRequest(
+  role: GovernedArtifactRole,
+  params: {
+    channel: string;
+    storageChannel?: string;
+    requestId: string;
+    cancelledBy?: string;
+    reason?: string;
+  }
+): ApprovalRequestRecord {
+  const storageChannel = normalizeApprovalChannel(params.storageChannel || params.channel);
+  const record = loadApprovalRequest(storageChannel, params.requestId);
+  if (!record) throw new Error(`Approval request not found: ${params.channel}/${params.requestId}`);
+  if (record.status !== 'pending') return record;
+
+  const updated: ApprovalRequestRecord = { ...record, status: 'cancelled' };
+  writeGovernedArtifactJson(role, approvalRequestLogicalPath(storageChannel, updated.id), updated);
+  appendGovernedArtifactJsonl(role, approvalEventLogicalPath(storageChannel), {
+    ts: new Date().toISOString(),
+    event: 'cancelled',
+    request_id: updated.id,
+    correlation_id: updated.correlationId,
+    cancelled_by: params.cancelledBy,
+    reason: params.reason,
+    source: updated.source,
+    channel: updated.channel,
+    thread_ts: updated.threadTs,
+  });
+  return updated;
+}
+
+const APPROVAL_SOURCE_FIELDS = ['missionId', 'taskId', 'agentId'] as const;
+
+/**
+ * KC-03: cancel every pending approval request originating from the given
+ * mission/task/agent so an aborted turn leaves no orphan pending approvals.
+ * Filter fields are subset-matched: `{ missionId }` cancels across all of that
+ * mission's tasks; `{ taskId }` only that task's requests.
+ */
+export function cancelApprovalRequestsBySource(
+  role: GovernedArtifactRole,
+  params: {
+    source: ApprovalRequestSource;
+    storageChannels?: string[];
+    cancelledBy?: string;
+    reason?: string;
+  }
+): ApprovalRequestRecord[] {
+  const specified = APPROVAL_SOURCE_FIELDS.filter((field) => {
+    const value = params.source?.[field];
+    return typeof value === 'string' && value.trim() !== '';
+  });
+  if (specified.length === 0) {
+    throw new Error(
+      '[POLICY_VIOLATION] cancelApprovalRequestsBySource requires at least one source field'
+    );
+  }
+
+  const pending = listApprovalRequests({
+    storageChannels: params.storageChannels,
+    status: 'pending',
+  });
+  const cancelled: ApprovalRequestRecord[] = [];
+  for (const record of pending) {
+    if (!record.source) continue;
+    if (!specified.every((field) => record.source?.[field] === params.source[field])) continue;
+    cancelled.push(
+      cancelApprovalRequest(role, {
+        channel: record.channel,
+        storageChannel: record.storageChannel,
+        requestId: record.id,
+        cancelledBy: params.cancelledBy,
+        reason: params.reason,
+      })
+    );
+  }
+  return cancelled;
 }
 
 /**
@@ -432,11 +611,23 @@ export function decideApprovalRequest(
     note?: string;
     /** LC-10: closed-vocabulary rejection reason (see rejection-reason.ts). */
     reasonCategory?: RejectionReasonCategory;
+    /**
+     * KC-03: opt in to auto-approving the same action class for the rest of
+     * this process session. Only honored for `approved` decisions made by a
+     * real, authenticated human — never for rejections.
+     */
+    sessionCache?: ApprovalActionDescriptor;
   }
 ): ApprovalRequestRecord {
   const storageChannel = params.storageChannel || params.channel;
   const record = loadApprovalRequest(normalizeApprovalChannel(storageChannel), params.requestId);
   if (!record) throw new Error(`Approval request not found: ${params.channel}/${params.requestId}`);
+
+  if (record.status === 'cancelled') {
+    throw new Error(
+      `[POLICY_VIOLATION] Approval request was cancelled and cannot be decided: ${record.id}`
+    );
+  }
 
   if (record.status === 'pending' && isApprovalRequestExpired(record)) {
     expireApprovalRequest(role, {
@@ -454,6 +645,19 @@ export function decideApprovalRequest(
     payloadHash: params.payloadHash,
     effectBinding: params.effectBinding,
   });
+
+  const cacheDescriptor = params.decision === 'approved' ? params.sessionCache : undefined;
+  if (cacheDescriptor) {
+    // The session cache is a standing grant, so its seed is held to the
+    // human-only contract even when the record itself carries no
+    // accountability binding. Fail before persisting so callers notice.
+    validateHumanFinalDecision({
+      accountability: { finalDecision: 'human_only' },
+      decidedByType: params.decidedByType,
+      authenticated: params.authenticated,
+    });
+    approvalActionCacheKey(cacheDescriptor);
+  }
 
   const decidedAt = new Date().toISOString();
   const workflow = record.workflow
@@ -512,6 +716,33 @@ export function decideApprovalRequest(
     note: params.note,
     reason_category: params.reasonCategory,
   });
+
+  if (cacheDescriptor) {
+    const key = approvalActionCacheKey(cacheDescriptor);
+    const entry: SessionApprovalCacheEntry = {
+      key,
+      action: cacheDescriptor.action.trim().toLowerCase(),
+      targetClass: cacheDescriptor.targetClass.trim().toLowerCase(),
+      grantedByRequestId: updated.id,
+      grantedBy: params.decidedBy,
+      grantedAt: decidedAt,
+      channel: updated.channel,
+      storageChannel: updated.storageChannel,
+      expiresAt: updated.expiresAt,
+    };
+    sessionApprovalCache.set(key, entry);
+    appendGovernedArtifactJsonl(role, approvalEventLogicalPath(storageChannel), {
+      ts: new Date().toISOString(),
+      event: 'session_cache_written',
+      request_id: updated.id,
+      correlation_id: updated.correlationId,
+      action: entry.action,
+      target_class: entry.targetClass,
+      granted_by: params.decidedBy,
+      channel: updated.channel,
+      thread_ts: updated.threadTs,
+    });
+  }
 
   return updated;
 }
