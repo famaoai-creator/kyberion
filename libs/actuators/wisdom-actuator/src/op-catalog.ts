@@ -4,6 +4,7 @@
 
 import type { WisdomOperationExecutor, WisdomOperationSpec } from './contracts/wisdom-operation.js';
 import type { WisdomContext } from './contracts/wisdom-context.js';
+import { DEPRECATED_WISDOM_ALIASES } from './compatibility/legacy-aliases.js';
 
 export type OpSpecKind = 'capture' | 'transform' | 'apply' | 'control';
 
@@ -117,14 +118,6 @@ const FORWARD_TARGETS: Record<string, { actuator: string; op: string }> = {
   escalate_for_review: { actuator: 'approval', op: 'request_review' },
 };
 
-const DEPRECATED_ALIASES: Record<string, string> = {
-  a2a_fanout: 'perspective_fanout',
-  a2a_roleplay: 'counterparty_roleplay',
-  cross_critique: 'typed_cross_critique',
-  tool_use: 'propose_tool_calls',
-  react_loop: 'reasoning_loop',
-};
-
 const ENSEMBLE_OPS = new Set([
   'a2a_fanout',
   'perspective_fanout',
@@ -164,7 +157,7 @@ const IDEMPOTENCY_BY_OP: Record<string, WisdomOperationSpec['idempotency']> = {
 };
 
 function toSpec(op: string, kind: OpSpecKind) {
-  const canonicalOp = DEPRECATED_ALIASES[op];
+  const canonicalOp = DEPRECATED_WISDOM_ALIASES[op as keyof typeof DEPRECATED_WISDOM_ALIASES];
   const forwardTo = FORWARD_TARGETS[op];
   const executionKind = ENSEMBLE_OPS.has(op)
     ? ('reasoning_ensemble' as const)
