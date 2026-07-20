@@ -3,7 +3,7 @@ import { secretGuard } from './secret-guard.js';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile, validateUrl } from './secure-io.js';
-import { evaluateEgressPolicy } from './egress-policy.js';
+import { evaluateEgressPolicy, type EgressPayloadContext } from './egress-policy.js';
 import { auditChain } from './audit-chain.js';
 import { recordGovernanceAction } from './kill-switch.js';
 import { assertOperationPolicy } from './operation-policy-gate.js';
@@ -104,9 +104,10 @@ function enforcePayloadSize(options: AxiosRequestConfig) {
 }
 
 export async function secureFetch<T = any>(options: SecureFetchOptions): Promise<T> {
-  const { kyberion_allow_local_network, ...axiosOptions } = options as SecureFetchOptions & {
-    authenticateRequest?: boolean;
-  };
+  const { kyberion_allow_local_network, kyberion_egress_context, ...axiosOptions } =
+    options as SecureFetchOptions & {
+      authenticateRequest?: boolean;
+    };
   const url = options.url || '';
   validateUrl(url, { allowLocalNetwork: kyberion_allow_local_network === true });
   const hostname = new URL(url).hostname;
@@ -120,7 +121,7 @@ export async function secureFetch<T = any>(options: SecureFetchOptions): Promise
   });
 
   // 1. Verify Endpoint Integrity for all requests.
-  const egressDecision = evaluateEgressPolicy(url);
+  const egressDecision = evaluateEgressPolicy(url, kyberion_egress_context);
   if (egressDecision.verdict === 'deny') {
     recordGovernanceAction(
       process.env.KYBERION_PERSONA || 'unknown',
@@ -138,8 +139,19 @@ export async function secureFetch<T = any>(options: SecureFetchOptions): Promise
         hostname,
         mode: egressDecision.mode,
         allowed: false,
+        // SA-04 acceptance 4: every outbound attempt is auditable with its tier.
+        tier: egressDecision.tier ?? 'unspecified',
+        tenant: kyberion_egress_context?.tenant_slug ?? null,
+        purpose: kyberion_egress_context?.purpose ?? null,
       },
     });
+    if (egressDecision.tier === 'confidential' || egressDecision.tier === 'personal') {
+      // SA-04 Task 2: the operator hears about tenant data being pushed out,
+      // not just the audit log.
+      logger.warn(
+        `[EGRESS] blocked an attempt to send ${egressDecision.tier} material to ${hostname}`
+      );
+    }
     throw new Error(`[NETWORK_POLICY_VIOLATION] ${egressDecision.reason}`);
   }
   if (egressDecision.verdict === 'warn') {
@@ -209,4 +221,13 @@ export async function secureFetch<T = any>(options: SecureFetchOptions): Promise
 export interface SecureFetchOptions extends AxiosRequestConfig {
   kyberion_allow_local_network?: boolean;
   authenticateRequest?: boolean;
+  /**
+   * SA-04 Task 2: declares the tier of the material being sent.
+   *
+   * Callers that knowingly move tenant data outward must set this; the egress
+   * policy then requires the destination to be approved for that tenant rather
+   * than merely allowlisted in general. Omitting it preserves the previous
+   * behaviour, so this is additive for existing callers.
+   */
+  kyberion_egress_context?: EgressPayloadContext;
 }

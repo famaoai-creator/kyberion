@@ -2,6 +2,7 @@ import { createLogger } from './logger.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { tryRepairJson } from './json-repair.js';
+import { withReasoningPayloadScope, type ReasoningPayloadScope } from './reasoning-egress-scope.js';
 
 // DS-04 / agy short-video quality: scene layout and visual composition used
 // to be a single hardcoded dark-navy dashboard skin baked into
@@ -28,6 +29,14 @@ export interface VideoVisualDirection {
     body_px: number;
   };
   per_scene?: Array<{ scene_id: string; layout_variant: string }>;
+  /** Durable provenance so a successful render cannot hide a degraded draft. */
+  resolution?: ArtDirectionResolution;
+}
+
+export interface ArtDirectionResolution {
+  source: 'model' | 'catalog-default';
+  degraded: boolean;
+  reason?: string;
 }
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
@@ -203,6 +212,7 @@ export interface GenerateVisualDirectionInput {
   scene_ids?: string[];
   /** Injectable for tests / stub environments. */
   generate?: (prompt: string) => Promise<string>;
+  scope?: ReasoningPayloadScope;
 }
 
 /**
@@ -248,7 +258,10 @@ export async function generateVideoVisualDirection(
         const { getReasoningBackend } = await import('./reasoning-backend.js');
         return String(await getReasoningBackend().prompt(p));
       });
-    const raw = await generate(prompt);
+    const raw = await withReasoningPayloadScope(
+      input.scope ?? { tier: 'public', purpose: 'video visual direction' },
+      () => generate(prompt)
+    );
     const jsonText = raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1);
     let parsed: any;
     try {
@@ -261,6 +274,7 @@ export async function generateVideoVisualDirection(
     if (!catalog[chosenId]) {
       logger.warn(`pattern "${chosenId}" not in catalog — using ${chosen[0]}`);
     }
+    const chosenFromModel = Boolean(catalog[chosenId]);
     const direction = patternToVisualDirection(chosen[0], chosen[1], input.frame);
     const perScene = Array.isArray(parsed?.per_scene)
       ? parsed.per_scene
@@ -270,9 +284,29 @@ export async function generateVideoVisualDirection(
             layout_variant: String(entry.layout_variant || 'default'),
           }))
       : [];
-    return perScene.length > 0 ? { ...direction, per_scene: perScene } : direction;
+    return {
+      ...direction,
+      ...(perScene.length > 0 ? { per_scene: perScene } : {}),
+      resolution: chosenFromModel
+        ? { source: 'model', degraded: false }
+        : {
+            source: 'catalog-default',
+            degraded: true,
+            reason: `unknown pattern id: ${chosenId || '(missing)'}`,
+          },
+    };
   } catch (error: any) {
     logger.warn(`visual direction selection failed, using default: ${error?.message || error}`);
-    return patternToVisualDirection(defaultEntry[0], defaultEntry[1], input.frame);
+    return {
+      ...patternToVisualDirection(defaultEntry[0], defaultEntry[1], input.frame),
+      resolution: {
+        source: 'catalog-default',
+        degraded: true,
+        reason: String(error?.message || error || 'visual direction selection failed').slice(
+          0,
+          240
+        ),
+      },
+    };
   }
 }

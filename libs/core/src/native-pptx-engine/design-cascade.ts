@@ -1,3 +1,9 @@
+import {
+  resolveCreativeDesign,
+  type CreativeDesignConstraints,
+  type CreativeDesignTypography,
+  type MediaThemeRecord,
+} from '../../creative-design-resolver.js';
 import { resolveEastAsianFontFamily } from '../../design-fonts.js';
 import type { PptxDesignProtocol, PptxElement, PptxStyle } from '../types/pptx-protocol.js';
 
@@ -76,11 +82,48 @@ export function resolvePptxDesignDefaults(
 export function designDefaultsFromMediaTheme(theme: {
   colors?: { text?: string; secondary?: string };
   fonts?: { body?: string; heading?: string };
+  typography?: CreativeDesignTypography;
 }): Partial<PptxDesignDefaults> {
+  const roles = theme.typography?.roles;
   return {
     fontFamily: resolveEastAsianFontFamily(theme.fonts?.body ?? theme.fonts?.heading),
     ...(theme.colors?.text ? { textColor: theme.colors.text } : {}),
     ...(theme.colors?.secondary ? { lineColor: theme.colors.secondary } : {}),
+    // MP-01: when the theme carries a type ramp, the cascade's fallback sizes
+    // come from it instead of the historical 14/12pt constants.
+    ...(roles ? { textFontSize: roles.body.size_pt, shapeFontSize: roles.label.size_pt } : {}),
+  };
+}
+
+/**
+ * MP-01: resolve the pptx surface straight from the single design entry point.
+ *
+ * The native engine previously never consumed resolveCreativeDesign — brief and
+ * script paths each hand-assembled a theme, which is how the same deck rendered
+ * with different balance depending on which path built it. This closes that
+ * last mile: callers pass a tenant slug and get the cascade defaults plus the
+ * type ramp and constraints that layout-fit needs.
+ */
+export function resolvePptxSurfaceDesign(tenantSlug?: string): {
+  theme: MediaThemeRecord;
+  typography: CreativeDesignTypography;
+  constraints: CreativeDesignConstraints;
+  defaults: Partial<PptxDesignDefaults>;
+} {
+  const resolved = resolveCreativeDesign({ surface: 'pptx', tenantSlug });
+  if (resolved.projection.surface !== 'pptx') {
+    throw new Error(`expected pptx projection, received ${resolved.projection.surface}`);
+  }
+  const theme = resolved.projection.theme;
+  return {
+    theme,
+    typography: resolved.typography,
+    constraints: resolved.constraints,
+    defaults: designDefaultsFromMediaTheme({
+      colors: theme.colors,
+      fonts: theme.fonts,
+      typography: resolved.typography,
+    }),
   };
 }
 

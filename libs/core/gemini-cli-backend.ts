@@ -10,6 +10,7 @@ import { z, type ZodType } from 'zod';
 import { logger } from './core.js';
 import { buildSafeExecEnv } from './secure-io.js';
 import { resolveRuntimeModelId } from './runtime-model-defaults.js';
+import { assertReasoningEgressAllowed } from './reasoning-egress-scope.js';
 import type {
   ReasoningBackend,
   DivergeHypothesisInput,
@@ -206,6 +207,7 @@ export class GeminiCliBackend implements ReasoningBackend {
   }
 
   async delegateTask(instruction: string, context?: string): Promise<string> {
+    assertReasoningEgressAllowed(this.name);
     const args = [
       '-p',
       `${instruction}\n\nContext: ${context ?? 'none'}`,
@@ -239,6 +241,7 @@ export class GeminiCliBackend implements ReasoningBackend {
     userPrompt: string;
     schema: ZodType<T>;
   }): Promise<T> {
+    assertReasoningEgressAllowed(this.name);
     const args = [
       '-p',
       `${params.systemPrompt}\n\n${params.userPrompt}`,
@@ -294,6 +297,7 @@ export class GeminiCliBackend implements ReasoningBackend {
   }
 
   private async runPrompt(prompt: string): Promise<string> {
+    assertReasoningEgressAllowed(this.name);
     const args = [
       '-p',
       prompt,

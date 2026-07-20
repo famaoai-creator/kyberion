@@ -49,6 +49,7 @@ import {
   withActuatorForwardingPort,
   type ActuatorForwardRequest,
   type ActuatorForwardingPort,
+  withReasoningPayloadScope,
 } from '@agent/core';
 import { tryRepairJson } from '@agent/core/json-repair';
 import { installPythonVoiceBridgeIfAvailable } from '@agent/core/python-voice-bridge';
@@ -1841,8 +1842,20 @@ async function runStepsInternal(
         status: outcome.status,
         ...(outcome.error && outcome.status === 'failed' ? { error: outcome.error } : {}),
       });
+      // OH-04 offloads oversized step output to an artifact and leaves a
+      // `{artifact_path, preview}` reference behind. That is right for tool
+      // logs, but a step's declared channel exists precisely so a later step
+      // can consume it: replacing a large structured payload with a preview
+      // hands the next op a truncated object, which fails far from the cause
+      // (or worse, succeeds on partial data). Generic text output still
+      // offloads; the declared channel never does.
+      const declaredChannel = step.produces
+        ? typeof step.produces === 'string'
+          ? step.produces
+          : step.produces.channel
+        : undefined;
       const outputKeys = [
-        resolveExportKey(step, 'last_output'),
+        ...(declaredChannel ? [] : [resolveExportKey(step, 'last_output')]),
         'last_output',
         'last_result',
         'stdout',
@@ -1850,7 +1863,7 @@ async function runStepsInternal(
         'output',
         'result',
         'response',
-      ];
+      ].filter((key) => key !== declaredChannel);
       let nextCtx = ctx;
       try {
         nextCtx = compactStepOutputContext(ctx, outputKeys, {
@@ -2089,11 +2102,35 @@ export async function main() {
         `[SAFETY_LIMIT][HOOK_BLOCKED] session_start blocked: ${sessionStart.reasons.join('; ')}`
       );
     }
-    const result = await runValidatedSteps(stepsToRun, mergedContext, {
-      trace,
-      pipelinePath: argv.input as string,
-      quiet: argv.quiet as boolean,
-    });
+    // SA-04: declare the payload tier once, at the mission boundary, so every
+    // reasoning call made anywhere inside this run inherits it. Annotating each
+    // call site individually would be missed the first time someone adds a new
+    // one; the mission already knows its tier, so it is the honest place to say
+    // it. A run with no mission stays unscoped (public work, previous behaviour).
+    const missionTier = String(autoContext.mission_tier || '');
+    const payloadTier: 'public' | 'confidential' | 'personal' =
+      missionTier === 'personal'
+        ? 'personal'
+        : missionTier === 'confidential'
+          ? 'confidential'
+          : 'public';
+    const runSteps = () =>
+      runValidatedSteps(stepsToRun, mergedContext, {
+        trace,
+        pipelinePath: argv.input as string,
+        quiet: argv.quiet as boolean,
+      });
+    const result =
+      payloadTier === 'public'
+        ? await runSteps()
+        : await withReasoningPayloadScope(
+            {
+              tier: payloadTier,
+              tenant_slug: process.env.KYBERION_CUSTOMER?.trim() || undefined,
+              purpose: `pipeline ${pipelineId}`,
+            },
+            runSteps
+          );
     const sessionEnd = await fireLifecycleHooks(getDefaultLifecycleHookEngine(), 'session_end', {
       matcher_value: pipelineId,
       pipeline_id: pipelineId,
