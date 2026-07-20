@@ -33,7 +33,11 @@ import {
 } from './provider-health-registry.js';
 import { enforceSpendGuardForReasoning } from './spend-guard.js';
 import { metrics } from './metrics.js';
+import * as path from 'node:path';
+import { pathResolver } from './path-resolver.js';
+import { getReasoningPayloadScope } from './reasoning-egress-scope.js';
 import { z } from 'zod';
+import { assertReasoningEgressAllowed } from './reasoning-egress-scope.js';
 
 // Auth/eligibility failures (dead credentials, retired tiers) do not heal in
 // seconds — keep retrying them per call and every operation pays the latency.
@@ -512,6 +516,63 @@ export interface ReasoningBackend {
   prompt(prompt: string, options?: ReasoningCallOptions): Promise<string>;
   /** (Optional) Execute a prompt with tool access (Function Calling / Tool Use). */
   generateWithTools?(prompt: string, tools: ToolDefinition[]): Promise<GenerateWithToolsResult>;
+  /**
+   * (Optional) Run a prompt with images attached.
+   *
+   * Optional because most backends here are CLI bridges that take text on
+   * stdin and have nowhere to put an image. Callers must check
+   * `backendSupportsVision` and degrade explicitly — a caller that silently
+   * falls back to a text prompt would be asking a model to describe pictures
+   * it was never shown, and would get confident answers about nothing.
+   */
+  promptWithImages?(
+    prompt: string,
+    images: ReasoningImageAttachment[],
+    options?: ReasoningCallOptions
+  ): Promise<string>;
+}
+
+/** A local image file to attach to a reasoning call. */
+export interface ReasoningImageAttachment {
+  /** Absolute path to the image on this host. */
+  path: string;
+  media_type: 'image/png' | 'image/jpeg' | 'image/webp' | 'image/gif';
+}
+
+/** True when this backend can actually look at images. */
+export function backendSupportsVision(
+  backend: Pick<ReasoningBackend, 'promptWithImages'>
+): boolean {
+  return typeof backend.promptWithImages === 'function';
+}
+
+/** Images larger than this are refused rather than silently truncated. */
+export const MAX_REASONING_IMAGE_BYTES = 5 * 1024 * 1024;
+/** More attachments than this in one call is almost always a mistake. */
+export const MAX_REASONING_IMAGES = 20;
+export const MAX_REASONING_IMAGE_BYTES_TOTAL = 20 * 1024 * 1024;
+
+export function validateReasoningImageAttachmentPaths(
+  images: readonly ReasoningImageAttachment[]
+): void {
+  const root = pathResolver.rootDir();
+  const scope = getReasoningPayloadScope();
+  for (const image of images) {
+    const resolved = path.resolve(image.path);
+    const relative = path.relative(root, resolved).replace(/\\/g, '/');
+    if (!relative || relative.startsWith('../') || path.isAbsolute(relative)) {
+      throw new Error('[VISION_PATH_DENIED] image attachment must stay under the project root');
+    }
+    if (scope && scope.tier !== 'public') {
+      const expected = `active/missions/${scope.tier}/`;
+      const projectExpected = `active/projects/${scope.tier}/`;
+      if (!relative.startsWith(expected) && !relative.startsWith(projectExpected)) {
+        throw new Error(
+          `[VISION_TIER_MISMATCH] ${scope.tier} image must remain in a tiered mission/project path`
+        );
+      }
+    }
+  }
 }
 
 export interface ReasoningBackendCandidate {
@@ -596,6 +657,10 @@ export class FailoverReasoningBackend implements ReasoningBackend {
   constructor(candidates: ReasoningBackendCandidate[]) {
     this.candidates = candidates.filter((candidate) => Boolean(candidate.backend));
     this.name = this.candidates[0]?.backend.name || 'failover';
+    if (this.candidates.some((candidate) => candidate.backend.promptWithImages)) {
+      this.promptWithImages = (prompt, images, options) =>
+        this.promptWithImagesAcrossCandidates(prompt, images, options);
+    }
   }
 
   selectConsultationCandidate(
@@ -680,6 +745,7 @@ export class FailoverReasoningBackend implements ReasoningBackend {
     const maxInPlaceRetries = resolveInPlaceRetryCount();
     for (let retryAttempt = 0; ; retryAttempt++) {
       try {
+        assertReasoningEgressAllowed(candidate.backend.name);
         const result = await invoke(candidate.backend);
         if (provider) reportProviderHealthy(provider);
         return { ok: true, result };
@@ -846,6 +912,50 @@ export class FailoverReasoningBackend implements ReasoningBackend {
 
     throw new Error(
       `[reasoning-backend:failover] generateWithTools failed across ${errors.length} candidate(s): ${errors.join(' | ')}`
+    );
+  }
+
+  /**
+   * Assigned in the constructor, and only when a candidate can actually see
+   * images, so `backendSupportsVision` on the wrapper answers truthfully
+   * instead of promising a capability none of the candidates has.
+   */
+  promptWithImages?: (
+    prompt: string,
+    images: ReasoningImageAttachment[],
+    options?: ReasoningCallOptions
+  ) => Promise<string>;
+
+  private async promptWithImagesAcrossCandidates(
+    prompt: string,
+    images: ReasoningImageAttachment[],
+    options?: ReasoningCallOptions
+  ): Promise<string> {
+    const skippedProviders = new Set(listDemotedProviders());
+    const errors: string[] = [];
+
+    for (const candidate of this.candidates) {
+      const provider = normalizeProviderName(candidate.provider);
+      if (provider && skippedProviders.has(provider)) continue;
+      // Skipping a text-only candidate matters more here than elsewhere:
+      // failing over to one would drop the images and return an answer about
+      // pictures the model never received.
+      if (!candidate.backend.promptWithImages) continue;
+      const attempt = await this.attemptCandidateWithRetries(
+        'promptWithImages',
+        candidate,
+        provider,
+        (backend) => backend.promptWithImages!(prompt, images, options)
+      );
+      if (attempt.ok === false) {
+        errors.push(`${candidateLabel(candidate)}: ${attempt.message}`);
+        continue;
+      }
+      return attempt.result;
+    }
+
+    throw new Error(
+      `[reasoning-backend:failover] promptWithImages failed across ${errors.length} vision-capable candidate(s): ${errors.join(' | ')}`
     );
   }
 }

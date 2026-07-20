@@ -145,6 +145,15 @@ export * from './adf-engine.js';
 export * from './autonomous-repair.js';
 export * from './operation-policy-gate.js';
 export * from './video-visual-direction.js';
+export * from './video-motion-direction.js';
+export * from './video-scene-composition.js';
+export * from './video-composition-lint.js';
+export * from './reasoning-egress-scope.js';
+export * from './visual-raster.js';
+export * from './visual-review.js';
+export * from './visual-review-loop.js';
+export * from './media-brief-lock.js';
+export * from './house-style-distillation.js';
 export * from './deck-theme-direction.js';
 export * from './semantic-decide.js';
 export * from './observation-distill.js';
@@ -451,9 +460,20 @@ export {
   applyPptxDesignDefaults,
   resolvePptxDesignDefaults,
   designDefaultsFromMediaTheme,
+  resolvePptxSurfaceDesign,
   type PptxDesignDefaults,
   type PptxDesignDefaultsInput,
 } from './src/native-pptx-engine/design-cascade.js';
+export {
+  fitTextToBox,
+  measureTextBlock,
+  measureTextWidthPt,
+  splitLinesBalanced,
+  wrapLine,
+  type LayoutFitRequest,
+  type LayoutFitResult,
+  type TextMeasurement,
+} from './src/native-pptx-engine/text-metrics.js';
 export {
   PPTX_PALETTE,
   textElement,

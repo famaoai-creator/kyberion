@@ -4,7 +4,11 @@
  * balance as hand-written builder scripts.
  */
 import { describe, it, expect } from 'vitest';
-import { applyPptxDesignDefaults, resolvePptxDesignDefaults } from '../design-cascade.js';
+import {
+  applyPptxDesignDefaults,
+  designDefaultsFromMediaTheme,
+  resolvePptxDesignDefaults,
+} from '../design-cascade.js';
 import type { PptxDesignProtocol, PptxElement } from '../../types/pptx-protocol.js';
 
 function baseProtocol(overrides: Partial<PptxDesignProtocol> = {}): PptxDesignProtocol {
@@ -101,6 +105,25 @@ describe('design-cascade (LE-01)', () => {
   it('derives fontFamily from theme minorFont when present', () => {
     const defaults = resolvePptxDesignDefaults({ theme: { minorFont: 'Yu Gothic' } }, true);
     expect(defaults?.fontFamily).toBe('Yu Gothic');
+  });
+
+  it('projects the shared type ramp into pptx cascade defaults', () => {
+    const defaults = designDefaultsFromMediaTheme({
+      fonts: { body: 'Noto Sans JP' },
+      typography: {
+        scale_ratio: 1.25,
+        roles: {
+          display: { size_pt: 40, min_size_pt: 24, weight: 700, line_spacing_pct: 105 },
+          headline: { size_pt: 28, min_size_pt: 18, weight: 700, line_spacing_pct: 110 },
+          title: { size_pt: 24, min_size_pt: 16, weight: 600, line_spacing_pct: 115 },
+          body: { size_pt: 17, min_size_pt: 11, weight: 400, line_spacing_pct: 125 },
+          label: { size_pt: 12, min_size_pt: 8, weight: 600, line_spacing_pct: 115 },
+          caption: { size_pt: 10, min_size_pt: 8, weight: 400, line_spacing_pct: 120 },
+        },
+      },
+    });
+    expect(defaults.textFontSize).toBe(17);
+    expect(defaults.shapeFontSize).toBe(12);
   });
 
   it('leaves shapes without text and non-text element types untouched', () => {

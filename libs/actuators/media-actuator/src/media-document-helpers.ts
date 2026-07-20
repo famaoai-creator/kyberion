@@ -20,13 +20,16 @@ import * as path from 'node:path';
 
 export type MediaBriefCategory = 'presentation' | 'document' | 'spreadsheet' | 'diagram';
 export type ProtocolKind = 'pptx' | 'docx' | 'pdf' | 'xlsx';
-export type DocumentCompositionPresetResolver = (rootDir: string, brief: any) => { profileId: string; preset: any };
+export type DocumentCompositionPresetResolver = (
+  rootDir: string,
+  brief: any
+) => { profileId: string; preset: any };
 export type DocumentCompositionCatalogLoader = (rootDir: string) => any;
 
 export function warnLegacyMediaOp(op: string): void {
   if (!isLegacyMediaOp(op)) return;
   logger.warn(
-    `[MEDIA_COMPAT] ${op} is a compatibility adapter. Prefer document_outline_from_brief -> brief_to_design_protocol -> generate_document.`,
+    `[MEDIA_COMPAT] ${op} is a compatibility adapter. Prefer document_outline_from_brief -> brief_to_design_protocol -> generate_document.`
   );
 }
 
@@ -119,7 +122,9 @@ export function buildCompositionTokenMap(brief: any): Record<string, string> {
 }
 
 export function chooseDocumentSectionEvidence(index: number, brief: any): any {
-  const evidence = Array.isArray(brief.evidence || brief.payload?.evidence) ? (brief.evidence || brief.payload?.evidence) : [];
+  const evidence = Array.isArray(brief.evidence || brief.payload?.evidence)
+    ? brief.evidence || brief.payload?.evidence
+    : [];
   return evidence[index] || evidence[evidence.length - 1] || null;
 }
 
@@ -127,8 +132,15 @@ export function classifyRenderSemantic(layoutKey?: string, mediaKind?: string): 
   const layout = String(layoutKey || '').toLowerCase();
   const kind = String(mediaKind || '').toLowerCase();
   if (layout.includes('title')) return 'hero';
-  if (layout.includes('summary') || layout.includes('overview') || kind === 'summary' || kind === 'dashboard') return 'summary';
-  if (layout.includes('execution') || layout.includes('main-table') || kind === 'execution') return 'execution';
+  if (
+    layout.includes('summary') ||
+    layout.includes('overview') ||
+    kind === 'summary' ||
+    kind === 'dashboard'
+  )
+    return 'summary';
+  if (layout.includes('execution') || layout.includes('main-table') || kind === 'execution')
+    return 'execution';
   if (layout.includes('contents')) return 'contents';
   if (layout.includes('timeline') || kind === 'roadmap') return 'roadmap';
   if (layout.includes('evidence') || kind === 'evidence') return 'evidence';
@@ -143,7 +155,9 @@ export function classifyRenderSemantic(layoutKey?: string, mediaKind?: string): 
 export function buildDocumentContentsSection(entries: any[], locale?: string): any | null {
   const list = Array.isArray(entries) ? entries.filter(Boolean) : [];
   const lines = list.map((entry, index) => {
-    const title = String(entry?.title || entry?.heading || entry?.section_id || `Section ${index + 1}`).trim();
+    const title = String(
+      entry?.title || entry?.heading || entry?.section_id || `Section ${index + 1}`
+    ).trim();
     const objective = String(entry?.objective || '').trim();
     return `${index + 1}. ${title}${objective ? ` — ${objective}` : ''}`;
   });
@@ -155,18 +169,25 @@ export function buildDocumentContentsSection(entries: any[], locale?: string): a
     body: lines,
     media_kind: 'contents',
     layout_key: 'doc-contents',
-    semantic_type: 'summary',
+    // A table of contents is an index, not a summary. Classifying it as
+    // 'summary' sent it through the same zone as the executive summary, so a
+    // long agenda rendered as one tall run of prose.
+    semantic_type: 'contents',
   };
 }
 
 export function insertDocumentContentsSection(entries: any[], locale?: string): any[] {
-  if (Array.isArray(entries) && entries.some((entry) => String(entry?.section_id || '').trim() === 'contents')) {
+  if (
+    Array.isArray(entries) &&
+    entries.some((entry) => String(entry?.section_id || '').trim() === 'contents')
+  ) {
     return entries;
   }
   const contentsSection = buildDocumentContentsSection(entries, locale);
   if (!contentsSection) return Array.isArray(entries) ? entries : [];
   const next = Array.isArray(entries) ? [...entries] : [];
-  const insertAt = next.length > 0 && ['cover', 'title'].includes(String(next[0]?.section_id || '')) ? 1 : 0;
+  const insertAt =
+    next.length > 0 && ['cover', 'title'].includes(String(next[0]?.section_id || '')) ? 1 : 0;
   next.splice(insertAt, 0, contentsSection);
   return next;
 }
@@ -180,7 +201,9 @@ export function chooseProposalSectionEvidence(sectionId: string, brief: any): an
   const chapters = Array.isArray(brief.story?.chapters) ? brief.story.chapters : [];
   const lowerChapters = chapters.map((entry: string) => String(entry).toLowerCase());
   const keywords = resolveProposalSectionKeywords(sectionId);
-  const chapterIndex = lowerChapters.findIndex((chapter) => keywords.some((keyword) => chapter.includes(keyword)));
+  const chapterIndex = lowerChapters.findIndex((chapter) =>
+    keywords.some((keyword) => chapter.includes(keyword))
+  );
   if (chapterIndex >= 0 && evidence[chapterIndex]) return evidence[chapterIndex];
   const evidenceIndex = resolveProposalEvidenceIndex(sectionId);
   if (evidenceIndex !== null) return evidence[evidenceIndex] || evidence[0];
@@ -191,7 +214,11 @@ export function buildReportNarrativeOutline(
   rootDir: string,
   brief: any,
   resolveDocumentCompositionPreset: DocumentCompositionPresetResolver,
-  applyCompositionTemplate: (template: any, tokens: Record<string, string>, fallback?: string) => string,
+  applyCompositionTemplate: (
+    template: any,
+    tokens: Record<string, string>,
+    fallback?: string
+  ) => string
 ): any {
   const { profileId, preset } = resolveDocumentCompositionPreset(rootDir, brief);
   const payloadSections = Array.isArray(brief.payload?.sections) ? brief.payload.sections : [];
@@ -201,39 +228,59 @@ export function buildReportNarrativeOutline(
   const reportSectionTitle = resolveReportSectionTitle();
   const tokens = buildCompositionTokenMap(brief);
   const chapters = Array.isArray(brief.story?.chapters || brief.payload?.story?.chapters)
-    ? (brief.story?.chapters || brief.payload?.story?.chapters)
+    ? brief.story?.chapters || brief.payload?.story?.chapters
     : [];
-  const sections = payloadSections.length > 0
-    ? payloadSections.map((section: any) => ({
-        section_id: String(section.heading || 'section').toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-        title: String(section.heading || reportSectionTitle),
-        objective: Array.isArray(section.body) ? String(section.body[0] || '') : '',
-        body: [
-          ...(Array.isArray(section.body) ? section.body.map((value: any) => String(value)) : []),
-          ...(Array.isArray(section.bullets) ? section.bullets.map((value: any) => `- ${String(value)}`) : []),
-        ].filter(Boolean),
-        visual: Array.isArray(section.callouts) && section.callouts[0]?.title ? String(section.callouts[0].title) : undefined,
-        media_kind: appendixPattern.test(String(section.heading || '')) ? 'appendix' : 'section-flow',
-        layout_key: appendixPattern.test(String(section.heading || '')) ? 'doc-appendix' : 'doc-sections',
-      }))
-    : presetSections.map((section: any, index: number) => {
-        const evidence = chooseDocumentSectionEvidence(index, brief);
-        const chapter = String(chapters[index] || '').trim();
-        const objective = applyCompositionTemplate(section.objective, tokens, chapter || brief.objective || section.title || '');
-        const body = [
-          chapter || objective || brief.objective || '',
-          evidence?.point ? String(evidence.point) : '',
-        ].filter(Boolean);
-        return {
-          section_id: String(section.section_id || 'section'),
-          title: applyCompositionTemplate(section.title, tokens, section.title || reportSectionTitle),
-          objective: objective || chapter || brief.objective || '',
-          body,
-          visual: evidence?.title ? String(evidence.title) : undefined,
-          media_kind: String(section.media_kind || 'section-flow'),
-          layout_key: String(section.layout_key || 'doc-sections'),
-        };
-      });
+  const sections =
+    payloadSections.length > 0
+      ? payloadSections.map((section: any) => ({
+          section_id: String(section.heading || 'section')
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-'),
+          title: String(section.heading || reportSectionTitle),
+          objective: Array.isArray(section.body) ? String(section.body[0] || '') : '',
+          body: [
+            ...(Array.isArray(section.body) ? section.body.map((value: any) => String(value)) : []),
+            ...(Array.isArray(section.bullets)
+              ? section.bullets.map((value: any) => `- ${String(value)}`)
+              : []),
+          ].filter(Boolean),
+          visual:
+            Array.isArray(section.callouts) && section.callouts[0]?.title
+              ? String(section.callouts[0].title)
+              : undefined,
+          media_kind: appendixPattern.test(String(section.heading || ''))
+            ? 'appendix'
+            : 'section-flow',
+          layout_key: appendixPattern.test(String(section.heading || ''))
+            ? 'doc-appendix'
+            : 'doc-sections',
+        }))
+      : presetSections.map((section: any, index: number) => {
+          const evidence = chooseDocumentSectionEvidence(index, brief);
+          const chapter = String(chapters[index] || '').trim();
+          const objective = applyCompositionTemplate(
+            section.objective,
+            tokens,
+            chapter || brief.objective || section.title || ''
+          );
+          const body = [
+            chapter || objective || brief.objective || '',
+            evidence?.point ? String(evidence.point) : '',
+          ].filter(Boolean);
+          return {
+            section_id: String(section.section_id || 'section'),
+            title: applyCompositionTemplate(
+              section.title,
+              tokens,
+              section.title || reportSectionTitle
+            ),
+            objective: objective || chapter || brief.objective || '',
+            body,
+            visual: evidence?.title ? String(evidence.title) : undefined,
+            media_kind: String(section.media_kind || 'section-flow'),
+            layout_key: String(section.layout_key || 'doc-sections'),
+          };
+        });
   const toc = insertDocumentContentsSection(sections, brief.locale);
   return {
     kind: 'document-outline-adf',
@@ -244,10 +291,14 @@ export function buildReportNarrativeOutline(
     branding: preset.branding || {},
     prompt_guide: Array.isArray(preset.prompt_guide) ? preset.prompt_guide : [],
     source_design: preset.source_design || null,
-    design_recommendations: Array.isArray(preset.design_recommendations) ? preset.design_recommendations : [],
+    design_recommendations: Array.isArray(preset.design_recommendations)
+      ? preset.design_recommendations
+      : [],
     narrative_pattern_id: preset.narrative_pattern_id || 'report-standard',
-    recommended_theme: brief.theme || brief.payload?.theme || preset.recommended_theme || 'kyberion-standard',
-    recommended_layout_template_id: brief.layout_template_id || preset.recommended_layout_template_id,
+    recommended_theme:
+      brief.theme || brief.payload?.theme || preset.recommended_theme || 'kyberion-standard',
+    recommended_layout_template_id:
+      brief.layout_template_id || preset.recommended_layout_template_id,
     generation_boundary: buildMediaGenerationBoundary({
       document_profile: profileId,
       design_system_id: preset.design_system_id,
@@ -263,16 +314,22 @@ export function buildReportNarrativeOutline(
         layout_key: 'doc-title',
         semantic_type: classifyRenderSemantic('doc-title', 'title-page'),
       },
-      ...((brief.payload?.summary || brief.summary) ? [{
-        section_id: 'summary',
-        title: reportSummaryTitle,
-        objective: brief.payload?.summary || brief.summary || brief.objective || '',
-        body: [brief.payload?.summary || brief.summary || brief.objective || ''].filter(Boolean),
-        visual: chooseDocumentSectionEvidence(0, brief)?.title || 'summary',
-        media_kind: 'summary',
-        layout_key: 'doc-summary',
-        semantic_type: classifyRenderSemantic('doc-summary', 'summary'),
-      }] : []),
+      ...(brief.payload?.summary || brief.summary
+        ? [
+            {
+              section_id: 'summary',
+              title: reportSummaryTitle,
+              objective: brief.payload?.summary || brief.summary || brief.objective || '',
+              body: [brief.payload?.summary || brief.summary || brief.objective || ''].filter(
+                Boolean
+              ),
+              visual: chooseDocumentSectionEvidence(0, brief)?.title || 'summary',
+              media_kind: 'summary',
+              layout_key: 'doc-summary',
+              semantic_type: classifyRenderSemantic('doc-summary', 'summary'),
+            },
+          ]
+        : []),
       ...toc.map((section: any) => ({
         section_id: String(section.section_id || 'section'),
         title: String(section.title || reportSectionTitle),
@@ -283,14 +340,18 @@ export function buildReportNarrativeOutline(
         layout_key: String(section.layout_key || 'doc-sections'),
         semantic_type: classifyRenderSemantic(
           String(section.layout_key || 'doc-sections'),
-          String(section.media_kind || 'section-flow'),
+          String(section.media_kind || 'section-flow')
         ),
       })),
     ],
   };
 }
 
-export function buildSpreadsheetNarrativeOutline(rootDir: string, brief: any, resolveDocumentCompositionPreset: DocumentCompositionPresetResolver): any {
+export function buildSpreadsheetNarrativeOutline(
+  rootDir: string,
+  brief: any,
+  resolveDocumentCompositionPreset: DocumentCompositionPresetResolver
+): any {
   const { profileId, preset } = resolveDocumentCompositionPreset(rootDir, brief);
   const protocol = brief.payload?.protocol;
   const sheetNames = Array.isArray(protocol?.worksheets)
@@ -298,7 +359,7 @@ export function buildSpreadsheetNarrativeOutline(rootDir: string, brief: any, re
     : [];
   const presetSections = Array.isArray(preset.sections) ? preset.sections : [];
   const sectionIndex = new Map<string, any>(
-    presetSections.map((section: any) => [String(section.section_id || ''), section]),
+    presetSections.map((section: any) => [String(section.section_id || ''), section])
   );
   const signalEntryPolicy = loadMediaSignalEntryPolicyCatalog();
   const trackerSheetPolicy = loadTrackerSheetPolicyCatalog();
@@ -311,10 +372,14 @@ export function buildSpreadsheetNarrativeOutline(rootDir: string, brief: any, re
     branding: preset.branding || {},
     prompt_guide: Array.isArray(preset.prompt_guide) ? preset.prompt_guide : [],
     source_design: preset.source_design || null,
-    design_recommendations: Array.isArray(preset.design_recommendations) ? preset.design_recommendations : [],
+    design_recommendations: Array.isArray(preset.design_recommendations)
+      ? preset.design_recommendations
+      : [],
     narrative_pattern_id: preset.narrative_pattern_id || 'operator-dashboard',
-    recommended_theme: brief.theme || brief.payload?.theme || preset.recommended_theme || 'kyberion-standard',
-    recommended_layout_template_id: brief.layout_template_id || preset.recommended_layout_template_id,
+    recommended_theme:
+      brief.theme || brief.payload?.theme || preset.recommended_theme || 'kyberion-standard',
+    recommended_layout_template_id:
+      brief.layout_template_id || preset.recommended_layout_template_id,
     generation_boundary: buildMediaGenerationBoundary({
       document_profile: profileId,
       design_system_id: preset.design_system_id,
@@ -325,21 +390,32 @@ export function buildSpreadsheetNarrativeOutline(rootDir: string, brief: any, re
         title: sectionIndex.get('overview')?.title || trackerSheetPolicy.sheet_titles.overview,
         media_kind: sectionIndex.get('overview')?.media_kind || 'dashboard',
         layout_key: sectionIndex.get('overview')?.layout_key || 'sheet-overview',
-        semantic_type: classifyRenderSemantic(sectionIndex.get('overview')?.layout_key || 'sheet-overview', sectionIndex.get('overview')?.media_kind || 'dashboard'),
+        semantic_type: classifyRenderSemantic(
+          sectionIndex.get('overview')?.layout_key || 'sheet-overview',
+          sectionIndex.get('overview')?.media_kind || 'dashboard'
+        ),
       },
       {
         section_id: 'execution-board',
-        title: sectionIndex.get('execution-board')?.title || trackerSheetPolicy.sheet_titles.execution_board,
+        title:
+          sectionIndex.get('execution-board')?.title ||
+          trackerSheetPolicy.sheet_titles.execution_board,
         media_kind: sectionIndex.get('execution-board')?.media_kind || 'table',
         layout_key: sectionIndex.get('execution-board')?.layout_key || 'sheet-main-table',
-        semantic_type: classifyRenderSemantic(sectionIndex.get('execution-board')?.layout_key || 'sheet-main-table', sectionIndex.get('execution-board')?.media_kind || 'table'),
+        semantic_type: classifyRenderSemantic(
+          sectionIndex.get('execution-board')?.layout_key || 'sheet-main-table',
+          sectionIndex.get('execution-board')?.media_kind || 'table'
+        ),
       },
       {
         section_id: 'signals',
         title: sectionIndex.get('signals')?.title || signalEntryPolicy.sheet_title,
         media_kind: sectionIndex.get('signals')?.media_kind || 'signals',
         layout_key: sectionIndex.get('signals')?.layout_key || 'sheet-signals',
-        semantic_type: classifyRenderSemantic(sectionIndex.get('signals')?.layout_key || 'sheet-signals', sectionIndex.get('signals')?.media_kind || 'signals'),
+        semantic_type: classifyRenderSemantic(
+          sectionIndex.get('signals')?.layout_key || 'sheet-signals',
+          sectionIndex.get('signals')?.media_kind || 'signals'
+        ),
       },
       ...sheetNames.map((name: string) => ({
         section_id: name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
@@ -352,7 +428,11 @@ export function buildSpreadsheetNarrativeOutline(rootDir: string, brief: any, re
   };
 }
 
-export function buildDiagramNarrativeOutline(rootDir: string, brief: any, resolveDocumentCompositionPreset: DocumentCompositionPresetResolver): any {
+export function buildDiagramNarrativeOutline(
+  rootDir: string,
+  brief: any,
+  resolveDocumentCompositionPreset: DocumentCompositionPresetResolver
+): any {
   const { profileId, preset } = resolveDocumentCompositionPreset(rootDir, brief);
   return {
     kind: 'document-outline-adf',
@@ -363,10 +443,18 @@ export function buildDiagramNarrativeOutline(rootDir: string, brief: any, resolv
     branding: preset.branding || {},
     prompt_guide: Array.isArray(preset.prompt_guide) ? preset.prompt_guide : [],
     source_design: preset.source_design || null,
-    design_recommendations: Array.isArray(preset.design_recommendations) ? preset.design_recommendations : [],
+    design_recommendations: Array.isArray(preset.design_recommendations)
+      ? preset.design_recommendations
+      : [],
     narrative_pattern_id: preset.narrative_pattern_id || 'solution-overview',
-    recommended_theme: brief.theme || brief.payload?.theme || preset.recommended_theme || brief.layout_template_id || 'aws-architecture',
-    recommended_layout_template_id: brief.layout_template_id || preset.recommended_layout_template_id,
+    recommended_theme:
+      brief.theme ||
+      brief.payload?.theme ||
+      preset.recommended_theme ||
+      brief.layout_template_id ||
+      'aws-architecture',
+    recommended_layout_template_id:
+      brief.layout_template_id || preset.recommended_layout_template_id,
     generation_boundary: buildMediaGenerationBoundary({
       document_profile: profileId,
       design_system_id: preset.design_system_id,
@@ -392,7 +480,9 @@ export function normalizeInvoiceDocumentBrief(input: any): any {
     throw new Error(`Unsupported document brief kind: ${String(input.kind || 'unknown')}`);
   }
   if (input.artifact_family !== 'document') {
-    throw new Error(`Unsupported artifact_family in document-brief: ${String(input.artifact_family)}`);
+    throw new Error(
+      `Unsupported artifact_family in document-brief: ${String(input.artifact_family)}`
+    );
   }
   if (input.document_type !== 'invoice') {
     throw new Error(`Unsupported document_type in document-brief: ${String(input.document_type)}`);
@@ -424,7 +514,9 @@ export function normalizeDiagramDocumentBrief(input: any): any {
     throw new Error(`Unsupported diagram brief kind: ${String(input.kind || 'unknown')}`);
   }
   if (input.artifact_family !== 'diagram') {
-    throw new Error(`Unsupported artifact_family in document-brief: ${String(input.artifact_family)}`);
+    throw new Error(
+      `Unsupported artifact_family in document-brief: ${String(input.artifact_family)}`
+    );
   }
   if (!['mmd', 'd2', 'drawio'].includes(String(input.render_target))) {
     throw new Error(`Unsupported render_target in document-brief: ${String(input.render_target)}`);
@@ -461,7 +553,9 @@ export function normalizeSpreadsheetDocumentBrief(rootDir: string, input: any): 
     throw new Error(`Unsupported spreadsheet brief kind: ${String(input.kind || 'unknown')}`);
   }
   if (input.artifact_family !== 'spreadsheet') {
-    throw new Error(`Unsupported artifact_family in document-brief: ${String(input.artifact_family)}`);
+    throw new Error(
+      `Unsupported artifact_family in document-brief: ${String(input.artifact_family)}`
+    );
   }
   if (input.render_target !== 'xlsx') {
     throw new Error(`Unsupported render_target in document-brief: ${String(input.render_target)}`);
@@ -476,7 +570,9 @@ export function normalizeSpreadsheetDocumentBrief(rootDir: string, input: any): 
     protocol = JSON.parse(safeReadFile(protocolPath, { encoding: 'utf8' }) as string);
   }
   if (!protocol && (!Array.isArray(input.payload.columns) || !Array.isArray(input.payload.rows))) {
-    throw new Error('document-brief for spreadsheet requires payload.protocol, payload.protocol_path, or semantic payload.columns + payload.rows.');
+    throw new Error(
+      'document-brief for spreadsheet requires payload.protocol, payload.protocol_path, or semantic payload.columns + payload.rows.'
+    );
   }
 
   return {
@@ -501,12 +597,14 @@ export function normalizeReportDocumentBrief(input: any): any {
     throw new Error(`Unsupported report brief kind: ${String(input.kind || 'unknown')}`);
   }
   if (input.artifact_family !== 'document') {
-    throw new Error(`Unsupported artifact_family in document-brief: ${String(input.artifact_family)}`);
+    throw new Error(
+      `Unsupported artifact_family in document-brief: ${String(input.artifact_family)}`
+    );
   }
   if (!['docx', 'pdf', 'pptx'].includes(String(input.render_target))) {
     throw new Error(`Unsupported render_target in document-brief: ${String(input.render_target)}`);
   }
-  const payload = (input.payload && typeof input.payload === 'object') ? input.payload : {};
+  const payload = input.payload && typeof input.payload === 'object' ? input.payload : {};
 
   return {
     artifact_family: input.artifact_family,
@@ -528,7 +626,18 @@ function gatherDocumentClueText(source: any, data: any): string {
     const text = String(value).trim();
     if (text) pieces.push(text);
   };
-  [source?.title, source?.summary, source?.objective, source?.document_type, source?.document_profile, data?.title, data?.summary, data?.objective, data?.document_type, data?.document_profile].forEach(pushValue);
+  [
+    source?.title,
+    source?.summary,
+    source?.objective,
+    source?.document_type,
+    source?.document_profile,
+    data?.title,
+    data?.summary,
+    data?.objective,
+    data?.document_type,
+    data?.document_profile,
+  ].forEach(pushValue);
   for (const item of [source?.payload, data?.payload, source, data]) {
     if (!item || typeof item !== 'object') continue;
     if (Array.isArray(item.sections)) {
@@ -563,7 +672,7 @@ function inferDocumentProfileId(
   documentType: string,
   source: any,
   data: any,
-  loadDocumentCompositionCatalog: DocumentCompositionCatalogLoader,
+  loadDocumentCompositionCatalog: DocumentCompositionCatalogLoader
 ): string | null {
   const clueText = gatherDocumentClueText(source, data);
   const docType = String(documentType || '').trim();
@@ -593,51 +702,70 @@ export function buildUnifiedDocumentBrief(
     source?: any;
     data?: any;
   },
-  loadDocumentCompositionCatalog: DocumentCompositionCatalogLoader,
+  loadDocumentCompositionCatalog: DocumentCompositionCatalogLoader
 ): any {
-  const source = (input.source && typeof input.source === 'object') ? input.source : {};
-  const data = (input.data && typeof input.data === 'object') ? input.data : {};
-  const renderTarget = String(input.renderTarget || source.render_target || data.render_target || '').trim();
+  const source = input.source && typeof input.source === 'object' ? input.source : {};
+  const data = input.data && typeof input.data === 'object' ? input.data : {};
+  const renderTarget = String(
+    input.renderTarget || source.render_target || data.render_target || ''
+  ).trim();
   const inferredDocumentType = String(
-    source.document_type ||
-    data.document_type ||
-    inferDocumentTypeFromClues(source, data) ||
-    '',
+    source.document_type || data.document_type || inferDocumentTypeFromClues(source, data) || ''
   ).trim();
   const profileId = String(
     input.profileId ||
-    source.document_profile ||
-    data.document_profile ||
-    inferDocumentProfileId(rootDir, source.artifact_family || data.artifact_family || '', inferredDocumentType, source, data, loadDocumentCompositionCatalog) ||
-    '',
+      source.document_profile ||
+      data.document_profile ||
+      inferDocumentProfileId(
+        rootDir,
+        source.artifact_family || data.artifact_family || '',
+        inferredDocumentType,
+        source,
+        data,
+        loadDocumentCompositionCatalog
+      ) ||
+      ''
   ).trim();
   const catalog = loadDocumentCompositionCatalog(rootDir);
   const profilePreset = profileId ? catalog.profiles?.[profileId] || null : null;
   const artifactFamily = String(
     source.artifact_family ||
-    data.artifact_family ||
-    profilePreset?.artifact_family ||
-    (renderTarget === 'pptx' ? 'presentation' : renderTarget === 'xlsx' ? 'spreadsheet' : 'document'),
+      data.artifact_family ||
+      profilePreset?.artifact_family ||
+      (renderTarget === 'pptx'
+        ? 'presentation'
+        : renderTarget === 'xlsx'
+          ? 'spreadsheet'
+          : 'document')
   ).trim();
   const documentType = String(
     source.document_type ||
-    data.document_type ||
-    inferredDocumentType ||
-    profilePreset?.document_type ||
-    (artifactFamily === 'presentation' ? 'proposal' : artifactFamily === 'spreadsheet' ? 'tracker' : 'report'),
+      data.document_type ||
+      inferredDocumentType ||
+      profilePreset?.document_type ||
+      (artifactFamily === 'presentation'
+        ? 'proposal'
+        : artifactFamily === 'spreadsheet'
+          ? 'tracker'
+          : 'report')
   ).trim();
 
   if (!renderTarget) {
     throw new Error('generate_document requires render_target');
   }
   if (!profileId) {
-    throw new Error('generate_document requires profile_id, document_profile, or inferable content');
+    throw new Error(
+      'generate_document requires profile_id, document_profile, or inferable content'
+    );
   }
 
   if (artifactFamily === 'presentation') {
-    const payload = (source.payload && typeof source.payload === 'object')
-      ? source.payload
-      : (data.payload && typeof data.payload === 'object' ? data.payload : {});
+    const payload =
+      source.payload && typeof source.payload === 'object'
+        ? source.payload
+        : data.payload && typeof data.payload === 'object'
+          ? data.payload
+          : {};
     return {
       kind: 'proposal-brief',
       artifact_family: 'presentation',
@@ -654,7 +782,8 @@ export function buildUnifiedDocumentBrief(
       audience: source.audience || data.audience || payload.audience,
       story: source.story || data.story || payload.story || {},
       evidence: source.evidence || data.evidence || payload.evidence || [],
-      required_sections: source.required_sections || data.required_sections || payload.required_sections || [],
+      required_sections:
+        source.required_sections || data.required_sections || payload.required_sections || [],
       payload,
     };
   }
@@ -668,7 +797,7 @@ export function buildUnifiedDocumentBrief(
       render_target: 'xlsx',
       locale: source.locale || data.locale || 'en-US',
       layout_template_id: source.layout_template_id || data.layout_template_id,
-      theme: source.theme || data.theme || (source.payload?.theme) || (data.payload?.theme),
+      theme: source.theme || data.theme || source.payload?.theme || data.payload?.theme,
       payload: source.payload || data.payload || data,
     };
   }
@@ -682,7 +811,7 @@ export function buildUnifiedDocumentBrief(
     locale: source.locale || data.locale || 'en-US',
     layout_template_id: source.layout_template_id || data.layout_template_id,
     project_id: source.project_id || data.project_id,
-    theme: source.theme || data.theme || (source.payload?.theme) || (data.payload?.theme),
+    theme: source.theme || data.theme || source.payload?.theme || data.payload?.theme,
     title: source.title || data.title,
     summary: source.summary || data.summary,
     payload: source.payload || data.payload || data,
