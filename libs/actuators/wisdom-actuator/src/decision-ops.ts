@@ -48,7 +48,6 @@ import {
   type MeetingFacilitatorPolicy,
   type PresentationPreferenceProfile,
   delegateBestOf,
-  requestPeerAdvice,
   deriveTestInventory,
   type SoftwareQualityContract,
   resolveReasoningParticipant,
@@ -69,6 +68,12 @@ import * as path from 'node:path';
 import { z } from 'zod';
 import { assignWisdomContextValue, mergeWisdomContext } from './contracts/wisdom-context.js';
 import { forwardWisdomBoundaryOperation } from './compatibility/cross-actuator-forwarders.js';
+import {
+  proposeToolCalls,
+  runPeerAdvice,
+  runPureReasoning,
+  runReasoningLoop,
+} from './reasoning/reasoning-ops.js';
 
 /**
  * Decision-support operations for Kyberion.
@@ -3360,7 +3365,6 @@ export async function dispatchDecisionOp(
     // Routes through the active reasoning backend. Fixes the previous no-op
     // where wisdom:reasoning fell through to default with handled=false.
     case 'reasoning': {
-      const backend = getReasoningBackend();
       const instruction =
         typeof params.instruction === 'string'
           ? resolveVars(params.instruction, ctx)
@@ -3374,21 +3378,20 @@ export async function dispatchDecisionOp(
         typeof params.system_prompt === 'string'
           ? resolveVars(params.system_prompt, ctx)
           : undefined;
-      const fullPrompt = systemPrompt
-        ? `[SYSTEM: ${systemPrompt}]\n\nInstruction: ${instruction}\nContext: ${contextRaw}`
-        : `Instruction: ${instruction}\nContext: ${contextRaw}`;
-      const useSubagent =
+      const allowBackendDelegation =
         params.use_subagent === true ||
         String(params.execution_mode ?? params.mode ?? '') === 'subagent' ||
         String(params.execution_mode ?? params.mode ?? '') === 'delegate';
-      const response = useSubagent
-        ? await backend.delegateTask(instruction, contextRaw)
-        : await backend.prompt(fullPrompt);
+      const response = await runPureReasoning({
+        instruction,
+        context: contextRaw,
+        systemPrompt,
+        allowBackendDelegation,
+      });
       return { handled: true, ctx: assign(response) };
     }
 
     case 'peer_advice': {
-      const backend = getReasoningBackend();
       const question =
         typeof params.question === 'string'
           ? resolveVars(params.question, ctx)
@@ -3399,27 +3402,21 @@ export async function dispatchDecisionOp(
         typeof params.context === 'string'
           ? resolveVars(params.context, ctx)
           : JSON.stringify(params.context ?? ctx);
-      const result = await requestPeerAdvice(
-        backend,
-        {
-          question,
-          context: contextRaw,
-          tone:
-            params.tone === 'concise' || params.tone === 'adversarial' ? params.tone : 'careful',
-          preferred_provider:
-            typeof params.preferred_provider === 'string'
-              ? resolveVars(params.preferred_provider, ctx)
-              : undefined,
-          preferred_label:
-            typeof params.preferred_label === 'string'
-              ? resolveVars(params.preferred_label, ctx)
-              : undefined,
-        },
-        {
-          context: String(params.context_label || 'wisdom:peer_advice'),
-          model_tier: params.model_tier,
-        }
-      );
+      const result = await runPeerAdvice({
+        question,
+        context: contextRaw,
+        tone: params.tone === 'concise' || params.tone === 'adversarial' ? params.tone : 'careful',
+        preferredProvider:
+          typeof params.preferred_provider === 'string'
+            ? resolveVars(params.preferred_provider, ctx)
+            : undefined,
+        preferredLabel:
+          typeof params.preferred_label === 'string'
+            ? resolveVars(params.preferred_label, ctx)
+            : undefined,
+        modelTier: params.model_tier,
+        contextLabel: String(params.context_label || 'wisdom:peer_advice'),
+      });
       const outputPath = resolved('output_path');
       if (outputPath) writeJSON(outputPath, result);
       return { handled: true, ctx: assign(result) };
@@ -3430,26 +3427,15 @@ export async function dispatchDecisionOp(
     // Tools are defined inline in the pipeline step params.
     case 'tool_use':
     case 'propose_tool_calls': {
-      const backend = getReasoningBackend();
-      if (!backend.generateWithTools) {
-        throw new Error(
-          '[wisdom:tool_use] Active backend does not support generateWithTools. ' +
-            'Set KYBERION_REASONING_BACKEND=anthropic.'
-        );
-      }
       const prompt = resolveVars(String(params.prompt ?? params.instruction ?? ''), ctx);
       const tools = Array.isArray(params.tools) ? params.tools : [];
-      const result = await backend.generateWithTools(prompt, tools);
+      const result = await proposeToolCalls({ prompt, tools });
       return {
         handled: true,
         ctx:
           op === 'propose_tool_calls'
-            ? assign({
-                ...result,
-                planned_tool_calls: result.toolCalls || [],
-                tool_execution_status: 'not_executed',
-              })
-            : assign(result),
+            ? assign(result)
+            : assign({ text: result.text, toolCalls: result.toolCalls }),
       };
     }
 
@@ -3458,46 +3444,10 @@ export async function dispatchDecisionOp(
     // Emits { goal, steps: [{role,content}], final_answer }.
     case 'react_loop':
     case 'reasoning_loop': {
-      const backend = getReasoningBackend();
       const goal = resolveVars(String(params.goal ?? params.instruction ?? ''), ctx);
       const maxSteps = Number(params.max_steps ?? 5);
-      const tools: any[] = Array.isArray(params.tools) ? params.tools : [];
-      const history: { role: string; content: string }[] = [];
-      let finalAnswer = '';
-
-      for (let s = 0; s < maxSteps; s++) {
-        const histText = history.map((h) => `[${h.role}] ${h.content}`).join('\n');
-        const thoughtPrompt =
-          `Goal: ${goal}\n\nHistory:\n${histText || '(none yet)'}\n\n` +
-          `Think step by step. Either produce FINAL ANSWER: <answer> or describe the next concrete action needed.`;
-
-        const response =
-          tools.length > 0 && backend.generateWithTools
-            ? await backend.generateWithTools(thoughtPrompt, tools)
-            : { text: await backend.prompt(thoughtPrompt) };
-
-        const text = response.text ?? '';
-        history.push({ role: 'thought', content: text });
-
-        if (text.includes('FINAL ANSWER:')) {
-          finalAnswer = text.split('FINAL ANSWER:')[1]?.trim() ?? text;
-          break;
-        }
-        if (response.toolCalls?.length) {
-          for (const call of response.toolCalls) {
-            history.push({
-              role: 'observation',
-              content: `Tool "${call.name}" → ${JSON.stringify(call.input)}`,
-            });
-          }
-        }
-      }
-
-      const reactResult = {
-        goal,
-        steps: history,
-        final_answer: finalAnswer || (history.at(-1)?.content ?? ''),
-      };
+      const tools = Array.isArray(params.tools) ? params.tools : [];
+      const reactResult = await runReasoningLoop({ goal, maxSteps, tools });
       return { handled: true, ctx: assign(reactResult) };
     }
 

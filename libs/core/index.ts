@@ -1582,6 +1582,9 @@ export type {
   SynthesizedPersona,
   PeerAdviceInput,
   PeerAdviceResult,
+  GenerateWithToolsResult,
+  ReasoningCallOptions,
+  ToolDefinition,
   UntrustedDataParams,
 } from './reasoning-backend.js';
 export {
