@@ -198,6 +198,31 @@ describe('wisdom public contract boundaries', () => {
     });
   });
 
+  it('publishes canonical names for perspective, counterparty, tool proposal, and reasoning loop ops', () => {
+    const catalog = describeOps();
+    expect(catalog.map(({ op }) => op)).toEqual(
+      expect.arrayContaining([
+        'perspective_fanout',
+        'counterparty_roleplay',
+        'typed_cross_critique',
+        'propose_tool_calls',
+        'reasoning_loop',
+      ])
+    );
+    expect(catalog.find(({ op }) => op === 'a2a_roleplay')).toMatchObject({
+      deprecated: true,
+      canonical_op: 'counterparty_roleplay',
+    });
+    expect(catalog.find(({ op }) => op === 'tool_use')).toMatchObject({
+      deprecated: true,
+      canonical_op: 'propose_tool_calls',
+    });
+    expect(catalog.find(({ op }) => op === 'react_loop')).toMatchObject({
+      deprecated: true,
+      canonical_op: 'reasoning_loop',
+    });
+  });
+
   it('keeps Agent runtime SDK ownership outside Wisdom and task-executor', () => {
     const wisdomSource = safeReadFile(
       pathResolver.rootResolve('libs/actuators/wisdom-actuator/src/decision-ops.ts'),

@@ -12,11 +12,7 @@
     "customer_name": "",
     "customer_person_slug": "",
     "customer_org": "",
-    "solution_personas": [
-      "lean-mvp-advocate",
-      "enterprise-architect",
-      "ux-researcher"
-    ]
+    "solution_personas": ["lean-mvp-advocate", "enterprise-architect", "ux-researcher"]
   },
   "steps": [
     {
@@ -91,7 +87,7 @@
     {
       "id": "solution_fanout",
       "role": "sink",
-      "op": "wisdom:a2a_fanout",
+      "op": "wisdom:perspective_fanout",
       "params": {
         "personas": "{{solution_personas}}",
         "min_hypotheses_per_persona": 2,
@@ -110,7 +106,7 @@
     {
       "id": "cross_critique",
       "role": "sink",
-      "op": "wisdom:cross_critique",
+      "op": "wisdom:typed_cross_critique",
       "params": {
         "input": "{{mission_evidence_dir}}/solution-proposals-raw.json",
         "personas": "{{solution_personas}}",

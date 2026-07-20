@@ -22,7 +22,7 @@
     },
     {
       "role": "transform",
-      "op": "wisdom:a2a_fanout",
+      "op": "wisdom:perspective_fanout",
       "consumes": "codebase_summary",
       "produces": { "channel": "strategic_views", "type": "FanoutResult" },
       "params": {
@@ -33,7 +33,7 @@
     },
     {
       "role": "transform",
-      "op": "wisdom:cross_critique",
+      "op": "wisdom:typed_cross_critique",
       "consumes": "strategic_views",
       "produces": { "channel": "synthesis", "type": "CrossCritiqueResult" },
       "params": {

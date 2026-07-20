@@ -17,7 +17,7 @@
     },
     {
       "role": "transform",
-      "op": "wisdom:a2a_fanout",
+      "op": "wisdom:perspective_fanout",
       "consumes": "contract_digest",
       "produces": { "channel": "review_perspectives", "type": "FanoutResult" },
       "params": {
@@ -28,7 +28,7 @@
     },
     {
       "role": "transform",
-      "op": "wisdom:cross_critique",
+      "op": "wisdom:typed_cross_critique",
       "consumes": "review_perspectives",
       "produces": { "channel": "critique_result", "type": "CrossCritiqueResult" },
       "params": {
