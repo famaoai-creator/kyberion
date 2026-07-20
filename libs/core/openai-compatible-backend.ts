@@ -1,6 +1,6 @@
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExec, safeReadFile, safeReaddir, safeWriteFile } from './secure-io.js';
+import { safeExec, safeReadFile, safeReaddir, safeWriteFile, validateUrl } from './secure-io.js';
 import { redactSensitiveObject } from './network.js';
 import { advanceToolLoopGuardrail, createToolLoopGuardrailState } from './tool-loop-guardrail.js';
 import type {
@@ -31,16 +31,32 @@ import {
   estimateRequestInputTokens,
   resolveConfiguredContextWindowTokens,
 } from './completion-token-budget.js';
+import type { ReasoningToolName, SamplingParams } from './reasoning-route-resolver.js';
+
+export type LocalLlmProviderPreset =
+  | 'generic'
+  | 'ollama'
+  | 'vllm'
+  | 'lmstudio'
+  | 'llamacpp'
+  | 'mlx'
+  | 'localai';
 
 export interface OpenAiCompatibleBackendOptions {
   baseURL: string;
   apiKey: string;
   model: string;
+  providerPreset?: LocalLlmProviderPreset;
+  endpointPolicy?: 'local' | 'public';
+  toolsEnabled?: boolean;
+  allowedTools?: ReasoningToolName[];
   timeoutMs?: number;
   /** KC-09: model context window in tokens; unset = unknown → no max_tokens sent. */
   contextWindowTokens?: number;
   /** KC-09: upper bound for the per-request completion budget. */
   maxCompletionTokens?: number;
+  /** Provider-normalized sampling parameters. Unsupported values are rejected by the route resolver. */
+  samplingParams?: SamplingParams;
 }
 
 export interface OpenAiCompatibleBackendAvailability {
@@ -55,6 +71,18 @@ export interface OpenAiCompatibleBackendEnvNames {
   defaultModel: string;
   unavailableReason: string;
   probeLabel: string;
+  providerPreset?: LocalLlmProviderPreset;
+  endpointPolicy: 'local' | 'public';
+}
+
+export interface OpenAiCompatibleBackendOverrides {
+  model?: string;
+  samplingParams?: SamplingParams;
+  contextWindowTokens?: number;
+  maxCompletionTokens?: number;
+  timeoutMs?: number;
+  toolsEnabled?: boolean;
+  allowedTools?: ReasoningToolName[];
 }
 
 type ChatRole = 'system' | 'user' | 'assistant' | 'tool';
@@ -86,6 +114,13 @@ interface ChatCompletionRequest {
   }>;
   tool_choice?: 'auto' | 'none';
   max_tokens?: number;
+  temperature?: number;
+  top_p?: number;
+  top_k?: number;
+  min_p?: number;
+  presence_penalty?: number;
+  frequency_penalty?: number;
+  stop?: string | string[];
 }
 
 interface ChatCompletionResponse {
@@ -97,10 +132,27 @@ interface ChatCompletionResponse {
   };
 }
 
-function normalizeBaseUrl(baseURL: string): string {
-  const trimmed = baseURL.trim();
+function normalizeBaseUrl(baseURL: string, providerPreset?: LocalLlmProviderPreset): string {
+  let trimmed = baseURL.trim();
   if (!trimmed) throw new Error('Missing baseURL for OpenAI-compatible backend');
+  if (
+    providerPreset === 'ollama' &&
+    !trimmed.endsWith('/v1') &&
+    !trimmed.endsWith('/v1/') &&
+    (trimmed.includes(':11434') || trimmed.endsWith('/api'))
+  ) {
+    trimmed = trimmed.replace(/\/api\/?$/, '');
+    trimmed = `${trimmed}/v1`;
+  }
   return trimmed.endsWith('/') ? trimmed : `${trimmed}/`;
+}
+
+function resolveDefaultContextWindowForPreset(preset?: LocalLlmProviderPreset): number | undefined {
+  // A runtime preset does not identify the loaded model or its tokenizer.
+  // Context defaults belong to the model registry or an explicit operator
+  // setting; guessing here silently creates truncation/overflow bugs.
+  void preset;
+  return undefined;
 }
 
 function isLocalHost(hostname: string): boolean {
@@ -160,8 +212,10 @@ function extractTextContent(content: ChatMessage['content']): string {
   return String(content);
 }
 
-function createToolDefinitions(): ChatCompletionRequest['tools'] {
-  return [
+function createToolDefinitions(
+  allowedTools: ReadonlySet<ReasoningToolName>
+): ChatCompletionRequest['tools'] {
+  const definitions: NonNullable<ChatCompletionRequest['tools']> = [
     {
       type: 'function',
       function: {
@@ -220,6 +274,7 @@ function createToolDefinitions(): ChatCompletionRequest['tools'] {
       },
     },
   ];
+  return definitions.filter((tool) => allowedTools.has(tool.function.name as ReasoningToolName));
 }
 
 function safeJsonParse(text: string): unknown {
@@ -240,13 +295,26 @@ function firstConfiguredEnv(env: NodeJS.ProcessEnv, keys: string[]): string | un
 
 function buildBackendFromEnvNames(
   env: NodeJS.ProcessEnv,
-  names: OpenAiCompatibleBackendEnvNames
+  names: OpenAiCompatibleBackendEnvNames,
+  overrides: OpenAiCompatibleBackendOverrides = {}
 ): OpenAiCompatibleBackend | null {
   const baseURL = firstConfiguredEnv(env, names.baseURL);
   if (!baseURL) return null;
   const apiKey = firstConfiguredEnv(env, names.apiKey) || 'not-needed';
-  const model = firstConfiguredEnv(env, names.model) || names.defaultModel;
-  return new OpenAiCompatibleBackend({ baseURL, apiKey, model });
+  const model = overrides.model || firstConfiguredEnv(env, names.model) || names.defaultModel;
+  return new OpenAiCompatibleBackend({
+    baseURL,
+    apiKey,
+    model,
+    providerPreset: names.providerPreset,
+    endpointPolicy: names.endpointPolicy,
+    samplingParams: overrides.samplingParams,
+    contextWindowTokens: overrides.contextWindowTokens,
+    maxCompletionTokens: overrides.maxCompletionTokens,
+    timeoutMs: overrides.timeoutMs,
+    toolsEnabled: overrides.toolsEnabled,
+    allowedTools: overrides.allowedTools,
+  });
 }
 
 async function probeBackendAvailabilityFromEnvNames(
@@ -264,8 +332,8 @@ async function probeBackendAvailabilityFromEnvNames(
 
   try {
     const url = options.allowPublicEndpoint
-      ? assertHttpEndpoint(baseURL)
-      : assertLocalCompatibleEndpoint(baseURL);
+      ? assertHttpEndpoint(normalizeBaseUrl(baseURL, names.providerPreset))
+      : assertLocalCompatibleEndpoint(normalizeBaseUrl(baseURL, names.providerPreset));
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 4_000);
     try {
@@ -296,21 +364,37 @@ async function probeBackendAvailabilityFromEnvNames(
 
 export class OpenAiCompatibleBackend implements ReasoningBackend {
   readonly name = 'openai-compatible';
+  readonly egressEndpoint: string;
+  readonly providerPreset: LocalLlmProviderPreset;
   private readonly baseURL: string;
   private readonly apiKey: string;
   private readonly model: string;
   private readonly timeoutMs: number;
   private readonly contextWindowTokens: number | undefined;
   private readonly maxCompletionTokens: number | undefined;
+  private readonly samplingParams: SamplingParams;
+  private readonly toolsEnabled: boolean;
+  private readonly allowedTools: ReadonlySet<ReasoningToolName>;
 
   constructor(options: OpenAiCompatibleBackendOptions) {
-    this.baseURL = normalizeBaseUrl(options.baseURL);
+    this.providerPreset = options.providerPreset ?? 'generic';
+    const normalizedBaseURL = normalizeBaseUrl(options.baseURL, this.providerPreset);
+    if ((options.endpointPolicy ?? 'local') === 'local')
+      assertLocalCompatibleEndpoint(normalizedBaseURL);
+    else validateUrl(normalizedBaseURL);
+    this.baseURL = normalizedBaseURL;
+    this.egressEndpoint = normalizedBaseURL;
     this.apiKey = options.apiKey;
     this.model = options.model;
     this.timeoutMs = options.timeoutMs ?? 60_000;
     this.contextWindowTokens =
-      options.contextWindowTokens ?? resolveConfiguredContextWindowTokens();
+      options.contextWindowTokens ??
+      resolveConfiguredContextWindowTokens() ??
+      resolveDefaultContextWindowForPreset(this.providerPreset);
     this.maxCompletionTokens = options.maxCompletionTokens;
+    this.samplingParams = { ...(options.samplingParams || {}) };
+    this.toolsEnabled = options.toolsEnabled === true;
+    this.allowedTools = new Set(options.allowedTools ?? []);
   }
 
   /** KC-09: budget only when a window is explicitly configured — unknown window leaves the request untouched. */
@@ -344,7 +428,10 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
     const body: ChatCompletionRequest = {
       model: this.model,
       messages: redactSensitiveObject(messages),
-      ...((opts.useTools ?? true) ? { tools: createToolDefinitions(), tool_choice: 'auto' } : {}),
+      ...((opts.useTools ?? this.toolsEnabled) && this.allowedTools.size > 0
+        ? { tools: createToolDefinitions(this.allowedTools), tool_choice: 'auto' }
+        : {}),
+      ...this.samplingParams,
     };
     const maxTokens = this.completionBudget(body);
     if (maxTokens !== undefined) body.max_tokens = maxTokens;
@@ -371,6 +458,9 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
   }
 
   private async handleToolCall(name: string, rawArguments: string): Promise<string> {
+    if (!this.toolsEnabled || !this.allowedTools.has(name as ReasoningToolName)) {
+      return `Error: Tool ${name} is not enabled for this reasoning route.`;
+    }
     const args = (safeJsonParse(rawArguments) as Record<string, unknown>) || {};
     logger.info(`[LOCAL_LLM] Tool Call: ${name}(${JSON.stringify(redactSensitiveObject(args))})`);
 
@@ -556,6 +646,74 @@ const LOCAL_OPENAI_COMPATIBLE_ENV: OpenAiCompatibleBackendEnvNames = {
   defaultModel: 'llama3',
   unavailableReason: 'KYBERION_LOCAL_LLM_URL',
   probeLabel: 'local LLM',
+  providerPreset: 'generic',
+  endpointPolicy: 'local',
+};
+
+const OLLAMA_OPENAI_COMPATIBLE_ENV: OpenAiCompatibleBackendEnvNames = {
+  baseURL: ['KYBERION_OLLAMA_URL', 'OLLAMA_HOST', 'KYBERION_LOCAL_LLM_URL'],
+  apiKey: ['KYBERION_OLLAMA_KEY', 'KYBERION_LOCAL_LLM_KEY'],
+  model: ['KYBERION_OLLAMA_MODEL', 'OLLAMA_MODEL', 'KYBERION_LOCAL_LLM_MODEL'],
+  defaultModel: 'llama3.2',
+  unavailableReason: 'KYBERION_OLLAMA_URL',
+  probeLabel: 'Ollama API',
+  providerPreset: 'ollama',
+  endpointPolicy: 'local',
+};
+
+const VLLM_OPENAI_COMPATIBLE_ENV: OpenAiCompatibleBackendEnvNames = {
+  baseURL: ['KYBERION_VLLM_URL'],
+  apiKey: ['KYBERION_VLLM_KEY', 'KYBERION_LOCAL_LLM_KEY'],
+  model: ['KYBERION_VLLM_MODEL', 'KYBERION_LOCAL_LLM_MODEL'],
+  defaultModel: 'vllm-model',
+  unavailableReason: 'KYBERION_VLLM_URL',
+  probeLabel: 'vLLM API',
+  providerPreset: 'vllm',
+  endpointPolicy: 'local',
+};
+
+const LMSTUDIO_OPENAI_COMPATIBLE_ENV: OpenAiCompatibleBackendEnvNames = {
+  baseURL: ['KYBERION_LMSTUDIO_URL', 'KYBERION_LM_STUDIO_URL', 'KYBERION_LOCAL_LLM_URL'],
+  apiKey: ['KYBERION_LMSTUDIO_KEY', 'KYBERION_LOCAL_LLM_KEY'],
+  model: ['KYBERION_LMSTUDIO_MODEL', 'KYBERION_LOCAL_LLM_MODEL'],
+  defaultModel: 'lmstudio-model',
+  unavailableReason: 'KYBERION_LMSTUDIO_URL',
+  probeLabel: 'LM Studio API',
+  providerPreset: 'lmstudio',
+  endpointPolicy: 'local',
+};
+
+const LLAMACPP_OPENAI_COMPATIBLE_ENV: OpenAiCompatibleBackendEnvNames = {
+  baseURL: ['KYBERION_LLAMACPP_URL', 'KYBERION_LOCAL_LLM_URL'],
+  apiKey: ['KYBERION_LLAMACPP_KEY', 'KYBERION_LOCAL_LLM_KEY'],
+  model: ['KYBERION_LLAMACPP_MODEL', 'KYBERION_LOCAL_LLM_MODEL'],
+  defaultModel: 'llama-model',
+  unavailableReason: 'KYBERION_LLAMACPP_URL',
+  probeLabel: 'llama.cpp API',
+  providerPreset: 'llamacpp',
+  endpointPolicy: 'local',
+};
+
+const MLX_OPENAI_COMPATIBLE_ENV: OpenAiCompatibleBackendEnvNames = {
+  baseURL: ['KYBERION_MLX_URL', 'KYBERION_LOCAL_LLM_URL'],
+  apiKey: ['KYBERION_MLX_KEY', 'KYBERION_LOCAL_LLM_KEY'],
+  model: ['KYBERION_MLX_MODEL', 'KYBERION_LOCAL_LLM_MODEL'],
+  defaultModel: 'mlx-model',
+  unavailableReason: 'KYBERION_MLX_URL',
+  probeLabel: 'MLX-LM API',
+  providerPreset: 'mlx',
+  endpointPolicy: 'local',
+};
+
+const LOCALAI_OPENAI_COMPATIBLE_ENV: OpenAiCompatibleBackendEnvNames = {
+  baseURL: ['KYBERION_LOCALAI_URL', 'KYBERION_LOCAL_LLM_URL'],
+  apiKey: ['KYBERION_LOCALAI_KEY', 'KYBERION_LOCAL_LLM_KEY'],
+  model: ['KYBERION_LOCALAI_MODEL', 'KYBERION_LOCAL_LLM_MODEL'],
+  defaultModel: 'localai-model',
+  unavailableReason: 'KYBERION_LOCALAI_URL',
+  probeLabel: 'LocalAI API',
+  providerPreset: 'localai',
+  endpointPolicy: 'local',
 };
 
 const NEMOTRON_OPENAI_COMPATIBLE_ENV: OpenAiCompatibleBackendEnvNames = {
@@ -565,24 +723,117 @@ const NEMOTRON_OPENAI_COMPATIBLE_ENV: OpenAiCompatibleBackendEnvNames = {
   defaultModel: 'nemotron',
   unavailableReason: 'KYBERION_NEMOTRON_URL',
   probeLabel: 'Nemotron API',
+  endpointPolicy: 'public',
 };
 
 export function buildOpenAiCompatibleBackendFromEnv(
-  env: NodeJS.ProcessEnv = process.env
+  env: NodeJS.ProcessEnv = process.env,
+  overrides?: OpenAiCompatibleBackendOverrides
 ): OpenAiCompatibleBackend | null {
-  return buildBackendFromEnvNames(env, LOCAL_OPENAI_COMPATIBLE_ENV);
+  return buildBackendFromEnvNames(env, LOCAL_OPENAI_COMPATIBLE_ENV, overrides);
+}
+
+export function buildOllamaBackendFromEnv(
+  env: NodeJS.ProcessEnv = process.env,
+  overrides?: OpenAiCompatibleBackendOverrides
+): OpenAiCompatibleBackend | null {
+  return buildBackendFromEnvNames(env, OLLAMA_OPENAI_COMPATIBLE_ENV, overrides);
+}
+
+export function buildVllmBackendFromEnv(
+  env: NodeJS.ProcessEnv = process.env,
+  overrides?: OpenAiCompatibleBackendOverrides
+): OpenAiCompatibleBackend | null {
+  return buildBackendFromEnvNames(env, VLLM_OPENAI_COMPATIBLE_ENV, overrides);
+}
+
+export function buildLmStudioBackendFromEnv(
+  env: NodeJS.ProcessEnv = process.env,
+  overrides?: OpenAiCompatibleBackendOverrides
+): OpenAiCompatibleBackend | null {
+  return buildBackendFromEnvNames(env, LMSTUDIO_OPENAI_COMPATIBLE_ENV, overrides);
+}
+
+export function buildLlamaCppBackendFromEnv(
+  env: NodeJS.ProcessEnv = process.env,
+  overrides?: OpenAiCompatibleBackendOverrides
+): OpenAiCompatibleBackend | null {
+  return buildBackendFromEnvNames(env, LLAMACPP_OPENAI_COMPATIBLE_ENV, overrides);
+}
+
+export function buildMlxBackendFromEnv(
+  env: NodeJS.ProcessEnv = process.env,
+  overrides?: OpenAiCompatibleBackendOverrides
+): OpenAiCompatibleBackend | null {
+  return buildBackendFromEnvNames(env, MLX_OPENAI_COMPATIBLE_ENV, overrides);
+}
+
+export function buildLocalAiBackendFromEnv(
+  env: NodeJS.ProcessEnv = process.env,
+  overrides?: OpenAiCompatibleBackendOverrides
+): OpenAiCompatibleBackend | null {
+  return buildBackendFromEnvNames(env, LOCALAI_OPENAI_COMPATIBLE_ENV, overrides);
 }
 
 export function buildNemotronBackendFromEnv(
-  env: NodeJS.ProcessEnv = process.env
+  env: NodeJS.ProcessEnv = process.env,
+  overrides?: OpenAiCompatibleBackendOverrides
 ): OpenAiCompatibleBackend | null {
-  return buildBackendFromEnvNames(env, NEMOTRON_OPENAI_COMPATIBLE_ENV);
+  return buildBackendFromEnvNames(env, NEMOTRON_OPENAI_COMPATIBLE_ENV, overrides);
 }
 
 export async function probeOpenAiCompatibleBackendAvailability(
   env: NodeJS.ProcessEnv = process.env
 ): Promise<OpenAiCompatibleBackendAvailability> {
   return probeBackendAvailabilityFromEnvNames(env, LOCAL_OPENAI_COMPATIBLE_ENV, {
+    allowPublicEndpoint: false,
+  });
+}
+
+export async function probeOllamaBackendAvailability(
+  env: NodeJS.ProcessEnv = process.env
+): Promise<OpenAiCompatibleBackendAvailability> {
+  return probeBackendAvailabilityFromEnvNames(env, OLLAMA_OPENAI_COMPATIBLE_ENV, {
+    allowPublicEndpoint: false,
+  });
+}
+
+export async function probeVllmBackendAvailability(
+  env: NodeJS.ProcessEnv = process.env
+): Promise<OpenAiCompatibleBackendAvailability> {
+  return probeBackendAvailabilityFromEnvNames(env, VLLM_OPENAI_COMPATIBLE_ENV, {
+    allowPublicEndpoint: false,
+  });
+}
+
+export async function probeLmStudioBackendAvailability(
+  env: NodeJS.ProcessEnv = process.env
+): Promise<OpenAiCompatibleBackendAvailability> {
+  return probeBackendAvailabilityFromEnvNames(env, LMSTUDIO_OPENAI_COMPATIBLE_ENV, {
+    allowPublicEndpoint: false,
+  });
+}
+
+export async function probeLlamaCppBackendAvailability(
+  env: NodeJS.ProcessEnv = process.env
+): Promise<OpenAiCompatibleBackendAvailability> {
+  return probeBackendAvailabilityFromEnvNames(env, LLAMACPP_OPENAI_COMPATIBLE_ENV, {
+    allowPublicEndpoint: false,
+  });
+}
+
+export async function probeMlxBackendAvailability(
+  env: NodeJS.ProcessEnv = process.env
+): Promise<OpenAiCompatibleBackendAvailability> {
+  return probeBackendAvailabilityFromEnvNames(env, MLX_OPENAI_COMPATIBLE_ENV, {
+    allowPublicEndpoint: false,
+  });
+}
+
+export async function probeLocalAiBackendAvailability(
+  env: NodeJS.ProcessEnv = process.env
+): Promise<OpenAiCompatibleBackendAvailability> {
+  return probeBackendAvailabilityFromEnvNames(env, LOCALAI_OPENAI_COMPATIBLE_ENV, {
     allowPublicEndpoint: false,
   });
 }

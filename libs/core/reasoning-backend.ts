@@ -37,7 +37,11 @@ import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { getReasoningPayloadScope } from './reasoning-egress-scope.js';
 import { z } from 'zod';
-import { assertReasoningEgressAllowed } from './reasoning-egress-scope.js';
+import {
+  assertReasoningEgressAllowed,
+  assertReasoningEgressAllowedAtEndpoint,
+} from './reasoning-egress-scope.js';
+import { classifyReasoningFailure, reasoningFailureMessage } from './reasoning-failure-taxonomy.js';
 
 // Auth/eligibility failures (dead credentials, retired tiers) do not heal in
 // seconds — keep retrying them per call and every operation pays the latency.
@@ -46,16 +50,8 @@ const AUTH_FAILURE_PATTERN =
 const AUTH_FAILURE_DEMOTION_MS = 6 * 60 * 60 * 1000;
 const DEFAULT_IN_PLACE_RETRIES = 3;
 const DEFAULT_RETRY_BASE_MS = 250;
-const TRANSIENT_FAILURE_PATTERN =
-  /(?:\b(?:429|500|502|503|504|529)\b|rate[ -]?limit|too many requests|overloaded|temporarily unavailable|service unavailable|gateway timeout)/i;
-
 function resolveDemotionRetryAfterMs(message: string): number | undefined {
   return AUTH_FAILURE_PATTERN.test(message) ? AUTH_FAILURE_DEMOTION_MS : undefined;
-}
-
-function isTransientFailure(error: unknown): boolean {
-  const message = summarizeError(error);
-  return !AUTH_FAILURE_PATTERN.test(message) && TRANSIENT_FAILURE_PATTERN.test(message);
 }
 
 function readRetryAfterMs(error: unknown): number | undefined {
@@ -84,13 +80,13 @@ function readRetryAfterMs(error: unknown): number | undefined {
   return Number.isFinite(dateMs) ? Math.max(0, dateMs - Date.now()) : undefined;
 }
 
-function resolveInPlaceRetryCount(): number {
+function resolveInPlaceRetryCount(policyDefault?: number): number {
   const raw = process.env.KYBERION_REASONING_IN_PLACE_RETRIES;
-  if (!raw?.trim()) return DEFAULT_IN_PLACE_RETRIES;
+  if (!raw?.trim()) return policyDefault ?? DEFAULT_IN_PLACE_RETRIES;
   const configured = Number(raw);
   return Number.isFinite(configured) && configured >= 0
-    ? Math.min(5, Math.floor(configured))
-    : DEFAULT_IN_PLACE_RETRIES;
+    ? Math.min(policyDefault ?? 5, Math.floor(configured))
+    : (policyDefault ?? DEFAULT_IN_PLACE_RETRIES);
 }
 
 function resolveRetryBaseMs(): number {
@@ -427,6 +423,10 @@ export interface ReasoningCallBudget {
 }
 
 export interface ReasoningCallOptions {
+  /** Governed role used to resolve a runtime/model profile. */
+  role?: string;
+  /** Optional resolved profile override; security constraints still apply. */
+  profile?: string;
   effort?: 'low' | 'medium' | 'high';
   budget?: ReasoningCallBudget;
   /**
@@ -515,7 +515,11 @@ export interface ReasoningBackend {
   /** Run a plain prompt against the active reasoning backend. */
   prompt(prompt: string, options?: ReasoningCallOptions): Promise<string>;
   /** (Optional) Execute a prompt with tool access (Function Calling / Tool Use). */
-  generateWithTools?(prompt: string, tools: ToolDefinition[]): Promise<GenerateWithToolsResult>;
+  generateWithTools?(
+    prompt: string,
+    tools: ToolDefinition[],
+    options?: ReasoningCallOptions
+  ): Promise<GenerateWithToolsResult>;
   /**
    * (Optional) Run a prompt with images attached.
    *
@@ -581,9 +585,10 @@ export interface ReasoningBackendCandidate {
   label?: string;
 }
 
-function summarizeError(error: unknown): string {
-  if (error instanceof Error) return error.message || error.name;
-  return String(error);
+export interface ReasoningFailoverPolicy {
+  max_attempts: number;
+  max_in_place_retries: number;
+  on_unsupported_parameter?: 'reject' | 'warn-and-drop' | 'translate';
 }
 
 // ---------------------------------------------------------------------------
@@ -653,9 +658,24 @@ function candidateLabel(candidate: ReasoningBackendCandidate): string {
 export class FailoverReasoningBackend implements ReasoningBackend {
   readonly name: string;
   private readonly candidates: ReasoningBackendCandidate[];
+  private readonly failoverPolicy: ReasoningFailoverPolicy;
 
-  constructor(candidates: ReasoningBackendCandidate[]) {
+  constructor(
+    candidates: ReasoningBackendCandidate[],
+    failoverPolicy?: Partial<ReasoningFailoverPolicy>
+  ) {
     this.candidates = candidates.filter((candidate) => Boolean(candidate.backend));
+    this.failoverPolicy = {
+      max_attempts: Math.max(
+        1,
+        Math.floor((failoverPolicy?.max_attempts ?? this.candidates.length) || 1)
+      ),
+      max_in_place_retries: Math.max(
+        0,
+        Math.floor(failoverPolicy?.max_in_place_retries ?? DEFAULT_IN_PLACE_RETRIES)
+      ),
+      on_unsupported_parameter: failoverPolicy?.on_unsupported_parameter ?? 'reject',
+    };
     this.name = this.candidates[0]?.backend.name || 'failover';
     if (this.candidates.some((candidate) => candidate.backend.promptWithImages)) {
       this.promptWithImages = (prompt, images, options) =>
@@ -709,7 +729,7 @@ export class FailoverReasoningBackend implements ReasoningBackend {
     const skippedProviders = new Set(listDemotedProviders());
     const errors: string[] = [];
 
-    for (const candidate of this.candidates) {
+    for (const candidate of this.candidates.slice(0, this.failoverPolicy.max_attempts)) {
       const provider = normalizeProviderName(candidate.provider);
       if (provider && skippedProviders.has(provider)) continue;
       const attempt = await this.attemptCandidateWithRetries(
@@ -720,6 +740,7 @@ export class FailoverReasoningBackend implements ReasoningBackend {
       );
       if (attempt.ok === false) {
         errors.push(`${candidateLabel(candidate)}: ${attempt.message}`);
+        if (attempt.stop) break;
         continue;
       }
       return attempt.result;
@@ -741,17 +762,30 @@ export class FailoverReasoningBackend implements ReasoningBackend {
     candidate: ReasoningBackendCandidate,
     provider: string | undefined,
     invoke: (backend: ReasoningBackend) => Promise<T>
-  ): Promise<{ ok: true; result: T } | { ok: false; message: string }> {
-    const maxInPlaceRetries = resolveInPlaceRetryCount();
+  ): Promise<{ ok: true; result: T } | { ok: false; message: string; stop: boolean }> {
+    const maxInPlaceRetries = resolveInPlaceRetryCount(this.failoverPolicy.max_in_place_retries);
     for (let retryAttempt = 0; ; retryAttempt++) {
       try {
-        assertReasoningEgressAllowed(candidate.backend.name);
+        const endpoint = (candidate.backend as ReasoningBackend & { egressEndpoint?: string })
+          .egressEndpoint;
+        if (endpoint) assertReasoningEgressAllowedAtEndpoint(candidate.backend.name, endpoint);
+        else assertReasoningEgressAllowed(candidate.backend.name);
         const result = await invoke(candidate.backend);
         if (provider) reportProviderHealthy(provider);
+        try {
+          metrics.record('reasoning:route-served', 0, 'success', {
+            operation,
+            provider: provider || undefined,
+            candidate: candidateLabel(candidate),
+          });
+        } catch {
+          // Metrics must never change reasoning behavior.
+        }
         return { ok: true, result };
       } catch (error) {
-        const message = summarizeError(error);
-        if (isTransientFailure(error) && retryAttempt < maxInPlaceRetries) {
+        const message = reasoningFailureMessage(error);
+        const classification = classifyReasoningFailure(error);
+        if (classification.retryable && retryAttempt < maxInPlaceRetries) {
           const nextAttempt = retryAttempt + 1;
           const delayMs = resolveInPlaceRetryDelayMs(error, nextAttempt);
           logger.warn(
@@ -774,15 +808,29 @@ export class FailoverReasoningBackend implements ReasoningBackend {
         }
 
         logger.warn(
-          `[reasoning-backend:failover] ${operation} failed on ${candidateLabel(candidate)}${provider ? ` (${provider})` : ''}; demoting for ${getProviderHealthDemotionTtlMs()}ms: ${message}`
+          `[reasoning-backend:failover] ${operation} failed on ${candidateLabel(candidate)}${provider ? ` (${provider})` : ''}; class=${classification.class}; ${classification.allowFailover ? `demoting for ${getProviderHealthDemotionTtlMs()}ms` : 'stopping without fallback'}: ${message}`
         );
-        if (provider) {
+        try {
+          metrics.record('reasoning:route-failure', 0, 'error', {
+            operation,
+            provider: provider || undefined,
+            candidate: candidateLabel(candidate),
+            failure_class: classification.class,
+          });
+        } catch {
+          // Metrics must never change failure handling.
+        }
+        if (provider && classification.demoteProvider) {
           reportProviderTemporarilyUnhealthy(provider, {
             reason: `${operation}:${message}`,
             retryAfterMs: resolveDemotionRetryAfterMs(message),
           });
         }
-        return { ok: false, message };
+        return {
+          ok: false,
+          message: `[${classification.class}] ${message}`,
+          stop: !classification.allowFailover,
+        };
       }
     }
   }
@@ -888,7 +936,8 @@ export class FailoverReasoningBackend implements ReasoningBackend {
 
   async generateWithTools(
     prompt: string,
-    tools: ToolDefinition[]
+    tools: ToolDefinition[],
+    options?: ReasoningCallOptions
   ): Promise<GenerateWithToolsResult> {
     const skippedProviders = new Set(listDemotedProviders());
     const errors: string[] = [];
@@ -901,10 +950,11 @@ export class FailoverReasoningBackend implements ReasoningBackend {
         'generateWithTools',
         candidate,
         provider,
-        (backend) => backend.generateWithTools!(prompt, tools)
+        (backend) => backend.generateWithTools!(prompt, tools, options)
       );
       if (attempt.ok === false) {
         errors.push(`${candidateLabel(candidate)}: ${attempt.message}`);
+        if (attempt.stop) break;
         continue;
       }
       return attempt.result;
@@ -949,6 +999,7 @@ export class FailoverReasoningBackend implements ReasoningBackend {
       );
       if (attempt.ok === false) {
         errors.push(`${candidateLabel(candidate)}: ${attempt.message}`);
+        if (attempt.stop) break;
         continue;
       }
       return attempt.result;
@@ -960,10 +1011,96 @@ export class FailoverReasoningBackend implements ReasoningBackend {
   }
 }
 
+/** Dispatches a call to a role-specific failover chain while preserving the
+ * legacy default chain for callers that do not provide a role. */
+export class RoleAwareReasoningBackend implements ReasoningBackend {
+  readonly name: string;
+  private readonly defaultBackend: ReasoningBackend;
+  private readonly roleBackends: Map<string, ReasoningBackend>;
+
+  constructor(
+    defaultBackend: ReasoningBackend,
+    roleBackends: Map<string, ReasoningBackend> = new Map()
+  ) {
+    this.defaultBackend = defaultBackend;
+    this.roleBackends = roleBackends;
+    // Preserve the legacy observable backend name for existing diagnostics and
+    // consumers; role dispatch is an internal routing concern.
+    this.name = defaultBackend.name;
+  }
+
+  private pick(options?: ReasoningCallOptions): ReasoningBackend {
+    const role = options?.role
+      ?.trim()
+      .toLowerCase()
+      .replace(/[-\s]+/g, '_');
+    return (role && this.roleBackends.get(role)) || this.defaultBackend;
+  }
+  divergePersonas(input: DivergeHypothesisInput, options?: ReasoningCallOptions) {
+    return this.pick(options).divergePersonas(input, options);
+  }
+  crossCritique(input: CritiqueInput, options?: ReasoningCallOptions) {
+    return this.pick(options).crossCritique(input, options);
+  }
+  synthesizePersona(input: PersonaSynthesisInput, options?: ReasoningCallOptions) {
+    return this.pick(options).synthesizePersona(input, options);
+  }
+  forkBranches(input: BranchForkInput, options?: ReasoningCallOptions) {
+    return this.pick(options).forkBranches(input, options);
+  }
+  simulateBranches(input: SimulationInput, options?: ReasoningCallOptions) {
+    return this.pick(options).simulateBranches(input, options);
+  }
+  extractRequirements(input: ExtractRequirementsInput, options?: ReasoningCallOptions) {
+    return this.pick(options).extractRequirements(input, options);
+  }
+  extractDesignSpec(input: ExtractDesignSpecInput, options?: ReasoningCallOptions) {
+    return this.pick(options).extractDesignSpec(input, options);
+  }
+  extractTestPlan(input: ExtractTestPlanInput, options?: ReasoningCallOptions) {
+    return this.pick(options).extractTestPlan(input, options);
+  }
+  decomposeIntoTasks(input: DecomposeIntoTasksInput, options?: ReasoningCallOptions) {
+    return this.pick(options).decomposeIntoTasks(input, options);
+  }
+  delegateTask(instruction: string, context?: string, options?: ReasoningCallOptions) {
+    return this.pick(options).delegateTask(instruction, context, options);
+  }
+  prompt(prompt: string, options?: ReasoningCallOptions) {
+    return this.pick(options).prompt(prompt, options);
+  }
+  generateWithTools(prompt: string, tools: ToolDefinition[], options?: ReasoningCallOptions) {
+    const backend = this.pick(options);
+    return backend.generateWithTools
+      ? backend.generateWithTools(prompt, tools, options)
+      : Promise.reject(new Error(`Role ${options?.role || 'default'} has no tool-capable backend`));
+  }
+  promptWithImages(
+    prompt: string,
+    images: ReasoningImageAttachment[],
+    options?: ReasoningCallOptions
+  ) {
+    const backend = this.pick(options);
+    if (!backend.promptWithImages)
+      return Promise.reject(
+        new Error(`Role ${options?.role || 'default'} does not support vision`)
+      );
+    return backend.promptWithImages(prompt, images, options);
+  }
+}
+
 export function buildFailoverReasoningBackend(
-  candidates: ReasoningBackendCandidate[]
+  candidates: ReasoningBackendCandidate[],
+  failoverPolicy?: Partial<ReasoningFailoverPolicy>
 ): ReasoningBackend {
-  return new FailoverReasoningBackend(candidates);
+  return new FailoverReasoningBackend(candidates, failoverPolicy);
+}
+
+export function buildRoleAwareReasoningBackend(
+  defaultBackend: ReasoningBackend,
+  roleBackends: Map<string, ReasoningBackend>
+): ReasoningBackend {
+  return new RoleAwareReasoningBackend(defaultBackend, roleBackends);
 }
 
 export function delegateStructured(
