@@ -1,12 +1,18 @@
 import type { ChildProcess } from 'node:child_process';
-import { generateVideoVisualDirection } from '@agent/core';
+import {
+  authorSceneCompositions,
+  generateVideoMotionDirection,
+  generateVideoVisualDirection,
+} from '@agent/core';
 import {
   compileNarratedVideoBriefToCompositionADF,
   compileVideoCompositionADF,
   compileVideoContentBriefToStoryboard,
   compileVideoStoryboardToNarratedVideoBrief,
+  formatVideoLintReport,
   getVideoCompositionTemplateRegistry,
   getVideoRenderRuntimePolicy,
+  lintVideoComposition,
   logger,
   pathResolver,
   renderNarratedFallbackVideo,
@@ -59,6 +65,15 @@ type VideoCompositionAction =
       params: { video_content_brief: Record<string, unknown> };
     }
   | {
+      action: 'lint_video_composition';
+      params: {
+        video_composition_adf: VideoCompositionADF;
+        bundle_dir?: string;
+        tenant_slug?: string;
+        fail_on_error?: boolean;
+      };
+    }
+  | {
       action: 'create_narrated_video_from_content_brief';
       params: {
         video_content_brief: Record<string, unknown>;
@@ -97,6 +112,10 @@ interface VideoCompositionJobDiagnostics {
   started_at?: string;
   finished_at?: string;
   duration_ms?: number;
+  /** MP-02: set when the artifact came from a lower-fidelity render path. */
+  render_degraded?: boolean;
+  render_degraded_from?: string;
+  render_degradation_reason?: string;
   terminal_status?: 'completed' | 'failed' | 'cancelled';
   cancellation_reason?: string;
   cancellation_requested_at?: string;
@@ -195,6 +214,7 @@ async function listVideoCompositionTemplates() {
 // story-matched visual direction (LLM zone). Failure never blocks the
 // render — the compiler degrades to the legacy palette.
 async function attachVisualDirection(adf: any, brief: Record<string, unknown>): Promise<void> {
+  const reasons: string[] = [];
   try {
     const storyboard = (brief as any).storyboard;
     const story = Array.isArray(storyboard?.beats)
@@ -202,6 +222,17 @@ async function attachVisualDirection(adf: any, brief: Record<string, unknown>): 
           .map((beat: any) => `${beat?.title ?? ''} ${beat?.narration ?? beat?.summary ?? ''}`)
           .join('\n')
       : String((brief as any).narration?.script ?? (brief as any).summary ?? adf.title ?? '');
+    const scope = {
+      tier: brief.tier === 'personal' || brief.tier === 'confidential' ? brief.tier : 'public',
+      tenant_slug: brief.tenant_slug ? String(brief.tenant_slug) : undefined,
+      purpose: 'video composition direction',
+    } as const;
+    const sceneInputs = (adf.scenes || []).map((scene: any) => ({
+      scene_id: String(scene.scene_id),
+      role: scene.role,
+      duration_sec: Number(scene.duration_sec),
+      available_keys: Object.keys(scene.content || {}),
+    }));
     adf.composition.visual_direction = await generateVideoVisualDirection({
       title: String(adf.title || 'Short video'),
       story,
@@ -209,9 +240,44 @@ async function attachVisualDirection(adf: any, brief: Record<string, unknown>): 
       audience: (brief as any).audience ? String((brief as any).audience) : undefined,
       frame: { width: adf.composition.width, height: adf.composition.height },
       scene_ids: (adf.scenes || []).map((scene: any) => String(scene.scene_id)),
+      scope,
     });
-  } catch {
-    /* art direction is best-effort; compiler falls back to defaults */
+    adf.composition.motion_direction = await generateVideoMotionDirection({
+      title: String(adf.title || 'Short video'),
+      story,
+      tone: (brief as any).tone ? String((brief as any).tone) : undefined,
+      scenes: sceneInputs,
+      scope,
+    });
+    adf.composition.scene_compositions = await authorSceneCompositions({
+      title: String(adf.title || 'Short video'),
+      story,
+      scenes: sceneInputs,
+      scope,
+    });
+    const resolutions = [
+      adf.composition.visual_direction?.resolution,
+      adf.composition.motion_direction?.resolution,
+      ...(adf.composition.scene_compositions || []).map((scene: any) => scene.resolution),
+    ].filter(Boolean);
+    const degraded = resolutions.some((resolution: any) => resolution.degraded === true);
+    for (const resolution of resolutions) {
+      if (resolution.reason) reasons.push(String(resolution.reason).slice(0, 240));
+    }
+    adf.composition.art_direction_resolution = {
+      degraded,
+      sources: Array.from(
+        new Set(resolutions.map((resolution: any) => resolution.source))
+      ) as Array<'model' | 'catalog-default'>,
+      ...(reasons.length > 0 ? { reasons: Array.from(new Set(reasons)).slice(0, 8) } : {}),
+    };
+  } catch (error: any) {
+    /* art direction is best-effort; compiler falls back to defaults, but the degradation is durable. */
+    adf.composition.art_direction_resolution = {
+      degraded: true,
+      sources: ['catalog-default'],
+      reasons: [String(error?.message || error || 'art direction unavailable').slice(0, 240)],
+    };
   }
 }
 
@@ -239,6 +305,63 @@ async function compileVideoContentBrief(params: { video_content_brief?: Record<s
     status: 'succeeded',
     kind: 'compiled_video_storyboard',
     video_storyboard: storyboard,
+  };
+}
+
+/**
+ * MP-02: lint a composition before it is rendered.
+ *
+ * Reads the compiled scene HTML when a bundle exists so the determinism rules
+ * apply to what will actually be seeked, not just to the contract. Errors fail
+ * the step: a bundle that reads a clock cannot be reproduced, and a scene gap
+ * renders as blank frames.
+ */
+async function lintVideoCompositionAction(params: {
+  video_composition_adf?: VideoCompositionADF;
+  bundle_dir?: string;
+  tenant_slug?: string;
+  fail_on_error?: boolean;
+}) {
+  if (!params.video_composition_adf) {
+    throw new Error('lint_video_composition requires params.video_composition_adf');
+  }
+  const adf = params.video_composition_adf;
+  const bundleDir = params.bundle_dir || adf.output?.bundle_dir;
+  const sceneHtml: Record<string, string> = {};
+  if (bundleDir) {
+    for (const scene of adf.scenes || []) {
+      const scenePath = path.join(
+        pathResolver.rootResolve(bundleDir),
+        'compositions',
+        `${scene.scene_id}.html`
+      );
+      if (safeExistsSync(scenePath)) {
+        sceneHtml[scene.scene_id] = safeReadFile(scenePath, { encoding: 'utf8' }) as string;
+      }
+    }
+  }
+
+  const report = lintVideoComposition({
+    adf,
+    sceneHtml,
+    ...(params.tenant_slug ? { tenantSlug: params.tenant_slug } : {}),
+  });
+  const failOnError = params.fail_on_error !== false;
+
+  if (report.findings.length > 0) {
+    logger.warn(`[video-lint]\n${formatVideoLintReport(report)}`);
+  }
+  if (!report.ok && failOnError) {
+    throw new Error(
+      `video composition lint failed with ${report.error_count} error(s):\n${formatVideoLintReport(report)}`
+    );
+  }
+
+  return {
+    status: 'succeeded',
+    kind: 'video_composition_lint_report',
+    lint_report: report,
+    scenes_inspected: Object.keys(sceneHtml).length,
   };
 }
 
@@ -754,6 +877,16 @@ async function prepareVideoComposition(params: {
             backendOutputPath = backendResult.output_path;
             artifactRefs = [...artifactRefs, backendOutputPath];
           }
+          // MP-02: a fallback render still produces a file, so without
+          // recording the downgrade the job reads as a clean success and a
+          // still-image slideshow ships as if it were the requested render.
+          if (backendResult.degraded) {
+            upsertJobDiagnostics(jobId, {
+              render_degraded: true,
+              render_degraded_from: backendResult.degraded_from,
+              render_degradation_reason: backendResult.degradation_reason,
+            });
+          }
           writeVideoCompositionJobTicket(jobTicketPath, {
             job_id: jobId,
             status: 'completed',
@@ -774,9 +907,11 @@ async function prepareVideoComposition(params: {
           api.report({
             status: 'encoding',
             progress: { current: 5, total: totalSteps, percent: 100, unit: 'steps' },
-            message: backendResult.executed
-              ? 'backend render completed'
-              : backendResult.reason || 'backend skipped',
+            message: backendResult.degraded
+              ? `backend render DEGRADED: ${backendResult.degradation_reason}`
+              : backendResult.executed
+                ? 'backend render completed'
+                : backendResult.reason || 'backend skipped',
             artifact_refs: artifactRefs,
           });
         } else {
@@ -892,6 +1027,9 @@ export async function handleSingleAction(input: VideoCompositionAction) {
   }
   if (action === 'compile_video_content_brief') {
     return compileVideoContentBrief(params);
+  }
+  if (action === 'lint_video_composition') {
+    return lintVideoCompositionAction(params);
   }
   if (action === 'create_narrated_video_from_content_brief') {
     return createNarratedVideoFromContentBrief(params);

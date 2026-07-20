@@ -45,6 +45,14 @@ export interface VideoCompositionJobDiagnostics {
   backend_cancelled?: boolean;
   backend_timed_out?: boolean;
   last_error?: string;
+  /**
+   * MP-02: set when the artifact came from a lower-fidelity render path than
+   * the one requested. The fallback still produces a file, so without this the
+   * job reads as a clean success.
+   */
+  render_degraded?: boolean;
+  render_degraded_from?: string;
+  render_degradation_reason?: string;
 }
 
 export function isPlainObject(value: unknown): value is Record<string, any> {

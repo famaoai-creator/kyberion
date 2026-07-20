@@ -1,7 +1,6 @@
 {
   "version": "1.0.0",
   "_meta": "Geometry for buildPptxSlideFromPattern. All units in inches (10×5.625 slide canvas). Colors come from the theme; this file controls only position/size/typography constants.",
-
   "chrome": {
     "header_h": 0.72,
     "separator_h": 0.024,
@@ -16,24 +15,23 @@
     "title_font_size": 22,
     "title_w_logo": 7.35,
     "title_w_no_logo": 9.5,
-    "accent_strip_x": 0.30,
+    "accent_strip_x": 0.3,
     "accent_strip_w": 0.065,
     "logo_zone_x": 7.82,
     "logo_zone_y": 0.03,
-    "logo_zone_w": 2.10,
+    "logo_zone_w": 2.1,
     "logo_zone_h": 0.66,
     "logo_display_h": 0.33,
     "logo_display_max_w": 1.95
   },
-
   "hero": {
     "white_panel_y": 4.42,
     "white_panel_h": 1.205,
-    "separator_y": 4.40,
+    "separator_y": 4.4,
     "separator_h": 0.03,
     "logo_display_h": 0.48,
     "logo_display_max_w": 2.84,
-    "logo_right_margin": 0.20,
+    "logo_right_margin": 0.2,
     "logo_y": 4.76,
     "brand_name_x": 0.5,
     "brand_name_y": 4.55,
@@ -51,7 +49,6 @@
     "subtitle_h": 0.85,
     "subtitle_font_size": 16
   },
-
   "body_zones": {
     "single_column": {
       "font_size": 13,
@@ -80,7 +77,7 @@
         "h": 0.28,
         "y_from_bottom": 0.32,
         "font_size": 9,
-        "margin": [2, 4, 2, 4]
+        "margin": [0.02, 0.06, 0.02, 0.06]
       }
     },
     "two_column_risk": {
@@ -103,7 +100,7 @@
     },
     "timeline": {
       "left_w": 2.9,
-      "right_x": 3.50,
+      "right_x": 3.5,
       "right_w": 6.12,
       "panel_h": 0.44,
       "left_font_size": 12,
@@ -124,13 +121,13 @@
         "h": 0.28,
         "y_from_bottom": 0.32,
         "font_size": 9,
-        "margin": [2, 4, 2, 4]
+        "margin": [0.02, 0.06, 0.02, 0.06]
       }
     },
     "architecture_panel": {
       "desc_h": 1.7,
       "panel_header_y_offset": 1.75,
-      "panel_header_h": 0.40,
+      "panel_header_h": 0.4,
       "panel_body_y_offset": 2.15,
       "desc_font_size": 13,
       "desc_line_spacing_pct": 160,
@@ -153,6 +150,356 @@
       "msg_line_spacing_pct": 160,
       "msg_margin": [0.1, 0.1, 0.1, 0.1],
       "cta_font_size": 15
-    }
+    },
+    "_meta_regions": "Zones below are region-declarative: the renderer builds them from this JSON alone, so a new zone is a new entry here rather than a new branch in the actuator. pos fields take a number (inches) or an anchor name (body_x/body_y/body_w/body_h) with an optional *_offset. fill/color take a theme role (primary/accent/navy/surface/text_primary/text_secondary/white) or a raw hex. source selects the text: body_all, body_head:N, body_tail:N, body_balanced_left, body_balanced_right, body_last, objective, cta, title.",
+    "metrics_band": {
+      "_note": "Numbers-forward slides: a short lead line above a band of metric cards.",
+      "regions": [
+        {
+          "id": "lead",
+          "type": "text",
+          "source": "body_head:1",
+          "pos": {
+            "x": "body_x",
+            "y": "body_y",
+            "w": "body_w",
+            "h": 1.05
+          },
+          "font_size": 14,
+          "line_spacing_pct": 150,
+          "margin": [0.1, 0.06, 0.06, 0.08],
+          "color": "text_primary",
+          "align": "left",
+          "valign": "top"
+        },
+        {
+          "id": "band_header",
+          "type": "panel",
+          "source": "literal",
+          "text": "  主要指標",
+          "pos": {
+            "x": "body_x",
+            "y": "body_y",
+            "y_offset": 1.15,
+            "w": "body_w",
+            "h": 0.4
+          },
+          "font_size": 12,
+          "bold": true,
+          "fill": "primary",
+          "color": "white",
+          "margin": [0, 0, 0, 0.12],
+          "align": "left",
+          "valign": "middle"
+        },
+        {
+          "id": "band_body",
+          "type": "panel",
+          "source": "body_tail:-1",
+          "pos": {
+            "x": "body_x",
+            "y": "body_y",
+            "y_offset": 1.55,
+            "w": "body_w",
+            "h": "body_h",
+            "h_offset": -1.55
+          },
+          "font_size": 12,
+          "line_spacing_pct": 150,
+          "margin": [0.12, 0.12, 0.12, 0.15],
+          "fill": "surface",
+          "color": "navy",
+          "align": "left",
+          "valign": "top"
+        }
+      ]
+    },
+    "comparison_two_col": {
+      "_note": "Balanced side-by-side comparison with headed columns. For option/trade-off slides.",
+      "regions": [
+        {
+          "id": "left_header",
+          "type": "panel",
+          "source": "literal",
+          "text": "  現状",
+          "pos": {
+            "x": "body_x",
+            "y": "body_y",
+            "w": 4.45,
+            "h": 0.4
+          },
+          "font_size": 12,
+          "bold": true,
+          "fill": "navy",
+          "color": "white",
+          "margin": [0, 0, 0, 0.12],
+          "align": "left",
+          "valign": "middle"
+        },
+        {
+          "id": "left_body",
+          "type": "text",
+          "source": "body_balanced_left",
+          "pos": {
+            "x": "body_x",
+            "y": "body_y",
+            "y_offset": 0.5,
+            "w": 4.45,
+            "h": "body_h",
+            "h_offset": -0.5
+          },
+          "font_size": 13,
+          "line_spacing_pct": 155,
+          "margin": [0.1, 0.06, 0.06, 0.08],
+          "color": "text_primary",
+          "align": "left",
+          "valign": "top"
+        },
+        {
+          "id": "right_header",
+          "type": "panel",
+          "source": "literal",
+          "text": "  提案",
+          "pos": {
+            "x": 5.07,
+            "y": "body_y",
+            "w": 4.65,
+            "h": 0.4
+          },
+          "font_size": 12,
+          "bold": true,
+          "fill": "primary",
+          "color": "white",
+          "margin": [0, 0, 0, 0.12],
+          "align": "left",
+          "valign": "middle"
+        },
+        {
+          "id": "right_body",
+          "type": "panel",
+          "source": "body_balanced_right",
+          "pos": {
+            "x": 5.07,
+            "y": "body_y",
+            "y_offset": 0.5,
+            "w": 4.65,
+            "h": "body_h",
+            "h_offset": -0.5
+          },
+          "font_size": 12,
+          "line_spacing_pct": 150,
+          "margin": [0.12, 0.12, 0.12, 0.15],
+          "fill": "surface",
+          "color": "navy",
+          "align": "left",
+          "valign": "top"
+        }
+      ]
+    },
+    "contents_index": {
+      "_note": "Agenda/table-of-contents: a two-column index so long agendas stop running as one tall list.",
+      "regions": [
+        {
+          "id": "index_left",
+          "type": "text",
+          "source": "body_balanced_left",
+          "pos": {
+            "x": "body_x",
+            "y": "body_y",
+            "w": 4.45,
+            "h": "body_h"
+          },
+          "font_size": 13,
+          "line_spacing_pct": 170,
+          "margin": [0.1, 0.06, 0.06, 0.08],
+          "color": "text_primary",
+          "align": "left",
+          "valign": "top"
+        },
+        {
+          "id": "index_right",
+          "type": "text",
+          "source": "body_balanced_right",
+          "pos": {
+            "x": 5.07,
+            "y": "body_y",
+            "w": 4.65,
+            "h": "body_h"
+          },
+          "font_size": 13,
+          "line_spacing_pct": 170,
+          "margin": [0.1, 0.06, 0.06, 0.08],
+          "color": "text_primary",
+          "align": "left",
+          "valign": "top"
+        }
+      ]
+    },
+    "statement": {
+      "_note": "One message held large and centered. For key-message and section-break slides.",
+      "regions": [
+        {
+          "id": "statement",
+          "type": "text",
+          "source": "body_head:2",
+          "pos": {
+            "x": "body_x",
+            "y": "body_y",
+            "y_offset": 0.5,
+            "w": "body_w",
+            "h": 2.6
+          },
+          "font_size": 22,
+          "line_spacing_pct": 150,
+          "margin": [0.12, 0.12, 0.12, 0.12],
+          "color": "navy",
+          "align": "center",
+          "valign": "middle"
+        },
+        {
+          "id": "support",
+          "type": "text",
+          "source": "body_tail:-2",
+          "pos": {
+            "x": 1.5,
+            "y": "body_y",
+            "y_offset": 3.3,
+            "w": 7.0,
+            "h": 0.9
+          },
+          "font_size": 12,
+          "line_spacing_pct": 145,
+          "margin": [0.06, 0.1, 0.06, 0.1],
+          "color": "text_secondary",
+          "align": "center",
+          "valign": "top"
+        }
+      ]
+    },
+    "checklist_grid": {
+      "_note": "Many short items as two balanced checklist columns instead of one long run.",
+      "regions": [
+        {
+          "id": "lead",
+          "type": "text",
+          "source": "body_head:1",
+          "pos": {
+            "x": "body_x",
+            "y": "body_y",
+            "w": "body_w",
+            "h": 0.6
+          },
+          "font_size": 13,
+          "line_spacing_pct": 145,
+          "margin": [0.08, 0.06, 0.04, 0.08],
+          "color": "text_primary",
+          "align": "left",
+          "valign": "top"
+        },
+        {
+          "id": "col_left",
+          "type": "panel",
+          "source": "body_balanced_left",
+          "pos": {
+            "x": "body_x",
+            "y": "body_y",
+            "y_offset": 0.7,
+            "w": 4.45,
+            "h": "body_h",
+            "h_offset": -0.7
+          },
+          "font_size": 12,
+          "line_spacing_pct": 160,
+          "margin": [0.12, 0.12, 0.12, 0.15],
+          "fill": "surface",
+          "color": "navy",
+          "align": "left",
+          "valign": "top"
+        },
+        {
+          "id": "col_right",
+          "type": "panel",
+          "source": "body_balanced_right",
+          "pos": {
+            "x": 5.07,
+            "y": "body_y",
+            "y_offset": 0.7,
+            "w": 4.65,
+            "h": "body_h",
+            "h_offset": -0.7
+          },
+          "font_size": 12,
+          "line_spacing_pct": 160,
+          "margin": [0.12, 0.12, 0.12, 0.15],
+          "fill": "surface",
+          "color": "navy",
+          "align": "left",
+          "valign": "top"
+        }
+      ]
+    },
+    "table_feature": {
+      "_note": "Tabular rows given a headed panel, with any surrounding prose kept above it.",
+      "regions": [
+        {
+          "id": "intro",
+          "type": "text",
+          "source": "body_head:1",
+          "pos": {
+            "x": "body_x",
+            "y": "body_y",
+            "w": "body_w",
+            "h": 0.75
+          },
+          "font_size": 13,
+          "line_spacing_pct": 150,
+          "margin": [0.08, 0.06, 0.04, 0.08],
+          "color": "text_primary",
+          "align": "left",
+          "valign": "top"
+        },
+        {
+          "id": "table_header",
+          "type": "panel",
+          "source": "literal",
+          "text": "  データ",
+          "pos": {
+            "x": "body_x",
+            "y": "body_y",
+            "y_offset": 0.85,
+            "w": "body_w",
+            "h": 0.38
+          },
+          "font_size": 11,
+          "bold": true,
+          "fill": "navy",
+          "color": "white",
+          "margin": [0, 0, 0, 0.12],
+          "align": "left",
+          "valign": "middle"
+        },
+        {
+          "id": "table_body",
+          "type": "panel",
+          "source": "body_tail:-1",
+          "pos": {
+            "x": "body_x",
+            "y": "body_y",
+            "y_offset": 1.23,
+            "w": "body_w",
+            "h": "body_h",
+            "h_offset": -1.23
+          },
+          "font_size": 11,
+          "line_spacing_pct": 155,
+          "margin": [0.12, 0.12, 0.12, 0.15],
+          "fill": "surface",
+          "color": "navy",
+          "align": "left",
+          "valign": "top"
+        }
+      ]
+    },
+    "_meta_units": "All pos/size/margin values are INCHES on a 10x5.625in canvas. Margins are inset from the element box, so left+right must stay well under the element width."
   }
 }

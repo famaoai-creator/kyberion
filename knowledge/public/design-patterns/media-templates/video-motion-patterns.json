@@ -1,0 +1,172 @@
+{
+  "version": "1.0.0",
+  "_meta": "MP-02 motion vocabulary. The compiler emits animation from these entries instead of literal @keyframes, and the reasoning backend may only SELECT ids from this catalog — never invent timing or curves. Durations are seconds. All patterns are transform/opacity/clip-path only so a seeking renderer stays deterministic.",
+
+  "eases": {
+    "_meta": "Named curves. A scene must use at least 3 distinct eases so motion does not read as one mechanical sweep.",
+    "smooth-out": "cubic-bezier(0.16, 1, 0.3, 1)",
+    "overshoot": "cubic-bezier(0.175, 0.885, 0.32, 1.275)",
+    "gentle": "cubic-bezier(0.4, 0.0, 0.2, 1)",
+    "sine-io": "ease-in-out",
+    "decelerate": "cubic-bezier(0.0, 0.0, 0.2, 1)",
+    "accelerate": "cubic-bezier(0.4, 0.0, 1, 1)",
+    "snap": "cubic-bezier(0.22, 1, 0.36, 1)",
+    "linear": "linear"
+  },
+
+  "entrance": {
+    "_meta": "One per scene. Offset delays the entrance slightly — a zero-delay entrance reads as a jump cut.",
+    "fade-rise": {
+      "name": "Fade rise",
+      "description": "Opacity in with a short upward travel. The neutral default.",
+      "keyframes": "from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); }",
+      "duration_sec": 0.8,
+      "offset_sec": 0.15,
+      "default_ease": "smooth-out"
+    },
+    "slide-in-left": {
+      "name": "Slide in from left",
+      "description": "Enters from the left edge. Suits stage and split layouts.",
+      "keyframes": "from { opacity: 0; transform: translateX(-48px); } to { opacity: 1; transform: translateX(0); }",
+      "duration_sec": 1.0,
+      "offset_sec": 0.15,
+      "default_ease": "smooth-out"
+    },
+    "slide-in-right": {
+      "name": "Slide in from right",
+      "description": "Mirror of slide-in-left for the opposing panel.",
+      "keyframes": "from { opacity: 0; transform: translateX(48px); } to { opacity: 1; transform: translateX(0); }",
+      "duration_sec": 1.0,
+      "offset_sec": 0.2,
+      "default_ease": "smooth-out"
+    },
+    "pop-in": {
+      "name": "Pop in",
+      "description": "Scales up past its resting size. High energy; use for hooks and CTAs.",
+      "keyframes": "from { opacity: 0; transform: scale(0.82); } to { opacity: 1; transform: scale(1); }",
+      "duration_sec": 0.6,
+      "offset_sec": 0.1,
+      "default_ease": "overshoot"
+    },
+    "scale-settle": {
+      "name": "Scale settle",
+      "description": "Subtle scale down into place. Calmer than pop-in.",
+      "keyframes": "from { opacity: 0; transform: scale(1.06); } to { opacity: 1; transform: scale(1); }",
+      "duration_sec": 0.7,
+      "offset_sec": 0.15,
+      "default_ease": "gentle"
+    },
+    "wipe-reveal": {
+      "name": "Wipe reveal",
+      "description": "Clip-path wipe from the leading edge. Editorial feel.",
+      "keyframes": "from { opacity: 0; clip-path: inset(0 100% 0 0); } to { opacity: 1; clip-path: inset(0 0 0 0); }",
+      "duration_sec": 0.9,
+      "offset_sec": 0.2,
+      "default_ease": "snap"
+    },
+    "bubble-appear": {
+      "name": "Bubble appear",
+      "description": "Chat-bubble entrance with a slight rise. Suits vtuber and dialogue scenes.",
+      "keyframes": "from { opacity: 0; transform: translateY(12px) scale(0.94); } to { opacity: 1; transform: translateY(0) scale(1); }",
+      "duration_sec": 0.8,
+      "offset_sec": 0.25,
+      "default_ease": "overshoot"
+    },
+    "blur-focus": {
+      "name": "Blur focus",
+      "description": "Resolves from soft to sharp. Reserve for openings.",
+      "keyframes": "from { opacity: 0; filter: blur(12px); transform: scale(1.03); } to { opacity: 1; filter: blur(0); transform: scale(1); }",
+      "duration_sec": 1.1,
+      "offset_sec": 0.1,
+      "default_ease": "decelerate"
+    }
+  },
+
+  "midscene": {
+    "_meta": "At least two per scene. Without these a scene is a static slide with an entrance — the single most common reason generated video looks like a slide deck.",
+    "breathe": {
+      "name": "Breathe",
+      "description": "Slow vertical float that keeps a held frame alive.",
+      "keyframes": "from { transform: translateY(0); } to { transform: translateY(-8px); }",
+      "duration_sec": 4.0,
+      "default_ease": "sine-io",
+      "alternate": true
+    },
+    "ken-burns": {
+      "name": "Ken Burns",
+      "description": "Slow push on imagery. 1 → 1.04, never more.",
+      "keyframes": "from { transform: scale(1); } to { transform: scale(1.04); }",
+      "duration_sec": 6.0,
+      "default_ease": "linear",
+      "alternate": false
+    },
+    "drift": {
+      "name": "Horizontal drift",
+      "description": "Lateral parallax for background layers.",
+      "keyframes": "from { transform: translateX(0); } to { transform: translateX(-14px); }",
+      "duration_sec": 5.0,
+      "default_ease": "sine-io",
+      "alternate": true
+    },
+    "pulse-accent": {
+      "name": "Accent pulse",
+      "description": "Opacity pulse on accent marks. Draws the eye without moving layout.",
+      "keyframes": "from { opacity: 0.55; } to { opacity: 1; }",
+      "duration_sec": 2.4,
+      "default_ease": "sine-io",
+      "alternate": true
+    },
+    "stagger-lines": {
+      "name": "Line stagger",
+      "description": "Sequential reveal of list items. Per-item delay is applied by the compiler.",
+      "keyframes": "from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); }",
+      "duration_sec": 0.5,
+      "stagger_sec": 0.12,
+      "default_ease": "smooth-out",
+      "alternate": false
+    },
+    "underline-sweep": {
+      "name": "Underline sweep",
+      "description": "Rule that draws itself under a headline.",
+      "keyframes": "from { transform: scaleX(0); transform-origin: left; } to { transform: scaleX(1); transform-origin: left; }",
+      "duration_sec": 0.8,
+      "default_ease": "snap",
+      "alternate": false
+    },
+    "bar-fill": {
+      "name": "Bar fill",
+      "description": "Progress/metric bars filling from zero.",
+      "keyframes": "from { transform: scaleX(0); transform-origin: left; } to { transform: scaleX(1); transform-origin: left; }",
+      "duration_sec": 1.2,
+      "stagger_sec": 0.15,
+      "default_ease": "decelerate",
+      "alternate": false
+    },
+    "glow-cycle": {
+      "name": "Glow cycle",
+      "description": "Soft shadow breathing on panels. Subtle depth cue.",
+      "keyframes": "from { box-shadow: 0 0 0 rgba(0,0,0,0); } to { box-shadow: 0 12px 48px rgba(0,0,0,0.28); }",
+      "duration_sec": 5.0,
+      "default_ease": "sine-io",
+      "alternate": true
+    }
+  },
+
+  "role_defaults": {
+    "_meta": "Deterministic assignment when no direction is drafted. Every role gets an entrance plus two mid-scene layers so the default output is never a static slide.",
+    "hook": { "entrance": "pop-in", "midscene": ["breathe", "pulse-accent"] },
+    "feature": { "entrance": "slide-in-left", "midscene": ["stagger-lines", "drift"] },
+    "proof": { "entrance": "wipe-reveal", "midscene": ["bar-fill", "glow-cycle"] },
+    "cta": { "entrance": "scale-settle", "midscene": ["pulse-accent", "breathe"] },
+    "outro": { "entrance": "fade-rise", "midscene": ["breathe", "glow-cycle"] },
+    "generic": { "entrance": "fade-rise", "midscene": ["breathe", "pulse-accent"] }
+  },
+
+  "transitions": {
+    "_meta": "Hard cuts are the default. A shader on every cut is the video equivalent of bolding every word.",
+    "default": "cut",
+    "max_non_cut_per_video": 3,
+    "min_duration_sec": 0.3,
+    "preferred_duration_sec": 0.5
+  }
+}

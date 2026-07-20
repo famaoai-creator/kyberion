@@ -6,6 +6,7 @@ import {
   STRUCTURED_REASONING_SYSTEM_PROMPT,
   type StructuredOpSpec,
 } from './structured-reasoning.js';
+import { assertReasoningEgressAllowed } from './reasoning-egress-scope.js';
 import type {
   BranchForkInput,
   CritiqueInput,
@@ -83,6 +84,7 @@ export class CopilotAcpReasoningBackend implements ReasoningBackend {
   }
 
   private async complete(systemPrompt: string, userPrompt: string): Promise<string> {
+    assertReasoningEgressAllowed(this.name);
     await this.ensureBooted();
     try {
       return await this.mediator.ask(`${systemPrompt}\n\n${userPrompt}`);

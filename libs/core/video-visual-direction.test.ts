@@ -98,5 +98,6 @@ describe('video visual direction (agy short-video quality)', () => {
     });
     expect(thrown.palette).toEqual(DEFAULT_VISUAL_DIRECTION.palette);
     expect(thrown.typography.headline_px).toBe(68);
+    expect(thrown.resolution?.degraded).toBe(true);
   });
 });

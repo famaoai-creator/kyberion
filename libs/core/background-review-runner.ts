@@ -48,6 +48,7 @@ import {
   enqueueSurfaceOutboxMessage,
 } from './surface-coordination-store.js';
 import type { SurfaceAsyncChannel } from './channel-surface-types.js';
+import { withReasoningPayloadScope } from './reasoning-egress-scope.js';
 
 const ProposalActionSchema = z.preprocess(
   (value) =>
@@ -299,14 +300,22 @@ export async function runBackgroundReviewFork(
   const sourceRef = canonicalSourceRef(input);
   const backend = input.backend || getReasoningBackend();
   try {
-    const raw = await backend.delegateTask(
-      buildForkPrompt(input),
-      `background-review:${input.sessionId}`,
-      input.callOptions || {
-        effort: 'low',
-        model_tier: 'fast',
-        budget: { max_prompt_chars: 16_000, max_response_chars: 4_000 },
-      }
+    const raw = await withReasoningPayloadScope(
+      {
+        tier: input.missionId ? 'confidential' : 'personal',
+        tenant_slug: process.env.KYBERION_CUSTOMER?.trim() || undefined,
+        purpose: 'background review snapshot',
+      },
+      () =>
+        backend.delegateTask(
+          buildForkPrompt(input),
+          'background-review:' + input.sessionId,
+          input.callOptions || {
+            effort: 'low',
+            model_tier: 'fast',
+            budget: { max_prompt_chars: 16_000, max_response_chars: 4_000 },
+          }
+        )
     );
     const proposal = parseProposal(raw);
     assertProposalPolicy(proposal);

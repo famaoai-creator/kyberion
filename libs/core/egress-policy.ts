@@ -9,6 +9,12 @@ export interface EgressPolicyFile {
   mode?: EgressPolicyMode;
   manual_allowed_domains?: string[];
   blocked_domains?: string[];
+  /**
+   * SA-04 Task 2: per-tenant destinations approved for confidential/personal
+   * material. Keyed by tenant slug; `*` applies to every tenant. Empty by
+   * default — tenant data has nowhere approved to go until someone says so.
+   */
+  tenant_allowed_domains?: Record<string, string[]>;
 }
 
 export interface EgressPolicyDecision {
@@ -17,6 +23,8 @@ export interface EgressPolicyDecision {
   reason: string;
   matchedDomain?: string;
   mode: EgressPolicyMode;
+  /** Tier the decision was made for, when the caller declared one. */
+  tier?: 'public' | 'confidential' | 'personal';
 }
 
 const DEFAULT_POLICY_PATH = pathResolver.knowledge('product/governance/egress-policy.json');
@@ -42,6 +50,7 @@ export function loadEgressPolicy(): EgressPolicyFile {
       mode: 'warn',
       manual_allowed_domains: [],
       blocked_domains: [],
+      tenant_allowed_domains: {},
     };
     return cachedPolicy;
   }
@@ -63,6 +72,10 @@ export function loadEgressPolicy(): EgressPolicyFile {
       ? parsed.manual_allowed_domains
       : [],
     blocked_domains: Array.isArray(parsed.blocked_domains) ? parsed.blocked_domains : [],
+    tenant_allowed_domains:
+      parsed.tenant_allowed_domains && typeof parsed.tenant_allowed_domains === 'object'
+        ? parsed.tenant_allowed_domains
+        : {},
   };
   return cachedPolicy;
 }
@@ -109,7 +122,25 @@ export function loadAllowedEgressDomains(): string[] {
   return cachedAllowedDomains;
 }
 
-export function evaluateEgressPolicy(url: string): EgressPolicyDecision {
+/**
+ * SA-04 Task 2: what tier of material this request carries, and for whom.
+ *
+ * Supplied by callers that knowingly move tenant data outward. Absent it the
+ * evaluation behaves exactly as before, so existing callers are unaffected.
+ */
+export interface EgressPayloadContext {
+  /** Most sensitive tier represented in the payload. */
+  tier?: 'public' | 'confidential' | 'personal';
+  /** Tenant the material belongs to, when tier is above public. */
+  tenant_slug?: string;
+  /** Short description of what is being sent, for the audit trail. */
+  purpose?: string;
+}
+
+export function evaluateEgressPolicy(
+  url: string,
+  context?: EgressPayloadContext
+): EgressPolicyDecision {
   const policy = loadEgressPolicy();
   const hostname = safeHostname(url);
   if (!hostname) {
@@ -137,6 +168,36 @@ export function evaluateEgressPolicy(url: string): EgressPolicyDecision {
     };
   }
 
+  // Confidential and personal material is denied unless the destination is
+  // explicitly allowed for that tenant. This gate is intentionally independent
+  // of `policy.mode`: the warn mode exists so an unlisted *public* host does
+  // not break a workflow, and letting it also soften tenant data leaving the
+  // box would defeat the point of having tiers at all.
+  const tier = context?.tier;
+  if (tier === 'confidential' || tier === 'personal') {
+    const tenantDomains = loadTenantEgressDomains(policy, context?.tenant_slug);
+    const matched = tenantDomains.find((domain) => matchesDomain(hostname, domain));
+    if (!matched) {
+      return {
+        verdict: 'deny',
+        hostname,
+        reason: `[TIER_EGRESS_DENIED] ${tier} material${
+          context?.tenant_slug ? ` for tenant ${context.tenant_slug}` : ''
+        } may not be sent to ${hostname}. Add the host to that tenant's allowed egress domains if this is intended.`,
+        mode: policy.mode || 'warn',
+        tier,
+      };
+    }
+    return {
+      verdict: 'allow',
+      hostname,
+      matchedDomain: matched,
+      reason: `Egress of ${tier} material allowed to tenant-approved host ${matched}`,
+      mode: policy.mode || 'warn',
+      tier,
+    };
+  }
+
   const allowedDomains = loadAllowedEgressDomains();
   const matchedDomain = allowedDomains.find((domain) => matchesDomain(hostname, domain));
   if (matchedDomain) {
@@ -155,6 +216,32 @@ export function evaluateEgressPolicy(url: string): EgressPolicyDecision {
     reason: `Egress host is not allowlisted: ${hostname}. Add it to egress-policy.json or security-policy.json.`,
     mode: policy.mode || 'warn',
   };
+}
+
+/**
+ * Destinations approved for a tenant's confidential material.
+ *
+ * Deliberately does NOT fall back to the general allowlist: a host being fine
+ * for public traffic says nothing about whether a tenant's confidential deck
+ * may be sent there.
+ */
+function loadTenantEgressDomains(policy: EgressPolicyFile, tenantSlug?: string): string[] {
+  const table = policy.tenant_allowed_domains ?? {};
+  const domains = new Set<string>();
+  for (const domain of table['*'] ?? []) {
+    const normalized = normalizeDomain(domain);
+    if (normalized) domains.add(normalized);
+  }
+  if (tenantSlug && /^[a-z][a-z0-9-]{1,30}$/u.test(tenantSlug)) {
+    const tenantDomains = Object.prototype.hasOwnProperty.call(table, tenantSlug)
+      ? table[tenantSlug]
+      : [];
+    for (const domain of tenantDomains ?? []) {
+      const normalized = normalizeDomain(domain);
+      if (normalized) domains.add(normalized);
+    }
+  }
+  return Array.from(domains);
 }
 
 function safeHostname(url: string): string {
