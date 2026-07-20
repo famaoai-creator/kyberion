@@ -426,6 +426,34 @@ describe('wisdom public contract boundaries', () => {
     }
   });
 
+  it('records compatibility alias metadata when a legacy Wisdom op is forwarded', async () => {
+    const forward = vi.fn().mockResolvedValue({
+      forwarded_to: 'terminal:shell_command',
+      status: 'succeeded',
+      result: { stdout: 'forwarded' },
+    });
+    registerActuatorForwardingPort({ forward });
+    try {
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [{ type: 'capture', op: 'shell', params: { cmd: 'printf forwarded' } }],
+        context: {},
+      });
+
+      expect(result.receipts[0]).toMatchObject({
+        requested_op: 'shell',
+        canonical_op: 'shell',
+        compatibility: {
+          compatibility_alias: 'wisdom:shell',
+          forwarded_to: 'terminal:shell_command',
+          deprecated: true,
+        },
+      });
+    } finally {
+      resetActuatorForwardingPort();
+    }
+  });
+
   it('derives a stable idempotency key for compatibility retries', async () => {
     const forward = vi.fn().mockResolvedValue({
       forwarded_to: 'terminal:shell_command',

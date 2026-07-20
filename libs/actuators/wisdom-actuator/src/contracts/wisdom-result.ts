@@ -24,8 +24,11 @@ export interface WisdomReceipt<T = unknown> {
     route_id?: string;
   };
   compatibility?: {
+    /** Fully-qualified legacy surface that was used by the caller. */
+    compatibility_alias?: string;
     deprecated_alias?: string;
     forwarded_to?: string;
+    deprecated?: boolean;
   };
   retry?: {
     attempts: number;
