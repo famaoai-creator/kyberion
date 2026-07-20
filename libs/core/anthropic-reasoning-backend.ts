@@ -42,7 +42,16 @@ import type {
   SynthesizedPersona,
   GenerateWithToolsResult,
   ToolDefinition,
+  ReasoningImageAttachment,
 } from './reasoning-backend.js';
+import {
+  MAX_REASONING_IMAGES,
+  MAX_REASONING_IMAGE_BYTES,
+  MAX_REASONING_IMAGE_BYTES_TOTAL,
+  validateReasoningImageAttachmentPaths,
+} from './reasoning-backend.js';
+import { safeReadFile, safeStat } from './secure-io.js';
+import { assertReasoningEgressAllowed } from './reasoning-egress-scope.js';
 
 const DEFAULT_MODEL = resolveRuntimeModelId('anthropic-default');
 const DEFAULT_MAX_TOKENS = 16000;
@@ -411,6 +420,7 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
   private async callParse(
     params: Parameters<typeof this.client.messages.parse>[0]
   ): Promise<Awaited<ReturnType<typeof this.client.messages.parse>>> {
+    assertReasoningEgressAllowed(this.name);
     const budgeted = this.applyCompletionBudget(params);
     const started = Date.now();
     try {
@@ -427,6 +437,10 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
   private async callCreate(
     params: Parameters<typeof this.client.messages.create>[0] & { stream?: false }
   ): Promise<Anthropic.Message> {
+    // The single outbound choke point for this backend. The SDK issues its own
+    // HTTP, so `secureFetch`'s tier gate never sees these sends; checking here
+    // is what keeps tenant material from reaching an unapproved provider.
+    assertReasoningEgressAllowed(this.name);
     const budgeted = this.applyCompletionBudget(params);
     const started = Date.now();
     try {
@@ -790,6 +804,85 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
     options?: { effort?: AnthropicReasoningBackendOptions['effort'] }
   ): Promise<string> {
     return this.delegateTask(prompt, undefined, options);
+  }
+
+  /**
+   * Run a prompt with images attached.
+   *
+   * Images are read from disk and inlined as base64 — the SDK's `source.data`
+   * form — so nothing depends on the files still existing, or on the model
+   * being able to reach a URL. Size and count are bounded before the call
+   * because an oversized attachment fails deep inside the API with an error
+   * that says nothing useful about which file caused it.
+   */
+  async promptWithImages(
+    prompt: string,
+    images: ReasoningImageAttachment[],
+    options?: { effort?: AnthropicReasoningBackendOptions['effort'] }
+  ): Promise<string> {
+    if (images.length === 0) {
+      return this.delegateTask(prompt, undefined, options);
+    }
+    if (images.length > MAX_REASONING_IMAGES) {
+      throw new Error(
+        `[VISION_TOO_MANY_IMAGES] ${images.length} images exceeds the ${MAX_REASONING_IMAGES} per-call limit`
+      );
+    }
+    validateReasoningImageAttachmentPaths(images);
+
+    let totalBytes = 0;
+    const blocks: Anthropic.ImageBlockParam[] = images.map((image) => {
+      const size = safeStat(image.path).size;
+      if (size > MAX_REASONING_IMAGE_BYTES) {
+        throw new Error(
+          `[VISION_IMAGE_TOO_LARGE] ${image.path} is ${Math.round(size / 1024)}KB, over the ${Math.round(MAX_REASONING_IMAGE_BYTES / 1024)}KB limit`
+        );
+      }
+      totalBytes += size;
+      if (totalBytes > MAX_REASONING_IMAGE_BYTES_TOTAL) {
+        throw new Error(
+          `[VISION_PAYLOAD_TOO_LARGE] image payload exceeds the ${Math.round(MAX_REASONING_IMAGE_BYTES_TOTAL / 1024 / 1024)}MB aggregate limit`
+        );
+      }
+      const raw = safeReadFile(image.path, { encoding: null }) as Buffer;
+      const signature = raw.subarray(0, 12);
+      const validSignature =
+        (image.media_type === 'image/png' &&
+          signature.length >= 8 &&
+          signature.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) ||
+        (image.media_type === 'image/jpeg' && signature[0] === 0xff && signature[1] === 0xd8) ||
+        (image.media_type === 'image/gif' &&
+          signature
+            .subarray(0, 6)
+            .toString('ascii')
+            .match(/^GIF8[79]a$/u)) ||
+        (image.media_type === 'image/webp' &&
+          signature.subarray(0, 4).toString('ascii') === 'RIFF' &&
+          signature.subarray(8, 12).toString('ascii') === 'WEBP');
+      if (!validSignature) {
+        throw new Error(
+          `[VISION_MEDIA_TYPE_MISMATCH] image bytes do not match ${image.media_type}`
+        );
+      }
+      const data = raw.toString('base64');
+      return {
+        type: 'image',
+        source: { type: 'base64', media_type: image.media_type, data },
+      };
+    });
+
+    const response = await this.callCreate({
+      model: this.model,
+      max_tokens: this.maxTokens,
+      system: SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: [...blocks, { type: 'text', text: prompt }] }],
+      ...this.thinkingConfig(options?.effort),
+    });
+
+    return response.content
+      .filter((block): block is Anthropic.TextBlock => block.type === 'text')
+      .map((block) => block.text)
+      .join('\n');
   }
 
   async generateWithTools(

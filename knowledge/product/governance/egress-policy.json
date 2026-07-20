@@ -2,5 +2,7 @@
   "version": "1",
   "mode": "warn",
   "manual_allowed_domains": [],
-  "blocked_domains": []
+  "blocked_domains": [],
+  "tenant_allowed_domains": {},
+  "_meta_tenant": "SA-04 Task 2: destinations approved for confidential/personal material, keyed by tenant slug ('*' applies to all). Empty means tenant data has no approved outbound destination — the general allowlist does NOT grant it, because a host being generally reachable says nothing about whether a tenant's confidential material may be sent there."
 }

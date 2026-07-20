@@ -1,0 +1,128 @@
+{
+  "action": "pipeline",
+  "name": "media-produce-and-review",
+  "version": "1.0.0",
+  "description": "MP-01〜07 の作成プロセスを一本に通すパイプライン。ブリーフのロック（明示/推定の区別と run-shape 確定）→ デザインプロトコル生成（トークン駆動・テキスト計測レイアウトフィット）→ レイアウト preflight（オーバーフローは明示 opt-in が無い限り失敗）→ PPTX レンダリング → 視覚レビュー（ラスタライズして批評。実施不能なら理由付きで skipped を返し、pass とは区別する）。視覚レビューは run_shape が支配する。",
+  "context": {
+    "mission_id": "MSN-AUTO-GENERATED",
+    "mission_evidence_dir": "active/shared/tmp/media-produce-and-review",
+    "brief_path": "knowledge/public/design-patterns/media-templates/examples/sample-deck-brief.json",
+    "output_filename": "deck.pptx",
+    "tenant_slug": "kyberion",
+    "tier": "public",
+    "visual_review_rounds": 1,
+    "allow_layout_overflow": false
+  },
+  "steps": [
+    {
+      "id": "read_brief",
+      "role": "source",
+      "op": "system:read_json",
+      "produces": {
+        "channel": "brief_raw",
+        "type": "MediaBriefRaw"
+      },
+      "params": {
+        "path": "{{brief_path}}",
+        "export_as": "brief_raw"
+      }
+    },
+    {
+      "id": "lock_brief",
+      "role": "transform",
+      "op": "media:lock_media_brief",
+      "consumes": "brief_raw",
+      "produces": {
+        "channel": "locked_media_brief",
+        "type": "LockedMediaBrief"
+      },
+      "params": {
+        "from": "brief_raw",
+        "export_as": "locked_media_brief",
+        "run_shape": {
+          "visual_review_rounds": "{{visual_review_rounds}}",
+          "allow_degraded_fallback": false,
+          "allow_external_visual_review": false
+        }
+      }
+    },
+    {
+      "id": "compile_design",
+      "role": "transform",
+      "op": "media:brief_to_design_protocol",
+      "consumes": "locked_media_brief",
+      "produces": {
+        "channel": "last_pptx_design",
+        "type": "PptxDesignProtocol"
+      },
+      "params": {
+        "from": "locked_media_brief"
+      }
+    },
+    {
+      "id": "layout_preflight",
+      "role": "transform",
+      "op": "media:pptx_layout_preflight",
+      "consumes": "last_pptx_design",
+      "produces": {
+        "channel": "media_layout_diagnostics",
+        "type": "MediaLayoutDiagnostics"
+      },
+      "params": {
+        "from": "last_pptx_design",
+        "export_as": "media_layout_diagnostics",
+        "allow_layout_overflow": "{{allow_layout_overflow}}"
+      }
+    },
+    {
+      "id": "render_pptx",
+      "role": "sink",
+      "op": "media:pptx_render",
+      "consumes": "last_pptx_design",
+      "params": {
+        "path": "{{mission_evidence_dir}}/{{output_filename}}"
+      }
+    },
+    {
+      "id": "visual_review",
+      "role": "transform",
+      "op": "media:visual_review",
+      "produces": {
+        "channel": "media_visual_review",
+        "type": "MediaVisualReview"
+      },
+      "params": {
+        "path": "{{mission_evidence_dir}}/{{output_filename}}",
+        "brief_from": "locked_media_brief",
+        "export_as": "media_visual_review",
+        "tenant_slug": "{{tenant_slug}}",
+        "tier": "{{tier}}",
+        "mission_id": "{{mission_id}}",
+        "label": "media-produce-and-review",
+        "max_pages": 12
+      }
+    },
+    {
+      "id": "visual_review_delivery_gate",
+      "role": "transform",
+      "op": "media:visual_review_delivery_gate",
+      "consumes": "media_visual_review",
+      "produces": {
+        "channel": "media_visual_review_gate",
+        "type": "MediaVisualReviewDeliveryGate"
+      },
+      "params": {
+        "from": "media_visual_review",
+        "export_as": "media_visual_review_gate"
+      }
+    },
+    {
+      "id": "log_done",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "🏁 [MEDIA] PPTX: {{mission_evidence_dir}}/{{output_filename}} | layout={{media_layout_diagnostics.status}} overflow={{media_layout_diagnostics.overflowCount}} | visual_review={{media_visual_review.status}}"
+      }
+    }
+  ]
+}

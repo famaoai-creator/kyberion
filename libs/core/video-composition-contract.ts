@@ -28,6 +28,19 @@ export interface VideoCompositionADF {
     aspect_ratio?: string;
     /** Story-matched art direction (LLM-drafted, schema-clamped). */
     visual_direction?: import('./video-visual-direction.js').VideoVisualDirection;
+    /** MP-02: story-matched motion (catalog ids only, clamped at compile). */
+    motion_direction?: import('./video-motion-direction.js').VideoMotionDirection;
+    /**
+     * MP-02: model-composed scene arrangements, from the governed block
+     * vocabulary. Absent means the built-in templates render as before.
+     */
+    scene_compositions?: import('./video-scene-composition.js').SceneComposition[];
+    /** Provenance for model-driven direction and deterministic fallbacks. */
+    art_direction_resolution?: {
+      degraded: boolean;
+      sources: Array<'model' | 'catalog-default'>;
+      reasons?: string[];
+    };
   };
   audio?: {
     narration_ref?: string;

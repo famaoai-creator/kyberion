@@ -13,7 +13,10 @@ import {
   platform,
   pathResolver,
 } from './index.js';
+import { createLogger } from './logger.js';
 import { resolveVideoBackend, type MediaBackendRecord } from './media-backend-registry.js';
+
+const logger = createLogger('video-render-backend');
 import type {
   VideoCompositionRenderPlan,
   VideoRenderRuntimePolicy,
@@ -28,6 +31,17 @@ export interface VideoRenderBackendResult {
   backend_id?: string;
   backend_kind?: MediaBackendRecord['kind'];
   backend_provider?: string;
+  /**
+   * MP-02: true when the artifact was produced by a lower-fidelity path than
+   * the one requested. The fallback still returns `executed: true` because a
+   * file was produced, so without this flag a still-image slideshow is
+   * indistinguishable from a real render and ships silently.
+   */
+  degraded?: boolean;
+  /** Backend that was asked for but could not run. */
+  degraded_from?: string;
+  /** Operator-facing explanation of what was lost. */
+  degradation_reason?: string;
 }
 
 export interface VideoRenderBackendExecutionOptions {
@@ -197,6 +211,13 @@ async function renderVideoCompositionBundleImpl(
       };
     } catch (error: any) {
       const fallbackResult = await renderVideoCompositionFallback(plan, outputPath, error);
+      if (fallbackResult.degraded) {
+        // Loud on purpose: a silent downgrade means a slideshow gets delivered
+        // as if it were the requested render.
+        logger.warn(
+          `[video-render] degraded to ${fallbackResult.backend}: ${fallbackResult.degradation_reason}`
+        );
+      }
       return fallbackResult;
     }
   }
@@ -366,6 +387,11 @@ export async function renderNarratedFallbackVideo(
     backend_id: `${backend.backend_id}.fallback`,
     backend_kind: backend.kind,
     backend_provider: 'ffmpeg',
+    degraded: true,
+    degraded_from: 'hyperframes_cli',
+    degradation_reason: cause
+      ? `hyperframes rendering failed (${cause.message}); the artifact is a still-image slideshow without scene motion`
+      : 'the artifact is a still-image slideshow without scene motion',
   };
 }
 
