@@ -2,21 +2,14 @@ import path from 'node:path';
 import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import {
-  compileSchemaFromPath,
-  pathResolver,
-  safeReadFile,
-  safeReaddir,
-} from '@agent/core';
+import { compileSchemaFromPath, pathResolver, safeReadFile, safeReaddir } from '@agent/core';
+import { handleAction } from './index.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 
 describe('meeting-actuator', () => {
-  const SCHEMA_PATH = path.join(
-    pathResolver.rootDir(),
-    'schemas/meeting-action.schema.json',
-  );
+  const SCHEMA_PATH = path.join(pathResolver.rootDir(), 'schemas/meeting-action.schema.json');
 
   it('emits a join action that satisfies the schema', () => {
     const ajv = new Ajv({ allErrors: true });
@@ -62,7 +55,7 @@ describe('meeting-actuator', () => {
     const validate = compileSchemaFromPath(ajv, SCHEMA_PATH);
     const examplesDir = path.join(
       pathResolver.rootDir(),
-      'libs/actuators/meeting-actuator/examples',
+      'libs/actuators/meeting-actuator/examples'
     );
     const failures: string[] = [];
     for (const entry of safeReaddir(examplesDir)) {
@@ -90,6 +83,24 @@ describe('meeting-actuator', () => {
     const validate = compileSchemaFromPath(ajv, SCHEMA_PATH);
     const bad = { action: 'join', params: { platform: 'discord', url: 'https://x' } };
     expect(validate(bad)).toBe(false);
+  });
+
+  it('dispatches meeting-derived records through the meeting pipeline owner', async () => {
+    const result = await handleAction({
+      action: 'pipeline',
+      steps: [
+        {
+          type: 'apply',
+          op: 'audit_speaker_fairness',
+          params: { mission_id: 'MSN-MTG-PIPELINE-OWNER-001', export_as: 'fairness' },
+        },
+      ],
+      context: {},
+    });
+
+    expect((result as any).status).toBe('succeeded');
+    expect((result as any).context.fairness.total_items).toBe(0);
+    expect((result as any).context.fairness.dominant_speaker).toBeNull();
   });
 });
 
@@ -120,7 +131,7 @@ describe('meeting-actuator voice-consent gate', () => {
         mission_id: FIX_MISSION,
         tier: 'confidential',
         assigned_persona: 'ecosystem_architect',
-      }),
+      })
     );
   });
 
@@ -156,7 +167,7 @@ describe('meeting-actuator voice-consent gate', () => {
   it('denies speak() when consent != "granted"', async () => {
     fs.writeFileSync(
       path2.join(MISSION_DIR, 'evidence/voice-consent.json'),
-      JSON.stringify({ consent: 'pending' }),
+      JSON.stringify({ consent: 'pending' })
     );
     const { handleAction } = await import('./index.js');
     const result = await handleAction({
@@ -170,7 +181,7 @@ describe('meeting-actuator voice-consent gate', () => {
   it('denies speak() when consent is malformed', async () => {
     fs.writeFileSync(
       path2.join(MISSION_DIR, 'evidence/voice-consent.json'),
-      JSON.stringify({ consent: 'granted' }),
+      JSON.stringify({ consent: 'granted' })
     );
     const { handleAction } = await import('./index.js');
     const result = await handleAction({
@@ -189,7 +200,7 @@ describe('meeting-actuator voice-consent gate', () => {
         mission_id: FIX_MISSION,
         operator_handle: 'operator',
         expires_at: '2026-01-01T00:00:00.000Z',
-      }),
+      })
     );
     const { handleAction } = await import('./index.js');
     const result = await handleAction({
@@ -208,7 +219,7 @@ describe('meeting-actuator voice-consent gate', () => {
         tier: 'confidential',
         assigned_persona: 'ecosystem_architect',
         tenant_slug: 'alpha-team',
-      }),
+      })
     );
     fs.writeFileSync(
       path2.join(MISSION_DIR, 'evidence/voice-consent.json'),
@@ -217,7 +228,7 @@ describe('meeting-actuator voice-consent gate', () => {
         mission_id: FIX_MISSION,
         operator_handle: 'operator',
         tenant_slug: 'beta-team',
-      }),
+      })
     );
     const { handleAction } = await import('./index.js');
     const result = await handleAction({
@@ -251,13 +262,13 @@ describe('meeting-actuator voice-consent gate', () => {
         mission_id: FIX_MISSION,
         operator_handle: 'operator',
         granted_at: '2026-05-07T00:00:00.000Z',
-      }),
+      })
     );
 
     const auditPath = path2.join(
       ROOT,
       'active/shared/logs/audit',
-      `audit-${new Date().toISOString().slice(0, 10)}.jsonl`,
+      `audit-${new Date().toISOString().slice(0, 10)}.jsonl`
     );
     const before = fs.existsSync(auditPath) ? fs.readFileSync(auditPath, 'utf8') : '';
     const { handleAction } = await import('./index.js');

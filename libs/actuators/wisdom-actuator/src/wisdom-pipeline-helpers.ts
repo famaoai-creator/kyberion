@@ -13,48 +13,11 @@ import {
   classifyError,
   derivePipelineStatus,
   executeAdfSteps,
-  getReasoningBackend,
-  getVoiceBridge,
-  getSpeechToTextBridge,
-  saveRequirementsDraft,
-  evaluateRequirementsCompletenessGate,
-  evaluateCustomerSignoffGate,
-  saveDesignSpec,
-  saveTestPlan,
-  saveTaskPlan,
-  readRequirementsDraft,
-  readDesignSpec,
-  readTestPlan,
-  readTaskPlan,
-  evaluateArchitectureReadyGate,
-  evaluateQaReadyGate,
-  evaluateTaskPlanReadyGate,
-  consumeTenantBudget,
-  TenantRateLimitExceededError,
-  findRelevantDistilledKnowledge,
-  formatDistilledKnowledgeSummary,
   rebuildPublicHistorySearchIndexFromLocalSources,
   searchHistory,
-  recordActionItem,
-  listActionItems,
-  listOthersPending,
-  listOperatorSelfPending,
-  appendReminder,
-  updateActionItemStatus,
-  nextActionItemId,
-  matchRestrictedAction,
-  loadMeetingFacilitatorPolicy,
-  registerPresentationPreferenceProfile,
-  type ActionItem,
-  type ActionItemAssignee,
-  type ActionItemAssigneeKind,
-  type ActionItemModality,
-  type ActionItemReviewState,
-  type ActionItemProvenance,
-  type MeetingFacilitatorPolicy,
-  type PresentationPreferenceProfile,
 } from '@agent/core';
 import * as path from 'node:path';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import * as yaml from 'js-yaml';
 import { dispatchDecisionOp } from './decision-ops.js';
 import { createWisdomDispatcher } from './wisdom-dispatcher.js';
@@ -68,7 +31,7 @@ import {
   normalizeKnowledgeTier,
 } from './knowledge/knowledge-package.js';
 import type { WisdomContext } from './contracts/wisdom-context.js';
-import type { WisdomReceipt } from './contracts/wisdom-result.js';
+import { makeWisdomReceipt, type WisdomReceipt } from './contracts/wisdom-result.js';
 import { validateWisdomRequest } from './contracts/wisdom-request.js';
 
 const WISDOM_MANIFEST_PATH = pathResolver.rootResolve(
@@ -82,6 +45,7 @@ const DEFAULT_WISDOM_RETRY = {
   factor: 2,
   jitter: true,
 };
+const operationRetryState = new AsyncLocalStorage<Map<string, number>>();
 
 const RECONCILE_ALLOWED_OPS = new Set([
   'history_search',
@@ -125,8 +89,65 @@ function buildRetryOptions() {
 
 export async function runWithOperationRetry<T>(op: string, task: () => Promise<T>): Promise<T> {
   const idempotency = getWisdomOperationSpec(op)?.idempotency;
-  if (idempotency !== 'read' && idempotency !== 'idempotent_write') return task();
-  return retry(task, buildRetryOptions());
+  const state = operationRetryState.getStore();
+  const attempt = async () => {
+    if (state) state.set(op, (state.get(op) || 0) + 1);
+    return task();
+  };
+  if (idempotency !== 'read' && idempotency !== 'idempotent_write') return attempt();
+  return retry(attempt, buildRetryOptions());
+}
+
+function withRetryAttempts(receipt: WisdomReceipt, op: string, before: number): WisdomReceipt {
+  const state = operationRetryState.getStore();
+  const attempts = Math.max(1, (state?.get(op) || 0) - before);
+  return receipt.retry ? { ...receipt, retry: { ...receipt.retry, attempts } } : receipt;
+}
+
+function failureCode(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.match(/^\[([^\]]+)\]/)?.[1] || 'OPERATION_FAILED';
+}
+
+function retryableCategory(category: string): boolean {
+  return ['network', 'rate_limit', 'resource_unavailable', 'timeout'].includes(category);
+}
+
+function makeFailureReceipt(
+  kind: 'capture' | 'transform' | 'apply',
+  op: string,
+  error: unknown,
+  context: WisdomContext
+): WisdomReceipt {
+  const spec = getWisdomOperationSpec(op);
+  const classification = classifyError(error);
+  const message = error instanceof Error ? error.message : String(error);
+  return makeWisdomReceipt({
+    requestedOp: op,
+    canonicalOp: spec?.canonical_op || op,
+    executionKind: spec?.execution_kind || 'deterministic',
+    status: 'failed',
+    error: {
+      code: failureCode(error),
+      message,
+      retryable: retryableCategory(classification.category),
+    },
+    securityScope:
+      context.security_scope && typeof context.security_scope === 'object'
+        ? (context.security_scope as WisdomReceipt['security_scope'])
+        : undefined,
+    retry: {
+      attempts: 1,
+      idempotency_class: spec?.idempotency || 'non_idempotent',
+      automatic_retry: spec?.idempotency === 'read' || spec?.idempotency === 'idempotent_write',
+    },
+    traceSummary: {
+      owner: spec?.owner || 'wisdom',
+      step_kind: kind,
+      forwarded: Boolean(spec?.forward_to),
+      error_category: classification.category,
+    },
+  });
 }
 
 export interface PipelineStep {
@@ -223,29 +244,49 @@ export async function executePipeline(
     ctx = { ...ctx, ...saved };
   }
 
-  const result = await executeAdfSteps(
-    steps as Parameters<typeof executeAdfSteps>[0],
-    ctx,
-    { maxSteps: MAX_STEPS, timeoutMs: TIMEOUT },
-    {
-      capture: async (op, params, currentCtx) => {
-        const result = await dispatcher.dispatch('capture', op, params, currentCtx);
-        receipts.push(result.receipt);
-        return result.context;
-      },
-      transform: async (op, params, currentCtx) => {
-        const result = await dispatcher.dispatch('transform', op, params, currentCtx);
-        receipts.push(result.receipt);
-        return result.context;
-      },
-      apply: async (op, params, currentCtx) => {
-        const result = await dispatcher.dispatch('apply', op, params, currentCtx);
-        receipts.push(result.receipt);
-        return result.context;
-      },
-      control: opControl,
-    }
-  );
+  const result = await operationRetryState.run(new Map<string, number>(), async () => {
+    return await executeAdfSteps(
+      steps as Parameters<typeof executeAdfSteps>[0],
+      ctx,
+      { maxSteps: MAX_STEPS, timeoutMs: TIMEOUT },
+      {
+        capture: async (op, params, currentCtx) => {
+          const before = operationRetryState.getStore()?.get(op) || 0;
+          try {
+            const result = await dispatcher.dispatch('capture', op, params, currentCtx);
+            receipts.push(withRetryAttempts(result.receipt, op, before));
+            return result.context;
+          } catch (error) {
+            receipts.push(makeFailureReceipt('capture', op, error, currentCtx));
+            throw error;
+          }
+        },
+        transform: async (op, params, currentCtx) => {
+          const before = operationRetryState.getStore()?.get(op) || 0;
+          try {
+            const result = await dispatcher.dispatch('transform', op, params, currentCtx);
+            receipts.push(withRetryAttempts(result.receipt, op, before));
+            return result.context;
+          } catch (error) {
+            receipts.push(makeFailureReceipt('transform', op, error, currentCtx));
+            throw error;
+          }
+        },
+        apply: async (op, params, currentCtx) => {
+          const before = operationRetryState.getStore()?.get(op) || 0;
+          try {
+            const result = await dispatcher.dispatch('apply', op, params, currentCtx);
+            receipts.push(withRetryAttempts(result.receipt, op, before));
+            return result.context;
+          } catch (error) {
+            receipts.push(makeFailureReceipt('apply', op, error, currentCtx));
+            throw error;
+          }
+        },
+        control: opControl,
+      }
+    );
+  });
   ctx = result.context;
 
   if (contextPath) {
