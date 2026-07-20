@@ -8,13 +8,23 @@ const DEPRECATED = new Map(
     .filter((entry) => entry.deprecated && entry.canonical_op)
     .map((entry) => [entry.op, entry.canonical_op as string])
 );
+const FORWARDED = new Map(
+  describeOps()
+    .filter((entry) => entry.forward_to)
+    .map((entry) => [entry.op, `${entry.forward_to!.actuator}:${entry.forward_to!.op}`])
+);
 
 const ROOTS = [
   pathResolver.rootResolve('pipelines'),
   pathResolver.rootResolve('knowledge/product/pipeline-templates'),
 ];
 
-type Finding = { file: string; alias: string; canonical: string };
+type Finding = {
+  file: string;
+  op: string;
+  canonical: string;
+  kind: 'deprecated_alias' | 'compatibility_forwarder';
+};
 
 function collectFindings(): Finding[] {
   const findings: Finding[] = [];
@@ -26,8 +36,19 @@ function collectFindings(): Finding[] {
         if (content.includes(`wisdom:${alias}`)) {
           findings.push({
             file: path.relative(pathResolver.rootDir(), file),
-            alias,
+            op: alias,
             canonical,
+            kind: 'deprecated_alias',
+          });
+        }
+      }
+      for (const [op, canonical] of FORWARDED) {
+        if (content.includes(`wisdom:${op}`)) {
+          findings.push({
+            file: path.relative(pathResolver.rootDir(), file),
+            op,
+            canonical,
+            kind: 'compatibility_forwarder',
           });
         }
       }
@@ -42,7 +63,7 @@ if (findings.length === 0) {
 } else {
   for (const finding of findings) {
     console.warn(
-      `[check:deprecated-wisdom-ops] ${finding.file}: wisdom:${finding.alias} -> wisdom:${finding.canonical}`
+      `[check:deprecated-wisdom-ops] ${finding.file}: wisdom:${finding.op} -> ${finding.canonical} (${finding.kind})`
     );
   }
   if (process.argv.includes('--fail')) process.exitCode = 1;

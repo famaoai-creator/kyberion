@@ -31,10 +31,7 @@
       "produces": { "channel": "audit_findings", "type": "AuditResult" },
       "params": {
         "instruction": "Audit the sampled traces against core vision and ethical guidelines. Identify any 'reasoning drift' or cultural misalignment. Tag violations as high/med/low risk.",
-        "context": [
-          "{{sampled_data}}",
-          "{{core_vision}}"
-        ]
+        "context": ["{{sampled_data}}", "{{core_vision}}"]
       }
     },
     {
@@ -49,7 +46,7 @@
     {
       "id": "emit-audit-log",
       "role": "sink",
-      "op": "wisdom:write_file",
+      "op": "file:write_file",
       "consumes": "audit_findings",
       "params": {
         "path": "knowledge/confidential/governance/culture-audit-log.jsonl",

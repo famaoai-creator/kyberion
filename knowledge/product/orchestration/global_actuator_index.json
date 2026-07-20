@@ -1,6 +1,6 @@
 {
   "v": "2.0.0",
-  "t": 30,
+  "t": 31,
   "actuators": [
     {
       "n": "agent-actuator",
@@ -29,9 +29,16 @@
       "path": "libs/actuators/approval-actuator",
       "d": "Human approval request state transitions and decision handling",
       "s": "implemented",
-      "version": "1.0.0",
-      "capability_count": 4,
-      "ops": ["create", "decide", "list_pending", "load"],
+      "version": "1.1.0",
+      "capability_count": 6,
+      "ops": [
+        "create",
+        "decide",
+        "evaluate_decision_rights",
+        "list_pending",
+        "load",
+        "request_review"
+      ],
       "contract_schema": "schemas/approval-action.schema.json",
       "prerequisites_summary": "-"
     },
@@ -109,6 +116,17 @@
       "ops": ["impact_analysis", "pipeline", "reconcile", "semgrep_scan"],
       "contract_schema": "schemas/code-pipeline.schema.json",
       "prerequisites_summary": "bin:semgrep, os:darwin, os:linux"
+    },
+    {
+      "n": "deployment-actuator",
+      "path": "libs/actuators/deployment-actuator",
+      "d": "Deployment capability boundary backed by the governed DeploymentAdapter",
+      "s": "implemented",
+      "version": "1.0.0",
+      "capability_count": 1,
+      "ops": ["deploy_release"],
+      "contract_schema": "schemas/deployment-action.schema.json",
+      "prerequisites_summary": "-"
     },
     {
       "n": "email-actuator",
@@ -382,7 +400,7 @@
       "d": "Knowledge-tier search, injection, import/export, and decision-support operations",
       "s": "implemented",
       "version": "1.3.0",
-      "capability_count": 74,
+      "capability_count": 77,
       "ops": [
         "a2a_fanout",
         "a2a_roleplay",
@@ -392,6 +410,7 @@
         "capture_intuition",
         "compute_readiness_matrix",
         "conduct_1on1",
+        "counterparty_roleplay",
         "cross_critique",
         "curate_background_review",
         "decompose_into_tasks",
@@ -432,11 +451,13 @@
         "peer_advice",
         "perspective_fanout",
         "pptx_diff",
+        "propose_tool_calls",
         "query",
         "react_loop",
         "read_file",
         "read_json",
         "reasoning",
+        "reasoning_loop",
         "recommend",
         "regex_extract",
         "regex_replace",

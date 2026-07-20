@@ -22,7 +22,7 @@
     {
       "id": "iterate_pending",
       "role": "sink",
-      "op": "wisdom:track_pending_action_items",
+      "op": "meeting:track_pending_action_items",
       "params": {
         "mission_id": "{{mission_id}}",
         "tone": "{{tone}}",

@@ -43,16 +43,12 @@
           {
             "id": "run_session",
             "role": "sink",
-            "op": "wisdom:conduct_1on1",
+            "op": "meeting:conduct_1on1",
             "consumes": "current_visit",
             "params": {
               "counterparty_ref": "{{current_visit.person_slug}}",
               "proposal_draft_ref": "{{proposal_draft}}",
-              "structure": [
-                "context_sharing_3min",
-                "listening_10min",
-                "soft_ask_2min"
-              ],
+              "structure": ["context_sharing_3min", "listening_10min", "soft_ask_2min"],
               "output_path": "active/missions/{{mission_id}}/evidence/nemawashi/{{current_visit.person_slug}}.raw.json"
             }
           },
