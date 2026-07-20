@@ -108,6 +108,9 @@ const FORWARD_TARGETS: Record<string, { actuator: string; op: string }> = {
   generate_facilitation_script: { actuator: 'meeting', op: 'generate_facilitation_script' },
   generate_reminder_message: { actuator: 'meeting', op: 'generate_reminder_message' },
   conduct_1on1: { actuator: 'meeting', op: 'conduct_1on1' },
+  execute_self_action_items: { actuator: 'meeting', op: 'execute_self_action_items' },
+  track_pending_action_items: { actuator: 'meeting', op: 'track_pending_action_items' },
+  audit_speaker_fairness: { actuator: 'meeting', op: 'audit_speaker_fairness' },
   execute_task_plan: { actuator: 'orchestrator', op: 'execute_task_plan' },
   deploy_release: { actuator: 'deployment', op: 'deploy_release' },
   extract_requirements: { actuator: 'modeling', op: 'extract_requirements' },
@@ -164,6 +167,15 @@ const IDEMPOTENCY_BY_OP: Record<string, WisdomOperationSpec['idempotency']> = {
   knowledge_inject: 'idempotent_write',
   knowledge_export: 'idempotent_write',
   knowledge_import: 'idempotent_write',
+  execute_task_plan: 'external_effect',
+  execute_self_action_items: 'external_effect',
+  track_pending_action_items: 'external_effect',
+  escalate_for_review: 'external_effect',
+  deploy_release: 'external_effect',
+  shell: 'external_effect',
+  write_file: 'external_effect',
+  write_artifact: 'external_effect',
+  transcribe_audio: 'external_effect',
 };
 
 function toSpec(op: string, kind: OpSpecKind) {

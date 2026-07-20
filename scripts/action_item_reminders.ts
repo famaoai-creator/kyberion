@@ -17,7 +17,7 @@ import {
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { listMissionSummaries } from './refactor/mission-read-model.js';
-import { generateReminderMessageOp } from '../libs/actuators/wisdom-actuator/src/decision-ops.js';
+import { generateReminderMessageOp } from '../libs/actuators/meeting-actuator/src/meeting-intelligence-ops.js';
 
 export interface ActionItemReminderSweepReport {
   generated_at: string;

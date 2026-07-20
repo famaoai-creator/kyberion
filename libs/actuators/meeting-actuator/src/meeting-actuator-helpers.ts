@@ -24,6 +24,7 @@ import {
   logger,
   safeExec,
   safeReadFile,
+  safeWriteFile,
   safeExistsSync,
   pathResolver,
   auditChain,
@@ -33,10 +34,21 @@ import {
   createActuatorTrace,
   finalizeActuatorTrace,
   resolveIdentityContext,
+  executeAdfSteps,
+  resolveVars,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  auditSpeakerFairnessOp,
+  conduct1on1,
+  executeSelfActionItemsOp,
+  extractActionItemsOp,
+  generateFacilitationScriptOp,
+  generateReminderMessageOp,
+  trackPendingActionItemsOp,
+} from './meeting-intelligence-ops.js';
 
 export interface MeetingAction {
   action: 'join' | 'leave' | 'speak' | 'listen' | 'chat' | 'status';
@@ -56,6 +68,17 @@ export interface MeetingAction {
     duration_sec?: number;
     transcript_path?: string;
   };
+}
+
+export interface MeetingPipelineAction {
+  action: 'pipeline';
+  steps: Array<{
+    type: 'capture' | 'transform' | 'apply' | 'control';
+    op: string;
+    params: Record<string, unknown>;
+  }>;
+  context?: Record<string, unknown>;
+  options?: { max_steps?: number; timeout_ms?: number };
 }
 
 export interface MeetingActionResult {
@@ -262,7 +285,220 @@ function recordMeetingEvent(input: MeetingAction, result: MeetingActionResult): 
   }
 }
 
-export async function handleAction(input: MeetingAction): Promise<MeetingActionResult> {
+function resolveMeetingParams(value: unknown, context: Record<string, unknown>): unknown {
+  if (Array.isArray(value)) return value.map((item) => resolveMeetingParams(item, context));
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, resolveMeetingParams(item, context)])
+    );
+  }
+  return resolveVars(value, context);
+}
+
+function meetingExport(
+  context: Record<string, unknown>,
+  params: Record<string, unknown>,
+  value: unknown,
+  fallback: string
+) {
+  return { ...context, [String(params.export_as || fallback)]: value };
+}
+
+async function executeMeetingPipeline(
+  steps: MeetingPipelineAction['steps'],
+  initialContext: Record<string, unknown> = {},
+  options: MeetingPipelineAction['options'] = {}
+) {
+  const result = await executeAdfSteps(
+    steps,
+    { ...initialContext, timestamp: new Date().toISOString() } as Record<string, unknown>,
+    {
+      maxSteps: options.max_steps || 1000,
+      timeoutMs: options.timeout_ms || 60000,
+    },
+    {
+      capture: async (op, rawParams, context) => {
+        if (op !== 'listen' && op !== 'status') {
+          throw new Error(`[UNKNOWN_OP] Unknown meeting capture op: ${op}`);
+        }
+        const params = resolveMeetingParams(rawParams, context) as MeetingAction['params'];
+        return meetingExport(
+          context,
+          params as Record<string, unknown>,
+          await handleAction({ action: op, params }),
+          `${op}_result`
+        );
+      },
+      transform: async () => {
+        throw new Error('[UNKNOWN_OP] Meeting intelligence does not own transform operations');
+      },
+      control: async () => {
+        throw new Error('[UNKNOWN_OP] Meeting intelligence does not own control operations');
+      },
+      apply: async (op, rawParams, context) => {
+        const params = resolveMeetingParams(rawParams, context) as Record<string, any>;
+        const missionId = String(params.mission_id || process.env.MISSION_ID || '');
+        switch (op) {
+          case 'join':
+          case 'leave':
+          case 'speak':
+          case 'chat':
+            return meetingExport(
+              context,
+              params,
+              await handleAction({ action: op, params: params as MeetingAction['params'] }),
+              `meeting_${op}_result`
+            );
+          case 'conduct_1on_1':
+            return meetingExport(
+              context,
+              params,
+              await conduct1on1({
+                counterparty_ref: String(params.counterparty_ref || ''),
+                proposal_draft_ref: String(params.proposal_draft_ref || ''),
+                structure: Array.isArray(params.structure) ? params.structure.map(String) : [],
+                output_path: String(params.output_path || ''),
+              }),
+              'one_on_one_result'
+            );
+          case 'extract_action_items': {
+            const transcriptPath = params.transcript_path ? String(params.transcript_path) : '';
+            const transcript = transcriptPath
+              ? String(safeReadFile(pathResolver.rootResolve(transcriptPath), { encoding: 'utf8' }))
+              : String(params.transcript || '');
+            const attendees = (
+              Array.isArray(params.attendees)
+                ? params.attendees
+                : Array.isArray(context[String(params.attendees_from || 'attendees')])
+                  ? context[String(params.attendees_from || 'attendees')]
+                  : []
+            ) as Array<{
+              name: string;
+              person_slug?: string;
+              channel_handle?: string;
+              manager_handle?: string;
+            }>;
+            const listenResult = context.listen_result || context.meeting_listen_result;
+            const partialState =
+              params.partial_state !== undefined
+                ? Boolean(params.partial_state)
+                : Boolean(
+                    listenResult &&
+                    typeof listenResult === 'object' &&
+                    (listenResult as any).partial_state
+                  );
+            const partialReason =
+              params.partial_reason !== undefined
+                ? String(params.partial_reason || '')
+                : listenResult && typeof listenResult === 'object'
+                  ? String((listenResult as any).partial_reason || '')
+                  : undefined;
+            const result = await extractActionItemsOp({
+              mission_id: missionId,
+              transcript,
+              attendees,
+              ...(params.operator_label ? { operator_label: String(params.operator_label) } : {}),
+              ...(params.default_assignee_label
+                ? { default_assignee_label: String(params.default_assignee_label) }
+                : {}),
+              ...(params.language ? { language: String(params.language) } : {}),
+              ...(partialState ? { partial_state: true } : {}),
+              ...(partialReason ? { partial_reason: partialReason } : {}),
+              ...(params.enforce_restricted_actions !== undefined
+                ? { enforce_restricted_actions: Boolean(params.enforce_restricted_actions) }
+                : {}),
+            });
+            return meetingExport(context, params, result, 'extracted_action_items');
+          }
+          case 'generate_facilitation_script':
+            return meetingExport(
+              context,
+              params,
+              await generateFacilitationScriptOp({
+                agenda: Array.isArray(params.agenda) ? params.agenda.map(String) : undefined,
+                ...(params.current_topic ? { current_topic: String(params.current_topic) } : {}),
+                ...(params.recent_transcript_chunk
+                  ? { recent_transcript_chunk: String(params.recent_transcript_chunk) }
+                  : {}),
+                ...(params.remaining_minutes !== undefined
+                  ? { remaining_minutes: Number(params.remaining_minutes) }
+                  : {}),
+                ...(params.facilitator_persona_label
+                  ? { facilitator_persona_label: String(params.facilitator_persona_label) }
+                  : {}),
+                ...(params.language ? { language: String(params.language) } : {}),
+              }),
+              'facilitation_script'
+            );
+          case 'generate_reminder_message': {
+            const item = params.item || context[String(params.item_from || 'item')];
+            if (!item || typeof item !== 'object') {
+              throw new Error('generate_reminder_message: missing params.item (ActionItem)');
+            }
+            return meetingExport(
+              context,
+              params,
+              await generateReminderMessageOp({
+                item: item as any,
+                ...(params.days_overdue !== undefined
+                  ? { days_overdue: Number(params.days_overdue) }
+                  : {}),
+                ...(params.tone ? { tone: params.tone } : {}),
+                ...(params.language ? { language: String(params.language) } : {}),
+              }),
+              'reminder_message'
+            );
+          }
+          case 'execute_self_action_items': {
+            if (!missionId) throw new Error('execute_self_action_items: mission_id is required');
+            const result = await executeSelfActionItemsOp({
+              mission_id: missionId,
+              language: String(params.language || 'ja'),
+            });
+            if (params.output_path) {
+              safeWriteFile(
+                pathResolver.rootResolve(String(params.output_path)),
+                JSON.stringify(result, null, 2)
+              );
+            }
+            return meetingExport(context, params, result, 'self_action_items_report');
+          }
+          case 'track_pending_action_items': {
+            if (!missionId) throw new Error('track_pending_action_items: mission_id is required');
+            const result = await trackPendingActionItemsOp({
+              mission_id: missionId,
+              tone: params.tone as 'friendly' | 'formal' | 'urgent' | undefined,
+              language: String(params.language || 'ja'),
+              max_items: Number(params.max_items || 20),
+            });
+            return meetingExport(context, params, result, 'pending_action_items_report');
+          }
+          case 'audit_speaker_fairness': {
+            if (!missionId) throw new Error('audit_speaker_fairness: mission_id is required');
+            const report = auditSpeakerFairnessOp({ mission_id: missionId });
+            if (params.output_path) {
+              safeWriteFile(
+                pathResolver.rootResolve(String(params.output_path)),
+                JSON.stringify(report, null, 2)
+              );
+            }
+            return meetingExport(context, params, report, 'speaker_fairness_report');
+          }
+          default:
+            throw new Error(`[UNKNOWN_OP] Unknown meeting op: ${op}`);
+        }
+      },
+    }
+  );
+  return result as unknown as Record<string, unknown>;
+}
+
+export async function handleAction(
+  input: MeetingAction | MeetingPipelineAction
+): Promise<MeetingActionResult | Record<string, unknown>> {
+  if (input.action === 'pipeline') {
+    return await executeMeetingPipeline(input.steps || [], input.context || {}, input.options);
+  }
   const traceCtx = createActuatorTrace('meeting-actuator', input.action, {
     pipelineId: input.params.meeting_id,
   });

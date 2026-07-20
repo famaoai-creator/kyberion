@@ -1,5 +1,5 @@
 import type { WisdomContext } from './wisdom-context.js';
-import type { ExecutionKind } from './wisdom-result.js';
+import type { ExecutionKind, IdempotencyClass } from './wisdom-result.js';
 
 export type WisdomOperationKind = 'capture' | 'transform' | 'apply';
 
@@ -8,7 +8,7 @@ export interface WisdomOperationSpec<Input = unknown, Output = unknown> {
   kind: WisdomOperationKind;
   inputSchema: object;
   execute(input: Input, context: WisdomContext): Promise<Output>;
-  idempotency: 'read' | 'idempotent_write' | 'non_idempotent';
+  idempotency: IdempotencyClass;
   owner: string;
   deprecated?: boolean;
   forwardTo?: { actuator: string; op: string };

@@ -7,6 +7,8 @@ export type ExecutionKind =
   | 'agent_a2a'
   | 'deterministic';
 
+export type IdempotencyClass = 'read' | 'idempotent_write' | 'non_idempotent' | 'external_effect';
+
 export interface WisdomReceipt<T = unknown> {
   actuator_id: 'wisdom-actuator';
   requested_op: string;
@@ -27,7 +29,7 @@ export interface WisdomReceipt<T = unknown> {
   };
   retry?: {
     attempts: number;
-    idempotency_class: 'read' | 'idempotent_write' | 'non_idempotent';
+    idempotency_class: IdempotencyClass;
     automatic_retry: boolean;
   };
   trace_summary?: Record<string, unknown>;
@@ -37,7 +39,9 @@ export function makeWisdomReceipt(input: {
   requestedOp: string;
   canonicalOp: string;
   executionKind: ExecutionKind;
+  status?: WisdomReceipt['status'];
   result?: unknown;
+  error?: WisdomReceipt['error'];
   compatibility?: WisdomReceipt['compatibility'];
   retry?: WisdomReceipt['retry'];
   securityScope?: WisdomReceipt['security_scope'];
@@ -49,8 +53,9 @@ export function makeWisdomReceipt(input: {
     requested_op: input.requestedOp,
     canonical_op: input.canonicalOp,
     execution_kind: input.executionKind,
-    status: 'succeeded',
+    status: input.status || 'succeeded',
     ...(input.result === undefined ? {} : { result: input.result }),
+    ...(input.error ? { error: input.error } : {}),
     ...(input.compatibility ? { compatibility: input.compatibility } : {}),
     ...(input.retry ? { retry: input.retry } : {}),
     ...(input.securityScope ? { security_scope: input.securityScope } : {}),

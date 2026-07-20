@@ -19,7 +19,7 @@ import {
   auditSpeakerFairnessOp,
   executeSelfActionItemsOp,
   trackPendingActionItemsOp,
-} from './decision-ops.js';
+} from '../../meeting-actuator/src/meeting-intelligence-ops.js';
 
 const FIX_MISSION = 'MSN-MTG-OPS-FIXTURE-001';
 const ROOT = pathResolver.rootDir();
@@ -32,7 +32,8 @@ function basePolicy(overrides: Partial<MeetingFacilitatorPolicy> = {}): MeetingF
     reminder_cc_after_n: 3,
     speaker_fairness_total_threshold: 0.6,
     speaker_fairness_must_threshold: 0.7,
-    restricted_actions_policy_path: 'knowledge/product/governance/restricted-action-kinds-policy.json',
+    restricted_actions_policy_path:
+      'knowledge/product/governance/restricted-action-kinds-policy.json',
     ...overrides,
   };
 }
@@ -121,7 +122,7 @@ describe('action-item follow-up ops', () => {
         mission_id: FIX_MISSION,
         tier: 'confidential',
         assigned_persona: 'ecosystem_architect',
-      }),
+      })
     );
     registerReasoningBackend({
       ...stubReasoningBackend,
@@ -176,7 +177,7 @@ describe('action-item follow-up ops', () => {
     expect(items.find((i) => i.item_id === 'AI-SELF-1')?.status).toBe('completed');
     expect(items.find((i) => i.item_id === 'AI-REST-1')?.status).toBe('blocked');
     expect(items.find((i) => i.item_id === 'AI-REST-1')?.blocked_reason).toContain(
-      'restricted-action-kinds gate',
+      'restricted-action-kinds gate'
     );
     expect(summary.by_owner_kind.operator_self).toBe(2);
     expect(summary.blocked_items).toEqual([
@@ -255,7 +256,7 @@ describe('auditSpeakerFairnessOp', () => {
         mission_id: FIX_MISSION,
         tier: 'confidential',
         assigned_persona: 'ecosystem_architect',
-      }),
+      })
     );
   });
 
