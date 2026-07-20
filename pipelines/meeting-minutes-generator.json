@@ -14,7 +14,7 @@
   "steps": [
     {
       "name": "Audio Transcription (Speech-to-Text)",
-      "op": "wisdom:transcribe_audio",
+      "op": "voice:transcribe",
       "params": {
         "audio_path": "{{audio_path}}",
         "language": "{{language}}",
@@ -23,7 +23,7 @@
     },
     {
       "name": "Extract Meeting Summary & Action Items (Reasoning Engine)",
-      "op": "wisdom:extract_requirements",
+      "op": "modeling:extract_requirements",
       "params": {
         "mission_id": "{{mission_id}}",
         "project_name": "{{project_name}}",

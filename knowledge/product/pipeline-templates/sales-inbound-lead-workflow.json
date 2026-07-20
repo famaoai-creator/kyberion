@@ -13,18 +13,16 @@
     "lead_person_slug": "",
     "lead_org": "",
     "inquiry_source": "web_form",
-    "solution_personas": [
-      "cto-technical-evaluator",
-      "cfo-roi-optimizer",
-      "end-user-operations"
-    ]
+    "solution_personas": ["cto-technical-evaluator", "cfo-roi-optimizer", "end-user-operations"]
   },
   "steps": [
     {
       "id": "log_start",
       "role": "sink",
       "op": "system:log",
-      "params": { "message": "📬 [INBOUND] Starting inbound lead workflow (mission: {{mission_id}}, lead: {{lead_org}})" }
+      "params": {
+        "message": "📬 [INBOUND] Starting inbound lead workflow (mission: {{mission_id}}, lead: {{lead_org}})"
+      }
     },
     {
       "id": "read_inquiry",
@@ -37,7 +35,9 @@
       "id": "log_inquiry",
       "role": "sink",
       "op": "system:log",
-      "params": { "message": "📄 Inbound inquiry loaded ({{mission_evidence_dir}}/inbound-inquiry.txt)" }
+      "params": {
+        "message": "📄 Inbound inquiry loaded ({{mission_evidence_dir}}/inbound-inquiry.txt)"
+      }
     },
     {
       "id": "classify_intent",
@@ -64,12 +64,14 @@
       "id": "log_intent",
       "role": "sink",
       "op": "system:log",
-      "params": { "message": "🎯 [INBOUND] Intent classified → {{mission_evidence_dir}}/intent-classification.md" }
+      "params": {
+        "message": "🎯 [INBOUND] Intent classified → {{mission_evidence_dir}}/intent-classification.md"
+      }
     },
     {
       "id": "solution_fanout",
       "role": "sink",
-      "op": "wisdom:a2a_fanout",
+      "op": "wisdom:perspective_fanout",
       "params": {
         "personas": "{{solution_personas}}",
         "min_hypotheses_per_persona": 2,
@@ -108,7 +110,9 @@
       "id": "log_proposal",
       "role": "sink",
       "op": "system:log",
-      "params": { "message": "📋 [INBOUND] Proposal draft written → {{mission_evidence_dir}}/proposal-draft.md" }
+      "params": {
+        "message": "📋 [INBOUND] Proposal draft written → {{mission_evidence_dir}}/proposal-draft.md"
+      }
     },
     {
       "id": "record_proposal_gate",
@@ -147,13 +151,17 @@
       "id": "log_email_draft",
       "role": "sink",
       "op": "system:log",
-      "params": { "message": "✉️ [INBOUND] Proposal email draft created in Mail.app → To: {{lead_email}}" }
+      "params": {
+        "message": "✉️ [INBOUND] Proposal email draft created in Mail.app → To: {{lead_email}}"
+      }
     },
     {
       "id": "log_done",
       "role": "sink",
       "op": "system:log",
-      "params": { "message": "🏁 [INBOUND] Pipeline complete. Artifacts in {{mission_evidence_dir}}. Next: review Mail.app draft → send proposal → schedule meeting with IT dept → close." }
+      "params": {
+        "message": "🏁 [INBOUND] Pipeline complete. Artifacts in {{mission_evidence_dir}}. Next: review Mail.app draft → send proposal → schedule meeting with IT dept → close."
+      }
     }
   ]
 }

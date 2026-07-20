@@ -22,6 +22,7 @@ export const AGENT_ACTUATOR_TRANSFORM_OPS = ['team_plan', 'team_role'] as const;
 export const AGENT_ACTUATOR_APPLY_OPS = [
   'spawn',
   'ask',
+  'delegate',
   'shutdown',
   'shutdown_all',
   'refresh',

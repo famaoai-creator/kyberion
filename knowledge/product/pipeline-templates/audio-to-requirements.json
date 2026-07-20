@@ -16,7 +16,7 @@
     {
       "id": "transcribe",
       "role": "source",
-      "op": "wisdom:transcribe_audio",
+      "op": "voice:transcribe",
       "produces": { "channel": "transcript", "type": "Transcript" },
       "params": {
         "audio_path": "{{mission_evidence_dir}}/call-recording.wav",
@@ -35,8 +35,8 @@
     },
     {
       "id": "extract",
-      "role": "transform",
-      "op": "wisdom:extract_requirements",
+      "role": "sink",
+      "op": "modeling:extract_requirements",
       "consumes": "transcript",
       "produces": { "channel": "extraction", "type": "RequirementsExtraction" },
       "params": {

@@ -11,11 +11,7 @@
     "hypotheses_output": "active/missions/{{mission_id}}/evidence/contract-risks-raw.json",
     "critique_output": "active/missions/{{mission_id}}/evidence/contract-risks.json",
     "dissent_output": "active/missions/{{mission_id}}/evidence/dissent-log.json",
-    "personas": [
-      "Legal Conservative",
-      "Ops Focused",
-      "Red Team Adversary"
-    ]
+    "personas": ["Legal Conservative", "Ops Focused", "Red Team Adversary"]
   },
   "steps": [
     {
@@ -40,7 +36,7 @@
     {
       "id": "diverge_risks",
       "role": "sink",
-      "op": "wisdom:a2a_fanout",
+      "op": "wisdom:perspective_fanout",
       "params": {
         "personas_from": "personas",
         "min_hypotheses_per_persona": 2,
@@ -51,7 +47,7 @@
     {
       "id": "critique_risks",
       "role": "sink",
-      "op": "wisdom:cross_critique",
+      "op": "wisdom:typed_cross_critique",
       "params": {
         "input": "{{hypotheses_output}}",
         "personas_from": "personas",

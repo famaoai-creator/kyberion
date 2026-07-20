@@ -33,10 +33,7 @@
             "produces": { "channel": "portfolio_evidence", "type": "ArtifactCollection" },
             "params": {
               "mission_ids": "{{active_mission_list}}",
-              "patterns": [
-                "TASK_BOARD.md",
-                "trace.json"
-              ]
+              "patterns": ["TASK_BOARD.md", "trace.json"]
             }
           },
           {
@@ -47,15 +44,13 @@
             "produces": { "channel": "portfolio_summary", "type": "AnalysisResult" },
             "params": {
               "instruction": "Analyze all active missions. Identify stall points, resource overlaps, and strategic misalignments. Rank interventions needed by the CEO.",
-              "context": [
-                "{{portfolio_evidence}}"
-              ]
+              "context": ["{{portfolio_evidence}}"]
             }
           },
           {
             "id": "update-dashboard",
             "role": "sink",
-            "op": "wisdom:write_file",
+            "op": "file:write_file",
             "consumes": "portfolio_summary",
             "params": {
               "path": "knowledge/confidential/governance/portfolio-status.md",

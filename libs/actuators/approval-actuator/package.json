@@ -1,6 +1,6 @@
 {
   "name": "@actuator/approval",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "description": "Approval-Actuator for human approval request state transitions",
   "main": "../../../dist/libs/actuators/approval-actuator/src/index.js",

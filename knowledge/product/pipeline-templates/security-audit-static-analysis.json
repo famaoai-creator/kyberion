@@ -40,7 +40,7 @@
     {
       "id": "vulnerability_hypothesis_divergence",
       "role": "sink",
-      "op": "wisdom:a2a_fanout",
+      "op": "wisdom:perspective_fanout",
       "params": {
         "personas": "{{personas}}",
         "topic": "Enumerate concrete, exploitable security weaknesses in {{target_dir}}. Reason from the static-analysis signal and the source itself, cross-checked against {{reference_standards}}. Static findings: {{semgrep_findings}}",
@@ -51,7 +51,7 @@
     {
       "id": "vulnerability_hypothesis_critique",
       "role": "sink",
-      "op": "wisdom:cross_critique",
+      "op": "wisdom:typed_cross_critique",
       "params": {
         "input": "{{mission_evidence_dir}}/audit-hypotheses-raw.json",
         "personas": "{{critiquers}}",

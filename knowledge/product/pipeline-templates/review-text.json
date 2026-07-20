@@ -16,11 +16,7 @@
     "critique_output": "active/missions/{{mission_id}}/evidence/review-risks.json",
     "dissent_output": "active/missions/{{mission_id}}/evidence/dissent-log.json",
     "report_output": "active/missions/{{mission_id}}/evidence/review-report.md",
-    "personas": [
-      "Content Reviewer",
-      "Approval Gatekeeper",
-      "Tenant Boundary Auditor"
-    ]
+    "personas": ["Content Reviewer", "Approval Gatekeeper", "Tenant Boundary Auditor"]
   },
   "steps": [
     {
@@ -45,7 +41,7 @@
     {
       "id": "diverge_review",
       "role": "sink",
-      "op": "wisdom:a2a_fanout",
+      "op": "wisdom:perspective_fanout",
       "params": {
         "personas_from": "personas",
         "min_hypotheses_per_persona": 2,
@@ -56,7 +52,7 @@
     {
       "id": "critique_review",
       "role": "sink",
-      "op": "wisdom:cross_critique",
+      "op": "wisdom:typed_cross_critique",
       "params": {
         "input": "{{hypotheses_output}}",
         "personas_from": "personas",

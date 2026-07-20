@@ -142,8 +142,8 @@ describe('scenario coverage contracts', () => {
 
     const reviewOps = collectPipelineOps(readJson('pipelines/contract-review.json'));
     expect(reviewOps.has('media:document_digest')).toBe(true);
-    expect(reviewOps.has('wisdom:a2a_fanout')).toBe(true);
-    expect(reviewOps.has('wisdom:cross_critique')).toBe(true);
+    expect(reviewOps.has('wisdom:perspective_fanout')).toBe(true);
+    expect(reviewOps.has('wisdom:typed_cross_critique')).toBe(true);
     expect(reviewOps.has('wisdom:emit_dissent_log')).toBe(true);
     expect(reviewOps.has('wisdom:render_hypothesis_report')).toBe(true);
   });

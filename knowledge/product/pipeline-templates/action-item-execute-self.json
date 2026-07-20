@@ -20,7 +20,7 @@
     {
       "id": "execute_self",
       "role": "sink",
-      "op": "wisdom:execute_self_action_items",
+      "op": "meeting:execute_self_action_items",
       "params": {
         "mission_id": "{{mission_id}}",
         "language": "{{language}}",

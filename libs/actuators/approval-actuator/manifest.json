@@ -1,6 +1,6 @@
 {
   "actuator_id": "approval-actuator",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Human approval request state transitions and decision handling",
   "contract_schema": "schemas/approval-action.schema.json",
   "resilience_tier": "adaptive_retry",
@@ -19,6 +19,8 @@
     { "op": "create", "platforms": ["darwin", "linux", "win32"] },
     { "op": "load", "platforms": ["darwin", "linux", "win32"] },
     { "op": "decide", "platforms": ["darwin", "linux", "win32"] },
-    { "op": "list_pending", "platforms": ["darwin", "linux", "win32"] }
+    { "op": "list_pending", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "evaluate_decision_rights", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "request_review", "platforms": ["darwin", "linux", "win32"] }
   ]
 }

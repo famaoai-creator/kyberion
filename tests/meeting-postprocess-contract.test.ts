@@ -10,14 +10,16 @@ import {
   stubReasoningBackend,
 } from '@agent/core';
 import * as path from 'node:path';
-import { extractActionItemsOp } from '../libs/actuators/wisdom-actuator/src/decision-ops.js';
+import { extractActionItemsOp } from '../libs/actuators/meeting-actuator/src/meeting-intelligence-ops.js';
 
 const FIXTURE_MISSION_ID = 'MSN-POSTPROCESS-001';
-const FIXTURE_TRANSCRIPT = pathResolver.rootResolve('tests/fixtures/meeting-postprocess/transcript.txt');
+const FIXTURE_TRANSCRIPT = pathResolver.rootResolve(
+  'tests/fixtures/meeting-postprocess/transcript.txt'
+);
 const FIXTURE_MISSION_DIR = path.join(
   pathResolver.rootDir(),
   'active/missions/confidential',
-  FIXTURE_MISSION_ID,
+  FIXTURE_MISSION_ID
 );
 
 function readText(relativePath: string): string {
@@ -43,8 +45,8 @@ describe('meeting postprocess contract', () => {
           assigned_persona: 'ecosystem_architect',
         },
         null,
-        2,
-      ),
+        2
+      )
     );
   });
 
@@ -61,9 +63,16 @@ describe('meeting postprocess contract', () => {
   });
 
   it('keeps the postprocess template aligned with transcript extraction and structured output', async () => {
-    const template = JSON.parse(readText('knowledge/product/pipeline-templates/meeting-facilitation-postprocess.json')) as {
+    const template = JSON.parse(
+      readText('knowledge/product/pipeline-templates/meeting-facilitation-postprocess.json')
+    ) as {
       context?: Record<string, unknown>;
-      steps?: Array<{ id: string; op?: string; params?: Record<string, unknown>; consumes?: string }>;
+      steps?: Array<{
+        id: string;
+        op?: string;
+        params?: Record<string, unknown>;
+        consumes?: string;
+      }>;
     };
 
     expect(template.context).toMatchObject({
@@ -91,7 +100,9 @@ describe('meeting postprocess contract', () => {
       ...stubReasoningBackend,
       name: 'meeting-postprocess-test',
       async delegateTask(prompt: string) {
-        expect(prompt).toContain('Alice: I will own the proposal outline and send the first version tomorrow.');
+        expect(prompt).toContain(
+          'Alice: I will own the proposal outline and send the first version tomorrow.'
+        );
         return JSON.stringify([
           {
             title: 'Send the first proposal outline',
@@ -102,7 +113,8 @@ describe('meeting postprocess contract', () => {
             due_at_iso: '2026-06-22T00:00:00.000Z',
             modality: 'declarative',
             speaker_label: 'Alice',
-            transcript_excerpt: 'I will own the proposal outline and send the first version tomorrow.',
+            transcript_excerpt:
+              'I will own the proposal outline and send the first version tomorrow.',
             transcript_offset_lines: [2],
           },
         ]);

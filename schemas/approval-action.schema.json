@@ -4,7 +4,7 @@
   "type": "object",
   "required": ["action", "params"],
   "properties": {
-    "action": { "enum": ["create", "load", "decide", "list_pending"] },
+    "action": { "enum": ["create", "load", "decide", "list_pending", "pipeline"] },
     "params": { "type": "object" }
   }
 }

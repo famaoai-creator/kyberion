@@ -10,47 +10,11 @@ import {
   resolveVars,
   getReasoningBackend,
   getVoiceBridge,
-  getSpeechToTextBridge,
-  saveRequirementsDraft,
-  evaluateRequirementsCompletenessGate,
-  evaluateCustomerSignoffGate,
-  saveDesignSpec,
-  saveTestPlan,
-  saveTaskPlan,
-  readRequirementsDraft,
-  readDesignSpec,
-  readTestPlan,
-  readTaskPlan,
-  evaluateArchitectureReadyGate,
-  evaluateQaReadyGate,
-  evaluateTaskPlanReadyGate,
   consumeTenantBudget,
   TenantRateLimitExceededError,
   findRelevantDistilledKnowledge,
   formatDistilledKnowledgeSummary,
   listDistillCandidateRecords,
-  recordActionItem,
-  listActionItems,
-  listOthersPending,
-  listOperatorSelfPending,
-  appendReminder,
-  updateActionItemStatus,
-  nextActionItemId,
-  matchRestrictedAction,
-  loadMeetingFacilitatorPolicy,
-  registerPresentationPreferenceProfile,
-  type ActionItem,
-  type ActionItemAssignee,
-  type ActionItemAssigneeKind,
-  type ActionItemModality,
-  type ActionItemReviewState,
-  type ActionItemProvenance,
-  type MeetingFacilitatorPolicy,
-  type PresentationPreferenceProfile,
-  delegateBestOf,
-  requestPeerAdvice,
-  deriveTestInventory,
-  type SoftwareQualityContract,
   resolveReasoningParticipant,
   renderReasoningParticipantContext,
   validateContextOutputTier,
@@ -59,14 +23,27 @@ import {
   resolveGoldenRulePriorityOrder,
   resolveVision,
   type GoldenRulePriority,
-  enforceApprovalGate,
-  evaluateDecisionRights,
-  resolveDecisionRightsMatrix,
   curateBackgroundReviewProposals,
 } from '@agent/core';
-import { getAllFiles } from '@agent/core/fs-utils';
 import * as path from 'node:path';
-import { z } from 'zod';
+import { assignWisdomContextValue, mergeWisdomContext } from './contracts/wisdom-context.js';
+import { forwardWisdomBoundaryOperation } from './compatibility/cross-actuator-forwarders.js';
+import {
+  proposeToolCalls,
+  runPeerAdvice,
+  runPureReasoning,
+  runReasoningLoop,
+} from './reasoning/reasoning-ops.js';
+import {
+  computeReadinessMatrix,
+  recommend,
+  stakeholderGridSort,
+} from './decision-support/stakeholder-ops.js';
+export {
+  computeReadinessMatrix,
+  recommend,
+  stakeholderGridSort,
+} from './decision-support/stakeholder-ops.js';
 
 /**
  * Decision-support operations for Kyberion.
@@ -137,438 +114,6 @@ function generateHeuristicId(): string {
 }
 
 // ---------------------------------------------------------------------------
-// Extract Requirements — drives the customer_engagement mission. Reads a
-// transcript / notes file, calls the registered reasoning backend to produce
-// an ExtractedRequirements object, and persists it as the mission's
-// requirements-draft.json via the store. Gate evaluators live on the store.
-// ---------------------------------------------------------------------------
-
-export interface ExtractRequirementsOpInput {
-  mission_id: string;
-  project_name: string;
-  source_path: string;
-  source_type?:
-    | 'call_recording'
-    | 'call_transcript'
-    | 'meeting_notes'
-    | 'document_pack'
-    | 'chat_log'
-    | 'mixed';
-  language?: string;
-  customer_name?: string;
-  customer_person_slug?: string;
-  customer_org?: string;
-  prior_draft_ref?: string;
-}
-
-export async function extractRequirementsOp(input: ExtractRequirementsOpInput): Promise<{
-  mission_id: string;
-  version: string;
-  draft_path: string;
-  completeness: { passed: boolean; reasons: string[] };
-}> {
-  if (!input.mission_id || !input.project_name || !input.source_path) {
-    throw new Error('[extract_requirements] requires mission_id, project_name, and source_path');
-  }
-  const backend = getReasoningBackend();
-  const sourceAbs = pathResolver.rootResolve(input.source_path);
-  if (!safeExistsSync(sourceAbs)) {
-    throw new Error(`[extract_requirements] source not found: ${input.source_path}`);
-  }
-  const sourceText = safeReadFile(sourceAbs, { encoding: 'utf8' }) as string;
-
-  let priorDraft: unknown;
-  if (input.prior_draft_ref) {
-    const priorAbs = pathResolver.rootResolve(input.prior_draft_ref);
-    if (safeExistsSync(priorAbs)) {
-      priorDraft = JSON.parse(safeReadFile(priorAbs, { encoding: 'utf8' }) as string);
-    }
-  }
-
-  const customer =
-    input.customer_name || input.customer_person_slug || input.customer_org
-      ? {
-          ...(input.customer_name ? { name: input.customer_name } : {}),
-          ...(input.customer_person_slug ? { person_slug: input.customer_person_slug } : {}),
-          ...(input.customer_org ? { org: input.customer_org } : {}),
-        }
-      : undefined;
-
-  const extracted = await backend.extractRequirements({
-    sourceText,
-    projectName: input.project_name,
-    customer,
-    language: input.language,
-    priorDraft,
-  });
-
-  const draft = saveRequirementsDraft({
-    missionId: input.mission_id,
-    projectName: input.project_name,
-    extracted,
-    customer,
-    elicitationSource: {
-      type: input.source_type ?? 'meeting_notes',
-      refs: [input.source_path],
-      ...(input.language ? { language: input.language } : {}),
-    },
-    generatedBy: backend.name,
-  });
-
-  const completeness = evaluateRequirementsCompletenessGate(input.mission_id);
-
-  const draftPath = `active/missions/${input.mission_id}/evidence/requirements-draft.json`;
-  return {
-    mission_id: input.mission_id,
-    version: draft.version,
-    draft_path: draftPath,
-    completeness,
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Extract Design Spec — requirements-draft → architectural design spec.
-// ---------------------------------------------------------------------------
-
-export interface ExtractDesignSpecOpInput {
-  mission_id: string;
-  project_name: string;
-  requirements_draft_path?: string;
-  additional_context?: string;
-}
-
-export async function extractDesignSpecOp(input: ExtractDesignSpecOpInput): Promise<{
-  mission_id: string;
-  version: string;
-  draft_path: string;
-  architecture_ready: { passed: boolean; reasons: string[] };
-}> {
-  if (!input.mission_id || !input.project_name) {
-    throw new Error('[extract_design_spec] requires mission_id and project_name');
-  }
-  const backend = getReasoningBackend();
-  const requirementsPath =
-    input.requirements_draft_path ??
-    `active/missions/${input.mission_id}/evidence/requirements-draft.json`;
-  const abs = pathResolver.rootResolve(requirementsPath);
-  if (!safeExistsSync(abs)) {
-    // Fall back to the store helper — may return null if evidence dir differs
-    const fromStore = readRequirementsDraft(input.mission_id);
-    if (!fromStore) {
-      throw new Error(`[extract_design_spec] requirements draft not found at ${requirementsPath}`);
-    }
-    const extracted = await backend.extractDesignSpec({
-      requirementsDraft: fromStore,
-      projectName: input.project_name,
-      additionalContext: input.additional_context,
-    });
-    const saved = saveDesignSpec({
-      missionId: input.mission_id,
-      projectName: input.project_name,
-      extracted,
-      sourceRefs: [requirementsPath],
-      generatedBy: backend.name,
-    });
-    const gate = evaluateArchitectureReadyGate(input.mission_id);
-    return {
-      mission_id: input.mission_id,
-      version: saved.version,
-      draft_path: `active/missions/${input.mission_id}/evidence/design-spec.json`,
-      architecture_ready: gate,
-    };
-  }
-  const requirementsDraft = JSON.parse(safeReadFile(abs, { encoding: 'utf8' }) as string);
-  const extracted = await backend.extractDesignSpec({
-    requirementsDraft,
-    projectName: input.project_name,
-    additionalContext: input.additional_context,
-  });
-  const saved = saveDesignSpec({
-    missionId: input.mission_id,
-    projectName: input.project_name,
-    extracted,
-    sourceRefs: [requirementsPath],
-    generatedBy: backend.name,
-  });
-  const gate = evaluateArchitectureReadyGate(input.mission_id);
-  return {
-    mission_id: input.mission_id,
-    version: saved.version,
-    draft_path: `active/missions/${input.mission_id}/evidence/design-spec.json`,
-    architecture_ready: gate,
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Extract Test Plan — requirements (+ optional design) → test-case-adf cases.
-// ---------------------------------------------------------------------------
-
-export interface ExtractTestPlanOpInput {
-  mission_id: string;
-  project_name: string;
-  app_id?: string;
-  requirements_draft_path?: string;
-  design_spec_path?: string;
-}
-
-export async function extractTestPlanOp(input: ExtractTestPlanOpInput): Promise<{
-  mission_id: string;
-  version: string;
-  draft_path: string;
-  qa_ready: { passed: boolean; reasons: string[] };
-}> {
-  if (!input.mission_id || !input.project_name) {
-    throw new Error('[extract_test_plan] requires mission_id and project_name');
-  }
-  const backend = getReasoningBackend();
-  const requirementsDraft =
-    readRequirementsDraft(input.mission_id) ??
-    (input.requirements_draft_path &&
-    safeExistsSync(pathResolver.rootResolve(input.requirements_draft_path))
-      ? JSON.parse(
-          safeReadFile(pathResolver.rootResolve(input.requirements_draft_path), {
-            encoding: 'utf8',
-          }) as string
-        )
-      : null);
-  if (!requirementsDraft) {
-    throw new Error('[extract_test_plan] requirements draft not found');
-  }
-  const designSpec =
-    readDesignSpec(input.mission_id) ??
-    (input.design_spec_path && safeExistsSync(pathResolver.rootResolve(input.design_spec_path))
-      ? JSON.parse(
-          safeReadFile(pathResolver.rootResolve(input.design_spec_path), {
-            encoding: 'utf8',
-          }) as string
-        )
-      : undefined);
-
-  const extracted = await backend.extractTestPlan({
-    requirementsDraft,
-    designSpec,
-    projectName: input.project_name,
-    appId: input.app_id,
-  });
-  const saved = saveTestPlan({
-    missionId: input.mission_id,
-    projectName: input.project_name,
-    extracted,
-    sourceRefs: [
-      `active/missions/${input.mission_id}/evidence/requirements-draft.json`,
-      ...(designSpec ? [`active/missions/${input.mission_id}/evidence/design-spec.json`] : []),
-    ],
-    generatedBy: backend.name,
-  });
-
-  // Must-have FR ids for coverage check
-  const mustHaveIds: string[] = Array.isArray((requirementsDraft as any).functional_requirements)
-    ? (
-        (requirementsDraft as any).functional_requirements as Array<{
-          id: string;
-          priority: string;
-        }>
-      )
-        .filter((r) => r.priority === 'must')
-        .map((r) => r.id)
-    : [];
-  const gate = evaluateQaReadyGate(input.mission_id, mustHaveIds);
-  return {
-    mission_id: input.mission_id,
-    version: saved.version,
-    draft_path: `active/missions/${input.mission_id}/evidence/test-plan.json`,
-    qa_ready: gate,
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Decompose Into Tasks — requirements (+ optional design) → task plan.
-// ---------------------------------------------------------------------------
-
-export interface DecomposeIntoTasksOpInput {
-  mission_id: string;
-  project_name: string;
-  requirements_draft_path?: string;
-  design_spec_path?: string;
-}
-
-export async function decomposeIntoTasksOp(input: DecomposeIntoTasksOpInput): Promise<{
-  mission_id: string;
-  version: string;
-  draft_path: string;
-  task_count: number;
-  task_plan_ready: { passed: boolean; reasons: string[] };
-}> {
-  if (!input.mission_id || !input.project_name) {
-    throw new Error('[decompose_into_tasks] requires mission_id and project_name');
-  }
-  const backend = getReasoningBackend();
-  const requirementsDraft =
-    readRequirementsDraft(input.mission_id) ??
-    (input.requirements_draft_path &&
-    safeExistsSync(pathResolver.rootResolve(input.requirements_draft_path))
-      ? JSON.parse(
-          safeReadFile(pathResolver.rootResolve(input.requirements_draft_path), {
-            encoding: 'utf8',
-          }) as string
-        )
-      : null);
-  if (!requirementsDraft) {
-    throw new Error('[decompose_into_tasks] requirements draft not found');
-  }
-  const designSpec =
-    readDesignSpec(input.mission_id) ??
-    (input.design_spec_path && safeExistsSync(pathResolver.rootResolve(input.design_spec_path))
-      ? JSON.parse(
-          safeReadFile(pathResolver.rootResolve(input.design_spec_path), {
-            encoding: 'utf8',
-          }) as string
-        )
-      : undefined);
-
-  const decomposed = await backend.decomposeIntoTasks({
-    requirementsDraft,
-    designSpec,
-    projectName: input.project_name,
-  });
-  const saved = saveTaskPlan({
-    missionId: input.mission_id,
-    projectName: input.project_name,
-    decomposed,
-    sourceRefs: [
-      `active/missions/${input.mission_id}/evidence/requirements-draft.json`,
-      ...(designSpec ? [`active/missions/${input.mission_id}/evidence/design-spec.json`] : []),
-    ],
-    generatedBy: backend.name,
-  });
-  const gate = evaluateTaskPlanReadyGate(input.mission_id);
-  return {
-    mission_id: input.mission_id,
-    version: saved.version,
-    draft_path: `active/missions/${input.mission_id}/evidence/task-plan.json`,
-    task_count: saved.tasks.length,
-    task_plan_ready: gate,
-  };
-}
-
-// ---------------------------------------------------------------------------
-// E2E-05 Task 4: task-plan → NEXT_TASKS.json (deterministic transform).
-// Converts the SDLC task plan into the orchestration worker's task contract
-// so "合意 → 分解 → ミッション着手" becomes one pipeline run. Roles from the
-// plan are respected (tester → qa); reviewer tasks get the worker's mandatory
-// review_target / REVIEW-<target>.md deliverable derived from depends_on.
-// ---------------------------------------------------------------------------
-
-export function taskPlanToNextTasksOp(input: { mission_id: string }): {
-  mission_id: string;
-  next_tasks_path: string;
-  task_count: number;
-} {
-  if (!input.mission_id) throw new Error('[task_plan_to_next_tasks] requires mission_id');
-  const plan = readTaskPlan(input.mission_id);
-  if (!plan || !Array.isArray(plan.tasks) || plan.tasks.length === 0) {
-    throw new Error('[task_plan_to_next_tasks] task plan not found or empty');
-  }
-  // A stub-backend placeholder plan must never become real worker tasks —
-  // that is a 字面成功 (the pipeline "passes" while the mission gets a fake
-  // plan). Fail loudly so the operator re-runs with a real backend.
-  const stubTasks = plan.tasks.filter(
-    (task) =>
-      /\[STUB\]/.test(String(task.title || '')) || /^T-STUB/i.test(String(task.task_id || ''))
-  );
-  if (stubTasks.length > 0) {
-    throw new Error(
-      `[task_plan_to_next_tasks] task plan contains ${stubTasks.length} stub placeholder task(s) — regenerate with a real reasoning backend (KYBERION_REASONING_BACKEND)`
-    );
-  }
-  const scopeOf = (estimate?: string): 'S' | 'M' | 'L' =>
-    estimate === 'L' || estimate === 'XL' ? 'L' : estimate === 'M' ? 'M' : 'S';
-  const nextTasks = plan.tasks.map((task) => {
-    const dependencies = Array.isArray(task.depends_on) ? task.depends_on : [];
-    let role =
-      task.assigned_role === 'tester'
-        ? 'qa'
-        : task.assigned_role === 'reviewer'
-          ? 'reviewer'
-          : 'implementer';
-    // The worker contract requires reviewer/qa tasks to carry review_target +
-    // a REVIEW-<target>.md deliverable; without a dependency there is nothing
-    // to review, so the task degrades to implementer instead of violating it.
-    const reviewTarget = role === 'reviewer' || role === 'qa' ? dependencies[0] : undefined;
-    if ((role === 'reviewer' || role === 'qa') && !reviewTarget) role = 'implementer';
-    const scope = scopeOf(task.estimate);
-    return {
-      task_id: task.task_id,
-      status: 'planned',
-      assigned_to: { role },
-      description: `${task.title} — ${task.summary}`,
-      deliverable: reviewTarget
-        ? `deliverables/REVIEW-${reviewTarget}.md`
-        : task.deliverables?.[0] || `deliverables/${task.task_id}.md`,
-      dependencies,
-      acceptance_criteria: Array.isArray(task.test_criteria) ? task.test_criteria : [],
-      estimated_scope: scope,
-      risk: scope === 'L' ? 'high' : scope === 'M' ? 'medium' : 'low',
-      ...(reviewTarget ? { review_target: reviewTarget } : {}),
-    };
-  });
-  // Same path convention the orchestration worker reads from
-  // (missionDir honors mission-management-config tier directories).
-  const nextTasksPath = `${missionDir(input.mission_id, 'public')}/NEXT_TASKS.json`;
-  safeWriteFile(nextTasksPath, JSON.stringify(nextTasks, null, 2));
-  return {
-    mission_id: input.mission_id,
-    next_tasks_path: nextTasksPath,
-    task_count: nextTasks.length,
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Presentation Preference Registration — extracted deck style → reusable
-// personal registry entry. This keeps theme hints and question prompts out of
-// the code path and lets media-actuator resolve the theme from the personal
-// overlay catalog.
-// ---------------------------------------------------------------------------
-
-export interface RegisterPresentationPreferenceProfileOpInput {
-  profile?: PresentationPreferenceProfile;
-  profile_path?: string;
-  registry_path?: string;
-}
-
-export async function registerPresentationPreferenceProfileOp(
-  input: RegisterPresentationPreferenceProfileOpInput
-): Promise<{
-  profile_id: string;
-  registry_path: string;
-  default_profile_id: string;
-}> {
-  const profile =
-    input.profile ??
-    (input.profile_path && safeExistsSync(pathResolver.rootResolve(input.profile_path))
-      ? JSON.parse(
-          safeReadFile(pathResolver.rootResolve(input.profile_path), { encoding: 'utf8' }) as string
-        )
-      : null);
-  if (!profile || typeof profile !== 'object') {
-    throw new Error(
-      '[register_presentation_preference_profile] requires a presentation-preference-profile'
-    );
-  }
-
-  const registryPath = registerPresentationPreferenceProfile(
-    profile as PresentationPreferenceProfile,
-    input.registry_path ? pathResolver.rootResolve(input.registry_path) : undefined
-  );
-
-  return {
-    profile_id: (profile as PresentationPreferenceProfile).profile_id,
-    registry_path: registryPath,
-    default_profile_id: (profile as PresentationPreferenceProfile).profile_id,
-  };
-}
-
-// ---------------------------------------------------------------------------
 // Intuition Capture — records a 3-question heuristic entry under the
 // confidential tier. See knowledge/product/orchestration/intuition-capture-protocol.md.
 // No LLM needed; the capture is a structured record of the Sovereign's answers.
@@ -626,23 +171,6 @@ function warnStub(op: string, note?: string): void {
 // ---------------------------------------------------------------------------
 // Pure-logic ops
 // ---------------------------------------------------------------------------
-
-/**
- * Sort stakeholder nodes by Power/Interest grid.
- * Input: array of { person_slug, power_level ('high'|'low'), interest_level ('high'|'low'), ... }
- * Output: ordered array, High-Power/High-Interest first, Low/Low last.
- */
-export function stakeholderGridSort(nodes: any[]): any[] {
-  const rank = (n: any): number => {
-    const p = (n.power_level || n.power || 'low').toLowerCase();
-    const i = (n.interest_level || n.interest || 'low').toLowerCase();
-    if (p === 'high' && i === 'high') return 0; // manage closely
-    if (p === 'high' && i === 'low') return 1; // keep satisfied
-    if (p === 'low' && i === 'high') return 2; // keep informed
-    return 3; // monitor
-  };
-  return [...nodes].sort((a, b) => rank(a) - rank(b));
-}
 
 /**
  * Emit dissent log from a hypothesis tree or arbitrary source with {hypotheses}.
@@ -787,93 +315,6 @@ export function renderHypothesisReport(input: {
 }
 
 /**
- * Aggregate nemawashi 1-on-1 visit files into a readiness matrix.
- * Expects visit files with { person_slug, stance, conditions, dissent_signals, visited_at }.
- */
-export function computeReadinessMatrix(input: {
-  visits_dir: string;
-  proposal_ref?: string;
-  deadline?: string;
-  output_path: string;
-}): {
-  readiness_score: number;
-  recommendation: 'proceed' | 'delay' | 'redesign';
-  written_to: string;
-} {
-  const dirAbs = pathResolver.rootResolve(input.visits_dir);
-  const files = safeExistsSync(dirAbs)
-    ? getAllFiles(dirAbs).filter((f) => f.endsWith('.json'))
-    : [];
-
-  const visits = files
-    .map((f) => {
-      try {
-        return JSON.parse(safeReadFile(f, { encoding: 'utf8' }) as string);
-      } catch {
-        return null;
-      }
-    })
-    .filter(Boolean);
-
-  const stanceWeight: Record<string, number> = {
-    support: 100,
-    conditional: 60,
-    neutral: 40,
-    oppose: 0,
-  };
-
-  const totalWeight = visits.reduce(
-    (sum: number, v: any) => sum + (stanceWeight[v.stance] ?? 30),
-    0
-  );
-  const readinessScore = visits.length === 0 ? 0 : Math.round(totalWeight / visits.length);
-
-  let recommendation: 'proceed' | 'delay' | 'redesign';
-  if (readinessScore >= 70) recommendation = 'proceed';
-  else if (readinessScore >= 40) recommendation = 'delay';
-  else recommendation = 'redesign';
-
-  const payload = {
-    proposal_ref: input.proposal_ref || null,
-    deadline: input.deadline || null,
-    visits: visits.map((v: any) => ({
-      person_slug: v.person_slug,
-      visited_at: v.visited_at,
-      stance: v.stance,
-      conditions: v.conditions || [],
-      dissent_signals: v.dissent_signals || [],
-    })),
-    readiness_score: readinessScore,
-    recommendation,
-    generated_at: nowIso(),
-  };
-  writeJSON(input.output_path, payload);
-  return { readiness_score: readinessScore, recommendation, written_to: input.output_path };
-}
-
-/**
- * Deterministic recommender that maps readiness_score to an action label.
- * No LLM — driven purely by the thresholds in readiness matrix output.
- */
-export function recommend(input: { readiness_ref: string; options?: string[] }): {
-  choice: string;
-  reason: string;
-} {
-  const matrix = readJSON<any>(input.readiness_ref);
-  const score = Number(matrix.readiness_score ?? 0);
-  const choice: string =
-    matrix.recommendation || (score >= 70 ? 'proceed' : score >= 40 ? 'delay' : 'redesign');
-  const allowed = input.options || ['proceed', 'delay', 'redesign'];
-  if (!allowed.includes(choice)) {
-    return {
-      choice: allowed[allowed.length - 1],
-      reason: `score ${score} did not map to any allowed option; falling back`,
-    };
-  }
-  return { choice, reason: `readiness_score=${score}` };
-}
-
-/**
  * CO-04 Task 3: when hypothesis-tree convergence (hypothesis-tree-protocol.md
  * Phase C) leaves more than one hypothesis surviving critique, decide between
  * them deterministically using the vision's golden-rule priority order
@@ -921,102 +362,6 @@ export function resolveHypothesisConflict(input: {
 }
 
 /**
- * CO-05: pipeline-callable decision-rights enforcement. Business-process
- * templates (procurement-vendor, hiring-workflow, ...) were writing a
- * narrative "approval_boundary" string into their decision note without
- * ever calling CO-04's actual enforcement (`evaluateDecisionRights` /
- * `enforceApprovalGate`) — spend/headcount thresholds were documented, not
- * enforced. This op is the missing pipeline-facing entry point: it evaluates
- * the tenant's decision-rights matrix and, when escalation is required,
- * creates (or looks up) a real pending/approved request via the same
- * approval-gate used elsewhere in the codebase — it does not duplicate that
- * logic. `allowed: false` means the pipeline must not proceed past this
- * point without a human decision; templates branch on it with `core:if`
- * rather than this op throwing, matching every other `enforceApprovalGate`
- * call site (procedure-dispatcher, kill-switch, browser-extension-bridge),
- * none of which throw on a pending approval either.
- */
-export interface EvaluateDecisionRightsApprovalOpInput {
-  operation_id: string;
-  correlation_id: string;
-  decision_type: string;
-  agent_id?: string;
-  caller_role?: string;
-  channel?: string;
-  amount?: number;
-  tenant_slug?: string;
-  mission_id?: string;
-  title?: string;
-  summary?: string;
-}
-
-export function evaluateDecisionRightsApprovalOp(input: EvaluateDecisionRightsApprovalOpInput): {
-  allowed: boolean;
-  status: 'approved' | 'pending' | 'not_required';
-  request_id?: string;
-  message?: string;
-} {
-  if (!input.operation_id || !input.correlation_id || !input.decision_type) {
-    throw new Error(
-      '[evaluate_decision_rights_approval] requires operation_id, correlation_id, and decision_type'
-    );
-  }
-
-  // Decide up front whether the matrix actually requires escalation for this
-  // decision_type/amount/role, using CO-04's own evaluator (not duplicated
-  // here). enforceApprovalGate's decision-rights integration is only a fast
-  // "allow immediately" path when rights DON'T require escalation — it does
-  // not independently block when they do, that depends on a matching
-  // approval-policy.json rule (see knowledge/product/governance/
-  // approval-policy.json "decision-rights-escalation", which matches on
-  // payload.decision_type). Gating the enforceApprovalGate call here on the
-  // same evaluation keeps that policy rule's "always requires approval for
-  // these 3 decision_types" reasonable even if a future decision_type in the
-  // matrix has a real per-amount threshold instead of
-  // requires_human_acceptance: true.
-  const matrix = resolveDecisionRightsMatrix(input.tenant_slug ?? null);
-  const evaluation = evaluateDecisionRights(matrix, {
-    decisionType: input.decision_type,
-    actorRole: input.caller_role,
-    amount: input.amount,
-  });
-  if (!evaluation || !evaluation.requiresEscalation) {
-    return { allowed: true, status: 'not_required' };
-  }
-
-  const result = enforceApprovalGate({
-    operationId: input.operation_id,
-    agentId: input.agent_id || 'mission_controller',
-    callerRole: input.caller_role,
-    correlationId: input.correlation_id,
-    channel: input.channel || 'mission',
-    payload: {
-      decision_type: input.decision_type,
-      ...(typeof input.amount === 'number' && Number.isFinite(input.amount)
-        ? { amount: input.amount }
-        : {}),
-      ...(input.tenant_slug ? { tenant_slug: input.tenant_slug } : {}),
-      ...(input.mission_id ? { mission_id: input.mission_id } : {}),
-    },
-    ...(input.title || input.summary
-      ? {
-          draft: {
-            title: input.title || `Approval required: ${input.operation_id}`,
-            summary: input.summary || `${input.decision_type} requires human review.`,
-            severity: 'medium' as const,
-          },
-        }
-      : {}),
-  });
-  return {
-    allowed: result.allowed,
-    status: result.status,
-    ...(result.requestId ? { request_id: result.requestId } : {}),
-    ...(result.message ? { message: result.message } : {}),
-  };
-}
-
-/**
  * Append-only proposal adjustment. Records new signals as a trailing
  * "Updates" section on the proposal file. Semantic rewording requires an LLM
  * and is not attempted here.
@@ -1034,96 +379,6 @@ export function adjustProposalAppend(input: {
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
   safeWriteFile(abs, original + block);
   return { written_to: out };
-}
-
-/**
- * Scan extracted slides and return the 1-based indices whose text contains
- * any of the supplied owner labels (e.g. "報告担当A"). Exact substring match.
- *
- * Input shape: output of media-actuator's `pptx_slide_text` op
- *   (array of { slide_index, concatenated, ... }).
- *
- * This is the missing piece for "give me a template, I'll give you back only
- * my slides": the agent calls pptx_slide_text, then this op, then pptx_filter_slides.
- */
-export function findSlidesByOwner(input: {
-  slides: Array<{ slide_index: number; concatenated?: string; text_runs?: string[] }>;
-  owner_labels: string[];
-  match_mode?: 'substring' | 'run_exact';
-}): { indices: number[]; matches: Array<{ slide_index: number; matched_label: string }> } {
-  const mode = input.match_mode || 'substring';
-  const matches: Array<{ slide_index: number; matched_label: string }> = [];
-
-  for (const slide of input.slides) {
-    for (const label of input.owner_labels) {
-      const hit =
-        mode === 'substring'
-          ? (slide.concatenated || '').includes(label)
-          : (slide.text_runs || []).includes(label);
-      if (hit) {
-        matches.push({ slide_index: slide.slide_index, matched_label: label });
-        break;
-      }
-    }
-  }
-
-  const indices = matches.map((m) => m.slide_index);
-  return { indices, matches };
-}
-
-/**
- * Diff two extracted slide sets and return a structured change report.
- * Compares concatenated text per slide_index. Slides present in only one
- * side are reported as added/removed.
- */
-export function pptxDiff(input: {
-  before: Array<{ slide_index: number; concatenated?: string; text_runs?: string[] }>;
-  after: Array<{ slide_index: number; concatenated?: string; text_runs?: string[] }>;
-}): {
-  added: number[];
-  removed: number[];
-  changed: Array<{
-    slide_index: number;
-    added_runs: string[];
-    removed_runs: string[];
-  }>;
-  unchanged: number[];
-} {
-  const byIndexBefore = new Map(input.before.map((s) => [s.slide_index, s]));
-  const byIndexAfter = new Map(input.after.map((s) => [s.slide_index, s]));
-
-  const added: number[] = [];
-  const removed: number[] = [];
-  const changed: Array<{ slide_index: number; added_runs: string[]; removed_runs: string[] }> = [];
-  const unchanged: number[] = [];
-
-  const allIndices = new Set([...byIndexBefore.keys(), ...byIndexAfter.keys()]);
-  for (const idx of Array.from(allIndices).sort((a, b) => a - b)) {
-    const b = byIndexBefore.get(idx);
-    const a = byIndexAfter.get(idx);
-    if (!b && a) {
-      added.push(idx);
-      continue;
-    }
-    if (b && !a) {
-      removed.push(idx);
-      continue;
-    }
-    if (!b || !a) continue;
-
-    const beforeRuns = new Set(b.text_runs || []);
-    const afterRuns = new Set(a.text_runs || []);
-    const addedRuns = [...afterRuns].filter((r) => !beforeRuns.has(r));
-    const removedRuns = [...beforeRuns].filter((r) => !afterRuns.has(r));
-
-    if (addedRuns.length === 0 && removedRuns.length === 0) {
-      unchanged.push(idx);
-    } else {
-      changed.push({ slide_index: idx, added_runs: addedRuns, removed_runs: removedRuns });
-    }
-  }
-
-  return { added, removed, changed, unchanged };
 }
 
 // ---------------------------------------------------------------------------
@@ -1387,36 +642,6 @@ export async function a2aRoleplay(input: {
   return { written_to: input.output_path, reasoning_mode: reasoningMode };
 }
 
-export async function conduct1on1(input: {
-  counterparty_ref: string;
-  proposal_draft_ref: string;
-  structure: string[];
-  output_path: string;
-}): Promise<{ written_to: string; reasoning_mode: 'placeholder' | 'model' }> {
-  const bridge = getVoiceBridge();
-  const result = await bridge.runOneOnOneSession({
-    counterpartyRef: input.counterparty_ref,
-    proposalDraftRef: input.proposal_draft_ref,
-    structure: input.structure,
-    outputPath: input.output_path,
-  });
-  const reasoningMode = deriveReasoningMode(bridge.name, Boolean(result._synthetic));
-  writeJSON(input.output_path, {
-    person_slug: result.person_slug,
-    visited_at: result.visited_at,
-    structure: input.structure,
-    transcript: result.transcript,
-    stance: result.stance,
-    conditions: result.conditions,
-    dissent_signals: result.dissent_signals,
-    engine_id: result.engine_id ?? null,
-    generated_by: bridge.name,
-    reasoning_mode: reasoningMode,
-    ...(result._synthetic ? { _synthetic: true } : {}),
-  });
-  return { written_to: input.output_path, reasoning_mode: reasoningMode };
-}
-
 export function extractDissentSignals(input: { session_log_path: string; output_path: string }): {
   written_to: string;
 } {
@@ -1550,677 +775,6 @@ export async function simulateAll(input: {
 }
 
 // ---------------------------------------------------------------------------
-// Meeting facilitation ops (G6 / new use case)
-//
-// extract_action_items / generate_facilitation_script / generate_reminder_message
-// drive the AI-runs-meetings flow. They use `backend.delegateTask` (which
-// every reasoning backend implements) so they work uniformly across stub /
-// claude-cli / claude-agent / anthropic / gemini-cli / codex-cli.
-// ---------------------------------------------------------------------------
-
-function extractFirstJsonBlock(text: string): unknown {
-  const trimmed = text.trim();
-  // Extract JSON inside a code fence first.
-  const fenced = trimmed.match(/```(?:json)?\s*\n([\s\S]*?)\n```/);
-  if (fenced) return JSON.parse(fenced[1]);
-  // Fallback: locate the first top-level {...} or [...].
-  const start = trimmed.search(/[\[{]/);
-  if (start === -1) throw new Error('no JSON block in delegateTask response');
-  const open = trimmed[start];
-  const close = open === '[' ? ']' : '}';
-  let depth = 0;
-  for (let i = start; i < trimmed.length; i++) {
-    if (trimmed[i] === open) depth += 1;
-    else if (trimmed[i] === close) {
-      depth -= 1;
-      if (depth === 0) return JSON.parse(trimmed.slice(start, i + 1));
-    }
-  }
-  throw new Error('unbalanced JSON block in delegateTask response');
-}
-
-export async function extractActionItemsOp(input: {
-  mission_id: string;
-  transcript: string;
-  attendees?: Array<{
-    name: string;
-    person_slug?: string;
-    channel_handle?: string;
-    manager_handle?: string;
-  }>;
-  operator_label?: string;
-  default_assignee_label?: string;
-  language?: string;
-  default_max_reminders?: number;
-  /**
-   * Ops-3: when true, every extracted item is recorded with
-   * `partial_state=true` so it fail-closes self-execution / tracking
-   * until cleared. Set this when the upstream listen result reported
-   * `partial_state` (bridge timeout, dropped capture, empty transcript).
-   */
-  partial_state?: boolean;
-  partial_reason?: string;
-  /**
-   * Compliance-2: when true, run each item through the restricted-action-kinds
-   * policy and tag matches with `restricted` + `restriction_rule_id`. Defaults
-   * to true; supply false only for closed-loop tests.
-   */
-  enforce_restricted_actions?: boolean;
-}): Promise<{
-  items: ActionItem[];
-  written_count: number;
-  pending_review_count: number;
-  partial_count: number;
-  restricted_count: number;
-}> {
-  const backend = getReasoningBackend();
-  const operatorLabel = input.operator_label ?? 'Operator';
-  const attendees = input.attendees ?? [];
-  const attendeesBlock = attendees.length
-    ? attendees
-        .map(
-          (a) =>
-            `  - ${a.name}${a.person_slug ? ` (slug=${a.person_slug})` : ''}${
-              a.channel_handle ? ` (channel=${a.channel_handle})` : ''
-            }`
-        )
-        .join('\n')
-    : '  (none provided)';
-  const language = input.language ?? 'auto';
-  const defaultMaxReminders = input.default_max_reminders ?? 5;
-  const prompt = [
-    'You analyze a meeting transcript and produce a JSON array of action items.',
-    '',
-    'Output rules:',
-    '- Output ONLY a JSON array. No prose. No code fence.',
-    '- Each item: { "title": str (≤120 chars, imperative), "summary": str?, "assignee_label": str, "assignee_kind": "operator_self"|"team_member"|"external"|"unassigned", "priority": "must"|"should"|"could"|"wont", "due_at_iso": str?, "modality": "declarative"|"conditional"|"hypothetical"|"rhetorical"|"humor", "speaker_label": str, "transcript_excerpt": str (≤240 chars, verbatim), "transcript_offset_lines": [int] }',
-    '',
-    `- assignee_kind = "operator_self" when the assignee matches "${operatorLabel}".`,
-    '- assignee_kind = "team_member" when the assignee is in the attendees list (not the operator).',
-    '- assignee_kind = "external" when the assignee is named but not in the attendee list.',
-    '- assignee_kind = "unassigned" when the action item has no clear owner.',
-    '',
-    'CRITICAL — modality classification (audit-load-bearing):',
-    '- "declarative"  : a clear commitment ("I will send X by Friday").',
-    '- "conditional"  : depends on a precondition not yet met ("if budget approves, then …").',
-    '- "hypothetical" : exploratory or thought-experiment ("we could try …", "what if we …").',
-    '- "rhetorical"   : framed as a question but not requesting action ("should we even do this?").',
-    '- "humor"        : a joke / sarcasm / reductio ad absurdum ("let\\u0027s just delete prod").',
-    'When modality != "declarative", the item lands in pending_speaker_review and will NOT be auto-executed or auto-tracked. Be conservative: if uncertain whether a sentence is a real commitment, label "conditional" or "hypothetical" rather than "declarative".',
-    '',
-    '- speaker_label: who actually uttered the words (one of the attendees, the operator, or "unknown").',
-    '- transcript_excerpt: a verbatim ≤ 240-char excerpt of the source line(s).',
-    '- transcript_offset_lines: 1-based line numbers in the transcript referenced by this item.',
-    '',
-    '- Capture imperatives, owners, and any deadlines; do not invent owners or deadlines that are not in the transcript.',
-    '',
-    'Attendees:',
-    attendeesBlock,
-    '',
-    'Transcript:',
-    input.transcript,
-    '',
-    `Language hint: ${language}.`,
-  ].join('\n');
-  const extractedAt = nowIso();
-  const raw = await backend.delegateTask(prompt, `mission=${input.mission_id}`);
-  let parsed: any[];
-  try {
-    parsed = extractFirstJsonBlock(raw) as any[];
-    if (!Array.isArray(parsed)) {
-      throw new Error('expected array');
-    }
-  } catch (err: any) {
-    logger.warn(
-      `[extract_action_items] parse failed: ${err?.message ?? err}; raw="${raw.slice(0, 200)}"`
-    );
-    return {
-      items: [],
-      written_count: 0,
-      pending_review_count: 0,
-      partial_count: 0,
-      restricted_count: 0,
-    };
-  }
-
-  const operatorTokens = new Set([operatorLabel.toLowerCase(), 'operator', 'self', 'me']);
-  const validModalities = new Set([
-    'declarative',
-    'conditional',
-    'hypothetical',
-    'rhetorical',
-    'humor',
-  ]);
-  const items: ActionItem[] = [];
-  let i = 0;
-  let pendingReview = 0;
-  let restrictedCount = 0;
-  for (const entry of parsed) {
-    if (!entry || typeof entry !== 'object') continue;
-    const title = String(entry.title ?? '').trim();
-    if (title.length < 5) continue;
-    const assigneeLabel =
-      String(entry.assignee_label ?? input.default_assignee_label ?? 'unassigned').trim() ||
-      'unassigned';
-    let kind: ActionItemAssigneeKind =
-      entry.assignee_kind &&
-      ['operator_self', 'team_member', 'external', 'unassigned'].includes(entry.assignee_kind)
-        ? (entry.assignee_kind as ActionItemAssigneeKind)
-        : 'unassigned';
-    if (kind === 'unassigned' && operatorTokens.has(assigneeLabel.toLowerCase())) {
-      kind = 'operator_self';
-    }
-    const matchedAttendee = attendees.find(
-      (a) => a.name.toLowerCase() === assigneeLabel.toLowerCase()
-    );
-    if (matchedAttendee && kind !== 'operator_self') {
-      kind = 'team_member';
-    }
-    const assignee: ActionItemAssignee = {
-      kind,
-      label: assigneeLabel,
-      ...(matchedAttendee?.person_slug ? { person_slug: matchedAttendee.person_slug } : {}),
-      ...(matchedAttendee?.channel_handle
-        ? { channel_handle: matchedAttendee.channel_handle }
-        : {}),
-    };
-    // HR-2 chain-of-command: lift the manager handle off the matched
-    // attendee record. The reminder dispatcher CCs this when priority
-    // is `must` or when the per-tenant policy demands manager visibility.
-    const managerHandle = matchedAttendee?.manager_handle;
-    const modality: ActionItemModality = validModalities.has(String(entry.modality))
-      ? (entry.modality as ActionItemModality)
-      : 'declarative';
-    const reviewState: ActionItemReviewState =
-      modality === 'declarative' ? 'auto_committed' : 'pending_speaker_review';
-    if (reviewState === 'pending_speaker_review') pendingReview += 1;
-    const provenance: ActionItemProvenance = {
-      ...(typeof entry.speaker_label === 'string' ? { speaker_label: entry.speaker_label } : {}),
-      ...(typeof entry.transcript_excerpt === 'string'
-        ? { transcript_excerpt: String(entry.transcript_excerpt).slice(0, 240) }
-        : {}),
-      ...(Array.isArray(entry.transcript_offset_lines)
-        ? {
-            transcript_offset_lines: entry.transcript_offset_lines
-              .map((n: unknown) => Number(n))
-              .filter((n: number) => Number.isFinite(n) && n > 0),
-          }
-        : {}),
-      extractor: {
-        backend: backend.name,
-        model: process.env.KYBERION_CLAUDE_CLI_MODEL || 'opus',
-        extracted_at: extractedAt,
-      },
-    };
-    i += 1;
-    const itemId = nextActionItemId(input.mission_id, `M${i}`);
-    // Compliance-2: classify against restricted-action-kinds policy.
-    const restrictedHit =
-      input.enforce_restricted_actions === false
-        ? null
-        : matchRestrictedAction({
-            title: title.slice(0, 120),
-            summary: typeof entry.summary === 'string' ? entry.summary : undefined,
-          });
-    if (restrictedHit) restrictedCount += 1;
-    const summaryParts: string[] = [];
-    if (typeof entry.summary === 'string') summaryParts.push(entry.summary);
-    if (input.partial_state && input.partial_reason) {
-      summaryParts.push(`[partial_state] ${input.partial_reason}`);
-    }
-    const policy: Record<string, unknown> = {};
-    if (input.partial_state) policy.partial_state = true;
-    if (restrictedHit) {
-      policy.restricted = true;
-      policy.restriction_rule_id = restrictedHit.id;
-    }
-    if (managerHandle) policy.manager_handle = managerHandle;
-    const recorded = recordActionItem({
-      item_id: itemId,
-      mission_id: input.mission_id,
-      title: title.slice(0, 120),
-      ...(summaryParts.length ? { summary: summaryParts.join('\n') } : {}),
-      assignee,
-      ...(entry.priority && ['must', 'should', 'could', 'wont'].includes(entry.priority)
-        ? { priority: entry.priority }
-        : {}),
-      ...(entry.due_at_iso ? { due_at: entry.due_at_iso } : {}),
-      modality,
-      review_state: reviewState,
-      provenance,
-      max_reminders: defaultMaxReminders,
-      ...(Object.keys(policy).length ? { policy } : {}),
-    });
-    items.push(recorded);
-  }
-  return {
-    items,
-    written_count: items.length,
-    pending_review_count: pendingReview,
-    partial_count: input.partial_state ? items.length : 0,
-    restricted_count: restrictedCount,
-  };
-}
-
-export async function generateFacilitationScriptOp(input: {
-  agenda?: string[];
-  current_topic?: string;
-  recent_transcript_chunk?: string;
-  remaining_minutes?: number;
-  facilitator_persona_label?: string;
-  language?: string;
-}): Promise<{
-  speech_text: string;
-  next_action: 'continue_listen' | 'transition_topic' | 'wrap_up' | 'pause';
-}> {
-  const backend = getReasoningBackend();
-  const persona = input.facilitator_persona_label ?? 'a calm professional facilitator';
-  const remaining = input.remaining_minutes ?? 30;
-  const agendaBlock =
-    (input.agenda ?? []).map((a, i) => `  ${i + 1}. ${a}`).join('\n') || '  (no agenda provided)';
-  const language = input.language ?? 'ja';
-  const prompt = [
-    `You generate the next short facilitation utterance for ${persona} in an online meeting.`,
-    'Output ONLY a JSON object: { "speech_text": str (≤ 2 sentences), "next_action": "continue_listen"|"transition_topic"|"wrap_up"|"pause" }',
-    'No prose, no code fence.',
-    `Language: ${language}. Be concise. Do not name people unless the transcript names them. Do not introduce facts not in the transcript.`,
-    '',
-    'Agenda:',
-    agendaBlock,
-    '',
-    `Current topic: ${input.current_topic ?? '(unspecified)'}`,
-    `Time remaining: ${remaining} minutes.`,
-    '',
-    'Recent transcript chunk:',
-    input.recent_transcript_chunk ?? '(silence so far)',
-  ].join('\n');
-  const facilitationSchema = z.object({
-    speech_text: z.string(),
-    next_action: z.enum(['continue_listen', 'transition_topic', 'wrap_up', 'pause']),
-  });
-  try {
-    const result = await delegateBestOf(backend, prompt, facilitationSchema, {
-      context: 'meeting-facilitation',
-      candidateCount: 2,
-      judgeInstructions:
-        'Prefer the candidate that is concise, natural in the requested language, and most likely to help the meeting advance without adding unsupported facts.',
-    });
-    return result.winner;
-  } catch (err: any) {
-    logger.warn(`[generate_facilitation_script] best-of failed: ${err?.message ?? err}`);
-    const raw = await backend.delegateTask(prompt, 'meeting-facilitation');
-    try {
-      const parsed = extractFirstJsonBlock(raw) as any;
-      const speech = typeof parsed.speech_text === 'string' ? parsed.speech_text : '';
-      const next =
-        parsed.next_action &&
-        ['continue_listen', 'transition_topic', 'wrap_up', 'pause'].includes(parsed.next_action)
-          ? parsed.next_action
-          : 'continue_listen';
-      return { speech_text: speech, next_action: next };
-    } catch (parseErr: any) {
-      logger.warn(`[generate_facilitation_script] parse failed: ${parseErr?.message ?? parseErr}`);
-      return { speech_text: '', next_action: 'continue_listen' };
-    }
-  }
-}
-
-/**
- * Compliance-2 approval gate.
- *
- * Partition pending items into `allowed` (free to proceed) and
- * `blocked` (restricted + not approved + no sudo). The caller marks
- * blocked items as `blocked` in the store and proceeds to dispatch
- * the rest. Pure function so the dispatch loop is testable.
- */
-export function applyRestrictedActionGate(
-  items: ActionItem[],
-  opts: { approved_item_ids: ReadonlySet<string>; sudo_override: boolean }
-): {
-  allowed: ActionItem[];
-  blocked: Array<{
-    item: ActionItem;
-    rule_id?: string;
-    reason: string;
-  }>;
-} {
-  const allowed: ActionItem[] = [];
-  const blocked: Array<{ item: ActionItem; rule_id?: string; reason: string }> = [];
-  for (const item of items) {
-    if (
-      item.policy?.restricted &&
-      !opts.sudo_override &&
-      !opts.approved_item_ids.has(item.item_id)
-    ) {
-      const ruleId = item.policy?.restriction_rule_id;
-      blocked.push({
-        item,
-        ...(ruleId ? { rule_id: ruleId } : {}),
-        reason: `restricted-action-kinds gate: rule=${ruleId ?? 'unknown'}; set KYBERION_RESTRICTED_APPROVED_ITEMS or KYBERION_SUDO to release`,
-      });
-      continue;
-    }
-    allowed.push(item);
-  }
-  return { allowed, blocked };
-}
-
-/**
- * Execute every operator_self pending item: gate restricted items,
- * then for each allowed item, mark in_progress, delegate the plan to
- * the reasoning backend, and transition to completed (or blocked on
- * failure). Returns a structured report; mutates the action-item
- * store via `updateActionItemStatus`.
- */
-export async function executeSelfActionItemsOp(input: {
-  mission_id: string;
-  language?: string;
-  policy?: MeetingFacilitatorPolicy;
-}): Promise<{
-  mission_id: string;
-  dispatched: Array<{ item_id: string; title: string; plan: string }>;
-  skipped_restricted: Array<{ item_id: string; title: string; restriction_rule_id?: string }>;
-  generated_at: string;
-}> {
-  const language = input.language ?? 'ja';
-  const policy = input.policy ?? loadMeetingFacilitatorPolicy();
-  const pending = listOperatorSelfPending(input.mission_id);
-  const { allowed, blocked } = applyRestrictedActionGate(pending, {
-    approved_item_ids: policy.restricted_approved_item_ids,
-    sudo_override: policy.sudo_override,
-  });
-  const skippedRestricted = blocked.map(({ item, rule_id, reason }) => {
-    updateActionItemStatus({
-      mission_id: input.mission_id,
-      item_id: item.item_id,
-      status: 'blocked',
-      blocked_reason: reason,
-      execution: { executed_via: 'agent_delegate', result_summary: reason },
-    });
-    return {
-      item_id: item.item_id,
-      title: item.title,
-      ...(rule_id ? { restriction_rule_id: rule_id } : {}),
-    };
-  });
-
-  const backend = getReasoningBackend();
-  const dispatched: Array<{ item_id: string; title: string; plan: string }> = [];
-  for (const item of allowed) {
-    updateActionItemStatus({
-      mission_id: input.mission_id,
-      item_id: item.item_id,
-      status: 'in_progress',
-    });
-    let plan = '';
-    try {
-      plan = await backend.delegateTask(
-        [
-          `You are dispatching an action item to the operator. Output ONLY a JSON object: { "plan": str (≤ 5 sentences), "completion_summary": str (≤ 3 sentences) }.`,
-          `No prose, no code fence. Language: ${language}.`,
-          `Action item title: "${item.title}".`,
-          item.summary ? `Summary: ${item.summary}` : '',
-          item.due_at ? `Due: ${item.due_at}.` : '',
-        ]
-          .filter(Boolean)
-          .join('\n'),
-        `self-exec:${item.item_id}`
-      );
-      let summary = '';
-      try {
-        const parsed = extractFirstJsonBlock(plan) as any;
-        if (typeof parsed.completion_summary === 'string') summary = parsed.completion_summary;
-        if (typeof parsed.plan === 'string') plan = parsed.plan;
-      } catch {
-        /* keep raw plan */
-      }
-      updateActionItemStatus({
-        mission_id: input.mission_id,
-        item_id: item.item_id,
-        status: 'completed',
-        execution: {
-          executed_via: 'agent_delegate',
-          execution_ref: `delegateTask:self-exec:${item.item_id}`,
-          ...(summary ? { result_summary: summary } : {}),
-        },
-      });
-    } catch (err: any) {
-      updateActionItemStatus({
-        mission_id: input.mission_id,
-        item_id: item.item_id,
-        status: 'blocked',
-        blocked_reason: `delegateTask failed: ${err?.message ?? err}`,
-        execution: {
-          executed_via: 'agent_delegate',
-          result_summary: `delegateTask failed: ${err?.message ?? err}`,
-        },
-      });
-    }
-    dispatched.push({ item_id: item.item_id, title: item.title, plan });
-  }
-  return {
-    mission_id: input.mission_id,
-    dispatched,
-    skipped_restricted: skippedRestricted,
-    generated_at: nowIso(),
-  };
-}
-
-/**
- * Track every team_member pending item: per-item, generate a reminder
- * message, persist it as a `primary` reminder, and append `cc_manager`
- * reminders for any HR-2 escalation channel returned by
- * `generateReminderMessageOp`. Returns the report; mutates the store.
- */
-export async function trackPendingActionItemsOp(input: {
-  mission_id: string;
-  tone?: 'friendly' | 'formal' | 'urgent';
-  language?: string;
-  max_items?: number;
-  policy?: MeetingFacilitatorPolicy;
-}): Promise<{
-  mission_id: string;
-  scanned: number;
-  reminded: Array<{
-    item_id: string;
-    channel: string;
-    days_overdue: number;
-    cc?: string[];
-  }>;
-  generated_at: string;
-}> {
-  const tone = input.tone ?? 'friendly';
-  const language = input.language ?? 'ja';
-  const maxItems = input.max_items ?? 20;
-  const policy = input.policy ?? loadMeetingFacilitatorPolicy();
-  const pending = listOthersPending(input.mission_id).slice(0, maxItems);
-  const now = new Date();
-  const reminded: Array<{
-    item_id: string;
-    channel: string;
-    days_overdue: number;
-    cc?: string[];
-  }> = [];
-  for (const item of pending) {
-    const dueAt = item.due_at ? new Date(item.due_at) : null;
-    const daysOverdue = dueAt
-      ? Math.max(0, Math.floor((now.getTime() - dueAt.getTime()) / (24 * 60 * 60 * 1000)))
-      : 0;
-    const reminder = await generateReminderMessageOp({
-      item,
-      days_overdue: daysOverdue,
-      tone,
-      language,
-      policy,
-    });
-    appendReminder({
-      mission_id: input.mission_id,
-      item_id: item.item_id,
-      reminder: {
-        sent_at: now.toISOString(),
-        channel: reminder.channel,
-        message: reminder.text,
-        relationship: 'primary',
-      },
-    });
-    if (reminder.cc && reminder.cc.length) {
-      for (const ccChannel of reminder.cc) {
-        appendReminder({
-          mission_id: input.mission_id,
-          item_id: item.item_id,
-          reminder: {
-            sent_at: now.toISOString(),
-            channel: ccChannel,
-            message: reminder.text,
-            relationship: 'cc_manager',
-          },
-        });
-      }
-    }
-    reminded.push({
-      item_id: item.item_id,
-      channel: reminder.channel,
-      days_overdue: daysOverdue,
-      ...(reminder.cc && reminder.cc.length ? { cc: reminder.cc } : {}),
-    });
-  }
-  return {
-    mission_id: input.mission_id,
-    scanned: pending.length,
-    reminded,
-    generated_at: nowIso(),
-  };
-}
-
-/**
- * HR-3 speaker fairness audit. Aggregates `provenance.speaker_label`
- * across the mission and emits a share-of-voice report. Pure read —
- * does not mutate the store. Defaults the dominance thresholds to
- * the values from the meeting-facilitator outcome simulation; callers
- * can override (per-tenant configurations).
- */
-export interface SpeakerFairnessReport {
-  mission_id: string;
-  total_items: number;
-  attributed_items: number;
-  unattributed_items: number;
-  distribution: Array<{
-    speaker: string;
-    total: number;
-    must: number;
-    share_total: number;
-    share_must: number;
-  }>;
-  dominant_speaker: string | null;
-  warn: boolean;
-  warn_reason: string | null;
-  generated_at: string;
-}
-
-export function auditSpeakerFairnessOp(input: {
-  mission_id: string;
-  policy?: MeetingFacilitatorPolicy;
-  /** Per-call override; takes precedence over `policy.speaker_fairness_total_threshold`. */
-  total_threshold?: number;
-  /** Per-call override; takes precedence over `policy.speaker_fairness_must_threshold`. */
-  must_threshold?: number;
-}): SpeakerFairnessReport {
-  const policy = input.policy ?? loadMeetingFacilitatorPolicy();
-  const items = listActionItems(input.mission_id);
-  const counts: Record<string, { total: number; must: number }> = {};
-  let totalAttributed = 0;
-  let mustAttributed = 0;
-  for (const it of items) {
-    const speaker = it.provenance?.speaker_label?.trim();
-    if (!speaker) continue;
-    if (!counts[speaker]) counts[speaker] = { total: 0, must: 0 };
-    counts[speaker].total += 1;
-    totalAttributed += 1;
-    if (it.priority === 'must') {
-      counts[speaker].must += 1;
-      mustAttributed += 1;
-    }
-  }
-  const distribution = Object.entries(counts)
-    .map(([speaker, c]) => ({
-      speaker,
-      total: c.total,
-      must: c.must,
-      share_total: totalAttributed ? c.total / totalAttributed : 0,
-      share_must: mustAttributed ? c.must / mustAttributed : 0,
-    }))
-    .sort((a, b) => b.total - a.total);
-  const dominant = distribution[0];
-  const totalThreshold = input.total_threshold ?? policy.speaker_fairness_total_threshold;
-  const mustThreshold = input.must_threshold ?? policy.speaker_fairness_must_threshold;
-  const warn = Boolean(
-    dominant && (dominant.share_total > totalThreshold || dominant.share_must > mustThreshold)
-  );
-  return {
-    mission_id: input.mission_id,
-    total_items: items.length,
-    attributed_items: totalAttributed,
-    unattributed_items: items.length - totalAttributed,
-    distribution,
-    dominant_speaker: dominant?.speaker ?? null,
-    warn,
-    warn_reason: warn
-      ? `dominant speaker '${dominant!.speaker}' has share_total=${dominant!.share_total.toFixed(2)}, share_must=${dominant!.share_must.toFixed(2)}`
-      : null,
-    generated_at: nowIso(),
-  };
-}
-
-export async function generateReminderMessageOp(input: {
-  item: ActionItem;
-  days_overdue?: number;
-  tone?: 'friendly' | 'formal' | 'urgent';
-  language?: string;
-  policy?: MeetingFacilitatorPolicy;
-}): Promise<{ channel: string; text: string; cc?: string[] }> {
-  const backend = getReasoningBackend();
-  const tone = input.tone ?? 'friendly';
-  const language = input.language ?? 'ja';
-  const channel = input.item.assignee.channel_handle ?? 'unspecified';
-  const overdue = input.days_overdue ?? 0;
-  const policy = input.policy ?? loadMeetingFacilitatorPolicy();
-  const prompt = [
-    'You draft a SHORT reminder message about an outstanding action item.',
-    'Output ONLY a JSON object: { "text": str (≤ 3 sentences) }',
-    'No prose, no code fence.',
-    `Tone: ${tone}. Language: ${language}.`,
-    `Recipient label: ${input.item.assignee.label}.`,
-    `Action item: "${input.item.title}".`,
-    input.item.due_at ? `Original due: ${input.item.due_at}.` : 'No firm deadline was set.',
-    overdue > 0 ? `Days overdue: ${overdue}.` : 'Not yet overdue, this is a check-in.',
-    'Do not threaten escalation. Do not invent context. Suggest one concrete next step.',
-  ].join('\n');
-  const raw = await backend.delegateTask(prompt, `reminder:${input.item.item_id}`);
-  let text = '';
-  try {
-    const parsed = extractFirstJsonBlock(raw) as any;
-    text = typeof parsed.text === 'string' ? parsed.text : '';
-  } catch {
-    // Fall back to a deterministic template if parse fails.
-    text = `Reminder: ${input.item.title}.${input.item.due_at ? ` Original due ${input.item.due_at}.` : ''}`;
-  }
-  // HR-2 chain-of-command: CC the manager handle when priority=must,
-  // when the recipient has missed the reminder several times, or when
-  // the action item is restricted. Threshold lives in the
-  // MeetingFacilitatorPolicy (defaults to 3 from the env var).
-  const cc: string[] = [];
-  const managerHandle = input.item.policy?.manager_handle;
-  if (managerHandle) {
-    const sent = input.item.reminders?.length ?? 0;
-    const shouldCc =
-      input.item.priority === 'must' ||
-      input.item.policy?.restricted === true ||
-      sent >= policy.reminder_cc_after_n;
-    if (shouldCc) cc.push(managerHandle);
-  }
-  return { channel, text, ...(cc.length ? { cc } : {}) };
-}
-
 /**
  * Run `simulate_all` N times against the same manifest and aggregate the
  * outcomes into an ensemble report. Addresses IP-3 (Counterfactual ensemble
@@ -2582,10 +1136,16 @@ const RATE_LIMITED_OPS = new Set([
 export async function dispatchDecisionOp(
   op: string,
   params: any,
-  ctx: Ctx
+  ctx: Ctx,
+  options: { compatibilityMode?: boolean } = {}
 ): Promise<{ handled: boolean; ctx: Ctx }> {
   const resolved = (k: string) => resolveVars(params[k], ctx);
   const exportAs = params.export_as;
+  const forwardedContext = await forwardWisdomBoundaryOperation(op, params, ctx, {
+    compatibilityMode: options.compatibilityMode,
+    defaultExportKey: `last_${op}_result`,
+  });
+  if (forwardedContext) return { handled: true, ctx: forwardedContext as Ctx };
   /**
    * Behavior: if `export_as` is set, the entire result lands at
    * `ctx[exportAs]`. Otherwise — if the result is a plain object —
@@ -2594,9 +1154,11 @@ export async function dispatchDecisionOp(
    * pipeline templating surprising; the merge is strictly additive.
    */
   const assign = (value: any): Ctx => {
-    if (exportAs) return { ...ctx, [exportAs]: value };
+    if (exportAs) {
+      return assignWisdomContextValue(ctx, String(exportAs), value, options);
+    }
     if (value && typeof value === 'object' && !Array.isArray(value)) {
-      return { ...ctx, ...(value as Record<string, unknown>) };
+      return mergeWisdomContext(ctx, value as Record<string, unknown>, options);
     }
     return ctx;
   };
@@ -2620,34 +1182,6 @@ export async function dispatchDecisionOp(
         : ctx[params.from || 'stakeholder_nodes'] || [];
       const sorted = stakeholderGridSort(nodes);
       return { handled: true, ctx: assign(sorted) };
-    }
-
-    case 'find_slides_by_owner': {
-      const slides = Array.isArray(params.slides)
-        ? params.slides
-        : ctx[params.slides_from || 'slides'] || ctx['last_pptx_slides'] || [];
-      const ownerLabels: string[] =
-        params.owner_labels ||
-        (params.owner_label ? [params.owner_label] : []) ||
-        ctx[params.owner_labels_from || 'owner_labels'] ||
-        [];
-      const result = findSlidesByOwner({
-        slides,
-        owner_labels: ownerLabels,
-        match_mode: params.match_mode,
-      });
-      return { handled: true, ctx: assign(result) };
-    }
-
-    case 'pptx_diff': {
-      const before = Array.isArray(params.before)
-        ? params.before
-        : ctx[params.before_from || 'before_slides'] || [];
-      const after = Array.isArray(params.after)
-        ? params.after
-        : ctx[params.after_from || 'after_slides'] || [];
-      const result = pptxDiff({ before, after });
-      return { handled: true, ctx: assign(result) };
     }
 
     case 'emit_dissent_log': {
@@ -2758,191 +1292,6 @@ export async function dispatchDecisionOp(
       };
     }
 
-    case 'extract_action_items': {
-      const transcriptPath = resolved('transcript_path');
-      const transcript = transcriptPath
-        ? (safeReadFile(pathResolver.rootResolve(transcriptPath), { encoding: 'utf8' }) as string)
-        : (resolved('transcript') as string) || '';
-      // Resolve `attendees` template; fall back to context value or empty.
-      const attendeesResolved = resolved('attendees');
-      const attendees = Array.isArray(attendeesResolved)
-        ? attendeesResolved
-        : Array.isArray(ctx[params.attendees_from || 'attendees'])
-          ? (ctx[params.attendees_from || 'attendees'] as any[])
-          : [];
-      // Ops-3: propagate partial_state from the upstream listen step.
-      // Two channels are supported: (a) explicit params, (b) the
-      // listen_result object that meeting-actuator pushes into ctx.
-      const listenResult = ctx['listen_result'] || ctx['meeting_listen_result'];
-      const partialFromCtx =
-        listenResult && typeof listenResult === 'object'
-          ? Boolean((listenResult as any).partial_state)
-          : false;
-      const partialReasonFromCtx =
-        listenResult && typeof listenResult === 'object'
-          ? ((listenResult as any).partial_reason as string | undefined)
-          : undefined;
-      const partialState =
-        params.partial_state !== undefined ? Boolean(resolved('partial_state')) : partialFromCtx;
-      const partialReason =
-        params.partial_reason !== undefined
-          ? String(resolved('partial_reason') ?? '')
-          : partialReasonFromCtx;
-      const result = await extractActionItemsOp({
-        mission_id: resolved('mission_id') || process.env.MISSION_ID || '',
-        transcript,
-        attendees,
-        ...(params.operator_label ? { operator_label: resolved('operator_label') } : {}),
-        ...(params.default_assignee_label
-          ? { default_assignee_label: resolved('default_assignee_label') }
-          : {}),
-        ...(params.language ? { language: resolved('language') } : {}),
-        ...(partialState ? { partial_state: true } : {}),
-        ...(partialReason ? { partial_reason: partialReason } : {}),
-        ...(params.enforce_restricted_actions !== undefined
-          ? { enforce_restricted_actions: Boolean(resolved('enforce_restricted_actions')) }
-          : {}),
-      });
-      const outputPath = resolved('output_path');
-      if (outputPath) {
-        if (String(outputPath).endsWith('.jsonl')) {
-          safeWriteFile(
-            pathResolver.rootResolve(outputPath),
-            `${result.items.map((item) => JSON.stringify(item)).join('\n')}${result.items.length ? '\n' : ''}`
-          );
-        } else {
-          writeJSON(outputPath, {
-            items: result.items,
-            written_count: result.written_count,
-            partial_count: result.partial_count,
-            restricted_count: result.restricted_count,
-            generated_at: nowIso(),
-          });
-        }
-      }
-      return {
-        handled: true,
-        ctx: assign({
-          extracted_action_items: result.items,
-          action_item_count: result.written_count,
-          partial_action_item_count: result.partial_count,
-          restricted_action_item_count: result.restricted_count,
-          ...(outputPath ? { written_to: outputPath } : {}),
-        }),
-      };
-    }
-
-    case 'generate_facilitation_script': {
-      const result = await generateFacilitationScriptOp({
-        agenda: Array.isArray(params.agenda) ? params.agenda : undefined,
-        ...(params.current_topic ? { current_topic: resolved('current_topic') } : {}),
-        ...(params.recent_transcript_chunk
-          ? { recent_transcript_chunk: resolved('recent_transcript_chunk') }
-          : {}),
-        ...(params.remaining_minutes !== undefined
-          ? { remaining_minutes: Number(resolved('remaining_minutes')) }
-          : {}),
-        ...(params.facilitator_persona_label
-          ? { facilitator_persona_label: resolved('facilitator_persona_label') }
-          : {}),
-        ...(params.language ? { language: resolved('language') } : {}),
-      });
-      return { handled: true, ctx: assign(result) };
-    }
-
-    case 'generate_reminder_message': {
-      const item = params.item ?? ctx[params.item_from || 'item'];
-      if (!item || typeof item !== 'object') {
-        throw new Error('generate_reminder_message: missing params.item (ActionItem)');
-      }
-      const result = await generateReminderMessageOp({
-        item: item as ActionItem,
-        ...(params.days_overdue !== undefined
-          ? { days_overdue: Number(resolved('days_overdue')) }
-          : {}),
-        ...(params.tone ? { tone: resolved('tone') } : {}),
-        ...(params.language ? { language: resolved('language') } : {}),
-      });
-      return { handled: true, ctx: assign(result) };
-    }
-
-    case 'execute_self_action_items': {
-      const missionId = resolved('mission_id') || process.env.MISSION_ID || '';
-      if (!missionId) {
-        throw new Error('execute_self_action_items: mission_id is required');
-      }
-      const result = await executeSelfActionItemsOp({
-        mission_id: missionId,
-        language: resolved('language') || 'ja',
-      });
-      const outputPath = resolved('output_path');
-      const report = {
-        mission_id: result.mission_id,
-        dispatched: result.dispatched.length,
-        skipped_restricted: result.skipped_restricted.length,
-        items: result.dispatched,
-        skipped_items: result.skipped_restricted,
-        generated_at: result.generated_at,
-      };
-      if (outputPath) writeJSON(outputPath, report);
-      return {
-        handled: true,
-        ctx: assign({
-          ...(outputPath ? { written_to: outputPath } : {}),
-          dispatched_count: result.dispatched.length,
-          skipped_restricted_count: result.skipped_restricted.length,
-        }),
-      };
-    }
-
-    case 'track_pending_action_items': {
-      const missionId = resolved('mission_id') || process.env.MISSION_ID || '';
-      if (!missionId) {
-        throw new Error('track_pending_action_items: mission_id is required');
-      }
-      const result = await trackPendingActionItemsOp({
-        mission_id: missionId,
-        tone: (resolved('tone') as 'friendly' | 'formal' | 'urgent' | undefined) ?? 'friendly',
-        language: resolved('language') || 'ja',
-        max_items: Number(resolved('max_items')) || 20,
-      });
-      const outputPath = resolved('output_path');
-      const report = {
-        mission_id: result.mission_id,
-        scanned: result.scanned,
-        reminded: result.reminded.length,
-        items: result.reminded,
-        generated_at: result.generated_at,
-      };
-      if (outputPath) writeJSON(outputPath, report);
-      return {
-        handled: true,
-        ctx: assign({
-          ...(outputPath ? { written_to: outputPath } : {}),
-          reminded_count: result.reminded.length,
-          scanned_count: result.scanned,
-        }),
-      };
-    }
-
-    case 'audit_speaker_fairness': {
-      const missionId = resolved('mission_id') || process.env.MISSION_ID || '';
-      if (!missionId) {
-        throw new Error('audit_speaker_fairness: mission_id is required');
-      }
-      const report = auditSpeakerFairnessOp({ mission_id: missionId });
-      const outputPath = resolved('output_path');
-      if (outputPath) writeJSON(outputPath, report);
-      return {
-        handled: true,
-        ctx: assign({
-          ...(outputPath ? { written_to: outputPath } : {}),
-          speaker_fairness_warn: report.warn,
-          dominant_speaker: report.dominant_speaker,
-        }),
-      };
-    }
-
     case 'evaluate_simulation_quality': {
       const sourcePath = resolved('source') || resolved('source_path');
       const outputPath = resolved('output_path');
@@ -3011,24 +1360,6 @@ export async function dispatchDecisionOp(
         source_path: resolved('source_path'),
         tenant_slug: params.tenant_slug ? resolved('tenant_slug') : null,
         output_path: resolved('output_path'),
-      });
-      return { handled: true, ctx: assign(result) };
-    }
-
-    case 'evaluate_decision_rights_approval': {
-      const amount = params.amount !== undefined ? Number(resolved('amount')) : undefined;
-      const result = evaluateDecisionRightsApprovalOp({
-        operation_id: resolved('operation_id'),
-        correlation_id: resolved('correlation_id'),
-        decision_type: resolved('decision_type'),
-        agent_id: params.agent_id ? resolved('agent_id') : undefined,
-        caller_role: params.caller_role ? resolved('caller_role') : undefined,
-        channel: params.channel ? resolved('channel') : undefined,
-        ...(amount !== undefined && Number.isFinite(amount) ? { amount } : {}),
-        tenant_slug: params.tenant_slug ? resolved('tenant_slug') : undefined,
-        mission_id: params.mission_id ? resolved('mission_id') : undefined,
-        title: params.title ? resolved('title') : undefined,
-        summary: params.summary ? resolved('summary') : undefined,
       });
       return { handled: true, ctx: assign(result) };
     }
@@ -3104,21 +1435,12 @@ export async function dispatchDecisionOp(
       return { handled: true, ctx: assign(result.persona_spec) };
     }
 
-    case 'a2a_roleplay': {
+    case 'a2a_roleplay':
+    case 'counterparty_roleplay': {
       const result = await a2aRoleplay({
         persona: params.persona || ctx[params.persona_from || 'persona_spec'],
         objective: resolved('objective'),
         time_budget_minutes: params.time_budget_minutes || 15,
-        output_path: resolved('output_path'),
-      });
-      return { handled: true, ctx: assign(result) };
-    }
-
-    case 'conduct_1on1': {
-      const result = await conduct1on1({
-        counterparty_ref: resolved('counterparty_ref'),
-        proposal_draft_ref: resolved('proposal_draft_ref'),
-        structure: params.structure || [],
         output_path: resolved('output_path'),
       });
       return { handled: true, ctx: assign(result) };
@@ -3167,201 +1489,10 @@ export async function dispatchDecisionOp(
       return { handled: true, ctx: assign(result) };
     }
 
-    case 'extract_requirements': {
-      const result = await extractRequirementsOp({
-        mission_id: resolved('mission_id'),
-        project_name: resolved('project_name'),
-        source_path: resolved('source_path') || resolved('transcript_path'),
-        source_type: resolved('source_type') as ExtractRequirementsOpInput['source_type'],
-        language: resolved('language'),
-        customer_name: resolved('customer_name'),
-        customer_person_slug: resolved('customer_person_slug'),
-        customer_org: resolved('customer_org'),
-        prior_draft_ref: resolved('prior_draft_ref'),
-      });
-      return { handled: true, ctx: assign(result) };
-    }
-
-    case 'evaluate_requirements_completeness': {
-      const result = evaluateRequirementsCompletenessGate(resolved('mission_id'));
-      return { handled: true, ctx: assign(result) };
-    }
-
-    case 'evaluate_customer_signoff': {
-      const result = evaluateCustomerSignoffGate(resolved('mission_id'));
-      return { handled: true, ctx: assign(result) };
-    }
-
-    case 'extract_design_spec': {
-      const result = await extractDesignSpecOp({
-        mission_id: resolved('mission_id'),
-        project_name: resolved('project_name'),
-        requirements_draft_path: resolved('requirements_draft_path'),
-        additional_context: resolved('additional_context'),
-      });
-      return { handled: true, ctx: assign(result) };
-    }
-
-    case 'evaluate_architecture_ready': {
-      const result = evaluateArchitectureReadyGate(resolved('mission_id'));
-      return { handled: true, ctx: assign(result) };
-    }
-
-    case 'extract_test_plan': {
-      const result = await extractTestPlanOp({
-        mission_id: resolved('mission_id'),
-        project_name: resolved('project_name'),
-        app_id: resolved('app_id'),
-        requirements_draft_path: resolved('requirements_draft_path'),
-        design_spec_path: resolved('design_spec_path'),
-      });
-      return { handled: true, ctx: assign(result) };
-    }
-
-    case 'derive_test_inventory': {
-      const contractPath = resolved('contract_path');
-      const contractValue =
-        params.contract ??
-        ctx[params.contract_from || 'quality_contract'] ??
-        (contractPath && safeExistsSync(pathResolver.rootResolve(contractPath))
-          ? JSON.parse(
-              safeReadFile(pathResolver.rootResolve(contractPath), { encoding: 'utf8' }) as string
-            )
-          : null);
-      if (!contractValue) throw new Error('[derive_test_inventory] quality contract not found');
-      const systemTagsValue = params.system_tags ?? ctx[params.system_tags_from || 'system_tags'];
-      const riskRefsValue = params.risk_refs ?? ctx[params.risk_refs_from || 'risk_refs'];
-      const inventory = await deriveTestInventory({
-        contract: contractValue as SoftwareQualityContract,
-        systemTags: Array.isArray(systemTagsValue) ? systemTagsValue.map(String) : [],
-        riskRefs: Array.isArray(riskRefsValue) ? riskRefsValue.map(String) : [],
-        additionalContext: resolved('additional_context'),
-        projectId: resolved('project_id') || undefined,
-      });
-      const outputPath = resolved('output_path');
-      if (outputPath) {
-        safeWriteFile(
-          pathResolver.rootResolve(outputPath),
-          `${JSON.stringify(inventory, null, 2)}\n`,
-          { encoding: 'utf8' }
-        );
-      }
-      return { handled: true, ctx: assign(inventory) };
-    }
-
-    case 'evaluate_qa_ready': {
-      const mustIds = Array.isArray(params.must_have_ids)
-        ? params.must_have_ids
-        : ctx[params.must_have_ids_from || 'must_have_ids'];
-      const result = evaluateQaReadyGate(
-        resolved('mission_id'),
-        Array.isArray(mustIds) ? mustIds : []
-      );
-      return { handled: true, ctx: assign(result) };
-    }
-
-    case 'decompose_into_tasks': {
-      const result = await decomposeIntoTasksOp({
-        mission_id: resolved('mission_id'),
-        project_name: resolved('project_name'),
-        requirements_draft_path: resolved('requirements_draft_path'),
-        design_spec_path: resolved('design_spec_path'),
-      });
-      return { handled: true, ctx: assign(result) };
-    }
-
-    case 'register_presentation_preference_profile': {
-      const result = await registerPresentationPreferenceProfileOp({
-        profile:
-          params.profile !== undefined
-            ? resolved('profile')
-            : ctx[params.profile_from || 'presentation_preference_profile'],
-        profile_path: resolved('profile_path'),
-        registry_path: resolved('registry_path'),
-      });
-      return { handled: true, ctx: assign(result) };
-    }
-
-    case 'evaluate_task_plan_ready': {
-      const result = evaluateTaskPlanReadyGate(resolved('mission_id'));
-      return { handled: true, ctx: assign(result) };
-    }
-
-    case 'task_plan_to_next_tasks': {
-      const result = taskPlanToNextTasksOp({ mission_id: resolved('mission_id') });
-      return { handled: true, ctx: assign(result) };
-    }
-
-    case 'transcribe_audio': {
-      const bridge = getSpeechToTextBridge();
-      const result = await bridge.transcribe({
-        audioPath: resolved('audio_path'),
-        language: resolved('language'),
-        outputPath: resolved('output_path'),
-      });
-      return { handled: true, ctx: assign(result) };
-    }
-
-    case 'execute_task_plan': {
-      const { executeTaskPlan } = await import('@agent/core');
-      const result = await executeTaskPlan({
-        missionId: resolved('mission_id'),
-        model: resolved('model'),
-        cwd: resolved('cwd'),
-        maxTasks: typeof params.max_tasks === 'number' ? params.max_tasks : undefined,
-        haltOnFailure: Boolean(params.halt_on_failure),
-      });
-      return { handled: true, ctx: assign(result) };
-    }
-
-    case 'deploy_release': {
-      const { getDeploymentAdapter, requireApprovalForOp, RISKY_OPS } = await import('@agent/core');
-      // Gate the deploy behind the config-policy-update approval rule.
-      const missionId = resolved('mission_id');
-      const environment = resolved('environment');
-      const approval = requireApprovalForOp({
-        opId: RISKY_OPS.CONFIG_UPDATE,
-        agentId: 'mission_controller',
-        correlationId: `${missionId}:deploy:${environment}`,
-        channel: 'system',
-        payload: {
-          scope: 'governance',
-          environment,
-          version: resolved('version'),
-          projectName: resolved('project_name'),
-        },
-        draft: {
-          title: `Deploy ${resolved('project_name')}@${resolved('version')} → ${environment}`,
-          summary: `Mission ${missionId} requests release deployment.`,
-          severity: environment === 'prod' ? 'high' : 'medium',
-        },
-      });
-      if (!approval.allowed) {
-        return {
-          handled: true,
-          ctx: assign({
-            status: 'blocked_by_approval',
-            approval_status: approval.status,
-            approval_request_id: approval.requestId,
-            message: approval.message,
-          }),
-        };
-      }
-      const adapter = getDeploymentAdapter();
-      const result = await adapter.deploy({
-        environment,
-        projectName: resolved('project_name'),
-        version: resolved('version'),
-        releaseNotesPath: resolved('release_notes_path'),
-      });
-      return { handled: true, ctx: assign(result) };
-    }
-
     // ── Adaptive Prompting: wisdom:reasoning ─────────────────────────────
     // Routes through the active reasoning backend. Fixes the previous no-op
     // where wisdom:reasoning fell through to default with handled=false.
     case 'reasoning': {
-      const backend = getReasoningBackend();
       const instruction =
         typeof params.instruction === 'string'
           ? resolveVars(params.instruction, ctx)
@@ -3375,21 +1506,20 @@ export async function dispatchDecisionOp(
         typeof params.system_prompt === 'string'
           ? resolveVars(params.system_prompt, ctx)
           : undefined;
-      const fullPrompt = systemPrompt
-        ? `[SYSTEM: ${systemPrompt}]\n\nInstruction: ${instruction}\nContext: ${contextRaw}`
-        : `Instruction: ${instruction}\nContext: ${contextRaw}`;
-      const useSubagent =
+      const allowBackendDelegation =
         params.use_subagent === true ||
         String(params.execution_mode ?? params.mode ?? '') === 'subagent' ||
         String(params.execution_mode ?? params.mode ?? '') === 'delegate';
-      const response = useSubagent
-        ? await backend.delegateTask(instruction, contextRaw)
-        : await backend.prompt(fullPrompt);
+      const response = await runPureReasoning({
+        instruction,
+        context: contextRaw,
+        systemPrompt,
+        allowBackendDelegation,
+      });
       return { handled: true, ctx: assign(response) };
     }
 
     case 'peer_advice': {
-      const backend = getReasoningBackend();
       const question =
         typeof params.question === 'string'
           ? resolveVars(params.question, ctx)
@@ -3400,27 +1530,21 @@ export async function dispatchDecisionOp(
         typeof params.context === 'string'
           ? resolveVars(params.context, ctx)
           : JSON.stringify(params.context ?? ctx);
-      const result = await requestPeerAdvice(
-        backend,
-        {
-          question,
-          context: contextRaw,
-          tone:
-            params.tone === 'concise' || params.tone === 'adversarial' ? params.tone : 'careful',
-          preferred_provider:
-            typeof params.preferred_provider === 'string'
-              ? resolveVars(params.preferred_provider, ctx)
-              : undefined,
-          preferred_label:
-            typeof params.preferred_label === 'string'
-              ? resolveVars(params.preferred_label, ctx)
-              : undefined,
-        },
-        {
-          context: String(params.context_label || 'wisdom:peer_advice'),
-          model_tier: params.model_tier,
-        }
-      );
+      const result = await runPeerAdvice({
+        question,
+        context: contextRaw,
+        tone: params.tone === 'concise' || params.tone === 'adversarial' ? params.tone : 'careful',
+        preferredProvider:
+          typeof params.preferred_provider === 'string'
+            ? resolveVars(params.preferred_provider, ctx)
+            : undefined,
+        preferredLabel:
+          typeof params.preferred_label === 'string'
+            ? resolveVars(params.preferred_label, ctx)
+            : undefined,
+        modelTier: params.model_tier,
+        contextLabel: String(params.context_label || 'wisdom:peer_advice'),
+      });
       const outputPath = resolved('output_path');
       if (outputPath) writeJSON(outputPath, result);
       return { handled: true, ctx: assign(result) };
@@ -3429,64 +1553,29 @@ export async function dispatchDecisionOp(
     // ── Mixture of Experts: wisdom:tool_use ──────────────────────────────
     // Invokes the reasoning backend's Function Calling interface.
     // Tools are defined inline in the pipeline step params.
-    case 'tool_use': {
-      const backend = getReasoningBackend();
-      if (!backend.generateWithTools) {
-        throw new Error(
-          '[wisdom:tool_use] Active backend does not support generateWithTools. ' +
-            'Set KYBERION_REASONING_BACKEND=anthropic.'
-        );
-      }
+    case 'tool_use':
+    case 'propose_tool_calls': {
       const prompt = resolveVars(String(params.prompt ?? params.instruction ?? ''), ctx);
       const tools = Array.isArray(params.tools) ? params.tools : [];
-      const result = await backend.generateWithTools(prompt, tools);
-      return { handled: true, ctx: assign(result) };
+      const result = await proposeToolCalls({ prompt, tools });
+      return {
+        handled: true,
+        ctx:
+          op === 'propose_tool_calls'
+            ? assign(result)
+            : assign({ text: result.text, toolCalls: result.toolCalls }),
+      };
     }
 
     // ── ReAct: wisdom:react_loop ──────────────────────────────────────────
     // Thought → Action → Observation loop with configurable max_steps.
     // Emits { goal, steps: [{role,content}], final_answer }.
-    case 'react_loop': {
-      const backend = getReasoningBackend();
+    case 'react_loop':
+    case 'reasoning_loop': {
       const goal = resolveVars(String(params.goal ?? params.instruction ?? ''), ctx);
       const maxSteps = Number(params.max_steps ?? 5);
-      const tools: any[] = Array.isArray(params.tools) ? params.tools : [];
-      const history: { role: string; content: string }[] = [];
-      let finalAnswer = '';
-
-      for (let s = 0; s < maxSteps; s++) {
-        const histText = history.map((h) => `[${h.role}] ${h.content}`).join('\n');
-        const thoughtPrompt =
-          `Goal: ${goal}\n\nHistory:\n${histText || '(none yet)'}\n\n` +
-          `Think step by step. Either produce FINAL ANSWER: <answer> or describe the next concrete action needed.`;
-
-        const response =
-          tools.length > 0 && backend.generateWithTools
-            ? await backend.generateWithTools(thoughtPrompt, tools)
-            : { text: await backend.prompt(thoughtPrompt) };
-
-        const text = response.text ?? '';
-        history.push({ role: 'thought', content: text });
-
-        if (text.includes('FINAL ANSWER:')) {
-          finalAnswer = text.split('FINAL ANSWER:')[1]?.trim() ?? text;
-          break;
-        }
-        if (response.toolCalls?.length) {
-          for (const call of response.toolCalls) {
-            history.push({
-              role: 'observation',
-              content: `Tool "${call.name}" → ${JSON.stringify(call.input)}`,
-            });
-          }
-        }
-      }
-
-      const reactResult = {
-        goal,
-        steps: history,
-        final_answer: finalAnswer || (history.at(-1)?.content ?? ''),
-      };
+      const tools = Array.isArray(params.tools) ? params.tools : [];
+      const reactResult = await runReasoningLoop({ goal, maxSteps, tools });
       return { handled: true, ctx: assign(reactResult) };
     }
 
@@ -3543,41 +1632,6 @@ export async function dispatchDecisionOp(
       }
 
       return { handled: true, ctx: assign(gateResult) };
-    }
-
-    // ── Active Learning escalation: wisdom:escalate_for_review ───────────
-    // Writes a pending human-review record to active/shared/tmp/pending-reviews/.
-    // Downstream: a Slack/email notifier can poll this directory.
-    case 'escalate_for_review': {
-      const topic = resolveVars(String(params.topic ?? 'Untitled review'), ctx);
-      const reason = resolveVars(String(params.reason ?? ''), ctx);
-      const evidenceKey = String(params.evidence_from ?? 'evidence');
-      const evidence = params.evidence
-        ? resolveVars(String(params.evidence), ctx)
-        : (ctx[evidenceKey] ?? '');
-      const missionId = resolveVars(String(params.mission_id ?? ctx.mission_id ?? ''), ctx);
-      const reviewId = `review-${Date.now()}`;
-
-      const reviewRecord = {
-        review_id: reviewId,
-        topic,
-        reason,
-        evidence: typeof evidence === 'string' ? evidence : JSON.stringify(evidence),
-        mission_id: missionId || null,
-        status: 'pending',
-        escalated_at: nowIso(),
-      };
-
-      const reviewDir = pathResolver.rootResolve('active/shared/tmp/pending-reviews');
-      safeMkdir(reviewDir, { recursive: true });
-      const reviewPath = `active/shared/tmp/pending-reviews/${reviewId}.json`;
-      writeJSON(reviewPath, reviewRecord);
-      logger.warn(`[escalate_for_review] Human review pending: "${topic}" → ${reviewPath}`);
-
-      return {
-        handled: true,
-        ctx: assign({ review_id: reviewId, review_path: reviewPath, review_status: 'pending' }),
-      };
     }
 
     default:

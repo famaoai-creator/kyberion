@@ -29,7 +29,7 @@ const DEFAULT_TERMINAL_RETRY = {
 };
 
 export interface TerminalAction {
-  action: 'spawn' | 'poll' | 'write' | 'kill' | 'list' | 'resize' | 'llm_decide';
+  action: 'spawn' | 'poll' | 'write' | 'kill' | 'list' | 'resize' | 'llm_decide' | 'shell_command';
   params: {
     sessionId?: string;
     threadId?: string;
@@ -37,6 +37,8 @@ export interface TerminalAction {
     shell?: string;
     args?: string[];
     cwd?: string;
+    cmd?: string;
+    text?: string;
     env?: Record<string, string>;
     data?: string;
     keys?: string[];
@@ -161,6 +163,19 @@ export async function handleAction(input: TerminalAction): Promise<TerminalResul
         degraded_reason: decided[`${exportAs}_degraded`],
       };
     }
+
+    case 'shell_command':
+      return await handleComputerInteraction({
+        version: '0.1',
+        kind: 'computer_interaction',
+        action: {
+          type: 'shell_command',
+          text: params.text || params.cmd,
+          shell: params.shell,
+          cwd: params.cwd,
+          thread_id: params.threadId,
+        },
+      });
 
     case 'write': {
       if (!params.sessionId) throw new Error('sessionId is required for write action');

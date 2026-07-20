@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import { pathResolver, safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
+import { withExecutionContext } from '@agent/core/governance';
 
 const ROOT = pathResolver.rootDir();
 const DEFAULT_BASELINE_PATH = pathResolver.rootResolve('scripts/check_type_ratchet.baseline.json');
@@ -147,13 +148,15 @@ export function checkTypeRatchet(
   const baseline = loadBaseline(baselinePath);
 
   if (options.writeBaseline) {
-    safeMkdir(path.dirname(baselinePath), { recursive: true });
-    safeWriteFile(baselinePath, JSON.stringify(current, null, 2));
-    return {
-      ...current,
-      baseline_path: baselinePath,
-      violations: [],
-    };
+    return withExecutionContext('ecosystem_architect', () => {
+      safeMkdir(path.dirname(baselinePath), { recursive: true });
+      safeWriteFile(baselinePath, JSON.stringify(current, null, 2));
+      return {
+        ...current,
+        baseline_path: baselinePath,
+        violations: [],
+      };
+    });
   }
 
   if (!baseline) {

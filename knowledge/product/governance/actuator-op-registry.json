@@ -78,6 +78,7 @@
       "apply": [
         "a2a",
         "ask",
+        "delegate",
         "prewarm_mission",
         "refresh",
         "restart",
@@ -123,7 +124,7 @@
     "approval": {
       "capture": ["list_pending", "load"],
       "transform": [],
-      "apply": ["create", "decide"]
+      "apply": ["create", "decide", "evaluate_decision_rights", "request_review"]
     },
     "artifact": {
       "capture": ["list", "read_json"],
@@ -224,6 +225,11 @@
       "transform": [],
       "apply": ["exec", "plugin"]
     },
+    "deployment": {
+      "capture": [],
+      "transform": [],
+      "apply": ["deploy_release"]
+    },
     "email": {
       "capture": [],
       "transform": [],
@@ -278,7 +284,9 @@
       "transform": [
         "apply_pattern",
         "apply_theme",
+        "find_slides_by_owner",
         "merge_content",
+        "pptx_diff",
         "proposal_content_from_storyline",
         "proposal_storyline_from_brief",
         "set",
@@ -289,6 +297,7 @@
         "pptx_filter_slides",
         "pptx_patch",
         "pptx_render",
+        "register_presentation_preference_profile",
         "write_file",
         "xlsx_render"
       ]
@@ -310,7 +319,19 @@
     "meeting": {
       "capture": ["listen", "status"],
       "transform": [],
-      "apply": ["chat", "join", "leave", "speak"]
+      "apply": [
+        "audit_speaker_fairness",
+        "chat",
+        "conduct_1on_1",
+        "execute_self_action_items",
+        "extract_action_items",
+        "generate_facilitation_script",
+        "generate_reminder_message",
+        "join",
+        "leave",
+        "speak",
+        "track_pending_action_items"
+      ]
     },
     "modeling": {
       "capture": ["glob_files", "read_file", "read_json", "shell"],
@@ -325,7 +346,19 @@
         "ui_flow_to_test_inventory",
         "web_profile_to_ui_flow_adf"
       ],
-      "apply": ["log", "write_artifact", "write_file"]
+      "apply": [
+        "derive_test_inventory",
+        "evaluate_architecture_ready",
+        "evaluate_customer_signoff",
+        "evaluate_qa_ready",
+        "evaluate_requirements_completeness",
+        "extract_design_spec",
+        "extract_requirements",
+        "extract_test_plan",
+        "log",
+        "write_artifact",
+        "write_file"
+      ]
     },
     "network": {
       "capture": ["a2a_poll", "fetch", "shell"],
@@ -335,7 +368,14 @@
     "orchestrator": {
       "capture": ["discover_capabilities", "discover_skills"],
       "transform": [],
-      "apply": ["deploy", "run_execution_plan_set"]
+      "apply": [
+        "decompose_into_tasks",
+        "deploy",
+        "evaluate_task_plan_ready",
+        "execute_task_plan",
+        "run_execution_plan_set",
+        "task_plan_to_next_tasks"
+      ]
     },
     "presence": {
       "capture": [],
@@ -507,6 +547,8 @@
         "capture_intuition",
         "compute_readiness_matrix",
         "conduct_1on1",
+        "conduct_1on_1",
+        "counterparty_roleplay",
         "cross_critique",
         "curate_background_review",
         "decompose_into_tasks",
@@ -542,8 +584,10 @@
         "peer_advice",
         "perspective_fanout",
         "pptx_diff",
+        "propose_tool_calls",
         "react_loop",
         "reasoning",
+        "reasoning_loop",
         "recommend",
         "register_presentation_preference_profile",
         "render_hypothesis_report",

@@ -1,35 +1,264 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.dev/schemas/wisdom-action.schema.json",
   "title": "Wisdom Actuator Request",
+  "description": "Canonical direct-action, pipeline, and wisdom-owned reconcile contract.",
   "type": "object",
+  "additionalProperties": false,
   "required": ["action"],
   "properties": {
     "action": {
+      "type": "string",
       "enum": [
         "knowledge_search",
         "history_search",
         "knowledge_inject",
         "knowledge_export",
-        "knowledge_import"
+        "knowledge_import",
+        "pipeline",
+        "reconcile"
       ]
     },
-    "params": {
-      "type": "object",
+    "params": { "type": "object" },
+    "steps": { "type": "array", "items": { "$ref": "#/$defs/pipelineStep" }, "minItems": 1 },
+    "context": { "type": "object" },
+    "options": { "$ref": "#/$defs/pipelineOptions" },
+    "strategy_path": { "type": "string", "minLength": 1 }
+  },
+  "oneOf": [
+    {
       "properties": {
-        "tier": {
-          "type": "string",
-          "enum": ["personal", "confidential", "public"]
-        },
-        "query": {
-          "type": "string"
-        },
-        "export_as": {
-          "type": "string"
-        },
-        "limit": {
-          "type": "number"
-        }
+        "action": { "const": "knowledge_search" },
+        "params": { "$ref": "#/$defs/knowledgeSearchParams" }
+      },
+      "required": ["action", "params"]
+    },
+    {
+      "properties": {
+        "action": { "const": "history_search" },
+        "params": { "$ref": "#/$defs/historySearchParams" }
+      },
+      "required": ["action", "params"]
+    },
+    {
+      "properties": {
+        "action": { "const": "knowledge_inject" },
+        "params": { "$ref": "#/$defs/knowledgeInjectParams" }
+      },
+      "required": ["action", "params"]
+    },
+    {
+      "properties": {
+        "action": { "const": "knowledge_export" },
+        "params": { "$ref": "#/$defs/knowledgeExportParams" }
+      },
+      "required": ["action", "params"]
+    },
+    {
+      "properties": {
+        "action": { "const": "knowledge_import" },
+        "params": { "$ref": "#/$defs/knowledgeImportParams" }
+      },
+      "required": ["action", "params"]
+    },
+    { "properties": { "action": { "const": "pipeline" } }, "required": ["action", "steps"] },
+    { "properties": { "action": { "const": "reconcile" } }, "required": ["action"] }
+  ],
+  "$defs": {
+    "exportAs": { "type": "string", "minLength": 1 },
+    "knowledgeTier": { "type": "string", "enum": ["personal", "confidential", "public"] },
+    "knowledgeSearchParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["query"],
+      "properties": {
+        "query": { "type": "string", "minLength": 1 },
+        "tier": { "$ref": "#/$defs/knowledgeTier" },
+        "limit": { "type": "integer", "minimum": 1 },
+        "export_as": { "$ref": "#/$defs/exportAs" }
       }
+    },
+    "historySearchParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "query": { "type": "string" },
+        "session_id": { "type": "string" },
+        "mode": { "type": "string" },
+        "max_results": { "type": "integer", "minimum": 1 },
+        "include_scheduled": { "type": "boolean" },
+        "export_as": { "$ref": "#/$defs/exportAs" }
+      }
+    },
+    "knowledgeInjectParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["knowledge_path", "mission_id"],
+      "properties": {
+        "knowledge_path": { "type": "string", "minLength": 1 },
+        "mission_id": { "type": "string", "minLength": 1 },
+        "export_as": { "$ref": "#/$defs/exportAs" }
+      }
+    },
+    "knowledgeExportParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "output_path": { "type": "string" },
+        "domain": { "type": "string" },
+        "visibility": { "$ref": "#/$defs/knowledgeTier" },
+        "export_as": { "$ref": "#/$defs/exportAs" }
+      }
+    },
+    "knowledgeImportParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "anyOf": [{ "required": ["package_path"] }, { "required": ["source_path"] }],
+      "properties": {
+        "package_path": { "type": "string", "minLength": 1 },
+        "source_path": { "type": "string", "minLength": 1 },
+        "tier": { "$ref": "#/$defs/knowledgeTier" },
+        "export_as": { "$ref": "#/$defs/exportAs" }
+      }
+    },
+    "pipelineOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max_steps": { "type": "integer", "minimum": 1 },
+        "timeout_ms": { "type": "integer", "minimum": 1 },
+        "compatibility_mode": { "type": "boolean" }
+      }
+    },
+    "pipelineParams": {
+      "type": "object",
+      "description": "Legacy step parameter envelope; individual handlers perform operation-specific validation.",
+      "additionalProperties": true
+    },
+    "pipelineStep": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "op"],
+          "properties": {
+            "type": { "const": "capture" },
+            "op": {
+              "enum": [
+                "glob_files",
+                "history_search",
+                "knowledge_search",
+                "query",
+                "read_file",
+                "read_json",
+                "shell"
+              ]
+            },
+            "params": { "$ref": "#/$defs/pipelineParams" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "op"],
+          "properties": {
+            "type": { "const": "transform" },
+            "op": {
+              "enum": ["array_count", "json_query", "regex_extract", "regex_replace", "yaml_update"]
+            },
+            "params": { "$ref": "#/$defs/pipelineParams" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "op"],
+          "properties": {
+            "type": { "const": "apply" },
+            "op": {
+              "enum": [
+                "a2a_fanout",
+                "perspective_fanout",
+                "a2a_roleplay",
+                "counterparty_roleplay",
+                "adjust_proposal",
+                "audit_speaker_fairness",
+                "capture_intuition",
+                "compute_readiness_matrix",
+                "conduct_1on_1",
+                "conduct_1on1",
+                "curate_background_review",
+                "cross_critique",
+                "typed_cross_critique",
+                "decompose_into_tasks",
+                "deploy_release",
+                "distill",
+                "derive_test_inventory",
+                "emit_dissent_log",
+                "escalate_for_review",
+                "evaluate_architecture_ready",
+                "evaluate_customer_signoff",
+                "evaluate_decision_rights_approval",
+                "evaluate_ensemble_convergence",
+                "evaluate_qa_ready",
+                "evaluate_requirements_completeness",
+                "evaluate_simulation_quality",
+                "evaluate_task_plan_ready",
+                "execute_self_action_items",
+                "execute_task_plan",
+                "extract_action_items",
+                "extract_design_spec",
+                "extract_dissent_signals",
+                "extract_requirements",
+                "extract_test_plan",
+                "find_slides_by_owner",
+                "fork_branches",
+                "generate_facilitation_script",
+                "generate_reminder_message",
+                "inject_prior_knowledge",
+                "knowledge_export",
+                "knowledge_import",
+                "knowledge_inject",
+                "log",
+                "peer_advice",
+                "pptx_diff",
+                "propose_tool_calls",
+                "react_loop",
+                "reasoning_loop",
+                "reasoning",
+                "recommend",
+                "register_presentation_preference_profile",
+                "render_hypothesis_report",
+                "resolve_hypothesis_conflict",
+                "simulate_all",
+                "simulate_all_ensemble",
+                "stakeholder_grid_sort",
+                "synthesize_counterparty_persona",
+                "task_plan_to_next_tasks",
+                "tool_use",
+                "track_pending_action_items",
+                "transcribe_audio",
+                "uncertainty_gate",
+                "write_artifact",
+                "write_file"
+              ]
+            },
+            "params": { "$ref": "#/$defs/pipelineParams" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "op"],
+          "properties": {
+            "type": { "const": "control" },
+            "op": { "enum": ["if", "while"] },
+            "params": { "$ref": "#/$defs/pipelineParams" }
+          }
+        }
+      ]
     }
   }
 }

@@ -6,9 +6,15 @@ import { handleAction } from './wisdom-pipeline-helpers.js';
 import { runActuatorCli } from '@agent/core';
 
 const main = async () => {
+  const schema = JSON.parse(
+    safeReadFile(pathResolver.rootResolve('schemas/wisdom-action.schema.json'), {
+      encoding: 'utf8',
+    }) as string
+  ) as object;
   await runActuatorCli({
     name: 'wisdom-actuator',
     handleAction,
+    schema,
   });
 };
 
@@ -24,5 +30,10 @@ if (entrypoint && modulePath === entrypoint) {
 
 export { handleAction } from './wisdom-pipeline-helpers.js';
 export { dispatchDecisionOp } from './decision-ops.js';
+export { createWisdomDispatcher } from './wisdom-dispatcher.js';
+export type { WisdomContext } from './contracts/wisdom-context.js';
+export type { ExecutionKind, IdempotencyClass, WisdomReceipt } from './contracts/wisdom-result.js';
+export type { WisdomOperationSpec } from './contracts/wisdom-operation.js';
+export { validateWisdomRequest } from './contracts/wisdom-request.js';
 
 export { describeOps } from './op-catalog.js';

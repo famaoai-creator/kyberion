@@ -22,12 +22,14 @@ import {
   shutdownAgentRuntimeViaDaemon,
   refreshAgentRuntimeViaDaemon,
   restartAgentRuntimeViaDaemon,
+  getAgentExecutionPort,
   pathResolver,
   buildGovernedRetryOptions,
   classifyError,
   retry,
 } from '@agent/core';
 import type { AgentProvider } from '@agent/core/agent-registry';
+import type { AgentTaskEnvelope } from '@agent/core';
 import type { A2AMessage } from '@agent/core/a2a-bridge';
 import { safeReadFile } from '@agent/core';
 import * as path from 'node:path';
@@ -45,6 +47,7 @@ export interface AgentAction {
   action:
     | 'spawn'
     | 'ask'
+    | 'delegate'
     | 'shutdown'
     | 'shutdown_all'
     | 'list'
@@ -65,6 +68,7 @@ export interface AgentAction {
     modelId?: string;
     systemPrompt?: string;
     capabilities?: string[];
+    task?: AgentTaskEnvelope;
     cwd?: string;
     parentAgentId?: string;
     missionId?: string;
@@ -186,6 +190,12 @@ export async function handleAction(input: AgentAction | AgentPipelineDispatch) {
         agentRegistry.updateStatus(params.agentId, 'error');
         throw e;
       }
+    }
+
+    case 'delegate': {
+      if (!params.task) throw new Error('task envelope is required for delegate');
+      const receipt = await getAgentExecutionPort().delegate(params.task);
+      return { status: receipt.status, execution_kind: 'agent_delegation', receipt };
     }
 
     case 'shutdown': {

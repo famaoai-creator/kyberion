@@ -18,8 +18,8 @@
   "steps": [
     {
       "id": "extract_requirements",
-      "role": "source",
-      "op": "wisdom:extract_requirements",
+      "role": "sink",
+      "op": "modeling:extract_requirements",
       "produces": { "channel": "requirements", "type": "RequirementsResult" },
       "params": {
         "mission_id": "{{mission_id}}",
@@ -33,8 +33,8 @@
     },
     {
       "id": "synthesize_design",
-      "role": "source",
-      "op": "wisdom:extract_design_spec",
+      "role": "sink",
+      "op": "modeling:extract_design_spec",
       "produces": { "channel": "design", "type": "DesignSpec" },
       "params": {
         "mission_id": "{{mission_id}}",
@@ -44,8 +44,8 @@
     },
     {
       "id": "derive_test_plan",
-      "role": "source",
-      "op": "wisdom:extract_test_plan",
+      "role": "sink",
+      "op": "modeling:extract_test_plan",
       "produces": { "channel": "test_plan", "type": "TestPlan" },
       "params": {
         "mission_id": "{{mission_id}}",
@@ -54,8 +54,8 @@
     },
     {
       "id": "decompose_tasks",
-      "role": "source",
-      "op": "wisdom:decompose_into_tasks",
+      "role": "sink",
+      "op": "orchestrator:decompose_into_tasks",
       "produces": { "channel": "task_plan", "type": "TaskPlan" },
       "params": {
         "mission_id": "{{mission_id}}",

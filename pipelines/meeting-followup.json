@@ -54,8 +54,8 @@
     },
     {
       "id": "extract_action_items",
-      "role": "source",
-      "op": "wisdom:extract_action_items",
+      "role": "sink",
+      "op": "meeting:extract_action_items",
       "consumes": "transcript_text",
       "produces": { "channel": "action_item_count", "type": "number" },
       "params": {

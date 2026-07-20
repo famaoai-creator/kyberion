@@ -18,10 +18,18 @@ import {
   pathResolver,
   buildUnknownActuatorOpError,
   validatePipelineAdf,
+  registerTaskPlanCoordinator,
+  evaluateTaskPlanReadyGate,
 } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
 import * as path from 'node:path';
 import yaml from 'js-yaml';
+import { executeTaskPlanFromOrchestrator, taskPlanCoordinator } from './task-plan-coordinator.js';
+import { decomposeIntoTasks, taskPlanToNextTasks } from './task-plan-ops.js';
+
+// Legacy core callers are still supported, but the coordinator is owned and
+// registered by the orchestrator actuator rather than by Wisdom or core.
+registerTaskPlanCoordinator(taskPlanCoordinator);
 
 export interface PipelineStep {
   type: 'capture' | 'transform' | 'apply' | 'control';
@@ -142,7 +150,7 @@ export async function executePipeline(
             ctx = await opTransform(step.op, step.params, ctx);
             break;
           case 'apply':
-            await opApply(step.op, step.params, ctx);
+            ctx = await opApply(step.op, step.params, ctx);
             break;
         }
       }
@@ -907,6 +915,21 @@ async function opTransform(op: string, params: any, ctx: any) {
         [params.export_as || 'execution_run_report']: runReport,
       };
     }
+    case 'execute_task_plan': {
+      const missionId = String(resolveVars(params.mission_id || ctx.mission_id || '', ctx));
+      if (!missionId) throw new Error('execute_task_plan requires mission_id');
+      const result = await executeTaskPlanFromOrchestrator({
+        missionId,
+        maxTasks: typeof params.max_tasks === 'number' ? params.max_tasks : undefined,
+        haltOnFailure: Boolean(params.halt_on_failure),
+        model: params.model ? String(resolveVars(params.model, ctx)) : undefined,
+        cwd: params.cwd ? String(resolveVars(params.cwd, ctx)) : undefined,
+      });
+      return {
+        ...ctx,
+        [params.export_as || 'task_execution_report']: result,
+      };
+    }
     case 'preflight_execution_plan_set': {
       const planSet = ctx[params.from || 'execution_plan_set'];
       if (!planSet || typeof planSet !== 'object')
@@ -962,6 +985,32 @@ async function opApply(op: string, params: any, ctx: any) {
     case 'log':
       logger.info(`[ORCH_LOG] ${resolveVars(params.message || 'Action completed', ctx)}`);
       break;
+    case 'decompose_into_tasks': {
+      const result = await decomposeIntoTasks({
+        mission_id: String(resolveVars(params.mission_id || ctx.mission_id || '', ctx)),
+        project_name: String(resolveVars(params.project_name || ctx.project_name || '', ctx)),
+        requirements_draft_path: params.requirements_draft_path
+          ? String(resolveVars(params.requirements_draft_path, ctx))
+          : undefined,
+        design_spec_path: params.design_spec_path
+          ? String(resolveVars(params.design_spec_path, ctx))
+          : undefined,
+      });
+      return { ...ctx, [params.export_as || 'task_plan_result']: result };
+    }
+    case 'evaluate_task_plan_ready':
+      return {
+        ...ctx,
+        [params.export_as || 'task_plan_ready']: evaluateTaskPlanReadyGate(
+          String(resolveVars(params.mission_id || ctx.mission_id || '', ctx))
+        ),
+      };
+    case 'task_plan_to_next_tasks': {
+      const result = taskPlanToNextTasks({
+        mission_id: String(resolveVars(params.mission_id || ctx.mission_id || '', ctx)),
+      });
+      return { ...ctx, [params.export_as || 'next_tasks_result']: result };
+    }
     case 'write_execution_plan_set': {
       const planSet =
         ctx[params.from || 'validated_execution_plan_set'] ||
@@ -986,6 +1035,7 @@ async function opApply(op: string, params: any, ctx: any) {
     default:
       throw buildUnknownOrchestratorOpError(op);
   }
+  return ctx;
 }
 
 export function loadActuatorRequestArchetypes(): any {

@@ -31,6 +31,7 @@ import { describeOps as describeVoiceOps } from '../libs/actuators/voice-actuato
 import { describeOps as describeMeetingOps } from '../libs/actuators/meeting-actuator/src/op-catalog.js';
 import { describeOps as describeMediaGenerationOps } from '../libs/actuators/media-generation-actuator/src/op-catalog.js';
 import { describeOps as describeVideoCompositionOps } from '../libs/actuators/video-composition-actuator/src/op-catalog.js';
+import { describeOps as describeDeploymentOps } from '../libs/actuators/deployment-actuator/src/op-catalog.js';
 
 // AR-02: actuators that self-describe their op surface. The registry and
 // discovery index are generated from these; check:op-registry fails on
@@ -71,6 +72,7 @@ const DESCRIBE_OPS_SOURCES: Record<
   'meeting-actuator': describeMeetingOps,
   'media-generation-actuator': describeMediaGenerationOps,
   'video-composition-actuator': describeVideoCompositionOps,
+  'deployment-actuator': describeDeploymentOps,
 };
 
 type PipelineOpKind = 'capture' | 'transform' | 'apply' | 'control';

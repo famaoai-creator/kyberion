@@ -11,6 +11,8 @@ import {
   resetReasoningBackend,
   resetVoiceBridge,
   stubReasoningBackend,
+  registerActuatorForwardingPort,
+  resetActuatorForwardingPort,
 } from '@agent/core';
 import {
   stakeholderGridSort,
@@ -18,18 +20,21 @@ import {
   computeReadinessMatrix,
   recommend,
   resolveHypothesisConflict,
-  evaluateDecisionRightsApprovalOp,
-  findSlidesByOwner,
-  pptxDiff,
   evaluateSimulationQuality,
   evaluateEnsembleConvergence,
   simulateAll,
   simulateAllEnsemble,
-  generateFacilitationScriptOp,
   dispatchDecisionOp,
 } from './decision-ops.js';
+import { generateFacilitationScriptOp } from '../../meeting-actuator/src/meeting-intelligence-ops.js';
+import { evaluateDecisionRightsOp as evaluateDecisionRightsApprovalOp } from '../../approval-actuator/src/approval-ops.js';
+import { findSlidesByOwner, pptxDiff } from '../../media-actuator/src/media-slide-ops.js';
 
 const TMP_ROOT = 'active/shared/tmp/decision-ops-tests';
+
+afterEach(() => {
+  resetActuatorForwardingPort();
+});
 
 function tmpPath(sub: string): { rel: string; abs: string } {
   const rel = path.posix.join(TMP_ROOT, sub);
@@ -899,6 +904,21 @@ describe("dispatchDecisionOp 'derive_test_inventory'", () => {
         dod: [{ check_id: 'DOD-1', description: 'Done', status: 'pending' }],
       })
     );
+    registerActuatorForwardingPort({
+      forward: async (request) => {
+        const modeling = await import('../../modeling-actuator/src/index.js');
+        const result = await modeling.handleAction({
+          action: 'pipeline',
+          steps: [{ type: 'apply', op: request.target_op, params: request.params }],
+          context: request.context,
+        });
+        return {
+          forwarded_to: `${request.target_actuator}:${request.target_op}`,
+          status: result.status === 'failed' ? 'failed' : 'succeeded',
+          context: result.context,
+        };
+      },
+    });
     const result = await dispatchDecisionOp(
       'derive_test_inventory',
       {

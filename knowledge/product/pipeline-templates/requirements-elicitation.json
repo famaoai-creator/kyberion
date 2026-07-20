@@ -17,8 +17,8 @@
   "steps": [
     {
       "id": "extract",
-      "role": "source",
-      "op": "wisdom:extract_requirements",
+      "role": "sink",
+      "op": "modeling:extract_requirements",
       "produces": { "channel": "extraction", "type": "RequirementsExtraction" },
       "params": {
         "mission_id": "{{mission_id}}",
@@ -43,8 +43,8 @@
     },
     {
       "id": "check_completeness",
-      "role": "transform",
-      "op": "wisdom:evaluate_requirements_completeness",
+      "role": "sink",
+      "op": "modeling:evaluate_requirements_completeness",
       "consumes": "extraction",
       "produces": { "channel": "completeness", "type": "CompletenessResult" },
       "params": {
