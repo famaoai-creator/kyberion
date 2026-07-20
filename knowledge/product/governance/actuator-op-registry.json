@@ -348,7 +348,14 @@
     "orchestrator": {
       "capture": ["discover_capabilities", "discover_skills"],
       "transform": [],
-      "apply": ["deploy", "execute_task_plan", "run_execution_plan_set"]
+      "apply": [
+        "decompose_into_tasks",
+        "deploy",
+        "evaluate_task_plan_ready",
+        "execute_task_plan",
+        "run_execution_plan_set",
+        "task_plan_to_next_tasks"
+      ]
     },
     "presence": {
       "capture": [],

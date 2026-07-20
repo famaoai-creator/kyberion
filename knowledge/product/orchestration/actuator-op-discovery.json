@@ -1867,7 +1867,15 @@
           "kind": "capture"
         },
         {
+          "op": "decompose_into_tasks",
+          "kind": "apply"
+        },
+        {
           "op": "deploy",
+          "kind": "apply"
+        },
+        {
+          "op": "evaluate_task_plan_ready",
           "kind": "apply"
         },
         {
@@ -1876,6 +1884,10 @@
         },
         {
           "op": "run_execution_plan_set",
+          "kind": "apply"
+        },
+        {
+          "op": "task_plan_to_next_tasks",
           "kind": "apply"
         }
       ]

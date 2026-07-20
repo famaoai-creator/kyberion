@@ -11,11 +11,6 @@ import {
   getReasoningBackend,
   getVoiceBridge,
   getSpeechToTextBridge,
-  saveTaskPlan,
-  readRequirementsDraft,
-  readDesignSpec,
-  readTaskPlan,
-  evaluateTaskPlanReadyGate,
   consumeTenantBudget,
   TenantRateLimitExceededError,
   findRelevantDistilledKnowledge,
@@ -140,148 +135,6 @@ function generateHeuristicId(): string {
   const time = Date.now().toString(36).toUpperCase();
   const rand = Math.random().toString(36).slice(2, 8).toUpperCase();
   return `HEU-${time}-${rand}`;
-}
-
-// ---------------------------------------------------------------------------
-// Decompose Into Tasks — requirements (+ optional design) → task plan.
-// ---------------------------------------------------------------------------
-
-export interface DecomposeIntoTasksOpInput {
-  mission_id: string;
-  project_name: string;
-  requirements_draft_path?: string;
-  design_spec_path?: string;
-}
-
-export async function decomposeIntoTasksOp(input: DecomposeIntoTasksOpInput): Promise<{
-  mission_id: string;
-  version: string;
-  draft_path: string;
-  task_count: number;
-  task_plan_ready: { passed: boolean; reasons: string[] };
-}> {
-  if (!input.mission_id || !input.project_name) {
-    throw new Error('[decompose_into_tasks] requires mission_id and project_name');
-  }
-  const backend = getReasoningBackend();
-  const requirementsDraft =
-    readRequirementsDraft(input.mission_id) ??
-    (input.requirements_draft_path &&
-    safeExistsSync(pathResolver.rootResolve(input.requirements_draft_path))
-      ? JSON.parse(
-          safeReadFile(pathResolver.rootResolve(input.requirements_draft_path), {
-            encoding: 'utf8',
-          }) as string
-        )
-      : null);
-  if (!requirementsDraft) {
-    throw new Error('[decompose_into_tasks] requirements draft not found');
-  }
-  const designSpec =
-    readDesignSpec(input.mission_id) ??
-    (input.design_spec_path && safeExistsSync(pathResolver.rootResolve(input.design_spec_path))
-      ? JSON.parse(
-          safeReadFile(pathResolver.rootResolve(input.design_spec_path), {
-            encoding: 'utf8',
-          }) as string
-        )
-      : undefined);
-
-  const decomposed = await backend.decomposeIntoTasks({
-    requirementsDraft,
-    designSpec,
-    projectName: input.project_name,
-  });
-  const saved = saveTaskPlan({
-    missionId: input.mission_id,
-    projectName: input.project_name,
-    decomposed,
-    sourceRefs: [
-      `active/missions/${input.mission_id}/evidence/requirements-draft.json`,
-      ...(designSpec ? [`active/missions/${input.mission_id}/evidence/design-spec.json`] : []),
-    ],
-    generatedBy: backend.name,
-  });
-  const gate = evaluateTaskPlanReadyGate(input.mission_id);
-  return {
-    mission_id: input.mission_id,
-    version: saved.version,
-    draft_path: `active/missions/${input.mission_id}/evidence/task-plan.json`,
-    task_count: saved.tasks.length,
-    task_plan_ready: gate,
-  };
-}
-
-// ---------------------------------------------------------------------------
-// E2E-05 Task 4: task-plan → NEXT_TASKS.json (deterministic transform).
-// Converts the SDLC task plan into the orchestration worker's task contract
-// so "合意 → 分解 → ミッション着手" becomes one pipeline run. Roles from the
-// plan are respected (tester → qa); reviewer tasks get the worker's mandatory
-// review_target / REVIEW-<target>.md deliverable derived from depends_on.
-// ---------------------------------------------------------------------------
-
-export function taskPlanToNextTasksOp(input: { mission_id: string }): {
-  mission_id: string;
-  next_tasks_path: string;
-  task_count: number;
-} {
-  if (!input.mission_id) throw new Error('[task_plan_to_next_tasks] requires mission_id');
-  const plan = readTaskPlan(input.mission_id);
-  if (!plan || !Array.isArray(plan.tasks) || plan.tasks.length === 0) {
-    throw new Error('[task_plan_to_next_tasks] task plan not found or empty');
-  }
-  // A stub-backend placeholder plan must never become real worker tasks —
-  // that is a 字面成功 (the pipeline "passes" while the mission gets a fake
-  // plan). Fail loudly so the operator re-runs with a real backend.
-  const stubTasks = plan.tasks.filter(
-    (task) =>
-      /\[STUB\]/.test(String(task.title || '')) || /^T-STUB/i.test(String(task.task_id || ''))
-  );
-  if (stubTasks.length > 0) {
-    throw new Error(
-      `[task_plan_to_next_tasks] task plan contains ${stubTasks.length} stub placeholder task(s) — regenerate with a real reasoning backend (KYBERION_REASONING_BACKEND)`
-    );
-  }
-  const scopeOf = (estimate?: string): 'S' | 'M' | 'L' =>
-    estimate === 'L' || estimate === 'XL' ? 'L' : estimate === 'M' ? 'M' : 'S';
-  const nextTasks = plan.tasks.map((task) => {
-    const dependencies = Array.isArray(task.depends_on) ? task.depends_on : [];
-    let role =
-      task.assigned_role === 'tester'
-        ? 'qa'
-        : task.assigned_role === 'reviewer'
-          ? 'reviewer'
-          : 'implementer';
-    // The worker contract requires reviewer/qa tasks to carry review_target +
-    // a REVIEW-<target>.md deliverable; without a dependency there is nothing
-    // to review, so the task degrades to implementer instead of violating it.
-    const reviewTarget = role === 'reviewer' || role === 'qa' ? dependencies[0] : undefined;
-    if ((role === 'reviewer' || role === 'qa') && !reviewTarget) role = 'implementer';
-    const scope = scopeOf(task.estimate);
-    return {
-      task_id: task.task_id,
-      status: 'planned',
-      assigned_to: { role },
-      description: `${task.title} — ${task.summary}`,
-      deliverable: reviewTarget
-        ? `deliverables/REVIEW-${reviewTarget}.md`
-        : task.deliverables?.[0] || `deliverables/${task.task_id}.md`,
-      dependencies,
-      acceptance_criteria: Array.isArray(task.test_criteria) ? task.test_criteria : [],
-      estimated_scope: scope,
-      risk: scope === 'L' ? 'high' : scope === 'M' ? 'medium' : 'low',
-      ...(reviewTarget ? { review_target: reviewTarget } : {}),
-    };
-  });
-  // Same path convention the orchestration worker reads from
-  // (missionDir honors mission-management-config tier directories).
-  const nextTasksPath = `${missionDir(input.mission_id, 'public')}/NEXT_TASKS.json`;
-  safeWriteFile(nextTasksPath, JSON.stringify(nextTasks, null, 2));
-  return {
-    mission_id: input.mission_id,
-    next_tasks_path: nextTasksPath,
-    task_count: nextTasks.length,
-  };
 }
 
 // ---------------------------------------------------------------------------
@@ -2833,16 +2686,6 @@ export async function dispatchDecisionOp(
       return { handled: true, ctx: assign(result) };
     }
 
-    case 'decompose_into_tasks': {
-      const result = await decomposeIntoTasksOp({
-        mission_id: resolved('mission_id'),
-        project_name: resolved('project_name'),
-        requirements_draft_path: resolved('requirements_draft_path'),
-        design_spec_path: resolved('design_spec_path'),
-      });
-      return { handled: true, ctx: assign(result) };
-    }
-
     case 'register_presentation_preference_profile': {
       const result = await registerPresentationPreferenceProfileOp({
         profile:
@@ -2852,16 +2695,6 @@ export async function dispatchDecisionOp(
         profile_path: resolved('profile_path'),
         registry_path: resolved('registry_path'),
       });
-      return { handled: true, ctx: assign(result) };
-    }
-
-    case 'evaluate_task_plan_ready': {
-      const result = evaluateTaskPlanReadyGate(resolved('mission_id'));
-      return { handled: true, ctx: assign(result) };
-    }
-
-    case 'task_plan_to_next_tasks': {
-      const result = taskPlanToNextTasksOp({ mission_id: resolved('mission_id') });
       return { handled: true, ctx: assign(result) };
     }
 

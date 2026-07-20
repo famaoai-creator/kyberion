@@ -122,6 +122,8 @@ const FORWARD_TARGETS: Record<string, { actuator: string; op: string }> = {
   derive_test_inventory: { actuator: 'modeling', op: 'derive_test_inventory' },
   evaluate_qa_ready: { actuator: 'modeling', op: 'evaluate_qa_ready' },
   decompose_into_tasks: { actuator: 'orchestrator', op: 'decompose_into_tasks' },
+  evaluate_task_plan_ready: { actuator: 'orchestrator', op: 'evaluate_task_plan_ready' },
+  task_plan_to_next_tasks: { actuator: 'orchestrator', op: 'task_plan_to_next_tasks' },
   evaluate_decision_rights_approval: { actuator: 'approval', op: 'evaluate_decision_rights' },
   escalate_for_review: { actuator: 'approval', op: 'request_review' },
 };
