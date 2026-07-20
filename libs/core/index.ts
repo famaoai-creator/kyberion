@@ -1206,6 +1206,7 @@ export type {
   TaskPlan,
   TestPlan,
 } from './sdlc-artifact-store.js';
+export { signA2AContent, verifyA2AContent } from './a2a-envelope-signature.js';
 export {
   buildFailoverReasoningBackend,
   getReasoningBackend,
