@@ -241,6 +241,10 @@ function buildCapabilitiesGuide(current: CurrentIndexRecord[]): string {
   );
   lines.push('');
   lines.push(
+    '> **Compatibility note:** Wisdom entries that forward to file, terminal, media, voice, meeting, modeling, approval, deployment, or orchestrator are retained for legacy pipelines. Use the canonical owner actuator for new work; the Wisdom entry is not an implementation grant.'
+  );
+  lines.push('');
+  lines.push(
     'Legacy or conceptual capability names are intentionally excluded here. If a component is not manifest-backed, it is not part of the current runtime catalog.'
   );
   lines.push('');

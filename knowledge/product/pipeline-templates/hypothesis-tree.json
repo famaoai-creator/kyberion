@@ -8,11 +8,7 @@
     "mission_id": "",
     "topic": "",
     "evidence_refs": [],
-    "personas": [
-      "Visionary Inventor",
-      "Ruthless Auditor",
-      "red-team-adversary"
-    ],
+    "personas": ["Visionary Inventor", "Ruthless Auditor", "red-team-adversary"],
     "min_hypotheses_per_persona": 2,
     "prior_knowledge_tags": []
   },
@@ -31,7 +27,7 @@
     {
       "id": "diverge",
       "role": "sink",
-      "op": "wisdom:a2a_fanout",
+      "op": "wisdom:perspective_fanout",
       "params": {
         "personas": "{{personas}}",
         "min_hypotheses_per_persona": "{{min_hypotheses_per_persona}}",
@@ -42,7 +38,7 @@
     {
       "id": "critique",
       "role": "sink",
-      "op": "wisdom:cross_critique",
+      "op": "wisdom:typed_cross_critique",
       "params": {
         "input": "{{mission_evidence_dir}}/hypothesis-tree-raw.json",
         "personas": "{{personas}}",

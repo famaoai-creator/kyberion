@@ -2,7 +2,7 @@
   "action": "pipeline",
   "name": "faas-add-api",
   "version": "2.0.0",
-  "description": "Conversational API authoring for projects/faas-platform. Takes a natural-language description plus mission metadata, produces a requirements draft, a design spec, a task plan, executes the plan via Claude Code sub-agent (full claude_code tool preset, cwd pinned to the project), and reports gate-check results. Deploy + approval are run as separate downstream pipelines (release-package → deploy-release) so the human approval moment stays explicit.",
+  "description": "Conversational API authoring for projects/faas-platform. Takes a natural-language description plus mission metadata, produces a requirements draft, a design spec, and a task plan, then executes it through the orchestrator and registered AgentExecutionPort before reporting gate-check results. Deploy + approval are run as separate downstream pipelines (release-package → deploy-release) so the human approval moment stays explicit.",
   "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
   "context": {
     "mission_id": "",
@@ -27,8 +27,8 @@
     },
     {
       "id": "requirements",
-      "role": "source",
-      "op": "wisdom:extract_requirements",
+      "role": "sink",
+      "op": "modeling:extract_requirements",
       "produces": { "channel": "requirements", "type": "RequirementsResult" },
       "params": {
         "mission_id": "{{mission_id}}",
@@ -42,8 +42,8 @@
     },
     {
       "id": "design",
-      "role": "source",
-      "op": "wisdom:extract_design_spec",
+      "role": "sink",
+      "op": "modeling:extract_design_spec",
       "produces": { "channel": "design", "type": "DesignResult" },
       "params": {
         "mission_id": "{{mission_id}}",
@@ -53,8 +53,8 @@
     },
     {
       "id": "task_plan",
-      "role": "source",
-      "op": "wisdom:decompose_into_tasks",
+      "role": "sink",
+      "op": "orchestrator:decompose_into_tasks",
       "produces": { "channel": "task_plan", "type": "TaskPlan" },
       "params": {
         "mission_id": "{{mission_id}}",
@@ -63,8 +63,8 @@
     },
     {
       "id": "execute",
-      "role": "source",
-      "op": "wisdom:execute_task_plan",
+      "role": "sink",
+      "op": "orchestrator:execute_task_plan",
       "produces": { "channel": "execution", "type": "ExecutionResult" },
       "params": {
         "mission_id": "{{mission_id}}",

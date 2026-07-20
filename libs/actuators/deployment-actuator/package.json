@@ -1,0 +1,15 @@
+{
+  "name": "@actuator/deployment",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Deployment capability boundary backed by the governed DeploymentAdapter",
+  "main": "../../../dist/libs/actuators/deployment-actuator/src/index.js",
+  "types": "../../../dist/libs/actuators/deployment-actuator/src/index.d.ts",
+  "scripts": {
+    "build": "tsc -p ../../../tsconfig.actuators.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@agent/core": "workspace:*"
+  }
+}

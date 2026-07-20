@@ -59,7 +59,7 @@
                 {
                   "id": "emit-plan",
                   "role": "sink",
-                  "op": "wisdom:write_file",
+                  "op": "file:write_file",
                   "consumes": "impact_report",
                   "params": {
                     "path": "{{mission_evidence_dir}}/strategic-impact-simulation.md",

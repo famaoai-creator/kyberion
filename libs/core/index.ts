@@ -840,12 +840,40 @@ export {
   saveTestPlan,
 } from './sdlc-artifact-store.js';
 export { executeTaskPlan } from './task-executor.js';
+export {
+  getTaskPlanCoordinator,
+  registerTaskPlanCoordinator,
+  resetTaskPlanCoordinator,
+} from './task-plan-coordinator-port.js';
 export type {
   ExecuteTaskPlanParams,
   ExecuteTaskPlanResult,
   TaskExecutionRecord,
   TaskExecutionStatus,
-} from './task-executor.js';
+  TaskPlanCoordinatorPort,
+} from './task-plan-coordinator-port.js';
+export {
+  getAgentExecutionPort,
+  registerAgentExecutionPort,
+  SupervisorAgentExecutionPort,
+} from './agent-execution-port.js';
+export type {
+  AgentExecutionPort,
+  AgentExecutionReceipt,
+  AgentTaskEnvelope,
+} from './agent-execution-port.js';
+export {
+  getActuatorForwardingPort,
+  registerActuatorForwardingPort,
+  resetActuatorForwardingPort,
+  withActuatorForwardingPort,
+} from './actuator-forwarding-port.js';
+export type {
+  ActuatorForwardingPort,
+  ActuatorForwardStatus,
+  ActuatorForwardRequest,
+  ActuatorForwardReceipt,
+} from './actuator-forwarding-port.js';
 export {
   getDeploymentAdapter,
   installShellDeploymentAdapterIfAvailable,
@@ -1185,6 +1213,7 @@ export type {
   TaskPlan,
   TestPlan,
 } from './sdlc-artifact-store.js';
+export { signA2AContent, verifyA2AContent } from './a2a-envelope-signature.js';
 export {
   buildFailoverReasoningBackend,
   getReasoningBackend,
@@ -1561,6 +1590,9 @@ export type {
   SynthesizedPersona,
   PeerAdviceInput,
   PeerAdviceResult,
+  GenerateWithToolsResult,
+  ReasoningCallOptions,
+  ToolDefinition,
   UntrustedDataParams,
 } from './reasoning-backend.js';
 export {

@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { indexHistoryEntry } from '@agent/core';
+import {
+  indexHistoryEntry,
+  registerActuatorForwardingPort,
+  resetActuatorForwardingPort,
+} from '@agent/core';
 
 const mocks = vi.hoisted(() => ({
   safeReadFile: vi.fn(),
@@ -106,52 +110,68 @@ describe('wisdom-actuator handleAction', () => {
     expect(result.results[0].error).toContain('Invalid knowledge import tier');
   });
 
-  it('registers a presentation preference profile through the personal registry', async () => {
-    mocks.safeExistsSync.mockImplementation((filePath: string) =>
-      filePath.includes('presentation-preference-registry.json') ? false : true
-    );
-    mocks.safeReadFile.mockReturnValue('');
-
+  it('fails closed when knowledge export has no governed origin scope', async () => {
+    mocks.safeReadFile.mockReturnValue('exported knowledge');
     const { handleAction } = await import('./index.js');
     const result = await handleAction({
       action: 'pipeline',
       steps: [
         {
           type: 'apply',
-          op: 'register_presentation_preference_profile',
-          params: {
-            registry_path: 'active/shared/tmp/presentation-preference-registry.test.json',
-            profile: {
-              kind: 'presentation-preference-profile',
-              profile_id: 'test-roundtrip-profile',
-              scope: 'briefing',
-              theme_selection_policy: {
-                decision_mode: 'ask_when_uncertain',
-                ask_user_when: ['new_deck_category'],
-                default_theme_hint: 'test-roundtrip-theme',
-              },
-              brief_question_sets: [
-                {
-                  label: 'Briefing deck',
-                  deck_purposes: ['briefing'],
-                  questions: ['Who is the audience?', 'What should the deck help decide?'],
-                },
-              ],
-              theme_sets: [
-                {
-                  label: 'Roundtrip theme',
-                  deck_purposes: ['briefing'],
-                  theme_hint: 'test-roundtrip-theme',
-                },
-              ],
-            },
-          },
+          op: 'knowledge_export',
+          params: { path: 'public/example.md' },
         },
       ],
-      context: {},
+      context: { agent_id: 'agent-test' },
     });
 
-    expect(result.status).toBe('succeeded');
+    expect(result.status).toBe('failed');
+    expect(result.results[0].error).toContain('KNOWLEDGE_ORIGIN_SCOPE_REQUIRED');
+  });
+
+  it('registers a presentation preference profile through the personal registry', async () => {
+    mocks.safeExistsSync.mockImplementation((filePath: string) =>
+      filePath.includes('presentation-preference-registry.json') ? false : true
+    );
+    mocks.safeReadFile.mockReturnValue('');
+
+    const forward = vi.fn().mockResolvedValue({
+      forwarded_to: 'media:register_presentation_preference_profile',
+      status: 'succeeded',
+      context: {
+        presentation_preference_profile_registered: {
+          profile_id: 'test-roundtrip-profile',
+        },
+      },
+    });
+    registerActuatorForwardingPort({ forward });
+    try {
+      const { handleAction } = await import('./index.js');
+      const result = await handleAction({
+        action: 'pipeline',
+        steps: [
+          {
+            type: 'apply',
+            op: 'register_presentation_preference_profile',
+            params: {
+              registry_path: 'active/shared/tmp/presentation-preference-registry.test.json',
+              profile: { profile_id: 'test-roundtrip-profile' },
+            },
+          },
+        ],
+        context: {},
+      });
+
+      expect(result.status).toBe('succeeded');
+      expect(forward).toHaveBeenCalledWith(
+        expect.objectContaining({
+          target_actuator: 'media',
+          target_op: 'register_presentation_preference_profile',
+        })
+      );
+    } finally {
+      resetActuatorForwardingPort();
+    }
   });
 
   it('exposes public history search through the capture pipeline op', async () => {

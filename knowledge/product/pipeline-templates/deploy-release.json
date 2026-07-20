@@ -14,8 +14,8 @@
   "steps": [
     {
       "id": "trigger",
-      "role": "source",
-      "op": "wisdom:deploy_release",
+      "role": "sink",
+      "op": "deployment:deploy_release",
       "produces": { "channel": "deploy_result", "type": "DeployResult" },
       "params": {
         "mission_id": "{{mission_id}}",

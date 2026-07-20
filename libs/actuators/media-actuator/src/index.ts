@@ -84,6 +84,7 @@ import {
 import { recognizeDocumentImage } from './media-ocr.js';
 import { createProposalPptxFlow } from './proposal-pptx-helpers.js';
 import { createMediaDocumentPipelineHelpers } from './media-document-pipeline-helpers.js';
+import { registerPresentationPreferenceProfileOp } from './presentation-preference-ops.js';
 import {
   warnLegacyMediaOp,
   buildMediaGenerationBoundary,
@@ -133,6 +134,7 @@ import {
   normalizeXlsxDesignProtocol,
 } from './media-spreadsheet-pipeline-helpers.js';
 import * as path from 'node:path';
+import { findSlidesByOwner, pptxDiff, type MediaSlideText } from './media-slide-ops.js';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import * as excelUtils from '@agent/shared-media';
@@ -1579,6 +1581,34 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
   const rootDir = pathResolver.rootDir();
   if (PDF_PYPDF_OPS.has(op)) return opCapture(op, params, ctx, resolve);
   switch (op) {
+    case 'find_slides_by_owner': {
+      const slides = (params.slides ||
+        ctx[params.from || 'last_pptx_slides'] ||
+        []) as MediaSlideText[];
+      const labels = Array.isArray(params.owner_labels)
+        ? params.owner_labels.map(String)
+        : Array.isArray(ctx[params.owner_labels_from || 'owner_labels'])
+          ? ctx[params.owner_labels_from || 'owner_labels'].map(String)
+          : [];
+      const result = findSlidesByOwner({
+        slides,
+        owner_labels: labels,
+        match_mode: params.match_mode,
+      });
+      return {
+        ...ctx,
+        [params.export_as || 'slide_owner_matches']: result,
+      };
+    }
+    case 'pptx_diff': {
+      const before = (params.before ||
+        ctx[params.before_from || 'before_slides'] ||
+        []) as MediaSlideText[];
+      const after = (params.after ||
+        ctx[params.after_from || 'after_slides'] ||
+        []) as MediaSlideText[];
+      return { ...ctx, [params.export_as || 'pptx_diff']: pptxDiff({ before, after }) };
+    }
     case 'pdf_to_pptx_design': {
       const pdfDesign = ctx[params.from || 'last_pdf_design'];
       if (!pdfDesign || typeof pdfDesign !== 'object') {
@@ -2129,6 +2159,17 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
   const rootDir = pathResolver.rootDir();
   if (PDF_PYPDF_OPS.has(op)) return opCapture(op, params, ctx, resolve);
   switch (op) {
+    case 'register_presentation_preference_profile': {
+      const result = registerPresentationPreferenceProfileOp({
+        profile: params.profile !== undefined ? resolve(params.profile) : undefined,
+        profile_path: params.profile_path ? resolve(params.profile_path) : undefined,
+        registry_path: params.registry_path ? resolve(params.registry_path) : undefined,
+      });
+      return {
+        ...ctx,
+        [params.export_as || 'presentation_preference_profile_registered']: result,
+      };
+    }
     case 'mermaid_render': {
       const outPath = path.resolve(rootDir, resolve(params.path));
       const source = resolveDiagramSource(rootDir, params, ctx, resolve);
