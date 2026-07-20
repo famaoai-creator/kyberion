@@ -3021,6 +3021,10 @@
           "kind": "apply"
         },
         {
+          "op": "counterparty_roleplay",
+          "kind": "apply"
+        },
+        {
           "op": "adjust_proposal",
           "kind": "apply"
         },
@@ -3181,7 +3185,15 @@
           "kind": "apply"
         },
         {
+          "op": "propose_tool_calls",
+          "kind": "apply"
+        },
+        {
           "op": "react_loop",
+          "kind": "apply"
+        },
+        {
+          "op": "reasoning_loop",
           "kind": "apply"
         },
         {

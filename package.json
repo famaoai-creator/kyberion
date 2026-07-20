@@ -45,6 +45,7 @@
     "check:governance-rules": "node dist/scripts/check_governance_rules.js",
     "generate:op-registry": "node --import ./scripts/ts-loader.mjs scripts/generate_op_registry.ts",
     "check:op-registry": "node --import ./scripts/ts-loader.mjs scripts/generate_op_registry.ts --check",
+    "check:deprecated-wisdom-ops": "node --import ./scripts/ts-loader.mjs scripts/check_deprecated_wisdom_ops.ts --fail",
     "generate:env-registry": "node --import ./scripts/ts-loader.mjs scripts/generate_env_registry.ts",
     "check:env-registry": "node --import ./scripts/ts-loader.mjs scripts/generate_env_registry.ts --check",
     "check:design-contrast": "node --import ./scripts/ts-loader.mjs scripts/check_design_contrast.ts",

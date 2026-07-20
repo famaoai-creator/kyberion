@@ -24,7 +24,7 @@
     {
       "id": "role_play",
       "role": "sink",
-      "op": "wisdom:a2a_roleplay",
+      "op": "wisdom:counterparty_roleplay",
       "consumes": "persona_spec",
       "params": {
         "persona_from": "persona_spec",
