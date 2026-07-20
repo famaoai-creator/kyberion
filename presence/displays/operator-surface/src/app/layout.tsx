@@ -58,6 +58,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <a href="/health" style={{ color: 'var(--kb-accent)' }}>
               Health
             </a>
+            <a href="/reasoning" style={{ color: 'var(--kb-accent)' }}>
+              Reasoning
+            </a>
             <a href="/surfaces" style={{ color: 'var(--kb-accent)' }}>
               Surfaces
             </a>

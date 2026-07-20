@@ -28,6 +28,12 @@ import { probeShellClaudeCliAvailability } from './shell-claude-cli-backend.js';
 import {
   probeNemotronBackendAvailability,
   probeOpenAiCompatibleBackendAvailability,
+  probeOllamaBackendAvailability,
+  probeVllmBackendAvailability,
+  probeLmStudioBackendAvailability,
+  probeLlamaCppBackendAvailability,
+  probeMlxBackendAvailability,
+  probeLocalAiBackendAvailability,
 } from './openai-compatible-backend.js';
 import { probeOpenRouterBackendAvailability } from './openrouter-backend.js';
 
@@ -63,6 +69,30 @@ async function probeReasoningBackend(): Promise<{ available: boolean; reason?: s
     const openrouterProbe = await probeOpenRouterBackendAvailability(process.env);
     if (openrouterProbe.available) return { available: true };
   }
+  if (Boolean(process.env.KYBERION_OLLAMA_URL) || Boolean(process.env.OLLAMA_HOST)) {
+    const ollamaProbe = await probeOllamaBackendAvailability(process.env);
+    if (ollamaProbe.available) return { available: true };
+  }
+  if (Boolean(process.env.KYBERION_VLLM_URL)) {
+    const vllmProbe = await probeVllmBackendAvailability(process.env);
+    if (vllmProbe.available) return { available: true };
+  }
+  if (Boolean(process.env.KYBERION_LMSTUDIO_URL) || Boolean(process.env.KYBERION_LM_STUDIO_URL)) {
+    const lmstudioProbe = await probeLmStudioBackendAvailability(process.env);
+    if (lmstudioProbe.available) return { available: true };
+  }
+  if (Boolean(process.env.KYBERION_LLAMACPP_URL)) {
+    const llamacppProbe = await probeLlamaCppBackendAvailability(process.env);
+    if (llamacppProbe.available) return { available: true };
+  }
+  if (Boolean(process.env.KYBERION_MLX_URL)) {
+    const mlxProbe = await probeMlxBackendAvailability(process.env);
+    if (mlxProbe.available) return { available: true };
+  }
+  if (Boolean(process.env.KYBERION_LOCALAI_URL)) {
+    const localaiProbe = await probeLocalAiBackendAvailability(process.env);
+    if (localaiProbe.available) return { available: true };
+  }
   if (Boolean(process.env.KYBERION_LOCAL_LLM_URL)) {
     const localProbe = await probeOpenAiCompatibleBackendAvailability(process.env);
     if (localProbe.available) return { available: true };
@@ -83,7 +113,7 @@ async function probeReasoningBackend(): Promise<{ available: boolean; reason?: s
   return {
     available: false,
     reason:
-      'no real reasoning backend reachable. Authenticate one of: codex CLI, gemini CLI, agy CLI, Anthropic API key (ANTHROPIC_API_KEY), OpenRouter API key (OPENROUTER_API_KEY or KYBERION_OPENROUTER_KEY), Nemotron API URL (KYBERION_NEMOTRON_URL), or local LLM URL (KYBERION_LOCAL_LLM_URL). Or set KYBERION_REASONING_BACKEND=stub to acknowledge stub-only mode.',
+      'no real reasoning backend reachable. Authenticate one of: codex CLI, gemini CLI, agy CLI, Anthropic API key (ANTHROPIC_API_KEY), OpenRouter API key (OPENROUTER_API_KEY or KYBERION_OPENROUTER_KEY), Ollama URL (KYBERION_OLLAMA_URL), vLLM URL (KYBERION_VLLM_URL), LM Studio URL (KYBERION_LMSTUDIO_URL), llama.cpp URL (KYBERION_LLAMACPP_URL), MLX URL (KYBERION_MLX_URL), LocalAI URL (KYBERION_LOCALAI_URL), Nemotron API URL (KYBERION_NEMOTRON_URL), or local LLM URL (KYBERION_LOCAL_LLM_URL). Or set KYBERION_REASONING_BACKEND=stub to acknowledge stub-only mode.',
   };
 }
 

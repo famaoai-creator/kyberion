@@ -8,6 +8,7 @@ import {
   stubReasoningBackend,
   type ReasoningBackend,
 } from './reasoning-backend.js';
+import { withReasoningPayloadScope } from './reasoning-egress-scope.js';
 
 function makeBackend(
   name: string,
@@ -17,6 +18,14 @@ function makeBackend(
 }
 
 const LONG_REPORT = 'A detailed report with concrete evidence. '.repeat(10);
+const TEST_REASONING_SCOPE = {
+  tier: 'public' as const,
+  purpose: 'hermetic reasoning backend test',
+};
+
+function withTestReasoningScope<T>(fn: () => Promise<T>): Promise<T> {
+  return withReasoningPayloadScope(TEST_REASONING_SCOPE, fn);
+}
 
 describe('KC-06 delegation summary min-length retry', () => {
   afterEach(() => {
@@ -35,7 +44,9 @@ describe('KC-06 delegation summary min-length retry', () => {
       },
     ]);
 
-    const result = await backend.delegateTask('Write the migration report.');
+    const result = await withTestReasoningScope(() =>
+      backend.delegateTask('Write the migration report.')
+    );
     // Still short after the continuation — passes through unconditionally.
     expect(result).toBe('too short');
     expect(prompts).toHaveLength(2);
@@ -58,7 +69,9 @@ describe('KC-06 delegation summary min-length retry', () => {
     ]);
 
     expect(LONG_REPORT.trim().length).toBeGreaterThanOrEqual(DELEGATION_SUMMARY_MIN_CHARS);
-    await expect(backend.delegateTask('Write the migration report.')).resolves.toBe(LONG_REPORT);
+    await expect(
+      withTestReasoningScope(() => backend.delegateTask('Write the migration report.'))
+    ).resolves.toBe(LONG_REPORT);
     expect(prompts).toHaveLength(1);
   });
 
@@ -74,7 +87,9 @@ describe('KC-06 delegation summary min-length retry', () => {
       },
     ]);
 
-    await expect(backend.delegateTask('Do work.')).resolves.toBe('[STUB] short');
+    await expect(withTestReasoningScope(() => backend.delegateTask('Do work.'))).resolves.toBe(
+      '[STUB] short'
+    );
     expect(prompts).toHaveLength(1);
   });
 
@@ -92,7 +107,9 @@ describe('KC-06 delegation summary min-length retry', () => {
       },
     ]);
 
-    await expect(backend.delegateTask('Do work.')).resolves.toBe('short');
+    await expect(withTestReasoningScope(() => backend.delegateTask('Do work.'))).resolves.toBe(
+      'short'
+    );
     expect(prompts).toHaveLength(1);
   });
 
@@ -109,7 +126,9 @@ describe('KC-06 delegation summary min-length retry', () => {
     ]);
 
     const structuredPrompt = `${STRUCTURED_DELEGATION_PROMPT_HEADER}\nSchema: {}`;
-    await expect(backend.delegateTask(structuredPrompt)).resolves.toBe('{"ok":true}');
+    await expect(
+      withTestReasoningScope(() => backend.delegateTask(structuredPrompt))
+    ).resolves.toBe('{"ok":true}');
     expect(prompts).toHaveLength(1);
   });
 

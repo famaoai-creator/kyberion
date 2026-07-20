@@ -15,6 +15,7 @@ import {
   type ReasoningBackend,
   type ReasoningImageAttachment,
 } from './reasoning-backend.js';
+import { withReasoningPayloadScope } from './reasoning-egress-scope.js';
 
 function textOnlyBackend(name: string): ReasoningBackend {
   return {
@@ -35,6 +36,14 @@ function visionBackend(
 }
 
 const IMAGES: ReasoningImageAttachment[] = [{ path: '/tmp/page-1.png', media_type: 'image/png' }];
+const TEST_REASONING_SCOPE = {
+  tier: 'public' as const,
+  purpose: 'hermetic reasoning vision test',
+};
+
+function withTestReasoningScope<T>(fn: () => Promise<T>): Promise<T> {
+  return withReasoningPayloadScope(TEST_REASONING_SCOPE, fn);
+}
 
 describe('backendSupportsVision', () => {
   it('is false for a text-only backend', () => {
@@ -69,7 +78,9 @@ describe('failover wrapper', () => {
       { backend: textOnlyBackend('text-first') },
       { backend: visionBackend('vision', seen) },
     ]);
-    const reply = await failover.promptWithImages!('judge these', IMAGES);
+    const reply = await withTestReasoningScope(() =>
+      failover.promptWithImages!('judge these', IMAGES)
+    );
     expect(reply).toBe('looked at it');
     expect(seen).toHaveBeenCalledOnce();
   });
@@ -84,7 +95,7 @@ describe('failover wrapper', () => {
         }),
       },
     ]);
-    await failover.promptWithImages!('judge', IMAGES);
+    await withTestReasoningScope(() => failover.promptWithImages!('judge', IMAGES));
     expect(received).toEqual(IMAGES);
   });
 
@@ -97,9 +108,9 @@ describe('failover wrapper', () => {
         }),
       },
     ]);
-    await expect(failover.promptWithImages!('judge', IMAGES)).rejects.toThrow(
-      /promptWithImages failed/
-    );
+    await expect(
+      withTestReasoningScope(() => failover.promptWithImages!('judge', IMAGES))
+    ).rejects.toThrow(/promptWithImages failed/);
   });
 });
 

@@ -1221,13 +1221,13 @@
     {
       "path": "product/governance/egress-policy.json",
       "tier": "public",
-      "size": 490,
+      "size": 630,
       "type": "json"
     },
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 57951,
+      "size": 62316,
       "type": "json"
     },
     {
@@ -1263,7 +1263,7 @@
     {
       "path": "product/governance/environment-manifests/reasoning-backend.json",
       "tier": "public",
-      "size": 2480,
+      "size": 2866,
       "type": "json"
     },
     {
@@ -1983,13 +1983,19 @@
     {
       "path": "product/governance/reasoning-backend-policy.json",
       "tier": "public",
-      "size": 1542,
+      "size": 2217,
       "type": "json"
     },
     {
       "path": "product/governance/reasoning-level-policy.json",
       "tier": "public",
       "size": 3958,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/reasoning-route-policy.json",
+      "tier": "public",
+      "size": 5984,
       "type": "json"
     },
     {
@@ -2361,7 +2367,7 @@
     {
       "path": "product/governance/tool-runtime-registry.json",
       "tier": "public",
-      "size": 8568,
+      "size": 13326,
       "type": "json"
     },
     {
@@ -7089,13 +7095,25 @@
     {
       "path": "product/schemas/reasoning-backend-policy.schema.json",
       "tier": "public",
-      "size": 2478,
+      "size": 2534,
       "type": "json"
     },
     {
       "path": "product/schemas/reasoning-level-policy.schema.json",
       "tier": "public",
       "size": 4133,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/reasoning-route-policy.schema.json",
+      "tier": "public",
+      "size": 4046,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/reasoning-route-user-config.schema.json",
+      "tier": "public",
+      "size": 2519,
       "type": "json"
     },
     {

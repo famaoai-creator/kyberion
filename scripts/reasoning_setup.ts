@@ -13,7 +13,9 @@ const REASONING_SETUP_GUIDANCE = [
   '  - GitHub Copilot CLI: authenticate Copilot CLI, then set `KYBERION_REASONING_BACKEND=copilot`',
   '  - Anthropic API: set `ANTHROPIC_API_KEY`, then set `KYBERION_REASONING_BACKEND=anthropic`',
   '  - OpenRouter API: set `OPENROUTER_API_KEY` (or `KYBERION_OPENROUTER_KEY`), then set `KYBERION_REASONING_BACKEND=openrouter`',
-  '  - OpenAI-compatible local/Nemotron: set `KYBERION_LOCAL_LLM_URL` or `KYBERION_NEMOTRON_URL`',
+  '  - OpenAI-compatible local runtimes: set `KYBERION_OLLAMA_URL`, `KYBERION_VLLM_URL`, `KYBERION_LMSTUDIO_URL`, `KYBERION_LLAMACPP_URL`, `KYBERION_MLX_URL`, `KYBERION_LOCALAI_URL`, `KYBERION_LOCAL_LLM_URL`, or `KYBERION_NEMOTRON_URL`',
+  '  - Role routing: use `pnpm reasoning:config list`, `explain`, `validate`, `doctor`, `bind-role`, and `set-fallback --role`',
+  '  - Tool access is deny-by-default for local/OpenAI-compatible runtimes; enable only through an explicit governed profile.',
   'Use `KYBERION_REASONING_BACKEND=stub` only when you intentionally want offline deterministic placeholders.',
 ];
 
@@ -71,10 +73,13 @@ async function main(): Promise<void> {
     logger.info('3. gemini-cli');
     logger.info('4. agy-cli');
     logger.info('5. openrouter');
-    logger.info('6. stub (Offline mock)');
+    logger.info('6. ollama');
+    logger.info('7. vllm');
+    logger.info('8. lmstudio');
+    logger.info('9. stub (Offline mock)');
 
     const answer = await new Promise<string>((resolve) => {
-      rl.question('Select reasoning backend [1-6, or enter to skip]: ', resolve);
+      rl.question('Select reasoning backend [1-9, or enter to skip]: ', resolve);
     });
 
     rl.close();
@@ -85,7 +90,10 @@ async function main(): Promise<void> {
       '3': 'gemini-cli',
       '4': 'agy-cli',
       '5': 'openrouter',
-      '6': 'stub',
+      '6': 'ollama',
+      '7': 'vllm',
+      '8': 'lmstudio',
+      '9': 'stub',
     };
 
     if (answer && choices[answer]) {

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   buildFailoverReasoningBackend,
+  buildRoleAwareReasoningBackend,
   delegateBestOf,
   delegateStructured,
   getReasoningBackend,
@@ -101,6 +102,18 @@ describe('reasoning-backend', () => {
 
     await expect(backend.prompt('hello')).resolves.toBe('recovered');
     expect(calls).toEqual(['primary', 'primary', 'primary']);
+  });
+
+  it('dispatches a role-scoped prompt to the governed role chain', async () => {
+    const defaultBackend = { ...stubReasoningBackend, prompt: async () => 'default-route' };
+    const subagentBackend = { ...stubReasoningBackend, prompt: async () => 'subagent-route' };
+    const backend = buildRoleAwareReasoningBackend(
+      defaultBackend,
+      new Map([['subagent', subagentBackend]])
+    );
+
+    await expect(backend.prompt('hello')).resolves.toBe('default-route');
+    await expect(backend.prompt('hello', { role: 'subagent' })).resolves.toBe('subagent-route');
   });
 
   it('honors Retry-After and does not retry authentication failures', async () => {

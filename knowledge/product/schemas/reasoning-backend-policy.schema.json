@@ -13,6 +13,9 @@
     "version": {
       "type": "string"
     },
+    "route_policy_ref": {
+      "type": "string"
+    },
     "mode_aliases": {
       "type": "object",
       "additionalProperties": {
