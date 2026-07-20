@@ -18,10 +18,16 @@ import {
   pathResolver,
   buildUnknownActuatorOpError,
   validatePipelineAdf,
+  registerTaskPlanCoordinator,
 } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
 import * as path from 'node:path';
 import yaml from 'js-yaml';
+import { executeTaskPlanFromOrchestrator, taskPlanCoordinator } from './task-plan-coordinator.js';
+
+// Legacy core callers are still supported, but the coordinator is owned and
+// registered by the orchestrator actuator rather than by Wisdom or core.
+registerTaskPlanCoordinator(taskPlanCoordinator);
 
 export interface PipelineStep {
   type: 'capture' | 'transform' | 'apply' | 'control';
@@ -910,8 +916,7 @@ async function opTransform(op: string, params: any, ctx: any) {
     case 'execute_task_plan': {
       const missionId = String(resolveVars(params.mission_id || ctx.mission_id || '', ctx));
       if (!missionId) throw new Error('execute_task_plan requires mission_id');
-      const { executeTaskPlan } = await import('@agent/core');
-      const result = await executeTaskPlan({
+      const result = await executeTaskPlanFromOrchestrator({
         missionId,
         maxTasks: typeof params.max_tasks === 'number' ? params.max_tasks : undefined,
         haltOnFailure: Boolean(params.halt_on_failure),

@@ -302,4 +302,19 @@ describe('wisdom public contract boundaries', () => {
       'const decision = await dispatchDecisionOp(op, params, ctx'
     );
   });
+
+  it('keeps task-plan DAG coordination in Orchestrator and core as a port facade', () => {
+    const coreExecutor = safeReadFile(pathResolver.rootResolve('libs/core/task-executor.ts'), {
+      encoding: 'utf8',
+    }) as string;
+    const orchestratorSource = safeReadFile(
+      pathResolver.rootResolve('libs/actuators/orchestrator-actuator/src/orchestrator-helpers.ts'),
+      { encoding: 'utf8' }
+    ) as string;
+
+    expect(coreExecutor).toContain('getTaskPlanCoordinator');
+    expect(coreExecutor).not.toContain('topologicalOrder');
+    expect(orchestratorSource).toContain('executeTaskPlanFromOrchestrator');
+    expect(orchestratorSource).not.toContain("import('@agent/core')");
+  });
 });
