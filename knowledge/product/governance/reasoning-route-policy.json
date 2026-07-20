@@ -1,0 +1,214 @@
+{
+  "version": "1.0.0",
+  "runtime_adapters": {
+    "codex-cli": {
+      "adapter": "codex-cli",
+      "capabilities": ["text", "structured_output", "tools"],
+      "supported_parameters": ["effort"]
+    },
+    "agy-cli": {
+      "adapter": "agy-cli",
+      "capabilities": ["text", "structured_output", "tools"],
+      "supported_parameters": ["effort"]
+    },
+    "anthropic": {
+      "adapter": "anthropic-sdk",
+      "capabilities": ["text", "structured_output", "tools", "vision"],
+      "supported_parameters": ["temperature", "top_p", "stop", "effort"]
+    },
+    "openrouter": {
+      "adapter": "openai-compatible",
+      "endpoint_policy": "public",
+      "model_policy": "approved",
+      "capabilities": ["text", "structured_output", "tools", "vision"],
+      "supported_parameters": [
+        "temperature",
+        "top_p",
+        "stop",
+        "presence_penalty",
+        "frequency_penalty"
+      ]
+    },
+    "nemotron-api": {
+      "adapter": "openai-compatible",
+      "endpoint_policy": "public",
+      "model_policy": "approved",
+      "capabilities": ["text", "structured_output"],
+      "supported_parameters": [
+        "temperature",
+        "top_p",
+        "stop",
+        "presence_penalty",
+        "frequency_penalty"
+      ]
+    },
+    "ollama": {
+      "adapter": "openai-compatible",
+      "preset": "ollama",
+      "endpoint_policy": "local",
+      "model_policy": "local-unregistered",
+      "capabilities": ["text", "structured_output"],
+      "supported_parameters": [
+        "temperature",
+        "top_p",
+        "top_k",
+        "min_p",
+        "stop",
+        "presence_penalty",
+        "frequency_penalty"
+      ]
+    },
+    "vllm": {
+      "adapter": "openai-compatible",
+      "preset": "vllm",
+      "endpoint_policy": "local",
+      "model_policy": "local-unregistered",
+      "capabilities": ["text", "structured_output"],
+      "supported_parameters": [
+        "temperature",
+        "top_p",
+        "top_k",
+        "min_p",
+        "stop",
+        "presence_penalty",
+        "frequency_penalty"
+      ]
+    },
+    "lmstudio": {
+      "adapter": "openai-compatible",
+      "preset": "lmstudio",
+      "endpoint_policy": "local",
+      "model_policy": "local-unregistered",
+      "capabilities": ["text", "structured_output"],
+      "supported_parameters": [
+        "temperature",
+        "top_p",
+        "top_k",
+        "min_p",
+        "stop",
+        "presence_penalty",
+        "frequency_penalty"
+      ]
+    },
+    "llamacpp": {
+      "adapter": "openai-compatible",
+      "preset": "llamacpp",
+      "endpoint_policy": "local",
+      "model_policy": "local-unregistered",
+      "capabilities": ["text", "structured_output"],
+      "supported_parameters": [
+        "temperature",
+        "top_p",
+        "top_k",
+        "min_p",
+        "stop",
+        "presence_penalty",
+        "frequency_penalty"
+      ]
+    },
+    "mlx": {
+      "adapter": "openai-compatible",
+      "preset": "mlx",
+      "endpoint_policy": "local",
+      "model_policy": "local-unregistered",
+      "capabilities": ["text", "structured_output"],
+      "supported_parameters": [
+        "temperature",
+        "top_p",
+        "top_k",
+        "min_p",
+        "stop",
+        "presence_penalty",
+        "frequency_penalty"
+      ]
+    },
+    "localai": {
+      "adapter": "openai-compatible",
+      "preset": "localai",
+      "endpoint_policy": "local",
+      "model_policy": "local-unregistered",
+      "capabilities": ["text", "structured_output"],
+      "supported_parameters": [
+        "temperature",
+        "top_p",
+        "top_k",
+        "min_p",
+        "stop",
+        "presence_penalty",
+        "frequency_penalty"
+      ]
+    },
+    "local": {
+      "adapter": "openai-compatible",
+      "endpoint_policy": "local",
+      "model_policy": "local-unregistered",
+      "capabilities": ["text", "structured_output"],
+      "supported_parameters": [
+        "temperature",
+        "top_p",
+        "top_k",
+        "min_p",
+        "stop",
+        "presence_penalty",
+        "frequency_penalty"
+      ]
+    },
+    "stub": {
+      "adapter": "stub",
+      "capabilities": ["text", "structured_output"],
+      "supported_parameters": []
+    }
+  },
+  "profiles": {
+    "default-codex": {
+      "mode": "codex-cli",
+      "model_ref": "openai:gpt-5.6-sol",
+      "capabilities": ["text", "structured_output", "tools"],
+      "tools_enabled": true,
+      "allowed_tools": ["read_file", "list_directory"]
+    },
+    "agy-default": {
+      "mode": "agy-cli",
+      "capabilities": ["text", "structured_output", "tools"],
+      "tools_enabled": true,
+      "allowed_tools": ["read_file", "list_directory"]
+    },
+    "subagent-local": {
+      "mode": "ollama",
+      "capabilities": ["text", "structured_output", "tools"],
+      "timeout_ms": 60000
+    },
+    "code-architect-claude": {
+      "mode": "anthropic",
+      "model_ref": "anthropic:claude-sonnet-5",
+      "capabilities": ["text", "structured_output", "tools", "vision"],
+      "tools_enabled": true,
+      "allowed_tools": ["read_file", "list_directory"]
+    },
+    "fast-local": {
+      "mode": "vllm",
+      "capabilities": ["text", "structured_output"],
+      "timeout_ms": 30000
+    }
+  },
+  "roles": {
+    "default": { "candidates": ["default-codex", "agy-default"], "requires": ["text"] },
+    "subagent": {
+      "candidates": ["subagent-local", "default-codex", "agy-default"],
+      "requires": ["text", "structured_output"]
+    },
+    "code_architect": {
+      "candidates": ["code-architect-claude", "default-codex"],
+      "requires": ["text", "structured_output", "tools"]
+    },
+    "fast_classifier": {
+      "candidates": ["fast-local", "default-codex"],
+      "requires": ["text", "structured_output"]
+    },
+    "researcher": {
+      "candidates": ["default-codex", "code-architect-claude"],
+      "requires": ["text", "structured_output"]
+    }
+  },
+  "fallback": { "max_attempts": 3, "max_in_place_retries": 3, "on_unsupported_parameter": "reject" }
+}

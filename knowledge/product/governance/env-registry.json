@@ -1071,8 +1071,72 @@
       "documented": false
     },
     {
+      "name": "KYBERION_LLAMACPP_KEY",
+      "category": "secret",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_LLAMACPP_MODEL",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_LLAMACPP_URL",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_LLM_CONCURRENCY",
       "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_LM_STUDIO_MODEL",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_LM_STUDIO_URL",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_LMSTUDIO_KEY",
+      "category": "secret",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_LMSTUDIO_MODEL",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_LMSTUDIO_URL",
+      "category": "provider",
       "type": "string",
       "required": false,
       "description": "",
@@ -1113,6 +1177,30 @@
       "description": "Bearer token for the chronos localadmin control surface.",
       "documented": true,
       "subsystem": "surfaces"
+    },
+    {
+      "name": "KYBERION_LOCALAI_KEY",
+      "category": "secret",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_LOCALAI_MODEL",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_LOCALAI_URL",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
     },
     {
       "name": "KYBERION_LOCALE",
@@ -1276,6 +1364,30 @@
       "documented": false
     },
     {
+      "name": "KYBERION_MLX_KEY",
+      "category": "secret",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_MLX_MODEL",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_MLX_URL",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_MOBILE_TOOLCHAIN",
       "category": "runtime",
       "type": "string",
@@ -1358,6 +1470,30 @@
     {
       "name": "KYBERION_OAUTH_SERVICE_ID",
       "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_OLLAMA_KEY",
+      "category": "secret",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_OLLAMA_MODEL",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_OLLAMA_URL",
+      "category": "provider",
       "type": "string",
       "required": false,
       "description": "",
@@ -1653,6 +1789,14 @@
       "subsystem": "voice"
     },
     {
+      "name": "KYBERION_REASONING_ALLOW_SHELL_TOOL",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_REASONING_BACKEND",
       "category": "provider",
       "type": "string",
@@ -1678,9 +1822,33 @@
       "documented": false
     },
     {
+      "name": "KYBERION_REASONING_PROFILE",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_REASONING_RETRY_BASE_MS",
       "category": "tuning",
       "type": "number",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_REASONING_ROLE_",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_REASONING_ROLE_SUBAGENT",
+      "category": "runtime",
+      "type": "string",
       "required": false,
       "description": "",
       "documented": false
@@ -2233,6 +2401,30 @@
       "name": "KYBERION_VIDEO_RENDER_RUNTIME_POLICY_PATH",
       "category": "path",
       "type": "path",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_VLLM_KEY",
+      "category": "secret",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_VLLM_MODEL",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_VLLM_URL",
+      "category": "provider",
+      "type": "string",
       "required": false,
       "description": "",
       "documented": false

@@ -234,6 +234,146 @@
       },
       "managed_env_subpath": "tool-runtimes/claude-real-video",
       "notes": "Video analysis tool for keyframe and transcription extraction. Installed locally via uv pip from the sibling directory."
+    },
+    {
+      "tool_id": "ollama",
+      "display_name": "Ollama Local LLM Runtime",
+      "ecosystem": "system",
+      "status": "active",
+      "platforms": ["any"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "trial_backend": {
+        "kind": "system",
+        "command": "ollama",
+        "args": ["--version"],
+        "description": "Probe Ollama CLI availability without mutating workspace state."
+      },
+      "install_backend": {
+        "kind": "brew",
+        "command": "brew",
+        "args": ["install", "ollama"],
+        "description": "Install Ollama via Homebrew on macOS."
+      },
+      "installed_backend": {
+        "kind": "system",
+        "command": "ollama",
+        "args": ["serve"],
+        "description": "Run Ollama server process."
+      },
+      "managed_env_subpath": "tool-runtimes/ollama",
+      "notes": "Ollama local LLM server runtime."
+    },
+    {
+      "tool_id": "vllm",
+      "display_name": "vLLM High-Throughput Engine",
+      "ecosystem": "python",
+      "status": "active",
+      "platforms": ["any"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "trial_backend": {
+        "kind": "system",
+        "command": "python3",
+        "args": ["-c", "import vllm; print(\"ok\")"],
+        "description": "Probe vLLM Python package availability."
+      },
+      "install_backend": {
+        "kind": "uv",
+        "command": "uv",
+        "args": ["pip", "install", "vllm"],
+        "description": "Install vLLM into the managed Python environment."
+      },
+      "installed_backend": {
+        "kind": "uv",
+        "command": "uv",
+        "args": ["run", "python3", "-m", "vllm.entrypoints.openai.api_server"],
+        "description": "Run vLLM OpenAI API server."
+      },
+      "managed_env_subpath": "tool-runtimes/vllm",
+      "notes": "vLLM high-throughput LLM server runtime."
+    },
+    {
+      "tool_id": "llamacpp",
+      "display_name": "llama.cpp C++ LLM Engine",
+      "ecosystem": "system",
+      "status": "active",
+      "platforms": ["any"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "trial_backend": {
+        "kind": "system",
+        "command": "llama-server",
+        "args": ["--version"],
+        "description": "Probe llama-server CLI availability."
+      },
+      "install_backend": {
+        "kind": "brew",
+        "command": "brew",
+        "args": ["install", "llama.cpp"],
+        "description": "Install llama.cpp binaries via Homebrew."
+      },
+      "installed_backend": {
+        "kind": "system",
+        "command": "llama-server",
+        "args": ["--port", "8080"],
+        "description": "Run llama-server process."
+      },
+      "managed_env_subpath": "tool-runtimes/llamacpp",
+      "notes": "llama.cpp server runtime for GGUF model inference."
+    },
+    {
+      "tool_id": "mlx_lm",
+      "display_name": "MLX-LM Apple Silicon LLM Engine",
+      "ecosystem": "python",
+      "status": "active",
+      "platforms": ["darwin"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "trial_backend": {
+        "kind": "system",
+        "command": "python3",
+        "args": ["-c", "import mlx_lm; print(\"ok\")"],
+        "description": "Probe mlx-lm Python package availability."
+      },
+      "install_backend": {
+        "kind": "uv",
+        "command": "uv",
+        "args": ["pip", "install", "mlx-lm"],
+        "description": "Install mlx-lm into the managed Python environment."
+      },
+      "installed_backend": {
+        "kind": "uv",
+        "command": "uv",
+        "args": ["run", "python3", "-m", "mlx_lm.server"],
+        "description": "Run mlx-lm HTTP server."
+      },
+      "managed_env_subpath": "tool-runtimes/mlx-lm",
+      "notes": "MLX-LM Apple Silicon inference server runtime."
+    },
+    {
+      "tool_id": "localai",
+      "display_name": "LocalAI Multi-Modal Engine",
+      "ecosystem": "system",
+      "status": "active",
+      "platforms": ["any"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "trial_backend": {
+        "kind": "system",
+        "command": "local-ai",
+        "args": ["--version"],
+        "description": "Probe LocalAI binary availability."
+      },
+      "install_backend": {
+        "kind": "brew",
+        "command": "brew",
+        "args": ["install", "local-ai"],
+        "description": "Install LocalAI via Homebrew."
+      },
+      "installed_backend": {
+        "kind": "system",
+        "command": "local-ai",
+        "args": [],
+        "description": "Run LocalAI server process."
+      },
+      "managed_env_subpath": "tool-runtimes/localai",
+      "notes": "LocalAI multi-modal OpenAI-compatible server."
     }
   ]
 }

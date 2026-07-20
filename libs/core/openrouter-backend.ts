@@ -1,6 +1,6 @@
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExec, safeReadFile, safeReaddir, safeWriteFile } from './secure-io.js';
+import { safeExec, safeReadFile, safeReaddir, safeWriteFile, validateUrl } from './secure-io.js';
 import { redactSensitiveObject } from './network.js';
 import { advanceToolLoopGuardrail, createToolLoopGuardrailState } from './tool-loop-guardrail.js';
 import {
@@ -30,12 +30,21 @@ import type {
   DecomposedTaskPlan,
 } from './reasoning-backend.js';
 import { runStructuredReasoningOp, structuredReasoningSpecs } from './structured-reasoning.js';
+import { assertReasoningEgressAllowedAtEndpoint } from './reasoning-egress-scope.js';
+import type { ReasoningToolName } from './reasoning-route-resolver.js';
 
 export interface OpenRouterBackendOptions {
   apiKey: string;
   model: string;
   baseURL?: string;
   timeoutMs?: number;
+  toolsEnabled?: boolean;
+  allowedTools?: ReasoningToolName[];
+}
+
+export interface OpenRouterBackendOverrides {
+  toolsEnabled?: boolean;
+  allowedTools?: ReasoningToolName[];
 }
 
 type ChatRole = 'system' | 'user' | 'assistant' | 'tool';
@@ -101,8 +110,10 @@ function extractTextContent(content: ChatMessage['content']): string {
   return String(content);
 }
 
-function createToolDefinitions(): ChatCompletionRequest['tools'] {
-  return [
+function createToolDefinitions(
+  allowedTools: ReadonlySet<ReasoningToolName>
+): ChatCompletionRequest['tools'] {
+  const definitions: NonNullable<ChatCompletionRequest['tools']> = [
     {
       type: 'function',
       function: {
@@ -161,6 +172,7 @@ function createToolDefinitions(): ChatCompletionRequest['tools'] {
       },
     },
   ];
+  return definitions.filter((tool) => allowedTools.has(tool.function.name as ReasoningToolName));
 }
 
 function safeJsonParse(text: string): unknown {
@@ -173,16 +185,23 @@ function safeJsonParse(text: string): unknown {
 
 export class OpenRouterBackend implements ReasoningBackend {
   readonly name = 'openrouter';
+  readonly egressEndpoint: string;
   private readonly baseURL: string;
   private readonly apiKey: string;
   private readonly model: string;
   private readonly timeoutMs: number;
+  private readonly toolsEnabled: boolean;
+  private readonly allowedTools: ReadonlySet<ReasoningToolName>;
 
   constructor(options: OpenRouterBackendOptions) {
     this.baseURL = normalizeBaseUrl(options.baseURL || 'https://openrouter.ai/api/v1');
+    validateUrl(this.baseURL);
+    this.egressEndpoint = this.baseURL;
     this.apiKey = options.apiKey;
     this.model = options.model;
     this.timeoutMs = options.timeoutMs ?? 60_000;
+    this.toolsEnabled = options.toolsEnabled === true;
+    this.allowedTools = new Set(options.allowedTools ?? []);
   }
 
   getModel(): string {
@@ -193,6 +212,7 @@ export class OpenRouterBackend implements ReasoningBackend {
     messages: ChatMessage[],
     opts: { useTools?: boolean } = {}
   ): Promise<ChatCompletionResponse> {
+    assertReasoningEgressAllowedAtEndpoint(this.name, this.baseURL);
     const headers: Record<string, string> = {
       'content-type': 'application/json',
       authorization: `Bearer ${this.apiKey}`,
@@ -203,7 +223,9 @@ export class OpenRouterBackend implements ReasoningBackend {
     const body: ChatCompletionRequest = {
       model: this.model,
       messages: redactSensitiveObject(messages),
-      ...((opts.useTools ?? true) ? { tools: createToolDefinitions(), tool_choice: 'auto' } : {}),
+      ...((opts.useTools ?? this.toolsEnabled) && this.allowedTools.size > 0
+        ? { tools: createToolDefinitions(this.allowedTools), tool_choice: 'auto' }
+        : {}),
     };
 
     const response = await fetch(joinEndpoint(this.baseURL, 'chat/completions'), {
@@ -226,6 +248,9 @@ export class OpenRouterBackend implements ReasoningBackend {
   }
 
   private async handleToolCall(name: string, rawArguments: string): Promise<string> {
+    if (!this.toolsEnabled || !this.allowedTools.has(name as ReasoningToolName)) {
+      return `Error: Tool ${name} is not enabled for this reasoning route.`;
+    }
     const args = (safeJsonParse(rawArguments) as Record<string, unknown>) || {};
     logger.info(`[OPENROUTER] Tool Call: ${name}(${JSON.stringify(redactSensitiveObject(args))})`);
 
@@ -406,13 +431,14 @@ export class OpenRouterBackend implements ReasoningBackend {
 
 export function buildOpenRouterBackendFromEnv(
   env: NodeJS.ProcessEnv = process.env,
-  modelOverride?: string
+  modelOverride?: string,
+  overrides: OpenRouterBackendOverrides = {}
 ): OpenRouterBackend | null {
   const apiKey = env.KYBERION_OPENROUTER_KEY?.trim() || env.OPENROUTER_API_KEY?.trim();
   if (!apiKey) return null;
   const model = resolveOpenRouterModelPolicy(env, modelOverride).model;
   const baseURL = env.KYBERION_OPENROUTER_URL?.trim();
-  return new OpenRouterBackend({ apiKey, model, baseURL });
+  return new OpenRouterBackend({ apiKey, model, baseURL, ...overrides });
 }
 
 /** Probe OpenRouter without consuming model tokens. */

@@ -204,6 +204,7 @@
     "soak:endurance": "node --import ./scripts/ts-loader.mjs scripts/soak_endurance.ts",
     "soak:restart-e2e": "node --import ./scripts/ts-loader.mjs scripts/soak_restart_e2e.ts",
     "reasoning:setup": "node dist/scripts/reasoning_setup.js",
+    "reasoning:config": "node dist/scripts/reasoning_config.js",
     "customer:create": "node --import ./scripts/ts-loader.mjs scripts/customer_create.ts",
     "customer:list": "node --import ./scripts/ts-loader.mjs scripts/customer_list.ts",
     "customer:migrate-from-personal": "node --import ./scripts/ts-loader.mjs scripts/customer_migrate_from_personal.ts",
