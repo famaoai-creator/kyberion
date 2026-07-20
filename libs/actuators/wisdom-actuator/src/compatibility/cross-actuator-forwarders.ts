@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { getActuatorForwardingPort, type ContextSecurityScope } from '@agent/core';
 import { assignWisdomContextValue } from '../contracts/wisdom-context.js';
 import type { WisdomContext } from '../contracts/wisdom-context.js';
@@ -33,9 +34,7 @@ export async function forwardWisdomBoundaryOperation(
       context.security_scope && typeof context.security_scope === 'object'
         ? (context.security_scope as ContextSecurityScope)
         : undefined,
-    idempotency_key: String(
-      params.idempotency_key || context.idempotency_key || `wisdom:${op}:${Date.now()}`
-    ),
+    idempotency_key: resolveForwardIdempotencyKey(op, params, context),
   });
 
   if (forwarded.status !== 'succeeded') {
@@ -51,4 +50,18 @@ export async function forwardWisdomBoundaryOperation(
     forwarded.result,
     { compatibilityMode: options.compatibilityMode }
   );
+}
+
+function resolveForwardIdempotencyKey(
+  op: string,
+  params: Record<string, unknown>,
+  context: WisdomContext
+): string {
+  const explicit = params.idempotency_key || context.idempotency_key;
+  if (explicit) return String(explicit);
+  const fingerprint = createHash('sha256')
+    .update(JSON.stringify({ op, params }))
+    .digest('hex')
+    .slice(0, 24);
+  return `wisdom:${op}:${fingerprint}`;
 }
