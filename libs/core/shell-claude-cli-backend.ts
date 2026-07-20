@@ -20,6 +20,7 @@
 
 import { spawn, spawnSync } from 'node:child_process';
 import { childDelegationEnv } from './operation-policy-gate.js';
+import { assertReasoningEgressAllowed } from './reasoning-egress-scope.js';
 import { z, type ZodType } from 'zod';
 import { logger } from './core.js';
 import type {
@@ -376,6 +377,7 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
     context?: string,
     options?: { model_tier?: 'fast' | 'standard' | 'deep' }
   ): Promise<string> {
+    assertReasoningEgressAllowed(this.name);
     const model = resolveClaudeModelForTier(options?.model_tier, this.model);
     const args = [
       '-p',
@@ -400,6 +402,7 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
    * artifact generation without using the reasoning-only structured backend.
    */
   async runDocumentAgentTask(input: DocumentAgentTaskInput): Promise<string> {
+    assertReasoningEgressAllowed(this.name);
     const prompt = [input.instruction.trim(), input.context ? `Context: ${input.context}` : '']
       .filter(Boolean)
       .join('\n\n');
@@ -420,6 +423,7 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
    * agent session.
    */
   async runBrowserAgentTask(input: BrowserAgentTaskInput): Promise<string> {
+    assertReasoningEgressAllowed(this.name);
     const prompt = [input.instruction.trim(), input.context ? `Context: ${input.context}` : '']
       .filter(Boolean)
       .join('\n\n');
@@ -440,6 +444,7 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
     userPrompt: string;
     schema: ZodType<T>;
   }): Promise<T> {
+    assertReasoningEgressAllowed(this.name);
     const jsonSchema = z.toJSONSchema(params.schema) as Record<string, unknown>;
     if ('$schema' in jsonSchema) delete jsonSchema['$schema'];
 

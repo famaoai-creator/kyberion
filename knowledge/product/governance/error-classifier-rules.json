@@ -21,6 +21,16 @@
       "repairAction": "Check if Service Engine process is running. If not, suggest starting it or switching to a cloud provider fallback."
     },
     {
+      "id": "media.visual-review-gate",
+      "category": "governance_block",
+      "label": "Visual review required before delivery",
+      "remediation": "The media artifact was not inspected cleanly. Configure a vision-capable reasoning backend, resolve any egress or rasterizer issue, then rerun the visual review before delivery.",
+      "patterns": [
+        "VISUAL_REVIEW_GATE_BLOCKED|visual review did not run|visual review finished with findings still open"
+      ],
+      "repairAction": "Run `pnpm doctor` to check LibreOffice/Poppler/Playwright, configure an allowed vision backend, and inspect `evidence/visual-review-report.json` for the exact skipped reason or outstanding findings."
+    },
+    {
       "id": "kyberion.tier-guard",
       "category": "tier_violation",
       "label": "Tier guard refused access",

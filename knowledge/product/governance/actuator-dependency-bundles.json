@@ -20,9 +20,15 @@
       "summary": "Voice actuator prerequisites."
     },
     {
+      "id": "media-actuator",
+      "actuator": "media-actuator",
+      "dependency_ids": ["node22", "playwright-browser", "libreoffice", "poppler"],
+      "summary": "Media document and visual-review prerequisites."
+    },
+    {
       "id": "media-generation",
       "actuator": "media-generation",
-      "dependency_ids": ["node22", "python3", "comfyui-server", "ffmpeg"],
+      "dependency_ids": ["node22", "python3", "comfyui-server", "ffmpeg", "libreoffice", "poppler"],
       "summary": "Media generation prerequisites."
     },
     {
@@ -34,7 +40,18 @@
     {
       "id": "all",
       "actuator": "all",
-      "dependency_ids": ["node22", "pnpm", "python3", "playwright-browser", "native-tts", "whisper", "ffmpeg", "comfyui-server"],
+      "dependency_ids": [
+        "node22",
+        "pnpm",
+        "python3",
+        "playwright-browser",
+        "native-tts",
+        "whisper",
+        "ffmpeg",
+        "comfyui-server",
+        "libreoffice",
+        "poppler"
+      ],
       "summary": "All common dependency checks."
     }
   ]

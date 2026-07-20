@@ -1,5 +1,9 @@
 import { z } from 'zod';
-import { buildCodexCliQueryOptionsFromEnv, runCodexCliQuery, type CodexCliQueryOptions } from './codex-cli-query.js';
+import {
+  buildCodexCliQueryOptionsFromEnv,
+  runCodexCliQuery,
+  type CodexCliQueryOptions,
+} from './codex-cli-query.js';
 import type {
   BranchForkInput,
   CritiqueInput,
@@ -26,6 +30,7 @@ import {
   structuredReasoningSpecs,
   type StructuredOpSpec,
 } from './structured-reasoning.js';
+import { assertReasoningEgressAllowed } from './reasoning-egress-scope.js';
 
 export interface CodexCliReasoningBackendOptions extends CodexCliQueryOptions {}
 
@@ -40,8 +45,9 @@ export class CodexCliReasoningBackend implements ReasoningBackend {
   /** Run a shared structured-reasoning op through the codex CLI (schema-validated). */
   private async runStructured<TInput, TOutput>(
     spec: StructuredOpSpec<TInput, TOutput>,
-    input: TInput,
+    input: TInput
   ): Promise<TOutput> {
+    assertReasoningEgressAllowed(this.name);
     const result = await runCodexCliQuery({
       systemPrompt: STRUCTURED_REASONING_SYSTEM_PROMPT,
       userPrompt: spec.buildUserPrompt(input),
@@ -89,15 +95,18 @@ export class CodexCliReasoningBackend implements ReasoningBackend {
   }
 
   async delegateTask(instruction: string, context?: string): Promise<string> {
+    assertReasoningEgressAllowed(this.name);
     const schema = z.object({ answer: z.string() });
-    const result = await runCodexCliQuery({
+    const result = (await runCodexCliQuery({
       systemPrompt:
         'You are a focused autonomous sub-agent. Complete the task in the workspace if needed and return a concise report.',
-      userPrompt: [context ? `Context: ${context}` : '', `Task: ${instruction}`].filter(Boolean).join('\n\n'),
+      userPrompt: [context ? `Context: ${context}` : '', `Task: ${instruction}`]
+        .filter(Boolean)
+        .join('\n\n'),
       schema,
       mode: 'workspace-write',
       options: this.options,
-    }) as z.infer<typeof schema>;
+    })) as z.infer<typeof schema>;
     return result.answer;
   }
 
@@ -107,7 +116,7 @@ export class CodexCliReasoningBackend implements ReasoningBackend {
 }
 
 export function buildCodexCliBackendFromEnv(
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = process.env
 ): CodexCliReasoningBackend {
   return new CodexCliReasoningBackend(buildCodexCliQueryOptionsFromEnv(env));
 }

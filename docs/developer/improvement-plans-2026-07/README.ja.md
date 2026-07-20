@@ -261,18 +261,32 @@ surface が提供する UI の機能的アフォーダンスの調査(2026-07-03
 
 [MoonshotAI/kimi-cli](https://github.com/MoonshotAI/kimi-cli) の実コード分析(2026-07-20)に基づく。正本は [KIMI_CLI_ADOPTION_PLAN_2026-07-20.ja.md](./KIMI_CLI_ADOPTION_PLAN_2026-07-20.ja.md)(KC-01〜10 は同文書内)。同じく概念昇華方式。実行**中**のワーカーループを守る機構(反復検知・巻き戻し)、型付きイベントストリーム(記録/再生/e2e)、承認・フック・委譲の運用小物に実装参照を与える。
 
-| ID    | タイトル                                                           | 優先度 | 規模 | 依存          |
-| ----- | ------------------------------------------------------------------ | ------ | ---- | ------------- |
-| KC-01 | ツール呼び出し反復ガバナー(streak 検知・段階的警告・強制停止)      | **P0** | S    | なし          |
-| KC-02 | ワーカーイベントストリーム契約(型付き envelope・記録/再生・e2e)    | P1     | M    | なし          |
-| KC-03 | 承認ランタイム強化(セッション action キャッシュ・source 単位 cancel) | P1     | S    | KC-02推奨     |
-| KC-04 | ライフサイクルフックエンジン一般化(13 イベント・fail-open)         | P1     | M    | KC-02推奨     |
-| KC-05 | AI 監査テスト層(markdown 不変条件 → subagent fan-out 監査)         | P1     | S    | なし          |
-| KC-06 | 委譲ハードニング(要約 retry・再開可能 store・完了通知の文脈注入)   | P1     | S    | OH-01連携     |
-| KC-07 | チェックポイント付き文脈巻き戻し D-Mail(実験)                      | P2     | M    | KC-02,OH-01   |
-| KC-08 | 動的注入 provider 契約(throttle・圧縮後リセット)                   | P2     | S    | KC-01,06連携  |
-| KC-09 | completion token 動的予算(OH-01 追補)                              | P3     | S    | なし          |
-| KC-10 | Mermaid フロー → pipeline compiler(需要確定まで backlog)           | P3     | S    | 需要トリガー  |
+| ID    | タイトル                                                             | 優先度 | 規模 | 依存         |
+| ----- | -------------------------------------------------------------------- | ------ | ---- | ------------ |
+| KC-01 | ツール呼び出し反復ガバナー(streak 検知・段階的警告・強制停止)        | **P0** | S    | なし         |
+| KC-02 | ワーカーイベントストリーム契約(型付き envelope・記録/再生・e2e)      | P1     | M    | なし         |
+| KC-03 | 承認ランタイム強化(セッション action キャッシュ・source 単位 cancel) | P1     | S    | KC-02推奨    |
+| KC-04 | ライフサイクルフックエンジン一般化(13 イベント・fail-open)           | P1     | M    | KC-02推奨    |
+| KC-05 | AI 監査テスト層(markdown 不変条件 → subagent fan-out 監査)           | P1     | S    | なし         |
+| KC-06 | 委譲ハードニング(要約 retry・再開可能 store・完了通知の文脈注入)     | P1     | S    | OH-01連携    |
+| KC-07 | チェックポイント付き文脈巻き戻し D-Mail(実験)                        | P2     | M    | KC-02,OH-01  |
+| KC-08 | 動的注入 provider 契約(throttle・圧縮後リセット)                     | P2     | S    | KC-01,06連携 |
+| KC-09 | completion token 動的予算(OH-01 追補)                                | P3     | S    | なし         |
+| KC-10 | Mermaid フロー → pipeline compiler(需要確定まで backlog)             | P3     | S    | 需要トリガー |
+
+### メディア生成プロセス(HyperFrames / Anthropic skills の作成プロセス移植)
+
+[heygen-com/hyperframes](https://github.com/heygen-com/hyperframes) の skills 群・design ガイドと [anthropics/skills](https://github.com/anthropics/skills)(pptx/frontend-design/canvas-design 等)の実プロセス分析(2026-07-20)に基づく。正本は [MEDIA_CREATION_PROCESS_PLAN_2026-07-20.ja.md](./MEDIA_CREATION_PROCESS_PLAN_2026-07-20.ja.md)(MP-01〜06 は同文書内)。動画・PPTX のデザイン品質を「ブリーフロック→トークン先行→ビート/ページ設計→lint→レンダリング視覚批評→限定修正」の段階ゲート型プロセスへ転換する。LE(スタイルカスケード統一)の後続として、レイアウト知能(テキスト計測)と視覚検証ループを補う。
+
+| ID    | タイトル                                                                     | 優先度 | 規模 | 依存        |
+| ----- | ---------------------------------------------------------------------------- | ------ | ---- | ----------- |
+| MP-01 | デザイン語彙拡充(タイポスケール/スペーシング/制約トークン・engine 直接消費)  | **P0** | M    | DS-01,LE-02 |
+| MP-02 | 動画オーサリング転換(モーション語彙統制・読了時間ビート尺・lint・降格表面化) | P1     | L    | MP-01,MP-04 |
+| MP-03 | PPTX レイアウトフィット(テキスト計測・自動リフロー・機械分割全廃)            | **P0** | M    | MP-01       |
+| MP-04 | 視覚QAループ(render→snapshot→批評→修正、動画/PPTX 共通)                      | P1     | M    | MP-01       |
+| MP-05 | インテントフロー見直し(ブリーフロック・run-shape・house-style 蒸留)          | P1     | M    | MP-01〜04   |
+| MP-06 | 受け入れ検証(ゴールデンブリーフ・文字ズレ回帰・決定論テスト)                 | P1     | S    | MP-01〜05   |
+| MP-07 | body-zone 語彙拡充(region 宣言駆動・新ゾーン6種・semantic マッピング拡張)    | P1     | M    | MP-03,MP-06 |
 
 ### Actuator リファクタリング/使いやすさ(ADFスキーマ・op)
 

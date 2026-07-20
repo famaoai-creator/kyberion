@@ -52,6 +52,23 @@ import {
   resolveProposalSectionKeywords,
   isLegacyMediaOp,
   retry,
+  fitTextToBox,
+  measureTextBlock,
+  splitLinesBalanced,
+  resolvePptxSurfaceDesign,
+  detectRasterCapabilities,
+  rasterizeDocument,
+  rasterizeHtml,
+  assertVisualReviewPathScope,
+  runVisualReview,
+  runVisualReviewLoop,
+  loadVisualReviewRubric,
+  formatVisualReviewReport,
+  ensureReadableOn,
+  lockMediaBrief,
+  inferredDecisions,
+  formatBriefForConfirmation,
+  type LayoutFitResult,
 } from '@agent/core';
 import { validateThemeContrast } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
@@ -83,7 +100,11 @@ import {
 } from './media-pipeline-helpers.js';
 import { recognizeDocumentImage } from './media-ocr.js';
 import { createProposalPptxFlow } from './proposal-pptx-helpers.js';
-import { createMediaDocumentPipelineHelpers } from './media-document-pipeline-helpers.js';
+import {
+  createMediaDocumentPipelineHelpers,
+  assertMediaProtocolLayoutReady,
+  summarizeMediaPptxLayout,
+} from './media-document-pipeline-helpers.js';
 import { registerPresentationPreferenceProfileOp } from './presentation-preference-ops.js';
 import {
   warnLegacyMediaOp,
@@ -265,12 +286,25 @@ function getPngDisplaySize(
   return { w: Math.round(targetH * 3 * 1000) / 1000, h: targetH };
 }
 
+/**
+ * Map a semantic type onto a body zone.
+ *
+ * Most semantic types used to fall through to single-column, so a deck of
+ * eight distinct meanings rendered as two or three visual shapes — correct,
+ * but monotonous. Each type now reaches a zone that suits how its content is
+ * actually read; anything genuinely prose-shaped still lands on single-column
+ * by design rather than by omission.
+ */
 function resolveBodyZoneLayout(semanticType: string): string {
   switch (semanticType) {
     case 'problem':
     case 'evidence':
-    case 'roi':
       return 'two-column-callout';
+    case 'roi':
+      // Numbers-forward: a metric band reads better than a prose callout.
+      return 'metrics-band';
+    case 'signals':
+      return 'metrics-band';
     case 'control':
       return 'two-column-risk';
     case 'plan':
@@ -282,6 +316,19 @@ function resolveBodyZoneLayout(semanticType: string): string {
     case 'decision':
     case 'cta':
       return 'decision-cta';
+    case 'contents':
+      return 'contents-index';
+    case 'summary':
+      // The headline message of a deck deserves to be held, not listed.
+      return 'statement';
+    case 'comparison':
+    case 'options':
+      return 'comparison-two-col';
+    case 'execution':
+    case 'table':
+      return 'table-feature';
+    case 'appendix':
+      return 'checklist-grid';
     default:
       return 'single-column';
   }
@@ -436,6 +483,227 @@ function resolveBodyZoneKey(
   return resolveBodyZoneLayout(semanticType).replace(/-/g, '_');
 }
 
+/**
+ * MP-03: the type ramp floors used when fitting body text.
+ *
+ * Resolved once per slide from the single design entry point so the floor a
+ * box may shrink to is a brand decision, not a constant buried in this file.
+ * Falls back to the built-in ramp when the tenant lookup fails, because a
+ * missing brand file must not make text unbounded.
+ */
+interface TypeFloors {
+  bodyMinPt: number;
+  labelMinPt: number;
+  headlineMinPt: number;
+  displayMinPt: number;
+  captionMinPt: number;
+}
+
+const typeFloorsCache = new Map<string, TypeFloors>();
+
+function resolveTypeFloors(tenantSlug?: string): TypeFloors {
+  const cacheKey = `${pathResolver.rootDir()}::${tenantSlug || ''}`;
+  const cached = typeFloorsCache.get(cacheKey);
+  if (cached) return cached;
+  try {
+    const surface = resolvePptxSurfaceDesign(tenantSlug);
+    const floors = {
+      bodyMinPt: Math.max(
+        surface.typography.roles.body.min_size_pt,
+        surface.constraints.min_body_pt
+      ),
+      labelMinPt: Math.max(
+        surface.typography.roles.label.min_size_pt,
+        surface.constraints.min_label_pt
+      ),
+      headlineMinPt: surface.typography.roles.headline.min_size_pt,
+      displayMinPt: surface.typography.roles.display.min_size_pt,
+      captionMinPt: surface.typography.roles.caption.min_size_pt,
+    };
+    typeFloorsCache.set(cacheKey, floors);
+    return floors;
+  } catch {
+    const fallback = {
+      bodyMinPt: 10,
+      labelMinPt: 8,
+      headlineMinPt: 18,
+      displayMinPt: 24,
+      captionMinPt: 8,
+    };
+    typeFloorsCache.set(cacheKey, fallback);
+    return fallback;
+  }
+}
+
+interface FittedTextBox {
+  fontSize: number;
+  designedFontSize: number;
+  lineSpacingPct: number;
+  fit: LayoutFitResult;
+}
+
+/**
+ * Fit body text to its box before the element is emitted.
+ *
+ * Sizes used to be constants regardless of how much text arrived, so long or
+ * Japanese-heavy bodies ran past the frame. Measuring here keeps the designed
+ * size whenever it fits and shrinks toward the ramp floor when it does not;
+ * text that overflows even at the floor is reported so the caller can surface
+ * it rather than rendering a broken slide silently.
+ */
+function fitBodyText(
+  text: string,
+  box: { widthIn: number; heightIn: number },
+  style: {
+    fontSize: number;
+    minFontSize: number;
+    lineSpacingPct?: number;
+    margin?: [number, number, number, number];
+  }
+): FittedTextBox {
+  const fit = fitTextToBox({
+    text,
+    widthIn: box.widthIn,
+    heightIn: box.heightIn,
+    fontSizePt: style.fontSize,
+    minFontSizePt: style.minFontSize,
+    lineSpacingPct: style.lineSpacingPct,
+    marginIn: style.margin,
+  });
+  return {
+    fontSize: fit.fontSizePt,
+    designedFontSize: style.fontSize,
+    lineSpacingPct: style.lineSpacingPct ?? 120,
+    fit,
+  };
+}
+
+/**
+ * Region-declarative body zones.
+ *
+ * The original six zones are each a hand-written branch, which is why the
+ * layout vocabulary stopped growing: a new zone meant new geometry code, so
+ * every unmapped semantic type fell back to single_column and decks looked
+ * the same regardless of content. Zones defined with `regions` are built from
+ * their JSON alone, so adding one is adding data.
+ */
+interface ZoneRegionSpec {
+  id: string;
+  type: 'text' | 'panel';
+  source: string;
+  text?: string;
+  pos: Record<string, number | string>;
+  font_size?: number;
+  line_spacing_pct?: number;
+  margin?: [number, number, number, number];
+  fill?: string;
+  color?: string;
+  bold?: boolean;
+  align?: string;
+  valign?: string;
+}
+
+/** Anchors a region's geometry may reference, resolved from the chrome. */
+interface ZoneAnchors {
+  body_x: number;
+  body_y: number;
+  body_w: number;
+  body_h: number;
+}
+
+function resolveZoneCoord(
+  spec: Record<string, number | string>,
+  key: 'x' | 'y' | 'w' | 'h',
+  anchors: ZoneAnchors
+): number {
+  const raw = spec[key];
+  const base =
+    typeof raw === 'number'
+      ? raw
+      : typeof raw === 'string' && raw in anchors
+        ? anchors[raw as keyof ZoneAnchors]
+        : 0;
+  const offset = Number(spec[`${key}_offset`] ?? 0);
+  return Math.round((base + offset) * 1000) / 1000;
+}
+
+/**
+ * Select a region's text. Splits are measured (`body_balanced_*`) rather than
+ * ratio-guessed, so a heavy line and a one-word bullet are not treated as
+ * equal weight.
+ */
+function resolveZoneRegionText(
+  source: string,
+  context: {
+    bodyLines: string[];
+    balanced: { left: string[]; right: string[] };
+    objective: string;
+    cta: string;
+    title: string;
+    literal?: string;
+  }
+): string {
+  const [kind, arg] = String(source || '').split(':');
+  const count = Number(arg);
+  switch (kind) {
+    case 'literal':
+      return context.literal ?? '';
+    case 'body_all':
+      return context.bodyLines.join('\n');
+    case 'body_head':
+      return context.bodyLines.slice(0, Math.max(1, count || 1)).join('\n');
+    case 'body_tail':
+      // A negative count drops that many leading lines instead of taking a tail.
+      return (
+        count < 0 ? context.bodyLines.slice(-count) : context.bodyLines.slice(-(count || 1))
+      ).join('\n');
+    case 'body_balanced_left':
+      return context.balanced.left.join('\n');
+    case 'body_balanced_right':
+      return context.balanced.right.join('\n');
+    case 'body_last':
+      return context.bodyLines[context.bodyLines.length - 1] ?? '';
+    case 'objective':
+      return context.objective;
+    case 'cta':
+      return context.cta;
+    case 'title':
+      return context.title;
+    default:
+      return context.bodyLines.join('\n');
+  }
+}
+
+/**
+ * Take as many leading lines as fit a fixed-height box, keeping at least one.
+ * Replaces count-based guesses like `Math.min(3, lines.length - 1)`.
+ */
+function takeLinesThatFit(
+  lines: string[],
+  box: {
+    widthIn: number;
+    heightIn: number;
+    fontSizePt: number;
+    lineSpacingPct?: number;
+    marginIn?: [number, number, number, number];
+    maxLines: number;
+  }
+): string[] {
+  const limit = Math.max(1, Math.min(box.maxLines, lines.length));
+  let taken = 1;
+  for (let count = 1; count <= limit; count += 1) {
+    const measured = measureTextBlock(lines.slice(0, count).join('\n'), {
+      fontSizePt: box.fontSizePt,
+      widthIn: box.widthIn,
+      lineSpacingPct: box.lineSpacingPct,
+      marginIn: box.marginIn,
+    });
+    if (measured.requiredHeightIn > box.heightIn) break;
+    taken = count;
+  }
+  return lines.slice(0, taken);
+}
+
 function buildPptxSlideFromPattern(
   rootDir: string,
   data: any,
@@ -475,6 +743,36 @@ function buildPptxSlideFromPattern(
   const logoExists = logoPath ? safeExistsSync(logoPath) : false;
   const brandName = data.branding?.brand_name || theme?.name || theme?.theme?.name || '';
 
+  /**
+   * Boxes whose text did not fit even at the ramp floor. Surfaced in slide
+   * metadata so an overflowing deck is visible to the caller instead of
+   * shipping with text running off the frame.
+   */
+  const overflows: Array<{ zone: string; fillRatio: number; overflowAtParagraph?: number }> = [];
+  const shrunkZones: Array<{ zone: string; fontSize: number; designedFontSize: number }> = [];
+  const recordFit = (zone: string, fitted: FittedTextBox): FittedTextBox => {
+    if (fitted.fit.strategy === 'shrunk') {
+      shrunkZones.push({
+        zone,
+        fontSize: fitted.fontSize,
+        designedFontSize: fitted.designedFontSize,
+      });
+    }
+    if (!fitted.fit.fits) {
+      overflows.push({
+        zone,
+        fillRatio: Number(fitted.fit.fillRatio.toFixed(3)),
+        ...(fitted.fit.overflowAtParagraph !== undefined
+          ? { overflowAtParagraph: fitted.fit.overflowAtParagraph }
+          : {}),
+      });
+    }
+    return fitted;
+  };
+
+  /** Body zone actually used, recorded for zone-diversity measurement. */
+  let renderedBodyZone = 'none';
+
   const isHero = semanticType === 'hero';
   const themeFonts = theme?.fonts || theme?.theme?.fonts || {};
   const headingFont = resolveLatinFontFamily(themeFonts.heading);
@@ -482,6 +780,7 @@ function buildPptxSlideFromPattern(
   const bzl = resolveLayoutTemplate(rootDir, data.design_system_id, data, theme);
   const chr = bzl.chrome;
   const hro = bzl.hero;
+  const typeFloors = resolveTypeFloors(data.branding?.tenant_slug || data.tenant_slug);
 
   if (Array.isArray(pageLayout?.elements)) {
     elements.push(...cloneJsonValue(pageLayout.elements));
@@ -528,6 +827,18 @@ function buildPptxSlideFromPattern(
         },
         placeholderConfig.title
       );
+      const titleFit = recordFit(
+        'hero.title',
+        fitBodyText(
+          data.title,
+          { widthIn: hro.title_w, heightIn: hro.title_h },
+          {
+            fontSize: hro.title_font_size,
+            minFontSize: typeFloors.displayMinPt,
+          }
+        )
+      );
+      titleEl.style = { ...(titleEl.style || {}), fontSize: titleFit.fontSize };
       titleEl.text = resolveSlideTemplate(titleEl.text, data, data.title);
       elements.push(titleEl);
     }
@@ -550,6 +861,18 @@ function buildPptxSlideFromPattern(
         },
         placeholderConfig.body
       );
+      const subtitleFit = recordFit(
+        'hero.subtitle',
+        fitBodyText(
+          bodyText,
+          { widthIn: hro.subtitle_w, heightIn: hro.subtitle_h },
+          {
+            fontSize: hro.subtitle_font_size,
+            minFontSize: typeFloors.bodyMinPt,
+          }
+        )
+      );
+      subtitleEl.style = { ...(subtitleEl.style || {}), fontSize: subtitleFit.fontSize };
       subtitleEl.text = resolveSlideTemplate(subtitleEl.text, data, bodyText);
       elements.push(subtitleEl);
     }
@@ -585,6 +908,7 @@ function buildPptxSlideFromPattern(
     // SBISS design: full-height blue header bar with white title text,
     // white logo box on right side of header, navy separator, body below.
     const bodyZoneKey = resolveBodyZoneKey(semanticType, data.design_system_id, rootDir);
+    renderedBodyZone = bodyZoneKey;
     const bodyY = chr.body_y;
     const bodyH = chr.body_h;
     const bodyX = chr.body_x;
@@ -601,6 +925,13 @@ function buildPptxSlideFromPattern(
       '#',
       ''
     );
+
+    // A theme missing a role falls back to a neighbouring one, which is how a
+    // panel can end up with identical fill and text color and render its body
+    // invisible. Resolve panel text against its own fill rather than trusting
+    // the roles to differ.
+    const onSurface = (preferred: string) => ensureReadableOn(surfaceBg, preferred);
+    const panelBodyColor = onSurface(navyHex);
 
     // 1. Full-height blue header bar
     elements.push({
@@ -636,18 +967,31 @@ function buildPptxSlideFromPattern(
     // 3. Slide title in blue header — white text, bold
     if (data.title && placeholderConfig.title !== false) {
       const titleAlign = bodyZoneKey === 'decision_cta' ? 'center' : 'left';
+      const titleW = logoExists ? chr.title_w_logo : chr.title_w_no_logo;
+      const titleFit = recordFit(
+        'standard.title',
+        fitBodyText(
+          data.title,
+          { widthIn: titleW, heightIn: chr.header_h },
+          {
+            fontSize: chr.title_font_size,
+            minFontSize: typeFloors.headlineMinPt,
+            margin: [0, 0, 0, 0.06],
+          }
+        )
+      );
       elements.push({
         type: 'text',
         placeholderType: 'title',
         pos: {
           x: chr.title_x,
           y: 0,
-          w: logoExists ? chr.title_w_logo : chr.title_w_no_logo,
+          w: titleW,
           h: chr.header_h,
         },
         text: resolveSlideTemplate(data.title, data, data.title),
         style: {
-          fontSize: chr.title_font_size,
+          fontSize: titleFit.fontSize,
           bold: true,
           color: 'FFFFFF',
           fontFamily: headingFont,
@@ -680,23 +1024,42 @@ function buildPptxSlideFromPattern(
     if (bodyText && placeholderConfig.body !== false) {
       if (bodyZoneKey === 'two_column_callout') {
         const zc = bzl.body_zones.two_column_callout;
-        const splitAt = Math.ceil(bodyLines.length * 0.55);
-        const leftLines = bodyLines.slice(0, splitAt);
-        const rightLines = bodyLines.slice(splitAt);
+        const { left: leftLines, right: rightLines } = splitLinesBalanced({
+          lines: bodyLines,
+          columnWidthIn: zc.left_w,
+          rightColumnWidthIn: zc.right_w,
+          fontSizePt: zc.left_font_size,
+          marginIn: zc.left_margin,
+          lineSpacingPct: zc.left_line_spacing_pct,
+        });
         const rightText =
           rightLines.join('\n') || data.objective || leftLines[leftLines.length - 1] || '';
         const calloutLabels = zc.semantic_labels || {};
         const calloutLabel =
           calloutLabels[semanticType] ?? calloutLabels['default'] ?? '  根拠データ';
         if (leftLines.length > 0) {
+          const leftText = leftLines.join('\n');
+          const fitted = recordFit(
+            'two_column_callout.left',
+            fitBodyText(
+              leftText,
+              { widthIn: zc.left_w, heightIn: bodyH },
+              {
+                fontSize: zc.left_font_size,
+                minFontSize: typeFloors.bodyMinPt,
+                lineSpacingPct: zc.left_line_spacing_pct,
+                margin: zc.left_margin,
+              }
+            )
+          );
           elements.push({
             type: 'text',
             placeholderType: 'body',
             pos: { x: bodyX, y: bodyY, w: zc.left_w, h: bodyH },
-            text: resolveSlideTemplate(leftLines.join('\n'), data, leftLines.join('\n')),
+            text: resolveSlideTemplate(leftText, data, leftText),
             style: {
               ...(placeholderConfig.body?.style || {}),
-              fontSize: zc.left_font_size,
+              fontSize: fitted.fontSize,
               color: bodyTextColor,
               fontFamily: bodyFont,
               align: 'left',
@@ -721,14 +1084,28 @@ function buildPptxSlideFromPattern(
           },
           text: calloutLabel,
         });
+        const calloutPanelH = bodyH - zc.panel_h;
+        const calloutPanelFit = recordFit(
+          'two_column_callout.panel',
+          fitBodyText(
+            rightText,
+            { widthIn: zc.right_w, heightIn: calloutPanelH },
+            {
+              fontSize: zc.panel_body_font_size,
+              minFontSize: typeFloors.bodyMinPt,
+              lineSpacingPct: zc.panel_body_line_spacing_pct,
+              margin: zc.panel_body_margin,
+            }
+          )
+        );
         elements.push({
           type: 'shape',
           shapeType: 'rect',
-          pos: { x: zc.right_x, y: bodyY + zc.panel_h, w: zc.right_w, h: bodyH - zc.panel_h },
+          pos: { x: zc.right_x, y: bodyY + zc.panel_h, w: zc.right_w, h: calloutPanelH },
           style: {
             fill: surfaceBg,
-            color: navyHex,
-            fontSize: zc.panel_body_font_size,
+            color: panelBodyColor,
+            fontSize: calloutPanelFit.fontSize,
             align: 'left',
             valign: 'top',
             lineSpacingPct: zc.panel_body_line_spacing_pct,
@@ -738,6 +1115,21 @@ function buildPptxSlideFromPattern(
         });
         if (data.visual) {
           const vl = zc.visual_label || {};
+          // Fitted like every other region: a label whose margins swallow its
+          // own box renders one character per line, and only measuring catches
+          // that before it ships.
+          const labelFit = recordFit(
+            'two_column_callout.visual_label',
+            fitBodyText(
+              String(data.visual),
+              { widthIn: zc.right_w, heightIn: vl.h ?? 0.28 },
+              {
+                fontSize: vl.font_size ?? 9,
+                minFontSize: typeFloors.labelMinPt,
+                margin: vl.margin,
+              }
+            )
+          );
           elements.push({
             type: 'text',
             pos: {
@@ -750,28 +1142,47 @@ function buildPptxSlideFromPattern(
             style: {
               fill: accentHex,
               color: 'FFFFFF',
-              fontSize: vl.font_size ?? 9,
+              fontSize: labelFit.fontSize,
               align: 'left',
               valign: 'middle',
-              margin: vl.margin ?? [2, 4, 2, 4],
+              margin: vl.margin ?? [0.02, 0.06, 0.02, 0.06],
             },
           });
         }
       } else if (bodyZoneKey === 'two_column_risk') {
         const zc = bzl.body_zones.two_column_risk;
-        const splitAt = Math.ceil(bodyLines.length * 0.55);
-        const leftLines = bodyLines.slice(0, splitAt);
-        const rightLines = bodyLines.slice(splitAt);
+        const { left: leftLines, right: rightLines } = splitLinesBalanced({
+          lines: bodyLines,
+          columnWidthIn: zc.left_w,
+          rightColumnWidthIn: zc.right_w,
+          fontSizePt: zc.left_font_size,
+          marginIn: zc.left_margin,
+          lineSpacingPct: zc.left_line_spacing_pct,
+        });
         const rightText = rightLines.join('\n') || data.objective || '';
         if (leftLines.length > 0) {
+          const leftText = leftLines.join('\n');
+          const fitted = recordFit(
+            'two_column_risk.left',
+            fitBodyText(
+              leftText,
+              { widthIn: zc.left_w, heightIn: bodyH },
+              {
+                fontSize: zc.left_font_size,
+                minFontSize: typeFloors.bodyMinPt,
+                lineSpacingPct: zc.left_line_spacing_pct,
+                margin: zc.left_margin,
+              }
+            )
+          );
           elements.push({
             type: 'text',
             placeholderType: 'body',
             pos: { x: bodyX, y: bodyY, w: zc.left_w, h: bodyH },
-            text: resolveSlideTemplate(leftLines.join('\n'), data, leftLines.join('\n')),
+            text: resolveSlideTemplate(leftText, data, leftText),
             style: {
               ...(placeholderConfig.body?.style || {}),
-              fontSize: zc.left_font_size,
+              fontSize: fitted.fontSize,
               color: bodyTextColor,
               fontFamily: bodyFont,
               align: 'left',
@@ -796,14 +1207,28 @@ function buildPptxSlideFromPattern(
           },
           text: zc.panel_label ?? '  リスク対策',
         });
+        const riskPanelH = bodyH - zc.panel_h;
+        const riskPanelFit = recordFit(
+          'two_column_risk.panel',
+          fitBodyText(
+            rightText,
+            { widthIn: zc.right_w, heightIn: riskPanelH },
+            {
+              fontSize: zc.panel_body_font_size,
+              minFontSize: typeFloors.bodyMinPt,
+              lineSpacingPct: zc.panel_body_line_spacing_pct,
+              margin: zc.panel_body_margin,
+            }
+          )
+        );
         elements.push({
           type: 'shape',
           shapeType: 'rect',
-          pos: { x: zc.right_x, y: bodyY + zc.panel_h, w: zc.right_w, h: bodyH - zc.panel_h },
+          pos: { x: zc.right_x, y: bodyY + zc.panel_h, w: zc.right_w, h: riskPanelH },
           style: {
             fill: zc.panel_body_fill ?? 'FFF0F0',
             color: zc.panel_body_color ?? '7F1D1D',
-            fontSize: zc.panel_body_font_size,
+            fontSize: riskPanelFit.fontSize,
             align: 'left',
             valign: 'top',
             lineSpacingPct: zc.panel_body_line_spacing_pct,
@@ -815,6 +1240,19 @@ function buildPptxSlideFromPattern(
         const zc = bzl.body_zones.timeline;
         const tlLabels = zc.semantic_labels || {};
         const tlLabel = tlLabels[semanticType] ?? tlLabels['default'] ?? '  ロードマップ';
+        const timelineLeftFit = recordFit(
+          'timeline.left',
+          fitBodyText(
+            bodyText,
+            { widthIn: zc.left_w, heightIn: bodyH },
+            {
+              fontSize: zc.left_font_size,
+              minFontSize: typeFloors.bodyMinPt,
+              lineSpacingPct: zc.left_line_spacing_pct,
+              margin: zc.left_margin,
+            }
+          )
+        );
         elements.push({
           type: 'text',
           placeholderType: 'body',
@@ -822,7 +1260,7 @@ function buildPptxSlideFromPattern(
           text: resolveSlideTemplate(bodyText, data, bodyText),
           style: {
             ...(placeholderConfig.body?.style || {}),
-            fontSize: zc.left_font_size,
+            fontSize: timelineLeftFit.fontSize,
             color: bodyTextColor,
             fontFamily: bodyFont,
             align: 'left',
@@ -847,14 +1285,28 @@ function buildPptxSlideFromPattern(
           text: tlLabel,
         });
         const timelineText = bodyLines.map((line: string) => `▶  ${line}`).join('\n\n');
+        const timelinePanelH = bodyH - zc.panel_h;
+        const timelinePanelFit = recordFit(
+          'timeline.panel',
+          fitBodyText(
+            timelineText,
+            { widthIn: zc.right_w, heightIn: timelinePanelH },
+            {
+              fontSize: zc.panel_body_font_size,
+              minFontSize: typeFloors.bodyMinPt,
+              lineSpacingPct: zc.panel_body_line_spacing_pct,
+              margin: zc.panel_body_margin,
+            }
+          )
+        );
         elements.push({
           type: 'shape',
           shapeType: 'rect',
-          pos: { x: zc.right_x, y: bodyY + zc.panel_h, w: zc.right_w, h: bodyH - zc.panel_h },
+          pos: { x: zc.right_x, y: bodyY + zc.panel_h, w: zc.right_w, h: timelinePanelH },
           style: {
             fill: surfaceBg,
-            color: navyHex,
-            fontSize: zc.panel_body_font_size,
+            color: panelBodyColor,
+            fontSize: timelinePanelFit.fontSize,
             align: 'left',
             valign: 'top',
             lineSpacingPct: zc.panel_body_line_spacing_pct,
@@ -864,6 +1316,18 @@ function buildPptxSlideFromPattern(
         });
         if (data.visual) {
           const vl = zc.visual_label || {};
+          const labelFit = recordFit(
+            'timeline.visual_label',
+            fitBodyText(
+              String(data.visual),
+              { widthIn: zc.right_w, heightIn: vl.h ?? 0.28 },
+              {
+                fontSize: vl.font_size ?? 9,
+                minFontSize: typeFloors.labelMinPt,
+                margin: vl.margin,
+              }
+            )
+          );
           elements.push({
             type: 'text',
             pos: {
@@ -876,26 +1340,48 @@ function buildPptxSlideFromPattern(
             style: {
               fill: vl.fill ?? 'DCFCE7',
               color: vl.color ?? '166534',
-              fontSize: vl.font_size ?? 9,
+              fontSize: labelFit.fontSize,
               align: 'left',
               valign: 'middle',
-              margin: vl.margin ?? [2, 4, 2, 4],
+              margin: vl.margin ?? [0.02, 0.06, 0.02, 0.06],
             },
           });
         }
       } else if (bodyZoneKey === 'architecture_panel') {
         const zc = bzl.body_zones.architecture_panel;
-        const splitAt = Math.min(3, Math.max(1, bodyLines.length - 1));
-        const descLines = bodyLines.slice(0, splitAt);
-        const archLines = bodyLines.slice(splitAt);
+        // The description band is a fixed-height box, so how many lines belong
+        // in it is a measurement question: take lines while they still fit.
+        const descLines = takeLinesThatFit(bodyLines, {
+          widthIn: bodyW,
+          heightIn: zc.desc_h,
+          fontSizePt: zc.desc_font_size,
+          lineSpacingPct: zc.desc_line_spacing_pct,
+          marginIn: zc.desc_margin,
+          maxLines: Math.max(1, bodyLines.length - 1),
+        });
+        const archLines = bodyLines.slice(descLines.length);
+        const descText = descLines.join('\n');
+        const descFit = recordFit(
+          'architecture_panel.desc',
+          fitBodyText(
+            descText,
+            { widthIn: bodyW, heightIn: zc.desc_h },
+            {
+              fontSize: zc.desc_font_size,
+              minFontSize: typeFloors.bodyMinPt,
+              lineSpacingPct: zc.desc_line_spacing_pct,
+              margin: zc.desc_margin,
+            }
+          )
+        );
         elements.push({
           type: 'text',
           placeholderType: 'body',
           pos: { x: bodyX, y: bodyY, w: bodyW, h: zc.desc_h },
-          text: resolveSlideTemplate(descLines.join('\n'), data, descLines.join('\n')),
+          text: resolveSlideTemplate(descText, data, descText),
           style: {
             ...(placeholderConfig.body?.style || {}),
-            fontSize: zc.desc_font_size,
+            fontSize: descFit.fontSize,
             color: bodyTextColor,
             fontFamily: bodyFont,
             align: 'left',
@@ -920,6 +1406,20 @@ function buildPptxSlideFromPattern(
           text: zc.panel_label ?? '  システム構成概要',
         });
         const archText = (archLines.length > 0 ? archLines : bodyLines).join('\n');
+        const archPanelH = bodyH - zc.panel_body_y_offset;
+        const archFit = recordFit(
+          'architecture_panel.panel',
+          fitBodyText(
+            archText,
+            { widthIn: bodyW, heightIn: archPanelH },
+            {
+              fontSize: zc.panel_body_font_size,
+              minFontSize: typeFloors.bodyMinPt,
+              lineSpacingPct: zc.panel_body_line_spacing_pct,
+              margin: zc.panel_body_margin,
+            }
+          )
+        );
         elements.push({
           type: 'shape',
           shapeType: 'rect',
@@ -927,12 +1427,12 @@ function buildPptxSlideFromPattern(
             x: bodyX,
             y: bodyY + zc.panel_body_y_offset,
             w: bodyW,
-            h: bodyH - zc.panel_body_y_offset,
+            h: archPanelH,
           },
           style: {
             fill: surfaceBg,
-            color: navyHex,
-            fontSize: zc.panel_body_font_size,
+            color: panelBodyColor,
+            fontSize: archFit.fontSize,
             align: 'left',
             valign: 'top',
             lineSpacingPct: zc.panel_body_line_spacing_pct,
@@ -946,6 +1446,19 @@ function buildPptxSlideFromPattern(
         const msgLines = ctaLine ? bodyLines.slice(0, -1) : bodyLines;
         const msgText = msgLines.join('\n');
         if (msgText) {
+          const msgFit = recordFit(
+            'decision_cta.message',
+            fitBodyText(
+              msgText,
+              { widthIn: bodyW, heightIn: zc.msg_h },
+              {
+                fontSize: zc.msg_font_size,
+                minFontSize: typeFloors.bodyMinPt,
+                lineSpacingPct: zc.msg_line_spacing_pct,
+                margin: zc.msg_margin,
+              }
+            )
+          );
           elements.push({
             type: 'text',
             placeholderType: 'body',
@@ -953,7 +1466,7 @@ function buildPptxSlideFromPattern(
             text: resolveSlideTemplate(msgText, data, msgText),
             style: {
               ...(placeholderConfig.body?.style || {}),
-              fontSize: zc.msg_font_size,
+              fontSize: msgFit.fontSize,
               color: navyHex,
               fontFamily: bodyFont,
               align: 'center',
@@ -964,6 +1477,14 @@ function buildPptxSlideFromPattern(
           });
         }
         if (ctaLine) {
+          const ctaFit = recordFit(
+            'decision_cta.cta',
+            fitBodyText(
+              ctaLine,
+              { widthIn: zc.cta_w, heightIn: zc.cta_h },
+              { fontSize: zc.cta_font_size, minFontSize: typeFloors.labelMinPt }
+            )
+          );
           elements.push({
             type: 'shape',
             shapeType: 'rect',
@@ -971,7 +1492,7 @@ function buildPptxSlideFromPattern(
             style: {
               fill: azureHex,
               color: 'FFFFFF',
-              fontSize: zc.cta_font_size,
+              fontSize: ctaFit.fontSize,
               bold: true,
               align: 'center',
               valign: 'middle',
@@ -979,10 +1500,123 @@ function buildPptxSlideFromPattern(
             text: ctaLine,
           });
         }
+      } else if (Array.isArray(bzl.body_zones?.[bodyZoneKey]?.regions)) {
+        // Region-declarative zone: built from JSON, no branch of its own.
+        const zoneSpec = bzl.body_zones[bodyZoneKey];
+        const anchors: ZoneAnchors = { body_x: bodyX, body_y: bodyY, body_w: bodyW, body_h: bodyH };
+        const themeRoles: Record<string, string> = {
+          primary: primaryHex,
+          accent: accentHex,
+          navy: navyHex,
+          azure: azureHex,
+          surface: surfaceBg,
+          text_primary: bodyTextColor,
+          text_secondary: subTextColor,
+          white: 'FFFFFF',
+        };
+        const resolveRole = (value: string | undefined, fallback: string): string => {
+          if (!value) return fallback;
+          if (themeRoles[value]) return themeRoles[value];
+          return value.replace('#', '');
+        };
+
+        // Column splits are measured, not ratio-guessed.
+        const firstColumnWidth = Number(
+          resolveZoneCoord(
+            (zoneSpec.regions as ZoneRegionSpec[]).find((region) =>
+              String(region.source).includes('balanced')
+            )?.pos ?? { w: bodyW },
+            'w',
+            anchors
+          )
+        );
+        const balanced = splitLinesBalanced({
+          lines: bodyLines,
+          columnWidthIn: firstColumnWidth || bodyW,
+          fontSizePt: 13,
+          lineSpacingPct: 155,
+        });
+
+        for (const region of zoneSpec.regions as ZoneRegionSpec[]) {
+          const text = resolveZoneRegionText(region.source, {
+            bodyLines,
+            balanced,
+            objective: String(data.objective || ''),
+            cta: bodyLines[bodyLines.length - 1] ?? '',
+            title: String(data.title || ''),
+            literal: region.text,
+          });
+          if (!text.trim()) continue;
+
+          const box = {
+            x: resolveZoneCoord(region.pos, 'x', anchors),
+            y: resolveZoneCoord(region.pos, 'y', anchors),
+            w: resolveZoneCoord(region.pos, 'w', anchors),
+            h: resolveZoneCoord(region.pos, 'h', anchors),
+          };
+          if (box.w <= 0 || box.h <= 0) continue;
+
+          const fitted = recordFit(
+            `${bodyZoneKey}.${region.id}`,
+            fitBodyText(
+              text,
+              { widthIn: box.w, heightIn: box.h },
+              {
+                fontSize: region.font_size ?? 13,
+                minFontSize: typeFloors.bodyMinPt,
+                lineSpacingPct: region.line_spacing_pct,
+                margin: region.margin,
+              }
+            )
+          );
+
+          // Region zones pair a fill with a text color from the theme roles;
+          // when those roles collapse onto the same value the text renders
+          // invisible, so the color is checked against the fill it lands on.
+          const regionFill = region.fill ? resolveRole(region.fill, surfaceBg) : undefined;
+          const preferredColor = resolveRole(region.color, bodyTextColor);
+          const regionColor = regionFill
+            ? ensureReadableOn(regionFill, preferredColor)
+            : preferredColor;
+
+          elements.push({
+            type: region.type === 'panel' ? 'shape' : 'text',
+            ...(region.type === 'panel'
+              ? { shapeType: 'rect' }
+              : { placeholderType: 'body' as const }),
+            pos: box,
+            text: resolveSlideTemplate(text, data, text),
+            style: {
+              ...(region.type === 'text' ? placeholderConfig.body?.style || {} : {}),
+              fontSize: fitted.fontSize,
+              color: regionColor,
+              ...(regionFill ? { fill: regionFill } : {}),
+              ...(region.type === 'text' ? { fontFamily: bodyFont } : {}),
+              ...(region.bold ? { bold: true } : {}),
+              align: region.align || 'left',
+              valign: region.valign || 'top',
+              ...(region.line_spacing_pct ? { lineSpacingPct: region.line_spacing_pct } : {}),
+              ...(region.margin ? { margin: region.margin } : {}),
+            },
+          });
+        }
       } else {
-        // single-column (summary / content / execution / signals / appendix)
+        // single-column (content / appendix and anything still unmapped)
         const zc = bzl.body_zones.single_column;
         const baseFontSize = zc.font_size + Number(pptxTokens.body_font_size_delta || 0);
+        const singleFit = recordFit(
+          'single_column',
+          fitBodyText(
+            bodyText,
+            { widthIn: bodyW, heightIn: bodyH },
+            {
+              fontSize: baseFontSize,
+              minFontSize: typeFloors.bodyMinPt,
+              lineSpacingPct: zc.line_spacing_pct,
+              margin: zc.margin,
+            }
+          )
+        );
         elements.push({
           type: 'text',
           placeholderType: 'body',
@@ -990,7 +1624,7 @@ function buildPptxSlideFromPattern(
           text: resolveSlideTemplate(bodyText, data, bodyText),
           style: {
             ...(placeholderConfig.body?.style || {}),
-            fontSize: baseFontSize,
+            fontSize: singleFit.fontSize,
             color: bodyTextColor,
             fontFamily: bodyFont,
             align: 'left',
@@ -1035,8 +1669,20 @@ function buildPptxSlideFromPattern(
       layoutKey: data.layout_key,
       mediaKind: data.media_kind,
       semanticType,
+      // Which body zone rendered this slide. Recorded so zone diversity is
+      // measurable: a deck where every semantic type collapses onto one zone
+      // reads as visually monotonous no matter how correct the fit is.
+      bodyZone: isHero ? 'hero' : renderedBodyZone,
       canvas,
       hasMaster: Boolean(activeMaster),
+      layoutFit: {
+        status: overflows.length > 0 ? 'overflow' : shrunkZones.length > 0 ? 'shrunk' : 'pass',
+        shrinkCount: shrunkZones.length,
+        overflowCount: overflows.length,
+        shrunkZones,
+        overflows,
+      },
+      ...(overflows.length > 0 ? { layoutOverflows: overflows } : {}),
     },
   };
 }
@@ -1751,6 +2397,10 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
             buildPptxSlideFromPattern(rootDir, data, idx, theme, pattern, activeMaster, canvas)
           ),
         };
+        protocol.metadata = {
+          ...(protocol.metadata || {}),
+          layoutDiagnostics: summarizeMediaPptxLayout(protocol),
+        };
         return { ...ctx, last_pptx_design: protocol, merged_output_format: 'pptx' };
       }
 
@@ -1956,7 +2606,13 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
       if (!rawBrief || typeof rawBrief !== 'object') {
         throw new Error(`brief_to_design_protocol could not find context key: ${fromKey}`);
       }
-      const compiled = compileBriefToDesignProtocol(rootDir, rawBrief);
+      const sourceBrief =
+        (rawBrief as any).kind === 'locked-media-brief' &&
+        (rawBrief as any).source_brief &&
+        typeof (rawBrief as any).source_brief === 'object'
+          ? (rawBrief as any).source_brief
+          : rawBrief;
+      const compiled = compileBriefToDesignProtocol(rootDir, sourceBrief);
       const exportKey = params.export_as || compiled.exportKey;
       return {
         ...ctx,
@@ -1966,6 +2622,334 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
         [exportKey]: compiled.protocol,
         last_design_protocol: compiled.protocol,
         last_design_protocol_kind: compiled.protocolKind,
+      };
+    }
+    case 'pptx_layout_preflight': {
+      const fromKey = resolve(params.from) || 'last_pptx_design';
+      const protocol = ctx[fromKey];
+      if (!protocol || typeof protocol !== 'object') {
+        throw new Error(`pptx_layout_preflight could not find context key: ${fromKey}`);
+      }
+      assertMediaProtocolLayoutReady(protocol, {
+        allowLayoutOverflow: params.allow_layout_overflow === true,
+      });
+      const diagnostics =
+        protocol?.metadata?.layoutDiagnostics || summarizeMediaPptxLayout(protocol);
+      return {
+        ...ctx,
+        [params.export_as || 'media_layout_diagnostics']: diagnostics,
+      };
+    }
+    case 'lock_media_brief': {
+      // MP-05: fix the brief before anything is produced, and record which
+      // parts the operator actually decided. An inference nobody can see is
+      // how a deck ends up written for the wrong reader.
+      const fromKey = resolve(params.from) || 'last_json';
+      const raw = ctx[fromKey];
+      if (!raw || typeof raw !== 'object') {
+        throw new Error(`[UNKNOWN_INPUT] lock_media_brief could not find context key: ${fromKey}`);
+      }
+
+      const stated: Record<string, string | undefined> = {};
+      for (const field of ['audience', 'objective', 'tone', 'locale', 'render_target', 'title']) {
+        const value = (raw as any)[field];
+        if (typeof value === 'string' && value.trim()) stated[field] = value.trim();
+      }
+
+      const inferred: Record<string, { value: string; rationale: string }> = {};
+      if (!stated.locale) {
+        inferred.locale = {
+          value: 'ja-JP',
+          rationale: 'no locale stated; defaulted to the workspace locale',
+        };
+      }
+      if (!stated.tone) {
+        inferred.tone = {
+          value: stated.audience ? 'formal' : 'neutral',
+          rationale: stated.audience
+            ? `inferred from the stated audience "${stated.audience}"`
+            : 'no audience or tone stated',
+        };
+      }
+
+      // Nested params are not template-resolved by the dispatcher, so a
+      // pipeline writing `"visual_review_rounds": "{{rounds}}"` would otherwise
+      // hand the op the literal placeholder. Resolve each value here; the
+      // run-shape schema then coerces the resulting strings.
+      const rawRunShape =
+        params.run_shape && typeof params.run_shape === 'object' ? params.run_shape : {};
+      const runShape: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(rawRunShape)) {
+        runShape[key] = typeof value === 'string' ? resolve(value) : value;
+      }
+
+      const locked = lockMediaBrief({
+        intent: String((raw as any).title || (raw as any).objective || 'media brief'),
+        stated,
+        inferred,
+        runShape: runShape as any,
+        sourceBrief: raw as Record<string, unknown>,
+      });
+
+      // Surfaced, not buried: the operator needs to see the guesses.
+      const assumptions = inferredDecisions(locked);
+      if (assumptions.length > 0) {
+        logger.info(`📋 [MEDIA]\n${formatBriefForConfirmation(locked)}`);
+      }
+
+      return { ...ctx, [params.export_as || 'locked_media_brief']: locked };
+    }
+    case 'visual_review': {
+      const capabilities = detectRasterCapabilities({ refresh: true });
+      const lockedBrief = ctx[String(resolve(params.brief_from) || 'locked_media_brief')];
+      const runShape = lockedBrief?.run_shape;
+      const tier = String(resolve(params.tier) || 'public');
+      if (!['public', 'confidential', 'personal'].includes(tier)) {
+        throw new Error(
+          '[VISUAL_REVIEW_TIER_INVALID] tier must be public, confidential, or personal'
+        );
+      }
+      const missionId = String(resolve(params.mission_id) || 'none');
+      const tenantSlug = String(resolve(params.tenant_slug) || 'kyberion');
+      if (tier !== 'public' && !lockedBrief) {
+        throw new Error(
+          '[VISUAL_REVIEW_LOCK_REQUIRED] confidential and personal reviews require a locked media brief'
+        );
+      }
+      const allowExternal =
+        lockedBrief && runShape
+          ? runShape.allow_external_visual_review === true
+          : tier === 'public' && params.allow_external_egress === true;
+      const requestedWorkDir = params.work_dir
+        ? resolve(params.work_dir)
+        : tier === 'public'
+          ? undefined
+          : missionId !== 'none'
+            ? path.join('active', 'missions', tier, missionId, 'visual-review')
+            : undefined;
+      const artifactKind = String(resolve(params.artifact_kind) || 'pptx') as
+        | 'pptx'
+        | 'doc'
+        | 'video-scenes'
+        | 'web';
+      const label = String(params.label || params.path || 'media-review').replace(
+        /[^a-zA-Z0-9._-]/g,
+        '-'
+      );
+      const rawHtmlPaths = Array.isArray(params.html_paths)
+        ? params.html_paths.map((value: unknown) => String(resolve(value)))
+        : [];
+      const artifactInput = String(resolve(params.path || params.artifact_path) || '');
+      if (artifactKind === 'video-scenes' || artifactKind === 'web') {
+        if (rawHtmlPaths.length === 0) {
+          throw new Error(
+            '[VISUAL_REVIEW_HTML_INPUT_REQUIRED] html_paths is required for HTML review'
+          );
+        }
+        for (const htmlPath of rawHtmlPaths) {
+          assertVisualReviewPathScope({
+            artifactPath: htmlPath,
+            workDir: requestedWorkDir,
+            tier: tier as any,
+            tenantSlug,
+            missionId,
+          });
+        }
+      } else {
+        const artifactPath = path.resolve(rootDir, artifactInput);
+        assertVisualReviewPathScope({
+          artifactPath,
+          workDir: requestedWorkDir,
+          tier: tier as any,
+          tenantSlug,
+          missionId,
+        });
+        if (!safeExistsSync(artifactPath)) {
+          throw new Error(
+            '[UNKNOWN_ARTIFACT] visual_review could not find artifact: ' + artifactPath
+          );
+        }
+      }
+
+      const scope = {
+        tenant_id: tenantSlug,
+        mission_id: missionId,
+        read_tiers: [tier],
+        write_tier: tier,
+        purpose: 'media visual review',
+        external_egress: allowExternal ? 'allow' : 'deny',
+      } as any;
+
+      // Zero rounds means the operator turned the review off; that is a
+      // deliberate skip, not a pass.
+      if (runShape && runShape.visual_review_rounds === 0) {
+        return {
+          ...ctx,
+          [params.export_as || 'media_visual_review']: {
+            status: 'skipped',
+            rubric_model:
+              'visual-review-rubric@' +
+              String((loadVisualReviewRubric({ tenantSlug }) as any).version || '1'),
+            error_count: 0,
+            warning_count: 0,
+            images_reviewed: 0,
+            findings: [],
+            delivery_status: 'unreviewed',
+            review_outcome: 'unreviewed',
+            skipped_reason: 'visual review disabled by the locked brief (visual_review_rounds = 0)',
+            raster: { available: false, backend: null, missing_binaries: capabilities.missing },
+          },
+        };
+      }
+
+      let lastRaster: any = {
+        available: false,
+        images: [],
+        unavailable_reason: 'rasterization did not run',
+      };
+      const render = async () => {
+        lastRaster =
+          artifactKind === 'video-scenes' || artifactKind === 'web'
+            ? await rasterizeHtml({
+                htmlPaths: rawHtmlPaths,
+                label,
+                ...(requestedWorkDir ? { workDir: requestedWorkDir } : {}),
+                tier: tier as any,
+                tenantSlug,
+                missionId,
+              })
+            : rasterizeDocument({
+                sourcePath: path.resolve(rootDir, artifactInput),
+                label,
+                ...(params.dpi ? { dpi: Number(params.dpi) } : {}),
+                ...(params.max_pages ? { maxPages: Number(params.max_pages) } : {}),
+                ...(requestedWorkDir ? { workDir: requestedWorkDir } : {}),
+                tier: tier as any,
+                tenantSlug,
+                missionId,
+              });
+        return {
+          images: lastRaster.images,
+          ...(lastRaster.unavailable_reason
+            ? { unavailable_reason: lastRaster.unavailable_reason }
+            : {}),
+        };
+      };
+      const loop = await runVisualReviewLoop({
+        render,
+        review: {
+          artifactKind,
+          title: params.title ? String(resolve(params.title)) : undefined,
+          scope,
+          backendName: String(resolve(params.backend) || 'stub'),
+          rubric: loadVisualReviewRubric({ tenantSlug }),
+        },
+        maxRounds: Number(runShape?.visual_review_rounds ?? 1),
+      });
+      const report = loop.final_report || {
+        status: 'skipped' as const,
+        findings: [],
+        error_count: 0,
+        warning_count: 0,
+        images_reviewed: 0,
+        skipped_reason: 'visual review did not produce a report',
+      };
+
+      if (report.status !== 'reviewed' && lastRaster.unavailable_reason) {
+        report.skipped_reason = lastRaster.unavailable_reason;
+      }
+
+      if (report.status !== 'reviewed') {
+        logger.warn(`⚠️  [MEDIA] ${formatVisualReviewReport(report)}`);
+      } else if (report.findings.length > 0) {
+        logger.info(`🔍 [MEDIA]\n${formatVisualReviewReport(report)}`);
+      }
+      if (missionId !== 'none') {
+        const missionPath = pathResolver.findMissionPath(missionId);
+        if (missionPath) {
+          try {
+            const evidenceDir = path.join(missionPath, 'evidence');
+            safeMkdir(evidenceDir, { recursive: true });
+            safeWriteFile(
+              path.join(evidenceDir, 'visual-review-report.json'),
+              JSON.stringify(
+                {
+                  version: '1.0.0',
+                  mission_id: missionId,
+                  tenant_slug: tenantSlug,
+                  tier,
+                  artifact_kind: artifactKind,
+                  delivery_status:
+                    loop.outcome === 'clean'
+                      ? 'clean'
+                      : loop.outcome === 'residual'
+                        ? 'residual'
+                        : 'unreviewed',
+                  review_outcome: loop.outcome,
+                  rounds: loop.rounds,
+                  report,
+                  generated_at: new Date().toISOString(),
+                },
+                null,
+                2
+              )
+            );
+          } catch (error: any) {
+            logger.warn('[MEDIA] visual review evidence could not be persisted: ' + error?.message);
+          }
+        }
+      }
+
+      return {
+        ...ctx,
+        [params.export_as || 'media_visual_review']: {
+          status: report.status,
+          rubric_model:
+            'visual-review-rubric@' +
+            String((loadVisualReviewRubric({ tenantSlug }) as any).version || '1'),
+          error_count: report.error_count,
+          warning_count: report.warning_count,
+          images_reviewed: report.images_reviewed,
+          findings: report.findings,
+          delivery_status:
+            loop.outcome === 'clean'
+              ? 'clean'
+              : loop.outcome === 'residual'
+                ? 'residual'
+                : 'unreviewed',
+          review_outcome: loop.outcome,
+          rounds: loop.rounds,
+          summary: loop.summary,
+          ...(report.verdict ? { verdict: report.verdict } : {}),
+          ...(report.skipped_reason ? { skipped_reason: report.skipped_reason } : {}),
+          raster: {
+            available: lastRaster.available,
+            backend: lastRaster.backend ?? null,
+            missing_binaries: capabilities.missing,
+          },
+        },
+      };
+    }
+    case 'visual_review_delivery_gate': {
+      const fromKey = String(resolve(params.from) || 'media_visual_review');
+      const report = ctx[fromKey];
+      if (!report || typeof report !== 'object') {
+        throw new Error('[VISUAL_REVIEW_GATE_BLOCKED] visual review report is missing');
+      }
+      const deliveryStatus = String((report as any).delivery_status || '');
+      if (deliveryStatus !== 'clean') {
+        throw new Error(
+          '[VISUAL_REVIEW_GATE_BLOCKED] delivery requires a clean visual review: ' +
+            String((report as any).summary || (report as any).skipped_reason || deliveryStatus)
+        );
+      }
+      return {
+        ...ctx,
+        [params.export_as || 'visual_review_delivery_gate']: {
+          status: 'passed',
+          source: fromKey,
+          delivery_status: deliveryStatus,
+        },
       };
     }
     case 'proposal_content_from_storyline': {
@@ -2252,6 +3236,9 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
         params.design_defaults !== undefined
           ? { ...baseProtocol, designDefaults: params.design_defaults }
           : baseProtocol;
+      assertMediaProtocolLayoutReady(protocol, {
+        allowLayoutOverflow: params.allow_layout_overflow === true,
+      });
       const outPath = path.resolve(rootDir, resolve(params.path || params.output_path));
 
       if (!safeExistsSync(path.dirname(outPath)))
@@ -2261,7 +3248,11 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
 
       const stats = safeStat(outPath);
       logger.info(`✅ [MEDIA] PPTX rendered at: ${outPath} (${stats.size} bytes).`);
-      break;
+      return {
+        ...ctx,
+        [params.export_as || 'media_render_diagnostics']:
+          protocol?.metadata?.layoutDiagnostics || summarizeMediaPptxLayout(protocol),
+      };
     }
     case 'pptx_patch': {
       const sourcePath = path.resolve(rootDir, resolve(params.source));
@@ -2379,7 +3370,12 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       await renderCompiledProtocol(compiled, outPath, params.options);
       const stats = safeStat(outPath);
       logger.info(`✅ [MEDIA] Unified document generated at: ${outPath} (${stats.size} bytes).`);
-      break;
+      return {
+        ...ctx,
+        [params.export_as || 'media_render_diagnostics']:
+          compiled.protocol?.metadata?.layoutDiagnostics ||
+          summarizeMediaPptxLayout(compiled.protocol),
+      };
     }
     case 'write_file':
       safeWriteFile(

@@ -1565,7 +1565,15 @@
           "kind": "transform"
         },
         {
+          "op": "brief_to_design_protocol",
+          "kind": "transform"
+        },
+        {
           "op": "find_slides_by_owner",
+          "kind": "transform"
+        },
+        {
+          "op": "lock_media_brief",
           "kind": "transform"
         },
         {
@@ -1574,6 +1582,10 @@
         },
         {
           "op": "pptx_diff",
+          "kind": "transform"
+        },
+        {
+          "op": "pptx_layout_preflight",
           "kind": "transform"
         },
         {
@@ -1590,6 +1602,14 @@
         },
         {
           "op": "theme_from_pptx_design",
+          "kind": "transform"
+        },
+        {
+          "op": "visual_review",
+          "kind": "transform"
+        },
+        {
+          "op": "visual_review_delivery_gate",
           "kind": "transform"
         },
         {
@@ -2960,6 +2980,10 @@
         },
         {
           "op": "compile_video_content_brief",
+          "kind": "transform"
+        },
+        {
+          "op": "lint_video_composition",
           "kind": "transform"
         },
         {

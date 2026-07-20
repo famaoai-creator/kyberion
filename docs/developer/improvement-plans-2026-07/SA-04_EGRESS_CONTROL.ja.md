@@ -2,6 +2,14 @@
 
 > 優先度: P1 / 規模: M / 依存: なし / 関連: SA-02(ADF ガードレールが egress ポリシーを参照)、tier 分離(WHY.md の中核主張)
 
+> **実装メモ(2026-07-20)**: Task 2(tier コンテキスト付き egress ゲート)を実装した。`evaluateEgressPolicy(url, {tier, tenant_slug, purpose})` と `secureFetch` の `kyberion_egress_context` を追加し、`egress-policy.json` に `tenant_allowed_domains`(テナント別許可先、`*` は全テナント適用)を新設。設計上の判断:
+>
+> - **warn モードでも tier ゲートは deny する**。warn は「未登録の _public_ ホストで業務を止めない」ための緩和であり、テナントデータの外部送信まで緩めては tier を持つ意味がなくなるため。
+> - **blocklist はテナント許可より優先**する(順序として blocked 判定を先に行う)。
+> - 一般 allowlist は confidential の許可根拠に**ならない**(到達可能性と、そのテナントの機密を送ってよいかは別問題)。
+> - 監査記録に `tier`/`tenant`/`purpose` を付与(受入条件4)、confidential/personal のブロック時は operator へ warn ログ(Task 2 の明示警告)。
+> - reasoning backend は各 SDK 自前の HTTP クライアントを使い `secureFetch` を通らないため、共通の `withReasoningPayloadScope` と全 adapter の送信直前ゲートで同じ tier ポリシーを適用した。設定可能な OpenAI-compatible endpoint は endpoint 自体を評価し、未登録 backend は安全側の未知ホストとして拒否する。background review、video direction、Claude Agent/CLI、Gemini CLI、Copilot ACP もこの境界を継承する。
+
 ## 背景と課題
 
 機密データが任意ホストへ送信されるのを防ぐ仕組みに穴がある。`secureFetch`(`libs/core/network.ts:107-150`)が全アクチュエータ共通の送信路。

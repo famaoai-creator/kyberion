@@ -139,7 +139,9 @@ export function compileVideoContentBriefToStoryboard(brief: VideoContentBrief): 
   );
   const durations = distributeDurations(
     durationSec,
-    beatPlan.map((entry) => entry.weight)
+    beatPlan.map((entry) => entry.weight),
+    // The narration cue is what the viewer actually has to keep up with.
+    beatPlan.map((entry) => estimateReadingTimeSec(entry.voCue(brief) || entry.message(brief)))
   );
   const tenantDesign = resolveVideoTenantDesign(brief);
   const tenantThemePack = tenantDesign?.themePack;
@@ -886,9 +888,56 @@ function resolveAssetRefs(brief: VideoContentBrief, entry: BeatPlanEntry): strin
   return Array.from(refs);
 }
 
-function distributeDurations(total: number, weights: number[]): number[] {
-  const totalWeight = weights.reduce((sum, value) => sum + value, 0) || 1;
-  const durations = weights.map((weight) => roundTo2((total * weight) / totalWeight));
+/**
+ * MP-02: how long a beat is on screen should follow how long it takes to read,
+ * not a fixed weight table.
+ *
+ * Weights alone gave a one-line CTA the same share as a dense feature beat, so
+ * some beats flashed past unread while others held on nothing. Reading time is
+ * estimated per script (CJK reads slower per character than latin per word),
+ * floored so no beat is subliminal and ceilinged so none drags; the weights
+ * survive as the tie-breaker when the estimate is uninformative.
+ */
+const READING_FLOOR_SEC = 2;
+const READING_CEILING_SEC = 5;
+/** Characters per second for CJK; words per second for latin. */
+const CJK_CHARS_PER_SEC = 5.5;
+const LATIN_WORDS_PER_SEC = 2.6;
+
+export function estimateReadingTimeSec(text: string): number {
+  const source = String(text || '').trim();
+  if (!source) return 0;
+  let cjkChars = 0;
+  let latinChars = 0;
+  for (const ch of source) {
+    const code = ch.codePointAt(0) ?? 0;
+    const isCjk =
+      (code >= 0x3041 && code <= 0x30ff) ||
+      (code >= 0x3400 && code <= 0x4dbf) ||
+      (code >= 0x4e00 && code <= 0x9fff) ||
+      (code >= 0xff00 && code <= 0xff60);
+    if (isCjk) cjkChars += 1;
+    else latinChars += 1;
+  }
+  const latinWords = latinChars > 0 ? Math.max(1, Math.round(latinChars / 5.5)) : 0;
+  return cjkChars / CJK_CHARS_PER_SEC + latinWords / LATIN_WORDS_PER_SEC;
+}
+
+/**
+ * Split the total runtime across beats in proportion to their reading budget.
+ *
+ * The budget is clamped per beat before the split, so a single overlong beat
+ * cannot starve the rest; the total is then honored exactly by settling any
+ * rounding remainder on the last beat.
+ */
+function distributeDurations(total: number, weights: number[], readingSec?: number[]): number[] {
+  const budgets = weights.map((weight, index) => {
+    const reading = readingSec?.[index] ?? 0;
+    if (reading <= 0) return weight;
+    return Math.min(READING_CEILING_SEC, Math.max(READING_FLOOR_SEC, reading));
+  });
+  const totalBudget = budgets.reduce((sum, value) => sum + value, 0) || 1;
+  const durations = budgets.map((budget) => roundTo2((total * budget) / totalBudget));
   const roundedTotal = roundTo2(durations.reduce((sum, value) => sum + value, 0));
   if (durations.length > 0) {
     durations[durations.length - 1] = roundTo2(

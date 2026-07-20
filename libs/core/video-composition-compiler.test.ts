@@ -66,6 +66,220 @@ describe('video composition compiler', () => {
     );
   });
 
+  // MP-02: motion arrives from the governed catalog, not from literals in the
+  // compiler, and no scene ships as a static slide with only an entrance.
+  it('injects catalog-driven motion into every scene', () => {
+    const bundleDir = pathResolver.sharedTmp('video-composition-bundle-tests/motion-direction');
+    const adf: VideoCompositionADF = {
+      kind: 'video-composition-adf',
+      version: '1.0.0',
+      intent: 'Motion direction',
+      title: 'Motion direction',
+      composition: { duration_sec: 8, fps: 30, width: 1920, height: 1080 },
+      scenes: [
+        {
+          scene_id: 'hook',
+          role: 'hook',
+          start_sec: 0,
+          duration_sec: 3,
+          template_ref: { template_id: 'basic-title-card' },
+          content: { headline: 'Hook', body: 'Body copy.' },
+        },
+        {
+          scene_id: 'proof',
+          role: 'proof',
+          start_sec: 3,
+          duration_sec: 5,
+          template_ref: { template_id: 'split-highlight' },
+          content: { headline: 'Proof', body: 'Evidence copy.' },
+        },
+      ],
+      output: { format: 'mp4', bundle_dir: bundleDir },
+    };
+
+    writeVideoCompositionBundle(adf);
+
+    for (const sceneId of ['hook', 'proof']) {
+      const html = safeReadFile(`${bundleDir}/compositions/${sceneId}.html`, { encoding: 'utf8' });
+      expect(html).toContain('data-kb-motion=');
+      expect(html).toContain('@keyframes kb-in-');
+      // Two mid-scene layers — an entrance alone is a slide that faded in.
+      const midsceneBlocks = [...html.matchAll(/@keyframes kb-mid-/g)];
+      expect(midsceneBlocks.length).toBeGreaterThanOrEqual(2);
+    }
+  });
+
+  it('honors a drafted motion direction and clamps it', () => {
+    const bundleDir = pathResolver.sharedTmp('video-composition-bundle-tests/motion-drafted');
+    const adf: VideoCompositionADF = {
+      kind: 'video-composition-adf',
+      version: '1.0.0',
+      intent: 'Drafted motion',
+      composition: {
+        duration_sec: 3,
+        fps: 30,
+        width: 1920,
+        height: 1080,
+        motion_direction: {
+          scenes: [
+            {
+              scene_id: 'hook',
+              entrance: {
+                pattern_id: 'wipe-reveal',
+                ease: 'snap',
+                duration_sec: 0.9,
+                offset_sec: 0.2,
+              },
+              midscene: [],
+            },
+          ],
+          transitions: [],
+        } as any,
+      },
+      scenes: [
+        {
+          scene_id: 'hook',
+          role: 'hook',
+          start_sec: 0,
+          duration_sec: 3,
+          template_ref: { template_id: 'basic-title-card' },
+          content: { headline: 'Hook', body: 'Body copy.' },
+        },
+      ],
+      output: { format: 'mp4', bundle_dir: bundleDir },
+    };
+
+    writeVideoCompositionBundle(adf);
+    const html = safeReadFile(`${bundleDir}/compositions/hook.html`, { encoding: 'utf8' });
+    expect(html).toContain('@keyframes kb-in-wipe-reveal');
+    // The draft supplied no mid-scene layers; the floor still applies.
+    expect([...html.matchAll(/@keyframes kb-mid-/g)].length).toBeGreaterThanOrEqual(2);
+  });
+
+  // MP-02: model-composed arrangements are opt-in and stay token-governed.
+  it('applies a scene composition when the ADF carries one', () => {
+    const bundleDir = pathResolver.sharedTmp('video-composition-bundle-tests/composition');
+    const adf: VideoCompositionADF = {
+      kind: 'video-composition-adf',
+      version: '1.0.0',
+      intent: 'Composed scene',
+      composition: {
+        duration_sec: 3,
+        fps: 30,
+        width: 1920,
+        height: 1080,
+        scene_compositions: [
+          {
+            scene_id: 'hook',
+            layout: 'split-left',
+            blocks: [
+              { type: 'headline', content_key: 'headline', emphasis: 'lead', column: 'primary' },
+              { type: 'body', content_key: 'body', emphasis: 'support', column: 'secondary' },
+            ],
+          },
+        ],
+      },
+      scenes: [
+        {
+          scene_id: 'hook',
+          role: 'hook',
+          start_sec: 0,
+          duration_sec: 3,
+          template_ref: { template_id: 'basic-title-card' },
+          content: { headline: 'Composed', body: 'Body copy.' },
+        },
+      ],
+      output: { format: 'mp4', bundle_dir: bundleDir },
+    };
+
+    writeVideoCompositionBundle(adf);
+    const html = safeReadFile(`${bundleDir}/compositions/hook.html`, {
+      encoding: 'utf8',
+    }) as string;
+
+    expect(html).toContain('data-kb-composition="split-left"');
+    expect(html).toContain('.kb-composed-hook');
+    // Styling still resolves through the design cascade.
+    expect(html).toContain('var(--kb-');
+  });
+
+  it('leaves scenes untouched when no composition is supplied', () => {
+    const bundleDir = pathResolver.sharedTmp('video-composition-bundle-tests/no-composition');
+    const adf: VideoCompositionADF = {
+      kind: 'video-composition-adf',
+      version: '1.0.0',
+      intent: 'Uncomposed scene',
+      composition: { duration_sec: 3, fps: 30, width: 1920, height: 1080 },
+      scenes: [
+        {
+          scene_id: 'hook',
+          role: 'hook',
+          start_sec: 0,
+          duration_sec: 3,
+          template_ref: { template_id: 'basic-title-card' },
+          content: { headline: 'Plain', body: 'Body copy.' },
+        },
+      ],
+      output: { format: 'mp4', bundle_dir: bundleDir },
+    };
+
+    writeVideoCompositionBundle(adf);
+    const html = safeReadFile(`${bundleDir}/compositions/hook.html`, {
+      encoding: 'utf8',
+    }) as string;
+    expect(html).not.toContain('data-kb-composition');
+  });
+
+  it('re-normalizes a stored composition against the content the scene has', () => {
+    // A stored arrangement must not outlive the fields it was written for.
+    const bundleDir = pathResolver.sharedTmp('video-composition-bundle-tests/stale-composition');
+    const adf: VideoCompositionADF = {
+      kind: 'video-composition-adf',
+      version: '1.0.0',
+      intent: 'Stale composition',
+      composition: {
+        duration_sec: 3,
+        fps: 30,
+        width: 1920,
+        height: 1080,
+        scene_compositions: [
+          {
+            scene_id: 'hook',
+            layout: 'split-left',
+            blocks: [
+              { type: 'headline', content_key: 'headline', emphasis: 'lead', column: 'primary' },
+              {
+                type: 'steps',
+                content_key: 'visual_steps',
+                emphasis: 'support',
+                column: 'secondary',
+              },
+            ],
+          },
+        ],
+      },
+      scenes: [
+        {
+          scene_id: 'hook',
+          role: 'hook',
+          start_sec: 0,
+          duration_sec: 3,
+          template_ref: { template_id: 'basic-title-card' },
+          // visual_steps is gone; the block referencing it must be dropped.
+          content: { headline: 'Composed' },
+        },
+      ],
+      output: { format: 'mp4', bundle_dir: bundleDir },
+    };
+
+    writeVideoCompositionBundle(adf);
+    const html = safeReadFile(`${bundleDir}/compositions/hook.html`, {
+      encoding: 'utf8',
+    }) as string;
+    // With the secondary column empty the split collapses to a stack.
+    expect(html).toContain('data-kb-composition="stack"');
+  });
+
   it('threads tenant design_system_vars into rendered scene css (DS-04 / E2E-02)', () => {
     const bundleDir = pathResolver.sharedTmp('video-composition-bundle-tests/tenant-branding');
     const adf: VideoCompositionADF = {
@@ -93,6 +307,8 @@ describe('video composition compiler', () => {
               '--kb-accent': '#ff00aa',
               '--kb-accent-blue': '#ff00aa',
               '--kb-bg-main': '#101010',
+              '--kb-size-headline': '104px',
+              '--evil': 'red; --kb-text-primary: white',
             },
           },
         },
@@ -109,6 +325,8 @@ describe('video composition compiler', () => {
     expect(html).toContain('--kb-accent: #ff00aa');
     expect(html).toContain('--kb-bg-main: #101010');
     expect(html).toContain('var(--kb-accent-blue');
+    expect(html).toContain('--headline-size: var(--kb-size-headline, 104px);');
+    expect(html).not.toContain('--evil');
   });
 
   it('slugifies the composition id from the intent when present', () => {

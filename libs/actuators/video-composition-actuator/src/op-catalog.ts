@@ -14,6 +14,7 @@ export const VIDEO_COMPOSITION_ACTUATOR_CAPTURE_OPS = [
 export const VIDEO_COMPOSITION_ACTUATOR_TRANSFORM_OPS = [
   'compile_narrated_video_brief',
   'compile_video_content_brief',
+  'lint_video_composition',
 ] as const;
 
 export const VIDEO_COMPOSITION_ACTUATOR_APPLY_OPS = [

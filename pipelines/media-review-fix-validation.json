@@ -1,0 +1,59 @@
+{
+  "pipeline_id": "media-review-fix-validation",
+  "version": "1.0.0",
+  "description": "Deterministic media review gates: compile a canonical brief, inspect PPTX layout diagnostics, and fail on unapproved overflow.",
+  "action": "pipeline",
+  "_refs": {
+    "mission": "MSN-MEDIA-REVIEW-FIX-20260720",
+    "plan": "docs/developer/improvement-plans-2026-07/MEDIA_CREATION_PROCESS_PLAN_2026-07-20.ja.md"
+  },
+  "steps": [
+    {
+      "id": "compile-media-brief",
+      "role": "transform",
+      "op": "media:brief_to_design_protocol",
+      "produces": {
+        "channel": "last_pptx_design",
+        "type": "PptxDesignProtocol"
+      },
+      "params": {
+        "export_as": "last_pptx_design",
+        "brief": {
+          "kind": "proposal-brief",
+          "document_profile": "executive-proposal",
+          "render_target": "pptx",
+          "locale": "ja-JP",
+          "title": "Media layout validation",
+          "objective": "Validate deterministic layout fitting and diagnostics.",
+          "story": {
+            "core_message": "Compile media content through the governed design protocol.",
+            "closing_cta": "Approve the validated layout."
+          },
+          "sections": [
+            {
+              "title": "Layout gate",
+              "objective": "Text is measured against its zone and reported before render.",
+              "body": [
+                "The render path must expose shrink and overflow diagnostics so operators can recover before delivery."
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "preflight-pptx-layout",
+      "role": "transform",
+      "op": "media:pptx_layout_preflight",
+      "consumes": ["last_pptx_design"],
+      "produces": {
+        "channel": "media_layout_diagnostics",
+        "type": "MediaLayoutDiagnostics"
+      },
+      "params": {
+        "from": "last_pptx_design",
+        "export_as": "media_layout_diagnostics"
+      }
+    }
+  ]
+}

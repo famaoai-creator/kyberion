@@ -32,6 +32,7 @@ describe('actuator-op-registry', () => {
     expect(determineActuatorStepType('media', 'document_diagram_render_from_brief')).toBe(
       'transform'
     );
+    expect(determineActuatorStepType('media', 'pptx_layout_preflight')).toBe('transform');
     expect(determineActuatorStepType('media', 'pptx_render')).toBe('apply');
   });
 
@@ -59,6 +60,7 @@ describe('actuator-op-registry', () => {
   it('exposes registered ops for a domain', () => {
     const mediaOps = listRegisteredDomainOps('media');
     expect(mediaOps.transform).toContain('apply_pattern');
+    expect(mediaOps.transform).toContain('pptx_layout_preflight');
     expect(mediaOps.apply).toContain('pptx_render');
   });
 

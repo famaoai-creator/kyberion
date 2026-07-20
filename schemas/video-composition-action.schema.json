@@ -15,6 +15,7 @@
             "prepare_video_composition",
             "compile_narrated_video_brief",
             "compile_video_content_brief",
+            "lint_video_composition",
             "create_narrated_video_from_content_brief",
             "create_narrated_intro_movie",
             "list_video_composition_templates",

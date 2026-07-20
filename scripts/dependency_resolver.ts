@@ -146,6 +146,43 @@ const FFMPEG: Dependency = {
   fallbackMode: 'audio/video conversion degraded; media-generation limited',
 };
 
+/**
+ * MP-04: rasterizers for visual review. Optional by design — without them the
+ * review reports itself as skipped rather than failing a render, so the level
+ * is 'nice' and the fallback mode says plainly what is lost.
+ */
+const LIBREOFFICE: Dependency = {
+  id: 'libreoffice',
+  name: 'LibreOffice (soffice)',
+  level: 'nice',
+  check: async () => {
+    const soffice = checkBinary('soffice');
+    if (soffice.ok) return { ok: true, version: soffice.version };
+    const libreoffice = checkBinary('libreoffice');
+    return {
+      ok: libreoffice.ok,
+      version: libreoffice.version,
+      detail: libreoffice.ok ? undefined : 'soffice/libreoffice not in PATH',
+    };
+  },
+  installCommand: 'brew install --cask libreoffice  # macOS; or apt install libreoffice',
+  installSizeHint: '~700 MB',
+  fallbackMode: 'PPTX/DOCX visual review skipped (documents cannot be rasterized for inspection)',
+};
+
+const POPPLER: Dependency = {
+  id: 'poppler',
+  name: 'Poppler (pdftoppm)',
+  level: 'nice',
+  check: async () => {
+    const r = checkBinary('pdftoppm');
+    return { ok: r.ok, version: r.version, detail: r.ok ? undefined : 'pdftoppm not in PATH' };
+  },
+  installCommand: 'brew install poppler  # macOS; or apt install poppler-utils',
+  installSizeHint: '~30 MB',
+  fallbackMode: 'PDF page rasterization unavailable; visual review skipped',
+};
+
 const COMFYUI: Dependency = {
   id: 'comfyui-server',
   name: 'ComfyUI server (port 8188)',
@@ -238,6 +275,8 @@ const DEPENDENCY_BY_ID: Record<string, Dependency> = {
   'native-tts': NATIVE_TTS,
   whisper: WHISPER,
   ffmpeg: FFMPEG,
+  libreoffice: LIBREOFFICE,
+  poppler: POPPLER,
   'comfyui-server': COMFYUI,
 };
 

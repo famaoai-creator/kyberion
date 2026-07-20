@@ -73,6 +73,57 @@ export interface MediaDocumentPipelineDeps {
   ) => string;
 }
 
+export function assertMediaProtocolLayoutReady(
+  protocol: any,
+  options: { allowLayoutOverflow?: boolean } = {}
+): void {
+  const diagnostics = protocol?.metadata?.layoutDiagnostics;
+  if (!diagnostics || diagnostics.status !== 'overflow' || options.allowLayoutOverflow === true) {
+    return;
+  }
+  const slides = Array.isArray(diagnostics.overflowSlides)
+    ? diagnostics.overflowSlides
+        .map(
+          (slide: any) => `slide ${slide.slideIndex}${slide.slideId ? ` (${slide.slideId})` : ''}`
+        )
+        .join(', ')
+    : 'unknown slide';
+  throw new Error(
+    `[MEDIA_LAYOUT] PPTX layout overflow detected in ${slides}. ` +
+      'Shorten the brief or split the content, or explicitly set allow_layout_overflow=true for review-only output.'
+  );
+}
+
+export function summarizeMediaPptxLayout(protocol: any): {
+  status: 'pass' | 'shrunk' | 'overflow';
+  measurementModel: 'deterministic-width-table';
+  slideCount: number;
+  shrinkCount: number;
+  overflowCount: number;
+  overflowSlides: Array<{ slideIndex: number; slideId?: string; overflows: any[] }>;
+} {
+  const slides = Array.isArray(protocol?.slides) ? protocol.slides : [];
+  const overflowSlides = slides.flatMap((slide: any, index: number) => {
+    const overflows = slide?.metadata?.layoutFit?.overflows;
+    return Array.isArray(overflows) && overflows.length > 0
+      ? [{ slideIndex: index + 1, slideId: slide.id, overflows }]
+      : [];
+  });
+  const shrinkCount = slides.reduce(
+    (sum: number, slide: any) => sum + Number(slide?.metadata?.layoutFit?.shrinkCount || 0),
+    0
+  );
+  const overflowCount = overflowSlides.reduce((sum, slide) => sum + slide.overflows.length, 0);
+  return {
+    status: overflowCount > 0 ? 'overflow' : shrinkCount > 0 ? 'shrunk' : 'pass',
+    measurementModel: 'deterministic-width-table',
+    slideCount: slides.length,
+    shrinkCount,
+    overflowCount,
+    overflowSlides,
+  };
+}
+
 export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDeps) {
   function resolveDocumentCompositionPreset(
     rootDir: string,
@@ -111,7 +162,8 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
           visual: 'outline navigation',
           media_kind: 'contents',
           layout_key: 'doc-contents',
-          semantic_type: 'summary',
+          // An index, not a summary — see buildDocumentContentsSection.
+          semantic_type: 'contents',
           design_system_id: outline.design_system_id,
           branding: outline.branding || {},
           id: 'contents',
@@ -123,7 +175,7 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
         contentData.splice(insertAt, 0, contentsSlide);
       }
     }
-    const protocol = {
+    const protocol: any = {
       version: '3.0.0',
       generatedAt: new Date().toISOString(),
       metadata: {
@@ -150,6 +202,7 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
       designDefaults: designDefaultsFromMediaTheme({
         colors: themeColors,
         fonts: theme?.fonts || theme?.theme?.fonts || {},
+        typography: theme?.typography || theme?.theme?.typography || {},
       }),
       slides: contentData.map((data: any, idx: number) =>
         deps.buildPptxSlideFromPattern(
@@ -163,6 +216,7 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
         )
       ),
     };
+    protocol.metadata.layoutDiagnostics = summarizeMediaPptxLayout(protocol);
     return { protocol, theme, themeName: outline.recommended_theme };
   }
 
@@ -238,6 +292,9 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
     outPath: string,
     options?: any
   ): Promise<void> {
+    assertMediaProtocolLayoutReady(compiled.protocol, {
+      allowLayoutOverflow: options?.allow_layout_overflow === true,
+    });
     safeMkdir(path.dirname(outPath), { recursive: true });
     const renderers: Record<ProtocolKind, () => Promise<void>> = {
       pptx: async () =>

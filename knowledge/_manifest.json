@@ -981,13 +981,13 @@
     {
       "path": "product/governance/actuator-dependency-bundles.json",
       "tier": "public",
-      "size": 1209,
+      "size": 1579,
       "type": "json"
     },
     {
       "path": "product/governance/actuator-op-registry.json",
       "tier": "public",
-      "size": 15735,
+      "size": 15954,
       "type": "json"
     },
     {
@@ -1221,7 +1221,7 @@
     {
       "path": "product/governance/egress-policy.json",
       "tier": "public",
-      "size": 96,
+      "size": 490,
       "type": "json"
     },
     {
@@ -1275,7 +1275,7 @@
     {
       "path": "product/governance/error-classifier-rules.json",
       "tier": "public",
-      "size": 17113,
+      "size": 17826,
       "type": "json"
     },
     {
@@ -2091,7 +2091,7 @@
     {
       "path": "product/governance/shell-command-policy.json",
       "tier": "public",
-      "size": 2644,
+      "size": 3162,
       "type": "json"
     },
     {
@@ -2937,7 +2937,7 @@
     {
       "path": "product/orchestration/actuator-op-discovery.json",
       "tier": "public",
-      "size": 75861,
+      "size": 76410,
       "type": "json"
     },
     {
@@ -7827,7 +7827,7 @@
     {
       "path": "public/design-patterns/brand-tokens/kyberion.json",
       "tier": "public",
-      "size": 1200,
+      "size": 2684,
       "type": "json"
     },
     {
@@ -8053,6 +8053,12 @@
       "type": "json"
     },
     {
+      "path": "public/design-patterns/media-templates/document-composition-presets/kyberion-overview-20pages.json",
+      "tier": "public",
+      "size": 4352,
+      "type": "json"
+    },
+    {
       "path": "public/design-patterns/media-templates/document-composition-presets/operations-and-diagrams.json",
       "tier": "public",
       "size": 1124,
@@ -8074,6 +8080,12 @@
       "path": "public/design-patterns/media-templates/document-layouts.json",
       "tier": "public",
       "size": 13460,
+      "type": "json"
+    },
+    {
+      "path": "public/design-patterns/media-templates/examples/sample-deck-brief.json",
+      "tier": "public",
+      "size": 2000,
       "type": "json"
     },
     {
@@ -8115,7 +8127,7 @@
     {
       "path": "public/design-patterns/media-templates/media-design-systems/systems.json",
       "tier": "public",
-      "size": 4224,
+      "size": 5188,
       "type": "json"
     },
     {
@@ -8157,7 +8169,7 @@
     {
       "path": "public/design-patterns/media-templates/slide-layout-presets/body-zone-layouts.json",
       "tier": "public",
-      "size": 4392,
+      "size": 14285,
       "type": "json"
     },
     {
@@ -8209,9 +8221,21 @@
       "type": "json"
     },
     {
+      "path": "public/design-patterns/media-templates/video-motion-patterns.json",
+      "tier": "public",
+      "size": 7529,
+      "type": "json"
+    },
+    {
       "path": "public/design-patterns/media-templates/video-visual-patterns.json",
       "tier": "public",
       "size": 6281,
+      "type": "json"
+    },
+    {
+      "path": "public/design-patterns/media-templates/visual-review-rubric.json",
+      "tier": "public",
+      "size": 2877,
       "type": "json"
     },
     {
