@@ -285,6 +285,29 @@ describe('wisdom public contract boundaries', () => {
     }
   });
 
+  it('routes task-plan decomposition and projection to orchestrator', () => {
+    const wisdomSource = safeReadFile(
+      pathResolver.rootResolve('libs/actuators/wisdom-actuator/src/decision-ops.ts'),
+      { encoding: 'utf8' }
+    ) as string;
+    const orchestratorSource = safeReadFile(
+      pathResolver.rootResolve('libs/actuators/orchestrator-actuator/src/orchestrator-helpers.ts'),
+      { encoding: 'utf8' }
+    ) as string;
+    expect(wisdomSource).not.toContain("case 'decompose_into_tasks'");
+    expect(wisdomSource).not.toContain("case 'task_plan_to_next_tasks'");
+    expect(orchestratorSource).toContain("from './task-plan-ops.js'");
+    for (const op of [
+      'decompose_into_tasks',
+      'evaluate_task_plan_ready',
+      'task_plan_to_next_tasks',
+    ]) {
+      expect(describeOps().find((entry) => entry.op === op)).toMatchObject({
+        forward_to: { actuator: 'orchestrator' },
+      });
+    }
+  });
+
   it('forwards a boundary operation through the typed port in canonical mode', async () => {
     const forward = vi.fn().mockResolvedValue({
       forwarded_to: 'terminal:shell_command',
