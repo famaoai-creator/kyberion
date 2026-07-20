@@ -840,12 +840,18 @@ export {
   saveTestPlan,
 } from './sdlc-artifact-store.js';
 export { executeTaskPlan } from './task-executor.js';
+export {
+  getTaskPlanCoordinator,
+  registerTaskPlanCoordinator,
+  resetTaskPlanCoordinator,
+} from './task-plan-coordinator-port.js';
 export type {
   ExecuteTaskPlanParams,
   ExecuteTaskPlanResult,
   TaskExecutionRecord,
   TaskExecutionStatus,
-} from './task-executor.js';
+  TaskPlanCoordinatorPort,
+} from './task-plan-coordinator-port.js';
 export {
   getAgentExecutionPort,
   registerAgentExecutionPort,
