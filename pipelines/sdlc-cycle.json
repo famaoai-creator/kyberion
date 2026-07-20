@@ -29,8 +29,8 @@
     },
     {
       "id": "extract_requirements",
-      "role": "transform",
-      "op": "wisdom:extract_requirements",
+      "role": "sink",
+      "op": "modeling:extract_requirements",
       "produces": {
         "channel": "requirements_result",
         "type": "RequirementsDraftRef"
@@ -45,8 +45,8 @@
     },
     {
       "id": "extract_design_spec",
-      "role": "transform",
-      "op": "wisdom:extract_design_spec",
+      "role": "sink",
+      "op": "modeling:extract_design_spec",
       "consumes": "requirements_result",
       "produces": {
         "channel": "design_result",
@@ -59,8 +59,8 @@
     },
     {
       "id": "decompose_into_tasks",
-      "role": "transform",
-      "op": "wisdom:decompose_into_tasks",
+      "role": "sink",
+      "op": "orchestrator:decompose_into_tasks",
       "consumes": "design_result",
       "produces": {
         "channel": "task_plan_result",
@@ -73,8 +73,8 @@
     },
     {
       "id": "task_plan_to_next_tasks",
-      "role": "transform",
-      "op": "wisdom:task_plan_to_next_tasks",
+      "role": "sink",
+      "op": "orchestrator:task_plan_to_next_tasks",
       "consumes": "task_plan_result",
       "produces": {
         "channel": "next_tasks_result",
@@ -86,8 +86,8 @@
     },
     {
       "id": "extract_test_plan",
-      "role": "transform",
-      "op": "wisdom:extract_test_plan",
+      "role": "sink",
+      "op": "modeling:extract_test_plan",
       "consumes": "next_tasks_result",
       "produces": {
         "channel": "test_plan_result",

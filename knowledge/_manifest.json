@@ -237,7 +237,7 @@
     {
       "path": "product/architecture/component-lifecycle-inventory.md",
       "tier": "public",
-      "size": 6311,
+      "size": 6470,
       "type": "md"
     },
     {
@@ -987,7 +987,7 @@
     {
       "path": "product/governance/actuator-op-registry.json",
       "tier": "public",
-      "size": 15454,
+      "size": 15658,
       "type": "json"
     },
     {
@@ -2937,7 +2937,7 @@
     {
       "path": "product/orchestration/actuator-op-discovery.json",
       "tier": "public",
-      "size": 75098,
+      "size": 75674,
       "type": "json"
     },
     {
@@ -3273,13 +3273,13 @@
     {
       "path": "product/orchestration/global_actuator_index.json",
       "tier": "public",
-      "size": 16919,
+      "size": 17510,
       "type": "json"
     },
     {
       "path": "product/orchestration/global_skill_index.json",
       "tier": "public",
-      "size": 7986,
+      "size": 8251,
       "type": "json"
     },
     {
@@ -4575,13 +4575,13 @@
     {
       "path": "product/pipeline-templates/action-item-execute-self.json",
       "tier": "public",
-      "size": 1197,
+      "size": 1198,
       "type": "json"
     },
     {
       "path": "product/pipeline-templates/action-item-tracking.json",
       "tier": "public",
-      "size": 1412,
+      "size": 1413,
       "type": "json"
     },
     {
@@ -4605,7 +4605,7 @@
     {
       "path": "product/pipeline-templates/audio-to-requirements.json",
       "tier": "public",
-      "size": 2268,
+      "size": 2258,
       "type": "json"
     },
     {
@@ -4713,13 +4713,13 @@
     {
       "path": "product/pipeline-templates/culture-governance-guardrail.json",
       "tier": "public",
-      "size": 1961,
+      "size": 1929,
       "type": "json"
     },
     {
       "path": "product/pipeline-templates/customer-discovery-workflow.json",
       "tier": "public",
-      "size": 6528,
+      "size": 6525,
       "type": "json"
     },
     {
@@ -4737,7 +4737,7 @@
     {
       "path": "product/pipeline-templates/deploy-release.json",
       "tier": "public",
-      "size": 1390,
+      "size": 1392,
       "type": "json"
     },
     {
@@ -4785,13 +4785,13 @@
     {
       "path": "product/pipeline-templates/executive-narrative-bridge.json",
       "tier": "public",
-      "size": 2123,
+      "size": 2121,
       "type": "json"
     },
     {
       "path": "product/pipeline-templates/external-intelligence-radar.json",
       "tier": "public",
-      "size": 2901,
+      "size": 2851,
       "type": "json"
     },
     {
@@ -4803,7 +4803,7 @@
     {
       "path": "product/pipeline-templates/faas-add-api.json",
       "tier": "public",
-      "size": 3965,
+      "size": 3969,
       "type": "json"
     },
     {
@@ -4839,7 +4839,7 @@
     {
       "path": "product/pipeline-templates/hiring-workflow.json",
       "tier": "public",
-      "size": 7426,
+      "size": 7414,
       "type": "json"
     },
     {
@@ -4851,7 +4851,7 @@
     {
       "path": "product/pipeline-templates/implementation-plan.json",
       "tier": "public",
-      "size": 1456,
+      "size": 1460,
       "type": "json"
     },
     {
@@ -4989,7 +4989,7 @@
     {
       "path": "product/pipeline-templates/mission-portfolio-auditor.json",
       "tier": "public",
-      "size": 2513,
+      "size": 2431,
       "type": "json"
     },
     {
@@ -5091,7 +5091,7 @@
     {
       "path": "product/pipeline-templates/procurement-vendor.json",
       "tier": "public",
-      "size": 5137,
+      "size": 5125,
       "type": "json"
     },
     {
@@ -5103,7 +5103,7 @@
     {
       "path": "product/pipeline-templates/project-kickstart.json",
       "tier": "public",
-      "size": 3691,
+      "size": 3703,
       "type": "json"
     },
     {
@@ -5127,7 +5127,7 @@
     {
       "path": "product/pipeline-templates/requirements-elicitation.json",
       "tier": "public",
-      "size": 2256,
+      "size": 2253,
       "type": "json"
     },
     {
@@ -5187,13 +5187,13 @@
     {
       "path": "product/pipeline-templates/stakeholder-consensus-orchestrator.json",
       "tier": "public",
-      "size": 3431,
+      "size": 3368,
       "type": "json"
     },
     {
       "path": "product/pipeline-templates/strategic-impact-simulator.json",
       "tier": "public",
-      "size": 3281,
+      "size": 3279,
       "type": "json"
     },
     {

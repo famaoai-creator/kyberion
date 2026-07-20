@@ -26,9 +26,6 @@ import {
   resolveGoldenRulePriorityOrder,
   resolveVision,
   type GoldenRulePriority,
-  enforceApprovalGate,
-  evaluateDecisionRights,
-  resolveDecisionRightsMatrix,
   curateBackgroundReviewProposals,
 } from '@agent/core';
 import * as path from 'node:path';
@@ -410,102 +407,6 @@ export function resolveHypothesisConflict(input: {
   };
   writeJSON(input.output_path, result);
   return { ...result, written_to: input.output_path };
-}
-
-/**
- * CO-05: pipeline-callable decision-rights enforcement. Business-process
- * templates (procurement-vendor, hiring-workflow, ...) were writing a
- * narrative "approval_boundary" string into their decision note without
- * ever calling CO-04's actual enforcement (`evaluateDecisionRights` /
- * `enforceApprovalGate`) — spend/headcount thresholds were documented, not
- * enforced. This op is the missing pipeline-facing entry point: it evaluates
- * the tenant's decision-rights matrix and, when escalation is required,
- * creates (or looks up) a real pending/approved request via the same
- * approval-gate used elsewhere in the codebase — it does not duplicate that
- * logic. `allowed: false` means the pipeline must not proceed past this
- * point without a human decision; templates branch on it with `core:if`
- * rather than this op throwing, matching every other `enforceApprovalGate`
- * call site (procedure-dispatcher, kill-switch, browser-extension-bridge),
- * none of which throw on a pending approval either.
- */
-export interface EvaluateDecisionRightsApprovalOpInput {
-  operation_id: string;
-  correlation_id: string;
-  decision_type: string;
-  agent_id?: string;
-  caller_role?: string;
-  channel?: string;
-  amount?: number;
-  tenant_slug?: string;
-  mission_id?: string;
-  title?: string;
-  summary?: string;
-}
-
-export function evaluateDecisionRightsApprovalOp(input: EvaluateDecisionRightsApprovalOpInput): {
-  allowed: boolean;
-  status: 'approved' | 'pending' | 'not_required';
-  request_id?: string;
-  message?: string;
-} {
-  if (!input.operation_id || !input.correlation_id || !input.decision_type) {
-    throw new Error(
-      '[evaluate_decision_rights_approval] requires operation_id, correlation_id, and decision_type'
-    );
-  }
-
-  // Decide up front whether the matrix actually requires escalation for this
-  // decision_type/amount/role, using CO-04's own evaluator (not duplicated
-  // here). enforceApprovalGate's decision-rights integration is only a fast
-  // "allow immediately" path when rights DON'T require escalation — it does
-  // not independently block when they do, that depends on a matching
-  // approval-policy.json rule (see knowledge/product/governance/
-  // approval-policy.json "decision-rights-escalation", which matches on
-  // payload.decision_type). Gating the enforceApprovalGate call here on the
-  // same evaluation keeps that policy rule's "always requires approval for
-  // these 3 decision_types" reasonable even if a future decision_type in the
-  // matrix has a real per-amount threshold instead of
-  // requires_human_acceptance: true.
-  const matrix = resolveDecisionRightsMatrix(input.tenant_slug ?? null);
-  const evaluation = evaluateDecisionRights(matrix, {
-    decisionType: input.decision_type,
-    actorRole: input.caller_role,
-    amount: input.amount,
-  });
-  if (!evaluation || !evaluation.requiresEscalation) {
-    return { allowed: true, status: 'not_required' };
-  }
-
-  const result = enforceApprovalGate({
-    operationId: input.operation_id,
-    agentId: input.agent_id || 'mission_controller',
-    callerRole: input.caller_role,
-    correlationId: input.correlation_id,
-    channel: input.channel || 'mission',
-    payload: {
-      decision_type: input.decision_type,
-      ...(typeof input.amount === 'number' && Number.isFinite(input.amount)
-        ? { amount: input.amount }
-        : {}),
-      ...(input.tenant_slug ? { tenant_slug: input.tenant_slug } : {}),
-      ...(input.mission_id ? { mission_id: input.mission_id } : {}),
-    },
-    ...(input.title || input.summary
-      ? {
-          draft: {
-            title: input.title || `Approval required: ${input.operation_id}`,
-            summary: input.summary || `${input.decision_type} requires human review.`,
-            severity: 'medium' as const,
-          },
-        }
-      : {}),
-  });
-  return {
-    allowed: result.allowed,
-    status: result.status,
-    ...(result.requestId ? { request_id: result.requestId } : {}),
-    ...(result.message ? { message: result.message } : {}),
-  };
 }
 
 /**
@@ -1629,24 +1530,6 @@ export async function dispatchDecisionOp(
       return { handled: true, ctx: assign(result) };
     }
 
-    case 'evaluate_decision_rights_approval': {
-      const amount = params.amount !== undefined ? Number(resolved('amount')) : undefined;
-      const result = evaluateDecisionRightsApprovalOp({
-        operation_id: resolved('operation_id'),
-        correlation_id: resolved('correlation_id'),
-        decision_type: resolved('decision_type'),
-        agent_id: params.agent_id ? resolved('agent_id') : undefined,
-        caller_role: params.caller_role ? resolved('caller_role') : undefined,
-        channel: params.channel ? resolved('channel') : undefined,
-        ...(amount !== undefined && Number.isFinite(amount) ? { amount } : {}),
-        tenant_slug: params.tenant_slug ? resolved('tenant_slug') : undefined,
-        mission_id: params.mission_id ? resolved('mission_id') : undefined,
-        title: params.title ? resolved('title') : undefined,
-        summary: params.summary ? resolved('summary') : undefined,
-      });
-      return { handled: true, ctx: assign(result) };
-    }
-
     case 'adjust_proposal': {
       const result = adjustProposalAppend({
         proposal_path: resolved('proposal') || resolved('proposal_path'),
@@ -1794,49 +1677,6 @@ export async function dispatchDecisionOp(
       return { handled: true, ctx: assign(result) };
     }
 
-    case 'deploy_release': {
-      const { getDeploymentAdapter, requireApprovalForOp, RISKY_OPS } = await import('@agent/core');
-      // Gate the deploy behind the config-policy-update approval rule.
-      const missionId = resolved('mission_id');
-      const environment = resolved('environment');
-      const approval = requireApprovalForOp({
-        opId: RISKY_OPS.CONFIG_UPDATE,
-        agentId: 'mission_controller',
-        correlationId: `${missionId}:deploy:${environment}`,
-        channel: 'system',
-        payload: {
-          scope: 'governance',
-          environment,
-          version: resolved('version'),
-          projectName: resolved('project_name'),
-        },
-        draft: {
-          title: `Deploy ${resolved('project_name')}@${resolved('version')} → ${environment}`,
-          summary: `Mission ${missionId} requests release deployment.`,
-          severity: environment === 'prod' ? 'high' : 'medium',
-        },
-      });
-      if (!approval.allowed) {
-        return {
-          handled: true,
-          ctx: assign({
-            status: 'blocked_by_approval',
-            approval_status: approval.status,
-            approval_request_id: approval.requestId,
-            message: approval.message,
-          }),
-        };
-      }
-      const adapter = getDeploymentAdapter();
-      const result = await adapter.deploy({
-        environment,
-        projectName: resolved('project_name'),
-        version: resolved('version'),
-        releaseNotesPath: resolved('release_notes_path'),
-      });
-      return { handled: true, ctx: assign(result) };
-    }
-
     // ── Adaptive Prompting: wisdom:reasoning ─────────────────────────────
     // Routes through the active reasoning backend. Fixes the previous no-op
     // where wisdom:reasoning fell through to default with handled=false.
@@ -1980,41 +1820,6 @@ export async function dispatchDecisionOp(
       }
 
       return { handled: true, ctx: assign(gateResult) };
-    }
-
-    // ── Active Learning escalation: wisdom:escalate_for_review ───────────
-    // Writes a pending human-review record to active/shared/tmp/pending-reviews/.
-    // Downstream: a Slack/email notifier can poll this directory.
-    case 'escalate_for_review': {
-      const topic = resolveVars(String(params.topic ?? 'Untitled review'), ctx);
-      const reason = resolveVars(String(params.reason ?? ''), ctx);
-      const evidenceKey = String(params.evidence_from ?? 'evidence');
-      const evidence = params.evidence
-        ? resolveVars(String(params.evidence), ctx)
-        : (ctx[evidenceKey] ?? '');
-      const missionId = resolveVars(String(params.mission_id ?? ctx.mission_id ?? ''), ctx);
-      const reviewId = `review-${Date.now()}`;
-
-      const reviewRecord = {
-        review_id: reviewId,
-        topic,
-        reason,
-        evidence: typeof evidence === 'string' ? evidence : JSON.stringify(evidence),
-        mission_id: missionId || null,
-        status: 'pending',
-        escalated_at: nowIso(),
-      };
-
-      const reviewDir = pathResolver.rootResolve('active/shared/tmp/pending-reviews');
-      safeMkdir(reviewDir, { recursive: true });
-      const reviewPath = `active/shared/tmp/pending-reviews/${reviewId}.json`;
-      writeJSON(reviewPath, reviewRecord);
-      logger.warn(`[escalate_for_review] Human review pending: "${topic}" → ${reviewPath}`);
-
-      return {
-        handled: true,
-        ctx: assign({ review_id: reviewId, review_path: reviewPath, review_status: 'pending' }),
-      };
     }
 
     default:
