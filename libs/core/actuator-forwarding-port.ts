@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import type { ContextSecurityScope } from './context-security-scope.js';
 
 export type ActuatorForwardStatus = 'succeeded' | 'failed' | 'blocked';
@@ -34,6 +35,14 @@ class MissingActuatorForwardingPort implements ActuatorForwardingPort {
 }
 
 let registeredActuatorForwardingPort: ActuatorForwardingPort | undefined;
+const forwardingPortStorage = new AsyncLocalStorage<ActuatorForwardingPort>();
+
+export function withActuatorForwardingPort<T>(
+  port: ActuatorForwardingPort,
+  task: () => Promise<T> | T
+): Promise<T> | T {
+  return forwardingPortStorage.run(port, task);
+}
 
 export function registerActuatorForwardingPort(port: ActuatorForwardingPort): void {
   registeredActuatorForwardingPort = port;
@@ -44,5 +53,8 @@ export function resetActuatorForwardingPort(): void {
 }
 
 export function getActuatorForwardingPort(): ActuatorForwardingPort {
-  return (registeredActuatorForwardingPort ||= new MissingActuatorForwardingPort());
+  return (
+    forwardingPortStorage.getStore() ||
+    (registeredActuatorForwardingPort ||= new MissingActuatorForwardingPort())
+  );
 }
