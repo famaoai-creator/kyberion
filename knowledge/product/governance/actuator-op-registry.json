@@ -326,7 +326,19 @@
         "ui_flow_to_test_inventory",
         "web_profile_to_ui_flow_adf"
       ],
-      "apply": ["log", "write_artifact", "write_file"]
+      "apply": [
+        "derive_test_inventory",
+        "evaluate_architecture_ready",
+        "evaluate_customer_signoff",
+        "evaluate_qa_ready",
+        "evaluate_requirements_completeness",
+        "extract_design_spec",
+        "extract_requirements",
+        "extract_test_plan",
+        "log",
+        "write_artifact",
+        "write_file"
+      ]
     },
     "network": {
       "capture": ["a2a_poll", "fetch", "shell"],

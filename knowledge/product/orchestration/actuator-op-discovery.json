@@ -1741,6 +1741,38 @@
           "kind": "transform"
         },
         {
+          "op": "derive_test_inventory",
+          "kind": "apply"
+        },
+        {
+          "op": "evaluate_architecture_ready",
+          "kind": "apply"
+        },
+        {
+          "op": "evaluate_customer_signoff",
+          "kind": "apply"
+        },
+        {
+          "op": "evaluate_qa_ready",
+          "kind": "apply"
+        },
+        {
+          "op": "evaluate_requirements_completeness",
+          "kind": "apply"
+        },
+        {
+          "op": "extract_design_spec",
+          "kind": "apply"
+        },
+        {
+          "op": "extract_requirements",
+          "kind": "apply"
+        },
+        {
+          "op": "extract_test_plan",
+          "kind": "apply"
+        },
+        {
           "op": "log",
           "kind": "apply"
         },
