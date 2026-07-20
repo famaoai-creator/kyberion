@@ -39,6 +39,15 @@ describe('wisdom public contract boundaries', () => {
     );
   });
 
+  it('rejects direct actions with missing operation-specific required params', async () => {
+    await expect(handleAction({ action: 'knowledge_search', params: {} })).rejects.toThrow(
+      '[INVALID_PARAMS] knowledge_search requires params.query'
+    );
+    await expect(
+      handleAction({ action: 'knowledge_inject', params: { mission_id: 'mission-1' } })
+    ).rejects.toThrow('[INVALID_PARAMS] knowledge_inject requires params.knowledge_path');
+  });
+
   it('fails closed when non-public knowledge is requested without a tenant scope', async () => {
     const result = await handleAction({
       action: 'knowledge_search',
