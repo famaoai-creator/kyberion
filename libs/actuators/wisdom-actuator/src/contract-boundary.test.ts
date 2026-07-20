@@ -81,6 +81,42 @@ describe('wisdom public contract boundaries', () => {
     expect(manifestOps).toEqual(catalogOps);
   });
 
+  it('keeps schema pipeline step op sets aligned with the typed catalog', () => {
+    const schema = readJson<{
+      $defs?: {
+        pipelineStep?: {
+          oneOf?: Array<{
+            properties?: {
+              type?: { const?: string };
+              op?: { enum?: string[] };
+            };
+          }>;
+        };
+      };
+    }>('schemas/wisdom-action.schema.json');
+    const schemaOps = new Map<string, string>();
+    for (const branch of schema.$defs?.pipelineStep?.oneOf || []) {
+      const kind = branch.properties?.type?.const;
+      for (const op of branch.properties?.op?.enum || []) schemaOps.set(op, kind || '');
+    }
+    const catalogOps = new Map(describeOps().map((entry) => [entry.op, entry.kind]));
+
+    expect([...schemaOps.keys()].sort()).toEqual([...catalogOps.keys()].sort());
+    expect([...schemaOps.entries()].sort()).toEqual([...catalogOps.entries()].sort());
+  });
+
+  it('documents the ownership rationale for every published Wisdom operation', () => {
+    const ownershipDoc = safeReadFile(
+      pathResolver.rootResolve(
+        'docs/developer/improvement-plans-2026-07/WISDOM_AGENT_OWNERSHIP_2026-07-20.ja.md'
+      ),
+      { encoding: 'utf8' }
+    ) as string;
+    for (const { op } of describeOps()) {
+      expect(ownershipDoc).toContain(`\`${op}\``);
+    }
+  });
+
   it('retains an apply decision result in pipeline context under export_as', async () => {
     const result = await handleAction({
       action: 'pipeline',

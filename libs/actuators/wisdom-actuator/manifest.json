@@ -166,6 +166,13 @@
       "protocol_ref": "knowledge/product/orchestration/stakeholder-consensus-protocol.md"
     },
     {
+      "op": "conduct_1on_1",
+      "platforms": ["darwin", "linux", "win32"],
+      "implementation": "compatibility",
+      "protocol_ref": "knowledge/product/orchestration/stakeholder-consensus-protocol.md",
+      "note": "Canonical meeting actuator op; conduct_1on1 remains a deprecated Wisdom alias."
+    },
+    {
       "op": "extract_dissent_signals",
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "stub",

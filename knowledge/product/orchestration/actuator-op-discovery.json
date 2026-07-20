@@ -3144,6 +3144,10 @@
           "kind": "apply"
         },
         {
+          "op": "conduct_1on_1",
+          "kind": "apply"
+        },
+        {
           "op": "conduct_1on1",
           "kind": "apply"
         },
