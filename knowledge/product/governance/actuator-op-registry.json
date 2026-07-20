@@ -284,13 +284,18 @@
       "transform": [
         "apply_pattern",
         "apply_theme",
+        "brief_to_design_protocol",
         "find_slides_by_owner",
+        "lock_media_brief",
         "merge_content",
         "pptx_diff",
+        "pptx_layout_preflight",
         "proposal_content_from_storyline",
         "proposal_storyline_from_brief",
         "set",
-        "theme_from_pptx_design"
+        "theme_from_pptx_design",
+        "visual_review",
+        "visual_review_delivery_gate"
       ],
       "apply": [
         "docx_render",
@@ -499,7 +504,11 @@
         "get_video_composition_queue",
         "list_video_composition_templates"
       ],
-      "transform": ["compile_narrated_video_brief", "compile_video_content_brief"],
+      "transform": [
+        "compile_narrated_video_brief",
+        "compile_video_content_brief",
+        "lint_video_composition"
+      ],
       "apply": [
         "await_video_composition_job",
         "cancel_video_composition_job",

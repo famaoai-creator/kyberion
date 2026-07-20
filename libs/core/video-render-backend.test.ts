@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('./secure-io.js', async () => {
-  const actual = await vi.importActual('./secure-io.js') as any;
+  const actual = (await vi.importActual('./secure-io.js')) as any;
   return {
     ...actual,
     safeExec: mocks.safeExec,
@@ -56,9 +56,18 @@ describe('video render backend', () => {
         version: '1.0.0',
         queue: { concurrency: 1, cancellation: 'queued_or_running' },
         progress: { throttle_ms: 250, min_percent_delta: 2, emit_heartbeat: true },
-        bundle: { default_bundle_root: 'active/shared/tmp/video-composition', copy_declared_assets: false },
-        render: { allowed_output_formats: ['mp4'], enable_backend_rendering: false, backend: 'none', quality: 'standard', command_timeout_ms: 300000 },
-      },
+        bundle: {
+          default_bundle_root: 'active/shared/tmp/video-composition',
+          copy_declared_assets: false,
+        },
+        render: {
+          allowed_output_formats: ['mp4'],
+          enable_backend_rendering: false,
+          backend: 'none',
+          quality: 'standard',
+          command_timeout_ms: 300000,
+        },
+      }
     );
     expect(result.executed).toBe(false);
     expect(mocks.safeExec).not.toHaveBeenCalled();
@@ -90,16 +99,25 @@ describe('video render backend', () => {
         version: '1.0.0',
         queue: { concurrency: 1, cancellation: 'queued_or_running' },
         progress: { throttle_ms: 250, min_percent_delta: 2, emit_heartbeat: true },
-        bundle: { default_bundle_root: 'active/shared/tmp/video-composition', copy_declared_assets: false },
-        render: { allowed_output_formats: ['mp4'], enable_backend_rendering: true, backend: 'hyperframes_cli', quality: 'standard', command_timeout_ms: 300000 },
-      },
+        bundle: {
+          default_bundle_root: 'active/shared/tmp/video-composition',
+          copy_declared_assets: false,
+        },
+        render: {
+          allowed_output_formats: ['mp4'],
+          enable_backend_rendering: true,
+          backend: 'hyperframes_cli',
+          quality: 'standard',
+          command_timeout_ms: 300000,
+        },
+      }
     );
     expect(result.executed).toBe(true);
     expect(result.backend).toBe('hyperframes_cli');
     expect(mocks.safeExec).toHaveBeenCalledWith(
       'npx',
       expect.arrayContaining(['hyperframes', 'render', '/tmp/demo', '--format', 'mp4']),
-      expect.objectContaining({ timeoutMs: 300000 }),
+      expect.objectContaining({ timeoutMs: 300000 })
     );
     expect(corePlatform.runMediaCommand).toHaveBeenCalledWith(
       'ffmpeg',
@@ -108,7 +126,7 @@ describe('video render backend', () => {
         pathResolver.resolve('active/shared/tmp/video-composition/demo/output.mp4'),
         '-i',
         '/tmp/demo/narration.aiff',
-      ]),
+      ])
     );
     expect(mocks.safeMoveSync).toHaveBeenCalled();
   });
@@ -139,9 +157,18 @@ describe('video render backend', () => {
         version: '1.0.0',
         queue: { concurrency: 1, cancellation: 'queued_or_running' },
         progress: { throttle_ms: 250, min_percent_delta: 2, emit_heartbeat: true },
-        bundle: { default_bundle_root: 'active/shared/tmp/video-composition', copy_declared_assets: false },
-        render: { allowed_output_formats: ['mp4'], enable_backend_rendering: true, backend: 'hyperframes_cli', quality: 'standard', command_timeout_ms: 300000 },
-      },
+        bundle: {
+          default_bundle_root: 'active/shared/tmp/video-composition',
+          copy_declared_assets: false,
+        },
+        render: {
+          allowed_output_formats: ['mp4'],
+          enable_backend_rendering: true,
+          backend: 'hyperframes_cli',
+          quality: 'standard',
+          command_timeout_ms: 300000,
+        },
+      }
     );
 
     expect(result.executed).toBe(true);
@@ -152,7 +179,7 @@ describe('video render backend', () => {
         pathResolver.resolve('active/shared/tmp/video-composition/demo/music-output.mp4'),
         '-i',
         '/tmp/demo/music.mp3',
-      ]),
+      ])
     );
   });
 
@@ -192,17 +219,33 @@ describe('video render backend', () => {
         version: '1.0.0',
         queue: { concurrency: 1, cancellation: 'queued_or_running' },
         progress: { throttle_ms: 250, min_percent_delta: 2, emit_heartbeat: true },
-        bundle: { default_bundle_root: 'active/shared/tmp/video-composition', copy_declared_assets: false },
-        render: { allowed_output_formats: ['mp4'], enable_backend_rendering: true, backend: 'hyperframes_cli', quality: 'standard', command_timeout_ms: 300000 },
-      },
+        bundle: {
+          default_bundle_root: 'active/shared/tmp/video-composition',
+          copy_declared_assets: false,
+        },
+        render: {
+          allowed_output_formats: ['mp4'],
+          enable_backend_rendering: true,
+          backend: 'hyperframes_cli',
+          quality: 'standard',
+          command_timeout_ms: 300000,
+        },
+      }
     );
 
     expect(result.executed).toBe(true);
     expect(result.backend).toBe('ffmpeg_fallback');
+    // MP-02: the fallback produces a file, so `executed` alone reads as
+    // success. The degradation must be explicit or a still-image slideshow
+    // ships as if it were the requested render.
+    expect(result.degraded).toBe(true);
+    expect(result.degraded_from).toBe('hyperframes_cli');
+    expect(result.degradation_reason).toContain('slideshow');
+    expect(result.degradation_reason).toContain('hyperframes');
     expect(mocks.safeExec).toHaveBeenCalledWith(
       'python3',
       expect.arrayContaining([expect.stringContaining('scripts/make_video_cover.py')]),
-      expect.objectContaining({ timeoutMs: 30000 }),
+      expect.objectContaining({ timeoutMs: 30000 })
     );
     expect(mocks.safeExec.mock.calls.some(([command]) => command === 'ffmpeg')).toBe(true);
   });

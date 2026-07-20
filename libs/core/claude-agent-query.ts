@@ -24,6 +24,7 @@ import {
 } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod';
 import { metrics } from './metrics.js';
+import { assertReasoningEgressAllowed } from './reasoning-egress-scope.js';
 
 /** Pull billable token counts from a result message's `usage` block (defensive). */
 function extractUsageTokens(message: unknown): {
@@ -108,6 +109,7 @@ export class ClaudeAgentQueryError extends Error {
 export async function runClaudeAgentQuery<T>(
   params: ClaudeAgentQueryParams<T>
 ): Promise<ClaudeAgentQueryResult<T>> {
+  assertReasoningEgressAllowed('claude-agent');
   const jsonSchema = z.toJSONSchema(params.schema) as Record<string, unknown>;
   // The Agent SDK's json_schema output format expects a raw JSON Schema
   // object; drop the $schema header to keep the surface minimal.
@@ -231,6 +233,7 @@ export interface ClaudeAgentTaskResult {
 export async function runClaudeAgentTask(
   params: ClaudeAgentTaskParams
 ): Promise<ClaudeAgentTaskResult> {
+  assertReasoningEgressAllowed('claude-agent');
   const options: Options = {
     systemPrompt: params.systemPrompt,
     model: params.model ?? 'opus',

@@ -1,0 +1,70 @@
+{
+  "version": "1.0.0",
+  "_meta": "MP-04 visual review rubric. Criteria are data, not code, so an operator can tune what a review looks for without touching the actuator. `weight` orders the summary; `severity` decides whether a finding blocks delivery. Anti-pattern checks are weighted above craft on purpose: a deck that is merely tidy but looks machine-made is the failure mode this loop exists to catch.",
+
+  "criteria": [
+    {
+      "id": "overflow",
+      "title": "Text fits its frame",
+      "severity": "error",
+      "weight": 10,
+      "prompt": "Does any text run past its box, clip at an edge, or collide with another element? Name the slide and the element."
+    },
+    {
+      "id": "alignment",
+      "title": "Alignment and margins",
+      "severity": "error",
+      "weight": 9,
+      "prompt": "Are elements aligned to a consistent grid, with even margins? Flag anything visibly off-axis or with uneven gutters."
+    },
+    {
+      "id": "contrast",
+      "title": "Legibility and contrast",
+      "severity": "error",
+      "weight": 9,
+      "prompt": "Is every text legible against its background at a glance? Flag low-contrast pairings and text that is too small for the medium."
+    },
+    {
+      "id": "hierarchy",
+      "title": "Visual hierarchy",
+      "severity": "warning",
+      "weight": 7,
+      "prompt": "Does the eye land on the most important thing first? Flag slides where everything is the same weight or the emphasis is on the wrong element."
+    },
+    {
+      "id": "ai-defaults",
+      "title": "Machine-made tells",
+      "severity": "warning",
+      "weight": 8,
+      "prompt": "Does this look generated? Flag decorative accent lines under titles, gratuitous color bars, uniform font weight throughout, everything centered, and stock gradient backgrounds. These are the specific tells that mark a deck as AI-made."
+    },
+    {
+      "id": "density",
+      "title": "Density and whitespace",
+      "severity": "warning",
+      "weight": 6,
+      "prompt": "Is any slide overloaded, or so empty it looks unfinished? Suggest splitting or merging."
+    },
+    {
+      "id": "consistency",
+      "title": "Cross-slide consistency",
+      "severity": "warning",
+      "weight": 7,
+      "prompt": "Do repeated elements (headers, footers, logos, body position) sit in the same place on every slide? Flag drift."
+    }
+  ],
+
+  "banned_patterns": [
+    "decorative-accent-line-under-title",
+    "decorative-color-bar",
+    "uniform-font-weight",
+    "centered-everything",
+    "stock-gradient-background"
+  ],
+
+  "iteration": {
+    "_meta": "Anthropic's generator/evaluator loop runs 5-15 rounds; this starts at 3 because each round costs a render plus a model call, and the deterministic layout fit already removed the mechanical failures a long loop would otherwise chase.",
+    "max_rounds": 3,
+    "stop_when_no_errors": true
+  }
+}

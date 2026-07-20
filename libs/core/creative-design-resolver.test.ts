@@ -149,6 +149,39 @@ describe('creative-design-resolver', () => {
     expect(resolved.colors.primary).toBe('#0f172a');
   });
 
+  it('rejects tenant slugs that could escape the confidential tenant boundary', () => {
+    expect(() => resolveCreativeDesign({ surface: 'pptx', tenantSlug: '../../etc' })).toThrow(
+      /tenant slug/i
+    );
+  });
+
+  it('drops unsafe tenant token values before projecting CSS', () => {
+    write('knowledge/confidential/client-a/design/tenant-override.json', {
+      tenant_id: 'client-a',
+      theme: 'client-a',
+      colors: { accent: '</style><script>alert(1)</script>' },
+      fonts: { body: 'Aster; font-family: evil' },
+    });
+    write('knowledge/confidential/client-a/design/theme.json', {
+      theme: {
+        colors: { accent: '</style><script>alert(2)</script>' },
+        fonts: { body: 'Aster; font-family: evil' },
+        typography: {
+          roles: { body: { size_pt: 9999, min_size_pt: -20 } },
+        },
+      },
+    });
+
+    const resolved = resolveCreativeDesign({ surface: 'video', tenantSlug: 'client-a' });
+    expect(resolved.colors.accent).not.toContain('<');
+    expect(resolved.projection.surface).toBe('video');
+    if (resolved.projection.surface === 'video') {
+      expect(resolved.projection.css_vars['--kb-accent']).not.toContain('<');
+      expect(resolved.projection.css_vars['--kb-font-sans']).not.toContain(';');
+    }
+    expect(resolved.typography.roles.body.size_pt).toBeLessThan(200);
+  });
+
   it('survives a missing brand tokens file with fallback palette', () => {
     fs.rmSync(path.join(rootDir, 'knowledge/public/design-patterns/brand-tokens/kyberion.json'));
     const resolved = resolveCreativeDesign({ surface: 'pptx' });

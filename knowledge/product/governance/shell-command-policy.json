@@ -37,6 +37,15 @@
         "^adb\\s+(?:devices|install|shell\\s+am\\s+start|uninstall)(?:\\s|$)"
       ],
       "reason": "Mobile AI-DLC/SDLC toolchain (E2E-05): build/test/device ops are allowed; deploy/signing stays approval-gated via the deployment adapter."
+    },
+    {
+      "id": "document-rasterization",
+      "command_regex": [
+        "^soffice\\s+--headless(?:\\s|$)",
+        "^libreoffice\\s+--headless(?:\\s|$)",
+        "^pdftoppm\\s+-png(?:\\s|$)"
+      ],
+      "reason": "MP-04 visual review rasterizes a rendered artifact locally so it can be inspected. Headless conversion only, with an isolated LibreOffice profile; the binaries read the artifact and write page images, and never reach the network. Interactive/non-headless invocations stay approval-gated."
     }
   ],
   "denylist": [

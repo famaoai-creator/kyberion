@@ -49,7 +49,10 @@
         "op": "xlsx_extract",
         "note": "Extract full XLSX design protocol (sheets + styles + raw passthrough) into context."
       },
-      { "op": "json_read", "note": "Read a JSON file into context." }
+      {
+        "op": "json_read",
+        "note": "Read a JSON file into context."
+      }
     ],
     "transform": [
       {
@@ -68,7 +71,10 @@
         "op": "apply_theme",
         "note": "Load a named theme from knowledge/public/design-patterns/media-templates/themes.json into active_theme."
       },
-      { "op": "apply_pattern", "note": "Load a design pattern JSON into active_pattern." },
+      {
+        "op": "apply_pattern",
+        "note": "Load a design pattern JSON into active_pattern."
+      },
       {
         "op": "merge_content",
         "note": "Combine active_theme + active_pattern + content_data into last_pptx_design (or last_xlsx_design, etc.)."
@@ -84,6 +90,26 @@
       {
         "op": "proposal_content_from_storyline",
         "note": "Expand a storyline into per-slide content_data ready for merge_content."
+      },
+      {
+        "op": "brief_to_design_protocol",
+        "note": "Compile a canonical media brief into a render-ready design protocol."
+      },
+      {
+        "op": "pptx_layout_preflight",
+        "note": "Validate compiled PPTX layout diagnostics before any render; overflow requires explicit review-only opt-in."
+      },
+      {
+        "op": "visual_review",
+        "note": "MP-04: rasterize a rendered artifact and inspect it against the visual-review rubric. Reports only — a review that cannot run (missing rasterizer, denied egress, no vision channel) returns status=skipped with a reason and is never a pass."
+      },
+      {
+        "op": "visual_review_delivery_gate",
+        "note": "Block delivery unless visual review completed with no outstanding errors."
+      },
+      {
+        "op": "lock_media_brief",
+        "note": "MP-05: fix the media brief before production and record which decisions were stated by the operator versus inferred here. Carries the run-shape (review rounds, degraded-fallback and external-egress permissions) that downstream steps obey."
       }
     ],
     "apply": [
@@ -103,9 +129,18 @@
         "op": "pptx_patch",
         "note": "Text-replacement patch on an existing PPTX (simple find-replace)."
       },
-      { "op": "xlsx_render", "note": "Render last_xlsx_design to a .xlsx file." },
-      { "op": "docx_render", "note": "Render last_docx_design to a .docx file." },
-      { "op": "write_file", "note": "Write a context value to a file path." }
+      {
+        "op": "xlsx_render",
+        "note": "Render last_xlsx_design to a .xlsx file."
+      },
+      {
+        "op": "docx_render",
+        "note": "Render last_docx_design to a .docx file."
+      },
+      {
+        "op": "write_file",
+        "note": "Write a context value to a file path."
+      }
     ]
   }
 }

@@ -194,3 +194,35 @@ export function validateThemeCatalog(catalog: {
   }
   return report;
 }
+
+/**
+ * MP-04 follow-up: guarantee a text color is actually readable on its fill.
+ *
+ * Theme palettes do not always carry every role a renderer asks for, and a
+ * missing role falls back to a neighbouring one — which is how a panel ended
+ * up emitting `fill: #334155` with `color: #334155` and rendering its body
+ * text completely invisible on four slides of a ten-slide deck. Layout checks
+ * cannot see this: the text fits its box perfectly, it just cannot be read.
+ *
+ * The preferred color is kept whenever it clears the AA floor. Otherwise the
+ * higher-contrast of near-black / near-white is substituted, which is always
+ * legible and never invents a brand color.
+ */
+export function ensureReadableOn(
+  fill: string,
+  preferred: string,
+  options: { minRatio?: number } = {}
+): string {
+  const minRatio = options.minRatio ?? WCAG_AA_BODY_TEXT;
+  const ratio = contrastRatio(preferred, fill);
+  // Unparseable colors are left alone: substituting on a guess would be worse
+  // than leaving an author's explicit choice in place.
+  if (ratio === null) return preferred;
+  if (ratio >= minRatio) return preferred;
+
+  const dark = '0f172a';
+  const light = 'ffffff';
+  const darkRatio = contrastRatio(dark, fill) ?? 0;
+  const lightRatio = contrastRatio(light, fill) ?? 0;
+  return darkRatio >= lightRatio ? dark : light;
+}

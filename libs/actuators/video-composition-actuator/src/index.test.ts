@@ -901,6 +901,98 @@ describe('video-composition-actuator', () => {
     );
     expect(typeof status.diagnostics.duration_ms).toBe('number');
   });
+
+  // MP-02: the lint gate. A bundle that reads a clock cannot be reproduced,
+  // so the step fails rather than rendering something untestable.
+  describe('lint_video_composition', () => {
+    const compositionAdf = {
+      kind: 'video-composition-adf',
+      version: '1.0.0',
+      composition: { duration_sec: 3, fps: 30, width: 1920, height: 1080 },
+      scenes: [
+        {
+          scene_id: 'hook',
+          role: 'hook',
+          start_sec: 0,
+          duration_sec: 3,
+          template_ref: { template_id: 'basic-title-card' },
+          content: {},
+        },
+      ],
+      output: { format: 'mp4', bundle_dir: 'active/shared/tmp/lint-bundle' },
+    };
+
+    it('passes a deterministic bundle', async () => {
+      const { safeReadFile } = await import('@agent/core');
+      vi.mocked(safeReadFile).mockImplementation((filePath: string) => {
+        if (String(filePath).includes('manifest.json'))
+          return JSON.stringify({ recovery_policy: {} });
+        if (String(filePath).endsWith('hook.html')) {
+          return '<style>.a { animation: kb-in-fade-rise 0.8s ease both; }</style>';
+        }
+        return '{}';
+      });
+
+      const { handleAction } = await import('./index.js');
+      const result: any = await handleAction({
+        action: 'lint_video_composition',
+        params: { video_composition_adf: compositionAdf },
+      } as any);
+
+      expect(result.status).toBe('succeeded');
+      expect(result.lint_report.ok).toBe(true);
+      expect(result.scenes_inspected).toBe(1);
+    });
+
+    it('fails the step when scene HTML is non-deterministic', async () => {
+      const { safeReadFile } = await import('@agent/core');
+      vi.mocked(safeReadFile).mockImplementation((filePath: string) => {
+        if (String(filePath).includes('manifest.json'))
+          return JSON.stringify({ recovery_policy: {} });
+        if (String(filePath).endsWith('hook.html')) {
+          return '<script>const seed = Math.random();</script>';
+        }
+        return '{}';
+      });
+
+      const { handleAction } = await import('./index.js');
+      await expect(
+        handleAction({
+          action: 'lint_video_composition',
+          params: { video_composition_adf: compositionAdf },
+        } as any)
+      ).rejects.toThrow(/lint failed/i);
+    });
+
+    it('reports without failing when fail_on_error is false', async () => {
+      const { safeReadFile } = await import('@agent/core');
+      vi.mocked(safeReadFile).mockImplementation((filePath: string) => {
+        if (String(filePath).includes('manifest.json'))
+          return JSON.stringify({ recovery_policy: {} });
+        if (String(filePath).endsWith('hook.html')) {
+          return '<script>const t = Date.now();</script>';
+        }
+        return '{}';
+      });
+
+      const { handleAction } = await import('./index.js');
+      const result: any = await handleAction({
+        action: 'lint_video_composition',
+        params: { video_composition_adf: compositionAdf, fail_on_error: false },
+      } as any);
+
+      expect(result.status).toBe('succeeded');
+      expect(result.lint_report.ok).toBe(false);
+      expect(result.lint_report.error_count).toBeGreaterThan(0);
+    });
+
+    it('requires the composition contract', async () => {
+      const { handleAction } = await import('./index.js');
+      await expect(
+        handleAction({ action: 'lint_video_composition', params: {} } as any)
+      ).rejects.toThrow(/requires params.video_composition_adf/);
+    });
+  });
 });
 
 async function waitForCancelledStatusWithSignal(handleAction: any, jobId: string) {

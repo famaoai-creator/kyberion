@@ -4,6 +4,16 @@ import {
   visualDirectionToCssVars,
   type VideoVisualDirection,
 } from './video-visual-direction.js';
+import {
+  motionDirectionToCss,
+  normalizeVideoMotionDirection,
+  type VideoMotionDirection,
+} from './video-motion-direction.js';
+import {
+  normalizeSceneComposition,
+  sceneCompositionToCss,
+  type SceneComposition,
+} from './video-scene-composition.js';
 import { getVideoCompositionTemplateRecord } from './video-composition-template-registry.js';
 import { getVideoRenderRuntimePolicy } from './video-render-runtime-policy.js';
 import * as pathResolver from './path-resolver.js';
@@ -97,10 +107,17 @@ export function writeVideoCompositionBundle(
   safeMkdir(plan.bundle_dir, { recursive: true });
   safeMkdir(path.join(plan.bundle_dir, 'compositions'), { recursive: true });
 
+  const motionDirection = resolveAdfMotionDirection(adf);
+
   for (const scene of plan.scenes) {
-    const sceneSource = applyVideoThemeTokens(
-      renderSceneHtml(adf, scene),
-      resolveAdfVisualDirection(adf)
+    const sceneSource = applySceneComposition(
+      applySceneMotion(
+        applyVideoThemeTokens(renderSceneHtml(adf, scene), resolveAdfVisualDirection(adf)),
+        scene,
+        motionDirection
+      ),
+      scene,
+      adf.composition.scene_compositions
     );
     const scenePath = path.join(plan.bundle_dir, scene.output_html);
     safeWriteFile(scenePath, sceneSource);
@@ -1391,7 +1408,13 @@ function normalizeSceneDesignSystemVars(value: unknown): Record<string, string> 
   if (!value || typeof value !== 'object') return {};
   return Object.entries(value as Record<string, unknown>).reduce<Record<string, string>>(
     (acc, [key, entry]) => {
-      if (typeof entry === 'string' && entry.trim()) {
+      if (
+        /^--kb-[a-z0-9-]+$/u.test(key) &&
+        typeof entry === 'string' &&
+        entry.trim() &&
+        entry.length <= 512 &&
+        !/[<>{};\u0000\r\n]/u.test(entry)
+      ) {
         acc[key] = entry.trim();
       }
       return acc;
@@ -1424,6 +1447,14 @@ function buildSceneCssVars(
     '--text': `var(--kb-text-primary, ${themeVars['--kb-text-primary'] || '#f8fafc'})`,
     '--subtext': `var(--kb-text-secondary, ${themeVars['--kb-text-secondary'] || '#94a3b8'})`,
     '--font-sans': `var(--kb-font-sans, ${themeVars['--kb-font-sans'] || '"Inter", -apple-system, BlinkMacSystemFont, sans-serif'})`,
+    '--headline-size': `var(--kb-size-headline, ${designSystemVars['--kb-size-headline'] || '68px'})`,
+    '--body-size': `var(--kb-size-body, ${designSystemVars['--kb-size-body'] || '23px'})`,
+    '--title-size': `var(--kb-size-title, ${designSystemVars['--kb-size-title'] || '42px'})`,
+    '--label-size': `var(--kb-size-label, ${designSystemVars['--kb-size-label'] || '16px'})`,
+    '--font-heading': `var(--kb-font-heading, ${designSystemVars['--kb-font-heading'] || '"Inter", sans-serif'})`,
+    '--font-body': `var(--kb-font-body, ${designSystemVars['--kb-font-body'] || '"Inter", sans-serif'})`,
+    '--space-unit': `var(--kb-space-unit, ${designSystemVars['--kb-space-unit'] || '4px'})`,
+    '--safe-area': `var(--kb-safe-area, ${designSystemVars['--kb-safe-area'] || '5%'})`,
     '--radius-panel': `var(--kb-panel-radius, ${themeVars['--kb-panel-radius'] || '32px'})`,
     '--radius-surface': `var(--kb-surface-radius, ${themeVars['--kb-surface-radius'] || '24px'})`,
   };
@@ -1607,6 +1638,79 @@ function resolveAdfVisualDirection(adf: VideoCompositionADF): VideoVisualDirecti
     width: adf.composition.width,
     height: adf.composition.height,
   });
+}
+
+function resolveAdfMotionDirection(adf: VideoCompositionADF): VideoMotionDirection {
+  return normalizeVideoMotionDirection(
+    adf.composition.motion_direction,
+    adf.scenes.map((scene) => ({
+      scene_id: scene.scene_id,
+      role: scene.role,
+      duration_sec: scene.duration_sec,
+    }))
+  );
+}
+
+/**
+ * MP-02: scene templates are the scaffold; motion arrives as tokens.
+ *
+ * Each layer attaches to structural selectors the templates already ship, so
+ * art direction can vary per story without the compiler carrying literal
+ * `@keyframes`. A scene absent from the direction (or a template without the
+ * hook element) simply renders without that layer.
+ */
+/**
+ * MP-02: apply a model-composed arrangement to a scene.
+ *
+ * Opt-in — a composition is only applied when the ADF carries one, so existing
+ * decks render byte-identically. The composition is re-normalized here against
+ * the content the scene actually has, so a stored arrangement cannot outlive
+ * the fields it was written for.
+ */
+function applySceneComposition(
+  html: string,
+  scene: CompiledVideoCompositionScene,
+  compositions: SceneComposition[] | undefined
+): string {
+  if (!compositions?.length) return html;
+  const drafted = compositions.find((entry) => entry.scene_id === scene.scene_id);
+  if (!drafted) return html;
+
+  const composition = normalizeSceneComposition(drafted, {
+    scene_id: scene.scene_id,
+    role: scene.role,
+    available_keys: Object.keys(scene.content ?? {}).filter(
+      (key) => scene.content[key] !== undefined && scene.content[key] !== null
+    ),
+  });
+
+  const css = sceneCompositionToCss(composition);
+  if (!css.trim()) return html;
+  const block = `<style data-kb-composition="${escapeHtml(composition.layout)}">\n${css}\n</style>`;
+  return html.includes('</head>')
+    ? html.replace('</head>', `${block}\n</head>`)
+    : `${block}\n${html}`;
+}
+
+function applySceneMotion(
+  html: string,
+  scene: CompiledVideoCompositionScene,
+  direction: VideoMotionDirection
+): string {
+  const sceneMotion = direction.scenes.find((entry) => entry.scene_id === scene.scene_id);
+  if (!sceneMotion) return html;
+  const css = motionDirectionToCss({ scenes: [sceneMotion], transitions: [] }, undefined, {
+    entrance: '.composition-root, body > .shell, body > .stack',
+    layers: [
+      'h1, .headline, .hero-text, .quote-text',
+      '.visual, .panel, .process-visual, .proof-row, img',
+    ],
+  });
+  if (!css.trim()) return html;
+  const block = `<style data-kb-motion="${escapeHtml(sceneMotion.entrance.pattern_id)}">\n${css}\n</style>`;
+  return html.includes('</head>')
+    ? html.replace('</head>', `${block}\n</head>`)
+    : `${block}\n${html}`;
 }
 
 function applyVideoThemeTokens(html: string, direction?: VideoVisualDirection): string {

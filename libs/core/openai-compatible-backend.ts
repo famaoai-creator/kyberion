@@ -25,6 +25,7 @@ import type {
   DecomposedTaskPlan,
 } from './reasoning-backend.js';
 import { runStructuredReasoningOp, structuredReasoningSpecs } from './structured-reasoning.js';
+import { assertReasoningEgressAllowedAtEndpoint } from './reasoning-egress-scope.js';
 import {
   computeCompletionTokenBudget,
   estimateRequestInputTokens,
@@ -332,6 +333,7 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
     messages: ChatMessage[],
     opts: { useTools?: boolean } = {}
   ): Promise<ChatCompletionResponse> {
+    assertReasoningEgressAllowedAtEndpoint(this.name, this.baseURL);
     const headers: Record<string, string> = {
       'content-type': 'application/json',
     };

@@ -39,6 +39,38 @@
     "fonts": {
       "sans": "Inter, 'Noto Sans JP', sans-serif",
       "mono": "'JetBrains Mono', monospace"
+    },
+    "typography": {
+      "_meta": "MP-01 modular type scale. size_pt is the pptx/doc surface size; min_size_pt is the floor layout-fit may shrink to. Weight contrast between display/headline and body is intentional.",
+      "scale_ratio": 1.25,
+      "roles": {
+        "display": { "size_pt": 36, "min_size_pt": 24, "weight": 800, "line_spacing_pct": 110 },
+        "headline": { "size_pt": 26, "min_size_pt": 18, "weight": 700, "line_spacing_pct": 120 },
+        "title": { "size_pt": 20, "min_size_pt": 14, "weight": 700, "line_spacing_pct": 130 },
+        "body": { "size_pt": 13, "min_size_pt": 10, "weight": 400, "line_spacing_pct": 155 },
+        "label": { "size_pt": 11, "min_size_pt": 9, "weight": 600, "line_spacing_pct": 130 },
+        "caption": { "size_pt": 9, "min_size_pt": 8, "weight": 400, "line_spacing_pct": 125 }
+      }
+    },
+    "spacing": {
+      "base_pt": 4,
+      "steps": [1, 2, 3, 4, 6, 8, 12],
+      "pptx_safe_margin_in": [0.3, 0.35, 0.3, 0.35],
+      "video_safe_area_pct": 0.05
+    },
+    "constraints": {
+      "_meta": "Hard floors bound layout-fit downscaling; banned_patterns feed the MP-04 visual-review rubric.",
+      "min_body_pt": 10,
+      "min_label_pt": 8,
+      "video_min_headline_px": 60,
+      "video_min_body_px": 20,
+      "banned_patterns": [
+        "decorative-accent-line-under-title",
+        "decorative-color-bar",
+        "cyan-on-dark-gradient",
+        "uniform-font-weight",
+        "centered-everything"
+      ]
     }
   }
 }

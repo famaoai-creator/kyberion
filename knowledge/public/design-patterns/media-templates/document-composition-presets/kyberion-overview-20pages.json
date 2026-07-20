@@ -1,0 +1,133 @@
+{
+  "profiles": {
+    "kyberion-overview-20pages": {
+      "artifact_family": "presentation",
+      "document_type": "proposal",
+      "narrative_pattern_id": "problem-solution-executive",
+      "recommended_theme": "kyberion-sovereign",
+      "recommended_layout_template_id": "executive-neutral",
+      "sections": [
+        {
+          "section_id": "slide-1",
+          "title": "Kyberion: 次世代コオペレーティングシステム",
+          "media_kind": "hero",
+          "layout_key": "cover-statement"
+        },
+        {
+          "section_id": "slide-2",
+          "title": "開発の背景とビジョン",
+          "media_kind": "summary",
+          "layout_key": "title-body"
+        },
+        {
+          "section_id": "slide-3",
+          "title": "Kyberionの3大主要モジュール",
+          "media_kind": "capability",
+          "layout_key": "three-pillars"
+        },
+        {
+          "section_id": "slide-4",
+          "title": "プロジェクト指向のドメインモデル",
+          "media_kind": "model",
+          "layout_key": "operating-model"
+        },
+        {
+          "section_id": "slide-5",
+          "title": "主権者（Sovereign）とエージェントの関係",
+          "media_kind": "controls",
+          "layout_key": "risk-controls"
+        },
+        {
+          "section_id": "slide-6",
+          "title": "ミッションコントロールモデル (KSMC)",
+          "media_kind": "architecture",
+          "layout_key": "three-point-architecture"
+        },
+        {
+          "section_id": "slide-7",
+          "title": "ADF (Agent Definition Format) ワークフロー",
+          "media_kind": "evidence",
+          "layout_key": "evidence-callout"
+        },
+        {
+          "section_id": "slide-8",
+          "title": "ADFのライフサイクルと自動修復",
+          "media_kind": "evidence",
+          "layout_key": "evidence-callout"
+        },
+        {
+          "section_id": "slide-9",
+          "title": "実行の階層構造（Layered Execution）",
+          "media_kind": "model",
+          "layout_key": "operating-model"
+        },
+        {
+          "section_id": "slide-10",
+          "title": "機密情報の厳格な隔離（Data Tiers）",
+          "media_kind": "controls",
+          "layout_key": "risk-controls"
+        },
+        {
+          "section_id": "slide-11",
+          "title": "外部サービス連携とサテライトプロセス",
+          "media_kind": "architecture",
+          "layout_key": "three-point-architecture"
+        },
+        {
+          "section_id": "slide-12",
+          "title": "サーフェスレイヤー (Presence Layer)",
+          "media_kind": "summary",
+          "layout_key": "title-body"
+        },
+        {
+          "section_id": "slide-13",
+          "title": "秘書コンシェルジュ（UIアバター）",
+          "media_kind": "summary",
+          "layout_key": "title-body"
+        },
+        {
+          "section_id": "slide-14",
+          "title": "音声インタラクションアーキテクチャ",
+          "media_kind": "capability",
+          "layout_key": "three-pillars"
+        },
+        {
+          "section_id": "slide-15",
+          "title": "ローカルAIとGPUの活用",
+          "media_kind": "architecture",
+          "layout_key": "three-point-architecture"
+        },
+        {
+          "section_id": "slide-16",
+          "title": "メディア生成オートメーション",
+          "media_kind": "timeline",
+          "layout_key": "timeline-roadmap"
+        },
+        {
+          "section_id": "slide-17",
+          "title": "Kyberion Working Philosophy",
+          "media_kind": "evidence",
+          "layout_key": "evidence-callout"
+        },
+        {
+          "section_id": "slide-18",
+          "title": "開発と品質保証",
+          "media_kind": "evidence",
+          "layout_key": "evidence-callout"
+        },
+        {
+          "section_id": "slide-19",
+          "title": "導入ロードマップ (First Win からスケールまで)",
+          "media_kind": "timeline",
+          "layout_key": "timeline-roadmap"
+        },
+        {
+          "section_id": "slide-20",
+          "title": "まとめと今後の展望",
+          "media_kind": "cta",
+          "layout_key": "decision-cta"
+        }
+      ]
+    }
+  }
+}
