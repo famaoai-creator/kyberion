@@ -1,4 +1,4 @@
-import type { WisdomAction, PipelineStep } from '../wisdom-pipeline-helpers.js';
+import type { WisdomAction, WisdomDirectAction, PipelineStep } from '../wisdom-pipeline-helpers.js';
 
 const DIRECT_ACTIONS = new Set<WisdomAction['action']>([
   'knowledge_search',
@@ -18,7 +18,10 @@ function assertRequiredString(params: Record<string, unknown>, action: string, k
   }
 }
 
-function assertDirectActionParams(action: WisdomAction['action'], params: Record<string, unknown>) {
+function assertDirectActionParams(
+  action: WisdomDirectAction['action'],
+  params: Record<string, unknown>
+) {
   switch (action) {
     case 'knowledge_search':
       assertRequiredString(params, action, 'query');
@@ -73,7 +76,7 @@ export function validateWisdomRequest(input: unknown): asserts input is WisdomAc
     if (!isRecord(input.params)) {
       throw new Error(`[INVALID_REQUEST] Direct action ${input.action} requires params`);
     }
-    assertDirectActionParams(input.action, input.params);
+    assertDirectActionParams(input.action as WisdomDirectAction['action'], input.params);
     return;
   }
   if (input.action === 'pipeline') {
