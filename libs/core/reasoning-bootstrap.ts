@@ -63,14 +63,21 @@ import { AgyCliIntentExtractor } from './agy-cli-intent-extractor.js';
 import { AgyCliVoiceBridge } from './agy-cli-voice-bridge.js';
 import { buildCopilotAcpBackendFromEnv } from './copilot-acp-reasoning-backend.js';
 import {
-  OpenAiCompatibleBackend,
   buildOpenAiCompatibleBackendFromEnv,
+  buildOllamaBackendFromEnv,
+  buildVllmBackendFromEnv,
+  buildLmStudioBackendFromEnv,
+  buildLlamaCppBackendFromEnv,
+  buildMlxBackendFromEnv,
+  buildLocalAiBackendFromEnv,
   buildNemotronBackendFromEnv,
+  type OpenAiCompatibleBackendOverrides,
 } from './openai-compatible-backend.js';
 import { buildOpenRouterBackendFromEnv } from './openrouter-backend.js';
 import { maybeWrapWithDispatcher } from './agent-dispatch.js';
 import {
   buildFailoverReasoningBackend,
+  buildRoleAwareReasoningBackend,
   type ReasoningBackendCandidate,
   registerReasoningBackend,
 } from './reasoning-backend.js';
@@ -102,6 +109,12 @@ import {
   resolveReasoningBackendModeFromContext,
   type ReasoningBackendMode,
 } from './reasoning-backend-policy.js';
+import {
+  loadReasoningRoutePolicy,
+  resolveReasoningRoute,
+  resolveSamplingParams,
+  type SamplingParams,
+} from './reasoning-route-resolver.js';
 
 export type { ReasoningBackendMode } from './reasoning-backend-policy.js';
 
@@ -122,6 +135,14 @@ export interface InstallReasoningOptions {
   mode?: ReasoningBackendMode;
   /** Override model for model-based backends. Defaults to the provider's standard model when omitted. */
   model?: string;
+  /** Governed role/profile route; omitted preserves legacy automatic selection. */
+  role?: string;
+  profile?: string;
+  samplingParams?: SamplingParams;
+  toolsEnabled?: boolean;
+  allowedTools?: import('./reasoning-route-resolver.js').ReasoningToolName[];
+  contextWindowTokens?: number;
+  maxCompletionTokens?: number;
   /** Pre-built Anthropic client (applies only to `anthropic` mode). */
   anthropicClient?: Anthropic;
   /** Force install even if stub would be chosen otherwise (for tests). */
@@ -161,6 +182,18 @@ function providerForReasoningMode(mode: ReasoningBackendMode): string | undefine
       return 'openrouter';
     case 'local':
       return 'local';
+    case 'ollama':
+      return 'ollama';
+    case 'vllm':
+      return 'vllm';
+    case 'lmstudio':
+      return 'lmstudio';
+    case 'llamacpp':
+      return 'llamacpp';
+    case 'mlx':
+      return 'mlx';
+    case 'localai':
+      return 'localai';
     case 'nemotron':
     case 'nemotron-api':
       return 'nemotron';
@@ -174,6 +207,22 @@ interface ReasoningRuntimeBundle {
   backend: ReasoningBackendCandidate;
   intentExtractor?: IntentExtractorCandidate;
   voiceBridge?: VoiceBridgeCandidate;
+}
+
+function openAiOverrides(
+  options: InstallReasoningOptions,
+  mode: string
+): OpenAiCompatibleBackendOverrides {
+  return {
+    model: options.model,
+    samplingParams: options.samplingParams
+      ? resolveSamplingParams({ mode, sampling: options.samplingParams })
+      : undefined,
+    contextWindowTokens: options.contextWindowTokens,
+    maxCompletionTokens: options.maxCompletionTokens,
+    toolsEnabled: options.toolsEnabled,
+    allowedTools: options.allowedTools,
+  };
 }
 
 function buildReasoningRuntimeBundle(
@@ -323,40 +372,119 @@ function buildReasoningRuntimeBundle(
       };
     }
     case 'local': {
-      const localBackend = buildOpenAiCompatibleBackendFromEnv(process.env);
+      const localBackend = buildOpenAiCompatibleBackendFromEnv(
+        process.env,
+        openAiOverrides(options, mode)
+      );
       if (!localBackend && !options.force) return null;
       if (!localBackend) return null;
-      const baseURL = process.env.KYBERION_LOCAL_LLM_URL || 'http://localhost:11434/v1';
-      const apiKey = process.env.KYBERION_LOCAL_LLM_KEY || 'not-needed';
-      const model = options.model || process.env.KYBERION_LOCAL_LLM_MODEL || 'llama3';
       return {
         mode,
         backend: {
-          backend: new OpenAiCompatibleBackend({ baseURL, apiKey, model }),
+          backend: localBackend,
+          provider,
+          label: mode,
+        },
+      };
+    }
+    case 'ollama': {
+      const ollamaBackend = buildOllamaBackendFromEnv(process.env, openAiOverrides(options, mode));
+      if (!ollamaBackend && !options.force) return null;
+      if (!ollamaBackend) return null;
+      return {
+        mode,
+        backend: {
+          backend: ollamaBackend,
+          provider,
+          label: mode,
+        },
+      };
+    }
+    case 'vllm': {
+      const vllmBackend = buildVllmBackendFromEnv(process.env, openAiOverrides(options, mode));
+      if (!vllmBackend && !options.force) return null;
+      if (!vllmBackend) return null;
+      return {
+        mode,
+        backend: {
+          backend: vllmBackend,
+          provider,
+          label: mode,
+        },
+      };
+    }
+    case 'lmstudio': {
+      const lmstudioBackend = buildLmStudioBackendFromEnv(
+        process.env,
+        openAiOverrides(options, mode)
+      );
+      if (!lmstudioBackend && !options.force) return null;
+      if (!lmstudioBackend) return null;
+      return {
+        mode,
+        backend: {
+          backend: lmstudioBackend,
+          provider,
+          label: mode,
+        },
+      };
+    }
+    case 'llamacpp': {
+      const llamacppBackend = buildLlamaCppBackendFromEnv(
+        process.env,
+        openAiOverrides(options, mode)
+      );
+      if (!llamacppBackend && !options.force) return null;
+      if (!llamacppBackend) return null;
+      return {
+        mode,
+        backend: {
+          backend: llamacppBackend,
+          provider,
+          label: mode,
+        },
+      };
+    }
+    case 'mlx': {
+      const mlxBackend = buildMlxBackendFromEnv(process.env, openAiOverrides(options, mode));
+      if (!mlxBackend && !options.force) return null;
+      if (!mlxBackend) return null;
+      return {
+        mode,
+        backend: {
+          backend: mlxBackend,
+          provider,
+          label: mode,
+        },
+      };
+    }
+    case 'localai': {
+      const localaiBackend = buildLocalAiBackendFromEnv(
+        process.env,
+        openAiOverrides(options, mode)
+      );
+      if (!localaiBackend && !options.force) return null;
+      if (!localaiBackend) return null;
+      return {
+        mode,
+        backend: {
+          backend: localaiBackend,
           provider,
           label: mode,
         },
       };
     }
     case 'nemotron-api': {
-      const nemotronBackend = buildNemotronBackendFromEnv(process.env);
+      const nemotronBackend = buildNemotronBackendFromEnv(
+        process.env,
+        openAiOverrides(options, mode)
+      );
       if (!nemotronBackend && !options.force) return null;
       if (!nemotronBackend) return null;
-      const baseURL =
-        process.env.KYBERION_NEMOTRON_URL ||
-        process.env.KYBERION_LOCAL_LLM_URL ||
-        'http://localhost:11434/v1';
-      const apiKey =
-        process.env.KYBERION_NEMOTRON_KEY || process.env.KYBERION_LOCAL_LLM_KEY || 'not-needed';
-      const model =
-        options.model ||
-        process.env.KYBERION_NEMOTRON_MODEL ||
-        process.env.KYBERION_LOCAL_LLM_MODEL ||
-        'nemotron';
       return {
         mode,
         backend: {
-          backend: new OpenAiCompatibleBackend({ baseURL, apiKey, model }),
+          backend: nemotronBackend,
           provider,
           label: mode,
         },
@@ -370,7 +498,10 @@ function buildReasoningRuntimeBundle(
       };
     }
     case 'openrouter': {
-      const openrouterBackend = buildOpenRouterBackendFromEnv(process.env, options.model);
+      const openrouterBackend = buildOpenRouterBackendFromEnv(process.env, options.model, {
+        toolsEnabled: options.toolsEnabled,
+        allowedTools: options.allowedTools,
+      });
       if (!openrouterBackend && !options.force) return null;
       if (!openrouterBackend) return null;
       return {
@@ -391,6 +522,43 @@ function buildReasoningRuntimeChain(
   selectedMode: ReasoningBackendMode,
   options: InstallReasoningOptions
 ): ReasoningRuntimeBundle[] {
+  if (options.role || options.profile) {
+    const initial = resolveReasoningRoute({
+      role: options.role,
+      requestedProfile: options.profile,
+      sampling: options.samplingParams,
+      requestedModel: options.model,
+    });
+    const candidates: ReasoningRuntimeBundle[] = [];
+    const seen = new Set<string>();
+    for (const profileRef of initial.candidates) {
+      const route = resolveReasoningRoute({
+        role: initial.role,
+        requestedProfile: profileRef,
+        sampling: options.samplingParams,
+        requestedModel: options.model,
+      });
+      const candidateKey = `${route.profileRef}:${route.model || ''}`;
+      if (seen.has(candidateKey)) continue;
+      seen.add(candidateKey);
+      const candidate = buildReasoningRuntimeBundle(
+        normalizeReasoningBackendMode(route.mode as ReasoningBackendMode),
+        {
+          ...options,
+          model: route.model?.includes(':')
+            ? route.model.slice(route.model.indexOf(':') + 1)
+            : route.model,
+          samplingParams: route.parameters,
+          toolsEnabled: route.toolsEnabled,
+          allowedTools: route.allowedTools,
+          contextWindowTokens: route.limits.contextWindowTokens ?? options.contextWindowTokens,
+          maxCompletionTokens: route.limits.maxCompletionTokens ?? options.maxCompletionTokens,
+        }
+      );
+      if (candidate) candidates.push(candidate);
+    }
+    return candidates;
+  }
   const policy = loadReasoningBackendPolicy();
   const orderedModes = [selectedMode, ...policy.provider_fallback_order.map((entry) => entry.mode)];
   const seen = new Set<string>();
@@ -420,6 +588,12 @@ const REASONING_BACKEND_MODES: ReadonlySet<ReasoningBackendMode> = new Set<Reaso
   'nemotron',
   'nemotron-api',
   'openrouter',
+  'ollama',
+  'vllm',
+  'lmstudio',
+  'llamacpp',
+  'mlx',
+  'localai',
   'stub',
 ]);
 
@@ -540,9 +714,37 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
   }
 
   const primaryMode = chain[0]!.mode;
-  registerReasoningBackend(
-    buildFailoverReasoningBackend(chain.map((candidate) => candidate.backend))
+  const governedFailoverPolicy = loadReasoningRoutePolicy().fallback;
+  const defaultBackend = buildFailoverReasoningBackend(
+    chain.map((candidate) => candidate.backend),
+    governedFailoverPolicy
   );
+  let activeBackend = defaultBackend;
+  if (!options.role && !options.profile) {
+    const roleBackends = new Map<string, ReturnType<typeof buildFailoverReasoningBackend>>();
+    for (const role of Object.keys(loadReasoningRoutePolicy().roles)) {
+      try {
+        const roleChain = buildReasoningRuntimeChain(mode, { ...options, role });
+        if (roleChain.length > 0)
+          roleBackends.set(
+            role,
+            buildFailoverReasoningBackend(
+              roleChain.map((candidate) => candidate.backend),
+              governedFailoverPolicy
+            )
+          );
+      } catch (error) {
+        logger.warn(
+          `[reasoning-bootstrap] role=${role} route unavailable; using default chain: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    }
+    activeBackend =
+      roleBackends.size > 0
+        ? buildRoleAwareReasoningBackend(defaultBackend, roleBackends)
+        : defaultBackend;
+  }
+  registerReasoningBackend(activeBackend);
   const intentCandidates = chain.flatMap((candidate) =>
     candidate.intentExtractor ? [candidate.intentExtractor] : []
   );

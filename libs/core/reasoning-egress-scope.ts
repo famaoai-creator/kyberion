@@ -43,7 +43,8 @@ export function getReasoningPayloadScope(): ReasoningPayloadScope | undefined {
 }
 
 /** Backends that keep material on this machine. */
-const LOCAL_BACKENDS = /^(stub|local|ollama|mlx|apple-intelligence)$/u;
+const LOCAL_BACKENDS =
+  /^(stub|local|ollama|vllm|lmstudio|llamacpp|mlx|localai|apple-intelligence)$/u;
 
 export function isLocalReasoningBackend(backendName: string): boolean {
   return LOCAL_BACKENDS.test(backendName);
@@ -82,11 +83,10 @@ export class ReasoningEgressDeniedError extends Error {
 /**
  * Throw if the ambient scope forbids sending to this backend.
  *
- * No ambient scope means no restriction. That is a deliberate compatibility
- * choice — most reasoning calls carry no tenant material, and defaulting to
- * deny would stop the system rather than protect it — but it does mean the
- * gate only helps where callers declare their scope. Paths that handle tenant
- * documents are expected to set it; that is the contract, not an optimization.
+ * Without an ambient scope, local endpoints and explicitly allowlisted public
+ * endpoints remain usable. Unknown public destinations are denied until the
+ * caller declares a payload scope, so a missing scope cannot silently turn
+ * into unrestricted external egress.
  */
 export function assertReasoningEgressAllowed(backendName: string): void {
   assertReasoningEgressAllowedAtEndpoint(backendName, reasoningBackendEndpoint(backendName));
@@ -98,7 +98,20 @@ export function assertReasoningEgressAllowedAtEndpoint(
   endpoint: string
 ): void {
   const scope = getReasoningPayloadScope();
-  if (!scope) return;
+  if (!scope) {
+    // A missing scope is treated as public only after the destination itself
+    // is approved. This preserves ordinary public prompts while preventing a
+    // forgotten scope declaration from becoming an unrestricted exfiltration
+    // path to arbitrary endpoints.
+    if (isLocalReasoningBackend(backendName) || isLocalReasoningEndpoint(endpoint)) return;
+    const decision = evaluateEgressPolicy(endpoint, { tier: 'public' });
+    if (decision.verdict !== 'allow') {
+      throw new ReasoningEgressDeniedError(
+        `[REASONING_EGRESS_SCOPE_REQUIRED] ${backendName} endpoint is not approved without an explicit payload scope: ${decision.reason}`
+      );
+    }
+    return;
+  }
   if (scope.tier === 'public') return;
   if (isLocalReasoningBackend(backendName)) return;
 
@@ -112,5 +125,24 @@ export function assertReasoningEgressAllowedAtEndpoint(
       `[EGRESS] blocked a ${scope.tier} payload from reaching ${backendName}: ${decision.reason}`
     );
     throw new ReasoningEgressDeniedError(decision.reason);
+  }
+}
+
+function isLocalReasoningEndpoint(endpoint: string): boolean {
+  try {
+    const hostname = new URL(endpoint).hostname.toLowerCase().replace(/^\[(.*)\]$/, '$1');
+    return (
+      hostname === 'localhost' ||
+      hostname === '0.0.0.0' ||
+      hostname === '::' ||
+      hostname === '::1' ||
+      /^127\./u.test(hostname) ||
+      /^10\./u.test(hostname) ||
+      /^192\.168\./u.test(hostname) ||
+      /^172\.(1[6-9]|2\d|3[0-1])\./u.test(hostname) ||
+      /^fd[0-9a-f]{2}:/u.test(hostname)
+    );
+  } catch {
+    return false;
   }
 }
