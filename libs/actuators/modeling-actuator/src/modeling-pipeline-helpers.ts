@@ -21,6 +21,17 @@ import * as AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import { terraformToArchitectureAdf } from './terraform-architecture.js';
 import { terraformToTopologyIr } from './terraform-topology.js';
+import {
+  deriveTestInventory,
+  evaluateArchitectureReady,
+  evaluateCustomerSignoff,
+  evaluateQaReady,
+  evaluateRequirementsCompleteness,
+  extractDesignSpec,
+  extractRequirements,
+  extractTestPlan,
+} from './sdlc-ops.js';
+import type { SoftwareQualityContract } from '@agent/core';
 
 const MODEL_MANIFEST_PATH = pathResolver.rootResolve(
   'libs/actuators/modeling-actuator/manifest.json'
@@ -100,10 +111,8 @@ export async function executePipeline(
     {
       capture: opCapture,
       transform: opTransform,
-      apply: async (op, params, currentCtx, resolve) => {
-        await opApply(op, params, currentCtx, resolve);
-        return currentCtx;
-      },
+      apply: async (op, params, currentCtx, resolve) =>
+        await opApply(op, params, currentCtx, resolve),
       control: opControl,
     }
   );
@@ -645,10 +654,109 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
         return undefined;
       }, buildRetryOptions());
       break;
+    case 'extract_requirements': {
+      const result = await extractRequirements({
+        mission_id: resolve(params.mission_id),
+        project_name: resolve(params.project_name),
+        source_path: resolve(params.source_path) || resolve(params.transcript_path),
+        source_type: resolve(params.source_type),
+        language: resolve(params.language),
+        customer_name: resolve(params.customer_name),
+        customer_person_slug: resolve(params.customer_person_slug),
+        customer_org: resolve(params.customer_org),
+        prior_draft_ref: resolve(params.prior_draft_ref),
+      });
+      return { ...ctx, [params.export_as || 'requirements_result']: result };
+    }
+    case 'extract_design_spec': {
+      const result = await extractDesignSpec({
+        mission_id: resolve(params.mission_id),
+        project_name: resolve(params.project_name),
+        requirements_draft_path: resolve(params.requirements_draft_path),
+        additional_context: resolve(params.additional_context),
+      });
+      return { ...ctx, [params.export_as || 'design_spec_result']: result };
+    }
+    case 'extract_test_plan': {
+      const result = await extractTestPlan({
+        mission_id: resolve(params.mission_id),
+        project_name: resolve(params.project_name),
+        app_id: resolve(params.app_id),
+        requirements_draft_path: resolve(params.requirements_draft_path),
+        design_spec_path: resolve(params.design_spec_path),
+      });
+      return { ...ctx, [params.export_as || 'test_plan_result']: result };
+    }
+    case 'derive_test_inventory': {
+      const contractPath = resolve(params.contract_path);
+      const contract =
+        params.contract ??
+        ctx[params.contract_from || 'quality_contract'] ??
+        (contractPath && safeExistsSync(pathResolver.rootResolve(contractPath))
+          ? JSON.parse(
+              safeReadFile(pathResolver.rootResolve(contractPath), { encoding: 'utf8' }) as string
+            )
+          : null);
+      if (!contract) throw new Error('[derive_test_inventory] quality contract not found');
+      const systemTags = params.system_tags ?? ctx[params.system_tags_from || 'system_tags'];
+      const riskRefs = params.risk_refs ?? ctx[params.risk_refs_from || 'risk_refs'];
+      const result = await deriveTestInventory({
+        contract: contract as SoftwareQualityContract,
+        system_tags: Array.isArray(systemTags) ? systemTags.map(String) : [],
+        risk_refs: Array.isArray(riskRefs) ? riskRefs.map(String) : [],
+        additional_context: resolve(params.additional_context),
+        project_id: resolve(params.project_id) || undefined,
+      });
+      const outputPath = resolve(params.output_path);
+      if (outputPath) {
+        safeWriteFile(
+          pathResolver.rootResolve(outputPath),
+          `${JSON.stringify(result, null, 2)}\n`,
+          { encoding: 'utf8' }
+        );
+      }
+      return {
+        ...ctx,
+        [params.export_as || 'test_inventory']: result,
+        ...(outputPath ? { written_to: outputPath } : {}),
+      };
+    }
+    case 'evaluate_requirements_completeness':
+      return {
+        ...ctx,
+        [params.export_as || 'requirements_completeness']: evaluateRequirementsCompleteness(
+          resolve(params.mission_id)
+        ),
+      };
+    case 'evaluate_customer_signoff':
+      return {
+        ...ctx,
+        [params.export_as || 'customer_signoff']: evaluateCustomerSignoff(
+          resolve(params.mission_id)
+        ),
+      };
+    case 'evaluate_architecture_ready':
+      return {
+        ...ctx,
+        [params.export_as || 'architecture_ready']: evaluateArchitectureReady(
+          resolve(params.mission_id)
+        ),
+      };
+    case 'evaluate_qa_ready': {
+      const mustHaveIds = params.must_have_ids ?? ctx[params.must_have_ids_from || 'must_have_ids'];
+      return {
+        ...ctx,
+        [params.export_as || 'qa_ready']: evaluateQaReady(
+          resolve(params.mission_id),
+          Array.isArray(mustHaveIds) ? mustHaveIds.map(String) : []
+        ),
+      };
+    }
     case 'log':
       logger.info(`[MODELING_LOG] ${resolve(params.message || 'Action completed')}`);
       break;
   }
+  return ctx;
 }
 
 export async function performReconcile(input: ModelingAction) {

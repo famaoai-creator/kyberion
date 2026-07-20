@@ -23,7 +23,19 @@ export const MODELING_ACTUATOR_TRANSFORM_OPS = [
   'web_profile_to_ui_flow_adf',
 ] as const;
 
-export const MODELING_ACTUATOR_APPLY_OPS = ['log', 'write_artifact', 'write_file'] as const;
+export const MODELING_ACTUATOR_APPLY_OPS = [
+  'derive_test_inventory',
+  'evaluate_architecture_ready',
+  'evaluate_customer_signoff',
+  'evaluate_qa_ready',
+  'evaluate_requirements_completeness',
+  'extract_design_spec',
+  'extract_requirements',
+  'extract_test_plan',
+  'log',
+  'write_artifact',
+  'write_file',
+] as const;
 
 export const MODELING_ACTUATOR_CONTROL_OPS = ['if', 'while'] as const;
 

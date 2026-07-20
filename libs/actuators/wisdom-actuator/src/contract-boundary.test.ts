@@ -261,6 +261,30 @@ describe('wisdom public contract boundaries', () => {
     }
   });
 
+  it('routes SDLC artifact and quality operations to modeling', () => {
+    const source = safeReadFile(
+      pathResolver.rootResolve('libs/actuators/wisdom-actuator/src/decision-ops.ts'),
+      { encoding: 'utf8' }
+    ) as string;
+    expect(source).not.toContain("case 'extract_requirements'");
+    expect(source).not.toContain("case 'extract_design_spec'");
+    expect(source).not.toContain("case 'extract_test_plan'");
+    for (const op of [
+      'extract_requirements',
+      'extract_design_spec',
+      'extract_test_plan',
+      'derive_test_inventory',
+      'evaluate_requirements_completeness',
+      'evaluate_customer_signoff',
+      'evaluate_architecture_ready',
+      'evaluate_qa_ready',
+    ]) {
+      expect(describeOps().find((entry) => entry.op === op)).toMatchObject({
+        forward_to: { actuator: 'modeling' },
+      });
+    }
+  });
+
   it('forwards a boundary operation through the typed port in canonical mode', async () => {
     const forward = vi.fn().mockResolvedValue({
       forwarded_to: 'terminal:shell_command',
