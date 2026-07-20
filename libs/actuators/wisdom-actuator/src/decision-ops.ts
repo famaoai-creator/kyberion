@@ -63,7 +63,6 @@ import {
   resolveDecisionRightsMatrix,
   curateBackgroundReviewProposals,
 } from '@agent/core';
-import { getAllFiles } from '@agent/core/fs-utils';
 import * as path from 'node:path';
 import { z } from 'zod';
 import { assignWisdomContextValue, mergeWisdomContext } from './contracts/wisdom-context.js';
@@ -74,6 +73,16 @@ import {
   runPureReasoning,
   runReasoningLoop,
 } from './reasoning/reasoning-ops.js';
+import {
+  computeReadinessMatrix,
+  recommend,
+  stakeholderGridSort,
+} from './decision-support/stakeholder-ops.js';
+export {
+  computeReadinessMatrix,
+  recommend,
+  stakeholderGridSort,
+} from './decision-support/stakeholder-ops.js';
 
 /**
  * Decision-support operations for Kyberion.
@@ -635,23 +644,6 @@ function warnStub(op: string, note?: string): void {
 // ---------------------------------------------------------------------------
 
 /**
- * Sort stakeholder nodes by Power/Interest grid.
- * Input: array of { person_slug, power_level ('high'|'low'), interest_level ('high'|'low'), ... }
- * Output: ordered array, High-Power/High-Interest first, Low/Low last.
- */
-export function stakeholderGridSort(nodes: any[]): any[] {
-  const rank = (n: any): number => {
-    const p = (n.power_level || n.power || 'low').toLowerCase();
-    const i = (n.interest_level || n.interest || 'low').toLowerCase();
-    if (p === 'high' && i === 'high') return 0; // manage closely
-    if (p === 'high' && i === 'low') return 1; // keep satisfied
-    if (p === 'low' && i === 'high') return 2; // keep informed
-    return 3; // monitor
-  };
-  return [...nodes].sort((a, b) => rank(a) - rank(b));
-}
-
-/**
  * Emit dissent log from a hypothesis tree or arbitrary source with {hypotheses}.
  * Filters hypotheses with `status === 'rejected'` (or falsy `survived`) and
  * writes a schema-conformant dissent-log.json.
@@ -791,93 +783,6 @@ export function renderHypothesisReport(input: {
   safeMkdir(path.dirname(pathResolver.rootResolve(input.output_path)), { recursive: true });
   safeWriteFile(pathResolver.rootResolve(input.output_path), lines.join('\n'));
   return { written_to: input.output_path, sections: personaEntries.length };
-}
-
-/**
- * Aggregate nemawashi 1-on-1 visit files into a readiness matrix.
- * Expects visit files with { person_slug, stance, conditions, dissent_signals, visited_at }.
- */
-export function computeReadinessMatrix(input: {
-  visits_dir: string;
-  proposal_ref?: string;
-  deadline?: string;
-  output_path: string;
-}): {
-  readiness_score: number;
-  recommendation: 'proceed' | 'delay' | 'redesign';
-  written_to: string;
-} {
-  const dirAbs = pathResolver.rootResolve(input.visits_dir);
-  const files = safeExistsSync(dirAbs)
-    ? getAllFiles(dirAbs).filter((f) => f.endsWith('.json'))
-    : [];
-
-  const visits = files
-    .map((f) => {
-      try {
-        return JSON.parse(safeReadFile(f, { encoding: 'utf8' }) as string);
-      } catch {
-        return null;
-      }
-    })
-    .filter(Boolean);
-
-  const stanceWeight: Record<string, number> = {
-    support: 100,
-    conditional: 60,
-    neutral: 40,
-    oppose: 0,
-  };
-
-  const totalWeight = visits.reduce(
-    (sum: number, v: any) => sum + (stanceWeight[v.stance] ?? 30),
-    0
-  );
-  const readinessScore = visits.length === 0 ? 0 : Math.round(totalWeight / visits.length);
-
-  let recommendation: 'proceed' | 'delay' | 'redesign';
-  if (readinessScore >= 70) recommendation = 'proceed';
-  else if (readinessScore >= 40) recommendation = 'delay';
-  else recommendation = 'redesign';
-
-  const payload = {
-    proposal_ref: input.proposal_ref || null,
-    deadline: input.deadline || null,
-    visits: visits.map((v: any) => ({
-      person_slug: v.person_slug,
-      visited_at: v.visited_at,
-      stance: v.stance,
-      conditions: v.conditions || [],
-      dissent_signals: v.dissent_signals || [],
-    })),
-    readiness_score: readinessScore,
-    recommendation,
-    generated_at: nowIso(),
-  };
-  writeJSON(input.output_path, payload);
-  return { readiness_score: readinessScore, recommendation, written_to: input.output_path };
-}
-
-/**
- * Deterministic recommender that maps readiness_score to an action label.
- * No LLM — driven purely by the thresholds in readiness matrix output.
- */
-export function recommend(input: { readiness_ref: string; options?: string[] }): {
-  choice: string;
-  reason: string;
-} {
-  const matrix = readJSON<any>(input.readiness_ref);
-  const score = Number(matrix.readiness_score ?? 0);
-  const choice: string =
-    matrix.recommendation || (score >= 70 ? 'proceed' : score >= 40 ? 'delay' : 'redesign');
-  const allowed = input.options || ['proceed', 'delay', 'redesign'];
-  if (!allowed.includes(choice)) {
-    return {
-      choice: allowed[allowed.length - 1],
-      reason: `score ${score} did not map to any allowed option; falling back`,
-    };
-  }
-  return { choice, reason: `readiness_score=${score}` };
 }
 
 /**
