@@ -4,9 +4,22 @@ import { makeWisdomReceipt, type WisdomReceipt } from './contracts/wisdom-result
 import type { WisdomOperationKind } from './contracts/wisdom-operation.js';
 
 export interface WisdomStepHandlers {
-  capture(op: string, params: unknown, context: WisdomContext): Promise<WisdomContext>;
-  transform(op: string, params: unknown, context: WisdomContext): Promise<WisdomContext>;
-  apply(op: string, params: unknown, context: WisdomContext): Promise<WisdomContext>;
+  capture(op: string, params: unknown, context: WisdomContext): Promise<WisdomContext | undefined>;
+  transform(
+    op: string,
+    params: unknown,
+    context: WisdomContext
+  ): Promise<WisdomContext | undefined>;
+  apply(op: string, params: unknown, context: WisdomContext): Promise<WisdomContext | undefined>;
+}
+
+export interface WisdomDispatcherOptions {
+  fallback?: (
+    kind: WisdomOperationKind,
+    op: string,
+    params: unknown,
+    context: WisdomContext
+  ) => Promise<WisdomContext>;
 }
 
 export interface WisdomDispatchResult {
@@ -28,7 +41,10 @@ function assertOperationKind(op: string, requestedKind: WisdomOperationKind): vo
   }
 }
 
-export function createWisdomDispatcher(handlers: WisdomStepHandlers) {
+export function createWisdomDispatcher(
+  handlers: WisdomStepHandlers,
+  options: WisdomDispatcherOptions = {}
+) {
   const dispatch = async (
     kind: WisdomOperationKind,
     op: string,
@@ -40,7 +56,14 @@ export function createWisdomDispatcher(handlers: WisdomStepHandlers) {
     const spec = getWisdomOperationSpec(op);
     if (!spec) throw new Error(`[UNKNOWN_OP] Unknown wisdom operation: ${op}`);
 
-    const nextContext = await handlers[kind](op, params, context);
+    const handledContext = await handlers[kind](op, params, context);
+    const nextContext =
+      handledContext ??
+      (options.fallback
+        ? await options.fallback(kind, op, params, context)
+        : (() => {
+            throw new Error(`[UNKNOWN_OP] Unknown ${kind} operation: ${op}`);
+          })());
     const canonicalOp = spec.canonical_op || op;
     const compatibility =
       spec.deprecated || spec.forward_to

@@ -289,4 +289,17 @@ describe('wisdom public contract boundaries', () => {
     expect(source).not.toContain('ensureAgentRuntime');
     expect(source).not.toContain('getAgentExecutionPort');
   });
+
+  it('keeps decision fallback inside the typed dispatcher and removes Wisdom shell/file handlers', () => {
+    const pipelineSource = safeReadFile(
+      pathResolver.rootResolve('libs/actuators/wisdom-actuator/src/wisdom-pipeline-helpers.ts'),
+      { encoding: 'utf8' }
+    ) as string;
+
+    expect(pipelineSource).toContain('fallback: async (_kind, op, params, currentCtx)');
+    expect(pipelineSource).not.toContain('safeExec(');
+    expect(pipelineSource).not.toContain(
+      'const decision = await dispatchDecisionOp(op, params, ctx'
+    );
+  });
 });
