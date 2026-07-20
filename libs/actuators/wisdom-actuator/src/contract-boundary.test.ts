@@ -6,6 +6,7 @@ import {
   resetActuatorForwardingPort,
 } from '@agent/core';
 import { describeOps } from './op-catalog.js';
+import { dispatchDecisionOp } from './decision-ops.js';
 import { handleAction, runWithOperationRetry } from './wisdom-pipeline-helpers.js';
 import { createWisdomDispatcher } from './wisdom-dispatcher.js';
 
@@ -326,6 +327,19 @@ describe('wisdom public contract boundaries', () => {
     }
   });
 
+  it('does not retain Media or Voice implementations in Wisdom', () => {
+    const source = safeReadFile(
+      pathResolver.rootResolve('libs/actuators/wisdom-actuator/src/decision-ops.ts'),
+      { encoding: 'utf8' }
+    ) as string;
+    for (const op of ['find_slides_by_owner', 'pptx_diff', 'transcribe_audio']) {
+      expect(source).not.toContain(`case '${op}'`);
+      expect(describeOps().find((entry) => entry.op === op)).toMatchObject({
+        forward_to: expect.any(Object),
+      });
+    }
+  });
+
   it('routes task-plan decomposition and projection to orchestrator', () => {
     const wisdomSource = safeReadFile(
       pathResolver.rootResolve('libs/actuators/wisdom-actuator/src/decision-ops.ts'),
@@ -401,6 +415,24 @@ describe('wisdom public contract boundaries', () => {
           target_actuator: 'terminal',
           target_op: 'shell_command',
         })
+      );
+    } finally {
+      resetActuatorForwardingPort();
+    }
+  });
+
+  it('derives a stable idempotency key for compatibility retries', async () => {
+    const forward = vi.fn().mockResolvedValue({
+      forwarded_to: 'terminal:shell_command',
+      status: 'succeeded',
+      result: { stdout: 'forwarded' },
+    });
+    registerActuatorForwardingPort({ forward });
+    try {
+      await dispatchDecisionOp('shell', { cmd: 'printf forwarded' }, {});
+      await dispatchDecisionOp('shell', { cmd: 'printf forwarded' }, {});
+      expect(forward.mock.calls[0][0].idempotency_key).toBe(
+        forward.mock.calls[1][0].idempotency_key
       );
     } finally {
       resetActuatorForwardingPort();

@@ -133,6 +133,7 @@ import {
   normalizeXlsxDesignProtocol,
 } from './media-spreadsheet-pipeline-helpers.js';
 import * as path from 'node:path';
+import { findSlidesByOwner, pptxDiff, type MediaSlideText } from './media-slide-ops.js';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import * as excelUtils from '@agent/shared-media';
@@ -1580,70 +1581,32 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
   if (PDF_PYPDF_OPS.has(op)) return opCapture(op, params, ctx, resolve);
   switch (op) {
     case 'find_slides_by_owner': {
-      const slides = params.slides || ctx[params.from || 'last_pptx_slides'] || [];
+      const slides = (params.slides ||
+        ctx[params.from || 'last_pptx_slides'] ||
+        []) as MediaSlideText[];
       const labels = Array.isArray(params.owner_labels)
         ? params.owner_labels.map(String)
         : Array.isArray(ctx[params.owner_labels_from || 'owner_labels'])
           ? ctx[params.owner_labels_from || 'owner_labels'].map(String)
           : [];
-      const mode = params.match_mode || 'substring';
-      const matches = slides.flatMap((slide: any) => {
-        const matched = labels.find((label: string) =>
-          mode === 'run_exact'
-            ? Array.isArray(slide.text_runs) && slide.text_runs.includes(label)
-            : String(slide.concatenated || '').includes(label)
-        );
-        return matched ? [{ slide_index: slide.slide_index, matched_label: matched }] : [];
+      const result = findSlidesByOwner({
+        slides,
+        owner_labels: labels,
+        match_mode: params.match_mode,
       });
       return {
         ...ctx,
-        [params.export_as || 'slide_owner_matches']: {
-          indices: matches.map((entry: any) => entry.slide_index),
-          matches,
-        },
+        [params.export_as || 'slide_owner_matches']: result,
       };
     }
     case 'pptx_diff': {
-      const before = (params.before || ctx[params.before_from || 'before_slides'] || []) as Array<{
-        slide_index: number;
-        text_runs?: string[];
-      }>;
-      const after = (params.after || ctx[params.after_from || 'after_slides'] || []) as Array<{
-        slide_index: number;
-        text_runs?: string[];
-      }>;
-      const byIndexBefore = new Map<number, (typeof before)[number]>(
-        before.map((slide) => [slide.slide_index, slide])
-      );
-      const byIndexAfter = new Map<number, (typeof after)[number]>(
-        after.map((slide) => [slide.slide_index, slide])
-      );
-      const added: number[] = [];
-      const removed: number[] = [];
-      const changed: Array<{ slide_index: number; added_runs: string[]; removed_runs: string[] }> =
-        [];
-      const unchanged: number[] = [];
-      for (const index of Array.from(
-        new Set([...byIndexBefore.keys(), ...byIndexAfter.keys()])
-      ).sort((a, b) => a - b)) {
-        const beforeSlide = byIndexBefore.get(index);
-        const afterSlide = byIndexAfter.get(index);
-        if (!beforeSlide && afterSlide) {
-          added.push(index);
-          continue;
-        }
-        if (beforeSlide && !afterSlide) {
-          removed.push(index);
-          continue;
-        }
-        const beforeRuns = new Set(beforeSlide?.text_runs || []);
-        const afterRuns = new Set(afterSlide?.text_runs || []);
-        const addedRuns = [...afterRuns].filter((run) => !beforeRuns.has(run));
-        const removedRuns = [...beforeRuns].filter((run) => !afterRuns.has(run));
-        if (addedRuns.length === 0 && removedRuns.length === 0) unchanged.push(index);
-        else changed.push({ slide_index: index, added_runs: addedRuns, removed_runs: removedRuns });
-      }
-      return { ...ctx, [params.export_as || 'pptx_diff']: { added, removed, changed, unchanged } };
+      const before = (params.before ||
+        ctx[params.before_from || 'before_slides'] ||
+        []) as MediaSlideText[];
+      const after = (params.after ||
+        ctx[params.after_from || 'after_slides'] ||
+        []) as MediaSlideText[];
+      return { ...ctx, [params.export_as || 'pptx_diff']: pptxDiff({ before, after }) };
     }
     case 'pdf_to_pptx_design': {
       const pdfDesign = ctx[params.from || 'last_pdf_design'];

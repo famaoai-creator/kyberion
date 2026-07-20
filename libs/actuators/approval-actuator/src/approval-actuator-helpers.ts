@@ -79,6 +79,7 @@ export interface ApprovalAction {
     justification?: ApprovalJustification;
     risk?: ApprovalRiskProfile;
     workflow?: ApprovalWorkflowState;
+    idempotency_key?: string;
   };
 }
 
