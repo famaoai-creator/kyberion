@@ -1609,6 +1609,10 @@
           "kind": "apply"
         },
         {
+          "op": "register_presentation_preference_profile",
+          "kind": "apply"
+        },
+        {
           "op": "write_file",
           "kind": "apply"
         },

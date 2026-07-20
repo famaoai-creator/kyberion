@@ -103,6 +103,10 @@ const FORWARD_TARGETS: Record<string, { actuator: string; op: string }> = {
   shell: { actuator: 'terminal', op: 'shell_command' },
   find_slides_by_owner: { actuator: 'media', op: 'find_slides_by_owner' },
   pptx_diff: { actuator: 'media', op: 'pptx_diff' },
+  register_presentation_preference_profile: {
+    actuator: 'media',
+    op: 'register_presentation_preference_profile',
+  },
   transcribe_audio: { actuator: 'voice', op: 'transcribe' },
   extract_action_items: { actuator: 'meeting', op: 'extract_action_items' },
   generate_facilitation_script: { actuator: 'meeting', op: 'generate_facilitation_script' },
