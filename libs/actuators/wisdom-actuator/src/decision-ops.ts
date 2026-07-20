@@ -15,8 +15,6 @@ import {
   findRelevantDistilledKnowledge,
   formatDistilledKnowledgeSummary,
   listDistillCandidateRecords,
-  registerPresentationPreferenceProfile,
-  type PresentationPreferenceProfile,
   resolveReasoningParticipant,
   renderReasoningParticipantContext,
   validateContextOutputTier,
@@ -113,51 +111,6 @@ function generateHeuristicId(): string {
   const time = Date.now().toString(36).toUpperCase();
   const rand = Math.random().toString(36).slice(2, 8).toUpperCase();
   return `HEU-${time}-${rand}`;
-}
-
-// ---------------------------------------------------------------------------
-// Presentation Preference Registration — extracted deck style → reusable
-// personal registry entry. This keeps theme hints and question prompts out of
-// the code path and lets media-actuator resolve the theme from the personal
-// overlay catalog.
-// ---------------------------------------------------------------------------
-
-export interface RegisterPresentationPreferenceProfileOpInput {
-  profile?: PresentationPreferenceProfile;
-  profile_path?: string;
-  registry_path?: string;
-}
-
-export async function registerPresentationPreferenceProfileOp(
-  input: RegisterPresentationPreferenceProfileOpInput
-): Promise<{
-  profile_id: string;
-  registry_path: string;
-  default_profile_id: string;
-}> {
-  const profile =
-    input.profile ??
-    (input.profile_path && safeExistsSync(pathResolver.rootResolve(input.profile_path))
-      ? JSON.parse(
-          safeReadFile(pathResolver.rootResolve(input.profile_path), { encoding: 'utf8' }) as string
-        )
-      : null);
-  if (!profile || typeof profile !== 'object') {
-    throw new Error(
-      '[register_presentation_preference_profile] requires a presentation-preference-profile'
-    );
-  }
-
-  const registryPath = registerPresentationPreferenceProfile(
-    profile as PresentationPreferenceProfile,
-    input.registry_path ? pathResolver.rootResolve(input.registry_path) : undefined
-  );
-
-  return {
-    profile_id: (profile as PresentationPreferenceProfile).profile_id,
-    registry_path: registryPath,
-    default_profile_id: (profile as PresentationPreferenceProfile).profile_id,
-  };
 }
 
 // ---------------------------------------------------------------------------
@@ -1532,18 +1485,6 @@ export async function dispatchDecisionOp(
         mission_id: resolved('mission_id'),
         trigger: resolved('trigger') as CaptureIntuitionInput['trigger'],
         tags: params.tags || ctx[params.tags_from || 'tags'],
-      });
-      return { handled: true, ctx: assign(result) };
-    }
-
-    case 'register_presentation_preference_profile': {
-      const result = await registerPresentationPreferenceProfileOp({
-        profile:
-          params.profile !== undefined
-            ? resolved('profile')
-            : ctx[params.profile_from || 'presentation_preference_profile'],
-        profile_path: resolved('profile_path'),
-        registry_path: resolved('registry_path'),
       });
       return { handled: true, ctx: assign(result) };
     }

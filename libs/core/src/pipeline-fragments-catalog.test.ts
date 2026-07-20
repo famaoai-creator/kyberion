@@ -32,10 +32,10 @@ const FRAGMENTS: Array<{
   {
     file: 'pipelines/fragments/wisdom-sdlc-pack.json',
     requiredOps: [
-      'wisdom:extract_requirements',
-      'wisdom:extract_design_spec',
-      'wisdom:extract_test_plan',
-      'wisdom:decompose_into_tasks',
+      'modeling:extract_requirements',
+      'modeling:extract_design_spec',
+      'modeling:extract_test_plan',
+      'orchestrator:decompose_into_tasks',
     ],
   },
   {

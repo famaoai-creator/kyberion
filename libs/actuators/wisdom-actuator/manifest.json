@@ -219,7 +219,7 @@
       "op": "register_presentation_preference_profile",
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "full",
-      "note": "Persist a presentation-preference-profile in the personal overlay registry so theme hints and question prompts can be reused."
+      "note": "Compatibility forwarder to media-actuator for presentation/design preference registry writes."
     },
     {
       "op": "evaluate_architecture_ready",

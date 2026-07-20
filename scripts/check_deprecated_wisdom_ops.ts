@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { describeOps } from '../libs/actuators/wisdom-actuator/src/op-catalog.js';
-import { getAllFiles } from '../libs/core/fs-utils.js';
-import { pathResolver, safeExistsSync, safeReadFile } from '../libs/core/index.js';
+import { getAllFiles } from '@agent/core/fs-utils';
+import { pathResolver, safeExistsSync, safeReadFile } from '@agent/core';
 
 const DEPRECATED = new Map(
   describeOps()

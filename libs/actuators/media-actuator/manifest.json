@@ -1,6 +1,6 @@
 {
   "actuator_id": "media-actuator",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Document and asset generation engine. Includes document_digest, pptx_slide_text, and pptx_filter_slides for template-inheriting partial-update workflows.",
   "contract_schema": "schemas/media-pipeline.schema.json",
   "resilience_tier": "adaptive_retry",
@@ -87,6 +87,10 @@
       }
     ],
     "apply": [
+      {
+        "op": "register_presentation_preference_profile",
+        "note": "Register a validated presentation preference profile in the media/design policy registry."
+      },
       {
         "op": "pptx_render",
         "note": "Render last_pptx_design to a .pptx file. Supports text, shape, image (imagePath or imageData), table, line, and smartart elements."

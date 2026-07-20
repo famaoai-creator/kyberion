@@ -297,6 +297,7 @@
         "pptx_filter_slides",
         "pptx_patch",
         "pptx_render",
+        "register_presentation_preference_profile",
         "write_file",
         "xlsx_render"
       ]

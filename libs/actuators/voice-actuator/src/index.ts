@@ -124,6 +124,12 @@ export async function handleSingleAction(input: VoiceAction) {
   if (input.action === 'list_voices') {
     return listVoices();
   }
+  if (input.action === 'transcribe') {
+    const payload = (input as any).params
+      ? { action: 'transcribe_voice_sample', ...((input as any).params || {}) }
+      : { ...input, action: 'transcribe_voice_sample' };
+    return transcribeVoiceSample(payload as any);
+  }
   if (input.action === 'generate_voice') {
     return generateVoice(input);
   }
