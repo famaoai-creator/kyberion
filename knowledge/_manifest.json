@@ -8053,12 +8053,6 @@
       "type": "json"
     },
     {
-      "path": "public/design-patterns/media-templates/document-composition-presets/kyberion-overview-20pages.json",
-      "tier": "public",
-      "size": 3392,
-      "type": "json"
-    },
-    {
       "path": "public/design-patterns/media-templates/document-composition-presets/operations-and-diagrams.json",
       "tier": "public",
       "size": 1124,
