@@ -2,11 +2,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { missionDir } from '@agent/core';
-import { taskPlanToNextTasksOp } from '../libs/actuators/wisdom-actuator/src/decision-ops.js';
+import { taskPlanToNextTasks } from '../libs/actuators/orchestrator-actuator/src/task-plan-ops.js';
 
 /**
  * E2E-05 Task 4: sdlc-cycle contract.
- * The pipeline JSON must chain the existing wisdom ops, and the deterministic
+ * The pipeline JSON must chain the existing modeling/orchestrator ops, and the deterministic
  * task-plan → NEXT_TASKS transform must produce worker-contract tasks
  * (reviewer tasks carry review_target + REVIEW-<target>.md).
  */
@@ -22,11 +22,11 @@ describe('sdlc-cycle pipeline contract', () => {
     expect(ops).toEqual([
       'system:log',
       'system:write_artifact',
-      'wisdom:extract_requirements',
-      'wisdom:extract_design_spec',
-      'wisdom:decompose_into_tasks',
-      'wisdom:task_plan_to_next_tasks',
-      'wisdom:extract_test_plan',
+      'modeling:extract_requirements',
+      'modeling:extract_design_spec',
+      'orchestrator:decompose_into_tasks',
+      'orchestrator:task_plan_to_next_tasks',
+      'modeling:extract_test_plan',
       'system:log',
     ]);
     expect(pipeline.context).toHaveProperty('mission_id');
@@ -98,7 +98,7 @@ describe('task_plan_to_next_tasks (deterministic transform)', () => {
   });
 
   it('maps the plan into worker-contract NEXT_TASKS', () => {
-    const result = taskPlanToNextTasksOp({ mission_id: MISSION });
+    const result = taskPlanToNextTasks({ mission_id: MISSION });
     expect(result.task_count).toBe(4);
     const tasks = JSON.parse(fs.readFileSync(path.join(missionPath, 'NEXT_TASKS.json'), 'utf8'));
 

@@ -12,7 +12,7 @@ import {
   safeWriteFile,
   stubReasoningBackend,
 } from '@agent/core';
-import { extractActionItemsOp } from '../libs/actuators/wisdom-actuator/src/decision-ops.js';
+import { extractActionItemsOp } from '../libs/actuators/meeting-actuator/src/meeting-intelligence-ops.js';
 import { runActionItemReminderSweep } from '../scripts/action_item_reminders.js';
 
 const MISSION_ID = 'MSN-MEETING-FOLLOWUP-001';
@@ -113,7 +113,7 @@ describe('meeting-to-value contract', () => {
       'reasoning:analyze'
     );
     expect(pipeline.steps?.find((step) => step.id === 'extract_action_items')?.op).toBe(
-      'wisdom:extract_action_items'
+      'meeting:extract_action_items'
     );
     expect(
       pipeline.steps?.find((step) => step.id === 'extract_action_items')?.params
