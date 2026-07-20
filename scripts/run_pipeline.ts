@@ -46,7 +46,9 @@ import {
   getDefaultWorkerEventStream,
   getDefaultLifecycleHookEngine,
   fireLifecycleHooks,
-  registerActuatorForwardingPort,
+  withActuatorForwardingPort,
+  type ActuatorForwardRequest,
+  type ActuatorForwardingPort,
 } from '@agent/core';
 import { tryRepairJson } from '@agent/core/json-repair';
 import { installPythonVoiceBridgeIfAvailable } from '@agent/core/python-voice-bridge';
@@ -1375,19 +1377,8 @@ export async function runSteps(
 }> {
   const rootDir = pathResolver.rootDir();
   const shellBin = 'bash';
-  const results: RunStepResult[] = [];
-  const totalTopLevelSteps = steps.length;
-  const stepStartTimes = new Map<number, number>();
-  const stepRefStack: PipelineAdfStep[] = [];
-  let includeStack: ReadonlySet<string> = opts._includeStack ?? new Set<string>();
-  let lastKnownCtx: Record<string, unknown> = initialCtx;
-
-  // Cross-actuator compatibility forwarding is registered at the orchestration
-  // boundary. Wisdom only sees the port and never imports another actuator,
-  // which keeps the dependency graph acyclic while allowing legacy wisdom
-  // pipeline steps to execute at their canonical owner.
-  registerActuatorForwardingPort({
-    forward: async (request) => {
+  const forwardingPort: ActuatorForwardingPort = {
+    forward: async (request: ActuatorForwardRequest) => {
       const targetOp = `${request.target_actuator}:${request.target_op}`;
       const targetStep = {
         op: targetOp,
@@ -1404,11 +1395,33 @@ export async function runSteps(
       );
       return {
         forwarded_to: targetOp,
-        status: 'succeeded',
+        status: 'succeeded' as const,
         context: nextContext,
       };
     },
-  });
+  };
+  return withActuatorForwardingPort(forwardingPort, () =>
+    runStepsInternal(steps, initialCtx, opts, rootDir, shellBin)
+  );
+}
+
+async function runStepsInternal(
+  steps: PipelineAdfStep[],
+  initialCtx: Record<string, unknown>,
+  opts: RunStepsOptions,
+  rootDir: string,
+  shellBin: string
+): Promise<{
+  status: 'succeeded' | 'failed';
+  results: RunStepResult[];
+  context: Record<string, unknown>;
+}> {
+  const results: RunStepResult[] = [];
+  const totalTopLevelSteps = steps.length;
+  const stepStartTimes = new Map<number, number>();
+  const stepRefStack: PipelineAdfStep[] = [];
+  let includeStack: ReadonlySet<string> = opts._includeStack ?? new Set<string>();
+  let lastKnownCtx: Record<string, unknown> = initialCtx;
 
   // core:include mutates includeStack around its own nested body only; every
   // other control op just needs a nested run + throw-on-failure, so it's

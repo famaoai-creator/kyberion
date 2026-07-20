@@ -866,6 +866,7 @@ export {
   getActuatorForwardingPort,
   registerActuatorForwardingPort,
   resetActuatorForwardingPort,
+  withActuatorForwardingPort,
 } from './actuator-forwarding-port.js';
 export type {
   ActuatorForwardingPort,
