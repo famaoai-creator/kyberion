@@ -38,22 +38,23 @@
 
 ## 3. 改善ポイント一覧
 
-| ID                                                   | タイトル                                                                   | 優先度 | 規模 | 依存      |
-| ---------------------------------------------------- | -------------------------------------------------------------------------- | ------ | ---- | --------- |
-| [IP-01](./IP-01_ESLINT_GOVERNANCE_ENFORCEMENT.ja.md) | ESLint ガバナンスの実効化(secure-io 不変条件の lint 復活)                  | **P0** | S    | なし      |
-| [IP-02](./IP-02_NATIVE_ENGINE_SECURE_IO.ja.md)       | native-\*-engine 等の secure-io 不変条件違反の解消                         | **P0** | M    | IP-01     |
-| [IP-03](./IP-03_CI_TEST_GATES.ja.md)                 | CI テスト実行範囲の拡大と品質ゲート強化                                    | **P0** | M    | なし      |
-| [IP-04](./IP-04_DEAD_REFERENCE_CLEANUP.ja.md)        | 死んだ参照の一掃と参照整合性チェックの自動化                               | P1     | S    | なし      |
-| [IP-05](./IP-05_ACTUATOR_CLI_RUNNER.ja.md)           | アクチュエータ CLI エントリポイントの共通化と入力検証                      | P1     | M    | なし      |
-| [IP-06](./IP-06_WORKSPACE_CONSISTENCY.ja.md)         | ワークスペース整合性の回復(package.json 欠落・命名不統一)                  | P1     | S    | なし      |
-| [IP-07](./IP-07_CRITICAL_PATH_TESTS.ja.md)           | クリティカルパスへのテスト追加(ADF修復・推論バックエンド等)                | **P0** | M    | なし      |
-| [IP-08](./IP-08_ERROR_HANDLING_DISCIPLINE.ja.md)     | エラーハンドリング規律(握りつぶし catch・浮遊 Promise・process.exit)       | P1     | M    | IP-05推奨 |
-| [IP-09](./IP-09_SHARED_UTILITY_CONSOLIDATION.ja.md)  | 重複ユーティリティの統合(slugify×14・retry×11 ほか)                        | P2     | S    | なし      |
-| [IP-10](./IP-10_GOD_FILE_DECOMPOSITION.ja.md)        | 巨大ファイルの分割(4,500〜5,300行級 5ファイル)                             | P2     | L    | IP-07     |
-| [IP-11](./IP-11_TYPE_SAFETY_RATCHET.ja.md)           | 型安全性ラチェット(strict 化・any 削減 約2,900箇所)                        | P2     | L    | IP-03     |
-| [IP-12](./IP-12_EXECUTION_MODE_UNIFICATION.ja.md)    | スクリプト実行モードの統一と baseline-check 高速化                         | P2     | M    | なし      |
-| [IP-13](./IP-13_MODEL_ID_CENTRALIZATION.ja.md)       | モデルIDの一元管理と陳腐化解消                                             | P1     | S    | なし      |
-| [IP-14](./IP-14_REPO_HYGIENE.ja.md)                  | リポジトリ衛生(ハードコードパス・死んだ共有ライブラリ・陳腐化ドキュメント) | P2     | S    | なし      |
+| ID                                                        | タイトル                                                                   | 優先度 | 規模 | 依存                    |
+| --------------------------------------------------------- | -------------------------------------------------------------------------- | ------ | ---- | ----------------------- |
+| [IP-01](./IP-01_ESLINT_GOVERNANCE_ENFORCEMENT.ja.md)      | ESLint ガバナンスの実効化(secure-io 不変条件の lint 復活)                  | **P0** | S    | なし                    |
+| [IP-02](./IP-02_NATIVE_ENGINE_SECURE_IO.ja.md)            | native-\*-engine 等の secure-io 不変条件違反の解消                         | **P0** | M    | IP-01                   |
+| [IP-03](./IP-03_CI_TEST_GATES.ja.md)                      | CI テスト実行範囲の拡大と品質ゲート強化                                    | **P0** | M    | なし                    |
+| [IP-04](./IP-04_DEAD_REFERENCE_CLEANUP.ja.md)             | 死んだ参照の一掃と参照整合性チェックの自動化                               | P1     | S    | なし                    |
+| [IP-05](./IP-05_ACTUATOR_CLI_RUNNER.ja.md)                | アクチュエータ CLI エントリポイントの共通化と入力検証                      | P1     | M    | なし                    |
+| [IP-06](./IP-06_WORKSPACE_CONSISTENCY.ja.md)              | ワークスペース整合性の回復(package.json 欠落・命名不統一)                  | P1     | S    | なし                    |
+| [IP-07](./IP-07_CRITICAL_PATH_TESTS.ja.md)                | クリティカルパスへのテスト追加(ADF修復・推論バックエンド等)                | **P0** | M    | なし                    |
+| [IP-08](./IP-08_ERROR_HANDLING_DISCIPLINE.ja.md)          | エラーハンドリング規律(握りつぶし catch・浮遊 Promise・process.exit)       | P1     | M    | IP-05推奨               |
+| [IP-09](./IP-09_SHARED_UTILITY_CONSOLIDATION.ja.md)       | 重複ユーティリティの統合(slugify×14・retry×11 ほか)                        | P2     | S    | なし                    |
+| [IP-10](./IP-10_GOD_FILE_DECOMPOSITION.ja.md)             | 巨大ファイルの分割(4,500〜5,300行級 5ファイル)                             | P2     | L    | IP-07                   |
+| [IP-11](./IP-11_TYPE_SAFETY_RATCHET.ja.md)                | 型安全性ラチェット(strict 化・any 削減 約2,900箇所)                        | P2     | L    | IP-03                   |
+| [IP-12](./IP-12_EXECUTION_MODE_UNIFICATION.ja.md)         | スクリプト実行モードの統一と baseline-check 高速化                         | P2     | M    | なし                    |
+| [IP-13](./IP-13_MODEL_ID_CENTRALIZATION.ja.md)            | モデルIDの一元管理と陳腐化解消                                             | P1     | S    | なし                    |
+| [RG-01](./RG-01_UNIFIED_REASONING_MODEL_GOVERNANCE.ja.md) | 統一推論・モデルガバナンス基盤(runtime/model/profile/role/fallback の統合) | P1     | L    | IP-13,MO-05,OP-01,SA-04 |
+| [IP-14](./IP-14_REPO_HYGIENE.ja.md)                       | リポジトリ衛生(ハードコードパス・死んだ共有ライブラリ・陳腐化ドキュメント) | P2     | S    | なし                    |
 
 規模: S = 半日〜1日 / M = 2〜5日 / L = 1〜3週(フェーズ分割前提)
 

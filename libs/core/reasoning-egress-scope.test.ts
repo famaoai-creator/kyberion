@@ -70,10 +70,14 @@ describe('scope propagation', () => {
 });
 
 describe('assertReasoningEgressAllowed', () => {
-  it('permits everything when no scope is declared', () => {
-    // Compatibility default: most calls carry no tenant material, and denying
-    // by default would stop the system rather than protect it.
+  it('permits an explicitly allowlisted public endpoint when no scope is declared', () => {
     expect(() => assertReasoningEgressAllowed('anthropic')).not.toThrow();
+  });
+
+  it('blocks an unapproved public endpoint when no scope is declared', () => {
+    expect(() => assertReasoningEgressAllowed('some-new-vendor')).toThrow(
+      ReasoningEgressDeniedError
+    );
   });
 
   it('permits public material to any backend', () => {
@@ -125,7 +129,16 @@ describe('assertReasoningEgressAllowed', () => {
 
 describe('backend classification', () => {
   it('recognizes local backends', () => {
-    for (const name of ['stub', 'ollama', 'local', 'mlx']) {
+    for (const name of [
+      'stub',
+      'ollama',
+      'vllm',
+      'lmstudio',
+      'llamacpp',
+      'local',
+      'mlx',
+      'localai',
+    ]) {
       expect(isLocalReasoningBackend(name)).toBe(true);
     }
     expect(isLocalReasoningBackend('anthropic')).toBe(false);

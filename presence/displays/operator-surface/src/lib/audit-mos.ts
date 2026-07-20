@@ -28,7 +28,8 @@ export interface MosReadEvent {
     | 'knowledge'
     | 'intent_snapshots'
     | 'surface_directory'
-    | 'deliverable_inbox';
+    | 'deliverable_inbox'
+    | 'reasoning_routes';
   resource_id?: string;
   result_count?: number;
 }
