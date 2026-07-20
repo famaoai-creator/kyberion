@@ -68,10 +68,12 @@ export function createWisdomDispatcher(
     const compatibility =
       spec.deprecated || spec.forward_to
         ? {
+            ...(spec.forward_to ? { compatibility_alias: `wisdom:${op}` } : {}),
             ...(spec.deprecated ? { deprecated_alias: op } : {}),
             ...(spec.forward_to
               ? { forwarded_to: `${spec.forward_to.actuator}:${spec.forward_to.op}` }
               : {}),
+            deprecated: true,
           }
         : undefined;
     return {
