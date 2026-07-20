@@ -332,10 +332,15 @@ describe('wisdom public contract boundaries', () => {
       pathResolver.rootResolve('libs/actuators/wisdom-actuator/src/decision-ops.ts'),
       { encoding: 'utf8' }
     ) as string;
-    for (const op of ['find_slides_by_owner', 'pptx_diff', 'transcribe_audio']) {
+    for (const op of [
+      'find_slides_by_owner',
+      'pptx_diff',
+      'register_presentation_preference_profile',
+      'transcribe_audio',
+    ]) {
       expect(source).not.toContain(`case '${op}'`);
       expect(describeOps().find((entry) => entry.op === op)).toMatchObject({
-        forward_to: expect.any(Object),
+        forward_to: op === 'transcribe_audio' ? expect.any(Object) : { actuator: 'media' },
       });
     }
   });

@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { describeOps } from '../libs/actuators/wisdom-actuator/src/op-catalog.js';
-import { getAllFiles } from '../libs/core/fs-utils.js';
-import { pathResolver, safeReadFile } from '../libs/core/index.js';
+import { getAllFiles } from '@agent/core/fs-utils';
+import { pathResolver, safeReadFile } from '@agent/core';
 
 type PipelineKind = 'capture' | 'transform' | 'apply' | 'control';
 type Registry = { domains: Record<string, Record<PipelineKind, string[]>> };
