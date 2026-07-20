@@ -6,9 +6,15 @@ import { handleAction } from './wisdom-pipeline-helpers.js';
 import { runActuatorCli } from '@agent/core';
 
 const main = async () => {
+  const schema = JSON.parse(
+    safeReadFile(pathResolver.rootResolve('schemas/wisdom-action.schema.json'), {
+      encoding: 'utf8',
+    }) as string
+  ) as object;
   await runActuatorCli({
     name: 'wisdom-actuator',
     handleAction,
+    schema,
   });
 };
 

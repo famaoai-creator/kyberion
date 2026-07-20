@@ -110,6 +110,25 @@ describe('wisdom-actuator handleAction', () => {
     expect(result.results[0].error).toContain('Invalid knowledge import tier');
   });
 
+  it('fails closed when knowledge export has no governed origin scope', async () => {
+    mocks.safeReadFile.mockReturnValue('exported knowledge');
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'pipeline',
+      steps: [
+        {
+          type: 'apply',
+          op: 'knowledge_export',
+          params: { path: 'public/example.md' },
+        },
+      ],
+      context: { agent_id: 'agent-test' },
+    });
+
+    expect(result.status).toBe('failed');
+    expect(result.results[0].error).toContain('KNOWLEDGE_ORIGIN_SCOPE_REQUIRED');
+  });
+
   it('registers a presentation preference profile through the personal registry', async () => {
     mocks.safeExistsSync.mockImplementation((filePath: string) =>
       filePath.includes('presentation-preference-registry.json') ? false : true

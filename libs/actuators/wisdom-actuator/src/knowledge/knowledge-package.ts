@@ -6,6 +6,11 @@ import { compileSchemaFromPath, pathResolver, signA2AContent, verifyA2AContent }
 export type KnowledgeTier = 'personal' | 'confidential' | 'public';
 export type KnowledgePackageSignatureStatus = 'absent' | 'verified' | 'rejected';
 
+export interface KnowledgePackageOriginScope {
+  tenantId?: string;
+  projectId?: string;
+}
+
 export interface KnowledgePackageSignature {
   status: KnowledgePackageSignatureStatus;
   algorithm?: 'hmac-sha256';
@@ -168,6 +173,30 @@ export function assertKnowledgePackageTrusted(pkg: KnowledgePackage): void {
   if (!verification.valid) {
     throw new Error(
       `[KNOWLEDGE_PACKAGE_SIGNATURE_INVALID] ${verification.reason || 'invalid signature'}`
+    );
+  }
+}
+
+export function assertKnowledgePackageOriginScope(
+  pkg: KnowledgePackage,
+  scope: KnowledgePackageOriginScope
+): void {
+  const tenantId = String(scope.tenantId || '').trim();
+  if (!tenantId) {
+    throw new Error('[KNOWLEDGE_ORIGIN_SCOPE_REQUIRED] import tenant scope is required');
+  }
+  if (pkg.metadata.origin_tenant_id !== tenantId) {
+    throw new Error(
+      `[KNOWLEDGE_ORIGIN_SCOPE_MISMATCH] package origin tenant ${pkg.metadata.origin_tenant_id} does not match import tenant ${tenantId}`
+    );
+  }
+
+  const originProjectId = String(pkg.metadata.origin_project_id || '').trim();
+  if (!originProjectId) return;
+  const projectId = String(scope.projectId || '').trim();
+  if (!projectId || originProjectId !== projectId) {
+    throw new Error(
+      `[KNOWLEDGE_ORIGIN_SCOPE_MISMATCH] package origin project ${originProjectId} does not match import project ${projectId || 'unknown'}`
     );
   }
 }

@@ -25,6 +25,7 @@ import { getWisdomOperationSpec } from './op-catalog.js';
 import { forwardWisdomBoundaryOperation } from './compatibility/cross-actuator-forwarders.js';
 import {
   assertKnowledgePackage,
+  assertKnowledgePackageOriginScope,
   assertKnowledgePackageTrusted,
   createKnowledgePackage,
   normalizeKnowledgePackageAgentId,
@@ -583,14 +584,53 @@ async function opApply(
         if (!safeExistsSync(sourceFile))
           throw new Error(`Knowledge source not found: ${sourceFile}`);
 
-        const agentId = normalizeKnowledgePackageAgentId(
-          params.origin_agent_id || ctx.agent_id || ctx.execution_context?.agent_id
-        );
-        const originTenantId = String(
-          params.origin_tenant_id || ctx.tenant_id || ctx.execution_context?.tenant_id || ''
+        const securityScope =
+          ctx.security_scope && typeof ctx.security_scope === 'object'
+            ? (ctx.security_scope as Record<string, unknown>)
+            : undefined;
+        const executionTenantId = String(
+          securityScope?.tenant_id || ctx.tenant_id || ctx.execution_context?.tenant_id || ''
         ).trim();
-        if (!originTenantId)
-          throw new Error('[KNOWLEDGE_ORIGIN_SCOPE_REQUIRED] origin_tenant_id is required');
+        if (!executionTenantId) {
+          throw new Error('[KNOWLEDGE_ORIGIN_SCOPE_REQUIRED] export tenant scope is required');
+        }
+        const requestedOriginTenantId = String(params.origin_tenant_id || '').trim();
+        if (
+          requestedOriginTenantId &&
+          executionTenantId &&
+          requestedOriginTenantId !== executionTenantId
+        ) {
+          throw new Error(
+            `[KNOWLEDGE_ORIGIN_SCOPE_MISMATCH] export origin tenant ${requestedOriginTenantId} does not match execution tenant ${executionTenantId}`
+          );
+        }
+        const executionProjectId = String(
+          securityScope?.project_id || ctx.project_id || ctx.execution_context?.project_id || ''
+        ).trim();
+        const requestedOriginProjectId = String(params.origin_project_id || '').trim();
+        if (
+          requestedOriginProjectId &&
+          executionProjectId &&
+          requestedOriginProjectId !== executionProjectId
+        ) {
+          throw new Error(
+            `[KNOWLEDGE_ORIGIN_SCOPE_MISMATCH] export origin project ${requestedOriginProjectId} does not match execution project ${executionProjectId}`
+          );
+        }
+        const executionAgentId = String(
+          ctx.agent_id || ctx.execution_context?.agent_id || ''
+        ).trim();
+        if (!executionAgentId) {
+          throw new Error('[KNOWLEDGE_ORIGIN_IDENTITY_REQUIRED] export agent identity is required');
+        }
+        const requestedOriginAgentId = String(params.origin_agent_id || '').trim();
+        if (requestedOriginAgentId && requestedOriginAgentId !== executionAgentId) {
+          throw new Error(
+            `[KNOWLEDGE_ORIGIN_IDENTITY_MISMATCH] export origin agent ${requestedOriginAgentId} does not match execution agent ${executionAgentId}`
+          );
+        }
+        const agentId = normalizeKnowledgePackageAgentId(executionAgentId);
+        const originTenantId = executionTenantId;
         const sourceTier = normalizeKnowledgeTier(
           params.source_tier || ctx.knowledge_tier || 'confidential'
         );
@@ -602,7 +642,7 @@ async function opApply(
           packageId,
           originAgentId: agentId,
           originTenantId,
-          originProjectId: String(params.origin_project_id || ctx.project_id || '') || undefined,
+          originProjectId: requestedOriginProjectId || executionProjectId || undefined,
           sourceTier,
           requestedTargetTier: normalizeKnowledgeTier(
             params.requested_target_tier || params.visibility || sourceTier
@@ -628,7 +668,8 @@ async function opApply(
 
     case 'knowledge_import':
       await runWithOperationRetry('knowledge_import', async () => {
-        const pkgPath = pathResolver.rootResolve(resolveVars(params.package_path, ctx));
+        const packageSource = params.package_path || params.source_path;
+        const pkgPath = pathResolver.rootResolve(resolveVars(packageSource, ctx));
         if (!safeExistsSync(pkgPath)) throw new Error(`Package not found: ${pkgPath}`);
 
         const targetTier = normalizeKnowledgeTier(params.tier);
@@ -658,6 +699,15 @@ async function opApply(
         }
 
         assertKnowledgePackageTrusted(pkg);
+        const securityScope =
+          ctx.security_scope && typeof ctx.security_scope === 'object'
+            ? (ctx.security_scope as Record<string, unknown>)
+            : undefined;
+        assertKnowledgePackageOriginScope(pkg, {
+          tenantId: securityScope?.tenant_id || ctx.tenant_id || ctx.execution_context?.tenant_id,
+          projectId:
+            securityScope?.project_id || ctx.project_id || ctx.execution_context?.project_id,
+        });
         if (pkg.metadata.requested_target_tier !== targetTier) {
           throw new Error(
             `[KNOWLEDGE_TIER_MISMATCH] package requests ${pkg.metadata.requested_target_tier}, import requested ${targetTier}`
@@ -666,7 +716,8 @@ async function opApply(
 
         const originAgentId = pkg.metadata.origin_agent_id;
         const sourceTier = pkg.metadata.source_tier;
-        if (sourceTier !== 'public' && targetTier === 'public' && !params.promotion_approval_id) {
+        const tierRank = { public: 0, confidential: 1, personal: 2 } as const;
+        if (tierRank[targetTier] < tierRank[sourceTier] && !params.promotion_approval_id) {
           throw new Error(
             '[KNOWLEDGE_PROMOTION_APPROVAL_REQUIRED] promotion approval is required for public import'
           );

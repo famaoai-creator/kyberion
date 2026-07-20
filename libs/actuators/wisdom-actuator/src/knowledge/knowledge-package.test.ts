@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { resetA2ASecretCache } from '@agent/core';
 import {
   assertKnowledgePackage,
+  assertKnowledgePackageOriginScope,
   assertKnowledgePackageTrusted,
   createKnowledgePackage,
 } from './knowledge-package.js';
@@ -73,5 +74,15 @@ describe('knowledge package trust boundary', () => {
         content: { ...pkg.content, path: '../outside.txt' },
       })
     ).toThrow('KNOWLEDGE_PACKAGE_SCHEMA_INVALID');
+  });
+
+  it('fails closed when an import package origin does not match the execution scope', () => {
+    const pkg = makePackage();
+    expect(() => assertKnowledgePackageOriginScope(pkg, { tenantId: 'different-tenant' })).toThrow(
+      'KNOWLEDGE_ORIGIN_SCOPE_MISMATCH'
+    );
+    expect(() => assertKnowledgePackageOriginScope(pkg, {})).toThrow(
+      'KNOWLEDGE_ORIGIN_SCOPE_REQUIRED'
+    );
   });
 });
