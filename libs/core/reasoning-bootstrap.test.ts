@@ -60,6 +60,20 @@ describe('reasoning-bootstrap', () => {
     delete process.env.KYBERION_LOCAL_LLM_URL;
     delete process.env.KYBERION_LOCAL_LLM_MODEL;
     delete process.env.KYBERION_LOCAL_LLM_KEY;
+    delete process.env.KYBERION_OLLAMA_URL;
+    delete process.env.OLLAMA_HOST;
+    delete process.env.KYBERION_OLLAMA_MODEL;
+    delete process.env.KYBERION_VLLM_URL;
+    delete process.env.KYBERION_VLLM_MODEL;
+    delete process.env.KYBERION_LMSTUDIO_URL;
+    delete process.env.KYBERION_LM_STUDIO_URL;
+    delete process.env.KYBERION_LMSTUDIO_MODEL;
+    delete process.env.KYBERION_LLAMACPP_URL;
+    delete process.env.KYBERION_LLAMACPP_MODEL;
+    delete process.env.KYBERION_MLX_URL;
+    delete process.env.KYBERION_MLX_MODEL;
+    delete process.env.KYBERION_LOCALAI_URL;
+    delete process.env.KYBERION_LOCALAI_MODEL;
     delete process.env.KYBERION_NEMOTRON_URL;
     delete process.env.KYBERION_NEMOTRON_MODEL;
     delete process.env.KYBERION_NEMOTRON_KEY;
@@ -101,6 +115,27 @@ describe('reasoning-bootstrap', () => {
 
     expect(installed).toBe(true);
     expect(getInstalledReasoningMode()).toBe('local');
+    expect(getReasoningBackend().name).toBe('openai-compatible');
+  });
+
+  it('installs the Ollama backend when configured explicitly or via mode=ollama', () => {
+    process.env.KYBERION_OLLAMA_URL = 'http://127.0.0.1:11434';
+    process.env.KYBERION_OLLAMA_MODEL = 'qwen2.5-coder';
+
+    const installed = installReasoningBackends({ mode: 'ollama' });
+
+    expect(installed).toBe(true);
+    expect(getInstalledReasoningMode()).toBe('ollama');
+    expect(getReasoningBackend().name).toBe('openai-compatible');
+  });
+
+  it('installs the vLLM backend when configured explicitly or via mode=vllm', () => {
+    process.env.KYBERION_VLLM_URL = 'http://127.0.0.1:8000/v1';
+
+    const installed = installReasoningBackends({ mode: 'vllm' });
+
+    expect(installed).toBe(true);
+    expect(getInstalledReasoningMode()).toBe('vllm');
     expect(getReasoningBackend().name).toBe('openai-compatible');
   });
 

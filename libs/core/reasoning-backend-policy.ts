@@ -14,6 +14,12 @@ export type ReasoningBackendMode =
   | 'agy-cli'
   | 'copilot'
   | 'local'
+  | 'ollama'
+  | 'vllm'
+  | 'lmstudio'
+  | 'llamacpp'
+  | 'mlx'
+  | 'localai'
   | 'nemotron'
   | 'nemotron-api'
   | 'openrouter'
@@ -39,6 +45,7 @@ export interface ReasoningBackendOpenRouterPolicy {
 
 export interface ReasoningBackendPolicy {
   version: string;
+  route_policy_ref?: string;
   mode_aliases: Record<string, Exclude<ReasoningBackendMode, 'gemini-api'>>;
   allowed_modes: Array<Exclude<ReasoningBackendMode, 'gemini-api'>>;
   auto_select_env_priority: ReasoningBackendEnvPriorityRule[];
@@ -78,6 +85,12 @@ const FALLBACK_POLICY: ReasoningBackendPolicy = {
     'agy-cli',
     'copilot',
     'local',
+    'ollama',
+    'vllm',
+    'lmstudio',
+    'llamacpp',
+    'mlx',
+    'localai',
     'nemotron-api',
     'openrouter',
     'stub',
@@ -85,6 +98,13 @@ const FALLBACK_POLICY: ReasoningBackendPolicy = {
   auto_select_env_priority: [
     { env: 'ANTHROPIC_API_KEY', mode: 'anthropic' },
     { env: 'KYBERION_NEMOTRON_URL', mode: 'nemotron-api' },
+    { env: 'KYBERION_OLLAMA_URL', mode: 'ollama' },
+    { env: 'KYBERION_VLLM_URL', mode: 'vllm' },
+    { env: 'KYBERION_LMSTUDIO_URL', mode: 'lmstudio' },
+    { env: 'KYBERION_LM_STUDIO_URL', mode: 'lmstudio' },
+    { env: 'KYBERION_LLAMACPP_URL', mode: 'llamacpp' },
+    { env: 'KYBERION_MLX_URL', mode: 'mlx' },
+    { env: 'KYBERION_LOCALAI_URL', mode: 'localai' },
     { env: 'KYBERION_LOCAL_LLM_URL', mode: 'local' },
     { env: 'KYBERION_OPENROUTER_KEY', mode: 'openrouter' },
     { env: 'OPENROUTER_API_KEY', mode: 'openrouter' },

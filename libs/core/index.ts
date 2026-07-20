@@ -1236,6 +1236,7 @@ export type {
 export { signA2AContent, verifyA2AContent } from './a2a-envelope-signature.js';
 export {
   buildFailoverReasoningBackend,
+  buildRoleAwareReasoningBackend,
   getReasoningBackend,
   delegateBestOf,
   delegateStructured,
@@ -1414,6 +1415,9 @@ export type {
   TaskModelHintInput,
   TaskModelTier,
 } from './reasoning-model-routing.js';
+export * from './reasoning-route-resolver.js';
+export * from './reasoning-route-doctor.js';
+export * from './reasoning-failure-taxonomy.js';
 export {
   loadVoiceTaskProfileCatalog,
   resolveVoiceTaskDistillTargetKind,

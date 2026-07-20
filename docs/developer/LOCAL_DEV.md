@@ -123,6 +123,15 @@ export KYBERION_REASONING_BACKEND=local
 export KYBERION_LOCAL_LLM_URL=http://127.0.0.1:11434/v1
 export KYBERION_LOCAL_LLM_KEY=not-needed
 export KYBERION_LOCAL_LLM_MODEL=llama3.2
+
+# Use dedicated local LLM runtimes (Ollama, vLLM, LM Studio, llama.cpp, MLX, LocalAI)
+# See detailed setup runbook: docs/operator/LOCAL_LLM_RUNBOOK.md
+export KYBERION_REASONING_BACKEND=ollama
+export KYBERION_OLLAMA_URL=http://localhost:11434
+export KYBERION_OLLAMA_MODEL=qwen2.5-coder
+
+export KYBERION_REASONING_BACKEND=vllm
+export KYBERION_VLLM_URL=http://localhost:8000/v1
 ```
 
 ## Editor setup

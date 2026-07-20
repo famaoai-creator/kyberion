@@ -1,0 +1,52 @@
+{
+  "pipeline_id": "rg-01-reasoning-governance-validation",
+  "version": "1.0.0",
+  "description": "Deterministic readiness checks for the unified reasoning/model governance implementation.",
+  "action": "pipeline",
+  "steps": [
+    {
+      "id": "probe_policy",
+      "role": "source",
+      "op": "system:probe",
+      "produces": { "channel": "policy", "type": "ProbeResult" },
+      "params": { "path": "knowledge/product/governance/reasoning-backend-policy.json" }
+    },
+    {
+      "id": "probe_registry",
+      "role": "source",
+      "op": "system:probe",
+      "produces": { "channel": "registry", "type": "ProbeResult" },
+      "params": { "path": "knowledge/product/governance/model-registry.json" }
+    },
+    {
+      "id": "probe_resolver",
+      "role": "source",
+      "op": "system:probe",
+      "produces": { "channel": "resolver", "type": "ProbeResult" },
+      "params": { "path": "libs/core/reasoning-route-resolver.ts" }
+    },
+    {
+      "id": "probe_cli",
+      "role": "source",
+      "op": "system:probe",
+      "produces": { "channel": "config_cli", "type": "ProbeResult" },
+      "params": { "path": "scripts/reasoning_config.ts" }
+    },
+    {
+      "id": "probe_schema",
+      "role": "source",
+      "op": "system:probe",
+      "produces": { "channel": "schema", "type": "ProbeResult" },
+      "params": { "path": "knowledge/product/schemas/reasoning-route-policy.schema.json" }
+    },
+    {
+      "id": "log_result",
+      "role": "sink",
+      "op": "system:log",
+      "consumes": ["policy", "registry", "resolver", "config_cli", "schema"],
+      "params": {
+        "message": "RG-01 readiness: policy={{policy.exists}} registry={{registry.exists}} resolver={{resolver.exists}} cli={{config_cli.exists}} schema={{schema.exists}}"
+      }
+    }
+  ]
+}

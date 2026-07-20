@@ -1,5 +1,6 @@
 {
   "version": "1.0.0",
+  "route_policy_ref": "knowledge/product/governance/reasoning-route-policy.json",
   "mode_aliases": {
     "gemini-api": "gemini-cli",
     "nemotron": "nemotron-api"
@@ -13,6 +14,12 @@
     "agy-cli",
     "copilot",
     "local",
+    "ollama",
+    "vllm",
+    "lmstudio",
+    "llamacpp",
+    "mlx",
+    "localai",
     "nemotron-api",
     "openrouter",
     "stub"
@@ -25,6 +32,34 @@
     {
       "env": "KYBERION_NEMOTRON_URL",
       "mode": "nemotron-api"
+    },
+    {
+      "env": "KYBERION_OLLAMA_URL",
+      "mode": "ollama"
+    },
+    {
+      "env": "KYBERION_VLLM_URL",
+      "mode": "vllm"
+    },
+    {
+      "env": "KYBERION_LMSTUDIO_URL",
+      "mode": "lmstudio"
+    },
+    {
+      "env": "KYBERION_LM_STUDIO_URL",
+      "mode": "lmstudio"
+    },
+    {
+      "env": "KYBERION_LLAMACPP_URL",
+      "mode": "llamacpp"
+    },
+    {
+      "env": "KYBERION_MLX_URL",
+      "mode": "mlx"
+    },
+    {
+      "env": "KYBERION_LOCALAI_URL",
+      "mode": "localai"
     },
     {
       "env": "KYBERION_LOCAL_LLM_URL",
