@@ -309,6 +309,23 @@ describe('wisdom public contract boundaries', () => {
     }
   });
 
+  it('does not retain approval or deployment implementations in Wisdom', () => {
+    const source = safeReadFile(
+      pathResolver.rootResolve('libs/actuators/wisdom-actuator/src/decision-ops.ts'),
+      { encoding: 'utf8' }
+    ) as string;
+    for (const op of [
+      'evaluate_decision_rights_approval',
+      'escalate_for_review',
+      'deploy_release',
+    ]) {
+      expect(source).not.toContain(`case '${op}'`);
+      expect(describeOps().find((entry) => entry.op === op)).toMatchObject({
+        forward_to: expect.any(Object),
+      });
+    }
+  });
+
   it('routes task-plan decomposition and projection to orchestrator', () => {
     const wisdomSource = safeReadFile(
       pathResolver.rootResolve('libs/actuators/wisdom-actuator/src/decision-ops.ts'),

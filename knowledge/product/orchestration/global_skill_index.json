@@ -1,6 +1,6 @@
 {
   "v": "3.0.0",
-  "t": 30,
+  "t": 31,
   "s": [
     {
       "n": "agent-actuator",
@@ -23,8 +23,8 @@
       "path": "libs/actuators/approval-actuator",
       "d": "Human approval request state transitions and decision handling",
       "s": "implemented",
-      "version": "1.0.0",
-      "capability_count": 4
+      "version": "1.1.0",
+      "capability_count": 6
     },
     {
       "n": "artifact-actuator",
@@ -73,6 +73,14 @@
       "s": "implemented",
       "version": "2.2.0",
       "capability_count": 4
+    },
+    {
+      "n": "deployment-actuator",
+      "path": "libs/actuators/deployment-actuator",
+      "d": "Deployment capability boundary backed by the governed DeploymentAdapter",
+      "s": "implemented",
+      "version": "1.0.0",
+      "capability_count": 1
     },
     {
       "n": "email-actuator",
@@ -232,7 +240,7 @@
       "d": "Knowledge-tier search, injection, import/export, and decision-support operations",
       "s": "implemented",
       "version": "1.3.0",
-      "capability_count": 74
+      "capability_count": 77
     },
     {
       "n": "working-memory-actuator",

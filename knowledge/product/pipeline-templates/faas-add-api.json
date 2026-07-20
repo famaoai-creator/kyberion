@@ -27,8 +27,8 @@
     },
     {
       "id": "requirements",
-      "role": "source",
-      "op": "wisdom:extract_requirements",
+      "role": "sink",
+      "op": "modeling:extract_requirements",
       "produces": { "channel": "requirements", "type": "RequirementsResult" },
       "params": {
         "mission_id": "{{mission_id}}",
@@ -42,8 +42,8 @@
     },
     {
       "id": "design",
-      "role": "source",
-      "op": "wisdom:extract_design_spec",
+      "role": "sink",
+      "op": "modeling:extract_design_spec",
       "produces": { "channel": "design", "type": "DesignResult" },
       "params": {
         "mission_id": "{{mission_id}}",
@@ -53,8 +53,8 @@
     },
     {
       "id": "task_plan",
-      "role": "source",
-      "op": "wisdom:decompose_into_tasks",
+      "role": "sink",
+      "op": "orchestrator:decompose_into_tasks",
       "produces": { "channel": "task_plan", "type": "TaskPlan" },
       "params": {
         "mission_id": "{{mission_id}}",

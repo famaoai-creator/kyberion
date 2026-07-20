@@ -67,8 +67,8 @@
       }
     },
     {
-      "role": "source",
-      "op": "wisdom:extract_requirements",
+      "role": "sink",
+      "op": "modeling:extract_requirements",
       "produces": { "channel": "extraction", "type": "RequirementsResult" },
       "params": {
         "mission_id": "{{mission_id}}",

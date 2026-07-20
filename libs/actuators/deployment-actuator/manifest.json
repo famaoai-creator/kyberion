@@ -1,0 +1,19 @@
+{
+  "actuator_id": "deployment-actuator",
+  "version": "1.0.0",
+  "description": "Deployment capability boundary backed by the governed DeploymentAdapter",
+  "contract_schema": "schemas/deployment-action.schema.json",
+  "resilience_tier": "no_auto_retry_external_effect",
+  "recovery_policy": {
+    "fallback_strategy": "approval_then_adapter",
+    "retry": {
+      "maxRetries": 0,
+      "initialDelayMs": 0,
+      "maxDelayMs": 0,
+      "factor": 1,
+      "jitter": false
+    },
+    "retryable_categories": []
+  },
+  "capabilities": [{ "op": "deploy_release", "platforms": ["darwin", "linux", "win32"] }]
+}

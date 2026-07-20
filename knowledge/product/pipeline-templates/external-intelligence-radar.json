@@ -54,16 +54,13 @@
             "produces": { "channel": "radar_analysis", "type": "AnalysisResult" },
             "params": {
               "instruction": "Compare internal strategy with simulated findings. Identify critical gaps or threats.",
-              "context": [
-                "{{web_findings}}",
-                "{{internal_strategy}}"
-              ]
+              "context": ["{{web_findings}}", "{{internal_strategy}}"]
             }
           },
           {
             "id": "emit-report",
             "role": "sink",
-            "op": "wisdom:write_file",
+            "op": "file:write_file",
             "consumes": "radar_analysis",
             "params": {
               "path": "{{mission_evidence_dir}}/radar-report.md",

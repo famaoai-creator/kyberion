@@ -124,7 +124,7 @@
     "approval": {
       "capture": ["list_pending", "load"],
       "transform": [],
-      "apply": ["create", "decide"]
+      "apply": ["create", "decide", "evaluate_decision_rights", "request_review"]
     },
     "artifact": {
       "capture": ["list", "read_json"],
@@ -225,6 +225,11 @@
       "transform": [],
       "apply": ["exec", "plugin"]
     },
+    "deployment": {
+      "capture": [],
+      "transform": [],
+      "apply": ["deploy_release"]
+    },
     "email": {
       "capture": [],
       "transform": [],
@@ -279,7 +284,9 @@
       "transform": [
         "apply_pattern",
         "apply_theme",
+        "find_slides_by_owner",
         "merge_content",
+        "pptx_diff",
         "proposal_content_from_storyline",
         "proposal_storyline_from_brief",
         "set",

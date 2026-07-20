@@ -27,7 +27,7 @@
     {
       "id": "requirements",
       "type": "apply",
-      "op": "wisdom:extract_requirements",
+      "op": "modeling:extract_requirements",
       "params": {
         "mission_id": "{{mission_id}}",
         "project_name": "{{project_name}}",
@@ -43,7 +43,7 @@
     {
       "id": "design",
       "type": "apply",
-      "op": "wisdom:extract_design_spec",
+      "op": "modeling:extract_design_spec",
       "params": {
         "mission_id": "{{mission_id}}",
         "project_name": "{{project_name}}",
@@ -54,7 +54,7 @@
     {
       "id": "test_plan",
       "type": "apply",
-      "op": "wisdom:extract_test_plan",
+      "op": "modeling:extract_test_plan",
       "params": {
         "mission_id": "{{mission_id}}",
         "project_name": "{{project_name}}",
@@ -65,7 +65,7 @@
     {
       "id": "task_plan",
       "type": "apply",
-      "op": "wisdom:decompose_into_tasks",
+      "op": "orchestrator:decompose_into_tasks",
       "params": {
         "mission_id": "{{mission_id}}",
         "project_name": "{{project_name}}",

@@ -14,8 +14,8 @@
   "steps": [
     {
       "id": "extract",
-      "role": "source",
-      "op": "wisdom:extract_test_plan",
+      "role": "sink",
+      "op": "modeling:extract_test_plan",
       "produces": { "channel": "test_extraction", "type": "TestPlanResult" },
       "params": {
         "mission_id": "{{mission_id}}",

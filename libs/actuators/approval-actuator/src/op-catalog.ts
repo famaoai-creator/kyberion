@@ -13,7 +13,12 @@ export const APPROVAL_ACTUATOR_CAPTURE_OPS = ['load', 'list_pending'] as const;
 
 export const APPROVAL_ACTUATOR_TRANSFORM_OPS = [] as const;
 
-export const APPROVAL_ACTUATOR_APPLY_OPS = ['create', 'decide'] as const;
+export const APPROVAL_ACTUATOR_APPLY_OPS = [
+  'create',
+  'decide',
+  'evaluate_decision_rights',
+  'request_review',
+] as const;
 
 function toSpec(op: string, kind: OpSpecKind) {
   return { op, kind };
