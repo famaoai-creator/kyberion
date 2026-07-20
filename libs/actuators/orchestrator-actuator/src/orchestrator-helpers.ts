@@ -19,11 +19,13 @@ import {
   buildUnknownActuatorOpError,
   validatePipelineAdf,
   registerTaskPlanCoordinator,
+  evaluateTaskPlanReadyGate,
 } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
 import * as path from 'node:path';
 import yaml from 'js-yaml';
 import { executeTaskPlanFromOrchestrator, taskPlanCoordinator } from './task-plan-coordinator.js';
+import { decomposeIntoTasks, taskPlanToNextTasks } from './task-plan-ops.js';
 
 // Legacy core callers are still supported, but the coordinator is owned and
 // registered by the orchestrator actuator rather than by Wisdom or core.
@@ -148,7 +150,7 @@ export async function executePipeline(
             ctx = await opTransform(step.op, step.params, ctx);
             break;
           case 'apply':
-            await opApply(step.op, step.params, ctx);
+            ctx = await opApply(step.op, step.params, ctx);
             break;
         }
       }
@@ -983,6 +985,32 @@ async function opApply(op: string, params: any, ctx: any) {
     case 'log':
       logger.info(`[ORCH_LOG] ${resolveVars(params.message || 'Action completed', ctx)}`);
       break;
+    case 'decompose_into_tasks': {
+      const result = await decomposeIntoTasks({
+        mission_id: String(resolveVars(params.mission_id || ctx.mission_id || '', ctx)),
+        project_name: String(resolveVars(params.project_name || ctx.project_name || '', ctx)),
+        requirements_draft_path: params.requirements_draft_path
+          ? String(resolveVars(params.requirements_draft_path, ctx))
+          : undefined,
+        design_spec_path: params.design_spec_path
+          ? String(resolveVars(params.design_spec_path, ctx))
+          : undefined,
+      });
+      return { ...ctx, [params.export_as || 'task_plan_result']: result };
+    }
+    case 'evaluate_task_plan_ready':
+      return {
+        ...ctx,
+        [params.export_as || 'task_plan_ready']: evaluateTaskPlanReadyGate(
+          String(resolveVars(params.mission_id || ctx.mission_id || '', ctx))
+        ),
+      };
+    case 'task_plan_to_next_tasks': {
+      const result = taskPlanToNextTasks({
+        mission_id: String(resolveVars(params.mission_id || ctx.mission_id || '', ctx)),
+      });
+      return { ...ctx, [params.export_as || 'next_tasks_result']: result };
+    }
     case 'write_execution_plan_set': {
       const planSet =
         ctx[params.from || 'validated_execution_plan_set'] ||
@@ -1007,6 +1035,7 @@ async function opApply(op: string, params: any, ctx: any) {
     default:
       throw buildUnknownOrchestratorOpError(op);
   }
+  return ctx;
 }
 
 export function loadActuatorRequestArchetypes(): any {
