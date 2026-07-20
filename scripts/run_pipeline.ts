@@ -46,6 +46,9 @@ import {
   getDefaultWorkerEventStream,
   getDefaultLifecycleHookEngine,
   fireLifecycleHooks,
+  withActuatorForwardingPort,
+  type ActuatorForwardRequest,
+  type ActuatorForwardingPort,
 } from '@agent/core';
 import { tryRepairJson } from '@agent/core/json-repair';
 import { installPythonVoiceBridgeIfAvailable } from '@agent/core/python-voice-bridge';
@@ -1374,6 +1377,45 @@ export async function runSteps(
 }> {
   const rootDir = pathResolver.rootDir();
   const shellBin = 'bash';
+  const forwardingPort: ActuatorForwardingPort = {
+    forward: async (request: ActuatorForwardRequest) => {
+      const targetOp = `${request.target_actuator}:${request.target_op}`;
+      const targetStep = {
+        op: targetOp,
+        type: resolveStepType({ op: targetOp, params: request.params }),
+        params: request.params,
+      } as PipelineAdfStep;
+      const nextContext = await dispatchLeafOp(
+        targetStep,
+        request.context,
+        rootDir,
+        shellBin,
+        opts,
+        normalizeReasoningPolicy(targetStep)
+      );
+      return {
+        forwarded_to: targetOp,
+        status: 'succeeded' as const,
+        context: nextContext,
+      };
+    },
+  };
+  return withActuatorForwardingPort(forwardingPort, () =>
+    runStepsInternal(steps, initialCtx, opts, rootDir, shellBin)
+  );
+}
+
+async function runStepsInternal(
+  steps: PipelineAdfStep[],
+  initialCtx: Record<string, unknown>,
+  opts: RunStepsOptions,
+  rootDir: string,
+  shellBin: string
+): Promise<{
+  status: 'succeeded' | 'failed';
+  results: RunStepResult[];
+  context: Record<string, unknown>;
+}> {
   const results: RunStepResult[] = [];
   const totalTopLevelSteps = steps.length;
   const stepStartTimes = new Map<number, number>();

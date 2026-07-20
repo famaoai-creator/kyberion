@@ -13,8 +13,8 @@
   "steps": [
     {
       "id": "extract",
-      "role": "source",
-      "op": "wisdom:extract_design_spec",
+      "role": "sink",
+      "op": "modeling:extract_design_spec",
       "produces": { "channel": "design_extraction", "type": "DesignExtraction" },
       "params": {
         "mission_id": "{{mission_id}}",

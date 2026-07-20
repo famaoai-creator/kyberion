@@ -121,7 +121,7 @@
 ### 23. `wisdom-sdlc-pack.json`
 
 - **目的**: requirements → design → test plan → task decomposition を 1 本で進める。
-- **主要操作**: `wisdom:extract_requirements`, `wisdom:extract_design_spec`, `wisdom:extract_test_plan`, `wisdom:decompose_into_tasks`, `wisdom:evaluate_task_plan_ready`, `system:log`
+- **主要操作**: `modeling:extract_requirements`, `modeling:extract_design_spec`, `modeling:extract_test_plan`, `orchestrator:decompose_into_tasks`, `orchestrator:evaluate_task_plan_ready`, `system:log`
 
 ### 24. `meeting-participation-pack-fragment.json`
 

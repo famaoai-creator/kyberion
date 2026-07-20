@@ -1,8 +1,8 @@
 {
   "name": "@actuator/wisdom",
-  "version": "1.0.0",
+  "version": "1.3.0",
   "type": "module",
-  "description": "Identity and Evolution Manager for Kyberion",
+  "description": "Knowledge, governed reasoning, and decision-support actuator for Kyberion",
   "main": "../../../dist/libs/actuators/wisdom-actuator/src/index.js",
   "types": "../../../dist/libs/actuators/wisdom-actuator/src/index.d.ts",
   "scripts": {

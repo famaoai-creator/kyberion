@@ -26,6 +26,43 @@
     { "op": "knowledge_inject", "platforms": ["darwin", "linux", "win32"] },
     { "op": "knowledge_export", "platforms": ["darwin", "linux", "win32"] },
     { "op": "knowledge_import", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "array_count", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "audit_speaker_fairness", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "distill", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "escalate_for_review", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "evaluate_decision_rights_approval", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "evaluate_ensemble_convergence", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "evaluate_simulation_quality", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "execute_self_action_items", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "extract_action_items", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "generate_facilitation_script", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "generate_reminder_message", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "glob_files", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "if", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "inject_prior_knowledge", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "json_query", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "log", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "query", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "react_loop", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "reasoning_loop", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "read_file", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "read_json", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "reasoning", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "regex_extract", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "regex_replace", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "render_hypothesis_report", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "resolve_hypothesis_conflict", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "shell", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "simulate_all_ensemble", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "task_plan_to_next_tasks", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "tool_use", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "propose_tool_calls", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "track_pending_action_items", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "uncertainty_gate", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "while", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "write_artifact", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "write_file", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "yaml_update", "platforms": ["darwin", "linux", "win32"] },
 
     {
       "op": "stakeholder_grid_sort",
@@ -91,6 +128,13 @@
       "note": "Typed participant fanout with per-participant security-scope context compilation and egress/output-tier guards."
     },
     {
+      "op": "counterparty_roleplay",
+      "platforms": ["darwin", "linux", "win32"],
+      "implementation": "stub",
+      "protocol_ref": "knowledge/product/orchestration/rehearsal-protocol.md",
+      "note": "Canonical synthetic-counterparty roleplay; a2a_roleplay remains a deprecated alias."
+    },
+    {
       "op": "cross_critique",
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "stub",
@@ -120,6 +164,13 @@
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "stub",
       "protocol_ref": "knowledge/product/orchestration/stakeholder-consensus-protocol.md"
+    },
+    {
+      "op": "conduct_1on_1",
+      "platforms": ["darwin", "linux", "win32"],
+      "implementation": "compatibility",
+      "protocol_ref": "knowledge/product/orchestration/stakeholder-consensus-protocol.md",
+      "note": "Canonical meeting actuator op; conduct_1on1 remains a deprecated Wisdom alias."
     },
     {
       "op": "extract_dissent_signals",
@@ -175,7 +226,7 @@
       "op": "register_presentation_preference_profile",
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "full",
-      "note": "Persist a presentation-preference-profile in the personal overlay registry so theme hints and question prompts can be reused."
+      "note": "Compatibility forwarder to media-actuator for presentation/design preference registry writes."
     },
     {
       "op": "evaluate_architecture_ready",
@@ -224,7 +275,7 @@
       "op": "execute_task_plan",
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "full",
-      "note": "Topologically orders a mission's task-plan.json and spawns a Claude Code sub-agent per task with full claude_code tool preset. Records each run to task-execution-log.jsonl; skips dependents on failure."
+      "note": "Compatibility forwarder for the orchestrator-owned task-plan coordinator. The orchestrator validates and orders the DAG; each runnable task is delegated through the AgentExecutionPort and recorded to task-execution-log.jsonl."
     },
     {
       "op": "deploy_release",

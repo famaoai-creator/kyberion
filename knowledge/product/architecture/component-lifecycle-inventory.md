@@ -13,22 +13,23 @@ This inventory is generated from the filesystem. Manifest-backed actuators are t
 ## Current Runtime Surface
 
 - Source of truth: `libs/actuators/*/manifest.json`
-- Count: 30
+- Count: 31
 - Rule: If a component should be discoverable by the CLI or governance layer, it needs a `manifest.json`.
 
-- `agent-actuator`: Meta-Actuator for Agent Lifecycle and A2A (6 ops, v1.0.0, schema schemas/agent-action.schema.json)
+- `agent-actuator`: Meta-Actuator for Agent Lifecycle and A2A (7 ops, v1.1.0, schema schemas/agent-action.schema.json)
 - `android-actuator`: Android Device Actuator — ADB pipeline + Android CLI for AI agents (layout, screen capture/resolve, describe, docs search) (1 ops, v1.1.0, schema schemas/mobile-device-pipeline.schema.json)
-- `approval-actuator`: Human approval request state transitions and decision handling (4 ops, v1.0.0, schema schemas/approval-action.schema.json)
+- `approval-actuator`: Human approval request state transitions and decision handling (6 ops, v1.1.0, schema schemas/approval-action.schema.json)
 - `artifact-actuator`: Governed Artifact and Delivery Pack Manager (4 ops, v1.0.0, schema schemas/artifact-action.schema.json)
 - `blockchain-actuator`: Local Ledger Anchoring Simulation (3 ops, v1.1.0, schema schemas/blockchain-action.schema.json)
 - `browser-actuator`: Pipeline-driven Playwright browser execution and session artifact actuator (2 ops, v1.1.0, schema schemas/browser-pipeline.schema.json)
 - `build-actuator`: iOS/Android build, test, archive and app scaffolding — the build stage of the mobile AI-DLC/SDLC loop (8 ops, v1.0.0, schema schemas/build-pipeline.schema.json)
 - `calendar-actuator`: macOS Calendar.app integration using JXA for cross-account schedule coordination (3 ops, v1.0.0, schema schemas/calendar-action.schema.json)
 - `code-actuator`: ADF-driven code analysis and refactoring pipeline engine (4 ops, v2.2.0, schema schemas/code-pipeline.schema.json)
+- `deployment-actuator`: Deployment capability boundary backed by the governed DeploymentAdapter (1 ops, v1.0.0, schema schemas/deployment-action.schema.json)
 - `email-actuator`: Email composition and sending via macOS Mail.app (JXA) with SMTP fallback via nodemailer (3 ops, v1.0.0, schema libs/actuators/email-actuator/schemas/email-action.schema.json)
 - `file-actuator`: Generic File-Actuator for Kyberion (1 ops, v1.1.0, schema schemas/file-pipeline.schema.json)
 - `ios-actuator`: simctl-driven iOS Simulator Actuator (1 ops, v1.1.0, schema schemas/mobile-device-pipeline.schema.json)
-- `media-actuator`: Document and asset generation engine. Includes document_digest, pptx_slide_text, and pptx_filter_slides for template-inheriting partial-update workflows. (1 ops, v1.1.0, schema schemas/media-pipeline.schema.json)
+- `media-actuator`: Document and asset generation engine. Includes document_digest, pptx_slide_text, and pptx_filter_slides for template-inheriting partial-update workflows. (1 ops, v1.2.0, schema schemas/media-pipeline.schema.json)
 - `media-generation-actuator`: Generative image, video, music, and screen capture actuator (12 ops, v1.1.0, schema schemas/media-generation-action.schema.json)
 - `meeting-actuator`: Abstracted online meeting bridge (Zoom, Teams, Google Meet) (6 ops, v1.1.0, schema schemas/meeting-action.schema.json)
 - `meeting-browser-driver`: Internal Playwright MeetingJoinDriver for Meet (primary) + Zoom/Teams (selectors-as-config). Exposes the meeting-browser-driver join_backend label and writes captured audio to an AudioBus. (2 ops, v1.0.0)
@@ -43,15 +44,14 @@ This inventory is generated from the filesystem. Manifest-backed actuators are t
 - `terminal-actuator`: PTY-driven Terminal Actuator (5 ops, v1.0.0, schema schemas/terminal-action.schema.json)
 - `video-composition-actuator`: Governed deterministic composed-video bundle preparation actuator (9 ops, v1.1.0)
 - `vision-actuator`: Perception-oriented compatibility facade; generation and screen capture live in media-generation-actuator (2 ops, v1.3.0, schema schemas/vision-action.schema.json)
-- `voice-actuator`: Governed local voice generation actuator with native playback and artifact fallback (9 ops, v1.2.0, schema schemas/voice-action.schema.json)
-- `wisdom-actuator`: Knowledge-tier search, injection, import/export, and decision-support operations (39 ops, v1.3.0, schema schemas/wisdom-action.schema.json)
+- `voice-actuator`: Governed local voice generation actuator with native playback and artifact fallback (9 ops, v1.3.0, schema schemas/voice-action.schema.json)
+- `wisdom-actuator`: Knowledge-tier search, injection, import/export, and decision-support operations (78 ops, v1.3.0, schema schemas/wisdom-action.schema.json)
 - `working-memory-actuator`: Volatile Knowledge Layer — CRUD + GC + index for working-memory faces (MEMORY.md, NOW.md, daily journal, weekly review, TODO). Dispatched as domain 'working-memory' in pipelines (op: 'working-memory:<action>'). (14 ops, v1.1.0, schema schemas/working-memory-action.schema.json)
 
 ## Legacy Review Queue
 
 - Source of truth: [legacy_component_index.json](knowledge/product/orchestration/legacy_component_index.json)
 - Count: 0
-
 
 ## Consolidation Recommendations
 

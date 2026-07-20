@@ -122,8 +122,8 @@
     },
     {
       "id": "evaluate_decision_rights",
-      "role": "transform",
-      "op": "wisdom:evaluate_decision_rights_approval",
+      "role": "sink",
+      "op": "approval:evaluate_decision_rights",
       "produces": { "channel": "decision_rights_result", "type": "DecisionRightsApprovalResult" },
       "params": {
         "operation_id": "hiring-workflow:{{role_name}}",

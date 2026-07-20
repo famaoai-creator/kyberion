@@ -13,8 +13,8 @@
   "steps": [
     {
       "id": "decompose",
-      "role": "source",
-      "op": "wisdom:decompose_into_tasks",
+      "role": "sink",
+      "op": "orchestrator:decompose_into_tasks",
       "produces": { "channel": "task_extraction", "type": "TaskExtraction" },
       "params": {
         "mission_id": "{{mission_id}}",

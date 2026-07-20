@@ -40,7 +40,7 @@
           {
             "id": "emit-brief",
             "role": "sink",
-            "op": "wisdom:write_file",
+            "op": "file:write_file",
             "consumes": "executive_narrative",
             "params": {
               "path": "{{mission_evidence_dir}}/executive-briefing.md",

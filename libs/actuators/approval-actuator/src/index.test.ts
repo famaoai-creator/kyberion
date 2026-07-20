@@ -170,4 +170,29 @@ describe('approval-actuator handleAction', () => {
     expect(result.requests).toHaveLength(2);
     expect(mocks.retry).toHaveBeenCalled();
   });
+
+  it('dispatches canonical decision-rights evaluation through the approval pipeline owner', async () => {
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'pipeline',
+      steps: [
+        {
+          type: 'apply',
+          op: 'evaluate_decision_rights',
+          params: {
+            operation_id: 'approval:test',
+            correlation_id: 'approval:test:1',
+            decision_type: 'unknown_decision_type',
+            export_as: 'rights_result',
+          },
+        },
+      ],
+      context: {},
+    });
+    expect((result as any).status).toBe('succeeded');
+    expect((result as any).context.rights_result).toMatchObject({
+      allowed: true,
+      status: 'not_required',
+    });
+  });
 });

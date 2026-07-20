@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import { compileSchemaFromPath, pathResolver } from '@agent/core';
+import type { AgentTaskEnvelope } from '@agent/core';
+import type { AgentAction } from './agent-actuator-helpers.js';
 
 const mocks = vi.hoisted(() => {
   const resolveMissionTeamPlan = vi.fn();
@@ -24,6 +26,7 @@ const mocks = vi.hoisted(() => {
   const getAgentRuntimeSnapshot = vi.fn();
   const refreshAgentRuntime = vi.fn();
   const restartAgentRuntime = vi.fn();
+  const getAgentExecutionPort = vi.fn();
 
   return {
     resolveMissionTeamPlan,
@@ -45,6 +48,7 @@ const mocks = vi.hoisted(() => {
     getAgentRuntimeSnapshot,
     refreshAgentRuntime,
     restartAgentRuntime,
+    getAgentExecutionPort,
   };
 });
 const Ajv = (AjvModule as any).default ?? AjvModule;
@@ -92,6 +96,7 @@ vi.mock('@agent/core', async (importOriginal) => {
     getAgentRuntimeSnapshot: mocks.getAgentRuntimeSnapshot,
     refreshAgentRuntime: mocks.refreshAgentRuntime,
     restartAgentRuntime: mocks.restartAgentRuntime,
+    getAgentExecutionPort: mocks.getAgentExecutionPort,
     shutdownAllAgentRuntimes: vi.fn(),
     safeReadFile: vi.fn(),
   };
@@ -131,6 +136,39 @@ describe('agent-actuator team composition actions', () => {
 
     expect(mocks.resolveMissionTeamPlan).toHaveBeenCalledWith({ missionId: 'MSN-TEAM' });
     expect(result).toEqual({ status: 'ok', missionId: 'MSN-TEAM', plan });
+  });
+
+  it('delegates a typed task envelope through the AgentExecutionPort', async () => {
+    const receipt = {
+      execution_kind: 'agent_delegation',
+      task_id: 'TASK-1',
+      agent_id: 'agent-1',
+      status: 'succeeded',
+    };
+    const delegate = vi.fn().mockResolvedValue(receipt);
+    mocks.getAgentExecutionPort.mockReturnValue({ delegate });
+
+    const task: AgentTaskEnvelope = {
+      task_id: 'TASK-1',
+      mission_id: 'MSN-TEAM',
+      agent_id: 'agent-1',
+      security_scope: {
+        tenant_id: 'tenant-a',
+        mission_id: 'MSN-TEAM',
+        read_tiers: ['public'],
+        write_tier: 'public',
+        purpose: 'test',
+      },
+      instruction: 'Inspect the task.',
+      idempotency_key: 'idempotency-task-1',
+    };
+
+    const { handleAction } = await import('./index.js');
+    const action = { action: 'delegate', params: { task } } satisfies AgentAction;
+    const result = await handleAction(action);
+
+    expect(delegate).toHaveBeenCalledWith(task);
+    expect(result).toEqual({ status: 'succeeded', execution_kind: 'agent_delegation', receipt });
   });
 
   it('returns a resolved assignment for team_role', async () => {
@@ -228,6 +266,28 @@ describe('agent-actuator team composition actions', () => {
         action: 'team_plan',
         params: {
           missionId: 'MSN-TEAM',
+        },
+      }),
+      JSON.stringify(validate.errors || [])
+    ).toBe(true);
+
+    expect(
+      validate({
+        action: 'delegate',
+        params: {
+          task: {
+            task_id: 'TASK-1',
+            agent_id: 'agent-1',
+            security_scope: {
+              tenant_id: 'tenant-a',
+              mission_id: 'MSN-TEAM',
+              read_tiers: ['public'],
+              write_tier: 'public',
+              purpose: 'test',
+            },
+            instruction: 'Inspect the task.',
+            idempotency_key: 'idempotency-task-1',
+          },
         },
       }),
       JSON.stringify(validate.errors || [])

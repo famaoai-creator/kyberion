@@ -12,11 +12,7 @@
     "customer_name": "",
     "customer_person_slug": "",
     "customer_org": "",
-    "solution_personas": [
-      "lean-mvp-advocate",
-      "enterprise-architect",
-      "ux-researcher"
-    ]
+    "solution_personas": ["lean-mvp-advocate", "enterprise-architect", "ux-researcher"]
   },
   "steps": [
     {
@@ -46,8 +42,8 @@
     },
     {
       "id": "extract_requirements",
-      "role": "source",
-      "op": "wisdom:extract_requirements",
+      "role": "sink",
+      "op": "modeling:extract_requirements",
       "produces": { "channel": "extraction", "type": "RequirementsExtraction" },
       "params": {
         "mission_id": "{{mission_id}}",
@@ -71,8 +67,8 @@
     },
     {
       "id": "check_completeness",
-      "role": "transform",
-      "op": "wisdom:evaluate_requirements_completeness",
+      "role": "sink",
+      "op": "modeling:evaluate_requirements_completeness",
       "consumes": "extraction",
       "produces": { "channel": "completeness", "type": "CompletenessResult" },
       "params": {
@@ -91,7 +87,7 @@
     {
       "id": "solution_fanout",
       "role": "sink",
-      "op": "wisdom:a2a_fanout",
+      "op": "wisdom:perspective_fanout",
       "params": {
         "personas": "{{solution_personas}}",
         "min_hypotheses_per_persona": 2,
@@ -110,7 +106,7 @@
     {
       "id": "cross_critique",
       "role": "sink",
-      "op": "wisdom:cross_critique",
+      "op": "wisdom:typed_cross_critique",
       "params": {
         "input": "{{mission_evidence_dir}}/solution-proposals-raw.json",
         "personas": "{{solution_personas}}",

@@ -5,6 +5,8 @@ import { pathResolver } from '@agent/core';
 import { handleApprovalAction } from './approval-actuator-helpers.js';
 import { runActuatorCli } from '@agent/core';
 export { handleApprovalAction as handleAction } from './approval-actuator-helpers.js';
+export { describeOps } from './op-catalog.js';
+export { evaluateDecisionRightsOp, requestReviewOp } from './approval-ops.js';
 
 const main = async () => {
   await runActuatorCli({

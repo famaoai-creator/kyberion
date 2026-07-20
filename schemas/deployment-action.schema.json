@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Deployment Actuator Request",
+  "type": "object",
+  "required": ["action"],
+  "properties": {
+    "action": { "enum": ["deploy_release", "pipeline"] },
+    "params": {
+      "type": "object",
+      "required": ["mission_id", "project_name", "version", "environment"],
+      "properties": {
+        "mission_id": { "type": "string", "minLength": 1 },
+        "project_name": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 },
+        "environment": { "type": "string", "minLength": 1 },
+        "release_notes_path": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "steps": { "type": "array", "items": { "type": "object" } },
+    "context": { "type": "object" },
+    "options": { "type": "object" }
+  },
+  "additionalProperties": false
+}

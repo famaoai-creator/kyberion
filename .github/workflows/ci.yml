@@ -75,6 +75,11 @@ jobs:
       - name: Check actuator op registry drift
         run: pnpm run check:op-registry
 
+      # Deprecated Wisdom aliases must stay out of canonical pipeline catalogs;
+      # compatibility remains available only at the typed dispatcher boundary.
+      - name: Check deprecated Wisdom operation usage
+        run: pnpm run check:deprecated-wisdom-ops
+
       # KYBERION_* env references must stay registered in the env registry
       # (OP-05: unregistered vars are invisible to startup validation).
       - name: Check env registry drift

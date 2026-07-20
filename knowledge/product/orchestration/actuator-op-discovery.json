@@ -43,6 +43,10 @@
           "kind": "apply"
         },
         {
+          "op": "delegate",
+          "kind": "apply"
+        },
+        {
           "op": "shutdown",
           "kind": "apply"
         },
@@ -218,6 +222,14 @@
         },
         {
           "op": "decide",
+          "kind": "apply"
+        },
+        {
+          "op": "evaluate_decision_rights",
+          "kind": "apply"
+        },
+        {
+          "op": "request_review",
           "kind": "apply"
         }
       ]
@@ -1023,6 +1035,17 @@
       ]
     },
     {
+      "n": "deployment-actuator",
+      "path": "libs/actuators/deployment-actuator",
+      "source": "describeOps",
+      "ops": [
+        {
+          "op": "deploy_release",
+          "kind": "apply"
+        }
+      ]
+    },
+    {
       "n": "email-actuator",
       "path": "libs/actuators/email-actuator",
       "source": "describeOps",
@@ -1542,7 +1565,15 @@
           "kind": "transform"
         },
         {
+          "op": "find_slides_by_owner",
+          "kind": "transform"
+        },
+        {
           "op": "merge_content",
+          "kind": "transform"
+        },
+        {
+          "op": "pptx_diff",
           "kind": "transform"
         },
         {
@@ -1575,6 +1606,10 @@
         },
         {
           "op": "pptx_render",
+          "kind": "apply"
+        },
+        {
+          "op": "register_presentation_preference_profile",
           "kind": "apply"
         },
         {
@@ -1656,7 +1691,31 @@
           "kind": "capture"
         },
         {
+          "op": "audit_speaker_fairness",
+          "kind": "apply"
+        },
+        {
           "op": "chat",
+          "kind": "apply"
+        },
+        {
+          "op": "conduct_1on_1",
+          "kind": "apply"
+        },
+        {
+          "op": "execute_self_action_items",
+          "kind": "apply"
+        },
+        {
+          "op": "extract_action_items",
+          "kind": "apply"
+        },
+        {
+          "op": "generate_facilitation_script",
+          "kind": "apply"
+        },
+        {
+          "op": "generate_reminder_message",
           "kind": "apply"
         },
         {
@@ -1669,6 +1728,10 @@
         },
         {
           "op": "speak",
+          "kind": "apply"
+        },
+        {
+          "op": "track_pending_action_items",
           "kind": "apply"
         }
       ]
@@ -1735,6 +1798,38 @@
         {
           "op": "web_profile_to_ui_flow_adf",
           "kind": "transform"
+        },
+        {
+          "op": "derive_test_inventory",
+          "kind": "apply"
+        },
+        {
+          "op": "evaluate_architecture_ready",
+          "kind": "apply"
+        },
+        {
+          "op": "evaluate_customer_signoff",
+          "kind": "apply"
+        },
+        {
+          "op": "evaluate_qa_ready",
+          "kind": "apply"
+        },
+        {
+          "op": "evaluate_requirements_completeness",
+          "kind": "apply"
+        },
+        {
+          "op": "extract_design_spec",
+          "kind": "apply"
+        },
+        {
+          "op": "extract_requirements",
+          "kind": "apply"
+        },
+        {
+          "op": "extract_test_plan",
+          "kind": "apply"
         },
         {
           "op": "log",
@@ -1831,11 +1926,27 @@
           "kind": "capture"
         },
         {
+          "op": "decompose_into_tasks",
+          "kind": "apply"
+        },
+        {
           "op": "deploy",
           "kind": "apply"
         },
         {
+          "op": "evaluate_task_plan_ready",
+          "kind": "apply"
+        },
+        {
+          "op": "execute_task_plan",
+          "kind": "apply"
+        },
+        {
           "op": "run_execution_plan_set",
+          "kind": "apply"
+        },
+        {
+          "op": "task_plan_to_next_tasks",
           "kind": "apply"
         }
       ]
@@ -3013,6 +3124,10 @@
           "kind": "apply"
         },
         {
+          "op": "counterparty_roleplay",
+          "kind": "apply"
+        },
+        {
           "op": "adjust_proposal",
           "kind": "apply"
         },
@@ -3026,6 +3141,10 @@
         },
         {
           "op": "compute_readiness_matrix",
+          "kind": "apply"
+        },
+        {
+          "op": "conduct_1on_1",
           "kind": "apply"
         },
         {
@@ -3173,7 +3292,15 @@
           "kind": "apply"
         },
         {
+          "op": "propose_tool_calls",
+          "kind": "apply"
+        },
+        {
           "op": "react_loop",
+          "kind": "apply"
+        },
+        {
+          "op": "reasoning_loop",
           "kind": "apply"
         },
         {
