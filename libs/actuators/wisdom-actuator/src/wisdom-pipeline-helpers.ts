@@ -2,15 +2,12 @@ import {
   logger,
   safeReadFile,
   safeWriteFile,
-  safeAppendFileSync,
   safeMkdir,
-  safeExec,
   safeExistsSync,
   pathResolver,
   resolveVars,
   evaluateCondition,
   getPathValue,
-  resolveWriteArtifactSpec,
   retry,
   buildGovernedRetryOptions,
   classifyError,
@@ -19,7 +16,6 @@ import {
   getReasoningBackend,
   getVoiceBridge,
   getSpeechToTextBridge,
-  getActuatorForwardingPort,
   saveRequirementsDraft,
   evaluateRequirementsCompletenessGate,
   evaluateCustomerSignoffGate,
@@ -55,16 +51,15 @@ import {
   type ActionItemModality,
   type ActionItemReviewState,
   type ActionItemProvenance,
-  type ContextSecurityScope,
   type MeetingFacilitatorPolicy,
   type PresentationPreferenceProfile,
 } from '@agent/core';
-import { getAllFiles } from '@agent/core/fs-utils';
 import * as path from 'node:path';
 import * as yaml from 'js-yaml';
 import { dispatchDecisionOp } from './decision-ops.js';
 import { createWisdomDispatcher } from './wisdom-dispatcher.js';
 import { getWisdomOperationSpec } from './op-catalog.js';
+import { forwardWisdomBoundaryOperation } from './compatibility/cross-actuator-forwarders.js';
 import type { WisdomContext } from './contracts/wisdom-context.js';
 import type { WisdomReceipt } from './contracts/wisdom-result.js';
 import { validateWisdomRequest } from './contracts/wisdom-request.js';
@@ -146,43 +141,6 @@ function normalizeKnowledgePackageAgentId(value: unknown): string {
   return agentId;
 }
 
-async function forwardBoundaryOperation(
-  op: string,
-  params: Record<string, unknown>,
-  ctx: WisdomContext,
-  _compatibilityMode: boolean,
-  defaultExportKey: string
-): Promise<WisdomContext | undefined> {
-  const spec = getWisdomOperationSpec(op);
-  if (!spec?.forward_to) return undefined;
-
-  const forwarded = await getActuatorForwardingPort().forward({
-    source_actuator: 'wisdom-actuator',
-    requested_op: op,
-    target_actuator: spec.forward_to.actuator,
-    target_op: spec.forward_to.op,
-    params,
-    context: ctx,
-    security_scope:
-      ctx.security_scope && typeof ctx.security_scope === 'object'
-        ? (ctx.security_scope as ContextSecurityScope)
-        : undefined,
-    idempotency_key: String(
-      params.idempotency_key || ctx.idempotency_key || `wisdom:${op}:${Date.now()}`
-    ),
-  });
-
-  if (forwarded.status !== 'succeeded') {
-    throw new Error(
-      `[FORWARDED_OP_FAILED] ${op} -> ${spec.forward_to.actuator}:${spec.forward_to.op}: ${forwarded.error || forwarded.status}`
-    );
-  }
-  if (forwarded.context) return forwarded.context as WisdomContext;
-
-  const exportKey = String(params.export_as || defaultExportKey);
-  return { ...ctx, [exportKey]: forwarded.result };
-}
-
 export interface PipelineStep {
   type: 'capture' | 'transform' | 'apply' | 'control';
   op: string;
@@ -244,13 +202,25 @@ export async function executePipeline(
 
   let ctx: WisdomContext = { ...initialCtx, today: new Date().toISOString().split('T')[0] };
   const receipts: WisdomReceipt[] = [];
-  const dispatcher = createWisdomDispatcher({
-    capture: (op, params, currentCtx) =>
-      opCapture(op, params, currentCtx, options.compatibility_mode),
-    transform: (op, params, currentCtx) =>
-      opTransform(op, params, currentCtx, options.compatibility_mode),
-    apply: (op, params, currentCtx) => opApply(op, params, currentCtx, options.compatibility_mode),
-  });
+  const dispatcher = createWisdomDispatcher(
+    {
+      capture: (op, params, currentCtx) =>
+        opCapture(op, params, currentCtx, options.compatibility_mode),
+      transform: (op, params, currentCtx) =>
+        opTransform(op, params, currentCtx, options.compatibility_mode),
+      apply: (op, params, currentCtx) =>
+        opApply(op, params, currentCtx, options.compatibility_mode),
+    },
+    {
+      fallback: async (_kind, op, params, currentCtx) => {
+        const decision = await dispatchDecisionOp(op, params, currentCtx, {
+          compatibilityMode: options.compatibility_mode,
+        });
+        if (!decision.handled) throw new Error(`[UNKNOWN_OP] Unknown wisdom operation: ${op}`);
+        return decision.ctx;
+      },
+    }
+  );
 
   if (contextPath && safeExistsSync(pathResolver.rootResolve(contextPath))) {
     const saved = await retry(
@@ -347,50 +317,14 @@ async function opCapture(
   params: any,
   ctx: any,
   _compatibilityMode = false
-): Promise<WisdomContext> {
-  const forwarded = await forwardBoundaryOperation(
-    op,
-    params,
-    ctx,
-    _compatibilityMode,
-    'last_capture'
-  );
+): Promise<WisdomContext | undefined> {
+  const forwarded = await forwardWisdomBoundaryOperation(op, params, ctx, {
+    compatibilityMode: _compatibilityMode,
+    defaultExportKey: 'last_capture',
+  });
   if (forwarded) return forwarded;
 
   switch (op) {
-    case 'shell':
-      const cmd = resolveVars(params.cmd, ctx);
-      return {
-        ...ctx,
-        [params.export_as || 'last_capture']: await runWithOperationRetry('shell', async () =>
-          safeExec(cmd).trim()
-        ),
-      };
-    case 'read_file':
-      return {
-        ...ctx,
-        [params.export_as || 'last_capture']: safeReadFile(
-          pathResolver.rootResolve(resolveVars(params.path, ctx)),
-          { encoding: 'utf8' }
-        ),
-      };
-    case 'read_json':
-      return {
-        ...ctx,
-        [params.export_as || 'last_capture_data']: JSON.parse(
-          safeReadFile(pathResolver.rootResolve(resolveVars(params.path, ctx)), {
-            encoding: 'utf8',
-          }) as string
-        ),
-      };
-    case 'glob_files':
-      const searchDir = pathResolver.rootResolve(resolveVars(params.dir, ctx));
-      return {
-        ...ctx,
-        [params.export_as || 'file_list']: getAllFiles(searchDir)
-          .filter((f) => !params.ext || f.endsWith(params.ext))
-          .map((f) => path.relative(pathResolver.rootDir(), f)),
-      };
     case 'history_search': {
       if (params.refresh_public_index === true) {
         rebuildPublicHistorySearchIndexFromLocalSources();
@@ -505,7 +439,7 @@ async function opCapture(
       return ctx;
     }
     default:
-      throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
+      return undefined;
   }
 }
 
@@ -562,11 +496,8 @@ async function opTransform(
       }).length;
       return { ...ctx, [params.export_as]: count };
     }
-    default: {
-      const decision = await dispatchDecisionOp(op, params, ctx, { compatibilityMode });
-      if (!decision.handled) throw new Error(`[UNKNOWN_OP] Unknown transform op: ${op}`);
-      return decision.ctx;
-    }
+    default:
+      return undefined;
   }
 }
 
@@ -575,42 +506,14 @@ async function opApply(
   params: any,
   ctx: any,
   compatibilityMode = false
-): Promise<WisdomContext> {
-  const forwarded = await forwardBoundaryOperation(
-    op,
-    params,
-    ctx,
+): Promise<WisdomContext | undefined> {
+  const forwarded = await forwardWisdomBoundaryOperation(op, params, ctx, {
     compatibilityMode,
-    'last_apply_result'
-  );
+    defaultExportKey: 'last_apply_result',
+  });
   if (forwarded) return forwarded;
 
   switch (op) {
-    case 'write_file':
-    case 'write_artifact':
-      const spec = resolveWriteArtifactSpec(params, ctx, (value) => resolveVars(value, ctx));
-      const out = pathResolver.rootResolve(spec.path);
-      const content = spec.content;
-      if (!safeExistsSync(path.dirname(out))) safeMkdir(path.dirname(out), { recursive: true });
-      if (params.append) {
-        const payload =
-          typeof content === 'string'
-            ? content
-            : content === undefined
-              ? ''
-              : `${JSON.stringify(content, null, 2)}\n`;
-        safeAppendFileSync(out, payload, 'utf8');
-      } else {
-        safeWriteFile(
-          out,
-          typeof content === 'string'
-            ? content
-            : content === undefined
-              ? ''
-              : JSON.stringify(content, null, 2)
-        );
-      }
-      break;
     case 'knowledge_inject':
       await runWithOperationRetry('knowledge_inject', async () => {
         const kPath = resolveVars(params.knowledge_path, ctx);
@@ -735,12 +638,7 @@ async function opApply(
       break;
 
     default:
-      {
-        const decision = await dispatchDecisionOp(op, params, ctx, { compatibilityMode });
-        if (!decision.handled) throw new Error(`[UNKNOWN_OP] Unknown apply op: ${op}`);
-        return decision.ctx;
-      }
-      return ctx;
+      return undefined;
   }
 }
 

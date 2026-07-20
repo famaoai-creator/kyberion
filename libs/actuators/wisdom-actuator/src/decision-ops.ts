@@ -11,7 +11,6 @@ import {
   getReasoningBackend,
   getVoiceBridge,
   getSpeechToTextBridge,
-  getActuatorForwardingPort,
   saveRequirementsDraft,
   evaluateRequirementsCompletenessGate,
   evaluateCustomerSignoffGate,
@@ -69,7 +68,7 @@ import { getAllFiles } from '@agent/core/fs-utils';
 import * as path from 'node:path';
 import { z } from 'zod';
 import { assignWisdomContextValue, mergeWisdomContext } from './contracts/wisdom-context.js';
-import { getWisdomOperationSpec } from './op-catalog.js';
+import { forwardWisdomBoundaryOperation } from './compatibility/cross-actuator-forwarders.js';
 
 /**
  * Decision-support operations for Kyberion.
@@ -2590,39 +2589,11 @@ export async function dispatchDecisionOp(
 ): Promise<{ handled: boolean; ctx: Ctx }> {
   const resolved = (k: string) => resolveVars(params[k], ctx);
   const exportAs = params.export_as;
-  const operationSpec = getWisdomOperationSpec(op);
-  if (operationSpec?.forward_to) {
-    const target = operationSpec.forward_to;
-    const forwarded = await getActuatorForwardingPort().forward({
-      source_actuator: 'wisdom-actuator',
-      requested_op: op,
-      target_actuator: target.actuator,
-      target_op: target.op,
-      params,
-      context: ctx,
-      security_scope:
-        ctx.security_scope && typeof ctx.security_scope === 'object'
-          ? ctx.security_scope
-          : undefined,
-      idempotency_key: String(
-        params.idempotency_key || ctx.idempotency_key || `wisdom:${op}:${Date.now()}`
-      ),
-    });
-    if (forwarded.status !== 'succeeded') {
-      throw new Error(
-        `[FORWARDED_OP_FAILED] ${op} -> ${target.actuator}:${target.op}: ${forwarded.error || forwarded.status}`
-      );
-    }
-    if (forwarded.context) return { handled: true, ctx: forwarded.context as Ctx };
-    return {
-      handled: true,
-      ctx: assignWisdomContextValue(
-        ctx,
-        String(exportAs || `last_${target.actuator}_result`),
-        forwarded.result
-      ),
-    };
-  }
+  const forwardedContext = await forwardWisdomBoundaryOperation(op, params, ctx, {
+    compatibilityMode: options.compatibilityMode,
+    defaultExportKey: `last_${op}_result`,
+  });
+  if (forwardedContext) return { handled: true, ctx: forwardedContext as Ctx };
   /**
    * Behavior: if `export_as` is set, the entire result lands at
    * `ctx[exportAs]`. Otherwise — if the result is a plain object —
