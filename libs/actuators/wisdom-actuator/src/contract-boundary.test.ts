@@ -466,6 +466,10 @@ describe('wisdom public contract boundaries', () => {
     const coreExecutor = safeReadFile(pathResolver.rootResolve('libs/core/task-executor.ts'), {
       encoding: 'utf8',
     }) as string;
+    const coordinatorSource = safeReadFile(
+      pathResolver.rootResolve('libs/actuators/orchestrator-actuator/src/task-plan-coordinator.ts'),
+      { encoding: 'utf8' }
+    ) as string;
     const orchestratorSource = safeReadFile(
       pathResolver.rootResolve('libs/actuators/orchestrator-actuator/src/orchestrator-helpers.ts'),
       { encoding: 'utf8' }
@@ -475,5 +479,21 @@ describe('wisdom public contract boundaries', () => {
     expect(coreExecutor).not.toContain('topologicalOrder');
     expect(orchestratorSource).toContain('executeTaskPlanFromOrchestrator');
     expect(orchestratorSource).not.toContain("import('@agent/core')");
+    expect(coordinatorSource).toContain('executionPort.delegate');
+    expect(coordinatorSource).not.toContain('getReasoningBackend');
+    expect(coordinatorSource).not.toContain('@anthropic-ai/claude-agent-sdk');
+  });
+
+  it('describes execute_task_plan as orchestrator coordination plus Agent delegation', () => {
+    const manifest = JSON.parse(
+      safeReadFile(pathResolver.rootResolve('libs/actuators/wisdom-actuator/manifest.json'), {
+        encoding: 'utf8',
+      }) as string
+    ) as { capabilities?: Array<{ op?: string; note?: string }> };
+    const executeTaskPlan = manifest.capabilities?.find(
+      (entry) => entry.op === 'execute_task_plan'
+    );
+    expect(executeTaskPlan?.note).toContain('AgentExecutionPort');
+    expect(executeTaskPlan?.note).not.toContain('Claude Code sub-agent');
   });
 });

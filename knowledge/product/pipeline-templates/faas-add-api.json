@@ -2,7 +2,7 @@
   "action": "pipeline",
   "name": "faas-add-api",
   "version": "2.0.0",
-  "description": "Conversational API authoring for projects/faas-platform. Takes a natural-language description plus mission metadata, produces a requirements draft, a design spec, a task plan, executes the plan via Claude Code sub-agent (full claude_code tool preset, cwd pinned to the project), and reports gate-check results. Deploy + approval are run as separate downstream pipelines (release-package → deploy-release) so the human approval moment stays explicit.",
+  "description": "Conversational API authoring for projects/faas-platform. Takes a natural-language description plus mission metadata, produces a requirements draft, a design spec, and a task plan, then executes it through the orchestrator and registered AgentExecutionPort before reporting gate-check results. Deploy + approval are run as separate downstream pipelines (release-package → deploy-release) so the human approval moment stays explicit.",
   "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
   "context": {
     "mission_id": "",
