@@ -268,7 +268,7 @@
       "op": "execute_task_plan",
       "platforms": ["darwin", "linux", "win32"],
       "implementation": "full",
-      "note": "Topologically orders a mission's task-plan.json and spawns a Claude Code sub-agent per task with full claude_code tool preset. Records each run to task-execution-log.jsonl; skips dependents on failure."
+      "note": "Compatibility forwarder for the orchestrator-owned task-plan coordinator. The orchestrator validates and orders the DAG; each runnable task is delegated through the AgentExecutionPort and recorded to task-execution-log.jsonl."
     },
     {
       "op": "deploy_release",

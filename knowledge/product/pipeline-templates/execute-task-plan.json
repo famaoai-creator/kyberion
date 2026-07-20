@@ -2,7 +2,7 @@
   "action": "pipeline",
   "name": "execute-task-plan",
   "version": "2.0.0",
-  "description": "SDLC implementation execution: read task-plan.json, topologically order tasks, then spawn a Claude Code sub-agent per task with full `claude_code` tool preset. Each task runs to completion (or failure); downstream tasks skip when dependencies fail. Every task's outcome lands in task-execution-log.jsonl under mission evidence.",
+  "description": "SDLC implementation execution: the orchestrator reads and validates task-plan.json, topologically orders tasks, and delegates each runnable task through the registered AgentExecutionPort. Each task returns an agent execution receipt; downstream tasks skip when dependencies fail. Every task's outcome lands in task-execution-log.jsonl under mission evidence.",
   "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
   "context": {
     "mission_id": "",
