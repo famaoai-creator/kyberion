@@ -44,6 +44,7 @@
     { "op": "log", "platforms": ["darwin", "linux", "win32"] },
     { "op": "query", "platforms": ["darwin", "linux", "win32"] },
     { "op": "react_loop", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "reasoning_loop", "platforms": ["darwin", "linux", "win32"] },
     { "op": "read_file", "platforms": ["darwin", "linux", "win32"] },
     { "op": "read_json", "platforms": ["darwin", "linux", "win32"] },
     { "op": "reasoning", "platforms": ["darwin", "linux", "win32"] },
@@ -55,6 +56,7 @@
     { "op": "simulate_all_ensemble", "platforms": ["darwin", "linux", "win32"] },
     { "op": "task_plan_to_next_tasks", "platforms": ["darwin", "linux", "win32"] },
     { "op": "tool_use", "platforms": ["darwin", "linux", "win32"] },
+    { "op": "propose_tool_calls", "platforms": ["darwin", "linux", "win32"] },
     { "op": "track_pending_action_items", "platforms": ["darwin", "linux", "win32"] },
     { "op": "uncertainty_gate", "platforms": ["darwin", "linux", "win32"] },
     { "op": "while", "platforms": ["darwin", "linux", "win32"] },
@@ -124,6 +126,13 @@
       "implementation": "full",
       "protocol_ref": "knowledge/product/orchestration/hypothesis-tree-protocol.md",
       "note": "Typed participant fanout with per-participant security-scope context compilation and egress/output-tier guards."
+    },
+    {
+      "op": "counterparty_roleplay",
+      "platforms": ["darwin", "linux", "win32"],
+      "implementation": "stub",
+      "protocol_ref": "knowledge/product/orchestration/rehearsal-protocol.md",
+      "note": "Canonical synthetic-counterparty roleplay; a2a_roleplay remains a deprecated alias."
     },
     {
       "op": "cross_critique",

@@ -3143,7 +3143,8 @@ export async function dispatchDecisionOp(
       return { handled: true, ctx: assign(result.persona_spec) };
     }
 
-    case 'a2a_roleplay': {
+    case 'a2a_roleplay':
+    case 'counterparty_roleplay': {
       const result = await a2aRoleplay({
         persona: params.persona || ctx[params.persona_from || 'persona_spec'],
         objective: resolved('objective'),
@@ -3456,7 +3457,8 @@ export async function dispatchDecisionOp(
     // ── Mixture of Experts: wisdom:tool_use ──────────────────────────────
     // Invokes the reasoning backend's Function Calling interface.
     // Tools are defined inline in the pipeline step params.
-    case 'tool_use': {
+    case 'tool_use':
+    case 'propose_tool_calls': {
       const backend = getReasoningBackend();
       if (!backend.generateWithTools) {
         throw new Error(
@@ -3467,13 +3469,24 @@ export async function dispatchDecisionOp(
       const prompt = resolveVars(String(params.prompt ?? params.instruction ?? ''), ctx);
       const tools = Array.isArray(params.tools) ? params.tools : [];
       const result = await backend.generateWithTools(prompt, tools);
-      return { handled: true, ctx: assign(result) };
+      return {
+        handled: true,
+        ctx:
+          op === 'propose_tool_calls'
+            ? assign({
+                ...result,
+                planned_tool_calls: result.toolCalls || [],
+                tool_execution_status: 'not_executed',
+              })
+            : assign(result),
+      };
     }
 
     // ── ReAct: wisdom:react_loop ──────────────────────────────────────────
     // Thought → Action → Observation loop with configurable max_steps.
     // Emits { goal, steps: [{role,content}], final_answer }.
-    case 'react_loop': {
+    case 'react_loop':
+    case 'reasoning_loop': {
       const backend = getReasoningBackend();
       const goal = resolveVars(String(params.goal ?? params.instruction ?? ''), ctx);
       const maxSteps = Number(params.max_steps ?? 5);

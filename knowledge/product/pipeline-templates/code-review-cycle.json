@@ -17,7 +17,7 @@
     {
       "id": "diverge_review",
       "role": "sink",
-      "op": "wisdom:a2a_fanout",
+      "op": "wisdom:perspective_fanout",
       "params": {
         "personas_from": "personas",
         "min_hypotheses_per_persona": 2,
@@ -28,7 +28,7 @@
     {
       "id": "cross_critique",
       "role": "sink",
-      "op": "wisdom:cross_critique",
+      "op": "wisdom:typed_cross_critique",
       "params": {
         "input": "{{hypotheses_output}}",
         "personas_from": "personas",
