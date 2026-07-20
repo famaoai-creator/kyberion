@@ -60,6 +60,13 @@ import { dispatchDecisionOp } from './decision-ops.js';
 import { createWisdomDispatcher } from './wisdom-dispatcher.js';
 import { getWisdomOperationSpec } from './op-catalog.js';
 import { forwardWisdomBoundaryOperation } from './compatibility/cross-actuator-forwarders.js';
+import {
+  assertKnowledgePackage,
+  assertKnowledgePackageTrusted,
+  createKnowledgePackage,
+  normalizeKnowledgePackageAgentId,
+  normalizeKnowledgeTier,
+} from './knowledge/knowledge-package.js';
 import type { WisdomContext } from './contracts/wisdom-context.js';
 import type { WisdomReceipt } from './contracts/wisdom-result.js';
 import { validateWisdomRequest } from './contracts/wisdom-request.js';
@@ -67,7 +74,6 @@ import { validateWisdomRequest } from './contracts/wisdom-request.js';
 const WISDOM_MANIFEST_PATH = pathResolver.rootResolve(
   'libs/actuators/wisdom-actuator/manifest.json'
 );
-const KNOWLEDGE_PACKAGE_AGENT_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
 const KNOWLEDGE_TIER_PATTERN = /^(personal|confidential|public)$/;
 const DEFAULT_WISDOM_RETRY = {
   maxRetries: 2,
@@ -121,24 +127,6 @@ export async function runWithOperationRetry<T>(op: string, task: () => Promise<T
   const idempotency = getWisdomOperationSpec(op)?.idempotency;
   if (idempotency !== 'read' && idempotency !== 'idempotent_write') return task();
   return retry(task, buildRetryOptions());
-}
-
-function normalizeKnowledgeTier(value: unknown): 'personal' | 'confidential' | 'public' {
-  const tier = String(value || 'confidential')
-    .trim()
-    .toLowerCase();
-  if (!KNOWLEDGE_TIER_PATTERN.test(tier)) {
-    throw new Error(`Invalid knowledge import tier: ${value}`);
-  }
-  return tier as 'personal' | 'confidential' | 'public';
-}
-
-function normalizeKnowledgePackageAgentId(value: unknown): string {
-  const agentId = String(value || '').trim();
-  if (!KNOWLEDGE_PACKAGE_AGENT_ID_PATTERN.test(agentId)) {
-    throw new Error(`Invalid knowledge package origin_agent_id: ${value}`);
-  }
-  return agentId;
 }
 
 export interface PipelineStep {
@@ -558,30 +546,21 @@ async function opApply(
         const { createHash } = await import('node:crypto');
         const hash = createHash('sha256').update(rawData).digest('hex');
         const packageId = String(params.package_id || `KKP-${hash.slice(0, 16)}`);
-
-        const kkp = {
-          metadata: {
-            package_version: '1.0.0',
-            package_id: packageId,
-            origin_agent_id: agentId,
-            origin_tenant_id: originTenantId,
-            origin_project_id: String(params.origin_project_id || ctx.project_id || ''),
-            source_tier: sourceTier,
-            requested_target_tier: normalizeKnowledgeTier(
-              params.requested_target_tier || params.visibility || sourceTier
-            ),
-            content_hash: hash,
-            created_at: new Date().toISOString(),
-            provenance: [resolveVars(params.path, ctx)],
-            trust_status: 'unverified',
-            signature: { status: 'absent' },
-            payload_encoding: 'utf8',
-          },
-          content: {
-            path: resolveVars(params.path, ctx),
-            raw_data: rawData,
-          },
-        };
+        const kkp = createKnowledgePackage({
+          packageId,
+          originAgentId: agentId,
+          originTenantId,
+          originProjectId: String(params.origin_project_id || ctx.project_id || '') || undefined,
+          sourceTier,
+          requestedTargetTier: normalizeKnowledgeTier(
+            params.requested_target_tier || params.visibility || sourceTier
+          ),
+          contentHash: hash,
+          createdAt: new Date().toISOString(),
+          provenance: [resolveVars(params.path, ctx)],
+          contentPath: resolveVars(params.path, ctx),
+          rawData,
+        });
 
         const outPath = pathResolver.rootResolve(
           resolveVars(
@@ -600,13 +579,25 @@ async function opApply(
         const pkgPath = pathResolver.rootResolve(resolveVars(params.package_path, ctx));
         if (!safeExistsSync(pkgPath)) throw new Error(`Package not found: ${pkgPath}`);
 
-        const pkg = JSON.parse(safeReadFile(pkgPath, { encoding: 'utf8' }) as string);
+        const targetTier = normalizeKnowledgeTier(params.tier);
+        const rawPackage: unknown = JSON.parse(
+          safeReadFile(pkgPath, { encoding: 'utf8' }) as string
+        );
+        if (
+          rawPackage &&
+          typeof rawPackage === 'object' &&
+          'metadata' in rawPackage &&
+          rawPackage.metadata &&
+          typeof rawPackage.metadata === 'object' &&
+          'origin_agent_id' in rawPackage.metadata
+        ) {
+          normalizeKnowledgePackageAgentId(rawPackage.metadata.origin_agent_id);
+        }
+        const pkg = assertKnowledgePackage(rawPackage);
         const { createHash: vHash } = await import('node:crypto');
-        const rawData = pkg?.content?.raw_data;
-        if (typeof rawData !== 'string')
-          throw new Error('[KNOWLEDGE_PACKAGE_INVALID] content.raw_data is required');
+        const rawData = pkg.content.raw_data;
         const actualHash = vHash('sha256').update(rawData).digest('hex');
-        const expectedHash = pkg?.metadata?.content_hash || pkg?.metadata?.hash;
+        const expectedHash = pkg.metadata.content_hash;
 
         if (actualHash !== expectedHash) {
           throw new Error(
@@ -614,14 +605,15 @@ async function opApply(
           );
         }
 
-        const targetTier = normalizeKnowledgeTier(params.tier);
-        const originAgentId = normalizeKnowledgePackageAgentId(pkg?.metadata?.origin_agent_id);
-        const originTenantId = String(pkg?.metadata?.origin_tenant_id || '').trim();
-        if (!originTenantId)
-          throw new Error('[KNOWLEDGE_ORIGIN_SCOPE_REQUIRED] origin_tenant_id is required');
-        const sourceTier = normalizeKnowledgeTier(
-          pkg?.metadata?.source_tier || pkg?.metadata?.visibility
-        );
+        assertKnowledgePackageTrusted(pkg);
+        if (pkg.metadata.requested_target_tier !== targetTier) {
+          throw new Error(
+            `[KNOWLEDGE_TIER_MISMATCH] package requests ${pkg.metadata.requested_target_tier}, import requested ${targetTier}`
+          );
+        }
+
+        const originAgentId = pkg.metadata.origin_agent_id;
+        const sourceTier = pkg.metadata.source_tier;
         if (sourceTier !== 'public' && targetTier === 'public' && !params.promotion_approval_id) {
           throw new Error(
             '[KNOWLEDGE_PROMOTION_APPROVAL_REQUIRED] promotion approval is required for public import'
