@@ -27,9 +27,9 @@ import {
   evaluateEnsembleConvergence,
   simulateAll,
   simulateAllEnsemble,
-  generateFacilitationScriptOp,
   dispatchDecisionOp,
 } from './decision-ops.js';
+import { generateFacilitationScriptOp } from '../../meeting-actuator/src/meeting-intelligence-ops.js';
 
 const TMP_ROOT = 'active/shared/tmp/decision-ops-tests';
 

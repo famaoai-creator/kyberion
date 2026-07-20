@@ -1660,7 +1660,31 @@
           "kind": "capture"
         },
         {
+          "op": "audit_speaker_fairness",
+          "kind": "apply"
+        },
+        {
           "op": "chat",
+          "kind": "apply"
+        },
+        {
+          "op": "conduct_1on_1",
+          "kind": "apply"
+        },
+        {
+          "op": "execute_self_action_items",
+          "kind": "apply"
+        },
+        {
+          "op": "extract_action_items",
+          "kind": "apply"
+        },
+        {
+          "op": "generate_facilitation_script",
+          "kind": "apply"
+        },
+        {
+          "op": "generate_reminder_message",
           "kind": "apply"
         },
         {
@@ -1673,6 +1697,10 @@
         },
         {
           "op": "speak",
+          "kind": "apply"
+        },
+        {
+          "op": "track_pending_action_items",
           "kind": "apply"
         }
       ]

@@ -311,7 +311,19 @@
     "meeting": {
       "capture": ["listen", "status"],
       "transform": [],
-      "apply": ["chat", "join", "leave", "speak"]
+      "apply": [
+        "audit_speaker_fairness",
+        "chat",
+        "conduct_1on_1",
+        "execute_self_action_items",
+        "extract_action_items",
+        "generate_facilitation_script",
+        "generate_reminder_message",
+        "join",
+        "leave",
+        "speak",
+        "track_pending_action_items"
+      ]
     },
     "modeling": {
       "capture": ["glob_files", "read_file", "read_json", "shell"],

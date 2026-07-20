@@ -150,6 +150,30 @@ describe('wisdom public contract boundaries', () => {
     }
   });
 
+  it('returns a normalized failed receipt with retry classification', async () => {
+    const result = await handleAction({
+      action: 'pipeline',
+      steps: [{ type: 'transform', op: 'knowledge_search', params: {} }],
+      context: {},
+    });
+
+    expect(result.status).toBe('failed');
+    expect(result.receipts[0]).toMatchObject({
+      actuator_id: 'wisdom-actuator',
+      requested_op: 'knowledge_search',
+      status: 'failed',
+      error: {
+        code: 'OP_KIND_MISMATCH',
+        retryable: false,
+      },
+      retry: {
+        attempts: 1,
+        idempotency_class: 'read',
+        automatic_retry: true,
+      },
+    });
+  });
+
   it('does not retry a non-idempotent side-effect operation', async () => {
     let attempts = 0;
     await expect(
@@ -304,6 +328,36 @@ describe('wisdom public contract boundaries', () => {
     ]) {
       expect(describeOps().find((entry) => entry.op === op)).toMatchObject({
         forward_to: { actuator: 'orchestrator' },
+      });
+    }
+  });
+
+  it('routes meeting-derived records to meeting and removes their Wisdom handlers', () => {
+    const wisdomSource = safeReadFile(
+      pathResolver.rootResolve('libs/actuators/wisdom-actuator/src/decision-ops.ts'),
+      { encoding: 'utf8' }
+    ) as string;
+    const meetingSource = safeReadFile(
+      pathResolver.rootResolve('libs/actuators/meeting-actuator/src/meeting-intelligence-ops.ts'),
+      { encoding: 'utf8' }
+    ) as string;
+    expect(wisdomSource).not.toContain("case 'extract_action_items'");
+    expect(wisdomSource).not.toContain("case 'generate_facilitation_script'");
+    expect(wisdomSource).not.toContain("case 'execute_self_action_items'");
+    expect(wisdomSource).not.toContain("case 'track_pending_action_items'");
+    expect(wisdomSource).not.toContain("case 'audit_speaker_fairness'");
+    expect(meetingSource).toContain('export async function extractActionItemsOp');
+    for (const op of [
+      'conduct_1on1',
+      'extract_action_items',
+      'generate_facilitation_script',
+      'generate_reminder_message',
+      'execute_self_action_items',
+      'track_pending_action_items',
+      'audit_speaker_fairness',
+    ]) {
+      expect(describeOps().find((entry) => entry.op === op)).toMatchObject({
+        forward_to: { actuator: 'meeting' },
       });
     }
   });
