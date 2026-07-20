@@ -10,7 +10,6 @@ import {
   resolveVars,
   getReasoningBackend,
   getVoiceBridge,
-  getSpeechToTextBridge,
   consumeTenantBudget,
   TenantRateLimitExceededError,
   findRelevantDistilledKnowledge,
@@ -427,96 +426,6 @@ export function adjustProposalAppend(input: {
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
   safeWriteFile(abs, original + block);
   return { written_to: out };
-}
-
-/**
- * Scan extracted slides and return the 1-based indices whose text contains
- * any of the supplied owner labels (e.g. "報告担当A"). Exact substring match.
- *
- * Input shape: output of media-actuator's `pptx_slide_text` op
- *   (array of { slide_index, concatenated, ... }).
- *
- * This is the missing piece for "give me a template, I'll give you back only
- * my slides": the agent calls pptx_slide_text, then this op, then pptx_filter_slides.
- */
-export function findSlidesByOwner(input: {
-  slides: Array<{ slide_index: number; concatenated?: string; text_runs?: string[] }>;
-  owner_labels: string[];
-  match_mode?: 'substring' | 'run_exact';
-}): { indices: number[]; matches: Array<{ slide_index: number; matched_label: string }> } {
-  const mode = input.match_mode || 'substring';
-  const matches: Array<{ slide_index: number; matched_label: string }> = [];
-
-  for (const slide of input.slides) {
-    for (const label of input.owner_labels) {
-      const hit =
-        mode === 'substring'
-          ? (slide.concatenated || '').includes(label)
-          : (slide.text_runs || []).includes(label);
-      if (hit) {
-        matches.push({ slide_index: slide.slide_index, matched_label: label });
-        break;
-      }
-    }
-  }
-
-  const indices = matches.map((m) => m.slide_index);
-  return { indices, matches };
-}
-
-/**
- * Diff two extracted slide sets and return a structured change report.
- * Compares concatenated text per slide_index. Slides present in only one
- * side are reported as added/removed.
- */
-export function pptxDiff(input: {
-  before: Array<{ slide_index: number; concatenated?: string; text_runs?: string[] }>;
-  after: Array<{ slide_index: number; concatenated?: string; text_runs?: string[] }>;
-}): {
-  added: number[];
-  removed: number[];
-  changed: Array<{
-    slide_index: number;
-    added_runs: string[];
-    removed_runs: string[];
-  }>;
-  unchanged: number[];
-} {
-  const byIndexBefore = new Map(input.before.map((s) => [s.slide_index, s]));
-  const byIndexAfter = new Map(input.after.map((s) => [s.slide_index, s]));
-
-  const added: number[] = [];
-  const removed: number[] = [];
-  const changed: Array<{ slide_index: number; added_runs: string[]; removed_runs: string[] }> = [];
-  const unchanged: number[] = [];
-
-  const allIndices = new Set([...byIndexBefore.keys(), ...byIndexAfter.keys()]);
-  for (const idx of Array.from(allIndices).sort((a, b) => a - b)) {
-    const b = byIndexBefore.get(idx);
-    const a = byIndexAfter.get(idx);
-    if (!b && a) {
-      added.push(idx);
-      continue;
-    }
-    if (b && !a) {
-      removed.push(idx);
-      continue;
-    }
-    if (!b || !a) continue;
-
-    const beforeRuns = new Set(b.text_runs || []);
-    const afterRuns = new Set(a.text_runs || []);
-    const addedRuns = [...afterRuns].filter((r) => !beforeRuns.has(r));
-    const removedRuns = [...beforeRuns].filter((r) => !afterRuns.has(r));
-
-    if (addedRuns.length === 0 && removedRuns.length === 0) {
-      unchanged.push(idx);
-    } else {
-      changed.push({ slide_index: idx, added_runs: addedRuns, removed_runs: removedRuns });
-    }
-  }
-
-  return { added, removed, changed, unchanged };
 }
 
 // ---------------------------------------------------------------------------
@@ -1322,34 +1231,6 @@ export async function dispatchDecisionOp(
       return { handled: true, ctx: assign(sorted) };
     }
 
-    case 'find_slides_by_owner': {
-      const slides = Array.isArray(params.slides)
-        ? params.slides
-        : ctx[params.slides_from || 'slides'] || ctx['last_pptx_slides'] || [];
-      const ownerLabels: string[] =
-        params.owner_labels ||
-        (params.owner_label ? [params.owner_label] : []) ||
-        ctx[params.owner_labels_from || 'owner_labels'] ||
-        [];
-      const result = findSlidesByOwner({
-        slides,
-        owner_labels: ownerLabels,
-        match_mode: params.match_mode,
-      });
-      return { handled: true, ctx: assign(result) };
-    }
-
-    case 'pptx_diff': {
-      const before = Array.isArray(params.before)
-        ? params.before
-        : ctx[params.before_from || 'before_slides'] || [];
-      const after = Array.isArray(params.after)
-        ? params.after
-        : ctx[params.after_from || 'after_slides'] || [];
-      const result = pptxDiff({ before, after });
-      return { handled: true, ctx: assign(result) };
-    }
-
     case 'emit_dissent_log': {
       const result = emitDissentLog({
         source_path: resolved('source') || resolved('source_path'),
@@ -1663,16 +1544,6 @@ export async function dispatchDecisionOp(
             : ctx[params.profile_from || 'presentation_preference_profile'],
         profile_path: resolved('profile_path'),
         registry_path: resolved('registry_path'),
-      });
-      return { handled: true, ctx: assign(result) };
-    }
-
-    case 'transcribe_audio': {
-      const bridge = getSpeechToTextBridge();
-      const result = await bridge.transcribe({
-        audioPath: resolved('audio_path'),
-        language: resolved('language'),
-        outputPath: resolved('output_path'),
       });
       return { handled: true, ctx: assign(result) };
     }

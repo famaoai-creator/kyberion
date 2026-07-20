@@ -3,6 +3,7 @@ import {
   enforceApprovalGate,
   evaluateDecisionRights,
   resolveDecisionRightsMatrix,
+  listApprovalRequests,
   type GovernedArtifactRole,
 } from '@agent/core';
 
@@ -78,6 +79,7 @@ export function evaluateDecisionRightsOp(input: EvaluateDecisionRightsInput): De
 
 export interface ReviewRequestInput {
   topic: string;
+  idempotency_key: string;
   reason?: string;
   evidence?: unknown;
   mission_id?: string;
@@ -88,10 +90,24 @@ export interface ReviewRequestInput {
 }
 
 export function requestReviewOp(input: ReviewRequestInput) {
-  if (!input.topic) throw new Error('[request_review] requires topic');
+  if (!input.topic || !input.idempotency_key) {
+    throw new Error('[request_review] requires topic and idempotency_key');
+  }
   const channel = input.channel || 'mission';
-  const correlationId =
-    input.correlation_id || `review:${input.mission_id || 'unscoped'}:${input.topic}`;
+  const correlationId = input.correlation_id || input.idempotency_key;
+  const existing = listApprovalRequests({
+    storageChannels: [channel],
+    status: ['pending', 'approved'],
+  }).find((request) => request.correlationId === correlationId);
+  if (existing) {
+    return {
+      status: existing.status === 'approved' ? ('approved' as const) : ('pending' as const),
+      request_id: existing.id,
+      review_id: existing.id,
+      review_status: existing.status,
+      deduplicated: true,
+    };
+  }
   const evidence =
     typeof input.evidence === 'string' ? input.evidence : JSON.stringify(input.evidence ?? '');
   const role: GovernedArtifactRole = 'mission_controller';

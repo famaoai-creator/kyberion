@@ -20,8 +20,6 @@ import {
   computeReadinessMatrix,
   recommend,
   resolveHypothesisConflict,
-  findSlidesByOwner,
-  pptxDiff,
   evaluateSimulationQuality,
   evaluateEnsembleConvergence,
   simulateAll,
@@ -30,6 +28,7 @@ import {
 } from './decision-ops.js';
 import { generateFacilitationScriptOp } from '../../meeting-actuator/src/meeting-intelligence-ops.js';
 import { evaluateDecisionRightsOp as evaluateDecisionRightsApprovalOp } from '../../approval-actuator/src/approval-ops.js';
+import { findSlidesByOwner, pptxDiff } from '../../media-actuator/src/media-slide-ops.js';
 
 const TMP_ROOT = 'active/shared/tmp/decision-ops-tests';
 
