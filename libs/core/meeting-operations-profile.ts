@@ -127,7 +127,7 @@ export function buildMeetingOperationsBrief(
     ...(supportRoles.length ? { support_roles: supportRoles } : {}),
     ...(input.agenda?.length ? { agenda: input.agenda.map((item) => String(item)) } : {}),
     ...(input.participants?.length ? { participants: input.participants } : {}),
-    desired_outcomes: desiredOutcomes,
+    desired_outcomes: desiredOutcomes as MeetingOperationsBrief['desired_outcomes'],
     authority_scope: {
       may_facilitate: primaryRole === 'facilitator' || primaryRole === 'planner',
       may_speak: profile.facilitation_policy.ask_before_speaking === false,
@@ -139,7 +139,7 @@ export function buildMeetingOperationsBrief(
     ...(input.tracking_expectations?.length
       ? { tracking_expectations: input.tracking_expectations.map((item) => String(item)) }
       : {}),
-    exit_conditions: exitConditions,
+    exit_conditions: exitConditions as MeetingOperationsBrief['exit_conditions'],
     follow_up_channel: profile.tracking_policy.default_follow_up_channel,
     environment,
     ...(input.notes ? { notes: input.notes } : {}),

@@ -17,10 +17,22 @@ import { PulseAudioBus } from './pulse-audio-bus.js';
 export type AudioBusId = 'stub' | 'blackhole' | 'pulseaudio';
 
 export function resolveAudioBus(
-  preferred: AudioBusId | undefined = process.env.KYBERION_AUDIO_BUS as AudioBusId | undefined,
+  preferred: AudioBusId | undefined = process.env.KYBERION_AUDIO_BUS as AudioBusId | undefined
 ): AudioBus {
   if (preferred === 'stub') return new StubAudioBus();
-  if (preferred === 'blackhole') return new BlackHoleAudioBus();
+  if (preferred === 'blackhole') {
+    return new BlackHoleAudioBus({
+      ...(process.env.KYBERION_BLACKHOLE_INPUT_UID
+        ? { input_device_uid: process.env.KYBERION_BLACKHOLE_INPUT_UID }
+        : {}),
+      ...(process.env.KYBERION_BLACKHOLE_OUTPUT_UID
+        ? { output_device_uid: process.env.KYBERION_BLACKHOLE_OUTPUT_UID }
+        : {}),
+      ...(process.env.KYBERION_BLACKHOLE_DEVICE_LABEL
+        ? { expected_device_label: process.env.KYBERION_BLACKHOLE_DEVICE_LABEL }
+        : {}),
+    });
+  }
   if (preferred === 'pulseaudio') return new PulseAudioBus();
   if (process.platform === 'darwin') return new BlackHoleAudioBus();
   if (process.platform === 'linux') return new PulseAudioBus();

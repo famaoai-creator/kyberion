@@ -1,10 +1,15 @@
 import * as path from 'node:path';
-import { safeExec, safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import { buildSafeExecEnv, safeExec, safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import { AudioDeviceLeaseManager, type AudioDeviceLease } from './audio-device-lease.js';
 import { pathResolver } from './path-resolver.js';
 import type { AudioChunk, AudioFormat } from './meeting-session-types.js';
-import { createVirtualDeviceInventoryBridge, type VirtualDeviceInventoryBridge } from './virtual-device-inventory-bridge.js';
+import {
+  createVirtualDeviceInventoryBridge,
+  type VirtualDeviceInventoryBridge,
+} from './virtual-device-inventory-bridge.js';
 
-export const VIRTUAL_AUDIO_OUTPUT_PLAYBACK_BRIDGE_ID = 'virtual-audio-output-playback-bridge' as const;
+export const VIRTUAL_AUDIO_OUTPUT_PLAYBACK_BRIDGE_ID =
+  'virtual-audio-output-playback-bridge' as const;
 
 export interface VirtualAudioOutputPlaybackBridgeOptions {
   inventory_bridge?: VirtualDeviceInventoryBridge;
@@ -26,6 +31,7 @@ export interface VirtualAudioOutputPlaybackTargetResult {
   selected_backend: 'swift-output-switch';
   output?: string;
   error?: string;
+  warning?: string;
 }
 
 export interface VirtualAudioOutputPlaybackProbe {
@@ -41,13 +47,21 @@ export interface VirtualAudioOutputPlaybackBridge {
   probe(): Promise<VirtualAudioOutputPlaybackProbe>;
   playOnOutputs(
     targets?: string[],
-    request?: VirtualAudioOutputPlaybackRequest,
-  ): Promise<{ bridge_id: typeof VIRTUAL_AUDIO_OUTPUT_PLAYBACK_BRIDGE_ID; platform: NodeJS.Platform; outputs: VirtualAudioOutputPlaybackTargetResult[] }>;
+    request?: VirtualAudioOutputPlaybackRequest
+  ): Promise<{
+    bridge_id: typeof VIRTUAL_AUDIO_OUTPUT_PLAYBACK_BRIDGE_ID;
+    platform: NodeJS.Platform;
+    outputs: VirtualAudioOutputPlaybackTargetResult[];
+  }>;
   playStream(
     stream: AsyncIterable<AudioChunk>,
     targets?: string[],
-    request?: VirtualAudioOutputPlaybackRequest,
-  ): Promise<{ bridge_id: typeof VIRTUAL_AUDIO_OUTPUT_PLAYBACK_BRIDGE_ID; platform: NodeJS.Platform; outputs: VirtualAudioOutputPlaybackTargetResult[] }>;
+    request?: VirtualAudioOutputPlaybackRequest
+  ): Promise<{
+    bridge_id: typeof VIRTUAL_AUDIO_OUTPUT_PLAYBACK_BRIDGE_ID;
+    platform: NodeJS.Platform;
+    outputs: VirtualAudioOutputPlaybackTargetResult[];
+  }>;
 }
 
 const DEFAULT_SWIFT_BIN = 'swift';
@@ -64,7 +78,7 @@ function tonePathFor(deviceName: string): string {
 
 function writeSineToneWav(
   outputPath: string,
-  opts: { frequencyHz: number; durationMs: number; volume: number },
+  opts: { frequencyHz: number; durationMs: number; volume: number }
 ): void {
   const sampleRate = 44100;
   const channels = 1;
@@ -94,7 +108,9 @@ function writeSineToneWav(
   const amplitude = Math.max(0, Math.min(1, opts.volume)) * 0x7fff;
   let offset = 44;
   for (let i = 0; i < frameCount; i += 1) {
-    const sample = Math.round(amplitude * Math.sin((2 * Math.PI * opts.frequencyHz * i) / sampleRate));
+    const sample = Math.round(
+      amplitude * Math.sin((2 * Math.PI * opts.frequencyHz * i) / sampleRate)
+    );
     buffer.writeInt16LE(sample, offset);
     offset += 2;
   }
@@ -103,13 +119,11 @@ function writeSineToneWav(
   safeWriteFile(outputPath, buffer);
 }
 
-function writeWavFromChunks(
-  outputPath: string,
-  chunks: AudioChunk[],
-  format: AudioFormat,
-): void {
+function writeWavFromChunks(outputPath: string, chunks: AudioChunk[], format: AudioFormat): void {
   if (format.encoding !== 'pcm_s16le') {
-    throw new Error(`[virtual-audio-output-playback-bridge] unsupported stream encoding ${format.encoding}`);
+    throw new Error(
+      `[virtual-audio-output-playback-bridge] unsupported stream encoding ${format.encoding}`
+    );
   }
   const channels = format.channels;
   const sampleRate = format.sample_rate_hz;
@@ -161,19 +175,29 @@ export class VirtualAudioOutputPlaybackBridgeImpl implements VirtualAudioOutputP
       bridge_id: VIRTUAL_AUDIO_OUTPUT_PLAYBACK_BRIDGE_ID,
       platform: process.platform,
       available: process.platform === 'darwin' && outputs.length > 0,
-      reason: process.platform !== 'darwin' ? `unsupported platform ${process.platform}` : outputs.length === 0 ? 'no audio outputs found' : undefined,
+      reason:
+        process.platform !== 'darwin'
+          ? `unsupported platform ${process.platform}`
+          : outputs.length === 0
+            ? 'no audio outputs found'
+            : undefined,
       outputs,
     };
   }
 
-  async playOnOutputs(targets?: string[], request?: VirtualAudioOutputPlaybackRequest): Promise<{
+  async playOnOutputs(
+    targets?: string[],
+    request?: VirtualAudioOutputPlaybackRequest
+  ): Promise<{
     bridge_id: typeof VIRTUAL_AUDIO_OUTPUT_PLAYBACK_BRIDGE_ID;
     platform: NodeJS.Platform;
     outputs: VirtualAudioOutputPlaybackTargetResult[];
   }> {
     const probe = await this.probe();
     if (!probe.available) {
-      throw new Error(`[virtual-audio-output-playback-bridge] not available: ${probe.reason || 'unknown reason'}`);
+      throw new Error(
+        `[virtual-audio-output-playback-bridge] not available: ${probe.reason || 'unknown reason'}`
+      );
     }
 
     const inventory = await this.inventoryBridge.probe();
@@ -200,11 +224,14 @@ export class VirtualAudioOutputPlaybackBridgeImpl implements VirtualAudioOutputP
     }
 
     const results: VirtualAudioOutputPlaybackTargetResult[] = [];
+    const leaseManager = new AudioDeviceLeaseManager();
     const swiftBin = this.opts.swift_bin ?? DEFAULT_SWIFT_BIN;
     const script = pathResolver.rootResolve('libs/core/virtual-audio-output-playback.swift');
 
     for (const outputName of selectedOutputs) {
-      const candidate = inventory.inventory.audio_outputs.find((device) => device.name === outputName);
+      const candidate = inventory.inventory.audio_outputs.find(
+        (device) => device.name === outputName
+      );
       if (!candidate) {
         results.push({
           device_name: outputName,
@@ -216,11 +243,16 @@ export class VirtualAudioOutputPlaybackBridgeImpl implements VirtualAudioOutputP
         });
         continue;
       }
+      let lease: AudioDeviceLease | undefined;
       try {
+        lease = leaseManager.acquire(
+          `legacy-default-output:${candidate.name}`,
+          `legacy-playback-${process.pid}-${Date.now()}`
+        );
         const output = safeExec(
           swiftBin,
           [script, '--device', candidate.name, '--tone-path', playbackPath],
-          { env: process.env, timeoutMs: 120000 },
+          { env: buildSafeExecEnv(), timeoutMs: 120000 }
         );
         results.push({
           device_name: candidate.name,
@@ -228,6 +260,8 @@ export class VirtualAudioOutputPlaybackBridgeImpl implements VirtualAudioOutputP
           source_path: playbackPath,
           tone_path: playbackPath,
           selected_backend: 'swift-output-switch',
+          warning:
+            'compatibility fallback changed the macOS default output temporarily; CoreAudio UID output is the canonical loopback path',
           output: output.trim() || undefined,
         });
       } catch (error: any) {
@@ -239,6 +273,8 @@ export class VirtualAudioOutputPlaybackBridgeImpl implements VirtualAudioOutputP
           selected_backend: 'swift-output-switch',
           error: error?.message || String(error),
         });
+      } finally {
+        lease?.release();
       }
     }
 
@@ -256,7 +292,7 @@ export class VirtualAudioOutputPlaybackBridgeImpl implements VirtualAudioOutputP
   async playStream(
     stream: AsyncIterable<AudioChunk>,
     targets?: string[],
-    request?: VirtualAudioOutputPlaybackRequest,
+    request?: VirtualAudioOutputPlaybackRequest
   ): Promise<{
     bridge_id: typeof VIRTUAL_AUDIO_OUTPUT_PLAYBACK_BRIDGE_ID;
     platform: NodeJS.Platform;
@@ -266,10 +302,14 @@ export class VirtualAudioOutputPlaybackBridgeImpl implements VirtualAudioOutputP
     let streamFormat: AudioFormat | undefined;
     for await (const chunk of stream) {
       if (!streamFormat) streamFormat = chunk.format;
-      if (streamFormat.encoding !== chunk.format.encoding
-        || streamFormat.channels !== chunk.format.channels
-        || streamFormat.sample_rate_hz !== chunk.format.sample_rate_hz) {
-        throw new Error('[virtual-audio-output-playback-bridge] mixed audio stream formats are not supported');
+      if (
+        streamFormat.encoding !== chunk.format.encoding ||
+        streamFormat.channels !== chunk.format.channels ||
+        streamFormat.sample_rate_hz !== chunk.format.sample_rate_hz
+      ) {
+        throw new Error(
+          '[virtual-audio-output-playback-bridge] mixed audio stream formats are not supported'
+        );
       }
       chunks.push(chunk);
     }
@@ -292,7 +332,7 @@ export class VirtualAudioOutputPlaybackBridgeImpl implements VirtualAudioOutputP
 }
 
 export function createVirtualAudioOutputPlaybackBridge(
-  opts: VirtualAudioOutputPlaybackBridgeOptions = {},
+  opts: VirtualAudioOutputPlaybackBridgeOptions = {}
 ): VirtualAudioOutputPlaybackBridge {
   return new VirtualAudioOutputPlaybackBridgeImpl(opts);
 }

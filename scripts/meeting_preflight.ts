@@ -9,18 +9,21 @@ import {
   safeExecResult,
   safeExistsSync,
   safeReaddir,
+  createCoreAudioDeviceInventoryBridge,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { collectDoctorReport } from './run_doctor.js';
 import { checkSpeakConsent } from '../libs/actuators/meeting-actuator/src/meeting-actuator-helpers.js';
 
-export type MeetingPreflightStatus = 'pass' | 'fail' | 'warn';
+export type MeetingPreflightStatus = 'pass' | 'fail' | 'warn' | 'operator_action_required';
 
 export interface MeetingPreflightItem {
   id: string;
   status: MeetingPreflightStatus;
   detail: string;
   fix: string;
+  automatic_fix_available: boolean;
+  reason_code?: string;
 }
 
 export interface MeetingPreflightReport {
@@ -37,9 +40,17 @@ function item(
   id: string,
   status: MeetingPreflightStatus,
   detail: string,
-  fix: string
+  fix: string,
+  options: { automaticFixAvailable?: boolean; reasonCode?: string } = {}
 ): MeetingPreflightItem {
-  return { id, status, detail, fix };
+  return {
+    id,
+    status,
+    detail,
+    fix,
+    automatic_fix_available: options.automaticFixAvailable ?? false,
+    ...(options.reasonCode ? { reason_code: options.reasonCode } : {}),
+  };
 }
 
 async function probeDoctorMeeting(missionId?: string): Promise<MeetingPreflightItem> {
@@ -70,7 +81,8 @@ async function probePlaywrightBrowser(): Promise<MeetingPreflightItem> {
     'playwright.browser',
     'fail',
     playwright?.reason || 'Playwright Chromium cache is missing',
-    'pnpm exec playwright install chromium'
+    'pnpm exec playwright install chromium',
+    { automaticFixAvailable: false, reasonCode: 'BROWSER_RUNTIME_MISSING' }
   );
 }
 
@@ -80,7 +92,8 @@ async function probeBlackHoleDevice(platform: NodeJS.Platform): Promise<MeetingP
       'blackhole.device',
       'warn',
       `skipped on ${platform}; BlackHole is macOS-only`,
-      'none'
+      'none',
+      { reasonCode: 'BLACKHOLE_NOT_APPLICABLE' }
     );
   }
   const result = safeExecResult('system_profiler', ['SPAudioDataType'], {
@@ -89,13 +102,93 @@ async function probeBlackHoleDevice(platform: NodeJS.Platform): Promise<MeetingP
   });
   const output = `${result.stdout}\n${result.stderr}`.trim();
   if (result.status === 0 && /BlackHole/i.test(output)) {
-    return item('blackhole.device', 'pass', 'BlackHole 2ch is listed by system_profiler', 'none');
+    return item(
+      'blackhole.device',
+      'pass',
+      'BlackHole is listed; the CoreAudio bridge will resolve input/output by UID at execution time',
+      'pnpm voice:route:probe -- --json'
+    );
   }
   const reason =
     result.status === 0
       ? 'system_profiler did not list BlackHole'
       : `system_profiler exited with code ${result.status}`;
-  return item('blackhole.device', 'fail', reason, 'brew install blackhole-2ch');
+  return item('blackhole.device', 'fail', reason, 'brew install blackhole-2ch', {
+    reasonCode: 'BLACKHOLE_DRIVER_REQUIRED',
+  });
+}
+
+async function probeCoreAudioOutputBridge(
+  platform: NodeJS.Platform
+): Promise<MeetingPreflightItem> {
+  if (platform !== 'darwin') {
+    return item(
+      'coreaudio.output.bridge',
+      'warn',
+      `skipped on ${platform}; CoreAudio is macOS-only`,
+      'none',
+      {
+        reasonCode: 'COREAUDIO_NOT_APPLICABLE',
+      }
+    );
+  }
+  const script = pathResolver.rootResolve('libs/core/coreaudio-output-bridge.swift');
+  const inventoryScript = pathResolver.rootResolve('libs/core/coreaudio-device-inventory.swift');
+  if (safeExistsSync(script) && safeExistsSync(inventoryScript)) {
+    const inventory = await createCoreAudioDeviceInventoryBridge().probe();
+    if (inventory.available) {
+      const virtualDevices = inventory.devices.filter((device) => device.is_virtual);
+      return item(
+        'coreaudio.output.bridge',
+        'pass',
+        `CoreAudio bridge ready; ${virtualDevices.length} virtual device(s) discovered with stable UID metadata`,
+        'none'
+      );
+    }
+    return item(
+      'coreaudio.output.bridge',
+      'warn',
+      inventory.reason || 'CoreAudio inventory returned no devices',
+      'Open Audio MIDI Setup and confirm the target device; do not change the system default output',
+      { reasonCode: 'COREAUDIO_DEVICE_INVENTORY_EMPTY' }
+    );
+  }
+  return item(
+    'coreaudio.output.bridge',
+    'fail',
+    'CoreAudio output helper is missing from the repository',
+    'Rebuild Kyberion packages and restore libs/core/coreaudio-output-bridge.swift',
+    { reasonCode: 'COREAUDIO_BRIDGE_MISSING' }
+  );
+}
+
+function probeAudioPermission(platform: NodeJS.Platform): MeetingPreflightItem {
+  if (platform !== 'darwin') {
+    return item(
+      'audio.permission',
+      'warn',
+      `OS audio permission probe is not applicable on ${platform}`,
+      'none',
+      {
+        reasonCode: 'AUDIO_PERMISSION_NOT_APPLICABLE',
+      }
+    );
+  }
+  if (process.env.KYBERION_AUDIO_PERMISSION_CONFIRMED === '1') {
+    return item(
+      'audio.permission',
+      'pass',
+      'operator confirmed macOS microphone/audio input permission',
+      'none'
+    );
+  }
+  return item(
+    'audio.permission',
+    'operator_action_required',
+    'macOS permission state is not auto-requested; operator confirmation is required before a live capture',
+    'System Settings > Privacy & Security > Microphone; then set KYBERION_AUDIO_PERMISSION_CONFIRMED=1 for this session',
+    { reasonCode: 'MICROPHONE_PERMISSION_REQUIRED' }
+  );
 }
 
 function probeMlxAudioRuntime(platform: NodeJS.Platform): MeetingPreflightItem {
@@ -120,7 +213,8 @@ function probeMlxAudioRuntime(platform: NodeJS.Platform): MeetingPreflightItem {
     'mlx.audio.runtime',
     'fail',
     `missing ${path.relative(pathResolver.rootDir(), pythonBin)}`,
-    fix
+    fix,
+    { reasonCode: 'TTS_RUNTIME_MISSING' }
   );
 }
 
@@ -151,7 +245,8 @@ function probeVoiceProfileStore(): MeetingPreflightItem {
     'voice.profile',
     'fail',
     `voice profile store has no metadata.json profiles under ${path.relative(pathResolver.rootDir(), storeDir)}`,
-    'Run Task 2: pnpm pipeline --input pipelines/voice-onboarding.json'
+    'Run Task 2: pnpm pipeline --input pipelines/voice-onboarding.json',
+    { reasonCode: 'VOICE_PROFILE_MISSING' }
   );
 }
 
@@ -164,7 +259,8 @@ function probeVoiceConsent(): MeetingPreflightItem {
     'voice.consent',
     'fail',
     consent.reason || 'voice consent is not granted',
-    'pnpm meeting:consent grant --mission <MISSION_ID> --operator <handle>'
+    'pnpm meeting:consent grant --mission <MISSION_ID> --operator <handle>',
+    { reasonCode: 'VOICE_CONSENT_REQUIRED' }
   );
 }
 
@@ -181,7 +277,8 @@ async function probeReasoningBackend(): Promise<MeetingPreflightItem> {
     'reasoning.backend',
     'fail',
     backend?.reason || 'no real reasoning backend reachable',
-    'pnpm reasoning:setup'
+    'pnpm reasoning:setup',
+    { reasonCode: 'REAL_REASONING_BACKEND_REQUIRED' }
   );
 }
 
@@ -200,6 +297,8 @@ export async function runMeetingPreflight(
     await probeDoctorMeeting(missionId),
     await probePlaywrightBrowser(),
     await probeBlackHoleDevice(platform),
+    await probeCoreAudioOutputBridge(platform),
+    probeAudioPermission(platform),
     probeMlxAudioRuntime(platform),
     probeVoiceProfileStore(),
     probeVoiceConsent(),
@@ -208,7 +307,9 @@ export async function runMeetingPreflight(
 
   return {
     items,
-    ready: items.every((entry) => entry.status !== 'fail'),
+    ready: items.every(
+      (entry) => entry.status !== 'fail' && entry.status !== 'operator_action_required'
+    ),
   };
 }
 

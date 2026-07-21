@@ -378,18 +378,21 @@
       "path": "libs/actuators/voice-actuator",
       "d": "Governed local voice generation actuator with native playback and artifact fallback",
       "s": "implemented",
-      "version": "1.3.0",
-      "capability_count": 9,
+      "version": "1.4.0",
+      "capability_count": 12,
       "ops": [
         "collect_and_register_voice_profile",
         "collect_voice_samples",
         "generate_voice",
         "health",
+        "list_audio_routes",
         "list_voices",
+        "probe_audio_route",
         "record_verify_repair_voice_sample",
         "record_voice_sample",
         "register_voice_profile",
-        "speak_local"
+        "speak_local",
+        "verify_tts_loopback"
       ],
       "contract_schema": "schemas/voice-action.schema.json",
       "prerequisites_summary": "-"

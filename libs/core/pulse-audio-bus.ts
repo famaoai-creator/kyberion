@@ -20,10 +20,12 @@
 
 import { spawn, type ChildProcess } from 'node:child_process';
 import { logger } from './core.js';
-import { safeExec } from './secure-io.js';
+import { buildSafeExecEnv, safeExec } from './secure-io.js';
 import { registerEnvironmentCapabilityProbe } from './environment-capability.js';
 import type { AudioBus, AudioBusProbe } from './audio-bus.js';
 import type { AudioChunk, AudioFormat } from './meeting-session-types.js';
+import { BoundedAudioQueue, DEFAULT_AUDIO_BUFFER_POLICY } from './bounded-audio-queue.js';
+import type { AudioBufferPolicy, AudioRouteHealth, AudioRouteMetrics } from './audio-route.js';
 
 export interface PulseAudioBusOptions {
   /** Source name we expose to the meeting client as its mic. */
@@ -32,9 +34,10 @@ export interface PulseAudioBusOptions {
   sink_name?: string;
   ffmpeg_bin?: string;
   pactl_bin?: string;
+  buffer_policy?: AudioBufferPolicy;
 }
 
-const DEFAULTS: Required<Omit<PulseAudioBusOptions, 'ffmpeg_bin' | 'pactl_bin'>> = {
+const DEFAULTS: Required<Pick<PulseAudioBusOptions, 'source_name' | 'sink_name'>> = {
   source_name: 'meeting_in',
   sink_name: 'meeting_out',
 };
@@ -51,14 +54,24 @@ export class PulseAudioBus implements AudioBus {
   private opened = false;
   private closed = false;
   private format: AudioFormat | null = null;
-  private inboundQueue: AudioChunk[] = [];
-  private inboundResolvers: Array<(chunk: AudioChunk | null) => void> = [];
+  private readonly inboundQueue: BoundedAudioQueue;
+  private status: AudioRouteHealth['status'] = 'closed';
+  private reason: string | undefined;
+  private readonly metricsValue: AudioRouteMetrics = {
+    audio_chunks_in: 0,
+    audio_chunks_out: 0,
+    dropped_chunks: 0,
+    dropped_ms: 0,
+    underrun_count: 0,
+    resampled: false,
+  };
 
   constructor(opts: PulseAudioBusOptions = {}) {
     this.source = opts.source_name ?? DEFAULTS.source_name;
     this.sink = opts.sink_name ?? DEFAULTS.sink_name;
     this.ffmpegBin = opts.ffmpeg_bin ?? 'ffmpeg';
     this.pactlBin = opts.pactl_bin ?? 'pactl';
+    this.inboundQueue = new BoundedAudioQueue(opts.buffer_policy ?? DEFAULT_AUDIO_BUFFER_POLICY);
   }
 
   async probe(): Promise<AudioBusProbe> {
@@ -139,12 +152,20 @@ export class PulseAudioBus implements AudioBus {
         's16le',
         '-',
       ],
-      { stdio: ['ignore', 'pipe', 'pipe'] }
+      { stdio: ['ignore', 'pipe', 'pipe'], env: buildSafeExecEnv(), detached: true }
     );
     this.inputProc.stdout?.on('data', (buf: Buffer) => this.handleInbound(buf));
+    this.inputProc.on('error', (error) => {
+      this.status = 'degraded';
+      this.reason = error.message;
+    });
     this.inputProc.on('exit', (code) => {
       logger.info(`[pulse-audio-bus] input ffmpeg exited with code ${code}`);
-      this.flushInboundDone();
+      if (!this.closed) {
+        this.status = 'degraded';
+        this.reason = `input process exited code=${String(code)}`;
+      }
+      this.inboundQueue.close();
     });
 
     // Output: write s16le into the source sink so the client picks it up.
@@ -166,13 +187,22 @@ export class PulseAudioBus implements AudioBus {
         'pulse',
         this.source,
       ],
-      { stdio: ['pipe', 'ignore', 'pipe'] }
+      { stdio: ['pipe', 'ignore', 'pipe'], env: buildSafeExecEnv(), detached: true }
     );
+    this.outputProc.on('error', (error) => {
+      this.status = 'degraded';
+      this.reason = error.message;
+    });
     this.outputProc.on('exit', (code) => {
       logger.info(`[pulse-audio-bus] output ffmpeg exited with code ${code}`);
+      if (!this.closed && code !== 0) {
+        this.status = 'degraded';
+        this.reason = `output process exited code=${String(code)}`;
+      }
     });
 
     this.opened = true;
+    this.status = 'healthy';
   }
 
   async close(): Promise<void> {
@@ -193,20 +223,15 @@ export class PulseAudioBus implements AudioBus {
       }
     }
     this.moduleIds = [];
-    this.flushInboundDone();
+    this.inboundQueue.close();
   }
 
   async *inputStream(): AsyncIterable<AudioChunk> {
     if (!this.opened) throw new Error('[pulse-audio-bus] open() before reading inputStream');
     while (!this.closed) {
-      if (this.inboundQueue.length > 0) {
-        yield this.inboundQueue.shift()!;
-        continue;
-      }
-      const chunk = await new Promise<AudioChunk | null>((resolve) => {
-        this.inboundResolvers.push(resolve);
-      });
+      const chunk = await this.inboundQueue.next();
       if (chunk === null) return;
+      this.metricsValue.audio_chunks_in += 1;
       yield chunk;
     }
   }
@@ -217,7 +242,15 @@ export class PulseAudioBus implements AudioBus {
     }
     for await (const chunk of stream) {
       if (this.closed) return;
-      this.outputProc.stdin?.write(Buffer.from(chunk.payload));
+      if (
+        chunk.format.encoding !== this.format?.encoding ||
+        chunk.format.sample_rate_hz !== this.format?.sample_rate_hz ||
+        chunk.format.channels !== this.format?.channels
+      )
+        throw new Error('[pulse-audio-bus] output PCM format mismatch');
+      if (this.outputProc.stdin && !this.outputProc.stdin.write(Buffer.from(chunk.payload)))
+        await onceDrain(this.outputProc.stdin);
+      this.metricsValue.audio_chunks_out += 1;
     }
   }
 
@@ -228,18 +261,38 @@ export class PulseAudioBus implements AudioBus {
       payload: new Uint8Array(buf),
       ts_ms: Date.now(),
     };
-    if (this.inboundResolvers.length > 0) {
-      this.inboundResolvers.shift()!(chunk);
-    } else {
-      this.inboundQueue.push(chunk);
-    }
+    this.inboundQueue.push(chunk);
   }
 
-  private flushInboundDone(): void {
-    while (this.inboundResolvers.length) {
-      this.inboundResolvers.shift()!(null);
-    }
+  health(): AudioRouteHealth {
+    return {
+      status: this.closed ? 'closed' : this.status,
+      input_process_alive: Boolean(this.inputProc && this.inputProc.exitCode === null),
+      output_process_alive: Boolean(this.outputProc && this.outputProc.exitCode === null),
+      queue_depth: this.inboundQueue.metrics().depth,
+      dropped_chunks: this.inboundQueue.metrics().dropped_chunks,
+      underrun_count: 0,
+      device_disconnected: this.status === 'degraded',
+      lease_held: this.opened && !this.closed,
+      ...(this.reason ? { reason: this.reason } : {}),
+    };
   }
+
+  metrics(): AudioRouteMetrics {
+    const queue = this.inboundQueue.metrics();
+    return {
+      ...this.metricsValue,
+      dropped_chunks: queue.dropped_chunks,
+      dropped_ms: queue.dropped_ms,
+    };
+  }
+}
+
+function onceDrain(stream: NodeJS.WritableStream): Promise<void> {
+  return new Promise((resolve, reject) => {
+    stream.once('drain', resolve);
+    stream.once('error', reject);
+  });
 }
 
 registerEnvironmentCapabilityProbe('audio-bus.pulseaudio', async () => {

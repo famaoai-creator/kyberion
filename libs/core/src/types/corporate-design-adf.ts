@@ -6,11 +6,25 @@
  * and run `pnpm generate:types` to regenerate this file.
  */
 
+/**
+ * Hex color code
+ */
+export type Color = string;
+
+/**
+ * Renderer-neutral corporate design system contract. Enables automated generation of branded presentations, documents, and media.
+ */
 export interface CorporateDesignADF {
   kind: 'corporate-design-adf';
   version: string;
   client: {
+    /**
+     * Full legal or display name
+     */
     name: string;
+    /**
+     * Abbreviation used in filenames and references
+     */
     short_name: string;
     copyright?: string;
     confidentiality?: 'public' | 'internal' | 'confidential' | 'restricted';
@@ -21,18 +35,27 @@ export interface CorporateDesignADF {
     aspect_ratio: '16:9' | '4:3' | '16:10';
   };
   color_scheme: {
+    /**
+     * Brand primary color (headers, accents)
+     */
     primary: string;
-    secondary?: string;
-    background: string;
-    text_primary: string;
-    text_secondary?: string;
+    secondary?: Color;
+    background: Color;
+    text_primary: Color;
+    text_secondary?: Color;
+    /**
+     * Hex color code
+     */
     text_on_primary?: string;
-    accent?: string[];
+    /**
+     * Ordered accent palette for charts, tags, etc.
+     */
+    accent?: Color[];
     semantic?: {
-      success?: string;
-      warning?: string;
-      danger?: string;
-      info?: string;
+      success?: Color;
+      warning?: Color;
+      danger?: Color;
+      info?: Color;
     };
   };
   typography: {
@@ -45,6 +68,9 @@ export interface CorporateDesignADF {
       char?: string;
     };
   };
+  /**
+   * Ordered list of slide layout definitions
+   */
   layouts: Layout[];
   assets?: {
     logo?: Asset;
@@ -52,28 +78,34 @@ export interface CorporateDesignADF {
     cover_background?: Asset;
     icon_set?: Asset;
   };
+  /**
+   * Engine-specific overrides (pptxgenjs, google-slides, etc.)
+   */
   render_hints?: {
     [k: string]: unknown;
   };
 }
-
 export interface FontSpec {
   family_ja?: string;
   family_latin?: string;
   family_fallback?: string;
   size_pt?: number;
   weight?: 'normal' | 'bold';
+  /**
+   * Line spacing as percentage (e.g. 150 = 150%)
+   */
   line_spacing_pct?: number;
 }
-
 export interface Layout {
   id: string;
   name: string;
+  /**
+   * Semantic role of this layout
+   */
   role: 'cover' | 'section' | 'content' | 'content_two_col' | 'blank' | 'closing';
   description?: string;
   elements?: Element[];
 }
-
 export interface Element {
   type:
     | 'shape'
@@ -86,15 +118,18 @@ export interface Element {
     | 'confidential_label';
   description?: string;
   placeholder_type?: 'title' | 'subtitle' | 'body' | 'custom';
+  /**
+   * Shape type (rect, trapezoid, etc.)
+   */
   shape?: string;
-  fill_color?: string;
+  fill_color?: Color;
   font_size_pt?: number;
-  font_color?: string;
+  font_color?: Color;
   font_weight?: 'normal' | 'bold';
   align?: 'left' | 'center' | 'right';
   valign?: 'top' | 'middle' | 'bottom';
   border?: {
-    color?: string;
+    color?: Color;
     width_pt?: number;
   };
   position?: {
@@ -104,8 +139,10 @@ export interface Element {
     h_emu?: number;
   };
 }
-
 export interface Asset {
+  /**
+   * Relative path from the ADF file
+   */
   path: string;
   description?: string;
 }

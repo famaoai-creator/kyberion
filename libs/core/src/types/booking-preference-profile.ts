@@ -169,33 +169,57 @@ export interface SiteSelectionPolicy {
   /**
    * @minItems 1
    */
-  compare_dimensions: (
-    | 'price'
-    | 'points'
-    | 'coupon'
-    | 'login_friction'
-    | 'cancellation'
-    | 'receipt_support'
-    | 'speed'
-    | 'familiarity'
-    | 'privacy'
-  )[];
+  compare_dimensions: [
+    (
+      | 'price'
+      | 'points'
+      | 'coupon'
+      | 'login_friction'
+      | 'cancellation'
+      | 'receipt_support'
+      | 'speed'
+      | 'familiarity'
+      | 'privacy'
+    ),
+    ...(
+      | 'price'
+      | 'points'
+      | 'coupon'
+      | 'login_friction'
+      | 'cancellation'
+      | 'receipt_support'
+      | 'speed'
+      | 'familiarity'
+      | 'privacy'
+    )[],
+  ];
   /**
    * @minItems 1
    */
-  ask_user_when: (
-    | 'sale_possible'
-    | 'price_gap_unclear'
-    | 'points_advantage_unclear'
-    | 'multiple_top_candidates'
-    | 'login_friction_tradeoff'
-    | 'new_service_category'
-    | 'user_requested_precheck'
-  )[];
+  ask_user_when: [
+    (
+      | 'sale_possible'
+      | 'price_gap_unclear'
+      | 'points_advantage_unclear'
+      | 'multiple_top_candidates'
+      | 'login_friction_tradeoff'
+      | 'new_service_category'
+      | 'user_requested_precheck'
+    ),
+    ...(
+      | 'sale_possible'
+      | 'price_gap_unclear'
+      | 'points_advantage_unclear'
+      | 'multiple_top_candidates'
+      | 'login_friction_tradeoff'
+      | 'new_service_category'
+      | 'user_requested_precheck'
+    )[],
+  ];
   max_questions_per_turn?: number;
   favorite_site_groups?: {
     label: string;
-    categories?: (
+    categories: (
       | 'hotel'
       | 'restaurant'
       | 'flight'
@@ -209,8 +233,34 @@ export interface SiteSelectionPolicy {
       | 'family'
       | 'gifts'
     )[];
+    /**
+     * @minItems 1
+     */
     preferred_sites: [string, ...string[]];
     backup_sites?: string[];
+    notes?: string;
+  }[];
+  preflight_question_sets?: {
+    label: string;
+    categories: (
+      | 'hotel'
+      | 'restaurant'
+      | 'flight'
+      | 'rail'
+      | 'activity'
+      | 'package'
+      | 'shopping'
+      | 'medical'
+      | 'subscription'
+      | 'home_service'
+      | 'family'
+      | 'gifts'
+    )[];
+    /**
+     * @minItems 1
+     * @maxItems 3
+     */
+    questions: [string] | [string, string] | [string, string, string];
     notes?: string;
   }[];
   sale_signal_policy?: {
@@ -219,23 +269,4 @@ export interface SiteSelectionPolicy {
     material_threshold?: string;
     preferred_sale_sources?: string[];
   };
-  preflight_question_sets?: {
-    label: string;
-    categories?: (
-      | 'hotel'
-      | 'restaurant'
-      | 'flight'
-      | 'rail'
-      | 'activity'
-      | 'package'
-      | 'shopping'
-      | 'medical'
-      | 'subscription'
-      | 'home_service'
-      | 'family'
-      | 'gifts'
-    )[];
-    questions: [string, ...string[]];
-    notes?: string;
-  }[];
 }
