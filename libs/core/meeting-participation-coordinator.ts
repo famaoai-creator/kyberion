@@ -68,6 +68,14 @@ export interface MeetingParticipationOptions {
   require_recording_consent?: boolean;
   /** Fail closed before TTS speech unless consent exists. Defaults to true when mission_id is set. */
   require_voice_consent?: boolean;
+  /** Suppress the assistant's own BlackHole return audio while speaking. */
+  self_audio_suppression_ms?: number;
+  /** Additional suppression window after output drains. */
+  post_playback_drain_ms?: number;
+  /** Reserved for the realtime driver; the coordinator remains half-duplex by default. */
+  barge_in_enabled?: boolean;
+  barge_in_rms_multiplier?: number;
+  barge_in_min_duration_ms?: number;
 }
 
 export interface MeetingParticipationReport {
@@ -170,6 +178,25 @@ export function checkMeetingParticipationConsent(input: {
   return { allowed: true };
 }
 
+export function filterSelfAudioFromMeetingInput(
+  source: AsyncIterable<AudioChunk>,
+  isSpeaking: () => boolean,
+  drainUntilMs: () => number,
+  onSuppressed?: () => void
+): AsyncIterable<AudioChunk> {
+  return {
+    async *[Symbol.asyncIterator]() {
+      for await (const chunk of source) {
+        if (isSpeaking() || Date.now() < drainUntilMs()) {
+          onSuppressed?.();
+          continue;
+        }
+        yield chunk;
+      }
+    },
+  };
+}
+
 export class MeetingParticipationCoordinator {
   constructor(
     private readonly deps: {
@@ -268,8 +295,16 @@ export class MeetingParticipationCoordinator {
     //    iterator lets us track silence + flag turn endpoints; STT
     //    sees the same chunks.
     const taps = teeInbound(session.audioInput());
-
-    const transcriptIterator = this.deps.stt.transcribeStream(taps.toStt);
+    let speaking = false;
+    let selfAudioDrainUntilMs = 0;
+    const transcriptIterator = this.deps.stt.transcribeStream(
+      filterSelfAudioFromMeetingInput(
+        taps.toStt,
+        () => speaking,
+        () => selfAudioDrainUntilMs,
+        () => this.deps.trace?.addEvent('meeting_participation.self_audio_suppressed', {})
+      )
+    );
     const vadIterator = this.driveVad(taps.toVad, deadline);
     void consumeIterator(vadIterator); // keep VAD active in background
 
@@ -303,7 +338,14 @@ export class MeetingParticipationCoordinator {
           this.deps.trace?.addEvent('meeting_participation.speak_requested', {
             chars: decision.speech.length,
           });
-          await this.speak(session, decision.speech, options.voice_profile_id, target, options);
+          speaking = true;
+          selfAudioDrainUntilMs = Date.now() + (options.self_audio_suppression_ms ?? 0);
+          try {
+            await this.speak(session, decision.speech, options.voice_profile_id, target, options);
+          } finally {
+            speaking = false;
+            selfAudioDrainUntilMs = Date.now() + (options.post_playback_drain_ms ?? 400);
+          }
           utterancesSpoken += 1;
           this.deps.trace?.addEvent('meeting_participation.spoke', {
             utterance_index: utterancesReceived,

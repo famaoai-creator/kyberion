@@ -91,7 +91,9 @@ describe('meeting_preflight', () => {
         candidate.includes('/active/shared/runtime/voice-profiles') ||
         candidate.includes('/active/shared/runtime/tool-runtimes/mlx-audio/bin/python') ||
         candidate.includes('/active/shared/runtime/tool-runtimes/mlx-audio/bin/python3') ||
-        candidate.includes('/active/shared/runtime/voice-profiles/alpha/metadata.json')
+        candidate.includes('/active/shared/runtime/voice-profiles/alpha/metadata.json') ||
+        candidate.includes('/libs/core/coreaudio-output-bridge.swift') ||
+        candidate.includes('/libs/core/coreaudio-device-inventory.swift')
     );
     mocks.safeReaddir.mockReturnValue(['alpha', 'README.md']);
     mocks.listToolRuntimeInventory.mockReturnValue({
@@ -107,6 +109,7 @@ describe('meeting_preflight', () => {
       ],
     });
     mocks.checkSpeakConsent.mockReturnValue({ allowed: true });
+    process.env.KYBERION_AUDIO_PERMISSION_CONFIRMED = '1';
     delete process.env.MISSION_ID;
   });
 
@@ -115,6 +118,7 @@ describe('meeting_preflight', () => {
     logSpy.mockReset();
     errorSpy.mockReset();
     delete process.env.MISSION_ID;
+    delete process.env.KYBERION_AUDIO_PERMISSION_CONFIRMED;
   });
 
   it('passes when the meeting runtime, browser cache, audio device, voice profile, consent, and reasoning backend are ready', async () => {
@@ -123,10 +127,17 @@ describe('meeting_preflight', () => {
     const report = await runMeetingPreflight({ missionId: 'MSN-MEETING-TEST', platform: 'darwin' });
 
     expect(report.ready).toBe(true);
-    expect(report.items.map((item) => [item.id, item.status])).toEqual([
+    const coreAudio = report.items.find((item) => item.id === 'coreaudio.output.bridge');
+    expect(coreAudio?.status).toMatch(/pass|warn/);
+    expect(
+      report.items
+        .filter((item) => item.id !== 'coreaudio.output.bridge')
+        .map((item) => [item.id, item.status])
+    ).toEqual([
       ['doctor.meeting', 'pass'],
       ['playwright.browser', 'pass'],
       ['blackhole.device', 'pass'],
+      ['audio.permission', 'pass'],
       ['mlx.audio.runtime', 'pass'],
       ['voice.profile', 'pass'],
       ['voice.consent', 'pass'],

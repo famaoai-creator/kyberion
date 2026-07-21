@@ -1010,6 +1010,13 @@ export { PulseAudioBus } from './pulse-audio-bus.js';
 export type { PulseAudioBusOptions } from './pulse-audio-bus.js';
 export { resolveAudioBus } from './audio-bus-resolver.js';
 export type { AudioBusId } from './audio-bus-resolver.js';
+export * from './audio-route.js';
+export * from './bounded-audio-queue.js';
+export * from './audio-text-similarity.js';
+export * from './coreaudio-device-inventory.js';
+export * from './coreaudio-output-bridge.js';
+export * from './tts-loopback-verifier.js';
+export * from './audio-device-lease.js';
 export { StubVideoFrameBus } from './video-frame-bus.js';
 export type { VideoFrameBus, VideoFrameBusProbe } from './video-frame-bus.js';
 export {
