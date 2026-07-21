@@ -43,6 +43,7 @@ import {
   StubAudioBus,
   createCoreAudioDeviceInventoryBridge,
   getStreamingSttBridge,
+  installShellStreamingSttBridgeFromEnv,
   TtsLoopbackVerifier,
   type TtsLoopbackVerificationRequest,
   type TtsSource,
@@ -61,6 +62,7 @@ import {
   waitForVoiceJob,
   type VoiceArtifactFormat,
 } from './voice-runtime-helpers.js';
+import { registerVoiceLoopbackSttAdapter } from './voice-stt-backend-adapters.js';
 import { runActuatorCli } from '@agent/core';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
@@ -1093,6 +1095,13 @@ async function verifyTtsLoopback(
     dryRun
   );
   const sttBridgeId = stringParam(params, 'stt_bridge_id');
+  registerVoiceLoopbackSttAdapter(sttBridgeId, { request_id: requestId, language });
+  if (sttBridgeId === 'shell' || process.env.KYBERION_STREAMING_STT_BRIDGE === 'shell') {
+    const installation = installShellStreamingSttBridgeFromEnv();
+    if (!installation.installed) {
+      throw new Error(`streaming STT shell bridge unavailable: ${installation.reason}`);
+    }
+  }
   const stt =
     busId === 'stub' && !sttBridgeId
       ? createDeterministicLoopbackStt(text)
@@ -1145,9 +1154,7 @@ function createDeterministicLoopbackTts(): TtsSource {
 
 function createDeterministicLoopbackStt(expectedText: string): {
   readonly bridge_id: string;
-  transcribeStream(
-    audio: AsyncIterable<AudioChunk>
-  ): AsyncIterable<{
+  transcribeStream(audio: AsyncIterable<AudioChunk>): AsyncIterable<{
     utterance_id: string;
     is_final: boolean;
     text: string;
@@ -1251,12 +1258,21 @@ function createNativeArtifactTtsSource(options: {
       const profile = getVoiceProfileRecord(voiceProfileId || options.profileId);
       const defaults = getVoiceTtsLanguageConfig(options.language);
       const engine = resolveVoiceEngineForPlatform(profile.default_engine_id);
+      const artifactFormats = engine.supports.artifact_formats;
+      const artifactFormat =
+        process.platform === 'darwin' &&
+        engine.engine_id === 'local_say' &&
+        artifactFormats.includes('aiff')
+          ? 'aiff'
+          : artifactFormats.includes('wav')
+            ? 'wav'
+            : (artifactFormats[0] ?? 'wav');
       const artifact = await renderNativeArtifact(text, {
         requestId: options.requestId,
         voice: defaults.voice,
         rate: defaults.rate,
         language: options.language,
-        format: 'wav',
+        format: artifactFormat,
         engineId: engine.engine_id,
         supportsFormats: engine.supports.artifact_formats,
         profile,
