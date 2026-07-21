@@ -11,6 +11,8 @@ const allowedManagedProcessConsumers = [
   // Apple Intelligence bridge: short-lived afm CLI calls, supervised so a
   // hung on-device inference can never outlive its timeout.
   'libs/core/apple-intelligence-bridge.ts',
+  'libs/core/blackhole-audio-bus.ts',
+  'libs/core/coreaudio-output-bridge.ts',
   'libs/actuators/service-actuator/src/reconcile-integration.test.ts',
   'libs/actuators/service-actuator/src/service-actuator-helpers.ts',
   'libs/core/acp-mediator.ts',

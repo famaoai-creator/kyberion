@@ -3279,7 +3279,7 @@
     {
       "path": "product/orchestration/global_actuator_index.json",
       "tier": "public",
-      "size": 17535,
+      "size": 17625,
       "type": "json"
     },
     {
