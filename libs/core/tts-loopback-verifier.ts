@@ -280,12 +280,12 @@ export class TtsLoopbackVerifier {
       outputError = error instanceof Error ? error.message : String(error);
     } finally {
       await wait(request.timing?.post_roll_ms ?? 250);
-      captureDone = true;
       await this.options.bus.close().catch((error: unknown) => {
         warnings.push(
           `audio cleanup failed: ${error instanceof Error ? error.message : String(error)}`
         );
       });
+      captureDone = true;
       await capturePromise;
     }
     if (outputError) warnings.push(outputError);
