@@ -3041,6 +3041,14 @@
           "kind": "capture"
         },
         {
+          "op": "list_audio_routes",
+          "kind": "capture"
+        },
+        {
+          "op": "probe_audio_route",
+          "kind": "capture"
+        },
+        {
           "op": "transcribe",
           "kind": "capture"
         },
@@ -3078,6 +3086,10 @@
         },
         {
           "op": "speak_local",
+          "kind": "apply"
+        },
+        {
+          "op": "verify_tts_loopback",
           "kind": "apply"
         }
       ]

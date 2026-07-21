@@ -524,7 +524,14 @@
       "apply": []
     },
     "voice": {
-      "capture": ["health", "list_voices", "transcribe", "transcribe_voice_sample"],
+      "capture": [
+        "health",
+        "list_audio_routes",
+        "list_voices",
+        "probe_audio_route",
+        "transcribe",
+        "transcribe_voice_sample"
+      ],
       "transform": [],
       "apply": [
         "collect_and_register_voice_profile",
@@ -534,7 +541,8 @@
         "record_verify_repair_voice_sample",
         "record_voice_sample",
         "register_voice_profile",
-        "speak_local"
+        "speak_local",
+        "verify_tts_loopback"
       ]
     },
     "wisdom": {

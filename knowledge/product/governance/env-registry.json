@@ -285,6 +285,22 @@
       "documented": false
     },
     {
+      "name": "KYBERION_AUDIO_DEVICE_UID",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_AUDIO_PERMISSION_CONFIRMED",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_AUDIO_RECORD_COMMAND",
       "category": "provider",
       "type": "string",
@@ -366,6 +382,30 @@
     },
     {
       "name": "KYBERION_BEST_OF_N",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_BLACKHOLE_DEVICE_LABEL",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_BLACKHOLE_INPUT_UID",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_BLACKHOLE_OUTPUT_UID",
       "category": "runtime",
       "type": "string",
       "required": false,
@@ -1066,6 +1106,14 @@
       "name": "KYBERION_KNOWLEDGE_ROOT",
       "category": "path",
       "type": "path",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_LIVE_BLACKHOLE_TEST",
+      "category": "runtime",
+      "type": "string",
       "required": false,
       "description": "",
       "documented": false

@@ -13,9 +13,14 @@ vi.mock('./virtual-device-inventory-bridge.js', () => ({
 
 vi.mock('./secure-io.js', () => ({
   safeExec: mocks.safeExec,
+  buildSafeExecEnv: vi.fn(() => ({})),
   safeMkdir: vi.fn(),
   safeWriteFile: mocks.safeWriteFile,
   safeRmSync: vi.fn(),
+  safeCreateExclusiveFileSync: vi.fn(),
+  safeExistsSync: vi.fn(() => false),
+  safeReadFile: vi.fn(),
+  safeUnlink: vi.fn(),
 }));
 
 describe('createVirtualAudioOutputPlaybackBridge', () => {
@@ -70,7 +75,8 @@ describe('createVirtualAudioOutputPlaybackBridge', () => {
   });
 
   it('plays a tone through each selected output', async () => {
-    const { createVirtualAudioOutputPlaybackBridge } = await import('./virtual-audio-output-playback-bridge.js');
+    const { createVirtualAudioOutputPlaybackBridge } =
+      await import('./virtual-audio-output-playback-bridge.js');
     const bridge = createVirtualAudioOutputPlaybackBridge();
     const result = await bridge.playOnOutputs(['Built-in Output', 'HDMI']);
 
@@ -81,27 +87,35 @@ describe('createVirtualAudioOutputPlaybackBridge', () => {
   });
 
   it('plays an existing source file through each selected output', async () => {
-    const { createVirtualAudioOutputPlaybackBridge } = await import('./virtual-audio-output-playback-bridge.js');
+    const { createVirtualAudioOutputPlaybackBridge } =
+      await import('./virtual-audio-output-playback-bridge.js');
     const bridge = createVirtualAudioOutputPlaybackBridge();
-    const result = await bridge.playOnOutputs(['Built-in Output'], { source_path: '/tmp/voice-generation/req-1.wav' });
+    const result = await bridge.playOnOutputs(['Built-in Output'], {
+      source_path: '/tmp/voice-generation/req-1.wav',
+    });
 
     expect(result.outputs).toHaveLength(1);
-    expect(result.outputs[0]).toEqual(expect.objectContaining({
-      device_name: 'Built-in Output',
-      status: 'played',
-      source_path: '/tmp/voice-generation/req-1.wav',
-      tone_path: '/tmp/voice-generation/req-1.wav',
-    }));
-    expect(mocks.safeExec.mock.calls[0]?.[1]).toEqual(expect.arrayContaining([
-      '--device',
-      'Built-in Output',
-      '--tone-path',
-      '/tmp/voice-generation/req-1.wav',
-    ]));
+    expect(result.outputs[0]).toEqual(
+      expect.objectContaining({
+        device_name: 'Built-in Output',
+        status: 'played',
+        source_path: '/tmp/voice-generation/req-1.wav',
+        tone_path: '/tmp/voice-generation/req-1.wav',
+      })
+    );
+    expect(mocks.safeExec.mock.calls[0]?.[1]).toEqual(
+      expect.arrayContaining([
+        '--device',
+        'Built-in Output',
+        '--tone-path',
+        '/tmp/voice-generation/req-1.wav',
+      ])
+    );
   });
 
   it('plays a pcm stream by converting it to a wav temp file', async () => {
-    const { createVirtualAudioOutputPlaybackBridge } = await import('./virtual-audio-output-playback-bridge.js');
+    const { createVirtualAudioOutputPlaybackBridge } =
+      await import('./virtual-audio-output-playback-bridge.js');
     const bridge = createVirtualAudioOutputPlaybackBridge();
     const result = await bridge.playStream(
       (async function* () {
@@ -115,14 +129,16 @@ describe('createVirtualAudioOutputPlaybackBridge', () => {
           ts_ms: 0,
         };
       })(),
-      ['Built-in Output'],
+      ['Built-in Output']
     );
 
     expect(result.outputs).toHaveLength(1);
-    expect(result.outputs[0]).toEqual(expect.objectContaining({
-      device_name: 'Built-in Output',
-      status: 'played',
-    }));
+    expect(result.outputs[0]).toEqual(
+      expect.objectContaining({
+        device_name: 'Built-in Output',
+        status: 'played',
+      })
+    );
     expect(mocks.safeWriteFile).toHaveBeenCalled();
     expect(mocks.safeExec).toHaveBeenCalledTimes(1);
   });
