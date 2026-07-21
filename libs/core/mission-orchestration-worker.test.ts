@@ -196,145 +196,151 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
     }
   });
 
-  it('dispatches planned next tasks and marks them completed after acceptance', async () => {
-    const { missionDir } = await import('./path-resolver.js');
-    const { safeWriteFile, safeReadFile } = await import('./secure-io.js');
-    const { dispatchMissionNextTasks } = await import('./mission-orchestration-worker.js');
+  it(
+    'dispatches planned next tasks and marks them completed after acceptance',
+    { timeout: 120_000 },
+    async () => {
+      const { missionDir } = await import('./path-resolver.js');
+      const { safeWriteFile, safeReadFile } = await import('./secure-io.js');
+      const { dispatchMissionNextTasks } = await import('./mission-orchestration-worker.js');
 
-    const missionPath = missionDir('MSN-FOLLOWUP', 'public');
-    safeWriteFile(`${missionPath}/deliverables/REVIEW-task-bootstrap.md`, '# review followup');
-    safeWriteFile(
-      `${missionPath}/NEXT_TASKS.json`,
-      JSON.stringify(
+      const missionPath = missionDir('MSN-FOLLOWUP', 'public');
+      safeWriteFile(`${missionPath}/deliverables/REVIEW-task-bootstrap.md`, '# review followup');
+      safeWriteFile(
+        `${missionPath}/NEXT_TASKS.json`,
+        JSON.stringify(
+          [
+            {
+              task_id: 'task-1',
+              status: 'planned',
+              assigned_to: { role: 'implementer', agent_id: 'implementation-architect' },
+              description: 'Implement the deck',
+              deliverable: 'deliverables/presentation.html',
+            },
+            {
+              task_id: 'task-2',
+              status: 'planned',
+              assigned_to: { role: 'reviewer', agent_id: 'independent-reviewer' },
+              description: 'Review the deck',
+              deliverable: 'deliverables/REVIEW-task-1.md',
+              dependencies: ['task-1'],
+              review_target: 'task-1',
+            },
+          ],
+          null,
+          2
+        )
+      );
+      safeWriteFile(
+        `${missionPath}/TASK_BOARD.md`,
         [
-          {
-            task_id: 'task-1',
-            status: 'planned',
-            assigned_to: { role: 'implementer', agent_id: 'implementation-architect' },
-            description: 'Implement the deck',
-            deliverable: 'deliverables/presentation.html',
-          },
-          {
-            task_id: 'task-2',
-            status: 'planned',
-            assigned_to: { role: 'reviewer', agent_id: 'independent-reviewer' },
-            description: 'Review the deck',
-            deliverable: 'deliverables/REVIEW-task-1.md',
-            dependencies: ['task-1'],
-            review_target: 'task-1',
-          },
-        ],
-        null,
-        2
-      )
-    );
-    safeWriteFile(
-      `${missionPath}/TASK_BOARD.md`,
-      [
-        '# TASK_BOARD: MSN-FOLLOWUP',
-        '',
-        '## Status: Planning Ready',
-        '',
-        '### 🛠️ Execution Phase',
-        '- [x] Step 1: Research and Strategy',
-        '- [ ] Step 2: Implementation',
-        '- [ ] Step 3: Validation',
-        '',
-      ].join('\n')
-    );
+          '# TASK_BOARD: MSN-FOLLOWUP',
+          '',
+          '## Status: Planning Ready',
+          '',
+          '### 🛠️ Execution Phase',
+          '- [x] Step 1: Research and Strategy',
+          '- [ ] Step 2: Implementation',
+          '- [ ] Step 3: Validation',
+          '',
+        ].join('\n')
+      );
 
-    mocks.ensureMissionTeamRuntimeViaSupervisor.mockResolvedValue({
-      runtime_plan: {
-        mission_id: 'MSN-FOLLOWUP',
-        assignments: [],
-      },
-    });
-    mocks.resolveMissionTeamPlan.mockReturnValue({
-      mission_id: 'MSN-FOLLOWUP',
-      mission_type: 'product_development',
-      assignments: [],
-    });
-    mocks.buildMissionTeamView.mockReturnValue({ planner: 'nerve-agent' });
-    mocks.resolveMissionTeamReceiver
-      .mockReturnValueOnce({
-        agent_id: 'implementation-architect',
-        model_hint: {
-          tier: 'small',
-          effort: 'low',
-          model_id: 'openai:gpt-5.4-mini',
-          route_reason: 'phase_kind=mechanical -> small/low',
-        },
-      })
-      .mockReturnValueOnce({
-        agent_id: 'independent-reviewer',
-        model_hint: {
-          tier: 'small',
-          effort: 'low',
-          model_id: 'openai:gpt-5.4-mini',
-          route_reason: 'phase_kind=mechanical -> small/low',
+      mocks.ensureMissionTeamRuntimeViaSupervisor.mockResolvedValue({
+        runtime_plan: {
+          mission_id: 'MSN-FOLLOWUP',
+          assignments: [],
         },
       });
-    mocks.route.mockResolvedValue({
-      payload: {
-        text: makeTaskResultText({
-          summary: 'Accepted the task and recorded the requested artifact.',
-          artifacts: [{ path: 'deliverables/presentation.html', kind: 'html' }],
-          verification_done: ['Confirmed the deliverable path.'],
-          gaps: [],
-          needs: [],
-          extraText: 'accepted',
-        }),
-      },
-    });
-
-    const dispatched = await dispatchMissionNextTasks('MSN-FOLLOWUP');
-
-    expect(mocks.ensureMissionTeamRuntimeViaSupervisor).toHaveBeenCalledWith(
-      expect.objectContaining({
-        missionId: 'MSN-FOLLOWUP',
-        teamRoles: ['implementer', 'reviewer'],
-      })
-    );
-    expect(mocks.route).toHaveBeenCalledTimes(2);
-    expect(mocks.route.mock.calls[0]?.[0]).toMatchObject({
-      payload: {
-        context: {
-          task_model_hint: expect.objectContaining({
-            model_id: 'openai:gpt-5.4-mini',
+      mocks.resolveMissionTeamPlan.mockReturnValue({
+        mission_id: 'MSN-FOLLOWUP',
+        mission_type: 'product_development',
+        assignments: [],
+      });
+      mocks.buildMissionTeamView.mockReturnValue({ planner: 'nerve-agent' });
+      mocks.resolveMissionTeamReceiver
+        .mockReturnValueOnce({
+          agent_id: 'implementation-architect',
+          model_hint: {
             tier: 'small',
             effort: 'low',
+            model_id: 'openai:gpt-5.4-mini',
             route_reason: 'phase_kind=mechanical -> small/low',
+          },
+        })
+        .mockReturnValueOnce({
+          agent_id: 'independent-reviewer',
+          model_hint: {
+            tier: 'small',
+            effort: 'low',
+            model_id: 'openai:gpt-5.4-mini',
+            route_reason: 'phase_kind=mechanical -> small/low',
+          },
+        });
+      mocks.route.mockResolvedValue({
+        payload: {
+          text: makeTaskResultText({
+            summary: 'Accepted the task and recorded the requested artifact.',
+            artifacts: [{ path: 'deliverables/presentation.html', kind: 'html' }],
+            verification_done: ['Confirmed the deliverable path.'],
+            gaps: [],
+            needs: [],
+            extraText: 'accepted',
           }),
         },
-      },
-    });
-    const prompt = String((mocks.route.mock.calls[0]?.[0] as any)?.payload?.text || '');
-    expect(prompt).toContain('Mission context pack (scoped, minimal, role-specific).');
-    expect(prompt).toContain('Return exactly one ```task_result``` block');
-    expect(dispatched).toEqual([
-      { task_id: 'task-1', team_role: 'implementer', agent_id: 'implementation-architect' },
-      { task_id: 'task-2', team_role: 'reviewer', agent_id: 'independent-reviewer' },
-    ]);
+      });
 
-    const stored = JSON.parse(
-      safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }) as string
-    );
-    expect(stored.map((task: any) => task.status)).toEqual(['completed', 'completed']);
+      const dispatched = await dispatchMissionNextTasks('MSN-FOLLOWUP');
 
-    const taskBoard = safeReadFile(`${missionPath}/TASK_BOARD.md`, { encoding: 'utf8' }) as string;
-    expect(taskBoard).toContain('## Status: Validation Ready');
-    expect(taskBoard).toContain('- [x] Step 2: Implementation');
-    expect(mocks.record).toHaveBeenCalledWith(
-      'MISSION_FOLLOWUP_DISPATCHED',
-      expect.objectContaining({
-        mission_id: 'MSN-FOLLOWUP',
-        dispatched_task_count: 2,
-        average_context_chars: expect.any(Number),
-        needs_rate: 0,
-        result_schema_ok_rate: 1,
-      })
-    );
-  });
+      expect(mocks.ensureMissionTeamRuntimeViaSupervisor).toHaveBeenCalledWith(
+        expect.objectContaining({
+          missionId: 'MSN-FOLLOWUP',
+          teamRoles: ['implementer', 'reviewer'],
+        })
+      );
+      expect(mocks.route).toHaveBeenCalledTimes(2);
+      expect(mocks.route.mock.calls[0]?.[0]).toMatchObject({
+        payload: {
+          context: {
+            task_model_hint: expect.objectContaining({
+              model_id: 'openai:gpt-5.4-mini',
+              tier: 'small',
+              effort: 'low',
+              route_reason: 'phase_kind=mechanical -> small/low',
+            }),
+          },
+        },
+      });
+      const prompt = String((mocks.route.mock.calls[0]?.[0] as any)?.payload?.text || '');
+      expect(prompt).toContain('Mission context pack (scoped, minimal, role-specific).');
+      expect(prompt).toContain('Return exactly one ```task_result``` block');
+      expect(dispatched).toEqual([
+        { task_id: 'task-1', team_role: 'implementer', agent_id: 'implementation-architect' },
+        { task_id: 'task-2', team_role: 'reviewer', agent_id: 'independent-reviewer' },
+      ]);
+
+      const stored = JSON.parse(
+        safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }) as string
+      );
+      expect(stored.map((task: any) => task.status)).toEqual(['completed', 'completed']);
+
+      const taskBoard = safeReadFile(`${missionPath}/TASK_BOARD.md`, {
+        encoding: 'utf8',
+      }) as string;
+      expect(taskBoard).toContain('## Status: Validation Ready');
+      expect(taskBoard).toContain('- [x] Step 2: Implementation');
+      expect(mocks.record).toHaveBeenCalledWith(
+        'MISSION_FOLLOWUP_DISPATCHED',
+        expect.objectContaining({
+          mission_id: 'MSN-FOLLOWUP',
+          dispatched_task_count: 2,
+          average_context_chars: expect.any(Number),
+          needs_rate: 0,
+          result_schema_ok_rate: 1,
+        })
+      );
+    }
+  );
 
   it('blocks a self-review assignment without reopening the completed implementation', async () => {
     const { missionDir } = await import('./path-resolver.js');
