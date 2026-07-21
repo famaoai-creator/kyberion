@@ -987,7 +987,7 @@
     {
       "path": "product/governance/actuator-op-registry.json",
       "tier": "public",
-      "size": 15954,
+      "size": 16083,
       "type": "json"
     },
     {
@@ -1227,7 +1227,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 62316,
+      "size": 63452,
       "type": "json"
     },
     {
@@ -1251,7 +1251,7 @@
     {
       "path": "product/governance/environment-manifests/meeting-participation-runtime.json",
       "tier": "public",
-      "size": 5900,
+      "size": 6611,
       "type": "json"
     },
     {
@@ -2943,7 +2943,7 @@
     {
       "path": "product/orchestration/actuator-op-discovery.json",
       "tier": "public",
-      "size": 76410,
+      "size": 76668,
       "type": "json"
     },
     {
@@ -4509,7 +4509,7 @@
     {
       "path": "product/orchestration/voice-interface-protocol.md",
       "tier": "public",
-      "size": 8396,
+      "size": 8678,
       "type": "md"
     },
     {
@@ -5248,6 +5248,12 @@
       "path": "product/pipeline-templates/voice-recording-session.json",
       "tier": "public",
       "size": 2008,
+      "type": "json"
+    },
+    {
+      "path": "product/pipeline-templates/voice-tts-loopback-verification.json",
+      "tier": "public",
+      "size": 1722,
       "type": "json"
     },
     {
@@ -9040,6 +9046,12 @@
       "path": "public/procedures/file/visualize-diffs.md",
       "tier": "public",
       "size": 655,
+      "type": "md"
+    },
+    {
+      "path": "public/procedures/media/blackhole-tts-loopback.md",
+      "tier": "public",
+      "size": 3377,
       "type": "md"
     },
     {

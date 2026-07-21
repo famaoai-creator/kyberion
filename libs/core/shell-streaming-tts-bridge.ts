@@ -20,6 +20,8 @@
 
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { logger } from './core.js';
+import { buildSafeExecEnv } from './secure-io.js';
+import { BoundedAudioQueue, DEFAULT_AUDIO_BUFFER_POLICY } from './bounded-audio-queue.js';
 import {
   registerStreamingTtsBridge,
   type StreamingTextToSpeechBridge,
@@ -32,6 +34,8 @@ export interface ShellStreamingTtsOptions {
   args?: readonly string[];
   env?: Record<string, string>;
   format?: AudioFormat;
+  max_queued_chunks?: number;
+  max_buffer_ms?: number;
 }
 
 const DEFAULT_FORMAT: AudioFormat = {
@@ -52,26 +56,25 @@ export class ShellStreamingTextToSpeechBridge implements StreamingTextToSpeechBr
     text: AsyncIterable<string>,
     voice_profile_id: string
   ): AsyncIterable<AudioChunk> {
-    const proc: ChildProcessWithoutNullStreams = spawn(
-      this.opts.command,
-      [...(this.opts.args ?? [])],
-      {
-        stdio: ['pipe', 'pipe', 'pipe'],
-        env: {
-          ...process.env,
-          ...(this.opts.env ?? {}),
-          KYBERION_VOICE_PROFILE_ID: voice_profile_id,
-        },
-      }
-    );
+    const command = validateTtsCommand(this.opts.command);
+    const proc: ChildProcessWithoutNullStreams = spawn(command, [...(this.opts.args ?? [])], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: buildSafeExecEnv({
+        ...(this.opts.env ?? {}),
+        KYBERION_VOICE_PROFILE_ID: voice_profile_id,
+      }),
+    });
     let stderrTail = '';
     proc.stderr.on('data', (buf) => {
       stderrTail += buf.toString('utf8');
       if (stderrTail.length > 4_096) stderrTail = stderrTail.slice(-4_096);
     });
 
-    const queue: AudioChunk[] = [];
-    const resolvers: Array<(c: AudioChunk | null) => void> = [];
+    const queue = new BoundedAudioQueue({
+      ...DEFAULT_AUDIO_BUFFER_POLICY,
+      ...(this.opts.max_queued_chunks ? { max_chunks: this.opts.max_queued_chunks } : {}),
+      ...(this.opts.max_buffer_ms ? { max_buffer_ms: this.opts.max_buffer_ms } : {}),
+    });
     let drained = false;
 
     proc.stdout.on('data', (buf: Buffer) => {
@@ -80,42 +83,75 @@ export class ShellStreamingTextToSpeechBridge implements StreamingTextToSpeechBr
         payload: new Uint8Array(buf),
         ts_ms: Date.now(),
       };
-      if (resolvers.length) resolvers.shift()!(chunk);
-      else queue.push(chunk);
+      queue.push(chunk);
     });
-    proc.on('exit', (code) => {
+    const finish = (code: number | null, signal: NodeJS.Signals | null): void => {
       if (code !== 0) {
         logger.warn(
-          `[shell-tts] command "${this.opts.command}" exited code=${code} stderr_tail=${stderrTail.slice(-256)}`
+          `[shell-tts] command "${command}" exited code=${String(code)} signal=${String(signal)} stderr_tail=${stderrTail.slice(-256)}`
         );
       }
       drained = true;
-      while (resolvers.length) resolvers.shift()!(null);
+      queue.close(code === 0 ? undefined : new Error(`shell TTS exited with code ${String(code)}`));
+    };
+    proc.on('exit', finish);
+    proc.on('error', (error) => {
+      drained = true;
+      queue.close(error);
     });
 
     void (async () => {
       try {
         for await (const segment of text) {
           if (drained) break;
-          proc.stdin.write(segment + '\n');
+          if (!proc.stdin.write(segment + '\n')) await onceDrain(proc.stdin);
         }
       } finally {
         proc.stdin.end();
       }
     })();
 
-    while (!drained) {
-      if (queue.length) {
-        yield queue.shift()!;
-        continue;
+    try {
+      while (!drained) {
+        const next = await queue.next();
+        if (next === null) return;
+        yield next;
       }
-      const next = await new Promise<AudioChunk | null>((resolve) => {
-        resolvers.push(resolve);
-      });
-      if (next === null) return;
-      yield next;
+    } finally {
+      if (!drained) terminateProcess(proc);
     }
   }
+}
+
+function validateTtsCommand(command: string): string {
+  const normalized = String(command || '').trim();
+  if (!normalized || /\s|\0/u.test(normalized))
+    throw new Error('KYBERION_TTS_COMMAND must be a single executable path');
+  return normalized;
+}
+
+function onceDrain(stream: NodeJS.WritableStream): Promise<void> {
+  return new Promise((resolve, reject) => {
+    stream.once('drain', resolve);
+    stream.once('error', reject);
+  });
+}
+
+function terminateProcess(proc: ChildProcessWithoutNullStreams): void {
+  if (proc.exitCode !== null || proc.signalCode !== null) return;
+  try {
+    proc.kill('SIGTERM');
+  } catch {
+    /* already exited */
+  }
+  const timer = setTimeout(() => {
+    try {
+      proc.kill('SIGKILL');
+    } catch {
+      /* already exited */
+    }
+  }, 500);
+  timer.unref();
 }
 
 export function installShellStreamingTtsBridge(opts: ShellStreamingTtsOptions): void {

@@ -3,7 +3,11 @@ import AjvModule, { type ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { compileSchemaFromPath } from './schema-loader.js';
-import type { MeetingBriefInput, MeetingPurpose, MeetingRole } from './meeting-operations-profile.js';
+import type {
+  MeetingBriefInput,
+  MeetingPurpose,
+  MeetingRole,
+} from './meeting-operations-profile.js';
 import type { MeetingOperationsProfile } from './src/types/meeting-operations-profile.js';
 import type { MeetingOperationsBrief } from './src/types/meeting-operations-brief.js';
 
@@ -11,7 +15,9 @@ const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
 
 const POLICY_PATH = pathResolver.knowledge('product/governance/meeting-environment-policy.json');
-const SCHEMA_PATH = pathResolver.knowledge('product/schemas/meeting-environment-policy.schema.json');
+const SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/meeting-environment-policy.schema.json'
+);
 
 export type MeetingEnvironmentState =
   | 'required'
@@ -88,17 +94,19 @@ function ensureValidator(): ValidateFunction {
 
 function errorsFrom(validate: ValidateFunction): string[] {
   return (validate.errors || []).map((error) =>
-    `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim(),
+    `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim()
   );
 }
 
 export function validateMeetingEnvironmentPolicy(
   value: unknown,
-  label = POLICY_PATH,
+  label = POLICY_PATH
 ): MeetingEnvironmentPolicy {
   const validate = ensureValidator();
   if (!validate(value)) {
-    throw new Error(`Invalid meeting environment policy at ${label}: ${errorsFrom(validate).join('; ')}`);
+    throw new Error(
+      `Invalid meeting environment policy at ${label}: ${errorsFrom(validate).join('; ')}`
+    );
   }
   return value as MeetingEnvironmentPolicy;
 }
@@ -146,14 +154,17 @@ function selectScopeItem(
     MeetingEnvironmentPolicy['camera'],
     'required_item' | 'recommended_item' | 'not_needed_item'
   >,
-  state: 'required' | 'recommended' | 'not_needed',
+  state: 'required' | 'recommended' | 'not_needed'
 ): MeetingEnvironmentItem {
   if (state === 'required') return cloneItem(scope.required_item);
   if (state === 'recommended') return cloneItem(scope.recommended_item);
   return cloneItem(scope.not_needed_item);
 }
 
-function purposeMatches(inputPurpose: MeetingBriefInput['purpose'], purposes: MeetingPurpose[]): boolean {
+function purposeMatches(
+  inputPurpose: MeetingBriefInput['purpose'],
+  purposes: MeetingPurpose[]
+): boolean {
   return purposes.includes((inputPurpose ? String(inputPurpose) : 'default') as MeetingPurpose);
 }
 
@@ -172,7 +183,8 @@ function resolveScopeState(input: {
   if (input.explicitRequested) return 'required';
   if (
     input.recommendedRequested ||
-    (roleMatches(input.primaryRole, input.recommendedRoles) && purposeMatches(input.purpose, input.recommendedPurposes))
+    (roleMatches(input.primaryRole, input.recommendedRoles) &&
+      purposeMatches(input.purpose, input.recommendedPurposes))
   ) {
     return 'recommended';
   }
@@ -183,7 +195,7 @@ export function resolveMeetingEnvironment(
   input: MeetingBriefInput,
   profile: MeetingOperationsProfile,
   primaryRole: MeetingRole,
-  policy: MeetingEnvironmentPolicy = loadMeetingEnvironmentPolicy(),
+  policy: MeetingEnvironmentPolicy = loadMeetingEnvironmentPolicy()
 ): MeetingEnvironmentSelection {
   const signals = normalizeSignalText([
     input.meeting_title,
@@ -205,7 +217,10 @@ export function resolveMeetingEnvironment(
 
   const explicitSpeakingRequested = signalIncludes(signals, policy.speaking.explicit_patterns);
   const explicitCameraRequested = signalIncludes(signals, policy.camera.explicit_patterns);
-  const explicitScreenShareRequested = signalIncludes(signals, policy.screen_share.explicit_patterns);
+  const explicitScreenShareRequested = signalIncludes(
+    signals,
+    policy.screen_share.explicit_patterns
+  );
   const canSpeak = profile.facilitation_policy.ask_before_speaking === false;
 
   const items: MeetingEnvironmentItem[] = policy.base_items.map(cloneItem);
@@ -248,9 +263,11 @@ export function resolveMeetingEnvironment(
   }
 
   return {
-    transport_mode: canSpeak ? policy.transport_modes.speaking_allowed : policy.transport_modes.speaking_blocked,
-    items,
-    questions,
+    transport_mode: canSpeak
+      ? policy.transport_modes.speaking_allowed
+      : policy.transport_modes.speaking_blocked,
+    items: items as MeetingEnvironmentSelection['items'],
+    questions: questions as MeetingEnvironmentSelection['questions'],
   };
 }
 

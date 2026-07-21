@@ -237,7 +237,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_VLLM_MODEL`                     | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
 | `KYBERION_VLLM_URL`                       | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
 
-## runtime (114)
+## runtime (120)
 
 | Variable                                      | Type   | Required | Description                                                                                             |
 | --------------------------------------------- | ------ | -------- | ------------------------------------------------------------------------------------------------------- |
@@ -250,11 +250,16 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_APPLE_FM`                           | string | no       | _undocumented_                                                                                          |
 | `KYBERION_APPLE_FM_SAMPLE_AUDIO`              | string | no       | _undocumented_                                                                                          |
 | `KYBERION_AUDIO_BUS`                          | string | no       | _undocumented_                                                                                          |
+| `KYBERION_AUDIO_DEVICE_UID`                   | string | no       | _undocumented_                                                                                          |
+| `KYBERION_AUDIO_PERMISSION_CONFIRMED`         | string | no       | _undocumented_                                                                                          |
 | `KYBERION_AUDIT_CONTINUITY_ENFORCE`           | string | no       | _undocumented_                                                                                          |
 | `KYBERION_AUDIT_FORWARDER`                    | string | no       | _undocumented_                                                                                          |
 | `KYBERION_AUDIT_FORWARDER_HEADERS`            | string | no       | _undocumented_                                                                                          |
 | `KYBERION_BACKUP_PASSPHRASE`                  | string | no       | _undocumented_                                                                                          |
 | `KYBERION_BEST_OF_N`                          | string | no       | _undocumented_                                                                                          |
+| `KYBERION_BLACKHOLE_DEVICE_LABEL`             | string | no       | _undocumented_                                                                                          |
+| `KYBERION_BLACKHOLE_INPUT_UID`                | string | no       | _undocumented_                                                                                          |
+| `KYBERION_BLACKHOLE_OUTPUT_UID`               | string | no       | _undocumented_                                                                                          |
 | `KYBERION_BLACKHOLE_SCRIPT`                   | string | no       | _undocumented_                                                                                          |
 | `KYBERION_BLUEBUBBLES_SEND_METHOD`            | string | no       | _undocumented_                                                                                          |
 | `KYBERION_BRAND_FONT_STACK`                   | string | no       | _undocumented_                                                                                          |
@@ -288,6 +293,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_INJECTION_SUSPECTED`                | string | no       | _undocumented_                                                                                          |
 | `KYBERION_KEPT`                               | string | no       | _undocumented_                                                                                          |
 | `KYBERION_KI_CACHE_MAX_MB`                    | string | no       | _undocumented_                                                                                          |
+| `KYBERION_LIVE_BLACKHOLE_TEST`                | string | no       | _undocumented_                                                                                          |
 | `KYBERION_LLM_CONCURRENCY`                    | string | no       | _undocumented_                                                                                          |
 | `KYBERION_LOCALE`                             | string | no       | _undocumented_                                                                                          |
 | `KYBERION_LOCALHOST_AUTOADMIN`                | string | no       | _undocumented_                                                                                          |

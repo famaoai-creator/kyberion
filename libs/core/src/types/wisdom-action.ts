@@ -95,6 +95,7 @@ export type PipelineStep =
         | 'capture_intuition'
         | 'compute_readiness_matrix'
         | 'conduct_1on_1'
+        | 'conduct_1on1'
         | 'curate_background_review'
         | 'cross_critique'
         | 'typed_cross_critique'

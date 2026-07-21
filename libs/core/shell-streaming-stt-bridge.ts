@@ -101,14 +101,20 @@ export class ShellStreamingSpeechToTextBridge implements StreamingSpeechToTextBr
         }
       }
     });
-    proc.on('exit', (code) => {
+    const finish = (code: number | null, signal: NodeJS.Signals | null): void => {
       if (code !== 0) {
         logger.warn(
-          `[shell-stt] command "${command}" exited code=${code} stderr_tail=${stderrTail.slice(-256)}`
+          `[shell-stt] command "${command}" exited code=${String(code)} signal=${String(signal)} stderr_tail=${stderrTail.slice(-256)}`
         );
       }
       drained = true;
       while (resolvers.length) resolvers.shift()!(null);
+    };
+    proc.on('exit', finish);
+    proc.on('error', (error) => {
+      drained = true;
+      while (resolvers.length) resolvers.shift()!(null);
+      logger.warn(`[shell-stt] command failed: ${error.message}`);
     });
 
     // Pump audio into stdin in the background.
@@ -116,7 +122,7 @@ export class ShellStreamingSpeechToTextBridge implements StreamingSpeechToTextBr
       try {
         for await (const chunk of audio) {
           if (drained) break;
-          proc.stdin.write(Buffer.from(chunk.payload));
+          if (!proc.stdin.write(Buffer.from(chunk.payload))) await onceDrain(proc.stdin);
         }
       } finally {
         proc.stdin.end();
@@ -124,18 +130,46 @@ export class ShellStreamingSpeechToTextBridge implements StreamingSpeechToTextBr
     })();
 
     // Yield transcript chunks as they arrive.
-    while (!drained) {
-      if (queue.length) {
-        yield queue.shift()!;
-        continue;
+    try {
+      while (!drained) {
+        if (queue.length) {
+          yield queue.shift()!;
+          continue;
+        }
+        const next = await new Promise<TranscriptChunk | null>((resolve) => {
+          resolvers.push(resolve);
+        });
+        if (next === null) return;
+        yield next;
       }
-      const next = await new Promise<TranscriptChunk | null>((resolve) => {
-        resolvers.push(resolve);
-      });
-      if (next === null) return;
-      yield next;
+    } finally {
+      if (!drained) terminateProcess(proc);
     }
   }
+}
+
+function onceDrain(stream: NodeJS.WritableStream): Promise<void> {
+  return new Promise((resolve, reject) => {
+    stream.once('drain', resolve);
+    stream.once('error', reject);
+  });
+}
+
+function terminateProcess(proc: ChildProcessWithoutNullStreams): void {
+  if (proc.exitCode !== null || proc.signalCode !== null) return;
+  try {
+    proc.kill('SIGTERM');
+  } catch {
+    /* already exited */
+  }
+  const timer = setTimeout(() => {
+    try {
+      proc.kill('SIGKILL');
+    } catch {
+      /* already exited */
+    }
+  }, 500);
+  timer.unref();
 }
 
 export function installShellStreamingSttBridge(opts: ShellStreamingSttOptions): void {

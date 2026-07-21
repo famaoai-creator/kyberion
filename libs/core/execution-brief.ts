@@ -2,9 +2,15 @@ import AjvModule, { type ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { buildGuidedCoordinationBrief } from './guided-coordination-brief.js';
-import { buildContextualIntentFrame, type ContextualIntentFrame } from './contextual-intent-frame.js';
+import {
+  buildContextualIntentFrame,
+  type ContextualIntentFrame,
+} from './contextual-intent-frame.js';
 import { assessContextualClarification } from './contextual-intent-clarification-policy.js';
-import { resolveDefaultApprovalSystem, resolveDefaultScheduleSource } from './contextual-intent-memory.js';
+import {
+  resolveDefaultApprovalSystem,
+  resolveDefaultScheduleSource,
+} from './contextual-intent-memory.js';
 import type { GuidedCoordinationBrief } from './src/types/guided-coordination-brief.js';
 import type { ActuatorExecutionBrief } from './src/types/actuator-execution-brief.js';
 import { resolveInputBindings, type InputBinding } from './input-binding.js';
@@ -51,10 +57,17 @@ export interface ApprovalWorkflowStep {
   label: string;
   description: string;
   actuator: string;
-  phase: 'resolve_system' | 'authenticate' | 'list_pending' | 'review_item' | 'decide' | 'summarize';
+  phase:
+    | 'resolve_system'
+    | 'authenticate'
+    | 'list_pending'
+    | 'review_item'
+    | 'decide'
+    | 'summarize';
   requires_confirmation?: boolean;
   input_refs?: string[];
   output_refs?: string[];
+  [k: string]: unknown;
 }
 
 let executionBriefValidateFn: ValidateFunction | null = null;
@@ -87,7 +100,9 @@ function isScheduleReadAgendaRequest(text: string): boolean {
     /(予定|スケジュール|日程|空き時間|会議|ミーティング|打ち合わせ|アポイント|agenda|availability|calendar)/i.test(
       text
     ) &&
-    /(教えて|見せて|確認|見る|空き|agenda|available|availability|今週|来週|今日|明日)/i.test(text) &&
+    /(教えて|見せて|確認|見る|空き|agenda|available|availability|今週|来週|今日|明日)/i.test(
+      text
+    ) &&
     !/(調整|変更|リスケ|ずら|移動|修正|update|change|resched|reschedule|入れ替え|前倒し|後ろ|見直し|再調整|詰め直し|整え|進め方|facilitate|preparation|準備)/i.test(
       text
     )
@@ -113,7 +128,9 @@ function isProjectBootstrapRequest(text: string): boolean {
 }
 
 function isApprovalRequestCreation(text: string): boolean {
-  return /(承認を依頼|承認を申請|承認依頼|稟議.*依頼|request approval|approval request)/i.test(text);
+  return /(承認を依頼|承認を申請|承認依頼|稟議.*依頼|request approval|approval request)/i.test(
+    text
+  );
 }
 
 function isApprovalRequestResolution(text: string): boolean {
@@ -135,17 +152,28 @@ function inferApprovalSystemCandidates(seed: ExecutionBriefSeed): string[] {
   }
   const defaults = resolveDefaultApprovalSystem();
   if (defaults.system) candidates.push(defaults.system);
-  if (/(kintone|サイボウズ|cybozu|garoon|desknet's|workflow|稟議システム|intra-mart|SAP|oracle|freee|ジョブカン|salesforce|notion)/i.test(text)) {
-    const match = text.match(/(kintone|サイボウズ|cybozu|garoon|desknet's|workflow|稟議システム|intra-mart|SAP|oracle|freee|ジョブカン|salesforce|notion)/i);
+  if (
+    /(kintone|サイボウズ|cybozu|garoon|desknet's|workflow|稟議システム|intra-mart|SAP|oracle|freee|ジョブカン|salesforce|notion)/i.test(
+      text
+    )
+  ) {
+    const match = text.match(
+      /(kintone|サイボウズ|cybozu|garoon|desknet's|workflow|稟議システム|intra-mart|SAP|oracle|freee|ジョブカン|salesforce|notion)/i
+    );
     if (match?.[1]) candidates.push(match[1]);
   }
   if (candidates.length === 0) candidates.push('operator_default_approval_system');
   return uniqueStrings(candidates);
 }
 
-function inferApprovalWorkflowSteps(seed: ExecutionBriefSeed, selectedSystem?: string): ApprovalWorkflowStep[] {
-  const system = selectedSystem || inferApprovalSystemCandidates(seed)[0] || 'operator_default_approval_system';
-  const approvalScope = seed.approvalScopeHint || resolveDefaultApprovalSystem().scope || 'pending_items';
+function inferApprovalWorkflowSteps(
+  seed: ExecutionBriefSeed,
+  selectedSystem?: string
+): ApprovalWorkflowStep[] {
+  const system =
+    selectedSystem || inferApprovalSystemCandidates(seed)[0] || 'operator_default_approval_system';
+  const approvalScope =
+    seed.approvalScopeHint || resolveDefaultApprovalSystem().scope || 'pending_items';
   return [
     {
       id: 'resolve_approval_system',
@@ -176,7 +204,8 @@ function inferApprovalWorkflowSteps(seed: ExecutionBriefSeed, selectedSystem?: s
     {
       id: 'review_item',
       label: 'Review target items',
-      description: 'Inspect the target approval items and extract the details needed for a decision.',
+      description:
+        'Inspect the target approval items and extract the details needed for a decision.',
       actuator: 'browser-actuator',
       phase: 'review_item',
       input_refs: ['pending_approval_items'],
@@ -259,10 +288,12 @@ function inferTargetActuators(seed: ExecutionBriefSeed): string[] {
   if (taskType === 'service_operation') return ['task-session-manager', 'service-orchestrator'];
   if (taskType === 'analysis') return ['analysis-engine', 'knowledge-retriever'];
   if (taskType === 'browser') return ['browser-actuator', 'web-retriever'];
-  if (taskType === 'capture_photo') return ['virtual-camera-bridge', 'vision-actuator', 'artifact-actuator'];
+  if (taskType === 'capture_photo')
+    return ['virtual-camera-bridge', 'vision-actuator', 'artifact-actuator'];
   if (taskType === 'workbook_wbs') return ['workbook-builder', 'spreadsheet-actuator'];
   if (isScheduleAgendaRead(seed)) return ['calendar-actuator', 'service-actuator'];
-  if (isApprovalWorkflowRequest(seed.requestText)) return ['browser-actuator', 'approval-actuator', 'service-actuator'];
+  if (isApprovalWorkflowRequest(seed.requestText))
+    return ['browser-actuator', 'approval-actuator', 'service-actuator'];
   if (isMeetingRequest(seed.requestText)) return ['meeting-actuator', 'meeting-browser-driver'];
   if (isScheduleRequest(seed.requestText)) return ['browser-actuator', 'service-actuator'];
   if (isProjectBootstrapRequest(seed.requestText))
@@ -303,24 +334,27 @@ function inferDeliverables(seed: ExecutionBriefSeed): string[] {
   }
 }
 
-function inferMissingInputs(seed: ExecutionBriefSeed, guidedMissingInputs: string[] = []): string[] {
+function inferMissingInputs(
+  seed: ExecutionBriefSeed,
+  guidedMissingInputs: string[] = []
+): string[] {
   const requiredInputs = toStringArray(seed.requiredInputs);
   const contextualFrame = seed.contextualFrame || buildContextualIntentFrame(seed.requestText);
   const candidateMissingInputs = (() => {
-  if (requiredInputs.length > 0) return requiredInputs;
-  if (isScheduleAgendaRead(seed)) {
-    const agendaMissing = [...contextualFrame.missing];
-    if (agendaMissing.length > 0) return agendaMissing;
-    if (!contextualFrame.source_binding.selected) return ['calendar_source'];
-    return [];
-  }
-  if (isApprovalWorkflowRequest(seed.requestText)) {
-    const approvalMissing = ['approval_system', 'approval_scope'];
-    if (seed.intentId === 'request-approval') return approvalMissing;
-    if (seed.intentId === 'resolve-approval') return approvalMissing;
-    return approvalMissing;
-  }
-  if (isMeetingScheduleCoordination(seed)) {
+    if (requiredInputs.length > 0) return requiredInputs;
+    if (isScheduleAgendaRead(seed)) {
+      const agendaMissing = [...contextualFrame.missing];
+      if (agendaMissing.length > 0) return agendaMissing;
+      if (!contextualFrame.source_binding.selected) return ['calendar_source'];
+      return [];
+    }
+    if (isApprovalWorkflowRequest(seed.requestText)) {
+      const approvalMissing = ['approval_system', 'approval_scope'];
+      if (seed.intentId === 'request-approval') return approvalMissing;
+      if (seed.intentId === 'resolve-approval') return approvalMissing;
+      return approvalMissing;
+    }
+    if (isMeetingScheduleCoordination(seed)) {
       return [
         'schedule_scope',
         'date_range',
@@ -564,7 +598,10 @@ function inferClarificationQuestions(seed: ExecutionBriefSeed, missingInputs: st
   }
 
   if (isScheduleAgendaRead(seed)) {
-    const questionByInput: Record<string, { question: string; reason: string; impact: string; default_assumption: string }> = {
+    const questionByInput: Record<
+      string,
+      { question: string; reason: string; impact: string; default_assumption: string }
+    > = {
       date_range: {
         question: 'Which time range should I inspect?',
         reason: 'The assistant needs a concrete window before reading calendar entries.',
@@ -598,18 +635,24 @@ function inferClarificationQuestions(seed: ExecutionBriefSeed, missingInputs: st
   }
 
   if (isApprovalWorkflowRequest(seed.requestText)) {
-    const questionByInput: Record<string, { question: string; reason: string; impact: string; default_assumption: string }> = {
+    const questionByInput: Record<
+      string,
+      { question: string; reason: string; impact: string; default_assumption: string }
+    > = {
       approval_system: {
         question: 'Which ringi or approval system should I use?',
         reason: 'The assistant needs the target approval system before it can open the queue.',
         impact: 'This determines which approval inbox, portal, or workflow system is used.',
-        default_assumption: 'Use the operator default approval system if one is already registered.',
+        default_assumption:
+          'Use the operator default approval system if one is already registered.',
       },
       approval_scope: {
         question: 'Which approvals should I process?',
-        reason: 'The assistant needs to know whether to handle all pending approvals or only a subset.',
+        reason:
+          'The assistant needs to know whether to handle all pending approvals or only a subset.',
         impact: 'This controls which items are listed and which ones are selected for decision.',
-        default_assumption: 'Process the pending approvals for the current business context if no narrower scope is given.',
+        default_assumption:
+          'Process the pending approvals for the current business context if no narrower scope is given.',
       },
     };
 
@@ -772,7 +815,8 @@ export function buildFallbackExecutionBrief(seed: ExecutionBriefSeed): ActuatorE
   const brief = buildExecutionBriefFromGuidedCoordinationBrief(guidedBrief, adjustedSeed);
   return {
     ...brief,
-    calendar_source: contextualFrame.source_binding.selected || resolveDefaultScheduleSource().source,
+    calendar_source:
+      contextualFrame.source_binding.selected || resolveDefaultScheduleSource().source,
   } as ActuatorExecutionBrief;
 }
 

@@ -18,6 +18,13 @@
  */
 
 import type { AudioChunk, AudioFormat } from './meeting-session-types.js';
+import { BoundedAudioQueue, DEFAULT_AUDIO_BUFFER_POLICY } from './bounded-audio-queue.js';
+import type {
+  AudioBufferPolicy,
+  AudioDeviceDescriptor,
+  AudioRouteHealth,
+  AudioRouteMetrics,
+} from './audio-route.js';
 
 export interface AudioBusProbe {
   /** Stable id to distinguish implementations in logs / audit. */
@@ -28,6 +35,8 @@ export interface AudioBusProbe {
   reason?: string;
   /** Devices the bus discovered (driver name / index). */
   devices?: { input?: string; output?: string };
+  device_descriptors?: AudioDeviceDescriptor[];
+  warnings?: string[];
 }
 
 export interface AudioBus {
@@ -45,6 +54,8 @@ export interface AudioBus {
   writeOutput(stream: AsyncIterable<AudioChunk>): Promise<void>;
   /** Tear down virtual devices / loopbacks. Idempotent. */
   close(): Promise<void>;
+  health?(): AudioRouteHealth;
+  metrics?(): AudioRouteMetrics;
 }
 
 /* ------------------------------------------------------------------ *
@@ -58,9 +69,20 @@ export interface AudioBus {
 export class StubAudioBus implements AudioBus {
   readonly bus_id = 'stub' as const;
   private opened = false;
-  private inboundQueue: AudioChunk[] = [];
-  private inboundResolvers: Array<(chunk: AudioChunk | null) => void> = [];
+  private readonly inboundQueue: BoundedAudioQueue;
+  private readonly metricsValue: AudioRouteMetrics = {
+    audio_chunks_in: 0,
+    audio_chunks_out: 0,
+    dropped_chunks: 0,
+    dropped_ms: 0,
+    underrun_count: 0,
+    resampled: false,
+  };
   private closed = false;
+
+  constructor(policy: AudioBufferPolicy = DEFAULT_AUDIO_BUFFER_POLICY) {
+    this.inboundQueue = new BoundedAudioQueue(policy);
+  }
 
   async probe(): Promise<AudioBusProbe> {
     return { bus_id: 'stub', available: true };
@@ -72,33 +94,20 @@ export class StubAudioBus implements AudioBus {
 
   async close(): Promise<void> {
     this.closed = true;
-    while (this.inboundResolvers.length) {
-      const r = this.inboundResolvers.shift()!;
-      r(null);
-    }
+    this.inboundQueue.close();
   }
 
   /** Test helper: feed an external chunk into `inputStream`. */
   injectInbound(chunk: AudioChunk): void {
-    if (this.inboundResolvers.length > 0) {
-      const r = this.inboundResolvers.shift()!;
-      r(chunk);
-    } else {
-      this.inboundQueue.push(chunk);
-    }
+    this.inboundQueue.push(chunk);
   }
 
   async *inputStream(): AsyncIterable<AudioChunk> {
     if (!this.opened) throw new Error('[stub-audio-bus] open() before reading inputStream');
     while (!this.closed) {
-      if (this.inboundQueue.length > 0) {
-        yield this.inboundQueue.shift()!;
-        continue;
-      }
-      const chunk = await new Promise<AudioChunk | null>((resolve) => {
-        this.inboundResolvers.push(resolve);
-      });
+      const chunk = await this.inboundQueue.next();
       if (chunk === null) return;
+      this.metricsValue.audio_chunks_in += 1;
       yield chunk;
     }
   }
@@ -107,6 +116,30 @@ export class StubAudioBus implements AudioBus {
     for await (const chunk of stream) {
       // Loopback so the coordinator's TTS output appears as inbound.
       this.injectInbound(chunk);
+      this.metricsValue.audio_chunks_out += 1;
     }
+  }
+
+  health(): AudioRouteHealth {
+    const queue = this.inboundQueue.metrics();
+    return {
+      status: this.closed ? 'closed' : 'healthy',
+      input_process_alive: !this.closed,
+      output_process_alive: !this.closed,
+      queue_depth: queue.depth,
+      dropped_chunks: queue.dropped_chunks,
+      underrun_count: 0,
+      device_disconnected: false,
+      lease_held: this.opened && !this.closed,
+    };
+  }
+
+  metrics(): AudioRouteMetrics {
+    const queue = this.inboundQueue.metrics();
+    return {
+      ...this.metricsValue,
+      dropped_chunks: queue.dropped_chunks,
+      dropped_ms: queue.dropped_ms,
+    };
   }
 }
