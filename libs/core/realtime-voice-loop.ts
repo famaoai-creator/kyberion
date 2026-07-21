@@ -84,6 +84,10 @@ export interface RealtimeVoiceLoopOptions {
    * speech debounce (default 250ms).
    */
   bargeIn?: { enabled: boolean; thresholdMultiplier?: number; minSpeechMs?: number };
+  /** Half-duplex self-audio suppression while output returns through BlackHole. */
+  selfAudioSuppressionMs?: number;
+  /** Additional drain window after playback finishes. */
+  postPlaybackDrainMs?: number;
   /** End the loop after this many completed turns. */
   maxTurns?: number;
   /** End the loop after this much continuous listening silence (default 120s). */
@@ -228,6 +232,7 @@ export async function startRealtimeVoiceLoop(
   });
 
   let state: RealtimeVoiceLoopState = 'listening';
+  let selfAudioSuppressionUntilMs = 0;
   let lastEmittedState: string | null = null;
   const emitState = (value: RealtimeVoiceLoopState | 'calibrating'): void => {
     if (value === lastEmittedState) return;
@@ -335,6 +340,10 @@ export async function startRealtimeVoiceLoop(
     });
     const speechResult = await speech.done;
     speech = null;
+    selfAudioSuppressionUntilMs = speechResult.interrupted
+      ? 0
+      : Date.now() +
+        Math.max(0, options.selfAudioSuppressionMs ?? 0, options.postPlaybackDrainMs ?? 400);
     if (speechResult.error) {
       options.onEvent?.({ kind: 'degraded', what: 'playback', reason: speechResult.error });
     }
@@ -380,6 +389,18 @@ export async function startRealtimeVoiceLoop(
     try {
       for await (const chunk of mic.chunks() as AsyncIterable<AudioChunk>) {
         if (stopping) break;
+
+        if (state === 'listening' && Date.now() < selfAudioSuppressionUntilMs) {
+          options.onEvent?.({
+            kind: 'degraded',
+            what: 'self_audio_suppressed',
+            reason: 'post-playback drain window',
+          });
+          trace?.addEvent('realtime_voice.self_audio_suppressed', {
+            reason: 'post_playback_drain',
+          });
+          continue;
+        }
 
         if (state === 'listening') {
           const result = segmenter.push(chunk);

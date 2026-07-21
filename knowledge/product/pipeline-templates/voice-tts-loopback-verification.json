@@ -1,0 +1,51 @@
+{
+  "action": "pipeline",
+  "name": "voice-tts-loopback-verification",
+  "version": "1.0.0",
+  "description": "Governed pre-meeting TTS → selected audio route → capture → STT comparison. Live BlackHole runs still require operator confirmation and KYBERION_LIVE_BLACKHOLE_TEST=1.",
+  "context": {
+    "request_id": "voice-loopback-{{mission_id}}",
+    "mission_id": "{{mission_id}}",
+    "text": "音声経路の確認です。",
+    "language": "ja",
+    "bus": "blackhole",
+    "operator_confirmed": false,
+    "dry_run": true
+  },
+  "steps": [
+    {
+      "id": "list_routes",
+      "role": "source",
+      "op": "voice:list_audio_routes",
+      "produces": { "channel": "audio_routes", "type": "AudioRouteViewModel" },
+      "params": { "action": "list_audio_routes", "params": { "bus": "{{bus}}" } }
+    },
+    {
+      "id": "probe_route",
+      "role": "gate",
+      "op": "voice:probe_audio_route",
+      "consumes": "audio_routes",
+      "produces": { "channel": "audio_probe", "type": "AudioRouteProbe" },
+      "params": { "action": "probe_audio_route", "params": { "bus": "{{bus}}" } }
+    },
+    {
+      "id": "verify_loopback",
+      "role": "sink",
+      "op": "voice:verify_tts_loopback",
+      "consumes": "audio_probe",
+      "params": {
+        "action": "verify_tts_loopback",
+        "params": {
+          "request_id": "{{request_id}}",
+          "mission_id": "{{mission_id}}",
+          "text": "{{text}}",
+          "language": "{{language}}",
+          "audio_route": { "bus": "{{bus}}" },
+          "operator_confirmed": "{{operator_confirmed}}",
+          "dry_run": "{{dry_run}}",
+          "persistence": { "retain_audio": false, "retain_transcript": true }
+        }
+      }
+    }
+  ]
+}

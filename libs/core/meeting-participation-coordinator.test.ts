@@ -43,7 +43,7 @@ function writeVoiceConsent(record: Record<string, unknown>): void {
       mission_id: CONSENT_MISSION,
       tier: 'confidential',
       assigned_persona: 'ecosystem_architect',
-    }),
+    })
   );
   fs.writeFileSync(path.join(evidenceDir, 'voice-consent.json'), JSON.stringify(record));
 }
@@ -82,8 +82,9 @@ describe('MeetingParticipationCoordinator (stub end-to-end)', () => {
       trace,
     });
 
-    // Inject some inbound chunks BEFORE running so the bus has data.
-    for (let i = 0; i < 5; i++) bus.injectInbound(makeChunk());
+    // Inject participant audio up front. Self-looped TTS is suppressed by the
+    // coordinator, so the fixture must provide enough independent input turns.
+    for (let i = 0; i < 11; i++) bus.injectInbound(makeChunk());
 
     const target: MeetingTarget = {
       url: 'https://meet.google.com/test-test-test',
@@ -95,6 +96,7 @@ describe('MeetingParticipationCoordinator (stub end-to-end)', () => {
       max_minutes: 1,
       voice_profile_id: 'operator-default-v1',
       audio_format: FORMAT,
+      post_playback_drain_ms: 0,
     });
 
     expect(heard.length).toBeGreaterThanOrEqual(3);
@@ -124,6 +126,9 @@ describe('MeetingParticipationCoordinator (stub end-to-end)', () => {
     };
     const trace = new TraceContext('meeting_participation:test', { missionId: 'MSN-TEST-2' });
 
+    // One external turn plus one later turn that tells the agent to leave;
+    // the assistant's own looped TTS is intentionally suppressed.
+    bus.injectInbound(makeChunk());
     bus.injectInbound(makeChunk());
     bus.injectInbound(makeChunk());
     const target: MeetingTarget = {
@@ -157,7 +162,7 @@ describe('MeetingParticipationCoordinator (stub end-to-end)', () => {
         mission_id: CONSENT_MISSION,
         tier: 'confidential',
         assigned_persona: 'ecosystem_architect',
-      }),
+      })
     );
     const bus = new StubAudioBus();
     const openSpy = vi.spyOn(bus, 'open');
@@ -189,8 +194,8 @@ describe('MeetingParticipationCoordinator (stub end-to-end)', () => {
           max_minutes: 1,
           voice_profile_id: 'operator-default-v1',
           audio_format: FORMAT,
-        },
-      ),
+        }
+      )
     ).rejects.toThrow(/voice-consent\.json missing/);
 
     expect(openSpy).not.toHaveBeenCalled();
@@ -237,8 +242,8 @@ describe('MeetingParticipationCoordinator (stub end-to-end)', () => {
           max_minutes: 1,
           voice_profile_id: 'operator-default-v1',
           audio_format: FORMAT,
-        },
-      ),
+        }
+      )
     ).rejects.toThrow(/consent != 'granted'/);
 
     expect(ttsSpy).not.toHaveBeenCalled();
@@ -282,7 +287,8 @@ describe('MeetingParticipationCoordinator (stub end-to-end)', () => {
         max_minutes: 1,
         voice_profile_id: 'operator-default-v1',
         audio_format: FORMAT,
-      },
+        post_playback_drain_ms: 0,
+      }
     );
 
     expect(report.utterances_spoken).toBe(1);

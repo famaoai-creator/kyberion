@@ -22,7 +22,7 @@
     {
       "capability_id": "blackhole-2ch.darwin",
       "kind": "virtual-audio-device",
-      "description": "BlackHole 2ch virtual audio device (macOS). Required for the AI to read meeting audio and inject TTS as the bot's mic.",
+      "description": "BlackHole 2ch virtual audio device (macOS). Capture uses AVFoundation input; TTS output uses the UID-selected CoreAudio bridge without changing the system default output.",
       "required_for": ["blackhole-audio-bus"],
       "applies_to_platforms": ["darwin"],
       "probe": { "kind": "probe", "probe_id": "audio-bus.blackhole" },
@@ -30,8 +30,21 @@
         "operator_confirmed": true,
         "command": "brew",
         "args": ["install", "--cask", "blackhole-2ch"],
-        "instruction": "After install, open System Settings → Sound and create a Multi-Output Device that mirrors BlackHole 2ch + your default speaker so you can still hear the meeting locally. The bot uses the BlackHole half.",
+        "instruction": "After install, verify input/output in Audio MIDI Setup. Optional physical monitoring is an explicit operator choice; Kyberion does not modify the system default output.",
         "docs_url": "https://existential.audio/blackhole/",
+        "retry_after_install": true
+      }
+    },
+    {
+      "capability_id": "coreaudio-output-bridge.darwin",
+      "kind": "binary",
+      "description": "UID-selected CoreAudio output helper used for direct PCM playback into the virtual route.",
+      "required_for": ["blackhole-audio-bus"],
+      "applies_to_platforms": ["darwin"],
+      "probe": { "kind": "command", "command": "swift", "args": ["--version"] },
+      "install": {
+        "operator_confirmed": false,
+        "instruction": "This helper is part of the Kyberion checkout; rebuild packages if it is missing.",
         "retry_after_install": true
       }
     },
@@ -51,7 +64,7 @@
     {
       "capability_id": "ffmpeg",
       "kind": "binary",
-      "description": "ffmpeg binary on PATH; both audio buses use it to negotiate AVFoundation/Pulse devices.",
+      "description": "ffmpeg binary on PATH; BlackHole uses it for AVFoundation input capture, while macOS output is handled by the CoreAudio helper.",
       "required_for": ["blackhole-audio-bus", "pulseaudio-audio-bus"],
       "probe": { "kind": "command", "command": "ffmpeg", "args": ["-version"] },
       "install": {
@@ -102,7 +115,14 @@
       "install": {
         "operator_confirmed": true,
         "command": "pnpm",
-        "args": ["meeting:consent", "grant", "--mission", "${MISSION_ID}", "--operator", "${KYBERION_OPERATOR_HANDLE}"],
+        "args": [
+          "meeting:consent",
+          "grant",
+          "--mission",
+          "${MISSION_ID}",
+          "--operator",
+          "${KYBERION_OPERATOR_HANDLE}"
+        ],
         "instruction": "Run `pnpm meeting:consent grant --mission MSN-… --operator <handle> --scope \"…\"` for the active mission. The CLI lands a `voice_consent.grant` audit entry. Bootstrap will substitute MISSION_ID and KYBERION_OPERATOR_HANDLE before invoking.",
         "retry_after_install": true
       }

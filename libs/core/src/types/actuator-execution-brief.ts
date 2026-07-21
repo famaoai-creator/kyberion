@@ -26,10 +26,17 @@ export interface ActuatorExecutionBrief {
     label: string;
     description: string;
     actuator: string;
-    phase: 'resolve_system' | 'authenticate' | 'list_pending' | 'review_item' | 'decide' | 'summarize';
+    phase:
+      | 'resolve_system'
+      | 'authenticate'
+      | 'list_pending'
+      | 'review_item'
+      | 'decide'
+      | 'summarize';
     requires_confirmation?: boolean;
     input_refs?: string[];
     output_refs?: string[];
+    [k: string]: unknown;
   }[];
   assumptions?: string[];
   clarification_questions?: {
@@ -40,7 +47,11 @@ export interface ActuatorExecutionBrief {
     impact?: string;
     [k: string]: unknown;
   }[];
-  readiness?: 'fully_automatable' | 'needs_clarification' | 'needs_external_asset' | 'blocked_by_runtime';
+  readiness?:
+    | 'fully_automatable'
+    | 'needs_clarification'
+    | 'needs_external_asset'
+    | 'blocked_by_runtime';
   readiness_reason?: string;
   llm_touchpoints?: {
     stage: string;
