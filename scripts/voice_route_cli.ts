@@ -9,6 +9,7 @@ interface CliOptions {
   text?: string;
   language?: string;
   voiceProfileId?: string;
+  sttBridgeId?: string;
   requestId?: string;
   inputDeviceUid?: string;
   outputDeviceUid?: string;
@@ -47,6 +48,9 @@ function parseArgs(argv: string[]): { command: Command; options: CliOptions } {
         break;
       case '--voice-profile-id':
         options.voiceProfileId = value();
+        break;
+      case '--stt-bridge-id':
+        options.sttBridgeId = value();
         break;
       case '--request-id':
         options.requestId = value();
@@ -130,6 +134,7 @@ async function main(): Promise<void> {
           text: options.text,
           language: options.language || 'ja',
           ...(options.voiceProfileId ? { voice_profile_id: options.voiceProfileId } : {}),
+          ...(options.sttBridgeId ? { stt_bridge_id: options.sttBridgeId } : {}),
           audio_route: routeParams(options),
           operator_confirmed: options.confirm,
           dry_run: options.dryRun,

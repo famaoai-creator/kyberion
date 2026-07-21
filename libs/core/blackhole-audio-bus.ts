@@ -298,6 +298,10 @@ export class BlackHoleAudioBus implements AudioBus {
 
   async close(): Promise<void> {
     if (this.closing) return;
+    // Keep capture alive while the CoreAudio output helper drains its final
+    // buffers. Stopping capture first can discard the tail of the loopback.
+    await this.output?.close();
+    this.output = null;
     this.closing = true;
     this.inputQueue?.close();
     if (this.inputProc) {
@@ -306,8 +310,6 @@ export class BlackHoleAudioBus implements AudioBus {
     }
     this.inputProc = null;
     this.inputResourceId = null;
-    await this.output?.close();
-    this.output = null;
     this.releaseLeases();
     this.opened = false;
     this.status = 'closed';
