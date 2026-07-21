@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { CoreAudioOutputBridge } from './coreaudio-output-bridge.js';
 import { CoreAudioDeviceInventoryBridge } from './coreaudio-device-inventory.js';
 import type { AudioDeviceDescriptor } from './audio-route.js';
@@ -30,6 +30,10 @@ function inventory(): CoreAudioDeviceInventoryBridge {
 }
 
 describe('CoreAudioOutputBridge', () => {
+  beforeEach(() =>
+    Object.defineProperty(process, 'platform', { configurable: true, value: 'darwin' })
+  );
+
   afterEach(() =>
     Object.defineProperty(process, 'platform', { configurable: true, value: originalPlatform })
   );
