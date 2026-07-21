@@ -8,6 +8,8 @@ type OpSpecKind = 'capture' | 'transform' | 'apply' | 'control';
 export const VOICE_ACTUATOR_CAPTURE_OPS = [
   'health',
   'list_voices',
+  'list_audio_routes',
+  'probe_audio_route',
   'transcribe',
   'transcribe_voice_sample',
 ] as const;
@@ -23,6 +25,7 @@ export const VOICE_ACTUATOR_APPLY_OPS = [
   'record_verify_repair_voice_sample',
   'register_voice_profile',
   'speak_local',
+  'verify_tts_loopback',
 ] as const;
 
 function toSpec(op: string, kind: OpSpecKind) {

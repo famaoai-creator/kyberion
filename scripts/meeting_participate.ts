@@ -372,6 +372,11 @@ async function main(): Promise<void> {
       describe: 'chrome-extension driver: seconds to wait for the extension to connect + join',
     })
     .option('max-minutes', { type: 'number', default: 30 })
+    .option('self-audio-suppression-ms', { type: 'number', default: 0 })
+    .option('post-playback-drain-ms', { type: 'number', default: 400 })
+    .option('barge-in-enabled', { type: 'boolean', default: false })
+    .option('barge-in-rms-multiplier', { type: 'number', default: 2.5 })
+    .option('barge-in-min-duration-ms', { type: 'number', default: 160 })
     .option('headed', { type: 'boolean', default: false })
     .option('account-slug', { type: 'string', default: 'default' })
     .option('skip-bootstrap-check', { type: 'boolean', default: false })
@@ -541,6 +546,11 @@ async function main(): Promise<void> {
       audio_format: FORMAT,
       require_recording_consent: runtimePlan.require_recording_consent,
       require_voice_consent: runtimePlan.require_voice_consent,
+      self_audio_suppression_ms: Math.max(0, Number(argv['self-audio-suppression-ms'])),
+      post_playback_drain_ms: Math.max(0, Number(argv['post-playback-drain-ms'])),
+      barge_in_enabled: Boolean(argv['barge-in-enabled']),
+      barge_in_rms_multiplier: Math.max(1, Number(argv['barge-in-rms-multiplier'])),
+      barge_in_min_duration_ms: Math.max(20, Number(argv['barge-in-min-duration-ms'])),
     });
     logger.info('');
     logger.info(`📋 Participation report:`);
