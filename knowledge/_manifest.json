@@ -991,6 +991,12 @@
       "type": "json"
     },
     {
+      "path": "product/governance/adapter-first-extension-policy.md",
+      "tier": "public",
+      "size": 8803,
+      "type": "md"
+    },
+    {
       "path": "product/governance/adf-execution-policy.json",
       "tier": "public",
       "size": 201,
@@ -1455,7 +1461,7 @@
     {
       "path": "product/governance/kyberion-development-practices.md",
       "tier": "public",
-      "size": 9402,
+      "size": 10196,
       "type": "md"
     },
     {
