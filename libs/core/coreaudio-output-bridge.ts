@@ -25,6 +25,7 @@ export interface CoreAudioOutputBridgeOptions {
   script_path?: string;
   startup_timeout_ms?: number;
   cleanup_timeout_ms?: number;
+  drain_timeout_ms?: number;
 }
 
 export class CoreAudioOutputBridge implements AudioOutputPort {
@@ -185,7 +186,7 @@ export class CoreAudioOutputBridge implements AudioOutputPort {
     const child = this.process;
     if (child?.stdin && !child.stdin.destroyed) child.stdin.end();
     if (child && child.exitCode === null && child.signalCode === null) {
-      await waitForClose(child, this.options.cleanup_timeout_ms ?? 1500);
+      await waitForClose(child, this.options.drain_timeout_ms ?? 10_000);
       if (child.exitCode === null && child.signalCode === null) terminateProcessGroup(child);
     }
     this.process = null;
