@@ -101,7 +101,8 @@ for id in deviceIDs() {
   let direction = hasInput && hasOutput ? "duplex" : hasInput ? "input" : "output"
   let channels = max(channelCount(id, kAudioObjectPropertyScopeInput) ?? 0, channelCount(id, kAudioObjectPropertyScopeOutput) ?? 0)
   let transport = transportName(uint32Property(id, kAudioDevicePropertyTransportType))
-  let virtual = name.range(of: "blackhole|loopback|virtual|null sink", options: .regularExpression) != nil || transport?.lowercased().contains("virtual") == true
+  let normalizedTransport = transport?.lowercased()
+  let virtual = name.range(of: "blackhole|loopback|virtual|null sink", options: .regularExpression) != nil || normalizedTransport == "virt" || normalizedTransport?.contains("virtual") == true
   records.append(DeviceRecord(
     uid: uid,
     display_name: name,
