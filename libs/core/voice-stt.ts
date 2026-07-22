@@ -1,3 +1,5 @@
+import { listVoiceSttAdapters, resolveVoiceSttAdapter } from './voice-provider-adapters.js';
+
 export type VoiceSttBackend = 'auto' | 'server' | 'mlx_whisper' | 'whisper_cpp' | 'native_speech';
 
 export interface VoiceSttAvailability {
@@ -88,18 +90,33 @@ export function resolveVoiceSttBackendOrder(
 
   const deduped = Array.from(new Set(preference));
   const available = deduped.filter((backend) => {
-    if (backend === 'server') return availability.server;
-    if (backend === 'mlx_whisper') return availability.mlxWhisper === true;
-    if (backend === 'whisper_cpp') return availability.whisperCpp;
-    return availability.nativeSpeech;
+    const adapter = resolveVoiceSttAdapter(backend);
+    if (adapter.adapter_id === 'openai_compatible_server') return availability.server;
+    if (adapter.adapter_id === 'managed_python_bridge') return availability.mlxWhisper === true;
+    if (adapter.adapter_id === 'whisper_cpp_cli') return availability.whisperCpp;
+    if (adapter.adapter_id === 'native_speech') return availability.nativeSpeech;
+    return false;
   });
 
   if (available.length > 0) return available;
 
   const fallback: Array<Exclude<VoiceSttBackend, 'auto'>> = [];
-  if (availability.server) fallback.push('server');
-  if (availability.mlxWhisper) fallback.push('mlx_whisper');
-  if (availability.whisperCpp) fallback.push('whisper_cpp');
-  if (availability.nativeSpeech) fallback.push('native_speech');
+  const fallbackCandidates = Array.from(
+    new Set([...deduped, ...listVoiceSttAdapters().map((adapter) => adapter.backend)])
+  ).filter((backend): backend is Exclude<VoiceSttBackend, 'auto'> => backend !== 'auto');
+  for (const backend of fallbackCandidates) {
+    const adapter = resolveVoiceSttAdapter(backend);
+    const isAvailable =
+      adapter.adapter_id === 'openai_compatible_server'
+        ? availability.server
+        : adapter.adapter_id === 'managed_python_bridge'
+          ? availability.mlxWhisper === true
+          : adapter.adapter_id === 'whisper_cpp_cli'
+            ? availability.whisperCpp
+            : adapter.adapter_id === 'native_speech'
+              ? availability.nativeSpeech
+              : false;
+    if (isAvailable && !fallback.includes(backend)) fallback.push(backend);
+  }
   return fallback;
 }
