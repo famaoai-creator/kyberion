@@ -18,6 +18,7 @@ import {
 import { hasBuiltInTts } from './native-tts.js';
 import { probeToolRuntime } from './tool-runtime-registry.js';
 import { pathResolver } from './path-resolver.js';
+import { listVoiceSttAdapters, resolveVoiceTtsAdapter } from './voice-provider-adapters.js';
 
 export interface VoiceSelectionPreferences {
   version: '1.0.0';
@@ -35,6 +36,7 @@ export interface VoiceTtsSelectionCandidate {
   status: VoiceSelectionStatus;
   selectable: boolean;
   live_presence: boolean;
+  adapter_id: string;
   fallback_engine_id?: string;
   reason?: string;
   supports: VoiceEngineRecord['supports'];
@@ -43,6 +45,7 @@ export interface VoiceTtsSelectionCandidate {
 export interface VoiceSttSelectionCandidate {
   backend: VoiceSttBackend;
   display_name: string;
+  adapter_id: string;
   status: VoiceSelectionStatus;
   selectable: boolean;
   reason?: string;
@@ -110,22 +113,27 @@ function getPreferences(): VoiceSelectionPreferences {
 }
 
 function resolveTtsCandidate(engine: VoiceEngineRecord): VoiceTtsSelectionCandidate {
+  const adapter = resolveVoiceTtsAdapter(engine);
   let status: VoiceSelectionStatus = 'unsupported';
   let reason =
     'This engine is available to governed voice artifacts, but not live Presence replies yet.';
-  const livePresence = engine.engine_id === 'local_say' || engine.engine_id === 'mlx_audio_qwen3';
+  const livePresence = engine.live_presence === true && adapter.live_presence;
 
-  if (engine.engine_id === 'local_say') {
+  if (!livePresence) {
+    reason = engine.notes || reason;
+  } else if (adapter.adapter_id === 'native_tts') {
     status = hasBuiltInTts() ? 'ready' : 'needs_setup';
     reason = hasBuiltInTts()
       ? 'Uses the host OS voice without network access.'
       : 'Install the host OS TTS command before selecting this engine.';
-  } else if (engine.engine_id === 'mlx_audio_qwen3') {
-    const runtime = probeToolRuntime('mlx_audio', 'installed');
+  } else if (adapter.adapter_id === 'python_bridge') {
+    const runtime = engine.runtime_id
+      ? probeToolRuntime(engine.runtime_id, 'installed')
+      : { installed: Boolean(engine.bridge_script) };
     status = runtime.installed ? 'ready' : 'needs_setup';
     reason = runtime.installed
-      ? 'Uses the managed mlx-audio runtime; voice cloning requires a profile sample.'
-      : 'Run `pnpm voice:setup --apply` before selecting Qwen3-TTS.';
+      ? `Uses the governed ${engine.runtime_id || 'Python'} bridge adapter.`
+      : `Prepare the ${engine.runtime_id || 'Python'} runtime before selecting this engine.`;
   }
 
   return {
@@ -135,6 +143,7 @@ function resolveTtsCandidate(engine: VoiceEngineRecord): VoiceTtsSelectionCandid
     status,
     selectable: livePresence && status === 'ready',
     live_presence: livePresence,
+    adapter_id: adapter.adapter_id,
     fallback_engine_id: engine.fallback_engine_id,
     reason,
     supports: engine.supports,
@@ -162,45 +171,39 @@ function resolveSttAvailability(): VoiceSttAvailability {
 }
 
 function sttCandidates(availability: VoiceSttAvailability): VoiceSttSelectionCandidate[] {
-  const rows: Array<[VoiceSttBackend, string, boolean, string]> = [
-    [
-      'auto',
-      'Auto (policy order)',
-      true,
-      'Uses the configured fallback order and skips unavailable backends.',
-    ],
-    [
-      'server',
-      'Hosted / OpenAI-compatible server',
-      availability.server,
-      'Set VOICE_HUB_STT_BASE_URL or a provider-specific STT URL.',
-    ],
-    [
-      'mlx_whisper',
-      'mlx-whisper (managed local)',
-      availability.mlxWhisper === true,
-      'Uses the managed mlx-whisper runtime on Apple Silicon.',
-    ],
-    [
-      'whisper_cpp',
-      'whisper.cpp',
-      availability.whisperCpp,
-      'Requires WHISPER_CLI_PATH and WHISPER_MODEL_PATH.',
-    ],
-    [
-      'native_speech',
-      'Native Speech',
-      availability.nativeSpeech,
-      'Uses the host OS speech API and microphone permission.',
-    ],
+  const isAvailable = (backend: VoiceSttBackend): boolean => {
+    if (backend === 'server') return availability.server;
+    if (backend === 'mlx_whisper') return availability.mlxWhisper === true;
+    if (backend === 'whisper_cpp') return availability.whisperCpp;
+    if (backend === 'native_speech') return availability.nativeSpeech;
+    return false;
+  };
+  const reasonFor = (backend: VoiceSttBackend): string => {
+    if (backend === 'server') return 'Set VOICE_HUB_STT_BASE_URL or a provider-specific STT URL.';
+    if (backend === 'mlx_whisper') return 'Uses the managed mlx-whisper runtime on Apple Silicon.';
+    if (backend === 'whisper_cpp') return 'Requires the configured whisper.cpp CLI and model.';
+    if (backend === 'native_speech')
+      return 'Uses the host OS speech API and microphone permission.';
+    return 'Uses the configured fallback order and skips unavailable backends.';
+  };
+  return [
+    {
+      backend: 'auto' as const,
+      display_name: 'Auto (policy order)',
+      adapter_id: 'policy',
+      status: 'ready' as const,
+      selectable: true,
+      reason: reasonFor('auto'),
+    },
+    ...listVoiceSttAdapters().map((adapter) => ({
+      backend: adapter.backend,
+      display_name: adapter.display_name,
+      adapter_id: adapter.adapter_id,
+      status: isAvailable(adapter.backend) ? ('ready' as const) : ('needs_setup' as const),
+      selectable: isAvailable(adapter.backend),
+      reason: reasonFor(adapter.backend),
+    })),
   ];
-  return rows.map(([backend, display_name, available, reason]) => ({
-    backend,
-    display_name,
-    status: available ? 'ready' : 'needs_setup',
-    selectable: available,
-    reason,
-  }));
 }
 
 export function getVoiceSelectionSnapshot(): VoiceSelectionSnapshot {

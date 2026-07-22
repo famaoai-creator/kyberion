@@ -9,6 +9,8 @@
       "provider": "system_tts",
       "status": "active",
       "platforms": ["darwin", "linux", "win32"],
+      "tts_adapter_id": "native_tts",
+      "live_presence": true,
       "supports": {
         "list_voices": true,
         "playback": true,
@@ -24,6 +26,8 @@
       "status": "active",
       "platforms": ["darwin", "linux", "win32"],
       "bridge_script": "libs/actuators/voice-actuator/scripts/espeak_ng_tts_bridge.py",
+      "tts_adapter_id": "python_bridge",
+      "live_presence": false,
       "supports": {
         "list_voices": true,
         "playback": true,
@@ -38,6 +42,8 @@
       "provider": "open_voice_clone",
       "status": "active",
       "platforms": ["any"],
+      "tts_adapter_id": "external_provider",
+      "live_presence": false,
       "supports": {
         "list_voices": false,
         "playback": true,
@@ -55,6 +61,9 @@
       "platforms": ["darwin"],
       "model_id": "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-8bit",
       "bridge_script": "libs/actuators/voice-actuator/scripts/mlx_audio_tts_bridge.py",
+      "tts_adapter_id": "python_bridge",
+      "runtime_id": "mlx_audio",
+      "live_presence": true,
       "stt_bridge_script": "libs/actuators/voice-actuator/scripts/mlx_audio_stt_bridge.py",
       "supports": {
         "list_voices": false,
@@ -75,6 +84,8 @@
       "platforms": ["darwin", "linux", "win32"],
       "model_id": "hexgrad/Kokoro-82M",
       "bridge_script": "libs/actuators/voice-actuator/scripts/kokoro_tts_bridge.py",
+      "tts_adapter_id": "python_bridge",
+      "live_presence": false,
       "supports": {
         "list_voices": false,
         "playback": true,
@@ -89,6 +100,8 @@
       "provider": "gemini_api",
       "status": "active",
       "platforms": ["any"],
+      "tts_adapter_id": "external_provider",
+      "live_presence": false,
       "supports": {
         "list_voices": false,
         "playback": true,

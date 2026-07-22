@@ -76,6 +76,17 @@ curl -s http://127.0.0.1:3031/api/voice/selection
 - voice clone を使う場合は、本人の明示的な許諾がある sample だけを profile に登録する。不要になった sample は profile のライフサイクル手順に従って管理する。
 - 選択変更後は短いテスト発話を行い、UI に表示された TTS/STT と実際の結果が一致することを確認する。変更履歴は Presence Studio の監査ログで追跡できる。
 
+## エンジン追加とアダプター契約
+
+実行コードは TTS/STT のエンジン ID を直接判定せず、アダプター契約を解決して実行する。既存のアダプターを使うエンジンを追加する場合は、原則として次のガバナンス登録だけを変更する。
+
+1. TTS は `knowledge/product/governance/voice-engines/<engine_id>.json` に `tts_adapter_id`、必要なら `runtime_id`、`bridge_script`、`live_presence`、`fallback_engine_id` を登録する。
+2. 既存の `native_tts` または `python_bridge` に適合することを確認する。ランタイムは `tool-runtime-registry` で管理し、UI や voice-hub にエンジン ID の分岐を追加しない。
+3. STT は選択候補とアダプターの定義を `libs/core/voice-provider-adapters.ts` の契約に合わせる。既存アダプターで表現できない新しい通信方式・実行方式だけは、アダプター実装と契約テストを一度追加する。
+4. `pnpm run build`、音声選択テスト、`pnpm voice:health`、`pnpm voice:route:probe` で、候補表示・可用性・実行経路が一致することを確認する。
+
+新しいエンジンを追加するたびに `satellites/voice-hub/server.ts` や Presence Studio の選択 UI を編集する設計にはしない。未知の `tts_adapter_id` は安全側で `unsupported` となり、実行されない。
+
 ## 関連手順
 
 - [リアルタイム音声会話](./realtime-voice-conversation.md)
