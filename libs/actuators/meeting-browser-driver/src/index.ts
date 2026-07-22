@@ -25,6 +25,7 @@
 
 import {
   registerMeetingJoinDriver,
+  abortableAudioChunks,
   logger,
   retry,
   type AudioBus,
@@ -459,8 +460,8 @@ class BrowserMeetingJoinDriver implements MeetingJoinDriver {
           yield chunk;
         }
       },
-      async audioOutput(stream: AsyncIterable<AudioChunk>): Promise<void> {
-        await bus.writeOutput(stream);
+      async audioOutput(stream: AsyncIterable<AudioChunk>, signal?: AbortSignal): Promise<void> {
+        await bus.writeOutput(abortableAudioChunks(stream, signal));
       },
       async chat(_text: string): Promise<void> {
         // Chat is platform-specific; selectors not yet wired.

@@ -37,7 +37,7 @@ import {
   DEFAULT_SPEECH_SEGMENT_CHARS,
 } from './segmented-voice-playback.js';
 import { VadTurnSegmenter, type VadTurnSegmenterOptions } from './vad-turn-recorder.js';
-import { EnergyVad, computeChunkDurationMs } from './voice-activity-detector.js';
+import { BargeInController } from './barge-in-controller.js';
 import type { TraceContext } from './src/trace.js';
 import type { StreamingSpeechToTextBridge } from './streaming-stt-bridge.js';
 import type { AudioChunk, AudioFormat } from './meeting-session-types.js';
@@ -252,18 +252,15 @@ export async function startRealtimeVoiceLoop(
   let bargedDuringTurn = false;
 
   // Barge-in detector state (only while SPEAKING).
-  let bargeVad: EnergyVad | null = null;
-  let bargeSpeechMs = 0;
-  let bargeChunks: AudioChunk[] = [];
+  let bargeController: BargeInController | null = null;
 
   const armBargeVad = (): void => {
     const base = segmenter.rmsThreshold > 0 ? segmenter.rmsThreshold : 800;
-    bargeVad = new EnergyVad({
-      rms_threshold: Math.round(base * bargeInMultiplier),
-      endpoint_ms: 10 ** 9, // endpoint never fires; we only use `speaking`
+    bargeController = new BargeInController({
+      base_rms_threshold: base,
+      threshold_multiplier: bargeInMultiplier,
+      min_speech_ms: bargeInMinSpeechMs,
     });
-    bargeSpeechMs = 0;
-    bargeChunks = [];
   };
 
   const processTurn = async (turnIndex: number, feed: SttFeed | null) => {
@@ -439,51 +436,43 @@ export async function startRealtimeVoiceLoop(
           continue;
         }
 
-        if (state === 'speaking' && bargeInEnabled && bargeVad) {
-          const vadState = bargeVad.ingest(chunk);
-          if (vadState.speaking) {
-            bargeSpeechMs += computeChunkDurationMs(chunk);
-            bargeChunks.push(chunk);
-            if (bargeSpeechMs >= bargeInMinSpeechMs && speech) {
-              bargedDuringTurn = true;
-              interruptions += 1;
-              options.onEvent?.({ kind: 'barge_in', turn: turnsCompleted });
-              trace?.addEvent('realtime_voice.barge_in', { turn: turnsCompleted });
-              const controller = speech;
-              const interruptedTurn = pendingTurn;
-              await controller.stop();
-              // The old processTurn owns the current turn's counters and
-              // callbacks. Finish it before accepting a new endpoint so a
-              // barged turn cannot race with the interrupted turn.
-              if (interruptedTurn) await interruptedTurn;
-              // Re-arm listening and replay the interrupting audio so the
-              // barged utterance keeps its first syllables.
-              segmenter.reset();
-              state = 'listening';
-              emitState(state);
-              const replay = bargeChunks;
-              bargeChunks = [];
-              bargeVad = null;
-              for (const replayChunk of replay) {
-                const replayResult = segmenter.push(replayChunk);
-                if (replayResult.onset && options.streamingStt) {
-                  sttFeed = startSttFeed(options.streamingStt, format);
-                  if (replayResult.onsetPreroll?.length) {
-                    sttFeed.push({
-                      format,
-                      payload: new Uint8Array(replayResult.onsetPreroll),
-                      ts_ms: replayChunk.ts_ms,
-                    });
-                  }
-                  sttFeed.push(replayChunk);
-                } else if (replayResult.state === 'recording' && !replayResult.onset) {
-                  sttFeed?.push(replayChunk);
+        if (state === 'speaking' && bargeInEnabled && bargeController) {
+          const observation = bargeController.observe(chunk);
+          if (observation.triggered && speech) {
+            bargedDuringTurn = true;
+            interruptions += 1;
+            options.onEvent?.({ kind: 'barge_in', turn: turnsCompleted });
+            trace?.addEvent('realtime_voice.barge_in', { turn: turnsCompleted });
+            const controller = speech;
+            const interruptedTurn = pendingTurn;
+            await controller.stop();
+            // The old processTurn owns the current turn's counters and
+            // callbacks. Finish it before accepting a new endpoint so a
+            // barged turn cannot race with the interrupted turn.
+            if (interruptedTurn) await interruptedTurn;
+            // Re-arm listening and replay the interrupting audio so the
+            // barged utterance keeps its first syllables.
+            segmenter.reset();
+            state = 'listening';
+            emitState(state);
+            const replay = observation.buffered_chunks;
+            bargeController = null;
+            for (const replayChunk of replay) {
+              const replayResult = segmenter.push(replayChunk);
+              if (replayResult.onset && options.streamingStt) {
+                sttFeed = startSttFeed(options.streamingStt, format);
+                if (replayResult.onsetPreroll?.length) {
+                  sttFeed.push({
+                    format,
+                    payload: new Uint8Array(replayResult.onsetPreroll),
+                    ts_ms: replayChunk.ts_ms,
+                  });
                 }
+                sttFeed.push(replayChunk);
+              } else if (replayResult.state === 'recording' && !replayResult.onset) {
+                sttFeed?.push(replayChunk);
               }
             }
-          } else {
-            bargeSpeechMs = 0;
-            bargeChunks = [];
           }
           continue;
         }

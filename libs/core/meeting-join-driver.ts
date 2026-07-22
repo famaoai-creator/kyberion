@@ -17,6 +17,7 @@ import type {
   MeetingTarget,
   AudioChunk,
 } from './meeting-session-types.js';
+import { abortableAudioChunks } from './meeting-session-types.js';
 import type { AudioBus } from './audio-bus.js';
 
 export interface MeetingJoinDriver {
@@ -171,8 +172,8 @@ export class StubMeetingJoinDriver implements MeetingJoinDriver {
           yield chunk;
         }
       },
-      async audioOutput(stream: AsyncIterable<AudioChunk>): Promise<void> {
-        await bus.writeOutput(stream);
+      async audioOutput(stream: AsyncIterable<AudioChunk>, signal?: AbortSignal): Promise<void> {
+        await bus.writeOutput(abortableAudioChunks(stream, signal));
       },
       async chat(_text: string): Promise<void> {
         /* no-op */

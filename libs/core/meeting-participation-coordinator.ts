@@ -38,6 +38,8 @@ import type {
   MeetingTarget,
   TranscriptChunk,
 } from './meeting-session-types.js';
+import { abortableAudioChunks } from './meeting-session-types.js';
+import { BargeInController } from './barge-in-controller.js';
 
 export interface ConversationAgent {
   /**
@@ -72,10 +74,12 @@ export interface MeetingParticipationOptions {
   self_audio_suppression_ms?: number;
   /** Additional suppression window after output drains. */
   post_playback_drain_ms?: number;
-  /** Reserved for the realtime driver; the coordinator remains half-duplex by default. */
+  /** Optional sustained-speech interruption; disabled for the default half-duplex mode. */
   barge_in_enabled?: boolean;
   barge_in_rms_multiplier?: number;
   barge_in_min_duration_ms?: number;
+  /** Baseline input RMS used by the generic barge-in detector. */
+  barge_in_base_rms_threshold?: number;
 }
 
 export interface MeetingParticipationReport {
@@ -182,15 +186,17 @@ export function filterSelfAudioFromMeetingInput(
   source: AsyncIterable<AudioChunk>,
   isSpeaking: () => boolean,
   drainUntilMs: () => number,
-  onSuppressed?: () => void
+  onSuppressed?: (chunk: AudioChunk) => void,
+  replaySuppressed?: () => AudioChunk[]
 ): AsyncIterable<AudioChunk> {
   return {
     async *[Symbol.asyncIterator]() {
       for await (const chunk of source) {
         if (isSpeaking() || Date.now() < drainUntilMs()) {
-          onSuppressed?.();
+          onSuppressed?.(chunk);
           continue;
         }
+        for (const replayChunk of replaySuppressed?.() ?? []) yield replayChunk;
         yield chunk;
       }
     },
@@ -297,15 +303,42 @@ export class MeetingParticipationCoordinator {
     const taps = teeInbound(session.audioInput());
     let speaking = false;
     let selfAudioDrainUntilMs = 0;
+    let bargeController: BargeInController | null = null;
+    let activeSpeechAbortController: AbortController | null = null;
+    let pendingBargeReplay: AudioChunk[] = [];
+    let bargeTriggeredForSpeech = false;
     const transcriptIterator = this.deps.stt.transcribeStream(
       filterSelfAudioFromMeetingInput(
         taps.toStt,
         () => speaking,
         () => selfAudioDrainUntilMs,
-        () => this.deps.trace?.addEvent('meeting_participation.self_audio_suppressed', {})
+        () => {
+          this.deps.trace?.addEvent('meeting_participation.self_audio_suppressed', {});
+        },
+        () => {
+          if (speaking || Date.now() < selfAudioDrainUntilMs) return [];
+          const replay = pendingBargeReplay;
+          pendingBargeReplay = [];
+          return replay;
+        }
       )
     );
-    const vadIterator = this.driveVad(taps.toVad, deadline);
+    const vadIterator = this.driveVad(
+      taps.toVad,
+      deadline,
+      () => speaking,
+      (chunk) => {
+        if (!bargeController) return;
+        const observation = bargeController.observe(chunk);
+        if (!observation.triggered) return;
+        pendingBargeReplay.push(...observation.buffered_chunks);
+        bargeTriggeredForSpeech = true;
+        activeSpeechAbortController?.abort();
+        this.deps.trace?.addEvent('meeting_participation.barge_in', {
+          buffered_chunks: observation.buffered_chunks.length,
+        });
+      }
+    );
     void consumeIterator(vadIterator); // keep VAD active in background
 
     // 3. Drain transcripts and run the agent. Speak when agent has
@@ -338,13 +371,34 @@ export class MeetingParticipationCoordinator {
           this.deps.trace?.addEvent('meeting_participation.speak_requested', {
             chars: decision.speech.length,
           });
+          const speechAbortController = new AbortController();
+          activeSpeechAbortController = speechAbortController;
+          bargeTriggeredForSpeech = false;
+          bargeController = options.barge_in_enabled
+            ? new BargeInController({
+                base_rms_threshold: options.barge_in_base_rms_threshold ?? 800,
+                threshold_multiplier: options.barge_in_rms_multiplier ?? 2,
+                min_speech_ms: options.barge_in_min_duration_ms ?? 250,
+              })
+            : null;
           speaking = true;
           selfAudioDrainUntilMs = Date.now() + (options.self_audio_suppression_ms ?? 0);
           try {
-            await this.speak(session, decision.speech, options.voice_profile_id, target, options);
+            await this.speak(
+              session,
+              decision.speech,
+              options.voice_profile_id,
+              target,
+              options,
+              speechAbortController.signal
+            );
           } finally {
             speaking = false;
-            selfAudioDrainUntilMs = Date.now() + (options.post_playback_drain_ms ?? 400);
+            bargeController = null;
+            activeSpeechAbortController = null;
+            selfAudioDrainUntilMs = bargeTriggeredForSpeech
+              ? 0
+              : Date.now() + (options.post_playback_drain_ms ?? 400);
           }
           utterancesSpoken += 1;
           this.deps.trace?.addEvent('meeting_participation.spoke', {
@@ -407,7 +461,8 @@ export class MeetingParticipationCoordinator {
     text: string,
     voiceProfileId: string,
     target: MeetingTarget,
-    options: MeetingParticipationOptions
+    options: MeetingParticipationOptions,
+    signal: AbortSignal
   ): Promise<void> {
     const requireVoiceConsent = options.require_voice_consent ?? Boolean(options.mission_id);
     if (requireVoiceConsent) {
@@ -432,9 +487,19 @@ export class MeetingParticipationCoordinator {
       yield text;
     }
     try {
-      await session.audioOutput(this.deps.tts.synthesizeStream(singleSegment(), voiceProfileId));
+      await session.audioOutput(
+        abortableAudioChunks(
+          this.deps.tts.synthesizeStream(singleSegment(), voiceProfileId),
+          signal
+        ),
+        signal
+      );
       this.deps.trace?.endSpan('ok');
     } catch (err: any) {
+      if (signal.aborted) {
+        this.deps.trace?.endSpan('ok');
+        return;
+      }
       this.deps.trace?.endSpan('error', err?.message ?? String(err));
       throw err;
     }
@@ -447,10 +512,13 @@ export class MeetingParticipationCoordinator {
    */
   private async *driveVad(
     audio: AsyncIterable<AudioChunk>,
-    deadline: number
+    deadline: number,
+    isSpeaking?: () => boolean,
+    onSpeakingChunk?: (chunk: AudioChunk) => void
   ): AsyncGenerator<{ endpoint: boolean; silence_ms: number }> {
     for await (const chunk of audio) {
       if (Date.now() > deadline) return;
+      if (isSpeaking?.()) onSpeakingChunk?.(chunk);
       const state = this.deps.vad.ingest(chunk);
       yield { endpoint: state.endpoint, silence_ms: state.silence_ms };
     }
