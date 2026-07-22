@@ -8,6 +8,7 @@ import {
 describe('voice STT helpers', () => {
   it('parses backend aliases into canonical values', () => {
     expect(parseVoiceSttBackend('whisper.cpp')).toBe('whisper_cpp');
+    expect(parseVoiceSttBackend('mlx-whisper')).toBe('mlx_whisper');
     expect(parseVoiceSttBackend('apple_speech')).toBe('native_speech');
     expect(parseVoiceSttBackend('server')).toBe('server');
     expect(parseVoiceSttBackend('unknown')).toBe('auto');
@@ -43,6 +44,11 @@ describe('voice STT helpers', () => {
     });
   });
 
+  it('rejects non-http STT endpoints before any audio egress', () => {
+    expect(resolveVoiceSttServerConfig({ VOICE_HUB_STT_BASE_URL: 'file:///tmp/stt' })).toBeNull();
+    expect(resolveVoiceSttServerConfig({ VOICE_HUB_STT_BASE_URL: 'not-a-url' })).toBeNull();
+  });
+
   it('builds an automatic backend order from availability and preference', () => {
     const order = resolveVoiceSttBackendOrder(
       'auto',
@@ -53,22 +59,30 @@ describe('voice STT helpers', () => {
       },
       {
         VOICE_HUB_STT_PREFERENCE: 'server,native_speech,whisper_cpp',
-      },
+      }
     );
 
     expect(order).toEqual(['native_speech', 'whisper_cpp']);
   });
 
   it('returns the requested backend directly for explicit choices', () => {
-    const order = resolveVoiceSttBackendOrder(
-      'whisper_cpp',
-      {
-        server: true,
-        whisperCpp: true,
-        nativeSpeech: true,
-      },
-    );
+    const order = resolveVoiceSttBackendOrder('whisper_cpp', {
+      server: true,
+      whisperCpp: true,
+      nativeSpeech: true,
+    });
 
     expect(order).toEqual(['whisper_cpp']);
+  });
+
+  it('can select the managed mlx-whisper backend when it is available', () => {
+    const order = resolveVoiceSttBackendOrder('mlx_whisper', {
+      server: false,
+      mlxWhisper: true,
+      whisperCpp: false,
+      nativeSpeech: true,
+    });
+
+    expect(order).toEqual(['mlx_whisper']);
   });
 });

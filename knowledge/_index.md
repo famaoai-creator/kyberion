@@ -805,6 +805,7 @@
 - [Procedure: Visual Imagination & Assertion](./public/procedures/media/visual-imagination-and-testing.md) (public | Unknown)
 - [Procedure: Voice Cloning Overview](./public/procedures/media/voice-cloning-overview.md) (public | Unknown)
 - [Publish a Narrated Video to YouTube](./public/procedures/media/publish-youtube-video.md) (public | Unknown)
+- [手順: Presence Studio で TTS / STT を選択する](./public/procedures/media/select-voice-backends.md) (public | Unknown)
 
 ## 📁 public/procedures/network
 - [Procedure: Moltbook API Integration](./public/procedures/network/moltbook-sync.md) (public | Unknown)

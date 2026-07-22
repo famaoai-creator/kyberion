@@ -17,6 +17,7 @@ import {
   presenceStudioVoiceMinutesSchema,
   presenceStudioVoiceIngestSchema,
   presenceStudioVoiceNativeListenSchema,
+  presenceStudioVoiceSelectionSchema,
   presenceStudioVoiceStimulusSchema,
   validateLocalServiceUrl,
 } from './security.js';
@@ -73,6 +74,8 @@ import {
   probeMicCapture,
   previewBrowserOnboarding,
   saveBrowserOnboardingVoiceSample,
+  getVoiceSelectionSnapshot,
+  saveVoiceSelectionPreferences,
   startInRoomMinutesSession,
   withExecutionContext,
 } from '@agent/core';
@@ -992,8 +995,9 @@ app.get('/api/onboarding/browser-state', (_req, res) => {
   try {
     const mic = probeMicCapture();
     res.json({ ...getBrowserOnboardingState(), readiness: { microphone: mic } });
-  } catch (error: any) {
-    res.status(500).json({ ok: false, error: error?.message || String(error) });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    res.status(500).json({ ok: false, error: message });
   }
 });
 
@@ -1963,6 +1967,52 @@ app.post('/api/voice/native-listen', async (req, res) => {
       ok: false,
       error: `Voice hub connection failed: ${error?.message || String(error)}`,
     });
+  }
+});
+
+app.get('/api/voice/selection', (_req, res) => {
+  try {
+    const snapshot = getVoiceSelectionSnapshot();
+    // Keep the profile storage location internal; the UI only needs the selectable
+    // candidates and effective preferences.
+    const { storage_path: _storagePath, ...publicSnapshot } = snapshot;
+    res.json({ ok: true, ...publicSnapshot });
+  } catch (error: any) {
+    res.status(500).json({ ok: false, error: error?.message || String(error) });
+  }
+});
+
+app.post('/api/voice/selection', (req, res) => {
+  const parsed = presenceStudioVoiceSelectionSchema.safeParse(req.body);
+  if (!parsed.success) {
+    logger.warn(
+      presenceStudioAuditLine(req, 'voice/selection.reject', {
+        status: 400,
+        error: validationErrorMessage(parsed.error),
+      })
+    );
+    return res.status(400).json({ ok: false, error: validationErrorMessage(parsed.error) });
+  }
+  try {
+    const snapshot = saveVoiceSelectionPreferences(parsed.data);
+    const { storage_path: _storagePath, ...publicSnapshot } = snapshot;
+    logger.info(
+      presenceStudioAuditLine(req, 'voice/selection.complete', {
+        status: 200,
+        tts_engine_id: publicSnapshot.preferences.tts_engine_id,
+        stt_backend: publicSnapshot.preferences.stt_backend,
+      })
+    );
+    return res.json({ ok: true, ...publicSnapshot });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.warn(
+      presenceStudioAuditLine(req, 'voice/selection.reject', {
+        status: 400,
+        error: message,
+      })
+    );
+    return res.status(400).json({ ok: false, error: message });
   }
 });
 
