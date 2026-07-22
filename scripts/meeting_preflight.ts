@@ -10,6 +10,8 @@ import {
   safeExistsSync,
   safeReaddir,
   createCoreAudioDeviceInventoryBridge,
+  resolveAudioDevice,
+  type CoreAudioDeviceInventoryBridge,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { collectDoctorReport } from './run_doctor.js';
@@ -24,6 +26,7 @@ export interface MeetingPreflightItem {
   fix: string;
   automatic_fix_available: boolean;
   reason_code?: string;
+  data?: Record<string, unknown>;
 }
 
 export interface MeetingPreflightReport {
@@ -41,7 +44,11 @@ function item(
   status: MeetingPreflightStatus,
   detail: string,
   fix: string,
-  options: { automaticFixAvailable?: boolean; reasonCode?: string } = {}
+  options: {
+    automaticFixAvailable?: boolean;
+    reasonCode?: string;
+    data?: Record<string, unknown>;
+  } = {}
 ): MeetingPreflightItem {
   return {
     id,
@@ -50,7 +57,14 @@ function item(
     fix,
     automatic_fix_available: options.automaticFixAvailable ?? false,
     ...(options.reasonCode ? { reason_code: options.reasonCode } : {}),
+    ...(options.data ? { data: options.data } : {}),
   };
+}
+
+function formatRates(rates?: readonly number[]): string {
+  return rates && rates.length > 0
+    ? rates.map((rate) => `${rate}Hz`).join(', ')
+    : 'unknown sample rates';
 }
 
 async function probeDoctorMeeting(missionId?: string): Promise<MeetingPreflightItem> {
@@ -86,7 +100,10 @@ async function probePlaywrightBrowser(): Promise<MeetingPreflightItem> {
   );
 }
 
-async function probeBlackHoleDevice(platform: NodeJS.Platform): Promise<MeetingPreflightItem> {
+async function probeBlackHoleDevice(
+  platform: NodeJS.Platform,
+  inventoryBridge: CoreAudioDeviceInventoryBridge = createCoreAudioDeviceInventoryBridge()
+): Promise<MeetingPreflightItem> {
   if (platform !== 'darwin') {
     return item(
       'blackhole.device',
@@ -102,11 +119,45 @@ async function probeBlackHoleDevice(platform: NodeJS.Platform): Promise<MeetingP
   });
   const output = `${result.stdout}\n${result.stderr}`.trim();
   if (result.status === 0 && /BlackHole/i.test(output)) {
+    const inventory = await inventoryBridge.probe();
+    const blackHoleDevices = inventory.devices.filter(
+      (device) => device.display_name === 'BlackHole 2ch'
+    );
+    const input = resolveAudioDevice(blackHoleDevices, {
+      expected_label: 'BlackHole 2ch',
+      direction: 'input',
+    });
+    const outputDevice = resolveAudioDevice(blackHoleDevices, {
+      expected_label: 'BlackHole 2ch',
+      direction: 'output',
+    });
+    if (!input.descriptor || !outputDevice.descriptor) {
+      const reason = input.reason || outputDevice.reason || 'BlackHole route is incomplete';
+      return item(
+        'blackhole.device',
+        'operator_action_required',
+        reason,
+        'Open Audio MIDI Setup and select an exact BlackHole 2ch input/output device; do not change the system default output',
+        {
+          reasonCode: 'BLACKHOLE_ROUTE_INCOMPLETE',
+          data: { devices: blackHoleDevices },
+        }
+      );
+    }
+    const inputDescriptor = input.descriptor;
+    const outputDescriptor = outputDevice.descriptor;
     return item(
       'blackhole.device',
       'pass',
-      'BlackHole is listed; the CoreAudio bridge will resolve input/output by UID at execution time',
-      'pnpm voice:route:probe -- --json'
+      `BlackHole 2ch ready; input/output UID ${inputDescriptor.uid}, ${inputDescriptor.channel_count ?? '?'} channel(s), rates ${formatRates(inputDescriptor.supported_sample_rates)}`,
+      'pnpm voice:route:probe -- --json',
+      {
+        data: {
+          input_device: inputDescriptor,
+          output_device: outputDescriptor,
+          uid_resolution: 'coreaudio_uid',
+        },
+      }
     );
   }
   const reason =
@@ -286,6 +337,7 @@ export async function runMeetingPreflight(
   options: {
     missionId?: string;
     platform?: NodeJS.Platform;
+    inventory_bridge?: CoreAudioDeviceInventoryBridge;
   } = {}
 ): Promise<MeetingPreflightReport> {
   installCoreEnvironmentProbes();
@@ -296,7 +348,7 @@ export async function runMeetingPreflight(
   const items = [
     await probeDoctorMeeting(missionId),
     await probePlaywrightBrowser(),
-    await probeBlackHoleDevice(platform),
+    await probeBlackHoleDevice(platform, options.inventory_bridge),
     await probeCoreAudioOutputBridge(platform),
     probeAudioPermission(platform),
     probeMlxAudioRuntime(platform),
