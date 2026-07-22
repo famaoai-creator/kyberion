@@ -587,6 +587,18 @@
         font: inherit;
         min-width: 240px;
       }
+      .voice-selection-group {
+        display: grid;
+        gap: 5px;
+        min-width: 240px;
+        flex: 1 1 240px;
+      }
+      .selection-label {
+        color: var(--muted);
+        font-size: 11px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
       .text-input {
         border: 1px solid rgba(125, 211, 252, 0.2);
         background: rgba(9, 16, 24, 0.8);
@@ -818,9 +830,19 @@
               <option value="conversation">Conversation Capture</option>
               <option value="notes">Notes Capture</option>
             </select>
-            <select class="select" id="native-device"></select>
-            <select class="select" id="stt-backend"></select>
-            <div class="hint" id="stt-availability-hint"></div>
+            <div class="voice-selection-group">
+              <label class="selection-label" for="tts-engine">TTS output</label>
+              <select class="select" id="tts-engine" aria-describedby="voice-selection-hint"></select>
+            </div>
+            <div class="voice-selection-group">
+              <label class="selection-label" for="stt-backend">Native STT backend</label>
+              <select class="select" id="stt-backend" aria-describedby="voice-selection-hint"></select>
+            </div>
+            <div class="voice-selection-group">
+              <label class="selection-label" for="native-device">Native input</label>
+              <select class="select" id="native-device"></select>
+            </div>
+            <div class="hint" id="voice-selection-hint" role="status" aria-live="polite"></div>
             <div class="hint" id="mic-hint">Browser speech recognition is idle.</div>
           </div>
           <div class="footer" id="voice-presence-state">Voice state: idle</div>
@@ -1245,7 +1267,9 @@
       const conversationModeEl = document.getElementById("conversation-mode");
       const captureModeEl = document.getElementById("capture-mode");
       const nativeDeviceEl = document.getElementById("native-device");
+      const ttsEngineEl = document.getElementById("tts-engine");
       const sttBackendEl = document.getElementById("stt-backend");
+      const voiceSelectionHintEl = document.getElementById("voice-selection-hint");
       const micHintEl = document.getElementById("mic-hint");
       const voicePresenceStateEl = document.getElementById("voice-presence-state");
       const dictationNotesEl = document.getElementById("dictation-notes");
@@ -1328,6 +1352,7 @@
       let browserSessions = [];
       let latestState = null;
       let latestSpeechState = { status: "idle" };
+      let voiceSelection = null;
       let previousSpeechStatus = "idle";
       let triggerHandsFreeRecognition = async () => {};
       let lastSavedMinutesMarkdown = "";
@@ -1819,6 +1844,78 @@
         return sttBackendEl.value || "auto";
       }
 
+      function renderVoiceSelectionOptions() {
+        if (!voiceSelection) return;
+        ttsEngineEl.innerHTML = "";
+        for (const candidate of voiceSelection.tts?.candidates || []) {
+          const option = document.createElement("option");
+          option.value = candidate.engine_id;
+          option.textContent = candidate.selectable
+            ? candidate.display_name
+            : `${candidate.display_name} (${candidate.status === "needs_setup" ? "Needs setup" : "Not live"})`;
+          option.disabled = !candidate.selectable;
+          option.title = candidate.reason || "";
+          ttsEngineEl.appendChild(option);
+        }
+        if (voiceSelection.preferences?.tts_engine_id) {
+          ttsEngineEl.value = voiceSelection.preferences.tts_engine_id;
+        }
+
+        sttBackendEl.innerHTML = "";
+        for (const candidate of voiceSelection.stt?.candidates || []) {
+          const option = document.createElement("option");
+          option.value = candidate.backend;
+          option.textContent = candidate.selectable
+            ? candidate.display_name
+            : `${candidate.display_name} (Needs setup)`;
+          option.disabled = !candidate.selectable;
+          option.title = candidate.reason || "";
+          sttBackendEl.appendChild(option);
+        }
+        if (voiceSelection.preferences?.stt_backend) {
+          sttBackendEl.value = voiceSelection.preferences.stt_backend;
+        }
+        renderVoicePresenceState();
+      }
+
+      async function saveVoiceSelection(field, value) {
+        if (!value) return;
+        if (voiceSelectionHintEl) voiceSelectionHintEl.textContent = "Saving voice selection...";
+        try {
+          const response = await fetch("/api/voice/selection", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ [field]: value }),
+          });
+          const body = await response.json();
+          if (!response.ok || !body.ok) throw new Error(body.error || `HTTP ${response.status}`);
+          voiceSelection = body;
+          renderVoiceSelectionOptions();
+          if (voiceSelectionHintEl) voiceSelectionHintEl.textContent = "Voice selection saved.";
+        } catch (error) {
+          if (voiceSelectionHintEl) voiceSelectionHintEl.textContent = `Voice selection failed: ${error.message || error}`;
+          await loadVoiceSelection();
+        }
+      }
+
+      async function loadVoiceSelection() {
+        try {
+          const response = await fetch("/api/voice/selection");
+          const body = await response.json();
+          if (!response.ok || !body.ok) throw new Error(body.error || `HTTP ${response.status}`);
+          voiceSelection = body;
+          renderVoiceSelectionOptions();
+          const selectedOrder = (body.stt?.selected_order || []).join(" -> ") || "none";
+          if (voiceSelectionHintEl) {
+            voiceSelectionHintEl.textContent = `Native STT Auto order: ${selectedOrder}. Browser Mic uses browser speech recognition separately.`;
+          }
+        } catch (error) {
+          if (voiceSelectionHintEl) voiceSelectionHintEl.textContent = `Voice selection unavailable: ${error.message || error}`;
+          ttsEngineEl.disabled = true;
+          sttBackendEl.disabled = true;
+        }
+      }
+
       async function syncBrowserLocationContext() {
         if (!navigator.geolocation) return;
         navigator.geolocation.getCurrentPosition(async (position) => {
@@ -1885,7 +1982,9 @@
         const captureMode = selectedCaptureMode();
         const status = latestSpeechState?.status || "idle";
         const handsFreeLabel = isHandsFreeActive ? "hands-free on" : "hands-free off";
-        voicePresenceStateEl.textContent = `Voice state: ${status} · mode: ${mode} · capture: ${captureMode} · ${handsFreeLabel}`;
+        const tts = voiceSelection?.preferences?.tts_engine_id || "default TTS";
+        const stt = voiceSelection?.preferences?.stt_backend || "auto";
+        voicePresenceStateEl.textContent = `Voice state: ${status} · TTS: ${tts} · STT: ${stt} · mode: ${mode} · capture: ${captureMode} · ${handsFreeLabel}`;
       }
 
       function selectedNativeDeviceLabel() {
@@ -1960,72 +2059,8 @@
         }
       }
 
-      const STT_BACKEND_HINTS = {
-        server: {
-          label: "Server",
-          enableHint: "Set VOICE_HUB_STT_SERVER_URL to your hosted STT endpoint, then restart voice-hub.",
-          enableHintJa: "VOICE_HUB_STT_SERVER_URL を設定し voice-hub を再起動すると有効になります。",
-        },
-        whisperCpp: {
-          label: "whisper.cpp",
-          enableHint: "Install whisper.cpp and point WHISPER_CLI_PATH to the compiled binary, then restart voice-hub.",
-          enableHintJa: "whisper.cpp をビルドし WHISPER_CLI_PATH に CLI のパスを設定して voice-hub を再起動すると有効になります。",
-        },
-        nativeSpeech: {
-          label: "Native Speech",
-          enableHint: "Native Speech requires the host OS speech APIs. Grant the relevant microphone & speech permission to Node.",
-          enableHintJa: "Native Speech は OS の音声 API を使います。Node に音声・マイクの権限を付与してください。",
-        },
-      };
-
       async function loadSttBackends() {
-        sttBackendEl.innerHTML = "";
-        const hintEl = document.getElementById("stt-availability-hint");
-        if (hintEl) hintEl.textContent = "";
-        try {
-          const response = await fetch("/api/voice/stt-backends");
-          const body = await response.json();
-          if (!response.ok || !body.ok) {
-            throw new Error(body.error || `HTTP ${response.status}`);
-          }
-          const options = [
-            { value: "auto", label: `Auto (${(body.selected || []).join(" -> ") || "none"})` },
-            { value: "server", label: `Server${body.available?.server ? "" : " (Unavailable)"}`, key: "server" },
-            { value: "whisper_cpp", label: `whisper.cpp${body.available?.whisperCpp ? "" : " (Unavailable)"}`, key: "whisperCpp" },
-            { value: "native_speech", label: `Native Speech${body.available?.nativeSpeech ? "" : " (Unavailable)"}`, key: "nativeSpeech" }
-          ];
-          for (const item of options) {
-            const option = document.createElement("option");
-            option.value = item.value;
-            option.textContent = item.label;
-            if (item.key && body.available && !body.available[item.key]) {
-              const hint = STT_BACKEND_HINTS[item.key];
-              if (hint) {
-                option.title = uiText(hint.enableHint, hint.enableHintJa);
-              }
-            }
-            sttBackendEl.appendChild(option);
-          }
-
-          // Build a one-line summary for any unavailable backend the user might wonder about.
-          if (hintEl) {
-            const unavailable = Object.entries(body.available || {})
-              .filter(([, ok]) => !ok)
-              .map(([k]) => STT_BACKEND_HINTS[k]?.label || k);
-            if (unavailable.length > 0) {
-              hintEl.textContent = uiText(
-                `Unavailable: ${unavailable.join(", ")}. Hover an option for setup steps.`,
-                `未接続: ${unavailable.join(", ")} — 各オプションにマウスを置くと設定手順が出ます。`,
-              );
-            }
-          }
-        } catch (error) {
-          const option = document.createElement("option");
-          option.value = "auto";
-          option.textContent = `Backend load failed: ${error.message || error}`;
-          sttBackendEl.appendChild(option);
-          sttBackendEl.disabled = true;
-        }
+        await loadVoiceSelection();
       }
 
       async function loadNativeInputDevices() {
@@ -3270,8 +3305,10 @@
           .then(([, state]) => render(state))
           .catch(() => {});
       }, 2000);
+      ttsEngineEl.addEventListener("change", () => saveVoiceSelection("tts_engine_id", ttsEngineEl.value));
+      sttBackendEl.addEventListener("change", () => saveVoiceSelection("stt_backend", sttBackendEl.value));
       loadNativeInputDevices();
-      loadSttBackends();
+      loadVoiceSelection();
       syncBrowserLocationContext();
       setInterval(syncBrowserLocationContext, 10 * 60 * 1000);
       setupMic();

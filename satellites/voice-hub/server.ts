@@ -43,6 +43,7 @@ import {
   formatSurfaceRecoveryAction,
   getVoiceTtsLanguageConfig,
   getVoiceProfileRecord,
+  getVoiceSelectionSnapshot,
   getActiveBrowserConversationSession,
   getActiveTaskSession,
   getSurfaceQueryProviderConfig,
@@ -78,6 +79,7 @@ import {
   runSurfaceConversation,
   runSurfaceMessageConversation,
   safeExec,
+  buildSafeExecEnv,
   safeReadFile,
   safeAppendFileSync,
   safeExistsSync,
@@ -101,6 +103,7 @@ import {
   resolveFallbackLocationCoordinates,
   resolveFallbackLocationSummary,
   resolveManagedToolPythonBin,
+  probeToolRuntime,
   listenNativeSpeech,
   resolveVoiceTaskDistillTargetKind,
   resolveVoiceTaskProfile,
@@ -170,6 +173,7 @@ interface SpeechPlaybackState {
   text?: string;
   startedAt?: number;
   pid?: number;
+  engine_id?: string;
 }
 
 interface RecentSpeechGuardState {
@@ -910,7 +914,7 @@ async function convertWavForWhisper(inputPath: string, outputPath: string): Prom
       ['-f', 'WAVE', '-d', 'LEI16@16000', '-c', '1', inputPath, outputPath],
       {
         cwd: pathResolver.rootDir(),
-        env: process.env,
+        env: buildSafeExecEnv({ KYBERION_PROJECT_ROOT: pathResolver.rootDir() }),
         stdio: ['ignore', 'pipe', 'pipe'],
       }
     );
@@ -963,7 +967,7 @@ async function transcribeWithWhisperCpp(
       ],
       {
         cwd: WHISPER_CPP_DIR,
-        env: process.env,
+        env: buildSafeExecEnv({ KYBERION_PROJECT_ROOT: pathResolver.rootDir() }),
         stdio: ['ignore', 'pipe', 'pipe'],
       }
     );
@@ -983,6 +987,64 @@ async function transcribeWithWhisperCpp(
       }
       reject(new Error(text || stderr.trim() || stdout.trim() || `whisper_cli_failed_${code}`));
     });
+  });
+}
+
+async function transcribeWithMlxWhisper(
+  inputPath: string,
+  locale: string
+): Promise<{ ok: boolean; text?: string; error?: string }> {
+  const pythonBin = resolveManagedToolPythonBin('mlx_whisper');
+  if (!pythonBin) return { ok: false, error: 'mlx_whisper_runtime_not_installed' };
+  const bridgeScript = pathResolver.rootResolve(
+    'libs/actuators/voice-actuator/scripts/mlx_audio_stt_bridge.py'
+  );
+  return new Promise((resolve) => {
+    const child = spawn(pythonBin, [bridgeScript], {
+      cwd: pathResolver.rootDir(),
+      env: buildSafeExecEnv({ KYBERION_PROJECT_ROOT: pathResolver.rootDir() }),
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (chunk) => {
+      stdout += String(chunk);
+      if (stdout.length > 2_000_000) child.kill('SIGTERM');
+    });
+    child.stderr.on('data', (chunk) => {
+      stderr += String(chunk).slice(0, 200_000);
+    });
+    child.on('error', (error) => resolve({ ok: false, error: error.message }));
+    child.on('close', (code) => {
+      const lines = stdout.trim().split(/\n+/).filter(Boolean);
+      let payload: { text?: unknown; status?: unknown; error?: unknown } | null = null;
+      try {
+        payload = lines.length ? JSON.parse(lines[lines.length - 1]) : null;
+      } catch {
+        payload = null;
+      }
+      const text = typeof payload?.text === 'string' ? payload.text.trim() : '';
+      if (code === 0 && payload?.status === 'success' && text) {
+        resolve({ ok: true, text });
+        return;
+      }
+      resolve({
+        ok: false,
+        error:
+          (typeof payload?.error === 'string' ? payload.error : undefined) ||
+          stderr.trim().slice(0, 500) ||
+          `mlx_whisper_failed_${code ?? 'unknown'}`,
+      });
+    });
+    child.stdin.end(
+      JSON.stringify({
+        action: 'transcribe',
+        params: {
+          audio_path: inputPath,
+          language: locale.toLowerCase().startsWith('ja') ? 'ja' : undefined,
+        },
+      })
+    );
   });
 }
 
@@ -1017,6 +1079,7 @@ async function transcribeWithOpenAiCompatibleServer(
     method: 'POST',
     headers,
     body: form,
+    signal: AbortSignal.timeout(30_000),
   });
 
   if (!response.ok) {
@@ -1038,8 +1101,10 @@ async function transcribeWithOpenAiCompatibleServer(
 }
 
 function getAvailableSttBackends() {
+  const mlxWhisper = probeToolRuntime('mlx_whisper', 'installed');
   return {
     server: resolveVoiceSttServerConfig(process.env) !== null,
+    mlxWhisper: mlxWhisper.installed,
     whisperCpp: safeExistsSync(WHISPER_CLI_PATH) && safeExistsSync(WHISPER_MODEL_PATH),
     nativeSpeech: safeExistsSync(pathResolver.resolve('satellites/voice-hub/native-stt.swift')),
   };
@@ -1056,6 +1121,13 @@ async function transcribeRecordedAudio(
       if (backend === 'server') {
         const result = await transcribeWithOpenAiCompatibleServer(inputPath, locale);
         if (result.ok) return result;
+        lastError = result.error || lastError;
+        continue;
+      }
+
+      if (backend === 'mlx_whisper') {
+        const result = await transcribeWithMlxWhisper(inputPath, locale);
+        if (result.ok) return { ...result, backend: 'mlx_whisper' };
         lastError = result.error || lastError;
         continue;
       }
@@ -1110,6 +1182,17 @@ async function speakReplyManaged(text: string): Promise<void> {
 
   const language = detectReplyLanguage(text);
   const normalized = normalizeTextForTts(text, language);
+  const selection = getVoiceSelectionSnapshot();
+  const selectedTts = selection.tts.candidates.find(
+    (candidate) =>
+      candidate.engine_id === selection.preferences.tts_engine_id && candidate.selectable
+  );
+  const engineId = selectedTts?.engine_id || 'local_say';
+  if (!selectedTts) {
+    logger.warn(
+      `[voice-hub] Selected TTS engine '${selection.preferences.tts_engine_id}' is unavailable; using local_say`
+    );
+  }
 
   let voiceProfile: any = null;
   try {
@@ -1118,7 +1201,7 @@ async function speakReplyManaged(text: string): Promise<void> {
     logger.warn(`[voice-hub] Failed to load voice profile record: ${error}`);
   }
 
-  if (voiceProfile && voiceProfile.default_engine_id === 'mlx_audio_qwen3') {
+  if (engineId === 'mlx_audio_qwen3') {
     logger.info(
       `[voice-hub] Using Qwen3-TTS mlx_audio_qwen3 cloned voice for active profile: ${voiceProfile.profile_id}`
     );
@@ -1155,7 +1238,7 @@ async function speakReplyManaged(text: string): Promise<void> {
       await new Promise<void>((resolve, reject) => {
         const pyProcess = spawn(pythonBin, [bridgeScript], {
           cwd: pathResolver.rootDir(),
-          env: process.env,
+          env: buildSafeExecEnv({ KYBERION_PROJECT_ROOT: pathResolver.rootDir() }),
           stdio: ['pipe', 'pipe', 'pipe'],
         });
 
@@ -1187,13 +1270,14 @@ async function speakReplyManaged(text: string): Promise<void> {
         await new Promise<void>((resolve, reject) => {
           const afplay = spawn('/usr/bin/afplay', [tmpPath], {
             cwd: pathResolver.rootDir(),
-            env: process.env,
+            env: buildSafeExecEnv({ KYBERION_PROJECT_ROOT: pathResolver.rootDir() }),
             stdio: ['ignore', 'ignore', 'pipe'],
           });
           activeSpeechProcess = afplay;
           activeSpeechState = {
             status: 'speaking',
             text: normalized,
+            engine_id: 'mlx_audio_qwen3',
             startedAt: Date.now(),
             pid: afplay.pid,
           };
@@ -1233,13 +1317,14 @@ async function speakReplyManaged(text: string): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     const child = spawn('/usr/bin/say', args, {
       cwd: pathResolver.rootDir(),
-      env: process.env,
+      env: buildSafeExecEnv({ KYBERION_PROJECT_ROOT: pathResolver.rootDir() }),
       stdio: ['ignore', 'ignore', 'pipe'],
     });
     activeSpeechProcess = child;
     activeSpeechState = {
       status: 'speaking',
       text: normalized,
+      engine_id: 'local_say',
       startedAt: Date.now(),
       pid: child.pid,
     };
@@ -4587,10 +4672,12 @@ app.get('/api/stt/backends', (_req, res) => {
   const available = getAvailableSttBackends();
   const serverConfig = resolveVoiceSttServerConfig(process.env);
   const selected = resolveVoiceSttBackendOrder('auto', available, process.env);
+  const selection = getVoiceSelectionSnapshot();
   res.json({
     ok: true,
     available,
     selected,
+    selection: selection.stt,
     server: serverConfig
       ? {
           base_url: serverConfig.baseUrl,
