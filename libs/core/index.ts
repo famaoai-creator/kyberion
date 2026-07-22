@@ -1002,6 +1002,8 @@ export type {
   MeetingTarget,
   TranscriptChunk,
 } from './meeting-session-types.js';
+export { abortableAudioChunks } from './meeting-session-types.js';
+export * from './barge-in-controller.js';
 export { StubAudioBus } from './audio-bus.js';
 export type { AudioBus, AudioBusProbe } from './audio-bus.js';
 export { BlackHoleAudioBus } from './blackhole-audio-bus.js';

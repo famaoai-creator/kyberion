@@ -34,6 +34,7 @@ import type {
   MeetingSessionState,
   MeetingTarget,
 } from './meeting-session-types.js';
+import { abortableAudioChunks } from './meeting-session-types.js';
 
 export interface ChromeExtensionMeetingDriverOptions {
   /** Loopback port the driver listens on and the extension connects to. */
@@ -251,10 +252,13 @@ export class ChromeExtensionMeetingJoinDriver implements MeetingJoinDriver {
           yield chunk;
         }
       },
-      audioOutput: async (stream: AsyncIterable<AudioChunk>): Promise<void> => {
+      audioOutput: async (
+        stream: AsyncIterable<AudioChunk>,
+        signal?: AbortSignal
+      ): Promise<void> => {
         // Speaking: the AI's TTS PCM is written to the bus (BlackHole), which the
         // operator has set as Chrome's microphone input for the meeting.
-        await bus.writeOutput(stream);
+        await bus.writeOutput(abortableAudioChunks(stream, signal));
       },
       chat: async (text: string): Promise<void> => {
         try {

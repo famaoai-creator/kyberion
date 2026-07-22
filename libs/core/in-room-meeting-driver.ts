@@ -33,6 +33,7 @@ import type {
   MeetingSessionState,
   MeetingTarget,
 } from './meeting-session-types.js';
+import { abortableAudioChunks } from './meeting-session-types.js';
 
 export interface InRoomMeetingDriverOptions {
   mic?: MicCaptureOptions;
@@ -109,15 +110,26 @@ export class InRoomMeetingJoinDriver implements MeetingJoinDriver {
     let speaking = false;
     let utteranceIndex = 0;
 
-    const playWav = (wavPath: string): Promise<void> =>
+    const playWav = (wavPath: string, signal?: AbortSignal): Promise<void> =>
       new Promise((resolve, reject) => {
         if (!playback) {
           resolve();
           return;
         }
+        if (signal?.aborted) {
+          resolve();
+          return;
+        }
         const child = spawn(playback[0], [...playback.slice(1), wavPath], { stdio: 'ignore' });
+        const stop = (): void => {
+          child.kill('SIGTERM');
+        };
+        signal?.addEventListener('abort', stop, { once: true });
         child.on('error', reject);
-        child.on('close', () => resolve());
+        child.on('close', () => {
+          signal?.removeEventListener('abort', stop);
+          resolve();
+        });
       });
 
     return {
@@ -130,21 +142,24 @@ export class InRoomMeetingJoinDriver implements MeetingJoinDriver {
           yield chunk;
         }
       },
-      audioOutput: async (stream: AsyncIterable<AudioChunk>): Promise<void> => {
+      audioOutput: async (
+        stream: AsyncIterable<AudioChunk>,
+        signal?: AbortSignal
+      ): Promise<void> => {
         speaking = true;
         try {
           const buffers: Buffer[] = [];
           let sampleRateHz = 16_000;
-          for await (const chunk of stream) {
+          for await (const chunk of abortableAudioChunks(stream, signal)) {
             buffers.push(Buffer.from(chunk.payload));
             sampleRateHz = chunk.format.sample_rate_hz;
           }
-          if (buffers.length === 0) return;
+          if (buffers.length === 0 || signal?.aborted) return;
           const pcm = Buffer.concat(buffers);
           utteranceIndex += 1;
           const wavPath = path.join(tmpDir, `utterance-${utteranceIndex}.wav`);
           safeWriteFile(wavPath, Buffer.concat([wavHeader(pcm.length, sampleRateHz), pcm]));
-          await playWav(wavPath);
+          await playWav(wavPath, signal);
         } finally {
           speaking = false;
         }
