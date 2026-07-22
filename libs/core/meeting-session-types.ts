@@ -108,9 +108,10 @@ export interface MeetingSession {
   audioInput(): AsyncIterable<AudioChunk>;
   /**
    * Send the AI's audio into the meeting (its "microphone").
-   * Caller pushes chunks; resolves when stream is fully drained.
+   * Caller pushes chunks; resolves when stream is drained or the optional
+   * signal cancels the current assistant turn.
    */
-  audioOutput(stream: AsyncIterable<AudioChunk>): Promise<void>;
+  audioOutput(stream: AsyncIterable<AudioChunk>, signal?: AbortSignal): Promise<void>;
   /**
    * Optional text-channel send (chat). Drivers may no-op when the
    * platform / config doesn't allow it.
@@ -118,4 +119,15 @@ export interface MeetingSession {
   chat(text: string): Promise<void>;
   /** Initiate a graceful leave. */
   leave(): Promise<void>;
+}
+
+/** Stop consuming an outbound stream promptly when a meeting turn is barged in. */
+export async function* abortableAudioChunks(
+  source: AsyncIterable<AudioChunk>,
+  signal?: AbortSignal
+): AsyncIterable<AudioChunk> {
+  for await (const chunk of source) {
+    if (signal?.aborted) return;
+    yield chunk;
+  }
 }
