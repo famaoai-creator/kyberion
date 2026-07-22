@@ -28,6 +28,20 @@ weakens a boundary silently). Ceremony checklist by change type:
 | **any of the above**                                        | finish the ceremony by RUNNING the matching contract suite (`pnpm vitest run tests/package-boundary-contract.test.ts` etc.) — editing the code without running the gate is how the same failure ships twice |
 | a knowledge document                                        | `pnpm generate:knowledge-index` (lint-staged does this when knowledge files are staged)                                                                                                                     |
 
+### 1.1 Adapter-first extension rule
+
+When multiple implementations provide one capability, use the adapter-first
+boundary defined in [Adapter-First Extension Policy](./adapter-first-extension-policy.md).
+The capability contract and resolver are the caller-facing API; provider and
+engine IDs belong in registry data. A provider that uses an existing adapter
+must be added through registration, schema, readiness, security, and focused
+tests without adding provider-specific branches to callers or UI.
+
+If the provider introduces a genuinely new protocol, add one adapter and its
+versioned contract tests. Do not spread that protocol's branches through
+surfaces, orchestration, or fallback code. Unknown or incomplete adapters must
+fail closed as unsupported, with an operator-visible reason.
+
 ## 2. Cross-platform determinism — the Linux CI rules
 
 Every one of these took a red CI round to learn (PR #475):

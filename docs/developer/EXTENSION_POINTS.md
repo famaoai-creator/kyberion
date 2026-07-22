@@ -169,6 +169,26 @@ Extensions should emit a schema-valid receipt and use the public evaluator.
 They must not infer approval from a free-form review note or bypass artifact
 re-hashing at reconcile/finish time.
 
+### 2.10 Capability Provider / Adapter Boundary — **Beta**
+
+The adapter boundary is the preferred extension point whenever multiple
+providers implement the same capability. The capability contract and resolver
+are provider-neutral; a provider descriptor selects an adapter and declares
+runtime, platform, readiness, and fallback metadata.
+
+**Additive by default**:
+
+- A provider using an existing adapter is added through registry/configuration
+  data, schema, readiness/security checks, and contract tests.
+- A new execution protocol adds one adapter implementation and its versioned
+  contract; callers continue to use the capability contract.
+- Provider-specific branches in surfaces, routers, orchestration, or fallback
+  code are not an extension mechanism and should be rejected in review.
+
+See [Adapter-First Extension Policy](../../knowledge/product/governance/adapter-first-extension-policy.md)
+for the required registration ceremony, security, UX, operations, and
+maintainability rules.
+
 ## 3. Semver Rules
 
 For each stable surface:
