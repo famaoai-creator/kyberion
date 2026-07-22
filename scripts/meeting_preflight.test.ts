@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   safeExistsSync: vi.fn(),
   safeReaddir: vi.fn(),
   listToolRuntimeInventory: vi.fn(),
+  createCoreAudioDeviceInventoryBridge: vi.fn(),
   checkSpeakConsent: vi.fn(),
   createStandardYargs: vi.fn(),
 }));
@@ -22,6 +23,7 @@ vi.mock('@agent/core', async (importOriginal) => {
     safeExistsSync: mocks.safeExistsSync,
     safeReaddir: mocks.safeReaddir,
     listToolRuntimeInventory: mocks.listToolRuntimeInventory,
+    createCoreAudioDeviceInventoryBridge: mocks.createCoreAudioDeviceInventoryBridge,
   };
 });
 
@@ -86,6 +88,22 @@ describe('meeting_preflight', () => {
       stdout: 'Audio Devices:\n  BlackHole 2ch',
       stderr: '',
     });
+    mocks.createCoreAudioDeviceInventoryBridge.mockReturnValue({
+      probe: vi.fn().mockResolvedValue({
+        available: true,
+        devices: [
+          {
+            uid: 'BlackHole_UID_2ch',
+            display_name: 'BlackHole 2ch',
+            direction: 'duplex',
+            channel_count: 2,
+            supported_sample_rates: [16000, 24000, 48000],
+            is_virtual: true,
+            transport: 'virt',
+          },
+        ],
+      }),
+    });
     mocks.safeExistsSync.mockImplementation(
       (candidate: string) =>
         candidate.includes('/active/shared/runtime/voice-profiles') ||
@@ -143,6 +161,11 @@ describe('meeting_preflight', () => {
       ['voice.consent', 'pass'],
       ['reasoning.backend', 'pass'],
     ]);
+    const blackhole = report.items.find((item) => item.id === 'blackhole.device');
+    expect(blackhole?.data).toMatchObject({
+      uid_resolution: 'coreaudio_uid',
+      input_device: { uid: 'BlackHole_UID_2ch', channel_count: 2 },
+    });
   });
 
   it('prints remediation fixes and exits non-zero when the checks fail', async () => {
@@ -226,6 +249,39 @@ describe('meeting_preflight', () => {
       )
     );
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('pnpm reasoning:setup'));
+  });
+
+  it('requires operator action when the exact BlackHole route is ambiguous', async () => {
+    mocks.createCoreAudioDeviceInventoryBridge.mockReturnValue({
+      probe: vi.fn().mockResolvedValue({
+        available: true,
+        devices: [
+          {
+            uid: 'BlackHole_UID_A',
+            display_name: 'BlackHole 2ch',
+            direction: 'duplex',
+            channel_count: 2,
+            is_virtual: true,
+            transport: 'virt',
+          },
+          {
+            uid: 'BlackHole_UID_B',
+            display_name: 'BlackHole 2ch',
+            direction: 'duplex',
+            channel_count: 2,
+            is_virtual: true,
+            transport: 'virt',
+          },
+        ],
+      }),
+    });
+
+    const { runMeetingPreflight } = await import('./meeting_preflight.js');
+    const report = await runMeetingPreflight({ missionId: 'MSN-MEETING-TEST', platform: 'darwin' });
+    const blackhole = report.items.find((item) => item.id === 'blackhole.device');
+    expect(blackhole?.status).toBe('operator_action_required');
+    expect(blackhole?.reason_code).toBe('BLACKHOLE_ROUTE_INCOMPLETE');
+    expect(blackhole?.automatic_fix_available).toBe(false);
   });
 
   it('warns instead of failing on non-darwin hosts for BlackHole', async () => {
