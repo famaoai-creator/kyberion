@@ -9,6 +9,8 @@
       "provider": "system_tts",
       "status": "active",
       "platforms": ["darwin", "linux", "win32"],
+      "tts_adapter_id": "native_tts",
+      "live_presence": true,
       "supports": {
         "list_voices": true,
         "playback": true,

@@ -18,6 +18,9 @@ export interface VoiceEngineRecord {
   platforms: VoiceEnginePlatform[];
   model_id?: string;
   bridge_script?: string;
+  tts_adapter_id?: string;
+  runtime_id?: string;
+  live_presence?: boolean;
   stt_bridge_script?: string;
   supports: {
     list_voices: boolean;
@@ -36,7 +39,9 @@ export interface VoiceEngineRegistry {
   engines: VoiceEngineRecord[];
 }
 
-const DEFAULT_REGISTRY_PATH = pathResolver.knowledge('product/governance/voice-engine-registry.json');
+const DEFAULT_REGISTRY_PATH = pathResolver.knowledge(
+  'product/governance/voice-engine-registry.json'
+);
 const DEFAULT_REGISTRY_DIR = pathResolver.knowledge('product/governance/voice-engines');
 
 const FALLBACK_REGISTRY: VoiceEngineRegistry = {
@@ -82,7 +87,9 @@ function loadRegistryDirectory(registryDir: string): VoiceEngineRegistry {
     throw new Error(`Voice engine registry directory not found: ${dir}`);
   }
 
-  const files = safeReaddir(dir).filter((entry) => entry.endsWith('.json')).sort();
+  const files = safeReaddir(dir)
+    .filter((entry) => entry.endsWith('.json'))
+    .sort();
   if (!files.length) {
     throw new Error(`Voice engine registry directory is empty: ${dir}`);
   }
@@ -113,7 +120,9 @@ function loadRegistryDirectory(registryDir: string): VoiceEngineRegistry {
       throw new Error(`Voice engine registry file ${file} must contain exactly one engine`);
     }
     if (file.replace(/\.json$/i, '') !== record.engine_id) {
-      throw new Error(`Voice engine registry file ${file} must match engine_id ${record.engine_id}`);
+      throw new Error(
+        `Voice engine registry file ${file} must match engine_id ${record.engine_id}`
+      );
     }
     engines.push(record);
   }
@@ -138,9 +147,13 @@ export function resetVoiceEngineRegistryCache(): void {
 export function getVoiceEngineRegistry(): VoiceEngineRegistry {
   const registryPath = getRegistryPath();
   const registryDir = getRegistryDir();
-  if (cachedRegistryPath === registryPath && cachedRegistryDir === registryDir && cachedRegistry) return cachedRegistry;
+  if (cachedRegistryPath === registryPath && cachedRegistryDir === registryDir && cachedRegistry)
+    return cachedRegistry;
 
-  if (registryPath === DEFAULT_REGISTRY_PATH && safeExistsSync(pathResolver.rootResolve(registryDir))) {
+  if (
+    registryPath === DEFAULT_REGISTRY_PATH &&
+    safeExistsSync(pathResolver.rootResolve(registryDir))
+  ) {
     try {
       const parsed = loadRegistryDirectory(registryDir);
       cachedRegistryPath = registryPath;
@@ -148,7 +161,9 @@ export function getVoiceEngineRegistry(): VoiceEngineRegistry {
       cachedRegistry = parsed;
       return parsed;
     } catch (error: any) {
-      logger.warn(`[VOICE_ENGINE_REGISTRY] Failed to load registry directory at ${registryDir}: ${error.message}`);
+      logger.warn(
+        `[VOICE_ENGINE_REGISTRY] Failed to load registry directory at ${registryDir}: ${error.message}`
+      );
     }
   }
 
@@ -166,7 +181,9 @@ export function getVoiceEngineRegistry(): VoiceEngineRegistry {
     cachedRegistry = parsed;
     return parsed;
   } catch (error: any) {
-    logger.warn(`[VOICE_ENGINE_REGISTRY] Failed to load registry at ${registryPath}: ${error.message}`);
+    logger.warn(
+      `[VOICE_ENGINE_REGISTRY] Failed to load registry at ${registryPath}: ${error.message}`
+    );
     cachedRegistryPath = registryPath;
     cachedRegistryDir = registryDir;
     cachedRegistry = FALLBACK_REGISTRY;
@@ -174,7 +191,9 @@ export function getVoiceEngineRegistry(): VoiceEngineRegistry {
   }
 }
 
-export function listVoiceEngines(status: VoiceEngineStatus | 'all' = 'active'): VoiceEngineRecord[] {
+export function listVoiceEngines(
+  status: VoiceEngineStatus | 'all' = 'active'
+): VoiceEngineRecord[] {
   const registry = getVoiceEngineRegistry();
   if (status === 'all') return registry.engines;
   return registry.engines.filter((engine) => engine.status === status);
@@ -184,17 +203,22 @@ export function getVoiceEngineRecord(engineId?: string): VoiceEngineRecord {
   const registry = getVoiceEngineRegistry();
   const resolvedEngineId = engineId || registry.default_engine_id;
   return (
-    registry.engines.find((engine) => engine.engine_id === resolvedEngineId)
-    || registry.engines.find((engine) => engine.engine_id === registry.default_engine_id)
-    || FALLBACK_REGISTRY.engines[0]
+    registry.engines.find((engine) => engine.engine_id === resolvedEngineId) ||
+    registry.engines.find((engine) => engine.engine_id === registry.default_engine_id) ||
+    FALLBACK_REGISTRY.engines[0]
   );
 }
 
 function isSupportedPlatform(engine: VoiceEngineRecord, platform: NodeJS.Platform): boolean {
-  return engine.platforms.includes('any') || engine.platforms.includes(platform as VoiceEnginePlatform);
+  return (
+    engine.platforms.includes('any') || engine.platforms.includes(platform as VoiceEnginePlatform)
+  );
 }
 
-export function resolveVoiceEngineForPlatform(engineId?: string, platform: NodeJS.Platform = process.platform): VoiceEngineRecord {
+export function resolveVoiceEngineForPlatform(
+  engineId?: string,
+  platform: NodeJS.Platform = process.platform
+): VoiceEngineRecord {
   const registry = getVoiceEngineRegistry();
   const defaultEngine = getVoiceEngineRecord(registry.default_engine_id);
   const visited = new Set<string>();

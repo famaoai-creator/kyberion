@@ -11,6 +11,9 @@
       "platforms": ["darwin"],
       "model_id": "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-8bit",
       "bridge_script": "libs/actuators/voice-actuator/scripts/mlx_audio_tts_bridge.py",
+      "tts_adapter_id": "python_bridge",
+      "runtime_id": "mlx_audio",
+      "live_presence": true,
       "stt_bridge_script": "libs/actuators/voice-actuator/scripts/mlx_audio_stt_bridge.py",
       "supports": {
         "list_voices": false,

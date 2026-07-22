@@ -2409,7 +2409,7 @@
     {
       "path": "product/governance/voice-engine-registry.json",
       "tier": "public",
-      "size": 3517,
+      "size": 3979,
       "type": "json"
     },
     {
@@ -2421,37 +2421,37 @@
     {
       "path": "product/governance/voice-engines/espeak_ng.json",
       "tier": "public",
-      "size": 592,
+      "size": 663,
       "type": "json"
     },
     {
       "path": "product/governance/voice-engines/gemini_tts.json",
       "tier": "public",
-      "size": 529,
+      "size": 604,
       "type": "json"
     },
     {
       "path": "product/governance/voice-engines/kokoro.json",
       "tier": "public",
-      "size": 661,
+      "size": 732,
       "type": "json"
     },
     {
       "path": "product/governance/voice-engines/local_say.json",
       "tier": "public",
-      "size": 552,
+      "size": 619,
       "type": "json"
     },
     {
       "path": "product/governance/voice-engines/mlx_audio_qwen3.json",
       "tier": "public",
-      "size": 1052,
+      "size": 1155,
       "type": "json"
     },
     {
       "path": "product/governance/voice-engines/open_voice_clone.json",
       "tier": "public",
-      "size": 572,
+      "size": 647,
       "type": "json"
     },
     {
@@ -7509,7 +7509,7 @@
     {
       "path": "product/schemas/voice-engine-registry.schema.json",
       "tier": "public",
-      "size": 2098,
+      "size": 2356,
       "type": "json"
     },
     {
@@ -9189,7 +9189,7 @@
     {
       "path": "public/procedures/media/select-voice-backends.md",
       "tier": "public",
-      "size": 6856,
+      "size": 8275,
       "type": "md"
     },
     {

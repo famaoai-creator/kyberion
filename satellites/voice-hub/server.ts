@@ -43,7 +43,12 @@ import {
   formatSurfaceRecoveryAction,
   getVoiceTtsLanguageConfig,
   getVoiceProfileRecord,
+  getVoiceEngineRegistry,
   getVoiceSelectionSnapshot,
+  resolveVoiceEngineForPlatform,
+  resolveVoiceTtsAdapter,
+  resolveVoiceSttAdapter,
+  type VoiceEngineRecord,
   getActiveBrowserConversationSession,
   getActiveTaskSession,
   getSurfaceQueryProviderConfig,
@@ -540,13 +545,6 @@ const app = express();
 const server = createServer(app);
 
 const STIMULI_PATH = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');
-const WHISPER_CPP_DIR = pathResolver.resolve('active/shared/tmp/whisper.cpp');
-const WHISPER_CLI_PATH = pathResolver.resolve(
-  'active/shared/tmp/whisper.cpp/build/bin/whisper-cli'
-);
-const WHISPER_MODEL_PATH = pathResolver.resolve(
-  'active/shared/tmp/whisper.cpp/models/ggml-small.bin'
-);
 const PORT = Number(process.env.VOICE_HUB_PORT || 3032);
 const HOST = process.env.VOICE_HUB_HOST || '127.0.0.1';
 const PRESENCE_STUDIO_URL = process.env.PRESENCE_STUDIO_URL || 'http://127.0.0.1:3031';
@@ -945,15 +943,22 @@ function parseWhisperText(raw: string): string {
 
 async function transcribeWithWhisperCpp(
   inputPath: string,
-  locale: string
+  locale: string,
+  adapter: ReturnType<typeof resolveVoiceSttAdapter>
 ): Promise<{ ok: boolean; text?: string; error?: string }> {
+  if (!adapter.cli_path || !adapter.model_path) {
+    return { ok: false, error: 'whisper_cpp_paths_not_configured' };
+  }
+  const cliPath = pathResolver.resolve(adapter.cli_path);
+  const modelPath = pathResolver.resolve(adapter.model_path);
+  const workingDirectory = path.dirname(cliPath);
   return new Promise((resolve, reject) => {
     const lang = locale.toLowerCase().startsWith('ja') ? 'ja' : 'auto';
     const child = spawn(
-      WHISPER_CLI_PATH,
+      cliPath,
       [
         '-m',
-        WHISPER_MODEL_PATH,
+        modelPath,
         '-f',
         inputPath,
         '-l',
@@ -966,7 +971,7 @@ async function transcribeWithWhisperCpp(
         '8',
       ],
       {
-        cwd: WHISPER_CPP_DIR,
+        cwd: workingDirectory,
         env: buildSafeExecEnv({ KYBERION_PROJECT_ROOT: pathResolver.rootDir() }),
         stdio: ['ignore', 'pipe', 'pipe'],
       }
@@ -992,13 +997,14 @@ async function transcribeWithWhisperCpp(
 
 async function transcribeWithMlxWhisper(
   inputPath: string,
-  locale: string
+  locale: string,
+  adapter: ReturnType<typeof resolveVoiceSttAdapter>
 ): Promise<{ ok: boolean; text?: string; error?: string }> {
-  const pythonBin = resolveManagedToolPythonBin('mlx_whisper');
-  if (!pythonBin) return { ok: false, error: 'mlx_whisper_runtime_not_installed' };
-  const bridgeScript = pathResolver.rootResolve(
-    'libs/actuators/voice-actuator/scripts/mlx_audio_stt_bridge.py'
-  );
+  const pythonBin = adapter.runtime_id ? resolveManagedToolPythonBin(adapter.runtime_id) : null;
+  if (!pythonBin)
+    return { ok: false, error: `${adapter.runtime_id || 'managed'}_runtime_not_installed` };
+  if (!adapter.bridge_script) return { ok: false, error: 'managed_stt_bridge_not_configured' };
+  const bridgeScript = pathResolver.rootResolve(adapter.bridge_script);
   return new Promise((resolve) => {
     const child = spawn(pythonBin, [bridgeScript], {
       cwd: pathResolver.rootDir(),
@@ -1101,12 +1107,33 @@ async function transcribeWithOpenAiCompatibleServer(
 }
 
 function getAvailableSttBackends() {
-  const mlxWhisper = probeToolRuntime('mlx_whisper', 'installed');
+  const availability = {
+    server: false,
+    mlxWhisper: false,
+    whisperCpp: false,
+    nativeSpeech: false,
+  };
+  for (const backend of ['server', 'mlx_whisper', 'whisper_cpp', 'native_speech'] as const) {
+    const adapter = resolveVoiceSttAdapter(backend);
+    if (adapter.adapter_id === 'openai_compatible_server') {
+      availability.server = resolveVoiceSttServerConfig(process.env) !== null;
+    } else if (adapter.adapter_id === 'managed_python_bridge' && adapter.runtime_id) {
+      availability.mlxWhisper = probeToolRuntime(adapter.runtime_id, 'installed').installed;
+    } else if (adapter.adapter_id === 'whisper_cpp_cli') {
+      availability.whisperCpp = Boolean(
+        adapter.cli_path &&
+        adapter.model_path &&
+        safeExistsSync(pathResolver.resolve(adapter.cli_path)) &&
+        safeExistsSync(pathResolver.resolve(adapter.model_path))
+      );
+    } else if (adapter.adapter_id === 'native_speech') {
+      availability.nativeSpeech = safeExistsSync(
+        pathResolver.resolve('satellites/voice-hub/native-stt.swift')
+      );
+    }
+  }
   return {
-    server: resolveVoiceSttServerConfig(process.env) !== null,
-    mlxWhisper: mlxWhisper.installed,
-    whisperCpp: safeExistsSync(WHISPER_CLI_PATH) && safeExistsSync(WHISPER_MODEL_PATH),
-    nativeSpeech: safeExistsSync(pathResolver.resolve('satellites/voice-hub/native-stt.swift')),
+    ...availability,
   };
 }
 
@@ -1118,22 +1145,23 @@ async function transcribeRecordedAudio(
   let lastError = 'no_stt_backend_available';
   for (const backend of backendOrder) {
     try {
-      if (backend === 'server') {
+      const adapter = resolveVoiceSttAdapter(parseVoiceSttBackend(backend));
+      if (adapter.adapter_id === 'openai_compatible_server') {
         const result = await transcribeWithOpenAiCompatibleServer(inputPath, locale);
         if (result.ok) return result;
         lastError = result.error || lastError;
         continue;
       }
 
-      if (backend === 'mlx_whisper') {
-        const result = await transcribeWithMlxWhisper(inputPath, locale);
+      if (adapter.adapter_id === 'managed_python_bridge') {
+        const result = await transcribeWithMlxWhisper(inputPath, locale, adapter);
         if (result.ok) return { ...result, backend: 'mlx_whisper' };
         lastError = result.error || lastError;
         continue;
       }
 
-      if (backend === 'whisper_cpp') {
-        const result = await transcribeWithWhisperCpp(inputPath, locale);
+      if (adapter.adapter_id === 'whisper_cpp_cli') {
+        const result = await transcribeWithWhisperCpp(inputPath, locale, adapter);
         if (result.ok) return { ...result, backend: 'whisper_cpp' };
         lastError = result.error || lastError;
         continue;
@@ -1175,25 +1203,202 @@ async function stopSpeechPlayback(
   return { ok: true, stopped: true, reason };
 }
 
+async function runVoiceTtsPythonBridge(
+  engine: VoiceEngineRecord,
+  text: string,
+  language: string,
+  profile: any,
+  voice: string,
+  rate: number
+): Promise<string> {
+  if (!engine.bridge_script) {
+    throw new Error(`TTS engine ${engine.engine_id} has no bridge_script`);
+  }
+  const pythonBin = engine.runtime_id
+    ? resolveManagedToolPythonBin(engine.runtime_id) || resolveVoiceHubPythonBin()
+    : resolveVoiceHubPythonBin();
+  if (engine.runtime_id && !resolveManagedToolPythonBin(engine.runtime_id)) {
+    throw new Error(`TTS runtime ${engine.runtime_id} is not installed`);
+  }
+  const bridgeScript = pathResolver.rootResolve(engine.bridge_script);
+  const tmpPath = pathResolver.sharedTmp(`voice-playback-${Date.now()}.wav`);
+  const samples = profile?.sample_refs || [];
+  const refAudio = samples.length > 0 ? pathResolver.rootResolve(samples[0]) : undefined;
+  const refTextFile = refAudio ? `${refAudio}.transcript.txt` : undefined;
+  let refText: string | undefined;
+  if (refTextFile && safeExistsSync(refTextFile)) {
+    refText = (safeReadFile(refTextFile, { encoding: 'utf8' }) as string).trim();
+  }
+
+  const payload = JSON.stringify({
+    action: 'generate',
+    params: {
+      text,
+      output_path: tmpPath,
+      model: engine.model_id,
+      lang_code: language.toLowerCase().startsWith('ja') ? 'ja' : 'en',
+      voice,
+      rate: String(rate),
+      ...(refAudio ? { ref_audio: refAudio } : {}),
+      ...(refText ? { ref_text: refText } : {}),
+    },
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn(pythonBin, [bridgeScript], {
+      cwd: pathResolver.rootDir(),
+      env: buildSafeExecEnv({ KYBERION_PROJECT_ROOT: pathResolver.rootDir() }),
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (chunk) => {
+      stdout += String(chunk).slice(0, 2_000_000);
+    });
+    child.stderr.on('data', (chunk) => {
+      stderr += String(chunk).slice(0, 200_000);
+    });
+    child.on('error', reject);
+    child.on('close', (code) => {
+      if (code !== 0) {
+        reject(new Error(`${engine.engine_id} bridge failed: ${stderr.trim() || stdout.trim()}`));
+        return;
+      }
+      const lines = stdout.trim().split(/\n+/).filter(Boolean);
+      let result: { status?: unknown; error?: unknown } | null = null;
+      try {
+        result = lines.length ? JSON.parse(lines[lines.length - 1]) : null;
+      } catch {
+        reject(new Error(`${engine.engine_id} bridge returned non-JSON output`));
+        return;
+      }
+      if (result?.status !== 'success') {
+        reject(
+          new Error(
+            typeof result?.error === 'string' ? result.error : `${engine.engine_id} bridge failed`
+          )
+        );
+        return;
+      }
+      resolve();
+    });
+    child.stdin.end(payload);
+  });
+
+  if (!safeExistsSync(tmpPath))
+    throw new Error(`${engine.engine_id} bridge produced no audio artifact`);
+  return tmpPath;
+}
+
+async function playVoiceArtifact(
+  artifactPath: string,
+  text: string,
+  engineId: string
+): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const player = spawn('/usr/bin/afplay', [artifactPath], {
+      cwd: pathResolver.rootDir(),
+      env: buildSafeExecEnv({ KYBERION_PROJECT_ROOT: pathResolver.rootDir() }),
+      stdio: ['ignore', 'ignore', 'pipe'],
+    });
+    activeSpeechProcess = player;
+    activeSpeechState = {
+      status: 'speaking',
+      text,
+      engine_id: engineId,
+      startedAt: Date.now(),
+      pid: player.pid,
+    };
+    player.on('close', () => {
+      if (activeSpeechProcess === player) {
+        activeSpeechProcess = null;
+        recentSpeechGuardState = { text, finishedAt: Date.now() };
+        activeSpeechState = { status: 'idle' };
+      }
+      resolve();
+    });
+    player.on('error', (error) => {
+      if (activeSpeechProcess === player) {
+        activeSpeechProcess = null;
+        activeSpeechState = { status: 'idle' };
+      }
+      reject(error);
+    });
+  });
+}
+
+async function speakWithVoiceEngine(
+  engine: VoiceEngineRecord,
+  text: string,
+  language: string,
+  profile: any
+): Promise<void> {
+  const adapter = resolveVoiceTtsAdapter(engine);
+  const languageProfile = getVoiceTtsLanguageConfig(language);
+  if (adapter.adapter_id === 'python_bridge') {
+    const artifactPath = await runVoiceTtsPythonBridge(
+      engine,
+      text,
+      language,
+      profile,
+      languageProfile.voice,
+      languageProfile.rate
+    );
+    await playVoiceArtifact(artifactPath, text, engine.engine_id);
+    return;
+  }
+  if (adapter.adapter_id === 'native_tts') {
+    const child = spawn(
+      '/usr/bin/say',
+      ['-v', languageProfile.voice, '-r', String(languageProfile.rate), text],
+      {
+        cwd: pathResolver.rootDir(),
+        env: buildSafeExecEnv({ KYBERION_PROJECT_ROOT: pathResolver.rootDir() }),
+        stdio: ['ignore', 'ignore', 'pipe'],
+      }
+    );
+    activeSpeechProcess = child;
+    activeSpeechState = {
+      status: 'speaking',
+      text,
+      engine_id: engine.engine_id,
+      startedAt: Date.now(),
+      pid: child.pid,
+    };
+    await new Promise<void>((resolve, reject) => {
+      let stderr = '';
+      child.stderr.on('data', (chunk) => {
+        stderr += String(chunk);
+      });
+      child.on('error', reject);
+      child.on('close', (code, signal) => {
+        if (activeSpeechProcess === child) {
+          activeSpeechProcess = null;
+          recentSpeechGuardState = { text, finishedAt: Date.now() };
+          activeSpeechState = { status: 'idle' };
+        }
+        if (code === 0 || signal === 'SIGTERM') return resolve();
+        reject(new Error(stderr.trim() || `native_tts_failed_${code || signal || 'unknown'}`));
+      });
+    });
+    return;
+  }
+  throw new Error(`TTS adapter '${adapter.adapter_id}' is not implemented for ${engine.engine_id}`);
+}
+
 async function speakReplyManaged(text: string): Promise<void> {
   await stopSpeechPlayback('replace_reply');
-
   if (process.platform !== 'darwin') return;
 
   const language = detectReplyLanguage(text);
   const normalized = normalizeTextForTts(text, language);
   const selection = getVoiceSelectionSnapshot();
-  const selectedTts = selection.tts.candidates.find(
+  const selected = selection.tts.candidates.find(
     (candidate) =>
       candidate.engine_id === selection.preferences.tts_engine_id && candidate.selectable
   );
-  const engineId = selectedTts?.engine_id || 'local_say';
-  if (!selectedTts) {
-    logger.warn(
-      `[voice-hub] Selected TTS engine '${selection.preferences.tts_engine_id}' is unavailable; using local_say`
-    );
-  }
-
+  const requestedEngineId = selected?.engine_id || getVoiceEngineRegistry().default_engine_id;
+  const engine = resolveVoiceEngineForPlatform(requestedEngineId);
   let voiceProfile: any = null;
   try {
     voiceProfile = getVoiceProfileRecord();
@@ -1201,161 +1406,17 @@ async function speakReplyManaged(text: string): Promise<void> {
     logger.warn(`[voice-hub] Failed to load voice profile record: ${error}`);
   }
 
-  if (engineId === 'mlx_audio_qwen3') {
-    logger.info(
-      `[voice-hub] Using Qwen3-TTS mlx_audio_qwen3 cloned voice for active profile: ${voiceProfile.profile_id}`
+  try {
+    await speakWithVoiceEngine(engine, normalized, language, voiceProfile);
+  } catch (error) {
+    const fallbackId = engine.fallback_engine_id || getVoiceEngineRegistry().default_engine_id;
+    const fallback = resolveVoiceEngineForPlatform(fallbackId);
+    if (fallback.engine_id === engine.engine_id) throw error;
+    logger.warn(
+      `[voice-hub] ${engine.engine_id} adapter failed; falling back to ${fallback.engine_id}: ${error instanceof Error ? error.message : String(error)}`
     );
-
-    const bridgeScript = pathResolver.rootResolve(
-      'libs/actuators/voice-actuator/scripts/mlx_audio_tts_bridge.py'
-    );
-    const pythonBin = resolveVoiceHubPythonBin();
-
-    const samples = voiceProfile.sample_refs || [];
-    const refAudio = samples.length > 0 ? pathResolver.rootResolve(samples[0]) : undefined;
-    const refTextFile = refAudio ? `${refAudio}.transcript.txt` : undefined;
-    let refText: string | undefined;
-    if (refTextFile && safeExistsSync(refTextFile)) {
-      try {
-        refText = (safeReadFile(refTextFile, { encoding: 'utf8' }) as string).trim();
-      } catch (err) {
-        logger.warn(`[server] suppressed error in speakReplyManaged: ${err}`);
-      }
-    }
-
-    const tmpPath = pathResolver.sharedTmp(`voice-playback-${Date.now()}.wav`);
-    const payload = JSON.stringify({
-      action: 'generate',
-      params: {
-        text: normalized,
-        output_path: tmpPath,
-        ...(refAudio ? { ref_audio: refAudio } : {}),
-        ...(refText ? { ref_text: refText } : {}),
-      },
-    });
-
-    try {
-      await new Promise<void>((resolve, reject) => {
-        const pyProcess = spawn(pythonBin, [bridgeScript], {
-          cwd: pathResolver.rootDir(),
-          env: buildSafeExecEnv({ KYBERION_PROJECT_ROOT: pathResolver.rootDir() }),
-          stdio: ['pipe', 'pipe', 'pipe'],
-        });
-
-        let stdout = '';
-        let stderr = '';
-        pyProcess.stdout.on('data', (chunk) => {
-          stdout += String(chunk);
-        });
-        pyProcess.stderr.on('data', (chunk) => {
-          stderr += String(chunk);
-        });
-
-        pyProcess.on('close', (code) => {
-          if (code !== 0) {
-            reject(
-              new Error(`MLX Qwen3-TTS generation failed with code ${code}. Stderr: ${stderr}`)
-            );
-          } else {
-            resolve();
-          }
-        });
-
-        pyProcess.stdin.write(payload);
-        pyProcess.stdin.end();
-      });
-
-      // MLX voice synthesized successfully! Let's play it using afplay.
-      if (safeExistsSync(tmpPath)) {
-        await new Promise<void>((resolve, reject) => {
-          const afplay = spawn('/usr/bin/afplay', [tmpPath], {
-            cwd: pathResolver.rootDir(),
-            env: buildSafeExecEnv({ KYBERION_PROJECT_ROOT: pathResolver.rootDir() }),
-            stdio: ['ignore', 'ignore', 'pipe'],
-          });
-          activeSpeechProcess = afplay;
-          activeSpeechState = {
-            status: 'speaking',
-            text: normalized,
-            engine_id: 'mlx_audio_qwen3',
-            startedAt: Date.now(),
-            pid: afplay.pid,
-          };
-
-          afplay.on('close', (code) => {
-            if (activeSpeechProcess === afplay) {
-              activeSpeechProcess = null;
-              recentSpeechGuardState = {
-                text: normalized,
-                finishedAt: Date.now(),
-              };
-              activeSpeechState = { status: 'idle' };
-            }
-            resolve();
-          });
-          afplay.on('error', (err) => {
-            if (activeSpeechProcess === afplay) {
-              activeSpeechProcess = null;
-              activeSpeechState = { status: 'idle' };
-            }
-            reject(err);
-          });
-        });
-        return;
-      }
-    } catch (err: any) {
-      logger.warn(
-        `[voice-hub] MLX Qwen3-TTS synthesis failed, falling back to OS say: ${err.message}`
-      );
-    }
+    await speakWithVoiceEngine(fallback, normalized, language, voiceProfile);
   }
-
-  // Fallback to macOS say
-  const profile = getVoiceTtsLanguageConfig(language);
-  const args = ['-v', profile.voice, '-r', String(profile.rate), normalized];
-
-  await new Promise<void>((resolve, reject) => {
-    const child = spawn('/usr/bin/say', args, {
-      cwd: pathResolver.rootDir(),
-      env: buildSafeExecEnv({ KYBERION_PROJECT_ROOT: pathResolver.rootDir() }),
-      stdio: ['ignore', 'ignore', 'pipe'],
-    });
-    activeSpeechProcess = child;
-    activeSpeechState = {
-      status: 'speaking',
-      text: normalized,
-      engine_id: 'local_say',
-      startedAt: Date.now(),
-      pid: child.pid,
-    };
-
-    let stderr = '';
-    child.stderr.on('data', (chunk) => {
-      stderr += String(chunk);
-    });
-    child.on('error', (error) => {
-      if (activeSpeechProcess === child) {
-        activeSpeechProcess = null;
-        activeSpeechState = { status: 'idle' };
-      }
-      reject(error);
-    });
-    child.on('close', (code, signal) => {
-      if (activeSpeechProcess === child) {
-        activeSpeechProcess = null;
-        recentSpeechGuardState = {
-          text: normalized,
-          finishedAt: Date.now(),
-        };
-        activeSpeechState = { status: 'idle' };
-      }
-      if (code === 0 || signal === 'SIGTERM') {
-        resolve();
-        return;
-      }
-      reject(new Error(stderr.trim() || `say_failed_${code || signal || 'unknown'}`));
-    });
-  });
 }
 
 async function processIngest(input: {

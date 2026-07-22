@@ -9,6 +9,8 @@
       "provider": "gemini_api",
       "status": "active",
       "platforms": ["any"],
+      "tts_adapter_id": "external_provider",
+      "live_presence": false,
       "supports": {
         "list_voices": false,
         "playback": true,

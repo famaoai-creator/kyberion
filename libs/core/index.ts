@@ -634,6 +634,7 @@ export * as docxUtils from './src/docx-utils.js';
 // Voice & Presentation
 export { say, speak } from './voice-synth.js';
 export * from './voice-stt.js';
+export * from './voice-provider-adapters.js';
 export * from './voice-selection-preferences.js';
 export * from './native-speech-listen-bridge.js';
 export {

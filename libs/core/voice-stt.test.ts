@@ -4,6 +4,7 @@ import {
   resolveVoiceSttBackendOrder,
   resolveVoiceSttServerConfig,
 } from './voice-stt.js';
+import { resolveVoiceSttAdapter, resolveVoiceTtsAdapter } from './voice-provider-adapters.js';
 
 describe('voice STT helpers', () => {
   it('parses backend aliases into canonical values', () => {
@@ -84,5 +85,29 @@ describe('voice STT helpers', () => {
     });
 
     expect(order).toEqual(['mlx_whisper']);
+  });
+
+  it('resolves runtime adapters from descriptors rather than engine identity', () => {
+    expect(
+      resolveVoiceTtsAdapter({
+        tts_adapter_id: 'python_bridge',
+        bridge_script: 'bridge.py',
+        supports: { list_voices: false, playback: true, artifact_formats: ['wav'] },
+      }).adapter_id
+    ).toBe('python_bridge');
+    expect(
+      resolveVoiceTtsAdapter({
+        supports: { list_voices: true, playback: true, artifact_formats: ['aiff'] },
+      }).adapter_id
+    ).toBe('native_tts');
+    expect(resolveVoiceSttAdapter('mlx_whisper').adapter_id).toBe('managed_python_bridge');
+    expect(resolveVoiceSttAdapter('whisper_cpp').adapter_id).toBe('whisper_cpp_cli');
+    expect(
+      resolveVoiceTtsAdapter({
+        tts_adapter_id: 'future_external_adapter',
+        bridge_script: 'bridge.py',
+        supports: { list_voices: false, playback: true, artifact_formats: ['wav'] },
+      }).adapter_id
+    ).toBe('unsupported');
   });
 });
