@@ -154,7 +154,9 @@
                 <label
                   ><span>Engine</span
                   ><select id="voice-engine" aria-describedby="voice-engine-hint"></select>
-                  ><small id="voice-engine-hint">利用可能な TTS エンジンを読み込んでいます。</small></label
+                  ><small id="voice-engine-hint"
+                    >利用可能な TTS エンジンを読み込んでいます。</small
+                  ></label
                 >
                 <p class="privacy-note">
                   録音はactive
@@ -181,9 +183,26 @@
               ><button type="button" data-preset="balanced" class="active">Balanced</button
               ><button type="button" data-preset="fast">Fast</button>
             </div>
+            <div class="tool-grid">
+              <label
+                ><span>Reasoning provider</span
+                ><select id="reasoning-provider" aria-describedby="reasoning-provider-hint"></select
+                ><small id="reasoning-provider-hint"
+                  >利用可能な LLM プロバイダを読み込んでいます。</small
+                ></label
+              >
+              <label
+                ><span>Model</span
+                ><select id="reasoning-model" aria-describedby="reasoning-model-hint"></select
+                ><small id="reasoning-model-hint"
+                  >プロバイダの既定モデルを使用します。</small
+                ></label
+              >
+            </div>
             <div id="provider-list" class="priority-list"></div>
             <p class="hint">
-              上から順にfallback候補になります。明示的に指定されたproviderは常に優先されます。
+              Reasoning provider/model は既定の reasoning route に適用されます。上の一覧は agent
+              provider の fallback 順です。
             </p>
           </section>
 

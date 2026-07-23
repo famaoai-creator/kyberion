@@ -3,21 +3,79 @@
   "runtime_adapters": {
     "codex-cli": {
       "adapter": "codex-cli",
+      "selection": {
+        "display_name": "Codex CLI",
+        "model_provider": "openai",
+        "discovery_provider": "codex",
+        "availability": { "kind": "provider_discovery" }
+      },
       "capabilities": ["text", "structured_output", "tools"],
       "supported_parameters": ["effort"]
     },
     "agy-cli": {
       "adapter": "agy-cli",
+      "selection": {
+        "display_name": "Agy CLI",
+        "model_provider": "gemini",
+        "discovery_provider": "agy",
+        "availability": { "kind": "provider_discovery" }
+      },
+      "capabilities": ["text", "structured_output", "tools"],
+      "supported_parameters": ["effort"]
+    },
+    "claude-cli": {
+      "adapter": "claude-cli",
+      "selection": {
+        "display_name": "Claude CLI",
+        "model_provider": "anthropic",
+        "discovery_provider": "claude",
+        "availability": { "kind": "provider_discovery" }
+      },
+      "capabilities": ["text", "structured_output", "tools", "vision"],
+      "supported_parameters": ["effort"]
+    },
+    "gemini-cli": {
+      "adapter": "gemini-cli",
+      "selection": {
+        "display_name": "Gemini CLI",
+        "model_provider": "gemini",
+        "discovery_provider": "gemini",
+        "availability": { "kind": "provider_discovery" }
+      },
+      "capabilities": ["text", "structured_output", "tools", "vision"],
+      "supported_parameters": ["effort"]
+    },
+    "copilot": {
+      "adapter": "copilot",
+      "selection": {
+        "display_name": "GitHub Copilot",
+        "model_provider": "anthropic",
+        "discovery_provider": "copilot",
+        "availability": { "kind": "provider_discovery" }
+      },
       "capabilities": ["text", "structured_output", "tools"],
       "supported_parameters": ["effort"]
     },
     "anthropic": {
       "adapter": "anthropic-sdk",
+      "selection": {
+        "display_name": "Anthropic API",
+        "model_provider": "anthropic",
+        "availability": { "kind": "env_any", "names": ["ANTHROPIC_API_KEY"] }
+      },
       "capabilities": ["text", "structured_output", "tools", "vision"],
       "supported_parameters": ["temperature", "top_p", "stop", "effort"]
     },
     "openrouter": {
       "adapter": "openai-compatible",
+      "selection": {
+        "display_name": "OpenRouter",
+        "model_provider": "openai",
+        "availability": {
+          "kind": "env_any",
+          "names": ["OPENROUTER_API_KEY", "KYBERION_OPENROUTER_KEY"]
+        }
+      },
       "endpoint_policy": "public",
       "model_policy": "approved",
       "capabilities": ["text", "structured_output", "tools", "vision"],
@@ -31,6 +89,11 @@
     },
     "nemotron-api": {
       "adapter": "openai-compatible",
+      "selection": {
+        "display_name": "Nemotron API",
+        "model_provider": "openai",
+        "availability": { "kind": "env_any", "names": ["KYBERION_NEMOTRON_URL"] }
+      },
       "endpoint_policy": "public",
       "model_policy": "approved",
       "capabilities": ["text", "structured_output"],
@@ -44,6 +107,13 @@
     },
     "ollama": {
       "adapter": "openai-compatible",
+      "selection": {
+        "display_name": "Ollama",
+        "availability": {
+          "kind": "env_any",
+          "names": ["KYBERION_OLLAMA_URL", "OLLAMA_HOST", "KYBERION_LOCAL_LLM_URL"]
+        }
+      },
       "preset": "ollama",
       "endpoint_policy": "local",
       "model_policy": "local-unregistered",
@@ -60,6 +130,13 @@
     },
     "vllm": {
       "adapter": "openai-compatible",
+      "selection": {
+        "display_name": "vLLM",
+        "availability": {
+          "kind": "env_any",
+          "names": ["KYBERION_VLLM_URL", "KYBERION_LOCAL_LLM_URL"]
+        }
+      },
       "preset": "vllm",
       "endpoint_policy": "local",
       "model_policy": "local-unregistered",
@@ -76,6 +153,13 @@
     },
     "lmstudio": {
       "adapter": "openai-compatible",
+      "selection": {
+        "display_name": "LM Studio",
+        "availability": {
+          "kind": "env_any",
+          "names": ["KYBERION_LMSTUDIO_URL", "KYBERION_LM_STUDIO_URL", "KYBERION_LOCAL_LLM_URL"]
+        }
+      },
       "preset": "lmstudio",
       "endpoint_policy": "local",
       "model_policy": "local-unregistered",
@@ -92,6 +176,13 @@
     },
     "llamacpp": {
       "adapter": "openai-compatible",
+      "selection": {
+        "display_name": "llama.cpp",
+        "availability": {
+          "kind": "env_any",
+          "names": ["KYBERION_LLAMACPP_URL", "KYBERION_LOCAL_LLM_URL"]
+        }
+      },
       "preset": "llamacpp",
       "endpoint_policy": "local",
       "model_policy": "local-unregistered",
@@ -108,6 +199,13 @@
     },
     "mlx": {
       "adapter": "openai-compatible",
+      "selection": {
+        "display_name": "MLX",
+        "availability": {
+          "kind": "env_any",
+          "names": ["KYBERION_MLX_URL", "KYBERION_LOCAL_LLM_URL"]
+        }
+      },
       "preset": "mlx",
       "endpoint_policy": "local",
       "model_policy": "local-unregistered",
@@ -124,6 +222,13 @@
     },
     "localai": {
       "adapter": "openai-compatible",
+      "selection": {
+        "display_name": "LocalAI",
+        "availability": {
+          "kind": "env_any",
+          "names": ["KYBERION_LOCALAI_URL", "KYBERION_LOCAL_LLM_URL"]
+        }
+      },
       "preset": "localai",
       "endpoint_policy": "local",
       "model_policy": "local-unregistered",
@@ -140,6 +245,10 @@
     },
     "local": {
       "adapter": "openai-compatible",
+      "selection": {
+        "display_name": "OpenAI-compatible local server",
+        "availability": { "kind": "env_any", "names": ["KYBERION_LOCAL_LLM_URL"] }
+      },
       "endpoint_policy": "local",
       "model_policy": "local-unregistered",
       "capabilities": ["text", "structured_output"],
@@ -155,6 +264,10 @@
     },
     "stub": {
       "adapter": "stub",
+      "selection": {
+        "display_name": "Deterministic stub (offline)",
+        "availability": { "kind": "always" }
+      },
       "capabilities": ["text", "structured_output"],
       "supported_parameters": []
     }
@@ -167,6 +280,35 @@
       "tools_enabled": true,
       "allowed_tools": ["read_file", "list_directory"]
     },
+    "claude-cli-default": {
+      "mode": "claude-cli",
+      "capabilities": ["text", "structured_output", "tools"]
+    },
+    "gemini-cli-default": {
+      "mode": "gemini-cli",
+      "capabilities": ["text", "structured_output", "tools"]
+    },
+    "copilot-default": {
+      "mode": "copilot",
+      "capabilities": ["text", "structured_output", "tools"]
+    },
+    "anthropic-default": {
+      "mode": "anthropic",
+      "capabilities": ["text", "structured_output", "tools", "vision"]
+    },
+    "openrouter-default": {
+      "mode": "openrouter",
+      "capabilities": ["text", "structured_output", "tools", "vision"]
+    },
+    "nemotron-default": { "mode": "nemotron-api", "capabilities": ["text", "structured_output"] },
+    "ollama-default": { "mode": "ollama", "capabilities": ["text", "structured_output"] },
+    "vllm-default": { "mode": "vllm", "capabilities": ["text", "structured_output"] },
+    "lmstudio-default": { "mode": "lmstudio", "capabilities": ["text", "structured_output"] },
+    "llamacpp-default": { "mode": "llamacpp", "capabilities": ["text", "structured_output"] },
+    "mlx-default": { "mode": "mlx", "capabilities": ["text", "structured_output"] },
+    "localai-default": { "mode": "localai", "capabilities": ["text", "structured_output"] },
+    "local-default": { "mode": "local", "capabilities": ["text", "structured_output"] },
+    "stub-default": { "mode": "stub", "capabilities": ["text", "structured_output"] },
     "agy-default": {
       "mode": "agy-cli",
       "capabilities": ["text", "structured_output", "tools"],

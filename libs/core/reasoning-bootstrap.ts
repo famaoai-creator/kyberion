@@ -61,6 +61,7 @@ import { ClaudeCliVoiceBridge } from './claude-cli-voice-bridge.js';
 import { buildAgyCliBackendFromEnv } from './agy-cli-backend.js';
 import { AgyCliIntentExtractor } from './agy-cli-intent-extractor.js';
 import { AgyCliVoiceBridge } from './agy-cli-voice-bridge.js';
+import { loadLlmSelectionPreferences } from './llm-selection-preferences.js';
 import { buildCopilotAcpBackendFromEnv } from './copilot-acp-reasoning-backend.js';
 import {
   buildOpenAiCompatibleBackendFromEnv,
@@ -161,6 +162,19 @@ function resolveMode(options: InstallReasoningOptions): ReasoningBackendMode {
     providers: discoverProviders(shouldRefreshProviders(options)),
     policy: loadReasoningBackendPolicy(),
   }) as ReasoningBackendMode;
+}
+
+function applyOperatorLlmSelection(options: InstallReasoningOptions): InstallReasoningOptions {
+  if (options.mode || process.env.KYBERION_REASONING_BACKEND) return options;
+  const selection = loadLlmSelectionPreferences();
+  if (!selection || !REASONING_BACKEND_MODES.has(selection.provider as ReasoningBackendMode)) {
+    return options;
+  }
+  return {
+    ...options,
+    mode: selection.provider as ReasoningBackendMode,
+    model: options.model || selection.model_id,
+  };
 }
 
 function providerForReasoningMode(mode: ReasoningBackendMode): string | undefined {
@@ -665,7 +679,8 @@ function reportResidualStubDegradation(mode: string, reason: string): void {
 }
 
 function _installReasoningBackendsCore(options: InstallReasoningOptions): boolean {
-  const mode = consultCapabilityBrokerForMode(resolveMode(options));
+  const effectiveOptions = applyOperatorLlmSelection(options);
+  const mode = consultCapabilityBrokerForMode(resolveMode(effectiveOptions));
 
   // Common infrastructure (order matters: voice bridge runs after reasoning backend)
   const shellSttInstalled = installShellSpeechToTextBridgeIfAvailable();
@@ -692,7 +707,7 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
     return false;
   }
 
-  const chain = buildReasoningRuntimeChain(mode, options);
+  const chain = buildReasoningRuntimeChain(mode, effectiveOptions);
   if (chain.length === 0 && !options.force) {
     installed = true;
     installedMode = 'stub';
@@ -724,7 +739,7 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
     const roleBackends = new Map<string, ReturnType<typeof buildFailoverReasoningBackend>>();
     for (const role of Object.keys(loadReasoningRoutePolicy().roles)) {
       try {
-        const roleChain = buildReasoningRuntimeChain(mode, { ...options, role });
+        const roleChain = buildReasoningRuntimeChain(mode, { ...effectiveOptions, role });
         if (roleChain.length > 0)
           roleBackends.set(
             role,

@@ -131,6 +131,54 @@ function renderProviders() {
         })
     );
 }
+function renderReasoningSelection() {
+  const providerSelect = $('reasoning-provider');
+  const modelSelect = $('reasoning-model');
+  const providerHint = $('reasoning-provider-hint');
+  const modelHint = $('reasoning-model-hint');
+  if (!providerSelect || !modelSelect) return;
+  const snapshot = serverState.reasoning_selection || {};
+  const candidates = Array.isArray(snapshot.candidates) ? snapshot.candidates : [];
+  providerSelect.replaceChildren();
+  candidates.forEach((candidate) => {
+    const option = document.createElement('option');
+    option.value = candidate.provider;
+    option.textContent = `${candidate.display_name} — ${candidate.status}`;
+    option.disabled = !candidate.selectable;
+    option.title = candidate.reason || '';
+    providerSelect.appendChild(option);
+  });
+  const configuredProvider = snapshot.preferences?.provider;
+  const selectedProvider = candidates.some((candidate) => candidate.provider === configuredProvider)
+    ? configuredProvider
+    : candidates.find((candidate) => candidate.selectable)?.provider || candidates[0]?.provider;
+  if (selectedProvider) providerSelect.value = selectedProvider;
+
+  const renderModels = () => {
+    const candidate = candidates.find((entry) => entry.provider === providerSelect.value);
+    modelSelect.replaceChildren();
+    const defaultOption = document.createElement('option');
+    defaultOption.value = '';
+    defaultOption.textContent = 'Provider default';
+    modelSelect.appendChild(defaultOption);
+    (candidate?.model_ids || []).forEach((modelId) => {
+      const option = document.createElement('option');
+      option.value = modelId;
+      option.textContent = modelId;
+      modelSelect.appendChild(option);
+    });
+    const configuredModel = snapshot.preferences?.model_id;
+    if (configuredModel && (candidate?.model_ids || []).includes(configuredModel)) {
+      modelSelect.value = configuredModel;
+    }
+    providerHint.textContent = candidate?.reason || 'LLM provider availability is unknown.';
+    modelHint.textContent = candidate?.model_ids?.length
+      ? `${candidate.model_ids.length} governed model candidates are available.`
+      : 'The provider default model will be used.';
+  };
+  providerSelect.onchange = renderModels;
+  renderModels();
+}
 function collectDraft() {
   const defaultModels = {};
   document.querySelectorAll('[data-model]').forEach((input) => {
@@ -161,6 +209,10 @@ function collectDraft() {
     },
     services,
     providers: { priority: providerPriority, default_models: defaultModels },
+    reasoning: {
+      provider: $('reasoning-provider').value,
+      model_id: $('reasoning-model').value || undefined,
+    },
     tools: {
       mode_preference: {
         python: $('tool-python').value,
@@ -333,11 +385,13 @@ async function load() {
     renderReadiness();
     renderServices();
     renderProviders();
+    renderReasoningSelection();
     await loadVoiceEngines();
   } catch (error) {
     notice(`状態を読み込めません: ${error.message}`, true);
     renderServices();
     renderProviders();
+    renderReasoningSelection();
     await loadVoiceEngines();
   }
 }
