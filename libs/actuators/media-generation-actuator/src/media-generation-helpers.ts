@@ -27,6 +27,11 @@ import {
   type ProviderHistory,
 } from './generation-artifact-adapters.js';
 import { createComfyUiProviderClient } from './comfyui-provider-client.js';
+import {
+  executeDirectVideoGeneration,
+  isDirectVideoGenerationBackend,
+  resolveVideoGenerationBackend,
+} from './video-generation-provider.js';
 
 export type GeneratedArtifact = {
   kind: string;
@@ -318,7 +323,13 @@ function preparePromptBasedGeneration(action: string, input: any): PromptGenerat
   const hasWorkflowPath = Boolean(params.workflow_path);
   const directImage =
     action === 'generate_image' && !workflow && !hasWorkflowPath && !params.image_adf;
-  if (!workflow && !hasWorkflowPath && !directImage) {
+  const directVideo =
+    action === 'generate_video' &&
+    !workflow &&
+    !hasWorkflowPath &&
+    !params.video_adf &&
+    isDirectVideoGenerationBackend(resolveVideoGenerationBackend(params));
+  if (!workflow && !hasWorkflowPath && !directImage && !directVideo) {
     const message =
       action === 'generate_music'
         ? 'generate_music requires either params.workflow or params.music_adf'
@@ -487,6 +498,12 @@ async function executePreparedGeneration(
   action: string,
   prepared: PromptGenerationRequest
 ): Promise<Record<string, unknown>> {
+  if (
+    action === 'generate_video' &&
+    isDirectVideoGenerationBackend(resolveVideoGenerationBackend(prepared.params))
+  ) {
+    return executeDirectVideoGeneration(prepared.params);
+  }
   const result = await executeServicePreset('media-generation', action, {
     ...prepared.params,
     workflow: prepared.workflow,
