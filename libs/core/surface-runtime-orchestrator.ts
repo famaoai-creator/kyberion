@@ -131,6 +131,11 @@ import type {
   SurfaceConversationResult,
 } from './channel-surface-types.js';
 import type { UserIntentFlow } from './intent-contract.js';
+import {
+  parseExecutionFeedbackText,
+  recordExecutionFeedback,
+  type ExecutionFeedbackRecord,
+} from './execution-feedback.js';
 
 interface SurfaceRuntimeRouteHandler {
   matches: (context: SurfaceRuntimeRouteContext) => boolean;
@@ -141,6 +146,44 @@ function appendCompletionClosure(text: string, completionSummary: string[]): str
   const closure = completionSummary.filter((line) => String(line || '').trim().length > 0);
   if (closure.length === 0) return text;
   return [text, '', ...closure].join('\n');
+}
+
+function buildExecutionFeedbackPrompt(scenarioId: string): string {
+  return [
+    `評価: このシナリオを改善する場合は、「評価 ${scenarioId}: 満足」、`,
+    `「評価 ${scenarioId}: 一部違う: 修正点」、または「評価 ${scenarioId}: 不満: 理由」で返信できます。`,
+  ].join('');
+}
+
+function attachExecutionFeedbackPrompt(
+  result: SurfaceConversationResult,
+  compiledFlow: UserIntentFlow | null,
+  input: SurfaceConversationInput
+): SurfaceConversationResult {
+  const scenario = compiledFlow?.useCaseScenario;
+  if (!scenario) return result;
+  return {
+    ...result,
+    text: [result.text, '', buildExecutionFeedbackPrompt(scenario.scenario_id)]
+      .filter(Boolean)
+      .join('\n'),
+    executionFeedbackRequest: {
+      scenario_id: scenario.scenario_id,
+      intent_id: scenario.intent_id,
+      ...(input.correlationId ? { correlation_id: input.correlationId } : {}),
+      outcomes: ['satisfied', 'partially_satisfied', 'dissatisfied'],
+      structured: true,
+    },
+  };
+}
+
+function buildFeedbackAcknowledgement(record: ExecutionFeedbackRecord): string {
+  const outcomeLabel = {
+    satisfied: '満足',
+    partially_satisfied: '一部違う',
+    dissatisfied: '不満',
+  }[record.outcome];
+  return `評価を記録しました（${outcomeLabel}）。次回の「${record.scenario_id}」シナリオ生成時に改善候補として反映します。`;
 }
 
 function buildPendingRuntimeContext(
@@ -2098,6 +2141,21 @@ export async function runSurfaceConversation(
   input: SurfaceConversationInput
 ): Promise<SurfaceConversationResult> {
   surfaceRuntimeContextStore.enterWith(input);
+  const parsedExecutionFeedback =
+    input.executionFeedback || parseExecutionFeedbackText(input.query);
+  if (parsedExecutionFeedback) {
+    const record = recordExecutionFeedback({
+      ...parsedExecutionFeedback,
+      ...(input.correlationId && !parsedExecutionFeedback.correlation_id
+        ? { correlation_id: input.correlationId }
+        : {}),
+      ...(input.surface && !parsedExecutionFeedback.surface ? { surface: input.surface } : {}),
+    });
+    return {
+      ...emptySurfaceResult(buildFeedbackAcknowledgement(record)),
+      executionFeedbackRecord: record,
+    };
+  }
   const forcedReceiver = normalizeSurfaceDelegationReceiver(input.forcedReceiver);
   const routedSurfaceInput = surfaceRoutingText(input);
   const surface = input.surface || surfaceChannelFromAgentId(input.agentId);
@@ -2195,7 +2253,11 @@ export async function runSurfaceConversation(
   );
   if (matchedRouteHandler) {
     const routedResult = await matchedRouteHandler.handle(routeContext);
-    return attachRoutingDecision(routedResult, compiledFlow?.routingDecision);
+    return attachExecutionFeedbackPrompt(
+      attachRoutingDecision(routedResult, compiledFlow?.routingDecision),
+      compiledFlow,
+      input
+    );
   }
 
   const handle = await ensureSurfaceAgent(input.agentId, input.cwd);
@@ -2227,7 +2289,11 @@ export async function runSurfaceConversation(
   }
 
   if (delegationResults.length === 0) {
-    return attachRoutingDecision(firstBlocks, compiledFlow?.routingDecision);
+    return attachExecutionFeedbackPrompt(
+      attachRoutingDecision(firstBlocks, compiledFlow?.routingDecision),
+      compiledFlow,
+      input
+    );
   }
 
   const successful = delegationResults.filter((result) => !result.error);
@@ -2242,16 +2308,20 @@ export async function runSurfaceConversation(
   const finalDelegationResults = [...delegationResults, ...routedDelegationResults];
 
   if (successful.length === 0 && routedDelegationResults.length === 0) {
-    return attachRoutingDecision(
-      {
-        ...firstBlocks,
-        delegationResults: finalDelegationResults,
-        approvalRequests: firstBlocks.approvalRequests,
-        routingProposals,
-        missionProposals: firstBlocks.missionProposals,
-        planningPackets: firstBlocks.planningPackets,
-      },
-      compiledFlow?.routingDecision
+    return attachExecutionFeedbackPrompt(
+      attachRoutingDecision(
+        {
+          ...firstBlocks,
+          delegationResults: finalDelegationResults,
+          approvalRequests: firstBlocks.approvalRequests,
+          routingProposals,
+          missionProposals: firstBlocks.missionProposals,
+          planningPackets: firstBlocks.planningPackets,
+        },
+        compiledFlow?.routingDecision
+      ),
+      compiledFlow,
+      input
     );
   }
 
@@ -2267,24 +2337,28 @@ export async function runSurfaceConversation(
   const followUpResponse = await handle.ask(summaryPrompt);
   const followUpBlocks = extractSurfaceBlocks(followUpResponse);
 
-  return attachRoutingDecision(
-    {
-      text: followUpBlocks.text,
-      a2uiMessages: [...firstBlocks.a2uiMessages, ...followUpBlocks.a2uiMessages],
-      a2aMessages: firstBlocks.a2aMessages,
-      delegationResults: finalDelegationResults,
-      approvalRequests: [...firstBlocks.approvalRequests, ...followUpBlocks.approvalRequests],
-      routingProposals,
-      missionProposals: [
-        ...(firstBlocks.missionProposals || []),
-        ...(followUpBlocks.missionProposals || []),
-      ],
-      planningPackets: [
-        ...(firstBlocks.planningPackets || []),
-        ...(followUpBlocks.planningPackets || []),
-      ],
-    },
-    compiledFlow?.routingDecision
+  return attachExecutionFeedbackPrompt(
+    attachRoutingDecision(
+      {
+        text: followUpBlocks.text,
+        a2uiMessages: [...firstBlocks.a2uiMessages, ...followUpBlocks.a2uiMessages],
+        a2aMessages: firstBlocks.a2aMessages,
+        delegationResults: finalDelegationResults,
+        approvalRequests: [...firstBlocks.approvalRequests, ...followUpBlocks.approvalRequests],
+        routingProposals,
+        missionProposals: [
+          ...(firstBlocks.missionProposals || []),
+          ...(followUpBlocks.missionProposals || []),
+        ],
+        planningPackets: [
+          ...(firstBlocks.planningPackets || []),
+          ...(followUpBlocks.planningPackets || []),
+        ],
+      },
+      compiledFlow?.routingDecision
+    ),
+    compiledFlow,
+    input
   );
 }
 

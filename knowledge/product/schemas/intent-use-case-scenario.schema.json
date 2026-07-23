@@ -23,7 +23,8 @@
     "governance",
     "handoff",
     "confidence",
-    "provenance"
+    "provenance",
+    "improvement"
   ],
   "properties": {
     "kind": { "const": "intent-use-case-scenario" },
@@ -157,6 +158,50 @@
       "properties": {
         "resolution_confidence": { "type": "number", "minimum": 0, "maximum": 1 },
         "resolution_candidates": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "improvement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["feedback_summary", "hints"],
+      "properties": {
+        "feedback_summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "scenario_id",
+            "intent_id",
+            "sample_count",
+            "outcome_counts",
+            "satisfaction_rate",
+            "common_corrections",
+            "recent_comments",
+            "improvement_status"
+          ],
+          "properties": {
+            "scenario_id": { "type": "string", "minLength": 1 },
+            "intent_id": { "type": "string", "minLength": 1 },
+            "sample_count": { "type": "integer", "minimum": 0 },
+            "outcome_counts": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["satisfied", "partially_satisfied", "dissatisfied"],
+              "properties": {
+                "satisfied": { "type": "integer", "minimum": 0 },
+                "partially_satisfied": { "type": "integer", "minimum": 0 },
+                "dissatisfied": { "type": "integer", "minimum": 0 }
+              }
+            },
+            "satisfaction_rate": { "type": "number", "minimum": 0, "maximum": 1 },
+            "common_corrections": { "type": "array", "items": { "type": "string" } },
+            "recent_comments": { "type": "array", "items": { "type": "string" } },
+            "last_outcome": {
+              "enum": ["satisfied", "partially_satisfied", "dissatisfied"]
+            },
+            "improvement_status": { "enum": ["none", "observing", "candidate"] }
+          }
+        },
+        "hints": { "type": "array", "items": { "type": "string" } }
       }
     }
   }

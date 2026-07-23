@@ -64,6 +64,25 @@ Surface agent はシナリオの handoff に従って、次のいずれかをユ
 - runtime が未準備: 復旧に必要な手順を案内する
 - 実行可能: シナリオの手順と成功条件に沿って進める
 
+## 実行結果からのユーザー評価と改善
+
+コンパイル経路のSurfaceレスポンスには、`executionFeedbackRequest` と評価の案内が付く。UIはこの構造化リクエストをボタン等に変換でき、テキストだけのSurfaceでは次の形式を使える。
+
+```text
+評価 use-case-schedule-read-agenda: 満足
+評価 use-case-schedule-read-agenda: 一部違う: 対象期間を確認してから取得してほしい
+評価 use-case-schedule-read-agenda: 不満: 予定の対象が違う
+```
+
+評価は `scenario_id` 単位で runtime feedback store に保存され、次回の同じScenario生成時に以下へ反映される。
+
+1. 過去の満足度・部分達成・不満の集計
+2. 繰り返し出た訂正内容の抽出
+3. 「次回は対象期間を確認する」などの改善ヒント生成
+4. Surface agentへ渡すScenarioの改善コンテキストへの注入
+
+評価は即座に実行契約や権限を変更しない。まず改善候補として扱い、将来のpromotionや共有ルール化は別の承認・閾値管理に委ねる。
+
 ## 今回の音声バックエンド導入への適用
 
 今回のように「軽量なSTT/VAD/TTSを導入して実際に試したい」という依頼は、次の順で具体化する。
