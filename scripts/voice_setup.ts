@@ -11,7 +11,14 @@ import {
   safeMkdir,
 } from '@agent/core';
 
-const VOICE_TOOL_IDS = ['mlx_audio', 'mlx_whisper'] as const;
+const VOICE_TOOL_IDS = [
+  'mlx_audio',
+  'mlx_whisper',
+  'kokoro_tts',
+  'pocket_tts',
+  'ten_vad',
+  'silero_vad',
+] as const;
 const MANAGED_PYTHON_VERSION = process.env.KYBERION_MANAGED_PYTHON_VERSION?.trim() || '3.11';
 
 type VoiceToolId = (typeof VOICE_TOOL_IDS)[number];
@@ -40,10 +47,7 @@ function resolveManagedPythonCandidates(managedEnvPath: string): string[] {
       path.join(managedEnvPath, 'Scripts', 'python3.exe'),
     ];
   }
-  return [
-    path.join(managedEnvPath, 'bin', 'python'),
-    path.join(managedEnvPath, 'bin', 'python3'),
-  ];
+  return [path.join(managedEnvPath, 'bin', 'python'), path.join(managedEnvPath, 'bin', 'python3')];
 }
 
 function resolveManagedPythonBin(toolId: VoiceToolId): string | null {
@@ -59,9 +63,26 @@ function isManagedPythonCurrent(pythonBin: string | null): boolean {
   const result = safeExecResult(
     pythonBin,
     ['-c', 'import sys; print(f"{sys.version_info[0]}.{sys.version_info[1]}")'],
-    { timeoutMs: 10_000, maxOutputMB: 1 },
+    { timeoutMs: 10_000, maxOutputMB: 1 }
   );
   return result.status === 0 && result.stdout.trim() === MANAGED_PYTHON_VERSION;
+}
+
+function isManagedVoiceRuntimeHealthy(toolId: VoiceToolId, pythonBin: string | null): boolean {
+  if (!isManagedPythonCurrent(pythonBin)) return false;
+  const imports: Record<VoiceToolId, string> = {
+    mlx_audio: 'import mlx_audio',
+    mlx_whisper: 'import mlx_whisper',
+    kokoro_tts: 'import kokoro, soundfile, unidic_lite',
+    pocket_tts: 'import pocket_tts, scipy',
+    ten_vad: 'import numpy, ten_vad',
+    silero_vad: 'import numpy, onnxruntime',
+  };
+  const result = safeExecResult(pythonBin!, ['-c', imports[toolId]], {
+    timeoutMs: 30_000,
+    maxOutputMB: 1,
+  });
+  return result.status === 0;
 }
 
 function installManagedVoiceRuntime(toolId: VoiceToolId): VoiceSetupRow {
@@ -79,11 +100,7 @@ function installManagedVoiceRuntime(toolId: VoiceToolId): VoiceSetupRow {
     };
   }
 
-  if (
-    backend.command === 'uv'
-    && backend.args?.[0] === 'pip'
-    && backend.args?.[1] === 'install'
-  ) {
+  if (backend.command === 'uv' && backend.args?.[0] === 'pip' && backend.args?.[1] === 'install') {
     const rootDir = pathResolver.rootDir();
     safeMkdir(resolution.managed_env_path, { recursive: true });
 
@@ -99,7 +116,9 @@ function installManagedVoiceRuntime(toolId: VoiceToolId): VoiceSetupRow {
       maxOutputMB: 8,
     });
     if (venvResult.status !== 0) {
-      throw new Error(`uv venv failed for ${toolId}: ${venvResult.stderr || venvResult.error?.message || 'unknown error'}`);
+      throw new Error(
+        `uv venv failed for ${toolId}: ${venvResult.stderr || venvResult.error?.message || 'unknown error'}`
+      );
     }
 
     const pythonBin = resolveManagedPythonPath(resolution.managed_env_path);
@@ -110,7 +129,9 @@ function installManagedVoiceRuntime(toolId: VoiceToolId): VoiceSetupRow {
       maxOutputMB: 32,
     });
     if (installResult.status !== 0) {
-      throw new Error(`uv pip install failed for ${toolId}: ${installResult.stderr || installResult.error?.message || 'unknown error'}`);
+      throw new Error(
+        `uv pip install failed for ${toolId}: ${installResult.stderr || installResult.error?.message || 'unknown error'}`
+      );
     }
 
     markToolRuntimeInstalled(toolId, {
@@ -137,7 +158,9 @@ function installManagedVoiceRuntime(toolId: VoiceToolId): VoiceSetupRow {
     maxOutputMB: 32,
   });
   if (result.status !== 0) {
-    throw new Error(`${backend.command} ${backend.args?.join(' ') || ''} failed for ${toolId}: ${result.stderr || result.error?.message || 'unknown error'}`);
+    throw new Error(
+      `${backend.command} ${backend.args?.join(' ') || ''} failed for ${toolId}: ${result.stderr || result.error?.message || 'unknown error'}`
+    );
   }
   markToolRuntimeInstalled(toolId, {
     action: 'voice_setup',
@@ -146,22 +169,23 @@ function installManagedVoiceRuntime(toolId: VoiceToolId): VoiceSetupRow {
     notes: `Installed via registered backend into ${resolution.managed_env_path}`,
   });
   return {
-      toolId,
-      managedEnvPath: resolution.managed_env_path,
-      installed: true,
-      installAction: 'applied',
-      pythonBin: resolveManagedPythonBin(toolId),
-      status: 'ready',
-      detail: `Installed via ${backend.command}`,
-    };
+    toolId,
+    managedEnvPath: resolution.managed_env_path,
+    installed: true,
+    installAction: 'applied',
+    pythonBin: resolveManagedPythonBin(toolId),
+    status: 'ready',
+    detail: `Installed via ${backend.command}`,
+  };
 }
 
 function inspectVoiceRuntime(toolId: VoiceToolId): VoiceSetupRow {
   const installedResolution = probeToolRuntime(toolId, 'installed');
   const approvedResolution = probeToolRuntime(toolId, 'approved_install');
   const pythonBin = resolveManagedPythonBin(toolId);
-  const supported = installedResolution.tool.platforms.includes('any')
-    || installedResolution.tool.platforms.includes(process.platform as any);
+  const supported =
+    installedResolution.tool.platforms.includes('any') ||
+    installedResolution.tool.platforms.includes(process.platform as any);
   if (!supported) {
     return {
       toolId,
@@ -174,7 +198,7 @@ function inspectVoiceRuntime(toolId: VoiceToolId): VoiceSetupRow {
     };
   }
   if (pythonBin) {
-    const current = isManagedPythonCurrent(pythonBin);
+    const current = isManagedVoiceRuntimeHealthy(toolId, pythonBin);
     return {
       toolId,
       managedEnvPath: installedResolution.managed_env_path,
@@ -183,8 +207,8 @@ function inspectVoiceRuntime(toolId: VoiceToolId): VoiceSetupRow {
       pythonBin,
       status: current ? 'ready' : 'needs_install',
       detail: current
-        ? `Managed Python ${MANAGED_PYTHON_VERSION} found at ${pythonBin}`
-        : `Managed Python upgrade required: ${MANAGED_PYTHON_VERSION} (found at ${pythonBin})`,
+        ? `Managed Python ${MANAGED_PYTHON_VERSION} and ${toolId} dependencies found at ${pythonBin}`
+        : `Managed Python or ${toolId} dependencies require setup (found at ${pythonBin})`,
     };
   }
   return {
@@ -215,7 +239,9 @@ function printReport(rows: VoiceSetupRow[], apply: boolean): void {
     console.log('Next step: `pnpm voice:setup --apply`');
   }
   console.log('Verify: `pnpm voice:health`');
-  console.log('Meeting/browser adjuncts: `pnpm env:bootstrap --manifest meeting-participation-runtime --apply`');
+  console.log(
+    'Meeting/browser adjuncts: `pnpm env:bootstrap --manifest meeting-participation-runtime --apply`'
+  );
 }
 
 export async function runVoiceSetup(options: { apply: boolean }): Promise<VoiceSetupRow[]> {

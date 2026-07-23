@@ -112,6 +112,7 @@ export * from './mission-retrospective.js';
 export * from './working-principles.js';
 export * from './design-qa.js';
 export * from './apple-intelligence-bridge.js';
+export * from './ten-vad-bridge.js';
 export * from './mission-hygiene.js';
 export * from './context-security-scope.js';
 export * from './reasoning-participant.js';
@@ -1340,6 +1341,7 @@ export {
   getSpeechToTextBridge,
   getSpeechToTextBridges,
   getSpeechToTextCapabilities,
+  installFluidAudioSpeechToTextBridgeIfAvailable,
   installShellSpeechToTextBridgeIfAvailable,
   NO_TIMESTAMP_STT_CAPABILITIES,
   registerSpeechToTextBridge,

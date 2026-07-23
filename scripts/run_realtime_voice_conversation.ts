@@ -16,6 +16,7 @@ import {
   installReasoningBackends,
   installShellStreamingSttBridgeFromEnv,
   installSileroVadBackend,
+  installTenVadBackend,
   pathResolver,
   probeAudioPlayback,
   probeMicCapture,
@@ -406,6 +407,7 @@ export async function runRealtimeVoiceConversationLoop(
 
   // VAD backend (Phase 3): silero when configured, energy otherwise.
   installSileroVadBackend();
+  installTenVadBackend();
   const resolvedVad = resolveVadBackend(options.vadBackend);
   if (resolvedVad.degradedFrom) {
     console.warn(

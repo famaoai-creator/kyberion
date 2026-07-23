@@ -5,7 +5,8 @@ Input lines:
   {"pcm": "<base64 s16le mono>", "sr": 16000}   -> {"prob": 0.87}
   {"reset": true}                                -> {"ok": true}
 
-Requires onnxruntime + numpy and a silero_vad ONNX model (v4/v5 layout with
+Requires onnxruntime + numpy and a current silero_vad ONNX model (v6.2 and
+backward-compatible v4/v5 layouts with
 LSTM state passed between calls). The model path comes from --model or
 KYBERION_SILERO_VAD_MODEL. On any fatal error a single {"error": ...} line is
 emitted and the process exits non-zero; the TypeScript side then degrades to

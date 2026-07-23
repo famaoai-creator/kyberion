@@ -12,13 +12,14 @@
       "model_id": "hexgrad/Kokoro-82M",
       "bridge_script": "libs/actuators/voice-actuator/scripts/kokoro_tts_bridge.py",
       "tts_adapter_id": "python_bridge",
-      "live_presence": false,
+      "runtime_id": "kokoro_tts",
+      "live_presence": true,
       "supports": {
         "list_voices": false,
         "playback": true,
         "artifact_formats": ["wav"]
       },
-      "notes": "82M parameter lightweight high-quality TTS using Kokoro-82M. Fast, low memory footprint, runs locally."
+      "notes": "82M parameter lightweight local TTS. Japanese voice selection depends on the installed Kokoro language pack."
     }
   ]
 }
