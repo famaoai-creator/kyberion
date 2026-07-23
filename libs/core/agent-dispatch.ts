@@ -1,6 +1,11 @@
 import { a2aBridge } from './a2a-bridge.js';
 import { logger } from './core.js';
 import {
+  describeSubagentCapabilityCatalog,
+  getSubagentCapabilityProfile,
+  listSubagentCapabilityProfileNames,
+} from './subagent-capability-profiles.js';
+import {
   advanceToolCallRepeatGovernor,
   createToolCallRepeatGovernorState,
   type ToolCallRepeatGovernorState,
@@ -10,6 +15,9 @@ import type {
   ToolDefinition,
   GenerateWithToolsResult,
 } from './reasoning-backend.js';
+
+/** Default tier for an in-session delegation that does not name one (backward compatible). */
+const DEFAULT_SUBAGENT_PROFILE = 'implementer';
 
 /**
  * Agent dispatch (agent-runtime plane).
@@ -28,7 +36,11 @@ export interface AgentDispatcher {
    * `backend` is the cognition substrate available for planning the dispatch
    * (tool-use) and as a delegation fallback.
    */
-  dispatch(instruction: string, context: string | undefined, backend: ReasoningBackend): Promise<string>;
+  dispatch(
+    instruction: string,
+    context: string | undefined,
+    backend: ReasoningBackend
+  ): Promise<string>;
 }
 
 /**
@@ -38,7 +50,11 @@ export interface AgentDispatcher {
 export class ProcessSpawnDispatcher implements AgentDispatcher {
   readonly name = 'process-spawn';
 
-  dispatch(instruction: string, context: string | undefined, backend: ReasoningBackend): Promise<string> {
+  dispatch(
+    instruction: string,
+    context: string | undefined,
+    backend: ReasoningBackend
+  ): Promise<string> {
     return backend.delegateTask(instruction, context);
   }
 }
@@ -60,25 +76,40 @@ export class InSessionDispatcher implements AgentDispatcher {
   private repeatGovernor: ToolCallRepeatGovernorState = createToolCallRepeatGovernorState();
   private pendingRepeatReminder: string | undefined;
 
-  async dispatch(instruction: string, context: string | undefined, backend: ReasoningBackend): Promise<string> {
+  async dispatch(
+    instruction: string,
+    context: string | undefined,
+    backend: ReasoningBackend
+  ): Promise<string> {
     logger.info('[agent-dispatch:in-session] Initiating in-session delegation for task...');
 
     if (!backend.generateWithTools) {
       logger.warn(
-        '[agent-dispatch:in-session] Base backend lacks generateWithTools — falling back to process-spawn delegation.',
+        '[agent-dispatch:in-session] Base backend lacks generateWithTools — falling back to process-spawn delegation.'
       );
       return this.fallback.dispatch(instruction, context, backend);
     }
 
+    // KD-05: the tier catalog is rebuilt from the registry on every dispatch,
+    // so the model always sees the current tier list — no manual sync
+    // between subagent-capability-profiles.ts and this description.
     const invokeAgentTool: ToolDefinition = {
       name: 'invoke_agent',
-      description:
+      description: [
         "Invoke a specialized sub-agent (e.g., 'codebase_investigator', 'generalist') to perform a complex task.",
+        'Choose the least-privileged agent_profile tier that can do the job:',
+        describeSubagentCapabilityCatalog(),
+      ].join('\n'),
       inputSchema: {
         type: 'object',
         properties: {
           agent_name: { type: 'string' },
           prompt: { type: 'string', description: 'Detailed instruction for the sub-agent' },
+          agent_profile: {
+            type: 'string',
+            enum: listSubagentCapabilityProfileNames(),
+            description: `Capability tier the sub-agent runs under (KD-05). Defaults to "${DEFAULT_SUBAGENT_PROFILE}" when omitted.`,
+          },
         },
         required: ['agent_name', 'prompt'],
       },
@@ -109,14 +140,14 @@ export class InSessionDispatcher implements AgentDispatcher {
           // A dead-end delegation loop: break it with a fresh process-spawn
           // child (new context, new judgment) instead of re-routing in-session.
           logger.error(
-            `[agent-dispatch:in-session] invoke_agent repeated ${decision.streak}x with identical arguments — breaking the loop via process-spawn fallback.`,
+            `[agent-dispatch:in-session] invoke_agent repeated ${decision.streak}x with identical arguments — breaking the loop via process-spawn fallback.`
           );
           const { recordGovernanceAction } = await import('./kill-switch.js');
           recordGovernanceAction(
             'agent-dispatch:in-session',
             'tool_call_repeat_force_stop',
             `invoke_agent streak=${decision.streak}`,
-            true,
+            true
           );
           this.repeatGovernor = createToolCallRepeatGovernorState();
           return this.fallback.dispatch(instruction, context, backend);
@@ -126,8 +157,34 @@ export class InSessionDispatcher implements AgentDispatcher {
           this.pendingRepeatReminder = decision.reminder;
         }
         const agentName = String(toolCall.input.agent_name || 'generalist');
-        const agentPrompt = String(toolCall.input.prompt || instruction);
-        logger.info(`[agent-dispatch:in-session] LLM chose to invoke sub-agent: ${agentName}`);
+        const requestedPrompt = String(toolCall.input.prompt || instruction);
+        // KD-05: resolve the chosen capability tier and prefix the sub-agent's
+        // prompt with its tier-appropriate system prompt. This is the
+        // instruction-level half of tier containment; the enforcement-level
+        // half is assertSubagentOpAllowed, called by op execution call sites
+        // (e.g. secure-io / actuator invocation) once they know the active
+        // delegation's tier. An unrecognized tier degrades to the default
+        // rather than failing the whole dispatch — the model picking a bad
+        // enum value should not brick delegation, but it never widens agency
+        // (the default tier is the least-privileged full-write tier only in
+        // the sense that it is the historical default before KD-05 existed).
+        const requestedProfileName = String(
+          toolCall.input.agent_profile || DEFAULT_SUBAGENT_PROFILE
+        );
+        let profileName = requestedProfileName;
+        try {
+          getSubagentCapabilityProfile(requestedProfileName);
+        } catch {
+          logger.warn(
+            `[agent-dispatch:in-session] Unknown agent_profile "${requestedProfileName}" — falling back to "${DEFAULT_SUBAGENT_PROFILE}".`
+          );
+          profileName = DEFAULT_SUBAGENT_PROFILE;
+        }
+        const profile = getSubagentCapabilityProfile(profileName);
+        const agentPrompt = `${profile.systemPromptPrefix}\n\n${requestedPrompt}`;
+        logger.info(
+          `[agent-dispatch:in-session] LLM chose to invoke sub-agent: ${agentName} (tier: ${profile.name})`
+        );
         const subResult = await this.routeToSubAgent(agentName, agentPrompt);
         return `[In-Session Rollup] Sub-agent '${agentName}' completed the task.\nSummary: ${subResult}`;
       }
@@ -169,7 +226,7 @@ export class DispatchingReasoningBackend implements ReasoningBackend {
 
   constructor(
     private readonly base: ReasoningBackend,
-    private readonly dispatcher: AgentDispatcher,
+    private readonly dispatcher: AgentDispatcher
   ) {
     this.name = `${base.name}+${dispatcher.name}`;
   }
@@ -228,7 +285,7 @@ export function selectAgentDispatcher(env: NodeJS.ProcessEnv = process.env): Age
  */
 export function maybeWrapWithDispatcher(
   backend: ReasoningBackend,
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv = process.env
 ): ReasoningBackend {
   if (env.KYBERION_IN_SESSION_SUBAGENT === '1') {
     logger.success('[agent-dispatch] ⚡ In-Session sub-agent dispatch enabled');
