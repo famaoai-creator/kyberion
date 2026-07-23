@@ -12,6 +12,7 @@ import type { VoiceSttBackend } from './voice-stt.js';
 export type VoiceTtsAdapterId = 'native_tts' | 'python_bridge' | 'unsupported';
 export type VoiceSttAdapterId =
   | 'native_speech'
+  | 'fluid_audio_native'
   | 'managed_python_bridge'
   | 'whisper_cpp_cli'
   | 'openai_compatible_server'
@@ -68,6 +69,11 @@ const STT_ADAPTERS: Record<VoiceSttBackend, VoiceSttAdapterDescriptor> = {
     display_name: 'mlx-whisper managed Python bridge',
     runtime_id: 'mlx_whisper',
     bridge_script: 'libs/actuators/voice-actuator/scripts/mlx_audio_stt_bridge.py',
+  },
+  fluid_audio: {
+    backend: 'fluid_audio',
+    adapter_id: 'fluid_audio_native',
+    display_name: 'FluidAudio Parakeet native bridge',
   },
   whisper_cpp: {
     backend: 'whisper_cpp',
