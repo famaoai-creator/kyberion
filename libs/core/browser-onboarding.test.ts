@@ -92,6 +92,41 @@ describe('browser onboarding', () => {
     });
   });
 
+  it('persists the selected reasoning provider and routes the default role through it', async () => {
+    const { applyBrowserOnboarding } = await import('./browser-onboarding.js');
+    const result = await applyBrowserOnboarding({
+      ...validDraft(),
+      reasoning: { provider: 'stub' },
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.artifacts).toContain(path.join(PROFILE_ROOT, 'onboarding', 'llm-selection.json'));
+    expect(
+      JSON.parse(
+        String(
+          safeReadFile(path.join(PROFILE_ROOT, 'onboarding', 'llm-selection.json'), {
+            encoding: 'utf8',
+          })
+        )
+      )
+    ).toMatchObject({ provider: 'stub', version: '1.0.0' });
+
+    const { resolveReasoningRoute } = await import('./reasoning-route-resolver.js');
+    expect(resolveReasoningRoute({ role: 'default', env: {} }).mode).toBe('stub');
+  });
+
+  it('rejects an unregistered reasoning provider before writing onboarding artifacts', async () => {
+    const { previewBrowserOnboarding } = await import('./browser-onboarding.js');
+
+    expect(() =>
+      previewBrowserOnboarding({
+        ...validDraft(),
+        reasoning: { provider: 'not-registered' },
+      })
+    ).toThrow(/Unknown reasoning provider/);
+    expect(safeExistsSync(PROFILE_ROOT)).toBe(false);
+  });
+
   it('stores supported voice samples only inside the active profile', async () => {
     const { saveBrowserOnboardingVoiceSample } = await import('./browser-onboarding.js');
     const sample = saveBrowserOnboardingVoiceSample({

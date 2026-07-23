@@ -1,10 +1,12 @@
 import { Ajv, type ValidateFunction } from 'ajv';
+import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import type { ReasoningBackendMode } from './reasoning-backend-policy.js';
 import { getReasoningPayloadScope } from './reasoning-egress-scope.js';
 import { loadModelRegistry } from './reasoning-model-routing.js';
+import { resolveActiveProfileRoot } from './profile-root.js';
 
 const ajv = new Ajv({ allErrors: true });
 const POLICY_PATH = pathResolver.knowledge('product/governance/reasoning-route-policy.json');
@@ -30,6 +32,15 @@ export type SamplingParams = {
 
 export interface RuntimeAdapterConfig {
   adapter: string;
+  selection?: {
+    display_name: string;
+    model_provider?: string;
+    discovery_provider?: string;
+    availability: {
+      kind: 'always' | 'env_any' | 'provider_discovery';
+      names?: string[];
+    };
+  };
   preset?: string;
   endpoint_policy?: 'local' | 'public';
   model_policy?: 'approved' | 'local-unregistered';
@@ -194,6 +205,27 @@ function requestedBinding(role: ReasoningRole, env: NodeJS.ProcessEnv): string |
   return env[key]?.trim() || env.KYBERION_REASONING_PROFILE?.trim();
 }
 
+function loadOperatorLlmSelection(): { provider: string; model_id?: string } | null {
+  const filePath = path.join(resolveActiveProfileRoot(), 'onboarding', 'llm-selection.json');
+  if (!safeExistsSync(filePath)) return null;
+  try {
+    const value = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as {
+      provider?: unknown;
+      model_id?: unknown;
+    };
+    if (typeof value.provider !== 'string' || !value.provider.trim()) return null;
+    return {
+      provider: value.provider.trim(),
+      model_id:
+        typeof value.model_id === 'string' && value.model_id.trim()
+          ? value.model_id.trim()
+          : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
 function parseBinding(binding: string): { profile?: string; mode?: string; model?: string } {
   if (binding.startsWith('profile:')) return { profile: binding.slice('profile:'.length).trim() };
   const separator = binding.indexOf(':');
@@ -293,11 +325,29 @@ export function resolveReasoningRoute(
   const binding = input.requestedProfile || requestedBinding(role, env);
   const parsed = binding ? parseBinding(binding) : {};
   const rolePolicy = policy.roles[role] ?? policy.roles.default;
+  const operatorSelection =
+    role === 'default' &&
+    !binding &&
+    !input.requestedProfile &&
+    !roleUser?.profile &&
+    !roleUser?.candidates
+      ? loadOperatorLlmSelection()
+      : null;
+  const selectedProfileRef = operatorSelection
+    ? Object.entries(policy.profiles).find(
+        ([, profile]) => profile.mode === operatorSelection.provider
+      )?.[0]
+    : undefined;
   const requestedProfileRef =
     parsed.profile || input.requestedProfile?.replace(/^profile:/, '') || roleUser?.profile;
   const configuredCandidates = requestedProfileRef
     ? [requestedProfileRef]
-    : roleUser?.candidates || rolePolicy.candidates;
+    : selectedProfileRef
+      ? [
+          selectedProfileRef,
+          ...rolePolicy.candidates.filter((candidate) => candidate !== selectedProfileRef),
+        ]
+      : roleUser?.candidates || rolePolicy.candidates;
   const candidates = input.requestedMode
     ? configuredCandidates.filter(
         (profileRef) => policy.profiles[profileRef]?.mode === input.requestedMode
@@ -334,6 +384,9 @@ export function resolveReasoningRoute(
           parsed.model ||
           overlay?.model ||
           base.model ||
+          (operatorSelection && mode === operatorSelection.provider
+            ? operatorSelection.model_id
+            : undefined) ||
           modelFromRuntimeEnv(mode, env),
         modelRef: overlay?.model_ref || base.model_ref,
         adapter,
@@ -387,6 +440,9 @@ export function resolveReasoningRoute(
         field: input.requestedProfile ? 'request.profile' : `env/user.role.${role}`,
       });
     if (overlay) provenance.push({ source: 'user', field: `profiles.${profileRef}` });
+    if (operatorSelection && mode === operatorSelection.provider) {
+      provenance.push({ source: 'operator-selection', field: 'llm-selection.json' });
+    }
     return {
       role,
       profileRef,
