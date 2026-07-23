@@ -147,4 +147,20 @@ describe('subagent-capability-profiles (KD-05)', () => {
       assertSubagentOpAllowed({ profileName: 'nonexistent-tier', opId: 'file:read' })
     ).toThrow(/SUBAGENT_PROFILE_UNKNOWN/);
   });
+
+  it('every explicit allowlist entry resolves against the real actuator op registry', async () => {
+    const { listKnownActuatorOps } = await import('./actuator-op-registry.js');
+    for (const profile of SUBAGENT_CAPABILITY_PROFILES) {
+      if (profile.allowedOps === '*') continue;
+      for (const entry of profile.allowedOps) {
+        const [domain, op] = entry.split(':');
+        expect(domain, `allowlist entry "${entry}" must be domain-qualified`).toBeTruthy();
+        expect(op, `allowlist entry "${entry}" must be domain-qualified`).toBeTruthy();
+        expect(
+          listKnownActuatorOps(domain).includes(op),
+          `allowlist entry "${entry}" (tier "${profile.name}") does not exist in the actuator op registry — fictional op vocabulary defeats the tier`
+        ).toBe(true);
+      }
+    }
+  });
 });
