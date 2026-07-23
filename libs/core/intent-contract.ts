@@ -44,6 +44,10 @@ import {
   storeIntentFlowCache,
 } from './intent-flow-cache.js';
 import {
+  buildIntentUseCaseScenario,
+  type IntentUseCaseScenario,
+} from './intent-use-case-scenario.js';
+import {
   buildFallbackExecutionBrief,
   normalizeExecutionBrief,
   type ExecutionBriefSeed,
@@ -143,6 +147,7 @@ export interface UserIntentFlow {
   executionBrief: ActuatorExecutionBrief;
   intentContract: IntentContract;
   workLoop: OrganizationWorkLoopSummary;
+  useCaseScenario?: IntentUseCaseScenario;
   correlationId?: string;
   routingDecision?: AgentRoutingDecision;
   reasoningDecision: ReasoningLevelDecision;
@@ -1633,8 +1638,17 @@ export async function compileUserIntentFlow(
       selectedResolutionShape: resolutionPacket.selected_resolution?.shape,
       contractExecutionShape: cacheLookup.cachedFlow.intentContract.resolution.execution_shape,
     });
+    const cachedUseCaseScenario = buildIntentUseCaseScenario({
+      input: resolvedInput,
+      packet: resolutionPacket,
+      selectedIntent,
+      executionBrief: cacheLookup.cachedFlow.executionBrief,
+      intentContract: cacheLookup.cachedFlow.intentContract,
+      workLoop: cacheLookup.cachedFlow.workLoop,
+    });
     return {
       ...cacheLookup.cachedFlow,
+      useCaseScenario: cachedUseCaseScenario,
       correlationId: cacheLookup.cachedFlow.correlationId || resolveCorrelationId(input),
     };
   }
@@ -1710,6 +1724,14 @@ export async function compileUserIntentFlow(
   const routingDecision = deriveAgentRoutingDecision(intentContract, workLoop, resolvedInput.text);
   const finalExecutionBrief =
     executionBrief ?? buildFallbackExecutionBrief(toExecutionBriefSeed(resolvedInput));
+  const useCaseScenario = buildIntentUseCaseScenario({
+    input: resolvedInput,
+    packet: resolutionPacket,
+    selectedIntent,
+    executionBrief: finalExecutionBrief,
+    intentContract,
+    workLoop,
+  });
   if (cacheEligibility.eligible) {
     const writeResult = storeIntentFlowCache({
       eligibility: cacheEligibility,
@@ -1760,6 +1782,7 @@ export async function compileUserIntentFlow(
     executionBrief: finalExecutionBrief,
     intentContract,
     workLoop,
+    useCaseScenario,
     correlationId: resolveCorrelationId(input),
     routingDecision,
     reasoningDecision,
