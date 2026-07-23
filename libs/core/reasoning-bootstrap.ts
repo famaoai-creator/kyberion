@@ -93,7 +93,10 @@ import {
   type VoiceBridgeCandidate,
   registerVoiceBridge,
 } from './voice-bridge.js';
-import { installShellSpeechToTextBridgeIfAvailable } from './speech-to-text-bridge.js';
+import {
+  installFluidAudioSpeechToTextBridgeIfAvailable,
+  installShellSpeechToTextBridgeIfAvailable,
+} from './speech-to-text-bridge.js';
 import { installAppleSpeechToTextBridgeIfAvailable } from './apple-intelligence-bridge.js';
 import {
   installShellDeploymentAdapterFromConfigIfAvailable,
@@ -685,7 +688,8 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
   const mode = consultCapabilityBrokerForMode(resolveMode(effectiveOptions));
 
   // Common infrastructure (order matters: voice bridge runs after reasoning backend)
-  const shellSttInstalled = installShellSpeechToTextBridgeIfAvailable();
+  const shellSttInstalled =
+    installShellSpeechToTextBridgeIfAvailable() || installFluidAudioSpeechToTextBridgeIfAvailable();
   if (!shellSttInstalled) {
     // Fire-and-forget: on Apple Silicon macOS this upgrades the stub to
     // on-device transcription; elsewhere the probe declines instantly.

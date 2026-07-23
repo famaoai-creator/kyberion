@@ -199,6 +199,118 @@
       "notes": "Runtime dependency for the Qwen3-STT bridge used by voice capture flows."
     },
     {
+      "tool_id": "kokoro_tts",
+      "display_name": "Kokoro TTS Runtime",
+      "ecosystem": "python",
+      "status": "active",
+      "platforms": ["any"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "trial_backend": {
+        "kind": "system",
+        "command": "python3",
+        "args": ["-c", "import kokoro, soundfile; print(\"ok\")"],
+        "description": "Probe the Kokoro and soundfile Python packages."
+      },
+      "install_backend": {
+        "kind": "uv",
+        "command": "uv",
+        "args": ["pip", "install", "kokoro", "soundfile", "misaki[ja]", "unidic-lite"],
+        "description": "Install Kokoro with audio output and Japanese text dependencies."
+      },
+      "installed_backend": {
+        "kind": "system",
+        "command": "python3",
+        "args": ["-c", "import kokoro, soundfile, unidic_lite; print(\"ok\")"],
+        "description": "Re-check the Kokoro TTS runtime."
+      },
+      "managed_env_subpath": "tool-runtimes/kokoro-tts",
+      "notes": "Optional lightweight TTS runtime used by the governed Kokoro bridge."
+    },
+    {
+      "tool_id": "pocket_tts",
+      "display_name": "Kyutai Pocket TTS Runtime",
+      "ecosystem": "python",
+      "status": "active",
+      "platforms": ["any"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "trial_backend": {
+        "kind": "system",
+        "command": "python3",
+        "args": ["-c", "import pocket_tts, scipy; print(\"ok\")"],
+        "description": "Probe Pocket TTS and scipy availability."
+      },
+      "install_backend": {
+        "kind": "uv",
+        "command": "uv",
+        "args": ["pip", "install", "pocket-tts", "scipy"],
+        "description": "Install Kyutai Pocket TTS and WAV output dependencies."
+      },
+      "installed_backend": {
+        "kind": "system",
+        "command": "python3",
+        "args": ["-c", "import pocket_tts, scipy; print(\"ok\")"],
+        "description": "Re-check the Pocket TTS runtime."
+      },
+      "managed_env_subpath": "tool-runtimes/pocket-tts",
+      "notes": "CPU streaming TTS and consent-gated voice cloning; upstream language packs currently exclude Japanese."
+    },
+    {
+      "tool_id": "ten_vad",
+      "display_name": "TEN VAD Runtime",
+      "ecosystem": "python",
+      "status": "active",
+      "platforms": ["darwin", "linux", "win32"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "trial_backend": {
+        "kind": "system",
+        "command": "python3",
+        "args": ["-c", "import ten_vad; print(\"ok\")"],
+        "description": "Probe the TEN VAD Python binding."
+      },
+      "install_backend": {
+        "kind": "uv",
+        "command": "uv",
+        "args": ["pip", "install", "numpy", "git+https://github.com/TEN-framework/ten-vad.git"],
+        "description": "Install the official TEN VAD Python binding and its NumPy dependency from upstream."
+      },
+      "installed_backend": {
+        "kind": "system",
+        "command": "python3",
+        "args": ["-c", "import ten_vad; print(\"ok\")"],
+        "description": "Re-check the TEN VAD runtime."
+      },
+      "managed_env_subpath": "tool-runtimes/ten-vad",
+      "notes": "Optional 10/16ms-hop VAD. Review the upstream Apache-2.0 additional conditions before redistribution."
+    },
+    {
+      "tool_id": "silero_vad",
+      "display_name": "Silero VAD Runtime",
+      "ecosystem": "python",
+      "status": "active",
+      "platforms": ["any"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "trial_backend": {
+        "kind": "system",
+        "command": "python3",
+        "args": ["-c", "import numpy, onnxruntime; print(\"ok\")"],
+        "description": "Probe the lightweight Silero ONNX bridge dependencies."
+      },
+      "install_backend": {
+        "kind": "uv",
+        "command": "uv",
+        "args": ["pip", "install", "numpy", "onnxruntime"],
+        "description": "Install the ONNX runtime used by the Silero VAD v6 bridge."
+      },
+      "installed_backend": {
+        "kind": "system",
+        "command": "python3",
+        "args": ["-c", "import numpy, onnxruntime; print(\"ok\")"],
+        "description": "Re-check the Silero VAD dependencies."
+      },
+      "managed_env_subpath": "tool-runtimes/silero-vad",
+      "notes": "The bridge accepts the current Silero VAD v6.2-compatible ONNX model through KYBERION_SILERO_VAD_MODEL."
+    },
+    {
       "tool_id": "claude_real_video",
       "display_name": "Claude Real Video Toolkit",
       "ecosystem": "python",

@@ -152,12 +152,16 @@ function resolveTtsCandidate(engine: VoiceEngineRecord): VoiceTtsSelectionCandid
 
 function resolveSttAvailability(): VoiceSttAvailability {
   const mlxWhisper = probeToolRuntime('mlx_whisper', 'installed');
+  const fluidAudio = Boolean(
+    process.platform === 'darwin' && process.env.KYBERION_FLUID_AUDIO_STT_COMMAND?.trim()
+  );
   return {
     server: Boolean(
       process.env.VOICE_HUB_STT_BASE_URL?.trim() ||
       process.env.WHISPERKIT_BASE_URL?.trim() ||
       process.env.MLX_AUDIO_BASE_URL?.trim()
     ),
+    fluidAudio,
     mlxWhisper: mlxWhisper.installed,
     whisperCpp:
       safeExistsSync(pathResolver.resolve('active/shared/tmp/whisper.cpp/build/bin/whisper-cli')) &&
@@ -173,6 +177,7 @@ function resolveSttAvailability(): VoiceSttAvailability {
 function sttCandidates(availability: VoiceSttAvailability): VoiceSttSelectionCandidate[] {
   const isAvailable = (backend: VoiceSttBackend): boolean => {
     if (backend === 'server') return availability.server;
+    if (backend === 'fluid_audio') return availability.fluidAudio === true;
     if (backend === 'mlx_whisper') return availability.mlxWhisper === true;
     if (backend === 'whisper_cpp') return availability.whisperCpp;
     if (backend === 'native_speech') return availability.nativeSpeech;
@@ -180,6 +185,8 @@ function sttCandidates(availability: VoiceSttAvailability): VoiceSttSelectionCan
   };
   const reasonFor = (backend: VoiceSttBackend): string => {
     if (backend === 'server') return 'Set VOICE_HUB_STT_BASE_URL or a provider-specific STT URL.';
+    if (backend === 'fluid_audio')
+      return 'Set KYBERION_FLUID_AUDIO_STT_COMMAND to a local FluidAudio/Parakeet JSON bridge command.';
     if (backend === 'mlx_whisper') return 'Uses the managed mlx-whisper runtime on Apple Silicon.';
     if (backend === 'whisper_cpp') return 'Requires the configured whisper.cpp CLI and model.';
     if (backend === 'native_speech')

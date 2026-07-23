@@ -43,6 +43,7 @@ describe('voice engine registry', () => {
     expect(engine.engine_id).toBe('local_say');
     expect(engine.supports.playback).toBe(true);
     expect(registry.engines.some((entry) => entry.engine_id === 'kokoro')).toBe(true);
+    expect(registry.engines.some((entry) => entry.engine_id === 'pocket_tts')).toBe(true);
   });
 
   it('resolves active clone engine on darwin', () => {
@@ -55,6 +56,14 @@ describe('voice engine registry', () => {
     expect(engine.engine_id).toBe('kokoro');
     expect(engine.bridge_script).toContain('kokoro_tts_bridge.py');
     expect(engine.supports.artifact_formats).toEqual(['wav']);
+    expect(engine.runtime_id).toBe('kokoro_tts');
+  });
+
+  it('exposes Pocket TTS as a live bridge-backed clone engine', () => {
+    const engine = getVoiceEngineRecord('pocket_tts');
+    expect(engine.runtime_id).toBe('pocket_tts');
+    expect(engine.supports.voice_clone).toBe(true);
+    expect(engine.supports.icl_ref_audio).toBe(true);
   });
 
   it('exposes the Gemini TTS engine metadata', () => {
