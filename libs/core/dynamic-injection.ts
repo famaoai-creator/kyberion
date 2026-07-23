@@ -12,6 +12,7 @@
  */
 
 import { logger } from './core.js';
+import { frameUntrustedInput } from './untrusted-input-framing.js';
 
 export interface DynamicInjectionState {
   /** Monotonic step counter of the consuming loop (for step-based pacing). */
@@ -164,6 +165,34 @@ export function buildWorkingPrinciplesInjectionProvider(
     collect: () => {
       const lines = buildLines(teamRole);
       return lines.length > 0 ? lines.join('\n') : null;
+    },
+  };
+}
+
+/**
+ * Build a provider whose injected text originates outside the system prompt
+ * (goal objectives, delegation echoes, surface input) and therefore must go
+ * through the KD-04 injection framing contract before it reaches `collect()`
+ * callers. `getData` returns the raw, untrusted text (or null/empty to skip
+ * this cycle); `frameUntrustedInput` (untrusted-input-framing.ts) does the
+ * HTML-escape + `<untrusted_data>` tag + boilerplate so this provider never
+ * hand-rolls its own framing.
+ */
+export function buildUntrustedDataInjectionProvider(
+  id: string,
+  source: string,
+  getData: (state: DynamicInjectionState) => string | null,
+  options?: Pick<DynamicInjectionProvider, 'throttleMs' | 'oneShot' | 'onContextCompacted'>
+): DynamicInjectionProvider {
+  return {
+    id,
+    throttleMs: options?.throttleMs,
+    oneShot: options?.oneShot,
+    onContextCompacted: options?.onContextCompacted,
+    collect: (state) => {
+      const data = getData(state);
+      if (!data || !data.trim()) return null;
+      return frameUntrustedInput({ data, source });
     },
   };
 }
