@@ -49,6 +49,7 @@
 > 3. **`visual_label` の margin `[2,4,2,4]` がインチ解釈で内容幅を消失**させ、「pain points」が1文字ずつ縦に描画されていた。単位を修正し、**この領域だけ layout-fit を通していなかった**ため計測経路にも接続(通っていれば検出できていた)。
 > 4. **紺地に紺文字で本文が10枚中4枚で不可視**(`fill=334155 color=334155`)。テーマに `surface`/`navy` ロールが無く同一値へフォールバックしていた。`ensureReadableOn()` を design-qa に追加し、パネル/region の文字色を**自分が乗る塗りに対して**検証するようにした。回帰テスト(塗り==文字色の要素を出さない / AA 比を下回らない)を追加。
 >    **教訓**: 「レイアウト pass・オーバーフロー0」でも、見れば一目で壊れている出力は出る。MP-04 の視覚レビューが必要な理由そのものが実証された。
+>    **2026-07-20追記**: Kimi Code概念取り込み KD-01〜09 を新設([KIMI_CODE_ADOPTION_PLAN_2026-07-20.ja.md](./KIMI_CODE_ADOPTION_PLAN_2026-07-20.ja.md)。MoonshotAI/kimi-code(kimi-cli の TypeScript 後継)の実コード分析に基づく概念昇華方式。KC-01〜10 の追補で、Goal 状態機械・イベントソーシング復元・プラグイン信頼由来導出など TS 版新規概念のみを扱う)。全件 TODO として追加し、DONE 90 / PARTIAL 31 / TODO 15 へ更新。
 >    **判定基準**: DONE = 受入条件を実コードで検証済 / PARTIAL = 一部充足 / TODO = 実質未着手。
 
 ## サマリ
@@ -57,7 +58,7 @@
 | ------- | ---- |
 | DONE    | 90   |
 | PARTIAL | 31   |
-| TODO    | 6    |
+| TODO    | 15   |
 
 ## P0 残作業(プロダクション化のクリティカルパス)
 
@@ -328,6 +329,22 @@
 | MP-05 | DONE | 2026-07-20 実装・検証済: `media-brief-lock.ts`(明示 stated / 推定 inferred+rationale の区別、推定が明示を上書きしない、run-shape 契約)。既定は**外部送信と劣化フォールバックを共に不許可**。`media:lock_media_brief` op を新設し、**run-shape が実行を実際に支配する**よう配線 — `visual_review` は locked brief の `allow_external_visual_review` を egress 判断に用い、`visual_review_rounds=0` では「operator が無効化した」と明示して skip(pass ではない)。Review フェーズ: `house-style-distillation.ts` で視覚批評の再発所見を house-style 制約へ昇格提案(**3成果物以上で初めてパターン扱い**=単一の粗悪成果物からの昇格を防止、既存制約は再提案しない、決定論的な制約IDで自由文言のドリフトを防止)。**提案のみを返し自動適用しない**(制約追加は以後の全成果物の作り方を変える統治判断のため、KM-03 の昇格承認を通す)。テスト20本(core 12 / op 8)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | MP-06 | DONE | 2026-07-20 実装・検証済: `layout-acceptance.test.ts`(ゴールデンブリーフ3種=日本語長文/箇条書き過多/表混在 × オーバーフロー0・ランプ下限維持・layoutDiagnostics 検証・同一入力2回のプロトコルハッシュ一致・ゾーン多様性ガード)。計15本。**MP-04 のルーブリック採点は未実装のため、客観指標(overflow数・shrink数・ゾーン多様性)で代替**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | MP-07 | DONE | 2026-07-20 実装・検証済: body-zone 語彙の拡充(非目標から転換)。JSON の `regions` 宣言から描画する汎用レンダラを新設し**ゾーン追加＝JSON追加**に(アクチュエータの分岐は増やさない)。新ゾーン6種(metrics_band/comparison_two_col/contents_index/statement/checklist_grid/table_feature)を追加、`resolveBodyZoneLayout` と統制カタログ `body_zone_map` の両方を拡張。目次スライドが `semantic_type:'summary'` とハードコードされ要約と同一ゾーンに流れていた欠陥を2箇所修正。ゴールデンブリーフの実測で**distinct zone 6→8・オーバーフロー0を維持**。`body-zones.test.ts` 29本(region 契約・キャンバス内収まり・ランプ下限・semantic→zone 到達性)。既存6ゾーンの region 化移行は後続                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+
+### KD(Kimi Code概念取り込み)
+
+正本: [KIMI_CODE_ADOPTION_PLAN_2026-07-20.ja.md](./KIMI_CODE_ADOPTION_PLAN_2026-07-20.ja.md)
+
+| ID    | 状態 | 残作業                                                                                                                |
+| ----- | ---- | --------------------------------------------------------------------------------------------------------------------- |
+| KD-01 | TODO | ワーカー Goal 状態機械(active/paused/blocked/complete)+ 自律ドライバ + 再監査 continuation。KC-07 rewind の配線先(P0) |
+| KD-02 | TODO | Goal 予算 grace step・75% 収束モード・wall-clock deadline(KD-01 依存)                                                 |
+| KD-03 | TODO | イベントソーシング型ワーカー状態復元(zod op・純 apply・restore 副作用禁止・版付き migration)。MO-06 の実装参照        |
+| KD-04 | TODO | untrusted 入力の注入枠付け契約(escape + タグ + 定型文、boundary 登録儀式)                                             |
+| KD-05 | TODO | サブエージェント能力ティア(AgentProfile 型 allowlist、implementer/explorer/planner)                                   |
+| KD-06 | TODO | 由来ベースのプラグイン信頼ラベル + managed-copy 隔離 + install 時無実行                                               |
+| KD-07 | TODO | リソース宣言型ツール並列スケジューラ(accesses 宣言、無宣言は all 排他)                                                |
+| KD-08 | TODO | プロンプトキャッシュ規律契約(安定 prefix 不変・deferred tools・breakpoint 3 箇所)                                     |
+| KD-09 | TODO | `{seq, epoch}` カーソル再同期契約(KD-03 依存・operator UI 需要確定まで backlog)                                       |
 
 ### CO(Company OS)
 
