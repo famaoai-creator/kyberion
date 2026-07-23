@@ -179,6 +179,41 @@ function renderReasoningSelection() {
   providerSelect.onchange = renderModels;
   renderModels();
 }
+function renderAdapterDefaults() {
+  const grid = $('adapter-default-grid');
+  if (!grid) return;
+  const categories = Array.isArray(serverState.adapter_defaults?.categories)
+    ? serverState.adapter_defaults.categories
+    : [];
+  grid.replaceChildren();
+  categories.forEach((category) => {
+    const label = document.createElement('label');
+    const title = document.createElement('span');
+    title.textContent = category.display_name || category.key;
+    const select = document.createElement('select');
+    select.dataset.adapterDefault = category.key;
+    const candidates = Array.isArray(category.candidates) ? category.candidates : [];
+    candidates.forEach((candidate) => {
+      const option = document.createElement('option');
+      option.value = candidate.id;
+      option.textContent = `${candidate.display_name} — ${candidate.status}`;
+      option.disabled = !candidate.selectable;
+      option.title = candidate.reason || '';
+      select.appendChild(option);
+    });
+    if (category.selected_id) select.value = category.selected_id;
+    const hint = document.createElement('small');
+    const selected = candidates.find((candidate) => candidate.id === select.value);
+    hint.textContent = selected?.reason || '候補を読み込めません。';
+    label.append(title, select, hint);
+    grid.appendChild(label);
+  });
+  if (!categories.length) {
+    const empty = document.createElement('small');
+    empty.textContent = 'Adapter default candidates are unavailable.';
+    grid.appendChild(empty);
+  }
+}
 function collectDraft() {
   const defaultModels = {};
   document.querySelectorAll('[data-model]').forEach((input) => {
@@ -189,6 +224,10 @@ function collectDraft() {
     auth_mode: input.dataset.auth,
     required: false,
   }));
+  const adapterDefaults = {};
+  document.querySelectorAll('[data-adapter-default]').forEach((input) => {
+    if (input.value) adapterDefaults[input.dataset.adapterDefault] = input.value;
+  });
   return {
     version: '1.0.0',
     identity: {
@@ -213,6 +252,7 @@ function collectDraft() {
       provider: $('reasoning-provider').value,
       model_id: $('reasoning-model').value || undefined,
     },
+    adapter_defaults: adapterDefaults,
     tools: {
       mode_preference: {
         python: $('tool-python').value,
@@ -386,12 +426,14 @@ async function load() {
     renderServices();
     renderProviders();
     renderReasoningSelection();
+    renderAdapterDefaults();
     await loadVoiceEngines();
   } catch (error) {
     notice(`状態を読み込めません: ${error.message}`, true);
     renderServices();
     renderProviders();
     renderReasoningSelection();
+    renderAdapterDefaults();
     await loadVoiceEngines();
   }
 }

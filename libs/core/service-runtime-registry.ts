@@ -5,6 +5,7 @@ import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } fr
 import { safeJsonParse } from './validators.js';
 import { secureFetch } from './network.js';
 import { getServiceEndpointRecord } from './service-binding.js';
+import { getAdapterDefault } from './adapter-default-preferences.js';
 import {
   getServiceRuntimePolicy,
   resolveServiceRuntimeRoot,
@@ -120,7 +121,9 @@ export interface ServiceRuntimeInventory {
   items: ServiceRuntimeInventoryItem[];
 }
 
-const DEFAULT_REGISTRY_PATH = pathResolver.knowledge('product/governance/service-runtime-registry.json');
+const DEFAULT_REGISTRY_PATH = pathResolver.knowledge(
+  'product/governance/service-runtime-registry.json'
+);
 const STATE_VERSION = '1.0.0';
 
 const FALLBACK_REGISTRY: ServiceRuntimeRegistry = {
@@ -155,7 +158,8 @@ const FALLBACK_REGISTRY: ServiceRuntimeRegistry = {
       managed_service_subpath: 'service-runtimes/comfyui',
       service_endpoint_path: 'knowledge/product/orchestration/service-endpoints/comfyui.json',
       service_preset_path: 'knowledge/product/orchestration/service-presets/comfyui.json',
-      notes: 'ComfyUI is managed as a service runtime so availability, provisioning intent, and managed location can be tracked separately from media-generation routing.',
+      notes:
+        'ComfyUI is managed as a service runtime so availability, provisioning intent, and managed location can be tracked separately from media-generation routing.',
     },
   ],
 };
@@ -188,7 +192,9 @@ function getRegistry(): ServiceRuntimeRegistry {
     cachedRegistry = parsed;
     return parsed;
   } catch (error: any) {
-    logger.warn(`[SERVICE_RUNTIME_REGISTRY] Failed to load registry at ${registryPath}: ${error.message}`);
+    logger.warn(
+      `[SERVICE_RUNTIME_REGISTRY] Failed to load registry at ${registryPath}: ${error.message}`
+    );
     cachedRegistryPath = registryPath;
     cachedRegistry = FALLBACK_REGISTRY;
     return cachedRegistry;
@@ -196,7 +202,10 @@ function getRegistry(): ServiceRuntimeRegistry {
 }
 
 function isSupportedPlatform(record: ServiceRuntimeRecord, platform: NodeJS.Platform): boolean {
-  return record.platforms.includes('any') || record.platforms.includes(platform as ServiceRuntimePlatform);
+  return (
+    record.platforms.includes('any') ||
+    record.platforms.includes(platform as ServiceRuntimePlatform)
+  );
 }
 
 function normalizeServiceId(serviceId?: string): string {
@@ -215,13 +224,20 @@ function resolveStatePath(record: ServiceRuntimeRecord): string {
 function loadStateFromPath(statePath: string): ServiceRuntimeState | null {
   if (!safeExistsSync(statePath)) return null;
   try {
-    return safeJsonParse<ServiceRuntimeState>(safeReadFile(statePath, { encoding: 'utf8' }) as string, 'service runtime state');
+    return safeJsonParse<ServiceRuntimeState>(
+      safeReadFile(statePath, { encoding: 'utf8' }) as string,
+      'service runtime state'
+    );
   } catch {
     return null;
   }
 }
 
-function writeState(record: ServiceRuntimeRecord, state: Omit<ServiceRuntimeState, 'version' | 'service_id' | 'managed_service_path'> & Partial<Pick<ServiceRuntimeState, 'version'>>): ServiceRuntimeState {
+function writeState(
+  record: ServiceRuntimeRecord,
+  state: Omit<ServiceRuntimeState, 'version' | 'service_id' | 'managed_service_path'> &
+    Partial<Pick<ServiceRuntimeState, 'version'>>
+): ServiceRuntimeState {
   const resolvedState: ServiceRuntimeState = {
     version: state.version || STATE_VERSION,
     service_id: record.service_id,
@@ -253,7 +269,10 @@ function resolveBaseUrl(record: ServiceRuntimeRecord, state: ServiceRuntimeState
   return (record.default_base_url || '').trim();
 }
 
-function resolveProbe(record: ServiceRuntimeRecord, requestedMode: ServiceRuntimeMode): ServiceRuntimeProbeDefinition | null {
+function resolveProbe(
+  record: ServiceRuntimeRecord,
+  requestedMode: ServiceRuntimeMode
+): ServiceRuntimeProbeDefinition | null {
   if (requestedMode === 'pinned' && record.installed_probe) {
     return record.installed_probe;
   }
@@ -263,14 +282,20 @@ function resolveProbe(record: ServiceRuntimeRecord, requestedMode: ServiceRuntim
   return record.trial_probe || null;
 }
 
-function resolvePlan(record: ServiceRuntimeRecord, requestedMode: ServiceRuntimeMode): ServiceRuntimeProvisionPlan | null {
+function resolvePlan(
+  record: ServiceRuntimeRecord,
+  requestedMode: ServiceRuntimeMode
+): ServiceRuntimeProvisionPlan | null {
   if (requestedMode === 'approved_install' || requestedMode === 'pinned') {
     return record.install_plan || null;
   }
   return record.install_plan || null;
 }
 
-function selectAction(state: ServiceRuntimeState | null, requestedMode: ServiceRuntimeMode): ServiceRuntimeAction {
+function selectAction(
+  state: ServiceRuntimeState | null,
+  requestedMode: ServiceRuntimeMode
+): ServiceRuntimeAction {
   if (state?.status === 'pinned') return 'pin';
   if (state?.status === 'installed') return 'reuse';
   if (requestedMode === 'approved_install') return 'provision';
@@ -281,7 +306,7 @@ function selectAction(state: ServiceRuntimeState | null, requestedMode: ServiceR
 async function runHttpProbe(
   record: ServiceRuntimeRecord,
   state: ServiceRuntimeState | null,
-  probe: ServiceRuntimeProbeDefinition,
+  probe: ServiceRuntimeProbeDefinition
 ): Promise<{ available: boolean; probe_url?: string; reason: string }> {
   const baseUrl = resolveBaseUrl(record, state);
   if (!baseUrl) {
@@ -315,7 +340,7 @@ export function getServiceRuntimeRegistry(): ServiceRuntimeRegistry {
 }
 
 export function getServiceRuntimeRecord(serviceId?: string): ServiceRuntimeRecord | null {
-  const normalized = normalizeServiceId(serviceId);
+  const normalized = normalizeServiceId(serviceId) || getAdapterDefault('service.runtime') || '';
   if (!normalized) return null;
   return getRegistry().services.find((service) => service.service_id === normalized) || null;
 }
@@ -323,12 +348,15 @@ export function getServiceRuntimeRecord(serviceId?: string): ServiceRuntimeRecor
 export async function resolveServiceRuntimeForPlatform(
   serviceId?: string,
   requestedMode: ServiceRuntimeMode = 'trial',
-  platform: NodeJS.Platform = process.platform,
+  platform: NodeJS.Platform = process.platform
 ): Promise<ServiceRuntimeResolution> {
   const registry = getRegistry();
-  const service = getServiceRuntimeRecord(serviceId) || getServiceRuntimeRecord(registry.default_service_id);
+  const service =
+    getServiceRuntimeRecord(serviceId) || getServiceRuntimeRecord(registry.default_service_id);
   if (!service) {
-    throw new Error(`No service runtime record found for "${serviceId || registry.default_service_id}"`);
+    throw new Error(
+      `No service runtime record found for "${serviceId || registry.default_service_id}"`
+    );
   }
   if (service.status === 'disabled') {
     return {
@@ -392,12 +420,14 @@ export async function resolveServiceRuntimeForPlatform(
     };
   }
 
-  const availableProbe = state?.status === 'pinned' || state?.status === 'installed'
-    ? await runHttpProbe(service, state, selectedProbe)
-    : await runHttpProbe(service, state, selectedProbe);
+  const availableProbe =
+    state?.status === 'pinned' || state?.status === 'installed'
+      ? await runHttpProbe(service, state, selectedProbe)
+      : await runHttpProbe(service, state, selectedProbe);
 
   const available = availableProbe.available;
-  const installed = available || Boolean(state?.status === 'installed' || state?.status === 'pinned');
+  const installed =
+    available || Boolean(state?.status === 'installed' || state?.status === 'pinned');
   const requiresInstall = !installed && requestedMode !== 'trial';
   const reason = availableProbe.reason;
 
@@ -422,37 +452,40 @@ export async function resolveServiceRuntimeForPlatform(
 export async function probeServiceRuntime(
   serviceId?: string,
   requestedMode: ServiceRuntimeMode = 'trial',
-  platform: NodeJS.Platform = process.platform,
+  platform: NodeJS.Platform = process.platform
 ): Promise<ServiceRuntimeResolution> {
   return resolveServiceRuntimeForPlatform(serviceId, requestedMode, platform);
 }
 
 export async function listServiceRuntimeInventory(
   requestedMode: ServiceRuntimeMode = 'trial',
-  platform: NodeJS.Platform = process.platform,
+  platform: NodeJS.Platform = process.platform
 ): Promise<ServiceRuntimeInventory> {
   const registry = getRegistry();
   const items: ServiceRuntimeInventoryItem[] = [];
   for (const service of registry.services) {
-    const resolution = await resolveServiceRuntimeForPlatform(service.service_id, requestedMode, platform);
-    const lifecycleStage: ServiceRuntimeLifecycleStage =
-      !isSupportedPlatform(service, platform)
-        ? 'unsupported'
-        : resolution.state?.status === 'pinned'
-          ? 'pinned'
-          : resolution.state?.status === 'installed'
-            ? 'installed'
+    const resolution = await resolveServiceRuntimeForPlatform(
+      service.service_id,
+      requestedMode,
+      platform
+    );
+    const lifecycleStage: ServiceRuntimeLifecycleStage = !isSupportedPlatform(service, platform)
+      ? 'unsupported'
+      : resolution.state?.status === 'pinned'
+        ? 'pinned'
+        : resolution.state?.status === 'installed'
+          ? 'installed'
           : resolution.available
-              ? requestedMode === 'approved_install'
-                ? 'approved_install'
-                : requestedMode === 'installed'
-                  ? 'installed'
-                  : requestedMode === 'pinned'
-                    ? 'pinned'
-                    : 'trial'
-              : resolution.requires_install
-                ? 'install_required'
-                : 'unsupported';
+            ? requestedMode === 'approved_install'
+              ? 'approved_install'
+              : requestedMode === 'installed'
+                ? 'installed'
+                : requestedMode === 'pinned'
+                  ? 'pinned'
+                  : 'trial'
+            : resolution.requires_install
+              ? 'install_required'
+              : 'unsupported';
     items.push({
       service,
       state: resolution.state,
@@ -484,7 +517,7 @@ export async function listServiceRuntimeInventory(
 export async function getServiceRuntimeInventoryItem(
   serviceId: string,
   requestedMode: ServiceRuntimeMode = 'trial',
-  platform: NodeJS.Platform = process.platform,
+  platform: NodeJS.Platform = process.platform
 ): Promise<ServiceRuntimeInventoryItem | null> {
   const inventory = await listServiceRuntimeInventory(requestedMode, platform);
   return inventory.items.find((item) => item.service.service_id === serviceId) || null;
@@ -499,7 +532,7 @@ export function getServiceRuntimeState(serviceId: string): ServiceRuntimeState |
 export function markServiceRuntimeInstalled(
   serviceId: string,
   baseUrl?: string,
-  notes?: string,
+  notes?: string
 ): ServiceRuntimeState {
   const record = getServiceRuntimeRecord(serviceId);
   if (!record) {
@@ -520,7 +553,7 @@ export function markServiceRuntimeInstalled(
 export function markServiceRuntimePinned(
   serviceId: string,
   baseUrl?: string,
-  notes?: string,
+  notes?: string
 ): ServiceRuntimeState {
   const record = getServiceRuntimeRecord(serviceId);
   if (!record) {
