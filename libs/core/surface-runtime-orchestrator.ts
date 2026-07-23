@@ -1319,6 +1319,44 @@ export function buildPipelineIntentContextArgs(context: SurfaceRuntimeRouteConte
   }
 }
 
+/**
+ * Keep the governed use-case scenario visible to the Surface agent whenever
+ * the intent compiler ran. Short/direct Surface routes intentionally bypass
+ * this context for latency, but compiled routes should have one canonical
+ * user-facing plan for clarification, approval, and execution handoff.
+ */
+export function buildSurfaceStructuredQuery(query: string, compiledFlow: UserIntentFlow): string {
+  return [
+    query,
+    '',
+    'Governed execution brief:',
+    JSON.stringify(compiledFlow.executionBrief, null, 2),
+    compiledFlow.executionBrief?.workflow_steps?.length ? '' : undefined,
+    compiledFlow.executionBrief?.workflow_steps?.length ? 'Governed workflow steps:' : undefined,
+    compiledFlow.executionBrief?.workflow_steps?.length
+      ? JSON.stringify(compiledFlow.executionBrief.workflow_steps, null, 2)
+      : undefined,
+    '',
+    'Governed intent contract:',
+    JSON.stringify(compiledFlow.intentContract, null, 2),
+    '',
+    'Governed work loop:',
+    JSON.stringify(compiledFlow.workLoop, null, 2),
+    compiledFlow.useCaseScenario ? '' : undefined,
+    compiledFlow.useCaseScenario
+      ? 'Governed use-case scenario (canonical user-facing handoff):'
+      : undefined,
+    compiledFlow.useCaseScenario
+      ? JSON.stringify(compiledFlow.useCaseScenario, null, 2)
+      : undefined,
+    compiledFlow.useCaseScenario
+      ? 'Follow the scenario handoff: clarify missing inputs, request approval, resolve runtime blockers, or execute as indicated. Explain the next step concisely to the user.'
+      : undefined,
+  ]
+    .filter((item): item is string => typeof item === 'string')
+    .join('\n');
+}
+
 async function handleGovernedExecutionHint(
   context: SurfaceRuntimeRouteContext
 ): Promise<SurfaceConversationResult> {
@@ -2135,27 +2173,7 @@ export async function runSurfaceConversation(
       : undefined);
 
   const structuredQuery = compiledFlow
-    ? [
-        input.query,
-        '',
-        'Governed execution brief:',
-        JSON.stringify(compiledFlow.executionBrief, null, 2),
-        compiledFlow.executionBrief?.workflow_steps?.length ? '' : undefined,
-        compiledFlow.executionBrief?.workflow_steps?.length
-          ? 'Governed workflow steps:'
-          : undefined,
-        compiledFlow.executionBrief?.workflow_steps?.length
-          ? JSON.stringify(compiledFlow.executionBrief.workflow_steps, null, 2)
-          : undefined,
-        '',
-        'Governed intent contract:',
-        JSON.stringify(compiledFlow.intentContract, null, 2),
-        '',
-        'Governed work loop:',
-        JSON.stringify(compiledFlow.workLoop, null, 2),
-      ]
-        .filter((item): item is string => typeof item === 'string')
-        .join('\n')
+    ? buildSurfaceStructuredQuery(input.query, compiledFlow)
     : input.query;
 
   const parsedSlackPrompt =
