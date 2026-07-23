@@ -735,6 +735,9 @@
 ## 📁 public/pmo/templates
 - [対外報告用ステータスレポート・テンプレート](./public/pmo/templates/external_status_report.md) (public | Ecosystem Architect)
 
+## 📁 public/procedures
+- [Select a reasoning provider and model](./public/procedures/select-reasoning-provider-and-model.md) (public | Unknown)
+
 ## 📁 public/procedures/audit
 - [Procedure: License & Supply Chain Audit](./public/procedures/audit/audit-licenses.md) (public | Unknown)
 - [Procedure: Predictive Bug Analysis & Red-Teaming](./public/procedures/audit/predict-risks.md) (public | Unknown)

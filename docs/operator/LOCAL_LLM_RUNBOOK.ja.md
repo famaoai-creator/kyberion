@@ -2,6 +2,8 @@
 
 本ランブックでは、Kyberion でサポートされているローカル LLM ランタイム（Ollama, vLLM, LM Studio, llama.cpp, MLX-LM, LocalAI）のセットアップ、起動手順、環境変数設定について解説します。
 
+ブラウザから推論プロバイダとモデルを選択する場合は、[Reasoning プロバイダとモデルの選択手順](../../knowledge/public/procedures/select-reasoning-provider-and-model.md)を先に確認してください。選択状態は active profile ごとに保存され、明示的な環境変数や role binding がある場合はそちらが優先されます。
+
 ## サポート対象ランタイム一覧
 
 | ランタイム        | バックエンドモード (`KYBERION_REASONING_BACKEND`) | デフォルト URL              | 参照環境変数             | 既定モデル(未指定時) | Context Window                       |
