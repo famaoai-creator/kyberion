@@ -50,15 +50,16 @@
 > 4. **紺地に紺文字で本文が10枚中4枚で不可視**(`fill=334155 color=334155`)。テーマに `surface`/`navy` ロールが無く同一値へフォールバックしていた。`ensureReadableOn()` を design-qa に追加し、パネル/region の文字色を**自分が乗る塗りに対して**検証するようにした。回帰テスト(塗り==文字色の要素を出さない / AA 比を下回らない)を追加。
 >    **教訓**: 「レイアウト pass・オーバーフロー0」でも、見れば一目で壊れている出力は出る。MP-04 の視覚レビューが必要な理由そのものが実証された。
 >    **2026-07-20追記**: Kimi Code概念取り込み KD-01〜09 を新設([KIMI_CODE_ADOPTION_PLAN_2026-07-20.ja.md](./KIMI_CODE_ADOPTION_PLAN_2026-07-20.ja.md)。MoonshotAI/kimi-code(kimi-cli の TypeScript 後継)の実コード分析に基づく概念昇華方式。KC-01〜10 の追補で、Goal 状態機械・イベントソーシング復元・プラグイン信頼由来導出など TS 版新規概念のみを扱う)。全件 TODO として追加し、DONE 90 / PARTIAL 31 / TODO 15 へ更新。
+>    **2026-07-24追記**: KD-01(worker goal 状態機械 + 自律ドライバ)/KD-02(goal 予算 grace step・75% 収束モード・wall-clock deadline)/KD-03(イベントソーシング型ワーカー状態復元)/KD-04(untrusted 注入枠付け契約)/KD-05(サブエージェント能力ティア)/KD-06(由来ベースプラグイン信頼 + managed-copy 隔離)/KD-07(リソース宣言型ツール並列スケジューラ、`core:parallel_calls`)/KD-08(プロンプトキャッシュ規律契約)を実装し、各受入条件を hermetic テスト(計 200+ 件)・typecheck・境界テスト・op-registry check で検証して DONE とした。KD-01 が generateWithTools 多段ループ(`worker-goal-driver.ts`)を導入し `context_rewind` を配線したため、**KC-07 も DONE へ更新**。KD-09 は需要トリガーの backlog として TODO のまま。DONE 99 / PARTIAL 30 / TODO 7 へ更新。
 >    **判定基準**: DONE = 受入条件を実コードで検証済 / PARTIAL = 一部充足 / TODO = 実質未着手。
 
 ## サマリ
 
 | 判定    | 件数 |
 | ------- | ---- |
-| DONE    | 90   |
-| PARTIAL | 31   |
-| TODO    | 15   |
+| DONE    | 99   |
+| PARTIAL | 30   |
+| TODO    | 7    |
 
 ## P0 残作業(プロダクション化のクリティカルパス)
 
@@ -303,18 +304,18 @@
 
 正本: [KIMI_CLI_ADOPTION_PLAN_2026-07-20.ja.md](./KIMI_CLI_ADOPTION_PLAN_2026-07-20.ja.md)
 
-| ID    | 状態    | 残作業                                                                                                                                                                                                                                        |
-| ----- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| KC-01 | DONE    | 2026-07-20 実装・検証済: `tool-call-repeat-governor.ts`(canonical 引数 streak・3/5/8 段階警告・12 強制停止)、adf-engine(明示ループ op 内は force-stop 免除)+ InSessionDispatcher に接続                                                       |
-| KC-02 | DONE    | 2026-07-20 実装・検証済: `worker-event-stream.ts`(zod envelope・SPMC・jsonl 記録/再生・fail-open)。run_pipeline の turn/step、approval-store、orchestration observation、圧縮 begin/end を投影                                                |
-| KC-03 | DONE    | 2026-07-20 実装・検証済: セッション action キャッシュ(deny/硬化 policy 素通り不可・audit 記録)+ source 単位 cancel(`cancelApprovalRequestsBySource`)。human-only 契約維持                                                                     |
-| KC-04 | DONE    | 2026-07-20 実装・検証済: `lifecycle-hook-engine.ts`(13 イベント・並列 regex・fail-open + block telemetry carve-out・コマンドフック stdin-JSON/exit-2)。pre_tool_use block は stepGate で run 中断                                             |
-| KC-05 | DONE    | 2026-07-20 実装・検証済: `tests_ai/` 不変条件 3 本 + `run_ai_audit.ts`(delegateStructured fan-out・report.json + Trace・stub は明示 skip)+ `ai-audit` pipeline(週次 schedule)。実 LLM での定期運用は今後                                      |
-| KC-06 | DONE    | 2026-07-20 実装・検証済: 要約最短長 retry(1 回・stub/structured 除外)、resumable 委譲 store + `resumeDelegatedTask`、claim-based 完了通知(≤4 件/step)、carryover に active_background_tasks                                                   |
-| KC-07 | PARTIAL | 2026-07-20 プリミティブ実装・検証済: `context-rewind.ts`(checkpoint・外部効果ガード・1 turn 1 回・lesson 上限・pinned 生存・governance/event 記録)+ `context_rewind` tool 定義。実ワーカー loop への配線は generateWithTools 多段ループ導入時 |
-| KC-08 | DONE    | 2026-07-20 実装・検証済: `dynamic-injection.ts`(throttle・one-shot・圧縮後リセット・fail-open・history 正規化)。working-principles を初代 provider 化、圧縮から registry reset を接続                                                         |
-| KC-09 | DONE    | 2026-07-20 実装・検証済: `completion-token-budget.ts` + anthropic(全経路)/openai-compatible(opt-in)接続。thinking budget は floor 引き上げ、window 不明時は passthrough                                                                       |
-| KC-10 | TODO    | Mermaid フロー → pipeline governed compiler(需要確定まで backlog)                                                                                                                                                                             |
+| ID    | 状態 | 残作業                                                                                                                                                                                                           |
+| ----- | ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| KC-01 | DONE | 2026-07-20 実装・検証済: `tool-call-repeat-governor.ts`(canonical 引数 streak・3/5/8 段階警告・12 強制停止)、adf-engine(明示ループ op 内は force-stop 免除)+ InSessionDispatcher に接続                          |
+| KC-02 | DONE | 2026-07-20 実装・検証済: `worker-event-stream.ts`(zod envelope・SPMC・jsonl 記録/再生・fail-open)。run_pipeline の turn/step、approval-store、orchestration observation、圧縮 begin/end を投影                   |
+| KC-03 | DONE | 2026-07-20 実装・検証済: セッション action キャッシュ(deny/硬化 policy 素通り不可・audit 記録)+ source 単位 cancel(`cancelApprovalRequestsBySource`)。human-only 契約維持                                        |
+| KC-04 | DONE | 2026-07-20 実装・検証済: `lifecycle-hook-engine.ts`(13 イベント・並列 regex・fail-open + block telemetry carve-out・コマンドフック stdin-JSON/exit-2)。pre_tool_use block は stepGate で run 中断                |
+| KC-05 | DONE | 2026-07-20 実装・検証済: `tests_ai/` 不変条件 3 本 + `run_ai_audit.ts`(delegateStructured fan-out・report.json + Trace・stub は明示 skip)+ `ai-audit` pipeline(週次 schedule)。実 LLM での定期運用は今後         |
+| KC-06 | DONE | 2026-07-20 実装・検証済: 要約最短長 retry(1 回・stub/structured 除外)、resumable 委譲 store + `resumeDelegatedTask`、claim-based 完了通知(≤4 件/step)、carryover に active_background_tasks                      |
+| KC-07 | DONE | 2026-07-24 完了: KD-01 の goal 駆動多段ループ(`worker-goal-driver.ts`)へ `context_rewind` tool を配線。goal turn 内からの発火・外部効果ガード・envelope/governance 記録を hermetic テストで検証(KD-01 受入条件5) |
+| KC-08 | DONE | 2026-07-20 実装・検証済: `dynamic-injection.ts`(throttle・one-shot・圧縮後リセット・fail-open・history 正規化)。working-principles を初代 provider 化、圧縮から registry reset を接続                            |
+| KC-09 | DONE | 2026-07-20 実装・検証済: `completion-token-budget.ts` + anthropic(全経路)/openai-compatible(opt-in)接続。thinking budget は floor 引き上げ、window 不明時は passthrough                                          |
+| KC-10 | TODO | Mermaid フロー → pipeline governed compiler(需要確定まで backlog)                                                                                                                                                |
 
 ### MP(メディア生成プロセス — HyperFrames / Anthropic skills 移植)
 
@@ -334,17 +335,17 @@
 
 正本: [KIMI_CODE_ADOPTION_PLAN_2026-07-20.ja.md](./KIMI_CODE_ADOPTION_PLAN_2026-07-20.ja.md)
 
-| ID    | 状態 | 残作業                                                                                                                |
-| ----- | ---- | --------------------------------------------------------------------------------------------------------------------- |
-| KD-01 | TODO | ワーカー Goal 状態機械(active/paused/blocked/complete)+ 自律ドライバ + 再監査 continuation。KC-07 rewind の配線先(P0) |
-| KD-02 | TODO | Goal 予算 grace step・75% 収束モード・wall-clock deadline(KD-01 依存)                                                 |
-| KD-03 | TODO | イベントソーシング型ワーカー状態復元(zod op・純 apply・restore 副作用禁止・版付き migration)。MO-06 の実装参照        |
-| KD-04 | TODO | untrusted 入力の注入枠付け契約(escape + タグ + 定型文、boundary 登録儀式)                                             |
-| KD-05 | TODO | サブエージェント能力ティア(AgentProfile 型 allowlist、implementer/explorer/planner)                                   |
-| KD-06 | TODO | 由来ベースのプラグイン信頼ラベル + managed-copy 隔離 + install 時無実行                                               |
-| KD-07 | TODO | リソース宣言型ツール並列スケジューラ(accesses 宣言、無宣言は all 排他)                                                |
-| KD-08 | TODO | プロンプトキャッシュ規律契約(安定 prefix 不変・deferred tools・breakpoint 3 箇所)                                     |
-| KD-09 | TODO | `{seq, epoch}` カーソル再同期契約(KD-03 依存・operator UI 需要確定まで backlog)                                       |
+| ID    | 状態 | 残作業                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ----- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| KD-01 | DONE | 2026-07-24 実装・検証済: `worker-goal.ts`(純状態機械: 4 状態・blocked 3-turn 閾値・impossible バイパス・complete 永続化拒否)+ `worker-goal-driver.ts`(多段ドライバ: 構造化 `goal_update` 信号のみで終了・KC-08 provider 経由 turn 境界注入・KD-04 枠付け・KC-01 governor 維持・KC-07 rewind 配線・mission blocker はイベント+callback で昇格)。受入条件 5 件 hermetic 検証。実運用 caller(mission-orchestration-worker)への採用は後続 |
+| KD-02 | DONE | 2026-07-24 実装・検証済: opt-in `GoalBudgetLimits`(token/turn/wall-clock)、grace step(tool 合成拒否 + 最終報告 1 step)、75% 収束モード文言切替、injectable scheduler による wall-clock 期限の live turn cancel。pipeline step 予算との層区別を文書化                                                                                                                                                                                  |
+| KD-03 | DONE | 2026-07-24 実装・検証済: `worker-state-journal.ts`(defineModel/defineOp kernel・純 apply 同一参照・非決定値は payload・restore-mode 構造的封鎖・v1→v2 migration・JSONL 正本 + 自己修復 derived index・fork/cancel 一回性 reminder の replay 非再配達・restore 後 active→paused 降格)。MO-06 のワーカー粒度先行実証                                                                                                                    |
+| KD-04 | DONE | 2026-07-24 実装・検証済: `untrusted-input-framing.ts`(escape + `<untrusted_data>` タグ + 定型文)、`delegateTaskWithUntrustedData` を同契約へ統合、`buildUntrustedDataInjectionProvider`、raw タグ構築の boundary allowlist テスト                                                                                                                                                                                                     |
+| KD-05 | DONE | 2026-07-24 実装・検証済: `subagent-capability-profiles.ts`(implementer/explorer/planner、1 箇所登録で catalog/enum 反映、`goal:*` 予約 deny、least-agency policy 経由 deny + envelope 記録)、resume の ownership+idle 検証。レビューで explorer allowlist を実 op レジストリへ突合修正(架空語彙の恒久防止テスト追加)                                                                                                                  |
+| KD-06 | DONE | 2026-07-24 実装・検証済: `plugin-source-trust.ts`(取得元由来の信頼導出、manifest を構造的に受け取れない設計)+ `plugin-managed-install.ts`(stage→検証→atomic rename、symlink 封じ込め、third-party は approval-store 経由 cancel 既定承認、壊れた manifest は診断 degrade・無実行)。skill_installer への配線は後続統合                                                                                                                 |
+| KD-07 | DONE | 2026-07-24 実装・検証済: `tool-call-scheduler.ts`(read/write path 競合判定・request 順 drain・`all` 混在時は全体直列の安全側読み)+ `OpInputContract.accesses` 宣言(file/system の read 系 op)+ run_pipeline の `core:parallel_calls` 配線                                                                                                                                                                                             |
+| KD-08 | DONE | 2026-07-24 実装・検証済: `prompt-cache-discipline.ts`(StablePrefixGuard・deferred tool 告知・cache breakpoint 3 境界)、anthropic backend 9 箇所の cache_control 統一 + generateWithTools/promptWithImages へ追加、openai-compatible の tool ループへ guard 配線。実 API cache_read 検証は opt-in(`ANTHROPIC_API_KEY`)                                                                                                                 |
+| KD-09 | TODO | `{seq, epoch}` カーソル再同期契約(KD-03 依存・operator UI 需要確定まで backlog)                                                                                                                                                                                                                                                                                                                                                       |
 
 ### CO(Company OS)
 
