@@ -18,6 +18,8 @@ vi.mock('./path-resolver.js', () => ({
   rootResolve: (p: string) => `/repo/${p}`,
   active: (p = '') => `/repo/active/${p}`,
   knowledge: (p = '') => `/repo/knowledge/${p}`,
+  resolve: (p: string) => p,
+  findMissionPath: () => null,
 }));
 
 vi.mock('./secure-io.js', () => ({

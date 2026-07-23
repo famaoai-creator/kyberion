@@ -6,6 +6,7 @@ import { getToolRuntimeRecord } from './tool-runtime-registry.js';
 import { probeToolRuntime } from './tool-runtime-registry.js';
 import { probeServiceRuntime } from './service-runtime-registry.js';
 import { probeAppleImageGeneration } from './apple-intelligence-bridge.js';
+import { getAdapterDefault } from './adapter-default-preferences.js';
 import {
   getVoiceEngineRegistry,
   resolveVoiceEngineForPlatform,
@@ -93,7 +94,13 @@ function defaultMediaBackendProbeTtlMs(): number {
 const DEFAULT_REGISTRY_PATH = pathResolver.knowledge(
   'product/governance/media-backend-registry.json'
 );
-const LOCAL_FLUX_TOOL_BACKEND = getToolRuntimeRecord('mflux').trial_backend;
+// Keep fallback construction free of registry calls at module evaluation time.
+// The canonical media registry is the source of truth; this fallback only
+// protects bootstrap when the governed files are unavailable.
+const LOCAL_FLUX_TOOL_BACKEND = {
+  command: 'uvx',
+  args: ['--from', 'mflux', 'mflux-generate'],
+};
 
 const FALLBACK_REGISTRY: MediaBackendRegistry = {
   version: 'fallback',
@@ -302,7 +309,11 @@ export function getMediaBackendRecord(
   modality?: MediaBackendModality
 ): MediaBackendRecord {
   const registry = getRegistry();
-  const defaultBackendId = modality ? registry.default_backend_ids[modality] : undefined;
+  const configuredDefault =
+    modality && modality !== 'voice' ? getAdapterDefault(`media.${modality}`) : undefined;
+  const defaultBackendId = modality
+    ? configuredDefault || registry.default_backend_ids[modality]
+    : undefined;
   const resolvedId = backendId || defaultBackendId || registry.default_backend_ids.image;
   const aliasId =
     modality === 'video' && resolvedId === 'media-generation.comfyui'
@@ -512,7 +523,9 @@ export function resolveMediaBackendForPlatform(
   platform: NodeJS.Platform = process.platform
 ): MediaBackendRecord {
   const registry = getRegistry();
-  const defaultBackendId = registry.default_backend_ids[modality];
+  const configuredDefault =
+    modality !== 'voice' ? getAdapterDefault(`media.${modality}`) : undefined;
+  const defaultBackendId = configuredDefault || registry.default_backend_ids[modality];
   const visited = new Set<string>();
   let current = getMediaBackendRecord(backendId || defaultBackendId, modality);
 
