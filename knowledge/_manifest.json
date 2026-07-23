@@ -6187,6 +6187,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/execution-feedback.schema.json",
+      "tier": "public",
+      "size": 1478,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/execution-receipt-policy.schema.json",
       "tier": "public",
       "size": 2251,
@@ -6376,6 +6382,12 @@
       "path": "product/schemas/intent-snapshot.schema.json",
       "tier": "public",
       "size": 2229,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/intent-use-case-scenario.schema.json",
+      "tier": "public",
+      "size": 7042,
       "type": "json"
     },
     {
