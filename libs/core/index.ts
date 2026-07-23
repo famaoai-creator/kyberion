@@ -670,6 +670,8 @@ export * from './bluebubbles-adapter.js';
 export * from './history-search-index.js';
 export * from './voice-engine-registry.js';
 export * from './media-backend-registry.js';
+export * from './adapter-default-preferences.js';
+export * from './adapter-default-selection.js';
 export * from './intent-execution-profile-registry.js';
 export * from './voice-sample-ingestion-policy.js';
 export * from './voice-sample-collection.js';
