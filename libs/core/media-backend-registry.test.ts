@@ -14,6 +14,8 @@ import {
 describe('media backend registry', () => {
   beforeEach(() => {
     resetMediaBackendAvailabilityCache();
+    delete process.env.KYBERION_RUNWAY_API_KEY;
+    delete process.env.RUNWAYML_API_SECRET;
   });
 
   it('caches availability probes and exposes bounded probe metadata', async () => {
@@ -137,5 +139,29 @@ describe('media backend registry', () => {
     expect(resolution.backend.backend_id).toBe('video.hyperframes_cli');
     expect(resolution.availability.probe_kind).toBe('registry');
     expect(resolution.fallback_used).toBe(false);
+  });
+
+  it('reports explicit API backends unavailable until a provider credential is configured', async () => {
+    const missing = await probeMediaBackendAvailability(
+      'media-generation.runway.gen4.5',
+      'video',
+      'linux',
+      { force: true }
+    );
+    expect(missing).toEqual(
+      expect.objectContaining({
+        available: false,
+        reason: expect.stringContaining('KYBERION_RUNWAY_API_KEY'),
+      })
+    );
+
+    process.env.KYBERION_RUNWAY_API_KEY = 'test-key';
+    const configured = await probeMediaBackendAvailability(
+      'media-generation.runway.gen4.5',
+      'video',
+      'linux',
+      { force: true }
+    );
+    expect(configured).toEqual(expect.objectContaining({ available: true }));
   });
 });

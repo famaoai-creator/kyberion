@@ -41,6 +41,111 @@
       "notes": "Compatibility-specific video contract for the shared ComfyUI runtime."
     },
     {
+      "backend_id": "media-generation.google.veo-3.1",
+      "modality": "video",
+      "display_name": "Google Veo 3.1 Video Generation API",
+      "kind": "api",
+      "provider": "google_veo",
+      "status": "active",
+      "platforms": ["any"],
+      "model": "veo-3.1-generate-preview",
+      "api_key_env": "KYBERION_GEMINI_VIDEO_API_KEY|GEMINI_API_KEY",
+      "endpoint_env": "KYBERION_GEMINI_VIDEO_URL",
+      "supports": {
+        "artifact_formats": ["mp4"],
+        "async": true,
+        "mux_audio": true
+      },
+      "notes": "Direct Google Gemini API adapter. Select explicitly; the default remains HyperFrames."
+    },
+    {
+      "backend_id": "media-generation.runway.gen4.5",
+      "modality": "video",
+      "display_name": "Runway Gen-4.5 Video Generation API",
+      "kind": "api",
+      "provider": "runway",
+      "status": "active",
+      "platforms": ["any"],
+      "model": "gen4.5",
+      "api_key_env": "KYBERION_RUNWAY_API_KEY|RUNWAYML_API_SECRET",
+      "endpoint_env": "KYBERION_RUNWAY_VIDEO_URL",
+      "supports": {
+        "artifact_formats": ["mp4"],
+        "async": true
+      },
+      "notes": "Provider adapter for Runway text-to-video and image-to-video task APIs."
+    },
+    {
+      "backend_id": "media-generation.runway.seedance2",
+      "modality": "video",
+      "display_name": "Runway Seedance 2 Video Generation API",
+      "kind": "api",
+      "provider": "runway",
+      "status": "active",
+      "platforms": ["any"],
+      "model": "seedance2",
+      "api_key_env": "KYBERION_RUNWAY_API_KEY|RUNWAYML_API_SECRET",
+      "endpoint_env": "KYBERION_RUNWAY_VIDEO_URL",
+      "supports": {
+        "artifact_formats": ["mp4"],
+        "async": true
+      },
+      "notes": "Same provider abstraction as Gen-4.5; model selection stays in the governed backend registry."
+    },
+    {
+      "backend_id": "media-generation.runway.gemini-omni-flash",
+      "modality": "video",
+      "display_name": "Runway Gemini Omni Flash Video Generation API",
+      "kind": "api",
+      "provider": "runway",
+      "status": "active",
+      "platforms": ["any"],
+      "model": "gemini_omni_flash",
+      "api_key_env": "KYBERION_RUNWAY_API_KEY|RUNWAYML_API_SECRET",
+      "endpoint_env": "KYBERION_RUNWAY_VIDEO_URL",
+      "supports": {
+        "artifact_formats": ["mp4"],
+        "async": true,
+        "mux_audio": true
+      },
+      "notes": "Runway-hosted Gemini Omni Flash route for conversational or reference-guided clips."
+    },
+    {
+      "backend_id": "media-generation.openai.sora-2",
+      "modality": "video",
+      "display_name": "OpenAI Sora 2 Video Generation API",
+      "kind": "api",
+      "provider": "openai_sora",
+      "status": "active",
+      "platforms": ["any"],
+      "model": "sora-2",
+      "api_key_env": "KYBERION_OPENAI_VIDEO_API_KEY|OPENAI_API_KEY",
+      "endpoint_env": "KYBERION_OPENAI_VIDEO_URL",
+      "supports": {
+        "artifact_formats": ["mp4"],
+        "async": true,
+        "mux_audio": true
+      },
+      "notes": "Direct OpenAI Videos API adapter. Verify account access before production use."
+    },
+    {
+      "backend_id": "media-generation.minimax.hailuo-2.3",
+      "modality": "video",
+      "display_name": "MiniMax Hailuo 2.3 Video Generation API",
+      "kind": "api",
+      "provider": "minimax_hailuo",
+      "status": "active",
+      "platforms": ["any"],
+      "model": "MiniMax-Hailuo-2.3",
+      "api_key_env": "KYBERION_MINIMAX_VIDEO_API_KEY|MINIMAX_API_KEY",
+      "endpoint_env": "KYBERION_MINIMAX_VIDEO_URL",
+      "supports": {
+        "artifact_formats": ["mp4"],
+        "async": true
+      },
+      "notes": "Direct MiniMax asynchronous task and file retrieval adapter."
+    },
+    {
       "backend_id": "media-generation.comfyui.music",
       "modality": "music",
       "display_name": "ComfyUI Music Generation",
