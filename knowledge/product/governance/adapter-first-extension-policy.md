@@ -17,6 +17,14 @@ This policy applies to voice engines, STT/TTS backends, reasoning providers,
 actuators, storage providers, browser drivers, and future capability
 providers.
 
+When a capability has more than one registered adapter-backed implementation,
+its effective default must be selected through the shared adapter-default
+selection layer. The selection surface is generated from the canonical
+registry, and the persisted value identifies a registered candidate rather
+than embedding provider logic in a caller. Adding another implementation to
+an existing capability is therefore a registry/descriptor change; the default
+selection UI, onboarding contract, and callers remain unchanged.
+
 ## 2. Required architecture
 
 Every multi-provider capability has four distinct layers:
@@ -126,6 +134,13 @@ candidate needs:
 An unavailable provider must be disabled or clearly marked. A hidden fallback
 is a UX and operations defect.
 
+The generic runtime-default categories currently cover image, video, and music
+media backends, service runtime, tool runtime, and voice activity detection.
+TTS/STT and reasoning provider/model selection retain their dedicated
+procedures because their credential, model, and privacy decisions need richer
+UX. Project-specific deployment adapters and agent/harness adapters are not
+generic onboarding defaults; they remain governed by the project contract.
+
 ## 5. Registration ceremony
 
 An adapter/provider addition is complete only when all applicable items are
@@ -178,3 +193,7 @@ features.
   defines where declarative wiring, typed logic, and design decisions belong.
 - [Voice backend selection procedure](../../public/procedures/media/select-voice-backends.md)
   applies this policy to TTS/STT selection.
+- [Adapter-backed runtime default selection procedure](../../public/procedures/select-adapter-backed-runtime-defaults.md)
+  applies this policy to generic adapter-backed defaults.
+- [Reasoning provider and model selection procedure](../../public/procedures/select-reasoning-provider-and-model.md)
+  applies this policy to the dedicated LLM route selector.

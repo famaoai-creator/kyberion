@@ -737,6 +737,7 @@
 
 ## 📁 public/procedures
 - [Select a reasoning provider and model](./public/procedures/select-reasoning-provider-and-model.md) (public | Unknown)
+- [Select adapter-backed runtime defaults](./public/procedures/select-adapter-backed-runtime-defaults.md) (public | Unknown)
 
 ## 📁 public/procedures/audit
 - [Procedure: License & Supply Chain Audit](./public/procedures/audit/audit-licenses.md) (public | Unknown)

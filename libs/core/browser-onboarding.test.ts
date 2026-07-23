@@ -115,6 +115,49 @@ describe('browser onboarding', () => {
     expect(resolveReasoningRoute({ role: 'default', env: {} }).mode).toBe('stub');
   });
 
+  it('persists adapter-backed runtime defaults and rejects unknown candidates', async () => {
+    const { applyBrowserOnboarding, previewBrowserOnboarding } =
+      await import('./browser-onboarding.js');
+    const result = await applyBrowserOnboarding({
+      ...validDraft(),
+      adapter_defaults: {
+        'media.image': 'media-generation.comfyui',
+        'media.video': 'video.hyperframes_cli',
+        'media.music': 'media-generation.comfyui.music',
+        'service.runtime': 'comfyui',
+        'tool.runtime': 'playwright',
+        'voice.vad': 'energy',
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.artifacts).toContain(
+      path.join(PROFILE_ROOT, 'onboarding', 'adapter-defaults.json')
+    );
+    expect(
+      JSON.parse(
+        String(
+          safeReadFile(path.join(PROFILE_ROOT, 'onboarding', 'adapter-defaults.json'), {
+            encoding: 'utf8',
+          })
+        )
+      )
+    ).toMatchObject({
+      defaults: {
+        'media.image': 'media-generation.comfyui',
+        'service.runtime': 'comfyui',
+        'voice.vad': 'energy',
+      },
+    });
+
+    expect(() =>
+      previewBrowserOnboarding({
+        ...validDraft(),
+        adapter_defaults: { 'media.image': 'not-registered' },
+      })
+    ).toThrow(/Unknown adapter default candidate/);
+  });
+
   it('rejects an unregistered reasoning provider before writing onboarding artifacts', async () => {
     const { previewBrowserOnboarding } = await import('./browser-onboarding.js');
 
