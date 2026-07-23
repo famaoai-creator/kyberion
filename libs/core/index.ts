@@ -1997,6 +1997,10 @@ export type {
 } from './service-procedure-executor.js';
 export { SERVICE_EXTERNAL_EFFECT_OP } from './procedure-dispatcher.js';
 
+// KD-04: untrusted input injection framing contract
+export type { FrameUntrustedInputParams } from './untrusted-input-framing.js';
+export { frameUntrustedInput, UNTRUSTED_DATA_BOILERPLATE } from './untrusted-input-framing.js';
+
 // SA-03 Prompt Injection & Untrusted Content Defense
 export type { ScanOptions } from './untrusted-content.js';
 export {
