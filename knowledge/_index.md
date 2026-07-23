@@ -44,6 +44,7 @@
 - [Architecture: The 5-Layer Backbone of Kyberion](./product/architecture/backbone-sovereignty.md) (public | Unknown)
 - [Benchmark-Driven Harness Evolution](./product/architecture/benchmark-driven-harness-evolution.md) (public | Ecosystem Architect)
 - [Browser Actuator v3](./product/architecture/browser-actuator-v3.md) (public | ecosystem_architect)
+- [Browser Execution Substrate — How To](./product/architecture/browser-execution-substrate-howto.md) (public | ecosystem_architect)
 - [CEO UX](./product/architecture/ceo-ux.md) (public | Ecosystem Architect)
 - [CLI Harness Coordination Model](./product/architecture/cli-harness-coordination-model.md) (public | Ecosystem Architect)
 - [Capability Bundle Model](./product/architecture/capability-bundle-model.md) (public | Unknown)

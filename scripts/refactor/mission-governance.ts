@@ -37,7 +37,7 @@ import { loadState } from './mission-state.js';
 
 export function syncRoleProcedure(missionId: string, persona: string): void {
   const roleSlug = persona.toLowerCase().replace(/\s+/g, '_');
-  const sourcePath = pathResolver.knowledge(`public/roles/${roleSlug}/PROCEDURE.md`);
+  const sourcePath = pathResolver.knowledge(`product/roles/${roleSlug}/PROCEDURE.md`);
   const targetDir = findMissionPath(missionId);
 
   if (!targetDir) {

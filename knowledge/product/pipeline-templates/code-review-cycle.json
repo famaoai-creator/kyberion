@@ -2,8 +2,8 @@
   "action": "pipeline",
   "name": "code-review-cycle",
   "version": "2.0.0",
-  "description": "SDLC code review phase: treat a diff (or changed-files list) as the review topic, run 3 adversarial personas (senior-dev / security-auditor / red-team) via a2a_fanout + cross_critique, and persist surviving concerns to dissent-log.json so the reviewer role can triage.",
-  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type only (no channel data flow — all communication via file paths in context).",
+  "description": "SDLC code review phase: treat a diff (or changed-files list) as the review topic, run 4 adversarial personas (senior-dev / security-auditor / red-team / maintainability-architect) via a2a_fanout + cross_critique, and persist surviving concerns to dissent-log.json so the reviewer role can triage.",
+  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type only (no channel data flow — all communication via file paths in context). v2.1: added a fourth persona (Staff Engineer — Maintainability & Architecture Fit) so non-functional concerns (maintainability, extensibility, operability) get a dedicated lens instead of being an afterthought under 'Senior Developer'. Add a 'UX Reviewer' persona in `context.personas` for missions that touch a user-facing surface (Chronos panels, CLI UX, etc.) — not included by default since most self-ops changes have no UI surface.",
   "context": {
     "mission_id": "",
     "review_topic": "Review the changes below for correctness, security, and risk.",
@@ -11,7 +11,12 @@
     "hypotheses_output": "active/missions/{{mission_id}}/evidence/code-review-raw.json",
     "critique_output": "active/missions/{{mission_id}}/evidence/code-review-critique.json",
     "dissent_output": "active/missions/{{mission_id}}/evidence/dissent-log.json",
-    "personas": ["Senior Developer", "Security Auditor", "Red Team Adversary"]
+    "personas": [
+      "Senior Developer",
+      "Security Auditor",
+      "Red Team Adversary",
+      "Staff Engineer — Maintainability & Architecture Fit (evaluate long-term maintainability, extensibility, operability/observability, and whether the change fits or fights the existing architecture)"
+    ]
   },
   "steps": [
     {

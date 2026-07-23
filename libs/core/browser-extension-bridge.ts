@@ -815,31 +815,64 @@ export interface BrowserRecordingPipelineDraft {
   }>;
 }
 
+// Recording ops that the Playwright browser-actuator can already execute
+// directly against a `{ref, role, name, dom_path}` target (no CSS selector),
+// via `resolveRefOrRecordedTarget` (libs/actuators/browser-actuator/src/recorded-ref-resolver.ts).
+// Keyed by the recording's own op name; note `wait_for_ref` (recording) maps
+// to the actuator's `wait_ref` case — the names never aligned.
+const PLAYWRIGHT_DIRECT_REF_OPS: Record<string, string> = {
+  click_ref: 'click_ref',
+  fill_ref: 'fill_ref',
+  press_ref: 'press_ref',
+  extract_text_ref: 'extract_text_ref',
+  wait_for_ref: 'wait_ref',
+};
+
 /**
  * Deterministically crystallize an (ideally approved) recording into a
- * browser-pipeline.schema-conformant **draft** ADF. The draft is never directly
- * runnable: recordings carry refs, not selectors, so `_review_required` always
- * lists the gaps a human must close before the pipeline is promoted to the
- * reusable registry. Only review-approved actions are included.
+ * browser-pipeline.schema-conformant **draft** ADF.
+ *
+ * For `executionSubstrate: 'extension'` (default, unchanged): the draft is
+ * never directly runnable — recordings carry refs, not selectors — so
+ * `_review_required` always lists the gaps a human must close before the
+ * pipeline is promoted to the reusable registry.
+ *
+ * For `executionSubstrate: 'playwright'`: ops with a direct ref-aware
+ * actuator handler (`PLAYWRIGHT_DIRECT_REF_OPS`) are kept as-is (plus
+ * `dom_path`) instead of being normalized to the selector-only canonical
+ * ops, since `resolveRefOrRecordedTarget` resolves them against the live
+ * page at run time — no manual selector resolution needed for those steps.
+ * Ops without a direct ref-aware handler still fall back to the existing
+ * normalize+`needs_selector` path. The high-risk-approval review line is
+ * always kept regardless of substrate: a clean ref resolution says nothing
+ * about whether the action itself is safe to auto-run.
  */
 export function compileBrowserRecordingToPipeline(
   recording: BrowserExtensionRecording,
-  opts: { pipelineId?: string } = {}
+  opts: { pipelineId?: string; executionSubstrate?: 'extension' | 'playwright' } = {}
 ): BrowserRecordingPipelineDraft {
   const validation = validateBrowserExtensionRecording(recording);
   if (!validation.value)
     throw new Error(`Invalid browser extension recording: ${validation.errors.join('; ')}`);
   const value = validation.value;
   const selected = selectedRecordingActions(value);
+  const isPlaywright = opts.executionSubstrate === 'playwright';
+  let hasUnresolvedRefStep = false;
 
   const steps = selected.map((action, index) => {
     const params: Record<string, unknown> = {};
     params.original_op = action.op;
+    const directRefOp = isPlaywright ? PLAYWRIGHT_DIRECT_REF_OPS[action.op] : undefined;
     if (action.target) {
       params.ref = action.target.ref;
       params.role = action.target.role;
       params.name = action.target.name;
-      params.needs_selector = true; // recording has no selector; resolve before run
+      if (directRefOp) {
+        if (action.target.dom_path) params.dom_path = action.target.dom_path;
+      } else {
+        params.needs_selector = true; // recording has no selector; resolve before run
+        hasUnresolvedRefStep = true;
+      }
     }
     if (action.op === 'fill_ref' && action.variable) {
       params.text = `{{${action.variable.name}}}`;
@@ -852,7 +885,8 @@ export function compileBrowserRecordingToPipeline(
       params.high_risk = true;
       params.original_op = action.op;
     }
-    const op = normalizeBrowserPipelineOp(resolveBrowserRecordingPipelineOp(action.op));
+    const op =
+      directRefOp ?? normalizeBrowserPipelineOp(resolveBrowserRecordingPipelineOp(action.op));
     const validation = validateOpInput('browser', op, { ...action, ...params });
     if (!validation.valid) {
       const { errors } = validation as { valid: false; errors: string[] };
@@ -869,7 +903,7 @@ export function compileBrowserRecordingToPipeline(
   });
 
   const reviewRequired: string[] = [];
-  if (selected.some((action) => action.target)) {
+  if (hasUnresolvedRefStep) {
     reviewRequired.push('Resolve ref → Playwright selector for every step before promotion');
   }
   if (selected.some((action) => HIGH_RISK_OPERATIONS.has(action.op))) {

@@ -346,7 +346,7 @@ async function main(): Promise<void> {
     .option('audio-bus', { type: 'string' })
     .option('transport-mode', {
       type: 'string',
-      choices: ['transcribe_first', 'realtime_voice'] as const,
+      choices: ['transcribe_first', 'captions_first', 'realtime_voice'] as const,
       default: 'transcribe_first',
     })
     .option('dry-run', { type: 'boolean', default: false })
@@ -417,12 +417,26 @@ async function main(): Promise<void> {
     installShellStreamingTtsBridgeFromEnv();
 
     const runtimePlan = resolveMeetingParticipationRuntimePlan({
-      transport_mode: argv['transport-mode'] as 'transcribe_first' | 'realtime_voice' | undefined,
+      transport_mode: argv['transport-mode'] as
+        | 'transcribe_first'
+        | 'captions_first'
+        | 'realtime_voice'
+        | undefined,
       dry_run: Boolean(argv['dry-run']),
     });
     logger.info(
       `[participate-cli] runtime plan transport=${runtimePlan.transport_mode} dry_run=${runtimePlan.dry_run} real_audio_bus=${runtimePlan.require_real_audio_bus} stt=${runtimePlan.require_streaming_stt} tts=${runtimePlan.require_streaming_tts} voice_profile=${runtimePlan.require_voice_profile}`
     );
+    if (
+      runtimePlan.transport_mode === 'captions_first' &&
+      String(argv.driver) !== 'chrome-extension'
+    ) {
+      logger.error(
+        '[participate-cli] --transport-mode captions_first requires --driver chrome-extension (platform live captions are scraped by the Meet Copilot extension).'
+      );
+      exitCode = 2;
+      return;
+    }
 
     // 同席モード (--driver in-room): the meeting is in the physical room, so
     // no meeting URL is required and the platform is forced to in_room.
@@ -551,6 +565,8 @@ async function main(): Promise<void> {
       barge_in_enabled: Boolean(argv['barge-in-enabled']),
       barge_in_rms_multiplier: Math.max(1, Number(argv['barge-in-rms-multiplier'])),
       barge_in_min_duration_ms: Math.max(20, Number(argv['barge-in-min-duration-ms'])),
+      transcript_source:
+        runtimePlan.transport_mode === 'captions_first' ? 'driver_captions' : 'stt',
     });
     logger.info('');
     logger.info(`📋 Participation report:`);

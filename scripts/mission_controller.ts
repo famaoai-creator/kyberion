@@ -614,6 +614,30 @@ async function recordEvidence(
   return result;
 }
 
+async function recordArtifactReview(
+  missionId: string,
+  reviewTaskId: string,
+  reviewerAgentId: string,
+  findings?: unknown[],
+  reviewerTeamRole?: 'reviewer' | 'qa',
+  specialistRoles?: string[]
+) {
+  const result = await missionSystem.recordArtifactReview(
+    missionId,
+    reviewTaskId,
+    reviewerAgentId,
+    (findings || []) as import('@agent/core').ArtifactReviewFinding[],
+    reviewerTeamRole,
+    specialistRoles
+  );
+  logger.info(
+    `[review-task] ${reviewTaskId}: status=${result.status}${result.taskCompleted ? ' (task completed)' : ''}${
+      result.reasons.length ? ` — ${result.reasons.join('; ')}` : ''
+    }`
+  );
+  return result;
+}
+
 async function reconcileExistingWork(missionId: string, manifestPath: string, dryRun = false) {
   const result = await missionSystem.reconcileExistingWork(missionId, manifestPath, dryRun);
   console.log(JSON.stringify(result, null, 2));
@@ -1335,6 +1359,10 @@ Maintenance Commands:
   record-task <ID> <description> Record a task intention (flight recorder)
   record-evidence <ID> <task_id> <note>
                                  Append an execution-ledger evidence entry and commit it
+  review-task <ID> <review_task_id> <reviewer_agent_id> [--findings <JSON>] [--reviewer-team-role reviewer|qa] [--specialist-roles <CSV>]
+                                 Record a real ArtifactReviewReceipt for a review-kind task (required before it
+                                 can complete — bare record-evidence is not enough for review tasks). Independence
+                                 from the implementer is computed from the execution ledger, not self-declared.
   reconcile-work <ID> --manifest <PATH> [--dry-run]
                                  Validate and adopt verified work completed outside dispatch-workitems
   review-reenter <ID>            Turn pending human review rejections into rework tasks and reactivate the mission
@@ -1830,6 +1858,7 @@ export async function main() {
     cancelMission,
     recordTask,
     recordEvidence,
+    recordArtifactReview,
     reconcileExistingWork,
     reenterMissionFromReview,
     purgeMissions,

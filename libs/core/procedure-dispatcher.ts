@@ -7,6 +7,7 @@ import {
   type BrowserExtensionRecording,
   type BrowserExtensionSessionRequest,
   type SegmentedLease,
+  compileBrowserRecordingToPipeline,
   enforceBrowserExtensionApproval,
   issueBrowserExtensionLease,
   issueSegmentedLeases,
@@ -71,6 +72,18 @@ export interface DispatchInput {
   serviceInputs?: Record<string, unknown>;
   /** Injected preset runner for service execution (tests). Defaults to the real engine. */
   executePreset?: ServicePresetRunner;
+  /**
+   * Required for `execution_substrate: 'playwright'` browser procedures. Runs
+   * the compiled pipeline steps through the Playwright browser-actuator.
+   * Injected (rather than statically imported) because `libs/core` does not
+   * depend on `libs/actuators/*` — the caller (e.g. a `scripts/*.ts` entry
+   * point) wires in the real `handleAction` from `@agent/browser-actuator`.
+   */
+  executeBrowserPipeline?: (input: {
+    steps: Array<{ id: string; type: string; op: string; params: Record<string, unknown> }>;
+    sessionId?: string;
+    options?: Record<string, unknown>;
+  }) => Promise<{ status: 'succeeded' | 'failed'; results?: unknown[]; errors?: string[] }>;
   /** Surface channel forwarded to the approval gate (e.g. "browser-extension"). */
   channel?: string;
   correlationId?: string;
@@ -87,6 +100,8 @@ export interface DispatchResult {
   segments?: SegmentedLease[];
   /** `service:preset`: per-step execution results (status === 'executed'). */
   serviceResults?: ServiceStepResult[];
+  /** `execution_substrate: 'playwright'`: per-step results from the browser-actuator. */
+  browserResults?: unknown[];
   /** Set when `status === 'approval_required'`. */
   approvalRequestId?: string;
   errors: string[];
@@ -106,6 +121,17 @@ export interface DispatchResult {
  * Design: docs/INTENT_DRIVEN_BROWSER_AUTOMATION_DESIGN.ja.md §7 Layer③
  */
 export async function dispatchProcedure(input: DispatchInput): Promise<DispatchResult> {
+  // Layer C substrate branch (design doc §7/§9): browser procedures authored
+  // for Playwright execution are routed to a dedicated function so the
+  // existing `extension_session` path (dispatchExtensionSession) never has to
+  // be edited to accommodate the new substrate.
+  if (
+    input.procedure.substrate === 'browser' &&
+    input.procedure.execution_substrate === 'playwright'
+  ) {
+    return dispatchPlaywrightPipeline(input);
+  }
+
   const executor = input.procedure.adapter.executor;
   switch (executor) {
     case 'extension_session':
@@ -261,6 +287,158 @@ function dispatchExtensionSession(input: DispatchInput): DispatchResult {
       `origin="${recording.tab.origin}" lease="${issued.lease.lease_id}"`
   );
   return { status: 'lease_issued', lease: issued.lease, errors: [] };
+}
+
+// ---------------------------------------------------------------------------
+// Browser / playwright executor (execution_substrate: 'playwright')
+// Design: docs/INTENT_DRIVEN_BROWSER_AUTOMATION_DESIGN.ja.md §4/§7 Layer③
+// ---------------------------------------------------------------------------
+
+async function dispatchPlaywrightPipeline(input: DispatchInput): Promise<DispatchResult> {
+  const { procedure, recording, session, agentId, channel, correlationId } = input;
+
+  if (!recording) {
+    recordGovernanceAction(agentId, 'procedure_dispatcher', 'missing_recording', true);
+    return {
+      status: 'blocked',
+      errors: ['playwright executor requires a recording'],
+    };
+  }
+  if (recording.review?.status !== 'approved') {
+    recordGovernanceAction(
+      agentId,
+      'procedure_dispatcher',
+      'playwright_unapproved_recording',
+      true
+    );
+    return {
+      status: 'blocked',
+      errors: ['playwright execution requires an approved recording review'],
+    };
+  }
+
+  // Same origin guard as dispatchExtensionSession: every origin the recording
+  // touches must be in the procedure's approved allowed-origins set.
+  const segments = segmentRecording(recording);
+  if (procedure.target.origins && procedure.target.origins.length > 0) {
+    for (const segment of segments) {
+      const allowed = procedure.target.origins.some((o) => matchesAllowedOrigin(o, segment.origin));
+      if (!allowed) {
+        recordGovernanceAction(
+          agentId,
+          'procedure_dispatcher',
+          `origin_blocked:${procedure.procedure_id}`,
+          true
+        );
+        return {
+          status: 'blocked',
+          errors: [
+            `Segment origin "${segment.origin}" is not in allowed origins for ` +
+              `procedure "${procedure.procedure_id}": [${procedure.target.origins.join(', ')}]`,
+          ],
+        };
+      }
+    }
+  }
+
+  // Same substrate-agnostic approval gate as the extension path: a clean ref
+  // resolution says nothing about whether a high-risk action should auto-run.
+  const approval = enforceBrowserExtensionApproval({
+    recording,
+    session: session ?? {
+      kind: 'browser-extension-session.v1',
+      mission_id: input.missionId,
+      pipeline_id: input.pipelineId ?? procedure.pipeline_ref,
+      tab_id: '',
+      origin: recording.tab.origin,
+      mode: 'execute',
+      recording_id: recording.recording_id,
+      requested_operations: [],
+    },
+    agentId,
+    channel: channel ?? 'browser-playwright',
+    correlationId: correlationId ?? `procedure:${procedure.procedure_id}:${recording.recording_id}`,
+  });
+
+  if (!approval.allowed) {
+    logger.info(
+      `[procedure-dispatcher] approval required for "${procedure.procedure_id}" ` +
+        `— request_id=${approval.requestId ?? 'n/a'}`
+    );
+    recordGovernanceAction(
+      agentId,
+      'procedure_dispatcher',
+      `approval_required:${procedure.procedure_id}`,
+      true
+    );
+    return {
+      status: 'approval_required',
+      approvalRequestId: approval.requestId,
+      errors: [],
+    };
+  }
+
+  if (!input.executeBrowserPipeline) {
+    recordGovernanceAction(
+      agentId,
+      'procedure_dispatcher',
+      'playwright_no_executor_injected',
+      true
+    );
+    return {
+      status: 'blocked',
+      errors: [
+        'playwright executor requires an injected executeBrowserPipeline ' +
+          '(wire in @agent/browser-actuator handleAction at the call site)',
+      ],
+    };
+  }
+
+  const draft = compileBrowserRecordingToPipeline(recording, {
+    pipelineId: input.pipelineId,
+    executionSubstrate: 'playwright',
+  });
+
+  try {
+    const exec = await input.executeBrowserPipeline({
+      steps: draft.steps,
+      sessionId: session?.tab_id,
+      options: draft.options,
+    });
+    if (exec.status !== 'succeeded') {
+      const errors =
+        exec.errors && exec.errors.length > 0 ? exec.errors : [`browser execution ${exec.status}`];
+      logger.warn(
+        `[procedure-dispatcher] playwright procedure "${procedure.procedure_id}" failed: ${errors.join('; ')}`
+      );
+      recordGovernanceAction(
+        agentId,
+        'procedure_dispatcher',
+        `playwright_execution_failed:${procedure.procedure_id}`,
+        true
+      );
+      return { status: 'blocked', browserResults: exec.results, errors };
+    }
+    logger.info(
+      `[procedure-dispatcher] playwright procedure "${procedure.procedure_id}" executed (${draft.steps.length} steps)`
+    );
+    return { status: 'executed', browserResults: exec.results, errors: [] };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    logger.warn(
+      `[procedure-dispatcher] playwright procedure "${procedure.procedure_id}" threw during execution: ${message}`
+    );
+    recordGovernanceAction(
+      agentId,
+      'procedure_dispatcher',
+      `playwright_execution_error:${procedure.procedure_id}`,
+      true
+    );
+    return {
+      status: 'blocked',
+      errors: [message],
+    };
+  }
 }
 
 // ---------------------------------------------------------------------------
