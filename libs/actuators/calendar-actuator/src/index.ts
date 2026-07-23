@@ -32,5 +32,29 @@ export {
   handleAction,
   listCalendars,
   listEvents,
+  queryFreeBusy,
   createEvent,
 } from './calendar-actuator-helpers.js';
+
+export {
+  calendarBackendRegistry,
+  createCalendarBackend,
+  createDefaultCalendarBackendRegistry,
+  registerCalendarBackend,
+  resolveCalendarBackend,
+  selectCalendarBackend,
+  CalendarBackendRegistry,
+} from './calendar-backend.js';
+export type {
+  CalendarBackend,
+  CalendarBackendAdapter,
+  CalendarBackendAvailabilityOverrides,
+  CalendarBackendKind,
+  CalendarBackendPreference,
+  CalendarEvent,
+  CalendarEventMutation,
+  CalendarFreeBusyEntry,
+  CalendarParams,
+  CalendarSummary,
+  CalendarTarget,
+} from './calendar-backend.js';

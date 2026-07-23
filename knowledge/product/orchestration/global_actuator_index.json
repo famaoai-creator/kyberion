@@ -98,11 +98,11 @@
     {
       "n": "calendar-actuator",
       "path": "libs/actuators/calendar-actuator",
-      "d": "macOS Calendar.app integration using JXA for cross-account schedule coordination",
+      "d": "Adapter-based calendar coordination with user-selectable and multi-calendar backends, including macOS Calendar.app (JXA) and authenticated Google Workspace (gws)",
       "s": "implemented",
-      "version": "1.0.0",
-      "capability_count": 3,
-      "ops": ["create_event", "list_calendars", "list_events"],
+      "version": "1.1.0",
+      "capability_count": 4,
+      "ops": ["create_event", "list_calendars", "list_events", "query_freebusy"],
       "contract_schema": "schemas/calendar-action.schema.json",
       "prerequisites_summary": "-"
     },

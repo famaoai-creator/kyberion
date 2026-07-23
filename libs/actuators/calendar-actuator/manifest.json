@@ -1,7 +1,7 @@
 {
   "actuator_id": "calendar-actuator",
-  "version": "1.0.0",
-  "description": "macOS Calendar.app integration using JXA for cross-account schedule coordination",
+  "version": "1.1.0",
+  "description": "Adapter-based calendar coordination with user-selectable and multi-calendar backends, including macOS Calendar.app (JXA) and authenticated Google Workspace (gws)",
   "contract_schema": "schemas/calendar-action.schema.json",
   "resilience_tier": "adaptive_retry",
   "recovery_policy": {
@@ -16,8 +16,25 @@
     "retryable_categories": ["network", "timeout", "resource_unavailable"]
   },
   "capabilities": [
-    { "op": "list_calendars", "description": "Lists all available calendars on the system", "platforms": ["darwin"] },
-    { "op": "list_events", "description": "Lists events for specific calendars within a date range", "platforms": ["darwin"] },
-    { "op": "create_event", "description": "Creates a new event in a specific calendar", "platforms": ["darwin"] }
+    {
+      "op": "list_calendars",
+      "description": "Lists calendars through the selected backend (JXA on macOS or authenticated gws)",
+      "platforms": ["darwin", "linux", "win32"]
+    },
+    {
+      "op": "list_events",
+      "description": "Lists events for specific calendars within a date range",
+      "platforms": ["darwin", "linux", "win32"]
+    },
+    {
+      "op": "query_freebusy",
+      "description": "Queries busy windows for one or more calendars",
+      "platforms": ["darwin", "linux", "win32"]
+    },
+    {
+      "op": "create_event",
+      "description": "Creates a new event through the selected calendar backend",
+      "platforms": ["darwin", "linux", "win32"]
+    }
   ]
 }

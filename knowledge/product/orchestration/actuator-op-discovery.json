@@ -962,6 +962,10 @@
           "kind": "capture"
         },
         {
+          "op": "query_freebusy",
+          "kind": "capture"
+        },
+        {
           "op": "create_event",
           "kind": "apply"
         }

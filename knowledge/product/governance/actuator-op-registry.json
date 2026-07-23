@@ -204,7 +204,7 @@
       ]
     },
     "calendar": {
-      "capture": ["list_calendars", "list_events"],
+      "capture": ["list_calendars", "list_events", "query_freebusy"],
       "transform": [],
       "apply": ["create_event"]
     },
