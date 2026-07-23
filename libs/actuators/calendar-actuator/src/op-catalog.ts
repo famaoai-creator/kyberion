@@ -8,7 +8,11 @@
 
 type OpSpecKind = 'capture' | 'transform' | 'apply' | 'control';
 
-export const CALENDAR_ACTUATOR_CAPTURE_OPS = ['list_calendars', 'list_events'] as const;
+export const CALENDAR_ACTUATOR_CAPTURE_OPS = [
+  'list_calendars',
+  'list_events',
+  'query_freebusy',
+] as const;
 
 export const CALENDAR_ACTUATOR_TRANSFORM_OPS = [] as const;
 

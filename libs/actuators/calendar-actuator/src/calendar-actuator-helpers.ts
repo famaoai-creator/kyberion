@@ -1,59 +1,39 @@
 import {
-  logger,
-  safeExec,
-  safeReadFile,
-  pathResolver,
-  TraceContext,
-  persistTrace,
-  retry,
-  buildGovernedRetryOptions,
   classifyError,
-  formatClassification,
   compileSchemaFromPath,
+  pathResolver,
+  persistTrace,
+  TraceContext,
 } from '@agent/core';
-import AjvModule, { type ValidateFunction } from 'ajv';
-import addFormatsModule from 'ajv-formats';
+import * as AjvModule from 'ajv';
+import * as addFormatsModule from 'ajv-formats';
+import type { Ajv as AjvInstance, Options, ValidateFunction } from 'ajv';
 import * as path from 'node:path';
+import {
+  calendarBackendRegistry,
+  createJxaCalendarBackend,
+  type CalendarBackendRegistry,
+  type CalendarBackendAdapter,
+  type CalendarTarget,
+  type CalendarParams,
+} from './calendar-backend.js';
 
-interface CalendarParams {
-  calendar_names?: string[];
-  start_date?: string;
-  end_date?: string;
-  title?: string;
-  location?: string;
-  description?: string;
-}
-
-interface CalendarAction {
-  op: 'list_calendars' | 'list_events' | 'create_event';
+export type CalendarAction = {
+  op: 'list_calendars' | 'list_events' | 'query_freebusy' | 'create_event';
   params?: CalendarParams;
-}
-
-interface CalendarEvent {
-  title: string;
-  start: string;
-  end: string;
-  calendar: string;
-  location: string;
-  description: string;
-}
-
-interface CalendarSummary {
-  name: string;
-}
-
-const AjvCtor = (AjvModule as any).default ?? AjvModule;
-const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
-const CALENDAR_MANIFEST_PATH = pathResolver.rootResolve(
-  'libs/actuators/calendar-actuator/manifest.json'
-);
-const DEFAULT_CALENDAR_RETRY = {
-  maxRetries: 2,
-  initialDelayMs: 500,
-  maxDelayMs: 5000,
-  factor: 2,
-  jitter: true,
 };
+
+type AjvConstructor = new (options?: Options) => AjvInstance;
+type AddFormats = (instance: AjvInstance) => AjvInstance;
+const AjvCtor =
+  (AjvModule as unknown as { default?: AjvConstructor }).default ||
+  (AjvModule as unknown as AjvConstructor);
+const addFormats =
+  (addFormatsModule as unknown as { default?: AddFormats }).default ||
+  (addFormatsModule as unknown as AddFormats);
+const CALENDAR_SCHEMA_PATH = pathResolver.rootResolve(
+  'libs/actuators/calendar-actuator/schemas/calendar-action.schema.json'
+);
 
 let cachedValidator: ValidateFunction | null = null;
 
@@ -61,194 +41,173 @@ function getValidator(): ValidateFunction {
   if (cachedValidator) return cachedValidator;
   const ajv = new AjvCtor({ allErrors: true });
   addFormats(ajv);
-  const schemaPath = path.resolve(
-    pathResolver.rootDir(),
-    'libs/actuators/calendar-actuator/schemas/calendar-action.schema.json'
-  );
-  cachedValidator = compileSchemaFromPath(ajv, schemaPath);
+  cachedValidator = compileSchemaFromPath(ajv, CALENDAR_SCHEMA_PATH);
   return cachedValidator;
+}
+
+function missingRequiredFields(action: CalendarAction): string[] {
+  const params = action.params || {};
+  if (action.op === 'create_event') {
+    const missing: string[] = [];
+    if (!params.title?.trim()) missing.push('params.title (例: "歯医者")');
+    if (!params.start_date?.trim()) {
+      missing.push('params.start_date (例: "2026-07-25T10:00:00+09:00")');
+    }
+    if (
+      !(
+        params.calendar_names?.some((name) => name.trim()) ||
+        params.calendar_id?.trim() ||
+        params.calendar_targets?.some(
+          (target) => target.calendar_id?.trim() || target.calendar_name?.trim()
+        )
+      )
+    ) {
+      missing.push(
+        'params.calendar_names[0]、params.calendar_id、または params.calendar_targets[0] (例: "primary")'
+      );
+    }
+    return missing;
+  }
+  if (action.op === 'query_freebusy') {
+    const missing: string[] = [];
+    if (!params.start_date?.trim()) {
+      missing.push('params.start_date (例: "2026-07-25T09:00:00+09:00")');
+    }
+    if (!params.end_date?.trim()) {
+      missing.push('params.end_date (例: "2026-07-25T18:00:00+09:00")');
+    }
+    return missing;
+  }
+  return [];
 }
 
 function validateAction(input: unknown): CalendarAction {
   const validate = getValidator();
   if (!validate(input)) {
     const errors = (validate.errors || [])
-      .map((e) => `${e.instancePath || '/'} ${e.message ?? 'invalid'}`)
+      .map((error) => `${error.instancePath || '/'} ${error.message ?? 'invalid'}`)
       .join('; ');
     throw new Error(`calendar-actuator: invalid input: ${errors}`);
   }
-  return input as CalendarAction;
-}
-
-function parseISODate(value: string | undefined, label: string): Date | null {
-  if (!value) return null;
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) {
-    throw new Error(`calendar-actuator: invalid ${label}: "${value}"`);
+  const action = input as CalendarAction;
+  const missing = missingRequiredFields(action);
+  if (missing.length) {
+    throw new Error(`calendar-actuator: missing required fields: ${missing.join(', ')}`);
   }
-  return d;
+  return action;
 }
 
-function buildRetryOptions(override?: Record<string, any>) {
-  return buildGovernedRetryOptions({
-    manifestPath: CALENDAR_MANIFEST_PATH,
-    defaults: DEFAULT_CALENDAR_RETRY,
-    override: override,
-    fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+type CalendarBackendSelection = {
+  adapter: CalendarBackendAdapter;
+  params: CalendarParams;
+};
+
+function targetParams(params: CalendarParams, target: CalendarTarget): CalendarParams {
+  return {
+    ...params,
+    backend: target.backend || params.backend,
+    backends: undefined,
+    calendar_id: target.calendar_id || undefined,
+    calendar_names: target.calendar_name ? [target.calendar_name] : undefined,
+    calendar_targets: undefined,
+  };
+}
+
+function resolveSelections(
+  params: CalendarParams,
+  registry: CalendarBackendRegistry = calendarBackendRegistry
+): CalendarBackendSelection[] {
+  if (params.calendar_targets?.length) {
+    return params.calendar_targets.map((target) => ({
+      adapter: registry.resolve(target.backend || params.backend || 'auto'),
+      params: targetParams(params, target),
+    }));
+  }
+
+  const requested = params.backends?.length
+    ? params.backends
+    : params.backend && params.backend !== 'auto'
+      ? [params.backend]
+      : ['auto'];
+  return requested.map((backend) => ({
+    adapter: registry.resolve(backend),
+    params: { ...params, backends: undefined, calendar_targets: undefined },
+  }));
+}
+
+function annotate<T extends object>(
+  adapter: CalendarBackendAdapter,
+  value: T
+): T & { backend: string } {
+  return { ...value, backend: adapter.id };
+}
+
+function uniqueSelections(selections: CalendarBackendSelection[]): CalendarBackendSelection[] {
+  const seen = new Set<string>();
+  return selections.filter(({ adapter }) => {
+    if (seen.has(adapter.id)) return false;
+    seen.add(adapter.id);
+    return true;
   });
 }
 
-async function runJxa<T>(scriptBody: string, params: Record<string, unknown>): Promise<T> {
-  const paramsLiteral = JSON.stringify(JSON.stringify(params));
-  const script = `
-    (function() {
-      const PARAMS = JSON.parse(${paramsLiteral});
-      ${scriptBody}
-    })();
-  `;
-  const output = await retry(
-    async () => safeExec('osascript', ['-l', 'JavaScript', '-e', script]),
-    buildRetryOptions()
-  );
-  const trimmed = String(output).trim();
-  if (!trimmed) return undefined as unknown as T;
-  try {
-    return JSON.parse(trimmed) as T;
-  } catch (err: any) {
-    throw new Error(
-      `calendar-actuator: failed to parse osascript output: ${err.message}\n${trimmed.slice(0, 300)}`
-    );
-  }
-}
-
-export async function listCalendars(): Promise<CalendarSummary[]> {
-  return runJxa<CalendarSummary[]>(
-    `
-      const app = Application("Calendar");
-      return JSON.stringify(app.calendars().map(function (cal) { return { name: cal.name() }; }));
-    `,
-    {}
-  );
-}
-
-export async function listEvents(params: CalendarParams): Promise<CalendarEvent[]> {
-  const startInput = parseISODate(params.start_date, 'start_date');
-  const endInput = parseISODate(params.end_date, 'end_date');
-
-  const start = startInput ?? new Date();
-  if (!startInput) start.setHours(0, 0, 0, 0);
-  const end = endInput ?? new Date(start.getTime() + 24 * 60 * 60 * 1000);
-  if (!endInput) end.setHours(23, 59, 59, 999);
-
-  if (end.getTime() <= start.getTime()) {
-    throw new Error(
-      `calendar-actuator: end_date (${end.toISOString()}) must be after start_date (${start.toISOString()})`
-    );
-  }
-
-  return runJxa<CalendarEvent[]>(
-    `
-      const app = Application("Calendar");
-      const targets = PARAMS.calendar_names && PARAMS.calendar_names.length ? PARAMS.calendar_names : null;
-      const startLimit = new Date(PARAMS.start_iso);
-      const endLimit = new Date(PARAMS.end_iso);
-      const results = [];
-      app.calendars().forEach(function (cal) {
-        if (targets && targets.indexOf(cal.name()) === -1) return;
-        try {
-          const events = cal.events.which({
-            _and: [
-              { startDate: { ">=": startLimit } },
-              { startDate: { "<": endLimit } }
-            ]
-          });
-          events().forEach(function (ev) {
-            results.push({
-              title: ev.summary(),
-              start: ev.startDate().toISOString(),
-              end: ev.endDate().toISOString(),
-              calendar: cal.name(),
-              location: ev.location() || "",
-              description: ev.description() || ""
-            });
-          });
-        } catch (e) {
-          // Silently skip calendars that fail to query.
-        }
-      });
-      return JSON.stringify(results);
-    `,
-    {
-      calendar_names: params.calendar_names ?? null,
-      start_iso: start.toISOString(),
-      end_iso: end.toISOString(),
-    }
-  );
-}
-
-export async function createEvent(
-  params: CalendarParams
-): Promise<{ status: string; title: string }> {
-  if (!params.title || !params.start_date || !params.calendar_names?.[0]) {
-    throw new Error(
-      'calendar-actuator: create_event requires title, start_date, and calendar_names[0]'
-    );
-  }
-  const start = parseISODate(params.start_date, 'start_date')!;
-  const end =
-    parseISODate(params.end_date, 'end_date') ?? new Date(start.getTime() + 30 * 60 * 1000);
-  if (end.getTime() <= start.getTime()) {
-    throw new Error(
-      `calendar-actuator: end_date (${end.toISOString()}) must be after start_date (${start.toISOString()})`
-    );
-  }
-
-  return runJxa<{ status: string; title: string }>(
-    `
-      const app = Application("Calendar");
-      const cal = app.calendars.byName(PARAMS.calendar_name);
-      if (!cal.exists()) {
-        return JSON.stringify({ status: "error", error: "calendar_not_found", title: PARAMS.title });
-      }
-      const event = app.Event({
-        summary: PARAMS.title,
-        startDate: new Date(PARAMS.start_iso),
-        endDate: new Date(PARAMS.end_iso),
-        location: PARAMS.location || "",
-        description: PARAMS.description || ""
-      });
-      cal.events.push(event);
-      return JSON.stringify({ status: "success", title: PARAMS.title });
-    `,
-    {
-      calendar_name: params.calendar_names[0],
-      title: params.title,
-      start_iso: start.toISOString(),
-      end_iso: end.toISOString(),
-      location: params.location ?? '',
-      description: params.description ?? '',
-    }
-  );
-}
-
-export async function handleAction(action: CalendarAction): Promise<unknown> {
+export async function handleAction(
+  action: CalendarAction,
+  registry: CalendarBackendRegistry = calendarBackendRegistry
+): Promise<unknown> {
   const valid = validateAction(action);
+  const params = valid.params || {};
+  const selections =
+    valid.op === 'list_calendars'
+      ? uniqueSelections(resolveSelections(params, registry))
+      : resolveSelections(params, registry);
+  if (valid.op === 'create_event' && selections.length !== 1) {
+    throw new Error(
+      'calendar-actuator: create_event requires exactly one backend/calendar target; use calendar_targets with one entry'
+    );
+  }
+  const backends = selections.map(({ adapter }) => adapter.id);
   const traceCtx = new TraceContext(`calendar-actuator:${valid.op}`, {
     actuator: 'calendar-actuator',
   });
-  traceCtx.addEvent('action.received', { op: valid.op });
+  traceCtx.addEvent('action.received', { op: valid.op, backend: backends.join(',') });
   let result: unknown;
   try {
     switch (valid.op) {
-      case 'list_calendars':
-        result = await listCalendars();
+      case 'list_calendars': {
+        const values = await Promise.all(
+          selections.map(async ({ adapter, params: selectedParams }) =>
+            (await adapter.listCalendars(selectedParams)).map((calendar) =>
+              annotate(adapter, calendar)
+            )
+          )
+        );
+        result = values.flat();
         break;
-      case 'list_events':
-        result = await listEvents(valid.params || {});
+      }
+      case 'list_events': {
+        const values = await Promise.all(
+          selections.map(async ({ adapter, params: selectedParams }) =>
+            (await adapter.listEvents(selectedParams)).map((event) => annotate(adapter, event))
+          )
+        );
+        result = values.flat();
         break;
-      case 'create_event':
-        result = await createEvent(valid.params || {});
+      }
+      case 'query_freebusy': {
+        const values = await Promise.all(
+          selections.map(async ({ adapter, params: selectedParams }) =>
+            (await adapter.queryFreeBusy(selectedParams)).map((entry) => annotate(adapter, entry))
+          )
+        );
+        result = values.flat();
         break;
+      }
+      case 'create_event': {
+        const [{ adapter, params: selectedParams }] = selections;
+        result = annotate(adapter, await adapter.createEvent(selectedParams));
+        break;
+      }
       default: {
         const _exhaustive: never = valid.op;
         throw new Error(`Unsupported operation: ${String(_exhaustive)}`);
@@ -256,21 +215,38 @@ export async function handleAction(action: CalendarAction): Promise<unknown> {
     }
     traceCtx.addEvent('action.completed', {
       op: valid.op,
+      backend: backends.join(','),
       records: Array.isArray(result) ? result.length : 1,
     });
     return result;
-  } catch (err: any) {
-    const classified = classifyError(err);
+  } catch (error: unknown) {
+    const classified = classifyError(error);
     traceCtx.addEvent('action.failed', {
       op: valid.op,
+      backend: backends.join(','),
       category: classified.category,
     });
-    throw err;
+    throw error;
   } finally {
     try {
       persistTrace(traceCtx.finalize());
     } catch (_) {
-      /* persistence best-effort */
+      // Trace persistence is best-effort and must not change the action result.
     }
   }
 }
+
+// Keep the historical direct exports on the macOS implementation for callers
+// that explicitly use the JXA surface. Normal actuator dispatch goes through
+// resolveCalendarBackend and may select gws.
+const jxaBackend = createJxaCalendarBackend();
+
+export const listCalendars = (): ReturnType<typeof jxaBackend.listCalendars> =>
+  jxaBackend.listCalendars();
+export const listEvents = (params: CalendarParams): ReturnType<typeof jxaBackend.listEvents> =>
+  jxaBackend.listEvents(params);
+export const queryFreeBusy = (
+  params: CalendarParams
+): ReturnType<typeof jxaBackend.queryFreeBusy> => jxaBackend.queryFreeBusy(params);
+export const createEvent = (params: CalendarParams): ReturnType<typeof jxaBackend.createEvent> =>
+  jxaBackend.createEvent(params);

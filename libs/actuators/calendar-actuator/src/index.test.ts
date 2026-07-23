@@ -7,8 +7,9 @@
  *
  * Set NODE_ENV=test (default in vitest) so the module does not auto-run main().
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { handleAction } from './index.js';
+import { CalendarBackendRegistry, type CalendarBackendAdapter } from './calendar-backend.js';
 
 describe('calendar-actuator: input validation', () => {
   it('rejects unknown ops via schema validation', async () => {
@@ -20,7 +21,7 @@ describe('calendar-actuator: input validation', () => {
       handleAction({
         op: 'list_events' as const,
         params: { calendar_names: 'work' as any },
-      }),
+      })
     ).rejects.toThrow(/invalid input/i);
   });
 
@@ -29,19 +30,17 @@ describe('calendar-actuator: input validation', () => {
       handleAction({
         op: 'list_events' as const,
         params: { start_date: 'not-a-date' as any },
-      }),
+      })
     ).rejects.toThrow(/invalid input/i);
   });
 
   it('requires title for create_event after schema passes', async () => {
-    // Schema allows missing title (it's optional in the schema), but the
-    // handler enforces title + start_date + calendar_names[0].
     await expect(
       handleAction({
         op: 'create_event' as const,
         params: { calendar_names: ['Personal'] },
-      }),
-    ).rejects.toThrow(/requires title/i);
+      })
+    ).rejects.toThrow(/missing required fields.*params.title/i);
   });
 
   it('requires start_date for create_event', async () => {
@@ -49,8 +48,57 @@ describe('calendar-actuator: input validation', () => {
       handleAction({
         op: 'create_event' as const,
         params: { title: 'Test event', calendar_names: ['Personal'] },
-      }),
-    ).rejects.toThrow(/requires title.*start_date/i);
+      })
+    ).rejects.toThrow(/missing required fields.*params.start_date/i);
+  });
+
+  it('requires a time window for freebusy queries before backend execution', async () => {
+    await expect(
+      handleAction({
+        op: 'query_freebusy' as const,
+        params: { backend: 'gws' },
+      })
+    ).rejects.toThrow(/missing required fields.*params.start_date.*params.end_date/i);
+  });
+
+  it('allows a user-selected registered adapter to aggregate multiple calendar targets', async () => {
+    const outlookAdapter: CalendarBackendAdapter = {
+      id: 'outlook',
+      isAvailable: () => true,
+      unavailableMessage: () => 'outlook unavailable',
+      listCalendars: vi.fn().mockResolvedValue([]),
+      listEvents: vi.fn(async (params) => [
+        {
+          title: `Event on ${params.calendar_id}`,
+          start: '2026-07-25T10:00:00+09:00',
+          end: '2026-07-25T11:00:00+09:00',
+          calendar: params.calendar_id || '',
+          location: '',
+          description: '',
+        },
+      ]),
+      queryFreeBusy: vi.fn().mockResolvedValue([]),
+      createEvent: vi.fn().mockResolvedValue({ status: 'success', title: 'Event' }),
+    };
+    const registry = new CalendarBackendRegistry([outlookAdapter]);
+
+    await expect(
+      handleAction(
+        {
+          op: 'list_events',
+          params: {
+            backend: 'outlook',
+            calendar_targets: [{ calendar_id: 'work' }, { calendar_id: 'personal' }],
+            start_date: '2026-07-25T00:00:00+09:00',
+            end_date: '2026-07-26T00:00:00+09:00',
+          },
+        },
+        registry
+      )
+    ).resolves.toEqual([
+      expect.objectContaining({ backend: 'outlook', calendar: 'work' }),
+      expect.objectContaining({ backend: 'outlook', calendar: 'personal' }),
+    ]);
   });
 });
 

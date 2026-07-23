@@ -237,7 +237,7 @@
     {
       "path": "product/architecture/component-lifecycle-inventory.md",
       "tier": "public",
-      "size": 6470,
+      "size": 6552,
       "type": "md"
     },
     {
@@ -987,7 +987,7 @@
     {
       "path": "product/governance/actuator-op-registry.json",
       "tier": "public",
-      "size": 16083,
+      "size": 16101,
       "type": "json"
     },
     {
@@ -2955,7 +2955,7 @@
     {
       "path": "product/orchestration/actuator-op-discovery.json",
       "tier": "public",
-      "size": 76668,
+      "size": 76751,
       "type": "json"
     },
     {
@@ -3291,13 +3291,13 @@
     {
       "path": "product/orchestration/global_actuator_index.json",
       "tier": "public",
-      "size": 17625,
+      "size": 17724,
       "type": "json"
     },
     {
       "path": "product/orchestration/global_skill_index.json",
       "tier": "public",
-      "size": 8251,
+      "size": 8333,
       "type": "json"
     },
     {
