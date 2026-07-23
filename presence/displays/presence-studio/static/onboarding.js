@@ -283,6 +283,38 @@ function renderSamples() {
     )
     .join('');
 }
+async function loadVoiceEngines() {
+  const select = $('voice-engine');
+  const hint = $('voice-engine-hint');
+  try {
+    const response = await fetch('/api/voice/selection');
+    const payload = await response.json();
+    if (!response.ok || !payload.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+    select.replaceChildren();
+    for (const candidate of payload.tts?.candidates || []) {
+      const option = document.createElement('option');
+      option.value = candidate.engine_id;
+      option.textContent = candidate.selectable
+        ? candidate.display_name
+        : `${candidate.display_name} (${candidate.status === 'needs_setup' ? 'Needs setup' : 'Not live'})`;
+      option.disabled = !candidate.selectable;
+      option.title = candidate.reason || '';
+      select.appendChild(option);
+    }
+    const configured =
+      serverState.onboarding?.voice?.engine_id || payload.preferences?.tts_engine_id;
+    if (configured) select.value = configured;
+    hint.textContent =
+      '未準備のエンジンは選択できません。候補にカーソルを置くと理由を確認できます。';
+  } catch (error) {
+    select.replaceChildren();
+    const option = document.createElement('option');
+    option.textContent = 'TTS engine list unavailable';
+    option.disabled = true;
+    select.appendChild(option);
+    hint.textContent = `TTS エンジン一覧を取得できません: ${error.message}`;
+  }
+}
 async function load() {
   try {
     const response = await fetch('/api/onboarding/browser-state');
@@ -301,10 +333,12 @@ async function load() {
     renderReadiness();
     renderServices();
     renderProviders();
+    await loadVoiceEngines();
   } catch (error) {
     notice(`状態を読み込めません: ${error.message}`, true);
     renderServices();
     renderProviders();
+    await loadVoiceEngines();
   }
 }
 document

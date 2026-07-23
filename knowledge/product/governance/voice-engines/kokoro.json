@@ -11,6 +11,8 @@
       "platforms": ["darwin", "linux", "win32"],
       "model_id": "hexgrad/Kokoro-82M",
       "bridge_script": "libs/actuators/voice-actuator/scripts/kokoro_tts_bridge.py",
+      "tts_adapter_id": "python_bridge",
+      "live_presence": false,
       "supports": {
         "list_voices": false,
         "playback": true,

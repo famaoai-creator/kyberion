@@ -3,7 +3,13 @@ import { isIP } from 'node:net';
 import { z } from 'zod';
 import { logger } from '@agent/core';
 
-const LOCALHOST_NAMES = new Set(['localhost', '127.0.0.1', '::1', '::ffff:127.0.0.1', '::ffff:7f00:1']);
+const LOCALHOST_NAMES = new Set([
+  'localhost',
+  '127.0.0.1',
+  '::1',
+  '::ffff:127.0.0.1',
+  '::ffff:7f00:1',
+]);
 const RATE_LIMIT_DEFAULT_WINDOW_MS = 60_000;
 const RATE_LIMIT_DEFAULT_GET = 180;
 const RATE_LIMIT_DEFAULT_MUTATION = 60;
@@ -11,27 +17,30 @@ const rateLimitStore = new Map<string, { count: number; windowStart: number }>()
 const booleanLike = z.union([z.boolean(), z.literal('true'), z.literal('false')]).optional();
 
 function normalizeHostname(hostname: string): string {
-  return hostname.trim().toLowerCase().replace(/^\[(.*)\]$/, '$1');
+  return hostname
+    .trim()
+    .toLowerCase()
+    .replace(/^\[(.*)\]$/, '$1');
 }
 
 function isPrivateIpv4(hostname: string): boolean {
   return (
-    /^10\./.test(hostname)
-    || /^127\./.test(hostname)
-    || /^169\.254\./.test(hostname)
-    || /^192\.168\./.test(hostname)
-    || /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname)
+    /^10\./.test(hostname) ||
+    /^127\./.test(hostname) ||
+    /^169\.254\./.test(hostname) ||
+    /^192\.168\./.test(hostname) ||
+    /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname)
   );
 }
 
 function isPrivateIpv6(hostname: string): boolean {
   return (
-    hostname === '::1'
-    || hostname.startsWith('fe80:')
-    || hostname.startsWith('fc')
-    || hostname.startsWith('fd')
-    || hostname.startsWith('::ffff:127.')
-    || hostname.startsWith('::ffff:7f00:')
+    hostname === '::1' ||
+    hostname.startsWith('fe80:') ||
+    hostname.startsWith('fc') ||
+    hostname.startsWith('fd') ||
+    hostname.startsWith('::ffff:127.') ||
+    hostname.startsWith('::ffff:7f00:')
   );
 }
 
@@ -70,24 +79,26 @@ export function extractPresenceStudioToken(req: Pick<Request, 'headers'>): strin
 
 export function checkPresenceStudioRateLimit(
   req: Pick<Request, 'method' | 'socket'>,
-  options?: { limit?: number; windowMs?: number },
+  options?: { limit?: number; windowMs?: number }
 ): { ok: boolean; status: number; reason: string; retryAfterSeconds?: number } {
   const clientAddress = getPresenceStudioClientAddress(req);
   if (isLoopbackAddress(clientAddress)) {
     return { ok: true, status: 200, reason: 'allowed' };
   }
 
-  const windowMs = options?.windowMs ?? Number(process.env.PRESENCE_STUDIO_RATE_LIMIT_WINDOW_MS || RATE_LIMIT_DEFAULT_WINDOW_MS);
+  const windowMs =
+    options?.windowMs ??
+    Number(process.env.PRESENCE_STUDIO_RATE_LIMIT_WINDOW_MS || RATE_LIMIT_DEFAULT_WINDOW_MS);
   const method = String(req.method || 'UNKNOWN').toUpperCase();
-  const limit = options?.limit ?? (
-    method === 'GET' || method === 'HEAD'
+  const limit =
+    options?.limit ??
+    (method === 'GET' || method === 'HEAD'
       ? Number(process.env.PRESENCE_STUDIO_RATE_LIMIT_GET || RATE_LIMIT_DEFAULT_GET)
-      : Number(process.env.PRESENCE_STUDIO_RATE_LIMIT_MUTATION || RATE_LIMIT_DEFAULT_MUTATION)
-  );
+      : Number(process.env.PRESENCE_STUDIO_RATE_LIMIT_MUTATION || RATE_LIMIT_DEFAULT_MUTATION));
   const key = getPresenceStudioRateLimitKey(req);
   const now = Date.now();
   const current = rateLimitStore.get(key);
-  const expired = !current || (now - current.windowStart) > windowMs;
+  const expired = !current || now - current.windowStart > windowMs;
   const windowStart = expired ? now : current.windowStart;
   const count = expired ? 1 : current.count + 1;
   rateLimitStore.set(key, { count, windowStart });
@@ -147,7 +158,8 @@ export function authorizePresenceStudioRequest(req: Pick<Request, 'headers' | 's
   return {
     ok: false,
     status: 403,
-    reason: 'Remote access disabled. Set PRESENCE_STUDIO_ALLOW_REMOTE=true or provide PRESENCE_STUDIO_TOKEN.',
+    reason:
+      'Remote access disabled. Set PRESENCE_STUDIO_ALLOW_REMOTE=true or provide PRESENCE_STUDIO_TOKEN.',
   };
 }
 
@@ -156,7 +168,7 @@ export function requirePresenceStudioAccess(): RequestHandler {
     const auth = authorizePresenceStudioRequest(req);
     if (!auth.ok) {
       logger.warn(
-        `[presence-studio][auth] denied method=${String(req.method || 'UNKNOWN').toUpperCase()} path=${String(req.path || req.url || '')} client=${getPresenceStudioClientAddress(req)} status=${auth.status} reason=${auth.reason}`,
+        `[presence-studio][auth] denied method=${String(req.method || 'UNKNOWN').toUpperCase()} path=${String(req.path || req.url || '')} client=${getPresenceStudioClientAddress(req)} status=${auth.status} reason=${auth.reason}`
       );
       return res.status(auth.status).json({ ok: false, error: auth.reason });
     }
@@ -172,7 +184,7 @@ export function requirePresenceStudioRateLimit(): RequestHandler {
         res.setHeader('Retry-After', String(decision.retryAfterSeconds));
       }
       logger.warn(
-        `[presence-studio][rate-limit] denied method=${String(req.method || 'UNKNOWN').toUpperCase()} path=${String(req.path || req.url || '')} client=${getPresenceStudioClientAddress(req)} status=${decision.status} reason=${decision.reason}`,
+        `[presence-studio][rate-limit] denied method=${String(req.method || 'UNKNOWN').toUpperCase()} path=${String(req.path || req.url || '')} client=${getPresenceStudioClientAddress(req)} status=${decision.status} reason=${decision.reason}`
       );
       return res.status(decision.status).json({ ok: false, error: decision.reason });
     }
@@ -234,6 +246,15 @@ export const presenceStudioVoiceNativeListenSchema = z.object({
   auto_reply: booleanLike,
 });
 
+export const presenceStudioVoiceSelectionSchema = z
+  .object({
+    tts_engine_id: z.string().trim().min(1).max(120).optional(),
+    stt_backend: z.string().trim().min(1).max(64).optional(),
+  })
+  .refine((value) => value.tts_engine_id !== undefined || value.stt_backend !== undefined, {
+    message: 'tts_engine_id or stt_backend is required',
+  });
+
 export const presenceStudioEmailDraftSchema = z.object({
   request_id: z.string().trim().min(1).max(128).optional(),
   to: z.string().trim().max(254).optional(),
@@ -244,7 +265,11 @@ export const presenceStudioEmailDraftSchema = z.object({
 
 export const presenceStudioEmailDeliverSchema = z.object({
   approved: booleanLike,
-  body_markdown: z.string().trim().min(1, 'body_markdown is required').max(20_000, 'body_markdown is too long'),
+  body_markdown: z
+    .string()
+    .trim()
+    .min(1, 'body_markdown is required')
+    .max(20_000, 'body_markdown is too long'),
   reply_mode: z.enum(['new', 'reply', 'reply-all']).optional(),
   draft_mode: booleanLike,
   subject: z.string().trim().max(200).optional(),
@@ -258,10 +283,15 @@ export const presenceStudioVoiceMinutesSchema = z.object({
   mission_id: z.string().trim().min(1).max(128).optional(),
   title: z.string().trim().min(1).max(120).optional(),
   language: z.string().trim().min(1).max(16).optional(),
-  attendees: z.array(z.union([
-    z.string(),
-    z.object({ name: z.string().trim().min(1).max(120) }).transform((value) => value.name),
-  ])).max(20).optional(),
+  attendees: z
+    .array(
+      z.union([
+        z.string(),
+        z.object({ name: z.string().trim().min(1).max(120) }).transform((value) => value.name),
+      ])
+    )
+    .max(20)
+    .optional(),
 });
 
 export const presenceStudioLocationSchema = z.object({
@@ -288,18 +318,22 @@ export function summarizePresenceStudioIdentity(payload: {
   agent: { agent_id: string; trust_tier: string | null } | null;
   vision: string | null;
 } {
-  const sovereignName = typeof payload.sovereign?.name === 'string' && payload.sovereign.name.trim()
-    ? payload.sovereign.name.trim()
-    : null;
-  const agentId = typeof payload.agent?.agent_id === 'string' && payload.agent.agent_id.trim()
-    ? payload.agent.agent_id.trim()
-    : null;
-  const trustTier = typeof payload.agent?.trust_tier === 'string' && payload.agent.trust_tier.trim()
-    ? payload.agent.trust_tier.trim()
-    : null;
-  const vision = typeof payload.vision === 'string' && payload.vision.trim()
-    ? payload.vision.trim().slice(0, 600)
-    : null;
+  const sovereignName =
+    typeof payload.sovereign?.name === 'string' && payload.sovereign.name.trim()
+      ? payload.sovereign.name.trim()
+      : null;
+  const agentId =
+    typeof payload.agent?.agent_id === 'string' && payload.agent.agent_id.trim()
+      ? payload.agent.agent_id.trim()
+      : null;
+  const trustTier =
+    typeof payload.agent?.trust_tier === 'string' && payload.agent.trust_tier.trim()
+      ? payload.agent.trust_tier.trim()
+      : null;
+  const vision =
+    typeof payload.vision === 'string' && payload.vision.trim()
+      ? payload.vision.trim().slice(0, 600)
+      : null;
 
   return {
     ok: true,
