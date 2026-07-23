@@ -3,6 +3,7 @@ import {
   CORE_WORKING_PRINCIPLES,
   ROLE_WORKING_PRINCIPLES,
   buildWorkingPrinciplesLines,
+  canonicalizeTeamRole,
   resolveRoleAddendum,
 } from './working-principles.js';
 
@@ -34,6 +35,18 @@ describe('working principles brief', () => {
     // unknown role still yields a valid brief
     const lines = buildWorkingPrinciplesLines('unknown-role');
     expect(lines.filter((line) => line.startsWith('- '))).toHaveLength(6);
+  });
+
+  it('canonicalizeTeamRole resolves aliases so role-identity checks outside this module stay consistent', () => {
+    expect(canonicalizeTeamRole('tester')).toBe('qa');
+    expect(canonicalizeTeamRole('experience_designer')).toBe('designer');
+    expect(canonicalizeTeamRole('reviewer')).toBe('reviewer');
+    expect(canonicalizeTeamRole('owner')).toBe('owner');
+    expect(canonicalizeTeamRole()).toBe('');
+  });
+
+  it('experience_designer aliases to the designer addendum', () => {
+    expect(resolveRoleAddendum('experience_designer')).toEqual(ROLE_WORKING_PRINCIPLES.designer);
   });
 
   it('reviewer addendum enforces refutation-with-evidence', () => {

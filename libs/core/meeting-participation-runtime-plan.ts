@@ -12,6 +12,7 @@
 
 export type MeetingParticipationTransportMode =
   | 'transcribe_first'
+  | 'captions_first'
   | 'realtime_voice';
 
 export interface MeetingParticipationRuntimePlan {
@@ -25,10 +26,12 @@ export interface MeetingParticipationRuntimePlan {
   require_voice_consent: boolean;
 }
 
-export function resolveMeetingParticipationRuntimePlan(input: {
-  transport_mode?: MeetingParticipationTransportMode;
-  dry_run?: boolean;
-} = {}): MeetingParticipationRuntimePlan {
+export function resolveMeetingParticipationRuntimePlan(
+  input: {
+    transport_mode?: MeetingParticipationTransportMode;
+    dry_run?: boolean;
+  } = {}
+): MeetingParticipationRuntimePlan {
   const transport_mode = input.transport_mode ?? 'transcribe_first';
   const dry_run = Boolean(input.dry_run);
 
@@ -41,6 +44,22 @@ export function resolveMeetingParticipationRuntimePlan(input: {
       require_streaming_tts: false,
       require_voice_profile: false,
       require_recording_consent: false,
+      require_voice_consent: false,
+    };
+  }
+
+  if (transport_mode === 'captions_first') {
+    // Platform live captions are the transcript source: no audio capture,
+    // no local STT/TTS. Replies go out over the meeting chat channel.
+    // Captions still capture meeting content, so recording consent stays on.
+    return {
+      transport_mode,
+      dry_run: false,
+      require_real_audio_bus: false,
+      require_streaming_stt: false,
+      require_streaming_tts: false,
+      require_voice_profile: false,
+      require_recording_consent: true,
       require_voice_consent: false,
     };
   }

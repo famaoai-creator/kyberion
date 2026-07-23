@@ -377,6 +377,128 @@ describe('dispatchProcedure', () => {
 });
 
 // ---------------------------------------------------------------------------
+// dispatchProcedure — playwright substrate (execution_substrate: 'playwright')
+// ---------------------------------------------------------------------------
+
+describe('dispatchProcedure — playwright substrate', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  const PLAYWRIGHT_PROCEDURE: ProcedureEntry = {
+    ...PROCEDURE,
+    execution_substrate: 'playwright',
+  };
+
+  const HEX64 = 'a'.repeat(64);
+
+  const CLICK_RECORDING: BrowserExtensionRecording = {
+    ...RECORDING,
+    tab: { ...RECORDING.tab, origin_hash: HEX64 },
+    actions: [
+      {
+        action_id: 'act-1',
+        op: 'click_ref',
+        summary: 'Approve',
+        risk: 'low',
+        captured_at: '2026-06-24T00:00:00Z',
+        target: {
+          ref: '@e1',
+          role: 'button',
+          name: 'Approve',
+          snapshot_hash: HEX64,
+        },
+      },
+    ],
+    review: {
+      status: 'approved',
+      reviewed_at: '2026-06-24T00:00:01Z',
+      decisions: [{ action_id: 'act-1', status: 'approved' }],
+    },
+  };
+
+  it('routes execution_substrate=playwright to the playwright executor without touching the extension_session path', async () => {
+    const executeBrowserPipeline = vi.fn().mockResolvedValue({ status: 'succeeded', results: [] });
+    const result = await dispatchProcedure({
+      ...BASE_INPUT,
+      procedure: PLAYWRIGHT_PROCEDURE,
+      recording: CLICK_RECORDING,
+      executeBrowserPipeline,
+    });
+    expect(result.status).toBe('executed');
+    expect(executeBrowserPipeline).toHaveBeenCalledTimes(1);
+    const call = executeBrowserPipeline.mock.calls[0][0];
+    expect(call.steps[0].op).toBe('click_ref');
+    expect(call.steps[0].params.ref).toBe('@e1');
+  });
+
+  it('returns approval_required for high-risk actions, identically to the extension path', async () => {
+    const highRiskRecording: BrowserExtensionRecording = {
+      ...CLICK_RECORDING,
+      actions: [{ ...CLICK_RECORDING.actions[0], op: 'delete', risk: 'high' }],
+      review: {
+        status: 'approved',
+        reviewed_at: '2026-06-24T00:00:01Z',
+        decisions: [{ action_id: 'act-1', status: 'approved' }],
+      },
+    };
+    vi.spyOn(bridge, 'enforceBrowserExtensionApproval').mockReturnValue({
+      allowed: false,
+      status: 'pending',
+      requestId: 'REQ-PW-1',
+      message: 'Pending approval',
+    });
+    const executeBrowserPipeline = vi.fn();
+    const result = await dispatchProcedure({
+      ...BASE_INPUT,
+      procedure: PLAYWRIGHT_PROCEDURE,
+      recording: highRiskRecording,
+      executeBrowserPipeline,
+    });
+    expect(result.status).toBe('approval_required');
+    expect(result.approvalRequestId).toBe('REQ-PW-1');
+    expect(executeBrowserPipeline).not.toHaveBeenCalled();
+  });
+
+  it('returns blocked when no executeBrowserPipeline is injected', async () => {
+    const result = await dispatchProcedure({
+      ...BASE_INPUT,
+      procedure: PLAYWRIGHT_PROCEDURE,
+      recording: CLICK_RECORDING,
+    });
+    expect(result.status).toBe('blocked');
+    expect(result.errors[0]).toContain('executeBrowserPipeline');
+  });
+
+  it('returns blocked when the recording review is not approved', async () => {
+    const unapproved: BrowserExtensionRecording = {
+      ...CLICK_RECORDING,
+      review: { status: 'pending', decisions: [] },
+    };
+    const result = await dispatchProcedure({
+      ...BASE_INPUT,
+      procedure: PLAYWRIGHT_PROCEDURE,
+      recording: unapproved,
+      executeBrowserPipeline: vi.fn(),
+    });
+    expect(result.status).toBe('blocked');
+    expect(result.errors[0]).toContain('approved recording review');
+  });
+
+  it('returns blocked when the browser-actuator reports a failed step', async () => {
+    const executeBrowserPipeline = vi
+      .fn()
+      .mockResolvedValue({ status: 'failed', results: [], errors: ['click_ref failed for @e1'] });
+    const result = await dispatchProcedure({
+      ...BASE_INPUT,
+      procedure: PLAYWRIGHT_PROCEDURE,
+      recording: CLICK_RECORDING,
+      executeBrowserPipeline,
+    });
+    expect(result.status).toBe('blocked');
+    expect(result.errors).toContain('click_ref failed for @e1');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // extendLeaseForMfa
 // ---------------------------------------------------------------------------
 

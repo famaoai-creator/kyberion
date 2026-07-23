@@ -348,6 +348,70 @@ describe('browser-actuator v3 contract', () => {
     expect(String(result.results[0].error)).toContain('Unknown browser ref');
   });
 
+  it('resolves a ref via recorded {role,name} when it is missing from ref_map (e.g. a step compiled from an extension recording)', async () => {
+    const { handleAction } = await import('./index');
+
+    const result = await handleAction({
+      action: 'pipeline',
+      session_id: 'browser-test',
+      steps: [
+        {
+          type: 'apply',
+          op: 'click_ref',
+          params: { ref: '@from-recording', role: 'button', name: 'Submit' },
+        },
+      ],
+      options: { headless: true },
+    });
+
+    expect(result.status).toBe('succeeded');
+    expect(result.results[0]).toMatchObject({ op: 'click_ref', status: 'success' });
+    expect(mocks.page.click).toHaveBeenCalledWith('button:nth-of-type(1)', { timeout: 5000 });
+    expect(result.context.ref_map).toMatchObject({ '@from-recording': 'button:nth-of-type(1)' });
+  });
+
+  it('surfaces an unresolved recorded ref as a normal per-step pipeline failure, not an unhandled rejection', async () => {
+    const { handleAction } = await import('./index');
+
+    const result = await handleAction({
+      action: 'pipeline',
+      session_id: 'browser-test',
+      steps: [
+        {
+          type: 'apply',
+          op: 'click_ref',
+          params: { ref: '@ghost', role: 'checkbox', name: 'Does Not Exist' },
+        },
+      ],
+      options: { headless: true },
+    });
+
+    expect(result.status).toBe('failed');
+    expect(result.results[0]).toMatchObject({ op: 'click_ref', status: 'failed' });
+    expect(String(result.results[0].error)).toContain('Could not resolve recorded ref');
+  });
+
+  it('fails closed for a high-risk ref action with no recorded dom_path to corroborate the match', async () => {
+    const { handleAction } = await import('./index');
+
+    const result = await handleAction({
+      action: 'pipeline',
+      session_id: 'browser-test',
+      steps: [
+        {
+          type: 'apply',
+          op: 'click_ref',
+          params: { ref: '@from-recording', role: 'button', name: 'Submit', high_risk: true },
+        },
+      ],
+      options: { headless: true },
+    });
+
+    expect(result.status).toBe('failed');
+    expect(result.results[0]).toMatchObject({ op: 'click_ref', status: 'failed' });
+    expect(String(result.results[0].error)).toContain('Refusing to resolve');
+  });
+
   it('tracks tabs and exports console/network observations', async () => {
     const { handleAction } = await import('./index');
 

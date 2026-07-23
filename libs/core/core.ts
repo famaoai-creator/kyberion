@@ -50,7 +50,13 @@ export const logger = {
         : level === 'warn'
           ? color('yellow', ' [WARN]  ')
           : color('blue', ' [INFO]  ');
-    console.error(ts + mid + prefix + msg);
+    if (level === 'error') {
+      console.error(ts + mid + prefix + msg);
+    } else if (level === 'warn') {
+      console.warn(ts + mid + prefix + msg);
+    } else {
+      console.log(ts + mid + prefix + msg);
+    }
   },
   info: (msg: string) => logger._log('info', msg),
   warn: (msg: string) => logger._log('warn', msg),

@@ -130,6 +130,15 @@ libs/actuators/` — plus `pnpm check:catalogs` and, if you touched
   (`KYBERION_APPLE_FM=0`-style), and no hard dependency anywhere.
 - macOS system frameworks may print loader noise to **stdout** — parse the
   last JSON line, not the whole stream.
+- **Compare canonicalized team roles, not raw strings.** Team-template role
+  names (`knowledge/product/orchestration/mission-team-templates.json`, e.g.
+  `tester`, `experience_designer`) are not always the canonical addendum key
+  (`qa`, `designer`) that `libs/core/working-principles.ts` resolves. A check
+  like `input.teamRole === 'qa'` silently misses `tester` tasks. Always
+  compare `canonicalizeTeamRole(teamRole)` (exported from
+  `working-principles.ts`) instead of the raw `teamRole` string — this bit
+  `prepareArtifactReviewTask` gating and artifact-review-receipt persistence
+  in `mission-orchestration-worker.ts` (fixed 2026-07).
 
 ## 6. Process discipline for repo work
 

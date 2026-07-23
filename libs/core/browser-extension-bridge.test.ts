@@ -479,6 +479,104 @@ describe('browser extension bridge contracts', () => {
     );
   });
 
+  it('keeps *_ref ops and drops the ref-resolution review line for the playwright substrate', () => {
+    const reviewed = recording({
+      actions: [
+        {
+          action_id: 'step-1',
+          op: 'click_ref',
+          summary: 'Continue を選択',
+          risk: 'low',
+          captured_at: '2026-06-23T00:00:01.000Z',
+          target: {
+            ref: '@e1',
+            role: 'button',
+            name: 'Continue',
+            snapshot_hash: sha256('snapshot-1'),
+            dom_path: 'body > div:nth-of-type(2) > button',
+          },
+        },
+      ],
+      risk_summary: {
+        requires_manual_review: true,
+        sensitive_input_omitted: 0,
+        approval_required_count: 0,
+      },
+      review: {
+        status: 'approved',
+        reviewed_at: '2026-06-23T00:01:00.000Z',
+        decisions: [{ action_id: 'step-1', status: 'approved' }],
+      },
+    });
+
+    const draft = compileBrowserRecordingToPipeline(
+      validateBrowserExtensionRecording(reviewed).value!,
+      {
+        executionSubstrate: 'playwright',
+      }
+    );
+
+    expect(draft.steps[0].op).toBe('click_ref');
+    expect(draft.steps[0].params.ref).toBe('@e1');
+    expect(draft.steps[0].params.role).toBe('button');
+    expect(draft.steps[0].params.name).toBe('Continue');
+    expect(draft.steps[0].params.dom_path).toBe('body > div:nth-of-type(2) > button');
+    expect(draft.steps[0].params.needs_selector).toBeUndefined();
+    expect(draft._review_required).not.toContain(
+      'Resolve ref → Playwright selector for every step before promotion'
+    );
+  });
+
+  it('still requires ref resolution for the playwright substrate when an op has no direct ref-aware handler', () => {
+    const reviewed = recording({
+      actions: [
+        {
+          ...recording().actions[0],
+          op: 'select_ref',
+          action_id: 'step-select',
+          target: {
+            ...recording().actions[0].target,
+            role: 'option',
+            name: 'Enable notifications',
+          },
+          selection: { kind: 'toggle', checked: true },
+        },
+      ],
+      risk_summary: {
+        requires_manual_review: true,
+        sensitive_input_omitted: 0,
+        approval_required_count: 0,
+      },
+      review: {
+        status: 'approved',
+        reviewed_at: '2026-06-23T00:01:00.000Z',
+        decisions: [{ action_id: 'step-select', status: 'approved' }],
+      },
+    });
+
+    const draft = compileBrowserRecordingToPipeline(
+      validateBrowserExtensionRecording(reviewed).value!,
+      {
+        executionSubstrate: 'playwright',
+      }
+    );
+    expect(draft._review_required).toContain(
+      'Resolve ref → Playwright selector for every step before promotion'
+    );
+  });
+
+  it('keeps the high-risk approval review line for the playwright substrate regardless of clean ref resolution', () => {
+    const draft = compileBrowserRecordingToPipeline(
+      validateBrowserExtensionRecording(approvedHighRiskRecording()).value!,
+      {
+        executionSubstrate: 'playwright',
+      }
+    );
+    expect(draft._review_required).toContain(
+      'High-risk steps require an approval gate at run time'
+    );
+  });
+
   it('preserves the original browser recording op in the generated draft pipeline', () => {
     const reviewed = recording({
       actions: [

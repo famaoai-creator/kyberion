@@ -151,6 +151,14 @@ export interface MissionControllerRoutingContext {
     actorId?: string,
     actorType?: 'agent' | 'human' | 'service'
   ) => Awaitable<void>;
+  recordArtifactReview: (
+    missionId: string,
+    reviewTaskId: string,
+    reviewerAgentId: string,
+    findings?: unknown[],
+    reviewerTeamRole?: 'reviewer' | 'qa',
+    specialistRoles?: string[]
+  ) => Awaitable<unknown>;
   reconcileExistingWork: (
     missionId: string,
     manifestPath: string,
@@ -686,6 +694,24 @@ export async function runMissionControllerAction(
         getValue('--actor-type', context.argv) as any
       );
       break;
+    case 'review-task': {
+      const findingsRaw = getValue('--findings', context.argv);
+      const findings = findingsRaw ? JSON.parse(findingsRaw) : [];
+      const reviewerTeamRole = getValue('--reviewer-team-role', context.argv) as
+        | 'reviewer'
+        | 'qa'
+        | undefined;
+      const specialistRoles = parseCsvOption('--specialist-roles', context.argv);
+      await context.recordArtifactReview(
+        arg1!,
+        arg2!,
+        arg3!,
+        findings,
+        reviewerTeamRole,
+        specialistRoles
+      );
+      break;
+    }
     case 'reconcile-work': {
       const manifestPath = getValue('--manifest', context.argv);
       if (!manifestPath) throw new Error('reconcile-work requires --manifest <PATH>');

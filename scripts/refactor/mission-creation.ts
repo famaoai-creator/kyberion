@@ -37,6 +37,7 @@ import {
   loadState,
   normalizeRelationships,
   saveState,
+  type KnowledgeInjectionDeclaration,
 } from './mission-state.js';
 import { syncRoleProcedure } from './mission-governance.js';
 import { emitMissionLifecycleIntentSnapshot } from './mission-intent-delta.js';
@@ -179,7 +180,7 @@ export async function createMission(args: {
   const templates = readJsonFile<{
     templates: Array<{
       name?: string;
-      knowledge_injections?: string[];
+      knowledge_injections?: KnowledgeInjectionDeclaration[];
       files: Array<{ content_template: string; path: string }>;
     }>;
   }>(templatePath).templates;
