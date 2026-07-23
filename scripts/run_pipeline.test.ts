@@ -129,6 +129,7 @@ describe('run_pipeline compatibility', () => {
     expect(normalizePipelineOp('if')).toBe('core:if');
     expect(normalizePipelineOp('while')).toBe('core:while');
     expect(normalizePipelineOp('parallel_foreach')).toBe('core:parallel_foreach');
+    expect(normalizePipelineOp('parallel_calls')).toBe('core:parallel_calls');
     expect(normalizePipelineOp('accumulate')).toBe('core:accumulate');
     expect(normalizePipelineOp('system:shell')).toBe('system:shell');
   });
@@ -474,6 +475,92 @@ describe('run_pipeline compatibility', () => {
     expect(result.context.parallel_outputs).toHaveLength(2);
     expect(result.context.parallel_outputs[0].context.mapped.doubled).toBe(2);
     expect(result.context.parallel_outputs[1].context.mapped.doubled).toBe(4);
+  });
+
+  it('runs core:parallel_calls across heterogeneous ops and merges per-call context in request order (KD-07)', async () => {
+    const result = await runSteps([
+      {
+        op: 'core:parallel_calls',
+        params: {
+          export_as: 'parallel_call_results',
+          calls: [
+            {
+              op: 'core:transform',
+              params: {
+                input: '1',
+                script: 'return { doubled: Number(input) * 2 };',
+                export_as: 'first',
+              },
+            },
+            {
+              op: 'core:transform',
+              params: {
+                input: '2',
+                script: 'return { doubled: Number(input) * 2 };',
+                export_as: 'second',
+              },
+            },
+          ],
+        },
+      },
+    ]);
+
+    expect(result.status).toBe('succeeded');
+    expect((result.context.first as any).doubled).toBe(2);
+    expect((result.context.second as any).doubled).toBe(4);
+    // Per-call status report drains in request order regardless of which
+    // call actually finished first (KD-07 golden ordering guarantee).
+    expect(result.context.parallel_call_results).toEqual([
+      { index: 0, op: 'core:transform', status: 'fulfilled' },
+      { index: 1, op: 'core:transform', status: 'fulfilled' },
+    ]);
+  });
+
+  it('fails the core:parallel_calls step when any call fails, surfacing its error (KD-07)', async () => {
+    const result = await runSteps([
+      {
+        op: 'core:parallel_calls',
+        params: {
+          calls: [
+            {
+              op: 'core:transform',
+              params: { input: '1', script: 'return { ok: true };', export_as: 'ok_result' },
+            },
+            { op: 'system:open_url', params: {} },
+          ],
+        },
+      },
+    ]);
+
+    expect(result.status).toBe('failed');
+    const failed = result.results.find(
+      (entry: { status: string; error?: string }) => entry.status === 'failed'
+    );
+    expect(failed?.error).toContain('[INVALID_OP_INPUT]');
+    expect(failed?.error).toContain('system:open_url');
+  });
+
+  it('accepts the bare "parallel_calls" op name (short-form normalization)', async () => {
+    const result = await runSteps([
+      {
+        op: 'parallel_calls',
+        params: {
+          calls: [
+            {
+              op: 'core:transform',
+              params: {
+                input: '3',
+                script: 'return { doubled: Number(input) * 2 };',
+                export_as: 'tripled_input',
+              },
+            },
+          ],
+        },
+      },
+    ] as any);
+
+    expect(result.status).toBe('succeeded');
+    expect((result.context.tripled_input as any).doubled).toBe(6);
   });
 
   it('runs accumulate until the unique target count is reached', async () => {
