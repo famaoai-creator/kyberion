@@ -1,15 +1,24 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  accrueGoalBudgetUsage,
   applyGoalUpdate,
+  blockGoalOnBudget,
   buildGoalStatusReminder,
   buildGoalUpdateToolDefinition,
+  checkGoalBudgetReached,
   createGoal,
+  createGoalBudgetStats,
   demoteActiveOnResume,
   GOAL_BLOCKED_PERSIST_TURNS,
+  GOAL_BUDGET_GRACE_STEP_PROMPT,
   GOAL_CANCEL_SYSTEM_REMINDER,
   GOAL_CONTINUATION_REAUDIT_PROMPT,
+  GOAL_CONVERGENCE_MODE_PROMPT,
+  GOAL_CONVERGENCE_THRESHOLD_RATIO,
+  GOAL_STEADY_PROGRESS_PROMPT,
   GOAL_UPDATE_TOOL_NAME,
+  goalBudgetUsageRatio,
   incrementGoalTurn,
   parseGoalUpdateSignal,
   pauseGoal,
@@ -200,5 +209,158 @@ describe('turn accounting + prompt fragments', () => {
     expect(reminder).toContain('blocked_streak: 2/');
     expect(reminder).toContain('rewind_checkpoints: ckpt-0');
     expect(reminder).not.toContain('do the thing');
+  });
+});
+
+describe('KD-02: goal budgets — opt-in, never invented', () => {
+  it('createGoal omits `budget` entirely when none is supplied', () => {
+    const goal = createGoal({ goalId: 'g-nobudget', objective: 'do the thing', now: fixedNow });
+    expect(goal.budget).toBeUndefined();
+    expect(goalBudgetUsageRatio(goal.budget, goal.budgetStats)).toBe(0);
+    expect(checkGoalBudgetReached(goal.budget, goal.budgetStats)).toEqual({ reached: false });
+  });
+
+  it('createGoal carries an explicitly supplied budget verbatim', () => {
+    const goal = createGoal({
+      goalId: 'g-budget',
+      objective: 'do the thing',
+      budget: { tokenBudget: 500_000 },
+      now: fixedNow,
+    });
+    expect(goal.budget).toEqual({ tokenBudget: 500_000 });
+  });
+});
+
+describe('KD-02: goalBudgetUsageRatio / checkGoalBudgetReached', () => {
+  it('reports 0 with no stats and ignores unset budget dimensions', () => {
+    expect(goalBudgetUsageRatio({ tokenBudget: 1000 }, undefined)).toBe(0);
+    expect(
+      goalBudgetUsageRatio(
+        { tokenBudget: 1000 },
+        { tokensUsed: 0, turnsUsed: 999, wallClockMsUsed: 999 }
+      )
+    ).toBe(0);
+  });
+
+  it('takes the max ratio across every configured dimension', () => {
+    const stats = { tokensUsed: 100, turnsUsed: 9, wallClockMsUsed: 1000 };
+    const ratio = goalBudgetUsageRatio(
+      { tokenBudget: 1000, turnBudget: 10, wallClockBudgetMs: 100_000 },
+      stats
+    );
+    expect(ratio).toBeCloseTo(0.9); // turn dimension (9/10) is the tightest
+  });
+
+  it('checks token/turn/wall-clock reach in a stable, deterministic order', () => {
+    expect(
+      checkGoalBudgetReached(
+        { tokenBudget: 100 },
+        { tokensUsed: 100, turnsUsed: 0, wallClockMsUsed: 0 }
+      )
+    ).toEqual({ reached: true, reason: 'goal budget reached: token budget 100' });
+    expect(
+      checkGoalBudgetReached({ turnBudget: 5 }, { tokensUsed: 0, turnsUsed: 5, wallClockMsUsed: 0 })
+    ).toEqual({ reached: true, reason: 'goal budget reached: turn budget 5' });
+    expect(
+      checkGoalBudgetReached(
+        { wallClockBudgetMs: 60_000 },
+        { tokensUsed: 0, turnsUsed: 0, wallClockMsUsed: 60_000 }
+      )
+    ).toEqual({ reached: true, reason: 'goal budget reached: wall-clock budget 60000ms' });
+    // not yet reached
+    expect(
+      checkGoalBudgetReached(
+        { tokenBudget: 100 },
+        { tokensUsed: 99, turnsUsed: 0, wallClockMsUsed: 0 }
+      )
+    ).toEqual({ reached: false });
+  });
+});
+
+describe('KD-02: accrueGoalBudgetUsage — accrues only while active', () => {
+  it('adds usage deltas onto existing stats', () => {
+    const goal = activeGoal({ budgetStats: createGoalBudgetStats() });
+    const next = accrueGoalBudgetUsage(goal, { tokens: 40, turns: 1, wallClockMs: 250 });
+    expect(next.budgetStats).toEqual({ tokensUsed: 40, turnsUsed: 1, wallClockMsUsed: 250 });
+    const again = accrueGoalBudgetUsage(next, { tokens: 10, turns: 1, wallClockMs: 50 });
+    expect(again.budgetStats).toEqual({ tokensUsed: 50, turnsUsed: 2, wallClockMsUsed: 300 });
+  });
+
+  it('is a no-op once the goal is no longer active', () => {
+    const blocked = blockGoalOnBudget(
+      activeGoal(),
+      'goal budget reached: token budget 100',
+      fixedNow
+    );
+    const unchanged = accrueGoalBudgetUsage(blocked, { tokens: 999 });
+    expect(unchanged).toBe(blocked); // same reference: guaranteed no mutation attempted
+  });
+});
+
+describe('KD-02: blockGoalOnBudget — BUSINESS stop, mirrors pauseGoal', () => {
+  it('blocks an active goal with a business terminal kind and the given reason', () => {
+    const blocked = blockGoalOnBudget(
+      activeGoal(),
+      'goal budget reached: token budget 500000',
+      fixedNow
+    );
+    expect(blocked.state).toBe('blocked');
+    expect(blocked.terminalKind).toBe('business');
+    expect(blocked.terminalReason).toBe('goal budget reached: token budget 500000');
+  });
+
+  it('is a no-op on an already-terminated goal', () => {
+    const paused = pauseGoal(activeGoal(), 'interrupted', fixedNow);
+    expect(blockGoalOnBudget(paused, 'goal budget reached', fixedNow)).toBe(paused);
+  });
+});
+
+describe('KD-02: convergence-mode wording flips exactly at 75%, not before', () => {
+  it('shows steady-progress wording below the threshold', () => {
+    const goal = activeGoal({
+      budget: { tokenBudget: 400 },
+      budgetStats: { tokensUsed: 299, turnsUsed: 0, wallClockMsUsed: 0 }, // ratio 0.7475
+    });
+    expect(goalBudgetUsageRatio(goal.budget, goal.budgetStats)).toBeLessThan(
+      GOAL_CONVERGENCE_THRESHOLD_RATIO
+    );
+    const reminder = buildGoalStatusReminder(goal);
+    expect(reminder).toContain(GOAL_STEADY_PROGRESS_PROMPT);
+    expect(reminder).not.toContain(GOAL_CONVERGENCE_MODE_PROMPT);
+  });
+
+  it('flips to convergence wording at exactly the 75% threshold', () => {
+    const goal = activeGoal({
+      budget: { tokenBudget: 400 },
+      budgetStats: { tokensUsed: 300, turnsUsed: 0, wallClockMsUsed: 0 }, // ratio exactly 0.75
+    });
+    expect(goalBudgetUsageRatio(goal.budget, goal.budgetStats)).toBe(
+      GOAL_CONVERGENCE_THRESHOLD_RATIO
+    );
+    const reminder = buildGoalStatusReminder(goal);
+    expect(reminder).toContain(GOAL_CONVERGENCE_MODE_PROMPT);
+    expect(reminder).not.toContain(GOAL_STEADY_PROGRESS_PROMPT);
+  });
+
+  it('stays in convergence wording past the threshold', () => {
+    const goal = activeGoal({
+      budget: { turnBudget: 4 },
+      budgetStats: { tokensUsed: 0, turnsUsed: 4, wallClockMsUsed: 0 }, // ratio 1.0
+    });
+    expect(buildGoalStatusReminder(goal)).toContain(GOAL_CONVERGENCE_MODE_PROMPT);
+  });
+
+  it('omits budget-mode wording entirely when no budget is configured', () => {
+    const reminder = buildGoalStatusReminder(activeGoal());
+    expect(reminder).not.toContain(GOAL_STEADY_PROGRESS_PROMPT);
+    expect(reminder).not.toContain(GOAL_CONVERGENCE_MODE_PROMPT);
+  });
+});
+
+describe('KD-02: grace-step reminder wording', () => {
+  it('tells the model tools will be rejected and to write a final status in prose', () => {
+    expect(GOAL_BUDGET_GRACE_STEP_PROMPT).toContain('synthetically rejected');
+    expect(GOAL_BUDGET_GRACE_STEP_PROMPT).toContain('final status');
+    expect(GOAL_BUDGET_GRACE_STEP_PROMPT).toContain('Do not call goal_update');
   });
 });
