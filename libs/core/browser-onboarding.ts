@@ -5,6 +5,11 @@ import { z } from 'zod';
 import { withExecutionContext } from './authority.js';
 import { loadProviderConfig } from './provider-config.js';
 import { resolveActiveProfileRoot } from './profile-root.js';
+import {
+  getLlmSelectionSnapshot,
+  saveLlmSelectionPreferences,
+  validateLlmSelectionPreferences,
+} from './llm-selection-preferences.js';
 import { listServiceBindingRecords } from './service-binding-registry.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
 import { withLock } from './src/lock-utils.js';
@@ -82,6 +87,12 @@ export const browserOnboardingDraftSchema = z
       priority: z.array(z.string().trim().min(1).max(80)).min(1).max(12),
       default_models: z.record(z.string(), z.string().trim().min(1).max(160)).default({}),
     }),
+    reasoning: z
+      .object({
+        provider: z.string().trim().min(1).max(80),
+        model_id: z.string().trim().min(1).max(160).optional(),
+      })
+      .optional(),
     tools: z.object({
       mode_preference: z.object({
         python: z.enum(toolModes),
@@ -169,12 +180,14 @@ export function previewBrowserOnboarding(input: unknown): BrowserOnboardingPrevi
       'A single voice sample works, but two or three samples usually produce a more stable clone.'
     );
   }
+  if (draft.reasoning) validateLlmSelectionPreferences(draft.reasoning);
 
   const effects = [
     ['identity', path.join(profileRoot(), 'my-identity.json'), 'Update operator identity'],
     ['vision', path.join(profileRoot(), 'my-vision.md'), 'Update sovereign vision'],
     ['agent', path.join(profileRoot(), 'agent-identity.json'), 'Update agent identity'],
     ['providers', onboardingPath('provider-preferences.json'), 'Set provider and model priority'],
+    ['reasoning', onboardingPath('llm-selection.json'), 'Set reasoning provider and model'],
     ['tools', onboardingPath('tool-runtime-policy.json'), 'Set tool runtime preference'],
     ['state', onboardingPath('browser-onboarding-state.json'), 'Record onboarding receipt'],
     ...draft.services.map((service) => [
@@ -249,6 +262,11 @@ export async function applyBrowserOnboarding(input: unknown): Promise<{
         });
         artifacts.push(providerPath);
 
+        if (draft.reasoning) {
+          const reasoningSelection = saveLlmSelectionPreferences(draft.reasoning);
+          artifacts.push(reasoningSelection.storage_path);
+        }
+
         const toolPath = onboardingPath('tool-runtime-policy.json');
         const baseToolPolicy = getToolRuntimePolicy();
         writeJson(toolPath, {
@@ -313,6 +331,7 @@ export async function applyBrowserOnboarding(input: unknown): Promise<{
           applied_at: now,
           identity: draft.identity,
           providers: draft.providers,
+          reasoning: draft.reasoning || getLlmSelectionSnapshot().preferences,
           tools: draft.tools,
           services: draft.services,
           voice_profile_id: draft.voice.enabled ? draft.voice.profile_id : null,
@@ -384,6 +403,7 @@ export function getBrowserOnboardingState(): Record<string, unknown> {
           priority: providerConfig.default_priority,
           default_models: providerConfig.default_models,
         },
+        reasoning_selection: getLlmSelectionSnapshot(),
         tools: toolPreference || getToolRuntimePolicy(),
         voice_profiles: getVoiceProfileRegistry().profiles,
         service_bindings: listServiceBindingRecords(),

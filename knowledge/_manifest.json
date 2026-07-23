@@ -2001,7 +2001,7 @@
     {
       "path": "product/governance/reasoning-route-policy.json",
       "tier": "public",
-      "size": 5984,
+      "size": 11089,
       "type": "json"
     },
     {
@@ -7119,7 +7119,7 @@
     {
       "path": "product/schemas/reasoning-route-policy.schema.json",
       "tier": "public",
-      "size": 4046,
+      "size": 4890,
       "type": "json"
     },
     {
@@ -9245,6 +9245,12 @@
       "tier": "public",
       "size": 328,
       "type": "json"
+    },
+    {
+      "path": "public/procedures/select-reasoning-provider-and-model.md",
+      "tier": "public",
+      "size": 4450,
+      "type": "md"
     },
     {
       "path": "public/procedures/sensors/github-watcher.adf.json",
