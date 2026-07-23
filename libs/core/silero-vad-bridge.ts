@@ -22,6 +22,7 @@ import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from 'node:chil
 import { buildSafeExecEnv } from './secure-io.js';
 import { rootResolve } from './path-resolver.js';
 import { safeExistsSync } from './secure-io.js';
+import { resolveManagedToolPythonBin } from './tool-runtime-registry.js';
 import { registerVadBackend, type VadFactoryOptions } from './vad-registry.js';
 import {
   computeChunkDurationMs,
@@ -57,6 +58,7 @@ function resolvePythonBin(opts: SileroVadOptions): string {
     opts.pythonBin ||
     process.env.KYBERION_SILERO_VAD_PYTHON ||
     process.env.KYBERION_PYTHON_BIN ||
+    resolveManagedToolPythonBin('silero_vad') ||
     'python3'
   );
 }

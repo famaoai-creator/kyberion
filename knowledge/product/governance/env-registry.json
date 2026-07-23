@@ -855,6 +855,22 @@
       "documented": false
     },
     {
+      "name": "KYBERION_FLUID_AUDIO_STT_COMMAND",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_FLUID_AUDIO_STT_TIMEOUT_MS",
+      "category": "tuning",
+      "type": "number",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_FORMAT",
       "category": "runtime",
       "type": "string",
@@ -2270,6 +2286,14 @@
     },
     {
       "name": "KYBERION_TELEMETRY",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_TEN_VAD_PYTHON",
       "category": "runtime",
       "type": "string",
       "required": false,

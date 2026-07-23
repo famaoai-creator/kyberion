@@ -72,7 +72,7 @@ export const NO_TIMESTAMP_STT_CAPABILITIES: SpeechToTextCapabilities = {
 };
 
 export function getSpeechToTextCapabilities(
-  bridge: Pick<SpeechToTextBridge, 'capabilities'>,
+  bridge: Pick<SpeechToTextBridge, 'capabilities'>
 ): SpeechToTextCapabilities {
   return bridge.capabilities ?? NO_TIMESTAMP_STT_CAPABILITIES;
 }
@@ -99,7 +99,7 @@ export function resetSpeechToTextBridge(): void {
 
 export function normalizeSpeechToTextResult(
   bridge: Pick<SpeechToTextBridge, 'name' | 'capabilities'>,
-  result: TranscribeResult,
+  result: TranscribeResult
 ): TranscribeResult {
   const validSegments = (result.segments || []).filter((segment) => {
     return (
@@ -122,6 +122,25 @@ export function normalizeSpeechToTextResult(
     },
     ...(result.segments ? { segments: validSegments } : {}),
   };
+}
+
+function parseStructuredOutput(stdout: string): Partial<TranscribeResult> {
+  try {
+    return JSON.parse(stdout) as Partial<TranscribeResult>;
+  } catch {
+    // Swift/CoreML loaders and model runtimes may print informational lines;
+    // accept the final JSON object while keeping malformed output fatal.
+    for (const line of stdout.split(/\r?\n/u).reverse()) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith('{')) continue;
+      try {
+        return JSON.parse(trimmed) as Partial<TranscribeResult>;
+      } catch {
+        continue;
+      }
+    }
+    throw new Error('structured output was not valid JSON');
+  }
 }
 
 function deriveSidecar(audioAbs: string): string {
@@ -166,6 +185,8 @@ export const stubSpeechToTextBridge: SpeechToTextBridge = {
 };
 
 export interface ShellSpeechToTextBridgeOptions {
+  /** Stable bridge name used in registry diagnostics. Defaults to `shell`. */
+  name?: string;
   /**
    * Shell command template. `{{audio}}` is replaced with the absolute audio
    * path, `{{language}}` with the BCP-47 code (empty string when unset).
@@ -188,10 +209,11 @@ export interface ShellSpeechToTextBridgeOptions {
 }
 
 export class ShellSpeechToTextBridge implements SpeechToTextBridge {
-  readonly name = 'shell';
+  readonly name: string;
   readonly capabilities: SpeechToTextCapabilities;
   readonly priority: number;
   constructor(private readonly options: ShellSpeechToTextBridgeOptions) {
+    this.name = options.name?.trim() || 'shell';
     this.capabilities = options.capabilities || NO_TIMESTAMP_STT_CAPABILITIES;
     this.priority = Number(options.priority || 0);
   }
@@ -218,9 +240,11 @@ export class ShellSpeechToTextBridge implements SpeechToTextBridge {
     let structured: Partial<TranscribeResult> = {};
     if (this.options.structuredOutput) {
       try {
-        structured = JSON.parse(stdout) as Partial<TranscribeResult>;
+        structured = parseStructuredOutput(stdout);
       } catch (error: any) {
-        throw new Error(`[stt-bridge:shell] structured output was not valid JSON: ${error.message}`);
+        throw new Error(
+          `[stt-bridge:shell] structured output was not valid JSON: ${error.message}`
+        );
       }
     }
     const text = String(structured.text || stdout).trim();
@@ -237,6 +261,34 @@ export class ShellSpeechToTextBridge implements SpeechToTextBridge {
       ...(structured.segments ? { segments: structured.segments } : {}),
     };
   }
+}
+
+/**
+ * Install a FluidAudio/Parakeet batch bridge when the caller supplies a local
+ * command. The command receives {{audio}} and {{language}} substitutions and
+ * must print {"text":"..."}; this keeps the Swift package optional while
+ * making the Kyberion boundary concrete and testable.
+ */
+export function installFluidAudioSpeechToTextBridgeIfAvailable(
+  env: NodeJS.ProcessEnv = process.env
+): boolean {
+  if (env.KYBERION_STT_COMMAND?.trim()) return false;
+  const command = env.KYBERION_FLUID_AUDIO_STT_COMMAND?.trim();
+  if (!command) return false;
+  registerSpeechToTextBridge(
+    new ShellSpeechToTextBridge({
+      name: 'fluid-audio-parakeet',
+      command,
+      structuredOutput: true,
+      priority: 100,
+      capabilities: { timestamps: true, granularity: 'segment', local_only: true },
+      ...(env.KYBERION_FLUID_AUDIO_STT_TIMEOUT_MS
+        ? { timeoutMs: parseInt(env.KYBERION_FLUID_AUDIO_STT_TIMEOUT_MS, 10) }
+        : {}),
+    })
+  );
+  logger.success('[stt-bridge] installed FluidAudio Parakeet bridge');
+  return true;
 }
 
 /**
