@@ -51,7 +51,7 @@ export function buildRetryOptions(override?: Record<string, any>) {
   });
 }
 
-type VoicePythonTool = 'mlx_audio' | 'mlx_whisper';
+type VoicePythonTool = 'mlx_audio' | 'mlx_whisper' | 'kokoro_tts' | 'pocket_tts';
 
 function resolvePythonBin(preferredTool: VoicePythonTool = 'mlx_audio'): string {
   if (process.env.KYBERION_PYTHON_BIN) return process.env.KYBERION_PYTHON_BIN;
@@ -136,7 +136,9 @@ async function runPythonTtsBridge(
   text: string,
   outputPath: string,
   language: string,
-  profile?: any
+  profile?: any,
+  runtimeId: VoicePythonTool = 'mlx_audio',
+  voice?: string
 ): Promise<void> {
   const bridgeScript = pathResolver.rootResolve(bridgeScriptPath);
 
@@ -149,12 +151,13 @@ async function runPythonTtsBridge(
       text,
       output_path: outputPath,
       lang_code: language.trim().toLowerCase().startsWith('ja') ? 'ja' : 'en',
+      ...(voice ? { voice } : {}),
       ...(refAudio ? { ref_audio: refAudio } : {}),
       ...(refText ? { ref_text: refText } : {}),
     },
   });
 
-  const result = safeExecResult(resolvePythonBin('mlx_audio'), [bridgeScript], { input: payload });
+  const result = safeExecResult(resolvePythonBin(runtimeId), [bridgeScript], { input: payload });
   if (result.error || result.status !== 0) {
     throw new Error(
       `${path.basename(bridgeScriptPath)} failed: ${result.stderr || result.error?.message}`
@@ -381,7 +384,9 @@ async function renderVoiceArtifactWithEngine(
       text,
       artifactPath,
       options.language,
-      options.profile
+      options.profile,
+      (engine.runtime_id as VoicePythonTool | undefined) || 'mlx_audio',
+      options.voice
     );
     return artifactPath;
   }
@@ -507,7 +512,9 @@ async function performPlayback(
           text,
           tmpPath,
           options.language,
-          options.profile
+          options.profile,
+          (engine.runtime_id as VoicePythonTool | undefined) || 'mlx_audio',
+          options.voice
         );
       }
       openPlaybackArtifact(tmpPath);

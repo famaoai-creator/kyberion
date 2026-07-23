@@ -12,6 +12,7 @@ describe('voice STT helpers', () => {
     expect(parseVoiceSttBackend('mlx-whisper')).toBe('mlx_whisper');
     expect(parseVoiceSttBackend('apple_speech')).toBe('native_speech');
     expect(parseVoiceSttBackend('server')).toBe('server');
+    expect(parseVoiceSttBackend('parakeet')).toBe('fluid_audio');
     expect(parseVoiceSttBackend('unknown')).toBe('auto');
   });
 
@@ -85,6 +86,22 @@ describe('voice STT helpers', () => {
     });
 
     expect(order).toEqual(['mlx_whisper']);
+  });
+
+  it('can select the FluidAudio Parakeet bridge when it is configured', () => {
+    const order = resolveVoiceSttBackendOrder(
+      'auto',
+      {
+        server: false,
+        fluidAudio: true,
+        mlxWhisper: false,
+        whisperCpp: false,
+        nativeSpeech: false,
+      },
+      { VOICE_HUB_STT_PREFERENCE: 'fluid_audio,native_speech' }
+    );
+    expect(order).toEqual(['fluid_audio']);
+    expect(resolveVoiceSttAdapter('fluid_audio').adapter_id).toBe('fluid_audio_native');
   });
 
   it('resolves runtime adapters from descriptors rather than engine identity', () => {

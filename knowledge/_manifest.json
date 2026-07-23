@@ -2373,7 +2373,7 @@
     {
       "path": "product/governance/tool-runtime-registry.json",
       "tier": "public",
-      "size": 13326,
+      "size": 17797,
       "type": "json"
     },
     {
@@ -2415,13 +2415,13 @@
     {
       "path": "product/governance/voice-engine-registry.json",
       "tier": "public",
-      "size": 3979,
+      "size": 4821,
       "type": "json"
     },
     {
       "path": "product/governance/voice-engines/README.md",
       "tier": "public",
-      "size": 372,
+      "size": 392,
       "type": "md"
     },
     {
@@ -2439,7 +2439,7 @@
     {
       "path": "product/governance/voice-engines/kokoro.json",
       "tier": "public",
-      "size": 732,
+      "size": 771,
       "type": "json"
     },
     {
@@ -2458,6 +2458,12 @@
       "path": "product/governance/voice-engines/open_voice_clone.json",
       "tier": "public",
       "size": 647,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/voice-engines/pocket_tts.json",
+      "tier": "public",
+      "size": 883,
       "type": "json"
     },
     {

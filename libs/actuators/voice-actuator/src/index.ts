@@ -1700,7 +1700,7 @@ async function transcribeVoiceSample(input: {
   model?: string;
   write_sidecar?: boolean;
   prefer_timestamps?: boolean;
-  backend?: 'auto' | 'bridge' | 'mlx_whisper';
+  backend?: 'auto' | 'bridge' | 'fluid_audio' | 'mlx_whisper';
   allow_synthetic?: boolean;
 }): Promise<any> {
   const audioPath = resolveVoicePath(String(input.audio_path || '').trim(), 'audio-input');
@@ -1814,6 +1814,14 @@ async function transcribeVoiceSample(input: {
 
   if (backendPreference === 'mlx_whisper') {
     transcribeWithMlxWhisper();
+  } else if (backendPreference === 'fluid_audio') {
+    const bridge = usableBridges.find((candidate) => candidate.name === 'fluid-audio-parakeet');
+    if (!bridge) {
+      throw new Error(
+        'FluidAudio/Parakeet bridge is not installed; set KYBERION_FLUID_AUDIO_STT_COMMAND.'
+      );
+    }
+    await transcribeWithBridge(bridge);
   } else if (backendPreference === 'bridge') {
     for (const bridge of [...timestampBridges, ...textBridges]) {
       await transcribeWithBridge(bridge);
