@@ -76,6 +76,7 @@
     "task:smoke": "node --import ./scripts/ts-loader.mjs scripts/task_smoke.ts",
     "intent": "node --import ./scripts/ts-loader.mjs scripts/intent.ts",
     "intent:trace": "node --import ./scripts/ts-loader.mjs scripts/intent_trace.ts",
+    "intent:scenario": "node dist/scripts/run_intent.js --scenario-only",
     "check:script-integrity": "node dist/scripts/check_script_integrity.js",
     "check:type-ratchet": "node dist/scripts/check_type_ratchet.js",
     "check:pipeline-shell-independence": "node dist/scripts/check_pipeline_shell_independence.js",

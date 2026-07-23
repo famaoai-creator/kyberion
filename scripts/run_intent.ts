@@ -135,6 +135,12 @@ async function main() {
       description:
         'Emit an assistant compiler request artifact without running the local LLM compiler',
     })
+    .option('scenario-only', {
+      type: 'boolean',
+      default: false,
+      description:
+        'Resolve the user request into a governed use-case scenario without executing side effects',
+    })
     .option('delegate-mode', {
       type: 'string',
       choices: ['plan_only', 'investigate', 'implement'],
@@ -213,6 +219,27 @@ async function main() {
       },
       compilerOptions
     );
+
+  if (argv.scenarioOnly) {
+    const compiled = await compileFlow();
+    if (compiled.clarificationPacket) {
+      console.log(formatClarificationPacket(compiled.clarificationPacket));
+    }
+    console.log(
+      JSON.stringify(
+        {
+          status: compiled.useCaseScenario?.handoff.status || 'blocked',
+          next_action: compiled.useCaseScenario?.handoff.next_action,
+          use_case_scenario: compiled.useCaseScenario,
+          clarification_packet: compiled.clarificationPacket,
+          routing_decision: compiled.routingDecision,
+        },
+        null,
+        2
+      )
+    );
+    return;
+  }
 
   if (argv.compileViaAssistant) {
     const compilerRequest = createAssistantCompilerRequest({

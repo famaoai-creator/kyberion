@@ -131,6 +131,11 @@ import type {
   SurfaceConversationResult,
 } from './channel-surface-types.js';
 import type { UserIntentFlow } from './intent-contract.js';
+import {
+  parseExecutionFeedbackText,
+  recordExecutionFeedback,
+  type ExecutionFeedbackRecord,
+} from './execution-feedback.js';
 
 interface SurfaceRuntimeRouteHandler {
   matches: (context: SurfaceRuntimeRouteContext) => boolean;
@@ -141,6 +146,44 @@ function appendCompletionClosure(text: string, completionSummary: string[]): str
   const closure = completionSummary.filter((line) => String(line || '').trim().length > 0);
   if (closure.length === 0) return text;
   return [text, '', ...closure].join('\n');
+}
+
+function buildExecutionFeedbackPrompt(scenarioId: string): string {
+  return [
+    `評価: このシナリオを改善する場合は、「評価 ${scenarioId}: 満足」、`,
+    `「評価 ${scenarioId}: 一部違う: 修正点」、または「評価 ${scenarioId}: 不満: 理由」で返信できます。`,
+  ].join('');
+}
+
+function attachExecutionFeedbackPrompt(
+  result: SurfaceConversationResult,
+  compiledFlow: UserIntentFlow | null,
+  input: SurfaceConversationInput
+): SurfaceConversationResult {
+  const scenario = compiledFlow?.useCaseScenario;
+  if (!scenario) return result;
+  return {
+    ...result,
+    text: [result.text, '', buildExecutionFeedbackPrompt(scenario.scenario_id)]
+      .filter(Boolean)
+      .join('\n'),
+    executionFeedbackRequest: {
+      scenario_id: scenario.scenario_id,
+      intent_id: scenario.intent_id,
+      ...(input.correlationId ? { correlation_id: input.correlationId } : {}),
+      outcomes: ['satisfied', 'partially_satisfied', 'dissatisfied'],
+      structured: true,
+    },
+  };
+}
+
+function buildFeedbackAcknowledgement(record: ExecutionFeedbackRecord): string {
+  const outcomeLabel = {
+    satisfied: '満足',
+    partially_satisfied: '一部違う',
+    dissatisfied: '不満',
+  }[record.outcome];
+  return `評価を記録しました（${outcomeLabel}）。次回の「${record.scenario_id}」シナリオ生成時に改善候補として反映します。`;
 }
 
 function buildPendingRuntimeContext(
@@ -1319,6 +1362,44 @@ export function buildPipelineIntentContextArgs(context: SurfaceRuntimeRouteConte
   }
 }
 
+/**
+ * Keep the governed use-case scenario visible to the Surface agent whenever
+ * the intent compiler ran. Short/direct Surface routes intentionally bypass
+ * this context for latency, but compiled routes should have one canonical
+ * user-facing plan for clarification, approval, and execution handoff.
+ */
+export function buildSurfaceStructuredQuery(query: string, compiledFlow: UserIntentFlow): string {
+  return [
+    query,
+    '',
+    'Governed execution brief:',
+    JSON.stringify(compiledFlow.executionBrief, null, 2),
+    compiledFlow.executionBrief?.workflow_steps?.length ? '' : undefined,
+    compiledFlow.executionBrief?.workflow_steps?.length ? 'Governed workflow steps:' : undefined,
+    compiledFlow.executionBrief?.workflow_steps?.length
+      ? JSON.stringify(compiledFlow.executionBrief.workflow_steps, null, 2)
+      : undefined,
+    '',
+    'Governed intent contract:',
+    JSON.stringify(compiledFlow.intentContract, null, 2),
+    '',
+    'Governed work loop:',
+    JSON.stringify(compiledFlow.workLoop, null, 2),
+    compiledFlow.useCaseScenario ? '' : undefined,
+    compiledFlow.useCaseScenario
+      ? 'Governed use-case scenario (canonical user-facing handoff):'
+      : undefined,
+    compiledFlow.useCaseScenario
+      ? JSON.stringify(compiledFlow.useCaseScenario, null, 2)
+      : undefined,
+    compiledFlow.useCaseScenario
+      ? 'Follow the scenario handoff: clarify missing inputs, request approval, resolve runtime blockers, or execute as indicated. Explain the next step concisely to the user.'
+      : undefined,
+  ]
+    .filter((item): item is string => typeof item === 'string')
+    .join('\n');
+}
+
 async function handleGovernedExecutionHint(
   context: SurfaceRuntimeRouteContext
 ): Promise<SurfaceConversationResult> {
@@ -2060,6 +2141,21 @@ export async function runSurfaceConversation(
   input: SurfaceConversationInput
 ): Promise<SurfaceConversationResult> {
   surfaceRuntimeContextStore.enterWith(input);
+  const parsedExecutionFeedback =
+    input.executionFeedback || parseExecutionFeedbackText(input.query);
+  if (parsedExecutionFeedback) {
+    const record = recordExecutionFeedback({
+      ...parsedExecutionFeedback,
+      ...(input.correlationId && !parsedExecutionFeedback.correlation_id
+        ? { correlation_id: input.correlationId }
+        : {}),
+      ...(input.surface && !parsedExecutionFeedback.surface ? { surface: input.surface } : {}),
+    });
+    return {
+      ...emptySurfaceResult(buildFeedbackAcknowledgement(record)),
+      executionFeedbackRecord: record,
+    };
+  }
   const forcedReceiver = normalizeSurfaceDelegationReceiver(input.forcedReceiver);
   const routedSurfaceInput = surfaceRoutingText(input);
   const surface = input.surface || surfaceChannelFromAgentId(input.agentId);
@@ -2135,27 +2231,7 @@ export async function runSurfaceConversation(
       : undefined);
 
   const structuredQuery = compiledFlow
-    ? [
-        input.query,
-        '',
-        'Governed execution brief:',
-        JSON.stringify(compiledFlow.executionBrief, null, 2),
-        compiledFlow.executionBrief?.workflow_steps?.length ? '' : undefined,
-        compiledFlow.executionBrief?.workflow_steps?.length
-          ? 'Governed workflow steps:'
-          : undefined,
-        compiledFlow.executionBrief?.workflow_steps?.length
-          ? JSON.stringify(compiledFlow.executionBrief.workflow_steps, null, 2)
-          : undefined,
-        '',
-        'Governed intent contract:',
-        JSON.stringify(compiledFlow.intentContract, null, 2),
-        '',
-        'Governed work loop:',
-        JSON.stringify(compiledFlow.workLoop, null, 2),
-      ]
-        .filter((item): item is string => typeof item === 'string')
-        .join('\n')
+    ? buildSurfaceStructuredQuery(input.query, compiledFlow)
     : input.query;
 
   const parsedSlackPrompt =
@@ -2177,7 +2253,11 @@ export async function runSurfaceConversation(
   );
   if (matchedRouteHandler) {
     const routedResult = await matchedRouteHandler.handle(routeContext);
-    return attachRoutingDecision(routedResult, compiledFlow?.routingDecision);
+    return attachExecutionFeedbackPrompt(
+      attachRoutingDecision(routedResult, compiledFlow?.routingDecision),
+      compiledFlow,
+      input
+    );
   }
 
   const handle = await ensureSurfaceAgent(input.agentId, input.cwd);
@@ -2209,7 +2289,11 @@ export async function runSurfaceConversation(
   }
 
   if (delegationResults.length === 0) {
-    return attachRoutingDecision(firstBlocks, compiledFlow?.routingDecision);
+    return attachExecutionFeedbackPrompt(
+      attachRoutingDecision(firstBlocks, compiledFlow?.routingDecision),
+      compiledFlow,
+      input
+    );
   }
 
   const successful = delegationResults.filter((result) => !result.error);
@@ -2224,16 +2308,20 @@ export async function runSurfaceConversation(
   const finalDelegationResults = [...delegationResults, ...routedDelegationResults];
 
   if (successful.length === 0 && routedDelegationResults.length === 0) {
-    return attachRoutingDecision(
-      {
-        ...firstBlocks,
-        delegationResults: finalDelegationResults,
-        approvalRequests: firstBlocks.approvalRequests,
-        routingProposals,
-        missionProposals: firstBlocks.missionProposals,
-        planningPackets: firstBlocks.planningPackets,
-      },
-      compiledFlow?.routingDecision
+    return attachExecutionFeedbackPrompt(
+      attachRoutingDecision(
+        {
+          ...firstBlocks,
+          delegationResults: finalDelegationResults,
+          approvalRequests: firstBlocks.approvalRequests,
+          routingProposals,
+          missionProposals: firstBlocks.missionProposals,
+          planningPackets: firstBlocks.planningPackets,
+        },
+        compiledFlow?.routingDecision
+      ),
+      compiledFlow,
+      input
     );
   }
 
@@ -2249,24 +2337,28 @@ export async function runSurfaceConversation(
   const followUpResponse = await handle.ask(summaryPrompt);
   const followUpBlocks = extractSurfaceBlocks(followUpResponse);
 
-  return attachRoutingDecision(
-    {
-      text: followUpBlocks.text,
-      a2uiMessages: [...firstBlocks.a2uiMessages, ...followUpBlocks.a2uiMessages],
-      a2aMessages: firstBlocks.a2aMessages,
-      delegationResults: finalDelegationResults,
-      approvalRequests: [...firstBlocks.approvalRequests, ...followUpBlocks.approvalRequests],
-      routingProposals,
-      missionProposals: [
-        ...(firstBlocks.missionProposals || []),
-        ...(followUpBlocks.missionProposals || []),
-      ],
-      planningPackets: [
-        ...(firstBlocks.planningPackets || []),
-        ...(followUpBlocks.planningPackets || []),
-      ],
-    },
-    compiledFlow?.routingDecision
+  return attachExecutionFeedbackPrompt(
+    attachRoutingDecision(
+      {
+        text: followUpBlocks.text,
+        a2uiMessages: [...firstBlocks.a2uiMessages, ...followUpBlocks.a2uiMessages],
+        a2aMessages: firstBlocks.a2aMessages,
+        delegationResults: finalDelegationResults,
+        approvalRequests: [...firstBlocks.approvalRequests, ...followUpBlocks.approvalRequests],
+        routingProposals,
+        missionProposals: [
+          ...(firstBlocks.missionProposals || []),
+          ...(followUpBlocks.missionProposals || []),
+        ],
+        planningPackets: [
+          ...(firstBlocks.planningPackets || []),
+          ...(followUpBlocks.planningPackets || []),
+        ],
+      },
+      compiledFlow?.routingDecision
+    ),
+    compiledFlow,
+    input
   );
 }
 

@@ -544,6 +544,8 @@ export {
 } from './src/intent-compiler.js';
 export type { CompiledIntent } from './src/intent-compiler.js';
 export * from './intent-contract.js';
+export * from './intent-use-case-scenario.js';
+export * from './execution-feedback.js';
 export * from './intent-contract-learning.js';
 export * from './contextual-intent-frame.js';
 export * from './contextual-intent-clarification-policy.js';

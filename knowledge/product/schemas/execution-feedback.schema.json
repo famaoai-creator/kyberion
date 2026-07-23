@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/execution-feedback.schema.json",
+  "title": "Execution Feedback Store",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "entries"],
+  "properties": {
+    "version": { "const": "1.0.0" },
+    "entries": {
+      "type": "array",
+      "maxItems": 500,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "schema_version",
+          "feedback_id",
+          "scenario_id",
+          "intent_id",
+          "outcome",
+          "source",
+          "recorded_at"
+        ],
+        "properties": {
+          "kind": { "const": "execution-feedback" },
+          "schema_version": { "const": "1.0.0" },
+          "feedback_id": { "type": "string", "minLength": 1 },
+          "scenario_id": { "type": "string", "minLength": 1 },
+          "intent_id": { "type": "string", "minLength": 1 },
+          "correlation_id": { "type": "string", "minLength": 1 },
+          "surface": { "type": "string", "minLength": 1 },
+          "outcome": { "enum": ["satisfied", "partially_satisfied", "dissatisfied"] },
+          "comment": { "type": "string", "maxLength": 2000 },
+          "correction": { "type": "string", "maxLength": 2000 },
+          "source": { "enum": ["user", "operator"] },
+          "recorded_at": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}
