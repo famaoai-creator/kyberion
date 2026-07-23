@@ -9,6 +9,11 @@ import type { GovernedArtifactRole } from './artifact-store.js';
 import type { A2AMessage } from './a2a-bridge.js';
 import type { A2UIMessage } from './a2ui.js';
 import type { AgentRoutingDecision } from './intent-contract.js';
+import type {
+  ExecutionFeedbackInput,
+  ExecutionFeedbackRecord,
+  ExecutionFeedbackRequest,
+} from './execution-feedback.js';
 
 export type SurfaceRole = GovernedArtifactRole;
 
@@ -295,6 +300,7 @@ interface SurfaceConversationInputBase {
   forcedReceiver?: string;
   missionId?: string;
   teamRole?: string;
+  executionFeedback?: ExecutionFeedbackInput;
 }
 
 export type SurfaceConversationInput = SurfaceConversationInputBase & {
@@ -318,6 +324,7 @@ interface SurfaceConversationMessageInputBase {
   teamRole?: string;
   /** Deterministic local E2E hook; production callers leave this unset. */
   awaitBackgroundReviewFork?: boolean;
+  executionFeedback?: ExecutionFeedbackInput;
 }
 
 export type SurfaceConversationMessageInput = SurfaceConversationMessageInputBase & {
@@ -341,6 +348,8 @@ export interface SurfaceConversationResult {
   taskResultErrors?: string[];
   surfaceParseErrors?: string[];
   routingDecision?: AgentRoutingDecision;
+  executionFeedbackRequest?: ExecutionFeedbackRequest;
+  executionFeedbackRecord?: ExecutionFeedbackRecord;
 }
 
 export interface SurfaceDelegationResult {

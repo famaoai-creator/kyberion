@@ -23,6 +23,7 @@ import type {
   SurfaceConversationMessageInput,
   SurfaceNotificationRecord,
 } from './channel-surface-types.js';
+import type { ExecutionFeedbackInput } from './execution-feedback.js';
 
 export type SurfaceProviderId = SurfaceAsyncChannel;
 export type SurfaceReplyMode = 'outbox' | 'notification';
@@ -122,6 +123,7 @@ export interface BuildSurfaceConversationInputOptions {
   missionId?: string;
   teamRole?: string;
   delegationSummaryInstruction?: string;
+  executionFeedback?: ExecutionFeedbackInput;
   slack?: {
     user?: string;
     team?: string;
@@ -589,6 +591,7 @@ export function buildSurfaceConversationInputFromMessage(
     missionId: options.missionId,
     teamRole: options.teamRole,
     delegationSummaryInstruction: options.delegationSummaryInstruction,
+    executionFeedback: options.executionFeedback,
   };
 }
 
@@ -649,6 +652,7 @@ export function buildSurfaceConversationInput(
     missionId: input.missionId,
     teamRole: input.teamRole,
     delegationSummaryInstruction: input.delegationSummaryInstruction,
+    executionFeedback: input.executionFeedback,
     slack:
       input.surface === 'slack'
         ? {
