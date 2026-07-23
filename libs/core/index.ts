@@ -614,6 +614,8 @@ export * from './lifecycle-hook-engine.js';
 export * from './dynamic-injection.js';
 export * from './prompt-cache-discipline.js';
 export * from './context-rewind.js';
+export * from './worker-goal.js';
+export * from './worker-goal-driver.js';
 export * from './adf-guardrails.js';
 export * from './reconcile-ops.js';
 export * from './report-ops.js';
