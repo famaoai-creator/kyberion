@@ -1,286 +1,257 @@
 {
-  "generated_at": "2026-05-07T14:44:03.835Z",
+  "generated_at": "2026-07-23T16:45:42.827Z",
   "generator_note": "Baseline of actuator extension-point surfaces for semver enforcement. See docs/developer/EXTENSION_POINTS.md. Update via `pnpm check:contract-semver -- --rebaseline`.",
   "actuators": [
     {
       "actuator_id": "agent-actuator",
-      "version": "1.0.0",
-      "ops": [
-        "a2a",
-        "ask",
-        "health",
-        "list",
-        "spawn",
-        "team_plan"
-      ],
+      "version": "1.1.0",
+      "ops": ["a2a", "ask", "delegate", "health", "list", "spawn", "team_plan"],
       "contract_schema": "schemas/agent-action.schema.json",
-      "contract_schema_sha256": "6ce62b8760ff4c0206af25f9a5aac43ea8e25136e4453eca54e82d0bee401532"
+      "contract_schema_sha256": "a348ef4ee8e0dccc8ae67e3cc67e3044c27ca60bc168ee8015b120debabc50f2"
     },
     {
       "actuator_id": "android-actuator",
-      "version": "1.0.0",
-      "ops": [
-        "pipeline"
-      ],
+      "version": "1.1.0",
+      "ops": ["pipeline"],
       "contract_schema": "schemas/mobile-device-pipeline.schema.json",
-      "contract_schema_sha256": "4e1fb74a1e78517a5e8fae4ad087863c9d5bae382b029e57decb5a21e81ec889"
-    },
-    {
-      "actuator_id": "email-actuator",
-      "version": "1.0.0",
-      "ops": [
-        "create_draft",
-        "send",
-        "send_from_file"
-      ],
-      "contract_schema": "libs/actuators/email-actuator/schemas/email-action.schema.json",
-      "contract_schema_sha256": "fb2c63205881214b3c74e2acc442ca6547c381c88d492508902a98f7df56b63b"
+      "contract_schema_sha256": "2f629450fe529eda6f4f4577d8d7a3294acf96e6affb3e0a8ec5e88aeed27c21"
     },
     {
       "actuator_id": "approval-actuator",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "ops": [
         "create",
         "decide",
+        "evaluate_decision_rights",
         "list_pending",
-        "load"
+        "load",
+        "request_review"
       ],
       "contract_schema": "schemas/approval-action.schema.json",
-      "contract_schema_sha256": "216880f52008b708f0ab6e70146f1b5000904e84d77ddc392770914e338c7f14"
+      "contract_schema_sha256": "532d10e4fb8856bc58949b9659bc62cf6c335fb7f2825765d656f2253ad7266c"
     },
     {
       "actuator_id": "artifact-actuator",
       "version": "1.0.0",
-      "ops": [
-        "append_event",
-        "read_json",
-        "write_delivery_pack",
-        "write_json"
-      ],
+      "ops": ["append_event", "read_json", "write_delivery_pack", "write_json"],
       "contract_schema": "schemas/artifact-action.schema.json",
       "contract_schema_sha256": "4ef1368f07742141344864c29cfff22a85164efb46157395e947a1922c2ab6aa"
     },
     {
       "actuator_id": "blockchain-actuator",
-      "version": "1.0.0",
-      "ops": [
-        "anchor_mission",
-        "anchor_trust"
-      ],
+      "version": "1.1.0",
+      "ops": ["anchor_mission", "anchor_trust", "verify_anchor"],
       "contract_schema": "schemas/blockchain-action.schema.json",
       "contract_schema_sha256": "a5949f228e3ac534f7c43cb709c11844791002250ff251edc1c2983da316d57a"
     },
     {
       "actuator_id": "browser-actuator",
+      "version": "1.1.0",
+      "ops": ["computer_interaction", "pipeline"],
+      "contract_schema": "schemas/browser-pipeline.schema.json",
+      "contract_schema_sha256": "7462c43bb900466e5b1fb29791aa754229b4b1dd55207df62dc11061353543cb"
+    },
+    {
+      "actuator_id": "build-actuator",
       "version": "1.0.0",
       "ops": [
-        "computer_interaction",
-        "pipeline"
+        "android_build",
+        "android_bundle",
+        "android_test",
+        "ios_archive",
+        "ios_build",
+        "ios_generate_project",
+        "ios_test",
+        "scaffold_app"
       ],
-      "contract_schema": "schemas/browser-pipeline.schema.json",
-      "contract_schema_sha256": "9079b2da38092acc9b28cb717ab60ce27db07e60294e3da9e90deab0c69d4793"
+      "contract_schema": "schemas/build-pipeline.schema.json",
+      "contract_schema_sha256": "afb709a1a661799377ba17dd47278923e886b4c333d9f48c58c6436a6fad09af"
     },
     {
       "actuator_id": "calendar-actuator",
-      "version": "1.0.0",
-      "ops": [
-        "create_event",
-        "list_calendars",
-        "list_events"
-      ],
+      "version": "1.1.0",
+      "ops": ["create_event", "list_calendars", "list_events", "query_freebusy"],
       "contract_schema": "schemas/calendar-action.schema.json",
       "contract_schema_sha256": null
     },
     {
       "actuator_id": "code-actuator",
-      "version": "2.1.0",
-      "ops": [
-        "pipeline",
-        "reconcile"
-      ],
+      "version": "2.2.0",
+      "ops": ["impact_analysis", "pipeline", "reconcile", "semgrep_scan"],
       "contract_schema": "schemas/code-pipeline.schema.json",
       "contract_schema_sha256": "05817263d4aa203f891281296137db571504564fd9c663abe2f89c88b671481d"
     },
     {
-      "actuator_id": "file-actuator",
+      "actuator_id": "deployment-actuator",
       "version": "1.0.0",
-      "ops": [
-        "pipeline"
-      ],
+      "ops": ["deploy_release"],
+      "contract_schema": "schemas/deployment-action.schema.json",
+      "contract_schema_sha256": "f62f3467db3b6a978b2546ce604f631e91821246fef01994939a3757e6572a73"
+    },
+    {
+      "actuator_id": "email-actuator",
+      "version": "1.0.0",
+      "ops": ["create_draft", "send", "send_from_file"],
+      "contract_schema": "libs/actuators/email-actuator/schemas/email-action.schema.json",
+      "contract_schema_sha256": "fb2c63205881214b3c74e2acc442ca6547c381c88d492508902a98f7df56b63b"
+    },
+    {
+      "actuator_id": "file-actuator",
+      "version": "1.1.0",
+      "ops": ["pipeline"],
       "contract_schema": "schemas/file-pipeline.schema.json",
-      "contract_schema_sha256": "422938439094b25b33d50eeecc0c49a6dfbc8fff71fe7c542554c691449250a4"
+      "contract_schema_sha256": "edd3f1059f6a3fd6c637a99ffba3c71c2eccb4044ef5fc5d0f7ffc6460f08f19"
     },
     {
       "actuator_id": "ios-actuator",
-      "version": "1.0.0",
-      "ops": [
-        "pipeline"
-      ],
+      "version": "1.1.0",
+      "ops": ["pipeline"],
       "contract_schema": "schemas/mobile-device-pipeline.schema.json",
-      "contract_schema_sha256": "4e1fb74a1e78517a5e8fae4ad087863c9d5bae382b029e57decb5a21e81ec889"
+      "contract_schema_sha256": "2f629450fe529eda6f4f4577d8d7a3294acf96e6affb3e0a8ec5e88aeed27c21"
     },
     {
       "actuator_id": "media-actuator",
-      "version": "1.1.0",
-      "ops": [
-        "pipeline"
-      ],
+      "version": "1.2.0",
+      "ops": ["pipeline"],
       "contract_schema": "schemas/media-pipeline.schema.json",
       "contract_schema_sha256": "40f17639125da43e054b1e9fd11a5d6e72e142419e71b22d3d1c72534fe0b356"
     },
     {
       "actuator_id": "media-generation-actuator",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "ops": [
+        "capture_focused_window",
         "capture_screen",
         "collect_generation_artifact",
         "generate_image",
         "generate_music",
         "generate_video",
         "get_generation_job",
+        "pipeline",
         "record_screen",
         "run_workflow",
         "submit_generation",
         "wait_generation_job"
       ],
       "contract_schema": "schemas/media-generation-action.schema.json",
-      "contract_schema_sha256": "1ce8fba7c1d815975fd3caa0baa37985678d53f7e7d0c69c19674f1453f51f13"
+      "contract_schema_sha256": "a9c5389d254c8c261f13f97ffda9c3280bb50d8dc9fe73750fb9722f0904a2b6"
     },
     {
       "actuator_id": "meeting-actuator",
-      "version": "1.0.0",
-      "ops": [
-        "chat",
-        "join",
-        "leave",
-        "listen",
-        "speak",
-        "status"
-      ],
+      "version": "1.1.0",
+      "ops": ["chat", "join", "leave", "listen", "speak", "status"],
       "contract_schema": "schemas/meeting-action.schema.json",
-      "contract_schema_sha256": "b5b480eb1be4c7315f402941675cbf0b832f23212f1e26e7855cc692472fc30c"
+      "contract_schema_sha256": "17fde8b3f90c397cf7bddd90c922d67aef55df965fa02aaf81a5b969ab46b1cd"
     },
     {
       "actuator_id": "meeting-browser-driver",
       "version": "1.0.0",
-      "ops": [
-        "join",
-        "leave"
-      ],
+      "ops": ["join", "leave"],
       "contract_schema": null,
       "contract_schema_sha256": null
     },
     {
       "actuator_id": "modeling-actuator",
       "version": "1.0.0",
-      "ops": [
-        "pipeline",
-        "reconcile"
-      ],
+      "ops": ["pipeline", "reconcile"],
       "contract_schema": "schemas/modeling-pipeline.schema.json",
       "contract_schema_sha256": "ae64b9779e379c1833be439f8b1437aaa7935963322274bebc1d246c85b13ee3"
     },
     {
       "actuator_id": "network-actuator",
       "version": "2.2.0",
-      "ops": [
-        "pipeline"
-      ],
+      "ops": ["pipeline"],
       "contract_schema": "schemas/network-pipeline.schema.json",
       "contract_schema_sha256": "cfca2bd33415bcffacacd7a6dcbfc79caf1cc69cec12cb42b025c4e04413cb26"
     },
     {
       "actuator_id": "orchestrator-actuator",
       "version": "1.0.0",
-      "ops": [
-        "pipeline",
-        "reconcile"
-      ],
+      "ops": ["pipeline", "reconcile"],
       "contract_schema": "schemas/orchestrator-pipeline.schema.json",
       "contract_schema_sha256": "5a7d225192520052a0a73c3430940d9860a707a2c9d18a3e2bc60d9f1312ae2d"
     },
     {
       "actuator_id": "presence-actuator",
       "version": "1.0.0",
-      "ops": [
-        "dispatch",
-        "dispatch_timeline",
-        "receive_event"
-      ],
+      "ops": ["dispatch", "dispatch_timeline", "receive_event"],
       "contract_schema": "schemas/presence-action.schema.json",
       "contract_schema_sha256": "435a45e6d49e6c16ea926e5067d9f1c087d8ea462a291102b88f476946fe1940"
     },
     {
       "actuator_id": "process-actuator",
       "version": "1.0.0",
-      "ops": [
-        "list",
-        "spawn",
-        "status",
-        "stop"
-      ],
+      "ops": ["list", "spawn", "status", "stop"],
       "contract_schema": "schemas/process-action.schema.json",
       "contract_schema_sha256": "3cdfa30561aa37d76588d888af5ee44444020b2006426f296583d4f8dfd5fe8a"
     },
     {
       "actuator_id": "secret-actuator",
-      "version": "1.0.0",
-      "ops": [
-        "delete",
-        "get",
-        "set"
-      ],
+      "version": "1.1.0",
+      "ops": ["delete", "get", "list", "set"],
       "contract_schema": "schemas/secret-action.schema.json",
       "contract_schema_sha256": "5cb178a2d004b5b0499f5666c0313d4792f8c43c80391cbf12fb358d887471d7"
     },
     {
       "actuator_id": "service-actuator",
-      "version": "1.0.0",
-      "ops": [
-        "api",
-        "cli",
-        "oauth",
-        "pipeline",
-        "preset",
-        "reconcile"
-      ],
+      "version": "1.1.0",
+      "ops": ["api", "cli", "mcp", "oauth", "pipeline", "preset", "reconcile"],
       "contract_schema": "schemas/service-action.schema.json",
-      "contract_schema_sha256": "d999b30539c5b812eaba66dfb3df808fb115f999b0a0380550351511601a3dd3"
+      "contract_schema_sha256": "212fa4d100dc1c8ac95610e5d5819b21f7ce69a9e28063ce3622b9a1eb689c8b"
     },
     {
       "actuator_id": "system-actuator",
-      "version": "1.1.0",
+      "version": "1.3.0",
       "ops": [
+        "audit_verify",
         "computer_interaction",
+        "control_media_devices",
+        "cost_report",
+        "list_displays",
+        "list_input_devices",
+        "list_media_devices",
+        "list_service_runtimes",
+        "list_tool_runtimes",
+        "macos_automation_probe",
         "pipeline",
-        "reconcile"
+        "reconcile",
+        "reconcile_config_fallbacks",
+        "reconcile_unclassified_errors",
+        "reconcile_unhandled_intents",
+        "record_screen",
+        "summarize_memory_promotion_queue",
+        "summarize_task_model_routing",
+        "test_audio_inputs",
+        "test_audio_outputs",
+        "test_camera_injection",
+        "test_camera_mp4_roundtrip",
+        "test_camera_stream",
+        "test_screen_mp4_roundtrip",
+        "test_screen_stream"
       ],
       "contract_schema": "schemas/system-pipeline.schema.json",
-      "contract_schema_sha256": "52ec1e7b395c7ece6ef7df0024574ec3285f772bbdccd8a9b2aa7706af0e57a7"
+      "contract_schema_sha256": "ec5c941dcc391e2a4df293602dc530c818489e649fe047991bdba727272a9b99"
     },
     {
       "actuator_id": "terminal-actuator",
       "version": "1.0.0",
-      "ops": [
-        "computer_interaction",
-        "kill",
-        "poll",
-        "spawn",
-        "write"
-      ],
+      "ops": ["computer_interaction", "kill", "poll", "spawn", "write"],
       "contract_schema": "schemas/terminal-action.schema.json",
       "contract_schema_sha256": "aff7129e9d112ec00a183d37c7ff8200e2c8059a5a400aaee6cb75a91d759553"
     },
     {
       "actuator_id": "video-composition-actuator",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "ops": [
         "await_video_composition_job",
         "compile_narrated_video_brief",
+        "compile_video_content_brief",
         "create_narrated_intro_movie",
+        "create_narrated_video_from_content_brief",
         "list_video_composition_templates",
         "pipeline",
-        "prepare_video_composition"
+        "prepare_video_composition",
+        "verify_rendered_video_artifact"
       ],
       "contract_schema": null,
       "contract_schema_sha256": null
@@ -288,68 +259,115 @@
     {
       "actuator_id": "vision-actuator",
       "version": "1.3.0",
-      "ops": [
-        "inspect_image",
-        "ocr_image"
-      ],
+      "ops": ["inspect_image", "ocr_image"],
       "contract_schema": "schemas/vision-action.schema.json",
       "contract_schema_sha256": "c2a4b50b5d1a1264e33e09630992b246a3df6516058e241b2d8e252ff446df54"
     },
     {
       "actuator_id": "voice-actuator",
-      "version": "1.1.0",
+      "version": "1.4.0",
       "ops": [
         "collect_and_register_voice_profile",
         "collect_voice_samples",
         "generate_voice",
+        "health",
+        "list_audio_routes",
         "list_voices",
-        "record_voice_sample",
+        "probe_audio_route",
         "record_verify_repair_voice_sample",
+        "record_voice_sample",
         "register_voice_profile",
-        "speak_local"
+        "speak_local",
+        "verify_tts_loopback"
       ],
       "contract_schema": "schemas/voice-action.schema.json",
-      "contract_schema_sha256": "0eda928bf217d4b093718155d9be3357834982b32b057725c89c723d680fe9b9"
+      "contract_schema_sha256": "15aeb633b0001c3199abcb8924eaa69d7aa4e957a197fe2d07d799f7e719912e"
     },
     {
       "actuator_id": "wisdom-actuator",
-      "version": "1.1.0",
+      "version": "1.3.0",
       "ops": [
         "a2a_fanout",
         "a2a_roleplay",
         "adjust_proposal",
+        "array_count",
+        "audit_speaker_fairness",
         "capture_intuition",
         "compute_readiness_matrix",
         "conduct_1on1",
+        "conduct_1on_1",
+        "counterparty_roleplay",
         "cross_critique",
+        "curate_background_review",
         "decompose_into_tasks",
         "deploy_release",
+        "derive_test_inventory",
+        "distill",
         "emit_dissent_log",
+        "escalate_for_review",
         "evaluate_architecture_ready",
         "evaluate_customer_signoff",
+        "evaluate_decision_rights_approval",
+        "evaluate_ensemble_convergence",
         "evaluate_qa_ready",
         "evaluate_requirements_completeness",
+        "evaluate_simulation_quality",
         "evaluate_task_plan_ready",
+        "execute_self_action_items",
         "execute_task_plan",
+        "extract_action_items",
         "extract_design_spec",
         "extract_dissent_signals",
         "extract_requirements",
         "extract_test_plan",
         "find_slides_by_owner",
         "fork_branches",
+        "generate_facilitation_script",
+        "generate_reminder_message",
+        "glob_files",
+        "history_search",
+        "if",
+        "inject_prior_knowledge",
+        "json_query",
         "knowledge_export",
         "knowledge_import",
         "knowledge_inject",
         "knowledge_search",
+        "log",
+        "peer_advice",
+        "perspective_fanout",
         "pptx_diff",
+        "propose_tool_calls",
+        "query",
+        "react_loop",
+        "read_file",
+        "read_json",
+        "reasoning",
+        "reasoning_loop",
         "recommend",
+        "regex_extract",
+        "regex_replace",
+        "register_presentation_preference_profile",
+        "render_hypothesis_report",
+        "resolve_hypothesis_conflict",
+        "shell",
         "simulate_all",
+        "simulate_all_ensemble",
         "stakeholder_grid_sort",
         "synthesize_counterparty_persona",
-        "transcribe_audio"
+        "task_plan_to_next_tasks",
+        "tool_use",
+        "track_pending_action_items",
+        "transcribe_audio",
+        "typed_cross_critique",
+        "uncertainty_gate",
+        "while",
+        "write_artifact",
+        "write_file",
+        "yaml_update"
       ],
       "contract_schema": "schemas/wisdom-action.schema.json",
-      "contract_schema_sha256": "19a16497499411fde1595184d73751f3006ff63c1f6f8902a34ed3e1f7321225"
+      "contract_schema_sha256": "72418731e5690d9a10b43366d15cf6f3c65e3fe00d941d2125b385c7bd1a4b00"
     },
     {
       "actuator_id": "working-memory-actuator",
