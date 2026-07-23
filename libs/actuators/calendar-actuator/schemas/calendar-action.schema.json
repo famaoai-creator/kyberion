@@ -4,16 +4,48 @@
   "type": "object",
   "required": ["op"],
   "properties": {
-    "op": { "enum": ["list_calendars", "list_events", "create_event"] },
+    "op": { "enum": ["list_calendars", "list_events", "query_freebusy", "create_event"] },
     "params": {
       "type": "object",
       "properties": {
-        "calendar_names": { "type": "array", "items": { "type": "string" }, "description": "Optional list of calendar names to target" },
+        "backend": { "type": "string", "minLength": 1, "default": "auto" },
+        "backends": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true,
+          "description": "Optional ordered list of registered backends to query"
+        },
+        "calendar_id": { "type": "string", "minLength": 1 },
+        "calendar_names": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Optional list of calendar names or IDs to target"
+        },
+        "calendar_targets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "backend": { "type": "string", "minLength": 1 },
+              "calendar_id": { "type": "string", "minLength": 1 },
+              "calendar_name": { "type": "string", "minLength": 1 }
+            },
+            "additionalProperties": false,
+            "anyOf": [{ "required": ["calendar_id"] }, { "required": ["calendar_name"] }]
+          },
+          "minItems": 1,
+          "description": "Explicit calendars, optionally distributed across registered backends"
+        },
         "start_date": { "type": "string", "format": "date-time" },
         "end_date": { "type": "string", "format": "date-time" },
         "title": { "type": "string" },
         "location": { "type": "string" },
-        "description": { "type": "string" }
+        "description": { "type": "string" },
+        "attendees": { "type": "array", "items": { "type": "string" } },
+        "time_zone": { "type": "string", "minLength": 1 },
+        "query": { "type": "string" },
+        "with_meet": { "type": "boolean" },
+        "conference_request_id": { "type": "string", "minLength": 1 }
       }
     }
   }
