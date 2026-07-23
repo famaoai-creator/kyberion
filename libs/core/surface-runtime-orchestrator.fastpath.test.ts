@@ -474,6 +474,27 @@ describe('surface-runtime-orchestrator fast-path', () => {
     );
   });
 
+  it('includes the compiled use-case scenario in the governed Surface context', async () => {
+    const scenario = {
+      kind: 'intent-use-case-scenario',
+      scenario_id: 'use-case-schedule-read-agenda',
+      handoff: { status: 'ready', next_action: 'execute' },
+    };
+    const { buildSurfaceStructuredQuery } = await import('./surface-runtime-orchestrator.js');
+    const structuredQuery = buildSurfaceStructuredQuery('来週の予定を教えて', {
+      executionBrief: { workflow_steps: [] },
+      intentContract: { resolution: { execution_shape: 'direct_reply' } },
+      workLoop: {},
+      useCaseScenario: scenario,
+    } as any);
+
+    expect(structuredQuery).toContain(
+      'Governed use-case scenario (canonical user-facing handoff):'
+    );
+    expect(structuredQuery).toContain('use-case-schedule-read-agenda');
+    expect(structuredQuery).toContain('Follow the scenario handoff:');
+  });
+
   it('threads iMessage context into intent compilation', async () => {
     mocks.resolveSurfaceIntent.mockReturnValue({
       intentId: 'schedule-coordination',
