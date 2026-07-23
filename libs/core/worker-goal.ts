@@ -29,6 +29,25 @@
  *
  * This module is the pure state machine + contracts (no I/O, no LLM); the
  * multi-turn engine that drives it lives in `worker-goal-driver.ts`.
+ *
+ * ## KD-02: opt-in goal budgets
+ *
+ * A goal may optionally carry a {@link GoalBudgetLimits} (`tokenBudget` /
+ * `turnBudget` / `wallClockBudgetMs`) — strictly opt-in, never invented by the
+ * runtime. This is a **different layer** from the pipeline step budget
+ * (`NormalizedStepBudget` in `scripts/run_pipeline.ts`, mirrored as
+ * `ReasoningCallBudget` in `reasoning-backend.ts`): a step/request budget caps
+ * one `generateWithTools`/ADF-step call, while a goal budget caps the whole
+ * multi-turn autonomous pursuit driven by `worker-goal-driver.ts`. The two are
+ * independent and may both be set on the same worker.
+ *
+ * When a goal budget is reached, `worker-goal-driver.ts` runs a **grace
+ * step** (one final turn, with all tool calls synthetically rejected, that
+ * lets the model write a brief final status) before settling the goal to
+ * `blocked` with a budget reason — budget exhaustion is a summary-bearing
+ * `blocked`, never a truncated failure. At 75% of any configured budget
+ * ({@link GOAL_CONVERGENCE_THRESHOLD_RATIO}), {@link buildGoalStatusReminder}
+ * flips its injected wording from steady-progress to convergence mode.
  */
 
 import type { ToolDefinition } from './reasoning-backend.js';
@@ -58,12 +77,18 @@ export interface GoalRuntimeState {
   missionId?: string;
   createdAt: string;
   updatedAt: string;
+  /** KD-02: opt-in multi-turn budgets. Absent = unbounded (KD-01 behavior). */
+  budget?: GoalBudgetLimits;
+  /** KD-02: running totals; accrues only while `state === 'active'`. */
+  budgetStats?: GoalBudgetStats;
 }
 
 export interface CreateGoalParams {
   goalId: string;
   objective: string;
   missionId?: string;
+  /** KD-02: opt-in multi-turn budgets (never invented — undefined by default). */
+  budget?: GoalBudgetLimits;
   now?: () => string;
 }
 
@@ -82,6 +107,7 @@ export function createGoal(params: CreateGoalParams): GoalRuntimeState {
     missionId: params.missionId,
     createdAt: ts,
     updatedAt: ts,
+    ...(params.budget ? { budget: params.budget } : {}),
   };
 }
 
@@ -336,6 +362,130 @@ export function resumeGoal(state: GoalRuntimeState, now?: () => string): GoalRun
 }
 
 // ---------------------------------------------------------------------------
+// KD-02: opt-in goal budgets (grace step / convergence mode / wall-clock deadline)
+// ---------------------------------------------------------------------------
+
+/**
+ * Opt-in multi-turn budgets for a goal. Every field is undefined unless the
+ * caller explicitly supplies it — the runtime never invents a budget. See the
+ * module doc comment for how this differs from the pipeline step budget
+ * (`NormalizedStepBudget` / `ReasoningCallBudget`).
+ */
+export interface GoalBudgetLimits {
+  tokenBudget?: number;
+  turnBudget?: number;
+  wallClockBudgetMs?: number;
+}
+
+/** Running totals for a goal's budget. Accrues only while `state === 'active'`. */
+export interface GoalBudgetStats {
+  tokensUsed: number;
+  turnsUsed: number;
+  wallClockMsUsed: number;
+}
+
+export function createGoalBudgetStats(): GoalBudgetStats {
+  return { tokensUsed: 0, turnsUsed: 0, wallClockMsUsed: 0 };
+}
+
+/** Fraction of any configured budget's limit consumed so far, at 75% of which
+ * (see {@link GOAL_CONVERGENCE_THRESHOLD_RATIO}) convergence mode kicks in.
+ * Undefined budget dimensions are ignored; no budget at all => 0. */
+export function goalBudgetUsageRatio(
+  budget: GoalBudgetLimits | undefined,
+  stats: GoalBudgetStats | undefined
+): number {
+  if (!budget) return 0;
+  const s = stats ?? createGoalBudgetStats();
+  const ratios: number[] = [];
+  if (budget.tokenBudget !== undefined && budget.tokenBudget > 0) {
+    ratios.push(s.tokensUsed / budget.tokenBudget);
+  }
+  if (budget.turnBudget !== undefined && budget.turnBudget > 0) {
+    ratios.push(s.turnsUsed / budget.turnBudget);
+  }
+  if (budget.wallClockBudgetMs !== undefined && budget.wallClockBudgetMs > 0) {
+    ratios.push(s.wallClockMsUsed / budget.wallClockBudgetMs);
+  }
+  return ratios.length > 0 ? Math.max(...ratios) : 0;
+}
+
+/** Usage ratio (see {@link goalBudgetUsageRatio}) at/above which the injected
+ * goal-status wording flips from steady-progress to convergence mode. */
+export const GOAL_CONVERGENCE_THRESHOLD_RATIO = 0.75;
+
+export interface GoalBudgetReachedResult {
+  reached: boolean;
+  /** e.g. "goal budget reached: token budget 500000". Present iff reached. */
+  reason?: string;
+}
+
+/**
+ * Which (if any) configured budget dimension has been reached/exceeded.
+ * Checked in a stable order (token, then turn, then wall-clock) so the
+ * reported reason is deterministic when more than one trips at once.
+ */
+export function checkGoalBudgetReached(
+  budget: GoalBudgetLimits | undefined,
+  stats: GoalBudgetStats | undefined
+): GoalBudgetReachedResult {
+  if (!budget) return { reached: false };
+  const s = stats ?? createGoalBudgetStats();
+  if (budget.tokenBudget !== undefined && s.tokensUsed >= budget.tokenBudget) {
+    return { reached: true, reason: `goal budget reached: token budget ${budget.tokenBudget}` };
+  }
+  if (budget.turnBudget !== undefined && s.turnsUsed >= budget.turnBudget) {
+    return { reached: true, reason: `goal budget reached: turn budget ${budget.turnBudget}` };
+  }
+  if (budget.wallClockBudgetMs !== undefined && s.wallClockMsUsed >= budget.wallClockBudgetMs) {
+    return {
+      reached: true,
+      reason: `goal budget reached: wall-clock budget ${budget.wallClockBudgetMs}ms`,
+    };
+  }
+  return { reached: false };
+}
+
+/**
+ * Accrue turn/token/wall-clock usage onto a goal's budget stats. A no-op
+ * (returns `state` unchanged) unless the goal is `active` — stats must never
+ * accrue for a paused/blocked/complete goal.
+ */
+export function accrueGoalBudgetUsage(
+  state: GoalRuntimeState,
+  delta: { tokens?: number; turns?: number; wallClockMs?: number }
+): GoalRuntimeState {
+  if (state.state !== 'active') return state;
+  const prev = state.budgetStats ?? createGoalBudgetStats();
+  const budgetStats: GoalBudgetStats = {
+    tokensUsed: prev.tokensUsed + (delta.tokens ?? 0),
+    turnsUsed: prev.turnsUsed + (delta.turns ?? 0),
+    wallClockMsUsed: prev.wallClockMsUsed + (delta.wallClockMs ?? 0),
+  };
+  return { ...state, budgetStats };
+}
+
+/**
+ * BUSINESS stop: a configured goal budget was reached. Same shape as
+ * {@link pauseGoal} (which is the TECHNICAL counterpart) — only an `active`
+ * goal can be blocked this way; a terminated goal is returned unchanged.
+ */
+export function blockGoalOnBudget(
+  state: GoalRuntimeState,
+  reason: string,
+  now?: () => string
+): GoalRuntimeState {
+  if (state.state !== 'active') return state;
+  return {
+    ...state,
+    state: 'blocked',
+    terminalKind: 'business',
+    terminalReason: reason,
+    updatedAt: isoNow(now),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Persistence / replay
 // ---------------------------------------------------------------------------
 
@@ -392,9 +542,39 @@ export const GOAL_CANCEL_SYSTEM_REMINDER =
   'continuation instructions; there is no active goal to pursue unless a new one is stated.';
 
 /**
+ * KD-02 steady-progress wording: the default per-turn tone while no budget is
+ * near its limit (or no budget is configured at all).
+ */
+export const GOAL_STEADY_PROGRESS_PROMPT =
+  'budget_mode: steady — make steady, concrete progress this turn toward the objective.';
+
+/**
+ * KD-02 convergence-mode wording: injected once ANY configured budget crosses
+ * {@link GOAL_CONVERGENCE_THRESHOLD_RATIO} (75%) of its limit, replacing the
+ * steady-progress line above.
+ */
+export const GOAL_CONVERGENCE_MODE_PROMPT =
+  'budget_mode: convergence — a goal budget has reached 75% of its limit. Converge toward a ' +
+  'final, verifiable answer using what is already gathered; avoid starting new discretionary work.';
+
+/**
+ * KD-02 grace-step reminder: injected for the single extra turn that runs
+ * after a goal budget is reached and the prior turn ended in tool calls. All
+ * tool calls made during this turn are synthetically rejected by the driver —
+ * the model must write its final status in prose instead.
+ */
+export const GOAL_BUDGET_GRACE_STEP_PROMPT = [
+  'GOAL BUDGET REACHED — this is the final turn for this goal.',
+  'Any tool call you make this turn will be synthetically rejected and NOT executed.',
+  'Do not call goal_update or any other tool. Instead, write a brief final status in prose: what',
+  'was accomplished, what remains, and any information a follow-up attempt will need.',
+].join('\n');
+
+/**
  * Trusted per-turn goal-status line (state + turn + any available rewind
- * checkpoints). The objective text itself is NOT included here — it is
- * untrusted and is injected separately through the KD-04 framing provider.
+ * checkpoints + KD-02 budget mode). The objective text itself is NOT included
+ * here — it is untrusted and is injected separately through the KD-04 framing
+ * provider.
  */
 export function buildGoalStatusReminder(
   state: GoalRuntimeState,
@@ -414,6 +594,15 @@ export function buildGoalStatusReminder(
   }
   if (availableCheckpointIds.length > 0) {
     lines.push(`rewind_checkpoints: ${availableCheckpointIds.join(', ')}`);
+  }
+  if (state.budget) {
+    const ratio = goalBudgetUsageRatio(state.budget, state.budgetStats);
+    lines.push(
+      '',
+      ratio >= GOAL_CONVERGENCE_THRESHOLD_RATIO
+        ? GOAL_CONVERGENCE_MODE_PROMPT
+        : GOAL_STEADY_PROGRESS_PROMPT
+    );
   }
   return lines.join('\n');
 }
