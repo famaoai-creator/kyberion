@@ -24,6 +24,27 @@ export interface MissionContract {
     approved_by_sovereign?: boolean;
     [k: string]: unknown;
   };
-  knowledge_injections?: string[];
+  /**
+   * Declarative knowledge scope this mission draws on. Resolved at runtime by tag/domain query (knowledge-index.ts), not by literal path, so it survives knowledge/ directory reorganizations.
+   */
+  knowledge_injections?: {
+    /**
+     * Knowledge tier this entry draws from; drives mission tier auto-elevation directly (no path sniffing).
+     */
+    tier: 'personal' | 'confidential' | 'public';
+    /**
+     * Required scoping when tier is 'confidential': matches knowledge/confidential/{project}/.
+     */
+    project?: string;
+    /**
+     * Knowledge domains to search, e.g. 'design-patterns', 'procedures/browser'.
+     */
+    domains?: string[];
+    /**
+     * Frontmatter/hint tags to match, e.g. 'browser-automation', 'pptx'.
+     */
+    tags?: string[];
+    [k: string]: unknown;
+  }[];
   [k: string]: unknown;
 }

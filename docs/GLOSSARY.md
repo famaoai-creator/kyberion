@@ -138,7 +138,7 @@ The reusable layer for procedures, schemas, templates, policies, catalogs, and p
 
 ### KnowledgeHint
 
-Structured hint stored in `knowledge/public/procedures/hints/`. Contains topic, hint text, source, confidence score, and tags. Queryable at runtime by actuators.
+Structured hint stored in `knowledge/product/hints/`. Contains topic, hint text, source, confidence score, and tags. Queryable at runtime by actuators.
 
 ### Spinal Cord
 
@@ -238,6 +238,13 @@ Service bindings should be read together with:
 ### Specialist Team
 
 The internal set of specialists Kyberion assigns to a request, such as a browser operator, document specialist, knowledge specialist, or mission lead. Users usually interact with one front-facing assistant while the specialist team works behind it.
+
+### Team Role vs. Assigned Persona
+
+Two distinct, non-interchangeable role concepts that are easy to conflate:
+
+- **Team Role** (`teamRole`): the per-task execution role assigned by `mission-team-plan-composer.ts` from a mission's team template (`knowledge/product/orchestration/mission-team-templates.json`, e.g. `owner`/`planner`/`implementer`/`reviewer`/`tester`/`experience_designer`). It selects the working-principles addendum (`libs/core/working-principles.ts`) and gates artifact-review behavior in `mission-orchestration-worker.ts`. Team-template role names are not always the canonical addendum key (e.g. `tester` canonicalizes to `qa`, `experience_designer` to `designer`) — any code branching on team-role identity must compare `canonicalizeTeamRole(teamRole)`, never the raw string, or aliased roles silently miss the behavior their canonical role is supposed to get.
+- **Assigned Persona**: the one org-chart role assigned to a whole mission at activation (e.g. `product_manager`, `qa_lead`, `solution_architect` — the 21 roles under `knowledge/product/roles/{persona}/`). `syncRoleProcedure` mirrors that persona's `PROCEDURE.md` into the mission directory once at activation; it is then injected into the first task prompt as a one-shot dynamic injection (see `buildRolePersonaProcedureInjectionProvider` in `mission-orchestration-worker.ts`). A mission started without an explicit `--persona` defaults to `worker`, which has no corresponding role directory — no procedure gets injected in that case.
 
 ### Evidence
 
