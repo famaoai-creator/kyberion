@@ -36,6 +36,52 @@ export interface MicCaptureProbeResult {
   reason?: string;
 }
 
+const MAC_VIRTUAL_AUDIO_DEVICE_RE =
+  /blackhole|soundflower|loopback|virtual|aggregate|multi-output/i;
+
+/**
+ * Select the first physical AVFoundation audio input from ffmpeg's device
+ * listing. macOS device indices are host-specific; `:0` is not a safe
+ * default because virtual devices such as BlackHole often occupy it.
+ */
+export function selectMacPhysicalAudioDevice(listing: string): string | undefined {
+  let inAudioSection = false;
+  for (const line of listing.split(/\r?\n/u)) {
+    if (/AVFoundation audio devices:/u.test(line)) {
+      inAudioSection = true;
+      continue;
+    }
+    if (!inAudioSection) continue;
+    const match = line.match(/\]\s+\[(\d+)\]\s+(.+?)\s*$/u);
+    if (!match) continue;
+    const name = match[2].trim();
+    if (MAC_VIRTUAL_AUDIO_DEVICE_RE.test(name)) continue;
+    return `:${match[1]}`;
+  }
+  return undefined;
+}
+
+function detectMacPhysicalAudioDevice(): string | undefined {
+  const probe = spawnSync(
+    'ffmpeg',
+    ['-hide_banner', '-f', 'avfoundation', '-list_devices', 'true', '-i', ''],
+    { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
+  );
+  return selectMacPhysicalAudioDevice(`${probe.stdout || ''}\n${probe.stderr || ''}`);
+}
+
+/** Resolve a host-safe default while preserving explicit test/device overrides. */
+export function resolveMicDevice(explicit?: string): string {
+  const requested = explicit?.trim();
+  if (requested) return requested;
+  if (process.platform !== 'darwin') return ':0';
+  const detected = detectMacPhysicalAudioDevice();
+  if (detected) return detected;
+  throw new Error(
+    '[mic-capture] no physical macOS audio input was detected; set --mic-device to an AVFoundation audio index'
+  );
+}
+
 function defaultCommand(opts: Required<Pick<MicCaptureOptions, 'device' | 'sampleRateHz'>>): {
   argv: string[];
   backend: MicCaptureProbeResult['backend'];
@@ -104,7 +150,7 @@ export async function startMicCapture(opts: MicCaptureOptions = {}): Promise<Mic
   const argv =
     opts.command && opts.command.length > 0
       ? opts.command
-      : defaultCommand({ device: opts.device ?? ':0', sampleRateHz }).argv;
+      : defaultCommand({ device: resolveMicDevice(opts.device), sampleRateHz }).argv;
 
   const child: ChildProcessWithoutNullStreams = spawn(argv[0], argv.slice(1), {
     stdio: ['ignore', 'pipe', 'pipe'],

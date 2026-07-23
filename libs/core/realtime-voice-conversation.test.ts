@@ -1,12 +1,21 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import * as pathResolver from './path-resolver.js';
 import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
-import { registerSpeechToTextBridge, resetSpeechToTextBridge, type SpeechToTextBridge } from './speech-to-text-bridge.js';
-import { registerReasoningBackend, resetReasoningBackend, stubReasoningBackend } from './reasoning-backend.js';
+import {
+  registerSpeechToTextBridge,
+  resetSpeechToTextBridge,
+  type SpeechToTextBridge,
+} from './speech-to-text-bridge.js';
+import {
+  registerReasoningBackend,
+  resetReasoningBackend,
+  stubReasoningBackend,
+} from './reasoning-backend.js';
 import { resetVoiceEngineRegistryCache } from './voice-engine-registry.js';
 import { resetVoiceProfileRegistryCache } from './voice-profile-registry.js';
 import {
   ensureRealtimeVoiceConversationSession,
+  buildRealtimeVoiceGenerationPayload,
   runRealtimeVoiceConversationTurn,
 } from './realtime-voice-conversation.js';
 
@@ -17,13 +26,73 @@ const ENGINE_REGISTRY_PATH = `${TMP_DIR}/voice-engine-registry.json`;
 describe('realtime voice conversation', () => {
   afterEach(() => {
     safeRmSync(TMP_DIR, { recursive: true, force: true });
-    safeRmSync(pathResolver.shared('runtime/realtime-voice-conversations'), { recursive: true, force: true });
+    safeRmSync(pathResolver.shared('runtime/realtime-voice-conversations'), {
+      recursive: true,
+      force: true,
+    });
     delete process.env.KYBERION_VOICE_PROFILE_REGISTRY_PATH;
     delete process.env.KYBERION_VOICE_ENGINE_REGISTRY_PATH;
     resetVoiceProfileRegistryCache();
     resetVoiceEngineRegistryCache();
     resetSpeechToTextBridge();
     resetReasoningBackend();
+  });
+
+  it('selects an artifact format supported by the active voice engine', () => {
+    safeMkdir(TMP_DIR, { recursive: true });
+    safeWriteFile(
+      PROFILE_REGISTRY_PATH,
+      JSON.stringify({
+        version: 'test',
+        default_profile_id: 'me-ja',
+        profiles: [
+          {
+            profile_id: 'me-ja',
+            display_name: 'Me JA',
+            tier: 'personal',
+            languages: ['ja'],
+            default_engine_id: 'mlx_audio_qwen3',
+            status: 'active',
+          },
+        ],
+      })
+    );
+    safeWriteFile(
+      ENGINE_REGISTRY_PATH,
+      JSON.stringify({
+        version: 'test',
+        default_engine_id: 'local_say',
+        engines: [
+          {
+            engine_id: 'mlx_audio_qwen3',
+            display_name: 'mlx-audio Qwen3-TTS',
+            kind: 'voice_clone_service',
+            provider: 'mlx_audio',
+            status: 'active',
+            platforms: ['darwin'],
+            supports: {
+              list_voices: false,
+              playback: true,
+              artifact_formats: ['wav'],
+            },
+          },
+        ],
+      })
+    );
+    process.env.KYBERION_VOICE_PROFILE_REGISTRY_PATH = PROFILE_REGISTRY_PATH;
+    process.env.KYBERION_VOICE_ENGINE_REGISTRY_PATH = ENGINE_REGISTRY_PATH;
+
+    const generated = buildRealtimeVoiceGenerationPayload({
+      sessionId: 'rtc-format',
+      profileId: 'me-ja',
+      language: 'ja',
+      text: 'こんにちは。',
+      deliveryMode: 'artifact',
+      personalVoiceMode: 'require_personal_voice',
+    });
+
+    expect(generated.payload.delivery).toMatchObject({ format: 'wav' });
+    expect(generated.artifactPath).toMatch(/\.wav$/u);
   });
 
   it('creates a session and runs a turn using active personal voice profile', async () => {
@@ -43,7 +112,7 @@ describe('realtime voice conversation', () => {
             status: 'active',
           },
         ],
-      }),
+      })
     );
     safeWriteFile(
       ENGINE_REGISTRY_PATH,
@@ -65,7 +134,7 @@ describe('realtime voice conversation', () => {
             },
           },
         ],
-      }),
+      })
     );
     process.env.KYBERION_VOICE_PROFILE_REGISTRY_PATH = PROFILE_REGISTRY_PATH;
     process.env.KYBERION_VOICE_ENGINE_REGISTRY_PATH = ENGINE_REGISTRY_PATH;
@@ -105,7 +174,9 @@ describe('realtime voice conversation', () => {
     expect(result.user_text).toBe('今日の予定を教えて');
     expect(result.assistant_text).toBe('今日はレビューと実装を進めます。');
     expect(result.profile_id).toBe('me-ja');
-    const saved = JSON.parse(safeReadFile(result.transcript_path, { encoding: 'utf8' }) as string) as {
+    const saved = JSON.parse(
+      safeReadFile(result.transcript_path, { encoding: 'utf8' }) as string
+    ) as {
       transcript?: Array<{ speaker?: string; text?: string }>;
     };
     expect(saved.transcript).toHaveLength(2);
@@ -129,7 +200,7 @@ describe('realtime voice conversation', () => {
             status: 'shadow',
           },
         ],
-      }),
+      })
     );
     safeWriteFile(
       ENGINE_REGISTRY_PATH,
@@ -151,7 +222,7 @@ describe('realtime voice conversation', () => {
             },
           },
         ],
-      }),
+      })
     );
     process.env.KYBERION_VOICE_PROFILE_REGISTRY_PATH = PROFILE_REGISTRY_PATH;
     process.env.KYBERION_VOICE_ENGINE_REGISTRY_PATH = ENGINE_REGISTRY_PATH;
@@ -160,7 +231,7 @@ describe('realtime voice conversation', () => {
       ensureRealtimeVoiceConversationSession({
         sessionId: 'rtc-shadow',
         profileId: 'shadow-me',
-      }),
+      })
     ).toThrow(/promotion to active is required/u);
   });
 });

@@ -53,7 +53,7 @@ pnpm meeting:consent grant --mission MSN-LIVE-VOICE-001
 ```
 
 ```bash
-pnpm voice:conversation:turn -- \
+pnpm voice:conversation:turn \
   --interactive \
   --session-id user-voice-live \
   --profile-id your-active-voice-profile \
@@ -75,7 +75,10 @@ Realtime loop flags (all optional):
 - `--vad-threshold <rms>` — explicit speech threshold; omitted → auto-calibrated
   from a ~500ms noise-floor sample
 - `--max-utterance-seconds 30` — safety cap per utterance
-- `--mic-device ":0"` — avfoundation index (macOS) / ALSA device (Linux)
+- `--mic-device ":1"` — avfoundation index (macOS) / ALSA device (Linux).
+  When omitted on macOS, Kyberion selects the first physical audio input and
+  skips virtual devices such as BlackHole. Use this option when several
+  physical microphones are connected.
 - `--no-streaming-stt` — disable in-utterance streaming transcription (used when
   `KYBERION_STT_COMMAND` is configured; batch STT on the turn WAV is the fallback)
 - `--no-warm-actuator` — spawn the voice actuator per segment instead of keeping
@@ -86,11 +89,15 @@ Realtime loop flags (all optional):
 
 The VAD recorder needs `ffmpeg` (macOS) or `arecord` (Linux) on PATH, and
 playback is used only with `--delivery-mode artifact_and_playback` and needs
-`afplay` / `aplay`. `--delivery-mode artifact` writes audio without playing it.
+`afplay` / `aplay`. On macOS playback follows the system default output device;
+select the desired speaker in macOS Sound settings before starting the loop.
+`--delivery-mode artifact` writes audio without playing it.
+The artifact format is selected from the active engine's supported formats;
+the `mlx_audio_qwen3` learned-voice engine therefore uses WAV on macOS.
 The legacy fixed-duration recorder remains available as a fallback:
 
 ```bash
-pnpm voice:conversation:turn -- \
+pnpm voice:conversation:turn \
   --interactive \
   --recorder fixed \
   --record-seconds 8 \

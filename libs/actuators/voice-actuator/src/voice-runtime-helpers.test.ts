@@ -237,4 +237,37 @@ describe('voice runtime helpers', () => {
       );
     }
   );
+
+  it.skipIf(process.platform !== 'darwin')(
+    'accepts a successful TTS payload after bridge progress logs',
+    async () => {
+      const { renderNativeArtifact } = await import('./voice-runtime-helpers.js');
+
+      mocks.safeExecResult.mockReturnValueOnce({
+        status: 0,
+        stdout:
+          'Initialized encoder codebooks\n{"status":"success","output_path":"/tmp/logged-tts.wav"}\n',
+        stderr: '',
+        error: null,
+      });
+      mocks.safeExec.mockImplementation((command: string) => {
+        if (command === 'ffprobe') return '2.0';
+        return '';
+      });
+
+      await expect(
+        renderNativeArtifact('ログ付きでも再生できます。', {
+          requestId: 'logged-tts-test',
+          voice: 'Kyoko',
+          rate: 170,
+          language: 'ja',
+          format: 'wav',
+          engineId: 'mlx_audio_qwen3',
+          supportsFormats: ['wav'],
+          outputPath: '/tmp/logged-tts.wav',
+          requireVoiceClone: true,
+        })
+      ).resolves.toBe('/tmp/logged-tts.wav');
+    }
+  );
 });
