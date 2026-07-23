@@ -62,6 +62,7 @@ import { buildAgyCliBackendFromEnv } from './agy-cli-backend.js';
 import { AgyCliIntentExtractor } from './agy-cli-intent-extractor.js';
 import { AgyCliVoiceBridge } from './agy-cli-voice-bridge.js';
 import { loadLlmSelectionPreferences } from './llm-selection-preferences.js';
+import { initializeAdapterDefaultPreferences } from './adapter-default-selection.js';
 import { buildCopilotAcpBackendFromEnv } from './copilot-acp-reasoning-backend.js';
 import {
   buildOpenAiCompatibleBackendFromEnv,
@@ -679,6 +680,7 @@ function reportResidualStubDegradation(mode: string, reason: string): void {
 }
 
 function _installReasoningBackendsCore(options: InstallReasoningOptions): boolean {
+  initializeAdapterDefaultPreferences();
   const effectiveOptions = applyOperatorLlmSelection(options);
   const mode = consultCapabilityBrokerForMode(resolveMode(effectiveOptions));
 
