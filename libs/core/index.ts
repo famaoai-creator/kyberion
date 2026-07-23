@@ -1427,6 +1427,7 @@ export type {
   TaskModelTier,
 } from './reasoning-model-routing.js';
 export * from './reasoning-route-resolver.js';
+export * from './llm-selection-preferences.js';
 export * from './reasoning-route-doctor.js';
 export * from './reasoning-failure-taxonomy.js';
 export {
