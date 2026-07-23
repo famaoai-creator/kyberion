@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { getOpInputContract, listOpInputContracts, validateOpInput } from './op-input-contracts.js';
+import {
+  getOpInputContract,
+  listOpInputContracts,
+  resolveOpAccessClaims,
+  validateOpInput,
+} from './op-input-contracts.js';
 
 describe('op-input-contracts', () => {
   it('exposes browser and system input contracts', () => {
@@ -58,5 +63,41 @@ describe('op-input-contracts', () => {
     if (!result.valid) {
       expect(result.errors.join(' ')).toMatch(/path/);
     }
+  });
+
+  describe('resolveOpAccessClaims (KD-07)', () => {
+    it('resolves a declared read-only op to a file read claim from its path param', () => {
+      expect(
+        resolveOpAccessClaims('file', 'read_file', { path: 'knowledge/product/README.md' })
+      ).toEqual([
+        {
+          kind: 'file',
+          operation: 'read',
+          path: 'knowledge/product/README.md',
+          recursive: undefined,
+        },
+      ]);
+      expect(resolveOpAccessClaims('system', 'read_json', { path: 'a/b.json' })).toEqual([
+        { kind: 'file', operation: 'read', path: 'a/b.json', recursive: undefined },
+      ]);
+    });
+
+    it('marks recursive search claims as covering the subtree', () => {
+      expect(
+        resolveOpAccessClaims('file', 'search', { path: 'knowledge/product', pattern: 'AR-03' })
+      ).toEqual([{ kind: 'file', operation: 'read', path: 'knowledge/product', recursive: true }]);
+    });
+
+    it('is conservative ({kind:"all"}) for an op with no accesses declaration', () => {
+      expect(resolveOpAccessClaims('system', 'shell', { command: 'ls' })).toEqual([
+        { kind: 'all' },
+      ]);
+      expect(resolveOpAccessClaims('file', 'write', { path: 'a.txt' })).toEqual([{ kind: 'all' }]);
+    });
+
+    it('is conservative when a declared path param is missing or not a string', () => {
+      expect(resolveOpAccessClaims('file', 'read', {})).toEqual([{ kind: 'all' }]);
+      expect(resolveOpAccessClaims('file', 'read', { path: 123 })).toEqual([{ kind: 'all' }]);
+    });
   });
 });
