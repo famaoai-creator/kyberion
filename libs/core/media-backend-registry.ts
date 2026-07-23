@@ -39,6 +39,9 @@ export interface MediaBackendRecord {
   };
   service_id?: string;
   action?: string;
+  model?: string;
+  api_key_env?: string;
+  endpoint_env?: string;
   command?: string;
   args?: string[];
   fallback_backend_id?: string;
@@ -410,6 +413,21 @@ async function probeMediaBackendAvailabilityUncached(
       available: resolution.available,
       probe_kind: 'native_bridge',
       reason: resolution.reason || 'Image Playground probe completed',
+    };
+  }
+
+  const credentialNames =
+    backend.api_key_env
+      ?.split('|')
+      .map((name) => name.trim())
+      .filter(Boolean) || [];
+  if (credentialNames.length > 0 && !credentialNames.some((name) => process.env[name]?.trim())) {
+    return {
+      backend_id: backend.backend_id,
+      modality: backend.modality,
+      available: false,
+      probe_kind: 'registry',
+      reason: `required credential ${credentialNames.join(' or ')} is not configured`,
     };
   }
 

@@ -45,6 +45,11 @@ import {
 } from './media-generation-helpers.js';
 import { getGenerationHistoryAdapterForAction } from './generation-artifact-adapters.js';
 import { createGenerationProviderHistoryClient } from './generation-provider-clients.js';
+import {
+  isDirectVideoGenerationBackend,
+  refreshDirectVideoGeneration,
+  resolveVideoGenerationBackend,
+} from './video-generation-provider.js';
 
 const PROMPT_BASED_ACTIONS = new Set([
   'generate_image',
@@ -352,6 +357,50 @@ async function getGenerationJob(params: any) {
     if (!promptId) {
       traceCtx.endSpan('ok');
       return { ...currentJob, ...finalizeActuatorTrace(traceCtx) };
+    }
+
+    if (
+      currentJob.action === 'generate_video' &&
+      isDirectVideoGenerationBackend(resolveVideoGenerationBackend(currentJob.request || {}))
+    ) {
+      const refreshed = await refreshDirectVideoGeneration(currentJob.request || {}, promptId);
+      if (refreshed.status === 'failed' || refreshed.status === 'canceled') {
+        throw new Error(String(refreshed.error || `video provider job ${promptId} failed`));
+      }
+      if (refreshed.status !== 'succeeded') {
+        const nextStatus = refreshed.status === 'running' ? 'running' : 'submitted';
+        const next = transitionGenerationJob(currentJob, nextStatus, {
+          kind: currentJob.kind || 'generation-job',
+          result: { ...currentJob.result, ...refreshed },
+          updated_at: nowIso(),
+        });
+        traceCtx.endSpan('ok');
+        return { ...writeJob(next), ...finalizeActuatorTrace(traceCtx) };
+      }
+      const succeeded = transitionGenerationJob(currentJob, 'succeeded', {
+        kind: currentJob.kind || 'generation-job',
+        result: {
+          ...currentJob.result,
+          ...refreshed,
+          ...(refreshed.artifact &&
+          typeof refreshed.artifact === 'object' &&
+          !Array.isArray(refreshed.artifact)
+            ? { artifact: refreshed.artifact as Record<string, unknown> }
+            : {}),
+          ...(Array.isArray(refreshed.artifacts)
+            ? {
+                artifacts: refreshed.artifacts.filter(
+                  (artifact): artifact is Record<string, unknown> =>
+                    Boolean(artifact) && typeof artifact === 'object' && !Array.isArray(artifact)
+                ),
+              }
+            : {}),
+        },
+        updated_at: nowIso(),
+        completed_at: nowIso(),
+      });
+      traceCtx.endSpan('ok');
+      return { ...writeJob(succeeded), ...finalizeActuatorTrace(traceCtx) };
     }
 
     const provider = String(
