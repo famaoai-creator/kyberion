@@ -935,6 +935,24 @@
       "documented": false
     },
     {
+      "name": "KYBERION_GEMINI_VIDEO_API_KEY",
+      "category": "secret",
+      "type": "string",
+      "required": false,
+      "description": "API key used by the explicit Google Veo video-generation backend.",
+      "subsystem": "media-generation",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_GEMINI_VIDEO_URL",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "Optional base URL override for the Google Veo video-generation API.",
+      "subsystem": "media-generation",
+      "documented": true
+    },
+    {
       "name": "KYBERION_GENERATION_SCHEDULE_INTERVAL_MS",
       "category": "tuning",
       "type": "number",
@@ -1420,6 +1438,24 @@
       "documented": false
     },
     {
+      "name": "KYBERION_MINIMAX_VIDEO_API_KEY",
+      "category": "secret",
+      "type": "string",
+      "required": false,
+      "description": "API key used by the explicit MiniMax Hailuo video-generation backend.",
+      "subsystem": "media-generation",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_MINIMAX_VIDEO_URL",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "Optional base URL override for the MiniMax Hailuo video-generation API.",
+      "subsystem": "media-generation",
+      "documented": true
+    },
+    {
       "name": "KYBERION_MLX_EMBED_MODEL",
       "category": "provider",
       "type": "string",
@@ -1578,6 +1614,24 @@
       "required": false,
       "description": "",
       "documented": false
+    },
+    {
+      "name": "KYBERION_OPENAI_VIDEO_API_KEY",
+      "category": "secret",
+      "type": "string",
+      "required": false,
+      "description": "API key used by the explicit OpenAI Sora video-generation backend.",
+      "subsystem": "media-generation",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_OPENAI_VIDEO_URL",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "Optional base URL override for the OpenAI Videos API.",
+      "subsystem": "media-generation",
+      "documented": true
     },
     {
       "name": "KYBERION_OPENAI_VISION_MODEL",
@@ -1973,6 +2027,24 @@
       "required": false,
       "description": "",
       "documented": false
+    },
+    {
+      "name": "KYBERION_RUNWAY_API_KEY",
+      "category": "secret",
+      "type": "string",
+      "required": false,
+      "description": "API key used by the explicit Runway video-generation backends.",
+      "subsystem": "media-generation",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_RUNWAY_VIDEO_URL",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "Optional base URL override for the Runway video-generation API.",
+      "subsystem": "media-generation",
+      "documented": true
     },
     {
       "name": "KYBERION_SECRET_ENCRYPTION",
