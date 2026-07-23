@@ -691,7 +691,7 @@ export async function main(): Promise<void> {
     .option('mic-device', {
       type: 'string',
       describe:
-        'Mic device for VAD mode (avfoundation index like ":0" on macOS, ALSA device on Linux)',
+        'Mic device for VAD mode (avfoundation index like ":1" on macOS, ALSA device on Linux); omit to auto-select a physical macOS input',
     })
     .option('barge-in', {
       type: 'boolean',

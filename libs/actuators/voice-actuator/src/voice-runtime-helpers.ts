@@ -56,7 +56,10 @@ type VoicePythonTool = 'mlx_audio' | 'mlx_whisper';
 function resolvePythonBin(preferredTool: VoicePythonTool = 'mlx_audio'): string {
   if (process.env.KYBERION_PYTHON_BIN) return process.env.KYBERION_PYTHON_BIN;
   if (process.env.KYBERION_PYTHON) return process.env.KYBERION_PYTHON;
-  for (const toolId of [preferredTool, preferredTool === 'mlx_audio' ? 'mlx_whisper' : 'mlx_audio'] as const) {
+  for (const toolId of [
+    preferredTool,
+    preferredTool === 'mlx_audio' ? 'mlx_whisper' : 'mlx_audio',
+  ] as const) {
     const managedPython = resolveManagedToolPythonBin(toolId);
     if (managedPython) return managedPython;
   }
@@ -115,6 +118,19 @@ function resolveArtifactPath(
   return pathResolver.sharedTmp(`voice-generation/${requestId}.${format}`);
 }
 
+function parseTrailingJson(raw: string): any {
+  for (const line of raw.split(/\r?\n/).reverse()) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith('{')) continue;
+    try {
+      return JSON.parse(trimmed);
+    } catch {
+      continue;
+    }
+  }
+  throw new Error('No JSON payload received');
+}
+
 async function runPythonTtsBridge(
   bridgeScriptPath: string,
   text: string,
@@ -147,9 +163,9 @@ async function runPythonTtsBridge(
 
   let parsed: any;
   try {
-    const stdout = result.stdout.trim();
+    const stdout = String(result.stdout || '').trim();
     if (!stdout) throw new Error('No stdout received');
-    parsed = JSON.parse(stdout);
+    parsed = parseTrailingJson(stdout);
   } catch {
     throw new Error(`${path.basename(bridgeScriptPath)} returned non-JSON: ${result.stdout}`);
   }
