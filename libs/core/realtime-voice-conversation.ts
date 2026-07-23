@@ -13,7 +13,29 @@ import { getReasoningBackend } from './reasoning-backend.js';
 import { createVoiceActuatorServeClient } from './actuator-serve-client.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
-import { resolveVoiceEngineForPlatform } from './voice-engine-registry.js';
+import {
+  resolveVoiceEngineForPlatform,
+  type VoiceEngineArtifactFormat,
+} from './voice-engine-registry.js';
+
+function resolveVoiceArtifactFormat(
+  supportedFormats: readonly VoiceEngineArtifactFormat[],
+  policyDefault: 'wav' | 'mp3' | 'ogg'
+): VoiceEngineArtifactFormat {
+  const preferred: VoiceEngineArtifactFormat[] = [
+    policyDefault,
+    ...(process.platform === 'darwin' ? (['aiff', 'wav'] as const) : (['wav', 'aiff'] as const)),
+    'mp3',
+    'ogg',
+  ];
+  const format = preferred.find((candidate) => supportedFormats.includes(candidate));
+  if (!format) {
+    throw new Error(
+      `Voice engine supports no configured artifact format (${supportedFormats.join(', ') || 'none'})`
+    );
+  }
+  return format;
+}
 
 export interface RealtimeVoiceConversationTurn {
   speaker: 'user' | 'assistant';
@@ -212,14 +234,19 @@ export function buildRealtimeVoiceGenerationPayload(input: RealtimeVoiceSynthesi
     Date.now().toString(36),
     randomUUID().slice(0, 8),
   ].join('-');
-  const format = process.platform === 'darwin' ? 'aiff' : 'wav';
-  const artifactPath = pathResolver.sharedTmp(`realtime-voice-conversation/${requestId}.${format}`);
-
   const profile = getVoiceProfileRecord(input.profileId);
   const policy = getVoiceRuntimePolicy();
+  const engine = resolveVoiceEngineForPlatform(profile.default_engine_id);
+  const format = resolveVoiceArtifactFormat(
+    engine.supports.artifact_formats,
+    policy.delivery.default_format
+  );
+  const resolvedArtifactPath = pathResolver.sharedTmp(
+    `realtime-voice-conversation/${requestId}.${format}`
+  );
 
   return {
-    artifactPath,
+    artifactPath: resolvedArtifactPath,
     payload: {
       action: 'generate_voice',
       request_id: requestId,
@@ -239,7 +266,7 @@ export function buildRealtimeVoiceGenerationPayload(input: RealtimeVoiceSynthesi
       delivery: {
         mode: input.deliveryMode,
         format,
-        artifact_path: artifactPath,
+        artifact_path: resolvedArtifactPath,
         emit_progress_packets: false,
       },
       routing: {
