@@ -12,6 +12,7 @@ import {
   StubStreamingTextToSpeechBridge,
   type AudioFormat,
   type ConversationAgent,
+  type MeetingJoinDriver,
   type MeetingTarget,
   type TranscriptChunk,
   pathResolver,
@@ -110,6 +111,111 @@ describe('MeetingParticipationCoordinator (stub end-to-end)', () => {
     expect(persistedText).toContain('meeting_participation.run');
     expect(persistedText).toContain('meeting_participation.spoke');
     fs.rmSync(traceDir, { recursive: true, force: true });
+  });
+
+  it('captions mode consumes the driver transcript stream and replies over chat', async () => {
+    const bus = new StubAudioBus();
+    const stub = new StubMeetingJoinDriver();
+    const stt = new StubStreamingSpeechToTextBridge(1);
+    const tts = new StubStreamingTextToSpeechBridge();
+    const vad = new EnergyVad();
+    const chats: string[] = [];
+    const captions: TranscriptChunk[] = [
+      {
+        utterance_id: 'cap-1',
+        is_final: true,
+        text: 'first caption',
+        emitted_at: new Date().toISOString(),
+      },
+      { utterance_id: 'tick-1', is_final: false, text: '', emitted_at: new Date().toISOString() },
+      {
+        utterance_id: 'cap-2',
+        is_final: true,
+        text: 'second caption',
+        emitted_at: new Date().toISOString(),
+      },
+    ];
+    const driver: MeetingJoinDriver = {
+      driver_id: 'stub-captions',
+      supported_platforms: ['teams', 'auto'],
+      probe: async () => ({ available: true }),
+      join: async (target, joinBus) => {
+        const session = await stub.join(target, joinBus);
+        return {
+          ...session,
+          chat: async (text: string) => {
+            chats.push(text);
+          },
+          async *transcriptInput(): AsyncIterable<TranscriptChunk> {
+            for (const caption of captions) yield caption;
+          },
+        };
+      },
+    };
+
+    const heard: TranscriptChunk[] = [];
+    const agent: ConversationAgent = {
+      async onUtterance(utt) {
+        heard.push(utt);
+        if (heard.length >= 2) return { speech: 'noted in chat', leave: true };
+        return { speech: `chat reply to ${utt.text}` };
+      },
+    };
+    const trace = new TraceContext('meeting_participation:test', { missionId: 'MSN-TEST-CAP' });
+
+    const report = await new MeetingParticipationCoordinator({
+      driver,
+      bus,
+      stt,
+      tts,
+      vad,
+      agent,
+      trace,
+    }).run(
+      { url: 'https://teams.microsoft.com/l/meetup-join/test', platform: 'teams' },
+      {
+        max_minutes: 1,
+        voice_profile_id: '',
+        audio_format: FORMAT,
+        transcript_source: 'driver_captions',
+      }
+    );
+
+    // Non-final heartbeat chunks are skipped; only the two captions count.
+    // leave=true wins over speech (existing coordinator semantics), so the
+    // final reply is not delivered.
+    expect(heard.map((u) => u.text)).toEqual(['first caption', 'second caption']);
+    expect(chats).toEqual(['chat reply to first caption']);
+    expect(report.utterances_received).toBe(2);
+    expect(report.utterances_spoken).toBe(1);
+  });
+
+  it('fails closed when captions mode is requested but the driver lacks transcriptInput', async () => {
+    const bus = new StubAudioBus();
+    const driver = new StubMeetingJoinDriver();
+    const agent: ConversationAgent = {
+      async onUtterance() {
+        return {};
+      },
+    };
+    await expect(
+      new MeetingParticipationCoordinator({
+        driver,
+        bus,
+        stt: new StubStreamingSpeechToTextBridge(1),
+        tts: new StubStreamingTextToSpeechBridge(),
+        vad: new EnergyVad(),
+        agent,
+      }).run(
+        { url: 'https://teams.microsoft.com/l/meetup-join/test', platform: 'teams' },
+        {
+          max_minutes: 1,
+          voice_profile_id: '',
+          audio_format: FORMAT,
+          transcript_source: 'driver_captions',
+        }
+      )
+    ).rejects.toThrow(/transcriptInput/);
   });
 
   it('agent.leave=true on first utterance ends the session immediately', async () => {

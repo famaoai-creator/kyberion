@@ -19,7 +19,7 @@ import {
   withLock,
   resolveActiveProfileRoot,
 } from '@agent/core';
-import { hasAuthority, detectTier } from '@agent/core/governance';
+import { hasAuthority } from '@agent/core/governance';
 import { readJsonFile } from './cli-input.js';
 import { type MissionState, type MissionRelationships, ACTIVE_TIERS } from './mission-types.js';
 const AjvCtor: any = (AjvModule as any).default || (AjvModule as any);
@@ -144,8 +144,20 @@ export function checkPrerequisites(): void {
   logger.success('✅ Prerequisites satisfied.');
 }
 
+export interface KnowledgeInjectionDeclaration {
+  tier: 'personal' | 'confidential' | 'public';
+  project?: string;
+  domains?: string[];
+  tags?: string[];
+}
+
+/**
+ * Mission tier auto-elevation (KC: knowledge-protocol tier inheritance).
+ * Each injection declares its own tier directly — no path-sniffing — so the
+ * declaration survives knowledge/ directory reorganizations.
+ */
 export function calculateRequiredTier(
-  injections: string[] = [],
+  injections: KnowledgeInjectionDeclaration[] = [],
   requestedTier?: string
 ): 'personal' | 'confidential' | 'public' {
   const tierWeight: Record<string, number> = {
@@ -157,11 +169,11 @@ export function calculateRequiredTier(
   let maxWeight = requestedTier ? tierWeight[requestedTier] || 1 : 1;
   let currentTier: 'personal' | 'confidential' | 'public' = (requestedTier as any) || 'public';
 
-  for (const filePath of injections) {
-    const tier = detectTier(filePath);
+  for (const injection of injections) {
+    const tier = injection.tier;
     if (tierWeight[tier] > (maxWeight || 0)) {
       maxWeight = tierWeight[tier];
-      currentTier = tier as any;
+      currentTier = tier;
     }
   }
 

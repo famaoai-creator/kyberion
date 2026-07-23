@@ -80,6 +80,12 @@ export interface MeetingParticipationOptions {
   barge_in_min_duration_ms?: number;
   /** Baseline input RMS used by the generic barge-in detector. */
   barge_in_base_rms_threshold?: number;
+  /**
+   * Where transcripts come from. `stt` (default) runs local STT over the
+   * audio bus; `driver_captions` consumes the driver's native caption
+   * stream (session.transcriptInput) and replies over meeting chat.
+   */
+  transcript_source?: 'stt' | 'driver_captions';
 }
 
 export interface MeetingParticipationReport {
@@ -297,53 +303,67 @@ export class MeetingParticipationCoordinator {
 
     const joinedAt = session.state.joined_at ?? new Date().toISOString();
 
-    // 2. Start STT over the inbound audio. The transformed VAD-aware
-    //    iterator lets us track silence + flag turn endpoints; STT
-    //    sees the same chunks.
-    const taps = teeInbound(session.audioInput());
+    // 2. Pick the transcript source: local STT over the inbound audio
+    //    (default), or the driver's native caption stream (captions_first).
+    //    STT mode also drives the VAD so silence/endpoints are tracked.
+    const useDriverCaptions = options.transcript_source === 'driver_captions';
     let speaking = false;
     let selfAudioDrainUntilMs = 0;
     let bargeController: BargeInController | null = null;
     let activeSpeechAbortController: AbortController | null = null;
     let pendingBargeReplay: AudioChunk[] = [];
     let bargeTriggeredForSpeech = false;
-    const transcriptIterator = this.deps.stt.transcribeStream(
-      filterSelfAudioFromMeetingInput(
-        taps.toStt,
-        () => speaking,
-        () => selfAudioDrainUntilMs,
-        () => {
-          this.deps.trace?.addEvent('meeting_participation.self_audio_suppressed', {});
-        },
-        () => {
-          if (speaking || Date.now() < selfAudioDrainUntilMs) return [];
-          const replay = pendingBargeReplay;
-          pendingBargeReplay = [];
-          return replay;
-        }
-      )
-    );
-    const vadIterator = this.driveVad(
-      taps.toVad,
-      deadline,
-      () => speaking,
-      (chunk) => {
-        if (!bargeController) return;
-        const observation = bargeController.observe(chunk);
-        if (!observation.triggered) return;
-        pendingBargeReplay.push(...observation.buffered_chunks);
-        bargeTriggeredForSpeech = true;
-        activeSpeechAbortController?.abort();
-        this.deps.trace?.addEvent('meeting_participation.barge_in', {
-          buffered_chunks: observation.buffered_chunks.length,
-        });
-      }
-    );
-    void consumeIterator(vadIterator); // keep VAD active in background
 
     // 3. Drain transcripts and run the agent. Speak when agent has
     //    a reply AND VAD reports a recent endpoint.
     try {
+      let transcriptIterator: AsyncIterable<TranscriptChunk>;
+      if (useDriverCaptions) {
+        if (typeof session.transcriptInput !== 'function') {
+          throw new Error(
+            `[meeting-participation] transcript_source 'driver_captions' requires a driver that exposes transcriptInput(), but '${this.deps.driver.driver_id}' does not`
+          );
+        }
+        this.deps.trace?.addEvent('meeting_participation.transcript_source', {
+          source: 'driver_captions',
+        });
+        transcriptIterator = session.transcriptInput();
+      } else {
+        const taps = teeInbound(session.audioInput());
+        transcriptIterator = this.deps.stt.transcribeStream(
+          filterSelfAudioFromMeetingInput(
+            taps.toStt,
+            () => speaking,
+            () => selfAudioDrainUntilMs,
+            () => {
+              this.deps.trace?.addEvent('meeting_participation.self_audio_suppressed', {});
+            },
+            () => {
+              if (speaking || Date.now() < selfAudioDrainUntilMs) return [];
+              const replay = pendingBargeReplay;
+              pendingBargeReplay = [];
+              return replay;
+            }
+          )
+        );
+        const vadIterator = this.driveVad(
+          taps.toVad,
+          deadline,
+          () => speaking,
+          (chunk) => {
+            if (!bargeController) return;
+            const observation = bargeController.observe(chunk);
+            if (!observation.triggered) return;
+            pendingBargeReplay.push(...observation.buffered_chunks);
+            bargeTriggeredForSpeech = true;
+            activeSpeechAbortController?.abort();
+            this.deps.trace?.addEvent('meeting_participation.barge_in', {
+              buffered_chunks: observation.buffered_chunks.length,
+            });
+          }
+        );
+        void consumeIterator(vadIterator); // keep VAD active in background
+      }
       for await (const utterance of transcriptIterator) {
         if (Date.now() > deadline) {
           endedByTimeout = true;
@@ -368,44 +388,58 @@ export class MeetingParticipationCoordinator {
           break;
         }
         if (decision.speech) {
-          this.deps.trace?.addEvent('meeting_participation.speak_requested', {
-            chars: decision.speech.length,
-          });
-          const speechAbortController = new AbortController();
-          activeSpeechAbortController = speechAbortController;
-          bargeTriggeredForSpeech = false;
-          bargeController = options.barge_in_enabled
-            ? new BargeInController({
-                base_rms_threshold: options.barge_in_base_rms_threshold ?? 800,
-                threshold_multiplier: options.barge_in_rms_multiplier ?? 2,
-                min_speech_ms: options.barge_in_min_duration_ms ?? 250,
-              })
-            : null;
-          speaking = true;
-          selfAudioDrainUntilMs = Date.now() + (options.self_audio_suppression_ms ?? 0);
-          try {
-            await this.speak(
-              session,
-              decision.speech,
-              options.voice_profile_id,
-              target,
-              options,
-              speechAbortController.signal
-            );
-          } finally {
-            speaking = false;
-            bargeController = null;
-            activeSpeechAbortController = null;
-            selfAudioDrainUntilMs = bargeTriggeredForSpeech
-              ? 0
-              : Date.now() + (options.post_playback_drain_ms ?? 400);
+          if (useDriverCaptions) {
+            // Caption mode has no synthesized-voice path — reply over chat.
+            this.deps.trace?.addEvent('meeting_participation.chat_requested', {
+              chars: decision.speech.length,
+            });
+            await session.chat(decision.speech);
+            utterancesSpoken += 1;
+            this.deps.trace?.addEvent('meeting_participation.chat_sent', {
+              utterance_index: utterancesReceived,
+              chars: decision.speech.length,
+            });
+            this.recordAudit('meeting_participation.chat_sent', target, 'allowed', decision.speech);
+          } else {
+            this.deps.trace?.addEvent('meeting_participation.speak_requested', {
+              chars: decision.speech.length,
+            });
+            const speechAbortController = new AbortController();
+            activeSpeechAbortController = speechAbortController;
+            bargeTriggeredForSpeech = false;
+            bargeController = options.barge_in_enabled
+              ? new BargeInController({
+                  base_rms_threshold: options.barge_in_base_rms_threshold ?? 800,
+                  threshold_multiplier: options.barge_in_rms_multiplier ?? 2,
+                  min_speech_ms: options.barge_in_min_duration_ms ?? 250,
+                })
+              : null;
+            speaking = true;
+            selfAudioDrainUntilMs = Date.now() + (options.self_audio_suppression_ms ?? 0);
+            try {
+              await this.speak(
+                session,
+                decision.speech,
+                options.voice_profile_id,
+                target,
+                options,
+                speechAbortController.signal
+              );
+            } finally {
+              speaking = false;
+              bargeController = null;
+              activeSpeechAbortController = null;
+              selfAudioDrainUntilMs = bargeTriggeredForSpeech
+                ? 0
+                : Date.now() + (options.post_playback_drain_ms ?? 400);
+            }
+            utterancesSpoken += 1;
+            this.deps.trace?.addEvent('meeting_participation.spoke', {
+              utterance_index: utterancesReceived,
+              chars: decision.speech.length,
+            });
+            this.recordAudit('meeting_participation.spoke', target, 'allowed', decision.speech);
           }
-          utterancesSpoken += 1;
-          this.deps.trace?.addEvent('meeting_participation.spoke', {
-            utterance_index: utterancesReceived,
-            chars: decision.speech.length,
-          });
-          this.recordAudit('meeting_participation.spoke', target, 'allowed', decision.speech);
         }
       }
       this.deps.trace?.addEvent('meeting_participation.loop_finished', {
