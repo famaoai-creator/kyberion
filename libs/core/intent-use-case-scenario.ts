@@ -9,6 +9,11 @@ import type {
 } from './intent-resolution.js';
 import type { ActuatorExecutionBrief } from './src/types/actuator-execution-brief.js';
 import type { OrganizationWorkLoopSummary } from './work-design.js';
+import {
+  buildExecutionFeedbackHints,
+  summarizeExecutionFeedback,
+  type ExecutionFeedbackSummary,
+} from './execution-feedback.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const ajv = new Ajv({ allErrors: true });
@@ -93,6 +98,10 @@ export interface IntentUseCaseScenario {
     resolution_confidence: number;
     resolution_candidates: string[];
   };
+  improvement: {
+    feedback_summary: ExecutionFeedbackSummary;
+    hints: string[];
+  };
 }
 
 let validateFn: ValidateFunction | null = null;
@@ -107,7 +116,7 @@ function unique(values: Array<string | undefined>): string[] {
   return [...new Set(values.map((value) => value?.trim()).filter(Boolean) as string[])];
 }
 
-function scenarioId(intentId: string): string {
+export function buildIntentUseCaseScenarioId(intentId: string): string {
   const normalized = intentId
     .trim()
     .toLowerCase()
@@ -218,6 +227,11 @@ export function buildIntentUseCaseScenario(
 ): IntentUseCaseScenario {
   const selectedIntentId =
     input.intentContract.intent_id || input.packet.selected_intent_id || 'unresolved-intent';
+  const scenario_id = buildIntentUseCaseScenarioId(selectedIntentId);
+  const feedbackSummary = summarizeExecutionFeedback({
+    scenarioId: scenario_id,
+    intentId: selectedIntentId,
+  });
   const missingInputs = unique([
     ...input.intentContract.required_inputs,
     ...input.executionBrief.missing_inputs,
@@ -258,7 +272,7 @@ export function buildIntentUseCaseScenario(
   const scenario: IntentUseCaseScenario = {
     kind: 'intent-use-case-scenario',
     schema_version: '1.0.0',
-    scenario_id: scenarioId(selectedIntentId),
+    scenario_id,
     source_text: input.input.text,
     intent_id: selectedIntentId,
     title,
@@ -315,6 +329,10 @@ export function buildIntentUseCaseScenario(
     provenance: {
       resolution_confidence: input.packet.selected_confidence || 0,
       resolution_candidates: resolutionCandidates(input.packet.candidates, selectedIntentId),
+    },
+    improvement: {
+      feedback_summary: feedbackSummary,
+      hints: buildExecutionFeedbackHints(feedbackSummary),
     },
   };
 

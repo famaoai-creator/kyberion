@@ -15,6 +15,8 @@ const mocks = vi.hoisted(() => {
   const getActiveTaskSession = vi.fn();
   const surfaceChannelFromAgentId = vi.fn(() => 'presence');
   const executeCapturePhotoTaskSession = vi.fn();
+  const recordExecutionFeedback = vi.fn();
+  const parseExecutionFeedbackText = vi.fn();
   return {
     safeExec,
     secureFetch,
@@ -30,6 +32,8 @@ const mocks = vi.hoisted(() => {
     getActiveTaskSession,
     surfaceChannelFromAgentId,
     executeCapturePhotoTaskSession,
+    recordExecutionFeedback,
+    parseExecutionFeedbackText,
   };
 });
 
@@ -74,6 +78,11 @@ vi.mock('./task-session.js', () => ({
 
 vi.mock('./capture-photo-task-session-executor.js', () => ({
   executeCapturePhotoTaskSession: mocks.executeCapturePhotoTaskSession,
+}));
+
+vi.mock('./execution-feedback.js', () => ({
+  recordExecutionFeedback: mocks.recordExecutionFeedback,
+  parseExecutionFeedbackText: mocks.parseExecutionFeedbackText,
 }));
 
 vi.mock('./router-contract.js', () => ({
@@ -218,6 +227,17 @@ describe('surface-runtime-orchestrator fast-path', () => {
         },
       },
     });
+    mocks.recordExecutionFeedback.mockReturnValue({
+      kind: 'execution-feedback',
+      schema_version: '1.0.0',
+      feedback_id: 'FB-TEST',
+      scenario_id: 'use-case-schedule-read-agenda',
+      intent_id: 'schedule-read-agenda',
+      outcome: 'partially_satisfied',
+      source: 'user',
+      recorded_at: '2026-07-23T00:00:00.000Z',
+    });
+    mocks.parseExecutionFeedbackText.mockReturnValue(null);
   });
 
   it('executes pipeline hint and emits execution-receipt', async () => {
@@ -493,6 +513,88 @@ describe('surface-runtime-orchestrator fast-path', () => {
     );
     expect(structuredQuery).toContain('use-case-schedule-read-agenda');
     expect(structuredQuery).toContain('Follow the scenario handoff:');
+  });
+
+  it('offers structured feedback after a compiled scenario response', async () => {
+    mocks.compileUserIntentFlow.mockResolvedValue({
+      intentContract: { resolution: { execution_shape: 'direct_reply' } },
+      workLoop: {},
+      executionBrief: { workflow_steps: [] },
+      useCaseScenario: {
+        kind: 'intent-use-case-scenario',
+        scenario_id: 'use-case-compiled-surface',
+        intent_id: 'compiled-surface',
+        handoff: { status: 'ready', next_action: 'execute' },
+      },
+    });
+    mocks.resolveSurfaceIntent.mockReturnValue({
+      intentId: 'live-query',
+      shape: 'direct_reply',
+      routeFamily: 'direct_reply',
+      queryType: 'knowledge_search',
+      queryText: 'compiled surface feedback',
+    });
+    const { runSurfaceConversation } = await import('./surface-runtime-orchestrator.js');
+    const result = await runSurfaceConversation({
+      agentId: 'presence-surface-agent',
+      query: 'この長い依頼をシナリオに沿って確認して'.repeat(8),
+      senderAgentId: 'test-sender',
+    });
+
+    expect(result.text).toContain('評価: このシナリオを改善する場合');
+    expect(result.executionFeedbackRequest).toMatchObject({
+      scenario_id: 'use-case-compiled-surface',
+      intent_id: 'compiled-surface',
+      structured: true,
+    });
+  });
+
+  it('records structured user feedback without rerunning the scenario', async () => {
+    const { runSurfaceConversation } = await import('./surface-runtime-orchestrator.js');
+    const result = await runSurfaceConversation({
+      agentId: 'presence-surface-agent',
+      query: '一部違います',
+      senderAgentId: 'test-sender',
+      executionFeedback: {
+        scenario_id: 'use-case-schedule-read-agenda',
+        intent_id: 'schedule-read-agenda',
+        outcome: 'partially_satisfied',
+        correction: '予定の対象期間を確認してから取得してほしい',
+      },
+    });
+
+    expect(mocks.recordExecutionFeedback).toHaveBeenCalledWith(
+      expect.objectContaining({
+        scenario_id: 'use-case-schedule-read-agenda',
+        outcome: 'partially_satisfied',
+      })
+    );
+    expect(result.text).toContain('評価を記録しました');
+    expect(mocks.compileUserIntentFlow).not.toHaveBeenCalled();
+  });
+
+  it('records the text fallback form of user feedback', async () => {
+    mocks.parseExecutionFeedbackText.mockReturnValue({
+      scenario_id: 'use-case-schedule-read-agenda',
+      intent_id: 'schedule-read-agenda',
+      outcome: 'partially_satisfied',
+      correction: '期間を確認して',
+    });
+    const { runSurfaceConversation } = await import('./surface-runtime-orchestrator.js');
+    await runSurfaceConversation({
+      agentId: 'presence-surface-agent',
+      query: '評価 use-case-schedule-read-agenda: 一部違う: 期間を確認して',
+      senderAgentId: 'test-sender',
+    });
+
+    expect(mocks.recordExecutionFeedback).toHaveBeenCalledWith(
+      expect.objectContaining({
+        scenario_id: 'use-case-schedule-read-agenda',
+        intent_id: 'schedule-read-agenda',
+        outcome: 'partially_satisfied',
+        correction: '期間を確認して',
+      })
+    );
   });
 
   it('threads iMessage context into intent compilation', async () => {
