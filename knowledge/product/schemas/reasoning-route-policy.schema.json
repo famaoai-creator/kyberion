@@ -27,6 +27,7 @@
       "required": ["adapter", "capabilities", "supported_parameters"],
       "properties": {
         "adapter": { "type": "string", "minLength": 1 },
+        "selection": { "$ref": "#/$defs/selection" },
         "preset": { "type": "string", "minLength": 1 },
         "endpoint_policy": { "type": "string", "enum": ["local", "public"] },
         "model_policy": { "type": "string", "enum": ["approved", "local-unregistered"] },
@@ -35,6 +36,29 @@
         "parameter_aliases": {
           "type": "object",
           "additionalProperties": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["display_name", "availability"],
+      "properties": {
+        "display_name": { "type": "string", "minLength": 1 },
+        "model_provider": { "type": "string", "minLength": 1 },
+        "discovery_provider": { "type": "string", "minLength": 1 },
+        "availability": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {
+            "kind": { "type": "string", "enum": ["always", "env_any", "provider_discovery"] },
+            "names": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 },
+              "minItems": 1
+            }
+          }
         }
       }
     },
