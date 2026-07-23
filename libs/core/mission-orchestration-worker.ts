@@ -47,14 +47,15 @@ import {
   updateWorkItem,
 } from './work-coordination.js';
 import { logger } from './core.js';
-import { buildWorkingPrinciplesLines } from './working-principles.js';
+import { buildWorkingPrinciplesLines, canonicalizeTeamRole } from './working-principles.js';
 import {
   buildWorkingPrinciplesInjectionProvider,
   getMissionDynamicInjectionRegistry,
   renderInjectionsAsSystemReminders,
+  type DynamicInjectionProvider,
 } from './dynamic-injection.js';
 import { buildExecutionEnv } from './authority.js';
-import { missionDir, missionEvidenceDir, rootDir } from './path-resolver.js';
+import { findMissionPath, missionDir, missionEvidenceDir, rootDir } from './path-resolver.js';
 import { pathResolver } from './path-resolver.js';
 import {
   renderMissionContextPack,
@@ -1162,6 +1163,28 @@ function buildRejectionLessonLines(): string[] {
   }
 }
 
+/**
+ * syncRoleProcedure (mission-governance.ts) mirrors the assigned persona's
+ * knowledge/product/roles/{persona}/PROCEDURE.md into ROLE_PROCEDURE.md once
+ * at mission activation. Without this provider, that file was written but
+ * never read back into any worker prompt.
+ */
+function buildRolePersonaProcedureInjectionProvider(missionId: string): DynamicInjectionProvider {
+  return {
+    id: 'role-persona-procedure',
+    oneShot: true,
+    collect: () => {
+      const missionPath = findMissionPath(missionId);
+      if (!missionPath) return null;
+      const procedurePath = nodePath.join(missionPath, 'ROLE_PROCEDURE.md');
+      if (!safeExistsSync(procedurePath)) return null;
+      const content = String(safeReadFile(procedurePath, { encoding: 'utf8' }) || '').trim();
+      if (!content) return null;
+      return ['## Assigned persona procedure', content].join('\n\n');
+    },
+  };
+}
+
 function buildTaskExecutionPrompt(input: {
   missionId: string;
   task: PlannedNextTask;
@@ -1589,7 +1612,8 @@ async function buildTaskDispatchContext(input: {
   const upstreamResultLines = compactedSections.upstreamResultLines;
   const teamSnapshotLines = compactedSections.teamSnapshotLines;
   const reviewFindingsLines = buildReviewFindingsLines(input.task);
-  if (input.teamRole === 'reviewer' || input.teamRole === 'qa') {
+  const canonicalTeamRole = canonicalizeTeamRole(input.teamRole);
+  if (canonicalTeamRole === 'reviewer' || canonicalTeamRole === 'qa') {
     prepareArtifactReviewTask({
       missionId: input.missionId,
       reviewTask: input.task,
@@ -1611,6 +1635,9 @@ async function buildTaskDispatchContext(input: {
     injectionRegistry.register(
       buildWorkingPrinciplesInjectionProvider(buildWorkingPrinciplesLines, input.teamRole)
     );
+  }
+  if (!injectionRegistry.hasProvider('role-persona-procedure')) {
+    injectionRegistry.register(buildRolePersonaProcedureInjectionProvider(input.missionId));
   }
   const dynamicInjectionLines = injectionRegistry
     .collect({ step: 0 })
@@ -1862,9 +1889,10 @@ async function dispatchPlannedMissionTask(input: {
     },
   });
   const taskResultNeeds = response.taskResult?.needs || [];
+  const dispatchCanonicalTeamRole = canonicalizeTeamRole(input.teamRole);
   const reviewFindings = normalizeReviewFindings(
     response.taskResult?.review_findings ||
-      (input.teamRole === 'reviewer' || input.teamRole === 'qa'
+      (dispatchCanonicalTeamRole === 'reviewer' || dispatchCanonicalTeamRole === 'qa'
         ? (response.taskResult?.gaps || []).map((gap) => ({
             severity: 'must_fix' as const,
             location: reviewTarget || input.task.deliverable || input.task.task_id,
@@ -2025,7 +2053,8 @@ async function dispatchPlannedMissionTask(input: {
   }
 
   const reviewTarget = resolveReviewTargetForTask(input.task);
-  const isArtifactReview = input.teamRole === 'reviewer' || input.teamRole === 'qa';
+  const isArtifactReview =
+    dispatchCanonicalTeamRole === 'reviewer' || dispatchCanonicalTeamRole === 'qa';
   const targetTask =
     isArtifactReview && reviewTarget
       ? input.allTasks.find((task) => task.task_id === reviewTarget)
@@ -2056,7 +2085,7 @@ async function dispatchPlannedMissionTask(input: {
       persistArtifactReviewReceipt({
         missionId: input.missionId,
         reviewTask: input.task,
-        teamRole: input.teamRole as 'reviewer' | 'qa',
+        teamRole: dispatchCanonicalTeamRole as 'reviewer' | 'qa',
         reviewerAgentId: input.assignment.agent_id,
         artifact: reviewArtifact,
         findings: reviewFindings,

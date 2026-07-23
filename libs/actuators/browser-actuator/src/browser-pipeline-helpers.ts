@@ -21,6 +21,7 @@ import {
   getSecret,
 } from '@agent/core';
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
+import { resolveRefOrRecordedTarget } from './recorded-ref-resolver.js';
 import { chromium, type CDPSession, type Page } from '@playwright/test';
 import * as path from 'node:path';
 
@@ -728,11 +729,20 @@ async function opCapture(
     }
     case 'extract_text_ref': {
       const ref = resolve(params.ref);
-      const selector = browserRuntimeHelpers.resolveRefSelector(ctx, ref);
+      const { selector, ctx: resolvedCtx } = await resolveRefOrRecordedTarget(
+        ctx,
+        ref,
+        page,
+        recordedRefTargetFromParams(params, { requireDomPathMatch: Boolean(params.high_risk) })
+      );
       const rawContent = await page.innerText(selector);
       const content = processUntrustedContent(rawContent, `web:${page.url()}`).wrapped;
       return browserRuntimeHelpers.recordBrowserAction(
-        { ...ctx, last_capture: content, [params.export_as || 'last_capture']: content },
+        {
+          ...resolvedCtx,
+          last_capture: content,
+          [params.export_as || 'last_capture']: content,
+        },
         {
           kind: 'capture',
           op: 'extract_text_ref',
@@ -1208,6 +1218,18 @@ export async function fillWithFallback(
   );
 }
 
+function recordedRefTargetFromParams(
+  params: Record<string, unknown>,
+  overrides: { requireDomPathMatch?: boolean } = {}
+): { role?: string; name?: string; dom_path?: string; requireDomPathMatch?: boolean } {
+  return {
+    ...(typeof params.role === 'string' ? { role: params.role } : {}),
+    ...(typeof params.name === 'string' ? { name: params.name } : {}),
+    ...(typeof params.dom_path === 'string' ? { dom_path: params.dom_path } : {}),
+    ...overrides,
+  };
+}
+
 async function opApply(
   op: string,
   params: any,
@@ -1317,37 +1339,53 @@ async function opApply(
       });
     case 'click_ref': {
       const ref = resolve(params.ref);
-      const selector = browserRuntimeHelpers.resolveRefSelector(ctx, ref);
-      const element = browserRuntimeHelpers.findSnapshotElement(ctx, ref);
+      const { selector, ctx: resolvedCtx } = await resolveRefOrRecordedTarget(
+        ctx,
+        ref,
+        page,
+        recordedRefTargetFromParams(params, { requireDomPathMatch: Boolean(params.high_risk) })
+      );
+      const element = browserRuntimeHelpers.findSnapshotElement(resolvedCtx, ref);
       await retry(async () => {
         await page.click(selector, { timeout: params.timeout || 5000 });
       }, buildRetryOptions(params));
-      return browserRuntimeHelpers.recordBrowserAction(ctx, {
+      return browserRuntimeHelpers.recordBrowserAction(resolvedCtx, {
         kind: 'apply',
         op: 'click_ref',
         tab_id: runtime.activeTabId,
         ref,
         selector,
-        element_name: element?.name,
-        element_role: element?.role,
+        element_name: element?.name ?? params.name,
+        element_role: element?.role ?? params.role,
       });
     }
     case 'fill_ref': {
       const ref = resolve(params.ref);
-      const selector = browserRuntimeHelpers.resolveRefSelector(ctx, ref);
-      const element = browserRuntimeHelpers.findSnapshotElement(ctx, ref);
       const secretKey = params.secret_ref
         ? String(resolve(params.secret_ref))
         : params.classification === 'secret_ref' && params.variable?.name
           ? String(resolve(params.variable.name))
           : undefined;
+      // Secret-bearing fills must corroborate the role/name match against
+      // dom_path (or fail closed if no dom_path was recorded) — a relabeled
+      // live element must never receive a secret value. See
+      // RecordedRefSpoofSuspectedError in recorded-ref-resolver.ts.
+      const { selector, ctx: resolvedCtx } = await resolveRefOrRecordedTarget(
+        ctx,
+        ref,
+        page,
+        recordedRefTargetFromParams(params, {
+          requireDomPathMatch: Boolean(secretKey) || Boolean(params.high_risk),
+        })
+      );
+      const element = browserRuntimeHelpers.findSnapshotElement(resolvedCtx, ref);
       const text = secretKey ? getSecret(secretKey) : resolve(params.text);
       if (secretKey && text == null)
         throw new Error(`[BROWSER_SECRET_MISSING] SecretResolver could not resolve ${secretKey}`);
       await retry(async () => {
         await page.fill(selector, String(text ?? ''), { timeout: params.timeout || 5000 });
       }, buildRetryOptions(params));
-      return browserRuntimeHelpers.recordBrowserAction(ctx, {
+      return browserRuntimeHelpers.recordBrowserAction(resolvedCtx, {
         kind: 'apply',
         op: 'fill_ref',
         tab_id: runtime.activeTabId,
@@ -1356,8 +1394,8 @@ async function opApply(
         ...(secretKey
           ? { classification: 'secret_ref' as const, secret_ref: secretKey }
           : { text }),
-        element_name: element?.name,
-        element_role: element?.role,
+        element_name: element?.name ?? params.name,
+        element_role: element?.role ?? params.role,
       });
     }
     case 'fill_secret_ref': {
@@ -1366,13 +1404,18 @@ async function opApply(
       const secret = getSecret(secretKey);
       if (secret == null)
         throw new Error(`[BROWSER_SECRET_MISSING] SecretResolver could not resolve ${secretKey}`);
-      const selector = browserRuntimeHelpers.resolveRefSelector(ctx, ref);
-      const element = browserRuntimeHelpers.findSnapshotElement(ctx, ref);
+      const { selector, ctx: resolvedCtx } = await resolveRefOrRecordedTarget(
+        ctx,
+        ref,
+        page,
+        recordedRefTargetFromParams(params, { requireDomPathMatch: true })
+      );
+      const element = browserRuntimeHelpers.findSnapshotElement(resolvedCtx, ref);
       await retry(
         async () => page.fill(selector, secret, { timeout: params.timeout || 5000 }),
         buildRetryOptions(params)
       );
-      return browserRuntimeHelpers.recordBrowserAction(ctx, {
+      return browserRuntimeHelpers.recordBrowserAction(resolvedCtx, {
         kind: 'apply',
         op: 'fill_secret_ref',
         tab_id: runtime.activeTabId,
@@ -1380,46 +1423,56 @@ async function opApply(
         selector,
         secret_ref: secretKey,
         classification: 'secret_ref',
-        element_name: element?.name,
-        element_role: element?.role,
+        element_name: element?.name ?? params.name,
+        element_role: element?.role ?? params.role,
       });
     }
     case 'press_ref': {
       const ref = resolve(params.ref);
       const key = resolve(params.key);
-      const selector = browserRuntimeHelpers.resolveRefSelector(ctx, ref);
-      const element = browserRuntimeHelpers.findSnapshotElement(ctx, ref);
+      const { selector, ctx: resolvedCtx } = await resolveRefOrRecordedTarget(
+        ctx,
+        ref,
+        page,
+        recordedRefTargetFromParams(params, { requireDomPathMatch: Boolean(params.high_risk) })
+      );
+      const element = browserRuntimeHelpers.findSnapshotElement(resolvedCtx, ref);
       await retry(async () => {
         await page.press(selector, key, { timeout: params.timeout || 5000 });
       }, buildRetryOptions(params));
-      return browserRuntimeHelpers.recordBrowserAction(ctx, {
+      return browserRuntimeHelpers.recordBrowserAction(resolvedCtx, {
         kind: 'apply',
         op: 'press_ref',
         tab_id: runtime.activeTabId,
         ref,
         selector,
         key,
-        element_name: element?.name,
-        element_role: element?.role,
+        element_name: element?.name ?? params.name,
+        element_role: element?.role ?? params.role,
       });
     }
     case 'scroll_ref': {
       const ref = resolve(params.ref);
-      const selector = browserRuntimeHelpers.resolveRefSelector(ctx, ref);
-      const element = browserRuntimeHelpers.findSnapshotElement(ctx, ref);
+      const { selector, ctx: resolvedCtx } = await resolveRefOrRecordedTarget(
+        ctx,
+        ref,
+        page,
+        recordedRefTargetFromParams(params, { requireDomPathMatch: Boolean(params.high_risk) })
+      );
+      const element = browserRuntimeHelpers.findSnapshotElement(resolvedCtx, ref);
       await retry(
         async () =>
           page.locator(selector).scrollIntoViewIfNeeded({ timeout: params.timeout || 5000 }),
         buildRetryOptions(params)
       );
-      return browserRuntimeHelpers.recordBrowserAction(ctx, {
+      return browserRuntimeHelpers.recordBrowserAction(resolvedCtx, {
         kind: 'apply',
         op: 'scroll_ref',
         tab_id: runtime.activeTabId,
         ref,
         selector,
-        element_name: element?.name,
-        element_role: element?.role,
+        element_name: element?.name ?? params.name,
+        element_role: element?.role ?? params.role,
       });
     }
     case 'scroll': {
@@ -1453,14 +1506,19 @@ async function opApply(
       });
     case 'wait_ref': {
       const ref = resolve(params.ref);
-      const selector = browserRuntimeHelpers.resolveRefSelector(ctx, ref);
+      const { selector, ctx: resolvedCtx } = await resolveRefOrRecordedTarget(
+        ctx,
+        ref,
+        page,
+        recordedRefTargetFromParams(params, { requireDomPathMatch: Boolean(params.high_risk) })
+      );
       await retry(async () => {
         await page.waitForSelector(selector, {
           state: params.state || 'visible',
           timeout: params.timeout || 10000,
         });
       }, buildRetryOptions(params));
-      return browserRuntimeHelpers.recordBrowserAction(ctx, {
+      return browserRuntimeHelpers.recordBrowserAction(resolvedCtx, {
         kind: 'apply',
         op: 'wait_ref',
         tab_id: runtime.activeTabId,

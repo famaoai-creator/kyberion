@@ -72,15 +72,24 @@ const ROLE_ALIASES: Readonly<Record<string, string>> = {
   design: 'designer',
   ui_designer: 'designer',
   visual_designer: 'designer',
+  experience_designer: 'designer',
 };
 
-export function resolveRoleAddendum(teamRole?: string): readonly string[] {
-  if (!teamRole) return [];
+/**
+ * Canonical team-role id (e.g. 'tester' -> 'qa'). Any code branching on team
+ * role identity (artifact-review gating, addendum lookup) must compare against
+ * this, not the raw team-template string, or aliased roles silently miss the
+ * behavior their canonical role is supposed to get.
+ */
+export function canonicalizeTeamRole(teamRole?: string): string {
+  if (!teamRole) return '';
   const normalized = teamRole.trim().toLowerCase();
-  const canonical = ROLE_WORKING_PRINCIPLES[normalized]
-    ? normalized
-    : ROLE_ALIASES[normalized] || '';
-  return canonical ? ROLE_WORKING_PRINCIPLES[canonical] : [];
+  return ROLE_WORKING_PRINCIPLES[normalized] ? normalized : ROLE_ALIASES[normalized] || normalized;
+}
+
+export function resolveRoleAddendum(teamRole?: string): readonly string[] {
+  const canonical = canonicalizeTeamRole(teamRole);
+  return canonical && ROLE_WORKING_PRINCIPLES[canonical] ? ROLE_WORKING_PRINCIPLES[canonical] : [];
 }
 
 /**

@@ -1,4 +1,4 @@
-import { pathResolver, transitionStatus } from '@agent/core';
+import { pathResolver, transitionStatus, type ArtifactReviewFinding } from '@agent/core';
 import { getCurrentBranch, getGitHash } from './mission-git.js';
 import {
   createMission as _createMission,
@@ -19,6 +19,7 @@ import {
   approveScopeChange as _approveScopeChange,
   createCheckpoint as _createCheckpoint,
   purgeMissions as _purgeMissions,
+  recordArtifactReview as _recordArtifactReview,
   recordEvidence as _recordEvidence,
   recordTask as _recordTask,
   resumeMission as _resumeMission,
@@ -216,6 +217,24 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
         getGitHash,
         syncProjectLedgerIfLinked: syncProjectLedgerIfLinkedInternal,
       }).then(() => syncProjectOperationalStateIfLinked(missionId));
+    },
+    recordArtifactReview(
+      missionId: string,
+      reviewTaskId: string,
+      reviewerAgentId: string,
+      findings?: ArtifactReviewFinding[],
+      reviewerTeamRole?: 'reviewer' | 'qa',
+      specialistRoles?: string[]
+    ) {
+      return _recordArtifactReview({
+        missionId,
+        reviewTaskId,
+        reviewerAgentId,
+        findings,
+        reviewerTeamRole,
+        specialistRoles,
+        getGitHash,
+      }).then((result) => syncProjectOperationalStateIfLinked(missionId).then(() => result));
     },
     reconcileExistingWork(missionId: string, manifestPath: string, dryRun = false) {
       return _reconcileMissionExistingWork({ missionId, manifestPath, dryRun }).then((result) => {

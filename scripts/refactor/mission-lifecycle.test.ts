@@ -10,9 +10,11 @@ vi.mock('@agent/core', async () => {
 });
 
 import {
+  buildArtifactReviewReceipt,
   customerResolver,
   emitIntentSnapshot,
   hashArtifactForReview,
+  inferArtifactReviewKind,
   pathResolver,
   safeExec,
   safeExistsSync,
@@ -28,6 +30,7 @@ import {
   evaluateMissionFinishExitGate,
   finishMission,
   reconcileLifecycleClosureCriteria,
+  tryAutoCompleteTaskFromEvidence,
   verifyMission,
 } from './mission-lifecycle.js';
 
@@ -777,5 +780,395 @@ describe('mission lifecycle finish gate', () => {
       if (previousCustomer === undefined) delete process.env.KYBERION_CUSTOMER;
       else process.env.KYBERION_CUSTOMER = previousCustomer;
     }
+  });
+});
+
+describe('tryAutoCompleteTaskFromEvidence', () => {
+  it('completes a normal (non-repair-prefixed) task once its deliverable exists and dependencies are done', () => {
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify(
+        [
+          {
+            task_id: 'alignment-requirements',
+            status: 'completed',
+            dependencies: [],
+            deliverable: 'evidence/requirements-draft.json',
+          },
+          {
+            task_id: 'planning-implementation-plan',
+            status: 'planned',
+            dependencies: ['alignment-requirements'],
+            deliverable: 'evidence/implementation-plan.json',
+          },
+        ],
+        null,
+        2
+      )
+    );
+    seedMissionEvidence('implementation-plan.json', '{}');
+
+    const result = tryAutoCompleteTaskFromEvidence(missionPath, 'planning-implementation-plan');
+    const tasks = JSON.parse(
+      String(safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }))
+    ) as Array<{ task_id?: string; status?: string }>;
+
+    expect(result.completed).toBe(true);
+    expect(tasks.find((task) => task.task_id === 'planning-implementation-plan')?.status).toBe(
+      'completed'
+    );
+  });
+
+  it('does not complete a task whose deliverable file is missing', () => {
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify(
+        [
+          {
+            task_id: 'execution-implement',
+            status: 'planned',
+            dependencies: [],
+            deliverable: 'evidence/implementation-report.md',
+          },
+        ],
+        null,
+        2
+      )
+    );
+
+    const result = tryAutoCompleteTaskFromEvidence(missionPath, 'execution-implement');
+    const tasks = JSON.parse(
+      String(safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }))
+    ) as Array<{ task_id?: string; status?: string }>;
+
+    expect(result.completed).toBe(false);
+    expect(tasks.find((task) => task.task_id === 'execution-implement')?.status).toBe('planned');
+  });
+
+  it('does not complete a task whose dependency is not yet completed, even if its own deliverable exists', () => {
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify(
+        [
+          {
+            task_id: 'upstream',
+            status: 'planned',
+            dependencies: [],
+            deliverable: 'evidence/upstream.md',
+          },
+          {
+            task_id: 'downstream',
+            status: 'planned',
+            dependencies: ['upstream'],
+            deliverable: 'evidence/downstream.md',
+          },
+        ],
+        null,
+        2
+      )
+    );
+    seedMissionEvidence('downstream.md', '# Downstream done');
+
+    const result = tryAutoCompleteTaskFromEvidence(missionPath, 'downstream');
+
+    expect(result.completed).toBe(false);
+    expect(result.reason).toContain('dependency');
+  });
+
+  it('is a no-op for a task that is already completed', () => {
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify(
+        [
+          {
+            task_id: 'retrospective-retrospective',
+            status: 'completed',
+            dependencies: [],
+            deliverable: 'evidence/retrospective.md',
+          },
+        ],
+        null,
+        2
+      )
+    );
+
+    const result = tryAutoCompleteTaskFromEvidence(missionPath, 'retrospective-retrospective');
+
+    expect(result).toEqual({ completed: false, reason: 'already completed' });
+  });
+
+  it('returns completed:false for an unknown task_id', () => {
+    safeWriteFile(`${missionPath}/NEXT_TASKS.json`, JSON.stringify([], null, 2));
+
+    const result = tryAutoCompleteTaskFromEvidence(missionPath, 'does-not-exist');
+
+    expect(result).toEqual({ completed: false, reason: 'task not found in NEXT_TASKS.json' });
+  });
+
+  it('does NOT complete a review-kind task just because its deliverable file exists — no receipt means no completion', () => {
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify(
+        [
+          {
+            task_id: 'execution-implement',
+            status: 'completed',
+            dependencies: [],
+            deliverable: 'evidence/implementation-report.md',
+          },
+          {
+            task_id: 'self_review-code-review',
+            status: 'planned',
+            phase_kind: 'review',
+            assigned_to: { role: 'reviewer' },
+            review_target: 'execution-implement',
+            dependencies: ['execution-implement'],
+            deliverable: 'evidence/REVIEW-execution-implement.md',
+          },
+        ],
+        null,
+        2
+      )
+    );
+    // Exactly the incident that prompted this fix: a bare placeholder file,
+    // no ArtifactReviewReceipt at all.
+    seedMissionEvidence('REVIEW-execution-implement.md', '# review\napproved');
+
+    const result = tryAutoCompleteTaskFromEvidence(missionPath, 'self_review-code-review');
+    const tasks = JSON.parse(
+      String(safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }))
+    ) as Array<{ task_id?: string; status?: string }>;
+
+    expect(result.completed).toBe(false);
+    expect(tasks.find((task) => task.task_id === 'self_review-code-review')?.status).toBe(
+      'planned'
+    );
+  });
+
+  it('completes a review-kind task once a real, independent ArtifactReviewReceipt exists', () => {
+    safeMkdir(`${missionPath}/evidence`, { recursive: true });
+    const artifactRelPath = 'evidence/implementation-report.md';
+    safeWriteFile(`${missionPath}/${artifactRelPath}`, '# report\nDone.');
+    const sha256 = hashArtifactForReview(`${missionPath}/${artifactRelPath}`);
+    const artifactRepoRelPath = pathResolver.toRepoRelative(`${missionPath}/${artifactRelPath}`);
+
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify(
+        [
+          {
+            task_id: 'execution-implement',
+            status: 'completed',
+            dependencies: [],
+            deliverable: artifactRelPath,
+          },
+          {
+            task_id: 'self_review-code-review',
+            status: 'planned',
+            phase_kind: 'review',
+            assigned_to: { role: 'reviewer' },
+            review_target: 'execution-implement',
+            dependencies: ['execution-implement'],
+            deliverable: 'evidence/REVIEW-execution-implement.md',
+            artifact_review_receipt: 'evidence/reviews/self_review-code-review-r1.json',
+            artifact_review_profile: {
+              artifact_kind: inferArtifactReviewKind(artifactRelPath),
+              artifact_path: artifactRepoRelPath,
+              artifact_sha256: sha256,
+              required_reviewer_roles: [],
+              independence_required: true,
+              implementer_agent_ids: ['implementer-agent'],
+            },
+          },
+        ],
+        null,
+        2
+      )
+    );
+    seedMissionEvidence('REVIEW-execution-implement.md', '# review\napproved');
+
+    const receipt = buildArtifactReviewReceipt({
+      reviewId: 'self_review-code-review-r1',
+      missionId,
+      reviewTaskId: 'self_review-code-review',
+      reviewTargetTaskId: 'execution-implement',
+      artifact: {
+        path: artifactRepoRelPath,
+        sha256,
+        kind: inferArtifactReviewKind(artifactRelPath),
+      },
+      reviewerAgentId: 'independent-reviewer-agent',
+      reviewerTeamRole: 'reviewer',
+      specialistRoles: ['reviewer'],
+      independentFrom: ['implementer-agent'],
+      findings: [],
+      acceptanceCriteria: ['Reviewed for correctness.'],
+    });
+    safeMkdir(`${missionPath}/evidence/reviews`, { recursive: true });
+    safeWriteFile(
+      `${missionPath}/evidence/reviews/self_review-code-review-r1.json`,
+      JSON.stringify(receipt, null, 2)
+    );
+
+    const result = tryAutoCompleteTaskFromEvidence(missionPath, 'self_review-code-review');
+    const tasks = JSON.parse(
+      String(safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }))
+    ) as Array<{ task_id?: string; status?: string }>;
+
+    expect(result.completed).toBe(true);
+    expect(tasks.find((task) => task.task_id === 'self_review-code-review')?.status).toBe(
+      'completed'
+    );
+  });
+
+  it('does NOT complete a review-kind task when the receipt reviewer is the same as the implementer', () => {
+    safeMkdir(`${missionPath}/evidence`, { recursive: true });
+    const artifactRelPath = 'evidence/implementation-report.md';
+    safeWriteFile(`${missionPath}/${artifactRelPath}`, '# report\nDone.');
+    const sha256 = hashArtifactForReview(`${missionPath}/${artifactRelPath}`);
+    const artifactRepoRelPath = pathResolver.toRepoRelative(`${missionPath}/${artifactRelPath}`);
+
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify(
+        [
+          {
+            task_id: 'execution-implement',
+            status: 'completed',
+            dependencies: [],
+            deliverable: artifactRelPath,
+          },
+          {
+            task_id: 'self_review-code-review',
+            status: 'planned',
+            phase_kind: 'review',
+            assigned_to: { role: 'reviewer' },
+            review_target: 'execution-implement',
+            dependencies: ['execution-implement'],
+            deliverable: 'evidence/REVIEW-execution-implement.md',
+            artifact_review_receipt: 'evidence/reviews/self_review-code-review-r1.json',
+            artifact_review_profile: {
+              artifact_kind: inferArtifactReviewKind(artifactRelPath),
+              artifact_path: artifactRepoRelPath,
+              artifact_sha256: sha256,
+              required_reviewer_roles: [],
+              independence_required: true,
+              // Same agent that implemented it — this is exactly the case
+              // real independence checking must reject.
+              implementer_agent_ids: ['same-agent'],
+            },
+          },
+        ],
+        null,
+        2
+      )
+    );
+    seedMissionEvidence('REVIEW-execution-implement.md', '# review\napproved');
+
+    const receipt = buildArtifactReviewReceipt({
+      reviewId: 'self_review-code-review-r1',
+      missionId,
+      reviewTaskId: 'self_review-code-review',
+      reviewTargetTaskId: 'execution-implement',
+      artifact: {
+        path: artifactRepoRelPath,
+        sha256,
+        kind: inferArtifactReviewKind(artifactRelPath),
+      },
+      reviewerAgentId: 'same-agent',
+      reviewerTeamRole: 'reviewer',
+      specialistRoles: ['reviewer'],
+      independentFrom: ['same-agent'],
+      findings: [],
+      acceptanceCriteria: ['Reviewed for correctness.'],
+    });
+    safeMkdir(`${missionPath}/evidence/reviews`, { recursive: true });
+    safeWriteFile(
+      `${missionPath}/evidence/reviews/self_review-code-review-r1.json`,
+      JSON.stringify(receipt, null, 2)
+    );
+
+    const result = tryAutoCompleteTaskFromEvidence(missionPath, 'self_review-code-review');
+    const tasks = JSON.parse(
+      String(safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }))
+    ) as Array<{ task_id?: string; status?: string }>;
+
+    expect(result.completed).toBe(false);
+    expect(tasks.find((task) => task.task_id === 'self_review-code-review')?.status).toBe(
+      'planned'
+    );
+  });
+
+  it('does NOT complete a review-kind task when the receipt has blocking findings', () => {
+    safeMkdir(`${missionPath}/evidence`, { recursive: true });
+    const artifactRelPath = 'evidence/implementation-report.md';
+    safeWriteFile(`${missionPath}/${artifactRelPath}`, '# report\nDone.');
+    const sha256 = hashArtifactForReview(`${missionPath}/${artifactRelPath}`);
+    const artifactRepoRelPath = pathResolver.toRepoRelative(`${missionPath}/${artifactRelPath}`);
+
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify(
+        [
+          {
+            task_id: 'execution-implement',
+            status: 'completed',
+            dependencies: [],
+            deliverable: artifactRelPath,
+          },
+          {
+            task_id: 'self_review-code-review',
+            status: 'planned',
+            phase_kind: 'review',
+            assigned_to: { role: 'reviewer' },
+            review_target: 'execution-implement',
+            dependencies: ['execution-implement'],
+            deliverable: 'evidence/REVIEW-execution-implement.md',
+            artifact_review_receipt: 'evidence/reviews/self_review-code-review-r1.json',
+            artifact_review_profile: {
+              artifact_kind: inferArtifactReviewKind(artifactRelPath),
+              artifact_path: artifactRepoRelPath,
+              artifact_sha256: sha256,
+              required_reviewer_roles: [],
+              independence_required: true,
+              implementer_agent_ids: ['implementer-agent'],
+            },
+          },
+        ],
+        null,
+        2
+      )
+    );
+    seedMissionEvidence('REVIEW-execution-implement.md', '# review\nchanges requested');
+
+    const receipt = buildArtifactReviewReceipt({
+      reviewId: 'self_review-code-review-r1',
+      missionId,
+      reviewTaskId: 'self_review-code-review',
+      reviewTargetTaskId: 'execution-implement',
+      artifact: {
+        path: artifactRepoRelPath,
+        sha256,
+        kind: inferArtifactReviewKind(artifactRelPath),
+      },
+      reviewerAgentId: 'independent-reviewer-agent',
+      reviewerTeamRole: 'reviewer',
+      specialistRoles: ['reviewer'],
+      independentFrom: ['implementer-agent'],
+      findings: [
+        { severity: 'blocking', category: 'correctness', description: 'Off-by-one in resolver' },
+      ],
+      acceptanceCriteria: ['Reviewed for correctness.'],
+    });
+    expect(receipt.verdict).toBe('changes_requested');
+    safeMkdir(`${missionPath}/evidence/reviews`, { recursive: true });
+    safeWriteFile(
+      `${missionPath}/evidence/reviews/self_review-code-review-r1.json`,
+      JSON.stringify(receipt, null, 2)
+    );
+
+    const result = tryAutoCompleteTaskFromEvidence(missionPath, 'self_review-code-review');
+
+    expect(result.completed).toBe(false);
   });
 });

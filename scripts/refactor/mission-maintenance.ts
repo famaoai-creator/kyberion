@@ -24,6 +24,12 @@ import {
   startMissionOrchestrationWorker,
   recoverMissionRequestedTasks,
   reissueBlockedMissionTasks,
+  buildArtifactReviewReceipt,
+  evaluateArtifactReviews,
+  hashArtifactForReview,
+  inferArtifactReviewKind,
+  receiptToArtifactReviewDecision,
+  type ArtifactReviewFinding,
 } from '@agent/core';
 import { recordApprovedIntentScopeChange } from '@agent/core/intent-snapshot-store';
 import {
@@ -34,6 +40,11 @@ import {
   saveState,
 } from './mission-state.js';
 import { emitMissionLifecycleIntentSnapshot } from './mission-intent-delta.js';
+import {
+  readMissionNextTasks,
+  tryAutoCompleteTaskFromEvidence,
+  writeMissionNextTasks,
+} from './mission-lifecycle.js';
 import { readJsonFile } from './cli-input.js';
 
 function resolveApprovalActor(requestedBy?: string): string {
@@ -599,6 +610,18 @@ export async function recordEvidence(args: {
       },
     });
 
+    // Close the NEXT_TASKS.json task out when its deliverable now exists and
+    // its dependencies are already done — otherwise the documented
+    // checkpoint+record-evidence flow (execution.md) silently never closes a
+    // task, and `finish` fails with "Pending tasks remain" even though every
+    // deliverable is in place. Gated on this explicit, task_id-scoped call so
+    // a bare file-existence check is never trusted without an agent
+    // deliberately asserting the work for THAT task is done.
+    const autoComplete = tryAutoCompleteTaskFromEvidence(missionPath, args.taskId);
+    if (autoComplete.completed) {
+      logger.info(`✅ Task "${args.taskId}" auto-completed (${autoComplete.reason}).`);
+    }
+
     safeExec('git', ['add', '.'], { cwd: missionPath });
     try {
       safeExec('git', ['commit', '-m', `evidence(${upperId}): ${args.taskId} - ${args.note}`], {
@@ -621,6 +644,215 @@ export async function recordEvidence(args: {
 
   await args.syncProjectLedgerIfLinked(upperId);
   logger.success(`✅ Recorded evidence for ${upperId}.`);
+}
+
+/** Distinct actor_ids that recorded evidence for `taskId` in this mission's execution ledger. */
+function findLedgerActorIdsForTask(missionPath: string, taskId: string): string[] {
+  const ledgerPath = path.join(missionPath, 'execution-ledger.jsonl');
+  if (!safeExistsSync(ledgerPath)) return [];
+  const lines = String(safeReadFile(ledgerPath, { encoding: 'utf8' }))
+    .split('\n')
+    .filter(Boolean);
+  const actorIds = new Set<string>();
+  for (const line of lines) {
+    try {
+      const entry = JSON.parse(line) as { task_id?: string; actor_id?: string };
+      if (entry.task_id === taskId && entry.actor_id) actorIds.add(String(entry.actor_id));
+    } catch {
+      /* skip malformed ledger line */
+    }
+  }
+  return Array.from(actorIds);
+}
+
+export interface RecordArtifactReviewResult {
+  /** Whether the receipt (as recorded) satisfies independence + no-blocking-findings. */
+  status: 'recorded' | 'blocked';
+  /** Whether the review task itself was auto-completed as a result. */
+  taskCompleted: boolean;
+  /** Non-empty only when status === 'blocked' — why the receipt doesn't clear the gate. */
+  reasons: string[];
+  receiptPath: string;
+}
+
+/**
+ * Record a REAL review verdict for a review-kind task — the strict
+ * counterpart to `recordEvidence` that `isReviewTaskSatisfied`
+ * (mission-lifecycle.ts) requires before a review-kind task can complete.
+ *
+ * Independence is not self-declared by the caller: `implementer_agent_ids`
+ * is computed from who ACTUALLY recorded evidence for the reviewed task in
+ * this mission's own execution ledger, so a reviewer that happens to be the
+ * same actor who did the implementation is a hard failure
+ * (`evaluation.ready === false`), not a self-reported flag a caller could
+ * fabricate.
+ */
+export async function recordArtifactReview(args: {
+  missionId: string;
+  reviewTaskId: string;
+  reviewerAgentId: string;
+  findings?: ArtifactReviewFinding[];
+  reviewerTeamRole?: 'reviewer' | 'qa';
+  specialistRoles?: string[];
+  getGitHash: (cwd: string) => string;
+}): Promise<RecordArtifactReviewResult> {
+  const upperId = args.missionId.toUpperCase();
+  const missionPath = findMissionPath(upperId);
+  if (!missionPath) throw new Error(`Mission ${upperId} not found.`);
+
+  const state = loadState(upperId);
+  if (!state) throw new Error(`Mission ${upperId} state not found.`);
+  if (state.status === 'archived') {
+    throw new Error(`Mission ${upperId} is archived. Reviews cannot be recorded.`);
+  }
+
+  const nextTasks = readMissionNextTasks(missionPath);
+  const task = nextTasks.find((entry) => String(entry.task_id || '') === args.reviewTaskId);
+  if (!task) throw new Error(`Task "${args.reviewTaskId}" not found in NEXT_TASKS.json.`);
+  const reviewTargetId = String(task.review_target || '');
+  if (!reviewTargetId) {
+    throw new Error(
+      `Task "${args.reviewTaskId}" has no review_target — it is not a review-kind task.`
+    );
+  }
+  const targetTask = nextTasks.find((entry) => String(entry.task_id || '') === reviewTargetId);
+  const deliverable = String(targetTask?.deliverable || targetTask?.target_path || '');
+  if (!deliverable) {
+    throw new Error(`Review target "${reviewTargetId}" has no deliverable to review.`);
+  }
+  const artifactPath = path.resolve(missionPath, deliverable);
+  if (!safeExistsSync(artifactPath)) {
+    throw new Error(`Reviewed artifact does not exist yet: ${deliverable}`);
+  }
+  // artifact_review_profile / the receipt store the artifact path
+  // repo-root-relative (matching validateMissionArtifactReviewGate's
+  // pathResolver.rootResolve, and mission-governance.test.ts's convention),
+  // not mission-relative.
+  const artifactReference = pathResolver.toRepoRelative(artifactPath);
+
+  logger.info(
+    `🔍 Recording review for ${upperId}: ${args.reviewTaskId} (target: ${reviewTargetId})...`
+  );
+
+  const implementerAgentIds = findLedgerActorIdsForTask(missionPath, reviewTargetId);
+  const sha256Value = hashArtifactForReview(artifactPath);
+  const kind = inferArtifactReviewKind(deliverable);
+
+  const reviewerTeamRole = args.reviewerTeamRole || 'reviewer';
+  // The receipt schema requires at least one entry in both arrays — fall
+  // back to the team role / a generic review scope rather than let an
+  // empty-array caller silently produce a receipt that fails validation.
+  const specialistRoles =
+    args.specialistRoles && args.specialistRoles.length > 0
+      ? args.specialistRoles
+      : [reviewerTeamRole];
+  const acceptanceCriteria =
+    Array.isArray(task.acceptance_criteria) && task.acceptance_criteria.length > 0
+      ? task.acceptance_criteria.map(String)
+      : ['Reviewed for correctness, security, and regression risk.'];
+
+  const receipt = buildArtifactReviewReceipt({
+    reviewId: `${args.reviewTaskId}-r1`,
+    missionId: upperId,
+    reviewTaskId: args.reviewTaskId,
+    reviewTargetTaskId: reviewTargetId,
+    artifact: { path: artifactReference, sha256: sha256Value, kind },
+    reviewerAgentId: args.reviewerAgentId,
+    reviewerTeamRole,
+    specialistRoles,
+    independentFrom: implementerAgentIds,
+    findings: args.findings || [],
+    acceptanceCriteria,
+  });
+
+  const receiptRelPath = `evidence/reviews/${args.reviewTaskId}-r1.json`;
+
+  let evaluation: { ready: boolean; reasons: string[] } = { ready: false, reasons: [] };
+  await withLock(`mission-${upperId}`, async () => {
+    const reviewsDir = path.join(missionPath, 'evidence', 'reviews');
+    if (!safeExistsSync(reviewsDir)) safeMkdir(reviewsDir, { recursive: true });
+    safeWriteFile(path.join(missionPath, receiptRelPath), JSON.stringify(receipt, null, 2));
+
+    // Stamp the task so both isReviewTaskSatisfied (record-evidence-time) and
+    // validateMissionArtifactReviewGate (finish-time) see the same receipt.
+    task.artifact_review_receipt = receiptRelPath;
+    task.artifact_review_profile = {
+      artifact_kind: kind,
+      artifact_path: artifactReference,
+      artifact_sha256: sha256Value,
+      required_reviewer_roles: [],
+      independence_required: true,
+      implementer_agent_ids: implementerAgentIds,
+    };
+    writeMissionNextTasks(missionPath, nextTasks);
+
+    appendMissionExecutionLedgerEntry({
+      mission_id: upperId,
+      mission_path_hint: missionPath,
+      event_type: 'artifact_review_recorded',
+      task_id: args.reviewTaskId,
+      actor_id: args.reviewerAgentId,
+      actor_type: 'agent',
+      decision: receipt.verdict,
+      evidence: [receiptRelPath],
+      payload: {
+        review_target_task_id: reviewTargetId,
+        independence_verified: receipt.reviewer.independence_verified,
+      },
+    });
+
+    safeExec('git', ['add', '.'], { cwd: missionPath });
+    try {
+      safeExec(
+        'git',
+        ['commit', '-m', `review(${upperId}): ${args.reviewTaskId} - ${receipt.verdict}`],
+        { cwd: missionPath }
+      );
+    } catch (_) {
+      logger.info('No new changes in mission repo after review record.');
+    }
+
+    evaluation = evaluateArtifactReviews({
+      artifacts: [{ path: artifactReference, sha256: sha256Value, kind }],
+      reviews: [receiptToArtifactReviewDecision(receipt)],
+      requiredReviewerRoles: [],
+      implementerAgentIds,
+      requireIndependence: true,
+    });
+
+    const hash = args.getGitHash(missionPath);
+    const currentState = loadState(upperId)!;
+    currentState.git.latest_commit = hash;
+    currentState.history.push({
+      ts: new Date().toISOString(),
+      event: 'ARTIFACT_REVIEW',
+      note: `${args.reviewTaskId}: ${receipt.verdict} (${evaluation.ready ? 'ready' : 'blocked'})`,
+    });
+    await saveState(upperId, currentState, { alreadyLocked: true });
+  });
+
+  let taskCompleted = false;
+  if (evaluation.ready) {
+    const autoComplete = tryAutoCompleteTaskFromEvidence(missionPath, args.reviewTaskId);
+    taskCompleted = autoComplete.completed;
+  }
+
+  if (evaluation.ready) {
+    logger.success(
+      `✅ Review recorded and task "${args.reviewTaskId}" satisfied: ${receipt.verdict}.`
+    );
+  } else {
+    logger.warn(
+      `⚠️ Review recorded but task "${args.reviewTaskId}" is still blocked: ${evaluation.reasons.join('; ')}`
+    );
+  }
+
+  return {
+    status: evaluation.ready ? 'recorded' : 'blocked',
+    taskCompleted,
+    reasons: evaluation.reasons,
+    receiptPath: receiptRelPath,
+  };
 }
 
 export async function purgeMissions(rootDir: string, dryRun = false): Promise<void> {
