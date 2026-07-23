@@ -85,13 +85,14 @@
       "model_id": "hexgrad/Kokoro-82M",
       "bridge_script": "libs/actuators/voice-actuator/scripts/kokoro_tts_bridge.py",
       "tts_adapter_id": "python_bridge",
-      "live_presence": false,
+      "runtime_id": "kokoro_tts",
+      "live_presence": true,
       "supports": {
         "list_voices": false,
         "playback": true,
         "artifact_formats": ["wav"]
       },
-      "notes": "82M parameter lightweight high-quality TTS using Kokoro-82M. Fast, low memory footprint, runs locally."
+      "notes": "82M parameter lightweight local TTS. Japanese voice selection depends on the installed Kokoro language pack."
     },
     {
       "engine_id": "gemini_tts",
@@ -108,6 +109,28 @@
         "artifact_formats": ["wav"]
       },
       "notes": "Gemini 3.1 Flash TTS preview through Google AI Studio / Gemini API using GEMINI_API_KEY."
+    },
+    {
+      "engine_id": "pocket_tts",
+      "display_name": "Kyutai Pocket TTS",
+      "kind": "voice_clone_service",
+      "provider": "kyutai",
+      "status": "active",
+      "platforms": ["darwin", "linux", "win32"],
+      "model_id": "kyutai/pocket-tts",
+      "bridge_script": "libs/actuators/voice-actuator/scripts/pocket_tts_bridge.py",
+      "tts_adapter_id": "python_bridge",
+      "runtime_id": "pocket_tts",
+      "live_presence": true,
+      "supports": {
+        "list_voices": true,
+        "playback": true,
+        "voice_clone": true,
+        "icl_ref_audio": true,
+        "artifact_formats": ["wav"]
+      },
+      "fallback_engine_id": "local_say",
+      "notes": "CPU streaming TTS and consent-gated voice cloning. Current upstream language packs do not include Japanese."
     }
   ]
 }
