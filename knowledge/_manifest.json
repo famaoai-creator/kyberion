@@ -1233,7 +1233,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 64022,
+      "size": 66334,
       "type": "json"
     },
     {
@@ -1503,7 +1503,7 @@
     {
       "path": "product/governance/media-backend-registry.json",
       "tier": "public",
-      "size": 5263,
+      "size": 8965,
       "type": "json"
     },
     {
