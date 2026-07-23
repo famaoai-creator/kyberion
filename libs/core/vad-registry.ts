@@ -11,6 +11,7 @@
  */
 
 import { EnergyVad, type VoiceActivityDetector } from './voice-activity-detector.js';
+import { getAdapterDefault } from './adapter-default-preferences.js';
 
 export interface VadFactoryOptions {
   /** Calibrated or explicit RMS threshold; null when calibration is skipped. */
@@ -61,7 +62,8 @@ export interface ResolvedVadBackend {
  * callers must surface it (fail-soft, never silent).
  */
 export function resolveVadBackend(id?: string): ResolvedVadBackend {
-  const requested = (id ?? process.env.KYBERION_VAD ?? 'energy').trim() || 'energy';
+  const explicit = id?.trim() || process.env.KYBERION_VAD?.trim();
+  const requested = explicit || getAdapterDefault('voice.vad') || 'energy';
   const backend = registry.get(requested);
   if (!backend) {
     return {

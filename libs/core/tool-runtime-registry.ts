@@ -1,7 +1,14 @@
 import * as path from 'node:path';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExecResult, safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
+import {
+  safeExecResult,
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeWriteFile,
+} from './secure-io.js';
 import { safeJsonParse } from './validators.js';
 import {
   getToolRuntimePolicy,
@@ -10,10 +17,19 @@ import {
   type ToolRuntimeMode,
   type ToolRuntimeModePreference,
 } from './tool-runtime-policy.js';
+import { getAdapterDefault } from './adapter-default-preferences.js';
 
 export type ToolRuntimeStatus = 'active' | 'shadow' | 'disabled';
 export type ToolRuntimePlatform = 'any' | 'darwin' | 'linux' | 'win32';
-export type ToolRuntimeBackendKind = 'uvx' | 'uv' | 'pipx' | 'npx' | 'npm' | 'pnpm' | 'brew' | 'system';
+export type ToolRuntimeBackendKind =
+  | 'uvx'
+  | 'uv'
+  | 'pipx'
+  | 'npx'
+  | 'npm'
+  | 'pnpm'
+  | 'brew'
+  | 'system';
 export type ToolRuntimeAction = 'run_trial' | 'run_installed' | 'install' | 'pin';
 
 export interface ToolRuntimeBackendCommand {
@@ -79,7 +95,13 @@ export interface ToolRuntimeResolution {
   reason: string;
 }
 
-export type ToolRuntimeLifecycleStage = 'trial' | 'approved_install' | 'installed' | 'pinned' | 'install_required' | 'unsupported';
+export type ToolRuntimeLifecycleStage =
+  | 'trial'
+  | 'approved_install'
+  | 'installed'
+  | 'pinned'
+  | 'install_required'
+  | 'unsupported';
 
 export interface ToolRuntimeInventoryItem {
   tool: ToolRuntimeRecord;
@@ -107,7 +129,9 @@ export interface ToolRuntimeInventory {
   items: ToolRuntimeInventoryItem[];
 }
 
-const DEFAULT_REGISTRY_PATH = pathResolver.knowledge('product/governance/tool-runtime-registry.json');
+const DEFAULT_REGISTRY_PATH = pathResolver.knowledge(
+  'product/governance/tool-runtime-registry.json'
+);
 const STATE_VERSION = '1.0.0';
 
 const FALLBACK_REGISTRY: ToolRuntimeRegistry = {
@@ -140,7 +164,8 @@ const FALLBACK_REGISTRY: ToolRuntimeRegistry = {
         description: 'Run mflux from the managed Python tool environment.',
       },
       managed_env_subpath: 'tool-runtimes/mflux',
-      notes: 'Apple Silicon FLUX entrypoint. Trial via uvx; promote to installed state after approval.',
+      notes:
+        'Apple Silicon FLUX entrypoint. Trial via uvx; promote to installed state after approval.',
     },
     {
       tool_id: 'playwright',
@@ -168,7 +193,8 @@ const FALLBACK_REGISTRY: ToolRuntimeRegistry = {
         description: 'Re-check the Playwright runtime after browser bootstrap.',
       },
       managed_env_subpath: 'tool-runtimes/playwright',
-      notes: 'Node runtime example: trial via npx, managed browser bootstrap through the Playwright runtime installer.',
+      notes:
+        'Node runtime example: trial via npx, managed browser bootstrap through the Playwright runtime installer.',
     },
     {
       tool_id: 'ffmpeg',
@@ -326,7 +352,9 @@ function loadRegistryFromPath(registryPath: string): ToolRuntimeRegistry {
 }
 
 function isSupportedPlatform(record: ToolRuntimeRecord, platform: NodeJS.Platform): boolean {
-  return record.platforms.includes('any') || record.platforms.includes(platform as ToolRuntimePlatform);
+  return (
+    record.platforms.includes('any') || record.platforms.includes(platform as ToolRuntimePlatform)
+  );
 }
 
 function backendIsAvailable(backend: ToolRuntimeBackendCommand | null | undefined): boolean {
@@ -350,10 +378,7 @@ function resolveManagedPythonCandidates(managedEnvPath: string): string[] {
       path.join(managedEnvPath, 'Scripts', 'python3.exe'),
     ];
   }
-  return [
-    path.join(managedEnvPath, 'bin', 'python'),
-    path.join(managedEnvPath, 'bin', 'python3'),
-  ];
+  return [path.join(managedEnvPath, 'bin', 'python'), path.join(managedEnvPath, 'bin', 'python3')];
 }
 
 function normalizeToolId(toolId?: string): string {
@@ -377,7 +402,9 @@ function getRegistry(): ToolRuntimeRegistry {
     cachedRegistry = parsed;
     return parsed;
   } catch (error: any) {
-    logger.warn(`[TOOL_RUNTIME_REGISTRY] Failed to load registry at ${registryPath}: ${error.message}`);
+    logger.warn(
+      `[TOOL_RUNTIME_REGISTRY] Failed to load registry at ${registryPath}: ${error.message}`
+    );
     cachedRegistryPath = registryPath;
     cachedRegistry = FALLBACK_REGISTRY;
     return cachedRegistry;
@@ -405,11 +432,12 @@ export function listToolRuntimes(): ToolRuntimeRecord[] {
 
 export function getToolRuntimeRecord(toolId?: string): ToolRuntimeRecord {
   const registry = getRegistry();
-  const resolvedToolId = normalizeToolId(toolId) || registry.default_tool_id;
+  const resolvedToolId =
+    normalizeToolId(toolId) || getAdapterDefault('tool.runtime') || registry.default_tool_id;
   return (
-    registry.tools.find((tool) => tool.tool_id === resolvedToolId)
-    || registry.tools.find((tool) => tool.tool_id === registry.default_tool_id)
-    || FALLBACK_REGISTRY.tools[0]
+    registry.tools.find((tool) => tool.tool_id === resolvedToolId) ||
+    registry.tools.find((tool) => tool.tool_id === registry.default_tool_id) ||
+    FALLBACK_REGISTRY.tools[0]
   );
 }
 
@@ -421,7 +449,10 @@ export function readToolRuntimeState(toolId?: string): ToolRuntimeState | null {
   const statePath = getToolRuntimeStatePath(toolId);
   if (!safeExistsSync(statePath)) return null;
   try {
-    const parsed = safeJsonParse<ToolRuntimeState>(safeReadFile(statePath, { encoding: 'utf8' }) as string, 'tool runtime state');
+    const parsed = safeJsonParse<ToolRuntimeState>(
+      safeReadFile(statePath, { encoding: 'utf8' }) as string,
+      'tool runtime state'
+    );
     return parsed;
   } catch (error: any) {
     logger.warn(`[TOOL_RUNTIME_REGISTRY] Failed to read state at ${statePath}: ${error.message}`);
@@ -438,7 +469,7 @@ function writeToolRuntimeStateFile(state: ToolRuntimeState): void {
 
 export function markToolRuntimeInstalled(
   toolId: string,
-  provenance?: ToolRuntimeState['provenance'],
+  provenance?: ToolRuntimeState['provenance']
 ): ToolRuntimeState {
   const tool = getToolRuntimeRecord(toolId);
   const state: ToolRuntimeState = {
@@ -458,7 +489,7 @@ export function markToolRuntimeInstalled(
 
 export function markToolRuntimePinned(
   toolId: string,
-  provenance?: ToolRuntimeState['provenance'],
+  provenance?: ToolRuntimeState['provenance']
 ): ToolRuntimeState {
   const tool = getToolRuntimeRecord(toolId);
   const state: ToolRuntimeState = {
@@ -493,7 +524,8 @@ function resolveLifecycleStage(resolution: ToolRuntimeResolution): ToolRuntimeLi
   if (currentState === 'installed') return 'installed';
   if (currentState === 'pinned') return 'pinned';
   if (resolution.requested_mode === 'approved_install') return 'approved_install';
-  if (!resolution.selected_backend && !resolution.installed && resolution.requires_install) return 'install_required';
+  if (!resolution.selected_backend && !resolution.installed && resolution.requires_install)
+    return 'install_required';
   if (resolution.selected_action === 'run_trial') return 'trial';
   if (resolution.selected_action === 'install') return 'approved_install';
   return resolution.installed ? 'installed' : 'trial';
@@ -502,14 +534,19 @@ function resolveLifecycleStage(resolution: ToolRuntimeResolution): ToolRuntimeLi
 function resolveRequestedMode(
   requestedMode: ToolRuntimeMode,
   record: ToolRuntimeRecord,
-  state: ToolRuntimeState | null,
+  state: ToolRuntimeState | null
 ): ToolRuntimeAction {
-  const installedState = currentModeFromState(state) === 'installed' || currentModeFromState(state) === 'pinned';
+  const installedState =
+    currentModeFromState(state) === 'installed' || currentModeFromState(state) === 'pinned';
 
   if (requestedMode === 'approved_install') return 'install';
   if (installedState && record.installed_backend) return 'run_installed';
   if (requestedMode === 'installed' || requestedMode === 'pinned') {
-    return record.installed_backend ? 'run_installed' : (record.trial_backend ? 'run_trial' : 'install');
+    return record.installed_backend
+      ? 'run_installed'
+      : record.trial_backend
+        ? 'run_trial'
+        : 'install';
   }
   if (requestedMode === 'trial') return record.trial_backend ? 'run_trial' : 'install';
   return record.trial_backend ? 'run_trial' : 'install';
@@ -518,7 +555,7 @@ function resolveRequestedMode(
 export function probeToolRuntime(
   toolId?: string,
   requestedMode: ToolRuntimeMode = 'trial',
-  platform: NodeJS.Platform = process.platform,
+  platform: NodeJS.Platform = process.platform
 ): ToolRuntimeResolution {
   const record = getToolRuntimeRecord(toolId);
   const state = readToolRuntimeState(record.tool_id);
@@ -543,15 +580,12 @@ export function probeToolRuntime(
   const selectedAction = resolveRequestedMode(requestedMode, record, state);
 
   let selectedBackend: ToolRuntimeBackendCommand | null = null;
-  if (selectedAction === 'run_installed') selectedBackend = record.installed_backend || record.trial_backend;
+  if (selectedAction === 'run_installed')
+    selectedBackend = record.installed_backend || record.trial_backend;
   if (selectedAction === 'run_trial') selectedBackend = record.trial_backend;
   if (selectedAction === 'install') selectedBackend = record.install_backend || null;
 
-  const availableCommands = [
-    record.trial_backend,
-    record.install_backend,
-    record.installed_backend,
-  ]
+  const availableCommands = [record.trial_backend, record.install_backend, record.installed_backend]
     .filter((backend): backend is ToolRuntimeBackendCommand => Boolean(backend))
     .filter((backend) => backendIsAvailable(backend))
     .map((backend) => backend.command);
@@ -590,11 +624,17 @@ export function getToolRuntimeModePreference(toolId?: string): ToolRuntimeModePr
   return getToolRuntimePolicy().mode_preference[record.ecosystem] || 'trial_first';
 }
 
-export function resolveToolRuntimeAction(toolId?: string, requestedMode: ToolRuntimeMode = 'trial'): ToolRuntimeAction {
+export function resolveToolRuntimeAction(
+  toolId?: string,
+  requestedMode: ToolRuntimeMode = 'trial'
+): ToolRuntimeAction {
   return probeToolRuntime(toolId, requestedMode).selected_action;
 }
 
-export function resolveToolRuntimeCommand(toolId?: string, requestedMode: ToolRuntimeMode = 'trial'): ToolRuntimeBackendCommand | null {
+export function resolveToolRuntimeCommand(
+  toolId?: string,
+  requestedMode: ToolRuntimeMode = 'trial'
+): ToolRuntimeBackendCommand | null {
   return probeToolRuntime(toolId, requestedMode).selected_backend;
 }
 
@@ -608,7 +648,7 @@ export function resolveManagedToolPythonBin(toolId?: string): string | null {
 
 export function listToolRuntimeInventory(
   requestedMode: ToolRuntimeMode = 'trial',
-  platform: NodeJS.Platform = process.platform,
+  platform: NodeJS.Platform = process.platform
 ): ToolRuntimeInventory {
   const registry = getRegistry();
   const items = registry.tools.map((tool) => {
@@ -643,7 +683,7 @@ export function listToolRuntimeInventory(
 export function getToolRuntimeInventoryItem(
   toolId?: string,
   requestedMode: ToolRuntimeMode = 'trial',
-  platform: NodeJS.Platform = process.platform,
+  platform: NodeJS.Platform = process.platform
 ): ToolRuntimeInventoryItem {
   const resolution = probeToolRuntime(toolId, requestedMode, platform);
   return {

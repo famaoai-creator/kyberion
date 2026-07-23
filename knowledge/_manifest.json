@@ -993,7 +993,7 @@
     {
       "path": "product/governance/adapter-first-extension-policy.md",
       "tier": "public",
-      "size": 8803,
+      "size": 10133,
       "type": "md"
     },
     {
@@ -9247,9 +9247,15 @@
       "type": "json"
     },
     {
+      "path": "public/procedures/select-adapter-backed-runtime-defaults.md",
+      "tier": "public",
+      "size": 4384,
+      "type": "md"
+    },
+    {
       "path": "public/procedures/select-reasoning-provider-and-model.md",
       "tier": "public",
-      "size": 4450,
+      "size": 4813,
       "type": "md"
     },
     {

@@ -3,6 +3,11 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 
 import { withExecutionContext } from './authority.js';
+import {
+  getAdapterDefaultSelectionSnapshot,
+  saveAdapterDefaultPreferences,
+  validateAdapterDefaultPreferences,
+} from './adapter-default-selection.js';
 import { loadProviderConfig } from './provider-config.js';
 import { resolveActiveProfileRoot } from './profile-root.js';
 import {
@@ -93,6 +98,9 @@ export const browserOnboardingDraftSchema = z
         model_id: z.string().trim().min(1).max(160).optional(),
       })
       .optional(),
+    adapter_defaults: z
+      .record(z.string().trim().min(1).max(120), z.string().trim().min(1).max(200))
+      .optional(),
     tools: z.object({
       mode_preference: z.object({
         python: z.enum(toolModes),
@@ -181,6 +189,7 @@ export function previewBrowserOnboarding(input: unknown): BrowserOnboardingPrevi
     );
   }
   if (draft.reasoning) validateLlmSelectionPreferences(draft.reasoning);
+  if (draft.adapter_defaults) validateAdapterDefaultPreferences(draft.adapter_defaults);
 
   const effects = [
     ['identity', path.join(profileRoot(), 'my-identity.json'), 'Update operator identity'],
@@ -188,6 +197,11 @@ export function previewBrowserOnboarding(input: unknown): BrowserOnboardingPrevi
     ['agent', path.join(profileRoot(), 'agent-identity.json'), 'Update agent identity'],
     ['providers', onboardingPath('provider-preferences.json'), 'Set provider and model priority'],
     ['reasoning', onboardingPath('llm-selection.json'), 'Set reasoning provider and model'],
+    [
+      'adapter-defaults',
+      onboardingPath('adapter-defaults.json'),
+      'Set adapter-backed runtime defaults',
+    ],
     ['tools', onboardingPath('tool-runtime-policy.json'), 'Set tool runtime preference'],
     ['state', onboardingPath('browser-onboarding-state.json'), 'Record onboarding receipt'],
     ...draft.services.map((service) => [
@@ -267,6 +281,11 @@ export async function applyBrowserOnboarding(input: unknown): Promise<{
           artifacts.push(reasoningSelection.storage_path);
         }
 
+        if (draft.adapter_defaults) {
+          const adapterDefaults = saveAdapterDefaultPreferences(draft.adapter_defaults);
+          artifacts.push(adapterDefaults.storage_path);
+        }
+
         const toolPath = onboardingPath('tool-runtime-policy.json');
         const baseToolPolicy = getToolRuntimePolicy();
         writeJson(toolPath, {
@@ -332,6 +351,8 @@ export async function applyBrowserOnboarding(input: unknown): Promise<{
           identity: draft.identity,
           providers: draft.providers,
           reasoning: draft.reasoning || getLlmSelectionSnapshot().preferences,
+          adapter_defaults:
+            draft.adapter_defaults || getAdapterDefaultSelectionSnapshot().preferences.defaults,
           tools: draft.tools,
           services: draft.services,
           voice_profile_id: draft.voice.enabled ? draft.voice.profile_id : null,
@@ -404,6 +425,7 @@ export function getBrowserOnboardingState(): Record<string, unknown> {
           default_models: providerConfig.default_models,
         },
         reasoning_selection: getLlmSelectionSnapshot(),
+        adapter_defaults: getAdapterDefaultSelectionSnapshot(),
         tools: toolPreference || getToolRuntimePolicy(),
         voice_profiles: getVoiceProfileRegistry().profiles,
         service_bindings: listServiceBindingRecords(),
