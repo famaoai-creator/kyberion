@@ -10,6 +10,8 @@
       "status": "active",
       "platforms": ["darwin", "linux", "win32"],
       "bridge_script": "libs/actuators/voice-actuator/scripts/espeak_ng_tts_bridge.py",
+      "tts_adapter_id": "python_bridge",
+      "live_presence": false,
       "supports": {
         "list_voices": true,
         "playback": true,
