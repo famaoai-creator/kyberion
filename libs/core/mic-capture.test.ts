@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { probeMicCapture, startMicCapture } from './mic-capture.js';
+import { probeMicCapture, selectMacPhysicalAudioDevice, startMicCapture } from './mic-capture.js';
 
 /** Emits `seconds` of synthetic PCM_S16LE audio on stdout via node -e. */
 function fixtureCommand(bytes: number): string[] {
@@ -11,6 +11,18 @@ function fixtureCommand(bytes: number): string[] {
 }
 
 describe('mic-capture', () => {
+  it('skips virtual macOS inputs instead of assuming :0 is a physical microphone', () => {
+    const listing = [
+      '[AVFoundation indev @ 0x1] AVFoundation audio devices:',
+      '[AVFoundation indev @ 0x1] [0] BlackHole 2ch',
+      '[AVFoundation indev @ 0x1] [1] Anker PowerConf C200',
+      '[AVFoundation indev @ 0x1] [2] Fammy Microphone',
+    ].join('\n');
+
+    expect(selectMacPhysicalAudioDevice(listing)).toBe(':1');
+    expect(selectMacPhysicalAudioDevice('[0] BlackHole 2ch')).toBeUndefined();
+  });
+
   it('probes custom commands as available', () => {
     const probe = probeMicCapture({ command: ['echo'] });
     expect(probe.available).toBe(true);
