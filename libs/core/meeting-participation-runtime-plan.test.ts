@@ -15,6 +15,19 @@ describe('resolveMeetingParticipationRuntimePlan', () => {
     });
   });
 
+  it('captions-first needs no audio bus, STT, or TTS but keeps recording consent', () => {
+    expect(resolveMeetingParticipationRuntimePlan({ transport_mode: 'captions_first' })).toEqual({
+      transport_mode: 'captions_first',
+      dry_run: false,
+      require_real_audio_bus: false,
+      require_streaming_stt: false,
+      require_streaming_tts: false,
+      require_voice_profile: false,
+      require_recording_consent: true,
+      require_voice_consent: false,
+    });
+  });
+
   it('requires full voice path for realtime voice mode', () => {
     expect(resolveMeetingParticipationRuntimePlan({ transport_mode: 'realtime_voice' })).toEqual({
       transport_mode: 'realtime_voice',
@@ -33,7 +46,7 @@ describe('resolveMeetingParticipationRuntimePlan', () => {
       resolveMeetingParticipationRuntimePlan({
         transport_mode: 'realtime_voice',
         dry_run: true,
-      }),
+      })
     ).toEqual({
       transport_mode: 'realtime_voice',
       dry_run: true,

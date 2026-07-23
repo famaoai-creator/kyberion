@@ -33,6 +33,7 @@ import type {
   MeetingSession,
   MeetingSessionState,
   MeetingTarget,
+  TranscriptChunk,
 } from './meeting-session-types.js';
 import { abortableAudioChunks } from './meeting-session-types.js';
 
@@ -115,6 +116,33 @@ export class ChromeExtensionMeetingJoinDriver implements MeetingJoinDriver {
     let socket: WsLike | null = null;
     const eventWaiters = new Map<string, Array<(e: ExtensionEvent) => void>>();
 
+    // Live-caption stream state: caption events double as a driver-native
+    // transcript so the coordinator can run captions_first (no local STT).
+    const captionQueue: TranscriptChunk[] = [];
+    let captionWaiter: (() => void) | null = null;
+    let captionSeq = 0;
+    let lastCaptionText = '';
+    const wakeCaptionWaiter = (): void => {
+      const waiter = captionWaiter;
+      captionWaiter = null;
+      waiter?.();
+    };
+    const pushCaption = (text: string, speaker?: string): void => {
+      const trimmed = text.trim();
+      // Platforms re-emit the growing caption line; only forward changes.
+      if (!trimmed || trimmed === lastCaptionText) return;
+      lastCaptionText = trimmed;
+      captionSeq += 1;
+      captionQueue.push({
+        utterance_id: `${sessionId}-cap-${captionSeq}`,
+        is_final: true,
+        text: trimmed,
+        ...(speaker ? { speaker_label: speaker } : {}),
+        emitted_at: new Date().toISOString(),
+      });
+      wakeCaptionWaiter();
+    };
+
     const onEvent = (name: string, cb: (e: ExtensionEvent) => void): void => {
       const list = eventWaiters.get(name) ?? [];
       list.push(cb);
@@ -180,6 +208,10 @@ export class ChromeExtensionMeetingJoinDriver implements MeetingJoinDriver {
               safeAppendFileSync(
                 captionsPath,
                 `${JSON.stringify({ ...parsed, ts: new Date().toISOString() })}\n`
+              );
+              pushCaption(
+                typeof parsed.text === 'string' ? parsed.text : '',
+                typeof parsed.speaker === 'string' ? parsed.speaker : undefined
               );
             }
             if (parsed.event === 'diagnostics') {
@@ -267,8 +299,33 @@ export class ChromeExtensionMeetingJoinDriver implements MeetingJoinDriver {
           logger.warn(`chat send failed: ${(err as Error).message}`);
         }
       },
+      async *transcriptInput(): AsyncIterable<TranscriptChunk> {
+        while (!left) {
+          while (captionQueue.length > 0) {
+            yield captionQueue.shift() as TranscriptChunk;
+          }
+          if (left) return;
+          const hadCaption = await new Promise<boolean>((resolve) => {
+            captionWaiter = () => resolve(true);
+            // Heartbeat so the consumer can enforce its deadline during
+            // long silences; non-final chunks are skipped by the agent loop.
+            const timer = setTimeout(() => resolve(false), 30_000);
+            (timer as { unref?: () => void }).unref?.();
+          });
+          if (!hadCaption && !left) {
+            captionSeq += 1;
+            yield {
+              utterance_id: `${sessionId}-tick-${captionSeq}`,
+              is_final: false,
+              text: '',
+              emitted_at: new Date().toISOString(),
+            };
+          }
+        }
+      },
       leave: async (): Promise<void> => {
         left = true;
+        wakeCaptionWaiter();
         try {
           // Register the waiter BEFORE sending so a fast 'left' reply isn't missed.
           const leftAck = waitEvent('left', 5_000).catch(() => undefined);

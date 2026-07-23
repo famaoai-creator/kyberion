@@ -24,7 +24,32 @@
     },
     "knowledge_injections": {
       "type": "array",
-      "items": { "type": "string" }
+      "description": "Declarative knowledge scope this mission draws on. Resolved at runtime by tag/domain query (knowledge-index.ts), not by literal path, so it survives knowledge/ directory reorganizations.",
+      "items": {
+        "type": "object",
+        "required": ["tier"],
+        "properties": {
+          "tier": {
+            "type": "string",
+            "enum": ["personal", "confidential", "public"],
+            "description": "Knowledge tier this entry draws from; drives mission tier auto-elevation directly (no path sniffing)."
+          },
+          "project": {
+            "type": "string",
+            "description": "Required scoping when tier is 'confidential': matches knowledge/confidential/{project}/."
+          },
+          "domains": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Knowledge domains to search, e.g. 'design-patterns', 'procedures/browser'."
+          },
+          "tags": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Frontmatter/hint tags to match, e.g. 'browser-automation', 'pptx'."
+          }
+        }
+      }
     }
   }
 }

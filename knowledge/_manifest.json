@@ -193,6 +193,12 @@
       "type": "md"
     },
     {
+      "path": "product/architecture/browser-execution-substrate-howto.md",
+      "tier": "public",
+      "size": 8847,
+      "type": "md"
+    },
+    {
       "path": "product/architecture/capability-bundle-model.md",
       "tier": "public",
       "size": 9762,
@@ -1443,7 +1449,7 @@
     {
       "path": "product/governance/knowledge-protocol.md",
       "tier": "public",
-      "size": 2914,
+      "size": 3168,
       "type": "md"
     },
     {
@@ -1461,7 +1467,7 @@
     {
       "path": "product/governance/kyberion-development-practices.md",
       "tier": "public",
-      "size": 10196,
+      "size": 10844,
       "type": "md"
     },
     {
@@ -1815,7 +1821,7 @@
     {
       "path": "product/governance/phases/execution.md",
       "tier": "public",
-      "size": 1859,
+      "size": 4454,
       "type": "md"
     },
     {
@@ -4701,7 +4707,7 @@
     {
       "path": "product/pipeline-templates/code-review-cycle.json",
       "tier": "public",
-      "size": 1962,
+      "size": 2662,
       "type": "json"
     },
     {

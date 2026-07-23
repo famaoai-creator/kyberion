@@ -117,6 +117,13 @@ export interface MeetingSession {
    * platform / config doesn't allow it.
    */
   chat(text: string): Promise<void>;
+  /**
+   * Optional driver-native transcript stream (e.g. platform live
+   * captions scraped by a browser extension). When present, the
+   * coordinator can consume this instead of running local STT.
+   * Yields until the session leaves.
+   */
+  transcriptInput?(): AsyncIterable<TranscriptChunk>;
   /** Initiate a graceful leave. */
   leave(): Promise<void>;
 }

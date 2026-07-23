@@ -24,7 +24,7 @@ import * as path from 'node:path';
 import { isIP } from 'node:net';
 import { randomUUID } from 'node:crypto';
 
-interface BrowserSnapshotElement {
+export interface BrowserSnapshotElement {
   ref: string;
   tag: string;
   role: string | null;
@@ -657,11 +657,22 @@ async function getSessionHealth(sessionId: string, runtime: BrowserRuntime, trai
   };
 }
 
-async function buildSnapshot(
+interface CapturedSnapshotElements {
+  viewport?: { width: number; height: number; scale: number };
+  ready_state?: string;
+  elements: BrowserSnapshotElement[];
+}
+
+/**
+ * The DOM-scanning half of `buildSnapshot`, split out so callers that only
+ * need the element list (e.g. resolving a recorded {role,name} target
+ * against the live page) don't have to go through the full named-snapshot
+ * bookkeeping (session/tab ids, persistence, focused_ref).
+ */
+async function captureSnapshotElements(
   page: Page,
-  options: { sessionId: string; tabId: string; maxElements: number }
-): Promise<BrowserSnapshot> {
-  const { sessionId, tabId, maxElements } = options;
+  maxElements: number
+): Promise<CapturedSnapshotElements> {
   const evaluated = await page.evaluate((max) => {
     const candidates = Array.from(
       document.querySelectorAll('a, button, input, select, textarea, summary, [role], [tabindex]')
@@ -751,9 +762,17 @@ async function buildSnapshot(
       }),
     };
   }, maxElements);
-  const raw = Array.isArray(evaluated)
+  return Array.isArray(evaluated)
     ? { viewport: undefined, ready_state: undefined, elements: evaluated }
     : evaluated;
+}
+
+async function buildSnapshot(
+  page: Page,
+  options: { sessionId: string; tabId: string; maxElements: number }
+): Promise<BrowserSnapshot> {
+  const { sessionId, tabId, maxElements } = options;
+  const raw = await captureSnapshotElements(page, maxElements);
 
   return {
     session_id: sessionId,
@@ -1213,6 +1232,7 @@ export const browserRuntimeHelpers = {
   summarizeTabs,
   saveBrowserSessionMetadata,
   saveBrowserSessionSnapshot,
+  captureSnapshotElements,
   buildSnapshot,
   buildSessionHandoff,
   resolveSessionHandoff,

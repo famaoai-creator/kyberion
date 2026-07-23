@@ -2,7 +2,7 @@
   "name": "kyberion",
   "version": "1.0.0",
   "private": true,
-  "packageManager": "pnpm@11.13.0",
+  "packageManager": "pnpm@11.15.1",
   "bin": {
     "kyberion": "dist/scripts/cli.js"
   },

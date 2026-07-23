@@ -22,7 +22,7 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 11.13.0
+          version: 11.15.1
 
       - uses: actions/setup-node@v4
         with:
@@ -124,7 +124,7 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 11.13.0
+          version: 11.15.1
 
       - uses: actions/setup-node@v4
         with:
@@ -175,7 +175,7 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 11.13.0
+          version: 11.15.1
 
       - uses: actions/setup-node@v4
         with:
@@ -207,7 +207,7 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 11.13.0
+          version: 11.15.1
 
       - uses: actions/setup-node@v4
         with:
