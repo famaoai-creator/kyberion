@@ -1,4 +1,6 @@
 export interface EmailParams {
+  /** Optional governed backend selection. Omit to use the configured default or auto policy. */
+  backend?: string;
   to?: string;
   cc?: string;
   subject?: string;
@@ -17,7 +19,7 @@ export interface EmailResult {
 
 export interface EmailProvider {
   readonly id: string;
-  isAvailable(): Promise<boolean>;
+  isAvailable(): boolean | Promise<boolean>;
   send(params: EmailParams): Promise<EmailResult>;
   createDraft(params: EmailParams): Promise<EmailResult>;
 }
