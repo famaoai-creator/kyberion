@@ -118,6 +118,7 @@
     "ai-test": "node dist/scripts/run_ai_audit.js",
     "generate:knowledge-index": "node --import ./scripts/ts-loader.mjs scripts/generate_knowledge_index.ts",
     "history:search": "node --import ./scripts/ts-loader.mjs scripts/history_search.ts",
+    "plugin:install": "node --import ./scripts/ts-loader.mjs scripts/plugin_install.ts",
     "background-review": "node --import ./scripts/ts-loader.mjs scripts/background_review.ts",
     "background-review:mission-e2e": "node --import ./scripts/ts-loader.mjs scripts/background_review_mission_e2e.ts",
     "automation:blueprint": "node --import ./scripts/ts-loader.mjs scripts/automation_blueprint.ts",

@@ -2137,6 +2137,14 @@
       "documented": false
     },
     {
+      "name": "KYBERION_SKILL_PLUGIN_TEST_MARKER",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_SKIP_TYPE_RATCHET",
       "category": "flag",
       "type": "boolean",

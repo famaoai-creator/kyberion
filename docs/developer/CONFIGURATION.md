@@ -247,7 +247,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_VLLM_MODEL`                     | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
 | `KYBERION_VLLM_URL`                       | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
 
-## runtime (121)
+## runtime (122)
 
 | Variable                                      | Type   | Required | Description                                                                                             |
 | --------------------------------------------- | ------ | -------- | ------------------------------------------------------------------------------------------------------- |
@@ -337,6 +337,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_RESTRICTED_ACTIONS_POLICY`          | string | no       | _undocumented_                                                                                          |
 | `KYBERION_RESTRICTED_APPROVED_ITEMS`          | string | no       | _undocumented_                                                                                          |
 | `KYBERION_SILERO_VAD_PYTHON`                  | string | no       | _undocumented_                                                                                          |
+| `KYBERION_SKILL_PLUGIN_TEST_MARKER`           | string | no       | _undocumented_                                                                                          |
 | `KYBERION_SMTP_PASS`                          | string | no       | _undocumented_                                                                                          |
 | `KYBERION_SMTP_USER`                          | string | no       | _undocumented_                                                                                          |
 | `KYBERION_SOMETHING_ELSE`                     | string | no       | _undocumented_                                                                                          |

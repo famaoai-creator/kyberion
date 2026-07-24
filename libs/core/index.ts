@@ -800,6 +800,7 @@ export * from './artifact-store.js';
 export * from './approval-store.js';
 export * from './plugin-source-trust.js';
 export * from './plugin-managed-install.js';
+export * from './skill-plugin-loader.js';
 export * from './provider-capability-scanner.js';
 export * from './approval-gate-summary.js';
 export { enforceApprovalGate } from './approval-gate.js';
