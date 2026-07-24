@@ -7,6 +7,11 @@ import {
   selectAgentDispatcher,
 } from './agent-dispatch.js';
 import type { ReasoningBackend } from './reasoning-backend.js';
+import {
+  SUBAGENT_CAPABILITY_PROFILES,
+  getSubagentCapabilityProfile,
+} from './subagent-capability-profiles.js';
+import { a2aBridge } from './a2a-bridge.js';
 
 vi.mock('./a2a-bridge.js', () => ({
   a2aBridge: {
@@ -86,7 +91,9 @@ describe('agent-dispatch', () => {
     recordGovernanceAction.mockClear();
     const backend = makeFakeBackend();
     (backend as any).generateWithTools = vi.fn(async () => ({
-      toolCalls: [{ name: 'invoke_agent', input: { agent_name: 'generalist', prompt: 'same task' } }],
+      toolCalls: [
+        { name: 'invoke_agent', input: { agent_name: 'generalist', prompt: 'same task' } },
+      ],
     }));
     const dispatcher = new InSessionDispatcher();
 
@@ -104,7 +111,7 @@ describe('agent-dispatch', () => {
       'agent-dispatch:in-session',
       'tool_call_repeat_force_stop',
       expect.stringContaining('streak=12'),
-      true,
+      true
     );
 
     // Escalation reminder is injected into the next dispatch prompt after the 3rd repeat.
@@ -116,7 +123,8 @@ describe('agent-dispatch', () => {
   it('selectAgentDispatcher / maybeWrapWithDispatcher honor KYBERION_IN_SESSION_SUBAGENT', () => {
     expect(selectAgentDispatcher({} as NodeJS.ProcessEnv).name).toBe('process-spawn');
     expect(
-      selectAgentDispatcher({ KYBERION_IN_SESSION_SUBAGENT: '1' } as unknown as NodeJS.ProcessEnv).name,
+      selectAgentDispatcher({ KYBERION_IN_SESSION_SUBAGENT: '1' } as unknown as NodeJS.ProcessEnv)
+        .name
     ).toBe('in-session');
 
     const backend = makeFakeBackend();
@@ -128,5 +136,66 @@ describe('agent-dispatch', () => {
     } as unknown as NodeJS.ProcessEnv);
     expect(wrapped).not.toBe(backend);
     expect(wrapped).toBeInstanceOf(DispatchingReasoningBackend);
+  });
+
+  // KD-05 acceptance criterion 2: adding a profile requires registration in
+  // exactly one place (subagent-capability-profiles.ts); catalog reflection
+  // into the dispatch-side tool description follows automatically.
+  it('reflects the live subagent capability catalog into the invoke_agent tool description and schema', async () => {
+    const backend = makeFakeBackend({ withTools: true });
+    await new InSessionDispatcher().dispatch('do it', undefined, backend);
+
+    const tools = (backend as any).generateWithTools.mock.calls[0][1];
+    const invokeAgentTool = tools.find((tool: any) => tool.name === 'invoke_agent');
+    expect(invokeAgentTool).toBeDefined();
+    for (const profile of SUBAGENT_CAPABILITY_PROFILES) {
+      expect(invokeAgentTool.description).toContain(profile.name);
+      expect(invokeAgentTool.inputSchema.properties.agent_profile.enum).toContain(profile.name);
+    }
+  });
+
+  it('prefixes the sub-agent prompt with the chosen tier system prompt (explorer)', async () => {
+    const backend = makeFakeBackend();
+    (backend as any).generateWithTools = vi.fn(async () => ({
+      toolCalls: [
+        {
+          name: 'invoke_agent',
+          input: {
+            agent_name: 'codebase_investigator',
+            prompt: 'Find the bug.',
+            agent_profile: 'explorer',
+          },
+        },
+      ],
+    }));
+
+    await new InSessionDispatcher().dispatch('investigate', undefined, backend);
+
+    const routedPayload = (a2aBridge.route as any).mock.calls.at(-1)[0];
+    const explorerProfile = getSubagentCapabilityProfile('explorer');
+    expect(routedPayload.payload.content).toContain(explorerProfile.systemPromptPrefix);
+    expect(routedPayload.payload.content).toContain('Find the bug.');
+  });
+
+  it('falls back to the default tier for an unrecognized agent_profile without failing the dispatch', async () => {
+    const backend = makeFakeBackend();
+    (backend as any).generateWithTools = vi.fn(async () => ({
+      toolCalls: [
+        {
+          name: 'invoke_agent',
+          input: {
+            agent_name: 'generalist',
+            prompt: 'Do the thing.',
+            agent_profile: 'nonexistent-tier',
+          },
+        },
+      ],
+    }));
+
+    const out = await new InSessionDispatcher().dispatch('do it', undefined, backend);
+    expect(out).toContain('[In-Session Rollup]');
+    const routedPayload = (a2aBridge.route as any).mock.calls.at(-1)[0];
+    const implementerProfile = getSubagentCapabilityProfile('implementer');
+    expect(routedPayload.payload.content).toContain(implementerProfile.systemPromptPrefix);
   });
 });
