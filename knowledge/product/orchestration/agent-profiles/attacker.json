@@ -2,7 +2,7 @@
   "version": "1.0.0",
   "agents": {
     "attacker": {
-      "authority_roles": ["mission_controller", "ecosystem_architect"],
+      "authority_roles": ["cyber_security", "mission_controller", "ecosystem_architect"],
       "team_roles": ["attacker"],
       "capabilities": ["reasoning", "security", "analysis"],
       "selection_hints": {

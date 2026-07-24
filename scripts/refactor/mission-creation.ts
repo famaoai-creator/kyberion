@@ -18,6 +18,7 @@ import {
   ensureDefaultTenantProfile,
   loadOrganizationProfile,
   resolveMissionWorkflowDesign,
+  resolveMissionReviewDesign,
   consumeIntentGoalHandoff,
   safeExistsSync,
   safeMkdir,
@@ -253,6 +254,26 @@ export async function createMission(args: {
       lines.splice(1, 0, '', headerLine);
       safeWriteFile(taskBoardPath, lines.join('\n'));
     }
+
+    // The task-board header is a one-line summary; this is the queryable
+    // record of how the mission is meant to proceed (workflow pattern/phases
+    // + review mode), so later tooling and humans don't have to re-derive it
+    // from the classification inputs.
+    const reviewDesign = resolveMissionReviewDesign({
+      missionClass: classification.mission_class,
+      deliveryShape: classification.delivery_shape,
+      riskProfile: classification.risk_profile,
+      workflowPattern: workflowDesign.pattern,
+      stage: classification.stage,
+    });
+    safeWriteFile(
+      path.join(missionDir, 'mission-workflow.json'),
+      JSON.stringify(
+        { classification, workflow_design: workflowDesign, review_design: reviewDesign },
+        null,
+        2
+      )
+    );
   }
 
   // MO-01: when the selected process template declares per-phase default

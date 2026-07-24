@@ -2,9 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { withExecutionContext } from './authority.js';
 import { safeExistsSync, safeReadFile, safeRmSync } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
-import { MissionCoordinationBus } from './mission-coordination-bus.js';
+import { MissionCoordinationBus, missionCoordinationBus } from './mission-coordination-bus.js';
 
 describe('mission-coordination-bus', () => {
+  it('exposes a process-wide singleton so callers share the loaded cache', () => {
+    expect(missionCoordinationBus).toBeInstanceOf(MissionCoordinationBus);
+  });
+
   it('routes direct role-targeted messages and tracks acknowledgements', () => {
     const bus = new MissionCoordinationBus();
     const message = bus.send({
