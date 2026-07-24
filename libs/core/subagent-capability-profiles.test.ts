@@ -1,13 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { auditChain } from './audit-chain.js';
 import {
+  DEFAULT_TEAM_ROLE_CAPABILITY_PROFILE,
   RESERVED_GOAL_OP_PREFIX,
   SUBAGENT_CAPABILITY_PROFILES,
+  SUBAGENT_PROFILE_CLI_TOOLS,
+  TEAM_ROLE_CAPABILITY_PROFILE,
   assertSubagentOpAllowed,
   describeSubagentCapabilityCatalog,
   getSubagentCapabilityProfile,
   isOpAllowedForProfile,
   listSubagentCapabilityProfileNames,
+  resolveCapabilityProfileForTeamRole,
 } from './subagent-capability-profiles.js';
 import {
   getDefaultWorkerEventStream,
@@ -146,6 +150,39 @@ describe('subagent-capability-profiles (KD-05)', () => {
     expect(() =>
       assertSubagentOpAllowed({ profileName: 'nonexistent-tier', opId: 'file:read' })
     ).toThrow(/SUBAGENT_PROFILE_UNKNOWN/);
+  });
+
+  it('every registered profile declares a non-null cliTools array (Wave-3: single SSoT for the CLI tool surface)', () => {
+    for (const profile of SUBAGENT_CAPABILITY_PROFILES) {
+      expect(Array.isArray(profile.cliTools)).toBe(true);
+    }
+  });
+
+  it('SUBAGENT_PROFILE_CLI_TOOLS is derived from (not a hand-typed copy of) the registry: same array reference per profile', () => {
+    for (const profile of SUBAGENT_CAPABILITY_PROFILES) {
+      expect(SUBAGENT_PROFILE_CLI_TOOLS[profile.name]).toBe(profile.cliTools);
+    }
+  });
+
+  it('resolveCapabilityProfileForTeamRole resolves known roles and falls back to the default for unknown ones', () => {
+    expect(resolveCapabilityProfileForTeamRole('implementer')).toBe('implementer');
+    expect(resolveCapabilityProfileForTeamRole('reviewer')).toBe('explorer');
+    expect(resolveCapabilityProfileForTeamRole('devils_advocate')).toBe('explorer');
+    expect(resolveCapabilityProfileForTeamRole('facilitator')).toBe('planner');
+    expect(resolveCapabilityProfileForTeamRole('some_future_role')).toBe(
+      DEFAULT_TEAM_ROLE_CAPABILITY_PROFILE
+    );
+  });
+
+  it('every TEAM_ROLE_CAPABILITY_PROFILE target names a registered capability tier', () => {
+    const known = new Set(listSubagentCapabilityProfileNames());
+    for (const [role, profileName] of Object.entries(TEAM_ROLE_CAPABILITY_PROFILE)) {
+      expect(
+        known.has(profileName),
+        `role "${role}" maps to unregistered tier "${profileName}"`
+      ).toBe(true);
+    }
+    expect(known.has(DEFAULT_TEAM_ROLE_CAPABILITY_PROFILE)).toBe(true);
   });
 
   it('every explicit allowlist entry resolves against the real actuator op registry', async () => {

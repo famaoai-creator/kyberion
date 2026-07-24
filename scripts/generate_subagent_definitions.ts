@@ -9,16 +9,12 @@
  *   - knowledge/product/roles/<authority-role>/PROCEDURE.md (condensed into
  *     the generated body when present)
  *   - libs/core/subagent-capability-profiles.ts (KD-05 capability tiers —
- *     NOT imported here: that module is not barrel-exported from
- *     libs/core/index.ts, and this script's authority is scoped to
- *     scripts/+.claude/agents/+package.json only. `PROFILE_SPECS` below
- *     mirrors its `name` / `systemPromptPrefix` fields by hand; keep the two
- *     in sync if that module changes)
+ *     the SSoT for both the team-role -> tier mapping
+ *     (`resolveCapabilityProfileForTeamRole`) and the tier -> CLI `tools:`
+ *     frontmatter projection (`SUBAGENT_PROFILE_CLI_TOOLS`), barrel-exported
+ *     from `@agent/core`. `PROFILE_SPECS` below only adds the
+ *     script-local framing lookup keyed by the same profile names.)
  *   - libs/core/working-principles.ts (buildWorkingPrinciplesLines)
- *
- * The team-role -> KD-05 profile mapping and the KD-05 profile -> CLI
- * `tools:` frontmatter mapping both live in ONE place below
- * (TEAM_ROLE_PROFILE / PROFILE_SPECS) per the CT-01 registration ceremony.
  *
  * Generated files are committed artifacts, never hand-edited (each file
  * carries its own "DO NOT EDIT BY HAND" header). `--check` regenerates
@@ -33,8 +29,12 @@
 import * as path from 'node:path';
 import { format as prettierFormat, resolveConfig as resolvePrettierConfig } from 'prettier';
 import {
+  DEFAULT_TEAM_ROLE_CAPABILITY_PROFILE,
+  SUBAGENT_CAPABILITY_PROFILES,
+  SUBAGENT_PROFILE_CLI_TOOLS,
   buildWorkingPrinciplesLines,
   pathResolver,
+  resolveCapabilityProfileForTeamRole,
   safeExistsSync,
   safeReadFile,
   safeWriteFile,
@@ -47,68 +47,35 @@ interface ProfileSpec {
   /** CLI `tools:` frontmatter allowlist for this KD-05 tier. */
   readonly tools: readonly string[];
   /**
-   * Mirrors `SUBAGENT_CAPABILITY_PROFILES[].systemPromptPrefix` in
-   * libs/core/subagent-capability-profiles.ts verbatim — the KD-05
-   * capability-framing sentence every generated definition must carry.
+   * `SUBAGENT_CAPABILITY_PROFILES[].systemPromptPrefix` from
+   * libs/core/subagent-capability-profiles.ts — the KD-05 capability-framing
+   * sentence every generated definition must carry.
    */
   readonly framing: string;
 }
 
-// CT-01 mapping table #1 — KD-05 profile -> CLI tool-name projection. The
-// ONE place this repo defines what each capability tier means in Claude
-// Code's `tools:` vocabulary.
-export const PROFILE_SPECS: Readonly<Record<SubagentProfileName, ProfileSpec>> = {
-  implementer: {
-    tools: ['Read', 'Grep', 'Glob', 'Edit', 'Write', 'Bash'],
-    framing:
-      'You are a delegated implementer sub-agent. You may read, write, and execute within your assignment scope.',
-  },
-  explorer: {
-    tools: ['Read', 'Grep', 'Glob'],
-    framing:
-      'You are a delegated explorer sub-agent. You are read-only: you may search and read, but you must never write, delete, or execute.',
-  },
-  planner: {
-    tools: [],
-    framing:
-      'You are a delegated planner sub-agent. Do not call any file, search, or execution tool — respond with reasoning and text only.',
-  },
-};
+// KD-05 profile -> { CLI tools:, framing } projection, derived from the SSoT
+// registry (libs/core/subagent-capability-profiles.ts) instead of a
+// hand-mirrored table. Adding/renaming a tier there flows through here
+// automatically.
+export const PROFILE_SPECS: Readonly<Record<SubagentProfileName, ProfileSpec>> = Object.fromEntries(
+  SUBAGENT_CAPABILITY_PROFILES.map((profile) => [
+    profile.name,
+    {
+      tools: SUBAGENT_PROFILE_CLI_TOOLS[profile.name] ?? [],
+      framing: profile.systemPromptPrefix,
+    },
+  ])
+) as Readonly<Record<SubagentProfileName, ProfileSpec>>;
 
-// CT-01 mapping table #2 — team-role (knowledge/product/orchestration/team-roles/*.json)
-// -> KD-05 profile. implementer keeps its own tier; analysis/critique-shaped
-// roles (review, dissent, adversarial) project onto explorer (read-only
-// investigation, per the CT-01 plan's own devils_advocate example);
-// coordination/strategy-shaped roles project onto planner (no tool
-// execution). Roles not listed fall back to DEFAULT_PROFILE — the safest
-// (read-only) tier — rather than silently inheriting implementer's write
-// access.
-export const TEAM_ROLE_PROFILE: Readonly<Record<string, SubagentProfileName>> = {
-  implementer: 'implementer',
-  tester: 'implementer',
-  operator: 'implementer',
-  reviewer: 'explorer',
-  devils_advocate: 'explorer',
-  attacker: 'explorer',
-  defender: 'explorer',
-  tracker: 'explorer',
-  scribe: 'explorer',
-  experience_designer: 'explorer',
-  surface_liaison: 'explorer',
-  counterparty_persona: 'explorer',
-  relationship_curator: 'explorer',
-  facilitator: 'planner',
-  planner: 'planner',
-  product_strategist: 'planner',
-  orchestrator: 'planner',
-  owner: 'planner',
-};
-export const DEFAULT_PROFILE: SubagentProfileName = 'explorer';
+export const DEFAULT_PROFILE: SubagentProfileName =
+  DEFAULT_TEAM_ROLE_CAPABILITY_PROFILE as SubagentProfileName;
 
 // The representative roles this ceremony generates definitions for today
 // (CT-01 acceptance criterion 1: implementer / an explorer-tier analysis
 // role / devils_advocate). Add a role here to bring it under drift check;
-// TEAM_ROLE_PROFILE above controls which tier it gets.
+// resolveCapabilityProfileForTeamRole (libs/core/subagent-capability-profiles.ts)
+// controls which tier it gets.
 export const GENERATED_ROLES: readonly string[] = ['implementer', 'reviewer', 'devils_advocate'];
 
 interface TeamRoleDefinition {
@@ -128,7 +95,7 @@ function loadTeamRole(role: string): TeamRoleDefinition {
 }
 
 export function resolveProfile(role: string): SubagentProfileName {
-  return TEAM_ROLE_PROFILE[role] ?? DEFAULT_PROFILE;
+  return resolveCapabilityProfileForTeamRole(role) as SubagentProfileName;
 }
 
 function loadProcedureMarkdown(authorityRole: string | undefined): string | null {
