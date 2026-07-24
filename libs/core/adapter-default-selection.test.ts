@@ -6,6 +6,7 @@ import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeRmSync } from './secure-io.js';
 
 const PROFILE_ROOT = pathResolver.sharedTmp('adapter-default-selection-tests/profile');
+const PORTABLE_EMAIL_BACKEND = process.platform === 'darwin' ? 'mac_mailapp' : 'smtp';
 
 vi.mock('./profile-root.js', () => ({
   resolveActiveProfileRoot: () => PROFILE_ROOT,
@@ -71,7 +72,7 @@ describe('adapter default selection', () => {
       'media.image': 'media-generation.comfyui',
       'media.video': 'video.hyperframes_cli',
       'media.music': 'media-generation.comfyui.music',
-      'email.backend': 'mac_mailapp',
+      'email.backend': PORTABLE_EMAIL_BACKEND,
       'email.account': 'gmail',
       'service.runtime': 'comfyui',
       'tool.runtime': 'playwright',
