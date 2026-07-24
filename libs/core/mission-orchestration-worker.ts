@@ -75,7 +75,11 @@ import { missionDir, missionEvidenceDir, rootDir } from './path-resolver.js';
 import { pathResolver } from './path-resolver.js';
 import { type MissionContextPackPruningSummary } from './mission-context-pack.js';
 import { provisionTaskKnowledge } from './task-knowledge-provisioning.js';
-import { recordKnowledgeUsageFeedback } from './src/knowledge-feedback-loop.js';
+import {
+  recordKnowledgeUsageFeedback,
+  type DeliveredKnowledgeRef,
+} from './src/knowledge-feedback-loop.js';
+import { TraceContext, persistTrace } from './src/trace.js';
 import * as nodePath from 'node:path';
 import * as path from 'node:path';
 import {
@@ -1585,6 +1589,8 @@ async function buildTaskDispatchContext(input: {
   missionContextPackSummary: string;
   missionContextPackPruningSummary?: MissionContextPackPruningSummary;
   securityScope?: import('./context-security-scope.js').ContextSecurityScope;
+  /** KP-05: knowledge actually delivered as part of this dispatch's context pack. */
+  deliveredKnowledgeRefs: DeliveredKnowledgeRef[];
 }> {
   const missionStateRaw = loadMissionStateSnapshot(input.missionId);
   const missionState =
@@ -1760,6 +1766,7 @@ async function buildTaskDispatchContext(input: {
     missionContextPackSummary: missionContextPack?.summary || 'degraded mission context pack',
     missionContextPackPruningSummary,
     securityScope: missionContextPack?.security_scope,
+    deliveredKnowledgeRefs: provisionedContext.deliveredKnowledgeRefs,
   };
 }
 
@@ -2063,7 +2070,12 @@ export async function provisionGoalDrivenTaskKnowledge(input: {
   teamRole: string;
   agentId: string;
   workItem: WorkItem;
-}): Promise<{ systemPrompt?: string; missionContextPackPath?: string }> {
+}): Promise<{
+  systemPrompt?: string;
+  missionContextPackPath?: string;
+  /** KP-05: knowledge actually delivered to this goal-driven dispatch, if any. */
+  deliveredKnowledgeRefs: DeliveredKnowledgeRef[];
+}> {
   try {
     const missionStateRaw = loadMissionStateSnapshot(input.missionId);
     const tier =
@@ -2080,30 +2092,34 @@ export async function provisionGoalDrivenTaskKnowledge(input: {
       assigneePeerId: input.agentId,
       workItem: input.workItem,
     });
-    if (!provisioned.pack) return {};
+    if (!provisioned.pack) return { deliveredKnowledgeRefs: [] };
     return {
       systemPrompt: provisioned.text,
       ...(provisioned.missionContextPackPath
         ? { missionContextPackPath: provisioned.missionContextPackPath }
         : {}),
+      deliveredKnowledgeRefs: provisioned.deliveredKnowledgeRefs,
     };
   } catch (err: any) {
     logger.warn(
       `[MISSION_WORKER] Task knowledge provisioning failed for goal-driven dispatch ${input.missionId}/${input.task.task_id}; proceeding without a context pack: ${err?.message || err}`
     );
-    return {};
+    return { deliveredKnowledgeRefs: [] };
   }
 }
 
-async function dispatchGoalDrivenMissionTask(input: {
-  missionId: string;
-  task: PlannedNextTask;
-  teamRole: string;
-  assignment: {
-    agent_id: string;
-    model_hint?: { model_id?: string; tier?: string; effort?: string; route_reason?: string };
-  };
-}): Promise<DispatchMissionTaskOutcome | null> {
+async function dispatchGoalDrivenMissionTask(
+  input: {
+    missionId: string;
+    task: PlannedNextTask;
+    teamRole: string;
+    assignment: {
+      agent_id: string;
+      model_hint?: { model_id?: string; tier?: string; effort?: string; route_reason?: string };
+    };
+  },
+  traceCtx: TraceContext
+): Promise<DispatchMissionTaskOutcome | null> {
   const workItemSourceRef = `mission:${input.missionId}:${input.task.task_id}:goal`;
   const workItem = importExternalWorkItem({
     source: 'local',
@@ -2140,13 +2156,17 @@ async function dispatchGoalDrivenMissionTask(input: {
 
   // KP-01: provision the mission context pack as a stable system-prompt
   // prefix for the goal loop. Fail-open — see provisionGoalDrivenTaskKnowledge.
-  const { systemPrompt } = await provisionGoalDrivenTaskKnowledge({
+  const { systemPrompt, deliveredKnowledgeRefs } = await provisionGoalDrivenTaskKnowledge({
     missionId: input.missionId,
     task: input.task,
     teamRole: input.teamRole,
     agentId: input.assignment.agent_id,
     workItem,
   });
+  // KP-05: report what the goal loop's stable prefix actually delivered so
+  // the dispatch trace's knowledgeRefs are non-empty for this path too — see
+  // attachDeliveredKnowledgeRefs.
+  attachDeliveredKnowledgeRefs(traceCtx, deliveredKnowledgeRefs);
 
   const outcome = await runGoalDrivenWorkItem({
     missionId: input.missionId,
@@ -2259,7 +2279,85 @@ async function dispatchGoalDrivenMissionTask(input: {
   return { ...baseOutcome, dispatched: false };
 }
 
-async function dispatchPlannedMissionTask(input: {
+// KP-05: mission-task dispatch tracing. `persistTrace` writes to the same
+// day-rotated `traces-*.jsonl` store actuator/pipeline flows use
+// (`traceLogDir()`, `active/shared/logs/traces/` or the active customer's
+// equivalent) — no new tracer or persistence path is invented here, only a
+// dir-override seam for hermetic tests (mirrors `KYBERION_KNOWLEDGE_DELIVERY_DIR`
+// in `src/knowledge-feedback-loop.ts`).
+let warnedMissionTaskTraceFailureOnce = false;
+
+function missionTaskTraceDirOverride(): string | undefined {
+  const override = process.env.KYBERION_MISSION_TASK_TRACE_DIR?.trim();
+  return override ? pathResolver.rootResolve(override) : undefined;
+}
+
+function warnMissionTaskTraceFailureOnce(context: string, error: unknown): void {
+  if (warnedMissionTaskTraceFailureOnce) return;
+  warnedMissionTaskTraceFailureOnce = true;
+  const message = error instanceof Error ? error.message : String(error);
+  logger.warn(`[MISSION_WORKER][KP-05] ${context}: ${message}`);
+}
+
+/**
+ * Attach delivered knowledge to the current dispatch trace span. `knowledgeRefs`
+ * (the trace schema field, `src/trace.ts`) is `string[]` — paths only — so
+ * paths go there; per-ref scores ride along on a companion event's
+ * attributes (`TraceEvent.attributes` already supports arbitrary
+ * string/number/boolean values, unlike `knowledgeRefs` which every consumer,
+ * e.g. chronos-mirror-v2's TraceViewer, expects to stay a plain string array).
+ * Never throws — a tracing failure must never affect dispatch.
+ */
+function attachDeliveredKnowledgeRefs(
+  traceCtx: TraceContext,
+  refs: DeliveredKnowledgeRef[] | undefined
+): void {
+  if (!refs || refs.length === 0) return;
+  try {
+    for (const ref of refs) traceCtx.addKnowledgeRef(ref.path);
+    traceCtx.addEvent('knowledge_delivered', {
+      knowledge_ref_count: refs.length,
+      knowledge_refs_scored: JSON.stringify(
+        refs.map((ref) => ({ path: ref.path, score: ref.score ?? null }))
+      ),
+    });
+  } catch (err: any) {
+    warnMissionTaskTraceFailureOnce(
+      `Failed to attach delivered knowledge refs to mission task trace`,
+      err
+    );
+  }
+}
+
+/**
+ * Record the dispatch outcome on the trace span and persist it. Called from
+ * `dispatchPlannedMissionTask`'s `finally` so it runs for every branch
+ * (success, blocked, rework, busy-retry-null) without threading trace
+ * bookkeeping through each of `dispatchPlannedMissionTaskCore`'s many return
+ * points. Fail-open: any error here (span attribute, finalize, or persist)
+ * is caught and warned once — it must never surface to the dispatch caller.
+ */
+function finalizeMissionTaskTrace(
+  traceCtx: TraceContext,
+  input: Pick<DispatchPlannedMissionTaskInput, 'task' | 'teamRole'>,
+  outcome: DispatchMissionTaskOutcome | null
+): void {
+  try {
+    traceCtx.setAttributes({
+      task_id: input.task.task_id,
+      team_role: input.teamRole,
+      dispatched: outcome?.dispatched ?? false,
+      result_schema_ok: outcome?.result_schema_ok ?? false,
+    });
+    const trace = traceCtx.finalize();
+    const dirOverride = missionTaskTraceDirOverride();
+    persistTrace(trace, dirOverride ? { dir: dirOverride } : undefined);
+  } catch (err: any) {
+    warnMissionTaskTraceFailureOnce('Failed to persist mission task dispatch trace', err);
+  }
+}
+
+interface DispatchPlannedMissionTaskInput {
   missionId: string;
   task: PlannedNextTask;
   teamRole: string;
@@ -2275,18 +2373,50 @@ async function dispatchPlannedMissionTask(input: {
     modelId?: string | null;
   };
   allTasks: PlannedNextTask[];
-}): Promise<DispatchMissionTaskOutcome | null> {
-  // KD-01 adoption: opt-in goal-driven execution runs a separate autonomous
-  // loop instead of the single-shot dispatch below. Default OFF — the rest of
-  // this function is unchanged when `goal_driven` is unset.
-  if (input.task.goal_driven) {
-    return dispatchGoalDrivenMissionTask({
-      missionId: input.missionId,
-      task: input.task,
-      teamRole: input.teamRole,
-      assignment: input.assignment,
-    });
+}
+
+/**
+ * KP-05: open a `mission_task_dispatch` trace span around a single task
+ * dispatch (single-shot or goal-driven), attach whatever knowledge was
+ * delivered into it, and persist the trace next to actuator/pipeline traces
+ * (`persistTrace`, same JSONL store as `createActuatorTrace` in
+ * `actuator-trace.ts`). Tracing is entirely best-effort: a failure anywhere
+ * in this wrapper (span creation, attribute recording, persistence) is
+ * caught in `finalizeMissionTaskTrace` and logged once — it must never
+ * affect the dispatch outcome itself, which is why the real dispatch work
+ * happens in `dispatchPlannedMissionTaskCore` / `dispatchGoalDrivenMissionTask`
+ * and only the trace bookkeeping wraps it.
+ */
+async function dispatchPlannedMissionTask(
+  input: DispatchPlannedMissionTaskInput
+): Promise<DispatchMissionTaskOutcome | null> {
+  const traceCtx = new TraceContext('mission_task_dispatch', { missionId: input.missionId });
+  let outcome: DispatchMissionTaskOutcome | null = null;
+  try {
+    // KD-01 adoption: opt-in goal-driven execution runs a separate autonomous
+    // loop instead of the single-shot dispatch below. Default OFF — the rest
+    // of dispatchPlannedMissionTaskCore is unchanged when `goal_driven` is unset.
+    outcome = input.task.goal_driven
+      ? await dispatchGoalDrivenMissionTask(
+          {
+            missionId: input.missionId,
+            task: input.task,
+            teamRole: input.teamRole,
+            assignment: input.assignment,
+          },
+          traceCtx
+        )
+      : await dispatchPlannedMissionTaskCore(input, traceCtx);
+    return outcome;
+  } finally {
+    finalizeMissionTaskTrace(traceCtx, input, outcome);
   }
+}
+
+async function dispatchPlannedMissionTaskCore(
+  input: DispatchPlannedMissionTaskInput,
+  traceCtx: TraceContext
+): Promise<DispatchMissionTaskOutcome | null> {
   const workItemSourceRef = `mission:${input.missionId}:${input.task.task_id}`;
   const workItem = importExternalWorkItem({
     source: 'local',
@@ -2387,6 +2517,9 @@ async function dispatchPlannedMissionTask(input: {
     }
     throw err;
   }
+  // KP-05: report what buildTaskDispatchContext's context pack actually
+  // delivered onto this dispatch's trace span.
+  attachDeliveredKnowledgeRefs(traceCtx, dispatchContext.deliveredKnowledgeRefs);
   emitMissionTaskEvent({
     event_type: 'participant_context_resolved',
     mission_id: input.missionId,
