@@ -16,9 +16,10 @@ import {
 } from '@agent/core';
 import { installPythonVoiceBridgeIfAvailable } from '@agent/core/python-voice-bridge';
 import {
-  executeGmailDelivery,
+  executeEmailDelivery,
   generateEmailReplyDraft,
-  organizeGmailInboxWithFilters,
+  organizeEmailInbox,
+  listEmailAccountProviders,
   readEmailDraftArtifact,
   readGwsAuthStatus,
   resolveEmailTriagePath,
@@ -602,7 +603,7 @@ async function handleEmailWorkflowCommand(
 
   if (subcommand === 'status') {
     printHeader();
-    console.log(JSON.stringify(readGwsAuthStatus(), null, 2));
+    console.log(JSON.stringify({ accounts: listEmailAccountProviders() }, null, 2));
     return;
   }
 
@@ -658,7 +659,7 @@ async function handleEmailWorkflowCommand(
     }
     const replyModeValue =
       typeof options['--reply-mode'] === 'string' ? options['--reply-mode'] : 'new';
-    const result = await executeGmailDelivery({
+    const result = await executeEmailDelivery({
       approved,
       draft_mode: draftMode,
       reply_mode:
@@ -667,6 +668,12 @@ async function handleEmailWorkflowCommand(
       subject: typeof options['--subject'] === 'string' ? options['--subject'] : undefined,
       to: typeof options['--to'] === 'string' ? options['--to'] : undefined,
       message_id: typeof options['--message-id'] === 'string' ? options['--message-id'] : undefined,
+      account:
+        typeof options['--account'] === 'string'
+          ? options['--account']
+          : typeof options['--provider'] === 'string'
+            ? options['--provider']
+            : 'auto',
     });
     printHeader();
     console.log(JSON.stringify(result, null, 2));
@@ -674,13 +681,26 @@ async function handleEmailWorkflowCommand(
   }
 
   if (subcommand === 'archive-inbox') {
-    const result = await organizeGmailInboxWithFilters({
+    const result = await organizeEmailInbox({
+      account:
+        typeof options['--account'] === 'string'
+          ? options['--account']
+          : typeof options['--provider'] === 'string'
+            ? options['--provider']
+            : 'auto',
       max_messages:
         Number(typeof options['--max-messages'] === 'string' ? options['--max-messages'] : '50') ||
         50,
       min_count:
         Number(typeof options['--min-count'] === 'string' ? options['--min-count'] : '2') || 2,
       apply: options['--apply'] === true || options['--apply'] === 'true',
+      message_ids:
+        typeof options['--message-ids'] === 'string'
+          ? options['--message-ids']
+              .split(',')
+              .map((id) => id.trim())
+              .filter(Boolean)
+          : [],
     });
     printHeader();
     console.log(JSON.stringify(result, null, 2));

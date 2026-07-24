@@ -26,7 +26,7 @@ This inventory is generated from the filesystem. Manifest-backed actuators are t
 - `calendar-actuator`: Adapter-based calendar coordination with user-selectable and multi-calendar backends, including macOS Calendar.app (JXA) and authenticated Google Workspace (gws) (4 ops, v1.1.0, schema schemas/calendar-action.schema.json)
 - `code-actuator`: ADF-driven code analysis and refactoring pipeline engine (4 ops, v2.2.0, schema schemas/code-pipeline.schema.json)
 - `deployment-actuator`: Deployment capability boundary backed by the governed DeploymentAdapter (1 ops, v1.0.0, schema schemas/deployment-action.schema.json)
-- `email-actuator`: Email composition and sending via macOS Mail.app (JXA) with SMTP fallback via nodemailer (3 ops, v1.0.0, schema libs/actuators/email-actuator/schemas/email-action.schema.json)
+- `email-actuator`: Adapter-based email composition and sending with selectable macOS Mail.app (JXA) and SMTP backends (3 ops, v1.1.0, schema libs/actuators/email-actuator/schemas/email-action.schema.json)
 - `file-actuator`: Generic File-Actuator for Kyberion (1 ops, v1.1.0, schema schemas/file-pipeline.schema.json)
 - `ios-actuator`: simctl-driven iOS Simulator Actuator (1 ops, v1.1.0, schema schemas/mobile-device-pipeline.schema.json)
 - `media-actuator`: Document and asset generation engine. Includes document_digest, pptx_slide_text, and pptx_filter_slides for template-inheriting partial-update workflows. (1 ops, v1.2.0, schema schemas/media-pipeline.schema.json)

@@ -3,7 +3,27 @@ import { spawn } from 'node:child_process';
 import * as path from 'node:path';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
+import { getAdapterDefault } from './adapter-default-preferences.js';
 import { EmailProvider, EmailParams, EmailResult } from './email-types.js';
+
+export type EmailBackendOperation = 'create_draft' | 'send';
+
+export interface EmailBackendAdapter extends EmailProvider {
+  readonly priority?: number;
+  readonly display_name?: string;
+  readonly platforms?: string[];
+  supportsOperation?(operation: EmailBackendOperation): boolean;
+  unavailableMessage?(operation?: EmailBackendOperation): string;
+}
+
+export interface EmailBackendCandidate {
+  id: string;
+  display_name: string;
+  adapter_id: string;
+  status: 'ready' | 'needs_setup' | 'unsupported';
+  selectable: boolean;
+  reason: string;
+}
 
 function buildJxaScript(op: 'create_draft' | 'send', params: EmailParams): string {
   const to = (params.to ?? '').replace(/"/g, '\\"');
@@ -37,9 +57,20 @@ ${sendLine}
 
 export class MacMailAppEmailProvider implements EmailProvider {
   readonly id = 'mac_mailapp';
+  readonly display_name = 'macOS Mail.app';
+  readonly priority = 20;
+  readonly platforms = ['darwin'];
 
-  async isAvailable(): Promise<boolean> {
+  isAvailable(): boolean {
     return process.platform === 'darwin';
+  }
+
+  supportsOperation(): boolean {
+    return true;
+  }
+
+  unavailableMessage(): string {
+    return 'Email backend "mac_mailapp" requires macOS Mail.app.';
   }
 
   async send(params: EmailParams): Promise<EmailResult> {
@@ -89,13 +120,27 @@ export class MacMailAppEmailProvider implements EmailProvider {
 
 export class SmtpEmailProvider implements EmailProvider {
   readonly id = 'smtp';
+  readonly display_name = 'SMTP';
+  readonly priority = 10;
+  readonly platforms = ['any'];
 
-  async isAvailable(): Promise<boolean> {
+  isAvailable(): boolean {
     return Boolean(
       process.env.KYBERION_SMTP_HOST &&
       process.env.KYBERION_SMTP_USER &&
       process.env.KYBERION_SMTP_PASS
     );
+  }
+
+  supportsOperation(operation: EmailBackendOperation): boolean {
+    return operation === 'send';
+  }
+
+  unavailableMessage(operation: EmailBackendOperation = 'send'): string {
+    if (operation === 'create_draft') {
+      return 'Email backend "smtp" does not support draft creation.';
+    }
+    return 'Email backend "smtp" requires KYBERION_SMTP_HOST, KYBERION_SMTP_USER, and KYBERION_SMTP_PASS.';
   }
 
   async send(params: EmailParams): Promise<EmailResult> {
@@ -163,37 +208,171 @@ print("ok")
   }
 
   async createDraft(params: EmailParams): Promise<EmailResult> {
-    throw new Error('Draft creation is not supported in SMTP mode.');
+    throw new Error(this.unavailableMessage('create_draft'));
   }
 }
 
-export class EmailPolicyRouter {
-  private providers: Map<string, EmailProvider> = new Map();
+function supportsOperation(provider: EmailProvider, operation: EmailBackendOperation): boolean {
+  const adapter = provider as EmailBackendAdapter;
+  return (
+    adapter.supportsOperation?.(operation) ??
+    (operation === 'send' || provider.id === 'mac_mailapp')
+  );
+}
 
-  constructor(providers: EmailProvider[]) {
-    for (const p of providers) {
-      this.providers.set(p.id, p);
-    }
+function unavailableMessage(provider: EmailProvider, operation: EmailBackendOperation): string {
+  const adapter = provider as EmailBackendAdapter;
+  return (
+    adapter.unavailableMessage?.(operation) ||
+    `Email backend "${provider.id}" is not available for ${operation}.`
+  );
+}
+
+function backendPriority(adapter: EmailBackendAdapter): number {
+  if (adapter.priority !== undefined) return adapter.priority;
+  if (adapter.id === 'smtp') return 10;
+  if (adapter.id === 'mac_mailapp') return 20;
+  return 100;
+}
+
+export interface EmailBackendAvailabilityOverrides {
+  [backendId: string]: boolean | undefined;
+}
+
+export class EmailBackendRegistry {
+  private readonly adapters = new Map<string, EmailBackendAdapter>();
+
+  constructor(adapters: readonly EmailBackendAdapter[] = []) {
+    adapters.forEach((adapter) => this.register(adapter));
   }
 
-  async selectProvider(op: 'create_draft' | 'send'): Promise<EmailProvider> {
-    if (op === 'create_draft') {
-      const provider = this.providers.get('mac_mailapp');
-      if (provider && (await provider.isAvailable())) {
-        return provider;
+  register(adapter: EmailBackendAdapter): this {
+    const id = adapter.id.trim();
+    if (!id) throw new Error('email-bridge: backend adapter id is required');
+    if (this.adapters.has(id)) {
+      throw new Error(`email-bridge: backend adapter "${id}" is already registered`);
+    }
+    this.adapters.set(id, adapter);
+    return this;
+  }
+
+  get(id: string): EmailBackendAdapter {
+    const adapter = this.adapters.get(id);
+    if (!adapter) {
+      throw new Error(
+        `email-bridge: unsupported backend "${id}". Available backends: ${this.ids().join(', ') || '(none)'}`
+      );
+    }
+    return adapter;
+  }
+
+  ids(): string[] {
+    return [...this.adapters.keys()];
+  }
+
+  async resolve(
+    requested: string = 'auto',
+    operation: EmailBackendOperation = 'send',
+    availabilityOverrides: EmailBackendAvailabilityOverrides = {}
+  ): Promise<EmailBackendAdapter> {
+    const configured =
+      requested === 'auto' ? getAdapterDefault('email.backend') || 'auto' : requested;
+    if (configured !== 'auto') {
+      const adapter = this.get(configured);
+      if (!supportsOperation(adapter, operation)) {
+        throw new Error(unavailableMessage(adapter, operation));
       }
-      throw new Error('create_draft is only supported on macOS Mail.app.');
+      if (!(await this.isAvailable(adapter, availabilityOverrides))) {
+        throw new Error(unavailableMessage(adapter, operation));
+      }
+      return adapter;
     }
 
-    // For sending emails: SMTP is preferred if configured, otherwise falls back to macOS Mail.app
-    const chain = ['smtp', 'mac_mailapp'];
-    for (const id of chain) {
-      const provider = this.providers.get(id);
-      if (provider && (await provider.isAvailable())) {
-        return provider;
+    const available: EmailBackendAdapter[] = [];
+    for (const adapter of this.adapters.values()) {
+      if (
+        supportsOperation(adapter, operation) &&
+        (await this.isAvailable(adapter, availabilityOverrides))
+      ) {
+        available.push(adapter);
       }
     }
-    throw new Error('No available Email Provider resolved.');
+    available.sort((left, right) => backendPriority(left) - backendPriority(right));
+    if (available[0]) return available[0];
+    throw new Error(
+      `email-bridge: no email backend is ready for ${operation}. ${[...this.adapters.values()]
+        .filter((adapter) => supportsOperation(adapter, operation))
+        .map((adapter) => unavailableMessage(adapter, operation))
+        .join(' ')}`
+    );
+  }
+
+  private async isAvailable(
+    adapter: EmailBackendAdapter,
+    availabilityOverrides: EmailBackendAvailabilityOverrides
+  ): Promise<boolean> {
+    const override = availabilityOverrides[adapter.id];
+    return override === undefined ? await adapter.isAvailable() : override;
+  }
+}
+
+export function createDefaultEmailBackendRegistry(): EmailBackendRegistry {
+  return new EmailBackendRegistry([new MacMailAppEmailProvider(), new SmtpEmailProvider()]);
+}
+
+export const emailBackendRegistry = createDefaultEmailBackendRegistry();
+
+export function registerEmailBackend(adapter: EmailBackendAdapter): EmailBackendRegistry {
+  emailBackendRegistry.register(adapter);
+  return emailBackendRegistry;
+}
+
+export function resolveEmailBackend(
+  requested: string = 'auto',
+  operation: EmailBackendOperation = 'send',
+  registry: EmailBackendRegistry = emailBackendRegistry
+): Promise<EmailBackendAdapter> {
+  return registry.resolve(requested, operation);
+}
+
+export function listEmailBackends(
+  registry: EmailBackendRegistry = emailBackendRegistry
+): EmailBackendCandidate[] {
+  return registry.ids().map((id) => {
+    const adapter = registry.get(id);
+    const supported =
+      !adapter.platforms ||
+      adapter.platforms.includes('any') ||
+      adapter.platforms.includes(process.platform);
+    const availability = adapter.isAvailable();
+    const selectable = supported && (typeof availability === 'boolean' ? availability : false);
+    return {
+      id,
+      display_name: adapter.display_name || id,
+      adapter_id: `email.${id}`,
+      status: !supported ? 'unsupported' : selectable ? 'ready' : 'needs_setup',
+      selectable,
+      reason: !supported
+        ? `Email backend ${id} is not supported on platform ${process.platform}.`
+        : selectable
+          ? `Email backend ${id} is registered and available for sending.`
+          : unavailableMessage(adapter, 'send'),
+    };
+  });
+}
+
+export class EmailPolicyRouter {
+  private readonly registry: EmailBackendRegistry;
+
+  constructor(providers: EmailBackendAdapter[]) {
+    this.registry = new EmailBackendRegistry(providers);
+  }
+
+  async selectProvider(
+    op: EmailBackendOperation,
+    requestedBackend: string = 'auto'
+  ): Promise<EmailBackendAdapter> {
+    return this.registry.resolve(requestedBackend, op);
   }
 }
 
@@ -208,14 +387,16 @@ function getRouter(): EmailPolicyRouter {
 
 export async function sendEmail(params: EmailParams): Promise<EmailResult> {
   const router = getRouter();
-  const provider = await router.selectProvider('send');
+  const { backend, ...providerParams } = params;
+  const provider = await router.selectProvider('send', backend || 'auto');
   logger.info(`[email_bridge] Routing send request to provider: ${provider.id}`);
-  return await provider.send(params);
+  return await provider.send(providerParams);
 }
 
 export async function createDraft(params: EmailParams): Promise<EmailResult> {
   const router = getRouter();
-  const provider = await router.selectProvider('create_draft');
+  const { backend, ...providerParams } = params;
+  const provider = await router.selectProvider('create_draft', backend || 'auto');
   logger.info(`[email_bridge] Routing draft request to provider: ${provider.id}`);
-  return await provider.createDraft(params);
+  return await provider.createDraft(providerParams);
 }
