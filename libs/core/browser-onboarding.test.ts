@@ -46,10 +46,16 @@ const validDraft = () => ({
 
 beforeEach(() => {
   safeRmSync(pathResolver.sharedTmp('browser-onboarding-tests'), { recursive: true, force: true });
+  if (PORTABLE_EMAIL_BACKEND === 'smtp') {
+    vi.stubEnv('KYBERION_SMTP_HOST', 'smtp.test.invalid');
+    vi.stubEnv('KYBERION_SMTP_USER', 'test-user');
+    vi.stubEnv('KYBERION_SMTP_PASS', 'test-pass');
+  }
 });
 
 afterEach(() => {
   safeRmSync(pathResolver.sharedTmp('browser-onboarding-tests'), { recursive: true, force: true });
+  vi.unstubAllEnvs();
   vi.restoreAllMocks();
 });
 
