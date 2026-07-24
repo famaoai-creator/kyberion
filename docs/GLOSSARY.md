@@ -182,6 +182,10 @@ Reference:
 
 The operational front door for agent runtimes. It owns runtime ensure, ask, refresh, restart, stop, and prewarm flows so callers do not spawn providers independently.
 
+### CLI Subagent Team Mode
+
+An execution surface where a team of subagents runs entirely inside one CLI harness session (Claude Code Agent tool / Agent SDK `agents`) instead of the agent-runtime A2A bridge — a thin adapter over the same CLI-independent contracts used everywhere else (team roles, KD-05 capability profiles, task contracts, context packs), not a second connection mechanism. Hub-and-spoke: the main CLI session stays mission owner, subagents never message each other directly. Best suited to short-lived, read-mostly, in-session work; see [Execution surface selection](../knowledge/product/architecture/agent-mission-control-model.md#11-execution-surface-selection) for the deterministic routing rubric against agent-runtime, and [CLI_SUBAGENT_TEAM_PLAN](developer/improvement-plans-2026-07/CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md) (CT-01–04) for the implementation plan.
+
 ### Service Runtime
 
 The governed lifecycle wrapper for long-lived services such as ComfyUI. It tracks probe availability, managed runtime paths, provisioning intent, and pinning separately from the service endpoint catalog.
