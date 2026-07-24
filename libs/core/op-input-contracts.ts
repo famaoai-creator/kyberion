@@ -1,12 +1,42 @@
 import AjvModule, { type ErrorObject, type ValidateFunction } from 'ajv';
 import { logger } from './core.js';
+import type { ResourceClaim } from './tool-call-scheduler.js';
 
 export type OpInputDomain = 'browser' | 'file' | 'system';
+
+/**
+ * KD-07: one entry in an op's declared resource footprint. Resolved into a
+ * concrete {@link ResourceClaim} per call via `resolveOpAccessClaims`, using
+ * either a literal path/flag (fixed-location ops like `list_knowledge`) or a
+ * param name to read from the actual call params (path-taking ops like
+ * `read_file`).
+ */
+export interface OpAccessDeclaration {
+  kind: 'file';
+  operation: 'read' | 'write';
+  /** Literal path, for ops that always touch a fixed location. */
+  path?: string;
+  /** Param name to read the path from at call time. */
+  pathParam?: string;
+  /** Literal recursive flag. */
+  recursive?: boolean;
+  /** Param name supplying a boolean recursive flag at call time. */
+  recursiveParam?: string;
+}
 
 export interface OpInputContract {
   summary: string;
   examples: Array<Record<string, unknown>>;
   schema: Record<string, unknown>;
+  /**
+   * KD-07: declared resource claims for the tool-call scheduler
+   * (tool-call-scheduler.ts). Absent (`undefined`) means the op has not been
+   * audited yet — callers must treat it conservatively as `{kind:'all'}`
+   * (today's fully-serial behavior). An explicit empty array means the op is
+   * known to touch no shared resource (e.g. it only transforms in-memory
+   * context) and may always run in parallel.
+   */
+  accesses?: OpAccessDeclaration[];
 }
 
 type ContractCatalog = Record<OpInputDomain, Record<string, OpInputContract>>;
@@ -238,6 +268,7 @@ const INPUT_CONTRACTS: ContractCatalog = {
         },
         additionalProperties: true,
       },
+      accesses: [{ kind: 'file', operation: 'read', pathParam: 'path' }],
     },
     read_file: {
       summary: 'Read a file from the workspace.',
@@ -250,6 +281,7 @@ const INPUT_CONTRACTS: ContractCatalog = {
         },
         additionalProperties: true,
       },
+      accesses: [{ kind: 'file', operation: 'read', pathParam: 'path' }],
     },
     read_json: {
       summary: 'Read a JSON file from the workspace.',
@@ -262,6 +294,7 @@ const INPUT_CONTRACTS: ContractCatalog = {
         },
         additionalProperties: true,
       },
+      accesses: [{ kind: 'file', operation: 'read', pathParam: 'path' }],
     },
     list: {
       summary: 'List a directory.',
@@ -274,6 +307,8 @@ const INPUT_CONTRACTS: ContractCatalog = {
         },
         additionalProperties: true,
       },
+      // Single-level directory listing (safeReaddir) — not recursive.
+      accesses: [{ kind: 'file', operation: 'read', pathParam: 'path', recursive: false }],
     },
     stat: {
       summary: 'Inspect a filesystem entry.',
@@ -286,6 +321,7 @@ const INPUT_CONTRACTS: ContractCatalog = {
         },
         additionalProperties: true,
       },
+      accesses: [{ kind: 'file', operation: 'read', pathParam: 'path' }],
     },
     exists: {
       summary: 'Check whether a filesystem entry exists.',
@@ -298,6 +334,7 @@ const INPUT_CONTRACTS: ContractCatalog = {
         },
         additionalProperties: true,
       },
+      accesses: [{ kind: 'file', operation: 'read', pathParam: 'path' }],
     },
     search: {
       summary: 'Search a file tree with ripgrep.',
@@ -311,6 +348,8 @@ const INPUT_CONTRACTS: ContractCatalog = {
         },
         additionalProperties: true,
       },
+      // rg recurses through the target subtree by default.
+      accesses: [{ kind: 'file', operation: 'read', pathParam: 'path', recursive: true }],
     },
     tail: {
       summary: 'Read the tail of a file.',
@@ -323,6 +362,7 @@ const INPUT_CONTRACTS: ContractCatalog = {
         },
         additionalProperties: true,
       },
+      accesses: [{ kind: 'file', operation: 'read', pathParam: 'path' }],
     },
     write: {
       summary: 'Write content to a file.',
@@ -626,6 +666,7 @@ const INPUT_CONTRACTS: ContractCatalog = {
         },
         additionalProperties: true,
       },
+      accesses: [{ kind: 'file', operation: 'read', pathParam: 'path' }],
     },
     read_json: {
       summary: 'Read a JSON file on the host.',
@@ -638,6 +679,7 @@ const INPUT_CONTRACTS: ContractCatalog = {
         },
         additionalProperties: true,
       },
+      accesses: [{ kind: 'file', operation: 'read', pathParam: 'path' }],
     },
     write_file: {
       summary: 'Write a file on the host.',
@@ -831,4 +873,34 @@ export function validateOpInput(
 
 export function listOpInputContracts(domain: OpInputDomain): Record<string, OpInputContract> {
   return { ...INPUT_CONTRACTS[domain] };
+}
+
+/**
+ * KD-07: resolve the resource claims a specific op invocation makes, from
+ * its manifest `accesses` declaration and the actual call params — for the
+ * tool-call-scheduler.ts batch scheduler. An op with no declaration, or
+ * whose declared path cannot be resolved from `params` (missing/non-string),
+ * is conservative: `[{ kind: 'all' }]`, matching today's fully-serial
+ * behavior. An explicit empty `accesses: []` declaration resolves to `[]`
+ * (touches nothing shared, always safe to parallelize).
+ */
+export function resolveOpAccessClaims(
+  domain: OpInputDomain,
+  op: string,
+  params: Record<string, unknown> | undefined
+): ResourceClaim[] {
+  const declarations = INPUT_CONTRACTS[domain]?.[op]?.accesses;
+  if (!declarations) return [{ kind: 'all' }];
+
+  const claims: ResourceClaim[] = [];
+  for (const declaration of declarations) {
+    const path =
+      declaration.path ?? (declaration.pathParam ? params?.[declaration.pathParam] : undefined);
+    if (typeof path !== 'string' || path.length === 0) return [{ kind: 'all' }];
+    const recursive =
+      declaration.recursive ??
+      (declaration.recursiveParam ? Boolean(params?.[declaration.recursiveParam]) : undefined);
+    claims.push({ kind: 'file', operation: declaration.operation, path, recursive });
+  }
+  return claims;
 }

@@ -201,6 +201,14 @@ export function listActiveDelegatedTaskRecords(limit = 8): DelegatedTaskRecord[]
  * KC-06: resume a completed (or still-open) delegation by id — the stored
  * instruction and result are embedded as context for a fresh delegateTask
  * carrying the follow-up instruction.
+ *
+ * KD-05: when a subagent (rather than the owning worker itself) initiates
+ * the resume, callers pass `requestedBy` so this function can verify the
+ * requester actually owns the delegation — the Kyberion-side equivalent of
+ * kimi-code's `ensureOwnedIdleSubagent`. A still-running delegation
+ * (`status: 'started'`) is always rejected regardless of `requestedBy`: two
+ * concurrent resumes of the same in-flight delegation is a race no caller
+ * should be relying on.
  */
 export async function resumeDelegatedTask(
   delegationId: string,
@@ -208,11 +216,23 @@ export async function resumeDelegatedTask(
   options: {
     backend?: { delegateTask(instruction: string, context?: string): Promise<string> };
     owner?: string;
+    /** KD-05: identity attempting the resume, checked against record.owner. */
+    requestedBy?: string;
   } = {}
 ): Promise<{ result: string; trace: DelegatedTaskTrace; record: DelegatedTaskRecord }> {
   const record = loadDelegatedTaskRecord(delegationId);
   if (!record) {
     throw new Error(`Delegated task record not found for id "${delegationId}".`);
+  }
+  if (record.status === 'started') {
+    throw new Error(
+      `Delegated task "${delegationId}" is still running; resume is rejected until it completes or fails.`
+    );
+  }
+  if (options.requestedBy && options.requestedBy !== record.owner) {
+    throw new Error(
+      `Delegated task "${delegationId}" is owned by "${record.owner}"; resume rejected for requester "${options.requestedBy}".`
+    );
   }
   const backend = options.backend ?? (await import('./reasoning-backend.js')).getReasoningBackend();
   const prompt = [

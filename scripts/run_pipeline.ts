@@ -50,6 +50,10 @@ import {
   type ActuatorForwardRequest,
   type ActuatorForwardingPort,
   withReasoningPayloadScope,
+  runToolCallBatch,
+  resolveOpAccessClaims,
+  type ResourceClaim,
+  type OpInputDomain,
 } from '@agent/core';
 import { tryRepairJson } from '@agent/core/json-repair';
 import { installPythonVoiceBridgeIfAvailable } from '@agent/core/python-voice-bridge';
@@ -628,6 +632,7 @@ export function normalizePipelineOp(op: string): string {
   if (op === 'while' || op === 'loop_until') return 'core:while';
   if (op === 'retry_until_quality') return 'core:retry_until_quality';
   if (op === 'parallel_foreach') return 'core:parallel_foreach';
+  if (op === 'parallel_calls') return 'core:parallel_calls';
   if (op === 'accumulate') return 'core:accumulate';
   return `system:${op}`;
 }
@@ -983,6 +988,7 @@ const CONTROL_ACTIONS = new Set([
   'retry_until_quality',
   'foreach',
   'parallel_foreach',
+  'parallel_calls',
   'accumulate',
   'include',
 ]);
@@ -1575,6 +1581,86 @@ async function runStepsInternal(
         workingCtx = { ...workingCtx, ...perItemContexts[perItemContexts.length - 1] };
       }
       return workingCtx;
+    }
+
+    if (action === 'parallel_calls') {
+      // KD-07: resource-claim declaring tool-call scheduler, wired here as
+      // the adf-engine batch-execution path for a single step that fans out
+      // into several heterogeneous tool/op calls. Different layer than
+      // `core:parallel_foreach` above: parallel_foreach runs ONE fixed body
+      // over N data items; parallel_calls runs N (possibly different) ops
+      // once each, parallelizing only the ones whose declared resource
+      // claims never conflict (see tool-call-scheduler.ts). An op with no
+      // `accesses` declaration is conservative — `{kind:'all'}` — which
+      // degrades the WHOLE batch to today's fully-serial behavior.
+      const callSteps = params.calls as PipelineAdfStep[];
+      if (!Array.isArray(callSteps) || callSteps.length === 0) return ctx;
+      const preparedCalls = prepareEngineSteps(callSteps);
+      const exportKey = resolveExportKey(
+        { op: rawOp, params } as PipelineAdfStep,
+        'last_parallel_calls'
+      );
+
+      const scheduled = preparedCalls.map((step, index) => {
+        const normalizedOp = normalizePipelineOp(step.op);
+        const [domain, opAction] = normalizedOp.split(':');
+        let resolvedParams: Record<string, unknown> = (step.params || {}) as Record<
+          string,
+          unknown
+        >;
+        try {
+          resolvedParams = resolveVars(step.params, ctx) as Record<string, unknown>;
+        } catch {
+          /* unresolvable templates — resolve claims from the raw params instead */
+        }
+        // Control ops (nested core:if/core:while/... ) have no filesystem
+        // footprint of their own to declare — stay conservative for them.
+        const claims: ResourceClaim[] =
+          domain === 'core'
+            ? [{ kind: 'all' }]
+            : resolveOpAccessClaims(domain as OpInputDomain, opAction, resolvedParams);
+        return {
+          claims,
+          run: async (): Promise<Record<string, unknown>> => {
+            const nested = await runNestedSteps([step], ctx);
+            if (nested.status === 'failed') {
+              throw new Error(
+                nested.results.find((r) => r.status === 'failed')?.error ||
+                  `core:parallel_calls call ${index + 1} (${step.op}) failed`
+              );
+            }
+            return nested.context;
+          },
+        };
+      });
+
+      const settled = await runToolCallBatch(scheduled);
+      const perCallResults = settled.map((entry, index) => ({
+        index,
+        op: preparedCalls[index].op,
+        status: entry.status,
+        ...(entry.status === 'rejected'
+          ? { error: entry.reason instanceof Error ? entry.reason.message : String(entry.reason) }
+          : {}),
+      }));
+      const firstFailure = settled.find((entry) => entry.status === 'rejected');
+      if (firstFailure && firstFailure.status === 'rejected') {
+        throw new Error(
+          firstFailure.reason instanceof Error
+            ? firstFailure.reason.message
+            : String(firstFailure.reason)
+        );
+      }
+      // Merge each call's context contribution in REQUEST order (later calls
+      // win on key collisions), exactly like sequential execution would —
+      // regardless of which call actually finished first in wall-clock time.
+      let mergedCtx: Record<string, unknown> = { ...ctx };
+      for (const entry of settled) {
+        if (entry.status === 'fulfilled') {
+          mergedCtx = { ...mergedCtx, ...(entry.value as Record<string, unknown>) };
+        }
+      }
+      return { ...mergedCtx, [exportKey]: perCallResults };
     }
 
     if (action === 'accumulate') {

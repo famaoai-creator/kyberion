@@ -1,4 +1,4 @@
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeRmSync } from './secure-io.js';
 import {
@@ -148,5 +148,43 @@ describe('KC-06 delegated-task-observability store', () => {
     await expect(resumeDelegatedTask('missing-id', 'follow up')).rejects.toThrow(
       /record not found/
     );
+  });
+
+  // KD-05 acceptance criterion 3: resume of a delegation id owned by another
+  // worker or still running is rejected.
+  it('rejects resume of a still-running (status: started) delegation', async () => {
+    const trace = startDelegatedTaskTrace({
+      owner: 'worker-a',
+      instruction: 'Long-running audit, not finished yet.',
+    });
+
+    await expect(
+      resumeDelegatedTask(trace.trace_id, 'follow up', {
+        backend: { delegateTask: vi.fn(async () => 'should not run') },
+      })
+    ).rejects.toThrow(/still running/);
+  });
+
+  it('rejects resume when requestedBy does not match the delegation owner', async () => {
+    const trace = startDelegatedTaskTrace({ owner: 'worker-a', instruction: 'Draft the report.' });
+    completeDelegatedTaskTrace(trace, { resultSummary: 'Report drafted.' });
+
+    await expect(
+      resumeDelegatedTask(trace.trace_id, 'follow up', {
+        requestedBy: 'worker-b',
+        backend: { delegateTask: vi.fn(async () => 'should not run') },
+      })
+    ).rejects.toThrow(/owned by "worker-a"/);
+  });
+
+  it('allows resume when requestedBy matches the owning worker of a completed delegation', async () => {
+    const trace = startDelegatedTaskTrace({ owner: 'worker-a', instruction: 'Draft the report.' });
+    completeDelegatedTaskTrace(trace, { resultSummary: 'Report drafted.' });
+
+    const { result } = await resumeDelegatedTask(trace.trace_id, 'Add a summary.', {
+      requestedBy: 'worker-a',
+      backend: { delegateTask: vi.fn(async () => 'Summary appended.') },
+    });
+    expect(result).toBe('Summary appended.');
   });
 });
