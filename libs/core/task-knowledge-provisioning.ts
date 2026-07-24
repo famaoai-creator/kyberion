@@ -47,6 +47,9 @@ import {
   recordKnowledgeDelivery,
   type DeliveredKnowledgeRef,
 } from './src/knowledge-feedback-loop.js';
+import { checkProviderEgress, providerIdForReasoningIdentifier } from './provider-egress-gate.js';
+import { getInstalledReasoningMode } from './reasoning-bootstrap.js';
+import { logger } from './core.js';
 
 export type TaskKnowledgeForm = 'pack' | 'system_prompt' | 'context_string';
 
@@ -55,10 +58,28 @@ export interface ProvisionTaskKnowledgeInput extends ResolveMissionContextPackIn
   form?: TaskKnowledgeForm;
   /** Mission directory to persist the resolved pack under. Omit to skip persistence. */
   missionPath?: string;
+  /**
+   * XP-03: the provider that will ultimately consume the rendered pack
+   * (e.g. `'claude'`, `'codex'`), when the caller knows it. Enables the
+   * tier x egress gate (`provider-egress-gate.ts`) against this mission's
+   * declared tier. When omitted, this function falls back to a best-effort
+   * resolution from the currently-installed reasoning backend mode
+   * (`getInstalledReasoningMode`, `reasoning-bootstrap.ts`); when even that
+   * cannot be mapped to a known provider id, the gate is skipped entirely
+   * (no false denials from an unresolved provider) — see
+   * `providerIdForReasoningIdentifier` in provider-egress-gate.ts.
+   */
+  provider?: string;
 }
 
 export interface ProvisionTaskKnowledgeResult {
-  /** Null when `resolveMissionContextPack` could not resolve mission state; callers degrade/fail open. */
+  /**
+   * Null when `resolveMissionContextPack` could not resolve mission state
+   * (callers degrade/fail open), OR when the tier x egress gate denied this
+   * provider for this mission's tier — check `egressDenied` to tell the two
+   * apart; only the latter is a refusal the caller must surface rather than
+   * silently proceed without a pack.
+   */
   pack: MissionContextPack | null;
   /** Rendered text in the requested form; `''` when `pack` is null. */
   text: string;
@@ -74,6 +95,19 @@ export interface ProvisionTaskKnowledgeResult {
    * (see `recordKnowledgeDelivery`, src/knowledge-feedback-loop.ts).
    */
   deliveredKnowledgeRefs: DeliveredKnowledgeRef[];
+  /**
+   * XP-03: set when the tier x egress gate denied delivering this mission's
+   * knowledge pack to the resolved provider. Distinct from a plain absent
+   * pack (mission state not found) — callers that fail open on a missing
+   * pack must NOT treat a denial the same way silently; at minimum log/
+   * surface `reason` so the refusal is visible instead of read as "no
+   * knowledge was available".
+   */
+  egressDenied?: {
+    provider: string;
+    dataTier: MissionContextPack['mission']['tier'];
+    reason: string;
+  };
 }
 
 function truncate(value: string, max: number): string {
@@ -162,11 +196,39 @@ function renderTaskKnowledgeForm(pack: MissionContextPack, form: TaskKnowledgeFo
 export async function provisionTaskKnowledge(
   input: ProvisionTaskKnowledgeInput
 ): Promise<ProvisionTaskKnowledgeResult> {
-  const { form = 'pack', missionPath, ...resolveInput } = input;
+  const { form = 'pack', missionPath, provider, ...resolveInput } = input;
   const pack = await resolveMissionContextPack(resolveInput);
   if (!pack) {
     return { pack: null, text: '', deliveredKnowledgeRefs: [] };
   }
+
+  // XP-03: gate before persisting/rendering — a denied provider must never
+  // see any rendering of this mission's knowledge, not even a truncated one.
+  const resolvedProvider =
+    (provider && provider.trim()) ||
+    providerIdForReasoningIdentifier(getInstalledReasoningMode() || undefined);
+  if (resolvedProvider) {
+    const egressCheck = checkProviderEgress({
+      provider: resolvedProvider,
+      dataTier: pack.mission.tier,
+    });
+    if (!egressCheck.allowed) {
+      logger.warn(
+        `[XP-03] provisionTaskKnowledge denied for mission=${resolveInput.missionId} provider=${resolvedProvider} tier=${pack.mission.tier}: ${egressCheck.reason}`
+      );
+      return {
+        pack: null,
+        text: '',
+        deliveredKnowledgeRefs: [],
+        egressDenied: {
+          provider: resolvedProvider,
+          dataTier: pack.mission.tier,
+          reason: egressCheck.reason || 'provider egress denied',
+        },
+      };
+    }
+  }
+
   const missionContextPackPath = missionPath
     ? saveMissionContextPack(missionPath, pack)
     : undefined;

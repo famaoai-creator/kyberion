@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   resolveMissionContextPack: vi.fn(),
+  sendOpsAlert: vi.fn(),
 }));
 
 vi.mock('./mission-context-pack.js', async (importOriginal) => {
@@ -22,6 +23,11 @@ vi.mock('./mission-context-pack.js', async (importOriginal) => {
     resolveMissionContextPack: mocks.resolveMissionContextPack,
   };
 });
+
+// XP-03: checkProviderEgress emits an ops-alert on denial (acceptance
+// criterion 3). Mocked here rather than exercised for real so this suite
+// never touches the shared ops-alerts.jsonl sink.
+vi.mock('./ops-alert.js', () => ({ sendOpsAlert: mocks.sendOpsAlert }));
 
 import {
   buildMissionContextPack,
@@ -35,6 +41,12 @@ import {
   knowledgeDeliveryLogDir,
   loadKnowledgeUsageAggregate,
 } from './src/knowledge-feedback-loop.js';
+import {
+  resetProviderEgressPolicyCache,
+  type ProviderEgressPolicyFile,
+} from './provider-egress-gate.js';
+import { safeMkdir, safeWriteFile } from './secure-io.js';
+import * as path from 'node:path';
 
 // buildMissionContextPack's internal pruning step writes a context rollup
 // under `missionPath` (default: the real `active/missions/public/<id>`
@@ -108,6 +120,7 @@ let originalUsagePath: string | undefined;
 
 beforeEach(() => {
   mocks.resolveMissionContextPack.mockReset();
+  mocks.sendOpsAlert.mockReset();
   originalDeliveryDir = process.env.KYBERION_KNOWLEDGE_DELIVERY_DIR;
   originalUsagePath = process.env.KYBERION_KNOWLEDGE_USAGE_PATH;
   process.env.KYBERION_KNOWLEDGE_DELIVERY_DIR = deliveryDirOverride;
@@ -266,6 +279,92 @@ describe('provisionTaskKnowledge', () => {
       });
 
       expect(result.missionContextPackPath).toBeUndefined();
+    });
+  });
+
+  // XP-03: gate before persisting/rendering — a denied provider must never
+  // see any rendering of this mission's knowledge, not even a truncated one.
+  describe('XP-03 tier x egress gate', () => {
+    const policyDir = pathResolver.sharedTmp(`kp01-provisioning-test/egress-policy-${process.pid}`);
+    const policyPath = path.join(policyDir, 'provider-egress-policy.json');
+    let originalPolicyPath: string | undefined;
+
+    function writePolicy(policy: ProviderEgressPolicyFile): void {
+      safeMkdir(policyDir, { recursive: true });
+      safeWriteFile(policyPath, JSON.stringify(policy), { encoding: 'utf8' });
+    }
+
+    beforeEach(() => {
+      originalPolicyPath = process.env.KYBERION_PROVIDER_EGRESS_POLICY_PATH;
+      process.env.KYBERION_PROVIDER_EGRESS_POLICY_PATH = policyPath;
+      writePolicy({
+        version: '1.0.0',
+        providers: { claude: { egress: 'external-api' }, codex: { egress: 'external-api' } },
+        tier_policy: {
+          confidential: { mode: 'approved-only', approved_providers: ['claude'] },
+          personal: { mode: 'local-only-or-approved', approved_providers: [] },
+        },
+      });
+      resetProviderEgressPolicyCache();
+    });
+
+    afterEach(() => {
+      safeRmSync(policyDir, { recursive: true, force: true });
+      if (originalPolicyPath === undefined) delete process.env.KYBERION_PROVIDER_EGRESS_POLICY_PATH;
+      else process.env.KYBERION_PROVIDER_EGRESS_POLICY_PATH = originalPolicyPath;
+      resetProviderEgressPolicyCache();
+    });
+
+    it('returns a typed refusal (not a silent empty pack) when the resolved provider is not approved for the mission tier', async () => {
+      const pack = buildFixturePack();
+      pack.mission.tier = 'confidential';
+      mocks.resolveMissionContextPack.mockResolvedValue(pack);
+
+      const result = await provisionTaskKnowledge({
+        form: 'pack',
+        missionId: pack.scope.mission_id,
+        provider: 'codex',
+      });
+
+      expect(result.pack).toBeNull();
+      expect(result.text).toBe('');
+      expect(result.deliveredKnowledgeRefs).toEqual([]);
+      expect(result.egressDenied).toBeDefined();
+      expect(result.egressDenied).toMatchObject({ provider: 'codex', dataTier: 'confidential' });
+      expect(result.egressDenied!.reason).toContain('PROVIDER_EGRESS_DENIED');
+      // No KP-05 delivery record for a denied render.
+      expect(safeExistsSync(knowledgeDeliveryLogDir())).toBe(false);
+      expect(mocks.sendOpsAlert).toHaveBeenCalledTimes(1);
+    });
+
+    it('delivers the pack when the resolved provider is approved for the mission tier', async () => {
+      const pack = buildFixturePack();
+      pack.mission.tier = 'confidential';
+      mocks.resolveMissionContextPack.mockResolvedValue(pack);
+
+      const result = await provisionTaskKnowledge({
+        form: 'pack',
+        missionId: pack.scope.mission_id,
+        provider: 'claude',
+      });
+
+      expect(result.pack).toBe(pack);
+      expect(result.egressDenied).toBeUndefined();
+      expect(mocks.sendOpsAlert).not.toHaveBeenCalled();
+    });
+
+    it('does not gate when no provider is supplied or resolvable', async () => {
+      const pack = buildFixturePack();
+      pack.mission.tier = 'confidential';
+      mocks.resolveMissionContextPack.mockResolvedValue(pack);
+
+      const result = await provisionTaskKnowledge({
+        form: 'pack',
+        missionId: pack.scope.mission_id,
+      });
+
+      expect(result.pack).toBe(pack);
+      expect(result.egressDenied).toBeUndefined();
     });
   });
 });

@@ -2017,6 +2017,12 @@
       "type": "json"
     },
     {
+      "path": "product/governance/provider-egress-policy.json",
+      "tier": "public",
+      "size": 543,
+      "type": "json"
+    },
+    {
       "path": "product/governance/qa-rules.json",
       "tier": "public",
       "size": 545,
@@ -7180,6 +7186,12 @@
       "path": "product/schemas/provider-config.schema.json",
       "tier": "public",
       "size": 3492,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/provider-egress-policy.schema.json",
+      "tier": "public",
+      "size": 3102,
       "type": "json"
     },
     {

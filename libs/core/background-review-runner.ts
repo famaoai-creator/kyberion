@@ -50,7 +50,12 @@ import {
   enqueueSurfaceOutboxMessage,
 } from './surface-coordination-store.js';
 import type { SurfaceAsyncChannel } from './channel-surface-types.js';
-import { withReasoningPayloadScope } from './reasoning-egress-scope.js';
+import { withReasoningPayloadScope, isLocalReasoningBackend } from './reasoning-egress-scope.js';
+import {
+  checkProviderEgress,
+  highestTierForPaths,
+  providerIdForReasoningIdentifier,
+} from './provider-egress-gate.js';
 
 const ProposalActionSchema = z.preprocess(
   (value) =>
@@ -127,7 +132,14 @@ export interface BackgroundReviewForkInput {
   approvalChannel?: string;
   approvalThreadTs?: string;
   sourceRef?: string;
-  backend?: Pick<ReasoningBackend, 'delegateTask'>;
+  /**
+   * `name` is optional here (unlike the real `ReasoningBackend`) so existing
+   * fake-backend test injections that only stub `delegateTask` keep
+   * compiling; XP-03's egress-gate lookup treats an absent name as
+   * "provider unknown" and skips the gate (see
+   * `buildBackgroundReviewKnowledgeContext`).
+   */
+  backend?: Pick<ReasoningBackend, 'delegateTask'> & { name?: string };
   callOptions?: ReasoningCallOptions;
 }
 
@@ -225,9 +237,20 @@ function truncateKnowledgeExcerpt(value: string, max: number): string {
  * Fail-open: any lookup error is swallowed and logged once; delegation
  * proceeds with the original label-only context exactly as before this
  * change.
+ *
+ * XP-03: this call site has no mission (see the "not usable" note above),
+ * so there is no declared mission tier to gate against. Instead the tier is
+ * derived from the delivered hint *paths* themselves
+ * (`highestTierForPaths` — path-prefix taxonomy in `tier-guard.ts`), and the
+ * provider is the reasoning backend actually handling this delegation
+ * (`backendName`, `ReasoningBackend.name` from the caller). A denial drops
+ * the knowledge section and falls back to `baseContext`, mirroring the
+ * existing fail-open shape below — delegation proceeds either way, just
+ * without the (denied) knowledge attached.
  */
 async function buildBackgroundReviewKnowledgeContext(
-  input: BackgroundReviewForkInput
+  input: BackgroundReviewForkInput,
+  backendName: string
 ): Promise<string> {
   const baseContext = 'background-review:' + input.sessionId;
   try {
@@ -239,6 +262,20 @@ async function buildBackgroundReviewKnowledgeContext(
       minScore: 0.08,
     });
     if (entries.length === 0) return baseContext;
+
+    if (!isLocalReasoningBackend(backendName)) {
+      const providerId = providerIdForReasoningIdentifier(backendName);
+      if (providerId) {
+        const dataTier = highestTierForPaths(entries.map((entry) => entry.path));
+        const egressCheck = checkProviderEgress({ provider: providerId, dataTier });
+        if (!egressCheck.allowed) {
+          logger.warn(
+            `[KP-02][XP-03] Background review knowledge egress denied for provider=${providerId} tier=${dataTier}: ${egressCheck.reason}`
+          );
+          return baseContext;
+        }
+      }
+    }
 
     const lines = [
       'Relevant knowledge:',
@@ -385,7 +422,7 @@ export async function runBackgroundReviewFork(
       async () =>
         backend.delegateTask(
           buildForkPrompt(input),
-          await buildBackgroundReviewKnowledgeContext(input),
+          await buildBackgroundReviewKnowledgeContext(input, backend.name || ''),
           input.callOptions || {
             effort: 'low',
             model_tier: 'fast',

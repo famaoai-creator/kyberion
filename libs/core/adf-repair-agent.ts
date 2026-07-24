@@ -20,6 +20,12 @@ import {
 } from './delegated-task-observability.js';
 import { findRelevantDistilledKnowledge } from './distill-knowledge-injector.js';
 import { recordKnowledgeDelivery } from './src/knowledge-feedback-loop.js';
+import { isLocalReasoningBackend } from './reasoning-egress-scope.js';
+import {
+  checkProviderEgress,
+  highestTierForPaths,
+  providerIdForReasoningIdentifier,
+} from './provider-egress-gate.js';
 
 export interface AdfRepairResult {
   repaired: boolean;
@@ -130,12 +136,20 @@ function truncateKnowledgeExcerpt(value: string, max: number): string {
  * Fail-open: any lookup error is swallowed and logged once; delegation
  * proceeds with the original `ADF Repair: <path>` context label exactly as
  * before this change.
+ *
+ * XP-03: no mission tier exists at this call site either (bare ADF path,
+ * no mission). Tier is derived from the delivered hint paths
+ * (`highestTierForPaths`) and the provider from the reasoning backend
+ * actually handling this repair (`backendName`). A denial drops the
+ * knowledge section and falls back to `baseContext`, same fail-open shape
+ * as the catch below.
  */
 async function buildAdfRepairKnowledgeContext(
   adfPath: string,
   schemaName: string,
   errorSummary: string,
-  hints: string
+  hints: string,
+  backendName: string
 ): Promise<string> {
   const baseContext = `ADF Repair: ${adfPath}`;
   try {
@@ -148,6 +162,20 @@ async function buildAdfRepairKnowledgeContext(
       minScore: 0.08,
     });
     if (entries.length === 0) return baseContext;
+
+    if (!isLocalReasoningBackend(backendName)) {
+      const providerId = providerIdForReasoningIdentifier(backendName);
+      if (providerId) {
+        const dataTier = highestTierForPaths(entries.map((entry) => entry.path));
+        const egressCheck = checkProviderEgress({ provider: providerId, dataTier });
+        if (!egressCheck.allowed) {
+          logger.warn(
+            `[KP-02][XP-03] ADF repair knowledge egress denied for provider=${providerId} tier=${dataTier}: ${egressCheck.reason}`
+          );
+          return baseContext;
+        }
+      }
+    }
 
     const lines = [
       'Relevant knowledge:',
@@ -238,7 +266,8 @@ Output constraints: pure JSON, no markdown fences, no comments, no trailing comm
       adfPath,
       schemaName,
       errorSummary,
-      hints
+      hints,
+      backend.name
     );
     const report = await backend.delegateTask(instruction, repairContext);
     logger.success(`[adf-repair] Sub-agent repair completed for ${adfPath}.`);
