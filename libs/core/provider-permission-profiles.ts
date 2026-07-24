@@ -21,11 +21,13 @@ import { getSubagentCapabilityProfile } from './subagent-capability-profiles.js'
  * silently granting full access.
  *
  * Scope note: this module is the declarative SSoT for the mapping and is
- * consumed by {@link buildProviderChildEnv} for env minimization today.
- * Wiring `resolveProviderPermissionArgs`'s `args` into each backend's
- * actual CLI invocation (so e.g. agy's unconditional
- * `--dangerously-skip-permissions` respects the `explorer` tier) is
- * tracked separately — see "open risks" in the XP-02 delivery report.
+ * consumed by {@link buildProviderChildEnv} for env minimization, and (XP-02
+ * follow-up) by shell-claude-cli-backend.ts / codex-cli-query.ts /
+ * agy-cli-backend.ts, each of which accepts an optional KD-05 profile on
+ * its invocation path and calls `resolveProviderPermissionArgs` to project
+ * it onto that provider's CLI argv (e.g. agy's previously-unconditional
+ * `--dangerously-skip-permissions` is now only used when no profile is
+ * given — see each backend's `resolvePermissionArgs` helper).
  */
 
 export type ProviderId = 'claude' | 'codex' | 'agy';

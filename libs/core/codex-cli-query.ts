@@ -6,7 +6,11 @@ import { z, type ZodType } from 'zod';
 import { logger } from './core.js';
 import * as pathResolver from './path-resolver.js';
 import { safeExecResult, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
-import { buildProviderChildEnv } from './provider-permission-profiles.js';
+import {
+  buildProviderChildEnv,
+  resolveProviderPermissionArgs,
+  type ProviderPermissionProfileName,
+} from './provider-permission-profiles.js';
 import { resolveRuntimeModelId } from './runtime-model-defaults.js';
 
 export interface CodexCliQueryOptions {
@@ -22,6 +26,14 @@ export interface RunCodexCliQueryParams<T> {
   userPrompt: string;
   schema: ZodType<T>;
   mode?: 'read-only' | 'workspace-write';
+  /**
+   * XP-02 follow-up: KD-05 capability profile. When set, its provider
+   * permission mapping (see {@link resolveProviderPermissionArgs}) supplies
+   * the `--sandbox` argv fragment instead of `mode`. Omit (the historical
+   * default) to keep `mode`-driven argv byte-identical to callers that
+   * predate this option.
+   */
+  profile?: ProviderPermissionProfileName;
   options?: CodexCliQueryOptions;
 }
 
@@ -30,10 +42,11 @@ export async function runCodexCliQuery<T>({
   userPrompt,
   schema,
   mode = 'read-only',
+  profile,
   options = {},
 }: RunCodexCliQueryParams<T>): Promise<T> {
   const query = new CodexCliQuery(options);
-  return query.runStructured({ systemPrompt, userPrompt, schema, mode });
+  return query.runStructured({ systemPrompt, userPrompt, schema, mode, profile });
 }
 
 class CodexCliQuery {
@@ -56,7 +69,15 @@ class CodexCliQuery {
     userPrompt: string;
     schema: ZodType<T>;
     mode: 'read-only' | 'workspace-write';
+    profile?: ProviderPermissionProfileName;
   }): Promise<T> {
+    // Resolved before any file I/O or spawn so a typed refusal (e.g.
+    // planner, which codex has no safe no-exec mode for) never touches the
+    // filesystem or attempts to spawn the CLI.
+    const sandboxArgs = params.profile
+      ? this.resolvePermissionArgs(params.profile)
+      : ['--sandbox', params.mode];
+
     const schemaJson = normalizeCodexSchema(
       z.toJSONSchema(params.schema) as Record<string, unknown>
     );
@@ -75,8 +96,7 @@ class CodexCliQuery {
       ].join('\n');
       const args = [
         'exec',
-        '--sandbox',
-        params.mode,
+        ...sandboxArgs,
         '--model',
         this.model,
         '--output-schema',
@@ -163,6 +183,19 @@ class CodexCliQuery {
       child.stdin.write(stdin);
       child.stdin.end();
     });
+  }
+
+  /**
+   * XP-02 follow-up: resolve a KD-05 capability profile to codex CLI argv
+   * fragments (the `--sandbox <mode>` pair). A typed refusal (e.g. planner
+   * — codex has no verified no-exec mode) throws before any spawn.
+   */
+  private resolvePermissionArgs(profile: ProviderPermissionProfileName): string[] {
+    const resolution = resolveProviderPermissionArgs(profile, 'codex');
+    if (resolution.kind === 'refused') {
+      throw new Error(`[codex-cli] permission profile "${profile}" refused: ${resolution.reason}`);
+    }
+    return [...resolution.args];
   }
 
   private tempFilePath(prefix: string, extension: string): string {

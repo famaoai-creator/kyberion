@@ -126,4 +126,61 @@ describe('codex-cli-query', () => {
       expect(spawnOptions.env.UNRELATED_TEST_SECRET).toBeUndefined();
     });
   });
+
+  describe('declarative permission profile argv (XP-02 follow-up)', () => {
+    beforeEach(() => {
+      mocks.safeWriteFile.mockReset();
+      mocks.safeReadFile.mockReset().mockReturnValue(JSON.stringify({ ok: true }));
+      mocks.safeRmSync.mockReset();
+      mocks.spawnMock.mockReset();
+    });
+
+    it('no profile: argv is byte-identical to the mode-driven baseline', async () => {
+      mocks.spawnMock.mockReturnValueOnce(createChild());
+
+      await runCodexCliQuery({
+        systemPrompt: 'sys',
+        userPrompt: 'usr',
+        schema: z.object({ ok: z.boolean() }),
+        options: { bin: 'codex', model: 'codex-default', cwd: '/repo' },
+      });
+
+      expect(mocks.spawnMock).toHaveBeenCalledTimes(1);
+      const [, argv] = mocks.spawnMock.mock.calls[0];
+      // First four argv entries are the historical baseline: exec --sandbox <mode> --model <model>
+      expect(argv.slice(0, 4)).toEqual(['exec', '--sandbox', 'read-only', '--model']);
+    });
+
+    it('explorer profile: argv contains the read-only sandbox mapping', async () => {
+      mocks.spawnMock.mockReturnValueOnce(createChild());
+
+      await runCodexCliQuery({
+        systemPrompt: 'sys',
+        userPrompt: 'usr',
+        schema: z.object({ ok: z.boolean() }),
+        profile: 'explorer',
+        options: { bin: 'codex', model: 'codex-default', cwd: '/repo' },
+      });
+
+      expect(mocks.spawnMock).toHaveBeenCalledTimes(1);
+      const [, argv] = mocks.spawnMock.mock.calls[0];
+      expect(argv).toEqual(expect.arrayContaining(['--sandbox', 'read-only']));
+      expect(argv).not.toContain('workspace-write');
+    });
+
+    it('planner profile: typed refusal, no spawn attempted', async () => {
+      await expect(
+        runCodexCliQuery({
+          systemPrompt: 'sys',
+          userPrompt: 'usr',
+          schema: z.object({ ok: z.boolean() }),
+          profile: 'planner',
+          options: { bin: 'codex', model: 'codex-default', cwd: '/repo' },
+        })
+      ).rejects.toThrow(/permission profile "planner" refused/);
+
+      expect(mocks.spawnMock).not.toHaveBeenCalled();
+      expect(mocks.safeWriteFile).not.toHaveBeenCalled();
+    });
+  });
 });

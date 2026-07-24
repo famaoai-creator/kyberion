@@ -20,7 +20,11 @@
 
 import { spawn, spawnSync } from 'node:child_process';
 import { childDelegationEnv } from './operation-policy-gate.js';
-import { buildProviderChildEnv } from './provider-permission-profiles.js';
+import {
+  buildProviderChildEnv,
+  resolveProviderPermissionArgs,
+  type ProviderPermissionProfileName,
+} from './provider-permission-profiles.js';
 import { assertReasoningEgressAllowed } from './reasoning-egress-scope.js';
 import { z, type ZodType } from 'zod';
 import { logger } from './core.js';
@@ -376,15 +380,26 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
   async delegateTask(
     instruction: string,
     context?: string,
-    options?: { model_tier?: 'fast' | 'standard' | 'deep' }
+    options?: {
+      model_tier?: 'fast' | 'standard' | 'deep';
+      /**
+       * XP-02 follow-up: KD-05 capability profile. When set, its provider
+       * permission mapping (see {@link resolveProviderPermissionArgs}) is
+       * appended to argv. Omit (the historical default) to keep argv
+       * byte-identical to callers that predate this option.
+       */
+      profile?: ProviderPermissionProfileName;
+    }
   ): Promise<string> {
     assertReasoningEgressAllowed(this.name);
     const model = resolveClaudeModelForTier(options?.model_tier, this.model);
+    const permissionArgs = this.resolvePermissionArgs(options?.profile);
     const args = [
       '-p',
       `${instruction}\n\nContext: ${context ?? 'none'}`,
       '--model',
       model,
+      ...permissionArgs,
       ...this.extraArgs,
     ];
     return this.spawnCli(args, '');
@@ -392,9 +407,29 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
 
   async prompt(
     prompt: string,
-    options?: { model_tier?: 'fast' | 'standard' | 'deep' }
+    options?: {
+      model_tier?: 'fast' | 'standard' | 'deep';
+      profile?: ProviderPermissionProfileName;
+    }
   ): Promise<string> {
     return this.delegateTask(prompt, undefined, options);
+  }
+
+  /**
+   * XP-02 follow-up: resolve a KD-05 capability profile to claude CLI argv
+   * fragments. No profile ⇒ `[]` (argv unchanged from pre-XP-02 behavior).
+   * A typed refusal (see the profile × provider matrix in
+   * provider-permission-profiles.ts) throws before any spawn is attempted.
+   */
+  private resolvePermissionArgs(profile?: ProviderPermissionProfileName): string[] {
+    if (!profile) return [];
+    const resolution = resolveProviderPermissionArgs(profile, 'claude');
+    if (resolution.kind === 'refused') {
+      throw new Error(
+        `[shell-claude-cli] permission profile "${profile}" refused: ${resolution.reason}`
+      );
+    }
+    return [...resolution.args];
   }
 
   /**
