@@ -63,6 +63,7 @@
     "libs/core/trust-engine.test.ts",
     "libs/core/validators.test.ts",
     "libs/core/worker-event-stream.test.ts",
+    "plugins/fixtures/skill-plugin-loader-official-fixture.mjs",
     "presence/displays/concierge/test/concierge-contract.test.ts",
     "scripts/agent_runtime_supervisor_daemon.test.ts",
     "scripts/check_tier_hygiene.test.ts",
