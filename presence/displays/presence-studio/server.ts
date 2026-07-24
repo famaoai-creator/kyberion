@@ -80,11 +80,11 @@ import {
   withExecutionContext,
 } from '@agent/core';
 import {
-  executeGmailDelivery,
+  executeEmailDelivery,
   extractFirstJsonBlock,
   generateEmailReplyDraft,
+  listEmailAccountProviders,
   readEmailDraftArtifact as readSharedEmailDraftArtifact,
-  readGwsAuthStatus,
   resolveEmailTriagePath,
 } from '@agent/core/email-workflow';
 import { collectDoctorReport } from '../../../scripts/run_doctor.js';
@@ -1052,7 +1052,7 @@ app.get('/api/email-draft', (_req, res) => {
 });
 
 app.get('/api/email-auth-status', (_req, res) => {
-  res.json(readGwsAuthStatus());
+  res.json({ accounts: listEmailAccountProviders() });
 });
 
 app.get('/api/surface-agents', (_req, res) => {
@@ -1845,6 +1845,7 @@ app.post('/api/email-deliver', async (req, res) => {
   const subject = parsed.data.subject || '';
   const to = parsed.data.to || '';
   const message_id = parsed.data.message_id || '';
+  const account = parsed.data.account || 'auto';
   if (!draft_mode && !approved) {
     logger.warn(
       presenceStudioAuditLine(req, 'email-deliver.reject', {
@@ -1864,11 +1865,12 @@ app.post('/api/email-deliver', async (req, res) => {
       to_present: to ? 'yes' : 'no',
       subject_len: subject.length,
       message_id_present: message_id ? 'yes' : 'no',
+      account,
     })
   );
 
   try {
-    const result = await executeGmailDelivery({
+    const result = await executeEmailDelivery({
       approved,
       draft_mode,
       reply_mode,
@@ -1876,6 +1878,7 @@ app.post('/api/email-deliver', async (req, res) => {
       subject,
       to,
       message_id: message_id || undefined,
+      account,
     });
     return res.status(201).json({
       ok: true,
@@ -1884,7 +1887,7 @@ app.post('/api/email-deliver', async (req, res) => {
       result,
     });
   } catch (error: any) {
-    logger.warn(`[presence-studio] gmail delivery failed: ${error?.message || String(error)}`);
+    logger.warn(`[presence-studio] email delivery failed: ${error?.message || String(error)}`);
     logger.warn(
       presenceStudioAuditLine(req, 'email-deliver.fail', {
         status: 500,

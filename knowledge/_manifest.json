@@ -243,7 +243,7 @@
     {
       "path": "product/architecture/component-lifecycle-inventory.md",
       "tier": "public",
-      "size": 6552,
+      "size": 6562,
       "type": "md"
     },
     {
@@ -3297,13 +3297,13 @@
     {
       "path": "product/orchestration/global_actuator_index.json",
       "tier": "public",
-      "size": 17724,
+      "size": 17734,
       "type": "json"
     },
     {
       "path": "product/orchestration/global_skill_index.json",
       "tier": "public",
-      "size": 8333,
+      "size": 8343,
       "type": "json"
     },
     {
@@ -4167,7 +4167,7 @@
     {
       "path": "product/orchestration/service-presets/m365.json",
       "tier": "public",
-      "size": 1649,
+      "size": 5192,
       "type": "json"
     },
     {
@@ -9273,7 +9273,7 @@
     {
       "path": "public/procedures/select-adapter-backed-runtime-defaults.md",
       "tier": "public",
-      "size": 4384,
+      "size": 4466,
       "type": "md"
     },
     {
