@@ -13,6 +13,18 @@ import {
   safeWriteFile,
 } from './secure-io.js';
 import { createLogger } from './logger.js';
+import { getAdapterDefault } from './adapter-default-preferences.js';
+import {
+  listEmailAccountProviders,
+  type EmailAccountId,
+  type EmailAccountOperation,
+} from './email-account-catalog.js';
+export { listEmailAccountProviders } from './email-account-catalog.js';
+export type {
+  EmailAccountId,
+  EmailAccountOperation,
+  EmailAccountProviderCandidate,
+} from './email-account-catalog.js';
 const logger = createLogger('email-workflow');
 
 export interface EmailDraftArtifact {
@@ -59,6 +71,30 @@ export interface EmailDeliveryRequest {
   reply_mode?: 'new' | 'reply' | 'reply-all';
   subject?: string;
   to?: string;
+  account?: EmailAccountId | string;
+}
+
+export interface OutlookInboxListInput {
+  max_messages?: number;
+}
+
+export interface OutlookInboxMessage {
+  id: string;
+  subject: string;
+  sender_email: string;
+  sender_display: string;
+  received_at: string | null;
+  snippet: string;
+  is_read: boolean;
+}
+
+export interface OutlookInboxArchiveResult {
+  ok: boolean;
+  applied: boolean;
+  provider: 'outlook';
+  inspected_messages: number;
+  archived_message_ids: string[];
+  candidates: OutlookInboxMessage[];
 }
 
 export interface GwsAuthStatus {
@@ -970,4 +1006,300 @@ export async function executeGmailDelivery(request: EmailDeliveryRequest) {
     }
     throw error;
   }
+}
+
+export async function readM365EmailAuthStatus(): Promise<{
+  ok: boolean;
+  available: boolean;
+  raw: unknown;
+  error?: string;
+}> {
+  try {
+    const raw = await executeServicePreset('m365', 'auth_status', { params: {} });
+    return { ok: true, available: true, raw };
+  } catch (error: any) {
+    return { ok: false, available: false, raw: null, error: error?.message || String(error) };
+  }
+}
+
+function isGmailReady(status: GwsAuthStatus): boolean {
+  return Boolean(
+    status.ok &&
+    status.available &&
+    (status.auth_method !== 'none' ||
+      status.token_cache_exists ||
+      status.encrypted_credentials_exists ||
+      status.plain_credentials_exists)
+  );
+}
+
+function graphMessageId(value: unknown): string | null {
+  if (!value || typeof value !== 'object') return null;
+  const record = value as Record<string, unknown>;
+  if (typeof record.id === 'string' && record.id.trim()) return record.id;
+  for (const key of ['data', 'body', 'result']) {
+    const nested = graphMessageId(record[key]);
+    if (nested) return nested;
+  }
+  if (Array.isArray(record.value)) {
+    for (const entry of record.value) {
+      const nested = graphMessageId(entry);
+      if (nested) return nested;
+    }
+  }
+  return null;
+}
+
+function outlookMessageBody(body: string): { contentType: 'Text'; content: string } {
+  return { contentType: 'Text', content: body };
+}
+
+function outlookRecipients(to: string): Array<{ emailAddress: { address: string } }> {
+  return to
+    .split(/[;,]/)
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((address) => ({ emailAddress: { address } }));
+}
+
+export async function executeOutlookDelivery(request: EmailDeliveryRequest) {
+  const replyMode = request.reply_mode || 'new';
+  const draftMode = request.draft_mode === true;
+  const body = request.body_markdown.trim();
+  if (!body) throw new Error('body_markdown is required');
+
+  if (replyMode === 'reply' || replyMode === 'reply-all') {
+    const messageId = request.message_id?.trim();
+    if (!messageId) throw new Error('message_id is required for reply mode');
+    if (draftMode) {
+      const createAction =
+        replyMode === 'reply-all' ? 'outlook_create_reply_all' : 'outlook_create_reply';
+      const created = await executeServicePreset('m365', createAction, { message_id: messageId });
+      const draftId = graphMessageId(created);
+      if (!draftId) throw new Error('Outlook did not return the reply draft ID.');
+      return executeServicePreset('m365', 'outlook_message_update', {
+        message_id: draftId,
+        body: { body: outlookMessageBody(body) },
+      });
+    }
+    return executeServicePreset(
+      'm365',
+      replyMode === 'reply-all' ? 'outlook_reply_all' : 'outlook_reply',
+      {
+        message_id: messageId,
+        body: { comment: body },
+      }
+    );
+  }
+
+  const message = {
+    subject: request.subject?.trim() || 'Re: Inbox update',
+    body: outlookMessageBody(body),
+    toRecipients: outlookRecipients(request.to?.trim() || ''),
+  };
+  if (draftMode) {
+    return executeServicePreset('m365', 'outlook_message_draft', { body: message });
+  }
+  return executeServicePreset('m365', 'outlook_send', {
+    body: { message, saveToSentItems: true },
+  });
+}
+
+export async function listOutlookInbox(
+  input: OutlookInboxListInput = {}
+): Promise<OutlookInboxMessage[]> {
+  const maxMessages = Math.min(Math.max(Math.floor(input.max_messages || 50), 1), 100);
+  const result: any = await executeServicePreset('m365', 'outlook_messages_list', {
+    max_results: maxMessages,
+  });
+  const values = Array.isArray(result?.value)
+    ? result.value
+    : Array.isArray(result?.body?.value)
+      ? result.body.value
+      : Array.isArray(result?.data?.value)
+        ? result.data.value
+        : [];
+  return values
+    .map((message: any) => ({
+      id: String(message?.id || ''),
+      subject: String(message?.subject || ''),
+      sender_email: String(message?.from?.emailAddress?.address || ''),
+      sender_display: String(
+        message?.from?.emailAddress?.name || message?.from?.emailAddress?.address || ''
+      ),
+      received_at: typeof message?.receivedDateTime === 'string' ? message.receivedDateTime : null,
+      snippet: String(message?.bodyPreview || ''),
+      is_read: Boolean(message?.isRead),
+    }))
+    .filter((message: OutlookInboxMessage) => message.id);
+}
+
+export interface OutlookInboxArchiveInput extends OutlookInboxListInput {
+  apply?: boolean;
+  message_ids?: string[];
+  min_count?: number;
+}
+
+export async function organizeOutlookInbox(
+  input: OutlookInboxArchiveInput = {}
+): Promise<OutlookInboxArchiveResult> {
+  const candidates = await listOutlookInbox(input);
+  const selectedIds = new Set((input.message_ids || []).map((id) => id.trim()).filter(Boolean));
+  const archivedMessageIds: string[] = [];
+  if (input.apply) {
+    if (!selectedIds.size) {
+      throw new Error(
+        'Outlook archive requires explicit message_ids; no heuristic archive was applied.'
+      );
+    }
+    for (const messageId of selectedIds) {
+      await executeServicePreset('m365', 'outlook_message_move', {
+        message_id: messageId,
+        body: { destinationId: 'archive' },
+      });
+      archivedMessageIds.push(messageId);
+    }
+  }
+  return {
+    ok: true,
+    applied: Boolean(input.apply),
+    provider: 'outlook',
+    inspected_messages: candidates.length,
+    archived_message_ids: archivedMessageIds,
+    candidates,
+  };
+}
+
+interface EmailAccountAdapter {
+  readonly id: EmailAccountId;
+  readonly display_name: string;
+  readonly capabilities: EmailAccountOperation[];
+  isReady(): Promise<boolean>;
+  deliver(request: EmailDeliveryRequest): Promise<unknown>;
+}
+
+class GmailEmailAccountAdapter implements EmailAccountAdapter {
+  readonly id = 'gmail' as const;
+  readonly display_name = 'Gmail';
+  readonly capabilities: EmailAccountOperation[] = [
+    'send',
+    'draft',
+    'reply',
+    'reply-all',
+    'list',
+    'archive',
+  ];
+  async isReady(): Promise<boolean> {
+    return isGmailReady(readGwsAuthStatus());
+  }
+  deliver(request: EmailDeliveryRequest): Promise<unknown> {
+    return executeGmailDelivery(request);
+  }
+}
+
+class OutlookEmailAccountAdapter implements EmailAccountAdapter {
+  readonly id = 'outlook' as const;
+  readonly display_name = 'Outlook / Microsoft 365';
+  readonly capabilities: EmailAccountOperation[] = [
+    'send',
+    'draft',
+    'reply',
+    'reply-all',
+    'list',
+    'archive',
+  ];
+  async isReady(): Promise<boolean> {
+    const status = await readM365EmailAuthStatus();
+    return status.ok && status.available;
+  }
+  deliver(request: EmailDeliveryRequest): Promise<unknown> {
+    return executeOutlookDelivery(request);
+  }
+}
+
+class SetupOnlyEmailAccountAdapter implements EmailAccountAdapter {
+  readonly id: EmailAccountId;
+  readonly display_name: string;
+  readonly capabilities: EmailAccountOperation[] = [
+    'send',
+    'draft',
+    'reply',
+    'reply-all',
+    'list',
+    'archive',
+  ];
+
+  constructor(id: EmailAccountId, displayName: string) {
+    this.id = id;
+    this.display_name = displayName;
+  }
+
+  async isReady(): Promise<boolean> {
+    return false;
+  }
+
+  async deliver(): Promise<unknown> {
+    throw new Error(
+      `${this.display_name} is registered, but its account connector is not configured.`
+    );
+  }
+}
+
+export class EmailAccountRegistry {
+  private readonly adapters = new Map<EmailAccountId, EmailAccountAdapter>();
+
+  constructor(
+    adapters: EmailAccountAdapter[] = [
+      new GmailEmailAccountAdapter(),
+      new OutlookEmailAccountAdapter(),
+      new SetupOnlyEmailAccountAdapter('yahoo', 'Yahoo Mail'),
+    ]
+  ) {
+    for (const adapter of adapters) this.adapters.set(adapter.id, adapter);
+  }
+
+  register(adapter: EmailAccountAdapter): void {
+    this.adapters.set(adapter.id, adapter);
+  }
+
+  get(id: EmailAccountId): EmailAccountAdapter {
+    const adapter = this.adapters.get(id);
+    if (!adapter) throw new Error(`Unsupported email account: ${id}`);
+    return adapter;
+  }
+
+  async resolve(requested?: string): Promise<EmailAccountAdapter> {
+    const requestedId = requested?.trim() || getAdapterDefault('email.account') || 'auto';
+    if (requestedId !== 'auto') {
+      const adapter = this.get(requestedId as EmailAccountId);
+      if (!(await adapter.isReady())) {
+        throw new Error(`${adapter.display_name} is not authenticated or available.`);
+      }
+      return adapter;
+    }
+    const preferred = getAdapterDefault('email.account');
+    const ids: EmailAccountId[] = [preferred as EmailAccountId, 'gmail', 'outlook'].filter(
+      (id, index, values): id is EmailAccountId => Boolean(id) && values.indexOf(id) === index
+    );
+    for (const id of ids) {
+      const adapter = this.adapters.get(id);
+      if (adapter && (await adapter.isReady())) return adapter;
+    }
+    throw new Error('No email account is authenticated. Configure Gmail or Outlook/Microsoft 365.');
+  }
+}
+
+export const emailAccountRegistry = new EmailAccountRegistry();
+
+export async function executeEmailDelivery(request: EmailDeliveryRequest) {
+  const adapter = await emailAccountRegistry.resolve(request.account);
+  return adapter.deliver(request);
+}
+
+export async function organizeEmailInbox(
+  input: OutlookInboxArchiveInput & { account?: string } = {}
+) {
+  const account = await emailAccountRegistry.resolve(input.account);
+  if (account.id === 'outlook') return organizeOutlookInbox(input);
+  return organizeGmailInboxWithFilters(input);
 }

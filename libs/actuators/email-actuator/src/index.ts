@@ -26,6 +26,7 @@ import {
 const PLATFORMS_DARWIN = process.platform === 'darwin';
 
 interface EmailParams {
+  backend?: string;
   to?: string;
   cc?: string;
   subject?: string;
@@ -50,6 +51,7 @@ function resolveBodyFromFile(filePath: string): string {
 
 function resolveEmailParams(raw: EmailParams, ctx: Record<string, unknown>): EmailParams {
   return {
+    backend: raw.backend !== undefined ? String(resolveVars(raw.backend, ctx)) : undefined,
     to: raw.to !== undefined ? String(resolveVars(raw.to, ctx)) : undefined,
     cc: raw.cc !== undefined ? String(resolveVars(raw.cc, ctx)) : undefined,
     subject: raw.subject !== undefined ? String(resolveVars(raw.subject, ctx)) : undefined,

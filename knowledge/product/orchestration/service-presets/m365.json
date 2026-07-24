@@ -32,7 +32,17 @@
     "calendar_freebusy_query": {
       "type": "cli",
       "command": "m365",
-      "args": ["request", "--method", "post", "--url", "@graph/me/calendar/getSchedule", "--body", "{{body}}", "--output", "json"],
+      "args": [
+        "request",
+        "--method",
+        "post",
+        "--url",
+        "@graph/me/calendar/getSchedule",
+        "--body",
+        "{{body}}",
+        "--output",
+        "json"
+      ],
       "description": "Query free/busy windows for one or more calendars."
     },
     "calendar_events_insert": {
@@ -50,6 +60,152 @@
         "json"
       ],
       "description": "Create a Microsoft 365 calendar event."
+    },
+    "outlook_messages_list": {
+      "type": "cli",
+      "command": "m365",
+      "args": [
+        "request",
+        "--url",
+        "@graph/me/mailFolders/inbox/messages?$top={{max_results}}&$select=id,subject,from,receivedDateTime,bodyPreview,isRead",
+        "--output",
+        "json"
+      ],
+      "description": "List messages from the signed-in user's Outlook inbox."
+    },
+    "outlook_message_get": {
+      "type": "cli",
+      "command": "m365",
+      "args": ["request", "--url", "@graph/me/messages/{{message_id}}", "--output", "json"],
+      "description": "Get one Outlook message by ID."
+    },
+    "outlook_send": {
+      "type": "cli",
+      "command": "m365",
+      "args": [
+        "request",
+        "--method",
+        "post",
+        "--url",
+        "@graph/me/sendMail",
+        "--body",
+        "{{body}}",
+        "--output",
+        "json"
+      ],
+      "description": "Send a new Outlook message."
+    },
+    "outlook_message_draft": {
+      "type": "cli",
+      "command": "m365",
+      "args": [
+        "request",
+        "--method",
+        "post",
+        "--url",
+        "@graph/me/messages",
+        "--body",
+        "{{body}}",
+        "--output",
+        "json"
+      ],
+      "description": "Create an Outlook message draft."
+    },
+    "outlook_reply": {
+      "type": "cli",
+      "command": "m365",
+      "args": [
+        "request",
+        "--method",
+        "post",
+        "--url",
+        "@graph/me/messages/{{message_id}}/reply",
+        "--body",
+        "{{body}}",
+        "--output",
+        "json"
+      ],
+      "description": "Reply to an Outlook message."
+    },
+    "outlook_reply_all": {
+      "type": "cli",
+      "command": "m365",
+      "args": [
+        "request",
+        "--method",
+        "post",
+        "--url",
+        "@graph/me/messages/{{message_id}}/replyAll",
+        "--body",
+        "{{body}}",
+        "--output",
+        "json"
+      ],
+      "description": "Reply to all recipients of an Outlook message."
+    },
+    "outlook_create_reply": {
+      "type": "cli",
+      "command": "m365",
+      "args": [
+        "request",
+        "--method",
+        "post",
+        "--url",
+        "@graph/me/messages/{{message_id}}/createReply",
+        "--body",
+        "{}",
+        "--output",
+        "json"
+      ],
+      "description": "Create an Outlook reply draft."
+    },
+    "outlook_create_reply_all": {
+      "type": "cli",
+      "command": "m365",
+      "args": [
+        "request",
+        "--method",
+        "post",
+        "--url",
+        "@graph/me/messages/{{message_id}}/createReplyAll",
+        "--body",
+        "{}",
+        "--output",
+        "json"
+      ],
+      "description": "Create an Outlook reply-all draft."
+    },
+    "outlook_message_update": {
+      "type": "cli",
+      "command": "m365",
+      "args": [
+        "request",
+        "--method",
+        "patch",
+        "--url",
+        "@graph/me/messages/{{message_id}}",
+        "--body",
+        "{{body}}",
+        "--output",
+        "json"
+      ],
+      "description": "Update an Outlook draft message."
+    },
+    "outlook_message_move": {
+      "type": "cli",
+      "command": "m365",
+      "args": [
+        "request",
+        "--method",
+        "post",
+        "--url",
+        "@graph/me/messages/{{message_id}}/move",
+        "--body",
+        "{{body}}",
+        "--output",
+        "json"
+      ],
+      "description": "Move an Outlook message to another mail folder."
     }
   }
 }

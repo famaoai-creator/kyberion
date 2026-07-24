@@ -1,9 +1,9 @@
 import {
-  executeGmailDelivery,
+  executeEmailDelivery,
   generateEmailReplyDraft,
-  organizeGmailInboxWithFilters,
+  organizeEmailInbox,
+  listEmailAccountProviders,
   readEmailDraftArtifact,
-  readGwsAuthStatus,
   resolveEmailTriagePath,
 } from '@agent/core/email-workflow';
 import { safeExistsSync, safeReadFile } from '@agent/core';
@@ -28,14 +28,16 @@ function parseArgs(argv: string[]): { command: string; args: ArgMap } {
 }
 
 function printHelp(): void {
-  console.log('Usage: npm run email:workflow -- <status|draft|latest-draft|deliver|archive-inbox> [options]');
+  console.log(
+    'Usage: npm run email:workflow -- <status|draft|latest-draft|deliver|archive-inbox> [options]'
+  );
   console.log('');
   console.log('Commands:');
   console.log('  status        Check email auth readiness');
   console.log('  draft         Generate an email draft from triage text');
   console.log('  latest-draft  Show the latest email draft artifact');
-  console.log('  deliver       Deliver or draft an email');
-  console.log('  archive-inbox Organize the inbox with filters');
+  console.log('  deliver       Deliver or draft an email (--account auto|gmail|outlook)');
+  console.log('  archive-inbox Organize the inbox (--account auto|gmail|outlook)');
 }
 
 function getString(args: ArgMap, key: string, fallback = ''): string {
@@ -61,7 +63,7 @@ async function main() {
   }
 
   if (command === 'status') {
-    console.log(JSON.stringify(readGwsAuthStatus(), null, 2));
+    console.log(JSON.stringify({ accounts: listEmailAccountProviders() }, null, 2));
     return;
   }
 
@@ -100,27 +102,36 @@ async function main() {
     const draftMode = getBoolean(args, '--draft-mode');
     const approved = getBoolean(args, '--approved');
     if (!draftMode && !approved) {
-      throw new Error('approval is required before sending an email; add --approved or use --draft-mode');
+      throw new Error(
+        'approval is required before sending an email; add --approved or use --draft-mode'
+      );
     }
     const replyModeValue = getString(args, '--reply-mode');
-    const result = await executeGmailDelivery({
+    const result = await executeEmailDelivery({
       approved,
       draft_mode: draftMode,
-      reply_mode: replyModeValue === 'reply' || replyModeValue === 'reply-all' ? replyModeValue : 'new',
+      reply_mode:
+        replyModeValue === 'reply' || replyModeValue === 'reply-all' ? replyModeValue : 'new',
       body_markdown: bodyMarkdown,
       subject: getString(args, '--subject'),
       to: getString(args, '--to'),
       message_id: getString(args, '--message-id'),
+      account: getString(args, '--account') || getString(args, '--provider') || 'auto',
     });
     console.log(JSON.stringify(result, null, 2));
     return;
   }
 
   if (command === 'archive-inbox') {
-    const result = await organizeGmailInboxWithFilters({
+    const result = await organizeEmailInbox({
+      account: getString(args, '--account') || getString(args, '--provider') || 'auto',
       max_messages: Number(getString(args, '--max-messages', '50') || '50'),
       min_count: Number(getString(args, '--min-count', '2') || '2'),
       apply: getBoolean(args, '--apply'),
+      message_ids: getString(args, '--message-ids')
+        .split(',')
+        .map((id) => id.trim())
+        .filter(Boolean),
     });
     console.log(JSON.stringify(result, null, 2));
     return;

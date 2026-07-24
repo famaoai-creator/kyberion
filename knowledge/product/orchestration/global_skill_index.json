@@ -85,9 +85,9 @@
     {
       "n": "email-actuator",
       "path": "libs/actuators/email-actuator",
-      "d": "Email composition and sending via macOS Mail.app (JXA) with SMTP fallback via nodemailer",
+      "d": "Adapter-based email composition and sending with selectable macOS Mail.app (JXA) and SMTP backends",
       "s": "implemented",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "capability_count": 3
     },
     {

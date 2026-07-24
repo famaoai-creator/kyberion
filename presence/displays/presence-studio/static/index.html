@@ -887,8 +887,11 @@
       <div class="grid" style="margin-top: 18px;">
         <section class="panel" id="email-panel">
           <div class="label">Email Reply Draft</div>
-          <div class="hint" id="email-auth-status">Checking Gmail auth status...</div>
+          <div class="hint" id="email-auth-status">Checking email account status...</div>
           <div class="controls" style="margin-top: 0;">
+            <select class="select" id="email-account" aria-label="Email account">
+              <option value="auto">Automatic account selection</option>
+            </select>
             <input class="text-input" id="email-draft-to" type="text" placeholder="Recipient" />
             <input class="text-input" id="email-draft-subject" type="text" placeholder="Subject" />
             <select class="select" id="email-draft-tone">
@@ -912,20 +915,20 @@
           <div id="email-draft-content" class="artifact-view" aria-live="polite">No email reply draft has been created yet.</div>
           <div class="controls" style="margin-top: 12px;">
             <button class="button" id="email-draft-create" type="button">Create Reply Draft</button>
-            <button class="button button-ghost" id="email-draft-create-gmail" type="button">Create Gmail Draft</button>
+            <button class="button button-ghost" id="email-draft-create-gmail" type="button">Create Account Draft</button>
             <button class="button button-ghost" id="email-draft-send" type="button">Send Approved Email</button>
             <button class="button button-ghost" id="email-auth-refresh" type="button">Refresh Auth</button>
             <button class="button button-ghost" id="email-draft-refresh" type="button">Reload Draft</button>
             <button class="button button-ghost" id="email-draft-copy" type="button">Copy Reply</button>
           </div>
-          <div class="hint" id="email-draft-hint">Generate a local reply draft from the latest inbox triage, then copy it into Gmail.</div>
+          <div class="hint" id="email-draft-hint">Generate a local reply draft, then create it in the selected email account.</div>
         </section>
       </div>
       <div id="email-send-confirm-modal" class="modal-backdrop" aria-hidden="true">
         <div class="modal" role="dialog" aria-modal="true" aria-labelledby="email-send-confirm-title" aria-describedby="email-send-confirm-body">
           <div id="email-send-confirm-title" class="modal-title">Confirm email send</div>
           <div id="email-send-confirm-body" class="modal-body"></div>
-          <div class="modal-note">This send will be recorded in Gmail and the local Presence Studio event flow.</div>
+          <div class="modal-note">This send will be recorded in the selected email account and the local Presence Studio event flow.</div>
           <div class="modal-shortcuts">Press <kbd>Esc</kbd> or click outside the dialog to cancel.</div>
           <div class="modal-actions">
             <button class="button button-ghost" id="email-send-confirm-cancel" type="button">Cancel</button>
@@ -1284,6 +1287,7 @@
       const emailTriageCopyEl = document.getElementById("email-triage-copy");
       const emailTriageHintEl = document.getElementById("email-triage-hint");
       const emailDraftToEl = document.getElementById("email-draft-to");
+      const emailAccountEl = document.getElementById("email-account");
       const emailDraftSubjectEl = document.getElementById("email-draft-subject");
       const emailDraftToneEl = document.getElementById("email-draft-tone");
       const emailDraftMessageIdEl = document.getElementById("email-draft-message-id");
@@ -1505,6 +1509,7 @@
             tone: emailDraftToneEl.value || "clear and concise",
             message_id: emailDraftMessageIdEl.value || "",
             reply_mode: emailDraftModeEl.value || "new",
+            account: emailAccountEl?.value || "auto",
             approved: Boolean(emailSendApprovalEl.checked),
             updated_at: new Date().toISOString(),
           }));
@@ -1526,6 +1531,7 @@
           if (typeof draft.reply_mode === "string" && ["new", "reply", "reply-all"].includes(draft.reply_mode)) {
             emailDraftModeEl.value = draft.reply_mode;
           }
+          if (typeof draft.account === "string" && emailAccountEl) emailAccountEl.value = draft.account;
           if (typeof draft.approved === "boolean") {
             emailSendApprovalEl.checked = draft.approved;
           }
@@ -1645,19 +1651,23 @@
       }
 
       function describeEmailAuthStatus(status) {
-        if (!status) return "Checking Gmail auth status...";
-        if (!status.ok) {
-          return `Gmail auth status unavailable: ${status.error || "unknown error"}`;
+        const accounts = Array.isArray(status?.accounts) ? status.accounts : [];
+        if (!accounts.length) return "No email accounts are registered.";
+        const selected = emailAccountEl?.value && emailAccountEl.value !== "auto"
+          ? accounts.find((account) => account.id === emailAccountEl.value)
+          : accounts.find((account) => account.status === "ready") || accounts[0];
+        if (!selected) return "Select an email account.";
+        return `${selected.display_name}: ${selected.reason}`;
+      }
+
+      function populateEmailAccounts(accounts) {
+        if (!emailAccountEl || !Array.isArray(accounts)) return;
+        const current = emailAccountEl.value || "auto";
+        emailAccountEl.replaceChildren(new Option("Automatic account selection", "auto"));
+        for (const account of accounts) {
+          emailAccountEl.append(new Option(account.display_name, account.id));
         }
-        if (status.auth_method && status.auth_method !== "none") {
-          const source = status.credential_source ? ` via ${status.credential_source}` : "";
-          return `Gmail auth ready (${status.auth_method}${source}).`;
-        }
-        const clientConfig = status.client_config_exists ? "client secret present" : "client secret missing";
-        const credentials = status.token_cache_exists || status.encrypted_credentials_exists || status.plain_credentials_exists
-          ? "credentials present"
-          : "no credentials yet";
-        return `Gmail auth not ready (${clientConfig}, ${credentials}).`;
+        emailAccountEl.value = accounts.some((account) => account.id === current) ? current : "auto";
       }
 
       function restoreEmailAuthStatus() {
@@ -1678,7 +1688,7 @@
 
       async function loadEmailAuthStatus() {
         if (!emailAuthStatusEl) return;
-        emailAuthStatusEl.textContent = "Checking Gmail auth status...";
+        emailAuthStatusEl.textContent = "Checking email account status...";
         setEmailDeliveryAvailability(false);
         try {
           const response = await fetch("/api/email-auth-status");
@@ -1687,8 +1697,12 @@
             throw new Error(body.error || `HTTP ${response.status}`);
           }
           emailAuthStatus = body;
+          populateEmailAccounts(body.accounts);
           emailAuthStatusEl.textContent = describeEmailAuthStatus(body);
-          const ready = Boolean(body.ok && body.auth_method && body.auth_method !== "none");
+          const selected = Array.isArray(body.accounts)
+            ? body.accounts.find((account) => account.id === (emailAccountEl?.value || "auto"))
+            : null;
+          const ready = Boolean(selected?.selectable || (emailAccountEl?.value === "auto" && body.accounts?.length));
           setEmailDeliveryAvailability(ready);
           try {
             localStorage.setItem(EMAIL_AUTH_STATUS_KEY, JSON.stringify(body));
@@ -1697,7 +1711,7 @@
           }
         } catch (error) {
           emailAuthStatus = null;
-          emailAuthStatusEl.textContent = `Gmail auth status unavailable: ${error.message || error}`;
+          emailAuthStatusEl.textContent = `Email account status unavailable: ${error.message || error}`;
           setEmailDeliveryAvailability(false);
         }
       }
@@ -1803,7 +1817,7 @@
         const approved = draftMode ? true : Boolean(emailSendApprovalEl.checked);
         const button = draftMode ? emailDraftCreateGmailEl : emailDraftSendEl;
         button.disabled = true;
-        emailDraftHintEl.textContent = draftMode ? "Creating Gmail draft..." : "Sending approved email...";
+        emailDraftHintEl.textContent = draftMode ? "Creating account draft..." : "Sending approved email...";
         try {
           const response = await fetch("/api/email-deliver", {
             method: "POST",
@@ -1816,6 +1830,7 @@
               subject: emailDraftSubjectEl.value.trim(),
               message_id: messageId,
               body_markdown: bodyMarkdown,
+              account: emailAccountEl?.value || "auto",
             }),
           });
           const body = await response.json();
@@ -1823,8 +1838,8 @@
             throw new Error(body.error || `HTTP ${response.status}`);
           }
           emailDraftHintEl.textContent = draftMode
-            ? "Gmail draft created."
-            : "Email sent through Gmail.";
+            ? "Email draft created in the selected account."
+            : "Email sent through the selected account.";
           persistEmailDraftForm();
         } catch (error) {
           emailDraftHintEl.textContent = `Email delivery failed: ${error.message || error}`;
@@ -3336,6 +3351,12 @@
       emailDraftSubjectEl.addEventListener("input", persistEmailDraftForm);
       emailDraftToneEl.addEventListener("change", persistEmailDraftForm);
       emailDraftMessageIdEl.addEventListener("input", persistEmailDraftForm);
+      emailAccountEl?.addEventListener("change", () => {
+        persistEmailDraftForm();
+        if (emailAuthStatus) {
+          emailAuthStatusEl.textContent = describeEmailAuthStatus(emailAuthStatus);
+        }
+      });
       emailDraftModeEl.addEventListener("change", () => {
         syncEmailReplyModeUI();
         persistEmailDraftForm();

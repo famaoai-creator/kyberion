@@ -2,6 +2,8 @@ export const ADAPTER_DEFAULT_KEYS = [
   'media.image',
   'media.video',
   'media.music',
+  'email.backend',
+  'email.account',
   'service.runtime',
   'tool.runtime',
   'voice.vad',

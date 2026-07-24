@@ -124,6 +124,7 @@ describe('browser onboarding', () => {
         'media.image': 'media-generation.comfyui',
         'media.video': 'video.hyperframes_cli',
         'media.music': 'media-generation.comfyui.music',
+        'email.backend': 'mac_mailapp',
         'service.runtime': 'comfyui',
         'tool.runtime': 'playwright',
         'voice.vad': 'energy',
