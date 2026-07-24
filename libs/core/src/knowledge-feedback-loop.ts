@@ -174,14 +174,17 @@ function bumpUsageAggregate(
  * (returns undefined) when there is nothing to record — most tasks resolve
  * without knowledge hints and should not grow the delivery log.
  *
- * TODO(KP-05 acceptance 1): also attach these refs to the active trace
- * span's `knowledgeRefs` (`TraceContext.addKnowledgeRef`, src/trace.ts).
- * `mission-orchestration-worker.ts`'s dispatch path does not currently open
- * a `TraceContext` around task dispatch (only actuator/pipeline flows do via
- * `actuator-trace.ts`), so there is no live span to attach to here without
- * inventing a new tracing seam for this task. The delivery log below is the
- * durable record until that span exists; wire the two together when the
- * dispatch path gains trace instrumentation.
+ * KP-05 acceptance 1 (done): `mission-orchestration-worker.ts` now opens a
+ * `mission_task_dispatch` TraceContext span around every task dispatch
+ * (single-shot via `dispatchPlannedMissionTaskCore`, goal-driven via
+ * `dispatchGoalDrivenMissionTask`) and attaches this call's returned
+ * `deliveredKnowledgeRefs` to it via `attachDeliveredKnowledgeRefs`
+ * (`TraceContext.addKnowledgeRef` for paths + a `knowledge_delivered` event
+ * carrying per-ref scores, since the trace schema's `knowledgeRefs` field is
+ * `string[]`-only). The span is persisted through the same `persistTrace`
+ * JSONL store actuator/pipeline traces use (`src/trace.ts`). The delivery
+ * log below remains the durable, queryable record independent of trace
+ * retention/rotation.
  */
 export function recordKnowledgeDelivery(input: {
   missionId: string;

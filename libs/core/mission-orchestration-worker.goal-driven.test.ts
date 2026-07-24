@@ -433,7 +433,10 @@ describe('KP-01: goal-driven dispatch context-pack provisioning', () => {
         workItem: fixtureWorkItem('MSN-GD-KP01-FAIL', 'WIT-GD-KP01-FAIL'),
       });
 
-      expect(provisioned).toEqual({});
+      // KP-05: provisionGoalDrivenTaskKnowledge always returns
+      // deliveredKnowledgeRefs (empty on failure) so callers can attach it to
+      // a dispatch trace without a null check.
+      expect(provisioned).toEqual({ deliveredKnowledgeRefs: [] });
       expect(warnSpy).toHaveBeenCalledTimes(1);
       expect(warnSpy.mock.calls[0][0]).toContain('MSN-GD-KP01-FAIL');
     } finally {
