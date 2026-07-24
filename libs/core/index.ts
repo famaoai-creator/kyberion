@@ -792,6 +792,7 @@ export * from './a2a-conversation-store.js';
 export * from './agent-manifest.js';
 export * from './provider-discovery.js';
 export * from './provider-capability-registry.js';
+export * from './provider-egress-gate.js';
 export * from './agent-provider-resolution.js';
 export * from './provider-health-registry.js';
 export * from './capability-broker.js';
