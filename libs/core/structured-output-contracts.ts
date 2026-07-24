@@ -8,6 +8,7 @@ import type {
   TaskAcceptanceEvidence,
   TaskResultBlock,
   TaskResultArtifact,
+  TaskResultKnowledgeFeedback,
   TaskReviewFinding,
 } from './channel-surface-types.js';
 
@@ -59,6 +60,17 @@ export const TaskAcceptanceEvidenceSchema: z.ZodType<TaskAcceptanceEvidence> = z
   })
   .strict();
 
+// KP-05: optional feedback bridge (see TaskResultKnowledgeFeedback doc
+// comment in channel-surface-types.ts). Additive-only — omitting the field
+// entirely (every pre-KP-05 task_result) must keep validating unchanged.
+export const TaskResultKnowledgeFeedbackSchema: z.ZodType<TaskResultKnowledgeFeedback> = z
+  .object({
+    used: z.array(z.string().min(1)).optional(),
+    not_used: z.array(z.string().min(1)).optional(),
+    missing_topics: z.array(z.string().min(1)).optional(),
+  })
+  .strict();
+
 export const TaskResultSchema: z.ZodType<TaskResultBlock> = z
   .object({
     summary: z.string().min(1).max(800),
@@ -68,6 +80,7 @@ export const TaskResultSchema: z.ZodType<TaskResultBlock> = z
     needs: z.array(z.string().min(1)),
     acceptance_evidence: z.array(TaskAcceptanceEvidenceSchema).optional(),
     review_findings: z.array(TaskReviewFindingSchema).optional(),
+    knowledge_feedback: TaskResultKnowledgeFeedbackSchema.optional(),
   })
   .strict();
 

@@ -31,6 +31,10 @@ import {
 import { provisionTaskKnowledge } from './task-knowledge-provisioning.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile, safeRmSync } from './secure-io.js';
+import {
+  knowledgeDeliveryLogDir,
+  loadKnowledgeUsageAggregate,
+} from './src/knowledge-feedback-loop.js';
 
 // buildMissionContextPack's internal pruning step writes a context rollup
 // under `missionPath` (default: the real `active/missions/public/<id>`
@@ -89,12 +93,35 @@ function buildFixturePack(
   });
 }
 
+// KP-05: provisionTaskKnowledge records delivery telemetry as a side effect.
+// Route it under the governed tmp root (same reasoning as fixtureRollupPath
+// above) so this suite never touches the real
+// active/shared/runtime/feedback-loop/ files.
+const deliveryDirOverride = pathResolver.sharedTmp(
+  `kp05-provisioning-test/delivery-${process.pid}`
+);
+const usagePathOverride = pathResolver.sharedTmp(
+  `kp05-provisioning-test/usage-${process.pid}.json`
+);
+let originalDeliveryDir: string | undefined;
+let originalUsagePath: string | undefined;
+
 beforeEach(() => {
   mocks.resolveMissionContextPack.mockReset();
+  originalDeliveryDir = process.env.KYBERION_KNOWLEDGE_DELIVERY_DIR;
+  originalUsagePath = process.env.KYBERION_KNOWLEDGE_USAGE_PATH;
+  process.env.KYBERION_KNOWLEDGE_DELIVERY_DIR = deliveryDirOverride;
+  process.env.KYBERION_KNOWLEDGE_USAGE_PATH = usagePathOverride;
 });
 
 afterEach(() => {
   safeRmSync(fixtureRollupPath, { recursive: true, force: true });
+  safeRmSync(deliveryDirOverride, { recursive: true, force: true });
+  safeRmSync(usagePathOverride, { recursive: true, force: true });
+  if (originalDeliveryDir === undefined) delete process.env.KYBERION_KNOWLEDGE_DELIVERY_DIR;
+  else process.env.KYBERION_KNOWLEDGE_DELIVERY_DIR = originalDeliveryDir;
+  if (originalUsagePath === undefined) delete process.env.KYBERION_KNOWLEDGE_USAGE_PATH;
+  else process.env.KYBERION_KNOWLEDGE_USAGE_PATH = originalUsagePath;
 });
 
 describe('provisionTaskKnowledge', () => {
@@ -159,6 +186,50 @@ describe('provisionTaskKnowledge', () => {
     expect(result.pack).toBeNull();
     expect(result.text).toBe('');
     expect(result.missionContextPackPath).toBeUndefined();
+  });
+
+  describe('KP-05 delivery telemetry', () => {
+    it('records a delivery record and exposes deliveredKnowledgeRefs when hints are delivered', async () => {
+      const pack = buildFixturePack();
+      mocks.resolveMissionContextPack.mockResolvedValue(pack);
+
+      const result = await provisionTaskKnowledge({
+        form: 'pack',
+        missionId: pack.scope.mission_id,
+        teamRole: 'implementer',
+        workItem: pack.work_item ?? undefined,
+      });
+
+      expect(result.deliveredKnowledgeRefs).toEqual([
+        {
+          path: 'knowledge/product/architecture/kp01-fixture-hint.md',
+          title: 'KP-01 Fixture Hint',
+          score: 0.5,
+        },
+      ]);
+
+      const dir = knowledgeDeliveryLogDir();
+      expect(safeExistsSync(dir)).toBe(true);
+      const aggregate = loadKnowledgeUsageAggregate();
+      const entry = aggregate.find(
+        (e) => e.document_path === 'knowledge/product/architecture/kp01-fixture-hint.md'
+      );
+      expect(entry).toMatchObject({ delivered_count: 1, occurrences: 1 });
+    });
+
+    it('does not write a delivery record when the pack has no knowledge hints', async () => {
+      const pack = buildFixturePack();
+      pack.knowledge_hints = [];
+      mocks.resolveMissionContextPack.mockResolvedValue(pack);
+
+      const result = await provisionTaskKnowledge({
+        form: 'pack',
+        missionId: pack.scope.mission_id,
+      });
+
+      expect(result.deliveredKnowledgeRefs).toEqual([]);
+      expect(safeExistsSync(knowledgeDeliveryLogDir())).toBe(false);
+    });
   });
 
   describe('persistence', () => {
