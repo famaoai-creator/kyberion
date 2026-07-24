@@ -47,6 +47,7 @@ Most agent frameworks stop at "execute". Kyberion closes the loop:
 - **The agent org improves itself.** Every finished mission runs a retrospective: deterministic execution stats ground LLM improvement proposals (human-ratified, never auto-applied), and measured agent×role outcomes feed the _next_ mission's team staffing. Your instance gets measurably better the more you use it.
 - **Frontier-model discipline on any model.** The working philosophy — read before write, one change one verification, no retry without a new hypothesis, evidence-based completion — is codified as mechanical rules ([working-philosophy](./knowledge/product/governance/working-philosophy.md)) and injected into every worker prompt, so fast/small models inherit the habits that make frontier models reliable.
 - **Governance by architecture, not by prompt.** Three-tier knowledge isolation is enforced at the file-IO boundary. Customer conversations are physically separated from mission state. Outbound sends always pass an approval gate. An append-only audit chain records everything.
+- **Workers get briefed, not dumped.** Each dispatched worker receives a role-scoped mission context pack — the mission goal, acceptance criteria, and the top knowledge hints distilled from previous runs — under an explicit size budget, with automatic compaction on long runs. Delegation is a briefing, not a context dump.
 
 ---
 
@@ -148,6 +149,9 @@ Plus:
 - **Three-tier knowledge isolation** — `personal/` / `confidential/` / `public/` enforced at the file-IO boundary.
 - **Customer aggregation** — `customer/{slug}/` overlay for FDE / implementation-support engagements without forks.
 - **Trace + audit** — OTel-inspired structured tracing per run, append-only audit chain.
+- **Goal-driven workers** — opt-in worker autonomy: a per-task goal state machine with token / turn / wall-clock budgets, event-sourced journals, and restart recovery that resumes exactly where the worker left off.
+- **Provenance-gated plugins** — skill plugins install through managed copies with source-derived trust; third-party code requires explicit human approval before it can ever run.
+- **Design-system-governed media** — PPTX and video are authored as semantic briefs; a single style cascade and text-measured layout fitting keep output on-brand without per-slide hand-tuning.
 
 For the catalog of actuators: [`CAPABILITIES_GUIDE.md`](./CAPABILITIES_GUIDE.md). For the architecture: [`knowledge/product/architecture/organization-work-loop.md`](./knowledge/product/architecture/organization-work-loop.md).
 

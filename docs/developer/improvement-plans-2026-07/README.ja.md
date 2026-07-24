@@ -9,6 +9,9 @@
 > **UI/UX 持続運営レビュー**: [UI_UX_DESIGN_SYSTEM_SUSTAINABILITY_PLAN_2026-07-13.ja.md](./UI_UX_DESIGN_SYSTEM_SUSTAINABILITY_PLAN_2026-07-13.ja.md)(DS-01/UX-05 の完了と週次 drift audit)。
 > **ループ完結計画**: [LOOP_CLOSURE_PLAN_2026-07-13.ja.md](./LOOP_CLOSURE_PLAN_2026-07-13.ja.md)(LC-01〜12: 実行成功→pipeline 昇格・LLM 判断配置・stub 縮退遮断・却下理由→修正再実行の4ループ)。
 > **実行レイヤリング計画**: [LAYERED_EXECUTION_PLAN_2026-07-15.ja.md](./LAYERED_EXECUTION_PLAN_2026-07-15.ja.md)(LE-01〜05: pipeline=配線 / typed ops=ロジック / デザインシステム=単一カスケードの3層分離。PPTX デザイン乖離の根治と script ラッパー pipeline の解消)。
+> **タスク知識配給計画**: [TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25.ja.md](./TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25.ja.md)(KP-01〜07: 配給経路の単一化・タスクプロファイル駆動の知識スライス・knowledge_feedback 帰還ループ・有効性主導キュレーション。MO-04/KM 系の後続ループ)。
+> **CLI サブエージェント・チーム計画**: [CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md](./CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md)(CT-01〜04: 単一 LLM プロバイダ CLI 内で完結するチーム構成・連携。役割→サブエージェント定義の生成儀式 + `HarnessSubagentDispatcher` + ファイル契約 E2E + 実行面の使い分け基準。agent-runtime の代替実行面)。
+> **クロスプロバイダ実行計画**: [CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md](./CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md)(XP-01〜07: 複数 LLM プロバイダ CLI(claude/codex/agy 等)の同一マシン併走規約。能力プローブ registry・権限射影と env 最小化・tier×egress ゲート・同一ディレクトリ併走契約・縮退表面化と provenance・並行予算・モデル分散 best-of-N。CT の兄弟計画)。
 
 ## 1. 目的
 
@@ -304,6 +307,45 @@ surface が提供する UI の機能的アフォーダンスの調査(2026-07-03
 | KD-07 | リソース宣言型ツール並列スケジューラ                      | P2     | M    | なし                  |
 | KD-08 | プロンプトキャッシュ規律契約                              | P2     | S    | KC-08/09(実装済み)    |
 | KD-09 | `{seq, epoch}` カーソル再同期契約(需要確定まで backlog)   | P3     | S    | KD-03、需要トリガー   |
+
+### タスク知識配給(配置・配給・帰還の閉ループ)
+
+ミッションのタスク実行時に担当エージェントへ渡すナレッジを「必要十分で生産性が高い」状態にする計画(2026-07-25、origin/main `00485737` で実コード突合)。正本は [TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25.ja.md](./TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25.ja.md)(KP-01〜07 は同文書内)。MO-04(context pack)・KM-01〜04(検索品質・昇格ガバナンス・ストア衛生)の後続ループ。**診断で判明した構造的問題: 配給3経路の装備不均一(goal-driven 経路は context pack 非添付、`delegateTask` は素文字列)、一律 top-3 で規模・役割に較正されない選定、trace `knowledgeRefs` 全空 = 帰還信号ゼロによる「量の管理」のみのメンテナンス。**
+
+| ID    | タイトル                                              | 優先度 | 規模 | 依存                   |
+| ----- | ----------------------------------------------------- | ------ | ---- | ---------------------- |
+| KP-01 | 配給 API の単一化と goal-driven 経路への接続          | P1     | M    | MO-04・KD-01(実装済み) |
+| KP-02 | `delegateTask` の構造化ナレッジ装備                   | P1     | S    | KP-01                  |
+| KP-03 | タスクプロファイル駆動の知識スライス(データ配置戦略)  | P1     | M    | KM-02(実装済み)        |
+| KP-04 | 必要十分の較正(規模連動予算と2巡目配給)               | P2     | S    | KP-01                  |
+| KP-05 | 配給テレメトリと knowledge_feedback(帰還ループの起点) | P1     | M    | KP-01                  |
+| KP-06 | 有効性主導キュレーションと鮮度 SLO(メンテナンス計画)  | P2     | M    | KP-05                  |
+| KP-07 | corpus 純度ガードの拡張(KM-04 の残穴)                 | P2     | S    | KM-04(実装済み)        |
+
+### CLI サブエージェント・チーム(単一プロバイダ CLI 内のチーム構成・連携)
+
+単一 LLM プロバイダの CLI(Claude Code / Agent SDK)内で完結するチームモードの構築計画(2026-07-25、実コード突合)。正本は [CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md](./CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md)(CT-01〜04 は同文書内)。Kyberion のチームは既に CLI 非依存の契約の束(team-roles・KD-05 能力ティア・タスク契約・context pack・共有ミッション作業域)なので、新規の連携機構ではなく**既存契約を CLI ハーネスのサブエージェント機構へ射影する薄いアダプタ**(役割定義の生成儀式 + `AgentDispatcher` seam への 1 クラス追加)として実現する。agent-runtime(A2A)の置き換えではなく代替実行面。
+
+| ID    | タイトル                                                       | 優先度 | 規模 | 依存            |
+| ----- | -------------------------------------------------------------- | ------ | ---- | --------------- |
+| CT-01 | 役割→サブエージェント定義の生成儀式(`.claude/agents/` SSoT 化) | P1     | M    | KD-05(実装済み) |
+| CT-02 | `HarnessSubagentDispatcher` の追加と配線                       | P1     | M    | CT-01           |
+| CT-03 | ファイル契約によるチーム連携の実証(E2E)                        | P2     | M    | CT-02           |
+| CT-04 | 実行面の使い分け基準と文書化                                   | P2     | S    | CT-02           |
+
+### クロスプロバイダ実行(複数 LLM プロバイダ CLI の併走規約)
+
+単一マシンに複数の LLM プロバイダ CLI(claude / codex / agy / gemini / copilot)が同居する現実(provider-discovery 5/5 検出、failover chain 構成済み)に対し、「検出して切り替える」以上の併走規約を定める計画(2026-07-25、実コード突合)。正本は [CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md](./CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md)(XP-01〜07 は同文書内)。ハード制約5点(ディレクトリ契約・指示の単一正本射影・env allowlist・tier×egress ゲート・プロバイダ中立出力契約)を**プロバイダ中立の宣言 + adapter 射影**として実装する。CT(単一 CLI チーム)の兄弟計画。
+
+| ID    | タイトル                                                 | 優先度 | 規模 | 依存                   |
+| ----- | -------------------------------------------------------- | ------ | ---- | ---------------------- |
+| XP-01 | プロバイダ能力プローブ registry と宣言ベースルーティング | P1     | M    | なし                   |
+| XP-02 | プロバイダ中立の権限プロファイル射影と env 最小化        | P1     | M    | KD-05(実装済み)        |
+| XP-03 | tier × egress ゲート(委譲面のデータ境界)                 | P1     | M    | SA-04(実装済み)・KP-01 |
+| XP-04 | 同一ディレクトリ併走契約(読み書きマトリクスと生成儀式)   | P1     | S〜M | CT-01 と生成儀式共有   |
+| XP-05 | 縮退表面化と成果物 provenance                            | P2     | S    | XP-01                  |
+| XP-06 | 並行・生存予算(プロセス面の資源統制)                     | P2     | S    | XP-01                  |
+| XP-07 | モデル分散 best-of-N(真のモデル多様性)                   | P2     | M    | XP-01〜03・MO-07       |
 
 ### Actuator リファクタリング/使いやすさ(ADFスキーマ・op)
 

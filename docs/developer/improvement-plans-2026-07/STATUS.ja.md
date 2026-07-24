@@ -51,6 +51,9 @@
 >    **教訓**: 「レイアウト pass・オーバーフロー0」でも、見れば一目で壊れている出力は出る。MP-04 の視覚レビューが必要な理由そのものが実証された。
 >    **2026-07-20追記**: Kimi Code概念取り込み KD-01〜09 を新設([KIMI_CODE_ADOPTION_PLAN_2026-07-20.ja.md](./KIMI_CODE_ADOPTION_PLAN_2026-07-20.ja.md)。MoonshotAI/kimi-code(kimi-cli の TypeScript 後継)の実コード分析に基づく概念昇華方式。KC-01〜10 の追補で、Goal 状態機械・イベントソーシング復元・プラグイン信頼由来導出など TS 版新規概念のみを扱う)。全件 TODO として追加し、DONE 90 / PARTIAL 31 / TODO 15 へ更新。
 >    **2026-07-24追記**: KD-01(worker goal 状態機械 + 自律ドライバ)/KD-02(goal 予算 grace step・75% 収束モード・wall-clock deadline)/KD-03(イベントソーシング型ワーカー状態復元)/KD-04(untrusted 注入枠付け契約)/KD-05(サブエージェント能力ティア)/KD-06(由来ベースプラグイン信頼 + managed-copy 隔離)/KD-07(リソース宣言型ツール並列スケジューラ、`core:parallel_calls`)/KD-08(プロンプトキャッシュ規律契約)を実装し、各受入条件を hermetic テスト(計 200+ 件)・typecheck・境界テスト・op-registry check で検証して DONE とした。KD-01 が generateWithTools 多段ループ(`worker-goal-driver.ts`)を導入し `context_rewind` を配線したため、**KC-07 も DONE へ更新**。KD-09 は需要トリガーの backlog として TODO のまま。DONE 99 / PARTIAL 30 / TODO 7 へ更新。
+>    **2026-07-25追記**: タスク知識配給計画 KP-01〜07 を新設([TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25.ja.md](./TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25.ja.md)。origin/main `00485737` の実コード突合に基づく。MO-04/KM 系の後続ループとして、配給3経路の装備不均一(goal-driven 経路の context pack 非添付・`delegateTask` の素文字列 context)、一律 top-3 選定、trace `knowledgeRefs` 全空=帰還信号ゼロを解消する)。全件 TODO として追加し、DONE 99 / PARTIAL 30 / TODO 14 へ更新。
+>    **2026-07-25追記**: CLI サブエージェント・チーム計画 CT-01〜04 を新設([CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md](./CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md)。単一 LLM プロバイダ CLI 内で完結するチーム構成・連携を、既存契約(team-roles・KD-05・タスク契約・context pack・ファイル契約)の CLI ハーネスへの射影として構築する。新規は役割定義の生成儀式と `HarnessSubagentDispatcher` の2点のみ)。全件 TODO として追加し、DONE 99 / PARTIAL 30 / TODO 18 へ更新。
+>    **2026-07-25追記**: クロスプロバイダ実行計画 XP-01〜07 を新設([CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md](./CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md)。複数 LLM プロバイダ CLI の同一マシン併走に対し、能力プローブ registry・KD-05 権限射影 + env allowlist・tier×egress ゲート・同一ディレクトリ併走契約・縮退表面化 + provenance・並行予算・モデル分散 best-of-N を、プロバイダ中立の宣言 + adapter 射影として定める。CT の兄弟計画)。全件 TODO として追加し、DONE 99 / PARTIAL 30 / TODO 25 へ更新。
 >    **判定基準**: DONE = 受入条件を実コードで検証済 / PARTIAL = 一部充足 / TODO = 実質未着手。
 
 ## サマリ
@@ -59,7 +62,7 @@
 | ------- | ---- |
 | DONE    | 99   |
 | PARTIAL | 30   |
-| TODO    | 7    |
+| TODO    | 25   |
 
 ## P0 残作業(プロダクション化のクリティカルパス)
 
@@ -346,6 +349,45 @@
 | KD-07 | DONE | 2026-07-24 実装・検証済: `tool-call-scheduler.ts`(read/write path 競合判定・request 順 drain・`all` 混在時は全体直列の安全側読み)+ `OpInputContract.accesses` 宣言(file/system の read 系 op)+ run_pipeline の `core:parallel_calls` 配線                                                                                                                                                                                                                                                                                                                                                                |
 | KD-08 | DONE | 2026-07-24 実装・検証済: `prompt-cache-discipline.ts`(StablePrefixGuard・deferred tool 告知・cache breakpoint 3 境界)、anthropic backend 9 箇所の cache_control 統一 + generateWithTools/promptWithImages へ追加、openai-compatible の tool ループへ guard 配線。実 API cache_read 検証は opt-in(`ANTHROPIC_API_KEY`)                                                                                                                                                                                                                                                                                    |
 | KD-09 | TODO | `{seq, epoch}` カーソル再同期契約(KD-03 依存・operator UI 需要確定まで backlog)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+
+### KP(タスク知識配給)
+
+正本: [TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25.ja.md](./TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25.ja.md)
+
+| ID    | 状態 | 残作業                                                                       |
+| ----- | ---- | ---------------------------------------------------------------------------- |
+| KP-01 | TODO | 配給 API の単一化(`provisionTaskKnowledge`)と goal-driven 経路への接続       |
+| KP-02 | TODO | `delegateTask` 呼び出し側の構造化ナレッジ装備(background-review/adf-repair)  |
+| KP-03 | TODO | タスクプロファイル駆動の知識スライス宣言(`knowledge-slices.json`)            |
+| KP-04 | TODO | 規模連動予算・task_guidance 全 tier 化・needs 起点の2巡目配給                |
+| KP-05 | TODO | trace `knowledgeRefs` 記録 + `task_result.knowledge_feedback` 帰還ループ     |
+| KP-06 | TODO | 週次キュレーション pipeline(delivered/used 集計・鮮度 SLO・降格候補)         |
+| KP-07 | TODO | corpus 純度ガード拡張(プレースホルダ distill 除外・persistent tier 汚染検知) |
+
+### CT(CLI サブエージェント・チーム)
+
+正本: [CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md](./CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md)
+
+| ID    | 状態 | 残作業                                                                              |
+| ----- | ---- | ----------------------------------------------------------------------------------- |
+| CT-01 | TODO | 役割→サブエージェント定義の生成儀式(SSoT 生成 + `--check` CI ドリフト検知)          |
+| CT-02 | TODO | `HarnessSubagentDispatcher` 追加と `maybeWrapWithDispatcher` 配線(呼び出し側無変更) |
+| CT-03 | TODO | ファイル契約のみでのチームフロー hermetic E2E(claim 排他・lens 分散レビュー)        |
+| CT-04 | TODO | 実行面の使い分け決定論ルーブリックと GLOSSARY/architecture 文書化                   |
+
+### XP(クロスプロバイダ実行)
+
+正本: [CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md](./CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md)
+
+| ID    | 状態 | 残作業                                                                               |
+| ----- | ---- | ------------------------------------------------------------------------------------ |
+| XP-01 | TODO | 能力プローブ registry(headless/JSON/認証/モデル)と宣言ベースルーティング             |
+| XP-02 | TODO | KD-05 プロファイル → プロバイダ別 permission マッピング表 + 子プロセス env allowlist |
+| XP-03 | TODO | プロバイダ egress ラベル × tier 突合ゲート(委譲入口)                                 |
+| XP-04 | TODO | 読み書きマトリクスの正準化と全プロバイダ指示への射影・git write 遮断                 |
+| XP-05 | TODO | failover 切替の trace 契約化と成果物 provider/model provenance                       |
+| XP-06 | TODO | global semaphore・プロバイダ別上限・wall-clock 予算・ゾンビ回収                      |
+| XP-07 | TODO | 複数プロバイダ並列発注 + MO-07 judge 集約(`best-of-providers`)                       |
 
 ### CO(Company OS)
 
