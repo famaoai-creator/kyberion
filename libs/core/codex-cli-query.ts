@@ -5,13 +5,8 @@ import path from 'node:path';
 import { z, type ZodType } from 'zod';
 import { logger } from './core.js';
 import * as pathResolver from './path-resolver.js';
-import {
-  buildSafeExecEnv,
-  safeExecResult,
-  safeReadFile,
-  safeRmSync,
-  safeWriteFile,
-} from './secure-io.js';
+import { safeExecResult, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
+import { buildProviderChildEnv } from './provider-permission-profiles.js';
 import { resolveRuntimeModelId } from './runtime-model-defaults.js';
 
 export interface CodexCliQueryOptions {
@@ -132,7 +127,8 @@ class CodexCliQuery {
     return new Promise((resolve, reject) => {
       const child = spawn(this.bin, args, {
         stdio: ['pipe', 'pipe', 'pipe'],
-        env: buildSafeExecEnv(),
+        // XP-02: minimal allowlisted env, scoped to codex's own required vars.
+        env: buildProviderChildEnv({ provider: 'codex' }),
         cwd: this.cwd,
       });
       let stderr = '';

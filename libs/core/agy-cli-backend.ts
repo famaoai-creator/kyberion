@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process';
 import * as path from 'node:path';
 import { z, type ZodType } from 'zod';
 import { logger } from './core.js';
-import { buildSafeExecEnv } from './secure-io.js';
+import { buildProviderChildEnv } from './provider-permission-profiles.js';
 import * as pathResolver from './path-resolver.js';
 import type {
   ReasoningBackend,
@@ -405,7 +405,8 @@ export class AgyCliBackend implements ReasoningBackend {
     return new Promise((resolve, reject) => {
       const child = spawn(this.bin, args, {
         stdio: ['pipe', 'pipe', 'pipe'],
-        env: buildSafeExecEnv(),
+        // XP-02: minimal allowlisted env, scoped to agy's own required vars.
+        env: buildProviderChildEnv({ provider: 'agy' }),
       });
       let stdout = '';
       let stderr = '';

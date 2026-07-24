@@ -20,6 +20,7 @@
 
 import { spawn, spawnSync } from 'node:child_process';
 import { childDelegationEnv } from './operation-policy-gate.js';
+import { buildProviderChildEnv } from './provider-permission-profiles.js';
 import { assertReasoningEgressAllowed } from './reasoning-egress-scope.js';
 import { z, type ZodType } from 'zod';
 import { logger } from './core.js';
@@ -494,8 +495,9 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
     return new Promise((resolve, reject) => {
       const child = spawn(this.bin, args, {
         stdio: ['pipe', 'pipe', 'pipe'],
-        // SA-05: the spawned CLI is one delegation hop deeper than us.
-        env: { ...process.env, ...childDelegationEnv() },
+        // XP-02: minimal allowlisted env (no cross-provider credential
+        // leakage); SA-05: one delegation hop deeper than us.
+        env: { ...buildProviderChildEnv({ provider: 'claude' }), ...childDelegationEnv() },
       });
       let stdout = '';
       let stderr = '';
@@ -540,7 +542,11 @@ export function probeShellClaudeCliAvailability(
       ['-p', 'Return the word ok.', '--output-format', 'json', '--model', 'opus'],
       {
         encoding: 'utf8',
-        env: { ...process.env, ...env },
+        // XP-02: minimal allowlisted env; overrides in `env` (e.g. a test's
+        // KYBERION_CLAUDE_CLI_BIN, or the KYBERION_PROVIDER_ENV_ALLOWLIST=0
+        // escape hatch) are applied before allowlisting so they still take
+        // effect.
+        env: buildProviderChildEnv({ provider: 'claude', baseEnv: { ...process.env, ...env } }),
         shell: false,
         timeout: timeoutMs,
         stdio: ['ignore', 'pipe', 'pipe'],

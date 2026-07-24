@@ -51,9 +51,7 @@ describe('agy-cli-backend', () => {
   });
 
   it('runs print mode with the current agy cli flags and parses JSON output', async () => {
-    spawnMock.mockReturnValueOnce(
-      createChild(JSON.stringify({ response: '{"ok":true}' })),
-    );
+    spawnMock.mockReturnValueOnce(createChild(JSON.stringify({ response: '{"ok":true}' })));
 
     const backend = new AgyCliBackend({
       bin: 'agy',
@@ -77,16 +75,55 @@ describe('agy-cli-backend', () => {
         '-p',
         'Return JSON: {"ok":true}',
       ]),
-      expect.any(Object),
+      expect.any(Object)
     );
     expect(spawnMock.mock.calls[0][1]).not.toContain('--output-format');
     expect(spawnMock.mock.calls[0][1]).not.toContain('--json-schema');
     expect(spawnMock.mock.calls[0][1]).not.toContain('--system-prompt');
   });
 
+  describe('spawnCli env allowlisting (XP-02)', () => {
+    const previousOpenAiKey = process.env.OPENAI_API_KEY;
+    const previousAnthropicKey = process.env.ANTHROPIC_API_KEY;
+    const previousUnrelated = process.env.UNRELATED_TEST_SECRET;
+
+    afterEach(() => {
+      if (previousOpenAiKey === undefined) delete process.env.OPENAI_API_KEY;
+      else process.env.OPENAI_API_KEY = previousOpenAiKey;
+      if (previousAnthropicKey === undefined) delete process.env.ANTHROPIC_API_KEY;
+      else process.env.ANTHROPIC_API_KEY = previousAnthropicKey;
+      if (previousUnrelated === undefined) delete process.env.UNRELATED_TEST_SECRET;
+      else process.env.UNRELATED_TEST_SECRET = previousUnrelated;
+    });
+
+    it('spawns agy with an allowlisted env that excludes other providers credentials', async () => {
+      process.env.OPENAI_API_KEY = 'fake-openai-key-should-not-leak';
+      process.env.ANTHROPIC_API_KEY = 'fake-anthropic-key-should-not-leak';
+      process.env.UNRELATED_TEST_SECRET = 'should-not-leak-either';
+      spawnMock.mockReturnValueOnce(createChild(JSON.stringify({ response: 'ok' })));
+
+      const backend = new AgyCliBackend({
+        bin: 'agy',
+        model: 'agy',
+        sandbox: true,
+        logFile: '/tmp/agy-cli.log',
+      });
+      await backend.prompt('hello');
+
+      expect(spawnMock).toHaveBeenCalledTimes(1);
+      const [, , spawnOptions] = spawnMock.mock.calls[0];
+      expect(spawnOptions.env.PATH).toBe(process.env.PATH);
+      expect(spawnOptions.env.OPENAI_API_KEY).toBeUndefined();
+      expect(spawnOptions.env.ANTHROPIC_API_KEY).toBeUndefined();
+      expect(spawnOptions.env.UNRELATED_TEST_SECRET).toBeUndefined();
+    });
+  });
+
   it('runs structured mode by requesting json in the prompt and validates the response', async () => {
     spawnMock.mockReturnValueOnce(
-      createChild('```json\n{"goal":"ship","constraints":[],"deliverables":[],"excluded":[],"stakeholders":[]}\n```'),
+      createChild(
+        '```json\n{"goal":"ship","constraints":[],"deliverables":[],"excluded":[],"stakeholders":[]}\n```'
+      )
     );
 
     const backend = new AgyCliBackend({
