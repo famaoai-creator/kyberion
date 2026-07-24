@@ -119,6 +119,68 @@ describe('agy-cli-backend', () => {
     });
   });
 
+  describe('declarative permission profile argv (XP-02 follow-up)', () => {
+    afterEach(() => {
+      spawnMock.mockClear();
+    });
+
+    it('no profile: argv is byte-identical to the pre-profile baseline (sandbox + skip-permissions)', async () => {
+      spawnMock.mockReturnValueOnce(createChild(JSON.stringify({ response: 'ok' })));
+
+      const backend = new AgyCliBackend({
+        bin: 'agy',
+        model: 'agy',
+        sandbox: true,
+        logFile: '/tmp/agy-cli.log',
+      });
+      await backend.prompt('hello');
+
+      expect(spawnMock).toHaveBeenCalledTimes(1);
+      const [, argv] = spawnMock.mock.calls[0];
+      expect(argv).toEqual([
+        '--log-file',
+        '/tmp/agy-cli.log',
+        '--model',
+        'agy',
+        '--sandbox',
+        '--dangerously-skip-permissions',
+        '-p',
+        'hello',
+      ]);
+    });
+
+    it('explorer profile: argv contains the sandbox mapping and not --dangerously-skip-permissions', async () => {
+      spawnMock.mockReturnValueOnce(createChild(JSON.stringify({ response: 'ok' })));
+
+      const backend = new AgyCliBackend({
+        bin: 'agy',
+        model: 'agy',
+        sandbox: true,
+        logFile: '/tmp/agy-cli.log',
+      });
+      await backend.prompt('hello', { profile: 'explorer' });
+
+      expect(spawnMock).toHaveBeenCalledTimes(1);
+      const [, argv] = spawnMock.mock.calls[0];
+      expect(argv).toContain('--sandbox');
+      expect(argv).not.toContain('--dangerously-skip-permissions');
+    });
+
+    it('planner profile: typed refusal, no spawn attempted', async () => {
+      const backend = new AgyCliBackend({
+        bin: 'agy',
+        model: 'agy',
+        sandbox: true,
+        logFile: '/tmp/agy-cli.log',
+      });
+
+      await expect(backend.prompt('hello', { profile: 'planner' })).rejects.toThrow(
+        /permission profile "planner" refused/
+      );
+      expect(spawnMock).not.toHaveBeenCalled();
+    });
+  });
+
   it('runs structured mode by requesting json in the prompt and validates the response', async () => {
     spawnMock.mockReturnValueOnce(
       createChild(

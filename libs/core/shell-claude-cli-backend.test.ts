@@ -80,4 +80,51 @@ describe('shell-claude-cli-backend', () => {
       expect(spawnOptions.env.UNRELATED_TEST_SECRET).toBeUndefined();
     });
   });
+
+  describe('declarative permission profile argv (XP-02 follow-up)', () => {
+    afterEach(() => {
+      spawnMock.mockClear();
+    });
+
+    it('no profile: argv is byte-identical to the pre-profile baseline', async () => {
+      spawnMock.mockReturnValueOnce(createChild('ok'));
+
+      const backend = new ShellClaudeCliBackend({ bin: 'claude', model: 'opus' });
+      await backend.delegateTask('do the thing', 'ctx');
+
+      expect(spawnMock).toHaveBeenCalledTimes(1);
+      const [, argv] = spawnMock.mock.calls[0];
+      expect(argv).toEqual(['-p', 'do the thing\n\nContext: ctx', '--model', 'opus']);
+    });
+
+    it('explorer profile: argv carries the read-only mapping and not write/exec flags', async () => {
+      spawnMock.mockReturnValueOnce(createChild('ok'));
+
+      const backend = new ShellClaudeCliBackend({ bin: 'claude', model: 'opus' });
+      await backend.delegateTask('do the thing', undefined, { profile: 'explorer' });
+
+      expect(spawnMock).toHaveBeenCalledTimes(1);
+      const [, argv] = spawnMock.mock.calls[0];
+      expect(argv).toContain('--allowedTools');
+      expect(argv).toEqual(expect.arrayContaining(['Read', 'Glob', 'Grep', 'WebFetch']));
+      expect(argv).toContain('--disallowedTools');
+      expect(argv).not.toContain('bypassPermissions');
+      expect(argv).not.toContain('--dangerously-skip-permissions');
+      // permission-mode is 'default' for explorer, never 'bypassPermissions'
+      const permissionModeIndex = argv.indexOf('--permission-mode');
+      expect(argv[permissionModeIndex + 1]).toBe('default');
+    });
+
+    it('planner profile on claude: grants plan mode (not a refusal)', async () => {
+      spawnMock.mockReturnValueOnce(createChild('ok'));
+
+      const backend = new ShellClaudeCliBackend({ bin: 'claude', model: 'opus' });
+      await backend.delegateTask('do the thing', undefined, { profile: 'planner' });
+
+      expect(spawnMock).toHaveBeenCalledTimes(1);
+      const [, argv] = spawnMock.mock.calls[0];
+      const permissionModeIndex = argv.indexOf('--permission-mode');
+      expect(argv[permissionModeIndex + 1]).toBe('plan');
+    });
+  });
 });

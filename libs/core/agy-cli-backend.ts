@@ -3,7 +3,11 @@ import { spawn } from 'node:child_process';
 import * as path from 'node:path';
 import { z, type ZodType } from 'zod';
 import { logger } from './core.js';
-import { buildProviderChildEnv } from './provider-permission-profiles.js';
+import {
+  buildProviderChildEnv,
+  resolveProviderPermissionArgs,
+  type ProviderPermissionProfileName,
+} from './provider-permission-profiles.js';
 import * as pathResolver from './path-resolver.js';
 import type {
   ReasoningBackend,
@@ -40,6 +44,14 @@ export interface RunAgyCliQueryParams<T> {
   systemPrompt: string;
   userPrompt: string;
   schema: ZodType<T>;
+  /**
+   * XP-02 follow-up: KD-05 capability profile. When set, its provider
+   * permission mapping (see {@link resolveProviderPermissionArgs}) replaces
+   * the unconditional `--dangerously-skip-permissions` flag. Omit (the
+   * historical default) to keep argv byte-identical to callers that predate
+   * this option.
+   */
+  profile?: ProviderPermissionProfileName;
   options?: AgyCliBackendOptions;
 }
 
@@ -291,20 +303,29 @@ export class AgyCliBackend implements ReasoningBackend {
     })) as DecomposedTaskPlan;
   }
 
-  async delegateTask(instruction: string, context?: string): Promise<string> {
+  async delegateTask(
+    instruction: string,
+    context?: string,
+    options?: { profile?: ProviderPermissionProfileName }
+  ): Promise<string> {
     return this.runPrompt(
-      [instruction, context ? `Context: ${context}` : ''].filter(Boolean).join('\n\n')
+      [instruction, context ? `Context: ${context}` : ''].filter(Boolean).join('\n\n'),
+      options?.profile
     );
   }
 
-  async prompt(prompt: string): Promise<string> {
-    return this.delegateTask(prompt);
+  async prompt(
+    prompt: string,
+    options?: { profile?: ProviderPermissionProfileName }
+  ): Promise<string> {
+    return this.delegateTask(prompt, undefined, options);
   }
 
   public async runStructured<T>(params: {
     systemPrompt: string;
     userPrompt: string;
     schema: ZodType<T>;
+    profile?: ProviderPermissionProfileName;
   }): Promise<T> {
     const jsonSchema = z.toJSONSchema(params.schema) as Record<string, unknown>;
     if ('$schema' in jsonSchema) delete jsonSchema['$schema'];
@@ -328,8 +349,7 @@ export class AgyCliBackend implements ReasoningBackend {
       this.logFile,
       '--model',
       this.model,
-      ...(this.sandbox ? ['--sandbox'] : []),
-      '--dangerously-skip-permissions',
+      ...this.resolvePermissionArgs(params.profile),
       '-p',
       prompt,
       ...this.extraArgs,
@@ -374,14 +394,16 @@ export class AgyCliBackend implements ReasoningBackend {
     return parsed.data;
   }
 
-  private async runPrompt(prompt: string): Promise<string> {
+  private async runPrompt(
+    prompt: string,
+    profile?: ProviderPermissionProfileName
+  ): Promise<string> {
     const args = [
       '--log-file',
       this.logFile,
       '--model',
       this.model,
-      ...(this.sandbox ? ['--sandbox'] : []),
-      '--dangerously-skip-permissions',
+      ...this.resolvePermissionArgs(profile),
       '-p',
       prompt,
       ...this.extraArgs,
@@ -399,6 +421,24 @@ export class AgyCliBackend implements ReasoningBackend {
       if (err.message.startsWith('[agy-cli]')) throw err;
       return stdout.trim();
     }
+  }
+
+  /**
+   * XP-02 follow-up: resolve a KD-05 capability profile to agy CLI argv
+   * fragments. No profile ⇒ the historical unconditional argv
+   * (`--sandbox` if enabled, plus `--dangerously-skip-permissions`) so
+   * existing callers see byte-identical argv. A typed refusal (e.g.
+   * planner — agy has no verified no-exec mode) throws before any spawn.
+   */
+  private resolvePermissionArgs(profile?: ProviderPermissionProfileName): string[] {
+    if (!profile) {
+      return [...(this.sandbox ? ['--sandbox'] : []), '--dangerously-skip-permissions'];
+    }
+    const resolution = resolveProviderPermissionArgs(profile, 'agy');
+    if (resolution.kind === 'refused') {
+      throw new Error(`[agy-cli] permission profile "${profile}" refused: ${resolution.reason}`);
+    }
+    return [...resolution.args];
   }
 
   private spawnCli(args: string[]): Promise<string> {
@@ -461,6 +501,7 @@ export async function runAgyCliQuery<T>(params: RunAgyCliQueryParams<T>): Promis
     systemPrompt: params.systemPrompt,
     userPrompt: params.userPrompt,
     schema: params.schema,
+    profile: params.profile,
   });
 }
 
