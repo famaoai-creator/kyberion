@@ -8,6 +8,11 @@ import {
   type DistilledKnowledgeEntry,
 } from './distill-knowledge-injector.js';
 import {
+  resolveKnowledgeSlice,
+  isKnowledgePathExcluded,
+  isKnowledgePathInSearchRoots,
+} from './knowledge-slices.js';
+import {
   findReusableArtifactOwnershipRecord,
   listArtifactOwnershipRecordsForProject,
   type ArtifactOwnershipRecord,
@@ -945,14 +950,100 @@ function loadTrackStateIfPossible(input: {
   return loadProjectTrackRecord(candidate);
 }
 
-async function loadKnowledgeHintsIfPossible(input: {
+const KNOWLEDGE_HINT_LIMIT = 3;
+const PINNED_EXCERPT_MAX_CHARS = 400;
+
+/**
+ * Parse a leading `---\n...\n---\n` YAML-ish frontmatter block for a `title:`
+ * field, mirroring the lightweight parsing distill-knowledge-injector.ts uses
+ * for distilled docs. Pinned KP-03 docs are plain governance markdown and
+ * rarely carry frontmatter, so this is a best-effort extraction, not the
+ * primary title source (see `firstMarkdownHeading` below).
+ */
+function pinnedFrontmatterTitle(text: string): { title?: string; body: string } {
+  if (!text.startsWith('---\n')) return { body: text };
+  const end = text.indexOf('\n---\n', 4);
+  if (end === -1) return { body: text };
+  const block = text.slice(4, end);
+  const body = text.slice(end + 5);
+  const match = block.match(/^title\s*:\s*(.+)$/m);
+  const title = match ? match[1].trim().replace(/^["']|["']$/g, '') : undefined;
+  return { title, body };
+}
+
+function firstMarkdownHeading(text: string): string | undefined {
+  const match = text.match(/^#\s+(.+)$/m);
+  return match ? match[1].trim() : undefined;
+}
+
+/** Truncate to the first paragraph, collapsed whitespace, ≤ max chars — same shape as distill excerpts. */
+function truncatePinnedExcerpt(body: string, max = PINNED_EXCERPT_MAX_CHARS): string {
+  const trimmed = body.trim();
+  const idx = trimmed.indexOf('\n\n');
+  const para = idx >= 0 ? trimmed.slice(0, idx) : trimmed;
+  return para.replace(/\s+/g, ' ').slice(0, max);
+}
+
+/**
+ * Load one KP-03 `pinned` document as a knowledge hint. Read via secure-io;
+ * missing/unreadable files are skipped (fail-open per document — the caller
+ * does not reserve a budget slot for a pin that failed to load).
+ */
+function loadPinnedKnowledgeHint(repoRelativePath: string): MissionContextPackKnowledgeHint | null {
+  try {
+    const abs = pathResolver.rootResolve(repoRelativePath);
+    if (!safeExistsSync(abs)) return null;
+    const raw = safeReadFile(abs, { encoding: 'utf8' }) as string;
+    const { title: frontmatterTitle, body } = pinnedFrontmatterTitle(raw);
+    const bodyWithoutHeading = body.replace(/^#\s+.+\n/, '');
+    const title = frontmatterTitle || firstMarkdownHeading(body) || path.basename(repoRelativePath);
+    return {
+      path: repoRelativePath,
+      title,
+      excerpt: truncatePinnedExcerpt(bodyWithoutHeading),
+      tags: [],
+    };
+  } catch {
+    return null;
+  }
+}
+
+export interface LoadKnowledgeHintsInput {
   missionState: MissionStateSummary;
   projectState?: ProjectOperationalState | null;
   trackRecord?: ProjectTrackRecord | null;
   teamRole?: string;
+  /**
+   * Governance phase (alignment/execution/onboarding/recovery/review). Not
+   * currently sourced from mission/work-item state — see KP-03 design note
+   * open question #1. Omitted here in production; tests may supply it
+   * directly to exercise phase-scoped slices (this is the "seam").
+   */
+  phase?: string;
   workItem?: WorkItem | null;
   taskSession?: TaskSession | null;
-}): Promise<MissionContextPackKnowledgeHint[]> {
+  /**
+   * Test-only override for the KP-03 knowledge slices manifest path
+   * (repo-relative). Defaults to `knowledge/product/governance/knowledge-slices.json`.
+   */
+  knowledgeSlicesPath?: string;
+}
+
+/**
+ * Resolve knowledge hints for a mission context pack.
+ *
+ * KP-03 wiring: resolves the matching knowledge slice for the dispatch
+ * profile (team_role x phase x mission_type), delivers `pinned` documents
+ * first (reserving hint-budget slots), then fills the remaining budget with
+ * `findRelevantDistilledKnowledge`, filtered by the slice's `exclude` globs
+ * and re-prioritized by its `search_roots`. When no slice matches, or the
+ * manifest is missing/invalid, this reduces to exactly the pre-KP-03
+ * behavior (flat top-`KNOWLEDGE_HINT_LIMIT` search, no pinning/filtering) —
+ * `resolveKnowledgeSlice` fails open, so no explicit branch is needed here.
+ */
+export async function loadKnowledgeHintsIfPossible(
+  input: LoadKnowledgeHintsInput
+): Promise<MissionContextPackKnowledgeHint[]> {
   const topic = [
     input.missionState.mission_type,
     input.teamRole,
@@ -984,14 +1075,50 @@ async function loadKnowledgeHintsIfPossible(input: {
       .filter(Boolean)
   );
 
+  const slice = resolveKnowledgeSlice({
+    teamRole: input.teamRole,
+    phase: input.phase,
+    missionType: input.missionState.mission_type,
+    slicesPath: input.knowledgeSlicesPath,
+  });
+
+  const pinnedHints: MissionContextPackKnowledgeHint[] = [];
+  for (const pinnedPath of slice.pinned) {
+    if (pinnedHints.length >= KNOWLEDGE_HINT_LIMIT) break;
+    const hint = loadPinnedKnowledgeHint(pinnedPath);
+    if (hint) pinnedHints.push(hint);
+  }
+
+  const remaining = KNOWLEDGE_HINT_LIMIT - pinnedHints.length;
+  if (remaining <= 0) return pinnedHints;
+
+  // Over-fetch when exclude globs are in play so post-filtering can still fill the budget.
+  const searchLimit = slice.exclude.length > 0 ? remaining * 2 : remaining;
   const relevant = await findRelevantDistilledKnowledge({
     topic,
     tags: Array.from(tags),
-    limit: 3,
+    limit: searchLimit,
     minScore: 0.08,
   });
 
-  return relevant.map((entry: DistilledKnowledgeEntry) => ({
+  const filtered =
+    slice.exclude.length > 0
+      ? relevant.filter((entry) => !isKnowledgePathExcluded(entry.path, slice.exclude))
+      : relevant;
+
+  const prioritized =
+    slice.searchRoots.length > 0
+      ? [
+          ...filtered.filter((entry) =>
+            isKnowledgePathInSearchRoots(entry.path, slice.searchRoots)
+          ),
+          ...filtered.filter(
+            (entry) => !isKnowledgePathInSearchRoots(entry.path, slice.searchRoots)
+          ),
+        ]
+      : filtered;
+
+  const searchHints = prioritized.slice(0, remaining).map((entry: DistilledKnowledgeEntry) => ({
     path: entry.path,
     title: entry.title,
     excerpt: entry.excerpt,
@@ -1001,6 +1128,8 @@ async function loadKnowledgeHintsIfPossible(input: {
     ...(entry.source_mission ? { source_mission: entry.source_mission } : {}),
     ...(entry.last_updated ? { last_updated: entry.last_updated } : {}),
   }));
+
+  return [...pinnedHints, ...searchHints];
 }
 
 function loadArtifactHintsIfPossible(input: {

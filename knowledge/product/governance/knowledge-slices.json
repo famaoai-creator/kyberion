@@ -6,7 +6,7 @@
     {
       "id": "implementer-execution",
       "description": "Implementers doing execution-phase work always get the working philosophy up front, and never see unreviewed auto-distilled placeholders that would crowd the budget with low-signal text.",
-      "match": { "team_role": "implementer", "phase": "execution" },
+      "match": { "team_role": "implementer", "phase": "*" },
       "pinned": ["knowledge/product/governance/working-philosophy.md"],
       "exclude": ["knowledge/product/evolution/distill_*.md"]
     },
