@@ -40,6 +40,7 @@ import {
   shutdownAllAgentRuntimes,
 } from './agent-runtime-supervisor.js';
 import { ledger } from './ledger.js';
+import { missionCoordinationBus } from './mission-coordination-bus.js';
 import {
   claimWorkItem,
   importExternalWorkItem,
@@ -69,7 +70,7 @@ import {
 import { WorkerStateJournal } from './worker-state-journal.js';
 import { getDefaultWorkerEventStream, type WorkerEventStream } from './worker-event-stream.js';
 import { buildExecutionEnv } from './authority.js';
-import { findMissionPath, missionDir, missionEvidenceDir, rootDir } from './path-resolver.js';
+import { missionDir, missionEvidenceDir, rootDir } from './path-resolver.js';
 import { pathResolver } from './path-resolver.js';
 import {
   renderMissionContextPack,
@@ -1209,23 +1210,31 @@ function buildRejectionLessonLines(): string[] {
 }
 
 /**
- * syncRoleProcedure (mission-governance.ts) mirrors the assigned persona's
- * knowledge/product/roles/{persona}/PROCEDURE.md into ROLE_PROCEDURE.md once
- * at mission activation. Without this provider, that file was written but
- * never read back into any worker prompt.
+ * Each team-role assignment carries its own `authority_role` (e.g. a
+ * `tester` task's assignee might be authorized as `qa_lead`, an
+ * `implementer` task's as `software_developer`) — a different, finer-grained
+ * concept than the single mission-wide `assigned_persona` that
+ * syncRoleProcedure (mission-governance.ts) mirrors at mission activation.
+ * That mission-wide copy is fine as an audit artifact, but injecting it into
+ * every task regardless of which role is actually doing the work would hand
+ * a reviewer/tester the mission owner's procedure instead of their own.
+ * This provider instead reads knowledge/product/roles/{authorityRole}/
+ * PROCEDURE.md directly, per-task, and is registered under a role-specific
+ * provider id so each authority_role's procedure is injected once (on that
+ * role's first task) rather than on every single task dispatch.
  */
-function buildRolePersonaProcedureInjectionProvider(missionId: string): DynamicInjectionProvider {
+function buildAuthorityRoleProcedureInjectionProvider(
+  authorityRole: string
+): DynamicInjectionProvider {
   return {
-    id: 'role-persona-procedure',
+    id: `authority-role-procedure:${authorityRole}`,
     oneShot: true,
     collect: () => {
-      const missionPath = findMissionPath(missionId);
-      if (!missionPath) return null;
-      const procedurePath = nodePath.join(missionPath, 'ROLE_PROCEDURE.md');
+      const procedurePath = pathResolver.knowledge(`product/roles/${authorityRole}/PROCEDURE.md`);
       if (!safeExistsSync(procedurePath)) return null;
       const content = String(safeReadFile(procedurePath, { encoding: 'utf8' }) || '').trim();
       if (!content) return null;
-      return ['## Assigned persona procedure', content].join('\n\n');
+      return [`## Role procedure (${authorityRole})`, content].join('\n\n');
     },
   };
 }
@@ -1562,6 +1571,7 @@ async function buildTaskDispatchContext(input: {
   task: PlannedNextTask;
   teamRole: string;
   agentId: string;
+  authorityRole?: string | null;
   taskModelHint?: { model_id?: string; tier?: string; effort?: string; route_reason?: string };
   allTasks: PlannedNextTask[];
   /** OH-01 reactive path: force compaction after a prompt-too-long dispatch failure. */
@@ -1664,6 +1674,19 @@ async function buildTaskDispatchContext(input: {
       reviewTask: input.task,
       tasks: input.allTasks,
     });
+    try {
+      missionCoordinationBus.send({
+        mission_id: input.missionId,
+        channel: 'review',
+        from_agent: 'mission_orchestration_worker',
+        to_agent: input.agentId,
+        to_role: canonicalTeamRole,
+        task_id: input.task.task_id,
+        content: `Artifact review requested for task ${input.task.task_id}.`,
+      });
+    } catch {
+      // Coordination-bus visibility is best-effort; never block dispatch on it.
+    }
   }
   const artifactReviewLines = buildArtifactReviewLines(input.task);
   const rejectionLessonLines = buildRejectionLessonLines();
@@ -1681,8 +1704,11 @@ async function buildTaskDispatchContext(input: {
       buildWorkingPrinciplesInjectionProvider(buildWorkingPrinciplesLines, input.teamRole)
     );
   }
-  if (!injectionRegistry.hasProvider('role-persona-procedure')) {
-    injectionRegistry.register(buildRolePersonaProcedureInjectionProvider(input.missionId));
+  if (input.authorityRole) {
+    const authorityRoleProviderId = `authority-role-procedure:${input.authorityRole}`;
+    if (!injectionRegistry.hasProvider(authorityRoleProviderId)) {
+      injectionRegistry.register(buildAuthorityRoleProcedureInjectionProvider(input.authorityRole));
+    }
   }
   const dynamicInjectionLines = injectionRegistry
     .collect({ step: 0 })
@@ -2168,6 +2194,7 @@ async function dispatchPlannedMissionTask(input: {
   teamRole: string;
   assignment: {
     agent_id: string;
+    authority_role?: string | null;
     model_hint?: { model_id?: string; tier?: string; effort?: string; route_reason?: string };
     organization_role_id?: string;
     perspective_ids?: string[];
@@ -2236,6 +2263,7 @@ async function dispatchPlannedMissionTask(input: {
       task: input.task,
       teamRole: input.teamRole,
       agentId: input.assignment.agent_id,
+      authorityRole: input.assignment.authority_role,
       taskModelHint: input.assignment.model_hint,
       allTasks: input.allTasks,
       ...(forceContextCompaction ? { forceContextCompaction: true } : {}),
@@ -2653,6 +2681,20 @@ async function dispatchPlannedMissionTask(input: {
           review_round: nextReviewRound,
         },
       });
+      try {
+        missionCoordinationBus.send({
+          mission_id: input.missionId,
+          channel: 'handoff',
+          from_agent: input.assignment.agent_id,
+          from_role: input.teamRole,
+          to_agent: targetTask.assigned_to?.agent_id,
+          to_role: targetTask.assigned_to?.role,
+          task_id: targetTask.task_id,
+          content: `Review round ${nextReviewRound} sent ${reviewFindings.length} finding(s) back to ${targetTask.task_id} for rework.`,
+        });
+      } catch {
+        // Coordination-bus visibility is best-effort; never block the rework handoff on it.
+      }
       emitMissionTaskEvent({
         event_type: 'task_reviewed',
         mission_id: input.missionId,

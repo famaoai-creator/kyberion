@@ -627,6 +627,73 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
     expect(stored.map((task: any) => task.status)).toEqual(['completed', 'completed']);
   });
 
+  it('injects the assignment authority_role procedure, not the mission-wide persona, per task', async () => {
+    const { missionDir } = await import('./path-resolver.js');
+    const { safeWriteFile } = await import('./secure-io.js');
+    const { dispatchMissionNextTasks } = await import('./mission-orchestration-worker.js');
+
+    const missionPath = missionDir('MSN-FOLLOWUP', 'public');
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify(
+        [
+          {
+            task_id: 'task-qa',
+            status: 'planned',
+            assigned_to: { role: 'tester', agent_id: 'qa-agent' },
+            description: 'Validate the release candidate',
+            deliverable: 'deliverables/task-qa.md',
+          },
+        ],
+        null,
+        2
+      )
+    );
+    safeWriteFile(
+      `${missionPath}/TASK_BOARD.md`,
+      ['# TASK_BOARD: MSN-FOLLOWUP', '', '### 🛠️ Execution Phase', ''].join('\n')
+    );
+
+    mocks.ensureMissionTeamRuntimeViaSupervisor.mockResolvedValue({
+      runtime_plan: { mission_id: 'MSN-FOLLOWUP', assignments: [] },
+    });
+    mocks.resolveMissionTeamPlan.mockReturnValue({
+      mission_id: 'MSN-FOLLOWUP',
+      mission_type: 'product_development',
+      assignments: [],
+    });
+    mocks.buildMissionTeamView.mockReturnValue({ planner: 'nerve-agent' });
+    mocks.resolveMissionTeamReceiver.mockReturnValue({
+      agent_id: 'qa-agent',
+      authority_role: 'qa_lead',
+      model_hint: {
+        tier: 'small',
+        effort: 'low',
+        model_id: 'openai:gpt-5.4-mini',
+        route_reason: 'phase_kind=mechanical -> small/low',
+      },
+    });
+    mocks.route.mockResolvedValue({
+      payload: {
+        text: makeTaskResultText({
+          summary: 'Validated the release candidate.',
+          artifacts: [{ path: 'deliverables/task-qa.md', kind: 'markdown' }],
+          verification_done: ['Ran the release checklist.'],
+          gaps: [],
+          needs: [],
+        }),
+      },
+    });
+
+    await dispatchMissionNextTasks('MSN-FOLLOWUP');
+
+    expect(mocks.route).toHaveBeenCalledTimes(1);
+    const prompt = String((mocks.route.mock.calls[0]?.[0] as any)?.payload?.text || '');
+    expect(prompt).toContain('## Role procedure (qa_lead)');
+    expect(prompt).toContain('Rigorous Validator');
+    expect(prompt).not.toContain('Assigned persona procedure');
+  });
+
   it('creates and claims a work item for each dispatched mission task', async () => {
     const { missionDir } = await import('./path-resolver.js');
     const { safeWriteFile } = await import('./secure-io.js');
@@ -1789,6 +1856,24 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
       },
     });
     expect(receipt.artifact.sha256).toMatch(/^[a-f0-9]{64}$/u);
+
+    const { missionCoordinationBus } = await import('./mission-coordination-bus.js');
+    const busMessages = missionCoordinationBus.listMissionMessages('MSN-FOLLOWUP');
+    expect(busMessages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          channel: 'review',
+          to_role: 'reviewer',
+          task_id: 'task-2',
+        }),
+        expect.objectContaining({
+          channel: 'handoff',
+          from_role: 'reviewer',
+          to_role: 'implementer',
+          task_id: 'task-1',
+        }),
+      ])
+    );
   });
 
   it('retries a busy task on the next wave when another task makes progress', async () => {
