@@ -53,6 +53,7 @@
 >    **2026-07-24追記**: KD-01(worker goal 状態機械 + 自律ドライバ)/KD-02(goal 予算 grace step・75% 収束モード・wall-clock deadline)/KD-03(イベントソーシング型ワーカー状態復元)/KD-04(untrusted 注入枠付け契約)/KD-05(サブエージェント能力ティア)/KD-06(由来ベースプラグイン信頼 + managed-copy 隔離)/KD-07(リソース宣言型ツール並列スケジューラ、`core:parallel_calls`)/KD-08(プロンプトキャッシュ規律契約)を実装し、各受入条件を hermetic テスト(計 200+ 件)・typecheck・境界テスト・op-registry check で検証して DONE とした。KD-01 が generateWithTools 多段ループ(`worker-goal-driver.ts`)を導入し `context_rewind` を配線したため、**KC-07 も DONE へ更新**。KD-09 は需要トリガーの backlog として TODO のまま。DONE 99 / PARTIAL 30 / TODO 7 へ更新。
 >    **2026-07-25追記**: タスク知識配給計画 KP-01〜07 を新設([TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25.ja.md](./TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25.ja.md)。origin/main `00485737` の実コード突合に基づく。MO-04/KM 系の後続ループとして、配給3経路の装備不均一(goal-driven 経路の context pack 非添付・`delegateTask` の素文字列 context)、一律 top-3 選定、trace `knowledgeRefs` 全空=帰還信号ゼロを解消する)。全件 TODO として追加し、DONE 99 / PARTIAL 30 / TODO 14 へ更新。
 >    **2026-07-25追記**: CLI サブエージェント・チーム計画 CT-01〜04 を新設([CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md](./CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md)。単一 LLM プロバイダ CLI 内で完結するチーム構成・連携を、既存契約(team-roles・KD-05・タスク契約・context pack・ファイル契約)の CLI ハーネスへの射影として構築する。新規は役割定義の生成儀式と `HarnessSubagentDispatcher` の2点のみ)。全件 TODO として追加し、DONE 99 / PARTIAL 30 / TODO 18 へ更新。
+>    **2026-07-25追記**: クロスプロバイダ実行計画 XP-01〜07 を新設([CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md](./CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md)。複数 LLM プロバイダ CLI の同一マシン併走に対し、能力プローブ registry・KD-05 権限射影 + env allowlist・tier×egress ゲート・同一ディレクトリ併走契約・縮退表面化 + provenance・並行予算・モデル分散 best-of-N を、プロバイダ中立の宣言 + adapter 射影として定める。CT の兄弟計画)。全件 TODO として追加し、DONE 99 / PARTIAL 30 / TODO 25 へ更新。
 >    **判定基準**: DONE = 受入条件を実コードで検証済 / PARTIAL = 一部充足 / TODO = 実質未着手。
 
 ## サマリ
@@ -61,7 +62,7 @@
 | ------- | ---- |
 | DONE    | 99   |
 | PARTIAL | 30   |
-| TODO    | 18   |
+| TODO    | 25   |
 
 ## P0 残作業(プロダクション化のクリティカルパス)
 
@@ -373,6 +374,20 @@
 | CT-02 | TODO | `HarnessSubagentDispatcher` 追加と `maybeWrapWithDispatcher` 配線(呼び出し側無変更) |
 | CT-03 | TODO | ファイル契約のみでのチームフロー hermetic E2E(claim 排他・lens 分散レビュー)        |
 | CT-04 | TODO | 実行面の使い分け決定論ルーブリックと GLOSSARY/architecture 文書化                   |
+
+### XP(クロスプロバイダ実行)
+
+正本: [CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md](./CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md)
+
+| ID    | 状態 | 残作業                                                                               |
+| ----- | ---- | ------------------------------------------------------------------------------------ |
+| XP-01 | TODO | 能力プローブ registry(headless/JSON/認証/モデル)と宣言ベースルーティング             |
+| XP-02 | TODO | KD-05 プロファイル → プロバイダ別 permission マッピング表 + 子プロセス env allowlist |
+| XP-03 | TODO | プロバイダ egress ラベル × tier 突合ゲート(委譲入口)                                 |
+| XP-04 | TODO | 読み書きマトリクスの正準化と全プロバイダ指示への射影・git write 遮断                 |
+| XP-05 | TODO | failover 切替の trace 契約化と成果物 provider/model provenance                       |
+| XP-06 | TODO | global semaphore・プロバイダ別上限・wall-clock 予算・ゾンビ回収                      |
+| XP-07 | TODO | 複数プロバイダ並列発注 + MO-07 judge 集約(`best-of-providers`)                       |
 
 ### CO(Company OS)
 

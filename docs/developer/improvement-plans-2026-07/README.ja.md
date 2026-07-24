@@ -11,6 +11,7 @@
 > **実行レイヤリング計画**: [LAYERED_EXECUTION_PLAN_2026-07-15.ja.md](./LAYERED_EXECUTION_PLAN_2026-07-15.ja.md)(LE-01〜05: pipeline=配線 / typed ops=ロジック / デザインシステム=単一カスケードの3層分離。PPTX デザイン乖離の根治と script ラッパー pipeline の解消)。
 > **タスク知識配給計画**: [TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25.ja.md](./TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25.ja.md)(KP-01〜07: 配給経路の単一化・タスクプロファイル駆動の知識スライス・knowledge_feedback 帰還ループ・有効性主導キュレーション。MO-04/KM 系の後続ループ)。
 > **CLI サブエージェント・チーム計画**: [CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md](./CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md)(CT-01〜04: 単一 LLM プロバイダ CLI 内で完結するチーム構成・連携。役割→サブエージェント定義の生成儀式 + `HarnessSubagentDispatcher` + ファイル契約 E2E + 実行面の使い分け基準。agent-runtime の代替実行面)。
+> **クロスプロバイダ実行計画**: [CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md](./CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md)(XP-01〜07: 複数 LLM プロバイダ CLI(claude/codex/agy 等)の同一マシン併走規約。能力プローブ registry・権限射影と env 最小化・tier×egress ゲート・同一ディレクトリ併走契約・縮退表面化と provenance・並行予算・モデル分散 best-of-N。CT の兄弟計画)。
 
 ## 1. 目的
 
@@ -331,6 +332,20 @@ surface が提供する UI の機能的アフォーダンスの調査(2026-07-03
 | CT-02 | `HarnessSubagentDispatcher` の追加と配線                       | P1     | M    | CT-01           |
 | CT-03 | ファイル契約によるチーム連携の実証(E2E)                        | P2     | M    | CT-02           |
 | CT-04 | 実行面の使い分け基準と文書化                                   | P2     | S    | CT-02           |
+
+### クロスプロバイダ実行(複数 LLM プロバイダ CLI の併走規約)
+
+単一マシンに複数の LLM プロバイダ CLI(claude / codex / agy / gemini / copilot)が同居する現実(provider-discovery 5/5 検出、failover chain 構成済み)に対し、「検出して切り替える」以上の併走規約を定める計画(2026-07-25、実コード突合)。正本は [CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md](./CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md)(XP-01〜07 は同文書内)。ハード制約5点(ディレクトリ契約・指示の単一正本射影・env allowlist・tier×egress ゲート・プロバイダ中立出力契約)を**プロバイダ中立の宣言 + adapter 射影**として実装する。CT(単一 CLI チーム)の兄弟計画。
+
+| ID    | タイトル                                                 | 優先度 | 規模 | 依存                   |
+| ----- | -------------------------------------------------------- | ------ | ---- | ---------------------- |
+| XP-01 | プロバイダ能力プローブ registry と宣言ベースルーティング | P1     | M    | なし                   |
+| XP-02 | プロバイダ中立の権限プロファイル射影と env 最小化        | P1     | M    | KD-05(実装済み)        |
+| XP-03 | tier × egress ゲート(委譲面のデータ境界)                 | P1     | M    | SA-04(実装済み)・KP-01 |
+| XP-04 | 同一ディレクトリ併走契約(読み書きマトリクスと生成儀式)   | P1     | S〜M | CT-01 と生成儀式共有   |
+| XP-05 | 縮退表面化と成果物 provenance                            | P2     | S    | XP-01                  |
+| XP-06 | 並行・生存予算(プロセス面の資源統制)                     | P2     | S    | XP-01                  |
+| XP-07 | モデル分散 best-of-N(真のモデル多様性)                   | P2     | M    | XP-01〜03・MO-07       |
 
 ### Actuator リファクタリング/使いやすさ(ADFスキーマ・op)
 
