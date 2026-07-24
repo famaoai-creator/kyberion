@@ -52,6 +52,11 @@ import {
 } from './reasoning-backend.js';
 import { safeReadFile, safeStat } from './secure-io.js';
 import { assertReasoningEgressAllowed } from './reasoning-egress-scope.js';
+import {
+  applyCacheBreakpointToLastMessage,
+  applyCacheBreakpointToSystemBlocks,
+  applyCacheBreakpointToTools,
+} from './prompt-cache-discipline.js';
 
 const DEFAULT_MODEL = resolveRuntimeModelId('anthropic-default');
 const DEFAULT_MAX_TOKENS = 16000;
@@ -74,6 +79,21 @@ Principles:
   with a real reason is more valuable than shallow agreement.
 - Never invent facts about specific people or companies. Use placeholders or
   generic language when concrete facts are not provided.`;
+
+/**
+ * KD-08: pre-computed cache-breakpoint form of SYSTEM_PROMPT, shared by every
+ * call site below instead of each hand-rolling its own `cache_control`
+ * block. `SYSTEM_PROMPT` itself never changes at runtime, so this is a fixed
+ * stable-prefix boundary — see `prompt-cache-discipline.ts` for the
+ * discipline this codifies: system prompt + tool declarations are an
+ * immutable prefix for the life of a conversation; mid-history mutation
+ * (kimi-code's rejected "micro-compaction") is out of scope on purpose, and
+ * OH-01 compaction (`worker-context-compaction.ts`) only ever runs at
+ * conversation boundaries, never in place.
+ */
+const CACHED_SYSTEM_PROMPT_BLOCKS = applyCacheBreakpointToSystemBlocks([
+  { type: 'text' as const, text: SYSTEM_PROMPT },
+]);
 
 export interface AnthropicReasoningBackendOptions {
   client?: Anthropic;
@@ -481,7 +501,7 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
     const result = await this.callParse({
       model: this.model,
       max_tokens: this.maxTokens,
-      system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
+      system: CACHED_SYSTEM_PROMPT_BLOCKS,
       thinking: this.thinkingConfig(),
       messages: [{ role: 'user', content: userPrompt }],
       output_config: {
@@ -513,7 +533,7 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
     const result = await this.callParse({
       model: this.model,
       max_tokens: this.maxTokens,
-      system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
+      system: CACHED_SYSTEM_PROMPT_BLOCKS,
       thinking: this.thinkingConfig(),
       messages: [{ role: 'user', content: userPrompt }],
       output_config: { format: zodOutputFormat(CritiqueResultSchema) },
@@ -545,7 +565,7 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
     const result = await this.callParse({
       model: this.model,
       max_tokens: this.maxTokens,
-      system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
+      system: CACHED_SYSTEM_PROMPT_BLOCKS,
       thinking: this.thinkingConfig(),
       messages: [{ role: 'user', content: userPrompt }],
       output_config: { format: zodOutputFormat(SynthesizedPersonaSchema) },
@@ -573,7 +593,7 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
     const result = await this.callParse({
       model: this.model,
       max_tokens: this.maxTokens,
-      system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
+      system: CACHED_SYSTEM_PROMPT_BLOCKS,
       thinking: this.thinkingConfig(),
       messages: [{ role: 'user', content: userPrompt }],
       output_config: {
@@ -602,7 +622,7 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
     const result = await this.callParse({
       model: this.model,
       max_tokens: this.maxTokens,
-      system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
+      system: CACHED_SYSTEM_PROMPT_BLOCKS,
       thinking: this.thinkingConfig(),
       messages: [{ role: 'user', content: userPrompt }],
       output_config: { format: zodOutputFormat(SimulationResultSchema) },
@@ -651,7 +671,7 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
     const result = await this.callParse({
       model: this.model,
       max_tokens: this.maxTokens,
-      system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
+      system: CACHED_SYSTEM_PROMPT_BLOCKS,
       thinking: this.thinkingConfig(),
       messages: [{ role: 'user', content: userPrompt }],
       output_config: { format: zodOutputFormat(ExtractedRequirementsSchema) },
@@ -693,7 +713,7 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
     const result = await this.callParse({
       model: this.model,
       max_tokens: this.maxTokens,
-      system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
+      system: CACHED_SYSTEM_PROMPT_BLOCKS,
       thinking: this.thinkingConfig(),
       messages: [{ role: 'user', content: userPrompt }],
       output_config: { format: zodOutputFormat(ExtractedDesignSpecSchema) },
@@ -727,7 +747,7 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
     const result = await this.callParse({
       model: this.model,
       max_tokens: this.maxTokens,
-      system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
+      system: CACHED_SYSTEM_PROMPT_BLOCKS,
       thinking: this.thinkingConfig(),
       messages: [{ role: 'user', content: userPrompt }],
       output_config: { format: zodOutputFormat(ExtractedTestPlanSchema) },
@@ -770,7 +790,7 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
     const result = await this.callParse({
       model: this.model,
       max_tokens: this.maxTokens,
-      system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
+      system: CACHED_SYSTEM_PROMPT_BLOCKS,
       thinking: this.thinkingConfig(options?.effort),
       messages: [{ role: 'user', content: userPrompt }],
       output_config: { format: zodOutputFormat(DecomposedTaskPlanSchema) },
@@ -874,8 +894,12 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
     const response = await this.callCreate({
       model: this.model,
       max_tokens: this.maxTokens,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: [...blocks, { type: 'text', text: prompt }] }],
+      // KD-08: same fixed system-prompt breakpoint as every other call site —
+      // see CACHED_SYSTEM_PROMPT_BLOCKS.
+      system: CACHED_SYSTEM_PROMPT_BLOCKS,
+      messages: applyCacheBreakpointToLastMessage([
+        { role: 'user' as const, content: [...blocks, { type: 'text' as const, text: prompt }] },
+      ]),
       ...this.thinkingConfig(options?.effort),
     });
 
@@ -895,11 +919,15 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
       input_schema: t.inputSchema as Anthropic.Tool.InputSchema,
     }));
 
+    // KD-08: cache breakpoints at the stable-prefix boundaries — the last
+    // tool declaration and the last message content block. This is the only
+    // call site in this backend that sends `tools`, so it is also the only
+    // one that needs the tools breakpoint.
     const response = await this.callCreate({
       model: this.model,
       max_tokens: this.maxTokens,
-      messages: [{ role: 'user', content: prompt }],
-      tools: anthropicTools,
+      messages: applyCacheBreakpointToLastMessage([{ role: 'user' as const, content: prompt }]),
+      tools: applyCacheBreakpointToTools(anthropicTools),
     });
 
     const textBlocks = response.content.filter((b): b is Anthropic.TextBlock => b.type === 'text');

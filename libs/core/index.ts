@@ -143,6 +143,7 @@ export * from './question-resolver.js';
 export * from './op-input-contracts.js';
 export * from './op-suggestions.js';
 export * from './adf-engine.js';
+export * from './tool-call-scheduler.js';
 export * from './autonomous-repair.js';
 export * from './operation-policy-gate.js';
 export * from './video-visual-direction.js';
@@ -612,7 +613,11 @@ export * from './completion-token-budget.js';
 export * from './worker-event-stream.js';
 export * from './lifecycle-hook-engine.js';
 export * from './dynamic-injection.js';
+export * from './prompt-cache-discipline.js';
 export * from './context-rewind.js';
+export * from './worker-goal.js';
+export * from './worker-goal-driver.js';
+export * from './worker-state-journal.js';
 export * from './adf-guardrails.js';
 export * from './reconcile-ops.js';
 export * from './report-ops.js';
@@ -793,6 +798,9 @@ export * from './surface-runtime.js';
 export * from './organization-profile.js';
 export * from './artifact-store.js';
 export * from './approval-store.js';
+export * from './plugin-source-trust.js';
+export * from './plugin-managed-install.js';
+export * from './skill-plugin-loader.js';
 export * from './provider-capability-scanner.js';
 export * from './approval-gate-summary.js';
 export { enforceApprovalGate } from './approval-gate.js';
@@ -1996,6 +2004,10 @@ export type {
   ExecuteServiceProcedureResult,
 } from './service-procedure-executor.js';
 export { SERVICE_EXTERNAL_EFFECT_OP } from './procedure-dispatcher.js';
+
+// KD-04: untrusted input injection framing contract
+export type { FrameUntrustedInputParams } from './untrusted-input-framing.js';
+export { frameUntrustedInput, UNTRUSTED_DATA_BOILERPLATE } from './untrusted-input-framing.js';
 
 // SA-03 Prompt Injection & Untrusted Content Defense
 export type { ScanOptions } from './untrusted-content.js';

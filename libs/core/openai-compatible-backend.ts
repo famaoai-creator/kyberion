@@ -31,6 +31,7 @@ import {
   estimateRequestInputTokens,
   resolveConfiguredContextWindowTokens,
 } from './completion-token-budget.js';
+import { StablePrefixGuard, type StablePrefixSnapshot } from './prompt-cache-discipline.js';
 import type { ReasoningToolName, SamplingParams } from './reasoning-route-resolver.js';
 
 export type LocalLlmProviderPreset =
@@ -362,6 +363,16 @@ async function probeBackendAvailabilityFromEnvNames(
   }
 }
 
+/**
+ * KD-08: this backend never edits `messages[0]` (the fixed system message) or
+ * recomputes `tools` from anything but constructor-level state, so the
+ * stable-prefix invariant already holds by construction; `StablePrefixGuard`
+ * in `prompt()` only makes that invariant an assertion instead of an
+ * assumption. Note also this class does not attempt any mid-history rewrite
+ * of earlier turns (kimi-code's rejected "micro-compaction" — see
+ * prompt-cache-discipline.ts) — the only history-shrinking path is OH-01's
+ * boundary compaction in `worker-context-compaction.ts`.
+ */
 export class OpenAiCompatibleBackend implements ReasoningBackend {
   readonly name = 'openai-compatible';
   readonly egressEndpoint: string;
@@ -395,6 +406,23 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
     this.samplingParams = { ...(options.samplingParams || {}) };
     this.toolsEnabled = options.toolsEnabled === true;
     this.allowedTools = new Set(options.allowedTools ?? []);
+  }
+
+  /**
+   * KD-08: the (system message, tool allowlist) pair as sent by
+   * `fetchChatCompletion` — the stable prefix a prompt cache keys on.
+   * `messages[0]` is always this backend's fixed system message; tools are a
+   * pure function of constructor-level state, so this is invariant across a
+   * `prompt()` call's tool-loop iterations by construction. `StablePrefixGuard`
+   * asserts that invariant on every iteration so a future change that starts
+   * mutating either mid-loop fails fast instead of silently invalidating the
+   * cache — see `prompt-cache-discipline.ts` for the full contract.
+   */
+  private stablePrefixSnapshot(messages: readonly ChatMessage[]): StablePrefixSnapshot {
+    return {
+      system: messages[0],
+      tools: this.toolsEnabled && this.allowedTools.size > 0 ? [...this.allowedTools].sort() : null,
+    };
   }
 
   /** KC-09: budget only when a window is explicitly configured — unknown window leaves the request untouched. */
@@ -513,6 +541,12 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
     let response = await this.fetchChatCompletion(messages);
     let message = response.choices[0].message;
     let guardrailState = createToolLoopGuardrailState();
+    // KD-08: record the stable-prefix baseline for this turn before any tool
+    // round trip, then re-assert it after every round trip completes — the
+    // prefix must stay closed while a tool call is in flight (delayed
+    // results grow the message array; they must never touch system/tools).
+    const prefixGuard = new StablePrefixGuard();
+    prefixGuard.assertStable(this.stablePrefixSnapshot(messages));
 
     while (message.tool_calls && message.tool_calls.length > 0) {
       messages.push({
@@ -540,6 +574,7 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
           content: result,
         });
       }
+      prefixGuard.assertStable(this.stablePrefixSnapshot(messages));
       response = await this.fetchChatCompletion(messages);
       message = response.choices[0].message;
     }
