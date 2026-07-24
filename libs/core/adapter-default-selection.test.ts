@@ -17,6 +17,11 @@ beforeEach(() => {
     recursive: true,
     force: true,
   });
+  if (PORTABLE_EMAIL_BACKEND === 'smtp') {
+    vi.stubEnv('KYBERION_SMTP_HOST', 'smtp.test.invalid');
+    vi.stubEnv('KYBERION_SMTP_USER', 'test-user');
+    vi.stubEnv('KYBERION_SMTP_PASS', 'test-pass');
+  }
 });
 
 afterEach(() => {
@@ -25,6 +30,7 @@ afterEach(() => {
     recursive: true,
     force: true,
   });
+  vi.unstubAllEnvs();
   vi.restoreAllMocks();
 });
 
