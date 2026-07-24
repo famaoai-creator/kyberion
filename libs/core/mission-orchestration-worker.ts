@@ -75,6 +75,7 @@ import { missionDir, missionEvidenceDir, rootDir } from './path-resolver.js';
 import { pathResolver } from './path-resolver.js';
 import { type MissionContextPackPruningSummary } from './mission-context-pack.js';
 import { provisionTaskKnowledge } from './task-knowledge-provisioning.js';
+import { recordKnowledgeUsageFeedback } from './src/knowledge-feedback-loop.js';
 import * as nodePath from 'node:path';
 import * as path from 'node:path';
 import {
@@ -1303,6 +1304,10 @@ function buildTaskExecutionPrompt(input: {
     resolveReviewTargetForTask(input.task)
       ? 'For review tasks, put concrete findings into review_findings[] using severity, location, and instruction. Keep gaps for unresolved blockers.'
       : 'Do not paste file contents. Include only conclusions, artifact paths, verification steps, gaps, and needs.',
+    // KP-05: optional bridge back to the knowledge provisioning loop — report
+    // which "Knowledge hints" above (by path) actually helped or didn't, and
+    // any topic you needed but were not given.
+    'Optionally include knowledge_feedback: {used, not_used, missing_topics} to report which of the knowledge hints above (by path) helped, which did not, and which topics were needed but missing.',
   ].filter(Boolean);
   return lines.join('\n');
 }
@@ -3229,6 +3234,18 @@ async function obtainTaskResultResponse(input: {
       notes.push(`task_result parse errors after retry: ${parseErrors.join('; ')}`);
     if (surfaceParseErrors.length > 0)
       notes.push(`surface parse errors after retry: ${surfaceParseErrors.join('; ')}`);
+  }
+
+  // KP-05: fold any knowledge_feedback the worker reported into the
+  // delivered/used aggregate and enqueue missing_topics as knowledge-gap
+  // promotion candidates. Fails open (recordKnowledgeUsageFeedback swallows
+  // its own errors) — telemetry must never block task dispatch.
+  if (taskResult?.knowledge_feedback) {
+    recordKnowledgeUsageFeedback({
+      missionId: input.missionId,
+      taskId: input.task.task_id,
+      feedback: taskResult.knowledge_feedback,
+    });
   }
 
   return {
