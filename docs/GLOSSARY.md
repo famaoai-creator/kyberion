@@ -304,6 +304,10 @@ The actuator class for local short-lived shell, OS, and file-control operations.
 
 ## Governance and storage terms
 
+### Knowledge Slice
+
+A task-profile-driven placement rule declared in `knowledge/product/governance/knowledge-slices.json` (schema: `schemas/knowledge-slices.schema.json`), matched on `team_role` x `phase` x `mission_type` (any field omitted or `'*'` matches anything). Resolved by `resolveKnowledgeSlice()` (`libs/core/knowledge-slices.ts`) and consumed by `loadKnowledgeHintsIfPossible()` (`libs/core/mission-context-pack.ts`) to decide, per dispatched task, which documents are always delivered (`pinned`, budget-reserved first), which subtrees to prioritize when searching (`search_roots`, most-specific-slice-wins), and which paths are never delivered (`exclude`, unioned across all matching slices). No matching slice, or a missing/invalid manifest, fails open to the pre-KP-03 behavior (flat top-N search, no pinning/filtering). See KP-03_SCHEMA_DESIGN_NOTE.ja.md for full precedence and merge rules.
+
 ### Trace / Span / Event
 
 Unified observability model inspired by OpenTelemetry. A Trace contains a tree of Spans (timed operations), each with Events (point-in-time occurrences) and Artifacts (screenshots, files).

@@ -705,6 +705,7 @@ export * from './sensory-memory.js';
 export * from './provider-capability-scanner.js';
 export * from './provider-capability-overview.js';
 export * from './provider-bridge.js';
+export * from './provider-permission-profiles.js';
 export * from './claude-task-runner.js';
 export * from './claude-task-session-executor.js';
 export * from './actuator-op-registry.js';
@@ -968,6 +969,21 @@ export {
   formatDistilledKnowledgeSummary,
 } from './distill-knowledge-injector.js';
 export type { DistilledKnowledgeEntry, FindRelevantInput } from './distill-knowledge-injector.js';
+export {
+  loadKnowledgeSlicesFile,
+  resolveKnowledgeSlice,
+  matchesKnowledgeGlob,
+  isKnowledgePathExcluded,
+  isKnowledgePathInSearchRoots,
+  _resetKnowledgeSlicesCacheForTests,
+} from './knowledge-slices.js';
+export type {
+  KnowledgeSliceMatcher,
+  KnowledgeSliceDefinition,
+  KnowledgeSlicesFile,
+  ResolveKnowledgeSliceInput,
+  ResolvedKnowledgeSlice,
+} from './knowledge-slices.js';
 export { loadRestrictedActionRules, matchRestrictedAction } from './restricted-action-policy.js';
 export type { RestrictedActionMatch, RestrictedActionRule } from './restricted-action-policy.js';
 export { loadMeetingFacilitatorPolicy } from './meeting-facilitator-policy.js';
@@ -1917,6 +1933,20 @@ export {
   recordPipelineResult,
   runFeedbackLoop,
 } from './src/feedback-loop.js';
+
+// KP-05: knowledge delivery telemetry + task_result knowledge_feedback aggregation
+export {
+  recordKnowledgeDelivery,
+  recordKnowledgeUsageFeedback,
+  loadKnowledgeUsageAggregate,
+  knowledgeDeliveryLogDir,
+  knowledgeUsageAggregatePath,
+} from './src/knowledge-feedback-loop.js';
+export type {
+  DeliveredKnowledgeRef,
+  KnowledgeDeliveryRecord,
+  KnowledgeUsageAggregateEntry,
+} from './src/knowledge-feedback-loop.js';
 
 // JSON repair (Paper2Any pattern — lightweight structural repair before LLM escalation)
 export { tryRepairJson, repairJsonString } from './json-repair.js';
