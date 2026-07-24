@@ -1,0 +1,20 @@
+{
+  "$schema": "../schemas/knowledge-slices.schema.json",
+  "version": "0.1.0",
+  "description": "Initial knowledge slice declarations (KP-03). Deliberately small: one role/phase-specific slice and one wildcard default. Extend as pinned needs surface from delivered/used telemetry (KP-05).",
+  "slices": [
+    {
+      "id": "implementer-execution",
+      "description": "Implementers doing execution-phase work always get the working philosophy up front, and never see unreviewed auto-distilled placeholders that would crowd the budget with low-signal text.",
+      "match": { "team_role": "implementer", "phase": "execution" },
+      "pinned": ["knowledge/product/governance/working-philosophy.md"],
+      "exclude": ["knowledge/product/evolution/distill_*.md"]
+    },
+    {
+      "id": "default-exclude-unreviewed-distills",
+      "description": "Wildcard default applied to every task: auto-distilled evolution notes are placeholder-prone (many still contain 'None extracted automatically (policy fallback)') and pollute retrieval ranking, so they are excluded corpus-wide. Curated evolution docs (biometric_privacy.md, reconstruction-learnings-*, wisdom_*) are NOT matched by the distill_ glob and remain searchable.",
+      "match": { "team_role": "*", "phase": "*", "mission_type": "*" },
+      "exclude": ["knowledge/product/evolution/distill_*.md"]
+    }
+  ]
+}
