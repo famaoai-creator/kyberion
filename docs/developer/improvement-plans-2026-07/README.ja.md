@@ -9,6 +9,7 @@
 > **UI/UX 持続運営レビュー**: [UI_UX_DESIGN_SYSTEM_SUSTAINABILITY_PLAN_2026-07-13.ja.md](./UI_UX_DESIGN_SYSTEM_SUSTAINABILITY_PLAN_2026-07-13.ja.md)(DS-01/UX-05 の完了と週次 drift audit)。
 > **ループ完結計画**: [LOOP_CLOSURE_PLAN_2026-07-13.ja.md](./LOOP_CLOSURE_PLAN_2026-07-13.ja.md)(LC-01〜12: 実行成功→pipeline 昇格・LLM 判断配置・stub 縮退遮断・却下理由→修正再実行の4ループ)。
 > **実行レイヤリング計画**: [LAYERED_EXECUTION_PLAN_2026-07-15.ja.md](./LAYERED_EXECUTION_PLAN_2026-07-15.ja.md)(LE-01〜05: pipeline=配線 / typed ops=ロジック / デザインシステム=単一カスケードの3層分離。PPTX デザイン乖離の根治と script ラッパー pipeline の解消)。
+> **タスク知識配給計画**: [TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25.ja.md](./TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25.ja.md)(KP-01〜07: 配給経路の単一化・タスクプロファイル駆動の知識スライス・knowledge_feedback 帰還ループ・有効性主導キュレーション。MO-04/KM 系の後続ループ)。
 
 ## 1. 目的
 
@@ -304,6 +305,20 @@ surface が提供する UI の機能的アフォーダンスの調査(2026-07-03
 | KD-07 | リソース宣言型ツール並列スケジューラ                      | P2     | M    | なし                  |
 | KD-08 | プロンプトキャッシュ規律契約                              | P2     | S    | KC-08/09(実装済み)    |
 | KD-09 | `{seq, epoch}` カーソル再同期契約(需要確定まで backlog)   | P3     | S    | KD-03、需要トリガー   |
+
+### タスク知識配給(配置・配給・帰還の閉ループ)
+
+ミッションのタスク実行時に担当エージェントへ渡すナレッジを「必要十分で生産性が高い」状態にする計画(2026-07-25、origin/main `00485737` で実コード突合)。正本は [TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25.ja.md](./TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25.ja.md)(KP-01〜07 は同文書内)。MO-04(context pack)・KM-01〜04(検索品質・昇格ガバナンス・ストア衛生)の後続ループ。**診断で判明した構造的問題: 配給3経路の装備不均一(goal-driven 経路は context pack 非添付、`delegateTask` は素文字列)、一律 top-3 で規模・役割に較正されない選定、trace `knowledgeRefs` 全空 = 帰還信号ゼロによる「量の管理」のみのメンテナンス。**
+
+| ID    | タイトル                                              | 優先度 | 規模 | 依存                   |
+| ----- | ----------------------------------------------------- | ------ | ---- | ---------------------- |
+| KP-01 | 配給 API の単一化と goal-driven 経路への接続          | P1     | M    | MO-04・KD-01(実装済み) |
+| KP-02 | `delegateTask` の構造化ナレッジ装備                   | P1     | S    | KP-01                  |
+| KP-03 | タスクプロファイル駆動の知識スライス(データ配置戦略)  | P1     | M    | KM-02(実装済み)        |
+| KP-04 | 必要十分の較正(規模連動予算と2巡目配給)               | P2     | S    | KP-01                  |
+| KP-05 | 配給テレメトリと knowledge_feedback(帰還ループの起点) | P1     | M    | KP-01                  |
+| KP-06 | 有効性主導キュレーションと鮮度 SLO(メンテナンス計画)  | P2     | M    | KP-05                  |
+| KP-07 | corpus 純度ガードの拡張(KM-04 の残穴)                 | P2     | S    | KM-04(実装済み)        |
 
 ### Actuator リファクタリング/使いやすさ(ADFスキーマ・op)
 
