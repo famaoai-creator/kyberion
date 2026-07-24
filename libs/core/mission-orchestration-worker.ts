@@ -53,7 +53,21 @@ import {
   getMissionDynamicInjectionRegistry,
   renderInjectionsAsSystemReminders,
   type DynamicInjectionProvider,
+  type DynamicInjectionRegistry,
 } from './dynamic-injection.js';
+import {
+  runGoalDrivenLoop,
+  type GoalWallClockScheduler,
+  type RunGoalDrivenLoopOptions,
+} from './worker-goal-driver.js';
+import {
+  createGoal,
+  type GoalBudgetLimits,
+  type GoalRuntimeState,
+  type GoalState,
+} from './worker-goal.js';
+import { WorkerStateJournal } from './worker-state-journal.js';
+import { getDefaultWorkerEventStream, type WorkerEventStream } from './worker-event-stream.js';
 import { buildExecutionEnv } from './authority.js';
 import { findMissionPath, missionDir, missionEvidenceDir, rootDir } from './path-resolver.js';
 import { pathResolver } from './path-resolver.js';
@@ -263,6 +277,22 @@ interface PlannedNextTask {
     }>;
     round: number;
   };
+  /**
+   * KD-01 adoption (opt-in, default OFF): run this work item through the
+   * autonomous goal-driven loop (`runGoalDrivenLoop`) instead of the single-shot
+   * dispatch. When absent/false the existing dispatch behavior is byte-identical.
+   */
+  goal_driven?: boolean;
+  /**
+   * KD-02 opt-in multi-turn goal budgets — honored ONLY when `goal_driven` is on.
+   * Never invented by the worker; a work item that omits it runs unbounded
+   * (except the driver's max-turns safety bound).
+   */
+  goal_budget?: {
+    tokenBudget?: number;
+    turnBudget?: number;
+    wallClockBudgetMs?: number;
+  };
 }
 
 const PLANNED_NEXT_TASK_STATUS_PRIORITY: Record<string, number> = {
@@ -466,6 +496,21 @@ function validatePlannedNextTasks(rawTasks: unknown, missionId: string): Planned
               })(),
             },
           }
+        : {}),
+      // KD-01 adoption: opt-in goal-driven execution (default OFF).
+      ...(task.goal_driven === true ? { goal_driven: true } : {}),
+      ...(task.goal_budget && typeof task.goal_budget === 'object'
+        ? (() => {
+            const rawBudget = task.goal_budget as Record<string, unknown>;
+            const budget: NonNullable<PlannedNextTask['goal_budget']> = {};
+            for (const key of ['tokenBudget', 'turnBudget', 'wallClockBudgetMs'] as const) {
+              const value = rawBudget[key];
+              if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+                budget[key] = value;
+              }
+            }
+            return Object.keys(budget).length > 0 ? { goal_budget: budget } : {};
+          })()
         : {}),
     } satisfies PlannedNextTask;
   });
@@ -1750,6 +1795,373 @@ export function cascadeBlockedDependents(tasks: PlannedNextTask[]): string[] {
   return cascaded;
 }
 
+// ---------------------------------------------------------------------------
+// KD-01 adoption: opt-in goal-driven execution mode for the mission worker.
+//
+// A work item may set `goal_driven: true` (and optionally `goal_budget`) to run
+// its objective through the autonomous multi-turn goal loop instead of the
+// single-shot dispatch. This wires `runGoalDrivenLoop` to the REAL worker seams
+// the mission worker already uses — `getReasoningBackend()` (via the driver's
+// default), the process worker event stream, and the mission-scoped
+// dynamic-injection registry (so the OH-01 dispatch compactor and the goal
+// status/objective providers coexist on the same registry). Goal lifecycle is
+// persisted to a KD-03 `WorkerStateJournal` in mission-local storage so a
+// kill/restart restores an `active` goal as `paused` (never self-advancing)
+// until an explicit resume. A `blocked` goal is escalated through the worker's
+// existing mission reporting path (`reportBlockerToMission` →
+// `recordMissionContextTask`); the worker never mutates mission-wide state
+// directly. Goal tools stay on the MAIN worker loop only — the subagent dispatch
+// path is never touched, so the KD-05 reserved `goal:*` denial is unaffected.
+// ---------------------------------------------------------------------------
+
+/** Seams for {@link runGoalDrivenWorkItem}; every field defaults to the real runtime singleton. */
+export interface GoalDrivenWorkItemSeams {
+  backend?: RunGoalDrivenLoopOptions['backend'];
+  stream?: WorkerEventStream;
+  injectionRegistry?: DynamicInjectionRegistry;
+  journal?: WorkerStateJournal;
+  /** Escalate a blocked goal to the mission owner (defaults to `recordMissionContextTask`). */
+  reportBlockerToMission?: (state: GoalRuntimeState) => void;
+  /** Explicitly resume a persisted `paused` goal (post-restart mission ceremony). */
+  resume?: boolean;
+  maxTurns?: number;
+  wallClockScheduler?: GoalWallClockScheduler;
+  now?: () => string;
+}
+
+export interface GoalDrivenWorkItemResult {
+  goalId: string;
+  finalState: GoalState;
+  goal: GoalRuntimeState;
+  turnsRun: number;
+  /** Goal record fit for persistence at rest (null when complete/cleared). */
+  persisted: GoalRuntimeState | null;
+  /** True when the goal ended `blocked` and was escalated to the mission. */
+  escalated: boolean;
+  /** KD-02 grace-step/final-turn prose report (budget-reached `blocked` only). */
+  finalReport?: string;
+}
+
+/** The work item's objective for the goal loop (framed as untrusted by the driver). */
+function goalDrivenObjective(task: PlannedNextTask): string {
+  return (task.description || task.deliverable || task.task_id).trim();
+}
+
+/** Stable goal id per (mission, work item), so a resume targets the same journal record. */
+export function goalIdForWorkItem(missionId: string, taskId: string): string {
+  return `goal-${missionId}-${taskId}`;
+}
+
+/** Mission-local KD-03 journal path (per work item). Created lazily on first append. */
+function goalJournalPath(missionId: string, taskId: string): string {
+  const safeTaskId = String(taskId)
+    .replace(/[^A-Za-z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return `${missionDir(missionId, 'public')}/coordination/goal-journal-${safeTaskId || 'task'}.jsonl`;
+}
+
+/** Convert opt-in work-item budgets into a driver budget (never invented). */
+function resolveGoalBudget(task: PlannedNextTask): GoalBudgetLimits | undefined {
+  const raw = task.goal_budget;
+  if (!raw) return undefined;
+  const budget: GoalBudgetLimits = {};
+  if (typeof raw.tokenBudget === 'number' && raw.tokenBudget > 0)
+    budget.tokenBudget = raw.tokenBudget;
+  if (typeof raw.turnBudget === 'number' && raw.turnBudget > 0) budget.turnBudget = raw.turnBudget;
+  if (typeof raw.wallClockBudgetMs === 'number' && raw.wallClockBudgetMs > 0)
+    budget.wallClockBudgetMs = raw.wallClockBudgetMs;
+  return Object.keys(budget).length > 0 ? budget : undefined;
+}
+
+/** Record the terminal goal lifecycle op onto the KD-03 journal. */
+function persistGoalTerminal(
+  journal: WorkerStateJournal,
+  goalId: string,
+  result: { finalState: GoalState; persisted: GoalRuntimeState | null }
+): void {
+  if (result.finalState === 'complete') {
+    // `complete` is transient — a completed goal is cleared, which records one
+    // one-shot "ignore prior active-goal reminders" reminder (KD-03 hygiene).
+    journal.cancelGoal(goalId, `${goalId}:cleared`);
+    return;
+  }
+  if (result.persisted) journal.recordGoal(result.persisted);
+}
+
+/**
+ * Run a work item's objective through the autonomous goal-driven loop (KD-01),
+ * persisting lifecycle to a KD-03 journal and escalating a blocked goal through
+ * the existing mission reporting path. This is the seam the goal-driven dispatch
+ * branch calls; it is exported so it can be exercised hermetically with a stub
+ * backend, injected event stream, and an injected journal.
+ */
+export async function runGoalDrivenWorkItem(input: {
+  missionId: string;
+  task: PlannedNextTask;
+  teamRole?: string;
+  agentId?: string;
+  /** Stable system framing prepended to every turn's prompt. */
+  systemPrompt?: string;
+  /** Per-turn instruction appended after the injected goal reminders. */
+  turnPrompt?: string;
+  seams?: GoalDrivenWorkItemSeams;
+}): Promise<GoalDrivenWorkItemResult> {
+  const { missionId, task } = input;
+  const seams = input.seams ?? {};
+  const goalId = goalIdForWorkItem(missionId, task.task_id);
+  const objective = goalDrivenObjective(task);
+  const budget = resolveGoalBudget(task);
+  const journal =
+    seams.journal ??
+    new WorkerStateJournal({
+      journalPath: goalJournalPath(missionId, task.task_id),
+      ...(seams.now ? { now: seams.now } : {}),
+    });
+  const stream = seams.stream ?? getDefaultWorkerEventStream();
+  const injectionRegistry =
+    seams.injectionRegistry ?? getMissionDynamicInjectionRegistry(missionId);
+  const reportBlockerToMission =
+    seams.reportBlockerToMission ??
+    ((state: GoalRuntimeState) => {
+      recordMissionContextTask(missionId, `Goal blocked for work item ${task.task_id}`, {
+        next_step: 'resolve the goal blocker before resuming the work item',
+        work_item_id: task.task_id,
+        goal_id: state.goalId,
+        blocker: state.terminalReason ?? '',
+        ...(input.teamRole ? { team_role: input.teamRole } : {}),
+        ...(input.agentId ? { assignee_peer_id: input.agentId } : {}),
+      });
+    });
+
+  const loopOptions: RunGoalDrivenLoopOptions = {
+    objective,
+    goalId,
+    missionId,
+    stream,
+    injectionRegistry,
+    reportBlockerToMission,
+    ...(budget ? { budget } : {}),
+    ...(input.systemPrompt ? { systemPrompt: input.systemPrompt } : {}),
+    ...(input.turnPrompt ? { turnPrompt: input.turnPrompt } : {}),
+    ...(seams.backend ? { backend: seams.backend } : {}),
+    ...(seams.maxTurns !== undefined ? { maxTurns: seams.maxTurns } : {}),
+    ...(seams.wallClockScheduler ? { wallClockScheduler: seams.wallClockScheduler } : {}),
+    ...(seams.now ? { now: seams.now } : {}),
+  };
+
+  // KD-03 restore contract: reconstruct state purely from the journal first. A
+  // persisted `active` goal (prior process died mid-turn) comes back `paused`.
+  const restored = journal.restore().goal;
+  const isOurs = restored?.goalId === goalId;
+
+  let result;
+  if (isOurs && restored && restored.state === 'blocked') {
+    // A prior run already settled + escalated this goal — do not re-run it.
+    return {
+      goalId,
+      finalState: restored.state,
+      goal: restored,
+      turnsRun: 0,
+      persisted: restored,
+      escalated: true,
+    };
+  } else if (isOurs && restored && restored.state === 'paused') {
+    // Resume path: without an explicit resume the driver returns at once and the
+    // goal does NOT self-advance (it stays paused).
+    result = await runGoalDrivenLoop({
+      ...loopOptions,
+      resumeFrom: restored,
+      resume: seams.resume === true,
+    });
+  } else {
+    // Fresh pursuit: checkpoint an `active` goal BEFORE the loop, so a mid-turn
+    // kill leaves the journal holding an `active` record that restores as
+    // `paused` on the next invocation.
+    journal.recordGoal(
+      createGoal({
+        goalId,
+        objective,
+        missionId,
+        ...(budget ? { budget } : {}),
+        ...(seams.now ? { now: seams.now } : {}),
+      })
+    );
+    result = await runGoalDrivenLoop(loopOptions);
+  }
+
+  persistGoalTerminal(journal, goalId, result);
+
+  return {
+    goalId: result.goalId,
+    finalState: result.finalState,
+    goal: result.goal,
+    turnsRun: result.turnsRun,
+    persisted: result.persisted,
+    escalated: result.finalState === 'blocked',
+    ...(result.finalReport !== undefined ? { finalReport: result.finalReport } : {}),
+  };
+}
+
+/**
+ * Goal-driven dispatch branch: claims the work item, runs the autonomous goal
+ * loop through the real worker seams, and maps the terminal goal state onto the
+ * work-item lifecycle (complete → done, blocked → blocked+escalated, paused →
+ * planned for a later resume). Only reached when `task.goal_driven` is set; the
+ * default single-shot path is untouched.
+ */
+async function dispatchGoalDrivenMissionTask(input: {
+  missionId: string;
+  task: PlannedNextTask;
+  teamRole: string;
+  assignment: {
+    agent_id: string;
+    model_hint?: { model_id?: string; tier?: string; effort?: string; route_reason?: string };
+  };
+}): Promise<DispatchMissionTaskOutcome | null> {
+  const workItemSourceRef = `mission:${input.missionId}:${input.task.task_id}:goal`;
+  const workItem = importExternalWorkItem({
+    source: 'local',
+    sourceRef: workItemSourceRef,
+    title: input.task.description || input.task.task_id,
+    description: input.task.description || input.task.task_id,
+    status: 'ready',
+    priority: 'normal',
+    projectId: input.missionId,
+    assigneePeerId: input.assignment.agent_id,
+    labels: [`mission:${input.missionId}`, `team_role:${input.teamRole}`, 'goal_driven'],
+    dependencies: Array.isArray(input.task.dependencies) ? input.task.dependencies : [],
+    metadata: {
+      deliverable: input.task.deliverable,
+      target_path: input.task.target_path,
+      task_id: input.task.task_id,
+      mission_id: input.missionId,
+      goal_driven: true,
+    },
+  });
+  const claimed = claimWorkItem({
+    itemId: workItem.item_id,
+    actorPeerId: 'mission-orchestration-worker',
+    purpose: `goal-driven dispatch ${input.missionId}/${input.task.task_id}`,
+    expectedVersion: workItem.version,
+    idempotencyKey: workItemSourceRef,
+    metadata: {
+      mission_id: input.missionId,
+      task_id: input.task.task_id,
+      team_role: input.teamRole,
+      goal_driven: true,
+    },
+  });
+
+  const outcome = await runGoalDrivenWorkItem({
+    missionId: input.missionId,
+    task: input.task,
+    teamRole: input.teamRole,
+    agentId: input.assignment.agent_id,
+  });
+
+  const baseOutcome: DispatchMissionTaskOutcome = {
+    task_id: input.task.task_id,
+    team_role: input.teamRole,
+    agent_id: input.assignment.agent_id,
+    dispatched: outcome.finalState === 'complete',
+    rollup_used: false,
+    result_schema_ok: outcome.finalState === 'complete',
+    needs_count: 0,
+  };
+
+  if (outcome.finalState === 'complete') {
+    updateWorkItem({
+      itemId: claimed.item.item_id,
+      expectedVersion: claimed.item.version,
+      status: 'done',
+      metadata: {
+        summary: outcome.goal.terminalReason || input.task.description || input.task.task_id,
+        mission_id: input.missionId,
+        task_id: input.task.task_id,
+        team_role: input.teamRole,
+        goal_id: outcome.goalId,
+        goal_turns: outcome.turnsRun,
+      },
+    });
+    input.task.status = 'completed';
+    emitMissionTaskEvent({
+      event_type: 'task_completed',
+      mission_id: input.missionId,
+      task_id: input.task.task_id,
+      agent_id: input.assignment.agent_id,
+      team_role: input.teamRole,
+      decision: 'task_completed',
+      why: 'Goal-driven work item reached structured completion.',
+      policy_used: 'mission_orchestration_control_plane_v1',
+      evidence: input.task.deliverable ? [String(input.task.deliverable)] : [],
+      payload: {
+        description: input.task.description,
+        deliverable: input.task.deliverable,
+        goal_id: outcome.goalId,
+        goal_turns: outcome.turnsRun,
+      },
+    });
+    return baseOutcome;
+  }
+
+  if (outcome.finalState === 'blocked') {
+    updateWorkItem({
+      itemId: claimed.item.item_id,
+      expectedVersion: claimed.item.version,
+      status: 'blocked',
+      metadata: {
+        summary: outcome.goal.terminalReason || input.task.description || input.task.task_id,
+        blocked_reason: outcome.goal.terminalReason || 'goal blocked',
+        mission_id: input.missionId,
+        task_id: input.task.task_id,
+        team_role: input.teamRole,
+        goal_id: outcome.goalId,
+      },
+    });
+    input.task.status = 'blocked';
+    // The blocker was already escalated to the mission owner inside
+    // runGoalDrivenLoop (mission_event + reportBlockerToMission); mirror it onto
+    // the task-event stream so it is visible in the task board too.
+    emitMissionTaskEvent({
+      event_type: 'task_reviewed',
+      mission_id: input.missionId,
+      task_id: input.task.task_id,
+      agent_id: input.assignment.agent_id,
+      team_role: input.teamRole,
+      decision: 'task_reviewed',
+      why: 'Goal-driven work item reported a persistent blocker.',
+      policy_used: 'mission_orchestration_control_plane_v1',
+      evidence: input.task.deliverable ? [String(input.task.deliverable)] : [],
+      payload: {
+        description: input.task.description,
+        deliverable: input.task.deliverable,
+        goal_id: outcome.goalId,
+        blocker: outcome.goal.terminalReason,
+        ...(outcome.finalReport ? { final_report: outcome.finalReport } : {}),
+      },
+    });
+    return { ...baseOutcome, dispatched: false };
+  }
+
+  // paused (technical stop / max-turns / resume halt): reset for a later resume.
+  input.task.status = 'planned';
+  releaseWorkItem({
+    itemId: claimed.item.item_id,
+    expectedVersion: claimed.item.version,
+    leaseId: claimed.lease.lease_id,
+    actorPeerId: 'mission-orchestration-worker',
+    summary: outcome.goal.terminalReason || input.task.description || input.task.task_id,
+    metadata: {
+      mission_id: input.missionId,
+      task_id: input.task.task_id,
+      team_role: input.teamRole,
+      goal_id: outcome.goalId,
+      paused_reason: outcome.goal.terminalReason || 'goal paused',
+    },
+  });
+  return { ...baseOutcome, dispatched: false };
+}
+
 async function dispatchPlannedMissionTask(input: {
   missionId: string;
   task: PlannedNextTask;
@@ -1766,6 +2178,17 @@ async function dispatchPlannedMissionTask(input: {
   };
   allTasks: PlannedNextTask[];
 }): Promise<DispatchMissionTaskOutcome | null> {
+  // KD-01 adoption: opt-in goal-driven execution runs a separate autonomous
+  // loop instead of the single-shot dispatch below. Default OFF — the rest of
+  // this function is unchanged when `goal_driven` is unset.
+  if (input.task.goal_driven) {
+    return dispatchGoalDrivenMissionTask({
+      missionId: input.missionId,
+      task: input.task,
+      teamRole: input.teamRole,
+      assignment: input.assignment,
+    });
+  }
   const workItemSourceRef = `mission:${input.missionId}:${input.task.task_id}`;
   const workItem = importExternalWorkItem({
     source: 'local',
