@@ -1,8 +1,14 @@
 import { createHash } from 'node:crypto';
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from './path-resolver.js';
 import { withExecutionContext } from './authority.js';
-import { safeExistsSync, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
+import {
+  safeExistsSync,
+  safeReaddir,
+  safeReadFile,
+  safeRmSync,
+  safeWriteFile,
+} from './secure-io.js';
 import {
   loadBackgroundReviewNudgeState,
   recordBackgroundReviewActivity,
@@ -20,10 +26,18 @@ import {
   listSurfaceOutboxMessages,
 } from './surface-coordination-store.js';
 import { resolveSurfaceApprovalReply } from './surface-approval-ui.js';
+import { findRelevantDistilledKnowledge } from './distill-knowledge-injector.js';
+import { knowledgeDeliveryLogDir } from './src/knowledge-feedback-loop.js';
 import {
   runBackgroundReviewFork,
   triggerBackgroundReviewFork,
 } from './background-review-runner.js';
+
+// KP-02: mocked so the delegation-context tests below are deterministic and
+// do not depend on the real knowledge/product/evolution corpus contents.
+vi.mock('./distill-knowledge-injector.js', () => ({
+  findRelevantDistilledKnowledge: vi.fn(async () => []),
+}));
 
 const queuePath = 'active/shared/tmp/test-memory-queue-background-review-runner.jsonl';
 const sessionIds = new Set<string>();
@@ -35,6 +49,13 @@ const outboxRefs = new Set<string>();
 const originalQueuePath = process.env.KYBERION_MEMORY_QUEUE_PATH;
 const originalRole = process.env.MISSION_ROLE;
 const originalPersona = process.env.KYBERION_PERSONA;
+
+// KP-02: hermetic isolation for knowledge delivery telemetry, same
+// convention as knowledge-feedback-loop.test.ts (KP-05).
+const knowledgeDeliveryDirOverride = pathResolver.sharedTmp(
+  `kp02-background-review-runner-knowledge-delivery/${process.pid}`
+);
+const originalKnowledgeDeliveryDir = process.env.KYBERION_KNOWLEDGE_DELIVERY_DIR;
 
 function cleanup(): void {
   withExecutionContext('surface_runtime', () => {
@@ -73,18 +94,29 @@ beforeAll(() => {
   process.env.KYBERION_MEMORY_QUEUE_PATH = queuePath;
   process.env.MISSION_ROLE = 'surface_runtime';
   process.env.KYBERION_PERSONA = 'worker';
+  process.env.KYBERION_KNOWLEDGE_DELIVERY_DIR = knowledgeDeliveryDirOverride;
+});
+
+beforeEach(() => {
+  vi.mocked(findRelevantDistilledKnowledge).mockReset();
+  vi.mocked(findRelevantDistilledKnowledge).mockResolvedValue([]);
+  safeRmSync(knowledgeDeliveryDirOverride, { recursive: true, force: true });
 });
 
 afterEach(cleanup);
 
 afterAll(() => {
   cleanup();
+  safeRmSync(knowledgeDeliveryDirOverride, { recursive: true, force: true });
   if (originalQueuePath === undefined) delete process.env.KYBERION_MEMORY_QUEUE_PATH;
   else process.env.KYBERION_MEMORY_QUEUE_PATH = originalQueuePath;
   if (originalRole === undefined) delete process.env.MISSION_ROLE;
   else process.env.MISSION_ROLE = originalRole;
   if (originalPersona === undefined) delete process.env.KYBERION_PERSONA;
   else process.env.KYBERION_PERSONA = originalPersona;
+  if (originalKnowledgeDeliveryDir === undefined)
+    delete process.env.KYBERION_KNOWLEDGE_DELIVERY_DIR;
+  else process.env.KYBERION_KNOWLEDGE_DELIVERY_DIR = originalKnowledgeDeliveryDir;
 });
 
 describe('background-review-runner', () => {
@@ -345,6 +377,104 @@ describe('background-review-runner', () => {
       status: 'promoted',
       promoted_ref: targetRef,
       tier: 'confidential',
+    });
+  });
+
+  describe('KP-02: delegateTask knowledge context', () => {
+    it('attaches a "Relevant knowledge" section to the delegation context when hints are found', async () => {
+      const sessionId = `runner-knowledge-hit-${process.pid}-${Date.now()}`;
+      sessionIds.add(sessionId);
+      vi.mocked(findRelevantDistilledKnowledge).mockResolvedValueOnce([
+        {
+          path: 'knowledge/product/evolution/distill_example_2026-07-01.md',
+          title: 'Example distilled knowledge',
+          tags: [],
+          excerpt: 'A useful excerpt about closure checklists.',
+          score: 0.4,
+        },
+      ]);
+      const delegateTask = vi.fn(async (_prompt: string, context?: string) => {
+        expect(context).toContain('Relevant knowledge:');
+        expect(context).toContain('Example distilled knowledge');
+        expect(context).toContain('knowledge/product/evolution/distill_example_2026-07-01.md');
+        return JSON.stringify({ action: 'no_action' });
+      });
+
+      const result = await runBackgroundReviewFork({
+        sessionId,
+        surface: 'slack',
+        snapshot: 'The operator repeatedly used the same closure checklist.',
+        backend: { delegateTask },
+      });
+
+      expect(result.status).toBe('no_action');
+      expect(delegateTask).toHaveBeenCalledTimes(1);
+    });
+
+    it('fails open when knowledge retrieval throws — delegation proceeds with the original context', async () => {
+      const sessionId = `runner-knowledge-fail-${process.pid}-${Date.now()}`;
+      sessionIds.add(sessionId);
+      vi.mocked(findRelevantDistilledKnowledge).mockRejectedValueOnce(new Error('boom'));
+      const delegateTask = vi.fn(async (_prompt: string, context?: string) => {
+        expect(context).toBe(`background-review:${sessionId}`);
+        return JSON.stringify({ action: 'no_action' });
+      });
+
+      const result = await runBackgroundReviewFork({
+        sessionId,
+        surface: 'slack',
+        snapshot: 'A one-off event that will not repeat.',
+        backend: { delegateTask },
+      });
+
+      expect(result.status).toBe('no_action');
+      expect(delegateTask).toHaveBeenCalledTimes(1);
+    });
+
+    it('records knowledge delivery telemetry with a non-mission scope marker when the fork has no missionId', async () => {
+      const sessionId = `runner-knowledge-delivery-${process.pid}-${Date.now()}`;
+      sessionIds.add(sessionId);
+      vi.mocked(findRelevantDistilledKnowledge).mockResolvedValueOnce([
+        {
+          path: 'knowledge/product/evolution/distill_delivery_2026-07-01.md',
+          title: 'Delivery test doc',
+          tags: [],
+          excerpt: 'Delivery excerpt.',
+          score: 0.5,
+        },
+      ]);
+      const delegateTask = vi.fn(async () => JSON.stringify({ action: 'no_action' }));
+
+      await runBackgroundReviewFork({
+        sessionId,
+        surface: 'slack',
+        snapshot: 'Something recurring worth remembering.',
+        backend: { delegateTask },
+      });
+
+      const dir = knowledgeDeliveryLogDir();
+      expect(safeExistsSync(dir)).toBe(true);
+      const files = safeReaddir(dir).filter((name) => name.endsWith('.jsonl'));
+      expect(files.length).toBeGreaterThan(0);
+      const raw = String(
+        safeReadFile(pathResolver.rootResolve(`${dir}/${files[0]}`), { encoding: 'utf8' })
+      );
+      const records = raw
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line));
+      const record = records.find((entry) => entry.task_id === sessionId);
+      expect(record).toMatchObject({
+        mission_id: `session:${sessionId}`,
+        task_id: sessionId,
+        recipient_kind: 'background_review_fork',
+      });
+      expect(record.refs).toContainEqual(
+        expect.objectContaining({
+          path: 'knowledge/product/evolution/distill_delivery_2026-07-01.md',
+          title: 'Delivery test doc',
+        })
+      );
     });
   });
 });
