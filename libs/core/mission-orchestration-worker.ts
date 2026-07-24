@@ -46,6 +46,7 @@ import {
   importExternalWorkItem,
   releaseWorkItem,
   updateWorkItem,
+  type WorkItem,
 } from './work-coordination.js';
 import { logger } from './core.js';
 import { buildWorkingPrinciplesLines, canonicalizeTeamRole } from './working-principles.js';
@@ -72,12 +73,8 @@ import { getDefaultWorkerEventStream, type WorkerEventStream } from './worker-ev
 import { buildExecutionEnv } from './authority.js';
 import { missionDir, missionEvidenceDir, rootDir } from './path-resolver.js';
 import { pathResolver } from './path-resolver.js';
-import {
-  renderMissionContextPack,
-  resolveMissionContextPack,
-  saveMissionContextPack,
-  type MissionContextPackPruningSummary,
-} from './mission-context-pack.js';
+import { type MissionContextPackPruningSummary } from './mission-context-pack.js';
+import { provisionTaskKnowledge } from './task-knowledge-provisioning.js';
 import * as nodePath from 'node:path';
 import * as path from 'node:path';
 import {
@@ -1602,7 +1599,12 @@ async function buildTaskDispatchContext(input: {
           history: [],
           relationships: {},
         };
-  const missionContextPack = await resolveMissionContextPack({
+  // KP-01: single provisioning entry point (resolve + persist + render) —
+  // `form: 'pack'` reproduces the pre-KP-01 inline resolve/save/render
+  // sequence byte-for-byte.
+  const provisionedContext = await provisionTaskKnowledge({
+    form: 'pack',
+    missionPath: missionDir(input.missionId, 'public'),
     missionId: input.missionId,
     tier: (missionState.tier as 'personal' | 'confidential' | 'public') || 'public',
     recipientKind: 'agent',
@@ -1635,11 +1637,10 @@ async function buildTaskDispatchContext(input: {
       },
     },
   });
-  const missionContextPackPath = missionContextPack
-    ? saveMissionContextPack(missionDir(input.missionId, 'public'), missionContextPack)
-    : undefined;
+  const missionContextPack = provisionedContext.pack;
+  const missionContextPackPath = provisionedContext.missionContextPackPath;
   const missionContextPackText = missionContextPack
-    ? renderMissionContextPack(missionContextPack)
+    ? provisionedContext.text
     : [
         'Mission context pack unavailable; using degraded fallback context.',
         `- Mission: ${input.missionId}`,
@@ -2035,6 +2036,60 @@ export async function runGoalDrivenWorkItem(input: {
  * planned for a later resume). Only reached when `task.goal_driven` is set; the
  * default single-shot path is untouched.
  */
+/**
+ * KP-01: goal-driven dispatch's context-pack provisioning. Renders the pack
+ * as `form: 'system_prompt'` — a role-scoped, compact rendering meant to be
+ * passed once as `systemPrompt` and reused as a stable prefix across every
+ * turn (KD-08 prompt-cache discipline; see `runGoalDrivenWorkItem`'s
+ * `systemPrompt` doc comment). Persists the pack the same way the single-shot
+ * path does (`saveMissionContextPack`, via `provisionTaskKnowledge`'s
+ * `missionPath`).
+ *
+ * Fails open by design: any provisioning error (invalid mission state,
+ * schema violation, I/O failure) is logged and swallowed here so a knowledge
+ * outage never blocks dispatch — the goal loop already tolerates an absent
+ * `systemPrompt` (it is optional on `RunGoalDrivenLoopOptions`). Exported so
+ * this seam can be exercised hermetically, same rationale as
+ * `runGoalDrivenWorkItem`.
+ */
+export async function provisionGoalDrivenTaskKnowledge(input: {
+  missionId: string;
+  task: PlannedNextTask;
+  teamRole: string;
+  agentId: string;
+  workItem: WorkItem;
+}): Promise<{ systemPrompt?: string; missionContextPackPath?: string }> {
+  try {
+    const missionStateRaw = loadMissionStateSnapshot(input.missionId);
+    const tier =
+      missionStateRaw && typeof missionStateRaw === 'object'
+        ? (missionStateRaw as Record<string, unknown>).tier
+        : undefined;
+    const provisioned = await provisionTaskKnowledge({
+      form: 'system_prompt',
+      missionPath: missionDir(input.missionId, 'public'),
+      missionId: input.missionId,
+      tier: (tier as 'personal' | 'confidential' | 'public') || 'public',
+      recipientKind: 'agent',
+      teamRole: input.teamRole,
+      assigneePeerId: input.agentId,
+      workItem: input.workItem,
+    });
+    if (!provisioned.pack) return {};
+    return {
+      systemPrompt: provisioned.text,
+      ...(provisioned.missionContextPackPath
+        ? { missionContextPackPath: provisioned.missionContextPackPath }
+        : {}),
+    };
+  } catch (err: any) {
+    logger.warn(
+      `[MISSION_WORKER] Task knowledge provisioning failed for goal-driven dispatch ${input.missionId}/${input.task.task_id}; proceeding without a context pack: ${err?.message || err}`
+    );
+    return {};
+  }
+}
+
 async function dispatchGoalDrivenMissionTask(input: {
   missionId: string;
   task: PlannedNextTask;
@@ -2078,11 +2133,22 @@ async function dispatchGoalDrivenMissionTask(input: {
     },
   });
 
+  // KP-01: provision the mission context pack as a stable system-prompt
+  // prefix for the goal loop. Fail-open — see provisionGoalDrivenTaskKnowledge.
+  const { systemPrompt } = await provisionGoalDrivenTaskKnowledge({
+    missionId: input.missionId,
+    task: input.task,
+    teamRole: input.teamRole,
+    agentId: input.assignment.agent_id,
+    workItem,
+  });
+
   const outcome = await runGoalDrivenWorkItem({
     missionId: input.missionId,
     task: input.task,
     teamRole: input.teamRole,
     agentId: input.assignment.agent_id,
+    ...(systemPrompt ? { systemPrompt } : {}),
   });
 
   const baseOutcome: DispatchMissionTaskOutcome = {
