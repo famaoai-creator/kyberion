@@ -2,7 +2,15 @@
   "version": "1.0.0",
   "agents": {
     "reasoning-worker": {
-      "authority_roles": ["ecosystem_architect", "software_developer", "mission_controller"],
+      "authority_roles": [
+        "qa_lead",
+        "ruthless_auditor",
+        "designer",
+        "cyber_security",
+        "ecosystem_architect",
+        "software_developer",
+        "mission_controller"
+      ],
       "team_roles": [
         "planner",
         "implementer",

@@ -1,0 +1,9 @@
+{
+  "role": "designer",
+  "description": "Visual identity and UX authority for interaction design and design-system stewardship.",
+  "default_persona": "designer",
+  "write_scopes": ["knowledge/design/", "templates/"],
+  "scope_classes": ["codebase_core", "design_system"],
+  "allowed_actuators": ["file-actuator", "artifact-actuator"],
+  "tier_access": ["public", "confidential"]
+}

@@ -1,0 +1,9 @@
+{
+  "role": "cyber_security",
+  "description": "Security review authority for threat modeling, vulnerability analysis, and mission veto power.",
+  "default_persona": "cyber_security",
+  "write_scopes": ["active/audit/security/", "knowledge/security/"],
+  "scope_classes": ["codebase_core", "security_validation", "audit"],
+  "allowed_actuators": ["code-actuator", "artifact-actuator"],
+  "tier_access": ["public", "confidential"]
+}
