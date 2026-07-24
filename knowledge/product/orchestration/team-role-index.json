@@ -4,7 +4,7 @@
     "attacker": {
       "description": "Builds offensive vulnerability hypotheses and adversarial proof paths from static analysis evidence.",
       "required_capabilities": ["reasoning", "security", "analysis"],
-      "compatible_authority_roles": ["ecosystem_architect", "mission_controller"],
+      "compatible_authority_roles": ["cyber_security", "ecosystem_architect", "mission_controller"],
       "allowed_delegate_team_roles": [],
       "escalation_parent_team_role": "owner",
       "required_scope_classes": ["codebase_core"],
@@ -32,7 +32,7 @@
     "defender": {
       "description": "Reviews and refutes adversarial findings, hardens mitigations, and checks for false positives.",
       "required_capabilities": ["reasoning", "security", "critique"],
-      "compatible_authority_roles": ["ecosystem_architect", "mission_controller"],
+      "compatible_authority_roles": ["cyber_security", "ecosystem_architect", "mission_controller"],
       "allowed_delegate_team_roles": [],
       "escalation_parent_team_role": "owner",
       "required_scope_classes": ["codebase_core"],
@@ -60,7 +60,7 @@
     "experience_designer": {
       "description": "Designs product flows, interaction models, and UX tradeoffs.",
       "required_capabilities": ["design", "ux", "analysis"],
-      "compatible_authority_roles": ["ecosystem_architect", "software_developer"],
+      "compatible_authority_roles": ["designer", "ecosystem_architect", "software_developer"],
       "allowed_delegate_team_roles": ["implementer"],
       "escalation_parent_team_role": "product_strategist",
       "required_scope_classes": ["codebase_core"],
@@ -208,7 +208,11 @@
     "reviewer": {
       "description": "Reviews risk, regression potential, and boundary compliance.",
       "required_capabilities": ["review", "analysis", "architecture"],
-      "compatible_authority_roles": ["ecosystem_architect", "knowledge_steward"],
+      "compatible_authority_roles": [
+        "ruthless_auditor",
+        "ecosystem_architect",
+        "knowledge_steward"
+      ],
       "allowed_delegate_team_roles": [],
       "escalation_parent_team_role": "owner",
       "required_scope_classes": ["knowledge_core"],
@@ -255,7 +259,7 @@
     "tester": {
       "description": "Owns validation strategy and test execution planning.",
       "required_capabilities": ["testing", "analysis", "quality"],
-      "compatible_authority_roles": ["software_developer", "ecosystem_architect"],
+      "compatible_authority_roles": ["qa_lead", "software_developer", "ecosystem_architect"],
       "allowed_delegate_team_roles": [],
       "escalation_parent_team_role": "planner",
       "required_scope_classes": ["codebase_core"],

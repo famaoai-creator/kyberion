@@ -419,6 +419,9 @@
 ## 📁 product/prompts
 - [prompts/](./product/prompts/README.md) (public | Unknown)
 
+## 📁 product/roles
+- [Roles Directory — Assigned Persona Reference](./product/roles/README.md) (public | Ecosystem Architect)
+
 ## 📁 product/roles/business_owner
 - [Business Owner (事業責任者) ミッション声明](./product/roles/business_owner/mission.md) (public | Ecosystem Architect)
 - [Role Procedure: Business Owner (Value Maximizer)](./product/roles/business_owner/PROCEDURE.md) (public | Unknown)
@@ -553,6 +556,7 @@
 - [Guided Coordination Brief](./product/schemas/README-guided-coordination-brief.md) (public | Unknown)
 - [Meeting Operations Brief](./product/schemas/README-meeting-operations-brief.md) (public | Unknown)
 - [Meeting Operations Profile](./product/schemas/README-meeting-operations-profile.md) (public | Unknown)
+- [Mission Contract](./product/schemas/README-mission-contract.md) (public | Unknown)
 - [Mobile App Profile](./product/schemas/README-mobile-app-profile.md) (public | Unknown)
 - [Mobile App Profile Index](./product/schemas/README-mobile-app-profile-index.md) (public | Unknown)
 - [Narrated Video Preference Profile](./product/schemas/README-narrated-video-preference-profile.md) (public | Unknown)

@@ -1,0 +1,9 @@
+{
+  "role": "ruthless_auditor",
+  "description": "Independent audit authority for evidence inspection, verdict issuance, and mission-halt power.",
+  "default_persona": "ruthless_auditor",
+  "write_scopes": ["active/audit/", "knowledge/incidents/"],
+  "scope_classes": ["knowledge_core", "audit"],
+  "allowed_actuators": ["artifact-actuator", "approval-actuator"],
+  "tier_access": ["public", "confidential"]
+}

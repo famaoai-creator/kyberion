@@ -63,6 +63,22 @@
       "allowed_actuators": ["presence-actuator"],
       "tier_access": ["public", "confidential"]
     },
+    "cyber_security": {
+      "description": "Security review authority for threat modeling, vulnerability analysis, and mission veto power.",
+      "default_persona": "cyber_security",
+      "write_scopes": ["active/audit/security/", "knowledge/security/"],
+      "scope_classes": ["codebase_core", "security_validation", "audit"],
+      "allowed_actuators": ["code-actuator", "artifact-actuator"],
+      "tier_access": ["public", "confidential"]
+    },
+    "designer": {
+      "description": "Visual identity and UX authority for interaction design and design-system stewardship.",
+      "default_persona": "designer",
+      "write_scopes": ["knowledge/design/", "templates/"],
+      "scope_classes": ["codebase_core", "design_system"],
+      "allowed_actuators": ["file-actuator", "artifact-actuator"],
+      "tier_access": ["public", "confidential"]
+    },
     "ecosystem_architect": {
       "description": "Core architecture and repo evolution authority.",
       "default_persona": "ecosystem_architect",
@@ -105,6 +121,22 @@
       "scope_classes": ["mission_state", "coordination_runtime", "observability", "audit"],
       "allowed_actuators": ["artifact-actuator", "approval-actuator", "orchestrator-actuator"],
       "tier_access": ["public", "confidential", "personal"]
+    },
+    "qa_lead": {
+      "description": "Quality assurance authority for test strategy, coverage validation, and regression evidence.",
+      "default_persona": "qa_lead",
+      "write_scopes": ["tests/", "active/audit/test-reports/", "knowledge/testing/"],
+      "scope_classes": ["codebase_core", "quality_validation"],
+      "allowed_actuators": ["code-actuator", "file-actuator"],
+      "tier_access": ["public", "confidential"]
+    },
+    "ruthless_auditor": {
+      "description": "Independent audit authority for evidence inspection, verdict issuance, and mission-halt power.",
+      "default_persona": "ruthless_auditor",
+      "write_scopes": ["active/audit/", "knowledge/incidents/"],
+      "scope_classes": ["knowledge_core", "audit"],
+      "allowed_actuators": ["artifact-actuator", "approval-actuator"],
+      "tier_access": ["public", "confidential"]
     },
     "slack_bridge": {
       "description": "Slack gateway authority for channel ingress and observability.",

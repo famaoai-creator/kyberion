@@ -245,3 +245,6 @@ export class MissionCoordinationBus {
     );
   }
 }
+
+/** Process-wide bus so repeated calls within one mission reuse the loaded cache. */
+export const missionCoordinationBus = new MissionCoordinationBus();

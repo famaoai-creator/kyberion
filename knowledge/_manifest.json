@@ -1035,7 +1035,7 @@
     {
       "path": "product/governance/authority-role-index.json",
       "tier": "public",
-      "size": 7580,
+      "size": 9312,
       "type": "json"
     },
     {
@@ -1069,6 +1069,18 @@
       "type": "json"
     },
     {
+      "path": "product/governance/authority-roles/cyber_security.json",
+      "tier": "public",
+      "size": 432,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/authority-roles/designer.json",
+      "tier": "public",
+      "size": 383,
+      "type": "json"
+    },
+    {
       "path": "product/governance/authority-roles/ecosystem_architect.json",
       "tier": "public",
       "size": 555,
@@ -1084,6 +1096,18 @@
       "path": "product/governance/authority-roles/mission_controller.json",
       "tier": "public",
       "size": 814,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/authority-roles/qa_lead.json",
+      "tier": "public",
+      "size": 415,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/authority-roles/ruthless_auditor.json",
+      "tier": "public",
+      "size": 410,
       "type": "json"
     },
     {
@@ -1815,7 +1839,7 @@
     {
       "path": "product/governance/phases/alignment.md",
       "tier": "public",
-      "size": 1808,
+      "size": 2135,
       "type": "md"
     },
     {
@@ -3027,7 +3051,7 @@
     {
       "path": "product/orchestration/agent-profile-index.json",
       "tier": "public",
-      "size": 7805,
+      "size": 8172,
       "type": "json"
     },
     {
@@ -3039,7 +3063,7 @@
     {
       "path": "product/orchestration/agent-profiles/attacker.json",
       "tier": "public",
-      "size": 403,
+      "size": 421,
       "type": "json"
     },
     {
@@ -3057,13 +3081,13 @@
     {
       "path": "product/orchestration/agent-profiles/defender.json",
       "tier": "public",
-      "size": 403,
+      "size": 421,
       "type": "json"
     },
     {
       "path": "product/orchestration/agent-profiles/implementation-architect.json",
       "tier": "public",
-      "size": 555,
+      "size": 646,
       "type": "json"
     },
     {
@@ -3075,7 +3099,7 @@
     {
       "path": "product/orchestration/agent-profiles/nerve-agent.json",
       "tier": "public",
-      "size": 489,
+      "size": 518,
       "type": "json"
     },
     {
@@ -3105,7 +3129,7 @@
     {
       "path": "product/orchestration/agent-profiles/reasoning-worker.json",
       "tier": "public",
-      "size": 1036,
+      "size": 1161,
       "type": "json"
     },
     {
@@ -3117,7 +3141,7 @@
     {
       "path": "product/orchestration/agent-profiles/sovereign-brain.json",
       "tier": "public",
-      "size": 524,
+      "size": 610,
       "type": "json"
     },
     {
@@ -4371,7 +4395,7 @@
     {
       "path": "product/orchestration/team-role-index.json",
       "tier": "public",
-      "size": 13833,
+      "size": 13944,
       "type": "json"
     },
     {
@@ -4383,7 +4407,7 @@
     {
       "path": "product/orchestration/team-roles/attacker.json",
       "tier": "public",
-      "size": 717,
+      "size": 675,
       "type": "json"
     },
     {
@@ -4395,7 +4419,7 @@
     {
       "path": "product/orchestration/team-roles/defender.json",
       "tier": "public",
-      "size": 711,
+      "size": 669,
       "type": "json"
     },
     {
@@ -4407,7 +4431,7 @@
     {
       "path": "product/orchestration/team-roles/experience_designer.json",
       "tier": "public",
-      "size": 766,
+      "size": 698,
       "type": "json"
     },
     {
@@ -4461,7 +4485,7 @@
     {
       "path": "product/orchestration/team-roles/reviewer.json",
       "tier": "public",
-      "size": 728,
+      "size": 676,
       "type": "json"
     },
     {
@@ -4479,7 +4503,7 @@
     {
       "path": "product/orchestration/team-roles/tester.json",
       "tier": "public",
-      "size": 693,
+      "size": 638,
       "type": "json"
     },
     {
@@ -5335,6 +5359,12 @@
       "type": "md"
     },
     {
+      "path": "product/roles/README.md",
+      "tier": "public",
+      "size": 2315,
+      "type": "md"
+    },
+    {
       "path": "product/roles/business_owner/PROCEDURE.md",
       "tier": "public",
       "size": 758,
@@ -5746,6 +5776,12 @@
       "path": "product/schemas/README-meeting-operations-profile.md",
       "tier": "public",
       "size": 1579,
+      "type": "md"
+    },
+    {
+      "path": "product/schemas/README-mission-contract.md",
+      "tier": "public",
+      "size": 2143,
       "type": "md"
     },
     {
