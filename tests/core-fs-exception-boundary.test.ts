@@ -13,6 +13,7 @@ const allowedCoreFsImports = [
   'libs/core/review-reentry.test.ts',
   'libs/core/audit-chain-tenant.test.ts',
   'libs/core/browser-extension-bridge.test.ts',
+  'libs/core/cli-subagent-team.e2e.test.ts',
   'libs/core/data-vault.test.ts',
   'libs/core/creative-design-resolver.test.ts',
   'libs/core/deliverable-inbox.test.ts',
