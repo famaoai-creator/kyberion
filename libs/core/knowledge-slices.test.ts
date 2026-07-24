@@ -110,7 +110,7 @@ describe('knowledge-slices: precedence and merge semantics', () => {
           id: 'implementer-execution',
           match: { team_role: 'implementer', phase: 'execution' },
           pinned: ['knowledge/product/governance/working-philosophy.md'],
-          exclude: ['knowledge/public/scratch/*.md'],
+          exclude: ['knowledge/public/drafts/*.md'],
           search_roots: ['knowledge/product/roles/'],
         },
       ],
@@ -130,7 +130,7 @@ describe('knowledge-slices: precedence and merge semantics', () => {
     ]);
     // exclude: unioned across both matching slices
     expect(resolved.exclude.sort()).toEqual(
-      ['knowledge/product/evolution/distill_*.md', 'knowledge/public/scratch/*.md'].sort()
+      ['knowledge/product/evolution/distill_*.md', 'knowledge/public/drafts/*.md'].sort()
     );
     // search_roots: most-specific-wins (not merged) — the more specific slice supplies the whole list
     expect(resolved.searchRoots).toEqual(['knowledge/product/roles/']);
