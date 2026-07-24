@@ -1,7 +1,7 @@
 {
   "name": "@actuator/email",
-  "version": "1.0.0",
-  "description": "Email composition and sending actuator (Mail.app JXA + SMTP)",
+  "version": "1.1.0",
+  "description": "Adapter-based email composition and sending actuator (Mail.app JXA + SMTP)",
   "type": "module",
   "main": "../../../dist/libs/actuators/email-actuator/src/index.js",
   "types": "../../../dist/libs/actuators/email-actuator/src/index.d.ts",

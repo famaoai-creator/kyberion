@@ -275,6 +275,7 @@ export const presenceStudioEmailDeliverSchema = z.object({
   subject: z.string().trim().max(200).optional(),
   to: z.string().trim().max(254).optional(),
   message_id: z.string().trim().max(512).optional(),
+  account: z.enum(['auto', 'gmail', 'outlook']).optional(),
 });
 
 export const presenceStudioVoiceMinutesSchema = z.object({

@@ -17,6 +17,8 @@ import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
 import { getServiceRuntimeRegistry } from './service-runtime-registry.js';
 import { listToolRuntimes, getToolRuntimeRegistry } from './tool-runtime-registry.js';
 import { listVadBackends, resolveVadBackend } from './vad-registry.js';
+import { listEmailBackends } from './email-bridge.js';
+import { listEmailAccountProviders } from './email-account-catalog.js';
 
 export type AdapterDefaultSelectionStatus = 'ready' | 'needs_setup' | 'unsupported';
 
@@ -46,6 +48,8 @@ const CATEGORY_LABELS: Record<AdapterDefaultKey, string> = {
   'media.image': 'Image generation backend',
   'media.video': 'Video rendering backend',
   'media.music': 'Music generation backend',
+  'email.backend': 'Email backend',
+  'email.account': 'Email account',
   'service.runtime': 'Service runtime',
   'tool.runtime': 'Tool runtime',
   'voice.vad': 'Voice activity detector',
@@ -209,6 +213,36 @@ function vadCategory(): AdapterDefaultCategory {
   };
 }
 
+function emailCategory(): AdapterDefaultCategory {
+  const candidates = listEmailBackends();
+  const selectedId =
+    loadAdapterDefaultPreferences().defaults['email.backend'] ||
+    candidates.find((candidate) => candidate.selectable)?.id ||
+    candidates[0]?.id ||
+    'auto';
+  return {
+    key: 'email.backend',
+    display_name: CATEGORY_LABELS['email.backend'],
+    selected_id: selectedId,
+    candidates,
+  };
+}
+
+function emailAccountCategory(): AdapterDefaultCategory {
+  const candidates = listEmailAccountProviders();
+  const selectedId =
+    loadAdapterDefaultPreferences().defaults['email.account'] ||
+    candidates.find((candidate) => candidate.selectable)?.id ||
+    candidates[0]?.id ||
+    'gmail';
+  return {
+    key: 'email.account',
+    display_name: CATEGORY_LABELS['email.account'],
+    selected_id: selectedId,
+    candidates,
+  };
+}
+
 export function getAdapterDefaultSelectionSnapshot(): AdapterDefaultSelectionSnapshot {
   const preferences = loadPersistedPreferences();
   return {
@@ -218,6 +252,8 @@ export function getAdapterDefaultSelectionSnapshot(): AdapterDefaultSelectionSna
       mediaCategory('image'),
       mediaCategory('video'),
       mediaCategory('music'),
+      emailCategory(),
+      emailAccountCategory(),
       serviceCategory(),
       toolCategory(),
       vadCategory(),

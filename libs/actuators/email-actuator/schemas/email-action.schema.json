@@ -11,12 +11,22 @@
     "params": {
       "type": "object",
       "properties": {
+        "backend": {
+          "type": "string",
+          "description": "Governed email backend ID (for example mac_mailapp or smtp)"
+        },
         "to": { "type": "string", "description": "Recipient email address" },
         "cc": { "type": "string", "description": "CC email address (optional)" },
         "subject": { "type": "string", "description": "Email subject line" },
         "body": { "type": "string", "description": "Email body (plain text or Markdown)" },
-        "body_file": { "type": "string", "description": "Path to a file containing the email body (for send_from_file)" },
-        "from": { "type": "string", "description": "Sender address override (falls back to KYBERION_EMAIL_FROM)" },
+        "body_file": {
+          "type": "string",
+          "description": "Path to a file containing the email body (for send_from_file)"
+        },
+        "from": {
+          "type": "string",
+          "description": "Sender address override (falls back to KYBERION_EMAIL_FROM)"
+        },
         "export_as": { "type": "string", "description": "Context key for result" }
       }
     }

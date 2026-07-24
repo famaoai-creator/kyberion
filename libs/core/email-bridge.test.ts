@@ -1,9 +1,10 @@
 import { EventEmitter } from 'node:events';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import {
+  EmailBackendRegistry,
   EmailPolicyRouter,
   MacMailAppEmailProvider,
-  SmtpEmailProvider
+  SmtpEmailProvider,
 } from './email-bridge.js';
 import { EmailProvider } from './email-types.js';
 
@@ -53,6 +54,25 @@ describe('EmailPolicyRouter', () => {
     const provider = await router.selectProvider('send');
     expect(provider.id).toBe('mac_mailapp');
   });
+
+  it('supports explicit backend selection without caller-specific branches', async () => {
+    const router = new EmailPolicyRouter([mockMacMail, mockSmtp]);
+    await expect(router.selectProvider('send', 'smtp')).resolves.toBe(mockSmtp);
+    await expect(router.selectProvider('create_draft', 'smtp')).rejects.toThrow(
+      /not available|does not support draft creation/i
+    );
+  });
+
+  it('resolves a newly registered backend through the same registry contract', async () => {
+    const outlook: EmailProvider = {
+      id: 'outlook',
+      isAvailable: vi.fn().mockResolvedValue(true),
+      send: vi.fn(),
+      createDraft: vi.fn(),
+    };
+    const registry = new EmailBackendRegistry([outlook]);
+    await expect(registry.resolve('outlook', 'send')).resolves.toBe(outlook);
+  });
 });
 
 describe('MacMailAppEmailProvider', () => {
@@ -91,7 +111,12 @@ describe('MacMailAppEmailProvider', () => {
     expect(result.provider).toBe('mac_mailapp');
     expect(mocks.spawn).toHaveBeenCalledWith(
       'osascript',
-      expect.arrayContaining(['-l', 'JavaScript', '-e', expect.stringContaining('Application(\'Mail\')')]),
+      expect.arrayContaining([
+        '-l',
+        'JavaScript',
+        '-e',
+        expect.stringContaining("Application('Mail')"),
+      ]),
       expect.any(Object)
     );
   });

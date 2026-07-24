@@ -36,14 +36,14 @@ describe('voice and browser smoke contract', () => {
     expect(page).toContain('Refresh Triage');
     expect(page).toContain('Copy Draft');
     expect(page).toContain('Email Reply Draft');
-    expect(page).toContain('Gmail auth status');
+    expect(page).toContain('email account status');
     expect(page).toContain('Create Reply Draft');
-    expect(page).toContain('Create Gmail Draft');
+    expect(page).toContain('Create Account Draft');
     expect(page).toContain('Send Approved Email');
     expect(page).toContain('Confirm email send');
     expect(page).toContain('Send Email');
     expect(page).toContain(
-      'This send will be recorded in Gmail and the local Presence Studio event flow.'
+      'This send will be recorded in the selected email account and the local Presence Studio event flow.'
     );
     expect(page).toContain('click outside the dialog to cancel.');
     expect(page).toContain('Refresh Auth');
