@@ -1,7 +1,7 @@
 # GitHub プレゼンス整備計画(2026-07-25)
 
 > **目的**: 2026-07 に完了したアーキテクチャ群(goal-driven worker・context pack・provenance ゲート・メディア生成プロセス等)を、GitHub 上の対外情報に反映する。
-> **状態**: 草稿。**リポジトリ設定の変更(description / topics)と Release / Discussion の公開は未実施** — オーナー承認後に §4 の手順で適用する。
+> **状態**: description / topics は **2026-07-25 適用済み**(§2.1 の案 + `multi-agent` `ai-agents` `typescript` `mcp` 追加を確認済み)。**Release / Discussions への投稿と Social preview は未実施** — §3 / §2.3 をオーナー判断で公開する。
 > **恒常化**: リリースハイライトの生成は今後リリースごとに繰り返すため、`pipelines/` 化の候補(traces → STATUS 差分 → ハイライト草稿の半自動生成)。
 
 ## 1. 現状スナップショット(2026-07-25 時点)
