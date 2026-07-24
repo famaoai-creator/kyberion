@@ -18,6 +18,8 @@ import {
   completeDelegatedTaskTrace,
   startDelegatedTaskTrace,
 } from './delegated-task-observability.js';
+import { findRelevantDistilledKnowledge } from './distill-knowledge-injector.js';
+import { recordKnowledgeDelivery } from './src/knowledge-feedback-loop.js';
 
 export interface AdfRepairResult {
   repaired: boolean;
@@ -94,6 +96,83 @@ export async function validateAndRepairAdf(
   );
 }
 
+const ADF_REPAIR_KNOWLEDGE_HINT_LIMIT = 2;
+const ADF_REPAIR_KNOWLEDGE_EXCERPT_MAX = 200;
+
+function truncateKnowledgeExcerpt(value: string, max: number): string {
+  const text = String(value || '')
+    .trim()
+    .replace(/\s+/g, ' ');
+  return text.length <= max ? text : `${text.slice(0, Math.max(0, max - 3))}...`;
+}
+
+/**
+ * KP-02: enrich the repair delegation's context with knowledge hints for
+ * this schema/error topic.
+ *
+ * (a) The failing op's own contract/schema doc is already resolved by the
+ * caller as `schemaContent` (via `loadSchema`/`safeReadFile` against the
+ * real `${schemaName}.schema.json` or the pipeline-adf schema file) and
+ * embedded directly in `instruction`'s "## Expected Schema" section — that
+ * is the repair agent's existing ground truth for the op, so there is
+ * nothing left for this helper to resolve there.
+ * (b) This adds top `findRelevantDistilledKnowledge` hits for the schema
+ * name + error/hint text (e.g. prior incident write-ups about the same kind
+ * of schema violation), mirroring the excerpt/truncation conventions from
+ * task-knowledge-provisioning.ts (200-char excerpts).
+ *
+ * `provisionTaskKnowledge` is not used here for the same reason as
+ * background-review-runner.ts: ADF repair delegation has no `missionId` to
+ * resolve a mission context pack around — it operates on a bare ADF file
+ * path outside any mission — so this calls the lower-level primitive
+ * directly and records delivery with a non-mission scope marker.
+ *
+ * Fail-open: any lookup error is swallowed and logged once; delegation
+ * proceeds with the original `ADF Repair: <path>` context label exactly as
+ * before this change.
+ */
+async function buildAdfRepairKnowledgeContext(
+  adfPath: string,
+  schemaName: string,
+  errorSummary: string,
+  hints: string
+): Promise<string> {
+  const baseContext = `ADF Repair: ${adfPath}`;
+  try {
+    const topic = [schemaName, errorSummary, hints].filter(Boolean).join(' ').slice(0, 2_000);
+    if (!topic.trim()) return baseContext;
+    const entries = await findRelevantDistilledKnowledge({
+      topic,
+      tags: [schemaName],
+      limit: ADF_REPAIR_KNOWLEDGE_HINT_LIMIT,
+      minScore: 0.08,
+    });
+    if (entries.length === 0) return baseContext;
+
+    const lines = [
+      'Relevant knowledge:',
+      ...entries.map(
+        (entry) =>
+          `- ${entry.title} (${entry.path}): ${truncateKnowledgeExcerpt(entry.excerpt, ADF_REPAIR_KNOWLEDGE_EXCERPT_MAX)}`
+      ),
+    ];
+    recordKnowledgeDelivery({
+      missionId: `adf-repair:${schemaName}`,
+      taskId: adfPath,
+      recipientKind: 'adf_repair_agent',
+      refs: entries.map((entry) => ({ path: entry.path, score: entry.score, title: entry.title })),
+    });
+    return `${baseContext}\n\n${lines.join('\n')}`;
+  } catch (error) {
+    logger.warn(
+      `[KP-02] ADF repair knowledge lookup failed, delegating without knowledge context: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+    return baseContext;
+  }
+}
+
 async function attemptSubagentRepair(
   adfPath: string,
   schemaName: string,
@@ -155,7 +234,13 @@ Output constraints: pure JSON, no markdown fences, no comments, no trailing comm
 
   try {
     const originalContent = safeReadFile(adfPath, { encoding: 'utf8' }) as string;
-    const report = await backend.delegateTask(instruction, `ADF Repair: ${adfPath}`);
+    const repairContext = await buildAdfRepairKnowledgeContext(
+      adfPath,
+      schemaName,
+      errorSummary,
+      hints
+    );
+    const report = await backend.delegateTask(instruction, repairContext);
     logger.success(`[adf-repair] Sub-agent repair completed for ${adfPath}.`);
 
     // Re-verify after repair

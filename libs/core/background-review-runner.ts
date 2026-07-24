@@ -43,6 +43,8 @@ import {
 } from './reasoning-backend.js';
 import { parseStructuredJson } from './structured-reasoning.js';
 import { logger } from './core.js';
+import { findRelevantDistilledKnowledge } from './distill-knowledge-injector.js';
+import { recordKnowledgeDelivery } from './src/knowledge-feedback-loop.js';
 import {
   enqueueSurfaceNotification,
   enqueueSurfaceOutboxMessage,
@@ -188,6 +190,80 @@ function boundedSnapshot(snapshot: string): string {
     .slice(0, 12_000);
 }
 
+const BACKGROUND_REVIEW_KNOWLEDGE_HINT_LIMIT = 2;
+const BACKGROUND_REVIEW_KNOWLEDGE_EXCERPT_MAX = 200;
+
+function truncateKnowledgeExcerpt(value: string, max: number): string {
+  const text = String(value || '')
+    .trim()
+    .replace(/\s+/g, ' ');
+  return text.length <= max ? text : `${text.slice(0, Math.max(0, max - 3))}...`;
+}
+
+/**
+ * KP-02: attach a compact "Relevant knowledge" section to the delegateTask
+ * context.
+ *
+ * `provisionTaskKnowledge` (task-knowledge-provisioning.ts, KP-01) is not
+ * usable at this call site: `resolveMissionContextPack` requires a real
+ * `missionId: string` that resolves to persisted mission state
+ * (`ResolveMissionContextPackInput`), but a background review fork runs
+ * per-*session* against a free-text conversation `snapshot` and is
+ * frequently not mission-scoped at all — `input.missionId` is optional (see
+ * `canonicalSourceRef` above, which falls back to a `surface:...` ref when
+ * absent). There is also no WorkItem/TaskSession/ProjectState here to
+ * resolve a pack around. So this calls the lower-level primitive
+ * `provisionTaskKnowledge` itself wraps (`findRelevantDistilledKnowledge`)
+ * directly, mirroring its excerpt/truncation conventions (200-char
+ * excerpts, same shape as `renderSystemPromptForm` in
+ * task-knowledge-provisioning.ts), and records delivery the same way KP-05
+ * does via `recordKnowledgeDelivery` — using a `session:<id>` scope marker
+ * in place of a mission id when this fork has no mission
+ * (`recordKnowledgeDelivery`'s `missionId` field is required but this
+ * caller has no mission to report against).
+ *
+ * Fail-open: any lookup error is swallowed and logged once; delegation
+ * proceeds with the original label-only context exactly as before this
+ * change.
+ */
+async function buildBackgroundReviewKnowledgeContext(
+  input: BackgroundReviewForkInput
+): Promise<string> {
+  const baseContext = 'background-review:' + input.sessionId;
+  try {
+    const topic = boundedSnapshot(input.snapshot);
+    if (!topic) return baseContext;
+    const entries = await findRelevantDistilledKnowledge({
+      topic,
+      limit: BACKGROUND_REVIEW_KNOWLEDGE_HINT_LIMIT,
+      minScore: 0.08,
+    });
+    if (entries.length === 0) return baseContext;
+
+    const lines = [
+      'Relevant knowledge:',
+      ...entries.map(
+        (entry) =>
+          `- ${entry.title} (${entry.path}): ${truncateKnowledgeExcerpt(entry.excerpt, BACKGROUND_REVIEW_KNOWLEDGE_EXCERPT_MAX)}`
+      ),
+    ];
+    recordKnowledgeDelivery({
+      missionId: input.missionId || `session:${input.sessionId}`,
+      taskId: input.sessionId,
+      recipientKind: 'background_review_fork',
+      refs: entries.map((entry) => ({ path: entry.path, score: entry.score, title: entry.title })),
+    });
+    return `${baseContext}\n\n${lines.join('\n')}`;
+  } catch (error) {
+    logger.warn(
+      `[KP-02] Background review knowledge lookup failed, delegating without knowledge context: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+    return baseContext;
+  }
+}
+
 function buildForkPrompt(input: BackgroundReviewForkInput): string {
   return `${buildBackgroundReviewPrompt({
     sessionId: input.sessionId,
@@ -306,10 +382,10 @@ export async function runBackgroundReviewFork(
         tenant_slug: process.env.KYBERION_CUSTOMER?.trim() || undefined,
         purpose: 'background review snapshot',
       },
-      () =>
+      async () =>
         backend.delegateTask(
           buildForkPrompt(input),
-          'background-review:' + input.sessionId,
+          await buildBackgroundReviewKnowledgeContext(input),
           input.callOptions || {
             effort: 'low',
             model_tier: 'fast',
