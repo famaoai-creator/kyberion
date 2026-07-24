@@ -2,7 +2,7 @@
   "version": "1.0.0",
   "agents": {
     "nerve-agent": {
-      "authority_roles": ["mission_controller", "ecosystem_architect"],
+      "authority_roles": ["qa_lead", "cyber_security", "mission_controller", "ecosystem_architect"],
       "team_roles": ["owner", "tester", "operator", "scribe", "facilitator", "attacker"],
       "capabilities": ["reasoning", "coordination", "routing", "analysis", "security"],
       "selection_hints": {

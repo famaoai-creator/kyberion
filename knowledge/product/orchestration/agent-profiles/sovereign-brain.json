@@ -2,7 +2,13 @@
   "version": "1.0.0",
   "agents": {
     "sovereign-brain": {
-      "authority_roles": ["mission_controller", "knowledge_steward", "ecosystem_architect"],
+      "authority_roles": [
+        "ruthless_auditor",
+        "cyber_security",
+        "mission_controller",
+        "knowledge_steward",
+        "ecosystem_architect"
+      ],
       "team_roles": ["owner", "planner", "reviewer", "product_strategist", "tracker", "defender"],
       "capabilities": ["reasoning", "strategy", "coordination", "analysis", "security"],
       "selection_hints": {
