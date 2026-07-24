@@ -11,6 +11,11 @@ import { safeWriteFile } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 import chalk from 'chalk';
 import * as path from 'node:path';
+import {
+  fireSkillPluginHook,
+  loadAuthorizedSkillPlugins,
+  type LoadedSkillPlugin,
+} from './skill-plugin-loader.js';
 
 function buildOutput<T>(
   skillName: string,
@@ -51,7 +56,8 @@ function buildOutput<T>(
 }
 
 function printOutput<T>(output: SkillOutput<T>) {
-  const isHuman = process.env.KYBERION_FORMAT === 'human' || process.argv.includes('--format=human');
+  const isHuman =
+    process.env.KYBERION_FORMAT === 'human' || process.argv.includes('--format=human');
 
   // Persistence for Feedback Loop: Save the latest response via Secure IO
   try {
@@ -115,11 +121,41 @@ export function runSkill<T>(skillName: string, fn: () => T): SkillOutput<T> {
   return output;
 }
 
+/**
+ * KD-06 wiring: loads plugins from `.kyberion-plugins.json` (if present)
+ * through the trust + managed-copy-isolation gate in
+ * `skill-plugin-loader.ts` before running the skill, and fires
+ * `beforeSkill`/`afterSkill` hooks around it. Loading/hook failures are
+ * logged and never propagate — a skipped or broken plugin must never block
+ * (or, worse, silently widen into "run anyway") the skill's own execution.
+ */
+async function runSkillWithPlugins<T>(
+  skillName: string,
+  fn: () => Promise<T>
+): Promise<SkillOutput<T>> {
+  let plugins: LoadedSkillPlugin[] = [];
+  try {
+    plugins = (await loadAuthorizedSkillPlugins()).loaded;
+  } catch (err) {
+    // Plugin loading itself must never block a skill run.
+    console.error(
+      `[skill-plugin-loader] Plugin loading failed (ignored, fail-open): ${
+        err instanceof Error ? err.message : String(err)
+      }`
+    );
+  }
+
+  await fireSkillPluginHook('beforeSkill', plugins, skillName, process.argv.slice(2));
+  const output = await wrapSkillAsync(skillName, fn);
+  await fireSkillPluginHook('afterSkill', plugins, skillName, output);
+  return output;
+}
+
 export async function runSkillAsync<T>(
   skillName: string,
   fn: () => Promise<T>
 ): Promise<SkillOutput<T>> {
-  const output = await wrapSkillAsync(skillName, fn);
+  const output = await runSkillWithPlugins(skillName, fn);
   printOutput(output);
   return output;
 }
