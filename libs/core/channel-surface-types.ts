@@ -194,6 +194,21 @@ export interface TaskAcceptanceEvidence {
   evidence: string;
 }
 
+/**
+ * KP-05: optional bridge back from a worker's task_result to the knowledge
+ * provisioning loop — which delivered `knowledge_hints` (by document path,
+ * see `MissionContextPackKnowledgeHint.path` in mission-context-pack.ts)
+ * actually helped, and which topics the worker needed but were not
+ * delivered. Absent entirely on older/other-form responses; parsing must
+ * stay backward compatible (additive-only field, see
+ * TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25.ja.md KP-05).
+ */
+export interface TaskResultKnowledgeFeedback {
+  used?: string[];
+  not_used?: string[];
+  missing_topics?: string[];
+}
+
 export interface TaskResultBlock {
   summary: string;
   artifacts: TaskResultArtifact[];
@@ -202,6 +217,7 @@ export interface TaskResultBlock {
   needs: string[];
   acceptance_evidence?: TaskAcceptanceEvidence[];
   review_findings?: TaskReviewFinding[];
+  knowledge_feedback?: TaskResultKnowledgeFeedback;
 }
 
 export interface A2ATaskContext {

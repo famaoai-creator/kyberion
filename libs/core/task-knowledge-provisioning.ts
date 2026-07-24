@@ -43,6 +43,10 @@ import {
   type MissionContextPackKnowledgeHint,
   type ResolveMissionContextPackInput,
 } from './mission-context-pack.js';
+import {
+  recordKnowledgeDelivery,
+  type DeliveredKnowledgeRef,
+} from './src/knowledge-feedback-loop.js';
 
 export type TaskKnowledgeForm = 'pack' | 'system_prompt' | 'context_string';
 
@@ -60,6 +64,16 @@ export interface ProvisionTaskKnowledgeResult {
   text: string;
   /** Set only when `missionPath` was provided and the pack was persisted. */
   missionContextPackPath?: string;
+  /**
+   * KP-05: the `knowledge_hints` actually delivered as part of `pack`
+   * (path + score), so callers can attach them to a trace span's
+   * `knowledgeRefs` or otherwise report what this call provisioned. Empty
+   * when the pack had no knowledge hints. This mirrors — and is recorded
+   * from — the same delivery telemetry persisted under
+   * `active/shared/runtime/feedback-loop/knowledge-delivery/`
+   * (see `recordKnowledgeDelivery`, src/knowledge-feedback-loop.ts).
+   */
+  deliveredKnowledgeRefs: DeliveredKnowledgeRef[];
 }
 
 function truncate(value: string, max: number): string {
@@ -151,15 +165,31 @@ export async function provisionTaskKnowledge(
   const { form = 'pack', missionPath, ...resolveInput } = input;
   const pack = await resolveMissionContextPack(resolveInput);
   if (!pack) {
-    return { pack: null, text: '' };
+    return { pack: null, text: '', deliveredKnowledgeRefs: [] };
   }
   const missionContextPackPath = missionPath
     ? saveMissionContextPack(missionPath, pack)
     : undefined;
   const text = renderTaskKnowledgeForm(pack, form);
+  // KP-05: report what this call actually delivered. Fire-and-forget from
+  // the caller's perspective (recordKnowledgeDelivery fails open — see its
+  // doc comment) but always returned so callers can attach it to a trace or
+  // their own observability without re-deriving it from `pack`.
+  const delivery = recordKnowledgeDelivery({
+    missionId: resolveInput.missionId,
+    taskId: resolveInput.workItem?.item_id || resolveInput.workItemId,
+    teamRole: resolveInput.teamRole,
+    recipientKind: resolveInput.recipientKind,
+    refs: (pack.knowledge_hints || []).map((hint) => ({
+      path: hint.path,
+      score: hint.score,
+      title: hint.title,
+    })),
+  });
   return {
     pack,
     text,
     ...(missionContextPackPath ? { missionContextPackPath } : {}),
+    deliveredKnowledgeRefs: delivery?.refs ?? [],
   };
 }

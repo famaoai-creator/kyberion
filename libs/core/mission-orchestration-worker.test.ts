@@ -35,6 +35,8 @@ function makeTaskResultText(input: {
     location: string;
     instruction: string;
   }>;
+  // KP-05: optional bridge back to the knowledge provisioning loop.
+  knowledge_feedback?: { used?: string[]; not_used?: string[]; missing_topics?: string[] };
   extraText?: string;
 }): string {
   return [
@@ -46,6 +48,7 @@ function makeTaskResultText(input: {
       gaps: input.gaps || [],
       needs: input.needs || [],
       ...(input.review_findings ? { review_findings: input.review_findings } : {}),
+      ...(input.knowledge_feedback ? { knowledge_feedback: input.knowledge_feedback } : {}),
     }),
     '```',
     input.extraText || '',
@@ -100,6 +103,26 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
     process.env.KYBERION_TEST_OBSERVABILITY_DIR = pathResolver.shared(
       `tmp/vitest-observability/mission-orchestration-worker-${process.pid}`
     );
+    // KP-05: knowledge delivery/usage telemetry and the memory promotion
+    // queue must not touch the real active/shared/runtime files either.
+    process.env.KYBERION_KNOWLEDGE_DELIVERY_DIR = pathResolver.shared(
+      `tmp/vitest-knowledge-delivery/mission-orchestration-worker-${process.pid}`
+    );
+    process.env.KYBERION_KNOWLEDGE_USAGE_PATH = pathResolver.shared(
+      `tmp/vitest-knowledge-usage/mission-orchestration-worker-${process.pid}/usage.json`
+    );
+    process.env.KYBERION_MEMORY_QUEUE_PATH = pathResolver.shared(
+      `tmp/vitest-memory-queue/mission-orchestration-worker-${process.pid}/promotion-queue.jsonl`
+    );
+    {
+      // enqueueMemoryPromotionCandidate only ensures the DEFAULT queue dir
+      // exists, not an overridden one — pre-create the parent dir ourselves.
+      const { safeMkdir: mkdirForQueue } = await import('./secure-io.js');
+      const nodePathModule = await import('node:path');
+      mkdirForQueue(nodePathModule.dirname(process.env.KYBERION_MEMORY_QUEUE_PATH), {
+        recursive: true,
+      });
+    }
     const { clearWorkCoordinationStore, setWorkCoordinationNamespace } =
       await import('./work-coordination.js');
     const { safeMkdir, safeWriteFile } = await import('./secure-io.js');
@@ -178,6 +201,15 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
     const observabilityDir = process.env.KYBERION_TEST_OBSERVABILITY_DIR;
     if (observabilityDir && safeExistsSync(observabilityDir)) safeRmSync(observabilityDir);
     delete process.env.KYBERION_TEST_OBSERVABILITY_DIR;
+    for (const envVar of [
+      'KYBERION_KNOWLEDGE_DELIVERY_DIR',
+      'KYBERION_KNOWLEDGE_USAGE_PATH',
+      'KYBERION_MEMORY_QUEUE_PATH',
+    ]) {
+      const dir = process.env[envVar];
+      if (dir && safeExistsSync(dir)) safeRmSync(dir, { recursive: true, force: true });
+      delete process.env[envVar];
+    }
     clearWorkCoordinationStore();
     clearWorkCoordinationNamespace();
   });
@@ -285,6 +317,9 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
             verification_done: ['Confirmed the deliverable path.'],
             gaps: [],
             needs: [],
+            // KP-05: exercise the knowledge_feedback -> aggregation/promotion
+            // wiring through the real dispatch path (obtainTaskResultResponse).
+            knowledge_feedback: { missing_topics: ['kp-05 integration test knowledge gap'] },
             extraText: 'accepted',
           }),
         },
@@ -314,6 +349,18 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
       const prompt = String((mocks.route.mock.calls[0]?.[0] as any)?.payload?.text || '');
       expect(prompt).toContain('Mission context pack (scoped, minimal, role-specific).');
       expect(prompt).toContain('Return exactly one ```task_result``` block');
+      // KP-05: output contract mentions the optional knowledge_feedback field.
+      expect(prompt).toContain('knowledge_feedback');
+
+      // KP-05: the worker's knowledge_feedback.missing_topics flowed through
+      // obtainTaskResultResponse -> recordKnowledgeUsageFeedback and landed
+      // as a knowledge-gap promotion candidate.
+      const { listMemoryPromotionCandidates } = await import('./memory-promotion-queue.js');
+      const candidates = listMemoryPromotionCandidates();
+      expect(
+        candidates.some((c) => c.summary.includes('kp-05 integration test knowledge gap'))
+      ).toBe(true);
+
       expect(dispatched).toEqual([
         { task_id: 'task-1', team_role: 'implementer', agent_id: 'implementation-architect' },
         { task_id: 'task-2', team_role: 'reviewer', agent_id: 'independent-reviewer' },
