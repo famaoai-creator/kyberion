@@ -131,6 +131,7 @@ describe('runDegradationWatch', () => {
     const { report, alert: receipt } = runDegradationWatch({
       regressions: [],
       demotedProviders: [],
+      runtimeSamples: [],
       alert: alert as never,
     });
     expect(report.verdict).toBe('green');
@@ -143,6 +144,7 @@ describe('runDegradationWatch', () => {
     const { report } = runDegradationWatch({
       regressions: [REGRESSION],
       demotedProviders: [],
+      runtimeSamples: [],
       alert: alert as never,
     });
     expect(report.verdict).toBe('yellow');
@@ -157,6 +159,7 @@ describe('runDegradationWatch', () => {
     runDegradationWatch({
       regressions: [],
       demotedProviders: ['codex', 'gemini'],
+      runtimeSamples: [],
       alert: alert as never,
     });
     expect(alert.mock.calls[0][0].severity).toBe('critical');
