@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import * as path from 'node:path';
-import { pathResolver, safeReadFile, safeWriteFile } from '@agent/core';
+import {
+  SUBAGENT_CAPABILITY_PROFILES,
+  SUBAGENT_PROFILE_CLI_TOOLS,
+  pathResolver,
+  safeReadFile,
+  safeWriteFile,
+} from '@agent/core';
 import { withExecutionContext } from '@agent/core/governance';
 import {
   GENERATED_ROLES,
@@ -67,7 +73,7 @@ describe('generate_subagent_definitions', () => {
     expect(source).toContain('## secure-io constraint');
     expect(source).toContain('never call `node:fs` directly');
     expect(source).toContain('GENERATED FILE — DO NOT EDIT BY HAND');
-    expect(source).toContain('tools: Read, Grep, Glob, Edit, Write, Bash');
+    expect(source).toContain(`tools: ${PROFILE_SPECS.implementer.tools.join(', ')}`);
   });
 
   it('explorer-mapped role definitions carry no write/execute tools', () => {
@@ -80,10 +86,24 @@ describe('generate_subagent_definitions', () => {
         .replace(/^tools:\s*/, '')
         .split(',')
         .map((t) => t.trim());
-      expect(tools).toEqual(['Read', 'Grep', 'Glob']);
+      expect(tools).toEqual([...PROFILE_SPECS.explorer.tools]);
       expect(tools).not.toContain('Edit');
       expect(tools).not.toContain('Write');
       expect(tools).not.toContain('Bash');
+    }
+  });
+
+  it('Wave-3 drift prevention: PROFILE_SPECS is derived from the SSoT registry, not a hand-mirrored copy', () => {
+    // Reference equality (not just deep-equal) proves PROFILE_SPECS.tools is
+    // literally the SSoT's array, so a future edit to
+    // libs/core/subagent-capability-profiles.ts's cliTools cannot silently
+    // diverge from what this generator emits — there is no second array to
+    // forget to update.
+    for (const profile of SUBAGENT_CAPABILITY_PROFILES) {
+      const spec = PROFILE_SPECS[profile.name as keyof typeof PROFILE_SPECS];
+      expect(spec).toBeDefined();
+      expect(spec.tools).toBe(SUBAGENT_PROFILE_CLI_TOOLS[profile.name]);
+      expect(spec.framing).toBe(profile.systemPromptPrefix);
     }
   });
 

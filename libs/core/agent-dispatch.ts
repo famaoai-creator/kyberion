@@ -1,6 +1,7 @@
 import { a2aBridge } from './a2a-bridge.js';
 import { logger } from './core.js';
 import {
+  SUBAGENT_PROFILE_CLI_TOOLS,
   describeSubagentCapabilityCatalog,
   getSubagentCapabilityProfile,
   listSubagentCapabilityProfileNames,
@@ -224,31 +225,6 @@ export class InSessionDispatcher implements AgentDispatcher {
       : String(response.payload || 'Sub-agent returned no data.');
   }
 }
-
-// CT-02 mapping table — KD-05 profile -> CLI Agent SDK tool-name projection.
-// Mirrors scripts/generate_subagent_definitions.ts's PROFILE_SPECS (CT-01),
-// which projects the same tiers onto Claude Code's subagent `tools:`
-// frontmatter vocabulary. That script cannot be imported here (scripts/ is
-// not part of the libs/core module graph and is scoped to the generation
-// ceremony), so the mapping is intentionally mirrored by hand — same
-// registration-ceremony trade-off CT-01's own header documents for its
-// mirror of `subagent-capability-profiles.ts`. Keep the two tables in sync
-// when a tier's tool surface changes.
-const SUBAGENT_PROFILE_CLI_TOOLS: Readonly<Record<string, readonly string[]>> = {
-  implementer: [
-    'Read',
-    'Grep',
-    'Glob',
-    'NotebookRead',
-    'Write',
-    'Edit',
-    'MultiEdit',
-    'NotebookEdit',
-    'Bash',
-  ],
-  explorer: ['Read', 'Grep', 'Glob', 'NotebookRead'],
-  planner: [],
-};
 
 /**
  * The governed Agent SDK runtime pieces {@link HarnessSubagentDispatcher} needs.

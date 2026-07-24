@@ -10,6 +10,7 @@ import {
 import type { ReasoningBackend } from './reasoning-backend.js';
 import {
   SUBAGENT_CAPABILITY_PROFILES,
+  SUBAGENT_PROFILE_CLI_TOOLS,
   getSubagentCapabilityProfile,
 } from './subagent-capability-profiles.js';
 import { a2aBridge } from './a2a-bridge.js';
@@ -282,6 +283,11 @@ describe('HarnessSubagentDispatcher (CT-02)', () => {
     expect(call.allowedTools).not.toContain('Write');
     expect(call.allowedTools).not.toContain('Edit');
     expect(call.allowedTools).not.toContain('Bash');
+    // Wave-3 drift prevention: the harness ceiling here (ALL_GOVERNED_TOOLS)
+    // is a superset of explorer's SSoT tools, so the intersection equals the
+    // SSoT list exactly — proving this dispatcher consumes
+    // SUBAGENT_PROFILE_CLI_TOOLS rather than a locally hand-mirrored table.
+    expect(call.allowedTools).toEqual(SUBAGENT_PROFILE_CLI_TOOLS.explorer);
   });
 
   it('defaults to the implementer profile when no role/profile hint is given', async () => {

@@ -36,6 +36,15 @@ export interface SubagentCapabilityProfile {
   /** Op ids this tier may invoke. `'*'` means "every non-reserved op". */
   readonly allowedOps: readonly string[] | '*';
   readonly systemPromptPrefix: string;
+  /**
+   * CLI/Agent-SDK tool-name projection of this tier (Claude Code `tools:`
+   * frontmatter vocabulary and Agent SDK `allowedTools`). This is the single
+   * source of truth both `scripts/generate_subagent_definitions.ts` (CT-01
+   * `.claude/agents/*.md` frontmatter) and `libs/core/agent-dispatch.ts`
+   * (CT-02 `HarnessSubagentDispatcher` allowlist) derive from — see
+   * {@link SUBAGENT_PROFILE_CLI_TOOLS}.
+   */
+  readonly cliTools: readonly string[];
 }
 
 /**
@@ -60,6 +69,17 @@ export const SUBAGENT_CAPABILITY_PROFILES: readonly SubagentCapabilityProfile[] 
     allowedOps: '*',
     systemPromptPrefix:
       'You are a delegated implementer sub-agent. You may read, write, and execute within your assignment scope.',
+    cliTools: [
+      'Read',
+      'Grep',
+      'Glob',
+      'NotebookRead',
+      'Write',
+      'Edit',
+      'MultiEdit',
+      'NotebookEdit',
+      'Bash',
+    ],
   },
   {
     name: 'explorer',
@@ -84,6 +104,7 @@ export const SUBAGENT_CAPABILITY_PROFILES: readonly SubagentCapabilityProfile[] 
     ],
     systemPromptPrefix:
       'You are a delegated explorer sub-agent. You are read-only: you may search and read, but you must never write, delete, or execute.',
+    cliTools: ['Read', 'Grep', 'Glob', 'NotebookRead'],
   },
   {
     name: 'planner',
@@ -93,8 +114,22 @@ export const SUBAGENT_CAPABILITY_PROFILES: readonly SubagentCapabilityProfile[] 
     allowedOps: [],
     systemPromptPrefix:
       'You are a delegated planner sub-agent. Do not call any file, search, or execution tool — respond with reasoning and text only.',
+    cliTools: [],
   },
 ] as const;
+
+/**
+ * KD-05 profile -> CLI/Agent-SDK tool-name projection, keyed by profile
+ * name. Derived (not hand-typed) from {@link SUBAGENT_CAPABILITY_PROFILES}
+ * so there is exactly one place a tier's tool surface is declared; both
+ * `scripts/generate_subagent_definitions.ts` (CT-01) and
+ * `libs/core/agent-dispatch.ts` (CT-02) consume this map instead of keeping
+ * their own hand-mirrored copies.
+ */
+export const SUBAGENT_PROFILE_CLI_TOOLS: Readonly<Record<string, readonly string[]>> =
+  Object.fromEntries(
+    SUBAGENT_CAPABILITY_PROFILES.map((profile) => [profile.name, profile.cliTools])
+  );
 
 const PROFILE_BY_NAME = new Map(
   SUBAGENT_CAPABILITY_PROFILES.map((profile) => [profile.name, profile])
@@ -113,6 +148,45 @@ export function getSubagentCapabilityProfile(name: string): SubagentCapabilityPr
 
 export function listSubagentCapabilityProfileNames(): string[] {
   return SUBAGENT_CAPABILITY_PROFILES.map((profile) => profile.name);
+}
+
+/**
+ * Team-role (knowledge/product/orchestration/team-roles/*.json) -> KD-05
+ * capability tier. `implementer`/`tester`/`operator` keep full write/exec
+ * access; analysis/critique-shaped roles (review, dissent, adversarial)
+ * project onto `explorer` (read-only investigation); coordination/strategy
+ * roles project onto `planner` (no tool execution). Roles not listed fall
+ * back to {@link DEFAULT_TEAM_ROLE_CAPABILITY_PROFILE} — the safest
+ * (read-only) tier — rather than silently inheriting implementer's write
+ * access. Moved here from `scripts/generate_subagent_definitions.ts` (CT-01)
+ * so it is the one place this repo defines the mapping.
+ */
+export const TEAM_ROLE_CAPABILITY_PROFILE: Readonly<Record<string, string>> = {
+  implementer: 'implementer',
+  tester: 'implementer',
+  operator: 'implementer',
+  reviewer: 'explorer',
+  devils_advocate: 'explorer',
+  attacker: 'explorer',
+  defender: 'explorer',
+  tracker: 'explorer',
+  scribe: 'explorer',
+  experience_designer: 'explorer',
+  surface_liaison: 'explorer',
+  counterparty_persona: 'explorer',
+  relationship_curator: 'explorer',
+  facilitator: 'planner',
+  planner: 'planner',
+  product_strategist: 'planner',
+  orchestrator: 'planner',
+  owner: 'planner',
+};
+
+export const DEFAULT_TEAM_ROLE_CAPABILITY_PROFILE = 'explorer';
+
+/** Resolve a team role to its KD-05 capability tier, per {@link TEAM_ROLE_CAPABILITY_PROFILE}. */
+export function resolveCapabilityProfileForTeamRole(teamRole: string): string {
+  return TEAM_ROLE_CAPABILITY_PROFILE[teamRole] ?? DEFAULT_TEAM_ROLE_CAPABILITY_PROFILE;
 }
 
 /**

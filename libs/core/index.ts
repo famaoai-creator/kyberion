@@ -1859,6 +1859,7 @@ export * from './trust-engine.js';
 export * from './audit-chain.js';
 export * from './agent-slo.js';
 export * from './kill-switch.js';
+export * from './subagent-capability-profiles.js';
 export {
   buildBridgeErrorReplyText,
   buildBridgeEmptyReplyText,
