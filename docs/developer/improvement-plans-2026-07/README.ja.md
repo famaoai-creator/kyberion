@@ -10,6 +10,7 @@
 > **ループ完結計画**: [LOOP_CLOSURE_PLAN_2026-07-13.ja.md](./LOOP_CLOSURE_PLAN_2026-07-13.ja.md)(LC-01〜12: 実行成功→pipeline 昇格・LLM 判断配置・stub 縮退遮断・却下理由→修正再実行の4ループ)。
 > **実行レイヤリング計画**: [LAYERED_EXECUTION_PLAN_2026-07-15.ja.md](./LAYERED_EXECUTION_PLAN_2026-07-15.ja.md)(LE-01〜05: pipeline=配線 / typed ops=ロジック / デザインシステム=単一カスケードの3層分離。PPTX デザイン乖離の根治と script ラッパー pipeline の解消)。
 > **タスク知識配給計画**: [TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25.ja.md](./TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25.ja.md)(KP-01〜07: 配給経路の単一化・タスクプロファイル駆動の知識スライス・knowledge_feedback 帰還ループ・有効性主導キュレーション。MO-04/KM 系の後続ループ)。
+> **CLI サブエージェント・チーム計画**: [CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md](./CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md)(CT-01〜04: 単一 LLM プロバイダ CLI 内で完結するチーム構成・連携。役割→サブエージェント定義の生成儀式 + `HarnessSubagentDispatcher` + ファイル契約 E2E + 実行面の使い分け基準。agent-runtime の代替実行面)。
 
 ## 1. 目的
 
@@ -319,6 +320,17 @@ surface が提供する UI の機能的アフォーダンスの調査(2026-07-03
 | KP-05 | 配給テレメトリと knowledge_feedback(帰還ループの起点) | P1     | M    | KP-01                  |
 | KP-06 | 有効性主導キュレーションと鮮度 SLO(メンテナンス計画)  | P2     | M    | KP-05                  |
 | KP-07 | corpus 純度ガードの拡張(KM-04 の残穴)                 | P2     | S    | KM-04(実装済み)        |
+
+### CLI サブエージェント・チーム(単一プロバイダ CLI 内のチーム構成・連携)
+
+単一 LLM プロバイダの CLI(Claude Code / Agent SDK)内で完結するチームモードの構築計画(2026-07-25、実コード突合)。正本は [CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md](./CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md)(CT-01〜04 は同文書内)。Kyberion のチームは既に CLI 非依存の契約の束(team-roles・KD-05 能力ティア・タスク契約・context pack・共有ミッション作業域)なので、新規の連携機構ではなく**既存契約を CLI ハーネスのサブエージェント機構へ射影する薄いアダプタ**(役割定義の生成儀式 + `AgentDispatcher` seam への 1 クラス追加)として実現する。agent-runtime(A2A)の置き換えではなく代替実行面。
+
+| ID    | タイトル                                                       | 優先度 | 規模 | 依存            |
+| ----- | -------------------------------------------------------------- | ------ | ---- | --------------- |
+| CT-01 | 役割→サブエージェント定義の生成儀式(`.claude/agents/` SSoT 化) | P1     | M    | KD-05(実装済み) |
+| CT-02 | `HarnessSubagentDispatcher` の追加と配線                       | P1     | M    | CT-01           |
+| CT-03 | ファイル契約によるチーム連携の実証(E2E)                        | P2     | M    | CT-02           |
+| CT-04 | 実行面の使い分け基準と文書化                                   | P2     | S    | CT-02           |
 
 ### Actuator リファクタリング/使いやすさ(ADFスキーマ・op)
 
