@@ -1723,6 +1723,12 @@
       "type": "md"
     },
     {
+      "path": "product/governance/multi-provider-coexecution-contract.md",
+      "tier": "public",
+      "size": 6203,
+      "type": "md"
+    },
+    {
       "path": "product/governance/onboarding-flow-policy.json",
       "tier": "public",
       "size": 1301,

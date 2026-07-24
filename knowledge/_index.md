@@ -173,6 +173,7 @@
 - [Kyberion Sovereign Consensus Protocol](./product/governance/consensus-protocol.md) (public | Ecosystem Architect)
 - [LLM Invocation Rubric — どのポイントで LLM に頼むか](./product/governance/llm-invocation-rubric.md) (public | Unknown)
 - [Mission Distillation Prompt](./product/governance/distill-prompt.md) (public | Unknown)
+- [Multi-Provider Co-Execution Contract](./product/governance/multi-provider-coexecution-contract.md) (public | Unknown)
 - [Operational Hints](./product/governance/HINTS.md) (public | Unknown)
 - [SOP: Multi-Agent Software Development & Review](./product/governance/multi-agent-development-sop.md) (public | Ecosystem Architect)
 - [SOP: TypeScript Core Base Stabilization](./product/governance/ts-base-stabilization-sop.md) (public | Ecosystem Architect)
