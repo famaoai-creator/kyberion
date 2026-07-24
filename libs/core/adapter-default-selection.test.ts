@@ -6,6 +6,7 @@ import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeRmSync } from './secure-io.js';
 
 const PROFILE_ROOT = pathResolver.sharedTmp('adapter-default-selection-tests/profile');
+const PORTABLE_EMAIL_BACKEND = process.platform === 'darwin' ? 'mac_mailapp' : 'smtp';
 
 vi.mock('./profile-root.js', () => ({
   resolveActiveProfileRoot: () => PROFILE_ROOT,
@@ -16,6 +17,11 @@ beforeEach(() => {
     recursive: true,
     force: true,
   });
+  if (PORTABLE_EMAIL_BACKEND === 'smtp') {
+    vi.stubEnv('KYBERION_SMTP_HOST', 'smtp.test.invalid');
+    vi.stubEnv('KYBERION_SMTP_USER', 'test-user');
+    vi.stubEnv('KYBERION_SMTP_PASS', 'test-pass');
+  }
 });
 
 afterEach(() => {
@@ -24,6 +30,7 @@ afterEach(() => {
     recursive: true,
     force: true,
   });
+  vi.unstubAllEnvs();
   vi.restoreAllMocks();
 });
 
@@ -36,6 +43,8 @@ describe('adapter default selection', () => {
       'media.image',
       'media.video',
       'media.music',
+      'email.backend',
+      'email.account',
       'service.runtime',
       'tool.runtime',
       'voice.vad',
@@ -50,6 +59,15 @@ describe('adapter default selection', () => {
         }),
       ])
     );
+    expect(
+      snapshot.categories.find((category) => category.key === 'email.account')?.candidates
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'gmail', adapter_id: 'email.account.gmail' }),
+        expect.objectContaining({ id: 'outlook', adapter_id: 'email.account.outlook' }),
+        expect.objectContaining({ id: 'yahoo', status: 'needs_setup' }),
+      ])
+    );
     expect(safeExistsSync(PROFILE_ROOT)).toBe(false);
   });
 
@@ -60,6 +78,8 @@ describe('adapter default selection', () => {
       'media.image': 'media-generation.comfyui',
       'media.video': 'video.hyperframes_cli',
       'media.music': 'media-generation.comfyui.music',
+      'email.backend': PORTABLE_EMAIL_BACKEND,
+      'email.account': 'gmail',
       'service.runtime': 'comfyui',
       'tool.runtime': 'playwright',
       'voice.vad': 'energy',
