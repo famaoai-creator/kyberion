@@ -107,6 +107,7 @@ import { installSecretResolverIfAvailable } from './secret-resolver.js';
 import { installPythonVoiceBridgeIfAvailable } from './python-voice-bridge.js';
 import { installEmbeddingBackendIfAvailable } from './embedding-bootstrap.js';
 import { discoverProviders } from './provider-discovery.js';
+import { peekProviderCapabilityRegistry } from './provider-capability-registry.js';
 import { resolveProviderDecision } from './capability-broker.js';
 import {
   loadReasoningBackendPolicy,
@@ -536,6 +537,54 @@ function buildReasoningRuntimeBundle(
   }
 }
 
+/**
+ * XP-01: narrow the failover chain using a provider-capability-registry
+ * snapshot when one is available. This is opt-in and non-breaking by
+ * construction: nothing in this repo populates the registry file as part of
+ * normal bootstrap, so `peekProviderCapabilityRegistry` returns null (no
+ * snapshot, no reprobe triggered here) and the chain is returned unchanged —
+ * identical to pre-XP-01 behavior. `KYBERION_PROVIDER_CAPABILITY_ROUTING=0`
+ * is an explicit kill-switch for environments that populate a registry file
+ * but want the old fail-open behavior back.
+ */
+function filterChainByProviderCapability(
+  chain: ReasoningRuntimeBundle[]
+): ReasoningRuntimeBundle[] {
+  if (process.env.KYBERION_PROVIDER_CAPABILITY_ROUTING === '0') return chain;
+
+  let snapshot: ReturnType<typeof peekProviderCapabilityRegistry>;
+  try {
+    snapshot = peekProviderCapabilityRegistry();
+  } catch (err) {
+    logger.warn(
+      `[reasoning-bootstrap] provider-capability-registry peek failed (non-fatal, fail-open): ${err instanceof Error ? err.message : String(err)}`
+    );
+    return chain;
+  }
+  if (!snapshot || snapshot.length === 0) return chain;
+
+  const byProvider = new Map(snapshot.map((entry) => [entry.provider_id, entry]));
+  return chain.filter((candidate) => {
+    const provider = providerForReasoningMode(candidate.mode);
+    if (!provider) return true;
+    const capability = byProvider.get(provider);
+    if (!capability) return true;
+    if (!capability.binary_found) {
+      logger.info(
+        `[reasoning-bootstrap] excluding candidate mode=${candidate.mode} provider=${provider}: provider-capability-registry reports binary_found=false (probed_at=${capability.probed_at})`
+      );
+      return false;
+    }
+    if (capability.authenticated === false) {
+      logger.info(
+        `[reasoning-bootstrap] excluding candidate mode=${candidate.mode} provider=${provider}: provider-capability-registry reports authenticated=false (probed_at=${capability.probed_at})`
+      );
+      return false;
+    }
+    return true;
+  });
+}
+
 function buildReasoningRuntimeChain(
   selectedMode: ReasoningBackendMode,
   options: InstallReasoningOptions
@@ -575,7 +624,7 @@ function buildReasoningRuntimeChain(
       );
       if (candidate) candidates.push(candidate);
     }
-    return candidates;
+    return filterChainByProviderCapability(candidates);
   }
   const policy = loadReasoningBackendPolicy();
   const orderedModes = [selectedMode, ...policy.provider_fallback_order.map((entry) => entry.mode)];
@@ -590,7 +639,7 @@ function buildReasoningRuntimeChain(
     if (candidate) candidates.push(candidate);
   }
 
-  return candidates;
+  return filterChainByProviderCapability(candidates);
 }
 
 const REASONING_BACKEND_MODES: ReadonlySet<ReasoningBackendMode> = new Set<ReasoningBackendMode>([

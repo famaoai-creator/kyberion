@@ -1477,6 +1477,12 @@
       "type": "md"
     },
     {
+      "path": "product/governance/knowledge-slices.json",
+      "tier": "public",
+      "size": 1369,
+      "type": "json"
+    },
+    {
       "path": "product/governance/knowledge-sync-rules.json",
       "tier": "public",
       "size": 1031,
@@ -2091,7 +2097,7 @@
     {
       "path": "product/governance/security-policy.json",
       "tier": "public",
-      "size": 19148,
+      "size": 19235,
       "type": "json"
     },
     {
@@ -6445,6 +6451,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/knowledge-slices.schema.json",
+      "tier": "public",
+      "size": 6385,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/knowledge-taxonomy.schema.json",
       "tier": "public",
       "size": 1889,
@@ -7138,6 +7150,12 @@
       "path": "product/schemas/proposal-storyline-adf.schema.json",
       "tier": "public",
       "size": 2158,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/provider-capability-registry.schema.json",
+      "tier": "public",
+      "size": 1471,
       "type": "json"
     },
     {
