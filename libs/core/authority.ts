@@ -190,8 +190,10 @@ function resolveRole(): string | undefined {
 export function inferPersonaFromRole(role?: string): Persona {
   if (!role) return 'unknown';
   const normalized = role.toLowerCase().replace(/\s+/g, '_');
-  const fromIndex = loadRolePersonaIndex().authority_roles?.[normalized]?.default_persona;
-  if (fromIndex) return fromIndex;
+  const fromIndex = normalizePersona(
+    loadRolePersonaIndex().authority_roles?.[normalized]?.default_persona
+  );
+  if (fromIndex !== 'unknown') return fromIndex;
   const fromMap = loadRoleAuthorityMapPersonas()[normalized];
   return fromMap || LEGACY_ROLE_PERSONA_DEFAULTS[normalized] || 'unknown';
 }

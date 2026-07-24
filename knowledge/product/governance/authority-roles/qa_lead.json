@@ -1,0 +1,9 @@
+{
+  "role": "qa_lead",
+  "description": "Quality assurance authority for test strategy, coverage validation, and regression evidence.",
+  "default_persona": "qa_lead",
+  "write_scopes": ["tests/", "active/audit/test-reports/", "knowledge/testing/"],
+  "scope_classes": ["codebase_core", "quality_validation"],
+  "allowed_actuators": ["code-actuator", "file-actuator"],
+  "tier_access": ["public", "confidential"]
+}

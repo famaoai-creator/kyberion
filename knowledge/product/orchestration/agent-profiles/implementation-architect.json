@@ -2,7 +2,13 @@
   "version": "1.0.0",
   "agents": {
     "implementation-architect": {
-      "authority_roles": ["ecosystem_architect", "software_developer"],
+      "authority_roles": [
+        "qa_lead",
+        "ruthless_auditor",
+        "designer",
+        "ecosystem_architect",
+        "software_developer"
+      ],
       "team_roles": ["planner", "implementer", "reviewer", "tester", "experience_designer"],
       "capabilities": ["architecture", "code", "review", "testing", "planning", "a2a"],
       "selection_hints": {
