@@ -686,6 +686,38 @@
       "documented": false
     },
     {
+      "name": "KYBERION_CURATION_REPORT_PATH",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_CURATION_SCAN_ROOTS",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_CURATION_SLO_CONFIG_PATH",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_CURATION_TAXONOMY_PATH",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_CUSTOMER",
       "category": "runtime",
       "type": "string",
@@ -711,9 +743,41 @@
       "documented": false
     },
     {
+      "name": "KYBERION_DELEGATION_KILL_GRACE_MS",
+      "category": "tuning",
+      "type": "number",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_DELEGATION_MAX_CONCURRENCY",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_DELEGATION_NOTIFICATIONS_PATH",
       "category": "path",
       "type": "path",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_DELEGATION_PROVIDER_CAPS",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_DELEGATION_PROVIDER_MAX_CONCURRENCY",
+      "category": "runtime",
+      "type": "string",
       "required": false,
       "description": "",
       "documented": false
@@ -738,6 +802,14 @@
       "name": "KYBERION_DELEGATION_TRACE_PATH",
       "category": "path",
       "type": "path",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_DELEGATION_WALL_CLOCK_MS",
+      "category": "tuning",
+      "type": "number",
       "required": false,
       "description": "",
       "documented": false
@@ -977,6 +1049,14 @@
       "documented": false
     },
     {
+      "name": "KYBERION_HARNESS_SUBAGENT",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_HINTS_ARCHIVE_DIR",
       "category": "path",
       "type": "path",
@@ -1137,7 +1217,23 @@
       "documented": false
     },
     {
+      "name": "KYBERION_KNOWLEDGE_DELIVERY_DIR",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_KNOWLEDGE_ROOT",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_KNOWLEDGE_USAGE_PATH",
       "category": "path",
       "type": "path",
       "required": false,
@@ -1454,6 +1550,14 @@
       "description": "Optional base URL override for the MiniMax Hailuo video-generation API.",
       "subsystem": "media-generation",
       "documented": true
+    },
+    {
+      "name": "KYBERION_MISSION_TASK_TRACE_DIR",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "",
+      "documented": false
     },
     {
       "name": "KYBERION_MLX_EMBED_MODEL",
@@ -1808,6 +1912,14 @@
       "documented": false
     },
     {
+      "name": "KYBERION_PREFIX",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_PRESENCE_AVATAR_PROFILES_PATH",
       "category": "path",
       "type": "path",
@@ -1840,6 +1952,14 @@
       "documented": false
     },
     {
+      "name": "KYBERION_PROVIDER_CAPABILITY_ROUTING",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_PROVIDER_DEMOTION_TTL_MS",
       "category": "tuning",
       "type": "number",
@@ -1849,6 +1969,22 @@
     },
     {
       "name": "KYBERION_PROVIDER_DISCOVERY_REFRESH",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_PROVIDER_EGRESS_POLICY_PATH",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_PROVIDER_ENV_ALLOWLIST",
       "category": "runtime",
       "type": "string",
       "required": false,
@@ -2291,6 +2427,14 @@
       "documented": false
     },
     {
+      "name": "KYBERION_STYLE_KEYS",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_SUDO",
       "category": "runtime",
       "type": "string",
@@ -2448,6 +2592,14 @@
     {
       "name": "KYBERION_TERMINAL_TOKEN",
       "category": "secret",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_TEST_MARKER",
+      "category": "runtime",
       "type": "string",
       "required": false,
       "description": "",
