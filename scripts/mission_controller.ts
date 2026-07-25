@@ -51,6 +51,7 @@ import {
   buildHandoffPacket,
   recordMissionGateOverride,
   missionLifecycleService,
+  releaseOrchestratorSessionForMissionBestEffort,
 } from '@agent/core';
 
 // --- Sub-module imports ---
@@ -1552,7 +1553,11 @@ async function reviewWorkerOutput(
   await verifyMission(id, result, note || `Worker output ${result} by operator review.`);
 }
 
-async function handoffMission(id: string, nextPersona: string, note?: string): Promise<void> {
+export async function handoffMission(
+  id: string,
+  nextPersona: string,
+  note?: string
+): Promise<void> {
   if (!id || !nextPersona) {
     logger.error('Usage: mission_controller handoff <MISSION_ID> <NEXT_PERSONA> [note]');
     return;
@@ -1608,6 +1613,11 @@ async function handoffMission(id: string, nextPersona: string, note?: string): P
   });
   await saveState(upperId, state);
   await syncProjectLedgerIfLinked(upperId);
+  // SO-02: the CLI orchestrator taking over means any conversation-thread
+  // owner steps down — release its orchestrator session (if any).
+  // Best-effort: a release failure must never fail a handoff that already
+  // completed (state is already saved above).
+  releaseOrchestratorSessionForMissionBestEffort(upperId, 'handoff');
   logger.success(`✅ Mission ${upperId} handoff complete: ${previousPersona} -> ${nextPersona}`);
 }
 

@@ -29,6 +29,7 @@ import { resolveRole } from './authority.js';
 import { auditChain } from './audit-chain.js';
 import { buildMissionStatusView, listMissionSummaries } from './mission-read-model.js';
 import type { MissionStatusView, MissionSummary } from './mission-read-model.js';
+import { releaseOrchestratorSessionForMissionBestEffort } from './orchestrator-session.js';
 
 export interface MissionLifecycleVerbOptions {
   /**
@@ -258,9 +259,14 @@ export function buildMissionLifecycleService(explicitSystem?: MissionLifecycleUn
     },
 
     async finish(id: string, seal = false, options?: MissionLifecycleVerbOptions) {
-      return runGovernedVerb('finish', normalizeMissionId(id), options, () =>
+      const result = await runGovernedVerb('finish', normalizeMissionId(id), options, () =>
         resolveSystem(explicitSystem).finishMission(id, seal)
       );
+      // SO-02: a finished mission has nothing left to steer — release its
+      // orchestrator session (if any). Best-effort: a release failure must
+      // never fail the finish that already succeeded.
+      releaseOrchestratorSessionForMissionBestEffort(normalizeMissionId(id), 'finish');
+      return result;
     },
 
     async staff(id: string, options?: MissionLifecycleVerbOptions) {
