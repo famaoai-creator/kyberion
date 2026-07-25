@@ -11,6 +11,7 @@ import { withExecutionContext } from '@agent/core/governance';
 import {
   GENERATED_ROLES,
   PROFILE_SPECS,
+  SHARED_DIRECTORY_RULES_LINES,
   buildAgentDefinitionSource,
   buildGeneratedFiles,
   condenseProcedure,
@@ -74,6 +75,31 @@ describe('generate_subagent_definitions', () => {
     expect(source).toContain('never call `node:fs` directly');
     expect(source).toContain('GENERATED FILE — DO NOT EDIT BY HAND');
     expect(source).toContain(`tools: ${PROFILE_SPECS.implementer.tools.join(', ')}`);
+  });
+
+  it('generated definitions carry the XP-04 shared-directory rules matrix and canonical link', () => {
+    for (const role of GENERATED_ROLES) {
+      const source = buildAgentDefinitionSource(role);
+      expect(source).toContain('## Shared-directory rules (multi-provider co-execution)');
+      expect(source).toContain(
+        'Write only what your active work-item claim covers — never a file outside your assignment scope.'
+      );
+      expect(source).toContain(
+        "Never touch `.git/` or repo config (`.gitignore`, workspace wiring, etc.) — that's the mission owner's, never a worker CLI's."
+      );
+      expect(source).toContain('Temp files only under `active/shared/tmp/`');
+      expect(source).toContain(
+        'Do not create or hand-edit provider state directories (`.claude/`, `.codex/`, `.agy/`, `.gemini/`, …)'
+      );
+      expect(source).toContain(
+        '[multi-provider-coexecution-contract](../../knowledge/product/governance/multi-provider-coexecution-contract.md)'
+      );
+      // The section is built from the single exported const, not
+      // re-typed prose in this test, so a future edit to
+      // SHARED_DIRECTORY_RULES_LINES cannot silently drift from what
+      // buildAgentDefinitionSource emits.
+      expect(source).toContain(SHARED_DIRECTORY_RULES_LINES.join('\n'));
+    }
   });
 
   it('explorer-mapped role definitions carry no write/execute tools', () => {
@@ -146,6 +172,38 @@ describe('generate_subagent_definitions', () => {
       expect(process.exitCode).toBe(1);
 
       // restore and confirm the check goes green again
+      withExecutionContext('generate_subagent_definitions', () => {
+        safeWriteFile(filePath, original);
+      });
+      process.exitCode = undefined;
+      await main(['--check']);
+      expect(process.exitCode).toBeUndefined();
+    });
+
+    it('fails --check when only the shared-directory rules section is tampered with, and recovers after restore', async () => {
+      const role = 'implementer';
+      const filePath = agentPath(role);
+      const original = String(safeReadFile(filePath, { encoding: 'utf8' }) || '');
+      originals.set(role, original);
+      expect(original).toContain('## Shared-directory rules (multi-provider co-execution)');
+
+      // Corrupt only the matrix section (e.g. a weakened rule slipped in by
+      // hand) while leaving the rest of the file byte-identical, proving
+      // --check's diff is sensitive to this section specifically.
+      const tampered = original.replace(
+        'Never touch `.git/` or repo config',
+        'Feel free to touch `.git/` or repo config'
+      );
+      expect(tampered).not.toBe(original);
+
+      withExecutionContext('generate_subagent_definitions', () => {
+        safeWriteFile(filePath, tampered);
+      });
+
+      process.exitCode = undefined;
+      await main(['--check']);
+      expect(process.exitCode).toBe(1);
+
       withExecutionContext('generate_subagent_definitions', () => {
         safeWriteFile(filePath, original);
       });
