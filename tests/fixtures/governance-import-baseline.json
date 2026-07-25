@@ -11,6 +11,8 @@
     "libs/core/cli-subagent-team.e2e.test.ts",
     "libs/core/creative-design-resolver.test.ts",
     "libs/core/data-vault.test.ts",
+    "libs/core/delegation-concurrency.test.ts",
+    "libs/core/distill-knowledge-injector.test.ts",
     "libs/core/deliverable-inbox.test.ts",
     "libs/core/environment-capability.test.ts",
     "libs/core/evidence-chain.test.ts",
