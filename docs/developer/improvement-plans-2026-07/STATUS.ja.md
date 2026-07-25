@@ -55,14 +55,15 @@
 >    **2026-07-25追記**: CLI サブエージェント・チーム計画 CT-01〜04 を新設([CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md](./CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md)。単一 LLM プロバイダ CLI 内で完結するチーム構成・連携を、既存契約(team-roles・KD-05・タスク契約・context pack・ファイル契約)の CLI ハーネスへの射影として構築する。新規は役割定義の生成儀式と `HarnessSubagentDispatcher` の2点のみ)。全件 TODO として追加し、DONE 99 / PARTIAL 30 / TODO 18 へ更新。
 >    **2026-07-25追記**: クロスプロバイダ実行計画 XP-01〜07 を新設([CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md](./CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md)。複数 LLM プロバイダ CLI の同一マシン併走に対し、能力プローブ registry・KD-05 権限射影 + env allowlist・tier×egress ゲート・同一ディレクトリ併走契約・縮退表面化 + provenance・並行予算・モデル分散 best-of-N を、プロバイダ中立の宣言 + adapter 射影として定める。CT の兄弟計画)。全件 TODO として追加し、DONE 99 / PARTIAL 30 / TODO 25 へ更新。
 >    **2026-07-25追記(実装ウェーブ)**: KP-01〜07・CT-01〜04・XP-01〜07 の全 18 件をサブエージェント委譲 + オーケストレータレビュー方式で実装した(5 ウェーブ、各タスクをレビュー・独立再検証してコミット)。KP 全 7 件・CT 全 4 件・XP-02/03 を DONE、XP-01/04/05/06/07 を PARTIAL(各行の残作業参照)とした。最終ゲート: 842 テストファイル / 5,136 テスト全緑・typecheck/build 緑・op-registry/catalogs/契約 semver 緑。付随修正: shell-claude の全 env 継承、KD-05 ツール表の実ドリフト、health-degradation テストの実ランタイム依存、a2a-lifecycle テストの personal tier 汚染(my-identity.json 書換の根本原因)。DONE 112 / PARTIAL 35 / TODO 7 へ更新。
+>    **2026-07-25追記(XP クローズアウト)**: XP-01/04/05/06/07 の残作業を実装・検証し全件 DONE へ更新(baseline-check の registry 自動更新と表面化、生成サブエージェント定義への併走マトリクス射影、worker 結果確定点での provenance 刻印、3 backend の実プロセス wall-clock 強制終了 + sweep 実プロデューサ接続、construction-only な実 backend resolver の opt-in 配線)。DONE 117 / PARTIAL 30 / TODO 7 へ更新。
 >    **判定基準**: DONE = 受入条件を実コードで検証済 / PARTIAL = 一部充足 / TODO = 実質未着手。
 
 ## サマリ
 
 | 判定    | 件数 |
 | ------- | ---- |
-| DONE    | 112  |
-| PARTIAL | 35   |
+| DONE    | 117  |
+| PARTIAL | 30   |
 | TODO    | 7    |
 
 ## P0 残作業(プロダクション化のクリティカルパス)
@@ -380,15 +381,15 @@
 
 正本: [CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md](./CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md)
 
-| ID    | 状態    | 残作業                                                                                                                                                                                                                                            |
-| ----- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| XP-01 | PARTIAL | registry・schema・failover 絞り込み(不在時完全互換 + kill-switch)は実装・検証済。残: registry を定期生成する population ジョブ(baseline-check/chronos 統合)— 現状は明示呼び出しまで inert                                                         |
-| XP-02 | DONE    | 2026-07-25 実装・検証済: tier×provider マッピング表(planner×codex/agy は fail-closed)+ 子プロセス env allowlist(shell-claude の全 env 継承バグ修正)。後続で宣言 args の実 argv 配線も完了                                                         |
-| XP-03 | DONE    | 2026-07-25 実装・検証済: egress policy 宣言 + 配給入口/KP-02 呼出点のゲート(confidential/personal fail-closed、拒否は ops-alert)。残注記: provider 未解決時はゲート skip(登録外プロバイダ)                                                        |
-| XP-04 | PARTIAL | 正準文書 + AGENTS.md 不変条件 + gitignore(check-ignore 検証済)は完了。残: CT-01 生成のプロバイダ指示ファイルへのマトリクス射影                                                                                                                    |
-| XP-05 | PARTIAL | failover イベント JSONL・marker・throttle 付き warn・baseline 警告表示・`getLastServedReasoningMode`・`task_result.provenance` schema は実装・検証済。残: worker 永続点での provenance 刻印                                                       |
-| XP-06 | PARTIAL | semaphore(global/プロバイダ別)・wall-clock 予算・kill-switch 連動・janitor ゾンビ回収(dry-run 先行)は実装・検証済。fallback 二重取得の自己デッドロックも設計時解消。残: 実 backend の pid ハンドル公開(実プロセス強制終了と sweep 実プロデューサ) |
-| XP-07 | PARTIAL | `runBestOfProviders`(XP-01 候補×XP-03 ゲート×XP-06 slot、決定論 judge 既定、メタデータのみ永続で tier 漏洩防止、単一プロバイダ自然縮退)は実装・検証済。残: 実 per-provider backend resolver の配線                                                |
+| ID    | 状態 | 残作業                                                                                                                                                                                                                                                                                      |
+| ----- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| XP-01 | DONE | 2026-07-25 完了: baseline-check が TTL 尊重で registry を自動更新し `provider_capabilities` をレポート表面化(hourly cron = 定期更新、probe kill-switch 付き)。routing 絞り込み・schema・fail-open は前段で実装済                                                                            |
+| XP-02 | DONE | 2026-07-25 実装・検証済: tier×provider マッピング表(planner×codex/agy は fail-closed)+ 子プロセス env allowlist(shell-claude の全 env 継承バグ修正)。後続で宣言 args の実 argv 配線も完了                                                                                                   |
+| XP-03 | DONE | 2026-07-25 実装・検証済: egress policy 宣言 + 配給入口/KP-02 呼出点のゲート(confidential/personal fail-closed、拒否は ops-alert)。残注記: provider 未解決時はゲート skip(登録外プロバイダ)                                                                                                  |
+| XP-04 | DONE | 2026-07-25 完了: 正準文書 + AGENTS.md 不変条件 + gitignore に加え、生成される全サブエージェント定義へ併走マトリクス5行 + 正準リンクを射影(単一 const 由来、`--check` ドリフト検知対象)                                                                                                      |
+| XP-05 | DONE | 2026-07-25 完了: worker の結果確定点で `task_result.provenance` を best-effort 刻印(local-served のみ、不明時は省略・既存値は不上書き)。failover イベント/marker/baseline 表示は前段で実装済。既知境界: 遠隔 a2a worker は自前刻印が必要(コメント明記)                                      |
+| XP-06 | DONE | 2026-07-25 完了: 3 backend の spawn を wall-clock 予算配下に接続(実プロセス SIGTERM→猶予→SIGKILL、children 記録 = sweep 実プロデューサ、shape ドリフトテスト付き)。semaphore/kill-switch 連動/janitor は前段で実装済。残注記: agent-dispatch 層の handle 無し予算と二重(無害・将来整理候補) |
+| XP-07 | DONE | 2026-07-25 完了: `resolveProviderBackend`(claude/codex/agy を construction-only で解決、XP-01 registry ゲート、cache 付き・不throw)を既定 seam に配線。`KYBERION_BEST_OF_PROVIDERS_LIVE=1` の明示 opt-in 必須で暗黙 CLI 起動なし。fan-out/judge/tier 保護は前段で実装済                     |
 
 ### CO(Company OS)
 
