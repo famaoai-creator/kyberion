@@ -256,7 +256,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_VLLM_MODEL`                     | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
 | `KYBERION_VLLM_URL`                       | string                                       | no       | _undocumented_                                                                                                                                                                                                                                                                                                                  |
 
-## runtime (132)
+## runtime (134)
 
 | Variable                                       | Type   | Required | Description                                                                                             |
 | ---------------------------------------------- | ------ | -------- | ------------------------------------------------------------------------------------------------------- |
@@ -276,6 +276,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_AUDIT_FORWARDER_HEADERS`             | string | no       | _undocumented_                                                                                          |
 | `KYBERION_BACKUP_PASSPHRASE`                   | string | no       | _undocumented_                                                                                          |
 | `KYBERION_BEST_OF_N`                           | string | no       | _undocumented_                                                                                          |
+| `KYBERION_BEST_OF_PROVIDERS_LIVE`              | string | no       | _undocumented_                                                                                          |
 | `KYBERION_BLACKHOLE_DEVICE_LABEL`              | string | no       | _undocumented_                                                                                          |
 | `KYBERION_BLACKHOLE_INPUT_UID`                 | string | no       | _undocumented_                                                                                          |
 | `KYBERION_BLACKHOLE_OUTPUT_UID`                | string | no       | _undocumented_                                                                                          |
@@ -340,6 +341,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_PIPELINE_FALLBACK_ACTIVE`            | string | no       | _undocumented_                                                                                          |
 | `KYBERION_PREFIX`                              | string | no       | _undocumented_                                                                                          |
 | `KYBERION_PROJECT_NAME`                        | string | no       | _undocumented_                                                                                          |
+| `KYBERION_PROVIDER_CAPABILITY_PROBE`           | string | no       | _undocumented_                                                                                          |
 | `KYBERION_PROVIDER_CAPABILITY_ROUTING`         | string | no       | _undocumented_                                                                                          |
 | `KYBERION_PROVIDER_DISCOVERY_REFRESH`          | string | no       | _undocumented_                                                                                          |
 | `KYBERION_PROVIDER_ENV_ALLOWLIST`              | string | no       | _undocumented_                                                                                          |
