@@ -2,6 +2,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomUUID } from 'node:crypto';
 import { queryKnowledge, queryKnowledgeHybrid } from './src/knowledge-index.js';
 import { deriveSurfaceSessionId } from './orchestrator-session.js';
+import { missionSteeringRouteHandler } from './surface-mission-steering.js';
 
 import { pathResolver } from './path-resolver.js';
 import { secureFetch } from './network.js';
@@ -23,7 +24,7 @@ import {
   formatClarificationPacketConcise,
 } from './intent-contract.js';
 import { logger } from './core.js';
-import { createLogger } from './logger.js';
+import { recordReasoningTierDeclaration } from './reasoning-tier-declaration.js';
 import type { AgentHandle } from './agent-lifecycle.js';
 import { triggerBackgroundReviewFork } from './background-review-runner.js';
 import { repairSurfaceUxContractText, validateSurfaceUxContract } from './surface-ux-contract.js';
@@ -1812,9 +1813,13 @@ async function ensureSurfaceAgent(agentId: string, cwd?: string) {
 // libs/core/surface-reasoning-tier-boundary.test.ts for the registration
 // ceremony that keeps every reasoning call in this file declared). Recorded
 // through a structured logger event — the lightest existing mechanism OP-01
-// / trace tooling can aggregate without a new subsystem.
-const surfaceReasoningTierLogger = createLogger('surface-reasoning-tier');
-
+// / trace tooling can aggregate without a new subsystem. The recorder itself
+// now lives in reasoning-tier-declaration.ts (SO-05 back half) so
+// orchestrator-judgment call sites elsewhere (intent-reconciliation.ts,
+// mission-lifecycle.ts, surface-mission-steering.ts) can log through the
+// same mechanism without depending on this module; this wrapper keeps the
+// narrower call-site union and the existing name for this file's 3 call
+// sites unchanged.
 type SurfaceReasoningTierCallSite =
   | 'surface_intent_compile'
   | 'surface_main_ask'
@@ -1825,12 +1830,7 @@ function recordSurfaceReasoningTierDeclaration(input: {
   declaredTier: 'fast' | 'standard' | 'deep';
   escalatedReason?: string;
 }): void {
-  surfaceReasoningTierLogger.info('surface_reasoning_tier_declared', {
-    call_site: input.callSite,
-    declared_tier: input.declaredTier,
-    escalated: Boolean(input.escalatedReason),
-    ...(input.escalatedReason ? { escalation_reason: input.escalatedReason } : {}),
-  });
+  recordReasoningTierDeclaration(input);
 }
 
 /**
@@ -1888,11 +1888,9 @@ async function escalateSurfaceTextIfNeeded(
     const escalatedText = extractSurfaceBlocks(escalatedRawText).text;
     return escalatedText || escalatedRawText;
   } catch (error: any) {
-    surfaceReasoningTierLogger.warn('surface_reasoning_tier_escalation_failed', {
-      call_site: callSite,
-      escalation_reason: escalationReason,
-      error: error?.message || String(error),
-    });
+    logger.warn(
+      `[surface_reasoning_tier_escalation_failed] call_site=${callSite} escalation_reason=${escalationReason} error=${error?.message || String(error)}`
+    );
     return text;
   }
 }
@@ -2138,6 +2136,12 @@ async function handlePresenceForcedBypass(
 }
 
 const SURFACE_RUNTIME_ROUTE_HANDLERS: SurfaceRuntimeRouteHandler[] = [
+  // SO-04: mission steering only matches when the thread already holds an
+  // active OrchestratorSession AND the message is an explicit steering
+  // phrase (rule-based, conservative) — see surface-mission-steering.ts.
+  // Placed first: a session-owning thread's steering intent must never be
+  // reinterpreted by intent-compile-based routing below.
+  missionSteeringRouteHandler,
   {
     matches: (context) => {
       if (!context.compiledFlow) return false;
