@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-const { parseConnectionReadinessConfig, deriveBaselineStatus } = await import(
-  new URL('./run_baseline_check.js', import.meta.url).href
-);
+const { parseConnectionReadinessConfig, deriveBaselineStatus, reasoningFailoverWarning } =
+  await import(new URL('./run_baseline_check.js', import.meta.url).href);
 
 describe('run_baseline_check', () => {
   it('marks readiness config as degraded when parse fails', () => {
@@ -63,5 +62,37 @@ describe('run_baseline_check', () => {
     );
 
     expect(status).toBe('needs_attention');
+  });
+
+  // XP-05: failover-active is a warning field, not a status input — a
+  // healthy chain that failed over stays `all_clear`/`needs_onboarding`/etc.
+  // exactly as before; only the extra `warnings.reasoning_failover` string
+  // changes.
+  it('does not change status when a provider failover marker is present (XP-05, non-blocking)', () => {
+    const status = deriveBaselineStatus(
+      { success: true, failedLayer: null },
+      { submitted: false, pending: false, reason: null },
+      false
+    );
+    expect(status).toBe('all_clear');
+  });
+
+  it('reasoningFailoverWarning returns null when no marker is present', () => {
+    expect(reasoningFailoverWarning(null)).toBeNull();
+  });
+
+  it('reasoningFailoverWarning surfaces from/to/method when a marker is present', () => {
+    const warning = reasoningFailoverWarning({
+      from_mode: 'claude-agent',
+      to_mode: 'codex-cli',
+      provider_from: 'claude',
+      provider_to: 'codex',
+      method: 'delegateTask',
+      at: '2026-07-25T00:00:00.000Z',
+    });
+    expect(warning).toContain('claude-agent');
+    expect(warning).toContain('codex-cli');
+    expect(warning).toContain('delegateTask');
+    expect(warning).toContain('2026-07-25T00:00:00.000Z');
   });
 });

@@ -9,6 +9,7 @@ import type {
   TaskResultBlock,
   TaskResultArtifact,
   TaskResultKnowledgeFeedback,
+  TaskResultProvenance,
   TaskReviewFinding,
 } from './channel-surface-types.js';
 
@@ -71,6 +72,17 @@ export const TaskResultKnowledgeFeedbackSchema: z.ZodType<TaskResultKnowledgeFee
   })
   .strict();
 
+// XP-05: optional provenance stamp (see TaskResultProvenance doc comment in
+// channel-surface-types.ts). Additive-only — omitting the field entirely
+// (every pre-XP-05 task_result) must keep validating unchanged.
+export const TaskResultProvenanceSchema: z.ZodType<TaskResultProvenance> = z
+  .object({
+    provider: z.string().min(1).optional(),
+    mode: z.string().min(1).optional(),
+    failover: z.boolean().optional(),
+  })
+  .strict();
+
 export const TaskResultSchema: z.ZodType<TaskResultBlock> = z
   .object({
     summary: z.string().min(1).max(800),
@@ -81,6 +93,7 @@ export const TaskResultSchema: z.ZodType<TaskResultBlock> = z
     acceptance_evidence: z.array(TaskAcceptanceEvidenceSchema).optional(),
     review_findings: z.array(TaskReviewFindingSchema).optional(),
     knowledge_feedback: TaskResultKnowledgeFeedbackSchema.optional(),
+    provenance: TaskResultProvenanceSchema.optional(),
   })
   .strict();
 

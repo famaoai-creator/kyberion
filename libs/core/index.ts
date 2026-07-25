@@ -821,6 +821,7 @@ export * from './agent-manifest.js';
 export * from './provider-discovery.js';
 export * from './provider-capability-registry.js';
 export * from './provider-egress-gate.js';
+export * from './best-of-providers.js'; // XP-07: model-diverse best-of-N delegation
 export * from './agent-provider-resolution.js';
 export * from './provider-health-registry.js';
 export * from './capability-broker.js';
@@ -1318,7 +1319,10 @@ export {
   getStubServedOps,
   resetStubServedOps,
   stubExplicitlyRequested,
+  getLastServedReasoningMode,
+  resetReasoningFailoverTracking,
   type StubServedRecord,
+  type LastServedReasoningMode,
 } from './reasoning-backend.js';
 export { AnthropicReasoningBackend } from './anthropic-reasoning-backend.js';
 export type { AnthropicReasoningBackendOptions } from './anthropic-reasoning-backend.js';
@@ -1433,6 +1437,16 @@ export {
   reasoningDegradedMarkerPath,
   type ReasoningDegradedMarker,
 } from './reasoning-degradation.js';
+export {
+  appendReasoningFailoverEvent,
+  markReasoningFailover,
+  clearReasoningFailover,
+  readReasoningFailover,
+  reasoningFailoverEventsPath,
+  reasoningFailoverMarkerPath,
+  type ReasoningFailoverEvent,
+  type ReasoningFailoverMarker,
+} from './reasoning-failover.js';
 export {
   recordAdhocPipelineRun,
   listPromotionCandidates,
@@ -1698,6 +1712,7 @@ export {
   ProcedureRankingCandidateSchema,
   ProcedureRankingSchema,
   TaskResultSchema,
+  TaskResultProvenanceSchema,
   structuredOutputSchemas,
   type ProcedureRankingCandidate,
   type ProcedureRankingResult,

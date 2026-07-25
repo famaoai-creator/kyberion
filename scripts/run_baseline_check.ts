@@ -13,6 +13,8 @@ import {
   killSwitch,
   readJanitorLastRunMs,
   readReasoningDegraded,
+  readReasoningFailover,
+  type ReasoningFailoverMarker,
   validateEnv,
   secretGuard,
 } from '@agent/core';
@@ -322,6 +324,20 @@ export function deriveBaselineStatus(
   return 'all_clear';
 }
 
+// XP-05: failover chain switches (an earlier reasoning candidate failed, a
+// later one served the call) are healthy behavior, not a degradation — so,
+// unlike reasoning_degraded above, this never changes `status`. It is
+// surfaced as a plain warning string so an operator sees "provider failover
+// active" at session start instead of only discovering it via logs.
+export function reasoningFailoverWarning(marker: ReasoningFailoverMarker | null): string | null {
+  if (!marker) return null;
+  return (
+    `provider failover active: ${marker.from_mode} -> ${marker.to_mode}` +
+    (marker.method ? ` (${marker.method})` : '') +
+    `; last switch at ${marker.at}`
+  );
+}
+
 async function main() {
   killSwitch.startMonitor();
 
@@ -413,6 +429,10 @@ async function main() {
 
   // LC-08: bootstrap writes this marker when a non-stub mode kept stubs.
   const reasoningDegraded = readReasoningDegraded();
+  // XP-05: the failover layer writes this marker when a later reasoning
+  // candidate served a call the primary failed. Non-blocking — read-only,
+  // never fed into deriveBaselineStatus.
+  const reasoningFailover = readReasoningFailover();
 
   // Determine High-Level Status
   const status = deriveBaselineStatus(result, janitorMaintenance, reasoningDegraded !== null);
@@ -425,6 +445,9 @@ async function main() {
     details: state.layers,
     config_degraded: baselineConfigDegraded,
     reasoning_degraded: reasoningDegraded,
+    warnings: {
+      reasoning_failover: reasoningFailoverWarning(reasoningFailover),
+    },
     cache: {
       tenant_drift: {
         cached: tenantDriftSnapshot.cached,
