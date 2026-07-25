@@ -12,6 +12,7 @@
 > **タスク知識配給計画**: [TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25.ja.md](./TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25.ja.md)(KP-01〜07: 配給経路の単一化・タスクプロファイル駆動の知識スライス・knowledge_feedback 帰還ループ・有効性主導キュレーション。MO-04/KM 系の後続ループ)。
 > **CLI サブエージェント・チーム計画**: [CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md](./CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md)(CT-01〜04: 単一 LLM プロバイダ CLI 内で完結するチーム構成・連携。役割→サブエージェント定義の生成儀式 + `HarnessSubagentDispatcher` + ファイル契約 E2E + 実行面の使い分け基準。agent-runtime の代替実行面)。
 > **クロスプロバイダ実行計画**: [CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md](./CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md)(XP-01〜07: 複数 LLM プロバイダ CLI(claude/codex/agy 等)の同一マシン併走規約。能力プローブ registry・権限射影と env 最小化・tier×egress ゲート・同一ディレクトリ併走契約・縮退表面化と provenance・並行予算・モデル分散 best-of-N。CT の兄弟計画)。
+> **surface 会話オーケストレータ計画**: [SURFACE_ORCHESTRATOR_PLAN_2026-07-25.ja.md](./SURFACE_ORCHESTRATOR_PLAN_2026-07-25.ja.md)(SO-01〜05: surface(Slack/terminal/web 等)が CLI と同格の対話オーケストレータ(ミッション所有・操縦)になる。lifecycle facade の libs 昇格・OrchestratorSession・owner 権限配線・会話操縦 + IL-04 完了検証・責務別モデル階梯(前面 fast/standard、判断 deep)。SN-01 の後続)。
 
 ## 1. 目的
 
@@ -346,6 +347,18 @@ surface が提供する UI の機能的アフォーダンスの調査(2026-07-03
 | XP-05 | 縮退表面化と成果物 provenance                            | P2     | S    | XP-01                  |
 | XP-06 | 並行・生存予算(プロセス面の資源統制)                     | P2     | S    | XP-01                  |
 | XP-07 | モデル分散 best-of-N(真のモデル多様性)                   | P2     | M    | XP-01〜03・MO-07       |
+
+### surface 会話オーケストレータ(surface が CLI と同格のオーケストレータになる)
+
+LLM プロバイダ CLI 経由では CLI セッションが会話オーケストレータ(ミッション所有・操縦)を担うのに対し、surface 経由では会話の前面(`runSurfaceConversation` の共通ループ)とミッション発行(SN-01)までしか中立化されていない(2026-07-25、実コード突合)。正本は [SURFACE_ORCHESTRATOR_PLAN_2026-07-25.ja.md](./SURFACE_ORCHESTRATOR_PLAN_2026-07-25.ja.md)(SO-01〜05 は同文書内)。既にプログラマティックに存在する lifecycle 動詞(`missionSystem`)の governed facade 昇格 + 会話スレッド↔ミッション所有の永続バインディング(`OrchestratorSession`)+ owner 権限配線 + 会話操縦ルートの4増分で、**発行者から所有者への昇格**を実現する。CLI オーケストレータの置き換えではなく対称化。加えて責務別モデル階梯(会話の前面 = fast/standard、オーケストレータ判断 = deep)を既存 `model_tier` 語彙の宣言として配線し、対称化がコスト増にならないようにする。
+
+| ID    | タイトル                                                       | 優先度 | 規模 | 依存                      |
+| ----- | -------------------------------------------------------------- | ------ | ---- | ------------------------- |
+| SO-01 | lifecycle 動詞の in-process governed facade                    | P1     | M〜L | なし                      |
+| SO-02 | OrchestratorSession(会話スレッド↔ミッション所有バインディング) | P1     | M    | SO-01                     |
+| SO-03 | surface のオーナー権限配線(execution context + claim)          | P1     | S〜M | SO-02                     |
+| SO-04 | 会話からのミッション操縦 + IL-04 完了検証                      | P2     | M    | SO-02・SO-03              |
+| SO-05 | 責務別モデル階梯の宣言(前面 fast/standard、判断 deep)          | P2     | S〜M | なし(前面)/ SO-04(判断面) |
 
 ### Actuator リファクタリング/使いやすさ(ADFスキーマ・op)
 
