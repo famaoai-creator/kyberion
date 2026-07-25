@@ -2,8 +2,15 @@ import { logger } from './core.js';
 import { trustEngine } from './trust-engine.js';
 
 /**
- * Agent Registry v1.0
+ * Agent Registry v1.1
  * Central in-memory store of all known agents in the Kyberion ecosystem.
+ *
+ * NI-01: this registry is the **runtime-instance cache** of the durable
+ * AgentIdentity registry (`agent-identity.ts`). An AgentRecord describes a
+ * live (or recently live) runtime; the durable, journal-backed identity —
+ * who owns it, its lifecycle status, when it was retired — lives in the
+ * agent-identity ledger, referenced from here via `metadata.nhi_id`
+ * (stamped at spawn by agent-lifecycle.ts).
  */
 
 export type AgentStatus = 'registered' | 'booting' | 'ready' | 'busy' | 'error' | 'shutdown';
@@ -85,6 +92,23 @@ class AgentRegistryImpl {
 
   findByCapability(capability: string): AgentRecord[] {
     return Array.from(this.agents.values()).filter((r) => r.capabilities.includes(capability));
+  }
+
+  /** NI-01: stamp the durable identity's nhi_id on the runtime record's metadata. */
+  attachRuntimeIdentity(agentId: string, nhiId: string): void {
+    const record = this.agents.get(agentId);
+    if (record) record.metadata = { ...record.metadata, nhi_id: nhiId };
+  }
+
+  /** NI-01: the durable identity nhi_id stamped at spawn, if any. */
+  getRuntimeIdentity(agentId: string): string | undefined {
+    const nhiId = this.agents.get(agentId)?.metadata?.nhi_id;
+    return typeof nhiId === 'string' && nhiId ? nhiId : undefined;
+  }
+
+  /** NI-01: reverse lookup — runtime records currently bound to a durable identity. */
+  findByRuntimeIdentity(nhiId: string): AgentRecord[] {
+    return Array.from(this.agents.values()).filter((r) => r.metadata?.nhi_id === nhiId);
   }
 
   getHealthSnapshot(): { total: number; ready: number; busy: number; error: number } {

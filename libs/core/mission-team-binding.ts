@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import { findMissionPath, missionDir } from './path-resolver.js';
+import { deriveAgentNhiId, ensureAgentIdentityBestEffort, parseNhiId } from './agent-identity.js';
 import type { MissionTeamAssignment, MissionTeamPlan } from './mission-team-plan-composer.js';
 import {
   safeAppendFileSync,
@@ -90,6 +91,8 @@ export interface MissionExecutionLedgerEntry {
   team_role?: string;
   actor_id?: string;
   actor_type?: MissionActorType;
+  /** NI-01: durable identity (nhi_id) of the acting resource, when known. */
+  runtime_identity?: string;
   decision?: string;
   evidence?: string[];
   source_event_id?: string;
@@ -136,14 +139,34 @@ function buildAssignmentId(missionId: string, teamRole: string, actorId: string)
   return `${missionId}:${teamRole}:${actorId}`.toLowerCase().replace(/[^a-z0-9:_-]+/g, '-');
 }
 
+/**
+ * NI-01: canonical runtime identity for an *agent* resource — prefer an
+ * explicitly carried nhi_id, else derive `kyberion://agent/<org>/<slug>` from
+ * the resource id. Humans keep `null`; services keep whatever external
+ * identity they declared (e.g. `stripe-prod`) — only kyberion agents get the
+ * nhi derivation.
+ */
+function resolveAgentRuntimeIdentity(
+  resourceType: MissionActorType,
+  actorId: string,
+  explicit: string | null | undefined,
+  organizationId: string | undefined
+): string | null {
+  if (explicit?.trim()) return explicit;
+  if (resourceType !== 'agent') return null;
+  return deriveAgentNhiId(actorId, organizationId);
+}
+
 function resourceFromLegacyAssignment(
-  assignment: MissionTeamPlan['assignments'][number]
+  assignment: MissionTeamPlan['assignments'][number],
+  organizationId?: string
 ): WorkforceResourceRef | null {
   const actorId = assignment.agent_id?.trim();
   if (!actorId) return null;
+  const resourceType = assignment.actor_type || 'agent';
   return {
     resource_id: actorId,
-    resource_type: assignment.actor_type || 'agent',
+    resource_type: resourceType,
     display_name: actorId,
     authority_roles: assignment.authority_role ? [assignment.authority_role] : [],
     capabilities: assignment.required_capabilities || [],
@@ -154,12 +177,18 @@ function resourceFromLegacyAssignment(
     accountable_human_id: assignment.accountable_human_id || null,
     provider: assignment.provider,
     model_id: assignment.modelId,
-    runtime_identity: assignment.runtime_identity || null,
+    runtime_identity: resolveAgentRuntimeIdentity(
+      resourceType,
+      actorId,
+      assignment.runtime_identity,
+      organizationId
+    ),
   };
 }
 
 function resolveAssignmentResource(
-  assignment: MissionTeamPlan['assignments'][number]
+  assignment: MissionTeamPlan['assignments'][number],
+  organizationId?: string
 ): WorkforceResourceRef | null {
   const resource = assignment.resource;
   if (resource) {
@@ -169,9 +198,41 @@ function resolveAssignmentResource(
         `Workforce resource ${resource.resource_id} requires accountable_human_id for ${resource.resource_type}`
       );
     }
+    const runtimeIdentity = resolveAgentRuntimeIdentity(
+      resource.resource_type,
+      resource.resource_id,
+      resource.runtime_identity,
+      organizationId
+    );
+    if (runtimeIdentity !== (resource.runtime_identity ?? null)) {
+      return { ...resource, runtime_identity: runtimeIdentity };
+    }
     return resource;
   }
-  return resourceFromLegacyAssignment(assignment);
+  return resourceFromLegacyAssignment(assignment, organizationId);
+}
+
+/**
+ * NI-01: ensure a durable 'provisioned' AgentIdentity exists for a staffed
+ * agent resource. Best-effort by design (never fails staffing): the ledger
+ * write requires an allowlisted execution context (mission staffing runs
+ * under `mission_controller`) and an accountable human (resource >
+ * organization profile fallback); refusals are logged by the helper.
+ */
+function provisionStaffedAgentIdentity(resource: WorkforceResourceRef, missionId: string): void {
+  if (resource.resource_type !== 'agent' || !resource.runtime_identity) return;
+  const parsed = parseNhiId(resource.runtime_identity);
+  if (!parsed) return;
+  ensureAgentIdentityBestEffort({
+    slug: parsed.slug,
+    kind: 'agent',
+    organizationId: parsed.organization_id,
+    displayName: resource.display_name,
+    accountableHumanId: resource.accountable_human_id ?? undefined,
+    affiliation: { mission_id: missionId },
+    providerHint: resource.provider ?? undefined,
+    modelHint: resource.model_id ?? undefined,
+  });
 }
 
 export function buildMissionTeamBlueprint(plan: MissionTeamPlan): MissionTeamBlueprint {
@@ -197,11 +258,15 @@ export function buildMissionTeamBlueprint(plan: MissionTeamPlan): MissionTeamBlu
 }
 
 export function buildMissionStaffingAssignments(plan: MissionTeamPlan): MissionStaffingAssignments {
+  const organizationId = plan.organization_profile?.organization_id;
   const assignments: MissionStaffingAssignment[] = plan.assignments
     .filter((assignment) => assignment.status === 'assigned')
     .flatMap((assignment) => {
-      const resource = resolveAssignmentResource(assignment);
+      const resource = resolveAssignmentResource(assignment, organizationId);
       if (!resource) return [];
+      // NI-01: staffed agents get a durable 'provisioned' identity in the
+      // ledger (resolve-or-issue, best-effort — see helper docs).
+      provisionStaffedAgentIdentity(resource, plan.mission_id);
       const actorId = resource.resource_id;
       return [
         {
@@ -273,9 +338,10 @@ export function loadMissionStaffingAssignments(
   const assignments = (parsed.assignments || []).flatMap((assignment) => {
     const actorId = String(assignment.actor_id || '').trim();
     if (!actorId) return [];
+    const legacyResourceType = assignment.actor_type || 'agent';
     const resource: WorkforceResourceRef = assignment.resource || {
       resource_id: actorId,
-      resource_type: assignment.actor_type || 'agent',
+      resource_type: legacyResourceType,
       display_name: actorId,
       authority_roles: assignment.authority_role ? [assignment.authority_role] : [],
       capabilities: [],
@@ -285,7 +351,14 @@ export function loadMissionStaffingAssignments(
       accountable_human_id: null,
       provider: assignment.provider ?? null,
       model_id: assignment.model_id ?? null,
-      runtime_identity: null,
+      // NI-01: legacy artifacts predate durable identities — normalize agent
+      // rows to their canonical nhi_id on read (pure derivation, no ledger IO).
+      runtime_identity: resolveAgentRuntimeIdentity(
+        legacyResourceType,
+        actorId,
+        null,
+        parsed.organization_profile?.organization_id
+      ),
     };
     return [
       {
@@ -299,6 +372,29 @@ export function loadMissionStaffingAssignments(
   return { ...parsed, assignments } as MissionStaffingAssignments;
 }
 
+/**
+ * NI-01: resolve the acting resource's durable identity for a ledger entry
+ * when the caller did not supply one: the mission's staffing assignments on
+ * disk are the authority (they carry the org-scoped nhi_id stamped at
+ * staffing time). Best-effort — attribution must never fail the append.
+ */
+function resolveLedgerRuntimeIdentity(
+  input: AppendMissionExecutionLedgerEntryInput,
+  missionId: string
+): string | undefined {
+  if (input.runtime_identity) return input.runtime_identity;
+  if (!input.actor_id) return undefined;
+  try {
+    const staffing = loadMissionStaffingAssignments(missionId, input.mission_path_hint);
+    const match = staffing?.assignments.find(
+      (assignment) => assignment.actor_id === input.actor_id
+    );
+    return match?.resource.runtime_identity ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function appendMissionExecutionLedgerEntry(
   input: AppendMissionExecutionLedgerEntryInput
 ): string {
@@ -310,6 +406,7 @@ export function appendMissionExecutionLedgerEntry(
     team_role: input.team_role,
     actor_id: input.actor_id,
     actor_type: input.actor_type,
+    runtime_identity: resolveLedgerRuntimeIdentity(input, missionId),
     decision: input.decision,
     evidence: input.evidence,
     source_event_id: input.source_event_id,
