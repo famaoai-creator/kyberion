@@ -241,6 +241,13 @@ interface LlmCompileOptions {
   model?: string;
   modelProvider?: string;
   trace?: Pick<TraceContext, 'addEvent'>;
+  /**
+   * SO-05: declared model tier for the reasoning call(s) this compile pass
+   * makes (fast/standard/deep). Threaded into `getReasoningBackend().prompt()`
+   * via `defaultAsk`; ignored by backends that don't honor tier routing
+   * (accepted — the declaration is still recorded).
+   */
+  model_tier?: 'fast' | 'standard' | 'deep';
 }
 
 type CompilationFallbackReason =
@@ -1155,8 +1162,14 @@ function buildWorkLoopPrompt(
   ].join('\n');
 }
 
-async function defaultAsk(prompt: string): Promise<string> {
-  return getReasoningBackend().prompt(prompt);
+async function defaultAsk(
+  prompt: string,
+  options?: Pick<LlmCompileOptions, 'model_tier'>
+): Promise<string> {
+  return getReasoningBackend().prompt(
+    prompt,
+    options?.model_tier ? { model_tier: options.model_tier } : undefined
+  );
 }
 
 export function resolveIntentCompilerTarget(
@@ -1203,7 +1216,8 @@ async function compileExecutionBriefWithLlm(
   input: CompileUserIntentFlowInput,
   options: LlmCompileOptions = {}
 ): Promise<ActuatorExecutionBrief | null> {
-  const ask = options.askFn || ((prompt: string) => defaultAsk(prompt));
+  const ask =
+    options.askFn || ((prompt: string) => defaultAsk(prompt, { model_tier: options.model_tier }));
   const raw = await ask(buildExecutionBriefPrompt(input));
   const parsed = parseJsonObject<ActuatorExecutionBrief>(raw);
   return parsed ? normalizeExecutionBrief(parsed, toExecutionBriefSeed(input)) : null;
@@ -1214,7 +1228,8 @@ async function compileIntentContractWithLlm(
   executionBrief: ActuatorExecutionBrief,
   options: LlmCompileOptions = {}
 ): Promise<IntentContract | null> {
-  const ask = options.askFn || ((prompt: string) => defaultAsk(prompt));
+  const ask =
+    options.askFn || ((prompt: string) => defaultAsk(prompt, { model_tier: options.model_tier }));
   const raw = await ask(buildIntentContractPrompt(input, executionBrief));
   const parsed = parseJsonObject<IntentContract>(raw);
   if (!parsed) return null;
@@ -1232,7 +1247,8 @@ async function compileWorkLoopWithLlm(
   contract: IntentContract,
   options: LlmCompileOptions = {}
 ): Promise<OrganizationWorkLoopSummary | null> {
-  const ask = options.askFn || ((prompt: string) => defaultAsk(prompt));
+  const ask =
+    options.askFn || ((prompt: string) => defaultAsk(prompt, { model_tier: options.model_tier }));
   const raw = await ask(buildWorkLoopPrompt(input, executionBrief, contract));
   const parsed = parseJsonObject<OrganizationWorkLoopSummary>(raw);
   if (!parsed) return null;
@@ -1552,6 +1568,8 @@ function emitIntentCompilationCompletedEvent(
     reasoningPolicyVersion: string;
     selectedResolutionShape?: string;
     contractExecutionShape?: string;
+    /** SO-05 / OP-01: model tier declared by the caller for this compile pass. */
+    declaredModelTier?: 'fast' | 'standard' | 'deep';
   }
 ): void {
   const shapeDisagreement =
@@ -1574,6 +1592,7 @@ function emitIntentCompilationCompletedEvent(
     shape_disagreement: shapeDisagreement,
     selected_resolution_shape: input.selectedResolutionShape || '',
     contract_execution_shape: input.contractExecutionShape || '',
+    declared_model_tier: input.declaredModelTier || '',
   });
 }
 
@@ -1637,6 +1656,7 @@ export async function compileUserIntentFlow(
       reasoningPolicyVersion: reasoningPolicy.version,
       selectedResolutionShape: resolutionPacket.selected_resolution?.shape,
       contractExecutionShape: cacheLookup.cachedFlow.intentContract.resolution.execution_shape,
+      declaredModelTier: options.model_tier,
     });
     const cachedUseCaseScenario = buildIntentUseCaseScenario({
       input: resolvedInput,
@@ -1776,6 +1796,7 @@ export async function compileUserIntentFlow(
     cacheStatus,
     selectedResolutionShape: resolutionPacket.selected_resolution?.shape,
     contractExecutionShape: intentContract.resolution.execution_shape,
+    declaredModelTier: options.model_tier,
   });
 
   return {
