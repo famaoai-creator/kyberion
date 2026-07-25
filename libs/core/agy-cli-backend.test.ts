@@ -4,12 +4,30 @@ import { PassThrough } from 'node:stream';
 import { z } from 'zod';
 import { AgyCliBackend, buildAgyCliBackendFromEnv } from './agy-cli-backend.js';
 
-const { spawnMock } = vi.hoisted(() => ({
+const { spawnMock, withWallClockBudgetMock } = vi.hoisted(() => ({
   spawnMock: vi.fn(),
+  withWallClockBudgetMock: vi.fn((_opts: unknown, fn: () => Promise<unknown>) => fn()),
 }));
 
 vi.mock('node:child_process', () => ({
   spawn: spawnMock,
+}));
+
+// XP-06: `spawnCli` now wraps its child in `withWallClockBudget`, which
+// (unmocked) would persist a real active-child record via `secure-io` /
+// `path-resolver` — a real filesystem write this suite must not perform.
+// `delegation-concurrency.test.ts` owns the hermetic (temp-dir-backed) tests
+// for the budget/kill machinery itself; here it's a spyable passthrough so
+// every pre-existing assertion below is unaffected, while still letting this
+// file assert *that* `spawnCli` wires through it with the right
+// provider/budget.
+vi.mock('./delegation-concurrency.js', () => ({
+  delegationChildHandleFromChildProcess: (child: any) => ({
+    pid: child.pid,
+    kill: (signal: NodeJS.Signals) => child.kill(signal),
+  }),
+  withWallClockBudget: withWallClockBudgetMock,
+  DelegationWallClockExceededError: class DelegationWallClockExceededError extends Error {},
 }));
 
 function createChild(stdoutText: string, stderrText = '', exitCode = 0): any {
@@ -208,5 +226,20 @@ describe('agy-cli-backend', () => {
     });
 
     expect(result).toMatchObject({ goal: 'ship' });
+  });
+
+  describe('wall-clock budget wiring (XP-06)', () => {
+    it('wraps the spawned child in withWallClockBudget with the agy provider and configured timeout', async () => {
+      spawnMock.mockReturnValueOnce(createChild(JSON.stringify({ response: 'ok' })));
+
+      const backend = new AgyCliBackend({ bin: 'agy', model: 'agy', timeoutMs: 9876 });
+      await backend.prompt('hello');
+
+      expect(withWallClockBudgetMock).toHaveBeenCalledTimes(1);
+      const [opts, fn] = withWallClockBudgetMock.mock.calls[0];
+      expect(opts).toMatchObject({ provider: 'agy', budgetMs: 9876 });
+      expect(opts.child).toEqual(expect.objectContaining({ kill: expect.any(Function) }));
+      expect(typeof fn).toBe('function');
+    });
   });
 });

@@ -37,20 +37,43 @@
  *  - `KYBERION_DELEGATION_KILL_GRACE_MS` — SIGTERM → SIGKILL grace window
  *    (default 5s).
  *
- * IMPORTANT SCOPE NOTE: the three CLI backends (`shell-claude-cli-backend.ts`,
- * `codex-cli-query.ts`, `agy-cli-backend.ts`) spawn their child processes
- * internally and do not currently return a handle to the caller — the
- * `agent-dispatch.ts` choke point that wires this module therefore cannot
- * pass a real {@link DelegationChildHandle} yet, so in production today the
- * wall-clock budget can abandon-and-record a hung delegation but cannot
- * forcibly kill the underlying OS process. `withWallClockBudget` and the
- * active-child registry are fully general (see the hermetic tests, which
- * inject fake handles) and ready for the day a backend exposes one. Real
- * orphans in the meantime are addressed by persisting whatever handle *is*
- * registered to `active/shared/runtime/delegation-children.json` (via
- * secure-io) and reaping stale entries in `storage-janitor.ts`'s zombie
- * sweep — a separate maintenance pass that can run in a later session even
- * if the process that spawned the child has already exited.
+ * PROCESS-FACE WIRING: all three CLI backends (`shell-claude-cli-backend.ts`,
+ * `codex-cli-query.ts`, `agy-cli-backend.ts`) spawn their delegation's child
+ * process asynchronously (`node:child_process` `spawn`, not `spawnSync`), so
+ * each one's `spawnCli` wraps its awaited child-process promise in
+ * {@link withWallClockBudget} directly, passing a real
+ * {@link DelegationChildHandle} built via
+ * {@link delegationChildHandleFromChildProcess}. On expiry the SIGTERM ->
+ * SIGKILL escalation therefore now kills the actual OS process, not just an
+ * abandoned `Promise`. This is layered *underneath* `agent-dispatch.ts`'s own
+ * `dispatchWithConcurrencyGovernance` (which still wraps the whole
+ * `delegateTask()` call with its own, handle-less budget for call sites that
+ * bypass the dispatcher plane entirely, e.g. `runStructured`/document/browser
+ * agent tasks) — nesting two independent wall-clock races over the same unit
+ * of work is redundant but not incorrect; only the inner (backend-level) one
+ * can ever actually kill anything.
+ *
+ * Each backend also has one or two genuinely synchronous helper spawns
+ * (`shell-claude-cli-backend.ts`'s `probeShellClaudeCliAvailability` via
+ * `spawnSync`, `codex-cli-query.ts`'s `resolveCodexBinary` via
+ * `safeExecResult`/`execFileSync`) that are NOT part of any delegation's
+ * wall-clock budget: they are one-shot preflight/discovery calls (find the
+ * binary, health-check it), not the delegation's own unit of work, and a
+ * synchronous call cannot be killed mid-flight from the same thread regardless
+ * — they rely on their own short, hardcoded timeouts instead. See the
+ * `// SYNC, NOT WALL-CLOCK-BUDGETED` comments at each call site.
+ *
+ * Orphans that outlive the in-process SIGTERM -> SIGKILL escalation (e.g. the
+ * Kyberion process itself exited or restarted mid-grace-window) are addressed
+ * by persisting whatever handle *is* registered to
+ * `active/shared/runtime/delegation-children.json` (via secure-io) and
+ * reaping stale entries in `storage-janitor.ts`'s zombie sweep
+ * (`sweepDelegationChildren`) — a separate maintenance pass that can run in a
+ * later session even if the process that spawned the child has already
+ * exited. `storage-janitor.ts` deliberately duplicates the
+ * `DelegationChildRecord` shape (see its own comment) rather than importing
+ * this module; `delegation-concurrency.test.ts`'s
+ * "producer/consumer shape drift" test keeps the two definitions honest.
  *
  * See docs/developer/improvement-plans-2026-07/
  * CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md §XP-06.
@@ -222,6 +245,26 @@ export function getDelegationConcurrencyStats(): DelegationConcurrencyStats {
 export interface DelegationChildHandle {
   pid?: number;
   kill(signal: NodeJS.Signals): void;
+}
+
+/**
+ * Adapt a real `node:child_process` `ChildProcess` (as returned by `spawn`)
+ * into a {@link DelegationChildHandle}. Structurally typed (not `import type
+ * { ChildProcess }`) so this module stays free of a hard `node:child_process`
+ * dependency — callers pass their already-spawned child as-is. Shared by the
+ * three CLI backends' `spawnCli` so the `{ pid, kill }` extraction has one
+ * definition instead of three.
+ */
+export function delegationChildHandleFromChildProcess(child: {
+  pid?: number;
+  kill(signal?: NodeJS.Signals | number): boolean;
+}): DelegationChildHandle {
+  return {
+    pid: child.pid,
+    kill: (signal: NodeJS.Signals) => {
+      child.kill(signal);
+    },
+  };
 }
 
 export interface DelegationChildRecord {
