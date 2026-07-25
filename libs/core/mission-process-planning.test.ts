@@ -1,14 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import {
-  pathResolver,
-  resolveMissionWorkflowDesign,
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  safeRmSync,
-  safeWriteFile,
-} from '@agent/core';
+import * as pathResolver from './path-resolver.js';
+import { resolveMissionWorkflowDesign } from './mission-workflow-catalog.js';
+import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 import type { MissionState } from './mission-types.js';
 import {
   activateMissionOnGateProgress,
