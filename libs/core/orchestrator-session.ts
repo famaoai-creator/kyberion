@@ -53,6 +53,15 @@ import {
   assertNotDuringRestore,
   type JournalEventEnvelope,
 } from './worker-state-journal.js';
+import {
+  claimWorkItem,
+  createWorkItem,
+  getWorkItem,
+  releaseWorkItem,
+  renewWorkItemLease,
+  WorkCoordinationError,
+  type WorkLease,
+} from './work-coordination.js';
 
 // ---------------------------------------------------------------------------
 // Session identity — single source of truth for the surface/channel/thread
@@ -111,6 +120,11 @@ export const orchestratorSessionRecordSchema = z
     released_at: z.string().optional(),
     release_reason: z.enum(ORCHESTRATOR_SESSION_RELEASE_REASONS).optional(),
     correlation_lineage: z.array(orchestratorSessionCorrelationLinkSchema).optional(),
+    // SO-03: cross-process mission-ownership work-item claim backing this
+    // session's owner authority. Optional so pre-SO-03 journal records (no
+    // lease fields at all) still parse — the journal version stays 1.
+    lease_id: z.string().optional(),
+    ownership_item_id: z.string().optional(),
   })
   .strict();
 
@@ -155,6 +169,10 @@ const sessionCreatedPayloadSchema = z
     owner_actor: z.string(),
     created_at: z.string(),
     correlation_id: z.string().optional(),
+    // SO-03: optional so replay of pre-SO-03 journal lines (written before
+    // this module claimed a work-item lease per session) still validates.
+    lease_id: z.string().optional(),
+    ownership_item_id: z.string().optional(),
   })
   .strict();
 
@@ -179,6 +197,8 @@ orchestratorSessionKernel.defineOp(ORCHESTRATOR_SESSION_OPS.sessionCreated, {
       owner_actor: payload.owner_actor,
       status: 'active',
       created_at: payload.created_at,
+      ...(payload.lease_id ? { lease_id: payload.lease_id } : {}),
+      ...(payload.ownership_item_id ? { ownership_item_id: payload.ownership_item_id } : {}),
       ...(payload.correlation_id
         ? {
             correlation_lineage: [
@@ -333,12 +353,20 @@ export class OrchestratorSessionGovernedError extends Error {
 export class OrchestratorSessionOwnershipConflictError extends Error {
   constructor(
     public readonly missionId: string,
-    public readonly existingSessionId: string
+    public readonly existingSessionId: string,
+    /**
+     * SO-03: extra context when the conflict was detected via the
+     * cross-process mission-ownership work-item claim (`lease_conflict`)
+     * rather than the in-process journal projection — e.g. the conflicting
+     * lease's holder identity, when the local journal hasn't yet observed
+     * the winning session's journal append.
+     */
+    public readonly conflictDetail?: string
   ) {
     super(
       `[orchestrator-session] mission ${missionId} already has an active orchestrator session ` +
         `(${existingSessionId}). One owner per mission: release it (handoff/finish/explicit) ` +
-        `before creating a new one.`
+        `before creating a new one.${conflictDetail ? ` ${conflictDetail}` : ''}`
     );
     this.name = 'OrchestratorSessionOwnershipConflictError';
   }
@@ -401,8 +429,46 @@ export function resetOrchestratorSessionServiceForTests(
   defaultJournal = new OrchestratorSessionJournal({ journalPath });
 }
 
-function normalizeMissionId(missionId: string): string {
+/** Exported so other SO-03+ modules (surface-steering-authority.ts, tests) normalize identically. */
+export function normalizeOrchestratorMissionId(missionId: string): string {
   return missionId.toUpperCase();
+}
+
+function normalizeMissionId(missionId: string): string {
+  return normalizeOrchestratorMissionId(missionId);
+}
+
+/** SO-03: deterministic namespace-safe id for a mission's ownership work-item claim. */
+const MISSION_OWNERSHIP_ITEM_PREFIX = 'mission-ownership:';
+
+/** SO-03: purpose tag stamped on the ownership work-item's lease. */
+export const ORCHESTRATOR_SESSION_OWNERSHIP_PURPOSE = 'mission_ownership';
+
+/** SO-03: lease TTL for the mission-ownership claim — long-lived (steering sessions can span hours), renewed by SO-04's steering turns via {@link renewOrchestratorSessionLease}. */
+export const ORCHESTRATOR_SESSION_LEASE_TTL_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * The deterministic work-item id backing `missionId`'s ownership claim.
+ * Prefixed and namespaced so it can never collide with a real work item
+ * dispatched through the normal WorkItem flow (see work-coordination.ts).
+ */
+export function deriveMissionOwnershipItemId(missionId: string): string {
+  return `${MISSION_OWNERSHIP_ITEM_PREFIX}${normalizeOrchestratorMissionId(missionId)}`;
+}
+
+/** Idempotent: create the mission-ownership work item on first use only. */
+function ensureMissionOwnershipWorkItem(itemId: string, missionId: string): void {
+  if (getWorkItem(itemId)) return;
+  createWorkItem({
+    itemId,
+    title: `Mission ownership: ${missionId}`,
+    description:
+      `SO-03 mission-ownership claim item for mission ${missionId}. This is not a real unit of ` +
+      'work — it exists only so orchestrator-session.ts can serialize "who owns this mission" ' +
+      'across processes through the same lease mechanism real work items use.',
+    projectId: 'orchestrator-sessions',
+    metadata: { mission_id: missionId, kind: 'mission_ownership' },
+  });
 }
 
 export interface CreateOrchestratorSessionParams {
@@ -439,6 +505,60 @@ export function createOrchestratorSession(
     throw new OrchestratorSessionOwnershipConflictError(missionId, existingActiveId);
   }
 
+  // SO-03: cross-process ownership claim. A bare journal append has no
+  // compare-and-set, so it cannot by itself stop two processes that both
+  // observed "no active session" above from each appending a
+  // `session_created` event for the same mission. work-coordination's lease
+  // claim DOES serialize concurrent claimants on the same item_id (see
+  // `claimWorkItem`'s existing-lease check), so it is the real mutual
+  // exclusion primitive here; the in-process check above is only a fast
+  // path for the common (non-racing) case.
+  const ownershipItemId = deriveMissionOwnershipItemId(missionId);
+  ensureMissionOwnershipWorkItem(ownershipItemId, missionId);
+
+  let lease: WorkLease;
+  try {
+    lease = claimWorkItem({
+      itemId: ownershipItemId,
+      actorPeerId: params.ownerActor,
+      purpose: ORCHESTRATOR_SESSION_OWNERSHIP_PURPOSE,
+      ttlMs: ORCHESTRATOR_SESSION_LEASE_TTL_MS,
+      // Idempotency key = session_id: the exact same thread+mission binding
+      // re-creating (e.g. after a restart, before the journal replay above
+      // even runs) re-claims the SAME lease rather than conflicting with
+      // itself.
+      idempotencyKey: sessionId,
+      metadata: {
+        surface: params.surface,
+        channel: params.channel,
+        thread_ts: params.threadTs,
+        mission_id: missionId,
+      },
+    }).lease;
+  } catch (error) {
+    if (error instanceof WorkCoordinationError && error.code === 'lease_conflict') {
+      // Prefer the locally-visible active session (already appended) for
+      // the error's `existingSessionId`; fall back to describing the raw
+      // work-item claim holder for the narrow window where the winning
+      // process claimed the lease but hasn't appended its journal event yet.
+      const knownActive = getActiveSessionForMission(missionId);
+      if (knownActive) {
+        throw new OrchestratorSessionOwnershipConflictError(missionId, knownActive.session_id);
+      }
+      const conflictingItem = getWorkItem(ownershipItemId);
+      const holderDetail = conflictingItem?.claimed_by_peer_id
+        ? `Conflicting holder: ${conflictingItem.claimed_by_peer_id} ` +
+          `(work-item lease ${conflictingItem.lease_id ?? 'unknown'}).`
+        : `Conflicting work-item claim on ${ownershipItemId}.`;
+      throw new OrchestratorSessionOwnershipConflictError(
+        missionId,
+        'cross-process-claim-holder',
+        holderDetail
+      );
+    }
+    throw error;
+  }
+
   const createdAt = new Date().toISOString();
   const payload = {
     session_id: sessionId,
@@ -448,6 +568,8 @@ export function createOrchestratorSession(
     mission_id: missionId,
     owner_actor: params.ownerActor,
     created_at: createdAt,
+    lease_id: lease.lease_id,
+    ownership_item_id: ownershipItemId,
     ...(params.correlationId ? { correlation_id: params.correlationId } : {}),
   };
   // Defense-in-depth: the gate above already required mission_controller
@@ -516,7 +638,59 @@ export function releaseOrchestratorSession(
     });
   });
   const next = refreshState();
+
+  // SO-03: best-effort release of the cross-process ownership lease. The
+  // journal release above already committed, so a missing/expired/foreign
+  // lease here (already reclaimed, TTL lapsed, pre-SO-03 record with no
+  // lease at all, ...) must never fail this call — only log.
+  if (existing.lease_id && existing.ownership_item_id) {
+    try {
+      releaseWorkItem({
+        itemId: existing.ownership_item_id,
+        leaseId: existing.lease_id,
+        actorPeerId: existing.owner_actor,
+      });
+    } catch (error) {
+      logger.warn(
+        `[orchestrator-session] best-effort ownership-lease release for session ${sessionId} ` +
+          `(item ${existing.ownership_item_id}, lease ${existing.lease_id}) failed: ${
+            error instanceof Error ? error.message : String(error)
+          }`
+      );
+    }
+  }
+
   return next.sessions[sessionId] ?? null;
+}
+
+/**
+ * SO-03: thin wrapper over `renewWorkItemLease` for the session's ownership
+ * lease. SO-04's steering turns call this to keep a long-running conversation
+ * thread's mission-ownership claim from expiring under
+ * {@link ORCHESTRATOR_SESSION_LEASE_TTL_MS} while the mission is still being
+ * actively steered. Fails closed outside a `mission_controller` execution
+ * context, like every other write in this module. Throws (does not swallow)
+ * on a missing/expired lease or an inactive/unknown session — callers that
+ * want best-effort semantics should catch at the call site, mirroring how
+ * {@link releaseOrchestratorSessionForMissionBestEffort} wraps
+ * {@link releaseOrchestratorSessionForMission}.
+ */
+export function renewOrchestratorSessionLease(sessionId: string): WorkLease {
+  assertOrchestratorSessionGovernedContext('renewOrchestratorSessionLease');
+  const state = ensureState();
+  const record = state.sessions[sessionId];
+  if (!record || record.status !== 'active') {
+    throw new Error(
+      `[orchestrator-session] cannot renew ownership lease: session ${sessionId} is not active`
+    );
+  }
+  if (!record.lease_id) {
+    throw new Error(
+      `[orchestrator-session] cannot renew ownership lease: session ${sessionId} has no ` +
+        'ownership lease on record (pre-SO-03 session).'
+    );
+  }
+  return renewWorkItemLease({ leaseId: record.lease_id, ttlMs: ORCHESTRATOR_SESSION_LEASE_TTL_MS });
 }
 
 /**

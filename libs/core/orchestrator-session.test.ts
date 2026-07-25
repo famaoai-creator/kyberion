@@ -8,13 +8,27 @@ import {
   type MissionLifecycleUnderlyingSystem,
 } from './mission-lifecycle-service.js';
 import {
+  claimWorkItem,
+  clearWorkCoordinationNamespace,
+  clearWorkCoordinationStore,
+  createWorkItem,
+  getWorkItem,
+  listActiveWorkLeases,
+  releaseWorkItem,
+  setWorkCoordinationNamespace,
+} from './work-coordination.js';
+import {
   createOrchestratorSession,
+  deriveMissionOwnershipItemId,
   deriveSurfaceSessionId,
   getActiveSessionForMission,
   getSessionForThread,
   listOrchestratorSessions,
+  normalizeOrchestratorMissionId,
+  ORCHESTRATOR_SESSION_LEASE_TTL_MS,
   releaseOrchestratorSession,
   releaseOrchestratorSessionForMission,
+  renewOrchestratorSessionLease,
   resetOrchestratorSessionServiceForTests,
   ORCHESTRATOR_SESSION_OPS,
   OrchestratorSessionGovernedError,
@@ -23,10 +37,14 @@ import {
 } from './orchestrator-session.js';
 
 /**
- * SO-02 tests. Hermetic: every test points the module-level singleton at a
- * fresh, unique journal path under active/shared/tmp/ (never the governed
- * default path), via `resetOrchestratorSessionServiceForTests` — mirrors the
- * KD-03 `worker-state-journal.test.ts` unique-tmp-journal pattern.
+ * SO-02/SO-03 tests. Hermetic: every test points the module-level singleton
+ * at a fresh, unique journal path under active/shared/tmp/ (never the
+ * governed default path), via `resetOrchestratorSessionServiceForTests` —
+ * mirrors the KD-03 `worker-state-journal.test.ts` unique-tmp-journal
+ * pattern. SO-03 additionally routes through work-coordination for the
+ * mission-ownership claim, so every test also runs under a dedicated
+ * work-coordination namespace (mirrors work-coordination.test.ts) — never
+ * the shared default store.
  */
 
 const TMP_DIR = `active/shared/tmp/so02-tests-${process.pid}`;
@@ -50,6 +68,8 @@ beforeEach(() => {
   previousPersona = process.env.KYBERION_PERSONA;
   delete process.env.MISSION_ROLE;
   delete process.env.KYBERION_PERSONA;
+  setWorkCoordinationNamespace(`orchestrator-session-so03-tests-${process.pid}`);
+  clearWorkCoordinationStore();
   resetOrchestratorSessionServiceForTests(nextJournalPath());
 });
 
@@ -58,6 +78,8 @@ afterEach(() => {
   else process.env.MISSION_ROLE = previousMissionRole;
   if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
   else process.env.KYBERION_PERSONA = previousPersona;
+  clearWorkCoordinationStore();
+  clearWorkCoordinationNamespace();
 });
 
 afterAll(() => cleanupTmpDir());
@@ -294,6 +316,198 @@ describe('orchestrator-session — one owner per mission', () => {
     expect(second.status).toBe('active');
     expect(second.session_id).not.toBe(first.session_id);
     expect(getActiveSessionForMission(missionId)?.session_id).toBe(second.session_id);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SO-03: cross-process mission-ownership claim fused into the ceremony
+// ---------------------------------------------------------------------------
+
+describe('orchestrator-session — SO-03 mission-ownership claim', () => {
+  it('createOrchestratorSession claims a mission-ownership work-item lease and stamps it on the record', () => {
+    const missionId = 'MSN-SO03-CLAIM-001';
+    const created = withExecutionContext('mission_controller', () =>
+      createOrchestratorSession({
+        surface: 'slack',
+        channel: 'C-claim',
+        threadTs: 'T-claim',
+        missionId,
+        ownerActor: 'operator-a',
+      })
+    );
+
+    expect(created.lease_id).toEqual(expect.any(String));
+    expect(created.ownership_item_id).toBe(deriveMissionOwnershipItemId(missionId));
+
+    const item = getWorkItem(deriveMissionOwnershipItemId(missionId));
+    expect(item).not.toBeNull();
+    expect(item?.claimed_by_peer_id).toBe('operator-a');
+    expect(item?.lease_id).toBe(created.lease_id);
+
+    const activeLeases = listActiveWorkLeases();
+    expect(activeLeases.some((lease) => lease.lease_id === created.lease_id)).toBe(true);
+  });
+
+  it('a concurrent claim on the same mission-ownership item (simulating a second process) is rejected as a lease conflict, enriched with the holder', () => {
+    const missionId = 'MSN-SO03-CLAIM-002';
+    const itemId = deriveMissionOwnershipItemId(missionId);
+
+    // Simulate a second process racing ahead of this one: it directly claims
+    // the ownership work-item (bypassing createOrchestratorSession/the
+    // journal entirely, exactly like a genuinely different OS process would)
+    // before this process's createOrchestratorSession ever runs.
+    createWorkItem({
+      itemId,
+      title: `Mission ownership: ${missionId}`,
+      description: 'pre-existing claim simulating a second process',
+      projectId: 'orchestrator-sessions',
+    });
+    claimWorkItem({
+      itemId,
+      actorPeerId: 'other-process-operator',
+      purpose: 'mission_ownership',
+      ttlMs: ORCHESTRATOR_SESSION_LEASE_TTL_MS,
+    });
+
+    let thrown: unknown;
+    try {
+      withExecutionContext('mission_controller', () =>
+        createOrchestratorSession({
+          surface: 'slack',
+          channel: 'C-claim-2',
+          threadTs: 'T-claim-2',
+          missionId,
+          ownerActor: 'operator-b',
+        })
+      );
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(OrchestratorSessionOwnershipConflictError);
+    const conflict = thrown as OrchestratorSessionOwnershipConflictError;
+    expect(conflict.missionId).toBe(normalizeOrchestratorMissionId(missionId));
+    expect(conflict.message).toContain('other-process-operator');
+
+    // No session/journal record was created for the losing attempt.
+    expect(getActiveSessionForMission(missionId)).toBeNull();
+  });
+
+  it('releaseOrchestratorSession releases the ownership lease best-effort', () => {
+    const missionId = 'MSN-SO03-RELEASE-001';
+    const created = withExecutionContext('mission_controller', () =>
+      createOrchestratorSession({
+        surface: 'slack',
+        channel: 'C-rel',
+        threadTs: 'T-rel',
+        missionId,
+        ownerActor: 'operator-a',
+      })
+    );
+    expect(listActiveWorkLeases().some((lease) => lease.lease_id === created.lease_id)).toBe(true);
+
+    withExecutionContext('mission_controller', () =>
+      releaseOrchestratorSession(created.session_id, 'explicit')
+    );
+
+    expect(listActiveWorkLeases().some((lease) => lease.lease_id === created.lease_id)).toBe(false);
+    // The item is free again: a new claim for the same mission succeeds.
+    const item = getWorkItem(deriveMissionOwnershipItemId(missionId));
+    expect(item?.status).not.toBe('in_progress');
+  });
+
+  it('releaseOrchestratorSession does not fail when the ownership lease is already gone (missing/foreign/expired)', () => {
+    const missionId = 'MSN-SO03-RELEASE-002';
+    const created = withExecutionContext('mission_controller', () =>
+      createOrchestratorSession({
+        surface: 'slack',
+        channel: 'C-rel-2',
+        threadTs: 'T-rel-2',
+        missionId,
+        ownerActor: 'operator-a',
+      })
+    );
+
+    // Simulate the lease already being gone by releasing it directly via
+    // work-coordination before the session release runs.
+    releaseWorkItem({
+      itemId: created.ownership_item_id!,
+      leaseId: created.lease_id!,
+      actorPeerId: 'operator-a',
+    });
+
+    const released = withExecutionContext('mission_controller', () =>
+      releaseOrchestratorSession(created.session_id, 'explicit')
+    );
+    expect(released?.status).toBe('released');
+  });
+
+  it('renewOrchestratorSessionLease extends the ownership lease expiry', () => {
+    const missionId = 'MSN-SO03-RENEW-001';
+    const created = withExecutionContext('mission_controller', () =>
+      createOrchestratorSession({
+        surface: 'slack',
+        channel: 'C-renew',
+        threadTs: 'T-renew',
+        missionId,
+        ownerActor: 'operator-a',
+      })
+    );
+    const before = getWorkItem(deriveMissionOwnershipItemId(missionId));
+    const beforeLease = listActiveWorkLeases().find((lease) => lease.lease_id === created.lease_id);
+    expect(beforeLease).toBeDefined();
+
+    const renewed = withExecutionContext('mission_controller', () =>
+      renewOrchestratorSessionLease(created.session_id)
+    );
+    expect(renewed.lease_id).toBe(created.lease_id);
+    expect(new Date(renewed.expires_at).getTime()).toBeGreaterThanOrEqual(
+      new Date(beforeLease!.expires_at).getTime()
+    );
+    expect(before?.claimed_by_peer_id).toBe('operator-a');
+  });
+
+  it('renewOrchestratorSessionLease fails closed outside mission_controller context', () => {
+    const missionId = 'MSN-SO03-RENEW-002';
+    const created = withExecutionContext('mission_controller', () =>
+      createOrchestratorSession({
+        surface: 'slack',
+        channel: 'C-renew-2',
+        threadTs: 'T-renew-2',
+        missionId,
+        ownerActor: 'operator-a',
+      })
+    );
+    expect(() => renewOrchestratorSessionLease(created.session_id)).toThrow(
+      OrchestratorSessionGovernedError
+    );
+  });
+
+  it('renewOrchestratorSessionLease throws for an unknown/released session', () => {
+    expect(() =>
+      withExecutionContext('mission_controller', () =>
+        renewOrchestratorSessionLease('surface-does-not-exist')
+      )
+    ).toThrow(/is not active/);
+  });
+
+  it('a journal record without lease_id/ownership_item_id (pre-SO-03 shape) still parses via restore', () => {
+    const journalPath = nextJournalPath();
+    const journal = new OrchestratorSessionJournal({ journalPath });
+    journal.append(ORCHESTRATOR_SESSION_OPS.sessionCreated, {
+      session_id: 'surface-pre-so03',
+      surface: 'terminal',
+      mission_id: 'MSN-SO03-BACKCOMPAT-001',
+      owner_actor: 'operator-a',
+      created_at: '2026-07-25T00:00:00.000Z',
+      // no lease_id / ownership_item_id — mirrors a record written before SO-03
+    });
+
+    const restored = journal.restore();
+    const record = restored.sessions['surface-pre-so03'];
+    expect(record).toBeDefined();
+    expect(record.status).toBe('active');
+    expect(record.lease_id).toBeUndefined();
+    expect(record.ownership_item_id).toBeUndefined();
   });
 });
 
