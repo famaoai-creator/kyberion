@@ -1978,6 +1978,24 @@ export type {
   KnowledgeUsageAggregateEntry,
 } from './src/knowledge-feedback-loop.js';
 
+// KP-06: effectiveness-driven curation + freshness SLO report, built from
+// KP-05's delivery/usage aggregate. Candidates only — no auto demotion.
+export {
+  computeCurationReport,
+  generateKnowledgeCurationReport,
+  loadCurationSloConfig,
+  renderCurationReportMarkdown,
+  writeCurationReport,
+  knowledgeCurationReportPath,
+  knowledgeCurationSloConfigPath,
+} from './src/knowledge-curation-report.js';
+export type {
+  CurationSloConfig,
+  CurationLowYieldHint,
+  CurationFreshnessBreach,
+  KnowledgeCurationReport,
+} from './src/knowledge-curation-report.js';
+
 // JSON repair (Paper2Any pattern — lightweight structural repair before LLM escalation)
 export { tryRepairJson, repairJsonString } from './json-repair.js';
 

@@ -24,6 +24,7 @@ import {
   resolveVision,
   type GoldenRulePriority,
   curateBackgroundReviewProposals,
+  generateKnowledgeCurationReport,
 } from '@agent/core';
 import * as path from 'node:path';
 import { assignWisdomContextValue, mergeWisdomContext } from './contracts/wisdom-context.js';
@@ -1216,6 +1217,16 @@ export async function dispatchDecisionOp(
         dryRun: rawDryRun === true || String(rawDryRun).toLowerCase() === 'true',
       });
       return { handled: true, ctx: assign(result) };
+    }
+
+    case 'curation_report': {
+      // KP-06: effectiveness-driven curation + freshness SLO reporting.
+      // Deterministic, no reasoning backend — computes from the KP-05
+      // delivery/usage aggregate + corpus frontmatter and overwrites
+      // CURATION_REPORT.md. Candidates only (KM-03 guardrail): no file is
+      // deleted, archived, or demoted here.
+      const { report, reportPath } = generateKnowledgeCurationReport();
+      return { handled: true, ctx: assign({ ...report, report_path: reportPath }) };
     }
 
     case 'distill': {
