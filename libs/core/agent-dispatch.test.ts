@@ -29,6 +29,10 @@ vi.mock('./a2a-bridge.js', () => ({
 const recordGovernanceAction = vi.fn();
 vi.mock('./kill-switch.js', () => ({
   recordGovernanceAction: (...args: unknown[]) => recordGovernanceAction(...args),
+  // XP-06: delegation-concurrency.ts dynamic-imports this at the top of
+  // every dispatch to wire kill-switch cascade termination; a no-op
+  // unsubscribe keeps that wiring quiet in tests that don't care about it.
+  onKillSwitchTermination: vi.fn(() => () => {}),
 }));
 
 /** Minimal fake backend that records delegation and supports tool-use opt-in. */
@@ -423,5 +427,95 @@ describe('HarnessSubagentDispatcher (CT-02)', () => {
     expect(wrapped).not.toBe(backend);
     expect(wrapped).toBeInstanceOf(DispatchingReasoningBackend);
     expect(wrapped.name).toBe('fake+harness-subagent');
+  });
+});
+
+/**
+ * XP-06: `dispatchWithConcurrencyGovernance` (agent-dispatch.ts) wraps every
+ * dispatcher's `dispatch()` with `withDelegationSlot` + `withWallClockBudget`
+ * from `delegation-concurrency.ts`. These tests exercise the wiring itself
+ * (provider resolution, serialization under a saturated cap) — the
+ * semaphore/budget mechanics themselves are covered exhaustively in
+ * `delegation-concurrency.test.ts`.
+ */
+describe('XP-06 delegation concurrency governance (agent-dispatch wiring)', () => {
+  beforeEach(async () => {
+    const { resetDelegationConcurrencyStateForTests } = await import('./delegation-concurrency.js');
+    resetDelegationConcurrencyStateForTests();
+    delete process.env.KYBERION_DELEGATION_MAX_CONCURRENCY;
+    delete process.env.KYBERION_DELEGATION_PROVIDER_MAX_CONCURRENCY;
+    delete process.env.KYBERION_DELEGATION_PROVIDER_CAPS;
+  });
+
+  afterEach(async () => {
+    const { resetDelegationConcurrencyStateForTests } = await import('./delegation-concurrency.js');
+    resetDelegationConcurrencyStateForTests();
+  });
+
+  it('gates ProcessSpawnDispatcher.dispatch through the per-provider semaphore keyed by backend.name', async () => {
+    process.env.KYBERION_DELEGATION_PROVIDER_MAX_CONCURRENCY = '1';
+    const backend = makeFakeBackend();
+    (backend as any).name = 'claude-cli'; // providerIdForReasoningIdentifier -> 'claude'
+
+    const order: string[] = [];
+    let releaseFirst: () => void = () => {};
+    backend.delegateTask = vi
+      .fn()
+      .mockImplementationOnce(async (instruction: string) => {
+        order.push(`start:${instruction}`);
+        await new Promise<void>((resolve) => {
+          releaseFirst = resolve;
+        });
+        order.push(`end:${instruction}`);
+        return `spawned:${instruction}`;
+      })
+      .mockImplementationOnce(async (instruction: string) => {
+        order.push(`start:${instruction}`);
+        order.push(`end:${instruction}`);
+        return `spawned:${instruction}`;
+      });
+
+    const dispatcher = new ProcessSpawnDispatcher();
+    const first = dispatcher.dispatch('first', undefined, backend);
+    const second = dispatcher.dispatch('second', undefined, backend);
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    // The provider cap (1) is held by the first call — the second must still
+    // be queued, not running.
+    expect(order).toEqual(['start:first']);
+
+    releaseFirst();
+    const [out1, out2] = await Promise.all([first, second]);
+    expect(out1).toBe('spawned:first');
+    expect(out2).toBe('spawned:second');
+    expect(order).toEqual(['start:first', 'end:first', 'start:second', 'end:second']);
+  });
+
+  it("buckets an unrecognized backend name under the shared 'unknown' provider", async () => {
+    const { getDelegationConcurrencyStats } = await import('./delegation-concurrency.js');
+    const backend = makeFakeBackend(); // name: 'fake' — not a known provider identifier
+    await new ProcessSpawnDispatcher().dispatch('do it', undefined, backend);
+    const stats = getDelegationConcurrencyStats();
+    expect(stats.providers.unknown).toBeDefined();
+  });
+
+  it('applies the same governance to InSessionDispatcher and HarnessSubagentDispatcher without double-wrapping their internal process-spawn fallback', async () => {
+    process.env.KYBERION_DELEGATION_PROVIDER_MAX_CONCURRENCY = '1';
+    const backend = makeFakeBackend({ withTools: false }); // forces InSessionDispatcher's fallback path
+    (backend as any).name = 'codex-cli';
+
+    // If the fallback path re-entered the semaphore for the same provider
+    // while the outer governance wrapper still held its slot, this would
+    // hang forever instead of resolving.
+    await expect(new InSessionDispatcher().dispatch('do Y', undefined, backend)).resolves.toBe(
+      'spawned:do Y'
+    );
+
+    const dispatcher = new HarnessSubagentDispatcher({
+      loadRuntime: async () => {
+        throw new Error('sdk unavailable');
+      },
+    });
+    await expect(dispatcher.dispatch('do X', 'ctx', backend)).resolves.toBe('spawned:do X');
   });
 });
