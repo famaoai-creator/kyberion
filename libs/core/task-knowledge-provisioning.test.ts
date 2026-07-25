@@ -152,6 +152,41 @@ describe('provisionTaskKnowledge', () => {
     expect(result.text).toBe(renderMissionContextPack(pack));
   });
 
+  // KP-04: estimatedScope is additive on ResolveMissionContextPackInput —
+  // provisionTaskKnowledge does no scope-specific logic itself, it just
+  // forwards whatever it's given straight to resolveMissionContextPack
+  // (which owns the actual scope -> hint-count/budget mapping, covered by
+  // mission-context-pack.test.ts's "KP-04 scope-linked budgets" suite).
+  it('forwards estimatedScope through to resolveMissionContextPack untouched', async () => {
+    const pack = buildFixturePack();
+    mocks.resolveMissionContextPack.mockResolvedValue(pack);
+
+    await provisionTaskKnowledge({
+      form: 'pack',
+      missionId: pack.scope.mission_id,
+      teamRole: 'implementer',
+      estimatedScope: 'L',
+    });
+
+    expect(mocks.resolveMissionContextPack).toHaveBeenCalledWith(
+      expect.objectContaining({ estimatedScope: 'L' })
+    );
+  });
+
+  it('omitting estimatedScope forwards no such field (byte-identical to pre-KP-04 callers)', async () => {
+    const pack = buildFixturePack();
+    mocks.resolveMissionContextPack.mockResolvedValue(pack);
+
+    await provisionTaskKnowledge({
+      form: 'pack',
+      missionId: pack.scope.mission_id,
+      teamRole: 'implementer',
+    });
+
+    const callArgs = mocks.resolveMissionContextPack.mock.calls[0]?.[0];
+    expect(callArgs).not.toHaveProperty('estimatedScope');
+  });
+
   it('defaults to form "pack" when the form option is omitted', async () => {
     const pack = buildFixturePack();
     mocks.resolveMissionContextPack.mockResolvedValue(pack);

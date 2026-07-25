@@ -329,6 +329,12 @@ export interface BuildMissionContextPackInput {
   knowledgeHints?: MissionContextPackKnowledgeHint[];
   contextPackId?: string;
   contextBudgetChars?: number;
+  /**
+   * KP-04: when `contextBudgetChars` is not explicitly supplied, the prune
+   * budget is derived from `SCOPE_KNOWLEDGE_BUDGETS[estimatedScope]`. Omitted
+   * = `M` (pre-KP-04 default of 6000), so existing callers are unaffected.
+   */
+  estimatedScope?: 'S' | 'M' | 'L';
 }
 
 export interface ResolveMissionContextPackInput {
@@ -350,6 +356,12 @@ export interface ResolveMissionContextPackInput {
   trackRecord?: ProjectTrackRecord | null;
   contextPackId?: string;
   contextBudgetChars?: number;
+  /**
+   * KP-04: scales both the knowledge hint count and (absent an explicit
+   * `contextBudgetChars`) the prune budget via `SCOPE_KNOWLEDGE_BUDGETS`.
+   * Omitted = `M`, matching pre-KP-04 behavior byte-for-byte.
+   */
+  estimatedScope?: 'S' | 'M' | 'L';
 }
 
 let missionStateValidateFn: ValidateFunction | null = null;
@@ -411,8 +423,13 @@ function buildTaskGuidance(input: {
   missionTeamAssignment?: MissionTeamAssignment | null;
   artifactHints?: MissionContextPackArtifactHint[];
 }): MissionContextPackTaskGuidance | undefined {
-  const modelTier = mapTaskModelTier(input.missionTeamAssignment?.model_hint?.tier);
-  if (modelTier !== 'fast') return undefined;
+  // KP-04: task_guidance is generated for every model tier, not just `fast`
+  // — the acceptance criteria / output contract / verification checklist is
+  // just as useful to a standard/deep-tier worker. `standard` is the
+  // fallback when no model hint resolved at all (no missionTeamAssignment),
+  // since guidance content itself does not vary by tier here (the pruning
+  // path already handles budget overflow for any tier).
+  const modelTier = mapTaskModelTier(input.missionTeamAssignment?.model_hint?.tier) ?? 'standard';
 
   const successCriteria = [
     ...(input.missionState.outcome_contract?.success_criteria || []),
@@ -950,7 +967,31 @@ function loadTrackStateIfPossible(input: {
   return loadProjectTrackRecord(candidate);
 }
 
-const KNOWLEDGE_HINT_LIMIT = 3;
+/**
+ * KP-04: hint count and pack char budget scale with the task's
+ * `estimated_scope` (S/M/L). Declared as a single map — not scattered
+ * literals — so the scope ↔ budget relationship stays visible in one place.
+ * `M` reproduces the pre-KP-04 defaults exactly (flat hint limit 3, prune
+ * budget 6000 — see the pre-KP-04 `KNOWLEDGE_HINT_LIMIT` constant and
+ * `pruneMissionContextPack`'s default), so any caller that omits
+ * `estimatedScope` (every caller before KP-04) gets byte-identical behavior.
+ */
+export const SCOPE_KNOWLEDGE_BUDGETS: Record<
+  'S' | 'M' | 'L',
+  { hintLimit: number; contextBudgetChars: number }
+> = {
+  S: { hintLimit: 2, contextBudgetChars: 4000 },
+  M: { hintLimit: 3, contextBudgetChars: 6000 },
+  L: { hintLimit: 5, contextBudgetChars: 9000 },
+};
+
+function resolveScopeBudget(scope?: 'S' | 'M' | 'L'): {
+  hintLimit: number;
+  contextBudgetChars: number;
+} {
+  return SCOPE_KNOWLEDGE_BUDGETS[scope ?? 'M'] ?? SCOPE_KNOWLEDGE_BUDGETS.M;
+}
+
 const PINNED_EXCERPT_MAX_CHARS = 400;
 
 /**
@@ -1027,6 +1068,11 @@ export interface LoadKnowledgeHintsInput {
    * (repo-relative). Defaults to `knowledge/product/governance/knowledge-slices.json`.
    */
   knowledgeSlicesPath?: string;
+  /**
+   * KP-04: scales the hint budget via `SCOPE_KNOWLEDGE_BUDGETS`. Omitted =
+   * `M` (pre-KP-04 default of 3).
+   */
+  estimatedScope?: 'S' | 'M' | 'L';
 }
 
 /**
@@ -1038,8 +1084,9 @@ export interface LoadKnowledgeHintsInput {
  * `findRelevantDistilledKnowledge`, filtered by the slice's `exclude` globs
  * and re-prioritized by its `search_roots`. When no slice matches, or the
  * manifest is missing/invalid, this reduces to exactly the pre-KP-03
- * behavior (flat top-`KNOWLEDGE_HINT_LIMIT` search, no pinning/filtering) —
- * `resolveKnowledgeSlice` fails open, so no explicit branch is needed here.
+ * behavior (flat top-N search scaled by `SCOPE_KNOWLEDGE_BUDGETS`, no
+ * pinning/filtering) — `resolveKnowledgeSlice` fails open, so no explicit
+ * branch is needed here.
  */
 export async function loadKnowledgeHintsIfPossible(
   input: LoadKnowledgeHintsInput
@@ -1082,14 +1129,15 @@ export async function loadKnowledgeHintsIfPossible(
     slicesPath: input.knowledgeSlicesPath,
   });
 
+  const hintLimit = resolveScopeBudget(input.estimatedScope).hintLimit;
   const pinnedHints: MissionContextPackKnowledgeHint[] = [];
   for (const pinnedPath of slice.pinned) {
-    if (pinnedHints.length >= KNOWLEDGE_HINT_LIMIT) break;
+    if (pinnedHints.length >= hintLimit) break;
     const hint = loadPinnedKnowledgeHint(pinnedPath);
     if (hint) pinnedHints.push(hint);
   }
 
-  const remaining = KNOWLEDGE_HINT_LIMIT - pinnedHints.length;
+  const remaining = hintLimit - pinnedHints.length;
   if (remaining <= 0) return pinnedHints;
 
   // Over-fetch when exclude globs are in play so post-filtering can still fill the budget.
@@ -1510,13 +1558,19 @@ export function buildMissionContextPack(input: BuildMissionContextPackInput): Mi
     redactions: defaultRedactions(),
     delivery: {
       mode: 'prompt',
+      // KP-04: task_guidance is generated for every tier now, not just
+      // `fast`, so this no longer distinguishes "fast-lane" from plain.
       summary: taskGuidance
-        ? 'Role-scoped mission context pack with fast-lane guidance. Full Kyberion knowledge and unrelated operational state are intentionally omitted.'
+        ? 'Role-scoped mission context pack with task guidance. Full Kyberion knowledge and unrelated operational state are intentionally omitted.'
         : 'Role-scoped mission context pack. Full Kyberion knowledge and unrelated operational state are intentionally omitted.',
     },
   };
 
-  const prunedPack = pruneMissionContextPack(pack, input.contextBudgetChars, missionPath);
+  // KP-04: an explicit budget always wins; otherwise scale by estimated_scope
+  // (M = pre-KP-04 default, so omitting both leaves behavior unchanged).
+  const effectiveBudgetChars =
+    input.contextBudgetChars ?? resolveScopeBudget(input.estimatedScope).contextBudgetChars;
+  const prunedPack = pruneMissionContextPack(pack, effectiveBudgetChars, missionPath);
   const validate = ensureMissionContextPackValidator();
   if (!validate(prunedPack)) {
     throw new Error(`Invalid mission context pack: ${validationErrors(validate).join('; ')}`);
@@ -1579,6 +1633,7 @@ export async function resolveMissionContextPack(
           teamRole: input.teamRole,
           workItem,
           taskSession,
+          ...(input.estimatedScope ? { estimatedScope: input.estimatedScope } : {}),
         });
 
   return buildMissionContextPack({
@@ -1595,6 +1650,7 @@ export async function resolveMissionContextPack(
     knowledgeHints,
     ...(input.contextBudgetChars ? { contextBudgetChars: input.contextBudgetChars } : {}),
     ...(input.contextPackId ? { contextPackId: input.contextPackId } : {}),
+    ...(input.estimatedScope ? { estimatedScope: input.estimatedScope } : {}),
   });
 }
 
