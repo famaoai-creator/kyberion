@@ -91,18 +91,19 @@ Rules of thumb:
 
 ### Capability & Knowledge
 
-| Pipeline                             | pnpm shortcut         | Description                                                                 |
-| ------------------------------------ | --------------------- | --------------------------------------------------------------------------- |
-| `knowledge-sync`                     | `pnpm knowledge:sync` | Sync knowledge artifacts to public tier                                     |
-| `history-search-refresh`             | —                     | Refresh the public zero-LLM conversation/mission history index              |
-| `background-review-curator`          | —                     | Archive stale background-review proposals without deleting governed records |
-| `surface-capability-check`           | —                     | Verify the governed surface capability layer and bridge integrations        |
-| `list-capabilities`                  | —                     | Enumerate installed actuators and their ops                                 |
-| `assimilate-gateway-capability`      | —                     | Ingest an external gateway into the capability registry                     |
-| `assimilate-gateway-capability-test` | —                     | Smoke test for gateway assimilation                                         |
-| `assimilate-harness-capability`      | —                     | Ingest a harness-style capability bundle                                    |
-| `license-injection-inner`            | —                     | Inner stage of license key injection                                        |
-| `license-injection-outer`            | —                     | Outer stage of license key injection                                        |
+| Pipeline                             | pnpm shortcut                                                    | Description                                                                                                                                        |
+| ------------------------------------ | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `knowledge-sync`                     | `pnpm knowledge:sync`                                            | Sync knowledge artifacts to public tier                                                                                                            |
+| `knowledge-curation-weekly`          | `pnpm pipeline --input pipelines/knowledge-curation-weekly.json` | KP-06 weekly report: low-yield hints + freshness SLO breaches for knowledge_steward review (candidates only, `schedule.cron` Sun 03:00 Asia/Tokyo) |
+| `history-search-refresh`             | —                                                                | Refresh the public zero-LLM conversation/mission history index                                                                                     |
+| `background-review-curator`          | —                                                                | Archive stale background-review proposals without deleting governed records                                                                        |
+| `surface-capability-check`           | —                                                                | Verify the governed surface capability layer and bridge integrations                                                                               |
+| `list-capabilities`                  | —                                                                | Enumerate installed actuators and their ops                                                                                                        |
+| `assimilate-gateway-capability`      | —                                                                | Ingest an external gateway into the capability registry                                                                                            |
+| `assimilate-gateway-capability-test` | —                                                                | Smoke test for gateway assimilation                                                                                                                |
+| `assimilate-harness-capability`      | —                                                                | Ingest a harness-style capability bundle                                                                                                           |
+| `license-injection-inner`            | —                                                                | Inner stage of license key injection                                                                                                               |
+| `license-injection-outer`            | —                                                                | Outer stage of license key injection                                                                                                               |
 
 ### Verification
 

@@ -295,7 +295,44 @@ Every authority change should explain:
 - use event streams as the source of truth for operational reasoning
 - close the loop from reconciliation summary to surface delivery through the generic outbox
 
-## 11. Non-Goals
+## 11. Execution surface selection
+
+Kyberion offers two execution surfaces for delegated work, plus a hybrid:
+
+- **CLI subagent team mode** — subagents run inside the same CLI harness session (Claude Code Agent tool / Agent SDK `agents`), against the same CLI-independent contracts used everywhere else (task contracts, context packs, `task_result`).
+- **agent-runtime (A2A bridge)** — the runtime model described in §3–§8 of this document: mission leases, runtime resources, coordination store, event streams.
+- **Hybrid** — starts in one surface and escalates to the other mid-task.
+
+This section gives a deterministic rubric so opus/sonnet/haiku reach the same routing decision from the same inputs, mirroring the axis/threshold format of [AUTONOMOUS_MAINTENANCE_JUDGMENT](../../../docs/developer/AUTONOMOUS_MAINTENANCE_JUDGMENT.ja.md) §1.
+
+### 11.1 Axes and thresholds
+
+Score each axis 0 (favors CLI team) to 3 (favors agent-runtime). Judged by the **max axis, not the sum** — one axis at 3 forces agent-runtime regardless of the others.
+
+| Axis                   | 0 — CLI subagent team                                                  | 3 — agent-runtime (forces)                                                                      |
+| ---------------------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Expected duration      | Completes within one CLI session (per-session, minutes)                | Spans multiple days or must survive the session ending                                          |
+| Write volume           | Read-mostly (review, audit, investigation)                             | Write-heavy (multi-file edits, migrations, sustained mutation)                                  |
+| Recovery requirement   | No restart-resume needed; losing the session loses nothing durable     | Must survive crash/restart — needs KD-03 event-sourced journal replay                           |
+| Failure isolation      | Blast radius is one subagent's output, discardable on rejection        | A crash must not take down concurrent unrelated work (per-resource isolation)                   |
+| Approval / kill-switch | Harness tool permission (allowlist, `canUseTool`) is sufficient        | Needs Kyberion-native gates: mission lease revocation, kill-switch, cross-session isolation     |
+| Model diversity need   | Lens-diverse suffices (same model/provider, different vantage prompts) | True multi-provider best-of-N required to cancel systematic single-model bias → route via XP-07 |
+
+### 11.2 Decision rule
+
+- All axes ≤1 → **CLI subagent team mode**.
+- Any single axis = 3 → **agent-runtime** (hard threshold; no averaging).
+- Mixed 2s with no 3 → **hybrid**: start in CLI team mode, escalate to agent-runtime the moment a 3-condition appears (e.g., a read-mostly review spawns a write-heavy fix).
+- **CLI-team choice and cross-provider choice are orthogonal**: "which execution surface" (this rubric) and "single-provider lens diversity vs. true multi-provider best-of-N" (the model diversity axis) compose independently — a CLI team task can still fan its judge step out to XP-07 best-of-providers when only the model diversity axis reads 3.
+
+### 11.3 Caveats (apply even once the rubric picks CLI team)
+
+- **Single-process blast radius**: all subagents in a CLI team share the orchestrating CLI process. A crash, OOM, or hang in the host session takes every in-flight subagent with it — there is no per-subagent runtime isolation the way agent-runtime provides per resource.
+- **Harness-permission dependency**: CLI team governance rests on the harness's own tool-permission and approval mechanism, not a Kyberion-native kill-switch. Kyberion layers tier/approval gates on top (governed path), but cannot force-stop a CLI subagent the harness has already approved.
+
+See [CLI_SUBAGENT_TEAM_PLAN (CT-01–04)](../../../docs/developer/improvement-plans-2026-07/CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md) for the implementation and [CROSS_PROVIDER_EXECUTION_PLAN (XP-07)](../../../docs/developer/improvement-plans-2026-07/CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md) for the model-diversity axis.
+
+## 12. Non-Goals
 
 This model does not attempt to:
 

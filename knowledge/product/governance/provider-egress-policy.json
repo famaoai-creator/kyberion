@@ -1,0 +1,21 @@
+{
+  "$schema": "../schemas/provider-egress-policy.schema.json",
+  "version": "1.0.0",
+  "providers": {
+    "claude": { "egress": "external-api" },
+    "codex": { "egress": "external-api" },
+    "agy": { "egress": "external-api" },
+    "gemini": { "egress": "external-api" },
+    "copilot": { "egress": "external-api" }
+  },
+  "tier_policy": {
+    "confidential": {
+      "mode": "approved-only",
+      "approved_providers": ["claude"]
+    },
+    "personal": {
+      "mode": "local-only-or-approved",
+      "approved_providers": []
+    }
+  }
+}

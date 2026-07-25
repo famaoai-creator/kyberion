@@ -1,0 +1,101 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Knowledge Slices",
+  "description": "Task-profile-driven placement layer for knowledge provisioning (KP-03). Declares, per (team_role x phase x mission_type) matcher, which documents are always delivered (pinned), which subtrees to prioritise when searching (search_roots), and which paths are never delivered (exclude). Consumed by loadKnowledgeHintsIfPossible: resolve matching slices, deliver pinned first, then fill the remaining hint budget with search restricted/prioritised by search_roots and filtered by exclude. Sibling of knowledge-taxonomy.json: taxonomy.retrieval_priority gives kind-order defaults per phase; a slice's search_roots overrides that ordering with concrete subtree priorities for the matched task profile.",
+  "type": "object",
+  "required": ["version", "slices"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "Semver of this slice declaration format, mirroring knowledge-taxonomy.json. Bump minor for additive matchers, major for a change to precedence/merge semantics."
+    },
+    "description": {
+      "type": "string",
+      "description": "Free-text human note describing the intent of this slice set."
+    },
+    "slices": {
+      "type": "array",
+      "description": "Ordered list of slices. A request matches every slice whose declared matcher fields all equal the request value or are the wildcard '*'. PRECEDENCE / MERGE across the matching set: (1) `pinned` and `exclude` are UNIONED across all matching slices — additive, so a broad default exclude always still applies. (2) `pinned` order is most-specific-first (higher matcher specificity = more non-wildcard fields leads), ties broken by array order, then de-duplicated keeping first occurrence. (3) `search_roots` is MOST-SPECIFIC-WINS (not merged): the single most-specific matching slice that declares search_roots supplies the whole list; if it declares none, fall back to the next-most-specific that does. Specificity = count of non-wildcard fields in `match` (0-3); exact array order is the deterministic tie-breaker (later entry wins).",
+      "items": { "$ref": "#/definitions/slice" }
+    }
+  },
+  "definitions": {
+    "matcherToken": {
+      "type": "string",
+      "description": "A concrete value matched case-sensitively against the request, or '*' to match any value. Omitting a field from `match` is equivalent to '*'.",
+      "pattern": "^(\\*|[a-z][a-z0-9_]*)$"
+    },
+    "phaseToken": {
+      "type": "string",
+      "description": "A governance phase (see knowledge/product/governance/phases/) or '*' for any phase.",
+      "enum": ["alignment", "execution", "onboarding", "recovery", "review", "*"]
+    },
+    "pinnedPath": {
+      "type": "string",
+      "description": "Repo-relative POSIX path to a single knowledge FILE that is always delivered when the slice matches. Must live under knowledge/ and be a concrete .md or .json file (no globs, no directories). Pinned documents are delivered before search results and COUNT AGAINST THE HINT BUDGET FIRST: the provisioner reserves budget for pinned entries in declared order, then fills the remainder with search. If pinned entries alone exceed the budget, later pinned entries are dropped in reverse order (least specific / last declared first) — pins are a priority claim, not an exemption from the budget.",
+      "pattern": "^knowledge/.+\\.(md|json)$"
+    },
+    "searchRoot": {
+      "type": "string",
+      "description": "Repo-relative POSIX subtree prefix (must end with '/') under knowledge/ whose documents are prioritised by retrieval for the matched profile, overriding taxonomy.retrieval_priority ordering. Directory prefix only — no file extension, no glob.",
+      "pattern": "^knowledge/(.+/)?$"
+    },
+    "excludeGlob": {
+      "type": "string",
+      "description": "Repo-relative POSIX glob under knowledge/ whose matching documents are NEVER delivered (neither pinned nor searched) for the matched profile. '*' matches within a path segment. Excludes are unioned across all matching slices and always win over pinned/search.",
+      "pattern": "^knowledge/[A-Za-z0-9_./*\\-]+$"
+    },
+    "slice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["match"],
+      "description": "One placement rule. Must declare at least one directive (pinned, search_roots, or exclude).",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Optional stable human-readable label for logs and tests."
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional rationale note (e.g. why a subtree is excluded)."
+        },
+        "match": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Selector over the dispatch-time task profile. Any omitted field is treated as '*' (matches all). An all-wildcard match is the default slice applied to every task.",
+          "properties": {
+            "team_role": { "$ref": "#/definitions/matcherToken" },
+            "phase": { "$ref": "#/definitions/phaseToken" },
+            "mission_type": { "$ref": "#/definitions/matcherToken" }
+          }
+        },
+        "pinned": {
+          "type": "array",
+          "description": "Documents always delivered when this slice matches, in delivery-priority order. See pinnedPath for budget interaction.",
+          "items": { "$ref": "#/definitions/pinnedPath" },
+          "minItems": 1
+        },
+        "search_roots": {
+          "type": "array",
+          "description": "Subtrees to prioritise during the budget-remainder search, overriding taxonomy.retrieval_priority for the matched profile. Most-specific-wins, not merged.",
+          "items": { "$ref": "#/definitions/searchRoot" },
+          "minItems": 1
+        },
+        "exclude": {
+          "type": "array",
+          "description": "Globs never delivered for the matched profile. Unioned across matching slices.",
+          "items": { "$ref": "#/definitions/excludeGlob" },
+          "minItems": 1
+        }
+      },
+      "anyOf": [
+        { "required": ["pinned"] },
+        { "required": ["search_roots"] },
+        { "required": ["exclude"] }
+      ]
+    }
+  }
+}

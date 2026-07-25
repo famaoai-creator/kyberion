@@ -402,8 +402,8 @@
       "path": "libs/actuators/wisdom-actuator",
       "d": "Knowledge-tier search, injection, import/export, and decision-support operations",
       "s": "implemented",
-      "version": "1.3.0",
-      "capability_count": 78,
+      "version": "1.4.0",
+      "capability_count": 79,
       "ops": [
         "a2a_fanout",
         "a2a_roleplay",
@@ -417,6 +417,7 @@
         "counterparty_roleplay",
         "cross_critique",
         "curate_background_review",
+        "curation_report",
         "decompose_into_tasks",
         "deploy_release",
         "derive_test_inventory",

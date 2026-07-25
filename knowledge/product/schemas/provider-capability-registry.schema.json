@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "provider-capability-registry.schema.json",
+  "description": "Persisted TTL-cached snapshot of libs/core/provider-capability-registry.ts (XP-01), stored at active/shared/runtime/provider-capability-registry.json.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "computed_at": { "type": "string", "format": "date-time" },
+    "ttl_ms": { "type": "integer", "minimum": 0 },
+    "value": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/providerCapability" }
+    }
+  },
+  "required": ["computed_at", "ttl_ms", "value"],
+  "$defs": {
+    "providerCapability": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "provider_id": { "type": "string", "minLength": 1 },
+        "binary_found": { "type": "boolean" },
+        "authenticated": {
+          "anyOf": [{ "type": "boolean" }, { "const": "unknown" }]
+        },
+        "headless": { "type": "boolean" },
+        "structured_output": { "type": "boolean" },
+        "models": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "probed_at": { "type": "string", "format": "date-time" },
+        "probe_error": { "type": "string" }
+      },
+      "required": [
+        "provider_id",
+        "binary_found",
+        "authenticated",
+        "headless",
+        "structured_output",
+        "models",
+        "probed_at"
+      ]
+    }
+  }
+}

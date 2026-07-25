@@ -28,7 +28,7 @@ interface Policy {
   allowlist_patterns?: string[];
 }
 
-interface Violation {
+export interface Violation {
   file: string;
   line: number;
   pattern: string;
@@ -106,7 +106,12 @@ function globToRegex(glob: string): RegExp {
   return new RegExp(`^(?:${parts.join('|')})$`);
 }
 
-function walk(root: string, current: string, collected: string[], structuralViolations: Violation[]): void {
+function walk(
+  root: string,
+  current: string,
+  collected: string[],
+  structuralViolations: Violation[]
+): void {
   let entries: string[];
   try {
     entries = safeReaddir(path.join(root, current));
@@ -116,7 +121,7 @@ function walk(root: string, current: string, collected: string[], structuralViol
   for (const entry of entries) {
     const rel = current ? `${current}/${entry}` : entry;
     const fullPath = path.join(root, rel);
-    
+
     // Check structural constraints for knowledge tier (KM-04)
     if (rel.startsWith('knowledge/')) {
       if (entry === '.git' && rel !== '.git') {
@@ -142,7 +147,7 @@ function walk(root: string, current: string, collected: string[], structuralViol
     if (entry.startsWith('.') || entry === 'node_modules' || entry === 'dist') {
       continue;
     }
-    
+
     let stat;
     try {
       stat = safeLstat(fullPath);
@@ -157,6 +162,116 @@ function walk(root: string, current: string, collected: string[], structuralViol
   }
 }
 
+// ── KP-07: persistent-tier (personal / confidential) test-fixture pollution ──
+//
+// knowledge/personal/ and knowledge/confidential/ are gitignored — they hold
+// the operator's real, locally-generated identity, vision, and promoted
+// memory, never committed to the repo. A test that writes fixture content
+// straight into those real paths (instead of a temp dir / customer overlay)
+// permanently pollutes the operator's live knowledge store. This complements
+// the structural MSN-TEST- directory-name check in walk() above by scanning
+// *file content* under the persistent tier (plus the committed, generated
+// HINTS.md) for known fixture signatures.
+
+const PERSISTENT_TIER_ROOT_RE = /^knowledge\/(personal|confidential)\//;
+const HINTS_PATH = 'knowledge/product/governance/HINTS.md';
+
+export const PERSISTENT_TIER_FIXTURE_PATTERNS: DeniedPattern[] = [
+  {
+    name: 'test-mission-slug',
+    regex: '\\bMSN-TEST-[A-Z0-9-]*\\b',
+    rationale:
+      'MSN-TEST-* mission slug found in persistent-tier content. A test wrote/promoted a ' +
+      'fixture mission into the real knowledge store instead of a temp dir / customer overlay.',
+  },
+  {
+    name: 'sovereign-test-placeholder',
+    regex: '"sovereign"\\s*:\\s*"test"',
+    rationale:
+      'my-identity.json (or similar) holds the literal test placeholder {"sovereign":"test",...} ' +
+      'instead of a real onboarding-generated identity — a test overwrote the real profile.',
+  },
+];
+
+/**
+ * Splits a governed HINTS.md-style file into `## <header>` sections and
+ * groups them by normalized body (header line and any `source_ref:` line
+ * stripped, since those legitimately vary per promotion even when the
+ * underlying hint is a repeated duplicate). Returns only groups with more
+ * than one member — i.e. actual duplicates.
+ */
+export function findDuplicateHintsSections(
+  content: string
+): Array<{ headers: string[]; count: number }> {
+  const sectionRe = /\n## ([^\n]+)\n([\s\S]*?)(?=\n## |$)/g;
+  const bySignature = new Map<string, string[]>();
+  let match: RegExpExecArray | null;
+  const padded = content.startsWith('\n') ? content : `\n${content}`;
+  while ((match = sectionRe.exec(padded)) !== null) {
+    const header = match[1].trim();
+    const signature = match[2]
+      .split('\n')
+      .filter((line) => !line.trim().startsWith('source_ref:'))
+      .join('\n')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!signature) continue;
+    const headers = bySignature.get(signature) ?? [];
+    headers.push(header);
+    bySignature.set(signature, headers);
+  }
+  return [...bySignature.values()]
+    .filter((headers) => headers.length > 1)
+    .map((headers) => ({ headers, count: headers.length }));
+}
+
+export function scanPersistentTierFixturePollution(root: string, files: string[]): Violation[] {
+  const violations: Violation[] = [];
+  const targets = files.filter((rel) => PERSISTENT_TIER_ROOT_RE.test(rel) || rel === HINTS_PATH);
+
+  for (const rel of targets) {
+    let content: string;
+    try {
+      content = safeReadFile(path.join(root, rel), { encoding: 'utf8' }) as string;
+    } catch {
+      // Fail-open: an unreadable file is not this check's concern.
+      continue;
+    }
+
+    for (const pattern of PERSISTENT_TIER_FIXTURE_PATTERNS) {
+      const re = new RegExp(pattern.regex, 'gu');
+      let match: RegExpExecArray | null;
+      while ((match = re.exec(content)) !== null) {
+        violations.push({
+          file: rel,
+          line: lineAt(content, match.index),
+          pattern: pattern.name,
+          matched: match[0],
+          rationale: pattern.rationale,
+        });
+        if (re.lastIndex === match.index) re.lastIndex += 1;
+      }
+    }
+
+    if (rel === HINTS_PATH) {
+      for (const group of findDuplicateHintsSections(content)) {
+        violations.push({
+          file: rel,
+          line: 0,
+          pattern: 'duplicate-hints-section',
+          matched: `${group.count}x: ${group.headers.join(', ')}`,
+          rationale:
+            'Duplicate HINTS.md sections with identical body content (differing only by header ' +
+            'id / source_ref) indicate a test repeatedly promoted the same fixture into the ' +
+            'governed hints file instead of using an isolated HINTS path.',
+        });
+      }
+    }
+  }
+
+  return violations;
+}
+
 export async function scan(): Promise<Violation[]> {
   const policy = await loadPolicy();
   const root = pathResolver.rootDir();
@@ -167,10 +282,26 @@ export async function scan(): Promise<Violation[]> {
   const allFiles: string[] = [];
   const violations: Violation[] = [];
   walk(root, '', allFiles, violations);
+  // NOTE (KP-07): scanPersistentTierFixturePollution() / findDuplicateHintsSections()
+  // above extend this module to detect test-fixture pollution in the
+  // persistent tier (knowledge/personal/, knowledge/confidential/) and
+  // HINTS.md duplication. They are intentionally NOT wired into this
+  // default scan(): knowledge/personal/ is gitignored, per-machine local
+  // state (secure-io additionally role-gates reads to it — see
+  // security-policy.json's "Sovereign Sanctuary"), so folding it into the
+  // shared `pnpm check:tier-hygiene` / `pnpm run validate` gate would make
+  // CI fail based on this box's local onboarding state rather than
+  // anything in the git tree, and would trip concurrently-running agents
+  // sharing this checkout. See tests/knowledge-store-purity.test.ts for
+  // hermetic, seeded-fixture coverage of both functions, and STATUS.md for
+  // the current pollution inventory / cleanup record. A caller that wants
+  // this enforced against the live tree can call
+  // scanPersistentTierFixturePollution(pathResolver.rootDir(), allFiles)
+  // directly, ideally wrapped in withExecutionContext('ecosystem_architect', ...)
+  // so the personal/confidential tier is actually readable.
 
   const files = allFiles.filter(
-    (rel) =>
-      scanRegexes.some((re) => re.test(rel)) && !skipRegexes.some((re) => re.test(rel)),
+    (rel) => scanRegexes.some((re) => re.test(rel)) && !skipRegexes.some((re) => re.test(rel))
   );
 
   const allowlist = buildAllowlist(policy);
@@ -192,7 +323,7 @@ export async function scan(): Promise<Violation[]> {
         // Expand match window to include enclosing allowlist tokens
         const window = content.slice(
           Math.max(0, match.index - 40),
-          Math.min(content.length, match.index + match[0].length + 40),
+          Math.min(content.length, match.index + match[0].length + 40)
         );
         if (isAllowlisted(window, allowlist)) continue;
         violations.push({
@@ -216,7 +347,7 @@ export async function scan(): Promise<Violation[]> {
         const hit = content.slice(idx, idx + needle.length);
         const window = content.slice(
           Math.max(0, idx - 40),
-          Math.min(content.length, idx + needle.length + 40),
+          Math.min(content.length, idx + needle.length + 40)
         );
         if (!isAllowlisted(window, allowlist)) {
           violations.push({
@@ -249,14 +380,13 @@ export async function main(): Promise<void> {
   console.error('');
   console.error(
     'Fix by moving the value into knowledge/confidential/{org}/ and using a placeholder (${VAR} / <PLACEHOLDER>) in public. ' +
-      'Legitimate industry terms should be added to allowlist_patterns in the tier-hygiene-policy.',
+      'Legitimate industry terms should be added to allowlist_patterns in the tier-hygiene-policy.'
   );
   process.exit(1);
 }
 
 const isDirectExecution =
-  process.argv[1] != null &&
-  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+  process.argv[1] != null && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 
 if (isDirectExecution) {
   main().catch((err) => {

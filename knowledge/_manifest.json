@@ -111,7 +111,7 @@
     {
       "path": "product/architecture/agent-mission-control-model.md",
       "tier": "public",
-      "size": 6627,
+      "size": 10903,
       "type": "md"
     },
     {
@@ -993,7 +993,7 @@
     {
       "path": "product/governance/actuator-op-registry.json",
       "tier": "public",
-      "size": 16101,
+      "size": 16128,
       "type": "json"
     },
     {
@@ -1263,7 +1263,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 66527,
+      "size": 70102,
       "type": "json"
     },
     {
@@ -1471,10 +1471,22 @@
       "type": "json"
     },
     {
+      "path": "product/governance/knowledge-curation-slo.json",
+      "tier": "public",
+      "size": 259,
+      "type": "json"
+    },
+    {
       "path": "product/governance/knowledge-protocol.md",
       "tier": "public",
       "size": 3168,
       "type": "md"
+    },
+    {
+      "path": "product/governance/knowledge-slices.json",
+      "tier": "public",
+      "size": 1361,
+      "type": "json"
     },
     {
       "path": "product/governance/knowledge-sync-rules.json",
@@ -1714,6 +1726,12 @@
       "path": "product/governance/multi-agent-development-sop.md",
       "tier": "public",
       "size": 8248,
+      "type": "md"
+    },
+    {
+      "path": "product/governance/multi-provider-coexecution-contract.md",
+      "tier": "public",
+      "size": 6203,
       "type": "md"
     },
     {
@@ -2005,6 +2023,12 @@
       "type": "json"
     },
     {
+      "path": "product/governance/provider-egress-policy.json",
+      "tier": "public",
+      "size": 543,
+      "type": "json"
+    },
+    {
       "path": "product/governance/qa-rules.json",
       "tier": "public",
       "size": 545,
@@ -2091,7 +2115,7 @@
     {
       "path": "product/governance/security-policy.json",
       "tier": "public",
-      "size": 19148,
+      "size": 19235,
       "type": "json"
     },
     {
@@ -2985,7 +3009,7 @@
     {
       "path": "product/orchestration/actuator-op-discovery.json",
       "tier": "public",
-      "size": 76751,
+      "size": 76833,
       "type": "json"
     },
     {
@@ -3321,7 +3345,7 @@
     {
       "path": "product/orchestration/global_actuator_index.json",
       "tier": "public",
-      "size": 17734,
+      "size": 17761,
       "type": "json"
     },
     {
@@ -5517,7 +5541,7 @@
     {
       "path": "product/roles/knowledge_steward/PROCEDURE.md",
       "tier": "public",
-      "size": 1658,
+      "size": 3576,
       "type": "md"
     },
     {
@@ -6445,6 +6469,18 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/knowledge-curation-slo.schema.json",
+      "tier": "public",
+      "size": 1280,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/knowledge-slices.schema.json",
+      "tier": "public",
+      "size": 6385,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/knowledge-taxonomy.schema.json",
       "tier": "public",
       "size": 1889,
@@ -7141,6 +7177,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/provider-capability-registry.schema.json",
+      "tier": "public",
+      "size": 1471,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/provider-capability-scan-policy.schema.json",
       "tier": "public",
       "size": 1663,
@@ -7156,6 +7198,12 @@
       "path": "product/schemas/provider-config.schema.json",
       "tier": "public",
       "size": 3492,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/provider-egress-policy.schema.json",
+      "tier": "public",
+      "size": 3102,
       "type": "json"
     },
     {

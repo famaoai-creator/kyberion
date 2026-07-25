@@ -194,6 +194,35 @@ export interface TaskAcceptanceEvidence {
   evidence: string;
 }
 
+/**
+ * KP-05: optional bridge back from a worker's task_result to the knowledge
+ * provisioning loop — which delivered `knowledge_hints` (by document path,
+ * see `MissionContextPackKnowledgeHint.path` in mission-context-pack.ts)
+ * actually helped, and which topics the worker needed but were not
+ * delivered. Absent entirely on older/other-form responses; parsing must
+ * stay backward compatible (additive-only field, see
+ * TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25.ja.md KP-05).
+ */
+export interface TaskResultKnowledgeFeedback {
+  used?: string[];
+  not_used?: string[];
+  missing_topics?: string[];
+}
+
+/**
+ * XP-05 (CROSS_PROVIDER_EXECUTION_PLAN): optional provenance stamp — which
+ * reasoning provider/mode actually served the delegation that produced this
+ * task_result, and whether that required a failover switch away from the
+ * primary candidate. Sourced from `getLastServedReasoningMode()` in
+ * reasoning-backend.ts. Additive-only: absent entirely on pre-XP-05
+ * task_results, and parsing must stay backward compatible.
+ */
+export interface TaskResultProvenance {
+  provider?: string;
+  mode?: string;
+  failover?: boolean;
+}
+
 export interface TaskResultBlock {
   summary: string;
   artifacts: TaskResultArtifact[];
@@ -202,6 +231,8 @@ export interface TaskResultBlock {
   needs: string[];
   acceptance_evidence?: TaskAcceptanceEvidence[];
   review_findings?: TaskReviewFinding[];
+  knowledge_feedback?: TaskResultKnowledgeFeedback;
+  provenance?: TaskResultProvenance;
 }
 
 export interface A2ATaskContext {

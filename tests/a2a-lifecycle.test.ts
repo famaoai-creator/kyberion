@@ -9,11 +9,27 @@ process.env.KYBERION_KNOWLEDGE_ROOT = TEST_KNOWLEDGE_ROOT;
 
 const AGENT_ID = 'Test-Agent-X';
 const LEDGER_PATH = pathResolver.knowledge('personal/governance/agent-trust-scores.json');
-const IDENTITY_PATH = pathResolver.knowledge('personal/my-identity.json');
 const RUN_ID = Date.now();
 
+// KP-07 (knowledge-store hygiene): mission_controller's checkPrerequisites()
+// gates mission creation on a full "sovereign profile" (my-identity.json +
+// my-vision.md + agent-identity.json) resolved via resolveActiveProfileRoot()
+// (scripts/refactor/mission-state.ts). That resolver honors KYBERION_CUSTOMER
+// as a profile-root override (libs/core/customer-resolver.ts: customerRoot()),
+// so this suite points the gate at an isolated `customer/{slug}/` overlay
+// instead of writing fixture identity content into the real
+// knowledge/personal/ tier — writing there was the root cause of
+// knowledge/personal/my-identity.json being clobbered with `{"sovereign":
+// "test", ...}` on every full test-suite run (KM-04 persistent-tier
+// pollution). runMissionController() forwards this env var to the
+// mission_controller.js subprocess via `env: { ...process.env, ... }`.
+const CUSTOMER_SLUG = `a2a-lifecycle-test-${RUN_ID}`;
+process.env.KYBERION_CUSTOMER = CUSTOMER_SLUG;
+const PROFILE_ROOT = path.join(process.cwd(), 'customer', CUSTOMER_SLUG);
+const IDENTITY_PATH = path.join(PROFILE_ROOT, 'my-identity.json');
+
 function ensurePersonalFixtures() {
-  fs.mkdirSync(path.dirname(IDENTITY_PATH), { recursive: true });
+  fs.mkdirSync(PROFILE_ROOT, { recursive: true });
   fs.mkdirSync(path.dirname(LEDGER_PATH), { recursive: true });
   fs.writeFileSync(
     IDENTITY_PATH,
@@ -23,11 +39,11 @@ function ensurePersonalFixtures() {
   // (my-identity.json + my-vision.md + agent-identity.json) — a dev box has
   // them from onboarding, a fresh CI checkout does not.
   fs.writeFileSync(
-    path.join(path.dirname(IDENTITY_PATH), 'my-vision.md'),
+    path.join(PROFILE_ROOT, 'my-vision.md'),
     '# Sovereign Vision\n\nTest fixture vision.\n'
   );
   fs.writeFileSync(
-    path.join(path.dirname(IDENTITY_PATH), 'agent-identity.json'),
+    path.join(PROFILE_ROOT, 'agent-identity.json'),
     JSON.stringify({ agent_id: 'test-agent', version: '1.0.0', trust_tier: 'sovereign' }, null, 2)
   );
   if (!safeExistsSync(LEDGER_PATH)) fs.writeFileSync(LEDGER_PATH, JSON.stringify({}, null, 2));
@@ -52,6 +68,11 @@ describe.sequential('A2A Mission Lifecycle & Trust Engine Integration', () => {
 
   afterAll(() => {
     fs.rmSync(TEST_KNOWLEDGE_ROOT, { recursive: true, force: true });
+    // KP-07: remove the isolated customer overlay used for the sovereign
+    // profile gate (see CUSTOMER_SLUG above) and restore the env var so it
+    // never leaks into other test files sharing this worker process.
+    fs.rmSync(PROFILE_ROOT, { recursive: true, force: true });
+    delete process.env.KYBERION_CUSTOMER;
     // Missions created via the real mission_controller land in the REAL
     // personal missions tier — remove this run's fixtures so test debris does
     // not accumulate in the operator home view.

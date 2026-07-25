@@ -1,23 +1,62 @@
 import { a2aBridge } from './a2a-bridge.js';
 import { logger } from './core.js';
 import {
+  SUBAGENT_PROFILE_CLI_TOOLS,
   describeSubagentCapabilityCatalog,
   getSubagentCapabilityProfile,
   listSubagentCapabilityProfileNames,
+  type SubagentCapabilityProfile,
 } from './subagent-capability-profiles.js';
 import {
   advanceToolCallRepeatGovernor,
   createToolCallRepeatGovernorState,
   type ToolCallRepeatGovernorState,
 } from './tool-call-repeat-governor.js';
+import { getDefaultWorkerEventStream, type WorkerEventStream } from './worker-event-stream.js';
+import {
+  withDelegationSlot,
+  withWallClockBudget,
+  wireDelegationKillSwitchIntegration,
+} from './delegation-concurrency.js';
+import { providerIdForReasoningIdentifier } from './provider-egress-gate.js';
 import type {
   ReasoningBackend,
+  ReasoningCallOptions,
   ToolDefinition,
   GenerateWithToolsResult,
 } from './reasoning-backend.js';
+import type { ClaudeAgentTaskParams, ClaudeAgentTaskResult } from './claude-agent-query.js';
+import type { GovernedAgentPromptInput } from './claude-agent-governance.js';
+import type { CanUseTool, McpServerConfig } from '@anthropic-ai/claude-agent-sdk';
 
 /** Default tier for an in-session delegation that does not name one (backward compatible). */
 const DEFAULT_SUBAGENT_PROFILE = 'implementer';
+
+/**
+ * XP-06: best-effort provider id for concurrency/budget bucketing. An
+ * unresolved backend name shares the 'unknown' bucket (still governed by the
+ * global cap) rather than skipping governance entirely.
+ */
+function resolveDelegationProvider(backend: ReasoningBackend): string {
+  return providerIdForReasoningIdentifier(backend.name) ?? 'unknown';
+}
+
+/**
+ * XP-06 choke point shared by all three dispatchers: a global + per-provider
+ * concurrency semaphore and a wall-clock budget around the same unit of
+ * work each `dispatch()` implementation already did. See
+ * `delegation-concurrency.ts` for the "why env config, why no real child
+ * handle yet" design notes.
+ */
+function dispatchWithConcurrencyGovernance<T>(
+  backend: ReasoningBackend,
+  fn: () => Promise<T>
+): Promise<T> {
+  // Fire-and-forget, memoized — cheap after the first call.
+  wireDelegationKillSwitchIntegration();
+  const provider = resolveDelegationProvider(backend);
+  return withDelegationSlot({ provider }, () => withWallClockBudget({ provider }, fn));
+}
 
 /**
  * Agent dispatch (agent-runtime plane).
@@ -34,12 +73,17 @@ export interface AgentDispatcher {
   /**
    * Hand a task to a sub-agent and return its result.
    * `backend` is the cognition substrate available for planning the dispatch
-   * (tool-use) and as a delegation fallback.
+   * (tool-use) and as a delegation fallback. `options` is the same call-level
+   * options bag `ReasoningBackend.delegateTask` already accepts (role/profile
+   * hint, budget, ...); it is optional so every pre-existing dispatcher
+   * implementation (which predates this parameter) remains a valid
+   * implementation without change — CT-02 backward compatibility.
    */
   dispatch(
     instruction: string,
     context: string | undefined,
-    backend: ReasoningBackend
+    backend: ReasoningBackend,
+    options?: ReasoningCallOptions
   ): Promise<string>;
 }
 
@@ -55,7 +99,9 @@ export class ProcessSpawnDispatcher implements AgentDispatcher {
     context: string | undefined,
     backend: ReasoningBackend
   ): Promise<string> {
-    return backend.delegateTask(instruction, context);
+    return dispatchWithConcurrencyGovernance(backend, () =>
+      backend.delegateTask(instruction, context)
+    );
   }
 }
 
@@ -76,7 +122,17 @@ export class InSessionDispatcher implements AgentDispatcher {
   private repeatGovernor: ToolCallRepeatGovernorState = createToolCallRepeatGovernorState();
   private pendingRepeatReminder: string | undefined;
 
-  async dispatch(
+  dispatch(
+    instruction: string,
+    context: string | undefined,
+    backend: ReasoningBackend
+  ): Promise<string> {
+    return dispatchWithConcurrencyGovernance(backend, () =>
+      this.dispatchInner(instruction, context, backend)
+    );
+  }
+
+  private async dispatchInner(
     instruction: string,
     context: string | undefined,
     backend: ReasoningBackend
@@ -87,7 +143,13 @@ export class InSessionDispatcher implements AgentDispatcher {
       logger.warn(
         '[agent-dispatch:in-session] Base backend lacks generateWithTools — falling back to process-spawn delegation.'
       );
-      return this.fallback.dispatch(instruction, context, backend);
+      // XP-06: call the backend directly rather than `this.fallback.dispatch`
+      // — `dispatchInner` already runs inside `dispatchWithConcurrencyGovernance`
+      // (see `dispatch()` above), and `ProcessSpawnDispatcher.dispatch` applies
+      // that same governance itself; nesting the two would double-count (and,
+      // under a saturated per-provider cap, self-deadlock: the outer slot
+      // would never free while waiting on an inner acquire from the same pool).
+      return backend.delegateTask(instruction, context);
     }
 
     // KD-05: the tier catalog is rebuilt from the registry on every dispatch,
@@ -150,7 +212,9 @@ export class InSessionDispatcher implements AgentDispatcher {
             true
           );
           this.repeatGovernor = createToolCallRepeatGovernorState();
-          return this.fallback.dispatch(instruction, context, backend);
+          // XP-06: see the comment on the other fallback path above — call
+          // the backend directly to avoid nesting concurrency governance.
+          return backend.delegateTask(instruction, context);
         }
         if (decision.reminder) {
           logger.warn(`[agent-dispatch:in-session] [repeat-governor] ${decision.reminder}`);
@@ -215,6 +279,193 @@ export class InSessionDispatcher implements AgentDispatcher {
 }
 
 /**
+ * The governed Agent SDK runtime pieces {@link HarnessSubagentDispatcher} needs.
+ * Loaded lazily (see {@link loadDefaultGovernedRuntime}) so importing this
+ * module never touches the real `@anthropic-ai/claude-agent-sdk` package —
+ * only an actual `dispatch()` call does, and only when
+ * `KYBERION_HARNESS_SUBAGENT=1` selects this dispatcher. Tests inject a fake
+ * runtime (or a rejecting loader, to simulate "SDK unavailable") via the
+ * constructor, so they never load the real SDK either.
+ */
+interface GovernedHarnessRuntime {
+  runTask: (params: ClaudeAgentTaskParams) => Promise<ClaudeAgentTaskResult>;
+  buildGovernedAgentSystemPrompt: (input: GovernedAgentPromptInput) => string;
+  buildKyberionMcpServerConfig: () => Record<string, McpServerConfig>;
+  createKyberionCanUseTool: () => CanUseTool;
+  /** Advisory allowlist ceiling (GOVERNED_AGENT_ALLOWED_TOOLS); canUseTool is the real enforcer. */
+  allowedTools: readonly string[];
+}
+
+async function loadDefaultGovernedRuntime(): Promise<GovernedHarnessRuntime> {
+  const [{ runClaudeAgentTask }, governance] = await Promise.all([
+    import('./claude-agent-query.js'),
+    import('./claude-agent-governance.js'),
+  ]);
+  return {
+    runTask: runClaudeAgentTask,
+    buildGovernedAgentSystemPrompt: governance.buildGovernedAgentSystemPrompt,
+    buildKyberionMcpServerConfig: governance.buildKyberionMcpServerConfig,
+    createKyberionCanUseTool: governance.createKyberionCanUseTool,
+    allowedTools: governance.GOVERNED_AGENT_ALLOWED_TOOLS,
+  };
+}
+
+/** Intersect a KD-05 tier's CLI tool projection with the governed ceiling. */
+function resolveHarnessAllowedTools(
+  profileName: string,
+  governedCeiling: readonly string[]
+): string[] {
+  const tierTools =
+    SUBAGENT_PROFILE_CLI_TOOLS[profileName] ?? SUBAGENT_PROFILE_CLI_TOOLS[DEFAULT_SUBAGENT_PROFILE];
+  return tierTools.filter((tool) => governedCeiling.includes(tool));
+}
+
+export interface HarnessSubagentDispatcherDeps {
+  /**
+   * Seam replacing {@link loadDefaultGovernedRuntime}. Tests inject a fake
+   * runtime to keep the real Agent SDK out of the test process entirely; a
+   * rejecting loader deterministically exercises the SDK-unavailable
+   * fallback without needing to uninstall or unmock anything.
+   */
+  loadRuntime?: () => Promise<GovernedHarnessRuntime>;
+}
+
+/**
+ * CT-02: dispatches delegated tasks through the CLI harness's own Agent SDK
+ * sub-agent mechanism (Direction B / governed path — `runClaudeAgentTask` +
+ * Kyberion MCP + `canUseTool` + governed system prompt), applying a KD-05
+ * capability profile: the profile's `allowedOps` tier is projected onto the
+ * SDK's `allowedTools` (intersected with `GOVERNED_AGENT_ALLOWED_TOOLS`,
+ * which stays the real ceiling — `canUseTool` enforces it) and its
+ * `systemPromptPrefix` is prepended to the sub-agent's system prompt.
+ *
+ * Selected via `KYBERION_HARNESS_SUBAGENT=1` (see {@link maybeWrapWithDispatcher}).
+ * Fail-open: if the Agent SDK is unavailable at runtime (import/probe
+ * failure), dispatch falls back to {@link ProcessSpawnDispatcher} exactly
+ * like {@link InSessionDispatcher}'s own fallback — the env flag must never
+ * hard-fail a delegation.
+ */
+export class HarnessSubagentDispatcher implements AgentDispatcher {
+  readonly name = 'harness-subagent';
+  /** Typed as the interface (not the concrete class) so the 4-arg dispatch call below type-checks. */
+  private readonly fallback: AgentDispatcher = new ProcessSpawnDispatcher();
+  private readonly loadRuntime: () => Promise<GovernedHarnessRuntime>;
+
+  constructor(deps: HarnessSubagentDispatcherDeps = {}) {
+    this.loadRuntime = deps.loadRuntime ?? loadDefaultGovernedRuntime;
+  }
+
+  dispatch(
+    instruction: string,
+    context: string | undefined,
+    backend: ReasoningBackend,
+    options?: ReasoningCallOptions
+  ): Promise<string> {
+    return dispatchWithConcurrencyGovernance(backend, () =>
+      this.dispatchInner(instruction, context, backend, options)
+    );
+  }
+
+  private async dispatchInner(
+    instruction: string,
+    context: string | undefined,
+    backend: ReasoningBackend,
+    options?: ReasoningCallOptions
+  ): Promise<string> {
+    const stream = getDefaultWorkerEventStream();
+    const profile = this.resolveProfile(options);
+
+    this.emit(stream, 'subagent_begin', {
+      dispatcher: this.name,
+      profile: profile.name,
+    });
+
+    let runtime: GovernedHarnessRuntime;
+    try {
+      runtime = await this.loadRuntime();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      logger.warn(
+        `[agent-dispatch:harness-subagent] Agent SDK unavailable (${message}) — falling back to process-spawn delegation.`
+      );
+      this.emit(stream, 'subagent_end', {
+        dispatcher: this.name,
+        profile: profile.name,
+        status: 'fallback',
+        fallback_to: this.fallback.name,
+        reason: message,
+      });
+      // XP-06: call the backend directly rather than `this.fallback.dispatch`
+      // — this method already runs inside `dispatchWithConcurrencyGovernance`
+      // (see `dispatch()` below), and nesting it via `ProcessSpawnDispatcher`
+      // would double-wrap (and risk self-deadlock under a saturated
+      // per-provider cap). `this.fallback` is kept only for its `.name`.
+      return backend.delegateTask(instruction, context);
+    }
+
+    try {
+      const result = await runtime.runTask({
+        systemPrompt: runtime.buildGovernedAgentSystemPrompt({
+          base: profile.systemPromptPrefix,
+          missionContext: context,
+        }),
+        userPrompt: `Task: ${instruction}`,
+        mcpServers: runtime.buildKyberionMcpServerConfig(),
+        allowedTools: resolveHarnessAllowedTools(profile.name, runtime.allowedTools),
+        canUseTool: runtime.createKyberionCanUseTool(),
+      });
+      this.emit(stream, 'subagent_end', {
+        dispatcher: this.name,
+        profile: profile.name,
+        status: 'success',
+      });
+      return result.text;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      logger.error(`[agent-dispatch:harness-subagent] Delegation failed: ${message}`);
+      this.emit(stream, 'subagent_end', {
+        dispatcher: this.name,
+        profile: profile.name,
+        status: 'failure',
+        error: message,
+      });
+      throw err;
+    }
+  }
+
+  /**
+   * KD-05 tier resolution: `options.profile` (falling back to `options.role`
+   * for callers that only set the governed-role hint) names the tier;
+   * unset or unrecognized both degrade to the historical default
+   * ({@link DEFAULT_SUBAGENT_PROFILE}) rather than failing the dispatch —
+   * matching {@link InSessionDispatcher}'s own degrade-not-fail rule.
+   */
+  private resolveProfile(options?: ReasoningCallOptions): SubagentCapabilityProfile {
+    const requested = options?.profile || options?.role || DEFAULT_SUBAGENT_PROFILE;
+    try {
+      return getSubagentCapabilityProfile(requested);
+    } catch {
+      logger.warn(
+        `[agent-dispatch:harness-subagent] Unknown profile "${requested}" — falling back to "${DEFAULT_SUBAGENT_PROFILE}".`
+      );
+      return getSubagentCapabilityProfile(DEFAULT_SUBAGENT_PROFILE);
+    }
+  }
+
+  private emit(
+    stream: WorkerEventStream,
+    type: 'subagent_begin' | 'subagent_end',
+    payload: Record<string, unknown>
+  ): void {
+    try {
+      stream.emit(type, payload);
+    } catch {
+      // Event stream projection is best-effort; it must never break dispatch.
+    }
+  }
+}
+
+/**
  * A reasoning backend decorator whose `delegateTask` routes through the agent-runtime
  * dispatch plane, while every cognition op forwards verbatim to the wrapped base
  * backend. This keeps `delegateTask` on the {@link ReasoningBackend} interface (so all
@@ -231,8 +482,12 @@ export class DispatchingReasoningBackend implements ReasoningBackend {
     this.name = `${base.name}+${dispatcher.name}`;
   }
 
-  delegateTask(instruction: string, context?: string): Promise<string> {
-    return this.dispatcher.dispatch(instruction, context, this.base);
+  delegateTask(
+    instruction: string,
+    context?: string,
+    options?: ReasoningCallOptions
+  ): Promise<string> {
+    return this.dispatcher.dispatch(instruction, context, this.base, options);
   }
 
   // --- cognition substrate: forward verbatim to the wrapped base backend ---
@@ -272,8 +527,14 @@ export class DispatchingReasoningBackend implements ReasoningBackend {
   }
 }
 
-/** Select the dispatch strategy from the environment (default: process-spawn). */
+/**
+ * Select the dispatch strategy from the environment (default: process-spawn).
+ * `KYBERION_HARNESS_SUBAGENT=1` (CT-02) takes precedence over
+ * `KYBERION_IN_SESSION_SUBAGENT=1` when both are set — the harness path is
+ * the more capable / more governed of the two opt-ins.
+ */
 export function selectAgentDispatcher(env: NodeJS.ProcessEnv = process.env): AgentDispatcher {
+  if (env.KYBERION_HARNESS_SUBAGENT === '1') return new HarnessSubagentDispatcher();
   if (env.KYBERION_IN_SESSION_SUBAGENT === '1') return new InSessionDispatcher();
   return new ProcessSpawnDispatcher();
 }
@@ -287,6 +548,10 @@ export function maybeWrapWithDispatcher(
   backend: ReasoningBackend,
   env: NodeJS.ProcessEnv = process.env
 ): ReasoningBackend {
+  if (env.KYBERION_HARNESS_SUBAGENT === '1') {
+    logger.success('[agent-dispatch] ⚡ Harness sub-agent dispatch enabled (CT-02)');
+    return new DispatchingReasoningBackend(backend, new HarnessSubagentDispatcher());
+  }
   if (env.KYBERION_IN_SESSION_SUBAGENT === '1') {
     logger.success('[agent-dispatch] ⚡ In-Session sub-agent dispatch enabled');
     return new DispatchingReasoningBackend(backend, new InSessionDispatcher());

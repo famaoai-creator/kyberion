@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { logger } from './core.js';
 import { getIntentExtractor, resetIntentExtractor } from './intent-extractor.js';
 import { getReasoningBackend, resetReasoningBackend } from './reasoning-backend.js';
 import {
@@ -31,12 +32,23 @@ const mockProviders = vi.hoisted(() => {
   };
 });
 
+// XP-01: no snapshot by default so every pre-existing test in this file keeps
+// exercising the exact pre-XP-01 candidate-construction behavior. Individual
+// tests override the return value to exercise the narrowing path.
+const mockCapabilityRegistry = vi.hoisted(() => ({
+  peekProviderCapabilityRegistry: vi.fn(() => null as any),
+}));
+
 vi.mock('./provider-discovery.js', () => ({
   discoverProviders: mockProviders.discoverProviders,
 }));
 
 vi.mock('./capability-broker.js', () => ({
   resolveProviderDecision: mockProviders.resolveProviderDecision,
+}));
+
+vi.mock('./provider-capability-registry.js', () => ({
+  peekProviderCapabilityRegistry: mockCapabilityRegistry.peekProviderCapabilityRegistry,
 }));
 
 describe('reasoning-bootstrap', () => {
@@ -85,6 +97,9 @@ describe('reasoning-bootstrap', () => {
     delete process.env.KYBERION_OPENROUTER_REQUIRED_PARAMETERS;
     delete process.env.KYBERION_OPENROUTER_URL;
     mockProviders.setProviders(mockProviders.defaultProviders);
+    mockCapabilityRegistry.peekProviderCapabilityRegistry.mockReset();
+    mockCapabilityRegistry.peekProviderCapabilityRegistry.mockReturnValue(null);
+    delete process.env.KYBERION_PROVIDER_CAPABILITY_ROUTING;
   });
 
   it('installs codex-cli adapters when requested explicitly', () => {
@@ -220,6 +235,103 @@ describe('reasoning-bootstrap', () => {
     expect(normalizeReasoningBackendMode('gemini-api')).toBe('gemini-cli');
     expect(normalizeReasoningBackendMode('claude-agent')).toBe('claude-agent');
     expect(normalizeReasoningBackendMode('nemotron')).toBe('nemotron-api');
+  });
+
+  describe('XP-01 provider-capability-registry wiring', () => {
+    it('candidate construction is unchanged when no capability registry snapshot exists', () => {
+      // Default afterEach state: peekProviderCapabilityRegistry() -> null.
+      const installed = installReasoningBackends({ mode: 'codex-cli', force: true });
+
+      expect(installed).toBe(true);
+      expect(getInstalledReasoningMode()).toBe('codex-cli');
+      expect(getReasoningBackend().name).toBe('codex-cli');
+    });
+
+    it('excludes an unauthenticated provider from the failover chain when a snapshot is present', () => {
+      const infoSpy = vi.spyOn(logger, 'info');
+      mockCapabilityRegistry.peekProviderCapabilityRegistry.mockReturnValue([
+        {
+          provider_id: 'codex',
+          binary_found: true,
+          authenticated: false,
+          headless: true,
+          structured_output: true,
+          models: [],
+          probed_at: '2026-07-25T00:00:00.000Z',
+        },
+        {
+          provider_id: 'agy',
+          binary_found: true,
+          authenticated: true,
+          headless: true,
+          structured_output: true,
+          models: [],
+          probed_at: '2026-07-25T00:00:00.000Z',
+        },
+      ]);
+
+      // Fallback order is [codex-cli, agy-cli]; both always build a candidate
+      // (buildAgyCliBackendFromEnv never returns null), so codex-cli would be
+      // primary today. With codex excluded for authenticated=false, agy-cli
+      // must become primary.
+      const installed = installReasoningBackends({ mode: 'codex-cli', force: true });
+
+      expect(installed).toBe(true);
+      expect(getInstalledReasoningMode()).toBe('agy-cli');
+      expect(getReasoningBackend().name).toBe('agy-cli');
+      expect(infoSpy).toHaveBeenCalledWith(
+        expect.stringContaining('excluding candidate mode=codex-cli provider=codex')
+      );
+      infoSpy.mockRestore();
+    });
+
+    it('excludes a provider whose binary was not found', () => {
+      mockCapabilityRegistry.peekProviderCapabilityRegistry.mockReturnValue([
+        {
+          provider_id: 'codex',
+          binary_found: false,
+          authenticated: false,
+          headless: true,
+          structured_output: true,
+          models: [],
+          probed_at: '2026-07-25T00:00:00.000Z',
+        },
+        {
+          provider_id: 'agy',
+          binary_found: true,
+          authenticated: 'unknown',
+          headless: true,
+          structured_output: true,
+          models: [],
+          probed_at: '2026-07-25T00:00:00.000Z',
+        },
+      ]);
+
+      const installed = installReasoningBackends({ mode: 'codex-cli', force: true });
+
+      expect(installed).toBe(true);
+      expect(getInstalledReasoningMode()).toBe('agy-cli');
+    });
+
+    it('the KYBERION_PROVIDER_CAPABILITY_ROUTING=0 kill-switch restores fail-open behavior', () => {
+      process.env.KYBERION_PROVIDER_CAPABILITY_ROUTING = '0';
+      mockCapabilityRegistry.peekProviderCapabilityRegistry.mockReturnValue([
+        {
+          provider_id: 'codex',
+          binary_found: true,
+          authenticated: false,
+          headless: true,
+          structured_output: true,
+          models: [],
+          probed_at: '2026-07-25T00:00:00.000Z',
+        },
+      ]);
+
+      const installed = installReasoningBackends({ mode: 'codex-cli', force: true });
+
+      expect(installed).toBe(true);
+      expect(getInstalledReasoningMode()).toBe('codex-cli');
+    });
   });
 });
 

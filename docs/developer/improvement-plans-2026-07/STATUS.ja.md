@@ -54,15 +54,16 @@
 >    **2026-07-25追記**: タスク知識配給計画 KP-01〜07 を新設([TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25.ja.md](./TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25.ja.md)。origin/main `00485737` の実コード突合に基づく。MO-04/KM 系の後続ループとして、配給3経路の装備不均一(goal-driven 経路の context pack 非添付・`delegateTask` の素文字列 context)、一律 top-3 選定、trace `knowledgeRefs` 全空=帰還信号ゼロを解消する)。全件 TODO として追加し、DONE 99 / PARTIAL 30 / TODO 14 へ更新。
 >    **2026-07-25追記**: CLI サブエージェント・チーム計画 CT-01〜04 を新設([CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md](./CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md)。単一 LLM プロバイダ CLI 内で完結するチーム構成・連携を、既存契約(team-roles・KD-05・タスク契約・context pack・ファイル契約)の CLI ハーネスへの射影として構築する。新規は役割定義の生成儀式と `HarnessSubagentDispatcher` の2点のみ)。全件 TODO として追加し、DONE 99 / PARTIAL 30 / TODO 18 へ更新。
 >    **2026-07-25追記**: クロスプロバイダ実行計画 XP-01〜07 を新設([CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md](./CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md)。複数 LLM プロバイダ CLI の同一マシン併走に対し、能力プローブ registry・KD-05 権限射影 + env allowlist・tier×egress ゲート・同一ディレクトリ併走契約・縮退表面化 + provenance・並行予算・モデル分散 best-of-N を、プロバイダ中立の宣言 + adapter 射影として定める。CT の兄弟計画)。全件 TODO として追加し、DONE 99 / PARTIAL 30 / TODO 25 へ更新。
+>    **2026-07-25追記(実装ウェーブ)**: KP-01〜07・CT-01〜04・XP-01〜07 の全 18 件をサブエージェント委譲 + オーケストレータレビュー方式で実装した(5 ウェーブ、各タスクをレビュー・独立再検証してコミット)。KP 全 7 件・CT 全 4 件・XP-02/03 を DONE、XP-01/04/05/06/07 を PARTIAL(各行の残作業参照)とした。最終ゲート: 842 テストファイル / 5,136 テスト全緑・typecheck/build 緑・op-registry/catalogs/契約 semver 緑。付随修正: shell-claude の全 env 継承、KD-05 ツール表の実ドリフト、health-degradation テストの実ランタイム依存、a2a-lifecycle テストの personal tier 汚染(my-identity.json 書換の根本原因)。DONE 112 / PARTIAL 35 / TODO 7 へ更新。
 >    **判定基準**: DONE = 受入条件を実コードで検証済 / PARTIAL = 一部充足 / TODO = 実質未着手。
 
 ## サマリ
 
 | 判定    | 件数 |
 | ------- | ---- |
-| DONE    | 99   |
-| PARTIAL | 30   |
-| TODO    | 25   |
+| DONE    | 112  |
+| PARTIAL | 35   |
+| TODO    | 7    |
 
 ## P0 残作業(プロダクション化のクリティカルパス)
 
@@ -354,40 +355,40 @@
 
 正本: [TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25.ja.md](./TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25.ja.md)
 
-| ID    | 状態 | 残作業                                                                       |
-| ----- | ---- | ---------------------------------------------------------------------------- |
-| KP-01 | TODO | 配給 API の単一化(`provisionTaskKnowledge`)と goal-driven 経路への接続       |
-| KP-02 | TODO | `delegateTask` 呼び出し側の構造化ナレッジ装備(background-review/adf-repair)  |
-| KP-03 | TODO | タスクプロファイル駆動の知識スライス宣言(`knowledge-slices.json`)            |
-| KP-04 | TODO | 規模連動予算・task_guidance 全 tier 化・needs 起点の2巡目配給                |
-| KP-05 | TODO | trace `knowledgeRefs` 記録 + `task_result.knowledge_feedback` 帰還ループ     |
-| KP-06 | TODO | 週次キュレーション pipeline(delivered/used 集計・鮮度 SLO・降格候補)         |
-| KP-07 | TODO | corpus 純度ガード拡張(プレースホルダ distill 除外・persistent tier 汚染検知) |
+| ID    | 状態 | 残作業                                                                                                                                                                                                                                                                                                              |
+| ----- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| KP-01 | DONE | 2026-07-25 実装・検証済: `provisionTaskKnowledge`(pack/system_prompt/context_string 3形態)、単発 dispatch はバイト同一リファクタ、goal-driven へ stable-prefix systemPrompt 接続(fail-open)                                                                                                                         |
+| KP-02 | DONE | 2026-07-25 実装・検証済: background-review/adf-repair の delegateTask context にナレッジ節を追加(非ミッション scope marker で配給記録、fail-open)                                                                                                                                                                   |
+| KP-03 | DONE | 2026-07-25 実装・検証済: schema/instance/loader/配線 + GLOSSARY。残注記: `phase` の実運用供給が未配線のため instance は phase `*` で運用中(供給配線後に execution へ絞る)                                                                                                                                           |
+| KP-04 | DONE | 2026-07-25 実装・検証済: `SCOPE_KNOWLEDGE_BUDGETS`(S 2/4000・M 3/6000=旧既定・L 5/9000)、task_guidance 全 tier 化、needs 起点の2巡目差分配給(既配布 path 除外)                                                                                                                                                      |
+| KP-05 | DONE | 2026-07-25 実装・検証済: 配給 JSONL ログ + `task_result.knowledge_feedback`(additive)+ 使用集計 + missing_topics の promotion queue 投入 + mission_task_dispatch trace span の `knowledgeRefs` 記録                                                                                                                 |
+| KP-06 | DONE | 2026-07-25 実装・検証済: 決定論 op `wisdom:curation_report`(低効率候補 + kind 別鮮度 SLO、設定宣言)+ 週次 cron pipeline + steward 週次手順。降格実行は steward 承認のまま(KM-03 ガードレール)                                                                                                                       |
+| KP-07 | DONE | 2026-07-25 実装・検証済: プレースホルダ distill の検索隔離、purity テスト新設、`my-identity.json` 汚染の根本原因(a2a-lifecycle テストの実 tier 書込)修正、HINTS.md 重複解消。残注記: 実 tree への CI 常時強制は per-machine 状態のため意図的未配線(module 内に理由記載)。実 identity の再生成は `pnpm onboard` 待ち |
 
 ### CT(CLI サブエージェント・チーム)
 
 正本: [CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md](./CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md)
 
-| ID    | 状態 | 残作業                                                                              |
-| ----- | ---- | ----------------------------------------------------------------------------------- |
-| CT-01 | TODO | 役割→サブエージェント定義の生成儀式(SSoT 生成 + `--check` CI ドリフト検知)          |
-| CT-02 | TODO | `HarnessSubagentDispatcher` 追加と `maybeWrapWithDispatcher` 配線(呼び出し側無変更) |
-| CT-03 | TODO | ファイル契約のみでのチームフロー hermetic E2E(claim 排他・lens 分散レビュー)        |
-| CT-04 | TODO | 実行面の使い分け決定論ルーブリックと GLOSSARY/architecture 文書化                   |
+| ID    | 状態 | 残作業                                                                                                                                                                          |
+| ----- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CT-01 | DONE | 2026-07-25 実装・検証済: `agents:generate`/`check:subagent-definitions`(SSoT 生成 + ドリフト検知)、security-policy へ狭域 allow_write 登録。後続で KD-05 ツール表を単一 SSoT 化 |
+| CT-02 | DONE | 2026-07-25 実装・検証済: `KYBERION_HARNESS_SUBAGENT=1` で governed SDK path + KD-05 プロファイル適用、SDK 不在 fallback、KC-02 イベント。残注記: 実 SDK での E2E は未実施       |
+| CT-03 | DONE | 2026-07-25 実装・検証済: hermetic E2E(upstream 伝播・claim 排他 `lease_conflict`・lens 分散多数決の MO-07 互換記録)。production ギャップ 0                                      |
+| CT-04 | DONE | 2026-07-25 実装・検証済: mission-control-model §11 実行面選択ルーブリック(max-axis 決定論)+ GLOSSARY。AGENTS.md 追記は計画どおり安定後に実施                                    |
 
 ### XP(クロスプロバイダ実行)
 
 正本: [CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md](./CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md)
 
-| ID    | 状態 | 残作業                                                                               |
-| ----- | ---- | ------------------------------------------------------------------------------------ |
-| XP-01 | TODO | 能力プローブ registry(headless/JSON/認証/モデル)と宣言ベースルーティング             |
-| XP-02 | TODO | KD-05 プロファイル → プロバイダ別 permission マッピング表 + 子プロセス env allowlist |
-| XP-03 | TODO | プロバイダ egress ラベル × tier 突合ゲート(委譲入口)                                 |
-| XP-04 | TODO | 読み書きマトリクスの正準化と全プロバイダ指示への射影・git write 遮断                 |
-| XP-05 | TODO | failover 切替の trace 契約化と成果物 provider/model provenance                       |
-| XP-06 | TODO | global semaphore・プロバイダ別上限・wall-clock 予算・ゾンビ回収                      |
-| XP-07 | TODO | 複数プロバイダ並列発注 + MO-07 judge 集約(`best-of-providers`)                       |
+| ID    | 状態    | 残作業                                                                                                                                                                                                                                            |
+| ----- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| XP-01 | PARTIAL | registry・schema・failover 絞り込み(不在時完全互換 + kill-switch)は実装・検証済。残: registry を定期生成する population ジョブ(baseline-check/chronos 統合)— 現状は明示呼び出しまで inert                                                         |
+| XP-02 | DONE    | 2026-07-25 実装・検証済: tier×provider マッピング表(planner×codex/agy は fail-closed)+ 子プロセス env allowlist(shell-claude の全 env 継承バグ修正)。後続で宣言 args の実 argv 配線も完了                                                         |
+| XP-03 | DONE    | 2026-07-25 実装・検証済: egress policy 宣言 + 配給入口/KP-02 呼出点のゲート(confidential/personal fail-closed、拒否は ops-alert)。残注記: provider 未解決時はゲート skip(登録外プロバイダ)                                                        |
+| XP-04 | PARTIAL | 正準文書 + AGENTS.md 不変条件 + gitignore(check-ignore 検証済)は完了。残: CT-01 生成のプロバイダ指示ファイルへのマトリクス射影                                                                                                                    |
+| XP-05 | PARTIAL | failover イベント JSONL・marker・throttle 付き warn・baseline 警告表示・`getLastServedReasoningMode`・`task_result.provenance` schema は実装・検証済。残: worker 永続点での provenance 刻印                                                       |
+| XP-06 | PARTIAL | semaphore(global/プロバイダ別)・wall-clock 予算・kill-switch 連動・janitor ゾンビ回収(dry-run 先行)は実装・検証済。fallback 二重取得の自己デッドロックも設計時解消。残: 実 backend の pid ハンドル公開(実プロセス強制終了と sweep 実プロデューサ) |
+| XP-07 | PARTIAL | `runBestOfProviders`(XP-01 候補×XP-03 ゲート×XP-06 slot、決定論 judge 既定、メタデータのみ永続で tier 漏洩防止、単一プロバイダ自然縮退)は実装・検証済。残: 実 per-provider backend resolver の配線                                                |
 
 ### CO(Company OS)
 

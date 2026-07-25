@@ -49,6 +49,8 @@
     "check:wisdom-forwarders": "node --import ./scripts/ts-loader.mjs scripts/check_wisdom_forwarders.ts",
     "generate:env-registry": "node --import ./scripts/ts-loader.mjs scripts/generate_env_registry.ts",
     "check:env-registry": "node --import ./scripts/ts-loader.mjs scripts/generate_env_registry.ts --check",
+    "agents:generate": "node --import ./scripts/ts-loader.mjs scripts/generate_subagent_definitions.ts",
+    "check:subagent-definitions": "node --import ./scripts/ts-loader.mjs scripts/generate_subagent_definitions.ts --check",
     "check:design-contrast": "node --import ./scripts/ts-loader.mjs scripts/check_design_contrast.ts",
     "check:apple-fm": "node --import ./scripts/ts-loader.mjs scripts/check_apple_fm.ts",
     "sync:intent-contract-memory": "node dist/scripts/sync_intent_contract_memory.js",

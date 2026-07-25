@@ -46,6 +46,7 @@ import {
   importExternalWorkItem,
   releaseWorkItem,
   updateWorkItem,
+  type WorkItem,
 } from './work-coordination.js';
 import { logger } from './core.js';
 import { buildWorkingPrinciplesLines, canonicalizeTeamRole } from './working-principles.js';
@@ -72,12 +73,15 @@ import { getDefaultWorkerEventStream, type WorkerEventStream } from './worker-ev
 import { buildExecutionEnv } from './authority.js';
 import { missionDir, missionEvidenceDir, rootDir } from './path-resolver.js';
 import { pathResolver } from './path-resolver.js';
+import { type MissionContextPackPruningSummary } from './mission-context-pack.js';
+import { provisionTaskKnowledge } from './task-knowledge-provisioning.js';
 import {
-  renderMissionContextPack,
-  resolveMissionContextPack,
-  saveMissionContextPack,
-  type MissionContextPackPruningSummary,
-} from './mission-context-pack.js';
+  recordKnowledgeDelivery,
+  recordKnowledgeUsageFeedback,
+  type DeliveredKnowledgeRef,
+} from './src/knowledge-feedback-loop.js';
+import { findRelevantDistilledKnowledge } from './distill-knowledge-injector.js';
+import { TraceContext, persistTrace } from './src/trace.js';
 import * as nodePath from 'node:path';
 import * as path from 'node:path';
 import {
@@ -1306,8 +1310,77 @@ function buildTaskExecutionPrompt(input: {
     resolveReviewTargetForTask(input.task)
       ? 'For review tasks, put concrete findings into review_findings[] using severity, location, and instruction. Keep gaps for unresolved blockers.'
       : 'Do not paste file contents. Include only conclusions, artifact paths, verification steps, gaps, and needs.',
+    // KP-05: optional bridge back to the knowledge provisioning loop — report
+    // which "Knowledge hints" above (by path) actually helped or didn't, and
+    // any topic you needed but were not given.
+    'Optionally include knowledge_feedback: {used, not_used, missing_topics} to report which of the knowledge hints above (by path) helped, which did not, and which topics were needed but missing.',
   ].filter(Boolean);
   return lines.join('\n');
+}
+
+// KP-04: how many fresh (not-already-delivered) hints the needs-driven
+// second-round retrieval appends to the retry prompt. Kept small — this is a
+// targeted delta, not a re-render of the full context pack.
+const NEEDS_KNOWLEDGE_RETRIEVAL_LIMIT = 3;
+
+/**
+ * KP-04: when a `task_result` reports unresolved `needs`, the pre-KP-04
+ * retry prompt only re-sent the same objective/context and asked again — it
+ * never looked anything up. This targets a fresh, small retrieval using the
+ * needs strings themselves as the query (`findRelevantDistilledKnowledge`,
+ * the same entry point `loadKnowledgeHintsIfPossible` in
+ * mission-context-pack.ts uses), excludes any path already delivered in the
+ * first-round context pack (`deliveredKnowledgeRefs`), and records what it
+ * delivers via `recordKnowledgeDelivery` so KP-05 telemetry sees this
+ * second round too. Fails open: a retrieval error must never block the
+ * retry — it just means no delta section gets appended.
+ */
+async function buildNeedsKnowledgeReinforcementLines(input: {
+  missionId: string;
+  taskId: string;
+  teamRole?: string;
+  needs: string[];
+  deliveredKnowledgeRefs: DeliveredKnowledgeRef[];
+}): Promise<string[]> {
+  if (input.needs.length === 0) return [];
+  try {
+    const excludePaths = new Set(input.deliveredKnowledgeRefs.map((ref) => ref.path));
+    const found = await findRelevantDistilledKnowledge({
+      topic: input.needs.join(' '),
+      limit: NEEDS_KNOWLEDGE_RETRIEVAL_LIMIT * 2,
+      minScore: 0.08,
+    });
+    const fresh = found
+      .filter((entry) => !excludePaths.has(entry.path))
+      .slice(0, NEEDS_KNOWLEDGE_RETRIEVAL_LIMIT);
+    if (fresh.length === 0) return [];
+
+    recordKnowledgeDelivery({
+      missionId: input.missionId,
+      taskId: input.taskId,
+      teamRole: input.teamRole,
+      recipientKind: 'agent',
+      refs: fresh.map((entry) => ({
+        path: entry.path,
+        ...(typeof entry.score === 'number' ? { score: entry.score } : {}),
+        ...(entry.title ? { title: entry.title } : {}),
+      })),
+    });
+
+    const lines = [
+      'Additional knowledge retrieved for the unresolved needs (not in the original context pack):',
+    ];
+    for (const entry of fresh) {
+      lines.push(`- ${entry.title} (${entry.path})`);
+      lines.push(`  ${entry.excerpt.trim().replace(/\s+/g, ' ').slice(0, 200)}`);
+    }
+    return lines;
+  } catch (err: any) {
+    logger.warn(
+      `[MISSION_WORKER] KP-04 needs-driven knowledge retrieval failed for ${input.missionId}/${input.taskId}: ${err?.message || err}`
+    );
+    return [];
+  }
 }
 
 function buildTaskResultRetryPrompt(input: {
@@ -1315,6 +1388,8 @@ function buildTaskResultRetryPrompt(input: {
   taskId: string;
   previousResponse: string;
   parseErrors: string[];
+  /** KP-04: compact delta section from buildNeedsKnowledgeReinforcementLines. */
+  knowledgeDeltaLines?: string[];
 }): string {
   return [
     `The previous response for mission ${input.missionId} task ${input.taskId} was rejected.`,
@@ -1323,6 +1398,9 @@ function buildTaskResultRetryPrompt(input: {
     'Do not include any other structured block.',
     'Errors:',
     ...input.parseErrors.map((error) => `- ${error}`),
+    ...(input.knowledgeDeltaLines && input.knowledgeDeltaLines.length > 0
+      ? ['', ...input.knowledgeDeltaLines]
+      : []),
     '',
     'Previous response excerpt:',
     input.previousResponse.slice(0, 1200),
@@ -1583,6 +1661,8 @@ async function buildTaskDispatchContext(input: {
   missionContextPackSummary: string;
   missionContextPackPruningSummary?: MissionContextPackPruningSummary;
   securityScope?: import('./context-security-scope.js').ContextSecurityScope;
+  /** KP-05: knowledge actually delivered as part of this dispatch's context pack. */
+  deliveredKnowledgeRefs: DeliveredKnowledgeRef[];
 }> {
   const missionStateRaw = loadMissionStateSnapshot(input.missionId);
   const missionState =
@@ -1602,12 +1682,21 @@ async function buildTaskDispatchContext(input: {
           history: [],
           relationships: {},
         };
-  const missionContextPack = await resolveMissionContextPack({
+  // KP-01: single provisioning entry point (resolve + persist + render) —
+  // `form: 'pack'` reproduces the pre-KP-01 inline resolve/save/render
+  // sequence byte-for-byte.
+  const provisionedContext = await provisionTaskKnowledge({
+    form: 'pack',
+    missionPath: missionDir(input.missionId, 'public'),
     missionId: input.missionId,
     tier: (missionState.tier as 'personal' | 'confidential' | 'public') || 'public',
     recipientKind: 'agent',
     teamRole: input.teamRole,
     assigneePeerId: input.agentId,
+    // KP-04: hint count + pack char budget scale with the task's declared
+    // scope (SCOPE_KNOWLEDGE_BUDGETS in mission-context-pack.ts). Absent
+    // scope falls back to `M`, so untagged tasks are unaffected.
+    ...(input.task.estimated_scope ? { estimatedScope: input.task.estimated_scope } : {}),
     workItem: {
       item_id: input.task.task_id,
       title: input.task.description || input.task.task_id,
@@ -1635,11 +1724,10 @@ async function buildTaskDispatchContext(input: {
       },
     },
   });
-  const missionContextPackPath = missionContextPack
-    ? saveMissionContextPack(missionDir(input.missionId, 'public'), missionContextPack)
-    : undefined;
+  const missionContextPack = provisionedContext.pack;
+  const missionContextPackPath = provisionedContext.missionContextPackPath;
   const missionContextPackText = missionContextPack
-    ? renderMissionContextPack(missionContextPack)
+    ? provisionedContext.text
     : [
         'Mission context pack unavailable; using degraded fallback context.',
         `- Mission: ${input.missionId}`,
@@ -1754,6 +1842,7 @@ async function buildTaskDispatchContext(input: {
     missionContextPackSummary: missionContextPack?.summary || 'degraded mission context pack',
     missionContextPackPruningSummary,
     securityScope: missionContextPack?.security_scope,
+    deliveredKnowledgeRefs: provisionedContext.deliveredKnowledgeRefs,
   };
 }
 
@@ -2035,15 +2124,80 @@ export async function runGoalDrivenWorkItem(input: {
  * planned for a later resume). Only reached when `task.goal_driven` is set; the
  * default single-shot path is untouched.
  */
-async function dispatchGoalDrivenMissionTask(input: {
+/**
+ * KP-01: goal-driven dispatch's context-pack provisioning. Renders the pack
+ * as `form: 'system_prompt'` — a role-scoped, compact rendering meant to be
+ * passed once as `systemPrompt` and reused as a stable prefix across every
+ * turn (KD-08 prompt-cache discipline; see `runGoalDrivenWorkItem`'s
+ * `systemPrompt` doc comment). Persists the pack the same way the single-shot
+ * path does (`saveMissionContextPack`, via `provisionTaskKnowledge`'s
+ * `missionPath`).
+ *
+ * Fails open by design: any provisioning error (invalid mission state,
+ * schema violation, I/O failure) is logged and swallowed here so a knowledge
+ * outage never blocks dispatch — the goal loop already tolerates an absent
+ * `systemPrompt` (it is optional on `RunGoalDrivenLoopOptions`). Exported so
+ * this seam can be exercised hermetically, same rationale as
+ * `runGoalDrivenWorkItem`.
+ */
+export async function provisionGoalDrivenTaskKnowledge(input: {
   missionId: string;
   task: PlannedNextTask;
   teamRole: string;
-  assignment: {
-    agent_id: string;
-    model_hint?: { model_id?: string; tier?: string; effort?: string; route_reason?: string };
-  };
-}): Promise<DispatchMissionTaskOutcome | null> {
+  agentId: string;
+  workItem: WorkItem;
+}): Promise<{
+  systemPrompt?: string;
+  missionContextPackPath?: string;
+  /** KP-05: knowledge actually delivered to this goal-driven dispatch, if any. */
+  deliveredKnowledgeRefs: DeliveredKnowledgeRef[];
+}> {
+  try {
+    const missionStateRaw = loadMissionStateSnapshot(input.missionId);
+    const tier =
+      missionStateRaw && typeof missionStateRaw === 'object'
+        ? (missionStateRaw as Record<string, unknown>).tier
+        : undefined;
+    const provisioned = await provisionTaskKnowledge({
+      form: 'system_prompt',
+      missionPath: missionDir(input.missionId, 'public'),
+      missionId: input.missionId,
+      tier: (tier as 'personal' | 'confidential' | 'public') || 'public',
+      recipientKind: 'agent',
+      teamRole: input.teamRole,
+      assigneePeerId: input.agentId,
+      // KP-04: same scope-linked budget as the single-shot path.
+      ...(input.task.estimated_scope ? { estimatedScope: input.task.estimated_scope } : {}),
+      workItem: input.workItem,
+    });
+    if (!provisioned.pack) return { deliveredKnowledgeRefs: [] };
+    return {
+      systemPrompt: provisioned.text,
+      ...(provisioned.missionContextPackPath
+        ? { missionContextPackPath: provisioned.missionContextPackPath }
+        : {}),
+      deliveredKnowledgeRefs: provisioned.deliveredKnowledgeRefs,
+    };
+  } catch (err: any) {
+    logger.warn(
+      `[MISSION_WORKER] Task knowledge provisioning failed for goal-driven dispatch ${input.missionId}/${input.task.task_id}; proceeding without a context pack: ${err?.message || err}`
+    );
+    return { deliveredKnowledgeRefs: [] };
+  }
+}
+
+async function dispatchGoalDrivenMissionTask(
+  input: {
+    missionId: string;
+    task: PlannedNextTask;
+    teamRole: string;
+    assignment: {
+      agent_id: string;
+      model_hint?: { model_id?: string; tier?: string; effort?: string; route_reason?: string };
+    };
+  },
+  traceCtx: TraceContext
+): Promise<DispatchMissionTaskOutcome | null> {
   const workItemSourceRef = `mission:${input.missionId}:${input.task.task_id}:goal`;
   const workItem = importExternalWorkItem({
     source: 'local',
@@ -2078,11 +2232,26 @@ async function dispatchGoalDrivenMissionTask(input: {
     },
   });
 
+  // KP-01: provision the mission context pack as a stable system-prompt
+  // prefix for the goal loop. Fail-open — see provisionGoalDrivenTaskKnowledge.
+  const { systemPrompt, deliveredKnowledgeRefs } = await provisionGoalDrivenTaskKnowledge({
+    missionId: input.missionId,
+    task: input.task,
+    teamRole: input.teamRole,
+    agentId: input.assignment.agent_id,
+    workItem,
+  });
+  // KP-05: report what the goal loop's stable prefix actually delivered so
+  // the dispatch trace's knowledgeRefs are non-empty for this path too — see
+  // attachDeliveredKnowledgeRefs.
+  attachDeliveredKnowledgeRefs(traceCtx, deliveredKnowledgeRefs);
+
   const outcome = await runGoalDrivenWorkItem({
     missionId: input.missionId,
     task: input.task,
     teamRole: input.teamRole,
     agentId: input.assignment.agent_id,
+    ...(systemPrompt ? { systemPrompt } : {}),
   });
 
   const baseOutcome: DispatchMissionTaskOutcome = {
@@ -2188,7 +2357,85 @@ async function dispatchGoalDrivenMissionTask(input: {
   return { ...baseOutcome, dispatched: false };
 }
 
-async function dispatchPlannedMissionTask(input: {
+// KP-05: mission-task dispatch tracing. `persistTrace` writes to the same
+// day-rotated `traces-*.jsonl` store actuator/pipeline flows use
+// (`traceLogDir()`, `active/shared/logs/traces/` or the active customer's
+// equivalent) — no new tracer or persistence path is invented here, only a
+// dir-override seam for hermetic tests (mirrors `KYBERION_KNOWLEDGE_DELIVERY_DIR`
+// in `src/knowledge-feedback-loop.ts`).
+let warnedMissionTaskTraceFailureOnce = false;
+
+function missionTaskTraceDirOverride(): string | undefined {
+  const override = process.env.KYBERION_MISSION_TASK_TRACE_DIR?.trim();
+  return override ? pathResolver.rootResolve(override) : undefined;
+}
+
+function warnMissionTaskTraceFailureOnce(context: string, error: unknown): void {
+  if (warnedMissionTaskTraceFailureOnce) return;
+  warnedMissionTaskTraceFailureOnce = true;
+  const message = error instanceof Error ? error.message : String(error);
+  logger.warn(`[MISSION_WORKER][KP-05] ${context}: ${message}`);
+}
+
+/**
+ * Attach delivered knowledge to the current dispatch trace span. `knowledgeRefs`
+ * (the trace schema field, `src/trace.ts`) is `string[]` — paths only — so
+ * paths go there; per-ref scores ride along on a companion event's
+ * attributes (`TraceEvent.attributes` already supports arbitrary
+ * string/number/boolean values, unlike `knowledgeRefs` which every consumer,
+ * e.g. chronos-mirror-v2's TraceViewer, expects to stay a plain string array).
+ * Never throws — a tracing failure must never affect dispatch.
+ */
+function attachDeliveredKnowledgeRefs(
+  traceCtx: TraceContext,
+  refs: DeliveredKnowledgeRef[] | undefined
+): void {
+  if (!refs || refs.length === 0) return;
+  try {
+    for (const ref of refs) traceCtx.addKnowledgeRef(ref.path);
+    traceCtx.addEvent('knowledge_delivered', {
+      knowledge_ref_count: refs.length,
+      knowledge_refs_scored: JSON.stringify(
+        refs.map((ref) => ({ path: ref.path, score: ref.score ?? null }))
+      ),
+    });
+  } catch (err: any) {
+    warnMissionTaskTraceFailureOnce(
+      `Failed to attach delivered knowledge refs to mission task trace`,
+      err
+    );
+  }
+}
+
+/**
+ * Record the dispatch outcome on the trace span and persist it. Called from
+ * `dispatchPlannedMissionTask`'s `finally` so it runs for every branch
+ * (success, blocked, rework, busy-retry-null) without threading trace
+ * bookkeeping through each of `dispatchPlannedMissionTaskCore`'s many return
+ * points. Fail-open: any error here (span attribute, finalize, or persist)
+ * is caught and warned once — it must never surface to the dispatch caller.
+ */
+function finalizeMissionTaskTrace(
+  traceCtx: TraceContext,
+  input: Pick<DispatchPlannedMissionTaskInput, 'task' | 'teamRole'>,
+  outcome: DispatchMissionTaskOutcome | null
+): void {
+  try {
+    traceCtx.setAttributes({
+      task_id: input.task.task_id,
+      team_role: input.teamRole,
+      dispatched: outcome?.dispatched ?? false,
+      result_schema_ok: outcome?.result_schema_ok ?? false,
+    });
+    const trace = traceCtx.finalize();
+    const dirOverride = missionTaskTraceDirOverride();
+    persistTrace(trace, dirOverride ? { dir: dirOverride } : undefined);
+  } catch (err: any) {
+    warnMissionTaskTraceFailureOnce('Failed to persist mission task dispatch trace', err);
+  }
+}
+
+interface DispatchPlannedMissionTaskInput {
   missionId: string;
   task: PlannedNextTask;
   teamRole: string;
@@ -2204,18 +2451,50 @@ async function dispatchPlannedMissionTask(input: {
     modelId?: string | null;
   };
   allTasks: PlannedNextTask[];
-}): Promise<DispatchMissionTaskOutcome | null> {
-  // KD-01 adoption: opt-in goal-driven execution runs a separate autonomous
-  // loop instead of the single-shot dispatch below. Default OFF — the rest of
-  // this function is unchanged when `goal_driven` is unset.
-  if (input.task.goal_driven) {
-    return dispatchGoalDrivenMissionTask({
-      missionId: input.missionId,
-      task: input.task,
-      teamRole: input.teamRole,
-      assignment: input.assignment,
-    });
+}
+
+/**
+ * KP-05: open a `mission_task_dispatch` trace span around a single task
+ * dispatch (single-shot or goal-driven), attach whatever knowledge was
+ * delivered into it, and persist the trace next to actuator/pipeline traces
+ * (`persistTrace`, same JSONL store as `createActuatorTrace` in
+ * `actuator-trace.ts`). Tracing is entirely best-effort: a failure anywhere
+ * in this wrapper (span creation, attribute recording, persistence) is
+ * caught in `finalizeMissionTaskTrace` and logged once — it must never
+ * affect the dispatch outcome itself, which is why the real dispatch work
+ * happens in `dispatchPlannedMissionTaskCore` / `dispatchGoalDrivenMissionTask`
+ * and only the trace bookkeeping wraps it.
+ */
+async function dispatchPlannedMissionTask(
+  input: DispatchPlannedMissionTaskInput
+): Promise<DispatchMissionTaskOutcome | null> {
+  const traceCtx = new TraceContext('mission_task_dispatch', { missionId: input.missionId });
+  let outcome: DispatchMissionTaskOutcome | null = null;
+  try {
+    // KD-01 adoption: opt-in goal-driven execution runs a separate autonomous
+    // loop instead of the single-shot dispatch below. Default OFF — the rest
+    // of dispatchPlannedMissionTaskCore is unchanged when `goal_driven` is unset.
+    outcome = input.task.goal_driven
+      ? await dispatchGoalDrivenMissionTask(
+          {
+            missionId: input.missionId,
+            task: input.task,
+            teamRole: input.teamRole,
+            assignment: input.assignment,
+          },
+          traceCtx
+        )
+      : await dispatchPlannedMissionTaskCore(input, traceCtx);
+    return outcome;
+  } finally {
+    finalizeMissionTaskTrace(traceCtx, input, outcome);
   }
+}
+
+async function dispatchPlannedMissionTaskCore(
+  input: DispatchPlannedMissionTaskInput,
+  traceCtx: TraceContext
+): Promise<DispatchMissionTaskOutcome | null> {
   const workItemSourceRef = `mission:${input.missionId}:${input.task.task_id}`;
   const workItem = importExternalWorkItem({
     source: 'local',
@@ -2277,6 +2556,9 @@ async function dispatchPlannedMissionTask(input: {
       taskModelHint: input.assignment.model_hint,
       prompt: context.prompt,
       securityScope: context.securityScope,
+      // KP-04: lets a needs-driven retry's second-round retrieval exclude
+      // what the first-round context pack already delivered.
+      deliveredKnowledgeRefs: context.deliveredKnowledgeRefs,
     };
     return isBestOfNCandidate({ teamRole: input.teamRole, task: input.task })
       ? obtainBestOfTaskResultResponse(dispatchArgs)
@@ -2316,6 +2598,9 @@ async function dispatchPlannedMissionTask(input: {
     }
     throw err;
   }
+  // KP-05: report what buildTaskDispatchContext's context pack actually
+  // delivered onto this dispatch's trace span.
+  attachDeliveredKnowledgeRefs(traceCtx, dispatchContext.deliveredKnowledgeRefs);
   emitMissionTaskEvent({
     event_type: 'participant_context_resolved',
     mission_id: input.missionId,
@@ -3044,6 +3329,12 @@ async function obtainTaskResultResponse(input: {
   taskModelHint?: { model_id?: string; tier?: string; effort?: string; route_reason?: string };
   prompt: string;
   securityScope?: import('./context-security-scope.js').ContextSecurityScope;
+  /**
+   * KP-04: what the first-round context pack already delivered (from
+   * `buildTaskDispatchContext`), so a needs-driven retry retrieval can
+   * exclude paths the worker already has instead of re-listing them.
+   */
+  deliveredKnowledgeRefs?: DeliveredKnowledgeRef[];
 }): Promise<{
   executionMode: 'agent';
   responseText: string;
@@ -3105,6 +3396,17 @@ async function obtainTaskResultResponse(input: {
     if (parseErrors.length > 0) notes.push(`task_result parse errors: ${parseErrors.join('; ')}`);
     if (surfaceParseErrors.length > 0)
       notes.push(`surface parse errors: ${surfaceParseErrors.join('; ')}`);
+    // KP-04: targeted second-round retrieval when the worker reported
+    // unresolved needs — a delta on top of the first-round context pack,
+    // not a re-send of it. No-op (empty lines) for parse-error-only retries
+    // (no needs to query against) or when nothing new is found.
+    const knowledgeDeltaLines = await buildNeedsKnowledgeReinforcementLines({
+      missionId: input.missionId,
+      taskId: input.task.task_id,
+      teamRole: input.teamRole,
+      needs: taskResult?.needs || [],
+      deliveredKnowledgeRefs: input.deliveredKnowledgeRefs || [],
+    });
     response = await a2aBridge.route({
       a2a_version: '1.0',
       header: {
@@ -3126,6 +3428,7 @@ async function obtainTaskResultResponse(input: {
               : []),
             ...parseErrors,
           ],
+          knowledgeDeltaLines,
         }),
         objective: input.task.description || input.task.task_id,
         acceptance_criteria: Array.isArray((input.task as any).acceptance_criteria)
@@ -3163,6 +3466,18 @@ async function obtainTaskResultResponse(input: {
       notes.push(`task_result parse errors after retry: ${parseErrors.join('; ')}`);
     if (surfaceParseErrors.length > 0)
       notes.push(`surface parse errors after retry: ${surfaceParseErrors.join('; ')}`);
+  }
+
+  // KP-05: fold any knowledge_feedback the worker reported into the
+  // delivered/used aggregate and enqueue missing_topics as knowledge-gap
+  // promotion candidates. Fails open (recordKnowledgeUsageFeedback swallows
+  // its own errors) — telemetry must never block task dispatch.
+  if (taskResult?.knowledge_feedback) {
+    recordKnowledgeUsageFeedback({
+      missionId: input.missionId,
+      taskId: input.task.task_id,
+      feedback: taskResult.knowledge_feedback,
+    });
   }
 
   return {
@@ -3294,6 +3609,7 @@ async function obtainBestOfTaskResultResponse(input: {
   taskModelHint?: { model_id?: string; tier?: string; effort?: string; route_reason?: string };
   prompt: string;
   securityScope?: import('./context-security-scope.js').ContextSecurityScope;
+  deliveredKnowledgeRefs?: DeliveredKnowledgeRef[];
 }): Promise<Awaited<ReturnType<typeof obtainTaskResultResponse>>> {
   const attempts: Array<{
     key: string;

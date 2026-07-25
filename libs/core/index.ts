@@ -705,6 +705,7 @@ export * from './sensory-memory.js';
 export * from './provider-capability-scanner.js';
 export * from './provider-capability-overview.js';
 export * from './provider-bridge.js';
+export * from './provider-permission-profiles.js';
 export * from './claude-task-runner.js';
 export * from './claude-task-session-executor.js';
 export * from './actuator-op-registry.js';
@@ -723,6 +724,8 @@ export {
   scanTmp,
   rotateLogs,
   scanDataVault,
+  scanRuntime,
+  sweepDelegationChildren,
   runJanitor,
   runJanitorIfStale,
   readJanitorLastRunMs,
@@ -734,7 +737,33 @@ export type {
   ScanTmpResult,
   RotateLogsResult,
   ScanDataVaultResult,
+  ScanRuntimeResult,
+  SweepDelegationChildrenOptions,
+  SweepDelegationChildrenResult,
 } from './storage-janitor.js';
+
+// Delegation Concurrency & Wall-Clock Budget (XP-06)
+export {
+  withDelegationSlot,
+  getDelegationConcurrencyStats,
+  withWallClockBudget,
+  DelegationWallClockExceededError,
+  terminateAllActiveDelegationChildren,
+  wireDelegationKillSwitchIntegration,
+  peekPersistedDelegationChildrenRegistry,
+  getRecordedDelegationTimeouts,
+  UNKNOWN_DELEGATION_PROVIDER,
+  DELEGATION_CHILDREN_REGISTRY_SUBPATH,
+} from './delegation-concurrency.js';
+export type {
+  DelegationSlotOptions,
+  DelegationConcurrencyStats,
+  DelegationConcurrencySlotStats,
+  DelegationChildHandle,
+  DelegationChildRecord,
+  WithWallClockBudgetOptions,
+  DelegationTimeoutRecord,
+} from './delegation-concurrency.js';
 
 // Data Vault (external data source reference cache)
 export {
@@ -790,6 +819,9 @@ export * from './a2a-bridge.js';
 export * from './a2a-conversation-store.js';
 export * from './agent-manifest.js';
 export * from './provider-discovery.js';
+export * from './provider-capability-registry.js';
+export * from './provider-egress-gate.js';
+export * from './best-of-providers.js'; // XP-07: model-diverse best-of-N delegation
 export * from './agent-provider-resolution.js';
 export * from './provider-health-registry.js';
 export * from './capability-broker.js';
@@ -967,6 +999,21 @@ export {
   formatDistilledKnowledgeSummary,
 } from './distill-knowledge-injector.js';
 export type { DistilledKnowledgeEntry, FindRelevantInput } from './distill-knowledge-injector.js';
+export {
+  loadKnowledgeSlicesFile,
+  resolveKnowledgeSlice,
+  matchesKnowledgeGlob,
+  isKnowledgePathExcluded,
+  isKnowledgePathInSearchRoots,
+  _resetKnowledgeSlicesCacheForTests,
+} from './knowledge-slices.js';
+export type {
+  KnowledgeSliceMatcher,
+  KnowledgeSliceDefinition,
+  KnowledgeSlicesFile,
+  ResolveKnowledgeSliceInput,
+  ResolvedKnowledgeSlice,
+} from './knowledge-slices.js';
 export { loadRestrictedActionRules, matchRestrictedAction } from './restricted-action-policy.js';
 export type { RestrictedActionMatch, RestrictedActionRule } from './restricted-action-policy.js';
 export { loadMeetingFacilitatorPolicy } from './meeting-facilitator-policy.js';
@@ -1272,7 +1319,10 @@ export {
   getStubServedOps,
   resetStubServedOps,
   stubExplicitlyRequested,
+  getLastServedReasoningMode,
+  resetReasoningFailoverTracking,
   type StubServedRecord,
+  type LastServedReasoningMode,
 } from './reasoning-backend.js';
 export { AnthropicReasoningBackend } from './anthropic-reasoning-backend.js';
 export type { AnthropicReasoningBackendOptions } from './anthropic-reasoning-backend.js';
@@ -1387,6 +1437,16 @@ export {
   reasoningDegradedMarkerPath,
   type ReasoningDegradedMarker,
 } from './reasoning-degradation.js';
+export {
+  appendReasoningFailoverEvent,
+  markReasoningFailover,
+  clearReasoningFailover,
+  readReasoningFailover,
+  reasoningFailoverEventsPath,
+  reasoningFailoverMarkerPath,
+  type ReasoningFailoverEvent,
+  type ReasoningFailoverMarker,
+} from './reasoning-failover.js';
 export {
   recordAdhocPipelineRun,
   listPromotionCandidates,
@@ -1652,6 +1712,7 @@ export {
   ProcedureRankingCandidateSchema,
   ProcedureRankingSchema,
   TaskResultSchema,
+  TaskResultProvenanceSchema,
   structuredOutputSchemas,
   type ProcedureRankingCandidate,
   type ProcedureRankingResult,
@@ -1715,6 +1776,7 @@ export * from './mission-orchestration-evaluator.js';
 export * from './mission-coordination-bus.js';
 export * from './mission-team-plan-composer.js';
 export * from './mission-context-pack.js';
+export * from './task-knowledge-provisioning.js';
 export * from './cognitive-routing.js';
 export * from './reasoning-drift-watchdog.js';
 export * from './mission-team-binding.js';
@@ -1841,6 +1903,7 @@ export * from './trust-engine.js';
 export * from './audit-chain.js';
 export * from './agent-slo.js';
 export * from './kill-switch.js';
+export * from './subagent-capability-profiles.js';
 export {
   buildBridgeErrorReplyText,
   buildBridgeEmptyReplyText,
@@ -1915,6 +1978,38 @@ export {
   recordPipelineResult,
   runFeedbackLoop,
 } from './src/feedback-loop.js';
+
+// KP-05: knowledge delivery telemetry + task_result knowledge_feedback aggregation
+export {
+  recordKnowledgeDelivery,
+  recordKnowledgeUsageFeedback,
+  loadKnowledgeUsageAggregate,
+  knowledgeDeliveryLogDir,
+  knowledgeUsageAggregatePath,
+} from './src/knowledge-feedback-loop.js';
+export type {
+  DeliveredKnowledgeRef,
+  KnowledgeDeliveryRecord,
+  KnowledgeUsageAggregateEntry,
+} from './src/knowledge-feedback-loop.js';
+
+// KP-06: effectiveness-driven curation + freshness SLO report, built from
+// KP-05's delivery/usage aggregate. Candidates only — no auto demotion.
+export {
+  computeCurationReport,
+  generateKnowledgeCurationReport,
+  loadCurationSloConfig,
+  renderCurationReportMarkdown,
+  writeCurationReport,
+  knowledgeCurationReportPath,
+  knowledgeCurationSloConfigPath,
+} from './src/knowledge-curation-report.js';
+export type {
+  CurationSloConfig,
+  CurationLowYieldHint,
+  CurationFreshnessBreach,
+  KnowledgeCurationReport,
+} from './src/knowledge-curation-report.js';
 
 // JSON repair (Paper2Any pattern — lightweight structural repair before LLM escalation)
 export { tryRepairJson, repairJsonString } from './json-repair.js';
