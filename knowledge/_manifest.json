@@ -2155,6 +2155,12 @@
       "type": "json"
     },
     {
+      "path": "product/governance/shared-tmp-allowlist.json",
+      "tier": "public",
+      "size": 12001,
+      "type": "json"
+    },
+    {
       "path": "product/governance/shell-command-policy.json",
       "tier": "public",
       "size": 3162,
