@@ -151,6 +151,34 @@ describe('trace', () => {
       const summary = ctx.summary();
       expect(summary.spans).toBe(4); // root + 3 levels
     });
+
+    it('NI-02: actorNhiId/onBehalfOf metadata survive the create -> finalize -> persist round-trip', () => {
+      const tmpDir = makeTestTmpDir('ni02-actor');
+      const ctx = new TraceContext('actor-attributed', {
+        missionId: 'MSN-NI02',
+        actorNhiId: 'kyberion://agent/ni02-org/worker-a',
+        onBehalfOf: 'user:U12345',
+      });
+      ctx.startSpan('child');
+      ctx.endSpan('ok');
+
+      const trace = ctx.finalize();
+      expect(trace.metadata.actorNhiId).toBe('kyberion://agent/ni02-org/worker-a');
+      expect(trace.metadata.onBehalfOf).toBe('user:U12345');
+
+      const written = persistTrace(trace, { dir: tmpDir });
+      const parsed = JSON.parse(fs.readFileSync(written, 'utf-8').trim().split('\n')[0]);
+      expect(parsed.metadata.actorNhiId).toBe('kyberion://agent/ni02-org/worker-a');
+      expect(parsed.metadata.onBehalfOf).toBe('user:U12345');
+
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    });
+
+    it('NI-02: the attribution fields stay absent when not supplied (purely additive)', () => {
+      const trace = new TraceContext('unattributed').finalize();
+      expect(trace.metadata.actorNhiId).toBeUndefined();
+      expect(trace.metadata.onBehalfOf).toBeUndefined();
+    });
   });
 
   describe('persistTrace', () => {

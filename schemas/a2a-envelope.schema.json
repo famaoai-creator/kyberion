@@ -33,6 +33,11 @@
         "signature": {
           "type": "string",
           "description": "Optional cryptographic signature for Sovereign approval"
+        },
+        "sender_nhi_id": {
+          "type": "string",
+          "pattern": "^kyberion://agent/[a-z][a-z0-9-]*/[a-z][a-z0-9-]*$",
+          "description": "NI-02: sender's durable NHI identity claim (agent-identity ledger). Covered by the envelope HMAC signature when present."
         }
       }
     },
