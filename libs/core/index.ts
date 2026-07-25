@@ -821,6 +821,7 @@ export * from './agent-manifest.js';
 export * from './provider-discovery.js';
 export * from './provider-capability-registry.js';
 export * from './provider-egress-gate.js';
+export * from './provider-backend-resolver.js'; // XP-07 close-out: real per-provider backend resolver
 export * from './best-of-providers.js'; // XP-07: model-diverse best-of-N delegation
 export * from './agent-provider-resolution.js';
 export * from './provider-health-registry.js';
