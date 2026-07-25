@@ -1,18 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('@agent/core', () => ({
+// SO-01: mission-intent-delta.ts now imports these directly from their
+// libs/core sibling modules (not the @agent/core barrel) — the mocks must
+// target the same specifiers or vitest won't intercept the real calls.
+vi.mock('./intent-snapshot-store.js', () => ({
   emitIntentSnapshot: vi.fn(),
   evaluateIntentDriftGate: vi.fn(),
-  getIntentExtractor: vi.fn(),
-  logger: { warn: vi.fn() },
   mapStageToLoopPhase: vi.fn((stage: string) => stage),
 }));
+vi.mock('./intent-extractor.js', () => ({
+  getIntentExtractor: vi.fn(),
+}));
+vi.mock('./core.js', () => ({
+  logger: { warn: vi.fn() },
+}));
 
-import {
-  emitIntentSnapshot,
-  evaluateIntentDriftGate,
-  getIntentExtractor,
-} from '@agent/core';
+import { emitIntentSnapshot, evaluateIntentDriftGate } from './intent-snapshot-store.js';
+import { getIntentExtractor } from './intent-extractor.js';
 import {
   emitMissionLifecycleIntentSnapshot,
   evaluateMissionIntentDrift,
@@ -44,7 +48,7 @@ describe('mission-intent-delta hooks', () => {
         source: 'user_prompt',
         traceRef: 'corr-mission-intent-001',
         intent: { goal: 'parsed goal' },
-      }),
+      })
     );
   });
 
@@ -69,7 +73,7 @@ describe('mission-intent-delta hooks', () => {
         stage: 'execution',
         source: 'mission_state',
         intent: { goal: '**goal**: Extended adaptive retry rollout' },
-      }),
+      })
     );
   });
 

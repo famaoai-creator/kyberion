@@ -315,6 +315,14 @@ async function handleRequest(
               correlationId:
                 typeof payload.correlationId === 'string' ? payload.correlationId : undefined,
               taskModelHint: readTaskModelHint(payload.taskModelHint),
+              // SO-05: optional field — tolerant decoding. Older clients that
+              // omit model_tier simply get undefined here (no protocol break).
+              modelTier:
+                payload.model_tier === 'fast' ||
+                payload.model_tier === 'standard' ||
+                payload.model_tier === 'deep'
+                  ? payload.model_tier
+                  : undefined,
             }
           );
           return {

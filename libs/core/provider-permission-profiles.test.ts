@@ -183,5 +183,30 @@ describe('provider-permission-profiles', () => {
         else process.env.KYBERION_TEST_MARKER = previous;
       }
     });
+
+    // SO-03 boundary test: owner authority (MISSION_ROLE=mission_controller,
+    // set on the parent process by an active OrchestratorSession's execution
+    // context — orchestrator-session.ts's withExecutionContext calls) must
+    // never project into a spawned worker/provider delegation's env. This is
+    // the real projection code path shell-claude-cli-backend.ts /
+    // codex-cli-query.ts / agy-cli-backend.ts all call to build their child
+    // `spawn`/`spawnSync` env — anchoring here means a future change that
+    // re-adds MISSION_ROLE/SYSTEM_ROLE to the base-key allowlist fails this
+    // test instead of silently reopening the leak.
+    it('SO-03: never propagates MISSION_ROLE or SYSTEM_ROLE (owner-authority signals) into a delegation env', () => {
+      for (const provider of providers) {
+        const base = {
+          ...fakeBaseEnv(),
+          MISSION_ROLE: 'mission_controller',
+          SYSTEM_ROLE: 'mission_controller',
+        } as NodeJS.ProcessEnv;
+        const env = buildProviderChildEnv({ provider, baseEnv: base });
+        expect(env.MISSION_ROLE, `provider=${provider}`).toBeUndefined();
+        expect(env.SYSTEM_ROLE, `provider=${provider}`).toBeUndefined();
+        // MISSION_ID (a plain identifier, not an authority signal) is
+        // unaffected — this test only pins the authority-signal exclusion.
+        expect(env.MISSION_ID, `provider=${provider}`).toBe('MSN-1');
+      }
+    });
   });
 });

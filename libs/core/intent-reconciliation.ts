@@ -4,6 +4,7 @@ import {
   stubExplicitlyRequested,
 } from './reasoning-backend.js';
 import { logger } from './core.js';
+import { recordReasoningTierDeclaration } from './reasoning-tier-declaration.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 import {
   buildCompletionNextAction,
@@ -17,6 +18,20 @@ export interface IntentReconciliationInput {
   artifactRefs?: string[];
   evidenceTexts?: string[];
   requestedResult?: string;
+}
+
+export interface IntentReconciliationOptions {
+  /**
+   * SO-05: declared model tier for the LLM tightening pass below (mirrors
+   * `LlmCompileOptions.model_tier` in intent-contract.ts). Completion
+   * reconciliation is an orchestrator-judgment call, not a conversation-front
+   * call, so callers that own that judgment (mission-lifecycle.ts's finish
+   * path, the mission-steering finish verb) should pass `'deep'`. Omitted for
+   * backward compatibility: existing callers that don't pass this see no
+   * behavior change (no `model_tier` is threaded into the backend call at
+   * all, exactly as before this option existed).
+   */
+  model_tier?: 'fast' | 'standard' | 'deep';
 }
 
 function normalizeText(value: string): string {
@@ -232,7 +247,8 @@ export function reconcileCompletionStructurally(
 }
 
 export async function reconcileCompletion(
-  input: IntentReconciliationInput
+  input: IntentReconciliationInput,
+  options?: IntentReconciliationOptions
 ): Promise<CompletionReconciliation> {
   const structural = reconcileCompletionStructurally(input);
   if (structural.satisfied || getReasoningBackend().name === 'stub') {
@@ -252,7 +268,16 @@ export async function reconcileCompletion(
       `Current gaps: ${JSON.stringify(structural.gaps)}`,
       'If the evidence is insufficient, keep satisfied=false and keep the gaps concise.',
     ].join('\n');
-    const raw = await backend.prompt(prompt);
+    if (options?.model_tier) {
+      recordReasoningTierDeclaration({
+        callSite: 'intent_reconciliation_llm_tighten',
+        declaredTier: options.model_tier,
+      });
+    }
+    const raw = await backend.prompt(
+      prompt,
+      options?.model_tier ? { model_tier: options.model_tier } : undefined
+    );
     const parsed = JSON.parse(raw) as Partial<CompletionReconciliation>;
     const confidence =
       typeof parsed.confidence === 'number' && Number.isFinite(parsed.confidence)

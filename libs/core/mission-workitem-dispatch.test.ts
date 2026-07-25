@@ -5,20 +5,17 @@ import {
   artifactOwnershipRegistryPath,
   appendArtifactOwnershipRecord,
   createArtifactOwnershipRecord,
+} from './artifact-registry.js';
+import {
   clearWorkCoordinationStore,
   createWorkItem,
-  hashArtifactForReview,
   listWorkItems,
-  loadArtifactReviewReceipt,
-  pathResolver,
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  safeRmSync,
-  safeWriteFile,
   setWorkCoordinationNamespace,
   updateWorkItem,
-} from '@agent/core';
+} from './work-coordination.js';
+import { hashArtifactForReview, loadArtifactReviewReceipt } from './artifact-review.js';
+import * as pathResolver from './path-resolver.js';
+import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 import type { MissionState } from './mission-types.js';
 import { dispatchMissionTickets } from './mission-ticket-dispatch.js';
 import { dispatchMissionWorkItems } from './mission-workitem-dispatch.js';

@@ -5,8 +5,11 @@ const mocks = vi.hoisted(() => ({
   syncProjectOperationalStateFromMission: vi.fn(),
 }));
 
-vi.mock('@agent/core', async () => {
-  const actual = await vi.importActual('@agent/core') as any;
+// SO-01: project-state-sync.ts now imports these directly from their
+// libs/core sibling modules (not the @agent/core barrel) — the mocks must
+// target the same specifiers or vitest won't intercept the real calls.
+vi.mock('./project-operational-state-registry.js', async () => {
+  const actual = (await vi.importActual('./project-operational-state-registry.js')) as any;
   return {
     ...actual,
     syncProjectOperationalStateFromMission: mocks.syncProjectOperationalStateFromMission,
@@ -65,7 +68,7 @@ describe('syncProjectOperationalStateIfLinked', () => {
             project_id: 'PRJ-OPS',
           }),
         }),
-      }),
+      })
     );
   });
 });

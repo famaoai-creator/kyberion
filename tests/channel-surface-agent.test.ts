@@ -52,27 +52,39 @@ describe.sequential('Channel surface agents', () => {
   };
   const baselineIdentity = withRole(
     'sovereign_concierge',
-    () => (safeExistsSync(identityPath) ? (safeReadFile(identityPath, { encoding: 'utf8' }) as string) : null),
+    () =>
+      safeExistsSync(identityPath)
+        ? (safeReadFile(identityPath, { encoding: 'utf8' }) as string)
+        : null,
     'sovereign'
   );
   const baselineVision = withRole(
     'sovereign_concierge',
-    () => (safeExistsSync(visionPath) ? (safeReadFile(visionPath, { encoding: 'utf8' }) as string) : null),
+    () =>
+      safeExistsSync(visionPath)
+        ? (safeReadFile(visionPath, { encoding: 'utf8' }) as string)
+        : null,
     'sovereign'
   );
   const baselineAgentIdentity = withRole(
     'sovereign_concierge',
-    () => (safeExistsSync(agentIdentityPath) ? (safeReadFile(agentIdentityPath, { encoding: 'utf8' }) as string) : null),
+    () =>
+      safeExistsSync(agentIdentityPath)
+        ? (safeReadFile(agentIdentityPath, { encoding: 'utf8' }) as string)
+        : null,
     'sovereign'
   );
-  const baselineDisableSupervisorDaemon = process.env.KYBERION_DISABLE_AGENT_RUNTIME_SUPERVISOR_DAEMON;
+  const baselineDisableSupervisorDaemon =
+    process.env.KYBERION_DISABLE_AGENT_RUNTIME_SUPERVISOR_DAEMON;
 
   const cleanupSurfaceState = () => {
     const slackDir = pathResolver.rootResolve('active/shared/coordination/channels/slack');
     const slackObsDir = pathResolver.rootResolve('active/shared/observability/channels/slack');
     const chronosDir = pathResolver.rootResolve('active/shared/coordination/chronos');
     const chronosObsDir = pathResolver.rootResolve('active/shared/observability/chronos');
-    const onboardingDir = pathResolver.rootResolve('active/shared/coordination/channels/slack/onboarding');
+    const onboardingDir = pathResolver.rootResolve(
+      'active/shared/coordination/channels/slack/onboarding'
+    );
     process.env.MISSION_ROLE = 'slack_bridge';
     if (safeExistsSync(slackDir)) safeRmSync(slackDir);
     if (safeExistsSync(slackObsDir)) safeRmSync(slackObsDir);
@@ -94,10 +106,14 @@ describe.sequential('Channel surface agents', () => {
     else if (safeExistsSync(identityPath)) safeRmSync(identityPath);
     if (baselineVision !== null) core.safeWriteFile(visionPath, baselineVision);
     else if (safeExistsSync(visionPath)) safeRmSync(visionPath);
-    if (baselineAgentIdentity !== null) core.safeWriteFile(agentIdentityPath, baselineAgentIdentity);
+    if (baselineAgentIdentity !== null)
+      core.safeWriteFile(agentIdentityPath, baselineAgentIdentity);
     else if (safeExistsSync(agentIdentityPath)) safeRmSync(agentIdentityPath);
-    if (baselineDisableSupervisorDaemon === undefined) delete process.env.KYBERION_DISABLE_AGENT_RUNTIME_SUPERVISOR_DAEMON;
-    else process.env.KYBERION_DISABLE_AGENT_RUNTIME_SUPERVISOR_DAEMON = baselineDisableSupervisorDaemon;
+    if (baselineDisableSupervisorDaemon === undefined)
+      delete process.env.KYBERION_DISABLE_AGENT_RUNTIME_SUPERVISOR_DAEMON;
+    else
+      process.env.KYBERION_DISABLE_AGENT_RUNTIME_SUPERVISOR_DAEMON =
+        baselineDisableSupervisorDaemon;
   });
 
   it('creates Slack handoff artifacts and events through the Slack surface agent role', () => {
@@ -113,50 +129,64 @@ describe.sequential('Channel surface agents', () => {
     const inboxPath = recordSlackSurfaceArtifact(artifact);
     expect(safeExistsSync(inboxPath)).toBe(true);
 
-    const eventPath = pathResolver.rootResolve('active/shared/observability/channels/slack/events.jsonl');
+    const eventPath = pathResolver.rootResolve(
+      'active/shared/observability/channels/slack/events.jsonl'
+    );
     expect(safeExistsSync(eventPath)).toBe(true);
 
     const content = safeReadFile(inboxPath, { encoding: 'utf8' }) as string;
     expect(content).toContain('slack-surface-agent');
     expect(artifact.shouldAck).toBe(true);
-    expect(buildSlackSurfacePrompt({
-      user: 'U123',
-      text: 'deploy status please',
-      channel: 'C123',
-      ts: '1710000000.000100',
-      channelType: 'im',
-    })).toContain('Slack Surface Agent');
-    expect(buildSlackSurfacePrompt({
-      user: 'U123',
-      text: 'Kyberionの資料を作ってください',
-      channel: 'C123',
-      ts: '1710000000.000100',
-      channelType: 'im',
-    })).toContain('Execution mode: conversation');
-    expect(buildSlackSurfacePrompt({
-      user: 'U123',
-      text: 'Kyberionの資料を作って欲しいんだけど可能かな？',
-      channel: 'C123',
-      ts: '1710000000.000100',
-      channelType: 'im',
-    })).toContain('Execution mode: conversation');
-    expect(buildSlackSurfacePrompt({
-      user: 'U123',
-      text: 'こんにちは',
-      channel: 'C123',
-      ts: '1710000000.000100',
-      channelType: 'im',
-    })).toContain('Execution mode: conversation');
+    expect(
+      buildSlackSurfacePrompt({
+        user: 'U123',
+        text: 'deploy status please',
+        channel: 'C123',
+        ts: '1710000000.000100',
+        channelType: 'im',
+      })
+    ).toContain('Slack Surface Agent');
+    expect(
+      buildSlackSurfacePrompt({
+        user: 'U123',
+        text: 'Kyberionの資料を作ってください',
+        channel: 'C123',
+        ts: '1710000000.000100',
+        channelType: 'im',
+      })
+    ).toContain('Execution mode: conversation');
+    expect(
+      buildSlackSurfacePrompt({
+        user: 'U123',
+        text: 'Kyberionの資料を作って欲しいんだけど可能かな？',
+        channel: 'C123',
+        ts: '1710000000.000100',
+        channelType: 'im',
+      })
+    ).toContain('Execution mode: conversation');
+    expect(
+      buildSlackSurfacePrompt({
+        user: 'U123',
+        text: 'こんにちは',
+        channel: 'C123',
+        ts: '1710000000.000100',
+        channelType: 'im',
+      })
+    ).toContain('Execution mode: conversation');
     expect(shouldForceSlackDelegation('deploy status please')).toBe(true);
     expect(shouldForceSlackDelegation('ping')).toBe(false);
-    expect(buildSlackSurfacePrompt({
-      user: 'U123',
-      text: '今の状態は？',
-      channel: 'C123',
-      ts: '1710000000.000100',
-      channelType: 'im',
-    })).toContain('Derived intent: request_deeper_reasoning');
-    expect(deriveSlackExecutionMode('Kyberionの資料を作って欲しいんだけど可能かな？')).toBe('conversation');
+    expect(
+      buildSlackSurfacePrompt({
+        user: 'U123',
+        text: '今の状態は？',
+        channel: 'C123',
+        ts: '1710000000.000100',
+        channelType: 'im',
+      })
+    ).toContain('Derived intent: request_deeper_reasoning');
+    expect(deriveSlackExecutionMode('Kyberionの資料を作って欲しいんだけど可能かな？')).toBe(
+      'conversation'
+    );
     expect(deriveSlackExecutionMode('Kyberionの資料を作成して保存してください')).toBe('task');
     expect(deriveSlackExecutionMode('Kyberionの資料を作ってください')).toBe('conversation');
   });
@@ -186,22 +216,28 @@ describe.sequential('Channel surface agents', () => {
     const requestJson = JSON.parse(safeReadFile(requestPath, { encoding: 'utf8' }) as string);
     recordChronosDelegationSummary(requestJson.correlation_id, 2, ['agent-a', 'agent-b']);
 
-    const requestEventPath = pathResolver.rootResolve('active/shared/observability/chronos/requests.jsonl');
-    const delegationEventPath = pathResolver.rootResolve('active/shared/observability/chronos/delegations.jsonl');
+    const requestEventPath = pathResolver.rootResolve(
+      'active/shared/observability/chronos/requests.jsonl'
+    );
+    const delegationEventPath = pathResolver.rootResolve(
+      'active/shared/observability/chronos/delegations.jsonl'
+    );
     expect(safeExistsSync(requestEventPath)).toBe(true);
     expect(safeExistsSync(delegationEventPath)).toBe(true);
   });
 
   it('extracts a2ui and a2a blocks from a surface-agent response', () => {
-    const parsed = extractSurfaceBlocks([
-      'Hello',
-      '```a2ui',
-      '{"createSurface":{"surfaceId":"s1","title":"Test"}}',
-      '```',
-      '```a2a',
-      '{"header":{"receiver":"nerve-agent","performative":"request"},"payload":{"text":"help"}}',
-      '```',
-    ].join('\n'));
+    const parsed = extractSurfaceBlocks(
+      [
+        'Hello',
+        '```a2ui',
+        '{"createSurface":{"surfaceId":"s1","title":"Test"}}',
+        '```',
+        '```a2a',
+        '{"header":{"receiver":"nerve-agent","performative":"request"},"payload":{"text":"help"}}',
+        '```',
+      ].join('\n')
+    );
 
     expect(parsed.text).toBe('Hello');
     expect(parsed.a2uiMessages).toHaveLength(1);
@@ -209,12 +245,14 @@ describe.sequential('Channel surface agents', () => {
   });
 
   it('extracts approval blocks from a surface-agent response', () => {
-    const parsed = extractSurfaceBlocks([
-      'Need approval.',
-      '```approval',
-      '{"title":"Deploy production change","summary":"Apply schema migration","severity":"high"}',
-      '```',
-    ].join('\n'));
+    const parsed = extractSurfaceBlocks(
+      [
+        'Need approval.',
+        '```approval',
+        '{"title":"Deploy production change","summary":"Apply schema migration","severity":"high"}',
+        '```',
+      ].join('\n')
+    );
 
     expect(parsed.text).toBe('Need approval.');
     expect(parsed.approvalRequests).toHaveLength(1);
@@ -222,12 +260,14 @@ describe.sequential('Channel surface agents', () => {
   });
 
   it('extracts mission proposal blocks from a surface-agent response', () => {
-    const parsed = extractSurfaceBlocks([
-      'I can escalate this into durable work.',
-      '```mission_proposal',
-      '{"intent":"create_mission","mission_type":"product_development","summary":"Create a Kyberion marketing deck","assigned_persona":"Ecosystem Architect","tier":"public","why":"Needs multi-step execution"}',
-      '```',
-    ].join('\n'));
+    const parsed = extractSurfaceBlocks(
+      [
+        'I can escalate this into durable work.',
+        '```mission_proposal',
+        '{"intent":"create_mission","mission_type":"product_development","summary":"Create a Kyberion marketing deck","assigned_persona":"Ecosystem Architect","tier":"public","why":"Needs multi-step execution"}',
+        '```',
+      ].join('\n')
+    );
 
     expect(parsed.text).toBe('I can escalate this into durable work.');
     expect(parsed.missionProposals).toHaveLength(1);
@@ -235,11 +275,13 @@ describe.sequential('Channel surface agents', () => {
   });
 
   it('extracts planning packet blocks from a planner response', () => {
-    const parsed = extractSurfaceBlocks([
-      '```planning_packet',
-      '{"mission_id":"MSN-PLAN-1","summary":"Plan summary","plan_markdown":"# PLAN\\n\\n## Objective\\nInspect active missions","next_tasks":[{"task_id":"task-1","team_role":"operator","description":"Collect current mission registry","deliverable":"artifacts/mission-list.md"}]}',
-      '```',
-    ].join('\n'));
+    const parsed = extractSurfaceBlocks(
+      [
+        '```planning_packet',
+        '{"mission_id":"MSN-PLAN-1","summary":"Plan summary","plan_markdown":"# PLAN\\n\\n## Objective\\nInspect active missions","next_tasks":[{"task_id":"task-1","team_role":"operator","description":"Collect current mission registry","deliverable":"artifacts/mission-list.md"}]}',
+        '```',
+      ].join('\n')
+    );
 
     expect(parsed.planningPackets).toHaveLength(1);
     expect(parsed.planningPackets?.[0].next_tasks[0].team_role).toBe('operator');
@@ -261,7 +303,14 @@ describe.sequential('Channel surface agents', () => {
     });
     expect(first.replyText).toContain('オンボーディング');
 
-    const answers = ['Sovereign', 'Japanese', 'Concierge', 'Software Engineering', 'Build a strong AI operating system.', 'KYBERION-PRIME'];
+    const answers = [
+      'Sovereign',
+      'Japanese',
+      'Concierge',
+      'Software Engineering',
+      'Build a strong AI operating system.',
+      'KYBERION-PRIME',
+    ];
     let current = first;
     for (const answer of answers) {
       current = handleSlackOnboardingTurn({
@@ -273,9 +322,13 @@ describe.sequential('Channel surface agents', () => {
 
     expect(current.completed).toBe(true);
     expect(isEnvironmentInitialized()).toBe(true);
-    expect(safeExistsSync(pathResolver.rootResolve('knowledge/personal/my-identity.json'))).toBe(true);
+    expect(safeExistsSync(pathResolver.rootResolve('knowledge/personal/my-identity.json'))).toBe(
+      true
+    );
     expect(safeExistsSync(pathResolver.rootResolve('knowledge/personal/my-vision.md'))).toBe(true);
-    expect(safeExistsSync(pathResolver.rootResolve('knowledge/personal/agent-identity.json'))).toBe(true);
+    expect(safeExistsSync(pathResolver.rootResolve('knowledge/personal/agent-identity.json'))).toBe(
+      true
+    );
   });
 
   it('accepts explicit Slack confirmation phrases for the default agent id', () => {
@@ -305,7 +358,9 @@ describe.sequential('Channel surface agents', () => {
 
     expect(current.completed).toBe(true);
     const agentIdentity = JSON.parse(
-      safeReadFile(pathResolver.rootResolve('knowledge/personal/agent-identity.json'), { encoding: 'utf8' }) as string
+      safeReadFile(pathResolver.rootResolve('knowledge/personal/agent-identity.json'), {
+        encoding: 'utf8',
+      }) as string
     );
     expect(agentIdentity.agent_id).toBe('KYBERION-PRIME');
   });
@@ -417,15 +472,18 @@ describe.sequential('Channel surface agents', () => {
 
   it('includes delegated response context when building the summary prompt', async () => {
     process.env.KYBERION_DISABLE_AGENT_RUNTIME_SUPERVISOR_DAEMON = '1';
-    const ask = vi.fn()
-      .mockResolvedValueOnce('```a2a\n{"header":{"receiver":"nerve-agent","performative":"request"},"payload":{"text":"help"}}\n```')
+    const ask = vi
+      .fn()
+      .mockResolvedValueOnce(
+        '```a2a\n{"header":{"receiver":"nerve-agent","performative":"request"},"payload":{"text":"help"}}\n```'
+      )
       .mockResolvedValueOnce('final slack reply');
 
     const spawnSpy = vi.spyOn(core.agentLifecycle, 'spawn').mockResolvedValue({
       agentId: 'slack-surface-agent',
       ask,
       shutdown: async () => {},
-      getRecord: () => ({ status: 'ready' } as any),
+      getRecord: () => ({ status: 'ready' }) as any,
     } as any);
 
     const routeSpy = vi.spyOn(core.a2aBridge, 'route').mockResolvedValue({
@@ -445,7 +503,8 @@ describe.sequential('Channel surface agents', () => {
     expect(routeSpy).toHaveBeenCalled();
     expect(ask).toHaveBeenNthCalledWith(
       2,
-      expect.stringContaining('- nerve-agent: delegated answer')
+      expect.stringContaining('- nerve-agent: delegated answer'),
+      expect.objectContaining({ model_tier: 'fast' })
     );
 
     spawnSpy.mockRestore();
@@ -457,7 +516,7 @@ describe.sequential('Channel surface agents', () => {
       agentId: 'slack-surface-agent',
       ask: vi.fn(),
       shutdown: async () => {},
-      getRecord: () => ({ status: 'ready' } as any),
+      getRecord: () => ({ status: 'ready' }) as any,
     } as any);
 
     const routeSpy = vi.spyOn(core.a2aBridge, 'route').mockResolvedValue({
@@ -490,7 +549,7 @@ describe.sequential('Channel surface agents', () => {
             execution_mode: 'conversation',
           }),
         }),
-      }),
+      })
     );
 
     spawnSpy.mockRestore();
@@ -502,7 +561,7 @@ describe.sequential('Channel surface agents', () => {
       agentId: 'slack-surface-agent',
       ask: vi.fn(),
       shutdown: async () => {},
-      getRecord: () => ({ status: 'ready' } as any),
+      getRecord: () => ({ status: 'ready' }) as any,
     } as any);
 
     const routeSpy = vi.spyOn(core.a2aBridge, 'route').mockResolvedValue({
@@ -527,17 +586,19 @@ describe.sequential('Channel surface agents', () => {
     });
 
     expect(spawnSpy).not.toHaveBeenCalled();
-    expect(routeSpy).toHaveBeenCalledWith(expect.objectContaining({
-      payload: expect.objectContaining({
-        intent: 'request_marketing_material',
-        text: 'Kyberionのコンセプトを説明する資料を作ってくれないかな？',
-        context: expect.objectContaining({
-          execution_mode: 'conversation',
-          channel: 'slack',
-          slack_channel: 'C123',
+    expect(routeSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          intent: 'request_marketing_material',
+          text: 'Kyberionのコンセプトを説明する資料を作ってくれないかな？',
+          context: expect.objectContaining({
+            execution_mode: 'conversation',
+            channel: 'slack',
+            slack_channel: 'C123',
+          }),
         }),
-      }),
-    }));
+      })
+    );
     expect(result.text).toBe('短く説明できます。まず対象読者を決めましょう。');
 
     spawnSpy.mockRestore();
@@ -548,7 +609,8 @@ describe.sequential('Channel surface agents', () => {
     process.env.KYBERION_DISABLE_AGENT_RUNTIME_SUPERVISOR_DAEMON = '1';
     const missionId = 'MSN-TEAM-ROUTING';
     const missionPath = core.missionDir(missionId, 'public');
-    const ask = vi.fn()
+    const ask = vi
+      .fn()
       .mockResolvedValueOnce('initial response without explicit a2a')
       .mockResolvedValueOnce('team-routed final reply');
 
@@ -556,7 +618,7 @@ describe.sequential('Channel surface agents', () => {
       agentId: 'chronos-mirror',
       ask,
       shutdown: async () => {},
-      getRecord: () => ({ status: 'ready' } as any),
+      getRecord: () => ({ status: 'ready' }) as any,
     } as any);
 
     const routeSpy = vi.spyOn(core.a2aBridge, 'route').mockResolvedValue({
@@ -568,26 +630,30 @@ describe.sequential('Channel surface agents', () => {
     process.env.MISSION_ROLE = 'mission_controller';
     core.safeWriteFile(
       `${missionPath}/team-composition.json`,
-      JSON.stringify({
-        mission_id: missionId,
-        mission_type: 'development',
-        tier: 'public',
-        template: 'development',
-        generated_at: new Date().toISOString(),
-        assignments: [
-          {
-            team_role: 'implementer',
-            required: true,
-            status: 'assigned',
-            agent_id: 'implementation-architect',
-            authority_role: 'ecosystem_architect',
-            provider: 'gemini',
-            modelId: 'gemini-2.5-pro',
-            required_capabilities: ['code'],
-            notes: 'matched',
-          },
-        ],
-      }, null, 2),
+      JSON.stringify(
+        {
+          mission_id: missionId,
+          mission_type: 'development',
+          tier: 'public',
+          template: 'development',
+          generated_at: new Date().toISOString(),
+          assignments: [
+            {
+              team_role: 'implementer',
+              required: true,
+              status: 'assigned',
+              agent_id: 'implementation-architect',
+              authority_role: 'ecosystem_architect',
+              provider: 'gemini',
+              modelId: 'gemini-2.5-pro',
+              required_capabilities: ['code'],
+              notes: 'matched',
+            },
+          ],
+        },
+        null,
+        2
+      )
     );
 
     const result = await runSurfaceConversation({
@@ -605,7 +671,7 @@ describe.sequential('Channel surface agents', () => {
         header: expect.objectContaining({
           receiver: 'implementation-architect',
         }),
-      }),
+      })
     );
 
     spawnSpy.mockRestore();
@@ -615,12 +681,14 @@ describe.sequential('Channel surface agents', () => {
   });
 
   it('extracts nerve routing proposals from delegated responses', () => {
-    const parsed = extractSurfaceBlocks([
-      'Delegation recommended.',
-      '```nerve_route',
-      '{"intent":"delegate_task","mission_id":"MSN-NERVE-ROUTE","team_role":"implementer","task_summary":"Implement the requested change","why":"Needs code changes"}',
-      '```',
-    ].join('\n'));
+    const parsed = extractSurfaceBlocks(
+      [
+        'Delegation recommended.',
+        '```nerve_route',
+        '{"intent":"delegate_task","mission_id":"MSN-NERVE-ROUTE","team_role":"implementer","task_summary":"Implement the requested change","why":"Needs code changes"}',
+        '```',
+      ].join('\n')
+    );
 
     expect(parsed.text).toBe('Delegation recommended.');
     expect(parsed.routingProposals).toHaveLength(1);

@@ -4,18 +4,23 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // finishMission fires real operator notifications (deliverable_ready /
 // mission_completed); without this mock every battery run appends phantom
 // entries to the REAL inbox (dev-practices §3).
-vi.mock('@agent/core', async () => {
-  const actual = await vi.importActual<Record<string, unknown>>('@agent/core');
+// SO-01: mission-lifecycle.ts now imports notifyOperator directly from its
+// libs/core sibling module (not the @agent/core barrel) — the mock must
+// target the same specifier or vitest won't intercept the real call.
+vi.mock('./operator-notifications.js', async () => {
+  const actual = await vi.importActual<Record<string, unknown>>('./operator-notifications.js');
   return { ...actual, notifyOperator: vi.fn().mockResolvedValue(true) };
 });
 
 import {
   buildArtifactReviewReceipt,
-  customerResolver,
-  emitIntentSnapshot,
   hashArtifactForReview,
   inferArtifactReviewKind,
-  pathResolver,
+} from './artifact-review.js';
+import * as customerResolver from './customer-resolver.js';
+import { emitIntentSnapshot } from './intent-snapshot-store.js';
+import * as pathResolver from './path-resolver.js';
+import {
   safeExec,
   safeExistsSync,
   safeMkdir,
@@ -23,8 +28,8 @@ import {
   safeReadFile,
   safeRmSync,
   safeWriteFile,
-  transitionStatus,
-} from '@agent/core';
+} from './secure-io.js';
+import { transitionStatus } from './mission-status.js';
 import {
   collectMissionEvidence,
   evaluateMissionFinishExitGate,

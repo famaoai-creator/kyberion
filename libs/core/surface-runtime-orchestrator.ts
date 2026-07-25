@@ -1,6 +1,8 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { queryKnowledge, queryKnowledgeHybrid } from './src/knowledge-index.js';
+import { deriveSurfaceSessionId } from './orchestrator-session.js';
+import { missionSteeringRouteHandler } from './surface-mission-steering.js';
 
 import { pathResolver } from './path-resolver.js';
 import { secureFetch } from './network.js';
@@ -22,6 +24,8 @@ import {
   formatClarificationPacketConcise,
 } from './intent-contract.js';
 import { logger } from './core.js';
+import { recordReasoningTierDeclaration } from './reasoning-tier-declaration.js';
+import type { AgentHandle } from './agent-lifecycle.js';
 import { triggerBackgroundReviewFork } from './background-review-runner.js';
 import { repairSurfaceUxContractText, validateSurfaceUxContract } from './surface-ux-contract.js';
 import {
@@ -1805,6 +1809,92 @@ async function ensureSurfaceAgent(agentId: string, cwd?: string) {
   }
 }
 
+// SO-05: model-tier declarations for the surface conversation front (see
+// libs/core/surface-reasoning-tier-boundary.test.ts for the registration
+// ceremony that keeps every reasoning call in this file declared). Recorded
+// through a structured logger event — the lightest existing mechanism OP-01
+// / trace tooling can aggregate without a new subsystem. The recorder itself
+// now lives in reasoning-tier-declaration.ts (SO-05 back half) so
+// orchestrator-judgment call sites elsewhere (intent-reconciliation.ts,
+// mission-lifecycle.ts, surface-mission-steering.ts) can log through the
+// same mechanism without depending on this module; this wrapper keeps the
+// narrower call-site union and the existing name for this file's 3 call
+// sites unchanged.
+type SurfaceReasoningTierCallSite =
+  | 'surface_intent_compile'
+  | 'surface_main_ask'
+  | 'surface_summary_ask';
+
+function recordSurfaceReasoningTierDeclaration(input: {
+  callSite: SurfaceReasoningTierCallSite;
+  declaredTier: 'fast' | 'standard' | 'deep';
+  escalatedReason?: string;
+}): void {
+  recordReasoningTierDeclaration(input);
+}
+
+/**
+ * SO-05 Task 3: one-shot fast→standard escalation for the *text* of a surface
+ * agent response that is about to become the user-visible reply. Runs INSIDE
+ * runSurfaceConversation (not the outer runSurfaceMessageConversation
+ * wrapper) because a fresh top-level re-ask would re-run routing/delegation
+ * and their side effects — this only re-asks the same handle with the same
+ * turn's prompt, never re-enters routing. Callers pass only the already
+ * `extractSurfaceBlocks`-derived `.text`; structured blocks (a2aMessages,
+ * approvalRequests, …) that were already acted on for this turn are left
+ * untouched by escalation.
+ *
+ * Escalates at most once per call: fast response → validate → repair →
+ * validate → standard re-ask (no further validation/repair loop — the outer
+ * `runSurfaceMessageConversation` chokepoint still runs its own unchanged
+ * validate/repair pass on the final text and is the last word).
+ */
+async function escalateSurfaceTextIfNeeded(
+  handle: AgentHandle,
+  prompt: string,
+  text: string,
+  callSite: SurfaceReasoningTierCallSite
+): Promise<string> {
+  // Empty text (e.g. a2a-only agent turns) keeps its pre-escalation handling:
+  // the outer chokepoint's deterministic repair is responsible for shaping it.
+  if (!text.trim()) return text;
+
+  const verdict = validateSurfaceUxContract({ text });
+  if (verdict.valid) return text;
+
+  const repairedText = repairSurfaceUxContractText(text);
+  if (repairedText !== text && validateSurfaceUxContract({ text: repairedText }).valid) {
+    return repairedText;
+  }
+
+  const escalationReason = 'ux_contract_validation_failed';
+  recordSurfaceReasoningTierDeclaration({
+    callSite,
+    declaredTier: 'standard',
+    escalatedReason: escalationReason,
+  });
+  const escalatedPrompt = [
+    prompt,
+    '',
+    `[Escalation notice: the previous fast-tier response failed UX-contract validation (${escalationReason}) and could not be auto-repaired. Regenerate a compliant response for the same request.]`,
+  ].join('\n');
+  // Fail-open on every escalation defect (throw, non-string, empty): the
+  // conversation must never get worse because the escalation attempt failed —
+  // fall back to the original text and let the outer chokepoint repair it,
+  // which is exactly the pre-escalation behavior.
+  try {
+    const escalatedRawText = await handle.ask(escalatedPrompt, { model_tier: 'standard' });
+    if (typeof escalatedRawText !== 'string' || !escalatedRawText.trim()) return text;
+    const escalatedText = extractSurfaceBlocks(escalatedRawText).text;
+    return escalatedText || escalatedRawText;
+  } catch (error: any) {
+    logger.warn(
+      `[surface_reasoning_tier_escalation_failed] call_site=${callSite} escalation_reason=${escalationReason} error=${error?.message || String(error)}`
+    );
+    return text;
+  }
+}
+
 export function deriveSlackIntentLabel(text: string): string {
   return deriveSurfaceIntentLabelFromProviderPolicy('slack', text);
 }
@@ -2046,6 +2136,12 @@ async function handlePresenceForcedBypass(
 }
 
 const SURFACE_RUNTIME_ROUTE_HANDLERS: SurfaceRuntimeRouteHandler[] = [
+  // SO-04: mission steering only matches when the thread already holds an
+  // active OrchestratorSession AND the message is an explicit steering
+  // phrase (rule-based, conservative) — see surface-mission-steering.ts.
+  // Placed first: a session-owning thread's steering intent must never be
+  // reinterpreted by intent-compile-based routing below.
+  missionSteeringRouteHandler,
   {
     matches: (context) => {
       if (!context.compiledFlow) return false;
@@ -2176,12 +2272,21 @@ export async function runSurfaceConversation(
     routingText,
     ruleBasedReceiver
   )
-    ? await compileUserIntentFlow({
-        text: originalText,
-        channel: surface || 'surface',
-        correlationId: input.correlationId,
-        runtimeContext: buildPendingRuntimeContext(pendingIntent, input),
-      }).catch((error: any) => {
+    ? await (() => {
+        recordSurfaceReasoningTierDeclaration({
+          callSite: 'surface_intent_compile',
+          declaredTier: 'fast',
+        });
+        return compileUserIntentFlow(
+          {
+            text: originalText,
+            channel: surface || 'surface',
+            correlationId: input.correlationId,
+            runtimeContext: buildPendingRuntimeContext(pendingIntent, input),
+          },
+          { model_tier: 'fast' }
+        );
+      })().catch((error: any) => {
         logger.warn(
           `[SURFACE] Intent contract compilation failed: ${error?.message || String(error)}`
         );
@@ -2261,7 +2366,8 @@ export async function runSurfaceConversation(
   }
 
   const handle = await ensureSurfaceAgent(input.agentId, input.cwd);
-  const firstResponse = await handle.ask(structuredQuery);
+  const firstResponse = await handle.ask(structuredQuery, { model_tier: 'fast' });
+  recordSurfaceReasoningTierDeclaration({ callSite: 'surface_main_ask', declaredTier: 'fast' });
   const firstBlocks = extractSurfaceBlocks(firstResponse);
   let delegationResults: SurfaceDelegationResult[] = [];
   const delegationFallbackText = buildDelegationFallbackText(structuredQuery);
@@ -2289,8 +2395,14 @@ export async function runSurfaceConversation(
   }
 
   if (delegationResults.length === 0) {
+    const mainAskText = await escalateSurfaceTextIfNeeded(
+      handle,
+      structuredQuery,
+      firstBlocks.text,
+      'surface_main_ask'
+    );
     return attachExecutionFeedbackPrompt(
-      attachRoutingDecision(firstBlocks, compiledFlow?.routingDecision),
+      attachRoutingDecision({ ...firstBlocks, text: mainAskText }, compiledFlow?.routingDecision),
       compiledFlow,
       input
     );
@@ -2308,10 +2420,17 @@ export async function runSurfaceConversation(
   const finalDelegationResults = [...delegationResults, ...routedDelegationResults];
 
   if (successful.length === 0 && routedDelegationResults.length === 0) {
+    const mainAskText = await escalateSurfaceTextIfNeeded(
+      handle,
+      structuredQuery,
+      firstBlocks.text,
+      'surface_main_ask'
+    );
     return attachExecutionFeedbackPrompt(
       attachRoutingDecision(
         {
           ...firstBlocks,
+          text: mainAskText,
           delegationResults: finalDelegationResults,
           approvalRequests: firstBlocks.approvalRequests,
           routingProposals,
@@ -2334,8 +2453,16 @@ export async function runSurfaceConversation(
     delegationResults: finalDelegationResults,
   })}`;
 
-  const followUpResponse = await handle.ask(summaryPrompt);
-  const followUpBlocks = extractSurfaceBlocks(followUpResponse);
+  const followUpResponse = await handle.ask(summaryPrompt, { model_tier: 'fast' });
+  recordSurfaceReasoningTierDeclaration({ callSite: 'surface_summary_ask', declaredTier: 'fast' });
+  const followUpBlocksRaw = extractSurfaceBlocks(followUpResponse);
+  const followUpText = await escalateSurfaceTextIfNeeded(
+    handle,
+    summaryPrompt,
+    followUpBlocksRaw.text,
+    'surface_summary_ask'
+  );
+  const followUpBlocks = { ...followUpBlocksRaw, text: followUpText };
 
   return attachExecutionFeedbackPrompt(
     attachRoutingDecision(
@@ -2369,12 +2496,10 @@ export async function runSurfaceMessageConversation(
   // correlation id is per message, so derive the stable session key from the
   // surface/channel/thread tuple instead.
   try {
-    const sessionKey = [
-      input.surface,
-      input.channel || 'default',
-      input.threadTs || 'default',
-    ].join(':');
-    const sessionId = `surface-${createHash('sha256').update(sessionKey).digest('hex').slice(0, 32)}`;
+    // SO-02: single source of truth for this derivation lives in
+    // orchestrator-session.ts (deriveSurfaceSessionId) — kept byte-identical
+    // to what was inlined here so existing session ids never change.
+    const sessionId = deriveSurfaceSessionId(input.surface, input.channel, input.threadTs);
     const trigger = triggerBackgroundReviewFork({
       sessionId,
       nudgeConfig: { turnThreshold: 10, toolThreshold: 10 },
