@@ -22,6 +22,8 @@ import {
   formatClarificationPacketConcise,
 } from './intent-contract.js';
 import { logger } from './core.js';
+import { createLogger } from './logger.js';
+import type { AgentHandle } from './agent-lifecycle.js';
 import { triggerBackgroundReviewFork } from './background-review-runner.js';
 import { repairSurfaceUxContractText, validateSurfaceUxContract } from './surface-ux-contract.js';
 import {
@@ -1805,6 +1807,77 @@ async function ensureSurfaceAgent(agentId: string, cwd?: string) {
   }
 }
 
+// SO-05: model-tier declarations for the surface conversation front (see
+// libs/core/surface-reasoning-tier-boundary.test.ts for the registration
+// ceremony that keeps every reasoning call in this file declared). Recorded
+// through a structured logger event — the lightest existing mechanism OP-01
+// / trace tooling can aggregate without a new subsystem.
+const surfaceReasoningTierLogger = createLogger('surface-reasoning-tier');
+
+type SurfaceReasoningTierCallSite =
+  | 'surface_intent_compile'
+  | 'surface_main_ask'
+  | 'surface_summary_ask';
+
+function recordSurfaceReasoningTierDeclaration(input: {
+  callSite: SurfaceReasoningTierCallSite;
+  declaredTier: 'fast' | 'standard' | 'deep';
+  escalatedReason?: string;
+}): void {
+  surfaceReasoningTierLogger.info('surface_reasoning_tier_declared', {
+    call_site: input.callSite,
+    declared_tier: input.declaredTier,
+    escalated: Boolean(input.escalatedReason),
+    ...(input.escalatedReason ? { escalation_reason: input.escalatedReason } : {}),
+  });
+}
+
+/**
+ * SO-05 Task 3: one-shot fast→standard escalation for the *text* of a surface
+ * agent response that is about to become the user-visible reply. Runs INSIDE
+ * runSurfaceConversation (not the outer runSurfaceMessageConversation
+ * wrapper) because a fresh top-level re-ask would re-run routing/delegation
+ * and their side effects — this only re-asks the same handle with the same
+ * turn's prompt, never re-enters routing. Callers pass only the already
+ * `extractSurfaceBlocks`-derived `.text`; structured blocks (a2aMessages,
+ * approvalRequests, …) that were already acted on for this turn are left
+ * untouched by escalation.
+ *
+ * Escalates at most once per call: fast response → validate → repair →
+ * validate → standard re-ask (no further validation/repair loop — the outer
+ * `runSurfaceMessageConversation` chokepoint still runs its own unchanged
+ * validate/repair pass on the final text and is the last word).
+ */
+async function escalateSurfaceTextIfNeeded(
+  handle: AgentHandle,
+  prompt: string,
+  text: string,
+  callSite: SurfaceReasoningTierCallSite
+): Promise<string> {
+  const verdict = validateSurfaceUxContract({ text });
+  if (verdict.valid) return text;
+
+  const repairedText = repairSurfaceUxContractText(text);
+  if (repairedText !== text && validateSurfaceUxContract({ text: repairedText }).valid) {
+    return repairedText;
+  }
+
+  const escalationReason = 'ux_contract_validation_failed';
+  recordSurfaceReasoningTierDeclaration({
+    callSite,
+    declaredTier: 'standard',
+    escalatedReason: escalationReason,
+  });
+  const escalatedPrompt = [
+    prompt,
+    '',
+    `[Escalation notice: the previous fast-tier response failed UX-contract validation (${escalationReason}) and could not be auto-repaired. Regenerate a compliant response for the same request.]`,
+  ].join('\n');
+  const escalatedRawText = await handle.ask(escalatedPrompt, { model_tier: 'standard' });
+  const escalatedText = extractSurfaceBlocks(escalatedRawText).text;
+  return escalatedText || escalatedRawText;
+}
+
 export function deriveSlackIntentLabel(text: string): string {
   return deriveSurfaceIntentLabelFromProviderPolicy('slack', text);
 }
@@ -2176,12 +2249,21 @@ export async function runSurfaceConversation(
     routingText,
     ruleBasedReceiver
   )
-    ? await compileUserIntentFlow({
-        text: originalText,
-        channel: surface || 'surface',
-        correlationId: input.correlationId,
-        runtimeContext: buildPendingRuntimeContext(pendingIntent, input),
-      }).catch((error: any) => {
+    ? await (() => {
+        recordSurfaceReasoningTierDeclaration({
+          callSite: 'surface_intent_compile',
+          declaredTier: 'fast',
+        });
+        return compileUserIntentFlow(
+          {
+            text: originalText,
+            channel: surface || 'surface',
+            correlationId: input.correlationId,
+            runtimeContext: buildPendingRuntimeContext(pendingIntent, input),
+          },
+          { model_tier: 'fast' }
+        );
+      })().catch((error: any) => {
         logger.warn(
           `[SURFACE] Intent contract compilation failed: ${error?.message || String(error)}`
         );
@@ -2261,7 +2343,8 @@ export async function runSurfaceConversation(
   }
 
   const handle = await ensureSurfaceAgent(input.agentId, input.cwd);
-  const firstResponse = await handle.ask(structuredQuery);
+  const firstResponse = await handle.ask(structuredQuery, { model_tier: 'fast' });
+  recordSurfaceReasoningTierDeclaration({ callSite: 'surface_main_ask', declaredTier: 'fast' });
   const firstBlocks = extractSurfaceBlocks(firstResponse);
   let delegationResults: SurfaceDelegationResult[] = [];
   const delegationFallbackText = buildDelegationFallbackText(structuredQuery);
@@ -2289,8 +2372,14 @@ export async function runSurfaceConversation(
   }
 
   if (delegationResults.length === 0) {
+    const mainAskText = await escalateSurfaceTextIfNeeded(
+      handle,
+      structuredQuery,
+      firstBlocks.text,
+      'surface_main_ask'
+    );
     return attachExecutionFeedbackPrompt(
-      attachRoutingDecision(firstBlocks, compiledFlow?.routingDecision),
+      attachRoutingDecision({ ...firstBlocks, text: mainAskText }, compiledFlow?.routingDecision),
       compiledFlow,
       input
     );
@@ -2308,10 +2397,17 @@ export async function runSurfaceConversation(
   const finalDelegationResults = [...delegationResults, ...routedDelegationResults];
 
   if (successful.length === 0 && routedDelegationResults.length === 0) {
+    const mainAskText = await escalateSurfaceTextIfNeeded(
+      handle,
+      structuredQuery,
+      firstBlocks.text,
+      'surface_main_ask'
+    );
     return attachExecutionFeedbackPrompt(
       attachRoutingDecision(
         {
           ...firstBlocks,
+          text: mainAskText,
           delegationResults: finalDelegationResults,
           approvalRequests: firstBlocks.approvalRequests,
           routingProposals,
@@ -2334,8 +2430,16 @@ export async function runSurfaceConversation(
     delegationResults: finalDelegationResults,
   })}`;
 
-  const followUpResponse = await handle.ask(summaryPrompt);
-  const followUpBlocks = extractSurfaceBlocks(followUpResponse);
+  const followUpResponse = await handle.ask(summaryPrompt, { model_tier: 'fast' });
+  recordSurfaceReasoningTierDeclaration({ callSite: 'surface_summary_ask', declaredTier: 'fast' });
+  const followUpBlocksRaw = extractSurfaceBlocks(followUpResponse);
+  const followUpText = await escalateSurfaceTextIfNeeded(
+    handle,
+    summaryPrompt,
+    followUpBlocksRaw.text,
+    'surface_summary_ask'
+  );
+  const followUpBlocks = { ...followUpBlocksRaw, text: followUpText };
 
   return attachExecutionFeedbackPrompt(
     attachRoutingDecision(

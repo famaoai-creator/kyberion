@@ -243,6 +243,59 @@ describe('agent_runtime_supervisor_daemon', () => {
     await Promise.all([pending1, pending2]);
   }, 90000);
 
+  it('decodes ask requests with and without the optional model_tier field (SO-05)', async () => {
+    // SO-05: model_tier is an optional, tolerant field on the ask payload —
+    // an old client that omits it must still be served, and a client that
+    // sets it must have the daemon forward it as `modelTier` to
+    // askAgentRuntime. No protocol version bump required.
+    instance = await startAgentRuntimeSupervisorDaemon({
+      transport: 'unix',
+      socketPath,
+      lockPath,
+      exitOnFatalError: false,
+      exitOnExistingHealthyDaemon: false,
+    });
+
+    await expect(
+      sendRequest(socketPath, {
+        id: 'with-tier',
+        method: 'ask',
+        payload: {
+          agentId: 'agent-1',
+          prompt: 'hello',
+          requestedBy: 'test',
+          model_tier: 'standard',
+        },
+      })
+    ).resolves.toMatchObject({ ok: true, result: { text: 'daemon-ask' } });
+    expect(mocks.askAgentRuntime).toHaveBeenCalledWith(
+      'agent-1',
+      'hello',
+      'test',
+      expect.objectContaining({ modelTier: 'standard' })
+    );
+
+    mocks.askAgentRuntime.mockClear();
+
+    await expect(
+      sendRequest(socketPath, {
+        id: 'without-tier',
+        method: 'ask',
+        payload: {
+          agentId: 'agent-1',
+          prompt: 'hello',
+          requestedBy: 'test',
+        },
+      })
+    ).resolves.toMatchObject({ ok: true, result: { text: 'daemon-ask' } });
+    expect(mocks.askAgentRuntime).toHaveBeenCalledWith(
+      'agent-1',
+      'hello',
+      'test',
+      expect.objectContaining({ modelTier: undefined })
+    );
+  }, 90000);
+
   it('returns a typed error for malformed JSON requests', async () => {
     instance = await startAgentRuntimeSupervisorDaemon({
       transport: 'unix',

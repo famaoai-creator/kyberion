@@ -97,6 +97,13 @@ export interface AgentRuntimeSupervisorAskPayload {
   requestedBy: string;
   correlationId?: string;
   taskModelHint?: TaskModelHint;
+  /**
+   * SO-05: declared reasoning tier for this ask (fast/standard/deep).
+   * Optional and tolerant on both ends — an old daemon build ignores the
+   * field (extra JSON property), and a new daemon build accepts requests
+   * from an old client that omits it. No protocol version bump needed.
+   */
+  model_tier?: 'fast' | 'standard' | 'deep';
 }
 
 const SOCKET_DIR = pathResolver.shared('runtime/agent-supervisor');
@@ -357,8 +364,16 @@ export function createSupervisorBackedAgentHandle(
 ): AgentHandle {
   return {
     agentId,
-    ask: async (prompt: string) => {
-      const result = await askAgentRuntimeViaDaemon({ agentId, prompt, requestedBy });
+    ask: async (
+      prompt: string,
+      options: { timeoutMs?: number; model_tier?: 'fast' | 'standard' | 'deep' } = {}
+    ) => {
+      const result = await askAgentRuntimeViaDaemon({
+        agentId,
+        prompt,
+        requestedBy,
+        model_tier: options.model_tier,
+      });
       return result.text;
     },
     shutdown: async () => {
