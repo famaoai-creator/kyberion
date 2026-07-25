@@ -62,6 +62,44 @@ export interface ScanRuntimeResult {
   deleted: string[];
 }
 
+/**
+ * XP-06 zombie sweep: shape mirrors (deliberately duplicated, not imported —
+ * see the comment on `DELEGATION_CHILDREN_REGISTRY_SUBPATH` below)
+ * `DelegationChildRecord` in `delegation-concurrency.ts`, the module that
+ * writes this registry in real time as CLI delegations start/finish.
+ */
+export interface DelegationChildRecord {
+  id: string;
+  provider: string;
+  pid?: number;
+  startedAt: string;
+  deadlineAt: string;
+  budgetMs: number;
+}
+
+/**
+ * Kept as a literal (not imported from `delegation-concurrency.ts`) so this
+ * module's existing test-mocking convention (`vi.mock('./path-resolver.js', ...)`
+ * with a minimal named-export surface) keeps working unchanged — importing
+ * the sibling module would pull in `semaphore.ts` and its own lazy
+ * `kill-switch.ts` wiring, none of which this file needs. Keep this string
+ * in sync with `DELEGATION_CHILDREN_REGISTRY_SUBPATH` if either changes.
+ */
+const DELEGATION_CHILDREN_REGISTRY_SUBPATH = 'runtime/delegation-children.json';
+
+export interface SweepDelegationChildrenOptions {
+  dryRun: boolean;
+  now?: () => number;
+  /** Injectable kill seam — production defaults to `process.kill`. Tests MUST inject a fake; never touch real processes. */
+  killFn?: (pid: number, signal: NodeJS.Signals) => void;
+}
+
+export interface SweepDelegationChildrenResult {
+  stale: DelegationChildRecord[];
+  killed: DelegationChildRecord[];
+  errors: string[];
+}
+
 export interface JanitorReport {
   expiredTmp: number;
   deletedTmp: number;
@@ -71,6 +109,8 @@ export interface JanitorReport {
   deletedDataVault: number;
   expiredRuntime: number;
   deletedRuntime: number;
+  staleDelegationChildren: number;
+  killedDelegationChildren: number;
   errors: string[];
   timestamp: string;
   dryRun: boolean;
@@ -223,6 +263,82 @@ export function scanRuntime(opts: { dryRun: boolean }): ScanRuntimeResult {
   return { expired, deleted };
 }
 
+function readDelegationChildrenRegistry(): DelegationChildRecord[] {
+  const filePath = shared(DELEGATION_CHILDREN_REGISTRY_SUBPATH);
+  if (!safeExistsSync(filePath)) return [];
+  const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
+  const parsed = JSON.parse(raw);
+  return Array.isArray(parsed) ? parsed : [];
+}
+
+function writeDelegationChildrenRegistry(records: DelegationChildRecord[]): void {
+  safeWriteFile(shared(DELEGATION_CHILDREN_REGISTRY_SUBPATH), JSON.stringify(records, null, 2));
+}
+
+/**
+ * XP-06 zombie sweep: reap orphaned CLI child processes whose wall-clock
+ * budget (`delegation-concurrency.ts` `withWallClockBudget`) expired without
+ * the in-process SIGTERM->SIGKILL escalation completing — e.g. the Kyberion
+ * process itself exited or restarted between the timeout firing and the
+ * grace window elapsing, orphaning the child. This is the maintenance-loop
+ * half of XP-06's process-face resource budget; the real-time half lives in
+ * `delegation-concurrency.ts`.
+ *
+ * Follows the janitor's existing dry-run convention: dry-run reports
+ * staleness (past `deadlineAt`) without killing anything or mutating the
+ * registry file; real mode kills stale PIDs and removes their records.
+ * Records without a numeric `pid` are reported as stale but never passed to
+ * `killFn` (nothing to kill) and are dropped from the registry alongside the
+ * ones that were killed.
+ */
+export function sweepDelegationChildren(
+  opts: SweepDelegationChildrenOptions
+): SweepDelegationChildrenResult {
+  const now = opts.now ?? Date.now;
+  const killFn =
+    opts.killFn ?? ((pid: number, signal: NodeJS.Signals) => process.kill(pid, signal));
+  const errors: string[] = [];
+
+  let records: DelegationChildRecord[] = [];
+  try {
+    records = readDelegationChildrenRegistry();
+  } catch (err: any) {
+    errors.push(`read: ${err?.message ?? String(err)}`);
+    return { stale: [], killed: [], errors };
+  }
+
+  const nowMs = now();
+  const stale = records.filter((r) => {
+    const deadline = Date.parse(r.deadlineAt);
+    return Number.isFinite(deadline) && deadline <= nowMs;
+  });
+
+  const killed: DelegationChildRecord[] = [];
+  if (!opts.dryRun && stale.length > 0) {
+    for (const record of stale) {
+      if (typeof record.pid !== 'number') continue;
+      try {
+        killFn(record.pid, 'SIGKILL');
+        killed.push(record);
+        logger.warn(
+          `[JANITOR] reaped orphaned delegation child pid=${record.pid} provider=${record.provider} id=${record.id}`
+        );
+      } catch (err: any) {
+        errors.push(`pid ${record.pid}: ${err?.message ?? String(err)}`);
+      }
+    }
+    const staleIds = new Set(stale.map((r) => r.id));
+    const remaining = records.filter((r) => !staleIds.has(r.id));
+    try {
+      writeDelegationChildrenRegistry(remaining);
+    } catch (err: any) {
+      errors.push(`write: ${err?.message ?? String(err)}`);
+    }
+  }
+
+  return { stale, killed, errors };
+}
+
 export function runJanitor(opts: { dryRun: boolean }): JanitorReport {
   const errors: string[] = [];
 
@@ -254,6 +370,18 @@ export function runJanitor(opts: { dryRun: boolean }): JanitorReport {
     errors.push(`runtime: ${err?.message ?? String(err)}`);
   }
 
+  let delegationChildrenResult: SweepDelegationChildrenResult = {
+    stale: [],
+    killed: [],
+    errors: [],
+  };
+  try {
+    delegationChildrenResult = sweepDelegationChildren({ dryRun: opts.dryRun });
+    errors.push(...delegationChildrenResult.errors);
+  } catch (err: any) {
+    errors.push(`delegation-children: ${err?.message ?? String(err)}`);
+  }
+
   const report: JanitorReport = {
     expiredTmp: tmpResult.expired.length,
     deletedTmp: tmpResult.deleted.length,
@@ -263,6 +391,8 @@ export function runJanitor(opts: { dryRun: boolean }): JanitorReport {
     deletedDataVault: vaultResult.deleted.length,
     expiredRuntime: runtimeResult.expired.length,
     deletedRuntime: runtimeResult.deleted.length,
+    staleDelegationChildren: delegationChildrenResult.stale.length,
+    killedDelegationChildren: delegationChildrenResult.killed.length,
     errors,
     timestamp: new Date().toISOString(),
     dryRun: opts.dryRun,

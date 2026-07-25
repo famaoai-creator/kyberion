@@ -13,6 +13,12 @@ import {
   type ToolCallRepeatGovernorState,
 } from './tool-call-repeat-governor.js';
 import { getDefaultWorkerEventStream, type WorkerEventStream } from './worker-event-stream.js';
+import {
+  withDelegationSlot,
+  withWallClockBudget,
+  wireDelegationKillSwitchIntegration,
+} from './delegation-concurrency.js';
+import { providerIdForReasoningIdentifier } from './provider-egress-gate.js';
 import type {
   ReasoningBackend,
   ReasoningCallOptions,
@@ -25,6 +31,32 @@ import type { CanUseTool, McpServerConfig } from '@anthropic-ai/claude-agent-sdk
 
 /** Default tier for an in-session delegation that does not name one (backward compatible). */
 const DEFAULT_SUBAGENT_PROFILE = 'implementer';
+
+/**
+ * XP-06: best-effort provider id for concurrency/budget bucketing. An
+ * unresolved backend name shares the 'unknown' bucket (still governed by the
+ * global cap) rather than skipping governance entirely.
+ */
+function resolveDelegationProvider(backend: ReasoningBackend): string {
+  return providerIdForReasoningIdentifier(backend.name) ?? 'unknown';
+}
+
+/**
+ * XP-06 choke point shared by all three dispatchers: a global + per-provider
+ * concurrency semaphore and a wall-clock budget around the same unit of
+ * work each `dispatch()` implementation already did. See
+ * `delegation-concurrency.ts` for the "why env config, why no real child
+ * handle yet" design notes.
+ */
+function dispatchWithConcurrencyGovernance<T>(
+  backend: ReasoningBackend,
+  fn: () => Promise<T>
+): Promise<T> {
+  // Fire-and-forget, memoized — cheap after the first call.
+  wireDelegationKillSwitchIntegration();
+  const provider = resolveDelegationProvider(backend);
+  return withDelegationSlot({ provider }, () => withWallClockBudget({ provider }, fn));
+}
 
 /**
  * Agent dispatch (agent-runtime plane).
@@ -67,7 +99,9 @@ export class ProcessSpawnDispatcher implements AgentDispatcher {
     context: string | undefined,
     backend: ReasoningBackend
   ): Promise<string> {
-    return backend.delegateTask(instruction, context);
+    return dispatchWithConcurrencyGovernance(backend, () =>
+      backend.delegateTask(instruction, context)
+    );
   }
 }
 
@@ -88,7 +122,17 @@ export class InSessionDispatcher implements AgentDispatcher {
   private repeatGovernor: ToolCallRepeatGovernorState = createToolCallRepeatGovernorState();
   private pendingRepeatReminder: string | undefined;
 
-  async dispatch(
+  dispatch(
+    instruction: string,
+    context: string | undefined,
+    backend: ReasoningBackend
+  ): Promise<string> {
+    return dispatchWithConcurrencyGovernance(backend, () =>
+      this.dispatchInner(instruction, context, backend)
+    );
+  }
+
+  private async dispatchInner(
     instruction: string,
     context: string | undefined,
     backend: ReasoningBackend
@@ -99,7 +143,13 @@ export class InSessionDispatcher implements AgentDispatcher {
       logger.warn(
         '[agent-dispatch:in-session] Base backend lacks generateWithTools — falling back to process-spawn delegation.'
       );
-      return this.fallback.dispatch(instruction, context, backend);
+      // XP-06: call the backend directly rather than `this.fallback.dispatch`
+      // — `dispatchInner` already runs inside `dispatchWithConcurrencyGovernance`
+      // (see `dispatch()` above), and `ProcessSpawnDispatcher.dispatch` applies
+      // that same governance itself; nesting the two would double-count (and,
+      // under a saturated per-provider cap, self-deadlock: the outer slot
+      // would never free while waiting on an inner acquire from the same pool).
+      return backend.delegateTask(instruction, context);
     }
 
     // KD-05: the tier catalog is rebuilt from the registry on every dispatch,
@@ -162,7 +212,9 @@ export class InSessionDispatcher implements AgentDispatcher {
             true
           );
           this.repeatGovernor = createToolCallRepeatGovernorState();
-          return this.fallback.dispatch(instruction, context, backend);
+          // XP-06: see the comment on the other fallback path above — call
+          // the backend directly to avoid nesting concurrency governance.
+          return backend.delegateTask(instruction, context);
         }
         if (decision.reminder) {
           logger.warn(`[agent-dispatch:in-session] [repeat-governor] ${decision.reminder}`);
@@ -303,7 +355,18 @@ export class HarnessSubagentDispatcher implements AgentDispatcher {
     this.loadRuntime = deps.loadRuntime ?? loadDefaultGovernedRuntime;
   }
 
-  async dispatch(
+  dispatch(
+    instruction: string,
+    context: string | undefined,
+    backend: ReasoningBackend,
+    options?: ReasoningCallOptions
+  ): Promise<string> {
+    return dispatchWithConcurrencyGovernance(backend, () =>
+      this.dispatchInner(instruction, context, backend, options)
+    );
+  }
+
+  private async dispatchInner(
     instruction: string,
     context: string | undefined,
     backend: ReasoningBackend,
@@ -332,7 +395,12 @@ export class HarnessSubagentDispatcher implements AgentDispatcher {
         fallback_to: this.fallback.name,
         reason: message,
       });
-      return this.fallback.dispatch(instruction, context, backend, options);
+      // XP-06: call the backend directly rather than `this.fallback.dispatch`
+      // — this method already runs inside `dispatchWithConcurrencyGovernance`
+      // (see `dispatch()` below), and nesting it via `ProcessSpawnDispatcher`
+      // would double-wrap (and risk self-deadlock under a saturated
+      // per-provider cap). `this.fallback` is kept only for its `.name`.
+      return backend.delegateTask(instruction, context);
     }
 
     try {

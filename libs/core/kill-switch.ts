@@ -81,6 +81,38 @@ interface ActionLog {
   policyViolation: boolean;
 }
 
+/**
+ * XP-06: listener invoked whenever the kill switch actually terminates an
+ * agent (severity >= 3, approved — see `respond()`'s 'killed' branch).
+ * `delegation-concurrency.ts` registers one to cascade termination to any
+ * active delegation child processes it is tracking; kept as a plain
+ * listener array (not an EventEmitter) to avoid adding a dependency to this
+ * already-central module for a single use.
+ */
+type KillSwitchTerminationListener = (agentId: string, reason: string) => void;
+const terminationListeners: KillSwitchTerminationListener[] = [];
+
+/** Register a listener for kill-switch terminations. Returns an unsubscribe function. */
+export function onKillSwitchTermination(listener: KillSwitchTerminationListener): () => void {
+  terminationListeners.push(listener);
+  return () => {
+    const idx = terminationListeners.indexOf(listener);
+    if (idx >= 0) terminationListeners.splice(idx, 1);
+  };
+}
+
+function notifyKillSwitchTermination(agentId: string, reason: string): void {
+  for (const listener of terminationListeners) {
+    try {
+      listener(agentId, reason);
+    } catch (err) {
+      logger.warn(
+        `[KILL_SWITCH] termination listener threw (non-fatal): ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+  }
+}
+
 class KillSwitchImpl {
   private actionLogs: Map<string, ActionLog[]> = new Map();
   private monitorInterval: ReturnType<typeof setInterval> | null = null;
@@ -194,8 +226,15 @@ class KillSwitchImpl {
       });
 
       if (!approval.allowed) {
-        logger.warn(`[KILL_SWITCH] Kill pending approval for ${agentId}. Isolating in the meantime.`);
-        trustEngine.recordEvent(agentId, 'securityPosture', -50, `isolated_pending_kill: ${anomalies[0]}`);
+        logger.warn(
+          `[KILL_SWITCH] Kill pending approval for ${agentId}. Isolating in the meantime.`
+        );
+        trustEngine.recordEvent(
+          agentId,
+          'securityPosture',
+          -50,
+          `isolated_pending_kill: ${anomalies[0]}`
+        );
         return 'isolated';
       }
 
@@ -207,6 +246,7 @@ class KillSwitchImpl {
         await stopAgentRuntime(agentId, 'kill_switch');
       }
       auditChain.recordLifecycle(agentId, 'shutdown');
+      notifyKillSwitchTermination(agentId, anomalies.join('; '));
       return 'killed';
     }
 

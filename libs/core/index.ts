@@ -724,6 +724,8 @@ export {
   scanTmp,
   rotateLogs,
   scanDataVault,
+  scanRuntime,
+  sweepDelegationChildren,
   runJanitor,
   runJanitorIfStale,
   readJanitorLastRunMs,
@@ -735,7 +737,33 @@ export type {
   ScanTmpResult,
   RotateLogsResult,
   ScanDataVaultResult,
+  ScanRuntimeResult,
+  SweepDelegationChildrenOptions,
+  SweepDelegationChildrenResult,
 } from './storage-janitor.js';
+
+// Delegation Concurrency & Wall-Clock Budget (XP-06)
+export {
+  withDelegationSlot,
+  getDelegationConcurrencyStats,
+  withWallClockBudget,
+  DelegationWallClockExceededError,
+  terminateAllActiveDelegationChildren,
+  wireDelegationKillSwitchIntegration,
+  peekPersistedDelegationChildrenRegistry,
+  getRecordedDelegationTimeouts,
+  UNKNOWN_DELEGATION_PROVIDER,
+  DELEGATION_CHILDREN_REGISTRY_SUBPATH,
+} from './delegation-concurrency.js';
+export type {
+  DelegationSlotOptions,
+  DelegationConcurrencyStats,
+  DelegationConcurrencySlotStats,
+  DelegationChildHandle,
+  DelegationChildRecord,
+  WithWallClockBudgetOptions,
+  DelegationTimeoutRecord,
+} from './delegation-concurrency.js';
 
 // Data Vault (external data source reference cache)
 export {
