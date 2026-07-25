@@ -1,0 +1,34 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "knowledge-curation-weekly",
+  "version": "1.0.0",
+  "name": "Weekly Knowledge Curation Report",
+  "description": "KP-06: computes low-yield knowledge hints (KP-05 delivery/usage aggregate) and freshness SLO breaches (knowledge-curation-slo.json) via the deterministic wisdom:curation_report op, which persists CURATION_REPORT.md for knowledge_steward review. Candidates only — no automatic deletion or demotion (KM-03 guardrail).",
+  "schedule": {
+    "id": "knowledge-curation-weekly",
+    "cron": "0 3 * * 0",
+    "timezone": "Asia/Tokyo",
+    "enabled": true
+  },
+  "steps": [
+    {
+      "role": "sink",
+      "op": "system:log",
+      "params": { "message": "🗂️ [KNOWLEDGE-CURATION] Starting weekly curation report..." }
+    },
+    {
+      "id": "curation-report",
+      "role": "transform",
+      "op": "wisdom:curation_report",
+      "produces": { "channel": "curation_report", "type": "KnowledgeCurationReport" },
+      "params": {}
+    },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "✅ [KNOWLEDGE-CURATION] Report written to {{curation_report.report_path}} (low_yield={{curation_report.summary.low_yield_count}}, freshness_breaches={{curation_report.summary.freshness_breach_count}})."
+      }
+    }
+  ]
+}

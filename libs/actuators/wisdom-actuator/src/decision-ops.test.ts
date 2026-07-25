@@ -4,6 +4,7 @@ import {
   safeMkdir,
   safeWriteFile,
   safeReadFile,
+  safeRmSync,
   pathResolver,
   safeExistsSync,
   registerReasoningBackend,
@@ -1069,5 +1070,93 @@ describe('typed participant wisdom operations', () => {
         {}
       )
     ).rejects.toThrow('[CROSS_CRITIQUE_SCOPE_DENIED]');
+  });
+});
+
+describe("dispatchDecisionOp 'curation_report' (KP-06)", () => {
+  // Hermetic isolation: point every path the underlying
+  // generateKnowledgeCurationReport() call touches at a unique tmp root so
+  // this suite never reads/writes the real active/shared or knowledge/product
+  // files — same convention as knowledge-curation-report.test.ts.
+  const suiteRoot = pathResolver.sharedTmp(`kp06-curation-report-op-test/${process.pid}`);
+  const usagePathOverride = `${suiteRoot}/knowledge-usage/usage.json`;
+  const sloConfigPathOverride = `${suiteRoot}/knowledge-curation-slo.json`;
+  const scanRootOverride = `${suiteRoot}/corpus`;
+  const reportPathOverride = `${suiteRoot}/CURATION_REPORT.md`;
+  const envKeys = [
+    'KYBERION_KNOWLEDGE_USAGE_PATH',
+    'KYBERION_CURATION_SLO_CONFIG_PATH',
+    'KYBERION_CURATION_SCAN_ROOTS',
+    'KYBERION_CURATION_REPORT_PATH',
+  ] as const;
+  const originalEnv: Record<string, string | undefined> = {};
+
+  beforeEach(() => {
+    for (const key of envKeys) originalEnv[key] = process.env[key];
+    process.env.KYBERION_KNOWLEDGE_USAGE_PATH = usagePathOverride;
+    process.env.KYBERION_CURATION_SLO_CONFIG_PATH = sloConfigPathOverride;
+    process.env.KYBERION_CURATION_SCAN_ROOTS = scanRootOverride;
+    process.env.KYBERION_CURATION_REPORT_PATH = reportPathOverride;
+    safeRmSync(suiteRoot, { recursive: true, force: true });
+
+    const usageFile = pathResolver.rootResolve(usagePathOverride);
+    safeMkdir(path.dirname(usageFile), { recursive: true });
+    safeWriteFile(
+      usageFile,
+      JSON.stringify(
+        [
+          {
+            document_path: 'knowledge/product/op-test-low-yield.md',
+            delivered_count: 5,
+            used_count: 0,
+            not_used_count: 5,
+            occurrences: 5,
+            last_seen: '2026-07-01T00:00:00.000Z',
+          },
+        ],
+        null,
+        2
+      )
+    );
+
+    const docFile = pathResolver.rootResolve(`${scanRootOverride}/stale-governance.md`);
+    safeMkdir(path.dirname(docFile), { recursive: true });
+    // Deliberately far in the past so the 90-day governance SLO threshold is
+    // breached regardless of the wall-clock date the suite runs on.
+    safeWriteFile(
+      docFile,
+      ['---', 'kind: governance', 'last_updated: 2000-01-01', '---'].join('\n')
+    );
+  });
+
+  afterEach(() => {
+    safeRmSync(suiteRoot, { recursive: true, force: true });
+    for (const key of envKeys) {
+      if (originalEnv[key] === undefined) delete process.env[key];
+      else process.env[key] = originalEnv[key];
+    }
+  });
+
+  it('is registered, deterministic, and persists CURATION_REPORT.md via the typed op', async () => {
+    const result = await dispatchDecisionOp(
+      'curation_report',
+      { export_as: 'curation_report' },
+      {}
+    );
+    expect(result.handled).toBe(true);
+    const report = result.ctx.curation_report as {
+      low_yield_hints: unknown[];
+      freshness_breaches: unknown[];
+      report_path: string;
+      summary: { low_yield_count: number; freshness_breach_count: number };
+    };
+    expect(report.summary.low_yield_count).toBe(1);
+    expect(report.summary.freshness_breach_count).toBe(1);
+    expect(safeExistsSync(report.report_path)).toBe(true);
+    expect(report.report_path).toBe(pathResolver.rootResolve(reportPathOverride));
+
+    const written = safeReadFile(report.report_path, { encoding: 'utf8' }) as string;
+    expect(written).toContain('op-test-low-yield.md');
+    expect(written).toContain('stale-governance.md');
   });
 });
