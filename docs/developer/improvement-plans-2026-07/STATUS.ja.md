@@ -56,6 +56,7 @@
 >    **2026-07-25追記**: クロスプロバイダ実行計画 XP-01〜07 を新設([CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md](./CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md)。複数 LLM プロバイダ CLI の同一マシン併走に対し、能力プローブ registry・KD-05 権限射影 + env allowlist・tier×egress ゲート・同一ディレクトリ併走契約・縮退表面化 + provenance・並行予算・モデル分散 best-of-N を、プロバイダ中立の宣言 + adapter 射影として定める。CT の兄弟計画)。全件 TODO として追加し、DONE 99 / PARTIAL 30 / TODO 25 へ更新。
 >    **2026-07-25追記(実装ウェーブ)**: KP-01〜07・CT-01〜04・XP-01〜07 の全 18 件をサブエージェント委譲 + オーケストレータレビュー方式で実装した(5 ウェーブ、各タスクをレビュー・独立再検証してコミット)。KP 全 7 件・CT 全 4 件・XP-02/03 を DONE、XP-01/04/05/06/07 を PARTIAL(各行の残作業参照)とした。最終ゲート: 842 テストファイル / 5,136 テスト全緑・typecheck/build 緑・op-registry/catalogs/契約 semver 緑。付随修正: shell-claude の全 env 継承、KD-05 ツール表の実ドリフト、health-degradation テストの実ランタイム依存、a2a-lifecycle テストの personal tier 汚染(my-identity.json 書換の根本原因)。DONE 112 / PARTIAL 35 / TODO 7 へ更新。
 >    **2026-07-25追記(XP クローズアウト)**: XP-01/04/05/06/07 の残作業を実装・検証し全件 DONE へ更新(baseline-check の registry 自動更新と表面化、生成サブエージェント定義への併走マトリクス射影、worker 結果確定点での provenance 刻印、3 backend の実プロセス wall-clock 強制終了 + sweep 実プロデューサ接続、construction-only な実 backend resolver の opt-in 配線)。DONE 117 / PARTIAL 30 / TODO 7 へ更新。
+>    **2026-07-25追記**: surface 会話オーケストレータ計画 SO-01〜05 を新設([SURFACE_ORCHESTRATOR_PLAN_2026-07-25.ja.md](./SURFACE_ORCHESTRATOR_PLAN_2026-07-25.ja.md)。surface 経由でも CLI と同格の対話オーケストレータ(ミッション所有・操縦)として動作できるようにする。会話の前面(`runSurfaceConversation`)と発行(SN-01)は中立化済みのため、lifecycle 動詞(`missionSystem`)の governed facade 昇格・会話スレッド↔ミッション所有の永続バインディング(OrchestratorSession)・owner 権限配線・会話操縦 + IL-04 完了検証の4増分で「発行者→所有者」の昇格を実現し、SO-05 で責務別モデル階梯(会話の前面 = fast/standard、オーケストレータ判断 = deep)を既存 `model_tier` 語彙の宣言として配線する。SN-01 の後続、CT/XP と直交)。全件 TODO として追加し、DONE 117 / PARTIAL 30 / TODO 12 へ更新。
 >    **判定基準**: DONE = 受入条件を実コードで検証済 / PARTIAL = 一部充足 / TODO = 実質未着手。
 
 ## サマリ
@@ -64,7 +65,7 @@
 | ------- | ---- |
 | DONE    | 117  |
 | PARTIAL | 30   |
-| TODO    | 7    |
+| TODO    | 12   |
 
 ## P0 残作業(プロダクション化のクリティカルパス)
 
@@ -390,6 +391,18 @@
 | XP-05 | DONE | 2026-07-25 完了: worker の結果確定点で `task_result.provenance` を best-effort 刻印(local-served のみ、不明時は省略・既存値は不上書き)。failover イベント/marker/baseline 表示は前段で実装済。既知境界: 遠隔 a2a worker は自前刻印が必要(コメント明記)                                      |
 | XP-06 | DONE | 2026-07-25 完了: 3 backend の spawn を wall-clock 予算配下に接続(実プロセス SIGTERM→猶予→SIGKILL、children 記録 = sweep 実プロデューサ、shape ドリフトテスト付き)。semaphore/kill-switch 連動/janitor は前段で実装済。残注記: agent-dispatch 層の handle 無し予算と二重(無害・将来整理候補) |
 | XP-07 | DONE | 2026-07-25 完了: `resolveProviderBackend`(claude/codex/agy を construction-only で解決、XP-01 registry ゲート、cache 付き・不throw)を既定 seam に配線。`KYBERION_BEST_OF_PROVIDERS_LIVE=1` の明示 opt-in 必須で暗黙 CLI 起動なし。fan-out/judge/tier 保護は前段で実装済                     |
+
+### SO(surface 会話オーケストレータ)
+
+正本: [SURFACE_ORCHESTRATOR_PLAN_2026-07-25.ja.md](./SURFACE_ORCHESTRATOR_PLAN_2026-07-25.ja.md)
+
+| ID    | 状態 | 残作業                                                                                                                                |
+| ----- | ---- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| SO-01 | TODO | lifecycle 動詞の in-process governed facade(mission-system 中核の libs 昇格 + CLI thin router 化、挙動不変)                           |
+| SO-02 | TODO | OrchestratorSession(会話スレッド↔ミッション所有の永続バインディング、journal 復元、二重オーナー防止)                                  |
+| SO-03 | TODO | surface のオーナー権限配線(execution context + claim の昇格 ceremony、surface-roles.json・共同実行契約の追記)                         |
+| SO-04 | TODO | 会話からのミッション操縦(status/checkpoint/gate/pause/resume/finish)+ IL-04 完了検証 + human 承認契約経由の不可逆操作                 |
+| SO-05 | TODO | 責務別モデル階梯の宣言(会話の前面 = fast/standard + 1回エスカレーション、オーケストレータ判断 = deep。既存 model_tier 語彙の配線のみ) |
 
 ### CO(Company OS)
 
