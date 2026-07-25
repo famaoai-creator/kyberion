@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { queryKnowledge, queryKnowledgeHybrid } from './src/knowledge-index.js';
+import { deriveSurfaceSessionId } from './orchestrator-session.js';
 
 import { pathResolver } from './path-resolver.js';
 import { secureFetch } from './network.js';
@@ -2491,12 +2492,10 @@ export async function runSurfaceMessageConversation(
   // correlation id is per message, so derive the stable session key from the
   // surface/channel/thread tuple instead.
   try {
-    const sessionKey = [
-      input.surface,
-      input.channel || 'default',
-      input.threadTs || 'default',
-    ].join(':');
-    const sessionId = `surface-${createHash('sha256').update(sessionKey).digest('hex').slice(0, 32)}`;
+    // SO-02: single source of truth for this derivation lives in
+    // orchestrator-session.ts (deriveSurfaceSessionId) — kept byte-identical
+    // to what was inlined here so existing session ids never change.
+    const sessionId = deriveSurfaceSessionId(input.surface, input.channel, input.threadTs);
     const trigger = triggerBackgroundReviewFork({
       sessionId,
       nudgeConfig: { turnThreshold: 10, toolThreshold: 10 },
