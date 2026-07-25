@@ -618,6 +618,10 @@ export * from './context-rewind.js';
 export * from './worker-goal.js';
 export * from './worker-goal-driver.js';
 export * from './worker-state-journal.js';
+// SO-02: durable conversation-thread <-> mission-ownership binding (own
+// event-sourcing kernel; see the module docstring for the KD-03 lineage).
+export * from './orchestrator-session.js';
+export * from './surface-steering-authority.js';
 export * from './adf-guardrails.js';
 export * from './reconcile-ops.js';
 export * from './report-ops.js';
@@ -2144,3 +2148,22 @@ export {
   buildSoftwareQualityReport,
 } from './software-quality.js';
 export * from './delegation-notifications.js';
+
+// SO-01: governed in-process facade over the mission lifecycle verbs
+// (start/create/checkpoint/verify/finish/staff/prewarm/dispatch/pause/resume/status).
+// Deliberately NOT barrel-exporting the raw mission-* internals (mission-system,
+// mission-creation, mission-lifecycle, mission-state, ...) — those are reached
+// only via their own @agent/core/mission-* subpath exports (used by the
+// scripts/refactor/*.ts re-export shims), never through this barrel.
+export {
+  buildMissionLifecycleService,
+  missionLifecycleService,
+  MissionLifecycleGovernedError,
+} from './mission-lifecycle-service.js';
+export type {
+  MissionLifecycleService,
+  MissionLifecycleVerbOptions,
+  MissionLifecycleCreateOptions,
+  MissionLifecycleStartOptions,
+  MissionLifecycleDispatchOptions,
+} from './mission-lifecycle-service.js';

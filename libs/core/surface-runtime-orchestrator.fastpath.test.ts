@@ -490,7 +490,8 @@ describe('surface-runtime-orchestrator fast-path', () => {
     expect(mocks.compileUserIntentFlow).toHaveBeenCalledWith(
       expect.objectContaining({
         channel: 'imessage',
-      })
+      }),
+      expect.objectContaining({ model_tier: 'fast' })
     );
   });
 
@@ -620,7 +621,8 @@ describe('surface-runtime-orchestrator fast-path', () => {
         runtimeContext: expect.objectContaining({
           thread_context: expect.stringContaining('今夜のお店は予定表に入れています'),
         }),
-      })
+      }),
+      expect.objectContaining({ model_tier: 'fast' })
     );
   });
 

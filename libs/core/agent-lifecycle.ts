@@ -47,9 +47,22 @@ export interface SpawnOptions {
   };
 }
 
+export interface AgentHandleAskOptions {
+  timeoutMs?: number;
+  /**
+   * SO-05: declared reasoning tier for this turn (fast/standard/deep).
+   * Accepted and recorded on every AgentHandle impl; only actually changes
+   * the model where the underlying adapter/session supports per-call model
+   * switching. Session/adapter-backed handles (exec adapter, ACP mediator)
+   * have their model fixed at spawn time — for those the tier is recorded
+   * but does not change the model. See per-impl comments below.
+   */
+  model_tier?: 'fast' | 'standard' | 'deep';
+}
+
 export interface AgentHandle {
   agentId: string;
-  ask(prompt: string, options?: { timeoutMs?: number }): Promise<string>;
+  ask(prompt: string, options?: AgentHandleAskOptions): Promise<string>;
   shutdown(): Promise<void>;
   getRecord(): AgentRecord | undefined;
 }
@@ -77,6 +90,8 @@ export interface AgentRuntimeMetrics {
   lastRefreshedAt?: number;
   lastRestartedAt?: number;
   usage?: AgentUsageMetrics;
+  /** SO-05 / OP-01: last declared reasoning tier for an `ask()` call. */
+  lastDeclaredModelTier?: 'fast' | 'standard' | 'deep';
 }
 
 export interface AgentProcessStats {
@@ -216,7 +231,8 @@ class AgentLifecycleManagerImpl {
     agentId: string,
     prompt: string,
     responseText: string,
-    stopReason: string
+    stopReason: string,
+    modelTier?: 'fast' | 'standard' | 'deep'
   ): void {
     const metrics = this.ensureMetrics(agentId);
     metrics.turnCount += 1;
@@ -226,6 +242,12 @@ class AgentLifecycleManagerImpl {
     metrics.totalResponseChars += responseText.length;
     metrics.lastStopReason = stopReason;
     metrics.lastError = undefined;
+    if (modelTier) {
+      // SO-05 / OP-01: lightweight per-agent record of the last declared
+      // tier. Session-backed handles cannot switch models mid-session, so
+      // this is a declaration record, not proof the model changed.
+      metrics.lastDeclaredModelTier = modelTier;
+    }
     this.recordUsage(metrics, this.getProviderRuntime(agentId));
   }
 
@@ -437,14 +459,19 @@ class AgentLifecycleManagerImpl {
 
       const handle: AgentHandle = {
         agentId,
-        ask: async (prompt: string) => {
+        // SO-05: exec adapters (Claude/Codex/AGY) don't support per-call
+        // model switching — the model is fixed at spawn (resolvedOptions.modelId).
+        // `options.model_tier` is accepted and recorded via observeSuccess
+        // (metrics.lastDeclaredModelTier) but does not change which model
+        // answers this turn.
+        ask: async (prompt: string, options: AgentHandleAskOptions = {}) => {
           agentRegistry.updateStatus(agentId, 'busy');
           agentRegistry.touch(agentId);
           runtimeSupervisor.touch(agentId);
           try {
             const res = await adapter.ask(prompt);
             agentRegistry.updateStatus(agentId, 'ready');
-            this.observeSuccess(agentId, prompt, res.text, res.stopReason);
+            this.observeSuccess(agentId, prompt, res.text, res.stopReason, options.model_tier);
             return res.text;
           } catch (e: any) {
             agentRegistry.updateStatus(agentId, 'error');
@@ -530,7 +557,12 @@ class AgentLifecycleManagerImpl {
 
     const handle: AgentHandle = {
       agentId,
-      ask: async (prompt: string, askOptions: { timeoutMs?: number } = {}) => {
+      // SO-05: the ACP mediator session (gemini/claude ACP) does not support
+      // per-call model switching either — model is fixed at mediator boot
+      // (mediatorOpts.modelId). `askOptions.model_tier` is accepted and
+      // recorded via observeSuccess but does not change which model answers
+      // this turn.
+      ask: async (prompt: string, askOptions: AgentHandleAskOptions = {}) => {
         agentRegistry.updateStatus(agentId, 'busy');
         agentRegistry.touch(agentId);
         runtimeSupervisor.touch(agentId);
@@ -539,7 +571,7 @@ class AgentLifecycleManagerImpl {
             timeoutMs: askOptions.timeoutMs ?? resolvedOptions.turnTimeoutMs,
           });
           agentRegistry.updateStatus(agentId, 'ready');
-          this.observeSuccess(agentId, prompt, result, 'completed');
+          this.observeSuccess(agentId, prompt, result, 'completed', askOptions.model_tier);
           return result;
         } catch (e: any) {
           agentRegistry.updateStatus(agentId, 'error');

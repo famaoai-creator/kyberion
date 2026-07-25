@@ -1,10 +1,13 @@
 import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import * as core from '@agent/core';
 import {
   pathResolver,
+  safeMkdir,
   safeReadFile,
   safeRmSync,
+  safeWriteFile,
   saveProjectRecord,
   saveProjectTrackRecord,
 } from '@agent/core';
@@ -16,6 +19,7 @@ import {
   extractProjectRelationshipOptionsFromArgv,
   buildHelpText,
   buildOrganizationDiscoveryReport,
+  handoffMission,
   main,
   resolveMissionStartCreateInputFromArgv,
   validateMissionStartCreateInput,
@@ -1131,5 +1135,55 @@ describe('mission_controller argument parsing', () => {
     process.env.KYBERION_SUDO = 'true';
 
     expect(() => assertCanGrantMissionAuthority()).not.toThrow();
+  });
+});
+
+describe('handoffMission — SO-02 orchestrator-session release hook', () => {
+  const missionId = 'MSN-SO02-HANDOFF-HOOK-001';
+  const missionPath = pathResolver.missionDir(missionId, 'public');
+
+  beforeEach(() => {
+    process.env.MISSION_ROLE = 'mission_controller';
+    process.env.KYBERION_PERSONA = 'worker';
+    safeMkdir(missionPath, { recursive: true });
+    safeWriteFile(
+      `${missionPath}/mission-state.json`,
+      JSON.stringify(
+        {
+          mission_id: missionId,
+          tier: 'public',
+          status: 'active',
+          execution_mode: 'delegated',
+          priority: 1,
+          assigned_persona: 'worker',
+          confidence_score: 1,
+          git: { branch: 'main', start_commit: 'start', latest_commit: 'latest', checkpoints: [] },
+          history: [],
+        },
+        null,
+        2
+      )
+    );
+  });
+
+  afterEach(() => {
+    safeRmSync(missionPath, { recursive: true, force: true });
+    delete process.env.MISSION_ROLE;
+    delete process.env.KYBERION_PERSONA;
+  });
+
+  it('triggers a best-effort orchestrator-session release with reason "handoff" after a successful handoff', async () => {
+    // Full mission-state seeding above is proportionate here (handoffMission
+    // reads/mutates/saves real mission state); the release side effect
+    // itself is spied rather than seeding a real orchestrator session, per
+    // the SO-02 brief's "mock/spy the release function" allowance.
+    const releaseSpy = vi
+      .spyOn(core, 'releaseOrchestratorSessionForMissionBestEffort')
+      .mockImplementation(() => {});
+
+    await handoffMission(missionId, 'ecosystem_architect', 'handoff test note');
+
+    expect(releaseSpy).toHaveBeenCalledWith(missionId, 'handoff');
+    releaseSpy.mockRestore();
   });
 });

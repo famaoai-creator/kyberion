@@ -63,7 +63,8 @@ export interface MissionControllerRoutingContext {
     persona?: string,
     relationships?: any,
     tenantSlug?: string,
-    organizationId?: string
+    organizationId?: string,
+    options?: { ephemeral?: boolean; intentGoal?: string }
   ) => Awaitable<void>;
   startMission: (
     id: string,
@@ -74,7 +75,8 @@ export interface MissionControllerRoutingContext {
     visionRef?: string,
     relationships?: any,
     tenantSlug?: string,
-    organizationId?: string
+    organizationId?: string,
+    options?: { ephemeral?: boolean; intentGoal?: string; force?: boolean }
   ) => Awaitable<void>;
   pauseMission: (id: string, note?: string) => Awaitable<void>;
   cancelMission: (id: string, note?: string) => Awaitable<void>;
@@ -178,13 +180,13 @@ export interface MissionControllerRoutingContext {
   showMissionStatus: (id: string, follow?: boolean) => void;
   showReasoningBackendStatus: () => void;
   syncProjectLedger: (missionId: string) => Awaitable<unknown>;
-  showMissionTeam: (id: string, refresh?: boolean, organizationId?: string) => Awaitable<void>;
-  staffMissionTeam: (id: string, organizationId?: string) => Awaitable<void>;
+  showMissionTeam: (id: string, refresh?: boolean, organizationId?: string) => Awaitable<unknown>;
+  staffMissionTeam: (id: string, organizationId?: string) => Awaitable<unknown>;
   prewarmMissionTeam: (
     id: string,
     teamRolesArg?: string,
     organizationId?: string
-  ) => Awaitable<void>;
+  ) => Awaitable<unknown>;
   classifyMission: (id: string, intentId?: string, taskType?: string) => Awaitable<void>;
   selectMissionWorkflow: (id: string, intentId?: string, taskType?: string) => Awaitable<void>;
   planProcessTemplateTasks: (args: {
@@ -426,7 +428,11 @@ export async function runMissionControllerAction(
         createInput?.persona,
         createInput?.relationships,
         createInput?.tenantSlug,
-        createInput?.organizationId
+        createInput?.organizationId,
+        {
+          ephemeral: context.argv.includes('--ephemeral'),
+          intentGoal: getValue('--intent-goal', context.argv),
+        }
       );
       persistIntentTrackGate(intentTrack.intentTrackGate);
       await syncRoutingDecisionSummary(context, arg1!, routingDecision, 'CREATE');
@@ -481,7 +487,12 @@ export async function runMissionControllerAction(
         input?.visionRef,
         input?.relationships,
         input?.tenantSlug,
-        input?.organizationId
+        input?.organizationId,
+        {
+          ephemeral: context.argv.includes('--ephemeral'),
+          intentGoal: getValue('--intent-goal', context.argv),
+          force: context.argv.includes('--force'),
+        }
       );
       persistIntentTrackGate(intentTrack.intentTrackGate);
       await syncRoutingDecisionSummary(context, arg1!, routingDecision, 'START');
@@ -765,26 +776,38 @@ export async function runMissionControllerAction(
     case 'sync-project-ledger':
       await context.syncProjectLedger(arg1!);
       break;
-    case 'team':
-      await context.showMissionTeam(
+    case 'team': {
+      const teamPlan = await context.showMissionTeam(
         arg1!,
         context.hasRefresh,
         getValue('--organization-id', context.argv) || getValue('--org', context.argv)
       );
+      if (teamPlan !== undefined) {
+        console.log(JSON.stringify(teamPlan, null, 2));
+      }
       break;
-    case 'staff':
-      await context.staffMissionTeam(
+    }
+    case 'staff': {
+      const runtimePlan = await context.staffMissionTeam(
         arg1!,
         getValue('--organization-id', context.argv) || getValue('--org', context.argv)
       );
+      if (runtimePlan !== undefined) {
+        console.log(JSON.stringify(runtimePlan, null, 2));
+      }
       break;
-    case 'prewarm':
-      await context.prewarmMissionTeam(
+    }
+    case 'prewarm': {
+      const prewarmSummary = await context.prewarmMissionTeam(
         arg1!,
         arg2,
         getValue('--organization-id', context.argv) || getValue('--org', context.argv)
       );
+      if (prewarmSummary !== undefined) {
+        console.log(JSON.stringify(prewarmSummary, null, 2));
+      }
       break;
+    }
     case 'classify':
       await context.classifyMission(arg1!, arg2, arg3);
       break;
