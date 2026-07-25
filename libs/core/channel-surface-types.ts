@@ -209,6 +209,20 @@ export interface TaskResultKnowledgeFeedback {
   missing_topics?: string[];
 }
 
+/**
+ * XP-05 (CROSS_PROVIDER_EXECUTION_PLAN): optional provenance stamp — which
+ * reasoning provider/mode actually served the delegation that produced this
+ * task_result, and whether that required a failover switch away from the
+ * primary candidate. Sourced from `getLastServedReasoningMode()` in
+ * reasoning-backend.ts. Additive-only: absent entirely on pre-XP-05
+ * task_results, and parsing must stay backward compatible.
+ */
+export interface TaskResultProvenance {
+  provider?: string;
+  mode?: string;
+  failover?: boolean;
+}
+
 export interface TaskResultBlock {
   summary: string;
   artifacts: TaskResultArtifact[];
@@ -218,6 +232,7 @@ export interface TaskResultBlock {
   acceptance_evidence?: TaskAcceptanceEvidence[];
   review_findings?: TaskReviewFinding[];
   knowledge_feedback?: TaskResultKnowledgeFeedback;
+  provenance?: TaskResultProvenance;
 }
 
 export interface A2ATaskContext {
