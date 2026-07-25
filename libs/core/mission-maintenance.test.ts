@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { pathResolver } from '@agent/core';
-import { safeMkdir, safeReadFile, safeWriteFile } from '@agent/core';
+import * as pathResolver from './path-resolver.js';
+import { safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
 import {
   recordTask,
   shouldSkipResumeEntry,

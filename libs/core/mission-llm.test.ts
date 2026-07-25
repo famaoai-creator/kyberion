@@ -82,7 +82,7 @@ describe('mission-llm resolution', () => {
       resolveLlmConfig('distill', policy as any, {
         userTools: {},
         isCommandAvailable: () => ({ available: false, reason: 'unavailable' }),
-      }),
+      })
     ).toThrow(/No usable LLM tool available/);
   });
 
@@ -186,7 +186,7 @@ describe('mission-llm resolution', () => {
         adapter: 'test-local-llm',
       },
       'hello world',
-      z.object({ answer: z.number() }),
+      z.object({ answer: z.number() })
     );
 
     expect(result).toEqual({ answer: 11 });
@@ -210,7 +210,9 @@ describe('mission-llm resolution', () => {
       'hello world',
       z.object({ answer: z.number() }),
       {
-        isCommandAvailable: (command) => ({ available: command === 'heavy-cmd' || command === 'standard-cmd' }),
+        isCommandAvailable: (command) => ({
+          available: command === 'heavy-cmd' || command === 'standard-cmd',
+        }),
         policy: {
           default_profile: 'heavy',
           profiles: {
@@ -218,7 +220,7 @@ describe('mission-llm resolution', () => {
             standard: { command: 'standard-cmd', args: [], adapter: 'quota-second' },
           },
         },
-      },
+      }
     );
 
     expect(result).toEqual({ answer: 11 });

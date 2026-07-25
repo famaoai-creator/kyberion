@@ -174,7 +174,7 @@ function normalizePersona(value: string | undefined): Persona {
   return 'unknown';
 }
 
-function resolveRole(): string | undefined {
+export function resolveRole(): string | undefined {
   const envRole = process.env.SYSTEM_ROLE || process.env.MISSION_ROLE;
   if (envRole) return envRole.toLowerCase().replace(/\s+/g, '_');
 

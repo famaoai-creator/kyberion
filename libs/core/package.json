@@ -802,6 +802,102 @@
     "./reasoning-degradation": {
       "types": "./dist/reasoning-degradation.d.ts",
       "default": "./dist/reasoning-degradation.js"
+    },
+    "./mission-lifecycle-service": {
+      "types": "./dist/mission-lifecycle-service.d.ts",
+      "default": "./dist/mission-lifecycle-service.js"
+    },
+    "./mission-system": {
+      "types": "./dist/mission-system.d.ts",
+      "default": "./dist/mission-system.js"
+    },
+    "./mission-creation": {
+      "types": "./dist/mission-creation.d.ts",
+      "default": "./dist/mission-creation.js"
+    },
+    "./mission-lifecycle": {
+      "types": "./dist/mission-lifecycle.d.ts",
+      "default": "./dist/mission-lifecycle.js"
+    },
+    "./mission-maintenance": {
+      "types": "./dist/mission-maintenance.d.ts",
+      "default": "./dist/mission-maintenance.js"
+    },
+    "./mission-project-ledger": {
+      "types": "./dist/mission-project-ledger.d.ts",
+      "default": "./dist/mission-project-ledger.js"
+    },
+    "./mission-runtime": {
+      "types": "./dist/mission-runtime.d.ts",
+      "default": "./dist/mission-runtime.js"
+    },
+    "./mission-distill": {
+      "types": "./dist/mission-distill.d.ts",
+      "default": "./dist/mission-distill.js"
+    },
+    "./mission-llm": {
+      "types": "./dist/mission-llm.d.ts",
+      "default": "./dist/mission-llm.js"
+    },
+    "./mission-ticket-dispatch": {
+      "types": "./dist/mission-ticket-dispatch.d.ts",
+      "default": "./dist/mission-ticket-dispatch.js"
+    },
+    "./mission-workitem-dispatch": {
+      "types": "./dist/mission-workitem-dispatch.d.ts",
+      "default": "./dist/mission-workitem-dispatch.js"
+    },
+    "./mission-dispatch-io": {
+      "types": "./dist/mission-dispatch-io.d.ts",
+      "default": "./dist/mission-dispatch-io.js"
+    },
+    "./mission-dispatch-lifecycle": {
+      "types": "./dist/mission-dispatch-lifecycle.d.ts",
+      "default": "./dist/mission-dispatch-lifecycle.js"
+    },
+    "./mission-work-reconciliation": {
+      "types": "./dist/mission-work-reconciliation.d.ts",
+      "default": "./dist/mission-work-reconciliation.js"
+    },
+    "./mission-seal": {
+      "types": "./dist/mission-seal.d.ts",
+      "default": "./dist/mission-seal.js"
+    },
+    "./mission-state": {
+      "types": "./dist/mission-state.d.ts",
+      "default": "./dist/mission-state.js"
+    },
+    "./mission-git": {
+      "types": "./dist/mission-git.d.ts",
+      "default": "./dist/mission-git.js"
+    },
+    "./mission-types": {
+      "types": "./dist/mission-types.d.ts",
+      "default": "./dist/mission-types.js"
+    },
+    "./mission-read-model": {
+      "types": "./dist/mission-read-model.d.ts",
+      "default": "./dist/mission-read-model.js"
+    },
+    "./mission-governance": {
+      "types": "./dist/mission-governance.d.ts",
+      "default": "./dist/mission-governance.js"
+    },
+    "./mission-intent-delta": {
+      "types": "./dist/mission-intent-delta.d.ts",
+      "default": "./dist/mission-intent-delta.js"
+    },
+    "./mission-process-planning": {
+      "types": "./dist/mission-process-planning.d.ts",
+      "default": "./dist/mission-process-planning.js"
+    },
+    "./project-state-sync": {
+      "types": "./dist/project-state-sync.d.ts",
+      "default": "./dist/project-state-sync.js"
+    },
+    "./cli-input": {
+      "types": "./dist/cli-input.d.ts",
+      "default": "./dist/cli-input.js"
     }
   },
   "dependencies": {

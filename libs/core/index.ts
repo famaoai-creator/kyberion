@@ -2144,3 +2144,22 @@ export {
   buildSoftwareQualityReport,
 } from './software-quality.js';
 export * from './delegation-notifications.js';
+
+// SO-01: governed in-process facade over the mission lifecycle verbs
+// (start/create/checkpoint/verify/finish/staff/prewarm/dispatch/pause/resume/status).
+// Deliberately NOT barrel-exporting the raw mission-* internals (mission-system,
+// mission-creation, mission-lifecycle, mission-state, ...) — those are reached
+// only via their own @agent/core/mission-* subpath exports (used by the
+// scripts/refactor/*.ts re-export shims), never through this barrel.
+export {
+  buildMissionLifecycleService,
+  missionLifecycleService,
+  MissionLifecycleGovernedError,
+} from './mission-lifecycle-service.js';
+export type {
+  MissionLifecycleService,
+  MissionLifecycleVerbOptions,
+  MissionLifecycleCreateOptions,
+  MissionLifecycleStartOptions,
+  MissionLifecycleDispatchOptions,
+} from './mission-lifecycle-service.js';

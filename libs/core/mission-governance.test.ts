@@ -1,15 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import {
-  hashArtifactForReview,
-  pathResolver,
-  safeExec,
-  safeExistsSync,
-  safeMkdir,
-  safeRmSync,
-  safeWriteFile,
-} from '@agent/core';
-import { createArtifactRecord, saveArtifactRecord } from '@agent/core';
+import { hashArtifactForReview } from './artifact-review.js';
+import * as pathResolver from './path-resolver.js';
+import { safeExec, safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import { createArtifactRecord, saveArtifactRecord } from './artifact-record.js';
 import { validateMissionQuality } from './mission-governance.js';
 
 const previousPersona = process.env.KYBERION_PERSONA;

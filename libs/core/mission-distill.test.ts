@@ -15,11 +15,20 @@ vi.mock('./src/knowledge-index.js', () => ({
   queryKnowledgeHybrid: vi.fn(async () => []),
 }));
 
-vi.mock('@agent/core', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@agent/core')>();
+// SO-01: mission-distill.ts now imports these directly from their libs/core
+// sibling modules (not the @agent/core barrel) — the mocks must target the
+// same specifiers or vitest won't intercept the real calls.
+vi.mock('./path-resolver.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./path-resolver.js')>();
   return {
     ...actual,
     findMissionPath: vi.fn(() => missionPath),
+  };
+});
+vi.mock('./ledger.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./ledger.js')>();
+  return {
+    ...actual,
     ledger: {
       ...actual.ledger,
       record: vi.fn(),
@@ -27,27 +36,21 @@ vi.mock('@agent/core', async (importOriginal) => {
   };
 });
 
-import {
-  pathResolver,
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  safeRmSync,
-  safeWriteFile,
-  withExecutionContext,
-} from '@agent/core';
+import * as pathResolver from './path-resolver.js';
+import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
+import { withExecutionContext } from './authority.js';
 import {
   createMemoryPromotionCandidate,
   enqueueMemoryPromotionCandidate,
   listMemoryPromotionCandidates,
   memoryPromotionQueuePath,
   updateMemoryPromotionCandidateStatus,
-} from '@agent/core';
-import { loadDistillCandidateRecord } from '@agent/core';
+} from './memory-promotion-queue.js';
+import { loadDistillCandidateRecord } from './distill-candidate-registry.js';
 import { loadState } from './mission-state.js';
 import { distillMission } from './mission-distill.js';
-import { promoteMemoryCandidateToKnowledge } from '@agent/core';
-import { safeExec } from '@agent/core';
+import { promoteMemoryCandidateToKnowledge } from './memory-promotion-workflow.js';
+import { safeExec } from './secure-io.js';
 
 // Namespace the promotion queue so parallel test files never clobber the
 // real shared queue (root cause of combined-run flakes).
