@@ -1854,6 +1854,10 @@ async function escalateSurfaceTextIfNeeded(
   text: string,
   callSite: SurfaceReasoningTierCallSite
 ): Promise<string> {
+  // Empty text (e.g. a2a-only agent turns) keeps its pre-escalation handling:
+  // the outer chokepoint's deterministic repair is responsible for shaping it.
+  if (!text.trim()) return text;
+
   const verdict = validateSurfaceUxContract({ text });
   if (verdict.valid) return text;
 
@@ -1873,9 +1877,23 @@ async function escalateSurfaceTextIfNeeded(
     '',
     `[Escalation notice: the previous fast-tier response failed UX-contract validation (${escalationReason}) and could not be auto-repaired. Regenerate a compliant response for the same request.]`,
   ].join('\n');
-  const escalatedRawText = await handle.ask(escalatedPrompt, { model_tier: 'standard' });
-  const escalatedText = extractSurfaceBlocks(escalatedRawText).text;
-  return escalatedText || escalatedRawText;
+  // Fail-open on every escalation defect (throw, non-string, empty): the
+  // conversation must never get worse because the escalation attempt failed —
+  // fall back to the original text and let the outer chokepoint repair it,
+  // which is exactly the pre-escalation behavior.
+  try {
+    const escalatedRawText = await handle.ask(escalatedPrompt, { model_tier: 'standard' });
+    if (typeof escalatedRawText !== 'string' || !escalatedRawText.trim()) return text;
+    const escalatedText = extractSurfaceBlocks(escalatedRawText).text;
+    return escalatedText || escalatedRawText;
+  } catch (error: any) {
+    surfaceReasoningTierLogger.warn('surface_reasoning_tier_escalation_failed', {
+      call_site: callSite,
+      escalation_reason: escalationReason,
+      error: error?.message || String(error),
+    });
+    return text;
+  }
 }
 
 export function deriveSlackIntentLabel(text: string): string {
