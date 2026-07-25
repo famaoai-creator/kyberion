@@ -17,6 +17,10 @@ import {
   type ReasoningFailoverMarker,
   validateEnv,
   secretGuard,
+  peekProviderCapabilityRegistry,
+  loadProviderCapabilityRegistry,
+  DEFAULT_PROVIDER_CAPABILITY_TTL_MS,
+  type ProviderCapability,
 } from '@agent/core';
 import { spawnManagedProcess } from '@agent/core/managed-process';
 import { runCoworkHealthCheck } from '@agent/core/cowork-health-check';
@@ -338,6 +342,117 @@ export function reasoningFailoverWarning(marker: ReasoningFailoverMarker | null)
   );
 }
 
+// XP-01: the provider-capability-registry population job. Session start is
+// the only place in the repo that reliably runs on a schedule (pipelines/
+// baseline-check.json's hourly cron — see the cron-decision note near
+// pipelines/baseline-check.json in docs), so baseline-check both consumes
+// and refreshes the registry: `loadProviderCapabilityRegistry` returns the
+// cached snapshot when it is fresh and probes-then-persists when it is
+// stale/absent — mirroring `getCachedTenantDrift`/`getCachedCoworkHealth`
+// above, except the TTL cache lives in the registry module itself rather
+// than under `runtime/baseline-check-cache/`.
+export const PROVIDER_CAPABILITY_PROBE_ENV = 'KYBERION_PROVIDER_CAPABILITY_PROBE';
+
+export interface ProviderCapabilitiesSummary {
+  probed_at: string | null;
+  available: string[];
+  excluded: { provider: string; reason: string }[];
+}
+
+/**
+ * Pure projection from the full probe result to the compact shape surfaced
+ * in the baseline report. A provider counts as "available" when its binary
+ * was found and it is not known to be unauthenticated (`authenticated:
+ * 'unknown'` — no cheap auth probe exists — still counts as available,
+ * matching `filterChainByProviderCapability`'s routing semantics in
+ * reasoning-bootstrap.ts). Everything else is excluded with a reason.
+ */
+export function summarizeProviderCapabilities(
+  capabilities: ProviderCapability[]
+): ProviderCapabilitiesSummary {
+  if (capabilities.length === 0) {
+    return { probed_at: null, available: [], excluded: [] };
+  }
+  const available: string[] = [];
+  const excluded: { provider: string; reason: string }[] = [];
+  for (const cap of capabilities) {
+    if (cap.binary_found && cap.authenticated !== false) {
+      available.push(cap.provider_id);
+    } else {
+      excluded.push({
+        provider: cap.provider_id,
+        reason: cap.probe_error || (!cap.binary_found ? 'binary not found' : 'not authenticated'),
+      });
+    }
+  }
+  return { probed_at: capabilities[0]!.probed_at, available, excluded };
+}
+
+export interface ProviderCapabilitiesSnapshot {
+  summary: ProviderCapabilitiesSummary;
+  cached: boolean;
+  age_ms: number | null;
+  probing_enabled: boolean;
+}
+
+const EMPTY_PROVIDER_CAPABILITIES_SUMMARY: ProviderCapabilitiesSummary = {
+  probed_at: null,
+  available: [],
+  excluded: [],
+};
+
+/**
+ * Dependency-injected core of the population job, kept separate from the
+ * module-level `peekProviderCapabilityRegistry`/`loadProviderCapabilityRegistry`
+ * imports so tests can exercise every branch (stale/absent/fresh/failing/
+ * disabled) without ever reaching the real exec seam. Never throws — a
+ * failure while reading or refreshing the registry degrades to an empty
+ * summary rather than affecting `deriveBaselineStatus`, which does not
+ * receive this value at all.
+ */
+export function resolveProviderCapabilitiesSnapshot(deps: {
+  probingEnabled: boolean;
+  peek: () => ProviderCapability[] | null;
+  load: () => ProviderCapability[];
+  now?: () => number;
+}): ProviderCapabilitiesSnapshot {
+  if (!deps.probingEnabled) {
+    return {
+      summary: EMPTY_PROVIDER_CAPABILITIES_SUMMARY,
+      cached: false,
+      age_ms: null,
+      probing_enabled: false,
+    };
+  }
+
+  try {
+    const wasCached = deps.peek() !== null;
+    const summary = summarizeProviderCapabilities(deps.load());
+    const now = deps.now ?? (() => Date.now());
+    const age_ms =
+      summary.probed_at !== null ? now() - new Date(summary.probed_at).getTime() : null;
+    return { summary, cached: wasCached, age_ms, probing_enabled: true };
+  } catch (err) {
+    logger.warn(
+      `[baseline-check] provider capability probe failed (non-fatal, fail-open): ${err instanceof Error ? err.message : String(err)}`
+    );
+    return {
+      summary: EMPTY_PROVIDER_CAPABILITIES_SUMMARY,
+      cached: false,
+      age_ms: null,
+      probing_enabled: true,
+    };
+  }
+}
+
+function getProviderCapabilitiesSnapshot(): ProviderCapabilitiesSnapshot {
+  return resolveProviderCapabilitiesSnapshot({
+    probingEnabled: process.env[PROVIDER_CAPABILITY_PROBE_ENV] !== '0',
+    peek: () => peekProviderCapabilityRegistry(),
+    load: () => loadProviderCapabilityRegistry({ maxAgeMs: DEFAULT_PROVIDER_CAPABILITY_TTL_MS }),
+  });
+}
+
 async function main() {
   killSwitch.startMonitor();
 
@@ -364,6 +479,22 @@ async function main() {
   const sentinel = new SovereignSentinel(statePath);
   const tenantDriftSnapshot = getCachedTenantDrift();
   const coworkHealthSnapshot = getCachedCoworkHealth();
+
+  // XP-01 population job: failure-tolerant, like the janitor fallback above
+  // — a broken probe must never block or influence the baseline status.
+  let providerCapabilities: ProviderCapabilitiesSnapshot = {
+    summary: EMPTY_PROVIDER_CAPABILITIES_SUMMARY,
+    cached: false,
+    age_ms: null,
+    probing_enabled: process.env[PROVIDER_CAPABILITY_PROBE_ENV] !== '0',
+  };
+  try {
+    providerCapabilities = getProviderCapabilitiesSnapshot();
+  } catch (err: any) {
+    logger.warn(
+      `[BASELINE] provider capability probe failed (non-fatal): ${err?.message ?? String(err)}`
+    );
+  }
 
   // L0: Physical Layer (CLI Tools)
   sentinel.registerLayer('L0', async () => {
@@ -448,6 +579,10 @@ async function main() {
     warnings: {
       reasoning_failover: reasoningFailoverWarning(reasoningFailover),
     },
+    // XP-01: population job output — never consulted by deriveBaselineStatus,
+    // purely observational (acceptance criterion 3: probe results surfaced
+    // on the baseline-check observation surface).
+    provider_capabilities: providerCapabilities.summary,
     cache: {
       tenant_drift: {
         cached: tenantDriftSnapshot.cached,
@@ -456,6 +591,11 @@ async function main() {
       cowork_health: {
         cached: coworkHealthSnapshot.cached,
         age_ms: coworkHealthSnapshot.age_ms ?? null,
+      },
+      provider_capabilities: {
+        cached: providerCapabilities.cached,
+        age_ms: providerCapabilities.age_ms,
+        probing_enabled: providerCapabilities.probing_enabled,
       },
     },
     maintenance: {
