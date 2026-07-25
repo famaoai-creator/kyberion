@@ -99,3 +99,57 @@ describe('extractTaskResultBlocks — knowledge_feedback (KP-05)', () => {
     });
   });
 });
+
+// XP-05: task_result gained an optional `provenance` field — which reasoning
+// provider/mode actually served the delegation, and whether that required a
+// failover switch. Same additive-only contract as KP-05's knowledge_feedback
+// above: every pre-XP-05 task_result must keep validating unchanged, and the
+// new field is validated (including rejected) when present.
+describe('TaskResultSchema — provenance (XP-05)', () => {
+  it('validates an old-format task_result with no provenance field — backward-compat regression', () => {
+    const result = validateTaskResult(baseTaskResult());
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
+    expect(result.value?.provenance).toBeUndefined();
+  });
+
+  it('accepts a fully populated provenance object', () => {
+    const result = validateTaskResult(
+      baseTaskResult({
+        provenance: { provider: 'codex', mode: 'codex-cli', failover: true },
+      })
+    );
+    expect(result.valid).toBe(true);
+    expect(result.value?.provenance).toEqual({
+      provider: 'codex',
+      mode: 'codex-cli',
+      failover: true,
+    });
+  });
+
+  it('accepts provenance with any subset of its optional keys', () => {
+    const modeOnly = validateTaskResult(baseTaskResult({ provenance: { mode: 'claude-agent' } }));
+    expect(modeOnly.valid).toBe(true);
+
+    const empty = validateTaskResult(baseTaskResult({ provenance: {} }));
+    expect(empty.valid).toBe(true);
+  });
+
+  it('rejects provenance with a non-boolean failover flag', () => {
+    const result = validateTaskResult(baseTaskResult({ provenance: { failover: 'yes' } }));
+    expect(result.valid).toBe(false);
+    expect(result.errors.length).toBeGreaterThan(0);
+  });
+
+  it('rejects provenance with unknown properties (strict schema)', () => {
+    const result = validateTaskResult(
+      baseTaskResult({ provenance: { provider: 'codex', bogus_field: true } })
+    );
+    expect(result.valid).toBe(false);
+  });
+
+  it('rejects provenance that is not an object', () => {
+    const result = validateTaskResult(baseTaskResult({ provenance: 'nope' }));
+    expect(result.valid).toBe(false);
+  });
+});

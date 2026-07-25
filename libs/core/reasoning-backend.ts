@@ -43,6 +43,7 @@ import {
   assertReasoningEgressAllowedAtEndpoint,
 } from './reasoning-egress-scope.js';
 import { classifyReasoningFailure, reasoningFailureMessage } from './reasoning-failure-taxonomy.js';
+import { appendReasoningFailoverEvent, markReasoningFailover } from './reasoning-failover.js';
 
 // Auth/eligibility failures (dead credentials, retired tiers) do not heal in
 // seconds — keep retrying them per call and every operation pays the latency.
@@ -656,6 +657,89 @@ function candidateLabel(candidate: ReasoningBackendCandidate): string {
   return candidate.label || candidate.backend.name || candidate.provider || 'unknown';
 }
 
+// ---------------------------------------------------------------------------
+// XP-05: failover switch surfacing + serving provenance.
+//
+// "Switch" means: the primary (first) candidate in the chain did not serve
+// the call and a later candidate did. Every switch is (a) appended to a
+// durable JSONL event log and (b) logged once per (from,to) pair per process
+// — long sessions that keep hitting the same dead primary must not spam the
+// log. `getLastServedReasoningMode()` is the minimal provenance accessor:
+// callers that persist a task_result can read it right after the call
+// resolves and stamp `provenance` on the result (see channel-surface-types.ts
+// TaskResultBlock.provenance). Wiring that stamp into the mission worker is
+// tracked as follow-up — see XP-05 report.
+// ---------------------------------------------------------------------------
+
+export interface LastServedReasoningMode {
+  mode: string;
+  provider?: string;
+  failover: boolean;
+}
+
+let lastServedReasoningMode: LastServedReasoningMode | null = null;
+const warnedFailoverPairs = new Set<string>();
+
+/** Which candidate actually served the most recent failover-chain call. */
+export function getLastServedReasoningMode(): LastServedReasoningMode | null {
+  return lastServedReasoningMode;
+}
+
+/** Test-only: clear in-process failover provenance/throttle state. */
+export function resetReasoningFailoverTracking(): void {
+  lastServedReasoningMode = null;
+  warnedFailoverPairs.clear();
+}
+
+/**
+ * Called once a candidate has successfully served a failover-chain call.
+ * Updates the provenance accessor unconditionally, and — only when the
+ * serving candidate is not the primary (chain[0]) — records the switch
+ * (JSONL event + marker file, both best-effort) and warns once per
+ * (from,to) pair per process.
+ */
+function recordCandidateServed(
+  operation: string,
+  primary: ReasoningBackendCandidate,
+  serving: ReasoningBackendCandidate,
+  errors: string[]
+): void {
+  const toMode = candidateLabel(serving);
+  const toProvider = normalizeProviderName(serving.provider) || undefined;
+  const isFailover = serving !== primary;
+  lastServedReasoningMode = { mode: toMode, provider: toProvider, failover: isFailover };
+  if (!isFailover) return;
+
+  const fromMode = candidateLabel(primary);
+  const fromProvider = normalizeProviderName(primary.provider) || undefined;
+  const errorSummary = errors[0] || 'unknown failure';
+
+  appendReasoningFailoverEvent({
+    from_mode: fromMode,
+    to_mode: toMode,
+    provider_from: fromProvider,
+    provider_to: toProvider,
+    method: operation,
+    error_summary: errorSummary,
+  });
+  markReasoningFailover({
+    from_mode: fromMode,
+    to_mode: toMode,
+    provider_from: fromProvider,
+    provider_to: toProvider,
+    method: operation,
+  });
+
+  const pairKey = `${fromMode}->${toMode}`;
+  if (!warnedFailoverPairs.has(pairKey)) {
+    warnedFailoverPairs.add(pairKey);
+    logger.warn(
+      `[reasoning-backend:failover] provider failover active: ${fromMode} -> ${toMode} (${operation}); ` +
+        `primary failure: ${errorSummary}`
+    );
+  }
+}
+
 export class FailoverReasoningBackend implements ReasoningBackend {
   readonly name: string;
   private readonly candidates: ReasoningBackendCandidate[];
@@ -744,6 +828,8 @@ export class FailoverReasoningBackend implements ReasoningBackend {
         if (attempt.stop) break;
         continue;
       }
+      if (this.candidates[0])
+        recordCandidateServed(operation, this.candidates[0], candidate, errors);
       return attempt.result;
     }
 
@@ -942,11 +1028,13 @@ export class FailoverReasoningBackend implements ReasoningBackend {
   ): Promise<GenerateWithToolsResult> {
     const skippedProviders = new Set(listDemotedProviders());
     const errors: string[] = [];
+    let primaryCandidate: ReasoningBackendCandidate | undefined;
 
     for (const candidate of this.candidates) {
       const provider = normalizeProviderName(candidate.provider);
       if (provider && skippedProviders.has(provider)) continue;
       if (!candidate.backend.generateWithTools) continue;
+      if (!primaryCandidate) primaryCandidate = candidate;
       const attempt = await this.attemptCandidateWithRetries(
         'generateWithTools',
         candidate,
@@ -958,6 +1046,7 @@ export class FailoverReasoningBackend implements ReasoningBackend {
         if (attempt.stop) break;
         continue;
       }
+      recordCandidateServed('generateWithTools', primaryCandidate, candidate, errors);
       return attempt.result;
     }
 
@@ -984,6 +1073,7 @@ export class FailoverReasoningBackend implements ReasoningBackend {
   ): Promise<string> {
     const skippedProviders = new Set(listDemotedProviders());
     const errors: string[] = [];
+    let primaryCandidate: ReasoningBackendCandidate | undefined;
 
     for (const candidate of this.candidates) {
       const provider = normalizeProviderName(candidate.provider);
@@ -992,6 +1082,7 @@ export class FailoverReasoningBackend implements ReasoningBackend {
       // failing over to one would drop the images and return an answer about
       // pictures the model never received.
       if (!candidate.backend.promptWithImages) continue;
+      if (!primaryCandidate) primaryCandidate = candidate;
       const attempt = await this.attemptCandidateWithRetries(
         'promptWithImages',
         candidate,
@@ -1003,6 +1094,7 @@ export class FailoverReasoningBackend implements ReasoningBackend {
         if (attempt.stop) break;
         continue;
       }
+      recordCandidateServed('promptWithImages', primaryCandidate, candidate, errors);
       return attempt.result;
     }
 
