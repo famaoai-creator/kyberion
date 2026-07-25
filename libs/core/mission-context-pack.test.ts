@@ -12,6 +12,7 @@ import {
   loadKnowledgeHintsIfPossible,
   renderMissionContextPack,
   saveMissionContextPack,
+  SCOPE_KNOWLEDGE_BUDGETS,
   type MissionContextPack,
   type MissionStateSummary,
 } from './mission-context-pack.js';
@@ -917,5 +918,87 @@ describe('loadKnowledgeHintsIfPossible (KP-03 knowledge slices)', () => {
     expect(hints[0].path).toBe('knowledge/product/architecture/a.md');
     expect(warnSpy).toHaveBeenCalled();
     warnSpy.mockRestore();
+  });
+});
+
+// KP-04: hint count + pack char budget scale with the task's estimated_scope
+// (SCOPE_KNOWLEDGE_BUDGETS). `M` must stay byte-identical to the pre-KP-04
+// defaults (hint limit 3, prune budget 6000) — the `(c)` test above already
+// pins that default via an omitted `estimatedScope`.
+describe('KP-04 scope-linked budgets', () => {
+  const kp04SlicesDir = pathResolver.sharedTmp('knowledge-slices-kp04-test');
+
+  function baseMissionState(): MissionStateSummary {
+    return {
+      mission_id: 'MSN-KP04-BUDGETS-TEST',
+      mission_type: 'product_development',
+      tier: 'public',
+      status: 'active',
+      execution_mode: 'local',
+      priority: 3,
+      confidence_score: 1,
+      assigned_persona: 'worker',
+      git: { branch: 'b', start_commit: 's', latest_commit: 'l', checkpoints: [] },
+      history: [],
+    };
+  }
+
+  afterEach(() => {
+    vi.mocked(findRelevantDistilledKnowledge).mockReset();
+  });
+
+  it('(a) hint count scales with estimated_scope: S=2, M=3, L=5', async () => {
+    const searchResult = Array.from({ length: 6 }, (_, index) => ({
+      path: `knowledge/product/architecture/kp04-scope-${index}.md`,
+      title: `KP-04 scope hint ${index}`,
+      excerpt: `excerpt ${index}`,
+      tags: [],
+      score: 0.9 - index * 0.01,
+    }));
+    vi.mocked(findRelevantDistilledKnowledge).mockResolvedValue(searchResult as any);
+
+    for (const scope of ['S', 'M', 'L'] as const) {
+      vi.mocked(findRelevantDistilledKnowledge).mockClear();
+      const expectedLimit = SCOPE_KNOWLEDGE_BUDGETS[scope].hintLimit;
+
+      const hints = await loadKnowledgeHintsIfPossible({
+        missionState: baseMissionState(),
+        teamRole: 'implementer',
+        knowledgeSlicesPath: `${kp04SlicesDir}/does-not-exist-kp04.json`,
+        estimatedScope: scope,
+      });
+
+      expect(hints).toHaveLength(expectedLimit);
+      expect(findRelevantDistilledKnowledge).toHaveBeenCalledWith(
+        expect.objectContaining({ limit: expectedLimit, minScore: 0.08 })
+      );
+    }
+  });
+
+  it('(b) pack char budget scales with estimated_scope when contextBudgetChars is not explicit: S=4000, M=6000, L=9000', () => {
+    for (const scope of ['S', 'M', 'L'] as const) {
+      const pack = buildMissionContextPack({
+        missionPath,
+        missionState: baseMissionState(),
+        estimatedScope: scope,
+        teamRole: 'implementer',
+        recipientKind: 'agent',
+      });
+
+      expect(pack.pruning?.budget_chars).toBe(SCOPE_KNOWLEDGE_BUDGETS[scope].contextBudgetChars);
+    }
+  });
+
+  it('(c) an explicit contextBudgetChars still wins over estimated_scope', () => {
+    const pack = buildMissionContextPack({
+      missionPath,
+      missionState: baseMissionState(),
+      estimatedScope: 'L',
+      contextBudgetChars: 1234,
+      teamRole: 'implementer',
+      recipientKind: 'agent',
+    });
+
+    expect(pack.pruning?.budget_chars).toBe(1234);
   });
 });
