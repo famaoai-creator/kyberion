@@ -1,0 +1,67 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "provider-egress-policy.schema.json",
+  "title": "Provider Egress Policy",
+  "description": "XP-03: tier x provider egress gate for the delegation face (a task contract / context pack handed to an external LLM CLI), as opposed to egress-policy.json (SA-04, network/domain face). Declares, per provider, whether it keeps material on this machine (local-only) or sends it to a vendor API (external-api), and per data tier which providers may receive that tier's material. Consumed by libs/core/provider-egress-gate.ts's checkProviderEgress.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "Semver of this policy format."
+    },
+    "providers": {
+      "type": "object",
+      "description": "Egress label per provider id (e.g. 'claude', 'codex', 'agy', 'gemini', 'copilot'). A provider absent from this map is treated as unknown -- not automatically local-only.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "egress": {
+            "type": "string",
+            "enum": ["external-api", "local-only"],
+            "description": "'external-api': the provider's CLI sends the payload to a vendor-hosted API. 'local-only': inference stays on this machine."
+          }
+        },
+        "required": ["egress"]
+      }
+    },
+    "tier_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Per data tier, which providers may receive material of that tier. `public` is always any-provider and is not overridable here -- the gate fails open for public regardless of this file's presence/validity.",
+      "properties": {
+        "confidential": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "mode": { "const": "approved-only" },
+            "approved_providers": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 },
+              "description": "Provider ids explicitly approved to receive confidential-tier material."
+            }
+          },
+          "required": ["mode", "approved_providers"]
+        },
+        "personal": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "mode": { "const": "local-only-or-approved" },
+            "approved_providers": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 },
+              "description": "Provider ids explicitly approved to receive personal-tier material despite not being local-only. Providers declared `local-only` in `providers` are allowed without appearing here."
+            }
+          },
+          "required": ["mode", "approved_providers"]
+        }
+      },
+      "required": ["confidential", "personal"]
+    }
+  },
+  "required": ["version", "providers", "tier_policy"]
+}

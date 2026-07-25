@@ -44,10 +44,12 @@ import {
   scanTmp,
   rotateLogs,
   scanRuntime,
+  sweepDelegationChildren,
   runJanitor,
   runJanitorIfStale,
   readJanitorLastRunMs,
   DEFAULT_TMP_TTL_MS,
+  type DelegationChildRecord,
 } from './storage-janitor.js';
 
 function writeFile(filePath: string, content = 'x'): void {
@@ -212,6 +214,104 @@ describe('storage-janitor', () => {
     });
   });
 
+  /** XP-06 zombie sweep — orphaned delegation-child PID reaping. */
+  describe('sweepDelegationChildren', () => {
+    function registryPath(): string {
+      return path.join(path.dirname(tmpDir), 'runtime', 'delegation-children.json');
+    }
+    function writeRegistry(records: DelegationChildRecord[]): void {
+      writeFile(registryPath(), JSON.stringify(records));
+    }
+    function readRegistryRaw(): DelegationChildRecord[] {
+      return JSON.parse(fs.readFileSync(registryPath(), 'utf8'));
+    }
+
+    const staleRecord: DelegationChildRecord = {
+      id: 'claude-1',
+      provider: 'claude',
+      pid: 12345,
+      startedAt: new Date(Date.now() - 20 * 60 * 1000).toISOString(),
+      deadlineAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(), // past — stale
+      budgetMs: 600000,
+    };
+    const freshRecord: DelegationChildRecord = {
+      id: 'codex-1',
+      provider: 'codex',
+      pid: 22222,
+      startedAt: new Date().toISOString(),
+      deadlineAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(), // future — not stale
+      budgetMs: 600000,
+    };
+
+    it('returns an empty result when the registry file does not exist', () => {
+      const result = sweepDelegationChildren({ dryRun: true, killFn: vi.fn() });
+      expect(result).toEqual({ stale: [], killed: [], errors: [] });
+    });
+
+    it('dry-run reports stale entries without killing anything or mutating the registry', () => {
+      writeRegistry([staleRecord, freshRecord]);
+      const killFn = vi.fn();
+
+      const result = sweepDelegationChildren({ dryRun: true, killFn });
+
+      expect(result.stale.map((r) => r.id)).toEqual(['claude-1']);
+      expect(result.killed).toHaveLength(0);
+      expect(killFn).not.toHaveBeenCalled();
+      expect(readRegistryRaw()).toHaveLength(2); // untouched
+    });
+
+    it('real mode kills stale PIDs via the injected killFn and removes them from the registry', () => {
+      writeRegistry([staleRecord, freshRecord]);
+      const killFn = vi.fn();
+
+      const result = sweepDelegationChildren({ dryRun: false, killFn });
+
+      expect(result.killed.map((r) => r.id)).toEqual(['claude-1']);
+      expect(killFn).toHaveBeenCalledTimes(1);
+      expect(killFn).toHaveBeenCalledWith(12345, 'SIGKILL');
+      // process.kill was never touched — only the injected seam was.
+      const remaining = readRegistryRaw();
+      expect(remaining).toHaveLength(1);
+      expect(remaining[0].id).toBe('codex-1');
+    });
+
+    it('keeps fresh (non-stale) records untouched in real mode', () => {
+      writeRegistry([freshRecord]);
+      const killFn = vi.fn();
+
+      const result = sweepDelegationChildren({ dryRun: false, killFn });
+
+      expect(result.stale).toHaveLength(0);
+      expect(killFn).not.toHaveBeenCalled();
+      expect(readRegistryRaw()).toHaveLength(1);
+    });
+
+    it('removes the stale record and reports the error even when killFn throws (e.g. process already gone)', () => {
+      writeRegistry([staleRecord]);
+      const killFn = vi.fn(() => {
+        throw new Error('ESRCH: no such process');
+      });
+
+      const result = sweepDelegationChildren({ dryRun: false, killFn });
+
+      expect(result.killed).toHaveLength(0);
+      expect(result.errors[0]).toContain('ESRCH');
+      expect(readRegistryRaw()).toHaveLength(0);
+    });
+
+    it('skips records with no numeric pid (nothing to kill) but still drops them once stale', () => {
+      const noPidRecord: DelegationChildRecord = { ...staleRecord, id: 'no-pid', pid: undefined };
+      writeRegistry([noPidRecord]);
+      const killFn = vi.fn();
+
+      const result = sweepDelegationChildren({ dryRun: false, killFn });
+
+      expect(killFn).not.toHaveBeenCalled();
+      expect(result.stale.map((r) => r.id)).toEqual(['no-pid']);
+      expect(readRegistryRaw()).toHaveLength(0);
+    });
+  });
+
   describe('runJanitor', () => {
     it('returns a valid report shape', () => {
       const report = runJanitor({ dryRun: true });
@@ -224,10 +324,31 @@ describe('storage-janitor', () => {
         deletedDataVault: expect.any(Number),
         expiredRuntime: expect.any(Number),
         deletedRuntime: expect.any(Number),
+        staleDelegationChildren: expect.any(Number),
+        killedDelegationChildren: expect.any(Number),
         errors: expect.any(Array),
         timestamp: expect.any(String),
         dryRun: true,
       });
+    });
+
+    it('surfaces delegation-children staleness in dry-run without killing (runJanitor never injects a killFn, so only dry-run is safe to exercise here)', () => {
+      const staleRecord: DelegationChildRecord = {
+        id: 'claude-1',
+        provider: 'claude',
+        pid: 999999999, // never a real pid; dry-run never calls killFn/process.kill regardless
+        startedAt: new Date(Date.now() - 20 * 60 * 1000).toISOString(),
+        deadlineAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+        budgetMs: 600000,
+      };
+      writeFile(
+        path.join(path.dirname(tmpDir), 'runtime', 'delegation-children.json'),
+        JSON.stringify([staleRecord])
+      );
+
+      const report = runJanitor({ dryRun: true });
+      expect(report.staleDelegationChildren).toBeGreaterThanOrEqual(1);
+      expect(report.killedDelegationChildren).toBe(0);
     });
 
     it('reports expired tmp files in dry-run', () => {
@@ -270,7 +391,12 @@ describe('storage-janitor', () => {
 
     it('runs again once the marker is older than maxAgeMs', () => {
       runJanitorIfStale();
-      const markerPath = path.join(path.dirname(tmpDir), 'runtime', 'state', 'janitor-last-run.json');
+      const markerPath = path.join(
+        path.dirname(tmpDir),
+        'runtime',
+        'state',
+        'janitor-last-run.json'
+      );
       const stale = new Date(Date.now() - DEFAULT_TMP_TTL_MS - 60_000).toISOString();
       fs.writeFileSync(markerPath, JSON.stringify({ completed_at: stale, errors: 0 }));
 

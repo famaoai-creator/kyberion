@@ -1,8 +1,12 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import {
   findRelevantDistilledKnowledge,
   formatDistilledKnowledgeSummary,
+  PLACEHOLDER_DISTILL_PATTERNS,
 } from './distill-knowledge-injector.js';
+import { pathResolver } from './path-resolver.js';
 import {
   registerEmbeddingBackend,
   resetEmbeddingBackend,
@@ -27,7 +31,7 @@ describe('distill-knowledge-injector (E5)', () => {
     if (r.length > 0) {
       const top = r[0];
       const overlap = top.tags.some((t) =>
-        ['mission-retrofit', 'dog-food'].includes(t.toLowerCase()),
+        ['mission-retrofit', 'dog-food'].includes(t.toLowerCase())
       );
       expect(overlap || top.score! < 0.5).toBe(true);
     }
@@ -57,6 +61,56 @@ describe('distill-knowledge-injector (E5)', () => {
   });
 });
 
+// ── KP-07: placeholder / policy-fallback distill quarantine ─────────────────
+
+describe('findRelevantDistilledKnowledge — placeholder distill quarantine (KP-07)', () => {
+  const dir = pathResolver.rootResolve('knowledge/product/evolution');
+  const probeName = `distill_kp07-placeholder-probe-${process.pid}.md`;
+  const probePath = path.join(dir, probeName);
+
+  // A query specific enough to match ONLY this probe file's title/tags, so a
+  // failure to quarantine it would make it rank (rather than merely appear
+  // among unrelated results).
+  const uniqueTag = `kp07-probe-tag-${process.pid}`;
+  const probeBody = `---
+title: 'KP-07 Placeholder Probe ${process.pid}'
+category: Incident
+tags: ['${uniqueTag}', 'auto-distilled']
+importance: 9
+source_mission: MSN-KP07-PLACEHOLDER-PROBE
+last_updated: 2026-07-25
+---
+
+# KP-07 Placeholder Probe
+
+## Summary
+
+Synthetic fixture for the placeholder-distill quarantine regression test.
+
+## Patterns Discovered
+
+- ${PLACEHOLDER_DISTILL_PATTERNS[1]}
+`;
+
+  afterEach(() => {
+    if (fs.existsSync(probePath)) fs.rmSync(probePath);
+  });
+
+  it('never ranks a distill doc containing a placeholder/policy-fallback pattern', async () => {
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(probePath, probeBody);
+
+    const r = await findRelevantDistilledKnowledge({
+      topic: 'KP-07 Placeholder Probe',
+      tags: [uniqueTag],
+      limit: 10,
+      minScore: 0,
+    });
+
+    expect(r.some((entry) => entry.path.endsWith(probeName))).toBe(false);
+  });
+});
+
 // ── Hybrid search (semantic RRF) ─────────────────────────────────────────────
 
 /**
@@ -79,10 +133,14 @@ const CLUSTER_VECTORS: Record<string, Float32Array> = {
 
 function clusterFor(text: string): Float32Array {
   const t = text.toLowerCase();
-  if (t.includes('meeting') || t.includes('会議') || t.includes('facilitator')) return CLUSTER_VECTORS['meeting'];
-  if (t.includes('governance') || t.includes('consent') || t.includes('compliance')) return CLUSTER_VECTORS['governance'];
-  if (t.includes('architecture') || t.includes('catalog') || t.includes('intent')) return CLUSTER_VECTORS['architecture'];
-  if (t.includes('voice') || t.includes('cloning') || t.includes('audio')) return CLUSTER_VECTORS['voice'];
+  if (t.includes('meeting') || t.includes('会議') || t.includes('facilitator'))
+    return CLUSTER_VECTORS['meeting'];
+  if (t.includes('governance') || t.includes('consent') || t.includes('compliance'))
+    return CLUSTER_VECTORS['governance'];
+  if (t.includes('architecture') || t.includes('catalog') || t.includes('intent'))
+    return CLUSTER_VECTORS['architecture'];
+  if (t.includes('voice') || t.includes('cloning') || t.includes('audio'))
+    return CLUSTER_VECTORS['voice'];
   return CLUSTER_VECTORS['default'];
 }
 
@@ -158,8 +216,12 @@ describe('findRelevantDistilledKnowledge — hybrid (with embedding backend)', (
     registerEmbeddingBackend({
       name: 'failing',
       dimensions: 4,
-      embed: async () => { throw new Error('embed unavailable'); },
-      embedBatch: async () => { throw new Error('embedBatch unavailable'); },
+      embed: async () => {
+        throw new Error('embed unavailable');
+      },
+      embedBatch: async () => {
+        throw new Error('embedBatch unavailable');
+      },
     });
     const r = await findRelevantDistilledKnowledge({
       topic: 'intent catalog',
