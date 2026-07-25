@@ -1,9 +1,9 @@
 ---
 title: Multi-Provider Co-Execution Contract
 category: Governance
-tags: [governance, multi-provider, cli, co-execution, xp-04]
+tags: [governance, multi-provider, cli, co-execution, xp-04, so-03]
 importance: 9
-last_updated: 2026-07-25
+last_updated: 2026-07-26
 ---
 
 # Multi-Provider Co-Execution Contract
@@ -40,6 +40,42 @@ scoped to that root.
 | `.git/` and repo config (`.gitignore`, `package.json` workspace wiring, etc.) | Mission owner only — never a worker CLI                                             | Git history and repo-wide config are mission-scoped state; a worker committing or reconfiguring on its own defeats the one-owner-per-mission invariant and can silently rewrite shared history.                                                                                                                                                                                       |
 | Temp files                                                                    | Any provider, but only under `active/shared/tmp/` (or mission-local storage)        | Ad hoc temp locations are invisible to cleanup and review, and can collide across concurrent providers; a single shared temp root keeps them inspectable and disposable.                                                                                                                                                                                                              |
 | Provider state directories (`.claude/`, `.codex/`, `.agy/`, `.gemini/`, …)    | Nobody hand-edits them; they are gitignored and reproduced by generation ceremonies | Per-provider state is derivable from the SSoT (team-roles + KD-05 profiles + working principles); committing hand-edited copies would let providers drift from the canonical role/tool definitions. Exception: `.claude/agents/` is generated **and tracked**, guarded by CT-01's drift check, so reviewers can see subagent definitions in diffs without anyone hand-authoring them. |
+
+## Surface orchestrator sessions
+
+A surface conversation thread (Slack / Telegram / Discord / iMessage /
+terminal / web) may hold mission-owner authority — the same authority a CLI
+orchestrator process holds — but ONLY through an active
+[`OrchestratorSession`](../../../docs/GLOSSARY.md#orchestratorsession)
+(SO-02) backed by a `mission-ownership:<MISSION_ID>` work-item claim (SO-03,
+`libs/core/orchestrator-session.ts`). There is no other path to owner
+authority for a surface: no surface may be granted mission-owner permissions
+by configuration alone, and `surface-roles.json`'s `writes: 'orchestrator'`
+vocabulary member (SO-03) marks this exact ceremony as the only legitimate
+route, never a blanket grant. The cwd contract above is unchanged — a
+surface's orchestrator session still operates from the repository/worktree
+root like any other provider process.
+
+This does not add a new row to the matrix above; it constrains who may
+qualify as "the mission owner" referenced in the `.git` row and the write
+row's "active work-item claim" holder. A surface that has NOT completed the
+OrchestratorSession ceremony remains an ordinary read/write-scoped surface
+per its `surface-roles.json` entry — it cannot reach `.git`, repo config, or
+another claim holder's write scope by conversation alone.
+
+- **`.git`/repo config stays mission-owner-only**, and the owner may now be
+  a surface's OrchestratorSession instead of a CLI process — the invariant is
+  about WHO (the current mission owner, however it authenticated), not WHICH
+  process kind.
+- **Owner authority is never projected into worker delegations.** A surface
+  (or CLI) process running under an active OrchestratorSession's
+  `mission_controller` execution context must not leak that role into any
+  spawned provider CLI delegation's environment (KD-05 capability-tier
+  projection, XP-02's `buildProviderChildEnv` env minimization) — see
+  `libs/core/provider-permission-profiles.ts`'s exclusion of
+  `MISSION_ROLE`/`SYSTEM_ROLE` from the delegation env allowlist. A
+  delegation always runs at its assigned KD-05 tier (implementer / explorer /
+  planner), never at the owner's authority.
 
 ## Enforcement notes
 

@@ -96,6 +96,14 @@ An explicit Mission owner operation that adopts work completed outside normal Wo
 
 The mission lifecycle controller referenced in the charter. It handles mission start, checkpoints, finish, and transactional safeguards.
 
+### OrchestratorSession
+
+A durable, journaled binding between a conversation thread (`surface`/`channel`/`thread`) and the mission it owns (SO-02, `libs/core/orchestrator-session.ts`). At most one active session exists per mission at a time, enforced across processes by claiming a `mission-ownership:<MISSION_ID>` work-item lease alongside the journal entry (SO-03) — not just an in-process check. Creating a session is the explicit ceremony that promotes a conversation thread from "issued this mission" to "owns and may steer this mission"; releasing it (handoff / finish / explicit) ends that authority. See [SURFACE_ORCHESTRATOR_PLAN](./developer/improvement-plans-2026-07/SURFACE_ORCHESTRATOR_PLAN_2026-07-25.ja.md) and the [multi-provider co-execution contract](../knowledge/product/governance/multi-provider-coexecution-contract.md#surface-orchestrator-sessions).
+
+### Surface Orchestrator
+
+A conversation thread (Slack / Telegram / Discord / iMessage / terminal / web) that has been promoted, via an active OrchestratorSession, to mission-owner authority equal to a CLI orchestrator process — able to steer mission lifecycle verbs (checkpoint, gate approval, pause/resume, finish) through the same governed SO-01 facade the CLI uses. This authority is never projected into worker/provider delegations spawned from that process (KD-05 capability tiers, XP-02 env minimization) — see [SO-03 in SURFACE_ORCHESTRATOR_PLAN](./developer/improvement-plans-2026-07/SURFACE_ORCHESTRATOR_PLAN_2026-07-25.ja.md).
+
 ## Lifecycle terms
 
 ### Onboarding

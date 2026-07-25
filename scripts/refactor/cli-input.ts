@@ -1,19 +1,6 @@
-import * as path from 'node:path';
-import { pathResolver } from '@agent/core/path-resolver';
-import { safeReadFile } from '@agent/core/secure-io';
-
-export function resolveCliInputPath(inputPath: string): string {
-  return path.isAbsolute(inputPath) ? inputPath : path.resolve(pathResolver.rootDir(), inputPath);
-}
-
-export function readTextFile(filePath: string): string {
-  return safeReadFile(filePath, { encoding: 'utf8' }) as string;
-}
-
-export function readJsonFile<T = any>(filePath: string): T {
-  return JSON.parse(readTextFile(filePath)) as T;
-}
-
-export function readJsonCliInput<T = any>(inputPath: string): T {
-  return readJsonFile<T>(resolveCliInputPath(inputPath));
-}
+/**
+ * Thin re-export shim: the implementation moved to `libs/core/cli-input.ts`
+ * (SO-01, @agent/core/cli-input). This file exists only to keep existing
+ * scripts/-relative importers working unchanged. Do not add logic here.
+ */
+export * from '@agent/core/cli-input';

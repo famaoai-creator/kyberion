@@ -27,7 +27,34 @@ const coreMocks = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('@agent/core', () => coreMocks);
+// SO-01: mission-runtime.ts now imports these directly from their libs/core
+// sibling modules (not the @agent/core barrel) — the mocks must target the
+// same specifiers or vitest won't intercept the real calls. `coreMocks`
+// stays a single shared object so assertions below don't need to change.
+vi.mock('./agent-runtime-supervisor.js', () => ({
+  enqueueMissionTeamPrewarmRequest: coreMocks.enqueueMissionTeamPrewarmRequest,
+  ensureMissionTeamRuntimeViaSupervisor: coreMocks.ensureMissionTeamRuntimeViaSupervisor,
+  startAgentRuntimeSupervisorForRequest: coreMocks.startAgentRuntimeSupervisorForRequest,
+}));
+vi.mock('./path-resolver.js', () => ({
+  findMissionPath: coreMocks.findMissionPath,
+}));
+vi.mock('./mission-team-binding.js', () => ({
+  initializeMissionTeamBindings: coreMocks.initializeMissionTeamBindings,
+}));
+vi.mock('./mission-team-plan-composer.js', () => ({
+  loadMissionTeamPlan: coreMocks.loadMissionTeamPlan,
+  enrichMissionTeamPlanWithOrganizationProfile:
+    coreMocks.enrichMissionTeamPlanWithOrganizationProfile,
+  resolveMissionTeamPlan: coreMocks.resolveMissionTeamPlan,
+  writeMissionTeamPlan: coreMocks.writeMissionTeamPlan,
+}));
+vi.mock('./core.js', () => ({
+  logger: coreMocks.logger,
+}));
+vi.mock('./organization-profile.js', () => ({
+  loadOrganizationProfile: coreMocks.loadOrganizationProfile,
+}));
 
 vi.mock('./mission-state.js', () => ({
   loadState: vi.fn(),
@@ -96,8 +123,9 @@ describe('mission-runtime organization defaults', () => {
       assignments: [],
     });
 
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    showMissionTeam('msn-1', false, '/workspace/root');
+    // SO-01: showMissionTeam now RETURNS the plan instead of console.log'ing
+    // it (the CLI router prints it); assert on the return value.
+    const returnedPlan = showMissionTeam('msn-1', false, '/workspace/root');
 
     expect(coreMocks.loadOrganizationProfile).toHaveBeenCalledWith('/workspace/root');
     expect(coreMocks.resolveMissionTeamPlan).toHaveBeenCalledWith(
@@ -106,19 +134,23 @@ describe('mission-runtime organization defaults', () => {
         organizationProfile: expect.objectContaining({
           organization_id: 'acme',
         }),
-      }),
+      })
     );
     expect(coreMocks.enrichMissionTeamPlanWithOrganizationProfile).not.toHaveBeenCalled();
+    expect(returnedPlan).toEqual(coreMocks.resolveMissionTeamPlan.mock.results[0]?.value);
     expect(coreMocks.logger.info).toHaveBeenCalledWith(
-      expect.stringContaining('[team] org=Acme (acme) template=org-default default=org-default catalog=demo-org'),
+      expect.stringContaining(
+        '[team] org=Acme (acme) template=org-default default=org-default catalog=demo-org'
+      )
     );
     expect(coreMocks.logger.info).toHaveBeenCalledWith(
-      expect.stringContaining('[team] assignments=0 required=0 assigned=0 unfilled_required=0'),
+      expect.stringContaining('[team] assignments=0 required=0 assigned=0 unfilled_required=0')
     );
     expect(coreMocks.writeMissionTeamPlan).toHaveBeenCalledWith('/tmp/MISSION', expect.any(Object));
-    expect(coreMocks.initializeMissionTeamBindings).toHaveBeenCalledWith('/tmp/MISSION', expect.any(Object));
-    expect(logSpy).toHaveBeenCalled();
-    logSpy.mockRestore();
+    expect(coreMocks.initializeMissionTeamBindings).toHaveBeenCalledWith(
+      '/tmp/MISSION',
+      expect.any(Object)
+    );
   });
 
   it('threads organization profile into staffing fallback planning', async () => {
@@ -151,8 +183,10 @@ describe('mission-runtime organization defaults', () => {
       },
     });
 
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    await staffMissionTeam('msn-2', '/workspace/root');
+    // SO-01: staffMissionTeam now RETURNS the runtime plan instead of
+    // console.log'ing it (the CLI router prints it); assert on the return
+    // value instead of stdout.
+    const returnedRuntimePlan = await staffMissionTeam('msn-2', '/workspace/root');
 
     expect(coreMocks.loadOrganizationProfile).toHaveBeenCalledWith('/workspace/root');
     expect(coreMocks.resolveMissionTeamPlan).toHaveBeenCalledWith(
@@ -161,33 +195,39 @@ describe('mission-runtime organization defaults', () => {
         organizationProfile: expect.objectContaining({
           organization_id: 'acme',
         }),
-      }),
+      })
     );
     expect(coreMocks.enrichMissionTeamPlanWithOrganizationProfile).not.toHaveBeenCalled();
     expect(coreMocks.logger.info).toHaveBeenCalledWith(
-      expect.stringContaining('[staff] org=Acme (acme) default=org-default catalog=default assignments=0'),
+      expect.stringContaining(
+        '[staff] org=Acme (acme) default=org-default catalog=default assignments=0'
+      )
     );
     expect(coreMocks.logger.info).toHaveBeenCalledWith(
-      expect.stringContaining('[staff] spawned=0 already_ready=0 unfilled=0 failed=0'),
+      expect.stringContaining('[staff] spawned=0 already_ready=0 unfilled=0 failed=0')
     );
     expect(coreMocks.writeMissionTeamPlan).toHaveBeenCalledWith('/tmp/MISSION', expect.any(Object));
-    expect(coreMocks.initializeMissionTeamBindings).toHaveBeenCalledWith('/tmp/MISSION', expect.any(Object));
+    expect(coreMocks.initializeMissionTeamBindings).toHaveBeenCalledWith(
+      '/tmp/MISSION',
+      expect.any(Object)
+    );
     expect(coreMocks.ensureMissionTeamRuntimeViaSupervisor).toHaveBeenCalledWith(
       expect.objectContaining({
         missionId: 'MSN-2',
         requestedBy: 'mission_controller',
-      }),
+      })
     );
     expect(coreMocks.logger.info).toHaveBeenCalledWith(
-      expect.stringContaining('[staff] org=Acme (acme) default=org-default catalog=default assignments=0'),
+      expect.stringContaining(
+        '[staff] org=Acme (acme) default=org-default catalog=default assignments=0'
+      )
     );
     expect(coreMocks.logger.info).toHaveBeenCalledWith(
-      expect.stringContaining('[staff] spawned=0 already_ready=0 unfilled=0 failed=0'),
+      expect.stringContaining('[staff] spawned=0 already_ready=0 unfilled=0 failed=0')
     );
-    expect(logSpy).toHaveBeenCalledWith(
-      expect.stringContaining('"organization_profile"'),
-    );
-    logSpy.mockRestore();
+    expect(returnedRuntimePlan).toMatchObject({
+      organization_profile: expect.objectContaining({ organization_id: 'acme' }),
+    });
   });
 
   it('enriches an existing mission plan with organization metadata before displaying it', () => {
@@ -200,8 +240,9 @@ describe('mission-runtime organization defaults', () => {
       assignments: [],
     });
 
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    showMissionTeam('msn-3', false, '/workspace/root');
+    // SO-01: showMissionTeam now RETURNS the plan instead of console.log'ing
+    // it (the CLI router prints it); assert on the return value.
+    const returnedPlan = showMissionTeam('msn-3', false, '/workspace/root');
 
     expect(coreMocks.enrichMissionTeamPlanWithOrganizationProfile).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -209,7 +250,7 @@ describe('mission-runtime organization defaults', () => {
       }),
       expect.objectContaining({
         organization_id: 'acme',
-      }),
+      })
     );
     expect(coreMocks.writeMissionTeamPlan).toHaveBeenCalledWith(
       '/tmp/MISSION',
@@ -218,15 +259,19 @@ describe('mission-runtime organization defaults', () => {
           organization_id: 'acme',
           name: 'Acme',
         }),
-      }),
+      })
     );
     expect(coreMocks.logger.info).toHaveBeenCalledWith(
-      expect.stringContaining('[team] org=Acme (acme) template=default default=org-default catalog=default'),
+      expect.stringContaining(
+        '[team] org=Acme (acme) template=default default=org-default catalog=default'
+      )
     );
     expect(coreMocks.logger.info).toHaveBeenCalledWith(
-      expect.stringContaining('[team] assignments=0 required=0 assigned=0 unfilled_required=0'),
+      expect.stringContaining('[team] assignments=0 required=0 assigned=0 unfilled_required=0')
     );
-    expect(logSpy).toHaveBeenCalled();
-    logSpy.mockRestore();
+    expect(returnedPlan).toMatchObject({
+      mission_id: 'MSN-3',
+      organization_profile: expect.objectContaining({ organization_id: 'acme' }),
+    });
   });
 });

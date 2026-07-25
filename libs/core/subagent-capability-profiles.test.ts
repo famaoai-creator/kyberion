@@ -18,6 +18,10 @@ import {
   resetDefaultWorkerEventStream,
   type WorkerEventEnvelope,
 } from './worker-event-stream.js';
+import {
+  buildMissionLifecycleService,
+  type MissionLifecycleUnderlyingSystem,
+} from './mission-lifecycle-service.js';
 
 vi.mock('./audit-chain.js', () => ({
   auditChain: { record: vi.fn() },
@@ -183,6 +187,44 @@ describe('subagent-capability-profiles (KD-05)', () => {
       ).toBe(true);
     }
     expect(known.has(DEFAULT_TEAM_ROLE_CAPABILITY_PROFILE)).toBe(true);
+  });
+
+  // SO-03 boundary test: mission-owner authority (SO-01's lifecycle verbs —
+  // start/checkpoint/gate approval/finish/etc.) must never be reachable
+  // through a KD-05 worker-delegation tier. Derives the verb list from the
+  // real SO-01 facade (buildMissionLifecycleService) instead of a hand-typed
+  // copy, so a future lifecycle verb added there is automatically checked
+  // here too.
+  it('SO-03: no KD-05 tier exposes an SO-01 mission-lifecycle verb as an op or CLI tool', () => {
+    const stubSystem: MissionLifecycleUnderlyingSystem = {
+      create: vi.fn(async () => undefined),
+      start: vi.fn(async () => undefined),
+      createCheckpoint: vi.fn(async () => ({}) as any),
+      verifyMission: vi.fn(async () => undefined),
+      finishMission: vi.fn(async () => undefined),
+      staffMissionTeam: vi.fn(async () => ({}) as any),
+      prewarmMissionTeam: vi.fn(async () => ({}) as any),
+      dispatchMissionWorkItems: vi.fn(async () => ({}) as any),
+      pauseMission: vi.fn(async () => undefined),
+      resumeMission: vi.fn(async () => undefined),
+    };
+    const facade = buildMissionLifecycleService(stubSystem);
+    const lifecycleVerbs = Object.keys(facade).filter((key) => key !== 'status');
+    expect(lifecycleVerbs.length).toBeGreaterThan(0);
+
+    for (const profile of SUBAGENT_CAPABILITY_PROFILES) {
+      const ops = profile.allowedOps === '*' ? [] : profile.allowedOps;
+      for (const verb of lifecycleVerbs) {
+        expect(
+          ops.some((op) => op.toLowerCase().includes(verb.toLowerCase())),
+          `tier "${profile.name}" allowedOps must not expose lifecycle verb "${verb}"`
+        ).toBe(false);
+        expect(
+          profile.cliTools.some((tool) => tool.toLowerCase() === verb.toLowerCase()),
+          `tier "${profile.name}" cliTools must not expose lifecycle verb "${verb}"`
+        ).toBe(false);
+      }
+    }
   });
 
   it('every explicit allowlist entry resolves against the real actuator op registry', async () => {

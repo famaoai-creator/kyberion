@@ -50,6 +50,8 @@ import {
   renderStatus,
   buildHandoffPacket,
   recordMissionGateOverride,
+  missionLifecycleService,
+  releaseOrchestratorSessionForMissionBestEffort,
 } from '@agent/core';
 
 // --- Sub-module imports ---
@@ -152,7 +154,7 @@ async function dispatchMissionTickets(id: string): Promise<void> {
 }
 
 async function dispatchMissionWorkItems(id: string): Promise<void> {
-  const result = await missionSystem.dispatchMissionWorkItems(
+  const result = await missionLifecycleService.dispatch(
     id,
     resolveMissionWorkItemDispatchOptionsFromArgv()
   );
@@ -375,10 +377,11 @@ async function createMission(
   persona: string = 'worker',
   relationships: any = {},
   tenantSlug?: string,
-  organizationId?: string
+  organizationId?: string,
+  options?: { ephemeral?: boolean; intentGoal?: string }
 ) {
   return withOrganizationContext(organizationId, () =>
-    missionSystem.create(
+    missionLifecycleService.create(
       id,
       tier,
       tenantId,
@@ -386,7 +389,8 @@ async function createMission(
       visionRef,
       persona,
       relationships,
-      tenantSlug
+      tenantSlug,
+      options
     )
   );
 }
@@ -456,10 +460,11 @@ async function startMission(
   visionRef?: string,
   relationships: any = {},
   tenantSlug?: string,
-  organizationId?: string
+  organizationId?: string,
+  options?: { ephemeral?: boolean; intentGoal?: string; force?: boolean }
 ) {
   await withOrganizationContext(organizationId, () =>
-    missionSystem.start(
+    missionLifecycleService.start(
       id,
       tier,
       persona,
@@ -467,7 +472,8 @@ async function startMission(
       missionType,
       visionRef,
       relationships,
-      tenantSlug
+      tenantSlug,
+      options
     )
   );
   const targetId = id.toUpperCase();
@@ -489,7 +495,7 @@ async function importMission(id: string, remoteUrl: string) {
 }
 
 async function verifyMission(id: string, result: 'verified' | 'rejected', note: string) {
-  const output = await missionSystem.verifyMission(id, result, note);
+  const output = await missionLifecycleService.verify(id, result, note);
   if (result === 'verified') {
     syncIntentContractMemorySnapshot(id, 'verify');
   }
@@ -503,7 +509,7 @@ async function verifyMission(id: string, result: 'verified' | 'rejected', note: 
 //   - scripts/refactor/mission-seal.ts (sealMission)
 
 async function finishMission(id: string, seal: boolean = false) {
-  const result = await missionSystem.finishMission(id, seal);
+  const result = await missionLifecycleService.finish(id, seal);
   syncIntentContractMemorySnapshot(id, 'finish');
   return result;
 }
@@ -544,7 +550,7 @@ function syncIntentContractMemorySnapshot(id: string, stage: 'verify' | 'finish'
 }
 
 async function createCheckpoint(taskId: string, note: string, explicitMissionId?: string) {
-  const result = await missionSystem.createCheckpoint(taskId, note, explicitMissionId);
+  const result = await missionLifecycleService.createCheckpoint(taskId, note, explicitMissionId);
   try {
     const tc = new TraceContext('mission:checkpoint', {
       missionId: explicitMissionId || (result as any)?.missionId || undefined,
@@ -562,11 +568,11 @@ async function createCheckpoint(taskId: string, note: string, explicitMissionId?
 }
 
 async function resumeMission(id?: string) {
-  return missionSystem.resumeMission(id);
+  return missionLifecycleService.resume(id);
 }
 
 async function pauseMission(id: string, note?: string) {
-  return missionSystem.pauseMission(id, note);
+  return missionLifecycleService.pause(id, note);
 }
 
 async function cancelMission(id: string, note?: string) {
@@ -1165,7 +1171,7 @@ function showMissionStatus(id: string, follow: boolean = false) {
     logger.error('Usage: mission_controller status <MISSION_ID>');
     return;
   }
-  const view = buildMissionStatusView(id);
+  const view = missionLifecycleService.status(id);
   if (!view) {
     logger.error(`Mission ${id.toUpperCase()} not found. Run "list" to see available missions.`);
     return;
@@ -1468,12 +1474,12 @@ function showMissionTeam(id: string, refresh = false, organizationId?: string) {
 }
 
 async function staffMissionTeam(id: string, organizationId?: string) {
-  return withOrganizationContext(organizationId, () => missionSystem.staffMissionTeam(id));
+  return withOrganizationContext(organizationId, () => missionLifecycleService.staff(id));
 }
 
 async function prewarmMissionTeam(id: string, teamRolesArg?: string, organizationId?: string) {
   return withOrganizationContext(organizationId, () =>
-    missionSystem.prewarmMissionTeam(id, teamRolesArg)
+    missionLifecycleService.prewarm(id, teamRolesArg)
   );
 }
 
@@ -1547,7 +1553,11 @@ async function reviewWorkerOutput(
   await verifyMission(id, result, note || `Worker output ${result} by operator review.`);
 }
 
-async function handoffMission(id: string, nextPersona: string, note?: string): Promise<void> {
+export async function handoffMission(
+  id: string,
+  nextPersona: string,
+  note?: string
+): Promise<void> {
   if (!id || !nextPersona) {
     logger.error('Usage: mission_controller handoff <MISSION_ID> <NEXT_PERSONA> [note]');
     return;
@@ -1603,6 +1613,11 @@ async function handoffMission(id: string, nextPersona: string, note?: string): P
   });
   await saveState(upperId, state);
   await syncProjectLedgerIfLinked(upperId);
+  // SO-02: the CLI orchestrator taking over means any conversation-thread
+  // owner steps down — release its orchestrator session (if any).
+  // Best-effort: a release failure must never fail a handoff that already
+  // completed (state is already saved above).
+  releaseOrchestratorSessionForMissionBestEffort(upperId, 'handoff');
   logger.success(`✅ Mission ${upperId} handoff complete: ${previousPersona} -> ${nextPersona}`);
 }
 
