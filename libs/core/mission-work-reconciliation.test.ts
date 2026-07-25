@@ -3,19 +3,21 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Ajv } from 'ajv';
 import {
   clearWorkCoordinationNamespace,
-  compileSchemaFromPath,
   getWorkItem,
   importExternalWorkItem,
-  pathResolver,
+  setWorkCoordinationNamespace,
+} from './work-coordination.js';
+import { compileSchemaFromPath } from './schema-loader.js';
+import * as pathResolver from './path-resolver.js';
+import {
   safeExec,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
   safeRmSync,
   safeWriteFile,
-  setWorkCoordinationNamespace,
-  sha256,
-} from '@agent/core';
+} from './secure-io.js';
+import { sha256 } from './marketing-workload.js';
 import {
   reconcileMissionExistingWork,
   type MissionWorkReconciliationManifest,
@@ -28,7 +30,12 @@ const manifestPath = nodePath.join(fixtureRoot, 'manifest.json');
 const namespace = 'mission-work-reconciliation-test';
 const actorId = 'reconciliation-test-actor';
 const artifactPath = 'package.json';
-const verificationPath = 'scripts/refactor/mission-distill.test.ts';
+// Arbitrary small git-tracked file used as evidence-hash fixture material —
+// not a reference to its actual content. Must be a file with no uncommitted
+// changes in the working tree (the commit-binding check below runs `git
+// cat-file`/`git diff --quiet` against HEAD), so this deliberately avoids
+// anything touched by the in-flight SO-01 mission-lifecycle-service move.
+const verificationPath = 'libs/core/mission-status.ts';
 let previousMissionRole: string | undefined;
 let previousPersona: string | undefined;
 
