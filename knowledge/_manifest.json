@@ -2215,6 +2215,12 @@
       "type": "json"
     },
     {
+      "path": "product/governance/storage-retention-catalog.json",
+      "tier": "public",
+      "size": 2044,
+      "type": "json"
+    },
+    {
       "path": "product/governance/surface-coordination-role-map.json",
       "tier": "public",
       "size": 1310,
@@ -6753,7 +6759,7 @@
     {
       "path": "product/schemas/mission-team-plan.schema.json",
       "tier": "public",
-      "size": 6352,
+      "size": 6843,
       "type": "json"
     },
     {
@@ -7381,6 +7387,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/storage-retention-catalog.schema.json",
+      "tier": "public",
+      "size": 3195,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/surface-coordination-role-map.schema.json",
       "tier": "public",
       "size": 666,
@@ -7431,7 +7443,7 @@
     {
       "path": "product/schemas/task-contract.schema.json",
       "tier": "public",
-      "size": 3026,
+      "size": 3517,
       "type": "json"
     },
     {
@@ -7797,7 +7809,7 @@
     {
       "path": "product/schemas/workforce-resource-ref.schema.json",
       "tier": "public",
-      "size": 1618,
+      "size": 2037,
       "type": "json"
     },
     {

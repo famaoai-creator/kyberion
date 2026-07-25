@@ -48,9 +48,11 @@ import {
   runJanitor,
   runJanitorIfStale,
   readJanitorLastRunMs,
+  listUncoveredRuntimeDirs,
   DEFAULT_TMP_TTL_MS,
   type DelegationChildRecord,
 } from './storage-janitor.js';
+import { RETENTION_CATALOG_REPO_PATH, RETENTION_DAY_MS } from './storage-retention-catalog.js';
 
 function writeFile(filePath: string, content = 'x'): void {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
@@ -60,6 +62,23 @@ function writeFile(filePath: string, content = 'x'): void {
 function setMtime(filePath: string, msAgo: number): void {
   const t = new Date(Date.now() - msAgo);
   fs.utimesSync(filePath, t, t);
+}
+
+/**
+ * AL-01: default catalog location under the mocked rootDir (see the
+ * path-resolver mock above — rootDir() is dirname(dirname(tmpDir))).
+ * The base tests never write this file, so they exercise the
+ * builtin-defaults fallback — which mirrors the former constants exactly.
+ */
+function catalogFilePath(): string {
+  return path.join(path.dirname(path.dirname(tmpDir)), ...RETENTION_CATALOG_REPO_PATH.split('/'));
+}
+
+function writeCatalogFile(content: unknown): void {
+  writeFile(
+    catalogFilePath(),
+    typeof content === 'string' ? content : JSON.stringify(content, null, 2)
+  );
 }
 
 describe('storage-janitor', () => {
@@ -312,10 +331,108 @@ describe('storage-janitor', () => {
     });
   });
 
+  /** AL-01: catalog-driven TTLs, fail-safe fallback, uncovered-dir reporting. */
+  describe('retention catalog integration', () => {
+    it('respects a catalog-declared tmp TTL override (longer than the builtin 24h)', () => {
+      writeCatalogFile({
+        version: '1.0.0',
+        entries: [
+          { path: 'active/shared/tmp', artifact_class: 'tmp', ttl_days: 3, action: 'delete' },
+        ],
+      });
+      const twoDaysOld = path.join(tmpDir, 'two-days-old.json');
+      writeFile(twoDaysOld);
+      setMtime(twoDaysOld, 2 * RETENTION_DAY_MS);
+      const fourDaysOld = path.join(tmpDir, 'four-days-old.json');
+      writeFile(fourDaysOld);
+      setMtime(fourDaysOld, 4 * RETENTION_DAY_MS);
+
+      const result = scanTmp({ dryRun: true });
+      // 2d < catalog 3d TTL: kept (would have expired under the builtin 24h).
+      expect(result.expired).not.toContain(twoDaysOld);
+      expect(result.expired).toContain(fourDaysOld);
+    });
+
+    it('derives runtime scan rules from the catalog (custom subdir honored)', () => {
+      writeCatalogFile({
+        version: '1.0.0',
+        entries: [
+          {
+            path: 'active/shared/runtime/custom-cache',
+            artifact_class: 'cache',
+            ttl_days: 1,
+            action: 'delete',
+          },
+        ],
+      });
+      const dir = path.join(path.dirname(tmpDir), 'runtime', 'custom-cache');
+      const oldFile = path.join(dir, 'stale.bin');
+      writeFile(oldFile);
+      setMtime(oldFile, 2 * RETENTION_DAY_MS);
+
+      const result = scanRuntime({ dryRun: false });
+      expect(result.deleted).toContain(oldFile);
+      expect(fs.existsSync(oldFile)).toBe(false);
+    });
+
+    it('falls back to builtin defaults on a corrupt catalog — janitor never dies', () => {
+      writeCatalogFile('{broken json!!');
+      const oldFile = path.join(tmpDir, 'stale-under-default-ttl.json');
+      writeFile(oldFile);
+      setMtime(oldFile, DEFAULT_TMP_TTL_MS + 60_000);
+
+      const report = runJanitor({ dryRun: true });
+      expect(report.retentionCatalogSource).toBe('builtin-defaults');
+      expect(report.retentionCatalogWarnings.length).toBeGreaterThanOrEqual(1);
+      expect(report.retentionCatalogWarnings[0]).toContain('corrupt');
+      // Builtin 24h tmp TTL still enforced.
+      expect(report.expiredTmp).toBeGreaterThanOrEqual(1);
+      expect(report.errors).toEqual([]);
+    });
+
+    it('reports runtime subdirs with no covering rule as uncovered — and never deletes them', () => {
+      const runtimeRoot = path.join(path.dirname(tmpDir), 'runtime');
+      const mysteryFile = path.join(runtimeRoot, 'mystery-dir', 'ancient.json');
+      writeFile(mysteryFile);
+      setMtime(mysteryFile, 365 * RETENTION_DAY_MS);
+      // A covered dir (builtin defaults) for contrast.
+      writeFile(path.join(runtimeRoot, 'browser-receipts', 'fresh.json'));
+
+      const report = runJanitor({ dryRun: false });
+      expect(report.uncoveredRuntimeDirs).toContain('active/shared/runtime/mystery-dir');
+      expect(report.uncoveredRuntimeDirs).not.toContain('active/shared/runtime/browser-receipts');
+      expect(fs.existsSync(mysteryFile)).toBe(true); // reported, not deleted
+    });
+
+    it('listUncoveredRuntimeDirs honors catalog coverage including note-only entries', () => {
+      writeCatalogFile({
+        version: '1.0.0',
+        entries: [
+          {
+            path: 'active/shared/runtime/declared-no-ttl',
+            artifact_class: 'report',
+            action: 'delete',
+            note: 'declared without TTL — covered for reporting purposes',
+          },
+        ],
+      });
+      const runtimeRoot = path.join(path.dirname(tmpDir), 'runtime');
+      writeFile(path.join(runtimeRoot, 'declared-no-ttl', 'a.json'));
+      writeFile(path.join(runtimeRoot, 'undeclared', 'b.json'));
+
+      const uncovered = listUncoveredRuntimeDirs();
+      expect(uncovered).toContain('active/shared/runtime/undeclared');
+      expect(uncovered).not.toContain('active/shared/runtime/declared-no-ttl');
+    });
+  });
+
   describe('runJanitor', () => {
     it('returns a valid report shape', () => {
       const report = runJanitor({ dryRun: true });
       expect(report).toMatchObject({
+        uncoveredRuntimeDirs: expect.any(Array),
+        retentionCatalogSource: 'builtin-defaults',
+        retentionCatalogWarnings: expect.any(Array),
         expiredTmp: expect.any(Number),
         deletedTmp: expect.any(Number),
         expiredLogs: expect.any(Number),

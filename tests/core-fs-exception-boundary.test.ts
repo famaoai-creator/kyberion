@@ -37,6 +37,8 @@ const allowedCoreFsImports = [
   'libs/core/meeting-participation-coordinator.test.ts',
   'libs/core/metrics.test.ts',
   'libs/core/mission-evidence-doc.test.ts',
+  // AL-01 hermetic purge test: raw fs to seed/inspect a temp KYBERION_ROOT.
+  'libs/core/mission-maintenance.purge.test.ts',
   'libs/core/mission-phase-exit-gates.test.ts',
   'libs/core/process-logger.test.ts',
   'libs/core/promoted-memory.test.ts',
@@ -67,6 +69,8 @@ const allowedCoreFsImports = [
   'libs/core/src/pipeline-preview.test.ts',
   'libs/core/src/trace.test.ts',
   'libs/core/storage-janitor.test.ts',
+  // AL-01 catalog loader test: raw fs for temp catalog fixtures.
+  'libs/core/storage-retention-catalog.test.ts',
   'libs/core/tenant-registry.test.ts',
   'libs/core/tier-guard-tenant.test.ts',
   'libs/core/trust-engine.test.ts',

@@ -17,6 +17,8 @@ const {
   summarizeProviderCapabilities,
   resolveProviderCapabilitiesSnapshot,
   PROVIDER_CAPABILITY_PROBE_ENV,
+  isJanitorMarkerFresh,
+  JANITOR_FRESHNESS_MAX_AGE_MS,
 } = await import(new URL('./run_baseline_check.js', import.meta.url).href);
 
 function fakeCapability(overrides: Partial<ProviderCapability> = {}): ProviderCapability {
@@ -104,6 +106,26 @@ describe('run_baseline_check', () => {
       false
     );
     expect(status).toBe('all_clear');
+  });
+
+  // AL-01: L8 Storage Hygiene Layer — janitor last-run freshness.
+  it('isJanitorMarkerFresh treats a missing marker as stale ("never ran" must not look healthy)', () => {
+    expect(isJanitorMarkerFresh(null)).toBe(false);
+  });
+
+  it('isJanitorMarkerFresh accepts a marker within 48h and rejects one beyond it', () => {
+    const now = Date.parse('2026-07-26T12:00:00.000Z');
+    expect(isJanitorMarkerFresh(now - 60 * 60 * 1000, now)).toBe(true); // 1h old
+    expect(isJanitorMarkerFresh(now - JANITOR_FRESHNESS_MAX_AGE_MS, now)).toBe(true); // exact boundary
+    expect(isJanitorMarkerFresh(now - JANITOR_FRESHNESS_MAX_AGE_MS - 1, now)).toBe(false); // just past
+  });
+
+  it('a failed L8 (stale janitor) degrades the baseline to needs_attention', () => {
+    const status = deriveBaselineStatus(
+      { success: false, failedLayer: 'L8' },
+      { submitted: false, pending: false, reason: null }
+    );
+    expect(status).toBe('needs_attention');
   });
 
   it('reasoningFailoverWarning returns null when no marker is present', () => {

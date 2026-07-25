@@ -1,0 +1,48 @@
+{
+  "$schema": "../schemas/storage-retention-catalog.schema.json",
+  "version": "1.0.0",
+  "description": "Single source of truth for storage retention (AL-01). Declares, per repo-relative directory, the artifact class, TTL, and expiry action enforced by libs/core/storage-janitor.ts. Seeded 1:1 from the pre-catalog in-code constants (behavior-unchanged): tmp 24h, logs 30d, browser-receipts 90d, procedure-deltas 14d, a2a-conversations 30d, data-vault self-expiring. Directories not declared here are never deleted by the janitor; runtime/ subdirectories without an entry are surfaced in the janitor report as uncovered.",
+  "entries": [
+    {
+      "path": "active/shared/tmp",
+      "artifact_class": "tmp",
+      "ttl_days": 1,
+      "action": "delete",
+      "note": "Formerly DEFAULT_TMP_TTL_MS (24h). Shared scratch floor — anything here is consumable by contract."
+    },
+    {
+      "path": "active/shared/logs",
+      "artifact_class": "log",
+      "ttl_days": 30,
+      "action": "delete",
+      "note": "Formerly DEFAULT_LOG_RETENTION_DAYS. Covers audit/process/surfaces/traces log subtrees."
+    },
+    {
+      "path": "active/shared/runtime/browser-receipts",
+      "artifact_class": "evidence",
+      "ttl_days": 90,
+      "action": "delete",
+      "note": "Browser execution evidence — kept ~90d to align with audit retention (review finding OP-M3)."
+    },
+    {
+      "path": "active/shared/runtime/procedure-deltas",
+      "artifact_class": "cache",
+      "ttl_days": 14,
+      "action": "delete",
+      "note": "Self-repair artifacts — short-lived until promoted."
+    },
+    {
+      "path": "active/shared/runtime/a2a-conversations",
+      "artifact_class": "log",
+      "ttl_days": 30,
+      "action": "delete",
+      "note": "A2A conversation transcripts."
+    },
+    {
+      "path": "active/shared/data-vault",
+      "artifact_class": "cache",
+      "action": "delete",
+      "note": "Self-expiring: each JSON entry carries its own expiresAt, honored per-file by the janitor. No directory-level TTL."
+    }
+  ]
+}

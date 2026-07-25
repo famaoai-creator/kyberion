@@ -1,0 +1,63 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Storage Retention Catalog",
+  "description": "Single source of truth for storage retention (AL-01). Each entry declares, for one repo-relative directory, what class of artifact lives there, how long it is retained (ttl_days), and what happens on expiry (action). Consumed by libs/core/storage-retention-catalog.ts, which falls back to built-in defaults mirroring the pre-catalog constants when this file is missing or invalid — the janitor never dies because of a bad catalog. Entries without ttl_days are note-only declarations (e.g. self-expiring stores); directories with no entry at all are never deleted and, under active/shared/runtime/, are surfaced by the janitor report as uncovered.",
+  "type": "object",
+  "required": ["version", "entries"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "Semver of this catalog format. Bump minor for additive vocabulary, major for a change to enforcement semantics."
+    },
+    "description": {
+      "type": "string",
+      "description": "Free-text human note describing the intent of this catalog."
+    },
+    "entries": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Retention declarations. Paths must be unique (enforced by the loader).",
+      "items": { "$ref": "#/definitions/entry" }
+    }
+  },
+  "definitions": {
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "artifact_class", "action"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Repo-relative directory governed by this rule (POSIX separators, no leading/trailing slash, no '..').",
+          "pattern": "^[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)*$"
+        },
+        "artifact_class": {
+          "type": "string",
+          "description": "What kind of artifact the directory holds. evidence = execution/audit evidence; report = generated reports; export = outbound deliverables; cache = regenerable intermediates; tmp = consumable scratch; log = append-only logs.",
+          "enum": ["evidence", "report", "export", "cache", "tmp", "log"]
+        },
+        "ttl_days": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Retention period in days, evaluated against file mtime. Omit for note-only entries whose contents self-expire (the note must explain the mechanism)."
+        },
+        "action": {
+          "type": "string",
+          "description": "What the janitor does when the TTL elapses. delete = remove the file; archive = move it to the archive tree (reserved for AL-03+; current enforcement only implements delete).",
+          "enum": ["delete", "archive"]
+        },
+        "audit": {
+          "type": "boolean",
+          "description": "When true, expiry actions must leave an audit record."
+        },
+        "note": {
+          "type": "string",
+          "description": "Human rationale: why this TTL/action, and any special expiry mechanism."
+        }
+      }
+    }
+  }
+}

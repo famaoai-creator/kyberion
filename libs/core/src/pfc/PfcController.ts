@@ -1,6 +1,6 @@
 import { safeExistsSync, safeReadFile, safeWriteFile } from '../../secure-io.js';
 
-export type Layer = 'L0' | 'L1' | 'L2' | 'L3' | 'L4' | 'L5' | 'L6' | 'L7';
+export type Layer = 'L0' | 'L1' | 'L2' | 'L3' | 'L4' | 'L5' | 'L6' | 'L7' | 'L8';
 
 export interface LayerState {
   status: 'pending' | 'passed' | 'failed';
@@ -37,6 +37,7 @@ export class PfcController {
         L5: { status: 'pending', attempt_count: 0 },
         L6: { status: 'pending', attempt_count: 0 },
         L7: { status: 'pending', attempt_count: 0 },
+        L8: { status: 'pending', attempt_count: 0 },
       },
     };
   }
