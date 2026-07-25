@@ -58,6 +58,7 @@
 >    **2026-07-25追記(XP クローズアウト)**: XP-01/04/05/06/07 の残作業を実装・検証し全件 DONE へ更新(baseline-check の registry 自動更新と表面化、生成サブエージェント定義への併走マトリクス射影、worker 結果確定点での provenance 刻印、3 backend の実プロセス wall-clock 強制終了 + sweep 実プロデューサ接続、construction-only な実 backend resolver の opt-in 配線)。DONE 117 / PARTIAL 30 / TODO 7 へ更新。
 >    **2026-07-25追記**: surface 会話オーケストレータ計画 SO-01〜05 を新設([SURFACE_ORCHESTRATOR_PLAN_2026-07-25.ja.md](./SURFACE_ORCHESTRATOR_PLAN_2026-07-25.ja.md)。surface 経由でも CLI と同格の対話オーケストレータ(ミッション所有・操縦)として動作できるようにする。会話の前面(`runSurfaceConversation`)と発行(SN-01)は中立化済みのため、lifecycle 動詞(`missionSystem`)の governed facade 昇格・会話スレッド↔ミッション所有の永続バインディング(OrchestratorSession)・owner 権限配線・会話操縦 + IL-04 完了検証の4増分で「発行者→所有者」の昇格を実現し、SO-05 で責務別モデル階梯(会話の前面 = fast/standard、オーケストレータ判断 = deep)を既存 `model_tier` 語彙の宣言として配線する。SN-01 の後続、CT/XP と直交)。全件 TODO として追加し、DONE 117 / PARTIAL 30 / TODO 12 へ更新。
 >    **2026-07-26追記(SO 実装)**: SO-01〜05 の全 5 件をサブエージェント委譲 + オーケストレータレビュー方式で実装し DONE へ更新(4 wave、各タスクをレビュー・独立再検証してタスク毎コミット)。最終ゲート: 937 テストファイル / 6,032 テスト全緑・typecheck / フルビルド緑。レビュー層が検出・修正した実問題: (1) SO-05 エスカレーションの undefined 応答クラッシュ(fail-open 化)、(2) SO-02 読み取りキャッシュのプロセス間鮮度問題(毎回 journal 再投影へ)、(3) XP-02 env allowlist の MISSION_ROLE 継承による owner 権限リーク(allowlist から除去 + 境界テスト固定)、(4) SO-04 承認実行時の権限再検証欠落(実行直前の再アサート + apply_failed 記録)、(5) steering テストの並列破壊(telegram surface + RUN_ID 隔離)。残注記: agent-runtime spawn 経路(agent-adapter / acp-mediator の ENV_WHITELIST)の MISSION_ROLE は別信頼面のため未変更 — 別途評価が必要。DONE 122 / PARTIAL 30 / TODO 7 へ更新。
+>    **2026-07-26追記**: 成果物・エージェントライフサイクル統治計画 AL-01〜04・NI-01〜05 を新設([ARTIFACT_AGENT_LIFECYCLE_NHI_PLAN_2026-07-26.ja.md](./ARTIFACT_AGENT_LIFECYCLE_NHI_PLAN_2026-07-26.ja.md)。実コード突合に基づく2欠陥の解消: (AL) スコープ階層(tenant/project/mission/task/session)がアクセス制御・配置には在るのに保持に接続されておらず、purgeMissions の ADF パス誤りで自動アーカイブが事実上死亡・janitor 不稼働・sharedTmp 直書き63箇所・runtime/ 43サブディレクトリ中 TTL 3つのみ — を保持カタログ正本 + スコープ連動 GC で体系化。(NI) エージェント識別が agentId/role/persona/provider/peer_id/resource_id の6系統に分裂し永続台帳・actor 検証・trace 帰属が無い — を NHI(Non-Human Identity)業界合意(OWASP NHI Top 10 2025・SPIFFE/WIMSE・RFC 8693/8707・Entra Agent ID)へ写像可能な journal-backed AgentIdentity レジストリ + 委譲チェーン + task 粒度短命グラント + 自動オフボーディングで実装。AO-05/CO-06 の概念、SO-02 の event sourcing パターン、AA-03 の署名基盤を前提とする)。全件 TODO として追加し、DONE 122 / PARTIAL 30 / TODO 16 へ更新。
 >    **判定基準**: DONE = 受入条件を実コードで検証済 / PARTIAL = 一部充足 / TODO = 実質未着手。
 
 ## サマリ
@@ -66,7 +67,7 @@
 | ------- | ---- |
 | DONE    | 122  |
 | PARTIAL | 30   |
-| TODO    | 7    |
+| TODO    | 16   |
 
 ## P0 残作業(プロダクション化のクリティカルパス)
 
@@ -404,6 +405,29 @@
 | SO-03 | DONE | 2026-07-26 実装・検証済: mission-ownership:<ID> work-item claim をセッション ceremony に融合(24h lease・冪等・lease_conflict→所有競合)、surface-steering-authority(journal + live lease 二重検証の typed チェック + UX 契約適合拒否文面)、surface-roles.json 'orchestrator' 語彙、共同実行契約 addendum、GLOSSARY。境界テスト構築中に XP-02 env allowlist の MISSION_ROLE リークを発見・修正。残: agent-runtime spawn 経路(agent-adapter/acp-mediator ENV_WHITELIST)の MISSION_ROLE は別信頼面のため別途評価 |
 | SO-04 | DONE | 2026-07-26 実装・検証済: surface-mission-steering(セッション保有スレッド限定のルールベース操縦ルート、対象はセッションの mission_id のみ)。不可逆動詞(gate 承認=verify/finish)は approval-store の decideApprovalRequest 単一チョークポイント経由でのみ実行(ブリッジ無変更、no-bypass 構造テスト)。finish は承認前に IL-04 突合、未充足はギャップ列挙で拒否。レビューで承認実行時の権限再検証を追加(handoff/lease 失効後の stale 承認は apply_failed)                                                        |
 | SO-05 | DONE | 2026-07-26 実装・検証済: 前面 = 意図コンパイル/main ask/summary ask へ fast 宣言 + UX 契約失敗時の 1 回限り standard エスカレーション(fail-open)、判断面 = reconcileCompletion / mission-lifecycle finish へ deep 宣言。AgentHandle.ask / LlmCompileOptions / daemon payload の tolerant 配管、registration ceremony 型ガード、tier/エスカレーション理由の構造化記録。既知境界: tier をモデル切替に反映するのは shell claude-cli backend のみ(セッション型 handle は宣言記録のみ)                            |
+
+### AL(成果物ライフサイクル)
+
+正本: [ARTIFACT_AGENT_LIFECYCLE_NHI_PLAN_2026-07-26.ja.md](./ARTIFACT_AGENT_LIFECYCLE_NHI_PLAN_2026-07-26.ja.md)
+
+| ID    | 状態 | 残作業                                                                                                                                                                               |
+| ----- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| AL-01 | TODO | P0: purgeMissions の dead ADF path 修正(自動アーカイブが事実上死亡)・janitor 稼働鮮度の baseline-check 表面化・storage-retention-catalog 正本化(カタログ駆動へ挙動不変置換)          |
+| AL-02 | TODO | P1: writeScopedArtifact(スコープ×クラス配置 + index)・大出力退避/mission-seal/janitor レポートの tmp 脱出・sharedTmp 63箇所の registration ceremony ratchet(新規追加 fail)           |
+| AL-03 | TODO | P1: finish の retention 適用(cache 削除・per-mission git の bundle 化)・purge の facade `archive` 動詞化(冪等 + 監査)・task 完了時の中間物 GC                                        |
+| AL-04 | TODO | P2: runtime/ 全43サブディレクトリ + exports/ + archive/ のカタログカバー(未宣言は表面化)・tenant/project オフボーディング動詞(human 承認 + export→削除)・削除監査 + soft-delete 猶予 |
+
+### NI(NHI — エージェント識別・ライフサイクル)
+
+正本: [ARTIFACT_AGENT_LIFECYCLE_NHI_PLAN_2026-07-26.ja.md](./ARTIFACT_AGENT_LIFECYCLE_NHI_PLAN_2026-07-26.ja.md)
+
+| ID    | 状態 | 残作業                                                                                                                                                                                           |
+| ----- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| NI-01 | TODO | P1: 正準 AgentIdentityRecord(nhi_id URI・accountable_human_id 必須・所属スコープ・provisioned→retired)+ journal-backed 永続レジストリ(SO-02 パターン)・runtime_identity の実装(常に null の解消) |
+| NI-02 | TODO | P1: owner_actor/holder_peer_id/A2A sender の registry 検証(warn→enforce 段階導入)・trace metadata への actor_nhi_id/on_behalf_of 追加・A2A envelope への sender claim(HMAC 署名対象)             |
+| NI-03 | TODO | P2: DelegationChain(RFC 8693 act 同型)の delegateTask/dispatch/task contract 貫通・attenuation(child ≤ parent)fail-closed 検証・ledger/trace/audit へのチェーン刻印                              |
+| NI-04 | TODO | P2: task-scoped 短命グラント(grantee_nhi_id + audience = mission/task + expires_at)・task 完了/失効での自動収回・resolveIdentityContext の audience 検証                                         |
+| NI-05 | TODO | P2: mission/project/tenant クローズ時の identity 自動 retire(OWASP NHI #1 対策)・孤児 NHI 検出の baseline-check 表面化・NHI 台帳レポート・外部標準写像文書(SPIFFE/act/audience/Entra)            |
 
 ### CO(Company OS)
 
