@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { withExecutionContext } from './authority.js';
 import { auditChain } from './audit-chain.js';
+import { resetAgentIdentityServiceForTests } from './agent-identity.js';
 import * as pathResolver from './path-resolver.js';
 import {
   buildMissionLifecycleService,
@@ -43,11 +44,23 @@ function makeStubSystem(): MissionLifecycleUnderlyingSystem {
 let previousMissionRole: string | undefined;
 let previousPersona: string | undefined;
 
+// NI-01 hermeticity: the argv-independence test below runs the REAL start()
+// under mission_controller, whose staffing path provisions durable agent
+// identities — point that ledger at a per-process tmp journal so this suite
+// never writes the governed default path (mirrors how orchestrator-session
+// tests repoint their own journal).
+const IDENTITY_JOURNAL_TMP_DIR = `active/shared/tmp/mission-lifecycle-service-ni01-${process.pid}`;
+let identityJournalCounter = 0;
+
 beforeEach(() => {
   previousMissionRole = process.env.MISSION_ROLE;
   previousPersona = process.env.KYBERION_PERSONA;
   delete process.env.MISSION_ROLE;
   delete process.env.KYBERION_PERSONA;
+  identityJournalCounter += 1;
+  resetAgentIdentityServiceForTests(
+    `${IDENTITY_JOURNAL_TMP_DIR}/agent-identities-${identityJournalCounter}.jsonl`
+  );
 });
 
 afterEach(() => {
@@ -55,6 +68,12 @@ afterEach(() => {
   else process.env.MISSION_ROLE = previousMissionRole;
   if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
   else process.env.KYBERION_PERSONA = previousPersona;
+  resetAgentIdentityServiceForTests();
+});
+
+afterAll(() => {
+  const dir = pathResolver.rootResolve(IDENTITY_JOURNAL_TMP_DIR);
+  fs.rmSync(dir, { recursive: true, force: true });
 });
 
 describe('mission-lifecycle-service — fail-closed execution-context gate', () => {

@@ -1,6 +1,8 @@
-import { describe, expect, it, beforeEach, afterEach } from 'vitest';
+import { describe, expect, it, beforeEach, afterEach, afterAll } from 'vitest';
 import * as pathResolver from './path-resolver.js';
 import { safeExistsSync, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
+import { withExecutionContext } from './authority.js';
+import { getAgentIdentity, resetAgentIdentityServiceForTests } from './agent-identity.js';
 import {
   appendMissionExecutionLedgerEntry,
   buildMissionStaffingAssignments,
@@ -15,6 +17,10 @@ import type {
 
 const MISSION_ID = 'MSN-BINDING-TEST-001';
 const TEST_MISSION_DIR = pathResolver.sharedTmp(`mission-team-binding-tests/${MISSION_ID}`);
+// NI-01 hermeticity: point the identity ledger at a per-process tmp journal so
+// staffing-time identity provisioning never writes the governed default path.
+const TEST_IDENTITY_JOURNAL_DIR = `active/shared/tmp/mission-team-binding-ni01-${process.pid}`;
+let identityJournalCounter = 0;
 const SAMPLE_ORG_PROFILE: MissionTeamOrganizationProfileSummary = {
   organization_id: 'demo-org',
   name: 'Demo Org',
@@ -85,10 +91,20 @@ const SAMPLE_PLAN: MissionTeamPlan = {
 describe('mission-team-binding', () => {
   beforeEach(() => {
     safeRmSync(TEST_MISSION_DIR, { recursive: true, force: true });
+    identityJournalCounter += 1;
+    resetAgentIdentityServiceForTests(
+      `${TEST_IDENTITY_JOURNAL_DIR}/agent-identities-${identityJournalCounter}.jsonl`
+    );
   });
 
   afterEach(() => {
     safeRmSync(TEST_MISSION_DIR, { recursive: true, force: true });
+    resetAgentIdentityServiceForTests();
+  });
+
+  afterAll(() => {
+    const dir = pathResolver.rootResolve(TEST_IDENTITY_JOURNAL_DIR);
+    if (safeExistsSync(dir)) safeRmSync(dir, { recursive: true, force: true });
   });
 
   it('builds blueprint and staffing views from team plan', () => {
@@ -105,6 +121,28 @@ describe('mission-team-binding', () => {
     expect(staffing.assignments[0]?.status).toBe('active');
     expect(staffing.assignments[0]?.resource.resource_type).toBe('agent');
     expect(staffing.assignments[0]?.resource.resource_id).toBe('nerve-agent');
+    // NI-01: agent resources always carry a canonical durable identity —
+    // org from the plan's organization profile, slug from the agent id.
+    expect(staffing.assignments[0]?.resource.runtime_identity).toBe(
+      'kyberion://agent/demo-org/nerve-agent'
+    );
+  });
+
+  it('provisions a durable AgentIdentity for staffed agents under a governed context (NI-01)', () => {
+    const staffing = withExecutionContext('mission_controller', () =>
+      buildMissionStaffingAssignments(SAMPLE_PLAN)
+    );
+    const nhiId = staffing.assignments[0]?.resource.runtime_identity;
+    expect(nhiId).toBe('kyberion://agent/demo-org/nerve-agent');
+
+    const identity = getAgentIdentity(nhiId!);
+    expect(identity).not.toBeNull();
+    expect(identity?.kind).toBe('agent');
+    expect(identity?.lifecycle_status).toBe('provisioned');
+    expect(identity?.affiliation.mission_id).toBe(MISSION_ID);
+    // Accountable human: resource carries none (legacy assignment), so the
+    // organization profile's accountable_human_resource_id fallback applies.
+    expect(identity?.accountable_human_id).toBeTruthy();
   });
 
   it('binds human and service resources alongside agents', () => {
@@ -152,6 +190,10 @@ describe('mission-team-binding', () => {
     expect(staffing.assignments.map((entry) => entry.actor_type)).toEqual(['human', 'service']);
     expect(staffing.assignments[1]?.accountable_human_id).toBeUndefined();
     expect(staffing.assignments[1]?.resource.accountable_human_id).toBe('human:founder');
+    // NI-01: humans stay without a runtime identity; services keep their
+    // declared external identity untouched (no nhi derivation for them).
+    expect(staffing.assignments[0]?.resource.runtime_identity ?? null).toBeNull();
+    expect(staffing.assignments[1]?.resource.runtime_identity).toBe('stripe-prod');
   });
 
   it('rejects a new agent or service resource without human accountability', () => {
@@ -204,10 +246,14 @@ describe('mission-team-binding', () => {
       mission_id?: string;
       actor_id?: string;
       team_role?: string;
+      runtime_identity?: string;
     };
     expect(parsed.mission_id).toBe(MISSION_ID);
     expect(parsed.actor_id).toBe('nerve-agent');
     expect(parsed.team_role).toBe('owner');
+    // NI-01: ledger entries for staffed agents resolve the durable identity
+    // from the mission's staffing assignments on disk.
+    expect(parsed.runtime_identity).toBe('kyberion://agent/demo-org/nerve-agent');
   });
 
   it('normalizes legacy staffing artifacts when loading them', () => {
@@ -239,5 +285,11 @@ describe('mission-team-binding', () => {
     expect(loaded?.assignments[0]?.resource.resource_id).toBe('legacy-agent');
     expect(loaded?.assignments[0]?.resource.resource_type).toBe('agent');
     expect(loaded?.assignments[0]?.resource.model_id).toBe('legacy-model');
+    // NI-01: legacy agent rows are normalized to a canonical nhi_id on read
+    // (org falls back to the active organization profile for artifacts that
+    // predate organization stamping).
+    expect(loaded?.assignments[0]?.resource.runtime_identity).toMatch(
+      /^kyberion:\/\/agent\/[a-z][a-z0-9-]*\/legacy-agent$/
+    );
   });
 });
