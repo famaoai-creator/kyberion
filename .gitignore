@@ -1,5 +1,13 @@
 .gemini/
 .venv/
+
+# Provider state directories (XP-04 multi-provider-coexecution-contract):
+# gitignored, reproduced via generation ceremonies. Exception: .claude/agents/
+# is generated-and-tracked under CT-01's drift check.
+.codex/
+.agy/
+/.claude/*
+!/.claude/agents/
 *.skill
 tmp/
 .DS_Store

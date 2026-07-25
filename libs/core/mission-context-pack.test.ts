@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
@@ -9,10 +9,19 @@ import {
 } from './artifact-registry.js';
 import {
   buildMissionContextPack,
+  loadKnowledgeHintsIfPossible,
   renderMissionContextPack,
   saveMissionContextPack,
+  SCOPE_KNOWLEDGE_BUDGETS,
   type MissionContextPack,
+  type MissionStateSummary,
 } from './mission-context-pack.js';
+import { _resetKnowledgeSlicesCacheForTests } from './knowledge-slices.js';
+import { findRelevantDistilledKnowledge } from './distill-knowledge-injector.js';
+
+vi.mock('./distill-knowledge-injector.js', () => ({
+  findRelevantDistilledKnowledge: vi.fn(async () => []),
+}));
 
 const missionId = 'MSN-CONTEXT-PACK-TEST-001';
 const missionPath = pathResolver.sharedTmp(`mission-context-pack/${missionId}`);
@@ -763,5 +772,233 @@ describe('mission-context-pack', () => {
     const rendered = renderMissionContextPack(pack);
     expect(rendered).toContain('Context pruning:');
     expect(rendered).toContain('Rollup:');
+  });
+});
+
+describe('loadKnowledgeHintsIfPossible (KP-03 knowledge slices)', () => {
+  const slicesDir = pathResolver.sharedTmp('knowledge-slices-mcp-test');
+
+  function writeSlices(name: string, content: unknown): string {
+    if (!safeExistsSync(slicesDir)) safeMkdir(slicesDir, { recursive: true });
+    const p = `${slicesDir}/${name}`;
+    safeWriteFile(p, JSON.stringify(content, null, 2));
+    return p;
+  }
+
+  function baseMissionState(missionType = 'product_development'): MissionStateSummary {
+    return {
+      mission_id: 'MSN-KP03-HINTS-TEST',
+      mission_type: missionType,
+      tier: 'public',
+      status: 'active',
+      assigned_persona: 'worker',
+      git: { branch: 'b', start_commit: 's', latest_commit: 'l', checkpoints: [] },
+      history: [],
+    };
+  }
+
+  afterEach(() => {
+    _resetKnowledgeSlicesCacheForTests();
+    if (safeExistsSync(slicesDir)) safeRmSync(slicesDir, { recursive: true, force: true });
+    vi.mocked(findRelevantDistilledKnowledge).mockReset();
+  });
+
+  it('(a) delivers the pinned working-philosophy doc as the first hint for implementer/execution', async () => {
+    const slicesPath = writeSlices('implementer-execution.json', {
+      version: '0.1.0',
+      slices: [
+        {
+          id: 'implementer-execution',
+          match: { team_role: 'implementer', phase: 'execution' },
+          pinned: ['knowledge/product/governance/working-philosophy.md'],
+        },
+      ],
+    });
+    vi.mocked(findRelevantDistilledKnowledge).mockResolvedValue([]);
+
+    const hints = await loadKnowledgeHintsIfPossible({
+      missionState: baseMissionState(),
+      teamRole: 'implementer',
+      phase: 'execution',
+      knowledgeSlicesPath: slicesPath,
+    });
+
+    expect(hints.length).toBeGreaterThan(0);
+    expect(hints[0].path).toBe('knowledge/product/governance/working-philosophy.md');
+    expect(hints[0].title).toContain('Working Philosophy');
+  });
+
+  it('(b) excludes distill_* results even when the search returns them', async () => {
+    const slicesPath = writeSlices('exclude-distills.json', {
+      version: '0.1.0',
+      slices: [
+        {
+          id: 'default-exclude',
+          match: { team_role: '*', phase: '*', mission_type: '*' },
+          exclude: ['knowledge/product/evolution/distill_*.md'],
+        },
+      ],
+    });
+    vi.mocked(findRelevantDistilledKnowledge).mockResolvedValue([
+      {
+        path: 'knowledge/product/evolution/distill_should_be_excluded.md',
+        title: 'Excluded distill',
+        excerpt: 'excerpt',
+        tags: [],
+      },
+      {
+        path: 'knowledge/product/architecture/kept.md',
+        title: 'Kept doc',
+        excerpt: 'excerpt',
+        tags: [],
+      },
+    ] as any);
+
+    const hints = await loadKnowledgeHintsIfPossible({
+      missionState: baseMissionState(),
+      teamRole: 'implementer',
+      knowledgeSlicesPath: slicesPath,
+    });
+
+    expect(hints.some((h) => h.path.includes('distill_should_be_excluded'))).toBe(false);
+    expect(hints.some((h) => h.path === 'knowledge/product/architecture/kept.md')).toBe(true);
+  });
+
+  it('(c) matches pre-KP-03 behavior exactly when no slice matches / manifest missing', async () => {
+    const searchResult = [
+      {
+        path: 'knowledge/product/architecture/a.md',
+        title: 'A',
+        excerpt: 'ex-a',
+        tags: ['x'],
+        score: 0.5,
+      },
+    ];
+    vi.mocked(findRelevantDistilledKnowledge).mockResolvedValue(searchResult as any);
+
+    const hints = await loadKnowledgeHintsIfPossible({
+      missionState: baseMissionState(),
+      teamRole: 'implementer',
+      knowledgeSlicesPath: `${slicesDir}/does-not-exist.json`,
+    });
+
+    expect(hints).toEqual([
+      {
+        path: 'knowledge/product/architecture/a.md',
+        title: 'A',
+        excerpt: 'ex-a',
+        tags: ['x'],
+        score: 0.5,
+      },
+    ]);
+    expect(findRelevantDistilledKnowledge).toHaveBeenCalledWith(
+      expect.objectContaining({ limit: 3, minScore: 0.08 })
+    );
+  });
+
+  it('(e) fails open (search-only, no throw) when the slices manifest is schema-invalid', async () => {
+    const slicesPath = writeSlices('invalid.json', {
+      version: '0.1.0',
+      // A slice must declare at least one of pinned/search_roots/exclude — this fails schema validation.
+      slices: [{ match: { team_role: 'implementer' } }],
+    });
+    const searchResult = [
+      { path: 'knowledge/product/architecture/a.md', title: 'A', excerpt: 'ex-a', tags: [] },
+    ];
+    vi.mocked(findRelevantDistilledKnowledge).mockResolvedValue(searchResult as any);
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const hints = await loadKnowledgeHintsIfPossible({
+      missionState: baseMissionState(),
+      teamRole: 'implementer',
+      knowledgeSlicesPath: slicesPath,
+    });
+
+    expect(hints).toHaveLength(1);
+    expect(hints[0].path).toBe('knowledge/product/architecture/a.md');
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+});
+
+// KP-04: hint count + pack char budget scale with the task's estimated_scope
+// (SCOPE_KNOWLEDGE_BUDGETS). `M` must stay byte-identical to the pre-KP-04
+// defaults (hint limit 3, prune budget 6000) — the `(c)` test above already
+// pins that default via an omitted `estimatedScope`.
+describe('KP-04 scope-linked budgets', () => {
+  const kp04SlicesDir = pathResolver.sharedTmp('knowledge-slices-kp04-test');
+
+  function baseMissionState(): MissionStateSummary {
+    return {
+      mission_id: 'MSN-KP04-BUDGETS-TEST',
+      mission_type: 'product_development',
+      tier: 'public',
+      status: 'active',
+      execution_mode: 'local',
+      priority: 3,
+      confidence_score: 1,
+      assigned_persona: 'worker',
+      git: { branch: 'b', start_commit: 's', latest_commit: 'l', checkpoints: [] },
+      history: [],
+    };
+  }
+
+  afterEach(() => {
+    vi.mocked(findRelevantDistilledKnowledge).mockReset();
+  });
+
+  it('(a) hint count scales with estimated_scope: S=2, M=3, L=5', async () => {
+    const searchResult = Array.from({ length: 6 }, (_, index) => ({
+      path: `knowledge/product/architecture/kp04-scope-${index}.md`,
+      title: `KP-04 scope hint ${index}`,
+      excerpt: `excerpt ${index}`,
+      tags: [],
+      score: 0.9 - index * 0.01,
+    }));
+    vi.mocked(findRelevantDistilledKnowledge).mockResolvedValue(searchResult as any);
+
+    for (const scope of ['S', 'M', 'L'] as const) {
+      vi.mocked(findRelevantDistilledKnowledge).mockClear();
+      const expectedLimit = SCOPE_KNOWLEDGE_BUDGETS[scope].hintLimit;
+
+      const hints = await loadKnowledgeHintsIfPossible({
+        missionState: baseMissionState(),
+        teamRole: 'implementer',
+        knowledgeSlicesPath: `${kp04SlicesDir}/does-not-exist-kp04.json`,
+        estimatedScope: scope,
+      });
+
+      expect(hints).toHaveLength(expectedLimit);
+      expect(findRelevantDistilledKnowledge).toHaveBeenCalledWith(
+        expect.objectContaining({ limit: expectedLimit, minScore: 0.08 })
+      );
+    }
+  });
+
+  it('(b) pack char budget scales with estimated_scope when contextBudgetChars is not explicit: S=4000, M=6000, L=9000', () => {
+    for (const scope of ['S', 'M', 'L'] as const) {
+      const pack = buildMissionContextPack({
+        missionPath,
+        missionState: baseMissionState(),
+        estimatedScope: scope,
+        teamRole: 'implementer',
+        recipientKind: 'agent',
+      });
+
+      expect(pack.pruning?.budget_chars).toBe(SCOPE_KNOWLEDGE_BUDGETS[scope].contextBudgetChars);
+    }
+  });
+
+  it('(c) an explicit contextBudgetChars still wins over estimated_scope', () => {
+    const pack = buildMissionContextPack({
+      missionPath,
+      missionState: baseMissionState(),
+      estimatedScope: 'L',
+      contextBudgetChars: 1234,
+      teamRole: 'implementer',
+      recipientKind: 'agent',
+    });
+
+    expect(pack.pruning?.budget_chars).toBe(1234);
   });
 });

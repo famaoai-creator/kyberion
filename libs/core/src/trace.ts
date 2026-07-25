@@ -158,6 +158,18 @@ export class TraceContext {
     this.currentSpan.knowledgeRefs.push(knowledgePath);
   }
 
+  /**
+   * Merge attributes onto the current span. Unlike `startSpan`'s
+   * `attributes` argument (set once, at creation), this lets a caller record
+   * outcome/result attributes discovered only after the span already exists
+   * — e.g. a dispatch span whose `dispatched`/`result_schema_ok` flags are
+   * only known once the work it wraps has resolved. Purely additive: merges
+   * into any existing `attributes`, never removes keys.
+   */
+  setAttributes(attributes: Record<string, string | number | boolean>): void {
+    this.currentSpan.attributes = { ...(this.currentSpan.attributes || {}), ...attributes };
+  }
+
   /** Finalize the trace and return the immutable result */
   finalize(): Trace {
     // Close any open spans

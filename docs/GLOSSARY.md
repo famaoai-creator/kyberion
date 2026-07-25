@@ -182,6 +182,10 @@ Reference:
 
 The operational front door for agent runtimes. It owns runtime ensure, ask, refresh, restart, stop, and prewarm flows so callers do not spawn providers independently.
 
+### CLI Subagent Team Mode
+
+An execution surface where a team of subagents runs entirely inside one CLI harness session (Claude Code Agent tool / Agent SDK `agents`) instead of the agent-runtime A2A bridge — a thin adapter over the same CLI-independent contracts used everywhere else (team roles, KD-05 capability profiles, task contracts, context packs), not a second connection mechanism. Hub-and-spoke: the main CLI session stays mission owner, subagents never message each other directly. Best suited to short-lived, read-mostly, in-session work; see [Execution surface selection](../knowledge/product/architecture/agent-mission-control-model.md#11-execution-surface-selection) for the deterministic routing rubric against agent-runtime, and [CLI_SUBAGENT_TEAM_PLAN](developer/improvement-plans-2026-07/CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md) (CT-01–04) for the implementation plan.
+
 ### Service Runtime
 
 The governed lifecycle wrapper for long-lived services such as ComfyUI. It tracks probe availability, managed runtime paths, provisioning intent, and pinning separately from the service endpoint catalog.
@@ -303,6 +307,10 @@ The diagnostic view that inspects runtime lease metadata, finds stale/orphaned/e
 The actuator class for local short-lived shell, OS, and file-control operations. It is distinct from channel gateways and from authenticated service binding.
 
 ## Governance and storage terms
+
+### Knowledge Slice
+
+A task-profile-driven placement rule declared in `knowledge/product/governance/knowledge-slices.json` (schema: `schemas/knowledge-slices.schema.json`), matched on `team_role` x `phase` x `mission_type` (any field omitted or `'*'` matches anything). Resolved by `resolveKnowledgeSlice()` (`libs/core/knowledge-slices.ts`) and consumed by `loadKnowledgeHintsIfPossible()` (`libs/core/mission-context-pack.ts`) to decide, per dispatched task, which documents are always delivered (`pinned`, budget-reserved first), which subtrees to prioritize when searching (`search_roots`, most-specific-slice-wins), and which paths are never delivered (`exclude`, unioned across all matching slices). No matching slice, or a missing/invalid manifest, fails open to the pre-KP-03 behavior (flat top-N search, no pinning/filtering). See KP-03_SCHEMA_DESIGN_NOTE.ja.md for full precedence and merge rules.
 
 ### Trace / Span / Event
 

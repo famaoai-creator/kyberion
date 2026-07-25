@@ -479,6 +479,9 @@
         "knowledge/public/design-patterns/media-templates/themes/themes.json"
       ]
     },
+    "generate_subagent_definitions": {
+      "allow_write": [".claude/agents/"]
+    },
     "reconcile_config_fallbacks": {
       "allow_write": ["knowledge/public/", "active/shared/tmp/"]
     },
