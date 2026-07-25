@@ -243,7 +243,7 @@
     {
       "path": "product/architecture/component-lifecycle-inventory.md",
       "tier": "public",
-      "size": 6562,
+      "size": 6563,
       "type": "md"
     },
     {
@@ -993,7 +993,7 @@
     {
       "path": "product/governance/actuator-op-registry.json",
       "tier": "public",
-      "size": 16101,
+      "size": 16128,
       "type": "json"
     },
     {
@@ -1468,6 +1468,12 @@
       "path": "product/governance/judgment-rules.json",
       "tier": "public",
       "size": 1878,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/knowledge-curation-slo.json",
+      "tier": "public",
+      "size": 259,
       "type": "json"
     },
     {
@@ -3003,7 +3009,7 @@
     {
       "path": "product/orchestration/actuator-op-discovery.json",
       "tier": "public",
-      "size": 76751,
+      "size": 76833,
       "type": "json"
     },
     {
@@ -3339,7 +3345,7 @@
     {
       "path": "product/orchestration/global_actuator_index.json",
       "tier": "public",
-      "size": 17734,
+      "size": 18505,
       "type": "json"
     },
     {
@@ -5535,7 +5541,7 @@
     {
       "path": "product/roles/knowledge_steward/PROCEDURE.md",
       "tier": "public",
-      "size": 1658,
+      "size": 3579,
       "type": "md"
     },
     {
@@ -6460,6 +6466,12 @@
       "path": "product/schemas/knowledge-card.schema.json",
       "tier": "public",
       "size": 1476,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/knowledge-curation-slo.schema.json",
+      "tier": "public",
+      "size": 1280,
       "type": "json"
     },
     {

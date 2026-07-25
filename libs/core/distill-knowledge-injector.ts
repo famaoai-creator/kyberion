@@ -27,11 +27,7 @@
 
 import * as path from 'node:path';
 import * as pathResolver from './path-resolver.js';
-import {
-  safeReadFile,
-  safeReaddir,
-  safeExistsSync,
-} from './secure-io.js';
+import { safeReadFile, safeReaddir, safeExistsSync } from './secure-io.js';
 import {
   getEmbeddingBackend,
   cosineSimilarity,
@@ -41,6 +37,37 @@ import {
 const CURRENT_DISTILL_DIR = 'knowledge/product/evolution';
 const LEGACY_DISTILL_DIRS = ['knowledge/product/incidents', 'knowledge/product/evolution'];
 const DISTILL_FILE_RE = /^distill_.+\.md$/;
+
+/**
+ * KP-07: substrings that mark an auto-distilled document as a policy
+ * fallback rather than real extracted knowledge (e.g. the `distill`
+ * command wrote "## Patterns Discovered\n\n- None extracted automatically
+ * (policy fallback)" because the underlying mission had nothing pattern-
+ * worthy to report). Docs containing any of these are excluded from the
+ * ranking corpus below — a doc with a placeholder section is not useful
+ * context to inject, and letting it rank crowds out genuinely relevant
+ * distills.
+ *
+ * `knowledge/product/governance/knowledge-slices.json` already excludes
+ * `distill_*.md` globally for slice-scoped retrieval, but this module reads
+ * the distill directories directly (bypassing slices), so this check is
+ * the only guard when slices are absent or a caller queries outside the
+ * slice system — defense in depth, not a duplicate of the slice exclude.
+ */
+export const PLACEHOLDER_DISTILL_PATTERNS: readonly string[] = [
+  'None extracted automatically',
+  '(policy fallback)',
+];
+
+function isPlaceholderDistill(text: string): boolean {
+  try {
+    return PLACEHOLDER_DISTILL_PATTERNS.some((pattern) => text.includes(pattern));
+  } catch {
+    // Fail-open: an unexpected error while scanning must never block a
+    // legitimate distill from being indexed.
+    return false;
+  }
+}
 
 export interface DistilledKnowledgeEntry {
   /** Relative path from project root, e.g. knowledge/product/evolution/distill_msn-foo_2026-04-27.md */
@@ -146,6 +173,13 @@ function loadAllDistilled(): DistilledKnowledgeEntry[] {
       } catch {
         continue;
       }
+      // KP-07: quarantine placeholder/policy-fallback distills at scan time
+      // — cheap (single substring pass, only when scanning) and keeps them
+      // out of `out` entirely so they can never rank or be returned.
+      if (isPlaceholderDistill(text)) {
+        seenNames.add(name);
+        continue;
+      }
       const fm = parseFrontmatter(text);
       const bodyStart = text.indexOf('\n---\n', 4);
       const body = bodyStart >= 0 ? text.slice(bodyStart + 5) : text;
@@ -155,9 +189,7 @@ function loadAllDistilled(): DistilledKnowledgeEntry[] {
         title: typeof fm.title === 'string' ? fm.title : name,
         ...(typeof fm.category === 'string' ? { category: fm.category } : {}),
         tags,
-        ...(typeof fm.source_mission === 'string'
-          ? { source_mission: fm.source_mission }
-          : {}),
+        ...(typeof fm.source_mission === 'string' ? { source_mission: fm.source_mission } : {}),
         ...(typeof fm.importance === 'number' ? { importance: fm.importance } : {}),
         ...(typeof fm.last_updated === 'string'
           ? { last_updated: fm.last_updated }
@@ -206,14 +238,13 @@ async function _embedWithCache(key: string, text: string): Promise<Float32Array 
 function scoreEntry(
   entry: DistilledKnowledgeEntry,
   queryTokens: Set<string>,
-  queryTags: Set<string>,
+  queryTags: Set<string>
 ): number {
   const titleTokens = new Set(tokenize(entry.title));
   const titleOverlap =
     queryTokens.size === 0
       ? 0
-      : [...queryTokens].filter((t) => titleTokens.has(t)).length /
-        queryTokens.size;
+      : [...queryTokens].filter((t) => titleTokens.has(t)).length / queryTokens.size;
   const tagOverlap =
     queryTags.size === 0
       ? 0
@@ -221,9 +252,8 @@ function scoreEntry(
         Math.max(queryTags.size, 1);
   const base = 0.7 * tagOverlap + 0.3 * titleOverlap;
   // Importance bonus (0..0.05 per importance point above 5)
-  const importanceBonus = entry.importance && entry.importance > 5
-    ? Math.min(0.1, (entry.importance - 5) * 0.02)
-    : 0;
+  const importanceBonus =
+    entry.importance && entry.importance > 5 ? Math.min(0.1, (entry.importance - 5) * 0.02) : 0;
   return base + importanceBonus;
 }
 
@@ -240,7 +270,7 @@ function scoreEntry(
  * are dropped.
  */
 export async function findRelevantDistilledKnowledge(
-  input: FindRelevantInput,
+  input: FindRelevantInput
 ): Promise<DistilledKnowledgeEntry[]> {
   const limit = input.limit ?? 5;
   const minScore = input.minScore ?? 0.0001;
@@ -314,11 +344,8 @@ export async function findRelevantDistilledKnowledge(
  * Render a found entry as a one-line summary suitable for prompt
  * injection or UI display.
  */
-export function formatDistilledKnowledgeSummary(
-  entry: DistilledKnowledgeEntry,
-): string {
+export function formatDistilledKnowledgeSummary(entry: DistilledKnowledgeEntry): string {
   const tags = entry.tags.length ? ` [${entry.tags.slice(0, 3).join(', ')}]` : '';
-  const score =
-    entry.score !== undefined ? ` (score=${entry.score.toFixed(2)})` : '';
+  const score = entry.score !== undefined ? ` (score=${entry.score.toFixed(2)})` : '';
   return `- ${entry.title}${tags}${score}\n  ${entry.excerpt.slice(0, 160)}…\n  source: ${entry.path}`;
 }
