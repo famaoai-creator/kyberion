@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
+  canonicalA2AEnvelopeContent,
   resetA2ASecretCache,
   resolveA2ASecret,
   resolveA2ASignatureMode,
@@ -62,5 +63,51 @@ describe('a2a-envelope-signature (AA-03)', () => {
     expect(resolveA2ASignatureMode()).toBe('enforce');
     process.env.KYBERION_A2A_SIGNATURE = 'garbage';
     expect(resolveA2ASignatureMode()).toBe('warn');
+  });
+
+  describe('NI-02 sender_nhi_id claim in the signed content', () => {
+    const baseHeader = {
+      msg_id: 'MSG-NI02',
+      sender: 'sender-x',
+      receiver: 'agent-y',
+      performative: 'request',
+    };
+
+    it('canonicalization without the claim is byte-identical to the pre-NI-02 form (backward compat)', () => {
+      const withoutField = canonicalA2AEnvelopeContent({
+        header: baseHeader,
+        payload: { text: 'hi' },
+      });
+      const withUndefined = canonicalA2AEnvelopeContent({
+        header: { ...baseHeader, sender_nhi_id: undefined },
+        payload: { text: 'hi' },
+      });
+      expect(withUndefined).toBe(withoutField);
+      // A legacy signature over the claim-less content still verifies.
+      const legacySignature = signA2AContent(withoutField).signature;
+      expect(verifyA2AContent(withUndefined, legacySignature)).toEqual({ valid: true });
+    });
+
+    it('tampering with sender_nhi_id breaks signature verification', () => {
+      const claimed = canonicalA2AEnvelopeContent({
+        header: { ...baseHeader, sender_nhi_id: 'kyberion://agent/ni02-org/worker-a' },
+        payload: { text: 'hi' },
+      });
+      const { signature } = signA2AContent(claimed);
+      expect(verifyA2AContent(claimed, signature)).toEqual({ valid: true });
+
+      const tampered = canonicalA2AEnvelopeContent({
+        header: { ...baseHeader, sender_nhi_id: 'kyberion://agent/ni02-org/impostor' },
+        payload: { text: 'hi' },
+      });
+      expect(verifyA2AContent(tampered, signature).valid).toBe(false);
+
+      // Stripping a present claim also breaks the signature.
+      const stripped = canonicalA2AEnvelopeContent({
+        header: baseHeader,
+        payload: { text: 'hi' },
+      });
+      expect(verifyA2AContent(stripped, signature).valid).toBe(false);
+    });
   });
 });
