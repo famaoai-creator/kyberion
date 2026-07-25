@@ -123,6 +123,25 @@ export interface ApprovalApplyResult {
   auditRef?: string;
 }
 
+/**
+ * SO-04 Task 3: the governed effect an approved decision triggers. Carried on
+ * the request record so the single decision-resolution choke point
+ * (`decideApprovalRequest` below) can execute it without any caller
+ * (bridges, native-action handlers, text-decision resolvers) needing to know
+ * steering exists — see `scheduleSteeringApprovalExecution` below and
+ * `libs/core/surface-mission-steering.ts`.
+ */
+export interface ApprovalSteeringAction {
+  kind: 'mission_lifecycle_verb';
+  verb: 'verify' | 'finish';
+  missionId: string;
+  note?: string;
+  surface: string;
+  channel: string;
+  threadTs: string;
+  correlationId: string;
+}
+
 export interface ApprovalRequestRecord extends ApprovalRequestDraft {
   id: string;
   kind: 'channel-approval' | 'secret_mutation';
@@ -145,6 +164,8 @@ export interface ApprovalRequestRecord extends ApprovalRequestDraft {
   risk?: ApprovalRiskProfile;
   workflow?: ApprovalWorkflowState;
   applyResult?: ApprovalApplyResult;
+  /** SO-04 Task 3: present only for approval requests created by mission steering. */
+  steering?: ApprovalSteeringAction;
   track_id?: string;
   track_name?: string;
   work_loop?: OrganizationWorkLoopSummary;
@@ -361,6 +382,7 @@ export function createApprovalRequest(
     workLoop?: OrganizationWorkLoopSummary;
     accountability?: ApprovalAccountability;
     source?: ApprovalRequestSource;
+    steering?: ApprovalSteeringAction;
   }
 ): ApprovalRequestRecord {
   const storageChannel = normalizeApprovalChannel(params.storageChannel || params.channel);
@@ -402,6 +424,7 @@ export function createApprovalRequest(
         requiresApproval: true,
       }),
     accountability: params.accountability,
+    steering: params.steering,
   };
 
   writeGovernedArtifactJson(role, approvalRequestLogicalPath(storageChannel, record.id), record);
@@ -859,5 +882,110 @@ export function decideApprovalRequest(
     });
   }
 
+  // SO-04 Task 3: the single choke point every decision path (native
+  // action, `appr:<id>:decision` text, numbered-choice text — see
+  // surface-approval-ui.ts) already funnels through. An approved decision on
+  // a steering-originated request triggers its governed mission-lifecycle
+  // verb here, so no caller can approve a steering request without the verb
+  // eventually executing, and no caller needs to know steering exists.
+  if (updated.status === 'approved' && updated.steering) {
+    scheduleSteeringApprovalExecution(role, storageChannel, updated);
+  }
+
+  return updated;
+}
+
+/**
+ * SO-04 Task 3: fire-and-forget execution of an approved steering action,
+ * mirroring the HA-01 background-review-fork pattern in
+ * surface-runtime-orchestrator.ts (`void fork.catch(handleForkFailure)`) —
+ * `decideApprovalRequest` stays synchronous for every existing caller
+ * (bridges, kill-switch, approval-gate, …), and the mission-lifecycle verb
+ * runs to completion in the background. Every in-flight execution is
+ * tracked so hermetic tests can await draining instead of polling/sleeping;
+ * see {@link drainPendingSteeringApprovalExecutions}. Uses a dynamic import
+ * of `surface-mission-steering.js` to avoid a static import cycle (that
+ * module imports `createApprovalRequest` from here) — same technique as
+ * `kill-switch.ts`'s dynamic import of `approval-gate.js`.
+ */
+const pendingSteeringApprovalExecutions = new Set<Promise<void>>();
+
+function scheduleSteeringApprovalExecution(
+  role: GovernedArtifactRole,
+  storageChannel: string,
+  record: ApprovalRequestRecord
+): void {
+  const task = (async () => {
+    let applyResult: ApprovalApplyResult;
+    try {
+      const { executeApprovedMissionSteeringApproval } =
+        await import('./surface-mission-steering.js');
+      const outcome = await executeApprovedMissionSteeringApproval(record);
+      applyResult = {
+        appliedAt: new Date().toISOString(),
+        appliedBy: 'surface_mission_steering',
+        result: 'success',
+        auditRef: outcome,
+      };
+    } catch (error) {
+      applyResult = {
+        appliedAt: new Date().toISOString(),
+        appliedBy: 'surface_mission_steering',
+        result: 'failed',
+        auditRef: error instanceof Error ? error.message : String(error),
+      };
+    }
+    try {
+      recordApprovalApplyResult(role, {
+        channel: record.channel,
+        storageChannel,
+        requestId: record.id,
+        applyResult,
+      });
+    } catch {
+      // Best-effort persistence of the outcome — the verb itself already
+      // ran (or failed) above; a failure to record that outcome must not
+      // surface as an unhandled rejection.
+    }
+  })();
+  pendingSteeringApprovalExecutions.add(task);
+  void task.finally(() => pendingSteeringApprovalExecutions.delete(task));
+}
+
+/**
+ * Test-only: await every in-flight fire-and-forget steering execution
+ * scheduled by {@link decideApprovalRequest} so far. Real callers never need
+ * this — production surfaces observe the outcome via the follow-up surface
+ * outbox message `executeApprovedMissionSteeringApproval` sends, not by
+ * blocking on the decision call.
+ */
+export function drainPendingSteeringApprovalExecutions(): Promise<void> {
+  return Promise.all(Array.from(pendingSteeringApprovalExecutions)).then(() => undefined);
+}
+
+/** Persist an approval request's terminal apply outcome (SO-04 Task 3). */
+export function recordApprovalApplyResult(
+  role: GovernedArtifactRole,
+  params: {
+    channel: string;
+    storageChannel?: string;
+    requestId: string;
+    applyResult: ApprovalApplyResult;
+  }
+): ApprovalRequestRecord {
+  const storageChannel = normalizeApprovalChannel(params.storageChannel || params.channel);
+  const record = loadApprovalRequest(storageChannel, params.requestId);
+  if (!record) throw new Error(`Approval request not found: ${params.channel}/${params.requestId}`);
+  const updated: ApprovalRequestRecord = { ...record, applyResult: params.applyResult };
+  writeGovernedArtifactJson(role, approvalRequestLogicalPath(storageChannel, updated.id), updated);
+  appendGovernedArtifactJsonl(role, approvalEventLogicalPath(storageChannel), {
+    ts: new Date().toISOString(),
+    event: params.applyResult.result === 'success' ? 'applied' : 'apply_failed',
+    request_id: updated.id,
+    correlation_id: updated.correlationId,
+    channel: updated.channel,
+    thread_ts: updated.threadTs,
+    apply_result: params.applyResult,
+  });
   return updated;
 }
