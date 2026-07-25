@@ -1,10 +1,12 @@
 import { logger } from './core.js';
 import { agentRegistry, AgentProvider } from './agent-registry.js';
 import {
+  canonicalA2AEnvelopeContent,
   resolveA2ASignatureMode,
   signA2AContent,
   verifyA2AContent,
 } from './a2a-envelope-signature.js';
+import { enforceNhiActorPolicy } from './nhi-actor-verification.js';
 import { type AgentHandle } from './agent-lifecycle.js';
 import {
   getAgentManifest,
@@ -71,17 +73,27 @@ export interface A2AMessage {
     timestamp?: string;
     signature?: string;
     sig_alg?: string;
+    /**
+     * NI-02 sender identity claim: the canonical NHI id
+     * (`kyberion://agent/<org>/<slug>`, agent-identity.ts) of the sending
+     * agent. Part of the HMAC-signed content (the whole header is signed —
+     * see canonicalA2AEnvelopeContent), so within AA-03's same-host
+     * integrity boundary the claim cannot be altered without breaking the
+     * signature. Optional: legacy envelopes without it still verify.
+     * Per-agent keys (a claim *proof* rather than a tamper-evident claim)
+     * remain E4's public-key scope.
+     */
+    sender_nhi_id?: string;
   };
   payload: any;
 }
 
 // AA-03: signing/verification delegate to the shared envelope-signature
 // module (persistent host-local secret; per-process throwaway keys are gone).
+// NI-02: canonicalization moved into that module (canonicalA2AEnvelopeContent)
+// so the sender_nhi_id claim's signature coverage is defined next to the HMAC.
 function envelopeContent(message: A2AMessage): string {
-  return JSON.stringify({
-    header: { ...message.header, signature: undefined, sig_alg: undefined },
-    payload: message.payload,
-  });
+  return canonicalA2AEnvelopeContent(message);
 }
 
 export function signA2AMessage(message: A2AMessage): string {
@@ -90,6 +102,18 @@ export function signA2AMessage(message: A2AMessage): string {
 
 export function verifyA2ASignature(message: A2AMessage): boolean {
   return verifyA2AContent(envelopeContent(message), message.header.signature).valid;
+}
+
+/**
+ * NI-02 verification side of the sender claim: the envelope's
+ * `sender_nhi_id`, but only when the envelope carries a valid signature —
+ * an unsigned or tampered claim is not exposed. Callers receiving a routed
+ * message use this to attribute it to a durable identity.
+ */
+export function extractVerifiedSenderNhiId(message: A2AMessage): string | undefined {
+  const claim = message.header.sender_nhi_id;
+  if (!claim) return undefined;
+  return verifyA2ASignature(message) ? claim : undefined;
 }
 
 export class AgentBusyError extends Error {
@@ -176,6 +200,21 @@ class A2ABridgeImpl {
         throw new Error('A2A message signature malformed');
       }
     }
+
+    // NI-02: sender identity claim. When present, the claim is checked
+    // against the NI-01 registry through the shared actor-policy seam: warn
+    // (default) audits an unregistered/retired/suspended sender identity and
+    // allows; KYBERION_NHI_ACTOR=enforce rejects it (typed
+    // NhiActorPolicyError + audit event). The claim counts as VERIFIED —
+    // and is exposed downstream (audit metadata below,
+    // extractVerifiedSenderNhiId for callers) — only when the envelope
+    // signature validated above, since the claim is inside the signed content.
+    const senderNhiClaim = envelope.header.sender_nhi_id;
+    if (senderNhiClaim) {
+      enforceNhiActorPolicy(senderNhiClaim, 'a2a-bridge.route.sender_nhi_id');
+    }
+    const verifiedSenderNhiId =
+      senderNhiClaim && envelope.header.signature ? senderNhiClaim : undefined;
 
     // Parse receiver
     const { agentId, provider } = this.parseReceiver(receiver);
@@ -302,6 +341,9 @@ class A2ABridgeImpl {
         receiver: agentId,
         performative: envelope.header.performative,
         correlation_id: correlationId,
+        // NI-02: durable identity attribution for the routed message, only
+        // when the claim was covered by a valid signature.
+        ...(verifiedSenderNhiId ? { sender_nhi_id: verifiedSenderNhiId } : {}),
       },
     });
     recordGovernanceAction(envelope.header.sender, 'a2a_route', agentId, false);
@@ -426,6 +468,12 @@ class A2ABridgeImpl {
         ...(rehydrated ? { metadata: { rehydrated: true } } : {}),
       },
     };
+    // NI-02: stamp the responding agent's durable identity (NI-01 attaches
+    // it to the runtime registry record at spawn) BEFORE signing, so the
+    // claim is covered by the HMAC. Optional chaining: registry doubles/
+    // mocks without the NI-01 accessor simply produce a claim-less envelope.
+    const responderNhiId = agentRegistry.getRuntimeIdentity?.(agentId);
+    if (responderNhiId) response.header.sender_nhi_id = responderNhiId;
     response.header.signature = signA2AMessage(response);
     response.header.sig_alg = 'hmac-sha256';
 

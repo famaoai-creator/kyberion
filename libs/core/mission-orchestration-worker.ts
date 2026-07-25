@@ -11,6 +11,7 @@ import { resolveQuestionInteractionPacket } from './question-resolver.js';
 import { inferTaskTargetPath, validateDelegatedTaskPreflight } from './delegation-preflight.js';
 import { notifyOperator } from './operator-notifications.js';
 import { agentRegistry } from './agent-registry.js';
+import { deriveAgentNhiId } from './agent-identity.js';
 import { reportProviderTemporarilyUnhealthy } from './provider-health-registry.js';
 import {
   emitChannelSurfaceEvent,
@@ -2466,10 +2467,33 @@ interface DispatchPlannedMissionTaskInput {
  * happens in `dispatchPlannedMissionTaskCore` / `dispatchGoalDrivenMissionTask`
  * and only the trace bookkeeping wraps it.
  */
+/**
+ * NI-02: resolve the worker's canonical nhi_id for trace attribution.
+ * Prefers the ledger-backed identity NI-01 stamped on the live runtime
+ * registry record at spawn; falls back to the deterministic name derivation
+ * when the runtime is not up yet (dispatch opens its trace before
+ * ensure/spawn). Best-effort — attribution must never affect dispatch.
+ */
+function resolveDispatchActorNhiId(agentId: string): string | undefined {
+  try {
+    return agentRegistry.getRuntimeIdentity?.(agentId) ?? deriveAgentNhiId(agentId) ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 async function dispatchPlannedMissionTask(
   input: DispatchPlannedMissionTaskInput
 ): Promise<DispatchMissionTaskOutcome | null> {
-  const traceCtx = new TraceContext('mission_task_dispatch', { missionId: input.missionId });
+  // NI-02: stamp actor attribution on the dispatch trace. This is THE trace
+  // creation point that knows which agent identity the task is dispatched to
+  // (input.assignment.agent_id), so worker-attributed traces carry actorNhiId
+  // from here without any per-call-site changes elsewhere.
+  const actorNhiId = resolveDispatchActorNhiId(input.assignment.agent_id);
+  const traceCtx = new TraceContext('mission_task_dispatch', {
+    missionId: input.missionId,
+    ...(actorNhiId ? { actorNhiId } : {}),
+  });
   let outcome: DispatchMissionTaskOutcome | null = null;
   try {
     // KD-01 adoption: opt-in goal-driven execution runs a separate autonomous

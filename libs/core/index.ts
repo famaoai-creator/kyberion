@@ -1313,7 +1313,13 @@ export type {
   TaskPlan,
   TestPlan,
 } from './sdlc-artifact-store.js';
-export { signA2AContent, verifyA2AContent } from './a2a-envelope-signature.js';
+export {
+  signA2AContent,
+  verifyA2AContent,
+  canonicalA2AEnvelopeContent,
+} from './a2a-envelope-signature.js';
+// NI-02: actor-string verification against the NHI registry (warn -> enforce).
+export * from './nhi-actor-verification.js';
 export {
   buildFailoverReasoningBackend,
   buildRoleAwareReasoningBackend,
