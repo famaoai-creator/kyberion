@@ -3196,6 +3196,10 @@
           "kind": "apply"
         },
         {
+          "op": "curation_report",
+          "kind": "apply"
+        },
+        {
           "op": "cross_critique",
           "kind": "apply"
         },

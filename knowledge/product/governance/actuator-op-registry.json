@@ -568,6 +568,7 @@
         "counterparty_roleplay",
         "cross_critique",
         "curate_background_review",
+        "curation_report",
         "decompose_into_tasks",
         "deploy_release",
         "derive_test_inventory",

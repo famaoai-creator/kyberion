@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Knowledge Curation SLO Config",
+  "description": "KP-06: kind-based freshness re-verify deadlines and the low-yield delivery threshold used by the weekly knowledge curation report. Declared here so thresholds are config, not hardcoded.",
+  "type": "object",
+  "required": [
+    "version",
+    "low_yield_delivery_threshold",
+    "freshness_days_by_kind",
+    "default_freshness_days"
+  ],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string" },
+    "low_yield_delivery_threshold": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "A document is a low-yield candidate once delivered_count reaches this value with used_count still 0 (KP-05 usage aggregate)."
+    },
+    "freshness_days_by_kind": {
+      "type": "object",
+      "description": "Re-verify deadline in days, keyed by frontmatter `kind` (e.g. governance, playbook, knowledge_hint).",
+      "additionalProperties": { "type": "integer", "minimum": 1 }
+    },
+    "default_freshness_days": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Freshness threshold applied to documents whose kind has no entry in freshness_days_by_kind."
+    }
+  },
+  "additionalProperties": false
+}
