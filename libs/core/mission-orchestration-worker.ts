@@ -76,9 +76,11 @@ import { pathResolver } from './path-resolver.js';
 import { type MissionContextPackPruningSummary } from './mission-context-pack.js';
 import { provisionTaskKnowledge } from './task-knowledge-provisioning.js';
 import {
+  recordKnowledgeDelivery,
   recordKnowledgeUsageFeedback,
   type DeliveredKnowledgeRef,
 } from './src/knowledge-feedback-loop.js';
+import { findRelevantDistilledKnowledge } from './distill-knowledge-injector.js';
 import { TraceContext, persistTrace } from './src/trace.js';
 import * as nodePath from 'node:path';
 import * as path from 'node:path';
@@ -1316,11 +1318,78 @@ function buildTaskExecutionPrompt(input: {
   return lines.join('\n');
 }
 
+// KP-04: how many fresh (not-already-delivered) hints the needs-driven
+// second-round retrieval appends to the retry prompt. Kept small — this is a
+// targeted delta, not a re-render of the full context pack.
+const NEEDS_KNOWLEDGE_RETRIEVAL_LIMIT = 3;
+
+/**
+ * KP-04: when a `task_result` reports unresolved `needs`, the pre-KP-04
+ * retry prompt only re-sent the same objective/context and asked again — it
+ * never looked anything up. This targets a fresh, small retrieval using the
+ * needs strings themselves as the query (`findRelevantDistilledKnowledge`,
+ * the same entry point `loadKnowledgeHintsIfPossible` in
+ * mission-context-pack.ts uses), excludes any path already delivered in the
+ * first-round context pack (`deliveredKnowledgeRefs`), and records what it
+ * delivers via `recordKnowledgeDelivery` so KP-05 telemetry sees this
+ * second round too. Fails open: a retrieval error must never block the
+ * retry — it just means no delta section gets appended.
+ */
+async function buildNeedsKnowledgeReinforcementLines(input: {
+  missionId: string;
+  taskId: string;
+  teamRole?: string;
+  needs: string[];
+  deliveredKnowledgeRefs: DeliveredKnowledgeRef[];
+}): Promise<string[]> {
+  if (input.needs.length === 0) return [];
+  try {
+    const excludePaths = new Set(input.deliveredKnowledgeRefs.map((ref) => ref.path));
+    const found = await findRelevantDistilledKnowledge({
+      topic: input.needs.join(' '),
+      limit: NEEDS_KNOWLEDGE_RETRIEVAL_LIMIT * 2,
+      minScore: 0.08,
+    });
+    const fresh = found
+      .filter((entry) => !excludePaths.has(entry.path))
+      .slice(0, NEEDS_KNOWLEDGE_RETRIEVAL_LIMIT);
+    if (fresh.length === 0) return [];
+
+    recordKnowledgeDelivery({
+      missionId: input.missionId,
+      taskId: input.taskId,
+      teamRole: input.teamRole,
+      recipientKind: 'agent',
+      refs: fresh.map((entry) => ({
+        path: entry.path,
+        ...(typeof entry.score === 'number' ? { score: entry.score } : {}),
+        ...(entry.title ? { title: entry.title } : {}),
+      })),
+    });
+
+    const lines = [
+      'Additional knowledge retrieved for the unresolved needs (not in the original context pack):',
+    ];
+    for (const entry of fresh) {
+      lines.push(`- ${entry.title} (${entry.path})`);
+      lines.push(`  ${entry.excerpt.trim().replace(/\s+/g, ' ').slice(0, 200)}`);
+    }
+    return lines;
+  } catch (err: any) {
+    logger.warn(
+      `[MISSION_WORKER] KP-04 needs-driven knowledge retrieval failed for ${input.missionId}/${input.taskId}: ${err?.message || err}`
+    );
+    return [];
+  }
+}
+
 function buildTaskResultRetryPrompt(input: {
   missionId: string;
   taskId: string;
   previousResponse: string;
   parseErrors: string[];
+  /** KP-04: compact delta section from buildNeedsKnowledgeReinforcementLines. */
+  knowledgeDeltaLines?: string[];
 }): string {
   return [
     `The previous response for mission ${input.missionId} task ${input.taskId} was rejected.`,
@@ -1329,6 +1398,9 @@ function buildTaskResultRetryPrompt(input: {
     'Do not include any other structured block.',
     'Errors:',
     ...input.parseErrors.map((error) => `- ${error}`),
+    ...(input.knowledgeDeltaLines && input.knowledgeDeltaLines.length > 0
+      ? ['', ...input.knowledgeDeltaLines]
+      : []),
     '',
     'Previous response excerpt:',
     input.previousResponse.slice(0, 1200),
@@ -1621,6 +1693,10 @@ async function buildTaskDispatchContext(input: {
     recipientKind: 'agent',
     teamRole: input.teamRole,
     assigneePeerId: input.agentId,
+    // KP-04: hint count + pack char budget scale with the task's declared
+    // scope (SCOPE_KNOWLEDGE_BUDGETS in mission-context-pack.ts). Absent
+    // scope falls back to `M`, so untagged tasks are unaffected.
+    ...(input.task.estimated_scope ? { estimatedScope: input.task.estimated_scope } : {}),
     workItem: {
       item_id: input.task.task_id,
       title: input.task.description || input.task.task_id,
@@ -2090,6 +2166,8 @@ export async function provisionGoalDrivenTaskKnowledge(input: {
       recipientKind: 'agent',
       teamRole: input.teamRole,
       assigneePeerId: input.agentId,
+      // KP-04: same scope-linked budget as the single-shot path.
+      ...(input.task.estimated_scope ? { estimatedScope: input.task.estimated_scope } : {}),
       workItem: input.workItem,
     });
     if (!provisioned.pack) return { deliveredKnowledgeRefs: [] };
@@ -2478,6 +2556,9 @@ async function dispatchPlannedMissionTaskCore(
       taskModelHint: input.assignment.model_hint,
       prompt: context.prompt,
       securityScope: context.securityScope,
+      // KP-04: lets a needs-driven retry's second-round retrieval exclude
+      // what the first-round context pack already delivered.
+      deliveredKnowledgeRefs: context.deliveredKnowledgeRefs,
     };
     return isBestOfNCandidate({ teamRole: input.teamRole, task: input.task })
       ? obtainBestOfTaskResultResponse(dispatchArgs)
@@ -3248,6 +3329,12 @@ async function obtainTaskResultResponse(input: {
   taskModelHint?: { model_id?: string; tier?: string; effort?: string; route_reason?: string };
   prompt: string;
   securityScope?: import('./context-security-scope.js').ContextSecurityScope;
+  /**
+   * KP-04: what the first-round context pack already delivered (from
+   * `buildTaskDispatchContext`), so a needs-driven retry retrieval can
+   * exclude paths the worker already has instead of re-listing them.
+   */
+  deliveredKnowledgeRefs?: DeliveredKnowledgeRef[];
 }): Promise<{
   executionMode: 'agent';
   responseText: string;
@@ -3309,6 +3396,17 @@ async function obtainTaskResultResponse(input: {
     if (parseErrors.length > 0) notes.push(`task_result parse errors: ${parseErrors.join('; ')}`);
     if (surfaceParseErrors.length > 0)
       notes.push(`surface parse errors: ${surfaceParseErrors.join('; ')}`);
+    // KP-04: targeted second-round retrieval when the worker reported
+    // unresolved needs — a delta on top of the first-round context pack,
+    // not a re-send of it. No-op (empty lines) for parse-error-only retries
+    // (no needs to query against) or when nothing new is found.
+    const knowledgeDeltaLines = await buildNeedsKnowledgeReinforcementLines({
+      missionId: input.missionId,
+      taskId: input.task.task_id,
+      teamRole: input.teamRole,
+      needs: taskResult?.needs || [],
+      deliveredKnowledgeRefs: input.deliveredKnowledgeRefs || [],
+    });
     response = await a2aBridge.route({
       a2a_version: '1.0',
       header: {
@@ -3330,6 +3428,7 @@ async function obtainTaskResultResponse(input: {
               : []),
             ...parseErrors,
           ],
+          knowledgeDeltaLines,
         }),
         objective: input.task.description || input.task.task_id,
         acceptance_criteria: Array.isArray((input.task as any).acceptance_criteria)
@@ -3510,6 +3609,7 @@ async function obtainBestOfTaskResultResponse(input: {
   taskModelHint?: { model_id?: string; tier?: string; effort?: string; route_reason?: string };
   prompt: string;
   securityScope?: import('./context-security-scope.js').ContextSecurityScope;
+  deliveredKnowledgeRefs?: DeliveredKnowledgeRef[];
 }): Promise<Awaited<ReturnType<typeof obtainTaskResultResponse>>> {
   const attempts: Array<{
     key: string;
