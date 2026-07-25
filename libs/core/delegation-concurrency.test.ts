@@ -24,6 +24,13 @@ vi.mock('./path-resolver.js', () => ({
   pathResolver: {
     shared: (sub = '') => path.join(tmpDir, sub),
   },
+  // Named exports (as opposed to the `pathResolver` object above) are what
+  // `storage-janitor.ts` imports — provided here too so the shape-drift /
+  // crash-recovery tests below can import `sweepDelegationChildren` and have
+  // it resolve the exact same tmp registry file this module's own
+  // `pathResolver.shared(...)` writes to.
+  shared: (sub = '') => path.join(tmpDir, sub),
+  sharedTmp: (sub = '') => path.join(tmpDir, 'tmp', sub),
 }));
 
 vi.mock('./secure-io.js', async () => {
@@ -53,8 +60,14 @@ import {
   peekPersistedDelegationChildrenRegistry,
   getRecordedDelegationTimeouts,
   resetDelegationConcurrencyStateForTests,
+  delegationChildHandleFromChildProcess,
   type DelegationChildHandle,
+  type DelegationChildRecord,
 } from './delegation-concurrency.js';
+import {
+  sweepDelegationChildren,
+  type DelegationChildRecord as JanitorDelegationChildRecord,
+} from './storage-janitor.js';
 
 function makeDeferred<T = void>() {
   let resolve!: (v: T) => void;
@@ -246,6 +259,18 @@ describe('delegation-concurrency', () => {
     });
   });
 
+  describe('delegationChildHandleFromChildProcess', () => {
+    it('adapts a ChildProcess-shaped object into a DelegationChildHandle (pid passthrough, kill forwarding)', () => {
+      const kill = vi.fn(() => true);
+      const fakeChildProcess = { pid: 555, kill };
+      const handle = delegationChildHandleFromChildProcess(fakeChildProcess);
+
+      expect(handle.pid).toBe(555);
+      handle.kill('SIGTERM');
+      expect(kill).toHaveBeenCalledWith('SIGTERM');
+    });
+  });
+
   describe('kill-switch integration', () => {
     it('terminateAllActiveDelegationChildren kills every registered child', async () => {
       vi.useFakeTimers();
@@ -288,6 +313,129 @@ describe('delegation-concurrency', () => {
       await wireDelegationKillSwitchIntegration();
       await wireDelegationKillSwitchIntegration();
       expect(onKillSwitchTermination).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // XP-06 remainder: the three CLI backends now build their real spawned
+  // `ChildProcess` into a handle via `delegationChildHandleFromChildProcess`
+  // and wrap the awaited spawn in `withWallClockBudget` (see the module doc
+  // header and each backend's own `spawnCli`). These tests exercise that
+  // exact pairing — `delegationChildHandleFromChildProcess` feeding a real
+  // `withWallClockBudget` call — against a fake async "spawn" (a bare object
+  // with `pid`/`kill`, standing in for a `ChildProcess`) rather than
+  // importing a real backend module, which would drag in that backend's full
+  // production dependency graph (egress policy, audit chain, ...) just to
+  // reconstruct what is, underneath, exactly this pairing. Each backend's own
+  // test file (`shell-claude-cli-backend.test.ts` etc.) asserts *that* its
+  // `spawnCli` calls `withWallClockBudget` with the right provider/budget/
+  // child, with `delegation-concurrency.js` mocked; this suite asserts what
+  // happens once it's for real.
+  describe('fake async spawn wired through delegationChildHandleFromChildProcess (XP-06)', () => {
+    function fakeAsyncSpawn(pid: number): { pid: number; kill: ReturnType<typeof vi.fn> } {
+      return { pid, kill: vi.fn(() => true) };
+    }
+
+    it('registers the fake spawned child (pid/provider/deadline) while running and deregisters it on clean exit', async () => {
+      const fakeChild = fakeAsyncSpawn(31337);
+      const deferred = makeDeferred<string>();
+
+      const runPromise = withWallClockBudget(
+        {
+          provider: 'claude',
+          budgetMs: 60000,
+          child: delegationChildHandleFromChildProcess(fakeChild),
+        },
+        () => deferred.promise
+      );
+
+      await new Promise((r) => setTimeout(r, 0));
+      const registry = peekPersistedDelegationChildrenRegistry();
+      expect(registry).toHaveLength(1);
+      expect(registry[0]).toMatchObject({ provider: 'claude', pid: 31337 });
+      expect(Date.parse(registry[0].deadlineAt)).toBeGreaterThan(Date.parse(registry[0].startedAt));
+
+      deferred.resolve('ok');
+      await runPromise;
+      expect(peekPersistedDelegationChildrenRegistry()).toEqual([]);
+    });
+
+    it('SIGTERM then (after the grace window) SIGKILLs the fake spawned child pid on wall-clock expiry', async () => {
+      vi.useFakeTimers();
+      const fakeChild = fakeAsyncSpawn(42);
+      const never = new Promise<string>(() => {});
+
+      const runPromise = withWallClockBudget(
+        {
+          provider: 'claude',
+          budgetMs: 1000,
+          killGraceMs: 500,
+          child: delegationChildHandleFromChildProcess(fakeChild),
+        },
+        () => never
+      );
+      const assertion = expect(runPromise).rejects.toBeInstanceOf(DelegationWallClockExceededError);
+
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(fakeChild.kill).toHaveBeenCalledWith('SIGTERM');
+      expect(fakeChild.kill).not.toHaveBeenCalledWith('SIGKILL');
+
+      await vi.advanceTimersByTimeAsync(500);
+      expect(fakeChild.kill).toHaveBeenCalledWith('SIGKILL');
+      await assertion;
+    });
+  });
+
+  // XP-06 remainder: the zombie sweep (`storage-janitor.ts`'s
+  // `sweepDelegationChildren`) now has a real producer (the backend
+  // integration tests above). `storage-janitor.ts` deliberately duplicates
+  // `DelegationChildRecord` rather than importing this module (see its own
+  // comment) — these tests keep that duplication honest and prove a record
+  // left behind by a crashed run is actually reaped.
+  describe('zombie-sweep producer/consumer shape (XP-06)', () => {
+    it("shape-drift guard: this module's DelegationChildRecord and storage-janitor.ts's duplicated one declare the same fields", () => {
+      const producerRecord: DelegationChildRecord = {
+        id: 'shape-check',
+        provider: 'claude',
+        pid: 123,
+        startedAt: new Date().toISOString(),
+        deadlineAt: new Date().toISOString(),
+        budgetMs: 1000,
+      };
+      // Compile-time: if either interface gains/loses/renames a field this
+      // bidirectional assignment stops type-checking — the cheapest possible
+      // drift guard given the two are deliberately not the same imported
+      // type (see storage-janitor.ts's comment on why not).
+      const asConsumerShape: JanitorDelegationChildRecord = producerRecord;
+      const roundTrip: DelegationChildRecord = asConsumerShape;
+      expect(roundTrip).toEqual(producerRecord);
+
+      // Runtime: catch a field added to one side with a default that would
+      // still satisfy the type checker (e.g. a new optional field) without
+      // the other side noticing.
+      expect(Object.keys(asConsumerShape).sort()).toEqual(Object.keys(producerRecord).sort());
+    });
+
+    it('a record left behind by a crashed run (no in-process SIGKILL escalation ever ran) is visible to and reaped by sweepDelegationChildren', () => {
+      const staleRecord: DelegationChildRecord = {
+        id: 'crashed-run-1',
+        provider: 'codex',
+        pid: 9999,
+        startedAt: new Date(Date.now() - 120000).toISOString(),
+        deadlineAt: new Date(Date.now() - 60000).toISOString(), // budget expired 1min ago
+        budgetMs: 60000,
+      };
+      const registryPath = path.join(tmpDir, 'runtime', 'delegation-children.json');
+      fs.mkdirSync(path.dirname(registryPath), { recursive: true });
+      fs.writeFileSync(registryPath, JSON.stringify([staleRecord], null, 2));
+
+      const killFn = vi.fn();
+      const result = sweepDelegationChildren({ dryRun: false, killFn });
+
+      expect(result.stale).toHaveLength(1);
+      expect(result.stale[0]).toMatchObject({ id: 'crashed-run-1', pid: 9999 });
+      expect(killFn).toHaveBeenCalledWith(9999, 'SIGKILL');
+      expect(result.killed).toHaveLength(1);
+      expect(JSON.parse(fs.readFileSync(registryPath, 'utf8'))).toEqual([]);
     });
   });
 });

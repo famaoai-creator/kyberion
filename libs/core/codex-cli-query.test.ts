@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   safeReadFile: vi.fn(),
   safeRmSync: vi.fn(),
   spawnMock: vi.fn(),
+  withWallClockBudgetMock: vi.fn((_opts: unknown, fn: () => Promise<unknown>) => fn()),
 }));
 
 vi.mock('./secure-io.js', async () => {
@@ -27,6 +28,21 @@ vi.mock('node:child_process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:child_process')>();
   return { ...actual, spawn: mocks.spawnMock };
 });
+
+// XP-06: `spawnCli` now wraps its child in `withWallClockBudget`, which
+// (unmocked) would persist a real active-child record via `secure-io` /
+// `path-resolver` — a real filesystem write this suite must not perform.
+// `delegation-concurrency.test.ts` owns the hermetic (temp-dir-backed) tests
+// for that wiring; here it's a pure passthrough so every pre-existing
+// assertion below is unaffected.
+vi.mock('./delegation-concurrency.js', () => ({
+  delegationChildHandleFromChildProcess: (child: any) => ({
+    pid: child.pid,
+    kill: (signal: NodeJS.Signals) => child.kill(signal),
+  }),
+  withWallClockBudget: mocks.withWallClockBudgetMock,
+  DelegationWallClockExceededError: class DelegationWallClockExceededError extends Error {},
+}));
 
 function createChild(exitCode = 0): any {
   const child = new EventEmitter() as any;
@@ -181,6 +197,33 @@ describe('codex-cli-query', () => {
 
       expect(mocks.spawnMock).not.toHaveBeenCalled();
       expect(mocks.safeWriteFile).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('wall-clock budget wiring (XP-06)', () => {
+    beforeEach(() => {
+      mocks.safeWriteFile.mockReset();
+      mocks.safeReadFile.mockReset().mockReturnValue(JSON.stringify({ ok: true }));
+      mocks.safeRmSync.mockReset();
+      mocks.spawnMock.mockReset();
+      mocks.withWallClockBudgetMock.mockClear();
+    });
+
+    it('wraps the spawned child in withWallClockBudget with the codex provider and configured timeout', async () => {
+      mocks.spawnMock.mockReturnValueOnce(createChild());
+
+      await runCodexCliQuery({
+        systemPrompt: 'sys',
+        userPrompt: 'usr',
+        schema: z.object({ ok: z.boolean() }),
+        options: { bin: 'codex', model: 'codex-default', cwd: '/repo', timeoutMs: 54321 },
+      });
+
+      expect(mocks.withWallClockBudgetMock).toHaveBeenCalledTimes(1);
+      const [opts, fn] = mocks.withWallClockBudgetMock.mock.calls[0];
+      expect(opts).toMatchObject({ provider: 'codex', budgetMs: 54321 });
+      expect(opts.child).toEqual(expect.objectContaining({ kill: expect.any(Function) }));
+      expect(typeof fn).toBe('function');
     });
   });
 });
