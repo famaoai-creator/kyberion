@@ -1,7 +1,36 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import type { ProviderCapability } from '@agent/core';
 
-const { parseConnectionReadinessConfig, deriveBaselineStatus, reasoningFailoverWarning } =
-  await import(new URL('./run_baseline_check.js', import.meta.url).href);
+// XP-01: this file's top-level import below runs `run_baseline_check.ts`'s
+// `main()` for real (unconditional `main().catch(...)` at module scope — see
+// the existing tests below, which already exercise real tenant-drift/cowork-
+// health checks this way). Without this kill switch, adding the provider-
+// capability-registry population job to `main()` would make every run of
+// this test file spawn real `claude --version` / `codex --help` / `gh auth
+// status` etc. subprocesses. Must be set before the dynamic import.
+process.env.KYBERION_PROVIDER_CAPABILITY_PROBE = '0';
+
+const {
+  parseConnectionReadinessConfig,
+  deriveBaselineStatus,
+  reasoningFailoverWarning,
+  summarizeProviderCapabilities,
+  resolveProviderCapabilitiesSnapshot,
+  PROVIDER_CAPABILITY_PROBE_ENV,
+} = await import(new URL('./run_baseline_check.js', import.meta.url).href);
+
+function fakeCapability(overrides: Partial<ProviderCapability> = {}): ProviderCapability {
+  return {
+    provider_id: 'claude',
+    binary_found: true,
+    authenticated: 'unknown',
+    headless: true,
+    structured_output: true,
+    models: ['claude-sonnet'],
+    probed_at: '2026-07-25T00:00:00.000Z',
+    ...overrides,
+  };
+}
 
 describe('run_baseline_check', () => {
   it('marks readiness config as degraded when parse fails', () => {
@@ -94,5 +123,126 @@ describe('run_baseline_check', () => {
     expect(warning).toContain('codex-cli');
     expect(warning).toContain('delegateTask');
     expect(warning).toContain('2026-07-25T00:00:00.000Z');
+  });
+
+  // XP-01: provider-capability-registry population job. Every case here
+  // drives `resolveProviderCapabilitiesSnapshot` with an injected fake
+  // peek/load — never the real exec seam — so these tests stay hermetic
+  // even though the module under test also runs the real thing once (with
+  // probing disabled) as a side effect of the top-level import above.
+  describe('provider capability population job (XP-01)', () => {
+    it('summarizes an available (binary found, authenticated or unknown) provider', () => {
+      const summary = summarizeProviderCapabilities([
+        fakeCapability({ provider_id: 'claude', binary_found: true, authenticated: 'unknown' }),
+        fakeCapability({ provider_id: 'copilot', binary_found: true, authenticated: true }),
+      ]);
+      expect(summary.probed_at).toBe('2026-07-25T00:00:00.000Z');
+      expect(summary.available).toEqual(['claude', 'copilot']);
+      expect(summary.excluded).toEqual([]);
+    });
+
+    it('excludes providers with no binary or a failed auth probe, with a reason', () => {
+      const summary = summarizeProviderCapabilities([
+        fakeCapability({
+          provider_id: 'codex',
+          binary_found: false,
+          authenticated: false,
+          probe_error: 'spawn ENOENT',
+        }),
+        fakeCapability({ provider_id: 'copilot', binary_found: true, authenticated: false }),
+      ]);
+      expect(summary.available).toEqual([]);
+      expect(summary.excluded).toEqual([
+        { provider: 'codex', reason: 'spawn ENOENT' },
+        { provider: 'copilot', reason: 'not authenticated' },
+      ]);
+    });
+
+    it('(a) absent/stale registry (peek → null) triggers a load and the summary reflects it', () => {
+      const peek = vi.fn().mockReturnValue(null);
+      const load = vi.fn().mockReturnValue([fakeCapability()]);
+      const snapshot = resolveProviderCapabilitiesSnapshot({
+        probingEnabled: true,
+        peek,
+        load,
+        now: () => Date.parse('2026-07-25T00:05:00.000Z'),
+      });
+
+      expect(peek).toHaveBeenCalledTimes(1);
+      expect(load).toHaveBeenCalledTimes(1);
+      expect(snapshot.cached).toBe(false);
+      expect(snapshot.probing_enabled).toBe(true);
+      expect(snapshot.summary.available).toEqual(['claude']);
+      expect(snapshot.age_ms).toBe(5 * 60 * 1000);
+    });
+
+    it('(b) fresh registry (peek → non-null) is reported as cached, no forced re-probe', () => {
+      // The "no re-probe within TTL" behavior itself lives in and is already
+      // covered by libs/core/provider-capability-registry.test.ts
+      // ("re-probes on TTL expiry using an injectable clock"); this test only
+      // asserts run_baseline_check's own report-shape responsibility: a fresh
+      // peek must be surfaced as `cached: true` in the baseline report.
+      const peek = vi.fn().mockReturnValue([fakeCapability()]);
+      const load = vi.fn().mockReturnValue([fakeCapability()]);
+      const snapshot = resolveProviderCapabilitiesSnapshot({
+        probingEnabled: true,
+        peek,
+        load,
+        now: () => Date.parse('2026-07-25T00:00:00.000Z'),
+      });
+
+      expect(snapshot.cached).toBe(true);
+      expect(snapshot.summary.available).toEqual(['claude']);
+    });
+
+    it('(c) a broken registry read/probe degrades to an empty summary without throwing', () => {
+      const peek = vi.fn(() => {
+        throw new Error('registry file corrupt');
+      });
+      const load = vi.fn().mockReturnValue([fakeCapability()]);
+
+      const snapshot = resolveProviderCapabilitiesSnapshot({ probingEnabled: true, peek, load });
+
+      expect(snapshot).toEqual({
+        summary: { probed_at: null, available: [], excluded: [] },
+        cached: false,
+        age_ms: null,
+        probing_enabled: true,
+      });
+    });
+
+    it('(c) all providers reporting unavailable still produces a well-formed, non-throwing summary', () => {
+      const summary = summarizeProviderCapabilities([
+        fakeCapability({
+          provider_id: 'codex',
+          binary_found: false,
+          authenticated: false,
+          probe_error: 'spawn ENOENT',
+        }),
+      ]);
+      expect(summary.available).toEqual([]);
+      expect(summary.excluded).toEqual([{ provider: 'codex', reason: 'spawn ENOENT' }]);
+      // deriveBaselineStatus never receives provider capability data at all,
+      // so a fully-degraded probe cannot change baseline status by
+      // construction — verified independently by the deriveBaselineStatus
+      // tests above, which never pass a provider-capabilities argument.
+    });
+
+    it('(d) probe kill-switch (KYBERION_PROVIDER_CAPABILITY_PROBE=0) skips peek/load entirely', () => {
+      expect(PROVIDER_CAPABILITY_PROBE_ENV).toBe('KYBERION_PROVIDER_CAPABILITY_PROBE');
+
+      const peek = vi.fn();
+      const load = vi.fn();
+      const snapshot = resolveProviderCapabilitiesSnapshot({ probingEnabled: false, peek, load });
+
+      expect(peek).not.toHaveBeenCalled();
+      expect(load).not.toHaveBeenCalled();
+      expect(snapshot).toEqual({
+        summary: { probed_at: null, available: [], excluded: [] },
+        cached: false,
+        age_ms: null,
+        probing_enabled: false,
+      });
+    });
   });
 });
