@@ -351,7 +351,13 @@ export async function askAgentRuntime(
   agentId: string,
   prompt: string,
   requestedBy: string,
-  options: { timeoutMs?: number; taskModelHint?: TaskModelHint; correlationId?: string } = {}
+  options: {
+    timeoutMs?: number;
+    taskModelHint?: TaskModelHint;
+    correlationId?: string;
+    /** SO-05 / OP-01: declared reasoning tier for this ask, recorded on both events below. */
+    modelTier?: 'fast' | 'standard' | 'deep';
+  } = {}
 ): Promise<string> {
   const startedAt = Date.now();
   appendSupervisorEvent({
@@ -360,12 +366,16 @@ export async function askAgentRuntime(
     requested_by: requestedBy,
     correlation_id: options.correlationId,
     task_model_hint: options.taskModelHint,
+    declared_model_tier: options.modelTier,
   });
   const handle = getAgentRuntimeHandle(agentId);
   if (!handle) {
     throw new Error(`Agent ${agentId} not found or not ready`);
   }
-  const response = await handle.ask(prompt, { timeoutMs: options.timeoutMs });
+  const response = await handle.ask(prompt, {
+    timeoutMs: options.timeoutMs,
+    model_tier: options.modelTier,
+  });
   const snapshot = getAgentRuntimeSnapshot(agentId, 20);
   appendSupervisorEvent({
     decision: 'agent_runtime_ask_completed',
@@ -378,6 +388,7 @@ export async function askAgentRuntime(
     total_tokens: snapshot?.metrics.usage?.totalTokens,
     correlation_id: options.correlationId,
     task_model_hint: options.taskModelHint,
+    declared_model_tier: options.modelTier,
   });
   return response;
 }
