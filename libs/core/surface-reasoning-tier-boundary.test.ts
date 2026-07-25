@@ -38,6 +38,23 @@ const SCAN_TARGETS: ScanTarget[] = [
     pattern: 'getReasoningBackend().prompt(',
     label: 'defaultAsk() reasoning backend prompt call',
   },
+  // SO-05 back half: orchestrator-JUDGMENT call sites (deep by default),
+  // distinct from the conversation-front call sites above (fast/standard).
+  {
+    file: 'libs/core/intent-reconciliation.ts',
+    pattern: 'backend.prompt(',
+    label: 'reconcileCompletion() LLM tightening pass',
+  },
+  {
+    file: 'libs/core/mission-lifecycle.ts',
+    pattern: 'reconcileCompletion(',
+    label: 'mission finish-time IL-04 completion reconciliation',
+  },
+  {
+    file: 'libs/core/surface-mission-steering.ts',
+    pattern: 'reconcileCompletion(',
+    label: 'mission-steering finish verb IL-04 completion reconciliation',
+  },
 ];
 
 /**

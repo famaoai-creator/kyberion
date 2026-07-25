@@ -42,7 +42,11 @@ import {
   loadArtifactReviewReceipt,
   receiptToArtifactReviewDecision,
 } from './artifact-review.js';
-import { reconcileCompletion, reconcileCompletionStructurally } from './intent-reconciliation.js';
+import {
+  reconcileCompletion,
+  reconcileCompletionStructurally,
+  type IntentReconciliationInput,
+} from './intent-reconciliation.js';
 import { loadState, saveState } from './mission-state.js';
 import {
   readTrustLedger,
@@ -77,6 +81,59 @@ export function collectMissionEvidence(missionDir: string): Array<{ ref: string;
       }
       return { ref, text };
     });
+}
+
+export interface MissionCompletionReconciliationContext {
+  reconciliationInput: IntentReconciliationInput;
+  completionGoal: { summary: string; success_condition: string };
+  evidence: Array<{ ref: string; text?: string }>;
+  evidenceRefs: string[];
+}
+
+/**
+ * SO-04: the exact `reconciliationInput` construction `finishMission` below
+ * builds from mission state + evidence, extracted so the surface-steering
+ * finish verb (`libs/core/surface-mission-steering.ts`) can run the SAME
+ * IL-04 check BEFORE it ever calls the lifecycle facade's `finish`, using
+ * the identical goal/evidence shape instead of re-deriving its own —
+ * avoiding drift between "what the CLI-owned finish path checks" and "what
+ * the surface-owned finish verb checks". Accepts pre-loaded state/missionDir
+ * so `finishMission` (which already loaded both) doesn't re-read them.
+ */
+export function buildMissionCompletionReconciliationInput(
+  missionId: string,
+  preloaded?: { state?: ReturnType<typeof loadState>; missionDir?: string | null }
+): MissionCompletionReconciliationContext | null {
+  const upperId = missionId.toUpperCase();
+  const missionDir =
+    preloaded?.missionDir !== undefined ? preloaded.missionDir : findMissionPath(upperId);
+  if (!missionDir) return null;
+  const state = preloaded?.state !== undefined ? preloaded.state : loadState(upperId);
+  if (!state) return null;
+
+  const evidence = collectMissionEvidence(missionDir);
+  const evidenceRefs = evidence.map((item) => item.ref);
+  const completionGoal = {
+    summary:
+      state.intent?.goal_summary ||
+      state.outcome_contract?.requested_result ||
+      `Mission ${upperId}`,
+    success_condition:
+      state.intent?.success_condition ||
+      state.outcome_contract?.success_criteria?.join('; ') ||
+      state.outcome_contract?.requested_result ||
+      `Mission ${upperId}`,
+  };
+  return {
+    reconciliationInput: {
+      goal: completionGoal,
+      evidenceRefs,
+      requestedResult: state.outcome_contract?.requested_result,
+    },
+    completionGoal,
+    evidence,
+    evidenceRefs,
+  };
 }
 
 function publishMeetingDeliverablesIfNeeded(input: {
@@ -1280,31 +1337,25 @@ export async function finishMission(
     };
   }
 
-  const evidence = collectMissionEvidence(missionDir);
-  const evidenceRefs = evidence.map((item) => item.ref);
-  const completionGoal = {
-    summary:
-      state.intent?.goal_summary ||
-      state.outcome_contract?.requested_result ||
-      `Mission ${upperId}`,
-    success_condition:
-      state.intent?.success_condition ||
-      state.outcome_contract?.success_criteria?.join('; ') ||
-      state.outcome_contract?.requested_result ||
-      `Mission ${upperId}`,
-  };
-  const reconciliationInput = {
-    goal: completionGoal,
-    evidenceRefs,
-    requestedResult: state.outcome_contract?.requested_result,
-  };
+  const reconciliationContext = buildMissionCompletionReconciliationInput(upperId, {
+    state,
+    missionDir,
+  });
+  if (!reconciliationContext) throw new Error(`Mission ${upperId} not found.`);
+  const { reconciliationInput, completionGoal, evidence, evidenceRefs } = reconciliationContext;
   const structuralReconciliation = reconcileLifecycleClosureCriteria(
     reconcileCompletionStructurally(reconciliationInput),
     state
   );
+  // SO-05: this is an orchestrator-judgment call (finish decision), not a
+  // conversation-front call — declare 'deep' explicitly rather than leaving
+  // it at intent-reconciliation.ts's undeclared default.
   const rawCompletionReconciliation = structuralReconciliation.satisfied
     ? structuralReconciliation
-    : reconcileLifecycleClosureCriteria(await reconcileCompletion(reconciliationInput), state);
+    : reconcileLifecycleClosureCriteria(
+        await reconcileCompletion(reconciliationInput, { model_tier: 'deep' }),
+        state
+      );
 
   // LC-11: pending human review rejections are goal gaps too — merge them so
   // the goal loop below converts "the reviewer said no" into rework tasks
