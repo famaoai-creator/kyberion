@@ -621,6 +621,7 @@ export * from './worker-state-journal.js';
 // SO-02: durable conversation-thread <-> mission-ownership binding (own
 // event-sourcing kernel; see the module docstring for the KD-03 lineage).
 export * from './orchestrator-session.js';
+export * from './surface-steering-authority.js';
 export * from './adf-guardrails.js';
 export * from './reconcile-ops.js';
 export * from './report-ops.js';
