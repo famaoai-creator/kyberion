@@ -222,9 +222,24 @@ const PROVIDER_CREDENTIAL_ENV_KEYS: Readonly<Record<ProviderId, readonly string[
   agy: [],
 };
 
-/** Kyberion's own config vars — always needed by a child kyberion-aware process. */
+/**
+ * Kyberion's own config vars — always needed by a child kyberion-aware
+ * process. Deliberately EXCLUDES `MISSION_ROLE` / `SYSTEM_ROLE` (SO-03):
+ * those are authority signals `resolveRole()` (authority.ts) reads to
+ * decide whether the CURRENT process is the mission owner/orchestrator
+ * (see orchestrator-session.ts's fail-closed gate). If the calling process
+ * is itself running under `MISSION_ROLE=mission_controller` (e.g. inside a
+ * surface OrchestratorSession's execution context) and that value passed
+ * through unchanged to a spawned provider CLI delegation, the delegation's
+ * own in-process code (or anything it shells back out to) would inherit
+ * mission-owner authority it was never granted — the exact leak the
+ * multi-provider co-execution contract's "owner authority is never
+ * projected into worker delegations" invariant forbids. A delegation that
+ * legitimately needs a role tag must have one assigned to it explicitly on
+ * its own path, never inherited from its parent's env.
+ */
 const KYBERION_PREFIX = 'KYBERION_';
-const ADDITIONAL_KYBERION_STYLE_KEYS = ['MISSION_ID', 'MISSION_ROLE'] as const;
+const ADDITIONAL_KYBERION_STYLE_KEYS = ['MISSION_ID'] as const;
 
 /** Matches `*_API_KEY` / `*_TOKEN`-shaped credential env vars (case-insensitive). */
 const CREDENTIAL_ENV_PATTERN = /(?:^|_)(API_KEY|TOKEN)$/i;

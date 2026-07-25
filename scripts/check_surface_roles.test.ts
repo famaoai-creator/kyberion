@@ -10,7 +10,11 @@ interface SurfaceRole {
   tagline_ja: string;
   dir: string;
   port: number;
-  writes: 'full' | 'scoped' | 'none';
+  // SO-03: 'orchestrator' is a vocabulary addition (a surface with an active
+  // OrchestratorSession + mission-ownership work-item claim may steer a
+  // mission's lifecycle, same as the CLI orchestrator). No existing role's
+  // value changes here — the vocabulary lands now, roles opt in later.
+  writes: 'full' | 'scoped' | 'none' | 'orchestrator';
   enabled: boolean;
 }
 
@@ -66,5 +70,16 @@ describe('surface roles contract', () => {
     const writesById = new Map(roles.map((role) => [role.id, role.writes]));
     expect(writesById.get('operator-surface')).toBe('none');
     expect(writesById.get('computer-surface')).toBe('none');
+  });
+
+  it('SO-03: declares the "orchestrator" writes vocabulary without opting any existing role into it yet', () => {
+    // The union type itself proves the vocabulary compiles; this asserts the
+    // *data* side of the "vocabulary now, opt-in later" contract — no role's
+    // value silently became 'orchestrator' as part of adding the enum member.
+    for (const role of roles) {
+      expect(role.writes, `${role.id} must not opt into 'orchestrator' yet`).not.toBe(
+        'orchestrator'
+      );
+    }
   });
 });

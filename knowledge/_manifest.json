@@ -1731,7 +1731,7 @@
     {
       "path": "product/governance/multi-provider-coexecution-contract.md",
       "tier": "public",
-      "size": 6203,
+      "size": 8376,
       "type": "md"
     },
     {
@@ -2295,7 +2295,7 @@
     {
       "path": "product/governance/surface-roles.json",
       "tier": "public",
-      "size": 2143,
+      "size": 2647,
       "type": "json"
     },
     {
