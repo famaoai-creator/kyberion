@@ -37,6 +37,10 @@ function makeTaskResultText(input: {
   }>;
   // KP-05: optional bridge back to the knowledge provisioning loop.
   knowledge_feedback?: { used?: string[]; not_used?: string[]; missing_topics?: string[] };
+  // XP-05: lets a fixture simulate a task_result that already arrived with
+  // provenance stamped (e.g. from a future remote worker) so the stamping
+  // path's no-overwrite rule can be exercised.
+  provenance?: { provider?: string; mode?: string; failover?: boolean };
   extraText?: string;
 }): string {
   return [
@@ -49,6 +53,7 @@ function makeTaskResultText(input: {
       needs: input.needs || [],
       ...(input.review_findings ? { review_findings: input.review_findings } : {}),
       ...(input.knowledge_feedback ? { knowledge_feedback: input.knowledge_feedback } : {}),
+      ...(input.provenance ? { provenance: input.provenance } : {}),
     }),
     '```',
     input.extraText || '',
@@ -2406,5 +2411,206 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
     expect(taskBoard).toContain('### Gate Status');
     expect(taskBoard).toContain('Rework count: 2');
     expect(taskBoard).toContain('finish-exit');
+  });
+
+  // XP-05 closeout: TaskResultBlock.provenance stamped at obtainTaskResultResponse's
+  // persist point, sourced from reasoning-backend.ts's getLastServedReasoningMode().
+  // These tests exercise the REAL reasoning-backend.js module (not mocked in this
+  // file) directly, mirroring how reasoning-backend.failover-events.test.ts warms
+  // the module-local `lastServedReasoningMode` state — a2aBridge.route stays
+  // mocked, so provenance can only be observed if the worker reads the accessor
+  // itself rather than deriving it from the (mocked) a2a response.
+  describe('task_result.provenance stamping (XP-05)', () => {
+    async function writeProvenanceFixtureTask(taskId: string): Promise<void> {
+      const { missionDir } = await import('./path-resolver.js');
+      const { safeWriteFile } = await import('./secure-io.js');
+      const missionPath = missionDir('MSN-FOLLOWUP', 'public');
+      safeWriteFile(
+        `${missionPath}/NEXT_TASKS.json`,
+        JSON.stringify(
+          [
+            {
+              task_id: taskId,
+              status: 'planned',
+              assigned_to: { role: 'implementer', agent_id: 'implementation-architect' },
+              description: 'Provenance stamping fixture',
+              deliverable: 'deliverables/work-item.md',
+            },
+          ],
+          null,
+          2
+        )
+      );
+    }
+
+    async function readStoredLastResult(taskId: string): Promise<any> {
+      const { missionDir } = await import('./path-resolver.js');
+      const { safeReadFile } = await import('./secure-io.js');
+      const missionPath = missionDir('MSN-FOLLOWUP', 'public');
+      const stored = JSON.parse(
+        safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }) as string
+      );
+      return stored.find((task: any) => task.task_id === taskId)?.last_result;
+    }
+
+    it('(a) stamps {mode, provider, failover:false} when the accessor reports a served mode', async () => {
+      const { dispatchMissionNextTasks } = await import('./mission-orchestration-worker.js');
+      const {
+        buildFailoverReasoningBackend,
+        stubReasoningBackend,
+        resetReasoningFailoverTracking,
+      } = await import('./reasoning-backend.js');
+
+      resetReasoningFailoverTracking();
+      const servingBackend = buildFailoverReasoningBackend([
+        {
+          label: 'claude-agent',
+          provider: 'claude',
+          backend: { ...stubReasoningBackend, prompt: async () => 'served-locally' },
+        },
+      ]);
+      await servingBackend.prompt('warm the last-served accessor');
+
+      await writeProvenanceFixtureTask('task-provenance-a');
+      mocks.route.mockResolvedValue({
+        payload: {
+          text: makeTaskResultText({
+            summary: 'Provenance stamped from a served mode.',
+            artifacts: [{ path: 'deliverables/work-item.md', kind: 'markdown' }],
+            verification_done: ['Stamped provenance.'],
+          }),
+        },
+      });
+
+      await dispatchMissionNextTasks('MSN-FOLLOWUP');
+
+      const lastResult = await readStoredLastResult('task-provenance-a');
+      expect(lastResult.provenance).toEqual({
+        mode: 'claude-agent',
+        provider: 'claude',
+        failover: false,
+      });
+    });
+
+    it('(b) stamps failover:true after a simulated primary-candidate failover', async () => {
+      const { dispatchMissionNextTasks } = await import('./mission-orchestration-worker.js');
+      const {
+        buildFailoverReasoningBackend,
+        stubReasoningBackend,
+        resetReasoningFailoverTracking,
+      } = await import('./reasoning-backend.js');
+
+      resetReasoningFailoverTracking();
+      const servingBackend = buildFailoverReasoningBackend([
+        {
+          label: 'claude-agent',
+          provider: 'claude',
+          backend: {
+            ...stubReasoningBackend,
+            prompt: async () => {
+              throw new Error('claude-agent unavailable: no active session');
+            },
+          },
+        },
+        {
+          label: 'codex-cli',
+          provider: 'codex',
+          backend: { ...stubReasoningBackend, prompt: async () => 'served-by-codex' },
+        },
+      ]);
+      await servingBackend.prompt('trigger a failover switch');
+
+      await writeProvenanceFixtureTask('task-provenance-b');
+      mocks.route.mockResolvedValue({
+        payload: {
+          text: makeTaskResultText({
+            summary: 'Provenance stamped after failover.',
+            artifacts: [{ path: 'deliverables/work-item.md', kind: 'markdown' }],
+            verification_done: ['Stamped provenance.'],
+          }),
+        },
+      });
+
+      await dispatchMissionNextTasks('MSN-FOLLOWUP');
+
+      const lastResult = await readStoredLastResult('task-provenance-b');
+      expect(lastResult.provenance).toEqual({
+        mode: 'codex-cli',
+        provider: 'codex',
+        failover: true,
+      });
+    });
+
+    it('(c) leaves provenance absent, and the block otherwise unchanged, when the accessor is null', async () => {
+      const { dispatchMissionNextTasks } = await import('./mission-orchestration-worker.js');
+      const { resetReasoningFailoverTracking } = await import('./reasoning-backend.js');
+
+      // No candidate served anything in this process this test — the accessor
+      // starts (and stays) null, exactly like every other dispatch test in
+      // this file where a2aBridge.route is mocked and the real reasoning
+      // backend chain is never exercised.
+      resetReasoningFailoverTracking();
+
+      await writeProvenanceFixtureTask('task-provenance-c');
+      mocks.route.mockResolvedValue({
+        payload: {
+          text: makeTaskResultText({
+            summary: 'No provenance available.',
+            artifacts: [{ path: 'deliverables/work-item.md', kind: 'markdown' }],
+            verification_done: ['Checked for provenance.'],
+          }),
+        },
+      });
+
+      await dispatchMissionNextTasks('MSN-FOLLOWUP');
+
+      const lastResult = await readStoredLastResult('task-provenance-c');
+      expect(lastResult.summary).toBe('No provenance available.');
+      expect(lastResult.provenance).toBeUndefined();
+      expect(Object.keys(lastResult)).not.toContain('provenance');
+    });
+
+    it('(d) does not overwrite provenance the worker response already carried', async () => {
+      const { dispatchMissionNextTasks } = await import('./mission-orchestration-worker.js');
+      const {
+        buildFailoverReasoningBackend,
+        stubReasoningBackend,
+        resetReasoningFailoverTracking,
+      } = await import('./reasoning-backend.js');
+
+      // Warm the accessor with a DIFFERENT mode than the one already embedded
+      // in the response, so a passing test can only mean "left alone", not
+      // "coincidentally matched what stamping would have produced".
+      resetReasoningFailoverTracking();
+      const servingBackend = buildFailoverReasoningBackend([
+        {
+          label: 'claude-agent',
+          provider: 'claude',
+          backend: { ...stubReasoningBackend, prompt: async () => 'served-locally' },
+        },
+      ]);
+      await servingBackend.prompt('warm the last-served accessor with a different mode');
+
+      await writeProvenanceFixtureTask('task-provenance-d');
+      mocks.route.mockResolvedValue({
+        payload: {
+          text: makeTaskResultText({
+            summary: 'Already carries provenance from a remote worker.',
+            artifacts: [{ path: 'deliverables/work-item.md', kind: 'markdown' }],
+            verification_done: ['Stamped provenance upstream.'],
+            provenance: { mode: 'remote-worker-mode', provider: 'remote-provider', failover: true },
+          }),
+        },
+      });
+
+      await dispatchMissionNextTasks('MSN-FOLLOWUP');
+
+      const lastResult = await readStoredLastResult('task-provenance-d');
+      expect(lastResult.provenance).toEqual({
+        mode: 'remote-worker-mode',
+        provider: 'remote-provider',
+        failover: true,
+      });
+    });
   });
 });

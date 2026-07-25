@@ -23,10 +23,28 @@ vi.mock('./delegation-concurrency.js', async () => {
   };
 });
 
+// Seams out real provider-backend-resolver construction (shells out to CLIs
+// in the real module) so the default-`seams.getBackend` / live-flag test
+// below stays hermetic — it only needs to prove *whether* the resolver is
+// consulted, not what a real CLI backend returns (that's
+// provider-backend-resolver.test.ts's job).
+const resolveProviderBackendCalls: string[] = [];
+vi.mock('./provider-backend-resolver.js', () => ({
+  resolveProviderBackend: (provider: string) => {
+    resolveProviderBackendCalls.push(provider);
+    return {
+      async delegateTask(instruction: string) {
+        return `live-resolver:${provider}:${instruction}`;
+      },
+    };
+  },
+}));
+
 import {
   runBestOfProviders,
   defaultBestOfProvidersJudge,
   peekBestOfProvidersVerdictLog,
+  BEST_OF_PROVIDERS_LIVE_ENV_VAR,
   type BestOfProviderBackend,
 } from './best-of-providers.js';
 import { PlanningReviewVerdictSchema } from './structured-output-contracts.js';
@@ -65,6 +83,7 @@ function throwingBackend(message: string): BestOfProviderBackend {
 
 beforeEach(() => {
   delegationSlotCalls.length = 0;
+  resolveProviderBackendCalls.length = 0;
   resetDelegationConcurrencyStateForTests();
 });
 
@@ -72,6 +91,7 @@ afterEach(() => {
   safeRmSync(POLICY_DIR, { recursive: true, force: true });
   safeRmSync(VERDICT_LOG_DIR, { recursive: true, force: true });
   delete process.env.KYBERION_PROVIDER_EGRESS_POLICY_PATH;
+  delete process.env[BEST_OF_PROVIDERS_LIVE_ENV_VAR];
   resetProviderEgressPolicyCache();
   resetDelegationConcurrencyStateForTests();
 });
@@ -219,6 +239,56 @@ describe('runBestOfProviders', () => {
 
     expect(delegationSlotCalls).toHaveLength(3);
     expect(delegationSlotCalls.map((c) => c.provider).sort()).toEqual(['agy', 'claude', 'codex']);
+  });
+});
+
+describe('default seams.getBackend (KYBERION_BEST_OF_PROVIDERS_LIVE opt-in)', () => {
+  it('stays inert (no backend, resolver never consulted) when no seams.getBackend is injected and the live flag is unset', async () => {
+    delete process.env[BEST_OF_PROVIDERS_LIVE_ENV_VAR];
+
+    const result = await runBestOfProviders({
+      instruction: 'assess risk',
+      dataTier: 'public',
+      providers: ['claude'],
+      seams: { verdictLogPath: VERDICT_LOG_PATH }, // no getBackend override
+    });
+
+    expect(resolveProviderBackendCalls).toEqual([]);
+    expect(result.candidates).toHaveLength(1);
+    expect(result.candidates[0].output).toBeNull();
+    expect(result.candidates[0].error).toContain('no backend available');
+  });
+
+  it('delegates to the live provider-backend-resolver when no seams.getBackend is injected and KYBERION_BEST_OF_PROVIDERS_LIVE=1', async () => {
+    process.env[BEST_OF_PROVIDERS_LIVE_ENV_VAR] = '1';
+
+    const result = await runBestOfProviders({
+      instruction: 'assess risk',
+      dataTier: 'public',
+      providers: ['claude'],
+      seams: { verdictLogPath: VERDICT_LOG_PATH }, // no getBackend override
+    });
+
+    expect(resolveProviderBackendCalls).toEqual(['claude']);
+    expect(result.candidates).toHaveLength(1);
+    expect(result.candidates[0].output).toBe('live-resolver:claude:assess risk');
+  });
+
+  it('an explicit seams.getBackend still wins over the live-flag default', async () => {
+    process.env[BEST_OF_PROVIDERS_LIVE_ENV_VAR] = '1';
+
+    const result = await runBestOfProviders({
+      instruction: 'assess risk',
+      dataTier: 'public',
+      providers: ['claude'],
+      seams: {
+        getBackend: (provider) => fakeBackend(`explicit:${provider}`),
+        verdictLogPath: VERDICT_LOG_PATH,
+      },
+    });
+
+    expect(resolveProviderBackendCalls).toEqual([]);
+    expect(result.candidates[0].output).toBe('explicit:claude');
   });
 });
 

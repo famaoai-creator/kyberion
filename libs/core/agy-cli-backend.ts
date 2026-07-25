@@ -9,6 +9,11 @@ import {
   type ProviderPermissionProfileName,
 } from './provider-permission-profiles.js';
 import * as pathResolver from './path-resolver.js';
+import {
+  delegationChildHandleFromChildProcess,
+  withWallClockBudget,
+  DelegationWallClockExceededError,
+} from './delegation-concurrency.js';
 import type {
   ReasoningBackend,
   DivergeHypothesisInput,
@@ -441,34 +446,47 @@ export class AgyCliBackend implements ReasoningBackend {
     return [...resolution.args];
   }
 
+  /**
+   * XP-06: real async `spawn` (not `spawnSync`), so the wall-clock budget is
+   * enforced against a real, killable handle via {@link withWallClockBudget}
+   * — expiry actually SIGTERM's then SIGKILL's this CLI process.
+   */
   private spawnCli(args: string[]): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const child = spawn(this.bin, args, {
-        stdio: ['pipe', 'pipe', 'pipe'],
-        // XP-02: minimal allowlisted env, scoped to agy's own required vars.
-        env: buildProviderChildEnv({ provider: 'agy' }),
-      });
-      let stdout = '';
-      let stderr = '';
-      const timer = setTimeout(() => {
-        child.kill('SIGKILL');
-        reject(new Error(`[agy-cli] timed out after ${this.timeoutMs}ms`));
-      }, this.timeoutMs);
-      child.stdout.on('data', (chunk) => (stdout += chunk.toString()));
-      child.stderr.on('data', (chunk) => (stderr += chunk.toString()));
-      child.on('close', (code) => {
-        clearTimeout(timer);
-        if (code !== 0) {
-          reject(new Error(`[agy-cli] CLI exited with code ${code}. stderr: ${stderr}`));
-          return;
-        }
-        resolve(stdout);
-      });
-      child.on('error', (err) => {
-        clearTimeout(timer);
-        reject(new Error(`[agy-cli] spawn failed: ${err.message}`));
-      });
-      child.stdin.end();
+    const child = spawn(this.bin, args, {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      // XP-02: minimal allowlisted env, scoped to agy's own required vars.
+      env: buildProviderChildEnv({ provider: 'agy' }),
+    });
+
+    return withWallClockBudget(
+      {
+        provider: 'agy',
+        budgetMs: this.timeoutMs,
+        child: delegationChildHandleFromChildProcess(child),
+      },
+      () =>
+        new Promise<string>((resolve, reject) => {
+          let stdout = '';
+          let stderr = '';
+          child.stdout.on('data', (chunk) => (stdout += chunk.toString()));
+          child.stderr.on('data', (chunk) => (stderr += chunk.toString()));
+          child.on('close', (code) => {
+            if (code !== 0) {
+              reject(new Error(`[agy-cli] CLI exited with code ${code}. stderr: ${stderr}`));
+              return;
+            }
+            resolve(stdout);
+          });
+          child.on('error', (err) => {
+            reject(new Error(`[agy-cli] spawn failed: ${err.message}`));
+          });
+          child.stdin.end();
+        })
+    ).catch((err) => {
+      if (err instanceof DelegationWallClockExceededError) {
+        throw new Error(`[agy-cli] timed out after ${this.timeoutMs}ms`);
+      }
+      throw err;
     });
   }
 }

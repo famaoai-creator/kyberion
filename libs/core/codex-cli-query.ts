@@ -12,6 +12,11 @@ import {
   type ProviderPermissionProfileName,
 } from './provider-permission-profiles.js';
 import { resolveRuntimeModelId } from './runtime-model-defaults.js';
+import {
+  delegationChildHandleFromChildProcess,
+  withWallClockBudget,
+  DelegationWallClockExceededError,
+} from './delegation-concurrency.js';
 
 export interface CodexCliQueryOptions {
   bin?: string;
@@ -143,45 +148,57 @@ class CodexCliQuery {
     }
   }
 
+  /**
+   * XP-06: real async `spawn` (not `spawnSync`), so the wall-clock budget is
+   * enforced against a real, killable handle via {@link withWallClockBudget}
+   * — expiry actually SIGTERM's then SIGKILL's this CLI process.
+   */
   private spawnCli(args: string[], stdin: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const child = spawn(this.bin, args, {
-        stdio: ['pipe', 'pipe', 'pipe'],
-        // XP-02: minimal allowlisted env, scoped to codex's own required vars.
-        env: buildProviderChildEnv({ provider: 'codex' }),
-        cwd: this.cwd,
-      });
-      let stderr = '';
-      let stdout = '';
-      const timer = setTimeout(() => {
-        child.kill('SIGKILL');
-        reject(new Error(`[codex-cli] timed out after ${this.timeoutMs}ms`));
-      }, this.timeoutMs);
+    const child = spawn(this.bin, args, {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      // XP-02: minimal allowlisted env, scoped to codex's own required vars.
+      env: buildProviderChildEnv({ provider: 'codex' }),
+      cwd: this.cwd,
+    });
 
-      child.stdout.on('data', (chunk) => {
-        stdout += chunk.toString();
-      });
-      child.stderr.on('data', (chunk) => {
-        stderr += chunk.toString();
-      });
-      child.on('close', (code) => {
-        clearTimeout(timer);
-        if (code !== 0) {
-          reject(
-            new Error(
-              `[codex-cli] CLI exited with code ${code}. stderr: ${stderr.slice(0, 1000)} stdout: ${stdout.slice(0, 500)}`
-            )
-          );
-          return;
-        }
-        resolve();
-      });
-      child.on('error', (err) => {
-        clearTimeout(timer);
-        reject(new Error(`[codex-cli] spawn failed: ${err.message}`));
-      });
-      child.stdin.write(stdin);
-      child.stdin.end();
+    return withWallClockBudget(
+      {
+        provider: 'codex',
+        budgetMs: this.timeoutMs,
+        child: delegationChildHandleFromChildProcess(child),
+      },
+      () =>
+        new Promise<void>((resolve, reject) => {
+          let stderr = '';
+          let stdout = '';
+          child.stdout.on('data', (chunk) => {
+            stdout += chunk.toString();
+          });
+          child.stderr.on('data', (chunk) => {
+            stderr += chunk.toString();
+          });
+          child.on('close', (code) => {
+            if (code !== 0) {
+              reject(
+                new Error(
+                  `[codex-cli] CLI exited with code ${code}. stderr: ${stderr.slice(0, 1000)} stdout: ${stdout.slice(0, 500)}`
+                )
+              );
+              return;
+            }
+            resolve();
+          });
+          child.on('error', (err) => {
+            reject(new Error(`[codex-cli] spawn failed: ${err.message}`));
+          });
+          child.stdin.write(stdin);
+          child.stdin.end();
+        })
+    ).catch((err) => {
+      if (err instanceof DelegationWallClockExceededError) {
+        throw new Error(`[codex-cli] timed out after ${this.timeoutMs}ms`);
+      }
+      throw err;
     });
   }
 
@@ -321,6 +338,12 @@ export function buildCodexCliQueryOptionsFromEnv(
   };
 }
 
+// SYNC, NOT WALL-CLOCK-BUDGETED (XP-06): binary discovery, not a delegation's
+// unit of work — `safeExecResult` below runs a synchronous `which -a codex`
+// (its own short, hardcoded 5s timeout) and never goes through `spawnCli`/
+// `withWallClockBudget`. Nothing to register or kill mid-flight from the
+// same thread; this function has already returned by the time any caller
+// could try.
 function resolveCodexBinary(env: NodeJS.ProcessEnv = process.env): string {
   const explicit = env.KYBERION_CODEX_CLI_BIN?.trim();
   if (explicit) return explicit;

@@ -26,6 +26,11 @@ import {
   type ProviderPermissionProfileName,
 } from './provider-permission-profiles.js';
 import { assertReasoningEgressAllowed } from './reasoning-egress-scope.js';
+import {
+  delegationChildHandleFromChildProcess,
+  withWallClockBudget,
+  DelegationWallClockExceededError,
+} from './delegation-concurrency.js';
 import { z, type ZodType } from 'zod';
 import { logger } from './core.js';
 import type {
@@ -526,44 +531,65 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
     return parsed.data;
   }
 
+  /**
+   * XP-06: the child is spawned asynchronously (real `ChildProcess`, not
+   * `spawnSync`), so its wall-clock budget is enforced by
+   * {@link withWallClockBudget} against a real, killable handle — on expiry
+   * this backend's CLI process is actually SIGTERM'd then (after the grace
+   * window) SIGKILL'd, not just abandoned.
+   */
   private spawnCli(args: string[], stdin: string): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const child = spawn(this.bin, args, {
-        stdio: ['pipe', 'pipe', 'pipe'],
-        // XP-02: minimal allowlisted env (no cross-provider credential
-        // leakage); SA-05: one delegation hop deeper than us.
-        env: { ...buildProviderChildEnv({ provider: 'claude' }), ...childDelegationEnv() },
-      });
-      let stdout = '';
-      let stderr = '';
-      const timer = setTimeout(() => {
-        child.kill('SIGKILL');
-        reject(new Error(`[shell-claude-cli] timed out after ${this.timeoutMs}ms`));
-      }, this.timeoutMs);
-      child.stdout.on('data', (chunk) => (stdout += chunk.toString()));
-      child.stderr.on('data', (chunk) => (stderr += chunk.toString()));
-      child.on('close', (code) => {
-        clearTimeout(timer);
-        if (code !== 0) {
-          reject(
-            new Error(
-              `[shell-claude-cli] CLI exited with code ${code}. stderr: ${stderr.slice(0, 500)}`
-            )
-          );
-          return;
-        }
-        resolve(stdout);
-      });
-      child.on('error', (err) => {
-        clearTimeout(timer);
-        reject(new Error(`[shell-claude-cli] spawn failed: ${err.message}`));
-      });
-      child.stdin.write(stdin);
-      child.stdin.end();
+    const child = spawn(this.bin, args, {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      // XP-02: minimal allowlisted env (no cross-provider credential
+      // leakage); SA-05: one delegation hop deeper than us.
+      env: { ...buildProviderChildEnv({ provider: 'claude' }), ...childDelegationEnv() },
+    });
+
+    return withWallClockBudget(
+      {
+        provider: 'claude',
+        budgetMs: this.timeoutMs,
+        child: delegationChildHandleFromChildProcess(child),
+      },
+      () =>
+        new Promise<string>((resolve, reject) => {
+          let stdout = '';
+          let stderr = '';
+          child.stdout.on('data', (chunk) => (stdout += chunk.toString()));
+          child.stderr.on('data', (chunk) => (stderr += chunk.toString()));
+          child.on('close', (code) => {
+            if (code !== 0) {
+              reject(
+                new Error(
+                  `[shell-claude-cli] CLI exited with code ${code}. stderr: ${stderr.slice(0, 500)}`
+                )
+              );
+              return;
+            }
+            resolve(stdout);
+          });
+          child.on('error', (err) => {
+            reject(new Error(`[shell-claude-cli] spawn failed: ${err.message}`));
+          });
+          child.stdin.write(stdin);
+          child.stdin.end();
+        })
+    ).catch((err) => {
+      if (err instanceof DelegationWallClockExceededError) {
+        throw new Error(`[shell-claude-cli] timed out after ${this.timeoutMs}ms`);
+      }
+      throw err;
     });
   }
 }
 
+// SYNC, NOT WALL-CLOCK-BUDGETED (XP-06): this is a one-shot health probe, not
+// a delegation's unit of work — it never goes through `spawnCli`/
+// `withWallClockBudget`. `spawnSync` blocks this thread until it returns (or
+// its own `timeout` fires), so there is no live handle to register and
+// nothing a wall-clock budget could kill mid-flight regardless; the bounded
+// `timeout` option below is this function's only, and sufficient, ceiling.
 export function probeShellClaudeCliAvailability(
   env: NodeJS.ProcessEnv = process.env,
   options: { bin?: string; timeoutMs?: number } = {}

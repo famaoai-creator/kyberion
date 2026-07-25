@@ -121,7 +121,10 @@ export const PROVIDER_PROBE_TABLE: Readonly<Record<string, ProviderProbeSpec>> =
 };
 
 const DEFAULT_PROBE_TIMEOUT_MS = 5000;
-const DEFAULT_TTL_MS = 15 * 60 * 1000; // 15 minutes — cheap probes, but not free
+// Exported so callers that want to state an explicit `maxAgeMs` (e.g.
+// `run_baseline_check.ts`'s population job) can stay consistent with this
+// module's own default instead of duplicating the magic number.
+export const DEFAULT_PROVIDER_CAPABILITY_TTL_MS = 15 * 60 * 1000; // 15 minutes — cheap probes, but not free
 const REGISTRY_CACHE_RELATIVE_PATH = 'runtime/provider-capability-registry.json';
 
 function defaultProbeExec(
@@ -326,7 +329,7 @@ export interface LoadProviderCapabilityRegistryOptions extends ProbeProviderCapa
 export function loadProviderCapabilityRegistry(
   opts: LoadProviderCapabilityRegistryOptions = {}
 ): ProviderCapability[] {
-  const ttlMs = opts.maxAgeMs ?? DEFAULT_TTL_MS;
+  const ttlMs = opts.maxAgeMs ?? DEFAULT_PROVIDER_CAPABILITY_TTL_MS;
   const now = opts.now ?? (() => new Date());
 
   if (!opts.forceRefresh) {

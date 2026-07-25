@@ -27,24 +27,36 @@
  *   consumers that already understand MO-07 verdicts can read a best-of-
  *   providers verdict without a second shape to learn.
  *
- * Backend acquisition (read this before wiring a real caller): there is no
- * clean, exported "give me a backend for provider X" factory as of this
- * writing — `reasoning-bootstrap.ts` builds exactly one *installed* backend
- * per process (`providerForReasoningMode` is private, and the install path
- * is a singleton via `registerReasoningBackend`/`getReasoningBackend`), and
- * that file is out of scope for this change (owned by a different track this
- * wave; see the XP-07 task brief). Rather than reach into it, this module
- * defines its own minimal structural interface (`BestOfProviderBackend` —
- * just `delegateTask(instruction, context?)`, the same call shape as
+ * Backend acquisition: there is no clean, exported "give me a backend for
+ * provider X" factory in `reasoning-bootstrap.ts` — it builds exactly one
+ * *installed* backend per process (`providerForReasoningMode` is private,
+ * the install path is a singleton via
+ * `registerReasoningBackend`/`getReasoningBackend`), and that file is out of
+ * scope for this module to reach into. Instead this module defines its own
+ * minimal structural interface (`BestOfProviderBackend` — just
+ * `delegateTask(instruction, context?)`, the same call shape as
  * `ReasoningBackend.delegateTask`, so real `ReasoningBackend` instances
  * satisfy it with no adapter) and accepts backend acquisition as an
- * injectable seam (`seams.getBackend`). The default seam returns `null` for
- * every provider — so with no seam injected, every candidate call resolves
- * to "no backend available" and is recorded as a per-candidate soft failure
- * (never a thrown error; see `runBestOfProviders`'s per-candidate try/catch).
- * A caller that wires a real multi-provider dispatcher (e.g. `agent-dispatch.ts`,
- * out of scope here) supplies `seams.getBackend` to make fan-out real; until
- * then, and in the common case where only one provider is actually installed,
+ * injectable seam (`seams.getBackend`).
+ *
+ * Default `seams.getBackend` (XP-07 close-out — see `provider-backend-resolver.ts`
+ * for the resolver itself and its per-provider constructor rationale):
+ * gated behind the `KYBERION_BEST_OF_PROVIDERS_LIVE=1` opt-in env var.
+ *   - Unset (the production default): every candidate call resolves to "no
+ *     backend available" and is recorded as a per-candidate soft failure
+ *     (never a thrown error; see `runBestOfProviders`'s per-candidate
+ *     try/catch) — so nothing starts spawning provider CLIs just because
+ *     `runBestOfProviders` is called. Nothing in this repo sets this env
+ *     var today, so best-of-providers stays inert-by-default in production
+ *     until an operator/deployment explicitly opts in.
+ *   - `KYBERION_BEST_OF_PROVIDERS_LIVE=1`: delegates to
+ *     `resolveProviderBackend` (`provider-backend-resolver.ts`), which
+ *     lazily constructs a real 'claude'/'codex'/'agy' CLI-backed backend
+ *     (never spawns at resolve time — only when `delegateTask` is actually
+ *     called), gated by the XP-01 cached capability registry.
+ * A caller can still inject its own `seams.getBackend` (e.g. a future real
+ * multi-provider dispatcher) to override this default entirely, live-flag
+ * or not. In the common case where only one provider is actually available,
  * this degrades to the documented `degraded: 'single-provider'` /
  * `degraded: 'no-eligible-providers'` outcomes rather than failing.
  *
@@ -82,8 +94,16 @@ import {
   type ProviderCapability,
 } from './provider-capability-registry.js';
 import { withDelegationSlot } from './delegation-concurrency.js';
+import { resolveProviderBackend } from './provider-backend-resolver.js';
 import type { TierLevel } from './types.js';
 import type { PlanningReviewVerdictResult } from './structured-output-contracts.js';
+
+/**
+ * Env flag that opts the default `seams.getBackend` into real per-provider
+ * CLI delegation (via `resolveProviderBackend`). See module header. Unset
+ * ⇒ default resolver stays the always-null no-op (production-safe).
+ */
+export const BEST_OF_PROVIDERS_LIVE_ENV_VAR = 'KYBERION_BEST_OF_PROVIDERS_LIVE';
 
 /**
  * Minimal structural shape this module needs from a provider backend — the
@@ -181,8 +201,21 @@ export interface BestOfProvidersResult {
 export const BEST_OF_PROVIDERS_VERDICT_LOG_RELATIVE_PATH =
   'runtime/best-of-providers/verdicts.jsonl';
 
-function defaultBackendResolver(_provider: string): BestOfProviderBackend | null {
-  return null;
+/**
+ * Default `seams.getBackend`. No-op (`null` for every provider) unless
+ * `KYBERION_BEST_OF_PROVIDERS_LIVE=1` is set, in which case it delegates to
+ * `resolveProviderBackend` (see module header + `provider-backend-resolver.ts`).
+ * Never throws — `resolveProviderBackend` itself never throws, but this
+ * still guards defensively since it runs inside `runBestOfProviders`'s
+ * per-candidate path.
+ */
+function defaultBackendResolver(provider: string): BestOfProviderBackend | null {
+  if (process.env[BEST_OF_PROVIDERS_LIVE_ENV_VAR] !== '1') return null;
+  try {
+    return resolveProviderBackend(provider);
+  } catch {
+    return null;
+  }
 }
 
 function defaultRegistrySnapshot(): ProviderCapability[] | null {

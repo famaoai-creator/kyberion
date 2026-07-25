@@ -110,7 +110,8 @@ import { emitIntentSnapshot, mapStageToLoopPhase } from './intent-snapshot-store
 import { summarizeHeuristics } from './heuristic-feedback.js';
 import { getIntentExtractor } from './intent-extractor.js';
 import { installAnthropicBackendsIfAvailable } from './reasoning-bootstrap.js';
-import { getReasoningBackend } from './reasoning-backend.js';
+import { getReasoningBackend, getLastServedReasoningMode } from './reasoning-backend.js';
+import { providerIdForReasoningIdentifier } from './provider-egress-gate.js';
 import { MissionWorkingMemory } from './mission-working-memory.js';
 import {
   MAX_CARRYOVER_BACKGROUND_TASKS,
@@ -3321,6 +3322,43 @@ async function dispatchPlannedMissionTaskCore(
   };
 }
 
+/**
+ * XP-05 closeout: stamp `TaskResultBlock.provenance` at the worker's persist
+ * point. `obtainTaskResultResponse` is where a single-shot dispatch's
+ * `taskResult` becomes final; everything downstream — `input.task.last_result`
+ * (line ~2640, which flows into the persisted `NEXT_TASKS.json` plan),
+ * `updateWorkItem` metadata summaries, and every
+ * `emitMissionTaskEvent({ payload: { task_result } })` call — references this
+ * same object, so stamping it once here is enough for it to survive to every
+ * persist/propagation point. Deliberately NOT added to the human-readable
+ * `upstreamResultLines` prompt lines (see buildUpstreamResultLines) — those
+ * are prose for the next agent's context window, not the schema-validated
+ * block.
+ *
+ * Boundary (do not fabricate): `getLastServedReasoningMode()` is process-local
+ * state set by the reasoning-backend failover chain (reasoning-backend.ts)
+ * only when a candidate in *this process* actually serves a call. Dispatch
+ * here goes through `a2aBridge.route()`, which for a genuinely remote a2a
+ * worker (different process/machine) never touches this process's reasoning
+ * backend — the accessor then holds either `null` or a stale value from an
+ * unrelated earlier call. Only stamp when the accessor reports a mode; a
+ * remote worker is responsible for stamping its own provenance before
+ * handing the block back over a2a (tracked as follow-up, out of scope here).
+ * Never overwrites a block that already carries `provenance` (e.g. a future
+ * remote-worker-stamped result).
+ */
+function stampTaskResultProvenance(taskResult: TaskResultBlock | undefined): void {
+  if (!taskResult || taskResult.provenance) return;
+  const served = getLastServedReasoningMode();
+  if (!served || !served.mode) return;
+  const provider = providerIdForReasoningIdentifier(served.mode) || served.provider;
+  taskResult.provenance = {
+    mode: served.mode,
+    ...(provider ? { provider } : {}),
+    failover: served.failover === true,
+  };
+}
+
 async function obtainTaskResultResponse(input: {
   missionId: string;
   task: PlannedNextTask;
@@ -3479,6 +3517,11 @@ async function obtainTaskResultResponse(input: {
       feedback: taskResult.knowledge_feedback,
     });
   }
+
+  // XP-05 closeout: this is the worker's persist point — see
+  // stampTaskResultProvenance's doc comment for the local-served-only
+  // boundary and why downstream propagation needs no further wiring.
+  stampTaskResultProvenance(taskResult);
 
   return {
     executionMode: 'agent',

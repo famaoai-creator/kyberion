@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import {
@@ -15,6 +15,26 @@ vi.mock('node:child_process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:child_process')>();
   return { ...actual, spawn: spawnMock };
 });
+
+// XP-06: `spawnCli` now wraps its child in `withWallClockBudget`, which
+// (unmocked) would persist a real active-child record via `secure-io` /
+// `path-resolver` — a real filesystem write this suite must not perform.
+// `delegation-concurrency.test.ts` owns the hermetic (temp-dir-backed) tests
+// for the budget/kill machinery itself; here it's a spyable passthrough so
+// every pre-existing assertion below (argv shape, env allowlisting) is
+// unaffected, while still letting this file assert *that* `spawnCli` wires
+// through it with the right provider/budget.
+const { withWallClockBudgetMock } = vi.hoisted(() => ({
+  withWallClockBudgetMock: vi.fn((_opts: unknown, fn: () => Promise<unknown>) => fn()),
+}));
+vi.mock('./delegation-concurrency.js', () => ({
+  delegationChildHandleFromChildProcess: (child: any) => ({
+    pid: child.pid,
+    kill: (signal: NodeJS.Signals) => child.kill(signal),
+  }),
+  withWallClockBudget: withWallClockBudgetMock,
+  DelegationWallClockExceededError: class DelegationWallClockExceededError extends Error {},
+}));
 
 function createChild(stdoutText: string, exitCode = 0): any {
   const child = new EventEmitter() as any;
@@ -125,6 +145,31 @@ describe('shell-claude-cli-backend', () => {
       const [, argv] = spawnMock.mock.calls[0];
       const permissionModeIndex = argv.indexOf('--permission-mode');
       expect(argv[permissionModeIndex + 1]).toBe('plan');
+    });
+  });
+
+  describe('wall-clock budget wiring (XP-06)', () => {
+    beforeEach(() => {
+      spawnMock.mockClear();
+      withWallClockBudgetMock.mockClear();
+    });
+
+    afterEach(() => {
+      spawnMock.mockClear();
+      withWallClockBudgetMock.mockClear();
+    });
+
+    it('wraps the spawned child in withWallClockBudget with the claude provider and configured timeout', async () => {
+      spawnMock.mockReturnValueOnce(createChild('ok'));
+
+      const backend = new ShellClaudeCliBackend({ bin: 'claude', timeoutMs: 12345 });
+      await backend.delegateTask('do the thing');
+
+      expect(withWallClockBudgetMock).toHaveBeenCalledTimes(1);
+      const [opts, fn] = withWallClockBudgetMock.mock.calls[0];
+      expect(opts).toMatchObject({ provider: 'claude', budgetMs: 12345 });
+      expect(opts.child).toEqual(expect.objectContaining({ kill: expect.any(Function) }));
+      expect(typeof fn).toBe('function');
     });
   });
 });
