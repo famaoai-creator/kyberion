@@ -10,11 +10,28 @@ import {
   safeWriteFile,
 } from './secure-io.js';
 import { logger } from './core.js';
+import {
+  loadRetentionCatalog,
+  retentionTtlMsForPath,
+  retentionTtlDaysForPath,
+  runtimeRetentionRules,
+  coveredRuntimeSubdirs,
+  BUILTIN_RETENTION_DEFAULTS,
+  type LoadedRetentionCatalog,
+} from './storage-retention-catalog.js';
 
 export const DEFAULT_TMP_TTL_MS = 24 * 60 * 60 * 1000;
 export const DEFAULT_LOG_RETENTION_DAYS = 30;
 
 /**
+ * AL-01: TTL values are now derived from the governance retention catalog
+ * (`knowledge/product/governance/storage-retention-catalog.json` via
+ * `storage-retention-catalog.ts`). The constants in this file are the
+ * last-resort fallback used when even the catalog loader's built-in defaults
+ * are bypassed by explicit caller options — the catalog's built-in defaults
+ * mirror these values exactly, so behavior is unchanged when the catalog is
+ * missing or corrupt.
+ *
  * Retention rules for governed runtime artifacts under active/shared/runtime/.
  * These directories are written by the browser-bridge / intent-driven automation
  * flow and previously had no TTL governance (review finding OP-M3).
@@ -31,6 +48,8 @@ export const RUNTIME_RETENTION: ReadonlyArray<{ subdir: string; ttlMs: number }>
 export interface ScanTmpOptions {
   dryRun: boolean;
   ttlMs?: number;
+  /** Preloaded retention catalog; loaded on demand when omitted. */
+  catalog?: LoadedRetentionCatalog;
 }
 
 export interface ScanTmpResult {
@@ -41,6 +60,8 @@ export interface ScanTmpResult {
 export interface RotateLogsOptions {
   dryRun: boolean;
   retentionDays?: number;
+  /** Preloaded retention catalog; loaded on demand when omitted. */
+  catalog?: LoadedRetentionCatalog;
 }
 
 export interface RotateLogsResult {
@@ -111,6 +132,15 @@ export interface JanitorReport {
   deletedRuntime: number;
   staleDelegationChildren: number;
   killedDelegationChildren: number;
+  /**
+   * AL-01: repo-relative `active/shared/runtime/<subdir>` directories that
+   * exist on disk but are skipped because no retention-catalog entry covers
+   * them (reported, never deleted).
+   */
+  uncoveredRuntimeDirs: string[];
+  /** Where the TTL rules came from: the governance catalog, or built-in fallback defaults. */
+  retentionCatalogSource: 'catalog' | 'builtin-defaults';
+  retentionCatalogWarnings: string[];
   errors: string[];
   timestamp: string;
   dryRun: boolean;
@@ -156,7 +186,10 @@ function collectFiles(dir: string): string[] {
 }
 
 export function scanTmp(opts: ScanTmpOptions): ScanTmpResult {
-  const ttlMs = opts.ttlMs ?? DEFAULT_TMP_TTL_MS;
+  const ttlMs =
+    opts.ttlMs ??
+    retentionTtlMsForPath(opts.catalog ?? loadRetentionCatalog(), 'active/shared/tmp') ??
+    DEFAULT_TMP_TTL_MS;
   const dir = sharedTmp();
   const now = Date.now();
   const expired: string[] = [];
@@ -183,7 +216,11 @@ export function scanTmp(opts: ScanTmpOptions): ScanTmpResult {
 }
 
 export function rotateLogs(opts: RotateLogsOptions): RotateLogsResult {
-  const retentionMs = (opts.retentionDays ?? DEFAULT_LOG_RETENTION_DAYS) * 24 * 60 * 60 * 1000;
+  const retentionDays =
+    opts.retentionDays ??
+    retentionTtlDaysForPath(opts.catalog ?? loadRetentionCatalog(), 'active/shared/logs') ??
+    DEFAULT_LOG_RETENTION_DAYS;
+  const retentionMs = retentionDays * 24 * 60 * 60 * 1000;
   const logsDir = shared('logs');
   const now = Date.now();
   const expired: string[] = [];
@@ -236,12 +273,16 @@ export function scanDataVault(opts: ScanDataVaultOptions): ScanDataVaultResult {
   return { expired, deleted };
 }
 
-export function scanRuntime(opts: { dryRun: boolean }): ScanRuntimeResult {
+export function scanRuntime(opts: {
+  dryRun: boolean;
+  catalog?: LoadedRetentionCatalog;
+}): ScanRuntimeResult {
   const now = Date.now();
   const expired: string[] = [];
   const deleted: string[] = [];
 
-  for (const rule of RUNTIME_RETENTION) {
+  const rules = runtimeRetentionRules(opts.catalog ?? loadRetentionCatalog());
+  for (const rule of rules) {
     const dir = shared(`runtime/${rule.subdir}`);
     for (const filePath of collectFiles(dir)) {
       try {
@@ -261,6 +302,35 @@ export function scanRuntime(opts: { dryRun: boolean }): ScanRuntimeResult {
   }
 
   return { expired, deleted };
+}
+
+/**
+ * AL-01: `active/shared/runtime/` subdirectories that exist on disk but have
+ * no retention-catalog entry. The janitor never deletes these — it reports
+ * them so undeclared (silently-forever) retention is visible instead of
+ * invisible. Returned repo-relative, sorted, directories only.
+ */
+export function listUncoveredRuntimeDirs(catalog?: LoadedRetentionCatalog): string[] {
+  const covered = coveredRuntimeSubdirs(catalog ?? loadRetentionCatalog());
+  const runtimeRoot = shared('runtime');
+  if (!safeExistsSync(runtimeRoot)) return [];
+  let entries: string[];
+  try {
+    entries = safeReaddir(runtimeRoot);
+  } catch {
+    return [];
+  }
+  const uncovered: string[] = [];
+  for (const name of [...entries].sort()) {
+    try {
+      const stat = safeLstat(nodePath.join(runtimeRoot, name));
+      if (!stat.isDirectory() || stat.isSymbolicLink()) continue;
+    } catch {
+      continue;
+    }
+    if (!covered.has(name)) uncovered.push(`active/shared/runtime/${name}`);
+  }
+  return uncovered;
 }
 
 function readDelegationChildrenRegistry(): DelegationChildRecord[] {
@@ -342,16 +412,31 @@ export function sweepDelegationChildren(
 export function runJanitor(opts: { dryRun: boolean }): JanitorReport {
   const errors: string[] = [];
 
+  // AL-01: single catalog load per run — never fatal (the loader falls back
+  // to built-in defaults on any catalog problem and reports it via warnings).
+  let catalog: LoadedRetentionCatalog;
+  try {
+    catalog = loadRetentionCatalog();
+  } catch (err: any) {
+    // Defensive: loadRetentionCatalog itself never throws by contract.
+    errors.push(`retention-catalog: ${err?.message ?? String(err)}`);
+    catalog = {
+      entries: [...BUILTIN_RETENTION_DEFAULTS],
+      source: 'builtin-defaults',
+      warnings: [],
+    };
+  }
+
   let tmpResult: ScanTmpResult = { expired: [], deleted: [] };
   try {
-    tmpResult = scanTmp({ dryRun: opts.dryRun });
+    tmpResult = scanTmp({ dryRun: opts.dryRun, catalog });
   } catch (err: any) {
     errors.push(`tmp: ${err?.message ?? String(err)}`);
   }
 
   let logResult: RotateLogsResult = { expired: [], rotated: [] };
   try {
-    logResult = rotateLogs({ dryRun: opts.dryRun });
+    logResult = rotateLogs({ dryRun: opts.dryRun, catalog });
   } catch (err: any) {
     errors.push(`logs: ${err?.message ?? String(err)}`);
   }
@@ -365,9 +450,16 @@ export function runJanitor(opts: { dryRun: boolean }): JanitorReport {
 
   let runtimeResult: ScanRuntimeResult = { expired: [], deleted: [] };
   try {
-    runtimeResult = scanRuntime({ dryRun: opts.dryRun });
+    runtimeResult = scanRuntime({ dryRun: opts.dryRun, catalog });
   } catch (err: any) {
     errors.push(`runtime: ${err?.message ?? String(err)}`);
+  }
+
+  let uncoveredRuntimeDirs: string[] = [];
+  try {
+    uncoveredRuntimeDirs = listUncoveredRuntimeDirs(catalog);
+  } catch (err: any) {
+    errors.push(`uncovered-runtime: ${err?.message ?? String(err)}`);
   }
 
   let delegationChildrenResult: SweepDelegationChildrenResult = {
@@ -393,6 +485,9 @@ export function runJanitor(opts: { dryRun: boolean }): JanitorReport {
     deletedRuntime: runtimeResult.deleted.length,
     staleDelegationChildren: delegationChildrenResult.stale.length,
     killedDelegationChildren: delegationChildrenResult.killed.length,
+    uncoveredRuntimeDirs,
+    retentionCatalogSource: catalog.source,
+    retentionCatalogWarnings: catalog.warnings,
     errors,
     timestamp: new Date().toISOString(),
     dryRun: opts.dryRun,

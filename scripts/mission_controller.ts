@@ -656,8 +656,11 @@ async function reenterMissionFromReview(missionId: string) {
   return result;
 }
 
-async function purgeMissions(dryRun: boolean = false) {
-  return missionSystem.purgeMissions(dryRun);
+async function purgeMissions(dryRun: boolean = false): Promise<void> {
+  // AL-01: purgeMissions now returns a structured PurgeMissionsResult; the
+  // CLI router's context type is (dryRun?) => Awaitable<void> and never
+  // consumed a return value, so drop it here to keep the thin-router contract.
+  await missionSystem.purgeMissions(dryRun);
 }
 
 /**
