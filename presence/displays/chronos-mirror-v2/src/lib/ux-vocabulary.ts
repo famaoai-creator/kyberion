@@ -11,9 +11,10 @@ import { normalizeLocale, type SupportedLocale } from '@agent/core/locale-normal
  */
 export type { SupportedLocale };
 
+type VocabularyEntry = Record<string, string>;
 type VocabularyCatalog = {
   default_locale: SupportedLocale;
-  domains?: Record<string, Record<string, Record<string, string>>>;
+  domains?: Record<string, Record<string, VocabularyEntry>>;
 };
 
 const catalog = vocabularyCatalog as VocabularyCatalog;
@@ -21,6 +22,41 @@ const speechLocales: Record<SupportedLocale, string> = {
   en: 'en-US',
   ja: 'ja-JP',
 };
+
+// I18N-02: the catalog moved from a single flat `domains.ux` to namespaced
+// domains (`chronos`, `cli`, `status`, `error`, `question`, `common`, plus
+// empty `bridge`/`concierge`/`onboarding` slots for I18N-04). chronos code
+// still calls uxLabel/uxText with the bare (unqualified) key names, so this
+// module keeps resolving them across every namespace — the same
+// backward-compat lookup `@agent/core`'s `t()` implements, minimized here to
+// stay import-free of secure-io. An ambiguous bare key (present in more than
+// one namespace) throws rather than silently picking one, matching the core
+// resolver's contract.
+let bareKeyIndex: Map<string, VocabularyEntry[]> | null = null;
+
+function buildBareKeyIndex(): Map<string, VocabularyEntry[]> {
+  const index = new Map<string, VocabularyEntry[]>();
+  for (const entries of Object.values(catalog.domains || {})) {
+    for (const [key, entry] of Object.entries(entries || {})) {
+      const list = index.get(key) ?? [];
+      list.push(entry);
+      index.set(key, list);
+    }
+  }
+  return index;
+}
+
+function lookupVocabularyEntry(key: string): VocabularyEntry | null {
+  if (!bareKeyIndex) bareKeyIndex = buildBareKeyIndex();
+  const matches = bareKeyIndex.get(key) ?? [];
+  if (matches.length === 0) return null;
+  if (matches.length > 1) {
+    throw new Error(
+      `[ux-vocabulary] ambiguous bare key "${key}" matches multiple namespaces; qualify the lookup or rename the key.`
+    );
+  }
+  return matches[0];
+}
 
 /**
  * Chronos-side entry point for steps 2/5/6 of the master precedence chain in
@@ -87,7 +123,7 @@ export function selectChronosLocaleText(
 }
 
 export function uxLabel(key: string, locale = resolveChronosLocale()): string {
-  const entry = catalog.domains?.ux?.[key];
+  const entry = lookupVocabularyEntry(key);
   if (!entry) return key;
   return entry[locale] || entry[catalog.default_locale] || key;
 }
@@ -96,7 +132,7 @@ export function uxLabel(key: string, locale = resolveChronosLocale()): string {
 // of truth. A missing key renders as the key itself (loud, greppable) and
 // tests/chronos-ux-vocabulary-contract.test.ts fails CI before that ships.
 export function uxText(key: string, locale = resolveChronosLocale()): string {
-  const entry = catalog.domains?.ux?.[key];
+  const entry = lookupVocabularyEntry(key);
   if (!entry) return key;
   return entry[locale] || entry[catalog.default_locale] || key;
 }
@@ -106,7 +142,7 @@ export function uxText(key: string, locale = resolveChronosLocale()): string {
  * the contract test cannot verify them). Static keys must use uxText.
  */
 export function uxTextOr(key: string, fallback: string, locale = resolveChronosLocale()): string {
-  const entry = catalog.domains?.ux?.[key];
+  const entry = lookupVocabularyEntry(key);
   if (!entry) return fallback;
   return entry[locale] || entry[catalog.default_locale] || fallback;
 }

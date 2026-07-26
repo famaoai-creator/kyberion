@@ -1,7 +1,6 @@
-import { safeReadFile } from './secure-io.js';
-import { pathResolver } from './path-resolver.js';
 import { logger } from './core.js';
 import { normalizeLocale, resolveDefaultLocale, type SupportedLocale } from './locale.js';
+import { loadVocabularyCatalog, resolveVocabularyEntry } from './vocabulary-catalog.js';
 
 /** @deprecated Use `SupportedLocale` from `./locale.js` instead. */
 export type UxVocabularyLocale = SupportedLocale;
@@ -13,88 +12,67 @@ export type UxStatusDomain =
   | 'progress'
   | 'runtime';
 
-type VocabularyEntry = Record<string, string>;
-type VocabularyCatalog = {
-  default_locale: string;
-  domains?: {
-    ux?: Record<string, VocabularyEntry>;
-  };
-};
-
-const VOCABULARY_PATH = pathResolver.knowledge('product/orchestration/user-facing-vocabulary.json');
-
-let cachedCatalog: VocabularyCatalog | null | undefined;
-
+// I18N-02: renderStatus's key map targets the `status` namespace exactly —
+// these are the domains renderStatus() has always served, and they moved
+// into `status` verbatim when the catalog split out of the single flat
+// `domains.ux`. Qualifying the lookup avoids any ambiguity if a future
+// namespace ever adds a same-named bare key.
 const STATUS_KEY_MAP: Record<UxStatusDomain, Record<string, string>> = {
   readiness: {
-    ready: 'readiness_ready',
-    fully_automatable: 'readiness_ready',
-    needs_clarification: 'readiness_clarification',
-    needs_external_assets: 'readiness_assets',
-    needs_assets: 'readiness_assets',
-    needs_setup: 'readiness_setup',
-    missing_runtime_prerequisites: 'readiness_runtime',
-    needs_runtime_prerequisites: 'readiness_runtime',
+    ready: 'status:readiness_ready',
+    fully_automatable: 'status:readiness_ready',
+    needs_clarification: 'status:readiness_clarification',
+    needs_external_assets: 'status:readiness_assets',
+    needs_assets: 'status:readiness_assets',
+    needs_setup: 'status:readiness_setup',
+    missing_runtime_prerequisites: 'status:readiness_runtime',
+    needs_runtime_prerequisites: 'status:readiness_runtime',
   },
   connection: {
-    ready: 'connection_connected',
-    connected: 'connection_connected',
-    connecting: 'connection_connecting',
-    pending: 'connection_pending',
-    blocked: 'connection_blocked',
-    missing: 'connection_missing',
-    'n/a': 'connection_not_applicable',
-    degraded: 'connection_degraded',
-    disconnected: 'connection_disconnected',
-    offline: 'connection_disconnected',
+    ready: 'status:connection_connected',
+    connected: 'status:connection_connected',
+    connecting: 'status:connection_connecting',
+    pending: 'status:connection_pending',
+    blocked: 'status:connection_blocked',
+    missing: 'status:connection_missing',
+    'n/a': 'status:connection_not_applicable',
+    degraded: 'status:connection_degraded',
+    disconnected: 'status:connection_disconnected',
+    offline: 'status:connection_disconnected',
   },
   provider: {
-    available: 'provider_available',
-    ready: 'provider_available',
-    busy: 'provider_busy',
-    fallback: 'provider_fallback',
-    error: 'provider_error',
-    missing: 'provider_missing',
-    unavailable: 'provider_error',
+    available: 'status:provider_available',
+    ready: 'status:provider_available',
+    busy: 'status:provider_busy',
+    fallback: 'status:provider_fallback',
+    error: 'status:provider_error',
+    missing: 'status:provider_missing',
+    unavailable: 'status:provider_error',
   },
   mission: {
-    planned: 'mission_planned',
-    active: 'mission_active',
-    blocked: 'mission_blocked',
-    done: 'mission_completed',
-    completed: 'mission_completed',
-    failed: 'mission_failed',
-    review: 'mission_review',
-    recovered: 'mission_recovered',
-    paused: 'mission_paused',
-    distilling: 'mission_distilling',
-    archived: 'mission_archived',
+    planned: 'status:mission_planned',
+    active: 'status:mission_active',
+    blocked: 'status:mission_blocked',
+    done: 'status:mission_completed',
+    completed: 'status:mission_completed',
+    failed: 'status:mission_failed',
+    review: 'status:mission_review',
+    recovered: 'status:mission_recovered',
+    paused: 'status:mission_paused',
+    distilling: 'status:mission_distilling',
+    archived: 'status:mission_archived',
   },
   progress: {
-    working: 'progress_working',
-    completed: 'progress_completed',
-    failed: 'progress_failed',
+    working: 'status:progress_working',
+    completed: 'status:progress_completed',
+    failed: 'status:progress_failed',
   },
   runtime: {
-    running: 'runtime_running',
-    stale: 'runtime_stale',
-    stopped: 'runtime_stopped',
+    running: 'status:runtime_running',
+    stale: 'status:runtime_stale',
+    stopped: 'status:runtime_stopped',
   },
 };
-
-function loadCatalog(): VocabularyCatalog | null {
-  if (cachedCatalog !== undefined) {
-    return cachedCatalog;
-  }
-  try {
-    cachedCatalog = JSON.parse(
-      String(safeReadFile(VOCABULARY_PATH, { label: 'user-facing vocabulary' }))
-    ) as VocabularyCatalog;
-  } catch {
-    cachedCatalog = null;
-  }
-  return cachedCatalog;
-}
 
 /**
  * @deprecated Thin wrapper over `./locale.js`. Kept for call-site
@@ -112,10 +90,11 @@ export function resolveVocabularyLocale(locale?: string): UxVocabularyLocale {
 }
 
 function renderVocabularyKey(key: string, locale: UxVocabularyLocale): string | null {
-  const catalog = loadCatalog();
-  const entry = catalog?.domains?.ux?.[key];
-  if (!entry) return null;
+  const resolved = resolveVocabularyEntry(key);
+  if (!resolved) return null;
+  const catalog = loadVocabularyCatalog();
   const defaultLocale = resolveVocabularyLocale(catalog?.default_locale || 'en');
+  const entry = resolved.entry;
   return entry[locale] || entry[defaultLocale] || entry.en || entry.ja || null;
 }
 

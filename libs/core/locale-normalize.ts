@@ -17,16 +17,25 @@
  * I18N-07 third-locale proof would fail on chronos alone.
  *
  * Keep this file import-free.
+ *
+ * I18N-02: `SUPPORTED_LOCALES` below is generated from the vocabulary
+ * catalog's `required_locales` field by `scripts/generate_vocabulary_types.ts`
+ * (`pnpm generate:vocabulary-types`, checked by `pnpm check:vocabulary-types`).
+ * Adding a locale is a one-line data edit to the catalog plus a
+ * regeneration — never a hand-edit of the array below. Do not add an import
+ * to read the catalog at runtime here; that would break the browser-bundle
+ * safety this file exists for.
  */
 
+// GENERATED-LOCALES:BEGIN
+export const SUPPORTED_LOCALES = ['en', 'ja'] as const;
+// GENERATED-LOCALES:END
+
 /**
- * The canonical supported-locale type for the whole codebase.
- *
- * I18N-02 will make this data-driven from the vocabulary catalog's
- * `required_locales` field; keeping the definition in exactly one place
- * means that change is a one-line edit here rather than a 22-site sweep.
+ * The canonical supported-locale type for the whole codebase, derived from
+ * {@link SUPPORTED_LOCALES}.
  */
-export type SupportedLocale = 'ja' | 'en';
+export type SupportedLocale = (typeof SUPPORTED_LOCALES)[number];
 
 /**
  * Normalizes a raw locale-ish value (`ja`, `ja-JP`, `ja_JP`, `JA`, `en-US`,
@@ -42,7 +51,14 @@ export function normalizeLocale(value: unknown): SupportedLocale | null {
   if (!raw) return null;
   const normalized = raw.toLowerCase().replace(/_/g, '-');
   if (normalized === 'c' || normalized === 'posix') return null;
-  if (normalized.startsWith('ja')) return 'ja';
-  if (normalized.startsWith('en')) return 'en';
+  for (const locale of SUPPORTED_LOCALES) {
+    if (normalized === locale || normalized.startsWith(`${locale}-`)) return locale;
+  }
+  // Fall back to a bare prefix match (e.g. `jav` should not match `ja`, but
+  // `ja` bare already matched above; this only covers tags without a
+  // separator that still start with a supported locale, e.g. legacy `jaJP`).
+  for (const locale of SUPPORTED_LOCALES) {
+    if (normalized.startsWith(locale)) return locale;
+  }
   return null;
 }
