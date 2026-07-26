@@ -9,6 +9,7 @@ import {
   safeReadFile,
   safeReaddir,
   safeStat,
+  buildAgentCollaborationProjection,
 } from '@agent/core';
 
 interface CheckResult {
@@ -132,6 +133,18 @@ export function buildVitalReport() {
     summary,
     checks,
     active_mission_count: activeMissionCount(),
+    collaboration: (() => {
+      const projection = buildAgentCollaborationProjection({ limit: 500 });
+      return {
+        events: projection.overview.events,
+        missions: projection.overview.missions,
+        tasks: projection.overview.tasks,
+        agents: projection.overview.agents,
+        attention: projection.attention.length,
+        partial: projection.partial,
+        status_flags: projection.status_flags,
+      };
+    })(),
   };
 }
 
