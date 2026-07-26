@@ -386,7 +386,7 @@ export function SovereignChat({
             >
               <div className="whitespace-pre-wrap">{msg.content}</div>
               <div className="text-[8px] opacity-30 mt-1 text-right">
-                {isMounted ? new Date(msg.timestamp).toLocaleTimeString() : ''}
+                {isMounted ? new Date(msg.timestamp).toLocaleTimeString(chronosSpeechLocale()) : ''}
               </div>
             </div>
           </div>

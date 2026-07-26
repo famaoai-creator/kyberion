@@ -7,10 +7,10 @@
 // ─── Style Primitives ────────────────────────────────────────
 
 export interface XlsxColor {
-  rgb?: string;       // #RRGGBB hex
-  theme?: number;     // Theme color index
-  tint?: number;      // Tint modifier (-1.0 to 1.0)
-  indexed?: number;   // Legacy indexed color
+  rgb?: string; // #RRGGBB hex
+  theme?: number; // Theme color index
+  tint?: number; // Tint modifier (-1.0 to 1.0)
+  indexed?: number; // Legacy indexed color
   auto?: boolean;
 }
 
@@ -28,9 +28,25 @@ export interface XlsxFont {
 }
 
 export interface XlsxFill {
-  patternType?: 'none' | 'solid' | 'gray125' | 'darkGray' | 'mediumGray' | 'lightGray'
-    | 'darkHorizontal' | 'darkVertical' | 'darkDown' | 'darkUp' | 'darkGrid' | 'darkTrellis'
-    | 'lightHorizontal' | 'lightVertical' | 'lightDown' | 'lightUp' | 'lightGrid' | 'lightTrellis';
+  patternType?:
+    | 'none'
+    | 'solid'
+    | 'gray125'
+    | 'darkGray'
+    | 'mediumGray'
+    | 'lightGray'
+    | 'darkHorizontal'
+    | 'darkVertical'
+    | 'darkDown'
+    | 'darkUp'
+    | 'darkGrid'
+    | 'darkTrellis'
+    | 'lightHorizontal'
+    | 'lightVertical'
+    | 'lightDown'
+    | 'lightUp'
+    | 'lightGrid'
+    | 'lightTrellis';
   fgColor?: XlsxColor;
   bgColor?: XlsxColor;
   gradient?: {
@@ -41,9 +57,21 @@ export interface XlsxFill {
 }
 
 export interface XlsxBorderEdge {
-  style?: 'thin' | 'medium' | 'thick' | 'double' | 'dotted' | 'dashed'
-    | 'dashDot' | 'dashDotDot' | 'mediumDashed' | 'mediumDashDot'
-    | 'mediumDashDotDot' | 'slantDashDot' | 'hair' | 'none';
+  style?:
+    | 'thin'
+    | 'medium'
+    | 'thick'
+    | 'double'
+    | 'dotted'
+    | 'dashed'
+    | 'dashDot'
+    | 'dashDotDot'
+    | 'mediumDashed'
+    | 'mediumDashDot'
+    | 'mediumDashDotDot'
+    | 'slantDashDot'
+    | 'hair'
+    | 'none';
   color?: XlsxColor;
 }
 
@@ -58,11 +86,19 @@ export interface XlsxBorder {
 }
 
 export interface XlsxAlignment {
-  horizontal?: 'general' | 'left' | 'center' | 'right' | 'fill' | 'justify' | 'centerContinuous' | 'distributed';
+  horizontal?:
+    | 'general'
+    | 'left'
+    | 'center'
+    | 'right'
+    | 'fill'
+    | 'justify'
+    | 'centerContinuous'
+    | 'distributed';
   vertical?: 'top' | 'center' | 'bottom' | 'justify' | 'distributed';
   wrapText?: boolean;
   shrinkToFit?: boolean;
-  textRotation?: number;  // 0-180 or 255 for vertical
+  textRotation?: number; // 0-180 or 255 for vertical
   indent?: number;
   readingOrder?: number;
 }
@@ -104,12 +140,12 @@ export interface XlsxTextRun {
 // ─── Cell ────────────────────────────────────────────────────
 
 export interface XlsxCell {
-  ref: string;            // e.g. "A1"
+  ref: string; // e.g. "A1"
   type?: 's' | 'n' | 'b' | 'e' | 'str' | 'inlineStr' | 'd';
   value?: string | number | boolean;
   formula?: string;
   richText?: XlsxTextRun[];
-  styleIndex?: number;    // Index into styles array
+  styleIndex?: number; // Index into styles array
   // Raw XML preservation
   rawXml?: string;
 }
@@ -117,8 +153,8 @@ export interface XlsxCell {
 // ─── Row ─────────────────────────────────────────────────────
 
 export interface XlsxRow {
-  index: number;          // 1-based row number
-  height?: number;        // Row height in points
+  index: number; // 1-based row number
+  height?: number; // Row height in points
   customHeight?: boolean;
   hidden?: boolean;
   outlineLevel?: number;
@@ -130,9 +166,9 @@ export interface XlsxRow {
 // ─── Column Definition ───────────────────────────────────────
 
 export interface XlsxColumn {
-  min: number;            // 1-based start column
-  max: number;            // 1-based end column
-  width?: number;         // Column width in character units
+  min: number; // 1-based start column
+  max: number; // 1-based end column
+  width?: number; // Column width in character units
   customWidth?: boolean;
   hidden?: boolean;
   outlineLevel?: number;
@@ -144,7 +180,7 @@ export interface XlsxColumn {
 // ─── Merge Cell ──────────────────────────────────────────────
 
 export interface XlsxMergeCell {
-  ref: string;            // e.g. "A1:C3"
+  ref: string; // e.g. "A1:C3"
 }
 
 // ─── Conditional Formatting ──────────────────────────────────
@@ -202,7 +238,7 @@ export interface XlsxDrawingElement {
   text?: string;
   textRuns?: XlsxTextRun[];
   imagePath?: string;
-  imageData?: string;   // Base64-encoded image binary (for lossless round-trip)
+  imageData?: string; // Base64-encoded image binary (for lossless round-trip)
   chartXml?: string;
   shapeType?: string;
   style?: {
@@ -235,7 +271,7 @@ export interface XlsxTable {
   id: number;
   name: string;
   displayName: string;
-  ref: string;           // e.g. "A1:D10"
+  ref: string; // e.g. "A1:D10"
   totalsRowShown?: boolean;
   headerRowCount?: number;
   columns: XlsxTableColumn[];
@@ -270,9 +306,12 @@ export interface XlsxPageSetup {
   fitToWidth?: number;
   fitToHeight?: number;
   margins?: {
-    top: number; bottom: number;
-    left: number; right: number;
-    header: number; footer: number;
+    top: number;
+    bottom: number;
+    left: number;
+    right: number;
+    header: number;
+    footer: number;
   };
   rawXml?: string;
 }
@@ -287,10 +326,10 @@ export interface XlsxAutoFilter {
 // ─── Worksheet ───────────────────────────────────────────────
 
 export interface XlsxWorksheet {
-  id: string;             // e.g. "sheet1"
-  name: string;           // Tab name
+  id: string; // e.g. "sheet1"
+  name: string; // Tab name
   state?: 'visible' | 'hidden' | 'veryHidden';
-  dimension?: string;     // Used range, e.g. "A1:Z100"
+  dimension?: string; // Used range, e.g. "A1:Z100"
   sheetView?: XlsxSheetView;
   columns: XlsxColumn[];
   rows: XlsxRow[];
@@ -310,7 +349,7 @@ export interface XlsxWorksheet {
 
 export interface XlsxTheme {
   name?: string;
-  colors: { [key: string]: string };  // dk1, lt1, dk2, lt2, accent1-6, hlink, folHlink
+  colors: { [key: string]: string }; // dk1, lt1, dk2, lt2, accent1-6, hlink, folHlink
   majorFont?: string;
   minorFont?: string;
   rawXml?: string;
@@ -320,7 +359,7 @@ export interface XlsxTheme {
 
 export interface XlsxDefinedName {
   name: string;
-  value: string;         // e.g. "Sheet1!$A$1:$D$10"
+  value: string; // e.g. "Sheet1!$A$1:$D$10"
   localSheetId?: number;
   hidden?: boolean;
 }
@@ -339,19 +378,23 @@ export interface XlsxDesignProtocol {
   version: string;
   generatedAt: string;
   theme: XlsxTheme;
+  // I18N-05: BCP-47/OOXML language tag applied to generated drawing <a:rPr>
+  // lang attributes (spell-check language, not visual style). Absent = legacy
+  // default 'ja-JP' (byte-identical output to pre-I18N-05 behavior).
+  locale?: string;
   styles: {
     fonts: XlsxFont[];
     fills: XlsxFill[];
     borders: XlsxBorder[];
     numFmts: XlsxNumberFormat[];
-    cellXfs: XlsxCellStyle[];       // Cell format index table
+    cellXfs: XlsxCellStyle[]; // Cell format index table
     namedStyles: XlsxNamedStyle[];
-    dxfs?: XlsxDxfStyle[];          // Differential formatting (for conditional formatting)
+    dxfs?: XlsxDxfStyle[]; // Differential formatting (for conditional formatting)
     tableStyles?: string[];
-    rawStylesXml?: string;          // Full styles.xml preservation
+    rawStylesXml?: string; // Full styles.xml preservation
   };
-  sharedStrings: string[];           // SST table (plain text)
-  sharedStringsRich?: XlsxTextRun[][];  // Rich text SST entries
+  sharedStrings: string[]; // SST table (plain text)
+  sharedStringsRich?: XlsxTextRun[][]; // Rich text SST entries
   workbookProperties?: XlsxWorkbookProperties;
   definedNames: XlsxDefinedName[];
   sheets: XlsxWorksheet[];

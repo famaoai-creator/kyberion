@@ -1,8 +1,9 @@
-"use client";
+'use client';
 
-import { Search, SlidersHorizontal } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { SurfaceStatusPanel } from "./SurfaceStatusPanel";
+import { Search, SlidersHorizontal } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { chronosSpeechLocale } from '../lib/ux-vocabulary';
+import { SurfaceStatusPanel } from './SurfaceStatusPanel';
 
 type TraceFeedRecord = {
   traceId: string;
@@ -13,7 +14,7 @@ type TraceFeedRecord = {
   missionId?: string;
   pipelineId?: string;
   actuator?: string;
-  status: "ok" | "error" | "in_progress";
+  status: 'ok' | 'error' | 'in_progress';
   rootSpanName: string;
   spanCount: number;
   eventCount: number;
@@ -22,7 +23,7 @@ type TraceFeedRecord = {
   rootSpan: {
     spanId?: string;
     name: string;
-    status: "ok" | "error" | "in_progress";
+    status: 'ok' | 'error' | 'in_progress';
     startTime: string;
     endTime?: string;
     attributes?: Record<string, string | number | boolean>;
@@ -35,13 +36,17 @@ type TraceFeedRecord = {
 type TraceSpanDetail = {
   spanId?: string;
   name: string;
-  status: "ok" | "error" | "in_progress";
+  status: 'ok' | 'error' | 'in_progress';
   startTime: string;
   endTime?: string;
   attributes?: Record<string, string | number | boolean>;
-  events: Array<{ name: string; timestamp: string; attributes?: Record<string, string | number | boolean> }>;
+  events: Array<{
+    name: string;
+    timestamp: string;
+    attributes?: Record<string, string | number | boolean>;
+  }>;
   artifacts: Array<{
-    type: "screenshot" | "file" | "document" | "log";
+    type: 'screenshot' | 'file' | 'document' | 'log';
     path: string;
     description?: string;
     timestamp: string;
@@ -66,64 +71,68 @@ type TraceDetailResponse = {
 };
 
 type TraceFilters = {
-  status: "all" | TraceFeedRecord["status"];
+  status: 'all' | TraceFeedRecord['status'];
   missionId: string;
   pipelineId: string;
   actuator: string;
   query: string;
 };
 
-type TraceSort = "error-first" | "newest" | "oldest" | "largest";
+type TraceSort = 'error-first' | 'newest' | 'oldest' | 'largest';
 
 const DEFAULT_FILTERS: TraceFilters = {
-  status: "all",
-  missionId: "",
-  pipelineId: "",
-  actuator: "",
-  query: "",
+  status: 'all',
+  missionId: '',
+  pipelineId: '',
+  actuator: '',
+  query: '',
 };
 
-const DEFAULT_SORT: TraceSort = "error-first";
-const TRACE_VIEWER_PREFS_KEY = "chronos.trace-viewer.prefs";
+const DEFAULT_SORT: TraceSort = 'error-first';
+const TRACE_VIEWER_PREFS_KEY = 'chronos.trace-viewer.prefs';
 
 function formatTs(value?: string): string {
-  if (!value) return "n/a";
+  if (!value) return 'n/a';
   const ts = new Date(value);
-  return Number.isNaN(ts.getTime()) ? value : ts.toLocaleString();
+  return Number.isNaN(ts.getTime()) ? value : ts.toLocaleString(chronosSpeechLocale());
 }
 
-function statusTone(status: TraceFeedRecord["status"]): string {
+function statusTone(status: TraceFeedRecord['status']): string {
   switch (status) {
-    case "error":
-      return "border-rose-400/30 bg-rose-500/10 text-rose-100";
-    case "ok":
-      return "border-emerald-400/25 bg-emerald-500/10 text-emerald-100";
+    case 'error':
+      return 'border-rose-400/30 bg-rose-500/10 text-rose-100';
+    case 'ok':
+      return 'border-emerald-400/25 bg-emerald-500/10 text-emerald-100';
     default:
-      return "border-amber-400/25 bg-amber-500/10 text-amber-100";
+      return 'border-amber-400/25 bg-amber-500/10 text-amber-100';
   }
 }
 
-function spanTone(status: TraceSpanDetail["status"]): string {
+function spanTone(status: TraceSpanDetail['status']): string {
   switch (status) {
-    case "error":
-      return "border-rose-400/25 bg-rose-500/8";
-    case "ok":
-      return "border-emerald-400/20 bg-emerald-500/8";
+    case 'error':
+      return 'border-rose-400/25 bg-rose-500/8';
+    case 'ok':
+      return 'border-emerald-400/20 bg-emerald-500/8';
     default:
-      return "border-amber-400/20 bg-amber-500/8";
+      return 'border-amber-400/20 bg-amber-500/8';
   }
 }
 
-export function buildTraceFeedUrl(limit: number, filters: TraceFilters, refreshTick: number): string {
+export function buildTraceFeedUrl(
+  limit: number,
+  filters: TraceFilters,
+  refreshTick: number
+): string {
   const params = new URLSearchParams({
     limit: String(limit),
     _: String(refreshTick),
   });
-  if (filters.status !== "all") params.set("status", filters.status);
-  if (filters.missionId.trim()) params.set("missionId", filters.missionId.trim());
-  if (filters.pipelineId.trim()) params.set("pipelineId", filters.pipelineId.trim());
-  if (filters.actuator.trim()) params.set("actuator", filters.actuator.trim());
-  if (filters.query.trim()) params.set("query", filters.query.trim());
+  if (filters.status !== 'all') params.set('status', filters.status);
+  if (filters.missionId.trim()) params.set('missionId', filters.missionId.trim());
+  if (filters.pipelineId.trim()) params.set('pipelineId', filters.pipelineId.trim());
+  if (filters.actuator.trim()) params.set('actuator', filters.actuator.trim());
+  if (filters.query.trim()) params.set('query', filters.query.trim());
   return `/api/traces?${params.toString()}`;
 }
 
@@ -148,7 +157,11 @@ export function focusTraceRecord(rawText: string, traceId?: string | null): stri
   return rawText;
 }
 
-export function buildTraceFocusHistory(history: string[], traceId?: string | null, limit = 5): string[] {
+export function buildTraceFocusHistory(
+  history: string[],
+  traceId?: string | null,
+  limit = 5
+): string[] {
   const next = traceId?.trim();
   if (!next) return history.slice(0, limit);
   return [next, ...history.filter((entry) => entry !== next)].slice(0, limit);
@@ -157,7 +170,7 @@ export function buildTraceFocusHistory(history: string[], traceId?: string | nul
 export function resolveTraceHotkeySelection(
   traces: TraceFeedRecord[],
   currentTraceId: string | null,
-  key: string,
+  key: string
 ): string | null {
   const normalized = key.toLowerCase();
   const index = Number.parseInt(normalized, 10);
@@ -166,11 +179,17 @@ export function resolveTraceHotkeySelection(
   }
 
   if (traces.length === 0) return null;
-  const currentIndex = currentTraceId ? traces.findIndex((trace) => trace.traceId === currentTraceId) : -1;
-  if (normalized === "j") {
-    return traces[Math.min(traces.length - 1, currentIndex + 1 >= 0 ? currentIndex + 1 : 0)]?.traceId || traces[0]?.traceId || null;
+  const currentIndex = currentTraceId
+    ? traces.findIndex((trace) => trace.traceId === currentTraceId)
+    : -1;
+  if (normalized === 'j') {
+    return (
+      traces[Math.min(traces.length - 1, currentIndex + 1 >= 0 ? currentIndex + 1 : 0)]?.traceId ||
+      traces[0]?.traceId ||
+      null
+    );
   }
-  if (normalized === "k") {
+  if (normalized === 'k') {
     if (currentIndex <= 0) return traces[0]?.traceId || null;
     return traces[currentIndex - 1]?.traceId || traces[0]?.traceId || null;
   }
@@ -181,10 +200,10 @@ function isEditableHotkeyTarget(target: EventTarget | null): boolean {
   const element = target as HTMLElement | null;
   return Boolean(
     element &&
-      (element.tagName === "INPUT" ||
-        element.tagName === "TEXTAREA" ||
-        element.tagName === "SELECT" ||
-        element.isContentEditable),
+    (element.tagName === 'INPUT' ||
+      element.tagName === 'TEXTAREA' ||
+      element.tagName === 'SELECT' ||
+      element.isContentEditable)
   );
 }
 
@@ -217,7 +236,7 @@ function normalizeTraceFocusHistory(value: unknown, limit = 5): string[] {
   if (!Array.isArray(value)) return [];
   const next: string[] = [];
   for (const entry of value) {
-    if (typeof entry !== "string") continue;
+    if (typeof entry !== 'string') continue;
     const traceId = entry.trim();
     if (!traceId || next.includes(traceId)) continue;
     next.push(traceId);
@@ -227,27 +246,30 @@ function normalizeTraceFocusHistory(value: unknown, limit = 5): string[] {
 }
 
 export function loadTraceViewerPrefs(rawValue?: string | null): TraceViewerPrefs | null {
-  const raw = rawValue ?? (typeof window === "undefined" ? null : window.localStorage.getItem(TRACE_VIEWER_PREFS_KEY));
+  const raw =
+    rawValue ??
+    (typeof window === 'undefined' ? null : window.localStorage.getItem(TRACE_VIEWER_PREFS_KEY));
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw) as Partial<TraceViewerPrefs>;
-    if (!parsed || typeof parsed !== "object") return null;
+    if (!parsed || typeof parsed !== 'object') return null;
     return {
       filters: {
         ...DEFAULT_FILTERS,
         ...(parsed.filters ?? {}),
       },
       sort:
-        parsed.sort === "error-first" ||
-        parsed.sort === "newest" ||
-        parsed.sort === "oldest" ||
-        parsed.sort === "largest"
+        parsed.sort === 'error-first' ||
+        parsed.sort === 'newest' ||
+        parsed.sort === 'oldest' ||
+        parsed.sort === 'largest'
           ? parsed.sort
           : DEFAULT_SORT,
-      selectedTraceId: typeof parsed.selectedTraceId === "string" ? parsed.selectedTraceId : null,
-      rawTraceFocusTraceId: typeof parsed.rawTraceFocusTraceId === "string" ? parsed.rawTraceFocusTraceId : "",
+      selectedTraceId: typeof parsed.selectedTraceId === 'string' ? parsed.selectedTraceId : null,
+      rawTraceFocusTraceId:
+        typeof parsed.rawTraceFocusTraceId === 'string' ? parsed.rawTraceFocusTraceId : '',
       rawTraceFocusHistory: normalizeTraceFocusHistory(parsed.rawTraceFocusHistory),
-      rawTraceVisible: typeof parsed.rawTraceVisible === "boolean" ? parsed.rawTraceVisible : false,
+      rawTraceVisible: typeof parsed.rawTraceVisible === 'boolean' ? parsed.rawTraceVisible : false,
     };
   } catch {
     return null;
@@ -255,7 +277,7 @@ export function loadTraceViewerPrefs(rawValue?: string | null): TraceViewerPrefs
 }
 
 function saveTraceViewerPrefs(prefs: TraceViewerPrefs): void {
-  if (typeof window === "undefined") return;
+  if (typeof window === 'undefined') return;
   try {
     window.localStorage.setItem(TRACE_VIEWER_PREFS_KEY, JSON.stringify(prefs));
   } catch {
@@ -280,7 +302,9 @@ function TraceSpanTree({
   const previewArtifacts = span.artifacts.slice(0, 3);
 
   return (
-    <div className={`rounded-2xl border ${spanTone(span.status)} p-3 ${depth > 0 ? "ml-4 mt-3" : ""}`}>
+    <div
+      className={`rounded-2xl border ${spanTone(span.status)} p-3 ${depth > 0 ? 'ml-4 mt-3' : ''}`}
+    >
       <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
         <div className="space-y-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -290,8 +314,8 @@ function TraceSpanTree({
             </span>
           </div>
           <p className="font-mono text-[11px] text-white/55">
-            {span.spanId || "no-span-id"} · {formatTs(span.startTime)}
-            {span.endTime ? ` → ${formatTs(span.endTime)}` : ""}
+            {span.spanId || 'no-span-id'} · {formatTs(span.startTime)}
+            {span.endTime ? ` → ${formatTs(span.endTime)}` : ''}
           </p>
           {span.error ? <p className="text-xs text-rose-100">{span.error}</p> : null}
         </div>
@@ -314,7 +338,10 @@ function TraceSpanTree({
       {span.attributes && Object.keys(span.attributes).length > 0 ? (
         <div className="mt-3 flex flex-wrap gap-2">
           {Object.entries(span.attributes).map(([key, value]) => (
-            <span key={key} className="rounded-full border border-white/8 bg-black/20 px-2 py-0.5 font-mono text-[10px] text-white/65">
+            <span
+              key={key}
+              className="rounded-full border border-white/8 bg-black/20 px-2 py-0.5 font-mono text-[10px] text-white/65"
+            >
               {key}={String(value)}
             </span>
           ))}
@@ -333,7 +360,7 @@ function TraceSpanTree({
             onClick={() => setShowEvents((value) => !value)}
             className="rounded-full border border-white/8 bg-black/20 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-white/65 transition hover:bg-white/10"
           >
-            {showEvents ? "Hide" : "Show"} events {span.events.length}
+            {showEvents ? 'Hide' : 'Show'} events {span.events.length}
           </button>
         ) : null}
         {span.events.length > 0 ? (
@@ -342,9 +369,12 @@ function TraceSpanTree({
             onClick={() =>
               void onCopy(
                 span.events
-                  .map((event) => `${formatTs(event.timestamp)} ${event.name}${event.attributes ? ` ${JSON.stringify(event.attributes)}` : ""}`)
-                  .join("\n"),
-                "events",
+                  .map(
+                    (event) =>
+                      `${formatTs(event.timestamp)} ${event.name}${event.attributes ? ` ${JSON.stringify(event.attributes)}` : ''}`
+                  )
+                  .join('\n'),
+                'events'
               )
             }
             className="rounded-full border border-white/8 bg-black/20 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-white/65 transition hover:bg-white/10"
@@ -358,7 +388,7 @@ function TraceSpanTree({
             onClick={() => setShowArtifacts((value) => !value)}
             className="rounded-full border border-white/8 bg-black/20 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-white/65 transition hover:bg-white/10"
           >
-            {showArtifacts ? "Hide" : "Show"} artifacts {span.artifacts.length}
+            {showArtifacts ? 'Hide' : 'Show'} artifacts {span.artifacts.length}
           </button>
         ) : null}
         {span.artifacts.length > 0 ? (
@@ -367,9 +397,12 @@ function TraceSpanTree({
             onClick={() =>
               void onCopy(
                 span.artifacts
-                  .map((artifact) => `${formatTs(artifact.timestamp)} ${artifact.type} ${artifact.description || artifact.path}`)
-                  .join("\n"),
-                "artifacts",
+                  .map(
+                    (artifact) =>
+                      `${formatTs(artifact.timestamp)} ${artifact.type} ${artifact.description || artifact.path}`
+                  )
+                  .join('\n'),
+                'artifacts'
               )
             }
             className="rounded-full border border-white/8 bg-black/20 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-white/65 transition hover:bg-white/10"
@@ -383,7 +416,7 @@ function TraceSpanTree({
             onClick={() => setShowChildren((value) => !value)}
             className="rounded-full border border-white/8 bg-black/20 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-white/65 transition hover:bg-white/10"
           >
-            {showChildren ? "Hide" : "Show"} children {span.children.length}
+            {showChildren ? 'Hide' : 'Show'} children {span.children.length}
           </button>
         ) : null}
         {span.knowledgeRefs.length > 0 ? (
@@ -392,13 +425,13 @@ function TraceSpanTree({
             onClick={() => setShowKnowledge((value) => !value)}
             className="rounded-full border border-white/8 bg-black/20 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-white/65 transition hover:bg-white/10"
           >
-            {showKnowledge ? "Hide" : "Show"} refs {span.knowledgeRefs.length}
+            {showKnowledge ? 'Hide' : 'Show'} refs {span.knowledgeRefs.length}
           </button>
         ) : null}
         {span.knowledgeRefs.length > 0 ? (
           <button
             type="button"
-            onClick={() => void onCopy(span.knowledgeRefs.join("\n"), "knowledge refs")}
+            onClick={() => void onCopy(span.knowledgeRefs.join('\n'), 'knowledge refs')}
             className="rounded-full border border-white/8 bg-black/20 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-white/65 transition hover:bg-white/10"
           >
             Copy refs
@@ -408,7 +441,9 @@ function TraceSpanTree({
 
       {showKnowledge && span.knowledgeRefs.length > 0 ? (
         <div className="mt-3 rounded-xl border border-white/8 bg-black/20 p-2">
-          <div className="text-[10px] uppercase tracking-[0.16em] text-white/40">knowledge refs</div>
+          <div className="text-[10px] uppercase tracking-[0.16em] text-white/40">
+            knowledge refs
+          </div>
           <div className="mt-1 space-y-1">
             {span.knowledgeRefs.slice(0, 4).map((ref) => (
               <div key={ref} className="font-mono text-[10px] text-white/65">
@@ -425,11 +460,14 @@ function TraceSpanTree({
           <div className="mt-1 space-y-1">
             {previewEvents.map((event, index) => (
               <div key={`${event.timestamp}-${index}`} className="text-[11px] text-white/68">
-                <span className="font-mono text-white/45">{formatTs(event.timestamp)}</span> {event.name}
+                <span className="font-mono text-white/45">{formatTs(event.timestamp)}</span>{' '}
+                {event.name}
               </div>
             ))}
             {span.events.length > previewEvents.length ? (
-              <div className="text-[10px] text-white/40">+{span.events.length - previewEvents.length} more</div>
+              <div className="text-[10px] text-white/40">
+                +{span.events.length - previewEvents.length} more
+              </div>
             ) : null}
           </div>
         </div>
@@ -441,11 +479,14 @@ function TraceSpanTree({
           <div className="mt-1 space-y-1">
             {previewArtifacts.map((artifact, index) => (
               <div key={`${artifact.timestamp}-${index}`} className="text-[11px] text-white/68">
-                <span className="font-mono text-white/45">{artifact.type}</span> {artifact.description || artifact.path}
+                <span className="font-mono text-white/45">{artifact.type}</span>{' '}
+                {artifact.description || artifact.path}
               </div>
             ))}
             {span.artifacts.length > previewArtifacts.length ? (
-              <div className="text-[10px] text-white/40">+{span.artifacts.length - previewArtifacts.length} more</div>
+              <div className="text-[10px] text-white/40">
+                +{span.artifacts.length - previewArtifacts.length} more
+              </div>
             ) : null}
           </div>
         </div>
@@ -454,7 +495,12 @@ function TraceSpanTree({
       {showChildren && span.children.length > 0 ? (
         <div className="mt-3 space-y-3">
           {span.children.map((child, index) => (
-            <TraceSpanTree key={`${child.spanId || child.name}-${index}`} span={child} depth={depth + 1} onCopy={onCopy} />
+            <TraceSpanTree
+              key={`${child.spanId || child.name}-${index}`}
+              span={child}
+              depth={depth + 1}
+              onCopy={onCopy}
+            />
           ))}
         </div>
       ) : null}
@@ -478,7 +524,7 @@ export function TraceViewer({ autoOpenRawTrace = false }: { autoOpenRawTrace?: b
   const [rawTraceLoading, setRawTraceLoading] = useState(false);
   const [rawTraceError, setRawTraceError] = useState<string | null>(null);
   const [rawTraceVisible, setRawTraceVisible] = useState(false);
-  const [rawTraceFocusTraceId, setRawTraceFocusTraceId] = useState<string>("");
+  const [rawTraceFocusTraceId, setRawTraceFocusTraceId] = useState<string>('');
   const [rawTraceFocusHistory, setRawTraceFocusHistory] = useState<string[]>([]);
   const [rawTraceLoadedTraceId, setRawTraceLoadedTraceId] = useState<string | null>(null);
 
@@ -513,7 +559,7 @@ export function TraceViewer({ autoOpenRawTrace = false }: { autoOpenRawTrace?: b
         setListError(null);
         const response = await fetch(buildTraceFeedUrl(12, filters, refreshTick), {
           signal: controller.signal,
-          cache: "no-store",
+          cache: 'no-store',
         });
         if (!response.ok) {
           throw new Error(`Trace feed request failed (${response.status})`);
@@ -521,7 +567,7 @@ export function TraceViewer({ autoOpenRawTrace = false }: { autoOpenRawTrace?: b
         const payload = (await response.json()) as TraceFeedResponse;
         setData(payload);
       } catch (err) {
-        if ((err as Error)?.name === "AbortError") return;
+        if ((err as Error)?.name === 'AbortError') return;
         setListError(err instanceof Error ? err.message : String(err));
       } finally {
         setLoadingList(false);
@@ -539,7 +585,8 @@ export function TraceViewer({ autoOpenRawTrace = false }: { autoOpenRawTrace?: b
       return;
     }
 
-    const currentExists = selectedTraceId && data.traces.some((trace) => trace.traceId === selectedTraceId);
+    const currentExists =
+      selectedTraceId && data.traces.some((trace) => trace.traceId === selectedTraceId);
     if (!currentExists) {
       setSelectedTraceId(data.traces[0].traceId);
     }
@@ -552,7 +599,7 @@ export function TraceViewer({ autoOpenRawTrace = false }: { autoOpenRawTrace?: b
       if (!visibleTraces.length) return;
 
       const normalized = event.key.toLowerCase();
-      if (normalized === "r") {
+      if (normalized === 'r') {
         event.preventDefault();
         setRawTraceVisible((current) => !current);
         return;
@@ -564,8 +611,8 @@ export function TraceViewer({ autoOpenRawTrace = false }: { autoOpenRawTrace?: b
       setSelectedTraceId(nextTraceId);
     };
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedTraceId, visibleTraces]);
 
   useEffect(() => {
@@ -580,17 +627,20 @@ export function TraceViewer({ autoOpenRawTrace = false }: { autoOpenRawTrace?: b
       try {
         setLoadingDetail(true);
         setDetailError(null);
-        const response = await fetch(`/api/traces?traceId=${encodeURIComponent(selectedTraceId)}&_=${refreshTick}`, {
-          signal: controller.signal,
-          cache: "no-store",
-        });
+        const response = await fetch(
+          `/api/traces?traceId=${encodeURIComponent(selectedTraceId)}&_=${refreshTick}`,
+          {
+            signal: controller.signal,
+            cache: 'no-store',
+          }
+        );
         if (!response.ok) {
           throw new Error(`Trace detail request failed (${response.status})`);
         }
         const payload = (await response.json()) as TraceDetailResponse;
         setSelectedTrace(payload.trace);
       } catch (err) {
-        if ((err as Error)?.name === "AbortError") return;
+        if ((err as Error)?.name === 'AbortError') return;
         setDetailError(err instanceof Error ? err.message : String(err));
       } finally {
         setLoadingDetail(false);
@@ -629,9 +679,9 @@ export function TraceViewer({ autoOpenRawTrace = false }: { autoOpenRawTrace?: b
   const visibleTraces = useMemo(
     () =>
       [...traces].sort((a, b) => {
-        if (sort === "newest") return b.persistedAt.localeCompare(a.persistedAt);
-        if (sort === "oldest") return a.persistedAt.localeCompare(b.persistedAt);
-        if (sort === "largest") {
+        if (sort === 'newest') return b.persistedAt.localeCompare(a.persistedAt);
+        if (sort === 'oldest') return a.persistedAt.localeCompare(b.persistedAt);
+        if (sort === 'largest') {
           const countDelta = b.spanCount - a.spanCount;
           if (countDelta !== 0) return countDelta;
           const errorDelta = b.errorCount - a.errorCount;
@@ -642,11 +692,11 @@ export function TraceViewer({ autoOpenRawTrace = false }: { autoOpenRawTrace?: b
         const errorDelta = b.errorCount - a.errorCount;
         if (errorDelta !== 0) return errorDelta;
 
-        const statusRank = (status: TraceFeedRecord["status"]): number => {
+        const statusRank = (status: TraceFeedRecord['status']): number => {
           switch (status) {
-            case "error":
+            case 'error':
               return 0;
-            case "in_progress":
+            case 'in_progress':
               return 1;
             default:
               return 2;
@@ -658,26 +708,42 @@ export function TraceViewer({ autoOpenRawTrace = false }: { autoOpenRawTrace?: b
 
         return b.persistedAt.localeCompare(a.persistedAt);
       }),
-    [sort, traces],
+    [sort, traces]
   );
   const selectedSummary = useMemo(
-    () => visibleTraces.find((trace) => trace.traceId === selectedTraceId) || visibleTraces[0] || null,
-    [selectedTraceId, visibleTraces],
+    () =>
+      visibleTraces.find((trace) => trace.traceId === selectedTraceId) || visibleTraces[0] || null,
+    [selectedTraceId, visibleTraces]
   );
   const missionOptions = useMemo(
-    () => [...new Set(visibleTraces.map((trace) => trace.missionId).filter((value): value is string => Boolean(value)))],
-    [visibleTraces],
+    () => [
+      ...new Set(
+        visibleTraces
+          .map((trace) => trace.missionId)
+          .filter((value): value is string => Boolean(value))
+      ),
+    ],
+    [visibleTraces]
   );
   const actuatorOptions = useMemo(
-    () => [...new Set(visibleTraces.map((trace) => trace.actuator).filter((value): value is string => Boolean(value)))],
-    [visibleTraces],
+    () => [
+      ...new Set(
+        visibleTraces
+          .map((trace) => trace.actuator)
+          .filter((value): value is string => Boolean(value))
+      ),
+    ],
+    [visibleTraces]
   );
 
   async function copyText(value: string, label: string): Promise<void> {
     try {
       await navigator.clipboard.writeText(value);
       setCopiedValue(label);
-      window.setTimeout(() => setCopiedValue((current) => (current === label ? null : current)), 1600);
+      window.setTimeout(
+        () => setCopiedValue((current) => (current === label ? null : current)),
+        1600
+      );
     } catch {
       setCopiedValue(`copy failed: ${label}`);
       window.setTimeout(() => setCopiedValue(null), 1600);
@@ -687,7 +753,7 @@ export function TraceViewer({ autoOpenRawTrace = false }: { autoOpenRawTrace?: b
   async function openRawTraceFile(tracePath: string, traceId?: string): Promise<void> {
     const path = tracePath.trim();
     if (!path) return;
-    const focusTraceId = traceId?.trim() || selectedTraceId || "";
+    const focusTraceId = traceId?.trim() || selectedTraceId || '';
     setRawTraceLoadedTraceId(selectedTraceId);
     setRawTraceVisible(true);
     setRawTraceLoading(true);
@@ -697,7 +763,7 @@ export function TraceViewer({ autoOpenRawTrace = false }: { autoOpenRawTrace?: b
     setRawTraceFocusHistory((current) => buildTraceFocusHistory(current, focusTraceId));
     try {
       const response = await fetch(`/api/trace-log?path=${encodeURIComponent(path)}`, {
-        cache: "no-store",
+        cache: 'no-store',
       });
       const text = await response.text();
       if (!response.ok) {
@@ -720,7 +786,7 @@ export function TraceViewer({ autoOpenRawTrace = false }: { autoOpenRawTrace?: b
     setFilters(DEFAULT_FILTERS);
     setSort(DEFAULT_SORT);
     setSelectedTraceId(null);
-    setRawTraceFocusTraceId("");
+    setRawTraceFocusTraceId('');
     setRawTraceFocusHistory([]);
     setRawTraceVisible(false);
   }
@@ -732,8 +798,8 @@ export function TraceViewer({ autoOpenRawTrace = false }: { autoOpenRawTrace?: b
           <p className="text-xs uppercase tracking-[0.35em] text-white/45">Trace Viewer</p>
           <h3 className="text-2xl font-semibold">Execution traces</h3>
           <p className="max-w-2xl text-sm leading-6 text-white/70">
-            Chronos reads persisted JSONL traces from the shared runtime log and surfaces the latest execution summaries,
-            span trees, events, artifact references, and filterable search.
+            Chronos reads persisted JSONL traces from the shared runtime log and surfaces the latest
+            execution summaries, span trees, events, artifact references, and filterable search.
           </p>
         </div>
         <button
@@ -755,7 +821,9 @@ export function TraceViewer({ autoOpenRawTrace = false }: { autoOpenRawTrace?: b
           <Search className="h-4 w-4 text-white/45" />
           <input
             value={filters.query}
-            onChange={(event) => setFilters((current) => ({ ...current, query: event.target.value }))}
+            onChange={(event) =>
+              setFilters((current) => ({ ...current, query: event.target.value }))
+            }
             placeholder="Search trace ID, mission, actuator, or root span"
             className="w-full bg-transparent text-sm text-white placeholder:text-white/30 outline-none"
           />
@@ -765,7 +833,10 @@ export function TraceViewer({ autoOpenRawTrace = false }: { autoOpenRawTrace?: b
           onChange={(event) =>
             setFilters((current) => ({
               ...current,
-              status: event.target.value === "all" ? "all" : (event.target.value as TraceFilters["status"]),
+              status:
+                event.target.value === 'all'
+                  ? 'all'
+                  : (event.target.value as TraceFilters['status']),
             }))
           }
           className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none"
@@ -777,7 +848,9 @@ export function TraceViewer({ autoOpenRawTrace = false }: { autoOpenRawTrace?: b
         </select>
         <select
           value={filters.missionId}
-          onChange={(event) => setFilters((current) => ({ ...current, missionId: event.target.value }))}
+          onChange={(event) =>
+            setFilters((current) => ({ ...current, missionId: event.target.value }))
+          }
           className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none"
         >
           <option value="">All missions</option>
@@ -789,7 +862,9 @@ export function TraceViewer({ autoOpenRawTrace = false }: { autoOpenRawTrace?: b
         </select>
         <select
           value={filters.actuator}
-          onChange={(event) => setFilters((current) => ({ ...current, actuator: event.target.value }))}
+          onChange={(event) =>
+            setFilters((current) => ({ ...current, actuator: event.target.value }))
+          }
           className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none"
         >
           <option value="">All actuators</option>
@@ -842,7 +917,7 @@ export function TraceViewer({ autoOpenRawTrace = false }: { autoOpenRawTrace?: b
             <SurfaceStatusPanel
               eyebrow="No matches"
               title="No traces matched the current filters"
-              detail={`Try clearing the filters or refreshing. The trace directory is ${data?.traceDir ?? "active/shared/logs/traces"}.`}
+              detail={`Try clearing the filters or refreshing. The trace directory is ${data?.traceDir ?? 'active/shared/logs/traces'}.`}
               tone="warning"
               actionLabel="Reset filters"
               onAction={resetTraceViewerPrefs}
@@ -861,23 +936,25 @@ export function TraceViewer({ autoOpenRawTrace = false }: { autoOpenRawTrace?: b
                   onClick={() => setSelectedTraceId(trace.traceId)}
                   className={`w-full rounded-2xl border p-4 text-left transition ${
                     selected
-                      ? "border-cyan-300/35 bg-cyan-500/12 shadow-[0_0_0_1px_rgba(103,232,249,0.12)]"
-                      : "border-white/10 bg-black/20 hover:border-white/20 hover:bg-black/30"
+                      ? 'border-cyan-300/35 bg-cyan-500/12 shadow-[0_0_0_1px_rgba(103,232,249,0.12)]'
+                      : 'border-white/10 bg-black/20 hover:border-white/20 hover:bg-black/30'
                   }`}
                 >
                   <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div className="space-y-2">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-mono text-xs text-white/55">{trace.traceId}</span>
-                        <span className={`rounded-full border px-2 py-0.5 text-[11px] uppercase tracking-[0.24em] ${statusTone(trace.status)}`}>
+                        <span
+                          className={`rounded-full border px-2 py-0.5 text-[11px] uppercase tracking-[0.24em] ${statusTone(trace.status)}`}
+                        >
                           {trace.status}
                         </span>
                       </div>
                       <h4 className="text-lg font-medium text-white">{trace.rootSpanName}</h4>
                       <p className="text-sm text-white/65">
-                        {trace.missionId ? `mission ${trace.missionId}` : "mission unknown"}
-                        {trace.pipelineId ? ` · pipeline ${trace.pipelineId}` : ""}
-                        {trace.actuator ? ` · ${trace.actuator}` : ""}
+                        {trace.missionId ? `mission ${trace.missionId}` : 'mission unknown'}
+                        {trace.pipelineId ? ` · pipeline ${trace.pipelineId}` : ''}
+                        {trace.actuator ? ` · ${trace.actuator}` : ''}
                       </p>
                     </div>
                     <div className="grid grid-cols-2 gap-2 text-xs text-white/65 md:text-right">
@@ -899,7 +976,9 @@ export function TraceViewer({ autoOpenRawTrace = false }: { autoOpenRawTrace?: b
                       </div>
                       <div>
                         <div className="text-white/40">errors</div>
-                        <div className={trace.errorCount > 0 ? "text-rose-200" : undefined}>{trace.errorCount}</div>
+                        <div className={trace.errorCount > 0 ? 'text-rose-200' : undefined}>
+                          {trace.errorCount}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -912,7 +991,9 @@ export function TraceViewer({ autoOpenRawTrace = false }: { autoOpenRawTrace?: b
         <aside className="space-y-3 rounded-2xl border border-white/10 bg-black/20 p-4">
           <div className="space-y-1">
             <p className="text-xs uppercase tracking-[0.3em] text-white/45">Selected Trace</p>
-            <h4 className="text-lg font-semibold text-white">{selectedSummary?.rootSpanName ?? "No trace loaded"}</h4>
+            <h4 className="text-lg font-semibold text-white">
+              {selectedSummary?.rootSpanName ?? 'No trace loaded'}
+            </h4>
           </div>
 
           {loadingDetail && (
@@ -937,7 +1018,9 @@ export function TraceViewer({ autoOpenRawTrace = false }: { autoOpenRawTrace?: b
           {selectedTrace ? (
             <div className="space-y-3 text-sm text-white/70">
               <div className="flex flex-wrap gap-2">
-                <span className={`rounded-full border px-2 py-0.5 text-[11px] uppercase tracking-[0.22em] ${statusTone(selectedTrace.status)}`}>
+                <span
+                  className={`rounded-full border px-2 py-0.5 text-[11px] uppercase tracking-[0.22em] ${statusTone(selectedTrace.status)}`}
+                >
                   {selectedTrace.status}
                 </span>
                 {selectedTrace.missionId ? (
@@ -963,19 +1046,23 @@ export function TraceViewer({ autoOpenRawTrace = false }: { autoOpenRawTrace?: b
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => void copyText(selectedTrace.traceId, "trace id")}
+                  onClick={() => void copyText(selectedTrace.traceId, 'trace id')}
                   className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] text-white/75 transition hover:bg-white/10"
                 >
                   Copy trace id
                 </button>
                 <button
                   type="button"
-                  onClick={() => void copyText(selectedTrace.tracePath, "trace path")}
+                  onClick={() => void copyText(selectedTrace.tracePath, 'trace path')}
                   className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] text-white/75 transition hover:bg-white/10"
                 >
                   Copy trace path
                 </button>
-                {copiedValue ? <span className="text-[11px] uppercase tracking-[0.18em] text-emerald-200">{copiedValue}</span> : null}
+                {copiedValue ? (
+                  <span className="text-[11px] uppercase tracking-[0.18em] text-emerald-200">
+                    {copiedValue}
+                  </span>
+                ) : null}
               </div>
 
               <dl className="space-y-2">
@@ -994,8 +1081,9 @@ export function TraceViewer({ autoOpenRawTrace = false }: { autoOpenRawTrace?: b
                 <div>
                   <dt className="text-white/40">Counts</dt>
                   <dd>
-                    {selectedTrace.spanCount} spans, {selectedTrace.eventCount} events, {selectedTrace.artifactCount} artifacts
-                    {selectedTrace.errorCount > 0 ? `, ${selectedTrace.errorCount} errors` : ""}
+                    {selectedTrace.spanCount} spans, {selectedTrace.eventCount} events,{' '}
+                    {selectedTrace.artifactCount} artifacts
+                    {selectedTrace.errorCount > 0 ? `, ${selectedTrace.errorCount} errors` : ''}
                   </dd>
                 </div>
                 <div>
@@ -1010,7 +1098,9 @@ export function TraceViewer({ autoOpenRawTrace = false }: { autoOpenRawTrace?: b
 
               <button
                 type="button"
-                onClick={() => void openRawTraceFile(selectedTrace.tracePath, selectedTrace.traceId)}
+                onClick={() =>
+                  void openRawTraceFile(selectedTrace.tracePath, selectedTrace.traceId)
+                }
                 className="w-full rounded-2xl border border-dashed border-white/15 bg-white/5 p-3 text-left font-mono text-[11px] text-white/60 transition hover:border-cyan-300/25 hover:bg-cyan-500/8"
               >
                 {selectedTrace.tracePath}
@@ -1019,7 +1109,9 @@ export function TraceViewer({ autoOpenRawTrace = false }: { autoOpenRawTrace?: b
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => void openRawTraceFile(selectedTrace.tracePath, selectedTrace.traceId)}
+                  onClick={() =>
+                    void openRawTraceFile(selectedTrace.tracePath, selectedTrace.traceId)
+                  }
                   className="rounded-full border border-cyan-300/20 bg-cyan-500/10 px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] text-cyan-100 transition hover:bg-cyan-500/15"
                 >
                   Open raw trace
@@ -1027,7 +1119,7 @@ export function TraceViewer({ autoOpenRawTrace = false }: { autoOpenRawTrace?: b
                 <button
                   type="button"
                   disabled={!rawTraceText}
-                  onClick={() => void copyText(rawTraceText || "", "focused raw record")}
+                  onClick={() => void copyText(rawTraceText || '', 'focused raw record')}
                   className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] text-white/75 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Copy focused record
@@ -1037,19 +1129,23 @@ export function TraceViewer({ autoOpenRawTrace = false }: { autoOpenRawTrace?: b
                   onClick={() => setRawTraceVisible((value) => !value)}
                   className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] text-white/75 transition hover:bg-white/10"
                 >
-                  {rawTraceVisible ? "Hide" : "Show"} raw trace
+                  {rawTraceVisible ? 'Hide' : 'Show'} raw trace
                 </button>
               </div>
 
               {rawTraceVisible ? (
                 <div className="rounded-2xl border border-white/10 bg-black/30 p-3">
                   <div className="flex items-center justify-between gap-2">
-                    <div className="text-xs uppercase tracking-[0.24em] text-white/40">Raw trace log</div>
+                    <div className="text-xs uppercase tracking-[0.24em] text-white/40">
+                      Raw trace log
+                    </div>
                     <div className="text-[11px] text-white/45">{selectedTrace.tracePath}</div>
                   </div>
                   {rawTraceFocusHistory.length > 1 ? (
                     <div className="mt-3 flex flex-wrap gap-2">
-                      <div className="text-[10px] uppercase tracking-[0.18em] text-white/40">recent</div>
+                      <div className="text-[10px] uppercase tracking-[0.18em] text-white/40">
+                        recent
+                      </div>
                       {rawTraceFocusHistory.map((traceId) => (
                         <button
                           key={traceId}
@@ -1060,8 +1156,8 @@ export function TraceViewer({ autoOpenRawTrace = false }: { autoOpenRawTrace?: b
                           }}
                           className={`rounded-full border px-2 py-1 font-mono text-[10px] uppercase tracking-[0.16em] transition ${
                             traceId === rawTraceFocusTraceId
-                              ? "border-cyan-300/30 bg-cyan-500/10 text-cyan-100"
-                              : "border-white/8 bg-black/20 text-white/60 hover:bg-white/10"
+                              ? 'border-cyan-300/30 bg-cyan-500/10 text-cyan-100'
+                              : 'border-white/8 bg-black/20 text-white/60 hover:bg-white/10'
                           }`}
                         >
                           {traceId}
@@ -1071,7 +1167,9 @@ export function TraceViewer({ autoOpenRawTrace = false }: { autoOpenRawTrace?: b
                   ) : null}
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <label className="flex min-w-[14rem] flex-1 items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/70">
-                      <span className="text-[10px] uppercase tracking-[0.18em] text-white/45">trace id</span>
+                      <span className="text-[10px] uppercase tracking-[0.18em] text-white/45">
+                        trace id
+                      </span>
                       <input
                         value={rawTraceFocusTraceId}
                         onChange={(event) => setRawTraceFocusTraceId(event.target.value)}
