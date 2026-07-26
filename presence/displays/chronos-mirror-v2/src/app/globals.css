@@ -12,13 +12,34 @@
   --kb-accent: #0066cc;
   --kb-warning: #eab308;
   --kb-text-primary: #0f172a;
-  --kb-text-secondary: rgba(15, 23, 42, 0.62);
-  --kb-accent-text: #0066cc;
+  --kb-text-secondary: #334155;
+  --kb-text-muted: #475569;
+  --kb-text-subtle: #64748b;
+  --kb-text-inverse: #ffffff;
+  --kb-accent-text: #00529c;
+  --kb-accent-border: #1d4ed8;
   --kb-surface: #f1f5f9;
+  --kb-surface-raised: rgba(15, 23, 42, 0.04);
+  --kb-surface-raised-subtle: rgba(15, 23, 42, 0.025);
+  --kb-surface-sunken: rgba(15, 23, 42, 0.08);
+  --kb-surface-well: rgba(15, 23, 42, 0.12);
+  --kb-surface-accent: rgba(0, 102, 204, 0.1);
   --kb-muted-text: #475569;
   --kb-border: #e2e8f0;
   --kb-success: #15803d;
   --kb-danger: #b91c1c;
+  --kb-status-positive: #166534;
+  --kb-status-negative: #991b1b;
+  --kb-status-warning: #78350f;
+  --kb-status-info: #075985;
+  --kb-status-positive-surface: rgba(22, 101, 52, 0.1);
+  --kb-status-negative-surface: rgba(185, 28, 28, 0.1);
+  --kb-status-warning-surface: rgba(146, 64, 14, 0.1);
+  --kb-status-info-surface: rgba(7, 89, 133, 0.1);
+  --kb-status-positive-border: rgba(22, 101, 52, 0.35);
+  --kb-status-negative-border: rgba(185, 28, 28, 0.35);
+  --kb-status-warning-border: rgba(146, 64, 14, 0.35);
+  --kb-status-info-border: rgba(7, 89, 133, 0.35);
   --kb-font-sans: Inter, 'Noto Sans JP', sans-serif;
   --kb-font-mono: 'JetBrains Mono', monospace;
   --kb-blur: blur(12px);
@@ -28,21 +49,42 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #020617;
-    --foreground: #F8FAFC;
+    --foreground: #f8fafc;
     --kb-bg-main: #020617;
     --kb-panel-bg: rgba(10, 25, 47, 0.82);
-    --kb-primary: #0A192F;
-    --kb-secondary: #31415B;
-    --kb-accent: #00F2FF;
+    --kb-primary: #0a192f;
+    --kb-secondary: #31415b;
+    --kb-accent: #00f2ff;
     --kb-warning: #f59e0b;
-    --kb-text-primary: #F8FAFC;
-    --kb-text-secondary: rgba(248, 250, 252, 0.62);
-    --kb-accent-text: #00F2FF;
+    --kb-text-primary: #f8fafc;
+    --kb-text-secondary: #cbd5e1;
+    --kb-text-muted: #94a3b8;
+    --kb-text-subtle: #94a3b8;
+    --kb-text-inverse: #020617;
+    --kb-accent-text: #00f2ff;
+    --kb-accent-border: #67e8f9;
     --kb-surface: #0f172a;
+    --kb-surface-raised: rgba(255, 255, 255, 0.05);
+    --kb-surface-raised-subtle: rgba(255, 255, 255, 0.03);
+    --kb-surface-sunken: rgba(0, 0, 0, 0.2);
+    --kb-surface-well: rgba(0, 0, 0, 0.4);
+    --kb-surface-accent: rgba(0, 242, 255, 0.1);
     --kb-muted-text: #94a3b8;
     --kb-border: #1e293b;
     --kb-success: #4ade80;
     --kb-danger: #f87171;
+    --kb-status-positive: #86efac;
+    --kb-status-negative: #fca5a5;
+    --kb-status-warning: #fcd34d;
+    --kb-status-info: #7dd3fc;
+    --kb-status-positive-surface: rgba(34, 197, 94, 0.15);
+    --kb-status-negative-surface: rgba(239, 68, 68, 0.15);
+    --kb-status-warning-surface: rgba(245, 158, 11, 0.15);
+    --kb-status-info-surface: rgba(34, 211, 238, 0.15);
+    --kb-status-positive-border: rgba(74, 222, 128, 0.35);
+    --kb-status-negative-border: rgba(248, 113, 113, 0.35);
+    --kb-status-warning-border: rgba(252, 211, 77, 0.35);
+    --kb-status-info-border: rgba(103, 232, 249, 0.35);
   }
 }
 
@@ -57,38 +99,224 @@
   --kb-accent: #0066cc;
   --kb-warning: #eab308;
   --kb-text-primary: #0f172a;
-  --kb-text-secondary: rgba(15, 23, 42, 0.62);
-  --kb-accent-text: #0066cc;
+  --kb-text-secondary: #334155;
+  --kb-text-muted: #475569;
+  --kb-text-subtle: #64748b;
+  --kb-text-inverse: #ffffff;
+  --kb-accent-text: #00529c;
+  --kb-accent-border: #1d4ed8;
   --kb-surface: #f1f5f9;
+  --kb-surface-raised: rgba(15, 23, 42, 0.04);
+  --kb-surface-raised-subtle: rgba(15, 23, 42, 0.025);
+  --kb-surface-sunken: rgba(15, 23, 42, 0.08);
+  --kb-surface-well: rgba(15, 23, 42, 0.12);
+  --kb-surface-accent: rgba(0, 102, 204, 0.1);
   --kb-muted-text: #475569;
   --kb-border: #e2e8f0;
   --kb-success: #15803d;
   --kb-danger: #b91c1c;
+  --kb-status-positive: #166534;
+  --kb-status-negative: #991b1b;
+  --kb-status-warning: #78350f;
+  --kb-status-info: #075985;
+  --kb-status-positive-surface: rgba(22, 101, 52, 0.1);
+  --kb-status-negative-surface: rgba(185, 28, 28, 0.1);
+  --kb-status-warning-surface: rgba(146, 64, 14, 0.1);
+  --kb-status-info-surface: rgba(7, 89, 133, 0.1);
+  --kb-status-positive-border: rgba(22, 101, 52, 0.35);
+  --kb-status-negative-border: rgba(185, 28, 28, 0.35);
+  --kb-status-warning-border: rgba(146, 64, 14, 0.35);
+  --kb-status-info-border: rgba(7, 89, 133, 0.35);
 }
 
 [data-theme='dark'] {
   color-scheme: dark;
   --background: #020617;
-  --foreground: #F8FAFC;
+  --foreground: #f8fafc;
   --kb-bg-main: #020617;
   --kb-panel-bg: rgba(10, 25, 47, 0.82);
-  --kb-primary: #0A192F;
-  --kb-secondary: #31415B;
-  --kb-accent: #00F2FF;
+  --kb-primary: #0a192f;
+  --kb-secondary: #31415b;
+  --kb-accent: #00f2ff;
   --kb-warning: #f59e0b;
-  --kb-text-primary: #F8FAFC;
-  --kb-text-secondary: rgba(248, 250, 252, 0.62);
-  --kb-accent-text: #00F2FF;
+  --kb-text-primary: #f8fafc;
+  --kb-text-secondary: #cbd5e1;
+  --kb-text-muted: #94a3b8;
+  --kb-text-subtle: #94a3b8;
+  --kb-text-inverse: #020617;
+  --kb-accent-text: #00f2ff;
+  --kb-accent-border: #67e8f9;
   --kb-surface: #0f172a;
+  --kb-surface-raised: rgba(255, 255, 255, 0.05);
+  --kb-surface-raised-subtle: rgba(255, 255, 255, 0.03);
+  --kb-surface-sunken: rgba(0, 0, 0, 0.2);
+  --kb-surface-well: rgba(0, 0, 0, 0.4);
+  --kb-surface-accent: rgba(0, 242, 255, 0.1);
   --kb-muted-text: #94a3b8;
   --kb-border: #1e293b;
   --kb-success: #4ade80;
   --kb-danger: #f87171;
+  --kb-status-positive: #86efac;
+  --kb-status-negative: #fca5a5;
+  --kb-status-warning: #fcd34d;
+  --kb-status-info: #7dd3fc;
+  --kb-status-positive-surface: rgba(34, 197, 94, 0.15);
+  --kb-status-negative-surface: rgba(239, 68, 68, 0.15);
+  --kb-status-warning-surface: rgba(245, 158, 11, 0.15);
+  --kb-status-info-surface: rgba(34, 211, 238, 0.15);
+  --kb-status-positive-border: rgba(74, 222, 128, 0.35);
+  --kb-status-negative-border: rgba(248, 113, 113, 0.35);
+  --kb-status-warning-border: rgba(252, 211, 77, 0.35);
+  --kb-status-info-border: rgba(103, 232, 249, 0.35);
+}
+
+@layer components {
+  .kb-text-primary {
+    color: var(--kb-text-primary);
+  }
+  .kb-text-secondary {
+    color: var(--kb-text-secondary);
+  }
+  .kb-text-muted {
+    color: var(--kb-text-muted);
+  }
+  .kb-text-subtle {
+    color: var(--kb-text-subtle);
+  }
+  .kb-text-accent {
+    color: var(--kb-accent-text);
+  }
+  .kb-text-inverse {
+    color: var(--kb-text-inverse);
+  }
+  .kb-surface-raised {
+    background-color: var(--kb-surface-raised);
+  }
+  .kb-surface-raised-subtle {
+    background-color: var(--kb-surface-raised-subtle);
+  }
+  .kb-surface-sunken {
+    background-color: var(--kb-surface-sunken);
+  }
+  .kb-surface-well {
+    background-color: var(--kb-surface-well);
+  }
+  .kb-surface-accent {
+    background-color: var(--kb-surface-accent);
+  }
+  .kb-border-subtle {
+    border-color: var(--kb-border);
+  }
+  .kb-border-accent {
+    border-color: var(--kb-accent-border);
+  }
+  .kb-status-positive {
+    color: var(--kb-status-positive);
+  }
+  .kb-status-negative {
+    color: var(--kb-status-negative);
+  }
+  .kb-status-warning {
+    color: var(--kb-status-warning);
+  }
+  .kb-status-info {
+    color: var(--kb-status-info);
+  }
+  .kb-status-positive-surface {
+    background-color: var(--kb-status-positive-surface);
+  }
+  .kb-status-negative-surface {
+    background-color: var(--kb-status-negative-surface);
+  }
+  .kb-status-warning-surface {
+    background-color: var(--kb-status-warning-surface);
+  }
+  .kb-status-info-surface {
+    background-color: var(--kb-status-info-surface);
+  }
+  .kb-status-positive-border {
+    border-color: var(--kb-status-positive-border);
+  }
+  .kb-status-negative-border {
+    border-color: var(--kb-status-negative-border);
+  }
+  .kb-status-warning-border {
+    border-color: var(--kb-status-warning-border);
+  }
+  .kb-status-info-border {
+    border-color: var(--kb-status-info-border);
+  }
+  .kb-accent-fill {
+    background-color: var(--kb-accent);
+  }
+  .hover\\:kb-surface-raised:hover {
+    background-color: var(--kb-surface-raised);
+  }
+  .hover\\:kb-surface-sunken:hover {
+    background-color: var(--kb-surface-sunken);
+  }
+  .hover\\:kb-surface-accent:hover {
+    background-color: var(--kb-surface-accent);
+  }
+  .hover\\:kb-surface-well:hover {
+    background-color: var(--kb-surface-well);
+  }
+  .hover\\:kb-border-accent:hover {
+    border-color: var(--kb-accent-border);
+  }
+  .hover\\:kb-border-subtle:hover {
+    border-color: var(--kb-border);
+  }
+  .hover\\:kb-text-primary:hover {
+    color: var(--kb-text-primary);
+  }
+  .hover\\:kb-text-secondary:hover {
+    color: var(--kb-text-secondary);
+  }
+  .hover\\:kb-text-accent:hover {
+    color: var(--kb-accent-text);
+  }
+  .hover\\:kb-status-negative:hover {
+    color: var(--kb-status-negative);
+  }
+  .hover\\:kb-status-warning:hover {
+    color: var(--kb-status-warning);
+  }
+  .hover\\:kb-status-negative-border:hover {
+    border-color: var(--kb-status-negative-border);
+  }
+  .hover\\:kb-status-warning-border:hover {
+    border-color: var(--kb-status-warning-border);
+  }
+  .hover\\:kb-status-negative-surface:hover {
+    background-color: var(--kb-status-negative-surface);
+  }
+  .hover\\:kb-status-warning-surface:hover {
+    background-color: var(--kb-status-warning-surface);
+  }
+  .hover\\:kb-status-positive-surface:hover {
+    background-color: var(--kb-status-positive-surface);
+  }
+  .hover\\:kb-status-positive:hover {
+    color: var(--kb-status-positive);
+  }
+  .hover\\:kb-status-info-surface:hover {
+    background-color: var(--kb-status-info-surface);
+  }
+  .hover\\:kb-status-warning-border:hover {
+    border-color: var(--kb-status-warning-border);
+  }
+  .focus\\:kb-status-warning-border:focus {
+    border-color: var(--kb-status-warning-border);
+  }
+  .focus\\:kb-border-accent:focus {
+    border-color: var(--kb-accent-border);
+  }
 }
 
 body {
   font-family: var(--kb-font-sans);
-  background: 
+  background:
     radial-gradient(circle at 50% 0%, rgba(0, 242, 255, 0.05) 0%, transparent 50%),
     var(--kb-bg-main);
   color: var(--kb-text-primary);
@@ -112,9 +340,16 @@ body {
 }
 
 @keyframes pulse-cyan {
-  0% { opacity: 0.6; }
-  50% { opacity: 1; text-shadow: var(--kb-glow-cyan); }
-  100% { opacity: 0.6; }
+  0% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+    text-shadow: var(--kb-glow-cyan);
+  }
+  100% {
+    opacity: 0.6;
+  }
 }
 
 .chronos-scroll {
