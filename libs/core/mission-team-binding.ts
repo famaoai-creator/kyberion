@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { findMissionPath, missionDir } from './path-resolver.js';
 import { deriveAgentNhiId, ensureAgentIdentityBestEffort, parseNhiId } from './agent-identity.js';
+import { parseDelegationChain, type DelegationChain } from './delegation-chain.js';
 import type { MissionTeamAssignment, MissionTeamPlan } from './mission-team-plan-composer.js';
 import {
   safeAppendFileSync,
@@ -93,6 +94,14 @@ export interface MissionExecutionLedgerEntry {
   actor_type?: MissionActorType;
   /** NI-01: durable identity (nhi_id) of the acting resource, when known. */
   runtime_identity?: string;
+  /**
+   * NI-03: root-first delegation chain (who delegated this work to whom —
+   * see delegation-chain.ts) at the moment the entry was written, so audits
+   * can reconstruct the full path (root user/orchestrator → every
+   * intermediate actor) from the ledger alone. Optional/additive: chain-less
+   * entries are unchanged.
+   */
+  delegation_chain?: DelegationChain;
   decision?: string;
   evidence?: string[];
   source_event_id?: string;
@@ -395,6 +404,23 @@ function resolveLedgerRuntimeIdentity(
   }
 }
 
+/**
+ * NI-03: resolve the entry's delegation chain — a typed `delegation_chain`
+ * input wins; otherwise a chain riding in `payload.delegation_chain` (the
+ * mission-task-events pass-through: emitMissionTaskEvent forwards event
+ * payloads verbatim, so the worker stamps the chain there and this seam
+ * promotes it to the first-class ledger column). Best-effort: a malformed
+ * payload chain is dropped, never fails the append.
+ */
+function resolveLedgerDelegationChain(
+  input: AppendMissionExecutionLedgerEntryInput
+): DelegationChain | undefined {
+  if (input.delegation_chain) return input.delegation_chain;
+  const fromPayload = input.payload?.delegation_chain;
+  if (fromPayload === undefined) return undefined;
+  return parseDelegationChain(fromPayload) ?? undefined;
+}
+
 export function appendMissionExecutionLedgerEntry(
   input: AppendMissionExecutionLedgerEntryInput
 ): string {
@@ -407,6 +433,7 @@ export function appendMissionExecutionLedgerEntry(
     actor_id: input.actor_id,
     actor_type: input.actor_type,
     runtime_identity: resolveLedgerRuntimeIdentity(input, missionId),
+    delegation_chain: resolveLedgerDelegationChain(input),
     decision: input.decision,
     evidence: input.evidence,
     source_event_id: input.source_event_id,
