@@ -1,6 +1,14 @@
 #!/usr/bin/env node
 
-import { pathResolver, safeReadFile } from '@agent/core';
+import {
+  createChronosWebThemePack,
+  createCompanionWebThemePack,
+  createConciergeWebThemePack,
+  pathResolver,
+  safeReadFile,
+  webThemePackToCssVars,
+  type WebThemePack,
+} from '@agent/core';
 
 type Palette = Record<string, string>;
 
@@ -134,6 +142,63 @@ function checkPalette(
   return violations;
 }
 
+/**
+ * The static token files below are hand-authored, so they were the only thing
+ * this check covered. But every web surface renders from `--kb-*` vars that are
+ * DERIVED from a theme pack at runtime, and that derivation is where the
+ * readability regressions actually happen: `--kb-panel-bg` used to be
+ * `primary @ 0.82` for every theme, which made light themes paint dark text on
+ * a dark panel (contrast 1.0) while the static files stayed innocent. Check the
+ * derived output too, for every pack a surface can serve.
+ */
+function checkDerivedWebThemePacks(): string[] {
+  const packs: Array<[string, WebThemePack]> = [
+    ['web.chronos-dark', createChronosWebThemePack('dark')],
+    ['web.chronos-light', createChronosWebThemePack('light')],
+    ['web.concierge', createConciergeWebThemePack()],
+    ['web.companion', createCompanionWebThemePack()],
+  ];
+
+  const pairs: ContrastPair[] = [
+    { label: 'body text', background: 'bg_main', foreground: 'text_primary', minRatio: 4.5 },
+    { label: 'secondary text', background: 'bg_main', foreground: 'text_secondary', minRatio: 4.5 },
+    { label: 'panel text', background: 'panel_bg', foreground: 'text_primary', minRatio: 4.5 },
+    {
+      label: 'panel secondary',
+      background: 'panel_bg',
+      foreground: 'text_secondary',
+      minRatio: 4.5,
+    },
+  ];
+
+  const violations: string[] = [];
+  for (const [name, pack] of packs) {
+    const cssVars = webThemePackToCssVars(pack);
+    const palette: Palette = {
+      bg_main: cssVars['--kb-bg-main'],
+      panel_bg: cssVars['--kb-panel-bg'],
+      text_primary: cssVars['--kb-text-primary'],
+      text_secondary: cssVars['--kb-text-secondary'],
+    };
+    // A translucent panel resolves against the page background, so blend it
+    // there rather than against the checker's default white.
+    violations.push(
+      ...checkPalette(name, palette, pairs, {
+        bg_main: cssVars['--kb-bg-main'],
+        panel_bg: cssVars['--kb-bg-main'],
+      })
+    );
+    // `--kb-border` is consumed everywhere as `1px solid var(--kb-border)`, so
+    // emitting a full `border` shorthand here silently invalidates it.
+    if (/\bsolid\b/.test(cssVars['--kb-border'] || '')) {
+      violations.push(
+        `[${name}] --kb-border must be a color, not a border shorthand (got "${cssVars['--kb-border']}")`
+      );
+    }
+  }
+  return violations;
+}
+
 function main(): void {
   const brandTokens = parseJson<{ tokens: { colors: { light: Palette; dark: Palette } } }>(
     pathResolver.rootResolve('knowledge/public/design-patterns/brand-tokens/kyberion.json')
@@ -198,6 +263,7 @@ function main(): void {
       ];
       return checkPalette(`theme.${themeId}`, colors, pairsForTheme);
     }),
+    ...checkDerivedWebThemePacks(),
   ];
 
   if (violations.length > 0) {
