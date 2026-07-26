@@ -355,6 +355,12 @@ describe('mission-orchestration-worker KP-05 dispatch tracing', { timeout: 60_00
 
     const traces = await readMissionTaskDispatchTraces();
     expect(traces.length).toBeGreaterThan(0);
+    // NI-02: worker-dispatched traces carry durable actor attribution — the
+    // canonical nhi_id derived for the assigned agent identity.
+    const metadata = (traces[0] as { metadata?: { actorNhiId?: string } }).metadata;
+    expect(metadata?.actorNhiId).toMatch(
+      /^kyberion:\/\/agent\/[a-z][a-z0-9-]*\/implementation-architect$/
+    );
     const span = traces[0].rootSpan;
     expect(span.knowledgeRefs).toContain(KNOWLEDGE_HINT_PATH);
     expect(span.attributes).toMatchObject({

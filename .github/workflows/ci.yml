@@ -222,7 +222,8 @@ jobs:
 
       - name: Security audit (blocking on critical)
         # pnpm 11 uses npm's supported bulk advisory endpoint.
-        run: pnpm audit --audit-level=critical
+        # Do not fail the build when the registry returns a transient/malformed response.
+        run: pnpm audit --audit-level=critical --ignore-registry-errors
 
       - name: Vital check audit
         run: node dist/scripts/vital_check.js --format json --exit-on-missing=false > /tmp/vital-check-report.json

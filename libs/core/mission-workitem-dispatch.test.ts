@@ -1320,6 +1320,38 @@ describe('mission work item dispatch', () => {
       targets: ['workitem', 'github', 'jira'],
     });
 
+    // AL-03: task-scoped disposable artifacts that must be GC'd when the
+    // task contract completes ('done'), plus evidence that must survive.
+    const missionRel = nodePath
+      .relative(pathResolver.rootDir(), missionPath)
+      .split(nodePath.sep)
+      .join('/');
+    safeMkdir(`${missionPath}/artifacts/cache/task-task-1`, { recursive: true });
+    safeWriteFile(`${missionPath}/artifacts/cache/task-task-1/tool-output.log`, 'disposable');
+    safeMkdir(`${missionPath}/artifacts/evidence/task-task-1`, { recursive: true });
+    safeWriteFile(`${missionPath}/artifacts/evidence/task-task-1/keep.md`, '# Keep');
+    safeWriteFile(
+      `${missionPath}/artifacts/artifacts-index.jsonl`,
+      [
+        JSON.stringify({
+          name: 'tool-output.log',
+          artifact_class: 'cache',
+          path: `${missionRel}/artifacts/cache/task-task-1/tool-output.log`,
+          scope: { mission: missionId, task: 'task-1' },
+          scope_kind: 'task',
+          written_at: new Date().toISOString(),
+        }),
+        JSON.stringify({
+          name: 'keep.md',
+          artifact_class: 'evidence',
+          path: `${missionRel}/artifacts/evidence/task-task-1/keep.md`,
+          scope: { mission: missionId, task: 'task-1' },
+          scope_kind: 'task',
+          written_at: new Date().toISOString(),
+        }),
+      ].join('\n') + '\n'
+    );
+
     const manifest = await dispatchMissionWorkItems(
       makeMissionState(),
       {
@@ -1387,6 +1419,19 @@ describe('mission work item dispatch', () => {
     expect(jiraArtifact.fields.status.name).toBe('Done');
     expect(Array.isArray(jiraArtifact.comments)).toBe(true);
     expect(jiraArtifact.comments.length).toBeGreaterThan(0);
+
+    // AL-03: the 'done' finalization GC'd the task's disposable scoped
+    // artifacts (cache class + its index entry); evidence class survived.
+    expect(safeExistsSync(`${missionPath}/artifacts/cache/task-task-1`)).toBe(false);
+    expect(safeExistsSync(`${missionPath}/artifacts/evidence/task-task-1/keep.md`)).toBe(true);
+    const gcIndex = String(
+      safeReadFile(`${missionPath}/artifacts/artifacts-index.jsonl`, { encoding: 'utf8' })
+    )
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line));
+    expect(gcIndex).toHaveLength(1);
+    expect(gcIndex[0].artifact_class).toBe('evidence');
 
     expect(manifest.records[0]).toMatchObject({
       reflection_status: 'done',

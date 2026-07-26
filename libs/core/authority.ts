@@ -251,6 +251,71 @@ function normalizeTenantSlug(value: string | undefined | null): string | undefin
   return /^[a-z][a-z0-9-]{1,30}$/.test(trimmed) ? trimmed : undefined;
 }
 
+// ---------------------------------------------------------------------------
+// NI-04 task-scoped grants — read-side (see libs/core/task-scoped-grants.ts)
+//
+// This module CANNOT import task-scoped-grants.ts: that module writes through
+// secure-io, and secure-io's policy chain imports authority.ts (the exact TDZ
+// cycle documented at the top of this file). The audience filter below is
+// therefore a small, intentionally duplicated raw-read twin of that module's
+// `resolveGrantsForActor`; both resolve the store through the same
+// KYBERION_TASK_GRANTS_PATH-or-default rule so they always read the same file.
+// ---------------------------------------------------------------------------
+
+/** Mirrors NHI_ID_PATTERN in agent-identity.ts (not importable here — see above). */
+const TASK_GRANT_NHI_ID_PATTERN = /^kyberion:\/\/agent\/[a-z][a-z0-9-]*\/[a-z][a-z0-9-]*$/;
+const TASK_GRANT_NHI_SLUG_PATTERN = /^[a-z][a-z0-9-]*$/;
+
+/**
+ * Authority names a task grant's `scope.capabilities` may confer. SUDO is
+ * deliberately excluded: a task-scoped grant must never mint full system
+ * access, whatever its capabilities claim.
+ */
+const TASK_GRANT_AUTHORITY_NAMES: ReadonlySet<string> = new Set([
+  'GIT_WRITE',
+  'SECRET_READ',
+  'NETWORK_FETCH',
+  'SYSTEM_EXEC',
+  'KNOWLEDGE_WRITE',
+]);
+
+function resolveTaskGrantsReadPath(): string {
+  const override = process.env.KYBERION_TASK_GRANTS_PATH?.trim();
+  if (override) return pathResolver.rootResolve(override);
+  return pathResolver.shared('coordination/identity/task-grants.jsonl');
+}
+
+/**
+ * The current execution's actor identity for grant matching:
+ * 1. `KYBERION_NHI_ID` env when it is a canonical nhi_id (the runtime
+ *    supervisor / dispatch env stamps this for spawned workers);
+ * 2. else, when the resolved role string is itself nhi-slug-shaped (an agent
+ *    slug such as `implementation-architect`, not an underscore authority
+ *    role like `mission_controller`), derive `kyberion://agent/<org>/<role>`
+ *    with the org read raw from the organization profile ('default'
+ *    fallback) — the same derivation as agent-identity.ts deriveAgentNhiId.
+ * Fail-closed: no resolvable actor identity means no task grants are served.
+ */
+function resolveGrantActorNhiId(role: string | undefined): string | undefined {
+  const explicit = process.env.KYBERION_NHI_ID?.trim();
+  if (explicit) {
+    return TASK_GRANT_NHI_ID_PATTERN.test(explicit) ? explicit : undefined;
+  }
+  if (!role || !TASK_GRANT_NHI_SLUG_PATTERN.test(role)) return undefined;
+  let organizationId = 'default';
+  try {
+    const profilePath = pathResolver.knowledge('product/governance/organization-profile.json');
+    if (rawExistsSync(profilePath)) {
+      const profile = JSON.parse(rawReadTextFile(profilePath)) as { organization_id?: unknown };
+      const candidate = typeof profile.organization_id === 'string' ? profile.organization_id : '';
+      if (TASK_GRANT_NHI_SLUG_PATTERN.test(candidate)) organizationId = candidate;
+    }
+  } catch (err) {
+    logger.debug(`task-grant actor org resolution fell back to 'default': ${err}`);
+  }
+  return `kyberion://agent/${organizationId}/${role}`;
+}
+
 export function resolveIdentityContext(): IdentityContext {
   const missionId = process.env.MISSION_ID;
   const envPersona = process.env.KYBERION_PERSONA;
@@ -339,6 +404,75 @@ export function resolveIdentityContext(): IdentityContext {
           authorities.push(authority as Authority);
         }
         if (grant.authority) authorities.push(grant.authority as Authority);
+      }
+    } catch (err) {
+      logger.warn(`suppressed error in resolveIdentityContext: ${err}`);
+    }
+  }
+
+  // B2. Task-scoped grants (NI-04) — the internal RFC 8707 audience check:
+  // a grant contributes authorities ONLY when it names this actor
+  // (grantee_nhi_id), its audience matches the requesting execution context
+  // (mission_id must equal MISSION_ID; task_id, when the grant names one,
+  // must equal the TASK_ID env), it has not expired (lazy expiry — no cron),
+  // and it is not revoked. Anything else contributes NOTHING (fail-closed
+  // silence + debug log). Legacy auth-grants.json handling above is
+  // untouched. Last record per grant_id wins (revocations re-append).
+  if (missionId) {
+    try {
+      const taskGrantsPath = resolveTaskGrantsReadPath();
+      if (rawExistsSync(taskGrantsPath)) {
+        const actorNhiId = resolveGrantActorNhiId(envRole);
+        if (actorNhiId) {
+          const taskId = process.env.TASK_ID?.trim() || undefined;
+          const latestGrants = new Map<string, any>();
+          for (const line of rawReadTextFile(taskGrantsPath).split('\n')) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+            try {
+              const parsed = JSON.parse(trimmed);
+              if (parsed && typeof parsed.grant_id === 'string') {
+                latestGrants.set(parsed.grant_id, parsed);
+              }
+            } catch {
+              // torn/corrupt line — tolerated, like the store's own reader
+            }
+          }
+          const now = Date.now();
+          for (const grant of latestGrants.values()) {
+            if (grant.grantee_nhi_id !== actorNhiId) continue;
+            if (grant.revoked_at) {
+              logger.debug(`task grant ${grant.grant_id} skipped: revoked`);
+              continue;
+            }
+            const expiresMs = Date.parse(String(grant.expires_at || ''));
+            if (!Number.isFinite(expiresMs) || expiresMs <= now) {
+              logger.debug(`task grant ${grant.grant_id} skipped: expired`);
+              continue;
+            }
+            const audience = grant.audience || {};
+            if (audience.mission_id !== missionId) {
+              logger.debug(
+                `task grant ${grant.grant_id} skipped: audience mission ${audience.mission_id} != ${missionId}`
+              );
+              continue;
+            }
+            if (audience.task_id !== undefined && audience.task_id !== taskId) {
+              logger.debug(
+                `task grant ${grant.grant_id} skipped: audience task ${audience.task_id} != ${taskId ?? '<none>'}`
+              );
+              continue;
+            }
+            const capabilities = Array.isArray(grant.scope?.capabilities)
+              ? grant.scope.capabilities
+              : [];
+            for (const capability of capabilities) {
+              if (typeof capability === 'string' && TASK_GRANT_AUTHORITY_NAMES.has(capability)) {
+                authorities.push(capability as Authority);
+              }
+            }
+          }
+        }
       }
     } catch (err) {
       logger.warn(`suppressed error in resolveIdentityContext: ${err}`);

@@ -1,0 +1,284 @@
+{
+  "$schema": "../schemas/storage-retention-catalog.schema.json",
+  "version": "1.1.0",
+  "description": "Single source of truth for storage retention (AL-01/AL-04). Declares, per repo-relative directory, the artifact class, TTL, and expiry action enforced by libs/core/storage-janitor.ts. AL-04 extends the AL-01 seed to full coverage of active/shared/runtime/, active/shared/exports/ and active/archive/: every directory is either TTL-governed or declared action=review_required (no automatic deletion; surfaced in the janitor report for a human decision — never a silent forever-retention). Entries with audit=true leave a deletion audit record in active/shared/logs/audit/storage-retention.jsonl; entries with soft_delete_days move expired files to active/archive/.trash/<original-path> for that many further days before the trash sweep purges them. Directories not declared here are never deleted by the janitor; runtime/ subdirectories without an entry are surfaced in the janitor report as uncovered.",
+  "entries": [
+    {
+      "path": "active/shared/tmp",
+      "artifact_class": "tmp",
+      "ttl_days": 1,
+      "action": "delete",
+      "note": "Formerly DEFAULT_TMP_TTL_MS (24h). Shared scratch floor — anything here is consumable by contract."
+    },
+    {
+      "path": "active/shared/logs",
+      "artifact_class": "log",
+      "ttl_days": 30,
+      "action": "delete",
+      "note": "Formerly DEFAULT_LOG_RETENTION_DAYS. Covers audit/process/surfaces/traces log subtrees."
+    },
+    {
+      "path": "active/shared/runtime/browser-receipts",
+      "artifact_class": "evidence",
+      "ttl_days": 90,
+      "action": "delete",
+      "note": "Browser execution evidence — kept ~90d to align with audit retention (review finding OP-M3)."
+    },
+    {
+      "path": "active/shared/runtime/procedure-deltas",
+      "artifact_class": "cache",
+      "ttl_days": 14,
+      "action": "delete",
+      "note": "Self-repair artifacts — short-lived until promoted."
+    },
+    {
+      "path": "active/shared/runtime/a2a-conversations",
+      "artifact_class": "log",
+      "ttl_days": 30,
+      "action": "delete",
+      "note": "A2A conversation transcripts."
+    },
+    {
+      "path": "active/shared/data-vault",
+      "artifact_class": "cache",
+      "action": "delete",
+      "note": "Self-expiring: each JSON entry carries its own expiresAt, honored per-file by the janitor. No directory-level TTL."
+    },
+    {
+      "path": "active/shared/runtime/reports",
+      "artifact_class": "report",
+      "ttl_days": 90,
+      "action": "delete",
+      "audit": true,
+      "soft_delete_days": 14,
+      "note": "Generated system/janitor reports. Deletions are audited and get a 14d trash grace because reports are sometimes referenced as evidence after the fact."
+    },
+    {
+      "path": "active/shared/runtime/health",
+      "artifact_class": "log",
+      "ttl_days": 90,
+      "action": "delete",
+      "note": "Runtime health history (runtime-health-history.ts) — log-like time series, aligned with report retention."
+    },
+    {
+      "path": "active/shared/runtime/voice-loopback-receipts",
+      "artifact_class": "evidence",
+      "ttl_days": 90,
+      "action": "delete",
+      "audit": true,
+      "soft_delete_days": 30,
+      "note": "TTS loopback verification receipts (tts-loopback-verifier.ts) — execution evidence, same 90d as browser-receipts, audited with a 30d trash grace."
+    },
+    {
+      "path": "active/shared/runtime/peer-conversations",
+      "artifact_class": "log",
+      "ttl_days": 30,
+      "action": "delete",
+      "note": "Peer conversation transcripts (peer-conversation.ts) — same retention as a2a-conversations."
+    },
+    {
+      "path": "active/shared/runtime/history-search",
+      "artifact_class": "cache",
+      "ttl_days": 30,
+      "action": "delete",
+      "note": "History search index (history-search-index.ts) — regenerable from source logs."
+    },
+    {
+      "path": "active/shared/runtime/baseline-check-cache",
+      "artifact_class": "cache",
+      "ttl_days": 14,
+      "action": "delete",
+      "note": "Baseline-check / provider-capability probe cache — regenerated on the next session start."
+    },
+    {
+      "path": "active/shared/runtime/apple-intelligence",
+      "artifact_class": "cache",
+      "ttl_days": 30,
+      "action": "delete",
+      "note": "Apple Intelligence bridge spool (apple-intelligence-bridge.ts) — request/response intermediates."
+    },
+    {
+      "path": "active/shared/runtime/distill-candidates",
+      "artifact_class": "cache",
+      "ttl_days": 30,
+      "action": "delete",
+      "note": "Distill candidate staging (distill-candidate-registry.ts) — candidates either promote into knowledge/ or expire; previously unbounded (~97 files)."
+    },
+    {
+      "path": "active/shared/runtime/feedback-loop",
+      "artifact_class": "cache",
+      "ttl_days": 30,
+      "action": "delete",
+      "note": "Promotion-candidate staging (promotion-candidates.ts) — same promote-or-expire contract as distill-candidates."
+    },
+    {
+      "path": "active/shared/runtime/heartbeats",
+      "artifact_class": "cache",
+      "ttl_days": 14,
+      "action": "delete",
+      "note": "Daemon heartbeat files (daemon-heartbeat.ts). Live daemons refresh mtime continuously, so a 14d TTL only ever removes entries of long-dead daemons."
+    },
+    {
+      "path": "active/shared/runtime/a2a",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "A2A envelope-signature / peer identity state (a2a-envelope-signature.ts) — load-bearing trust material, no automatic deletion."
+    },
+    {
+      "path": "active/shared/runtime/agent-supervisor",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Agent runtime supervisor state — load-bearing while supervised runtimes exist."
+    },
+    {
+      "path": "active/shared/runtime/artifacts",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Artifact-record store payloads (artifact-record.ts) referenced by artifact_id — deleting by TTL would break references; lifecycle belongs to AL-02/AL-03 scoped closure."
+    },
+    {
+      "path": "active/shared/runtime/audit",
+      "artifact_class": "evidence",
+      "action": "review_required",
+      "note": "Audit chain integrity state (chain-integrity.ts) — never auto-delete audit material."
+    },
+    {
+      "path": "active/shared/runtime/background-review",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Background-review patches/records referenced by approval requests — load-bearing while a review is pending."
+    },
+    {
+      "path": "active/shared/runtime/browser",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Browser conversation-session state (browser-conversation-session.ts)."
+    },
+    {
+      "path": "active/shared/runtime/computer",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Computer-surface session state (computer-surface.ts)."
+    },
+    {
+      "path": "active/shared/runtime/locks",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Cross-process lock files (src/lock-utils.ts) — deleting a held lock breaks mutual exclusion."
+    },
+    {
+      "path": "active/shared/runtime/media-generation",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Generation scheduler job queue (generation-scheduler.ts) — load-bearing while jobs are pending."
+    },
+    {
+      "path": "active/shared/runtime/memory",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Memory promotion queue (memory-promotion-queue.ts) — pending promotions are un-regenerable learning."
+    },
+    {
+      "path": "active/shared/runtime/oauth",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "OAuth token/flow state — credentials, never TTL-deleted."
+    },
+    {
+      "path": "active/shared/runtime/peer-messaging",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Peer messaging queues (peer-messaging.ts) — undelivered messages are load-bearing."
+    },
+    {
+      "path": "active/shared/runtime/presence",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Surface presence coordination state (surface-coordination-store.ts)."
+    },
+    {
+      "path": "active/shared/runtime/presence-studio",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Presence-studio workflow state (email-workflow.ts)."
+    },
+    {
+      "path": "active/shared/runtime/project-tracks",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Project track state (mission-context-pack.ts) — load-bearing across missions."
+    },
+    {
+      "path": "active/shared/runtime/projects",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Project registry (project-registry.ts) — load-bearing registry."
+    },
+    {
+      "path": "active/shared/runtime/service-bindings",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Service binding registry (service-binding-registry.ts) — connection state, never TTL-deleted."
+    },
+    {
+      "path": "active/shared/runtime/session",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Session-scoped volatile workspaces (path-resolver volatile('session')). GC'd by scope-linked mission-archive GC (AL-04, mission-maintenance.ts), not by TTL."
+    },
+    {
+      "path": "active/shared/runtime/state",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Miscellaneous runtime state incl. janitor-last-run marker and reasoning failover state (reasoning-failover.ts)."
+    },
+    {
+      "path": "active/shared/runtime/surfaces",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Surface runtime state (surface-runtime.ts) — load-bearing for running surfaces."
+    },
+    {
+      "path": "active/shared/runtime/task-sessions",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Task-session records (task-session.ts). GC'd per mission by scope-linked mission-archive GC (AL-04), not by TTL."
+    },
+    {
+      "path": "active/shared/runtime/terminal",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Terminal bridge session state (terminal-bridge.ts)."
+    },
+    {
+      "path": "active/shared/runtime/voice-profiles",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Voice profile registry (voice-profile-registry.ts) — user-facing configuration, never TTL-deleted."
+    },
+    {
+      "path": "active/shared/runtime/work-coordination",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Work-item claim/coordination state (work-coordination.ts) — deleting live claims breaks the write-exclusion contract."
+    },
+    {
+      "path": "active/shared/exports",
+      "artifact_class": "export",
+      "action": "review_required",
+      "note": "Outbound deliverables incl. tenant-offboarding tarballs — deletion is a human decision, never automatic."
+    },
+    {
+      "path": "active/archive",
+      "artifact_class": "evidence",
+      "action": "review_required",
+      "note": "Archived missions and long-term retention tree — deletion is a human decision, never automatic. (.trash below is the one TTL-governed exception.)"
+    },
+    {
+      "path": "active/archive/.trash",
+      "artifact_class": "tmp",
+      "action": "delete",
+      "note": "Soft-delete grace floor (AL-04): expired files from soft_delete_days entries land here preserving their original repo-relative path. The janitor trash sweep purges each file after its governing entry's soft_delete_days (30d default when no entry covers it). Code-driven — no directory-level ttl_days."
+    }
+  ]
+}

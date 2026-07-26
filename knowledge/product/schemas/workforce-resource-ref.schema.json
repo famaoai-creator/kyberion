@@ -45,6 +45,24 @@
           "accountable_human_id": { "type": "string", "minLength": 1 }
         }
       }
+    },
+    {
+      "if": {
+        "properties": { "resource_type": { "const": "agent" } }
+      },
+      "then": {
+        "properties": {
+          "runtime_identity": {
+            "anyOf": [
+              { "type": "null" },
+              {
+                "type": "string",
+                "pattern": "^kyberion://agent/[a-z][a-z0-9-]*/[a-z][a-z0-9-]*$"
+              }
+            ]
+          }
+        }
+      }
     }
   ],
   "additionalProperties": false

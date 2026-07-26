@@ -10,10 +10,39 @@ import { findMissionPath } from './path-resolver.js';
 import {
   safeExec,
   safeExistsSync,
+  safeMkdir,
   safeReadFile,
+  safeRmSync,
   safeUnlinkSync,
   safeWriteFile,
 } from './secure-io.js';
+
+/**
+ * AL-02: sealed outputs are durable archive artifacts, not consumables. They
+ * are written to `<missionDir>/seal/` (after the tarball is taken, so the
+ * seal never contains itself); the finish-flow archive step (`cp -r` of the
+ * mission tree into the archive area declared by mission-management-config
+ * `directories.archive`, default `active/archive/missions`) then lands them
+ * at `<archive>/<MISSION_ID>/seal/` — this final location is what
+ * `missionSealArchiveDir` resolves. Writing straight into the archive area
+ * would not survive: finishMission `rm -rf`s `<archive>/<MISSION_ID>` before
+ * copying the mission tree. Only intermediates (tarball, symmetric key,
+ * anchor input) still pass through `active/shared/tmp/` and are removed
+ * before returning.
+ */
+export function missionSealArchiveDir(missionId: string): string {
+  const configPath = pathResolver.knowledge('product/governance/mission-management-config.json');
+  let archiveSubPath = 'active/archive/missions';
+  if (safeExistsSync(configPath)) {
+    try {
+      const config = JSON.parse(String(safeReadFile(configPath, { encoding: 'utf8' })));
+      archiveSubPath = config.directories?.archive || archiveSubPath;
+    } catch (_) {
+      /* fall back to the default archive dir */
+    }
+  }
+  return path.join(pathResolver.rootResolve(archiveSubPath), missionId, 'seal');
+}
 
 export async function sealMission(id: string): Promise<string | undefined> {
   const upperId = id.toUpperCase();
@@ -30,10 +59,17 @@ export async function sealMission(id: string): Promise<string | undefined> {
 
   const archivePath = pathResolver.sharedTmp(`missions/${upperId}/${upperId}.tar.gz`);
   const symKeyPath = pathResolver.sharedTmp(`missions/${upperId}/${upperId}.key`);
-  const encKeyPath = pathResolver.sharedTmp(`missions/${upperId}/${upperId}.key.enc`);
-  const encryptedPath = pathResolver.sharedTmp(`missions/${upperId}/${upperId}.enc`);
+  if (!safeExistsSync(path.dirname(archivePath))) {
+    safeMkdir(path.dirname(archivePath), { recursive: true });
+  }
+  const sealDir = path.join(missionDir, 'seal');
+  const encKeyPath = path.join(sealDir, `${upperId}.key.enc`);
+  const encryptedPath = path.join(sealDir, `${upperId}.enc`);
 
   try {
+    // A re-seal replaces the previous seal, and the tarball is taken before
+    // seal/ is (re)created so the sealed archive never contains a seal.
+    if (safeExistsSync(sealDir)) safeRmSync(sealDir, { recursive: true, force: true });
     safeExec('tar', [
       '-czf',
       archivePath,
@@ -41,6 +77,7 @@ export async function sealMission(id: string): Promise<string | undefined> {
       path.dirname(missionDir),
       path.basename(missionDir),
     ]);
+    if (!safeExistsSync(sealDir)) safeMkdir(sealDir, { recursive: true });
     safeExec('openssl', ['rand', '-out', symKeyPath, '32']);
     safeExec('openssl', [
       'enc',

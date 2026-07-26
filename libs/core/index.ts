@@ -621,6 +621,11 @@ export * from './worker-state-journal.js';
 // SO-02: durable conversation-thread <-> mission-ownership binding (own
 // event-sourcing kernel; see the module docstring for the KD-03 lineage).
 export * from './orchestrator-session.js';
+// NI-01: durable NHI registry for agent identities (journal-backed, SO-02
+// pattern); AL-01 retention catalog is the storage-lifecycle counterpart.
+export * from './agent-identity.js';
+export * from './nhi-lifecycle-governance.js';
+export * from './storage-retention-catalog.js';
 export * from './surface-steering-authority.js';
 export * from './adf-guardrails.js';
 export * from './reconcile-ops.js';
@@ -733,8 +738,14 @@ export {
   runJanitor,
   runJanitorIfStale,
   readJanitorLastRunMs,
+  sweepTrash,
+  softDeleteToTrash,
+  restoreFromTrash,
+  listReviewRequiredDirs,
   DEFAULT_TMP_TTL_MS,
   DEFAULT_LOG_RETENTION_DAYS,
+  DEFAULT_TRASH_GRACE_DAYS,
+  TRASH_REPO_SUBPATH,
 } from './storage-janitor.js';
 export type {
   JanitorReport,
@@ -742,9 +753,29 @@ export type {
   RotateLogsResult,
   ScanDataVaultResult,
   ScanRuntimeResult,
+  SweepTrashResult,
   SweepDelegationChildrenOptions,
   SweepDelegationChildrenResult,
 } from './storage-janitor.js';
+
+// Scope-linked GC & offboarding (AL-04)
+export {
+  gcMissionRuntimeResidue,
+  offboardScope,
+  collectScopeTargets,
+  OFFBOARDING_EXPORT_SUBDIR,
+} from './scope-offboarding.js';
+export type {
+  GcMissionRuntimeResidueResult,
+  MissionResidueCandidate,
+  MissionResidueProbe,
+  OffboardApproval,
+  OffboardScopeInput,
+  OffboardScopeResult,
+  OffboardScopeType,
+  OffboardTarget,
+  OffboardTargetKind,
+} from './scope-offboarding.js';
 
 // Delegation Concurrency & Wall-Clock Budget (XP-06)
 export {
@@ -1309,7 +1340,15 @@ export type {
   TaskPlan,
   TestPlan,
 } from './sdlc-artifact-store.js';
-export { signA2AContent, verifyA2AContent } from './a2a-envelope-signature.js';
+export {
+  signA2AContent,
+  verifyA2AContent,
+  canonicalA2AEnvelopeContent,
+} from './a2a-envelope-signature.js';
+// NI-02: actor-string verification against the NHI registry (warn -> enforce).
+export * from './nhi-actor-verification.js';
+// NI-03: RFC 8693 act-chain-analog delegation chains with attenuation.
+export * from './delegation-chain.js';
 export {
   buildFailoverReasoningBackend,
   buildRoleAwareReasoningBackend,

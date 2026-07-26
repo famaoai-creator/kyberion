@@ -1,5 +1,5 @@
 import * as nodePath from 'node:path';
-import { sharedTmp, shared } from './path-resolver.js';
+import { sharedTmp, shared, rootDir, sharedLogsAudit } from './path-resolver.js';
 import {
   safeReaddir,
   safeReadFile,
@@ -8,13 +8,41 @@ import {
   safeUnlinkSync,
   safeExistsSync,
   safeWriteFile,
+  safeAppendFileSync,
+  safeMkdir,
+  safeMoveSync,
+  safeRmSync,
 } from './secure-io.js';
 import { logger } from './core.js';
+import {
+  loadRetentionCatalog,
+  retentionTtlMsForPath,
+  retentionTtlDaysForPath,
+  retentionEntryForExactPath,
+  retentionEntryForPath,
+  reviewRequiredCatalogPaths,
+  runtimeRetentionRules,
+  coveredRuntimeSubdirs,
+  BUILTIN_RETENTION_DEFAULTS,
+  RETENTION_CATALOG_REPO_PATH,
+  RETENTION_DAY_MS,
+  STORAGE_RETENTION_AUDIT_FILENAME,
+  type LoadedRetentionCatalog,
+  type RetentionCatalogEntry,
+} from './storage-retention-catalog.js';
 
 export const DEFAULT_TMP_TTL_MS = 24 * 60 * 60 * 1000;
 export const DEFAULT_LOG_RETENTION_DAYS = 30;
 
 /**
+ * AL-01: TTL values are now derived from the governance retention catalog
+ * (`knowledge/product/governance/storage-retention-catalog.json` via
+ * `storage-retention-catalog.ts`). The constants in this file are the
+ * last-resort fallback used when even the catalog loader's built-in defaults
+ * are bypassed by explicit caller options — the catalog's built-in defaults
+ * mirror these values exactly, so behavior is unchanged when the catalog is
+ * missing or corrupt.
+ *
  * Retention rules for governed runtime artifacts under active/shared/runtime/.
  * These directories are written by the browser-bridge / intent-driven automation
  * flow and previously had no TTL governance (review finding OP-M3).
@@ -31,21 +59,29 @@ export const RUNTIME_RETENTION: ReadonlyArray<{ subdir: string; ttlMs: number }>
 export interface ScanTmpOptions {
   dryRun: boolean;
   ttlMs?: number;
+  /** Preloaded retention catalog; loaded on demand when omitted. */
+  catalog?: LoadedRetentionCatalog;
 }
 
 export interface ScanTmpResult {
   expired: string[];
   deleted: string[];
+  /** AL-04: expired files moved to `active/archive/.trash/` instead of unlinked. */
+  softDeleted: string[];
 }
 
 export interface RotateLogsOptions {
   dryRun: boolean;
   retentionDays?: number;
+  /** Preloaded retention catalog; loaded on demand when omitted. */
+  catalog?: LoadedRetentionCatalog;
 }
 
 export interface RotateLogsResult {
   expired: string[];
   rotated: string[];
+  /** AL-04: expired files moved to `active/archive/.trash/` instead of unlinked. */
+  softDeleted: string[];
 }
 
 export interface ScanDataVaultOptions {
@@ -60,6 +96,14 @@ export interface ScanDataVaultResult {
 export interface ScanRuntimeResult {
   expired: string[];
   deleted: string[];
+  /** AL-04: expired files moved to `active/archive/.trash/` instead of unlinked. */
+  softDeleted: string[];
+}
+
+/** AL-04 trash sweep result — see `sweepTrash`. */
+export interface SweepTrashResult {
+  expired: string[];
+  purged: string[];
 }
 
 /**
@@ -111,6 +155,27 @@ export interface JanitorReport {
   deletedRuntime: number;
   staleDelegationChildren: number;
   killedDelegationChildren: number;
+  /**
+   * AL-01: repo-relative `active/shared/runtime/<subdir>` directories that
+   * exist on disk but are skipped because no retention-catalog entry covers
+   * them (reported, never deleted).
+   */
+  uncoveredRuntimeDirs: string[];
+  /**
+   * AL-04: repo-relative directories declared `action: review_required` in
+   * the catalog that exist on disk — never deleted, never counted as
+   * uncovered, surfaced here for a human retention decision.
+   */
+  reviewRequiredDirs: string[];
+  /** AL-04: files moved to `active/archive/.trash/` this run (soft-delete). */
+  softDeleted: number;
+  /** AL-04: `.trash/` files past their soft-delete grace this run. */
+  expiredTrash: number;
+  /** AL-04: `.trash/` files actually purged this run. */
+  purgedTrash: number;
+  /** Where the TTL rules came from: the governance catalog, or built-in fallback defaults. */
+  retentionCatalogSource: 'catalog' | 'builtin-defaults';
+  retentionCatalogWarnings: string[];
   errors: string[];
   timestamp: string;
   dryRun: boolean;
@@ -155,12 +220,225 @@ function collectFiles(dir: string): string[] {
   return results;
 }
 
+/** Repo-relative POSIX path under the (possibly test-overridden) root. */
+export function repoRelativePosix(absolutePath: string): string {
+  return nodePath.relative(rootDir(), absolutePath).split(nodePath.sep).join('/');
+}
+
+/** AL-04: soft-delete grace floor — see the catalog's `active/archive/.trash` entry. */
+export const TRASH_REPO_SUBPATH = 'active/archive/.trash';
+
+/** Grace applied to trashed files whose original path no longer has a covering catalog entry. */
+export const DEFAULT_TRASH_GRACE_DAYS = 30;
+
+function trashRootDir(): string {
+  return nodePath.join(rootDir(), ...TRASH_REPO_SUBPATH.split('/'));
+}
+
+/**
+ * AL-04 trash index. A move preserves mtime, so an expired file arrives in
+ * the trash ALREADY older than any grace — mtime cannot express "when it was
+ * trashed". This append-only sidecar (one `{path, trashed_at}` record per
+ * soft-delete, last record per path wins) is what the grace is measured
+ * from; entries whose trash file is gone are pruned by the sweep. A file
+ * with no index record falls back to mtime, so a hand-moved file is still
+ * eventually reclaimed.
+ */
+export const TRASH_INDEX_FILENAME = '.trash-index.jsonl';
+
+function trashIndexPath(): string {
+  return nodePath.join(trashRootDir(), TRASH_INDEX_FILENAME);
+}
+
+function readTrashIndex(): Map<string, number> {
+  const indexPath = trashIndexPath();
+  const trashedAt = new Map<string, number>();
+  if (!safeExistsSync(indexPath)) return trashedAt;
+  try {
+    for (const line of String(safeReadFile(indexPath, { encoding: 'utf8' })).split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      try {
+        const record = JSON.parse(trimmed) as { path?: unknown; trashed_at?: unknown };
+        const ms = Date.parse(String(record.trashed_at ?? ''));
+        if (typeof record.path === 'string' && Number.isFinite(ms)) {
+          trashedAt.set(record.path, ms);
+        }
+      } catch {
+        // torn line — the rest of the index still replays
+      }
+    }
+  } catch (err) {
+    logger.warn(
+      `[JANITOR] failed to read the trash index (falling back to mtime): ${err instanceof Error ? err.message : String(err)}`
+    );
+  }
+  return trashedAt;
+}
+
+function recordTrashEntry(originalRepoRelative: string): void {
+  try {
+    safeAppendFileSync(
+      trashIndexPath(),
+      `${JSON.stringify({ path: originalRepoRelative, trashed_at: new Date().toISOString() })}\n`,
+      { encoding: 'utf8' }
+    );
+  } catch (err) {
+    // Losing the record only costs precision (mtime fallback), never data.
+    logger.warn(
+      `[JANITOR] failed to record trash index entry for ${originalRepoRelative}: ${err instanceof Error ? err.message : String(err)}`
+    );
+  }
+}
+
+/** Rewrite the index without records whose trash file no longer exists. */
+function pruneTrashIndex(trashedAt: Map<string, number>): void {
+  const surviving: string[] = [];
+  for (const [repoRel, ms] of trashedAt) {
+    const filePath = nodePath.join(trashRootDir(), ...repoRel.split('/'));
+    if (safeExistsSync(filePath)) {
+      surviving.push(JSON.stringify({ path: repoRel, trashed_at: new Date(ms).toISOString() }));
+    }
+  }
+  try {
+    if (surviving.length === 0) {
+      if (safeExistsSync(trashIndexPath())) safeUnlinkSync(trashIndexPath());
+      return;
+    }
+    safeWriteFile(trashIndexPath(), `${surviving.join('\n')}\n`);
+  } catch (err) {
+    logger.warn(
+      `[JANITOR] failed to prune the trash index: ${err instanceof Error ? err.message : String(err)}`
+    );
+  }
+}
+
+/**
+ * AL-04 deletion audit — best-effort append to
+ * `active/shared/logs/audit/storage-retention.jsonl`. An unwritable audit log
+ * never blocks the janitor (the deletion/move already happened or is about
+ * to; losing the audit line is logged, not fatal).
+ */
+export function appendRetentionAudit(record: Record<string, unknown>): void {
+  try {
+    safeAppendFileSync(
+      sharedLogsAudit(STORAGE_RETENTION_AUDIT_FILENAME),
+      `${JSON.stringify({ ts: new Date().toISOString(), ...record })}\n`,
+      { encoding: 'utf8' }
+    );
+  } catch (err) {
+    logger.warn(
+      `[JANITOR] failed to append retention audit record: ${err instanceof Error ? err.message : String(err)}`
+    );
+  }
+}
+
+/**
+ * AL-04 soft-delete: move a file or directory to
+ * `active/archive/.trash/<original-repo-relative-path>` (structure preserved,
+ * so {@link restoreFromTrash} and the trash sweep can both recover the
+ * original location from the trash path alone). Returns the trash location.
+ *
+ * Shared primitive: the janitor's TTL expiry and the scope-linked GC of
+ * `scope-offboarding.ts` both delete through here, so everything reclaimed
+ * automatically has the same restore window.
+ */
+export function softDeleteToTrash(absolutePath: string): {
+  trashPath: string;
+  originalRepoRelative: string;
+} {
+  const repoRel = repoRelativePosix(absolutePath);
+  const trashPath = nodePath.join(trashRootDir(), ...repoRel.split('/'));
+  const trashDir = nodePath.dirname(trashPath);
+  if (!safeExistsSync(trashDir)) safeMkdir(trashDir, { recursive: true });
+  if (safeExistsSync(trashPath)) safeRmSync(trashPath, { recursive: true, force: true });
+  safeMoveSync(absolutePath, trashPath);
+  recordTrashEntry(repoRel);
+  return { trashPath, originalRepoRelative: repoRel };
+}
+
+/**
+ * AL-04 restore: move a soft-deleted path back from the trash to its original
+ * repo-relative location (the inverse of {@link softDeleteToTrash}). Returns
+ * `restored: false` when the trash holds nothing for that path — restoring an
+ * already-purged or never-trashed path is a no-op, never an error.
+ */
+export function restoreFromTrash(originalRepoRelativePath: string): {
+  restored: boolean;
+  path: string;
+} {
+  const segments = originalRepoRelativePath.split('/').filter(Boolean);
+  const restoredPath = nodePath.join(rootDir(), ...segments);
+  const trashPath = nodePath.join(trashRootDir(), ...segments);
+  if (!safeExistsSync(trashPath)) return { restored: false, path: restoredPath };
+  const parent = nodePath.dirname(restoredPath);
+  if (!safeExistsSync(parent)) safeMkdir(parent, { recursive: true });
+  if (safeExistsSync(restoredPath)) safeRmSync(restoredPath, { recursive: true, force: true });
+  safeMoveSync(trashPath, restoredPath);
+  appendRetentionAudit({
+    event: 'RETENTION_RESTORED',
+    path: originalRepoRelativePath,
+    trash_path: `${TRASH_REPO_SUBPATH}/${originalRepoRelativePath}`,
+    policy_ref: RETENTION_CATALOG_REPO_PATH,
+    reason: 'operator restore from soft-delete grace',
+  });
+  return { restored: true, path: restoredPath };
+}
+
+/**
+ * AL-04: apply a catalog entry's expiry action to one expired file.
+ *
+ *  - `soft_delete_days` declared → move to
+ *    `active/archive/.trash/<original-repo-relative-path>` (structure
+ *    preserved) so the trash sweep can purge it after the grace period.
+ *  - otherwise → hard delete (unchanged pre-AL-04 behavior).
+ *  - `audit: true` (or any soft-delete, which needs a restore trail) → an
+ *    audit JSONL record of what/why/policy ref.
+ */
+function expireFilePerPolicy(
+  filePath: string,
+  entry: RetentionCatalogEntry | null,
+  outcome: { deleted: string[]; softDeleted: string[] }
+): void {
+  const repoRel = repoRelativePosix(filePath);
+  const softDelete = entry?.soft_delete_days !== undefined;
+  if (softDelete) {
+    softDeleteToTrash(filePath);
+    outcome.softDeleted.push(filePath);
+    logger.info(`[JANITOR] soft-deleted (trash): ${filePath}`);
+  } else {
+    safeUnlinkSync(filePath);
+    outcome.deleted.push(filePath);
+    logger.info(`[JANITOR] deleted: ${filePath}`);
+  }
+  if (entry?.audit || softDelete) {
+    appendRetentionAudit({
+      event: softDelete ? 'RETENTION_SOFT_DELETE' : 'RETENTION_DELETE',
+      path: repoRel,
+      ...(softDelete
+        ? {
+            trash_path: `${TRASH_REPO_SUBPATH}/${repoRel}`,
+            soft_delete_days: entry?.soft_delete_days,
+          }
+        : {}),
+      policy_path: entry?.path,
+      artifact_class: entry?.artifact_class,
+      ttl_days: entry?.ttl_days,
+      policy_ref: RETENTION_CATALOG_REPO_PATH,
+      reason: 'retention TTL elapsed (storage janitor)',
+    });
+  }
+}
+
 export function scanTmp(opts: ScanTmpOptions): ScanTmpResult {
-  const ttlMs = opts.ttlMs ?? DEFAULT_TMP_TTL_MS;
+  const catalog = opts.catalog ?? loadRetentionCatalog();
+  const entry = retentionEntryForExactPath(catalog, 'active/shared/tmp');
+  const ttlMs =
+    opts.ttlMs ?? retentionTtlMsForPath(catalog, 'active/shared/tmp') ?? DEFAULT_TMP_TTL_MS;
   const dir = sharedTmp();
   const now = Date.now();
   const expired: string[] = [];
-  const deleted: string[] = [];
+  const outcome = { deleted: [] as string[], softDeleted: [] as string[] };
 
   const files = collectFiles(dir);
   for (const filePath of files) {
@@ -169,9 +447,7 @@ export function scanTmp(opts: ScanTmpOptions): ScanTmpResult {
       if (now - stat.mtimeMs > ttlMs) {
         expired.push(filePath);
         if (!opts.dryRun) {
-          safeUnlinkSync(filePath);
-          deleted.push(filePath);
-          logger.info(`[JANITOR] deleted tmp: ${filePath}`);
+          expireFilePerPolicy(filePath, entry, outcome);
         }
       }
     } catch {
@@ -179,15 +455,21 @@ export function scanTmp(opts: ScanTmpOptions): ScanTmpResult {
     }
   }
 
-  return { expired, deleted };
+  return { expired, deleted: outcome.deleted, softDeleted: outcome.softDeleted };
 }
 
 export function rotateLogs(opts: RotateLogsOptions): RotateLogsResult {
-  const retentionMs = (opts.retentionDays ?? DEFAULT_LOG_RETENTION_DAYS) * 24 * 60 * 60 * 1000;
+  const catalog = opts.catalog ?? loadRetentionCatalog();
+  const entry = retentionEntryForExactPath(catalog, 'active/shared/logs');
+  const retentionDays =
+    opts.retentionDays ??
+    retentionTtlDaysForPath(catalog, 'active/shared/logs') ??
+    DEFAULT_LOG_RETENTION_DAYS;
+  const retentionMs = retentionDays * 24 * 60 * 60 * 1000;
   const logsDir = shared('logs');
   const now = Date.now();
   const expired: string[] = [];
-  const rotated: string[] = [];
+  const outcome = { deleted: [] as string[], softDeleted: [] as string[] };
 
   const files = collectFiles(logsDir);
   for (const filePath of files) {
@@ -196,9 +478,7 @@ export function rotateLogs(opts: RotateLogsOptions): RotateLogsResult {
       if (now - stat.mtimeMs > retentionMs) {
         expired.push(filePath);
         if (!opts.dryRun) {
-          safeUnlinkSync(filePath);
-          rotated.push(filePath);
-          logger.info(`[JANITOR] rotated log: ${filePath}`);
+          expireFilePerPolicy(filePath, entry, outcome);
         }
       }
     } catch {
@@ -206,7 +486,7 @@ export function rotateLogs(opts: RotateLogsOptions): RotateLogsResult {
     }
   }
 
-  return { expired, rotated };
+  return { expired, rotated: outcome.deleted, softDeleted: outcome.softDeleted };
 }
 
 export function scanDataVault(opts: ScanDataVaultOptions): ScanDataVaultResult {
@@ -236,12 +516,16 @@ export function scanDataVault(opts: ScanDataVaultOptions): ScanDataVaultResult {
   return { expired, deleted };
 }
 
-export function scanRuntime(opts: { dryRun: boolean }): ScanRuntimeResult {
+export function scanRuntime(opts: {
+  dryRun: boolean;
+  catalog?: LoadedRetentionCatalog;
+}): ScanRuntimeResult {
   const now = Date.now();
   const expired: string[] = [];
-  const deleted: string[] = [];
+  const outcome = { deleted: [] as string[], softDeleted: [] as string[] };
 
-  for (const rule of RUNTIME_RETENTION) {
+  const rules = runtimeRetentionRules(opts.catalog ?? loadRetentionCatalog());
+  for (const rule of rules) {
     const dir = shared(`runtime/${rule.subdir}`);
     for (const filePath of collectFiles(dir)) {
       try {
@@ -249,9 +533,7 @@ export function scanRuntime(opts: { dryRun: boolean }): ScanRuntimeResult {
         if (now - stat.mtimeMs > rule.ttlMs) {
           expired.push(filePath);
           if (!opts.dryRun) {
-            safeUnlinkSync(filePath);
-            deleted.push(filePath);
-            logger.info(`[JANITOR] deleted runtime artifact: ${filePath}`);
+            expireFilePerPolicy(filePath, rule.entry, outcome);
           }
         }
       } catch {
@@ -260,7 +542,112 @@ export function scanRuntime(opts: { dryRun: boolean }): ScanRuntimeResult {
     }
   }
 
-  return { expired, deleted };
+  return { expired, deleted: outcome.deleted, softDeleted: outcome.softDeleted };
+}
+
+/**
+ * AL-04 trash sweep: purge `active/archive/.trash/` files whose soft-delete
+ * grace elapsed. The grace per file is the `soft_delete_days` of the catalog
+ * entry that covers the file's ORIGINAL repo-relative path (its path inside
+ * the trash mirrors it); files whose original path no longer has a covering
+ * entry fall back to `DEFAULT_TRASH_GRACE_DAYS`. The grace is counted from
+ * the trash-index `trashed_at` (see {@link TRASH_INDEX_FILENAME}) — NOT from
+ * mtime, which a move preserves and which would therefore make an
+ * already-expired file purgeable the instant it is trashed. Files with no
+ * index record (hand-moved) fall back to mtime.
+ */
+export function sweepTrash(opts: {
+  dryRun: boolean;
+  catalog?: LoadedRetentionCatalog;
+}): SweepTrashResult {
+  const catalog = opts.catalog ?? loadRetentionCatalog();
+  const trashRoot = trashRootDir();
+  const now = Date.now();
+  const expired: string[] = [];
+  const purged: string[] = [];
+  const trashedAt = readTrashIndex();
+
+  for (const filePath of collectFiles(trashRoot)) {
+    try {
+      const originalRepoRel = nodePath.relative(trashRoot, filePath).split(nodePath.sep).join('/');
+      if (originalRepoRel === TRASH_INDEX_FILENAME) continue;
+      const entry = retentionEntryForPath(catalog, originalRepoRel);
+      const graceDays = entry?.soft_delete_days ?? DEFAULT_TRASH_GRACE_DAYS;
+      const graceStartMs = trashedAt.get(originalRepoRel) ?? safeStat(filePath).mtimeMs;
+      if (now - graceStartMs > graceDays * RETENTION_DAY_MS) {
+        expired.push(filePath);
+        if (!opts.dryRun) {
+          safeUnlinkSync(filePath);
+          purged.push(filePath);
+          logger.info(`[JANITOR] purged trash: ${filePath}`);
+          appendRetentionAudit({
+            event: 'RETENTION_TRASH_PURGED',
+            path: `${TRASH_REPO_SUBPATH}/${originalRepoRel}`,
+            original_path: originalRepoRel,
+            soft_delete_days: graceDays,
+            policy_path: entry?.path,
+            policy_ref: RETENTION_CATALOG_REPO_PATH,
+            reason: 'soft-delete grace elapsed (janitor trash sweep)',
+          });
+        }
+      }
+    } catch {
+      // skip
+    }
+  }
+
+  if (!opts.dryRun && trashedAt.size > 0) pruneTrashIndex(trashedAt);
+
+  return { expired, purged };
+}
+
+/**
+ * AL-04: repo-relative directories declared `action: review_required` that
+ * exist on disk. Never deleted, never uncovered — surfaced so a human can
+ * make the retention decision the catalog deliberately refuses to automate.
+ */
+export function listReviewRequiredDirs(catalog?: LoadedRetentionCatalog): string[] {
+  const declared = reviewRequiredCatalogPaths(catalog ?? loadRetentionCatalog());
+  const present: string[] = [];
+  for (const repoRel of declared) {
+    try {
+      if (safeExistsSync(nodePath.join(rootDir(), ...repoRel.split('/')))) {
+        present.push(repoRel);
+      }
+    } catch {
+      // unreadable — skip
+    }
+  }
+  return present;
+}
+
+/**
+ * AL-01: `active/shared/runtime/` subdirectories that exist on disk but have
+ * no retention-catalog entry. The janitor never deletes these — it reports
+ * them so undeclared (silently-forever) retention is visible instead of
+ * invisible. Returned repo-relative, sorted, directories only.
+ */
+export function listUncoveredRuntimeDirs(catalog?: LoadedRetentionCatalog): string[] {
+  const covered = coveredRuntimeSubdirs(catalog ?? loadRetentionCatalog());
+  const runtimeRoot = shared('runtime');
+  if (!safeExistsSync(runtimeRoot)) return [];
+  let entries: string[];
+  try {
+    entries = safeReaddir(runtimeRoot);
+  } catch {
+    return [];
+  }
+  const uncovered: string[] = [];
+  for (const name of [...entries].sort()) {
+    try {
+      const stat = safeLstat(nodePath.join(runtimeRoot, name));
+      if (!stat.isDirectory() || stat.isSymbolicLink()) continue;
+    } catch {
+      continue;
+    }
+    if (!covered.has(name)) uncovered.push(`active/shared/runtime/${name}`);
+  }
+  return uncovered;
 }
 
 function readDelegationChildrenRegistry(): DelegationChildRecord[] {
@@ -342,16 +729,31 @@ export function sweepDelegationChildren(
 export function runJanitor(opts: { dryRun: boolean }): JanitorReport {
   const errors: string[] = [];
 
-  let tmpResult: ScanTmpResult = { expired: [], deleted: [] };
+  // AL-01: single catalog load per run — never fatal (the loader falls back
+  // to built-in defaults on any catalog problem and reports it via warnings).
+  let catalog: LoadedRetentionCatalog;
   try {
-    tmpResult = scanTmp({ dryRun: opts.dryRun });
+    catalog = loadRetentionCatalog();
+  } catch (err: any) {
+    // Defensive: loadRetentionCatalog itself never throws by contract.
+    errors.push(`retention-catalog: ${err?.message ?? String(err)}`);
+    catalog = {
+      entries: [...BUILTIN_RETENTION_DEFAULTS],
+      source: 'builtin-defaults',
+      warnings: [],
+    };
+  }
+
+  let tmpResult: ScanTmpResult = { expired: [], deleted: [], softDeleted: [] };
+  try {
+    tmpResult = scanTmp({ dryRun: opts.dryRun, catalog });
   } catch (err: any) {
     errors.push(`tmp: ${err?.message ?? String(err)}`);
   }
 
-  let logResult: RotateLogsResult = { expired: [], rotated: [] };
+  let logResult: RotateLogsResult = { expired: [], rotated: [], softDeleted: [] };
   try {
-    logResult = rotateLogs({ dryRun: opts.dryRun });
+    logResult = rotateLogs({ dryRun: opts.dryRun, catalog });
   } catch (err: any) {
     errors.push(`logs: ${err?.message ?? String(err)}`);
   }
@@ -363,11 +765,32 @@ export function runJanitor(opts: { dryRun: boolean }): JanitorReport {
     errors.push(`data-vault: ${err?.message ?? String(err)}`);
   }
 
-  let runtimeResult: ScanRuntimeResult = { expired: [], deleted: [] };
+  let runtimeResult: ScanRuntimeResult = { expired: [], deleted: [], softDeleted: [] };
   try {
-    runtimeResult = scanRuntime({ dryRun: opts.dryRun });
+    runtimeResult = scanRuntime({ dryRun: opts.dryRun, catalog });
   } catch (err: any) {
     errors.push(`runtime: ${err?.message ?? String(err)}`);
+  }
+
+  let trashResult: SweepTrashResult = { expired: [], purged: [] };
+  try {
+    trashResult = sweepTrash({ dryRun: opts.dryRun, catalog });
+  } catch (err: any) {
+    errors.push(`trash: ${err?.message ?? String(err)}`);
+  }
+
+  let uncoveredRuntimeDirs: string[] = [];
+  try {
+    uncoveredRuntimeDirs = listUncoveredRuntimeDirs(catalog);
+  } catch (err: any) {
+    errors.push(`uncovered-runtime: ${err?.message ?? String(err)}`);
+  }
+
+  let reviewRequiredDirs: string[] = [];
+  try {
+    reviewRequiredDirs = listReviewRequiredDirs(catalog);
+  } catch (err: any) {
+    errors.push(`review-required: ${err?.message ?? String(err)}`);
   }
 
   let delegationChildrenResult: SweepDelegationChildrenResult = {
@@ -393,6 +816,16 @@ export function runJanitor(opts: { dryRun: boolean }): JanitorReport {
     deletedRuntime: runtimeResult.deleted.length,
     staleDelegationChildren: delegationChildrenResult.stale.length,
     killedDelegationChildren: delegationChildrenResult.killed.length,
+    uncoveredRuntimeDirs,
+    reviewRequiredDirs,
+    softDeleted:
+      tmpResult.softDeleted.length +
+      logResult.softDeleted.length +
+      runtimeResult.softDeleted.length,
+    expiredTrash: trashResult.expired.length,
+    purgedTrash: trashResult.purged.length,
+    retentionCatalogSource: catalog.source,
+    retentionCatalogWarnings: catalog.warnings,
     errors,
     timestamp: new Date().toISOString(),
     dryRun: opts.dryRun,

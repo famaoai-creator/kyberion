@@ -11,6 +11,11 @@ import {
   resolveAgentTrustScore,
 } from './agent-registry.js';
 import { getAgentManifest, validateRequirements } from './agent-manifest.js';
+import {
+  bindAgentRuntimeInstanceBestEffort,
+  ensureAgentIdentityBestEffort,
+  releaseAgentRuntimeInstanceBestEffort,
+} from './agent-identity.js';
 import * as crypto from 'node:crypto';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 import * as path from 'node:path';
@@ -385,6 +390,38 @@ class AgentLifecycleManagerImpl {
 
     agentRegistry.updateStatus(agentId, 'booting');
 
+    // NI-01: resolve-or-issue the durable AgentIdentity for this runtime and
+    // bind the runtime instance to it. Strictly best-effort — an identity
+    // ledger failure (unwritable journal, non-allowlisted execution context,
+    // missing accountable human) must never break spawn; it is logged as a
+    // warning inside the best-effort helpers. The identity survives shutdown;
+    // only the *instance* binding is released then (retire is explicit).
+    const identityResult = ensureAgentIdentityBestEffort({
+      slug: agentId,
+      kind: 'agent',
+      displayName: agentId,
+      affiliation: resolvedOptions.missionId
+        ? { mission_id: resolvedOptions.missionId }
+        : undefined,
+      providerHint: resolvedOptions.provider,
+      modelHint: resolvedOptions.modelId,
+    });
+    if (identityResult.nhi_id) {
+      // In-memory registry is the runtime-instance cache of the durable
+      // identity registry: stamp the nhi_id so lookups can reach it.
+      agentRegistry.attachRuntimeIdentity(agentId, identityResult.nhi_id);
+      if (identityResult.recorded) {
+        bindAgentRuntimeInstanceBestEffort({
+          nhiId: identityResult.nhi_id,
+          instanceId: agentId,
+          pid: process.pid,
+          sessionId: resolvedOptions.missionId,
+          provider: resolvedOptions.provider,
+          modelId: resolvedOptions.modelId,
+        });
+      }
+    }
+
     if (resolvedTarget.strategy === 'fallback') {
       logger.info(
         `[LIFECYCLE] Falling back agent ${agentId} from ${options.provider}/${options.modelId || '-'} to ${resolvedOptions.provider}/${resolvedOptions.modelId || '-'}`
@@ -484,6 +521,10 @@ class AgentLifecycleManagerImpl {
           this.execAdapters.delete(agentId);
           this.handles.delete(agentId);
           runtimeSupervisor.unregister(agentId);
+          // NI-01: release the runtime-instance binding (identity persists
+          // until explicitly retired). Must run before unregister — the
+          // nhi_id lives in the registry record's metadata.
+          this.releaseIdentityInstance(agentId, 'shutdown');
           agentRegistry.updateStatus(agentId, 'shutdown');
           agentRegistry.unregister(agentId);
           this.spawnOptions.delete(agentId);
@@ -586,6 +627,18 @@ class AgentLifecycleManagerImpl {
     return handle;
   }
 
+  /**
+   * NI-01: best-effort release of the durable identity's runtime-instance
+   * binding for `agentId`. Reads the nhi_id from the in-memory registry
+   * record's metadata (stamped at spawn), so it must run BEFORE
+   * `agentRegistry.unregister`. Never throws — shutdown must not break on an
+   * identity-ledger failure.
+   */
+  private releaseIdentityInstance(agentId: string, reason: string): void {
+    const nhiId = agentRegistry.getRuntimeIdentity(agentId);
+    if (nhiId) releaseAgentRuntimeInstanceBestEffort(nhiId, agentId, reason);
+  }
+
   async shutdown(agentId: string): Promise<void> {
     const mediator = this.mediators.get(agentId);
     if (mediator) {
@@ -600,6 +653,7 @@ class AgentLifecycleManagerImpl {
     this.handles.delete(agentId);
     this.pendingSpawns.delete(agentId);
     runtimeSupervisor.unregister(agentId);
+    this.releaseIdentityInstance(agentId, 'shutdown');
     agentRegistry.updateStatus(agentId, 'shutdown');
     agentRegistry.unregister(agentId);
     this.spawnOptions.delete(agentId);

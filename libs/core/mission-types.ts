@@ -234,6 +234,13 @@ export interface MissionState {
     review_reentry_last_gaps?: string[];
     mission_finish_gate_requires_operator?: boolean;
     mission_finish_recovered_commit?: string;
+    /** AL-03: outcome of the finish-time retention closure. */
+    mission_artifact_closure?: {
+      status: 'closed' | 'already_closed' | 'mission_not_found' | 'error';
+      deleted_directories?: string[];
+      deleted_index_entry_count?: number;
+      bundle_status?: 'bundled' | 'already_bundled' | 'no_git' | 'failed';
+    };
   };
   history: Array<{
     ts: string;
