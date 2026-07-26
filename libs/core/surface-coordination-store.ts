@@ -385,6 +385,8 @@ export function enqueueSurfaceOutboxMessage(params: {
   text: string;
   source?: 'surface' | 'nerve' | 'system';
   deduplicationKey?: string;
+  /** Restore a previously persisted message ID during dead-letter replay. */
+  messageId?: string;
 }): string {
   const deadTarget = getSurfaceDeadTarget(params.surface, params.channel);
   if (deadTarget) {
@@ -403,9 +405,14 @@ export function enqueueSurfaceOutboxMessage(params: {
     if (existing)
       return pathResolver.resolve(surfaceOutboxLogicalPath(params.surface, existing.message_id));
   }
-  const surfacePrefix = params.surface.toUpperCase();
+  const messageId =
+    params.messageId?.trim() ||
+    `${params.surface.toUpperCase()}-OUTBOX-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 8).toUpperCase()}`;
+  if (!/^[A-Za-z0-9_-]{1,200}$/.test(messageId)) {
+    throw new Error('[POLICY_VIOLATION] Surface outbox message ID is invalid.');
+  }
   const record: SurfaceOutboxMessage = {
-    message_id: `${surfacePrefix}-OUTBOX-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 8).toUpperCase()}`,
+    message_id: messageId,
     surface: params.surface,
     correlation_id: params.correlationId,
     channel: params.channel,
@@ -646,6 +653,7 @@ export function replaySurfaceDeadLetter(
         text: record.text,
         source: record.source,
         deduplicationKey,
+        messageId: record.last_replay_message_id,
       });
   const messageId = path.basename(messagePath, '.json');
   writeJsonAs(
