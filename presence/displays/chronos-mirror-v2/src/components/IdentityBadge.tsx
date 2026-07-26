@@ -40,7 +40,7 @@ export function IdentityBadge() {
   if (error || !data) return null;
   if (!data.onboarded) {
     return (
-      <div className="flex items-center gap-2 rounded-lg border border-[color:var(--kb-warning)]/30 bg-amber-400/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-[color:var(--kb-warning)]">
+      <div className="flex items-center gap-2 rounded-lg border kb-status-warning-border kb-status-warning-surface px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest kb-status-warning">
         <Crown size={12} />
         <span>Onboarding required</span>
       </div>
