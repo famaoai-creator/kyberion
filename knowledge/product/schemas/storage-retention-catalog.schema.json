@@ -36,8 +36,8 @@
         },
         "artifact_class": {
           "type": "string",
-          "description": "What kind of artifact the directory holds. evidence = execution/audit evidence; report = generated reports; export = outbound deliverables; cache = regenerable intermediates; tmp = consumable scratch; log = append-only logs.",
-          "enum": ["evidence", "report", "export", "cache", "tmp", "log"]
+          "description": "What kind of artifact the directory holds. evidence = execution/audit evidence; report = generated reports; export = outbound deliverables; cache = regenerable intermediates; tmp = consumable scratch; log = append-only logs; state = load-bearing runtime state (registries, locks, sessions, tokens) — never TTL-deleted, pair with action review_required (AL-04).",
+          "enum": ["evidence", "report", "export", "cache", "tmp", "log", "state"]
         },
         "ttl_days": {
           "type": "number",
@@ -46,12 +46,17 @@
         },
         "action": {
           "type": "string",
-          "description": "What the janitor does when the TTL elapses. delete = remove the file; archive = move it to the archive tree (reserved for AL-03+; current enforcement only implements delete).",
-          "enum": ["delete", "archive"]
+          "description": "What the janitor does when the TTL elapses. delete = remove the file; archive = move it to the archive tree (reserved for AL-03+; current enforcement only implements delete); review_required = no automatic deletion ever — the directory is declared (never reported uncovered) and surfaced in the janitor report for a human retention decision (AL-04).",
+          "enum": ["delete", "archive", "review_required"]
         },
         "audit": {
           "type": "boolean",
-          "description": "When true, expiry actions must leave an audit record."
+          "description": "When true, expiry actions must leave an audit record (active/shared/logs/audit/storage-retention.jsonl)."
+        },
+        "soft_delete_days": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "AL-04 soft-delete grace: expired files are moved to active/archive/.trash/<original-repo-relative-path> instead of unlinked, and purged from the trash only after this many further days (mtime-based). Omit for immediate hard delete."
         },
         "note": {
           "type": "string",
