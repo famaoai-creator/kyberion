@@ -1656,6 +1656,22 @@
       "documented": false
     },
     {
+      "name": "KYBERION_NHI_ACTOR",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_NHI_ID",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
       "name": "KYBERION_OAUTH_CALLBACK_HOST",
       "category": "provider",
       "type": "string",
@@ -2504,6 +2520,14 @@
       "name": "KYBERION_SURFACE_QUERY_ROLE",
       "category": "runtime",
       "type": "string",
+      "required": false,
+      "description": "",
+      "documented": false
+    },
+    {
+      "name": "KYBERION_TASK_GRANTS_PATH",
+      "category": "path",
+      "type": "path",
       "required": false,
       "description": "",
       "documented": false
