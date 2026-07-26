@@ -53,6 +53,7 @@ import {
   writeMissionNextTasks,
 } from './mission-lifecycle.js';
 import { readJsonFile } from './cli-input.js';
+import { gcMissionRuntimeResidue } from './scope-offboarding.js';
 
 function resolveApprovalActor(requestedBy?: string): string {
   const resolvedActor = process.env.KYBERION_PERSONA || process.env.USER || 'mission_controller';
@@ -1029,6 +1030,9 @@ export async function purgeMissions(rootDir: string, dryRun = false): Promise<Pu
       to: candidate.targetPath,
       policy: candidate.policyName,
     });
+    // AL-04: the mission tree moved to the archive — reclaim the runtime
+    // residue that now points at nothing (best-effort by contract).
+    gcMissionRuntimeResidue({ missionId: candidate.mission });
   }
 
   logger.success(`✅ ${archived.length} mission(s) purged.`);
@@ -1118,6 +1122,9 @@ export async function archiveMissionById(missionId: string): Promise<ArchiveMiss
     policy: policy.name,
     explicit: true,
   });
+  // AL-04: scope-linked GC — the mission's runtime residue follows its tree
+  // into the archive. Best-effort: never fails an archive that succeeded.
+  gcMissionRuntimeResidue({ missionId: mission });
   logger.success(`📦 Mission ${mission} archived to ${targetPath} (policy: ${policy.name}).`);
   return { status: 'archived', mission, from: missionDir, to: targetPath, policy: policy.name };
 }

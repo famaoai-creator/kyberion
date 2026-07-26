@@ -737,8 +737,14 @@ export {
   runJanitor,
   runJanitorIfStale,
   readJanitorLastRunMs,
+  sweepTrash,
+  softDeleteToTrash,
+  restoreFromTrash,
+  listReviewRequiredDirs,
   DEFAULT_TMP_TTL_MS,
   DEFAULT_LOG_RETENTION_DAYS,
+  DEFAULT_TRASH_GRACE_DAYS,
+  TRASH_REPO_SUBPATH,
 } from './storage-janitor.js';
 export type {
   JanitorReport,
@@ -746,9 +752,29 @@ export type {
   RotateLogsResult,
   ScanDataVaultResult,
   ScanRuntimeResult,
+  SweepTrashResult,
   SweepDelegationChildrenOptions,
   SweepDelegationChildrenResult,
 } from './storage-janitor.js';
+
+// Scope-linked GC & offboarding (AL-04)
+export {
+  gcMissionRuntimeResidue,
+  offboardScope,
+  collectScopeTargets,
+  OFFBOARDING_EXPORT_SUBDIR,
+} from './scope-offboarding.js';
+export type {
+  GcMissionRuntimeResidueResult,
+  MissionResidueCandidate,
+  MissionResidueProbe,
+  OffboardApproval,
+  OffboardScopeInput,
+  OffboardScopeResult,
+  OffboardScopeType,
+  OffboardTarget,
+  OffboardTargetKind,
+} from './scope-offboarding.js';
 
 // Delegation Concurrency & Wall-Clock Budget (XP-06)
 export {
