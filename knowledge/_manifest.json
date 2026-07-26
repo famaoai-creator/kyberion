@@ -981,7 +981,7 @@
     {
       "path": "product/governance/active-surfaces.json",
       "tier": "public",
-      "size": 7235,
+      "size": 7236,
       "type": "json"
     },
     {
@@ -2319,7 +2319,7 @@
     {
       "path": "product/governance/surfaces/chronos-mirror-v2.json",
       "tier": "public",
-      "size": 609,
+      "size": 611,
       "type": "json"
     },
     {
@@ -5956,6 +5956,12 @@
       "path": "product/schemas/actuator-resolution-plan.schema.json",
       "tier": "public",
       "size": 1037,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/agent-collaboration-event.schema.json",
+      "tier": "public",
+      "size": 2042,
       "type": "json"
     },
     {

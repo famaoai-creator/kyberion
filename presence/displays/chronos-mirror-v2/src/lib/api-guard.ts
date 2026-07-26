@@ -25,7 +25,13 @@ function getClientIP(req: NextRequest): string {
 }
 
 function isLoopback(ip: string): boolean {
-  return ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1' || ip === 'unknown';
+  return ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
+}
+
+function isLoopbackHostname(hostname: string | undefined): boolean {
+  if (!hostname) return false;
+  const normalized = hostname.replace(/^\[/, '').replace(/\]$/, '').toLowerCase();
+  return normalized === 'localhost' || normalized === '127.0.0.1' || normalized === '::1';
 }
 
 function checkRateLimit(ip: string): boolean {
@@ -60,11 +66,13 @@ function getRateLimitKey(req: NextRequest): string {
 export function resolveChronosAccessRole(req: NextRequest): ChronosAccessRole | null {
   const token = resolveToken(req);
   const ip = getClientIP(req);
-  // 'unknown' means the runtime couldn't determine a real IP (common on
-  // self-hosted Node.js, where NextRequest.ip is often unpopulated) - it
-  // must never be treated as a trusted loopback signal, or every request
-  // with an undetermined IP would silently get localadmin.
-  const isLocal = ip !== 'unknown' && isLoopback(ip);
+  // Self-hosted Next.js commonly leaves NextRequest.ip unset. In that case,
+  // use the direct request hostname as a local signal; forwarded requests
+  // must still provide an explicit token because the proxy owns the origin.
+  const forwardedFor = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
+  const isLocal =
+    (ip !== 'unknown' && isLoopback(ip)) ||
+    (isLoopbackHostname(req.nextUrl?.hostname) && (!forwardedFor || isLoopback(forwardedFor)));
 
   if (LOCALADMIN_TOKEN && token === LOCALADMIN_TOKEN) {
     return 'localadmin';
