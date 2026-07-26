@@ -252,6 +252,11 @@ export interface A2ATaskContext {
   // ContextSecurityScope object from the mission context pack; the a2a bridge
   // uses it to fingerprint conversation storage and validate egress.
   security_scope?: Record<string, unknown>;
+  // NI-03: root-first DelegationChain (DelegationLink[] — delegation-chain.ts)
+  // recording who delegated this task to whom. Typed loosely here like
+  // security_scope; delegation-chain.ts's parseDelegationChain is the deep
+  // validator. Optional/additive — chain-less contracts are unchanged.
+  delegation_chain?: Array<Record<string, unknown>>;
 }
 
 export interface A2ATaskContract {

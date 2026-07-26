@@ -24,8 +24,11 @@ export class SovereignSentinel {
   }
 
   public async run(): Promise<SentinelResult> {
-    // 実行順序 (L0 -> L7)
-    const ORDER: Layer[] = ['L0', 'L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7'];
+    // 実行順序 (L0 -> L9)
+    // NOTE: every layer in PfcController's `Layer` union MUST appear here —
+    // a registered layer missing from ORDER silently never runs (this
+    // exact bug previously left a layer dead; see STATUS ledger).
+    const ORDER: Layer[] = ['L0', 'L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7', 'L8', 'L9'];
 
     for (const layer of ORDER) {
       if (this.registry.has(layer)) {

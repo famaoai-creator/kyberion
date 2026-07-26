@@ -37,6 +37,19 @@ const allowedCoreFsImports = [
   'libs/core/meeting-participation-coordinator.test.ts',
   'libs/core/metrics.test.ts',
   'libs/core/mission-evidence-doc.test.ts',
+  // AL-02 hermetic scoped-artifact tests: raw fs to seed/inspect a temp KYBERION_ROOT.
+  'libs/core/artifact-store.test.ts',
+  'libs/core/mission-seal.test.ts',
+  'libs/core/output-artifacts.test.ts',
+  // AL-01 hermetic purge test: raw fs to seed/inspect a temp KYBERION_ROOT.
+  'libs/core/mission-maintenance.purge.test.ts',
+  // AL-03 hermetic closure test: raw fs to seed/inspect a temp KYBERION_ROOT.
+  'libs/core/mission-artifact-closure.test.ts',
+  // AL-04 / NI-05 hermetic tests: raw fs to seed/inspect a temp repo root
+  // (scope trees, trash, identity ledger) — secure-io is the module under
+  // test's own seam, so the fixtures must bypass it.
+  'libs/core/scope-offboarding.test.ts',
+  'libs/core/nhi-lifecycle-governance.test.ts',
   'libs/core/mission-phase-exit-gates.test.ts',
   'libs/core/process-logger.test.ts',
   'libs/core/promoted-memory.test.ts',
@@ -67,6 +80,8 @@ const allowedCoreFsImports = [
   'libs/core/src/pipeline-preview.test.ts',
   'libs/core/src/trace.test.ts',
   'libs/core/storage-janitor.test.ts',
+  // AL-01 catalog loader test: raw fs for temp catalog fixtures.
+  'libs/core/storage-retention-catalog.test.ts',
   'libs/core/tenant-registry.test.ts',
   'libs/core/tier-guard-tenant.test.ts',
   'libs/core/trust-engine.test.ts',

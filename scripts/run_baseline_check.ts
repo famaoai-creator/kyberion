@@ -12,6 +12,7 @@ import {
   loadServiceEndpointsCatalog,
   killSwitch,
   readJanitorLastRunMs,
+  listOrphanNhiIdentities,
   readReasoningDegraded,
   readReasoningFailover,
   type ReasoningFailoverMarker,
@@ -43,6 +44,23 @@ const BASELINE_CACHE_TTL_MS = 60 * 60 * 1000;
 const BASELINE_CACHE_DIR = 'runtime/baseline-check-cache';
 const JANITOR_MAINTENANCE_TTL_MS = 24 * 60 * 60 * 1000;
 const JANITOR_SUBMIT_MARKER = 'runtime/state/janitor-last-submit.json';
+
+// AL-01: janitor liveness observation. The maintenance fallback above only
+// re-submits the janitor job — it cannot see a submission machinery that is
+// itself broken (job spawned but never completes). This freshness window is
+// intentionally 2x the maintenance TTL: one missed daily run is absorbed by
+// re-submission; a marker missing or older than 48h means the janitor is not
+// actually running and the baseline must degrade to needs_attention (L8).
+export const JANITOR_FRESHNESS_MAX_AGE_MS = 48 * 60 * 60 * 1000;
+
+/**
+ * Pure freshness predicate for the janitor last-run marker
+ * (`active/shared/runtime/state/janitor-last-run.json`). A missing marker
+ * (null) is stale by definition — "never ran" must not look healthy.
+ */
+export function isJanitorMarkerFresh(lastRunMs: number | null, nowMs = Date.now()): boolean {
+  return lastRunMs !== null && nowMs - lastRunMs <= JANITOR_FRESHNESS_MAX_AGE_MS;
+}
 let baselineConfigDegraded = false;
 
 type CachedEnvelope<T> = {
@@ -555,6 +573,19 @@ async function main() {
   const envReport = validateEnv();
   sentinel.registerLayer('L7', async () => envReport.errors.length === 0);
 
+  // L8: Storage Hygiene Layer (AL-01) — janitor last-run freshness. Fails
+  // (→ needs_attention via deriveBaselineStatus) when the janitor completion
+  // marker is missing or older than 48h, i.e. TTL GC is not actually running.
+  const janitorLastRunMs = readJanitorLastRunMs();
+  sentinel.registerLayer('L8', async () => isJanitorMarkerFresh(janitorLastRunMs));
+
+  // L9: NHI Lifecycle Layer (NI-05) — orphan identities. A non-retired agent
+  // identity whose affiliation scope no longer exists is a missed offboarding
+  // (OWASP NHI #1); it must degrade the baseline to needs_attention rather
+  // than stay silently permanent. Read-only, never blocking L0-L2 recovery.
+  const nhiOrphans = listOrphanNhiIdentities();
+  sentinel.registerLayer('L9', async () => nhiOrphans.length === 0);
+
   const result = await sentinel.run();
   const state = sentinel.getState();
 
@@ -604,6 +635,11 @@ async function main() {
         submitted: janitorMaintenance.submitted,
         pending: janitorMaintenance.pending,
         reason: janitorMaintenance.reason,
+        // AL-01 (L8): observed completion freshness of the janitor itself.
+        last_completed_at:
+          janitorLastRunMs !== null ? new Date(janitorLastRunMs).toISOString() : null,
+        fresh: isJanitorMarkerFresh(janitorLastRunMs),
+        freshness_max_age_ms: JANITOR_FRESHNESS_MAX_AGE_MS,
       },
     },
     env: {
@@ -611,6 +647,12 @@ async function main() {
       errors: envReport.errors,
       warnings: envReport.warnings,
       unknown: envReport.unknown,
+    },
+    // NI-05 (L9): orphan NHIs — an identity outliving its scope needs a
+    // human retirement decision, so it is named here, not just counted.
+    nhi: {
+      orphans: nhiOrphans,
+      orphan_count: nhiOrphans.length,
     },
   };
 

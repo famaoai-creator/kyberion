@@ -2,6 +2,7 @@ import * as crypto from 'node:crypto';
 import { slugify } from './text-utils.js';
 
 import { withExecutionContext } from './authority.js';
+import { enforceNhiActorPolicy } from './nhi-actor-verification.js';
 import {
   safeAppendFileSync,
   safeExistsSync,
@@ -986,6 +987,9 @@ function appendLeaseEvent(
 }
 
 export function claimWorkItem(input: ClaimWorkItemInput): { item: WorkItem; lease: WorkLease } {
+  // NI-02: the claimant actor is no longer an unverified free string. warn
+  // (default) audits unregistered/inactive actors and allows; enforce rejects.
+  enforceNhiActorPolicy(input.actorPeerId, 'work-coordination.claimWorkItem');
   const current = currentWorkItem(input.itemId);
   if (!current) {
     throw new WorkCoordinationError('item_not_found', `item not found: ${input.itemId}`);
@@ -1192,6 +1196,10 @@ export function handoffWorkItem(input: HandoffWorkItemInput): {
   fromLease: WorkLease;
   toLease: WorkLease;
 } {
+  // NI-02: verify the receiving actor BEFORE releasing the from-lease — in
+  // enforce mode a rejected toPeerId must not leave the item released and
+  // unclaimed (the inner claimWorkItem would reject only after the release).
+  enforceNhiActorPolicy(input.toPeerId, 'work-coordination.handoffWorkItem');
   const current = currentWorkItem(input.itemId);
   const packet =
     input.handoffPacket ??

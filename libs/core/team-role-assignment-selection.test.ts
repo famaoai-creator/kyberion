@@ -39,13 +39,61 @@ describe('team-role assignment selection', () => {
           },
           provider_strategy: 'strict',
         },
-      },
+      }
     );
 
     expect(assignment.status).toBe('assigned');
     expect(assignment.agent_id).toBe('nerve-agent');
     expect(assignment.provider).toBe('gemini');
     expect(assignment.modelId).toBe('auto-gemini-3');
+    // NI-01: assigned agents carry their canonical durable-identity name
+    // (org resolved from the active organization profile when not passed).
+    expect(assignment.runtime_identity).toMatch(
+      /^kyberion:\/\/agent\/[a-z][a-z0-9-]*\/nerve-agent$/
+    );
+  });
+
+  it('derives runtime_identity with an explicit organization id (NI-01)', () => {
+    const assignment = selectAgentForTeamRole(
+      'owner',
+      {
+        description: 'Owner role',
+        required_capabilities: ['reasoning'],
+        compatible_authority_roles: ['mission_controller'],
+        allowed_delegate_team_roles: [],
+        escalation_parent_team_role: null,
+        required_scope_classes: ['mission_state'],
+        ownership_scope: 'Owns the mission.',
+        autonomy_level: 'high',
+      },
+      {
+        mission_controller: {
+          description: 'Mission controller',
+          write_scopes: ['mission_state.write'],
+          scope_classes: ['mission_state'],
+          allowed_actuators: [],
+          tier_access: ['public'],
+        },
+      },
+      {
+        'nerve-agent': {
+          authority_roles: ['mission_controller'],
+          team_roles: ['owner'],
+          capabilities: ['reasoning'],
+          selection_hints: {
+            preferred_provider: 'gemini',
+            preferred_modelId: 'auto-gemini-3',
+          },
+          provider_strategy: 'strict',
+        },
+      },
+      undefined,
+      undefined,
+      'demo-org'
+    );
+
+    expect(assignment.status).toBe('assigned');
+    expect(assignment.runtime_identity).toBe('kyberion://agent/demo-org/nerve-agent');
   });
 
   it('returns unfilled when no compatible agent exists', () => {
@@ -85,10 +133,11 @@ describe('team-role assignment selection', () => {
           },
           provider_strategy: 'strict',
         },
-      },
+      }
     );
 
     expect(assignment.status).toBe('unfilled');
     expect(assignment.agent_id).toBeNull();
+    expect(assignment.runtime_identity).toBeUndefined();
   });
 });

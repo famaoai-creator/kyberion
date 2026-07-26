@@ -168,6 +168,7 @@ export interface MissionControllerRoutingContext {
   ) => Awaitable<unknown>;
   reenterMissionFromReview: (missionId: string) => Awaitable<unknown>;
   purgeMissions: (dryRun?: boolean) => Awaitable<void>;
+  archiveMissions: (options: { missionId?: string; execute?: boolean }) => Awaitable<void>;
   listMissions: (filterStatus?: string) => void;
   listOrganizationCatalogs: (organizationId?: string, jsonOutput?: boolean) => Awaitable<void>;
   listOrganizationProfiles: (organizationId?: string) => Awaitable<void>;
@@ -734,6 +735,15 @@ export async function runMissionControllerAction(
       break;
     case 'purge':
       await context.purgeMissions(!context.argv.includes('--execute'));
+      break;
+    case 'archive':
+      // AL-03: governed archive verb. `purge` above keeps its exact argv
+      // contract; `archive` routes through the mission-lifecycle-service
+      // facade, optionally targeting one mission via --mission <ID>.
+      await context.archiveMissions({
+        missionId: getValue('--mission', context.argv),
+        execute: context.argv.includes('--execute'),
+      });
       break;
     case 'list':
       context.listMissions(arg1);

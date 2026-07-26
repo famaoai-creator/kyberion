@@ -1,5 +1,6 @@
 import * as crypto from 'node:crypto';
 import * as path from 'node:path';
+import { writeScopedArtifact } from './artifact-store.js';
 import { pathResolver } from './path-resolver.js';
 import { safeMkdir, safeWriteFile } from './secure-io.js';
 
@@ -49,8 +50,14 @@ function serializeOutput(value: unknown): {
 }
 
 /**
- * Persist an oversized step result under the governed temporary area and
- * return a bounded reference suitable for carrying through later steps.
+ * Persist an oversized step result and return a bounded reference suitable
+ * for carrying through later steps.
+ *
+ * AL-02: when the mission is known the offload is a mission-scoped 'cache'
+ * artifact (`<missionDir>/artifacts/cache/tool-output/`, recorded in the
+ * mission's artifacts-index.jsonl so mission-finish GC can reclaim it).
+ * Only when no mission is known ('shared') does it fall back to the legacy
+ * `active/shared/tmp/tool-output/` floor governed by the 24h TTL janitor.
  */
 export function offloadLargeOutput(
   value: unknown,
@@ -68,12 +75,25 @@ export function offloadLargeOutput(
   const step = slug(options.stepOp || 'step', 'step');
   const stepNumber = Number.isFinite(options.stepNumber) ? String(options.stepNumber) : 'n';
   const id = crypto.randomUUID();
-  const relativePath = path.join('tool-output', mission, `${stepNumber}-${step}-${id}.log`);
-  const absolutePath = pathResolver.sharedTmp(relativePath);
-  safeMkdir(path.dirname(absolutePath), { recursive: true });
-  safeWriteFile(absolutePath, serialized.text, { mkdir: true, encoding: 'utf8' });
+  const fileName = `${stepNumber}-${step}-${id}.log`;
 
-  const portablePath = pathResolver.toRepoRelative(absolutePath);
+  let portablePath: string;
+  if (mission !== 'shared') {
+    const written = writeScopedArtifact({
+      scope: { mission },
+      artifact_class: 'cache',
+      name: `tool-output/${fileName}`,
+      content: serialized.text,
+      format: 'text',
+    });
+    portablePath = written.repo_relative_path;
+  } else {
+    const relativePath = path.join('tool-output', mission, fileName);
+    const absolutePath = pathResolver.sharedTmp(relativePath);
+    safeMkdir(path.dirname(absolutePath), { recursive: true });
+    safeWriteFile(absolutePath, serialized.text, { mkdir: true, encoding: 'utf8' });
+    portablePath = pathResolver.toRepoRelative(absolutePath);
+  }
   const reference: OutputArtifactReference = {
     artifact_path: portablePath,
     preview: previewText(serialized.text, maxInlineChars),

@@ -1263,7 +1263,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 70487,
+      "size": 71020,
       "type": "json"
     },
     {
@@ -2155,6 +2155,12 @@
       "type": "json"
     },
     {
+      "path": "product/governance/shared-tmp-allowlist.json",
+      "tier": "public",
+      "size": 12001,
+      "type": "json"
+    },
+    {
       "path": "product/governance/shell-command-policy.json",
       "tier": "public",
       "size": 3162,
@@ -2212,6 +2218,12 @@
       "path": "product/governance/standard-policy.json",
       "tier": "public",
       "size": 1992,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/storage-retention-catalog.json",
+      "tier": "public",
+      "size": 12093,
       "type": "json"
     },
     {
@@ -4569,7 +4581,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 48430,
+      "size": 50397,
       "type": "json"
     },
     {
@@ -6753,7 +6765,7 @@
     {
       "path": "product/schemas/mission-team-plan.schema.json",
       "tier": "public",
-      "size": 6352,
+      "size": 6843,
       "type": "json"
     },
     {
@@ -7381,6 +7393,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/storage-retention-catalog.schema.json",
+      "tier": "public",
+      "size": 3950,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/surface-coordination-role-map.schema.json",
       "tier": "public",
       "size": 666,
@@ -7431,7 +7449,7 @@
     {
       "path": "product/schemas/task-contract.schema.json",
       "tier": "public",
-      "size": 3026,
+      "size": 5106,
       "type": "json"
     },
     {
@@ -7797,7 +7815,7 @@
     {
       "path": "product/schemas/workforce-resource-ref.schema.json",
       "tier": "public",
-      "size": 1618,
+      "size": 2037,
       "type": "json"
     },
     {

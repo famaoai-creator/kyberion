@@ -36,6 +36,7 @@ import {
   safeWriteFile,
 } from './secure-io.js';
 import { recordMissionGateOverride, writeMissionGateRecord } from './mission-gate-engine.js';
+import { closeMissionArtifacts } from './mission-artifact-closure.js';
 import {
   evaluateArtifactReviews,
   hashArtifactForReview,
@@ -1636,6 +1637,31 @@ export async function finishMission(
     tier: state.tier,
     note: 'Mission finished. Control surfaces may refresh or restart mission-bound agents to reduce stale context.',
   });
+
+  // AL-03: retention closure — reached only on a successful finish (every
+  // gate above passed and the state already transitioned to `completed`), so
+  // failed finishes never touch the tree. Deletes disposable classes
+  // (cache/tmp) per the retention catalog, bundles the per-mission git repo
+  // into evidence/ and removes the nested `.git` (KM-04), and audits the
+  // deletions. Idempotent and best-effort: closure must never fail a finish
+  // that already succeeded.
+  traceCtx.startSpan('mission:artifact-closure');
+  try {
+    const closure = closeMissionArtifacts({ missionId: upperId, missionDir });
+    state.context = {
+      ...(state.context || {}),
+      mission_artifact_closure: {
+        status: closure.status,
+        deleted_directories: closure.deleted_directories,
+        deleted_index_entry_count: closure.deleted_index_entries.length,
+        bundle_status: closure.bundle?.status,
+      },
+    };
+    traceCtx.endSpan('ok');
+  } catch (err: any) {
+    logger.warn(`⚠️ [ARTIFACT_CLOSURE] skipped for ${upperId}: ${err?.message || err}`);
+    traceCtx.endSpan('error', err?.message || String(err));
+  }
 
   const missionTmpDir = pathResolver.sharedTmp(path.join('missions', upperId));
   if (safeExistsSync(missionTmpDir)) {
