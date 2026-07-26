@@ -1198,6 +1198,30 @@
       "chronos_sc_delivery_detail": {
         "en": "Slack and Chronos share one operator-visible delivery queue.",
         "ja": "Slack と Chronos は operator から見える単一のデリバリーキューを共有します。"
+      },
+      "cli_help_sec_offboarding": {
+        "en": "── Scope Offboarding ───────────────────────────────────────────────",
+        "ja": "── スコープオフボーディング ────────────────────────────────────────"
+      },
+      "cli_help_offboard_summary": {
+        "en": "  offboard <tenant|project> <id>  Preview (default) or run export → delete for a closing scope",
+        "ja": "  offboard <tenant|project> <id>  終了するスコープの export → 削除を確認(既定)/実行"
+      },
+      "cli_help_offboard_usage": {
+        "en": "Usage: npm run cli -- offboard <tenant|project> <id> [--execute --approved-by <who> --purpose \"<why>\"] [--json]",
+        "ja": "使い方: npm run cli -- offboard <tenant|project> <id> [--execute --approved-by <承認者> --purpose \"<理由>\"] [--json]"
+      },
+      "cli_help_offboard_dry_run_short": {
+        "en": "  (default)  Dry run: list the active/ trees that would be exported and deleted. Writes nothing.",
+        "ja": "  (既定)     ドライラン: export/削除の対象となる active/ 配下のツリーを一覧。書き込みなし。"
+      },
+      "cli_help_offboard_execute_short": {
+        "en": "  --execute  Export every target under active/shared/exports/offboarding/, then delete it. Requires --approved-by and --purpose.",
+        "ja": "  --execute  対象を active/shared/exports/offboarding/ へ export してから削除。--approved-by と --purpose が必須。"
+      },
+      "cli_help_offboard_restore_note": {
+        "en": "  Deletions are soft: everything moves to active/archive/.trash/ and stays restorable until the janitor purges it.",
+        "ja": "  削除は soft-delete: active/archive/.trash/ へ移動し、janitor が purge するまで復元可能。"
       }
     }
   }
